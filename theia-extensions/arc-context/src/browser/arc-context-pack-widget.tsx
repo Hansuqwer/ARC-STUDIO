@@ -34,8 +34,7 @@ export class ArcContextPackWidget extends ReactWidget {
   protected generated = false;
 
   @postConstruct()
-  protected override init(): void {
-    super.init();
+  protected init(): void {
     this.id = ArcContextPackWidget.ID;
     this.title.label = ArcContextPackWidget.LABEL;
     this.title.closable = true;
@@ -103,7 +102,7 @@ export class ArcContextPackWidget extends ReactWidget {
               </div>
               <div style={{ fontSize: '11px', color: 'var(--theia-descriptionForeground)', marginBottom: '4px' }}>
                 Source: <code>{entry.source_type}</code>
-                {entry.url && <> · <a href={entry.url} style={{ color: 'var(--theia-textLink-foreground)' }}>{entry.url}</a></>}
+                {entry.url && <span> · <a href={entry.url} style={{ color: 'var(--theia-textLink-foreground)' }}>{entry.url}</a></span>}
               </div>
               <p style={{ fontSize: '12px', margin: 0, lineHeight: 1.5 }}>{entry.content}</p>
             </div>

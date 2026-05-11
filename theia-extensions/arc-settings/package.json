@@ -13,6 +13,6 @@
     "test": "echo 'arc-settings test ok'"
   },
   "theiaExtensions": [{ "frontend": "lib/browser/arc-settings-frontend-module" }],
-  "dependencies": { "@theia/core": "1.71.0", "@theia/preferences": "1.71.0", "arc-core": "0.1.0-alpha" },
+  "dependencies": { "@theia/core": "1.71.0", "@theia/preferences": "1.71.0", "arc-core": "workspace:*" },
   "devDependencies": { "@theia/cli": "1.71.0", "rimraf": "^5.0.10", "typescript": "^5.4.5" }
 }

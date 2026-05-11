@@ -18,6 +18,7 @@
 import { injectable, inject } from '@theia/core/shared/inversify';
 import { ILogger } from '@theia/core/lib/common/logger';
 import * as cp from 'child_process';
+import * as fs from 'fs';
 import * as path from 'path';
 import * as http from 'http';
 import {
@@ -29,6 +30,7 @@ import {
   SchemaInfo,
   RunRecord,
   ContextPackEntry,
+  ProviderStatus,
   ARC_PROTOCOL_VERSION,
 } from '../common/arc-protocol';
 
@@ -85,6 +87,7 @@ export class ArcServiceImpl implements ArcService {
 
       // Try uv first, then python -m
       const proc = cp.spawn('uv', ['run', 'arc', ...fullArgs], {
+        cwd: this.pythonProjectDir(),
         timeout: ARC_CLI_TIMEOUT_MS,
         env: { ...process.env, ARC_JSON_OUTPUT: '1' },
       });
@@ -112,6 +115,43 @@ export class ArcServiceImpl implements ArcService {
     });
   }
 
+  private pythonProjectDir(): string {
+    const candidates = [
+      process.env.ARC_PYTHON_DIR,
+      path.resolve(process.cwd(), 'python'),
+      path.resolve(process.cwd(), '..', '..', 'python'),
+      '/Users/hansvilund/HansuQWER/WorkSpace/ARC/arc-theia-studio/python',
+    ].filter((candidate): candidate is string => Boolean(candidate));
+    return candidates.find(candidate => fs.existsSync(path.join(candidate, 'pyproject.toml'))) ?? process.cwd();
+  }
+
+  private workspacePath(workspacePath: string): string {
+    if (workspacePath) {
+      return workspacePath;
+    }
+    if (process.env.ARC_WORKSPACE_PATH) {
+      return process.env.ARC_WORKSPACE_PATH;
+    }
+    const rootDirIndex = process.argv.indexOf('--root-dir');
+    if (rootDirIndex >= 0 && process.argv[rootDirIndex + 1]) {
+      return process.argv[rootDirIndex + 1];
+    }
+    return workspacePath;
+  }
+
+  private workspaceSource(workspacePath: string): string {
+    if (workspacePath) {
+      return 'frontend';
+    }
+    if (process.env.ARC_WORKSPACE_PATH) {
+      return 'ARC_WORKSPACE_PATH';
+    }
+    if (process.argv.includes('--root-dir')) {
+      return '--root-dir';
+    }
+    return 'unset';
+  }
+
   /** Error envelope — never fake successful product data. */
   private errorEnvelope<T>(command: string, error: unknown): ArcEnvelope<T> {
     return {
@@ -130,11 +170,12 @@ export class ArcServiceImpl implements ArcService {
   }
 
   async inspectWorkspace(workspacePath: string): Promise<ArcEnvelope<WorkspaceInfo>> {
+    const workspace = this.workspacePath(workspacePath);
     try {
       if (await this.isDaemonRunning()) {
-        return this.callDaemon('/api/inspect', { workspace: workspacePath });
+        return this.callDaemon('/api/inspect', { workspace });
       }
-      return this.runCli(['inspect', '--workspace', workspacePath]);
+      return this.runCli(['inspect', '--workspace', workspace]);
     } catch (e) {
       this.logger.warn(`inspectWorkspace failed: ${e}`);
       return this.errorEnvelope('inspect', e);
@@ -142,22 +183,24 @@ export class ArcServiceImpl implements ArcService {
   }
 
   async listRuntimes(workspacePath: string): Promise<ArcEnvelope<RuntimeInfo[]>> {
+    const workspace = this.workspacePath(workspacePath);
     try {
       if (await this.isDaemonRunning()) {
-        return this.callDaemon('/api/runtimes', { workspace: workspacePath });
+        return this.callDaemon('/api/runtimes', { workspace });
       }
-      return this.runCli(['runtimes', '--workspace', workspacePath]);
+      return this.runCli(['runtimes', '--workspace', workspace]);
     } catch (e) {
       return this.errorEnvelope('runtimes', e);
     }
   }
 
   async listWorkflows(workspacePath: string, runtimeId?: string): Promise<ArcEnvelope<WorkflowInfo[]>> {
+    const workspace = this.workspacePath(workspacePath);
     try {
-      const args = ['workflows', '--workspace', workspacePath];
+      const args = ['workflows', '--workspace', workspace];
       if (runtimeId) args.push('--runtime', runtimeId);
       if (await this.isDaemonRunning()) {
-        return this.callDaemon('/api/workflows', { workspace: workspacePath, runtime: runtimeId ?? '' });
+        return this.callDaemon('/api/workflows', { workspace, runtime: runtimeId ?? '' });
       }
       return this.runCli(args);
     } catch (e) {
@@ -166,11 +209,12 @@ export class ArcServiceImpl implements ArcService {
   }
 
   async listSchemas(workspacePath: string, runtimeId?: string): Promise<ArcEnvelope<SchemaInfo[]>> {
+    const workspace = this.workspacePath(workspacePath);
     try {
-      const args = ['schemas', '--workspace', workspacePath];
+      const args = ['schemas', '--workspace', workspace];
       if (runtimeId) args.push('--runtime', runtimeId);
       if (await this.isDaemonRunning()) {
-        return this.callDaemon('/api/schemas', { workspace: workspacePath, runtime: runtimeId ?? '' });
+        return this.callDaemon('/api/schemas', { workspace, runtime: runtimeId ?? '' });
       }
       return this.runCli(args);
     } catch (e) {
@@ -183,7 +227,10 @@ export class ArcServiceImpl implements ArcService {
       if (await this.isDaemonRunning()) {
         return this.callDaemon('/api/runs/start', { workflow_id: workflowId });
       }
-      return this.runCli(['run', workflowId]);
+      const args = ['run', workflowId];
+      const workspace = this.workspacePath('');
+      if (workspace) args.push('--workspace', workspace);
+      return this.runCli(args);
     } catch (e) {
       return this.errorEnvelope('run', e);
     }
@@ -201,11 +248,12 @@ export class ArcServiceImpl implements ArcService {
   }
 
   async listRuns(workspacePath: string): Promise<ArcEnvelope<RunRecord[]>> {
+    const workspace = this.workspacePath(workspacePath);
     try {
       if (await this.isDaemonRunning()) {
-        return this.callDaemon('/api/runs', { workspace: workspacePath });
+        return this.callDaemon('/api/runs', { workspace });
       }
-      return this.runCli(['runs', '--workspace', workspacePath]);
+      return this.runCli(['runs', '--workspace', workspace]);
     } catch (e) {
       return this.errorEnvelope('runs', e);
     }
@@ -213,10 +261,11 @@ export class ArcServiceImpl implements ArcService {
 
   async generateContextPack(task: string, workspacePath?: string): Promise<ArcEnvelope<ContextPackEntry[]>> {
     try {
+      const workspace = workspacePath ? this.workspacePath(workspacePath) : '';
       const args = ['context', 'pack', '--task', task];
-      if (workspacePath) args.push('--workspace', workspacePath);
+      if (workspace) args.push('--workspace', workspace);
       if (await this.isDaemonRunning()) {
-        return this.callDaemon('/api/context/pack', { task, workspace: workspacePath ?? '' });
+        return this.callDaemon('/api/context/pack', { task, workspace });
       }
       return this.runCli(args);
     } catch (e) {
@@ -233,5 +282,53 @@ export class ArcServiceImpl implements ArcService {
       error: null,
       meta: { timestamp: new Date().toISOString() },
     };
+  }
+
+  async getProviderStatus(provider: string, baseUrl?: string): Promise<ArcEnvelope<ProviderStatus>> {
+    const normalized = (provider || '9router').trim();
+    const envNames = this.providerApiKeyEnvNames(normalized);
+    const apiKeySource = envNames.find(name => Boolean(process.env[name]));
+    const baseUrlConfigured = Boolean(baseUrl?.trim() || process.env[`AI_PROVIDER_GATEWAY_${this.envProviderName(normalized)}_BASE_URL`]);
+    return {
+      version: ARC_PROTOCOL_VERSION,
+      ok: true,
+      data: {
+        provider: normalized,
+        baseUrlConfigured,
+        apiKeyConfigured: Boolean(apiKeySource),
+        apiKeySource,
+        runtimeAvailable: true,
+        message: apiKeySource
+          ? `Provider credentials detected from environment. Local SwarmGraph run bridge is available; backend=${process.env.ARC_SWARMGRAPH_RUN_BACKEND ?? 'stub'}.`
+          : `Local SwarmGraph run bridge is available with backend=${process.env.ARC_SWARMGRAPH_RUN_BACKEND ?? 'stub'}. Provider calls need one of: ${envNames.join(', ')}`,
+      },
+      error: null,
+      meta: { timestamp: new Date().toISOString() },
+    };
+  }
+
+  async getWorkspaceStatus(workspacePath: string): Promise<ArcEnvelope<{ frontendPath: string; backendPath: string; source: string }>> {
+    return {
+      version: ARC_PROTOCOL_VERSION,
+      ok: true,
+      data: {
+        frontendPath: workspacePath,
+        backendPath: this.workspacePath(workspacePath),
+        source: this.workspaceSource(workspacePath),
+      },
+      error: null,
+      meta: { timestamp: new Date().toISOString() },
+    };
+  }
+
+  private providerApiKeyEnvNames(provider: string): string[] {
+    if (provider.toLowerCase() === '9router') {
+      return ['AI_PROVIDER_GATEWAY_9ROUTER_API_KEY', 'ROUTER_API_KEY', 'NINEROUTER_API_KEY', 'KILO_CODE_API_KEY'];
+    }
+    return [`AI_PROVIDER_GATEWAY_${this.envProviderName(provider)}_API_KEY`];
+  }
+
+  private envProviderName(provider: string): string {
+    return provider.toUpperCase().replace(/[^A-Z0-9]/g, '_');
   }
 }

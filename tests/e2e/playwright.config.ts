@@ -14,4 +14,11 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
+  webServer: {
+    command: 'pnpm --filter @arc-studio/browser start',
+    cwd: '../..',
+    url: process.env.ARC_E2E_URL || 'http://localhost:3000',
+    reuseExistingServer: true,
+    timeout: 60_000,
+  },
 });

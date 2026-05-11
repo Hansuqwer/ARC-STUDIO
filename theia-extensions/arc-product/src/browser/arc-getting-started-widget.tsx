@@ -7,15 +7,8 @@
  */
 
 import * as React from 'react';
-import { injectable, inject } from '@theia/core/shared/inversify';
+import { injectable } from '@theia/core/shared/inversify';
 import { GettingStartedWidget } from '@theia/getting-started/lib/browser/getting-started-widget';
-import { WorkspaceService } from '@theia/workspace/lib/browser/workspace-service';
-import { ApplicationServer } from '@theia/core/lib/common/application-protocol';
-import { EnvVariablesServer } from '@theia/core/lib/common/env-variables';
-import { CommandService } from '@theia/core/lib/common/command';
-import { FrontendApplicationStateService } from '@theia/core/lib/browser/frontend-application-state';
-import { PreferenceService } from '@theia/core/lib/browser/preferences/preference-service';
-import { WindowService } from '@theia/core/lib/browser/window/window-service';
 
 export const ARC_STUDIO_VERSION = '0.1.0-alpha';
 

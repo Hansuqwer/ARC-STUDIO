@@ -25,7 +25,7 @@ class TestSwarmGraphAdapter:
         caps = self.adapter.capabilities()
         # can_replay should be False (not yet implemented)
         assert caps.can_replay is False
-        assert caps.can_run is False
+        assert caps.can_run is True
         assert caps.can_trace is False
         assert caps.can_inspect is True
         assert caps.can_export_workflow is True
@@ -53,6 +53,16 @@ class TestSwarmGraphAdapter:
             detected, conf, evidence = self.adapter.detect(tdp)
             assert detected is True
             assert any("swarmgraph.yaml" in e for e in evidence)
+
+    def test_detect_with_launcher(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            launcher = tdp / "swarmgraph"
+            launcher.write_text("#!/usr/bin/env sh\n")
+            detected, conf, evidence = self.adapter.detect(tdp)
+            assert detected is True
+            assert conf >= 0.7
+            assert any("swarmgraph found" in e for e in evidence)
 
     def test_export_workflow_returns_list(self):
         with tempfile.TemporaryDirectory() as td:
@@ -97,9 +107,28 @@ class TestSwarmGraphAdapter:
             assert all(s.name != "RawMetadata" for s in schemas)
 
     @pytest.mark.asyncio
-    async def test_run_workflow_raises_not_implemented(self):
-        with pytest.raises(NotImplementedError):
-            await self.adapter.run_workflow("wf-test")
+    async def test_run_workflow_missing_launcher_fails_truthfully(self, monkeypatch):
+        monkeypatch.setenv("ARC_SWARMGRAPH_CLI", "/definitely/missing/swarmgraph")
+        with tempfile.TemporaryDirectory() as td:
+            with pytest.raises(FileNotFoundError):
+                await self.adapter.run_workflow("wf-test", {"workspace": td})
+
+    @pytest.mark.asyncio
+    async def test_run_workflow_uses_real_cli_json(self, monkeypatch):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            cli = tdp / "swarmgraph"
+            cli.write_text(
+                "#!/usr/bin/env sh\n"
+                "printf '%s\\n' '{\"swarm_id\":\"sg-test\",\"status\":\"completed\",\"worker_count\":0,\"final_output\":\"ok\"}'\n"
+            )
+            cli.chmod(cli.stat().st_mode | 0o111)
+            monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))
+            run = await self.adapter.run_workflow("wf-test", {"workspace": td})
+            assert run.status.value == "completed"
+            assert run.metadata["swarm_id"] == "sg-test"
+            assert run.metadata["final_output"] == "ok"
+            assert any(event.type == "RUN_COMPLETED" for event in run.events)
 
     @pytest.mark.asyncio
     async def test_demo_run_workflow_returns_marked_run_record(self):

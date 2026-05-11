@@ -21,6 +21,8 @@
     "build:browser": "pnpm --filter @arc-studio/browser build",
     "build:electron": "pnpm --filter @arc-studio/electron build",
     "start:browser": "pnpm --filter @arc-studio/browser start",
+    "start:browser:arc": "pnpm --filter @arc-studio/browser start:arc",
+    "start:browser:swarmgraph": "pnpm --filter @arc-studio/browser start:swarmgraph",
     "start:electron": "pnpm --filter @arc-studio/electron start",
     "test": "pnpm -r test",
     "test:e2e": "pnpm --filter @arc-studio/e2e-tests test",
@@ -34,6 +36,11 @@
   "devDependencies": {
     "rimraf": "^5.0.10",
     "typescript": "^5.4.5"
+  },
+  "pnpm": {
+    "overrides": {
+      "@vscode/ripgrep": "1.17.1"
+    }
   },
   "theiaPluginsDir": "plugins",
   "theiaPlugins": {}

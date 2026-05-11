@@ -17,6 +17,7 @@ import {
   SchemaInfo,
   RunRecord,
   ContextPackEntry,
+  ProviderStatus,
 } from '../common/arc-protocol';
 
 @injectable()
@@ -75,5 +76,14 @@ export class ArcFrontendService {
 
   async getDaemonStatus(): Promise<ArcEnvelope<{ running: boolean; version: string; pid?: number }>> {
     return this.arcService.getDaemonStatus();
+  }
+
+  async getProviderStatus(provider: string, baseUrl?: string): Promise<ArcEnvelope<ProviderStatus>> {
+    return this.arcService.getProviderStatus(provider, baseUrl);
+  }
+
+  async getWorkspaceStatus(): Promise<ArcEnvelope<{ frontendPath: string; backendPath: string; source: string }>> {
+    const path = await this.getWorkspacePath();
+    return this.arcService.getWorkspaceStatus(path);
   }
 }

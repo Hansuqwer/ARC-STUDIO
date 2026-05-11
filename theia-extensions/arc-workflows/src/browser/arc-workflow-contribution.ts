@@ -1,5 +1,5 @@
 import { injectable } from '@theia/core/shared/inversify';
-import { AbstractViewContribution, FrontendApplicationContribution } from '@theia/core/lib/browser';
+import { AbstractViewContribution } from '@theia/core/lib/browser';
 import { Command, CommandRegistry } from '@theia/core/lib/common/command';
 import { ArcWorkflowGraphWidget } from './arc-workflow-graph-widget';
 
@@ -11,8 +11,7 @@ export const OpenWorkflowGraphCommand: Command = {
 
 @injectable()
 export class ArcWorkflowContribution
-  extends AbstractViewContribution<ArcWorkflowGraphWidget>
-  implements FrontendApplicationContribution {
+  extends AbstractViewContribution<ArcWorkflowGraphWidget> {
 
   constructor() {
     super({

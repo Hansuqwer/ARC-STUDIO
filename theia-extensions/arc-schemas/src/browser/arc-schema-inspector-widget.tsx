@@ -21,8 +21,7 @@ export class ArcSchemaInspectorWidget extends ReactWidget {
   protected loading = false;
 
   @postConstruct()
-  protected override init(): void {
-    super.init();
+  protected init(): void {
     this.id = ArcSchemaInspectorWidget.ID;
     this.title.label = ArcSchemaInspectorWidget.LABEL;
     this.title.closable = true;
@@ -80,12 +79,12 @@ export class ArcSchemaInspectorWidget extends ReactWidget {
         {/* Schema Detail */}
         <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
           {this.selected ? (
-            <>
+            <div>
               <h2 style={{ margin: '0 0 8px 0', fontSize: '16px' }}>{this.selected.name}</h2>
               <div style={{ marginBottom: '12px', fontSize: '12px', color: 'var(--theia-descriptionForeground)' }}>
                 Runtime: <strong>{this.selected.runtime}</strong>
                 {this.selected.source_file && (
-                  <> · <code style={{ fontSize: '11px' }}>{this.selected.source_file}</code></>
+                  <span> · <code style={{ fontSize: '11px' }}>{this.selected.source_file}</code></span>
                 )}
               </div>
               {this.selected.schema?.description && (
@@ -107,7 +106,7 @@ export class ArcSchemaInspectorWidget extends ReactWidget {
               }}>
                 {JSON.stringify(this.selected.schema, null, 2)}
               </pre>
-            </>
+            </div>
           ) : (
             <div style={{ textAlign: 'center', paddingTop: '48px', color: 'var(--theia-descriptionForeground)' }}>
               Select a schema to inspect

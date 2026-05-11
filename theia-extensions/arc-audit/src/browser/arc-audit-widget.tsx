@@ -24,8 +24,7 @@ export class ArcAuditWidget extends ReactWidget {
   static readonly LABEL = 'ARC Audit Viewer';
 
   @postConstruct()
-  protected override init(): void {
-    super.init();
+  protected init(): void {
     this.id = ArcAuditWidget.ID;
     this.title.label = ArcAuditWidget.LABEL;
     this.title.closable = true;
