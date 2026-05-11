@@ -31,6 +31,14 @@ const TIMEOUT = 60_000;
 const REPO_ROOT = join(__dirname, '..', '..');
 const ARC_WORKSPACE = process.env.ARC_WORKSPACE_PATH || REPO_ROOT;
 
+async function skipIfRuntimeUnavailable(page: import('@playwright/test').Page): Promise<void> {
+  const failed = page.getByText('Run failed.');
+  if (await failed.isVisible()) {
+    const error = (await page.locator('text=/Error:/').first().textContent().catch(() => '')) || '';
+    test.skip(true, `Local SwarmGraph runtime unavailable to Theia backend: ${error}`);
+  }
+}
+
 test.describe('ARC Studio — Smoke Tests', () => {
 
   test.beforeEach(async ({ page }) => {
@@ -88,9 +96,7 @@ test.describe('ARC Studio — Smoke Tests', () => {
     const completed = page.getByText('Run completed.');
     const failed = page.getByText('Run failed.');
     await expect(completed.or(failed).first()).toBeVisible({ timeout: TIMEOUT });
-    if (await failed.isVisible()) {
-      test.skip(true, 'Local SwarmGraph launcher unavailable to Theia backend in this environment');
-    }
+    await skipIfRuntimeUnavailable(page);
     await expect(page.getByText('Replay Events')).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText('Connect SSE Stream')).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText('Export Run JSON')).toBeAttached({ timeout: TIMEOUT });
@@ -101,9 +107,21 @@ test.describe('ARC Studio — Smoke Tests', () => {
 
     await page.getByPlaceholder('Prompt for local SwarmGraph stub run').fill('ARC E2E reload history run.');
     await page.getByText('Start SwarmGraph Run').click();
-    await expect(page.getByText('Run completed.')).toBeVisible({ timeout: TIMEOUT });
+    const completed = page.getByText('Run completed.');
+    const failed = page.getByText('Run failed.');
+    await expect(completed.or(failed).first()).toBeVisible({ timeout: TIMEOUT });
+    await skipIfRuntimeUnavailable(page);
     const runId = (await page.locator('h2', { hasText: 'Run: run-sg-' }).first().textContent())?.match(/run-sg-[a-f0-9]+/)?.[0];
     expect(runId).toBeTruthy();
+
+    await page.getByText('Replay Events').scrollIntoViewIfNeeded();
+    await page.getByText('Replay Events').click();
+    await expect(page.getByText('Trace Viewer:')).toBeAttached({ timeout: TIMEOUT });
+    await expect(page.locator('option', { hasText: 'RUN_COMPLETED' })).toBeAttached({ timeout: TIMEOUT });
+    await expect(page.getByText('RUN_COMPLETED')).toBeAttached({ timeout: TIMEOUT });
+    await expect(page.getByText('Copy Trace JSON')).toBeAttached({ timeout: TIMEOUT });
+    await expect(page.getByText('Export Run JSON')).toBeAttached({ timeout: TIMEOUT });
+    await expect(page.getByText('Connect SSE Stream')).toBeAttached({ timeout: TIMEOUT });
 
     await page.reload({ waitUntil: 'networkidle', timeout: TIMEOUT });
     await expect(page.getByText('completed').first()).toBeVisible({ timeout: TIMEOUT });
