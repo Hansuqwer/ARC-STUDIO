@@ -98,8 +98,8 @@ node packages/arc-test-fixtures/src/index.js
 
 | Runtime | Current support | Missing |
 | --- | --- | --- |
-| SwarmGraph | Detection, AST workflow/schema export heuristics | Real execution, real trace/audit/replay |
-| LangGraph | Detection, AST workflow heuristics, fixture schema | Dynamic graph loading, real execution |
+| SwarmGraph | Detection, AST workflow/schema export heuristics, local/gateway execution, JSONL trace replay/export | Audit integrations |
+| LangGraph | Detection, AST workflow heuristics, dynamic export hook, fixture schema | Real runtime execution |
 | CrewAI | Not implemented | Adapter |
 | OpenAI Agents SDK | Not implemented | Adapter |
 | AG2 | Not implemented | Adapter |

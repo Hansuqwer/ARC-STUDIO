@@ -39,6 +39,8 @@ export class ArcRunTimelineWidget extends ReactWidget {
   protected workspaceStatus?: { frontendPath: string; backendPath: string; source: string };
   protected lastError?: string;
   protected runStatusMessage?: string;
+  protected eventFilter = '';
+  protected selectedEvent: RunEvent | null = null;
 
   @postConstruct()
   protected init(): void {
@@ -118,7 +120,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
   }
 
   protected renderTimeline(run: RunRecord): React.ReactNode {
-    const events = this.liveEvents.length > 0 ? this.liveEvents : run.events;
+    const events = this.filteredEvents(this.liveEvents.length > 0 ? this.liveEvents : run.events);
     const duration = run.ended_at
       ? new Date(run.ended_at).getTime() - new Date(run.started_at).getTime()
       : null;
@@ -131,7 +133,9 @@ export class ArcRunTimelineWidget extends ReactWidget {
           </h2>
           <button style={secondaryBtnStyle} onClick={() => this.copyText('Run ID', run.id)}>Copy Run ID</button>
           <button style={secondaryBtnStyle} onClick={() => this.replayRun(run)}>Replay Events</button>
+          <button style={secondaryBtnStyle} onClick={() => this.clearReplay()}>Show Stored Trace</button>
           <button style={secondaryBtnStyle} onClick={() => this.connectSseStream(run.id)}>Connect SSE Stream</button>
+          <button style={secondaryBtnStyle} onClick={() => this.exportRunJson(run)}>Export Run JSON</button>
           <div style={{ fontSize: '12px', color: 'var(--theia-descriptionForeground)' }}>
             Workflow: <strong>{run.workflow_id}</strong> ·
             Runtime: <strong>{run.runtime}</strong> ·
@@ -145,6 +149,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
           )}
           {this.renderRunMetadata(run)}
           {this.renderRunControls()}
+          {this.renderTraceControls(run, events)}
         </div>
 
         {/* Timeline track */}
@@ -161,6 +166,41 @@ export class ArcRunTimelineWidget extends ReactWidget {
 
           {events.map((event, i) => this.renderEvent(event, i, run.started_at))}
         </div>
+        {this.renderSelectedEvent()}
+      </div>
+    );
+  }
+
+  protected renderTraceControls(run: RunRecord, events: RunEvent[]): React.ReactNode {
+    const types = Array.from(new Set(run.events.map(event => event.type))).sort();
+    return (
+      <div style={{ ...metadataBoxStyle, marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <strong>Trace Viewer:</strong>
+        <span>{events.length}/{run.events.length} events</span>
+        <select
+          style={selectStyle}
+          value={this.eventFilter}
+          onChange={event => { this.eventFilter = event.currentTarget.value; this.update(); }}
+        >
+          <option value="">All events</option>
+          {types.map(type => <option key={type} value={type}>{type}</option>)}
+        </select>
+        <button style={secondaryBtnStyle} onClick={() => this.copyText('Trace JSON', JSON.stringify(run.events, null, 2))}>Copy Trace JSON</button>
+      </div>
+    );
+  }
+
+  protected renderSelectedEvent(): React.ReactNode {
+    if (!this.selectedEvent) {
+      return null;
+    }
+    return (
+      <div style={{ ...metadataBoxStyle, marginTop: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+          <strong>Selected Event: {this.selectedEvent.type}</strong>
+          <button style={secondaryBtnStyle} onClick={() => { this.selectedEvent = null; this.update(); }}>Close</button>
+        </div>
+        <pre style={outputBoxStyle}>{JSON.stringify(this.selectedEvent, null, 2)}</pre>
       </div>
     );
   }
@@ -273,7 +313,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
           border: `1px solid ${isError ? '#ef5350' : 'var(--theia-widget-border)'}`,
           borderRadius: '6px',
           padding: '8px 12px',
-        }}>
+        }} onClick={() => { this.selectedEvent = event; this.update(); }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
             <span style={{ fontWeight: 600, fontSize: '12px' }}>{event.type}</span>
             <span style={{ fontSize: '10px', color: 'var(--theia-descriptionForeground)' }}>
@@ -337,6 +377,30 @@ export class ArcRunTimelineWidget extends ReactWidget {
     await this.loadRuns();
   }
 
+  protected filteredEvents(events: RunEvent[]): RunEvent[] {
+    return this.eventFilter ? events.filter(event => event.type === this.eventFilter) : events;
+  }
+
+  protected clearReplay(): void {
+    this.liveEvents = [];
+    this.selectedEvent = null;
+    this.runStatusMessage = 'Showing stored trace.';
+    this.update();
+  }
+
+  protected exportRunJson(run: RunRecord): void {
+    const json = JSON.stringify(run, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${run.id}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    this.runStatusMessage = 'Run JSON exported.';
+    this.update();
+  }
+
   protected async replayRun(run: RunRecord): Promise<void> {
     this.liveEvents = [];
     this.runStatusMessage = `Replaying ${run.events.length} events...`;
@@ -351,7 +415,8 @@ export class ArcRunTimelineWidget extends ReactWidget {
   }
 
   protected connectSseStream(runId: string): void {
-    const url = `http://localhost:7777/api/runs/${encodeURIComponent(runId)}/events`;
+    const host = window.location.hostname || 'localhost';
+    const url = `http://${host}:7777/api/runs/${encodeURIComponent(runId)}/events`;
     this.liveEvents = [];
     this.streaming = true;
     this.runStatusMessage = 'Connecting to local SSE stream...';
@@ -371,7 +436,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
     source.onerror = () => {
       source.close();
       this.streaming = false;
-      this.lastError = 'SSE stream unavailable. Start `uv run arc serve` on localhost:7777.';
+      this.lastError = `SSE stream unavailable at ${url}. Start \`uv run arc serve\`.`;
       this.update();
     };
     this.update();
@@ -464,6 +529,14 @@ const traceCodeStyle: React.CSSProperties = {
   border: '1px solid var(--theia-widget-border)',
   borderRadius: '4px',
   wordBreak: 'break-all',
+};
+
+const selectStyle: React.CSSProperties = {
+  color: 'var(--theia-dropdown-foreground)',
+  backgroundColor: 'var(--theia-dropdown-background)',
+  border: '1px solid var(--theia-dropdown-border)',
+  borderRadius: '4px',
+  padding: '4px 6px',
 };
 
 const statusMessageStyle: React.CSSProperties = {

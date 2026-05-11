@@ -12,8 +12,8 @@
 - Implement real SwarmGraph adapter execution, trace, audit, and replay support.
 - Implement real LangGraph graph loading/export.
 - Extend daemon integration tests beyond run listing and SSE replay.
-- Implement replay viewer over JSONL trace storage.
-- Wire SSE event stream to Theia run timeline.
+- Expand replay viewer beyond JSONL event detail/export.
+- Expand SSE coverage for reconnect/error paths.
 
 ## P2
 

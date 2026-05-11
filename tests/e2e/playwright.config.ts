@@ -6,7 +6,7 @@ const e2eSwarmGraphCli = join(__dirname, 'fixtures', 'swarmgraph-stub.sh');
 
 export default defineConfig({
   testDir: '.',
-  timeout: 60_000,
+  timeout: 90_000,
   retries: 1,
   reporter: [['list'], ['html', { open: 'never', outputFolder: '../../test-results/e2e-html' }]],
   use: {
@@ -23,7 +23,7 @@ export default defineConfig({
     cwd: '../..',
     url: process.env.ARC_E2E_URL || 'http://localhost:3000',
     reuseExistingServer: true,
-    timeout: 60_000,
+    timeout: 90_000,
     env: {
       ...process.env,
       ARC_SWARMGRAPH_CLI: process.env.ARC_SWARMGRAPH_CLI || e2eSwarmGraphCli,

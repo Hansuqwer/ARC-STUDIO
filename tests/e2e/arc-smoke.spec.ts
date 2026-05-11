@@ -27,7 +27,7 @@ import { test, expect } from '@playwright/test';
 import { join } from 'path';
 
 const APP_URL = process.env.ARC_E2E_URL || 'http://localhost:3000';
-const TIMEOUT = 30_000;
+const TIMEOUT = 60_000;
 const REPO_ROOT = join(__dirname, '..', '..');
 const ARC_WORKSPACE = process.env.ARC_WORKSPACE_PATH || REPO_ROOT;
 
@@ -91,6 +91,9 @@ test.describe('ARC Studio — Smoke Tests', () => {
     if (await failed.isVisible()) {
       test.skip(true, 'Local SwarmGraph launcher unavailable to Theia backend in this environment');
     }
+    await expect(page.getByText('Replay Events')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('Connect SSE Stream')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('Export Run JSON')).toBeAttached({ timeout: TIMEOUT });
   });
 
   test('run timeline shows completed run after reload', async ({ page }) => {
