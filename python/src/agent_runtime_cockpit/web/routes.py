@@ -25,7 +25,6 @@ from ..workspace import iter_workspace_files
 
 log = logging.getLogger(__name__)
 redactor = Redactor()
-trace_store = JsonlTraceStore()
 ctx_gen = ContextPackGenerator()
 
 
@@ -46,6 +45,10 @@ def _json(data: dict, status: int = 200) -> web.Response:
         status=status,
         headers={"Access-Control-Allow-Origin": "http://localhost:3000"},
     )
+
+
+def _trace_store(request: web.Request) -> JsonlTraceStore:
+    return JsonlTraceStore(_workspace(request) / ".arc" / "traces")
 
 
 async def health(request: web.Request) -> web.Response:
@@ -141,7 +144,7 @@ async def start_run(request: web.Request) -> web.Response:
         if adapter.capabilities().can_run:
             try:
                 run = await adapter.run_workflow(workflow_id)
-                trace_store.save(run)
+                _trace_store(request).save(run)
                 envelope = ok(run.model_dump(), adapter=adapter.adapter_id,
                               duration_ms=(time.time() - t0) * 1000)
                 return _json(envelope.model_dump())
@@ -156,15 +159,16 @@ async def start_run(request: web.Request) -> web.Response:
 
 async def get_run(request: web.Request) -> web.Response:
     run_id = request.match_info["run_id"]
-    run = trace_store.load(run_id)
+    run = _trace_store(request).load(run_id)
     if not run:
         return _json(err(ArcErrorCode.RUN_NOT_FOUND, f"Run {run_id} not found").model_dump(), 404)
     return _json(ok(run.model_dump()).model_dump())
 
 
 async def list_runs(request: web.Request) -> web.Response:
-    run_ids = trace_store.list_runs()
-    runs = [r for rid in run_ids if (r := trace_store.load(rid)) is not None]
+    store = _trace_store(request)
+    run_ids = store.list_runs()
+    runs = [r for rid in run_ids if (r := store.load(rid)) is not None]
     return _json(ok([r.model_dump() for r in runs]).model_dump())
 
 
@@ -187,7 +191,7 @@ async def run_events_sse(request: web.Request) -> web.StreamResponse:
     })
     await response.prepare(request)
 
-    run = trace_store.load(run_id)
+    run = _trace_store(request).load(run_id)
     if run:
         for event in run.events:
             data = json.dumps(event.model_dump(), default=str)

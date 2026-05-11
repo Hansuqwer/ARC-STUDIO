@@ -42,11 +42,11 @@ uv run arc context pack --task "build theia extension"
 
 - [x] Add timeline replay controls for stored JSONL events
 - [x] Connect Theia run timeline to local daemon SSE stream
-- [ ] Add Theia ↔ Python integration test (spawn real daemon)
+- [x] Add daemon integration test coverage for `/api/runs` and SSE events
 - [ ] Implement replay viewer (JSONL playback)
 - [x] Add LangGraph dynamic export hook via `ARC_LANGGRAPH_EXPORT=module:function`
 - [x] Add provider-backed SwarmGraph execution behind `ARC_SWARMGRAPH_ALLOW_COSTS=true`
-- [ ] Electron packaging (set signing certs)
+- [x] Add unsigned Electron packaging smoke
 - [ ] Add more Open VSX extensions (JSON, Python, YAML viewers)
 
 ## Medium Term
@@ -57,6 +57,7 @@ uv run arc context pack --task "build theia extension"
 - [ ] Implement A2UI v1.0 renderer (when spec stable)
 - [ ] Add Flutter project extension (enable via settings)
 - [x] Upload Playwright traces/screenshots from E2E CI failures
+- [x] Add package/plugin license policy check
 - [ ] Auto-update (electron-updater)
 
 ## Production Criteria

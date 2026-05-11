@@ -1,61 +1,33 @@
-# ARC Studio — Packaging Guide
+# Packaging
 
-## Local Development Package (unsigned)
+## Unsigned Smoke
 
 ```bash
-pnpm package:electron
-# Output: applications/electron/dist/
+pnpm build
+pnpm package:electron:dir
 ```
 
-## Code Signing (REQUIRED for distribution)
+This produces an unpacked Electron app only. It does not sign, notarize, upload, or publish artifacts.
 
-### macOS
-```bash
-# Set these before packaging:
-export CSC_LINK=/path/to/Developer-ID-Application.p12
-export CSC_KEY_PASSWORD=your_cert_password
-export APPLE_ID=your@apple.id
-export APPLE_APP_SPECIFIC_PASSWORD=xxxx-xxxx-xxxx-xxxx
+## Signing Blockers
 
-pnpm package:electron
-```
+- macOS signing requires `CSC_LINK`, `CSC_KEY_PASSWORD`, Apple ID credentials, and notarization setup.
+- Windows signing requires a code-signing certificate and timestamp server configuration.
+- Linux repository publishing requires package signing keys and repository hosting.
 
-### Windows
-```bash
-export CSC_LINK=/path/to/code-signing.pfx
-export CSC_KEY_PASSWORD=your_cert_password
-pnpm package:electron
-```
+Do not enable signing or auto-update publishing without explicit release approval.
 
-### Linux
-Linux packages (AppImage, deb) do not require signing for local distribution.
+## PyPI Trusted Publisher
 
-## Mock: Signing Not Configured
+Configure each PyPI project in the PyPI UI before publishing:
 
-```
-MOCK_REASON: No signing certificates in CI environment
-REAL_IMPLEMENTATION_PATH: scripts/sign-electron.sh
-LOCAL_FIX_STEPS: Set CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID env vars
-REMOVE_BEFORE: Production release
-```
+- Owner: `Hansuqwer`
+- Repository: `arc-theia-studio`
+- Workflow: release workflow name once added
+- Environment: `pypi`
 
-## Electron Builder Config
-
-See `applications/electron/electron-builder.yml` for full configuration.
-
-## Python Bundling
-
-The Python daemon is bundled into the Electron app via `extraResources` in electron-builder.yml.
-
-The Electron main process launches the daemon automatically:
-
-```
-applications/electron/resources/arc-python/ ← bundled Python
-```
-
-For development, run the daemon separately: `uv run arc serve`
+Publishing remains blocked until PyPI Trusted Publisher entries exist.
 
 ## Auto-Update
 
-Auto-update is planned for beta. Use `electron-updater` with an S3/GitHub releases endpoint.
-Set `updaterCacheDirName` and publish targets in `electron-builder.yml`.
+Auto-update needs a signed artifact pipeline and update feed. Add only after signing is configured and tested.

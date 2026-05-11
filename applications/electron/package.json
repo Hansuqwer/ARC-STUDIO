@@ -12,6 +12,7 @@
     "start:dev": "theia start --app-project-path=. --hostname localhost --port 3000",
     "watch": "theia build --watch --mode development",
     "package": "electron-builder --config electron-builder.yml",
+    "package:dir": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir --config electron-builder.yml",
     "package:mac": "electron-builder --mac --config electron-builder.yml",
     "package:linux": "electron-builder --linux --config electron-builder.yml",
     "package:win": "electron-builder --win --config electron-builder.yml",
