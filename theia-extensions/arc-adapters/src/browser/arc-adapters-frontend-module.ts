@@ -1,7 +1,6 @@
 /** ARC Adapters — Frontend Module */
 import { ContainerModule } from '@theia/core/shared/inversify';
 import { WidgetFactory, bindViewContribution, FrontendApplicationContribution } from '@theia/core/lib/browser';
-import { CommandContribution } from '@theia/core/lib/common';
 import { ArcAdaptersWidget } from './arc-adapters-widget';
 import { ArcAdaptersContribution } from './arc-adapters-contribution';
 
@@ -13,5 +12,4 @@ export default new ContainerModule(bind => {
   })).inSingletonScope();
   bindViewContribution(bind, ArcAdaptersContribution);
   bind(FrontendApplicationContribution).toService(ArcAdaptersContribution);
-  bind(CommandContribution).toService(ArcAdaptersContribution);
 });

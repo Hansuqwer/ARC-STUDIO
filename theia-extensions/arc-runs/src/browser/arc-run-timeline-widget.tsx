@@ -129,6 +129,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
               ⚠ [MOCK] Fixture run — connect ARC daemon for live runs
             </div>
           )}
+          {this.renderRunMetadata(run)}
         </div>
 
         {/* Timeline track */}
@@ -147,6 +148,47 @@ export class ArcRunTimelineWidget extends ReactWidget {
         </div>
       </div>
     );
+  }
+
+  protected renderRunMetadata(run: RunRecord): React.ReactNode {
+    const metadata = run.metadata ?? {};
+    const summary = [
+      ['Backend', metadata['backend']],
+      ['Provider', metadata['provider']],
+      ['Swarm ID', metadata['swarm_id']],
+      ['Command', metadata['_external_command']],
+    ].filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].length > 0);
+    const finalOutput = this.eventValue(run, 'RUN_COMPLETED', 'final_output') ?? this.eventValue(run, 'MESSAGE', 'message');
+    const errorOutput = this.eventValue(run, 'RUN_FAILED', 'error') ?? this.eventValue(run, 'RUN_FAILED', 'stderr');
+
+    if (summary.length === 0 && !finalOutput && !errorOutput) {
+      return null;
+    }
+
+    return (
+      <div style={{ marginTop: '10px', display: 'grid', gap: '8px' }}>
+        {summary.length > 0 && (
+          <div style={metadataBoxStyle}>
+            {summary.map(([label, value]) => (
+              <div key={label}><strong>{label}:</strong> {value}</div>
+            ))}
+          </div>
+        )}
+        {finalOutput && <pre style={outputBoxStyle}>{finalOutput}</pre>}
+        {errorOutput && <pre style={{ ...outputBoxStyle, borderColor: '#ef5350', color: '#ef9a9a' }}>{errorOutput}</pre>}
+      </div>
+    );
+  }
+
+  protected eventValue(run: RunRecord, type: string, key: string): string | undefined {
+    for (let i = run.events.length - 1; i >= 0; i--) {
+      const event = run.events[i];
+      const value = event.type === type ? event.data[key] : undefined;
+      if (typeof value === 'string' && value.length > 0) {
+        return value;
+      }
+    }
+    return undefined;
   }
 
   protected renderEvent(event: RunEvent, index: number, runStart: string): React.ReactNode {
@@ -256,4 +298,23 @@ const primaryBtnStyle: React.CSSProperties = {
   borderRadius: '4px',
   padding: '6px 12px',
   cursor: 'pointer',
+};
+
+const metadataBoxStyle: React.CSSProperties = {
+  padding: '8px 10px',
+  border: '1px solid var(--theia-widget-border)',
+  borderRadius: '4px',
+  backgroundColor: 'var(--theia-editor-background)',
+  fontSize: '11px',
+};
+
+const outputBoxStyle: React.CSSProperties = {
+  margin: 0,
+  padding: '8px 10px',
+  border: '1px solid var(--theia-widget-border)',
+  borderRadius: '4px',
+  backgroundColor: 'var(--theia-editor-background)',
+  color: 'var(--theia-foreground)',
+  fontSize: '11px',
+  whiteSpace: 'pre-wrap',
 };
