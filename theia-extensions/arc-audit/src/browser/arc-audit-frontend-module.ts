@@ -4,7 +4,6 @@
  */
 import { ContainerModule } from '@theia/core/shared/inversify';
 import { WidgetFactory, bindViewContribution, FrontendApplicationContribution } from '@theia/core/lib/browser';
-import { CommandContribution } from '@theia/core/lib/common';
 import { ArcAuditWidget } from './arc-audit-widget';
 import { ArcAuditContribution } from './arc-audit-contribution';
 
@@ -16,5 +15,4 @@ export default new ContainerModule(bind => {
   })).inSingletonScope();
   bindViewContribution(bind, ArcAuditContribution);
   bind(FrontendApplicationContribution).toService(ArcAuditContribution);
-  bind(CommandContribution).toService(ArcAuditContribution);
 });
