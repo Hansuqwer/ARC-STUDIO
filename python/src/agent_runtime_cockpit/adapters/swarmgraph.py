@@ -297,10 +297,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
             if configured.exists():
                 return configured
             raise FileNotFoundError(f"Configured SwarmGraph launcher not found: {configured}")
-        candidates = [
-            workspace / "swarmgraph",
-            Path("/Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph/swarmgraph"),
-        ]
+        candidates = [workspace / "swarmgraph"]
         for candidate in candidates:
             if candidate and candidate.exists():
                 return candidate
