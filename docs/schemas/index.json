@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "models": [
+    "WorkspaceInfo",
+    "RuntimeInfo",
+    "WorkflowInfo",
+    "SchemaInfo",
+    "RunRecord",
+    "RunEvent",
+    "ContextPackEntry"
+  ],
+  "generated": "2026-05-11T00:10:57.740658Z"
+}

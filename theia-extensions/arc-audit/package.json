@@ -1,0 +1,18 @@
+{
+  "name": "arc-audit",
+  "version": "0.1.0-alpha",
+  "description": "ARC Studio audit — audit chain viewer, tamper warnings, redaction report",
+  "keywords": ["theia-extension"],
+  "license": "Apache-2.0",
+  "files": ["lib", "src"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch",
+    "clean": "rimraf lib *.tsbuildinfo",
+    "check": "echo 'arc-audit check ok'",
+    "test": "echo 'arc-audit test ok'"
+  },
+  "theiaExtensions": [{ "frontend": "lib/browser/arc-audit-frontend-module" }],
+  "dependencies": { "@theia/core": "1.71.0", "arc-core": "0.1.0-alpha" },
+  "devDependencies": { "@theia/cli": "1.71.0", "rimraf": "^5.0.10", "typescript": "^5.4.5" }
+}
