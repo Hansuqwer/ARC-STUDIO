@@ -28,6 +28,7 @@ cd python && .venv/bin/arc adapter test swarmgraph --json
 cd python && .venv/bin/arc adapter test langgraph --json
 node tests/unit/arc-protocol.test.js
 node packages/arc-test-fixtures/src/index.js
+bash scripts/check-artifacts.sh
 pnpm -r build
 ```
 
