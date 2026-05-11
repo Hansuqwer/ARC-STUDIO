@@ -7,7 +7,7 @@ This repo is a prototype prepared for GitHub handoff. Python core commands, Thei
 ## Known Failures / Blockers
 
 - Provider-backed SwarmGraph execution requires explicit approval before running paid/external calls.
-- Real LangGraph dynamic graph loading is not implemented.
+- Real LangGraph runtime execution is not implemented beyond dynamic workflow export.
 - Electron packaging/signing is not verified.
 
 ## Commands Run
@@ -52,11 +52,10 @@ pnpm package:electron:dir
 ## Completion Plan
 
 1. Keep CI passing Python tests and Node build/tests.
-2. Extend SwarmGraph trace/audit paths beyond JSONL run records.
-3. Implement real LangGraph graph loading or narrow capability claims.
-4. Add daemon integration tests and E2E tests.
-5. Implement replay viewer and live event streaming.
-6. Package unsigned Electron locally, then signed builds.
+2. Extend SwarmGraph audit paths beyond JSONL run records.
+3. Implement real LangGraph runtime execution or narrow capability claims further.
+4. Expand daemon integration and E2E coverage for error paths.
+5. Package signed Electron builds after credentials are available.
 
 ## Ownership Assumptions
 

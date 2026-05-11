@@ -43,7 +43,7 @@ uv run arc context pack --task "build theia extension"
 - [x] Add timeline replay controls for stored JSONL events
 - [x] Connect Theia run timeline to local daemon SSE stream
 - [x] Add daemon integration test coverage for `/api/runs` and SSE events
-- [ ] Implement replay viewer (JSONL playback)
+- [x] Add trace filtering, event detail inspection, trace copy, and run JSON export
 - [x] Add LangGraph dynamic export hook via `ARC_LANGGRAPH_EXPORT=module:function`
 - [x] Add provider-backed SwarmGraph execution behind `ARC_SWARMGRAPH_ALLOW_COSTS=true`
 - [x] Add unsigned Electron packaging smoke
