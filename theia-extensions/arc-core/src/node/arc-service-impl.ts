@@ -127,7 +127,6 @@ export class ArcServiceImpl implements ArcService {
       process.env.ARC_PYTHON_DIR,
       path.resolve(process.cwd(), 'python'),
       path.resolve(process.cwd(), '..', '..', 'python'),
-      '/Users/hansvilund/HansuQWER/WorkSpace/ARC/arc-theia-studio/python',
     ].filter((candidate): candidate is string => Boolean(candidate));
     return candidates.find(candidate => fs.existsSync(path.join(candidate, 'pyproject.toml'))) ?? process.cwd();
   }

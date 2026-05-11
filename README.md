@@ -42,15 +42,15 @@ Default SwarmGraph runs use the local `stub` backend and do not call paid/provid
 ```bash
 cd python
 uv run arc run wf-swarmgraph-001 \
-  --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph \
+  --workspace /path/to/swarmgraph/workspace \
   --prompt "ARC local stub smoke run" \
   --json
 
-uv run arc runs --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph --json
-uv run arc runs get <run-id> --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph --json
-uv run arc runs trace <run-id> --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph --tail 5 --json
-uv run arc runs prune --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph --keep 20 --json
-uv run arc runs prune --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph --keep 20 --yes --json
+uv run arc runs --workspace /path/to/swarmgraph/workspace --json
+uv run arc runs get <run-id> --workspace /path/to/swarmgraph/workspace --json
+uv run arc runs trace <run-id> --workspace /path/to/swarmgraph/workspace --tail 5 --json
+uv run arc runs prune --workspace /path/to/swarmgraph/workspace --keep 20 --json
+uv run arc runs prune --workspace /path/to/swarmgraph/workspace --keep 20 --yes --json
 ```
 
 Open the Run Timeline directly in Theia:
