@@ -217,6 +217,7 @@ def serve(
 def run_workflow(
     workflow: str = typer.Argument("wf-swarmgraph-fixture", help="Workflow ID"),
     workspace: Optional[str] = WORKSPACE_FLAG,
+    prompt: Optional[str] = typer.Option(None, "--prompt", help="Prompt passed to runnable adapters"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
@@ -231,10 +232,16 @@ def run_workflow(
         _out(err(ArcErrorCode.NOT_IMPLEMENTED, "No adapter supports real workflow execution yet"), json_output)
         raise typer.Exit(1)
 
-    run_record = asyncio.run(adapter.run_workflow(workflow, {"workspace": str(ws)}))
+    inputs = {"workspace": str(ws)}
+    if prompt:
+        inputs["prompt"] = prompt
+    run_record = asyncio.run(adapter.run_workflow(workflow, inputs))
 
     from .storage.jsonl import JsonlTraceStore
-    JsonlTraceStore().save(run_record)
+    store = JsonlTraceStore(ws / ".arc" / "traces")
+    trace_path = store.trace_path(run_record.id)
+    run_record.metadata["trace_path"] = str(trace_path)
+    store.save(run_record)
 
     _out(ok(run_record.model_dump()), json_output)
     if not json_output:
@@ -243,15 +250,72 @@ def run_workflow(
 
 # ─── runs ─────────────────────────────────────────────────────────────────────
 
-@app.command()
-def runs(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
+runs_app = typer.Typer(name="runs", help="List and manage stored run records", invoke_without_command=True)
+app.add_typer(runs_app)
+
+
+@runs_app.callback(invoke_without_command=True)
+def runs(
+    ctx: typer.Context,
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
     """List stored run records."""
+    if ctx.invoked_subcommand is not None:
+        return
     _setup_logging(debug)
     from .storage.jsonl import JsonlTraceStore
-    store = JsonlTraceStore()
+    ws = _workspace(workspace)
+    store = JsonlTraceStore(ws / ".arc" / "traces")
     run_ids = store.list_runs()
     run_list = [r for rid in run_ids if (r := store.load(rid)) is not None]
     _out(ok([r.model_dump() for r in run_list]), json_output)
+
+
+@runs_app.command("prune")
+def runs_prune(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    keep: int = typer.Option(20, "--keep", min=0, help="Number of newest traces to keep"),
+    yes: bool = typer.Option(False, "--yes", help="Delete files instead of dry-run"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Prune oldest workspace trace files beyond --keep."""
+    _setup_logging(debug)
+    from .storage.jsonl import JsonlTraceStore
+    ws = _workspace(workspace)
+    trace_dir = ws / ".arc" / "traces"
+    store = JsonlTraceStore(trace_dir)
+    victims = store.prune(keep=keep, dry_run=not yes)
+    payload = {
+        "workspace": str(ws),
+        "trace_dir": str(trace_dir),
+        "keep": keep,
+        "dry_run": not yes,
+        "deleted": [] if not yes else [str(path) for path in victims],
+        "would_delete": [str(path) for path in victims] if not yes else [],
+    }
+    _out(ok(payload, workspace=str(ws)), json_output)
+
+
+@runs_app.command("get")
+def runs_get(
+    run_id: str = typer.Argument(..., help="Run ID to load"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Load one stored run record."""
+    _setup_logging(debug)
+    from .storage.jsonl import JsonlTraceStore
+    ws = _workspace(workspace)
+    store = JsonlTraceStore(ws / ".arc" / "traces")
+    run_record = store.load(run_id)
+    if run_record is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
+        raise typer.Exit(1)
+    _out(ok(run_record.model_dump(), workspace=str(ws)), json_output)
 
 
 # ─── context pack ─────────────────────────────────────────────────────────────

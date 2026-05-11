@@ -19,6 +19,8 @@ jobs:
         run: |
           node tests/unit/arc-protocol.test.js
           node packages/arc-test-fixtures/src/index.js
+      - name: PR hygiene
+        run: bash scripts/check-pr.sh
       - name: Install
         run: pnpm install --frozen-lockfile=false
       - name: Build

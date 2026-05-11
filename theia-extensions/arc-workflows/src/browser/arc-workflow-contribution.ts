@@ -1,6 +1,6 @@
 import { injectable } from '@theia/core/shared/inversify';
 import { AbstractViewContribution } from '@theia/core/lib/browser';
-import { Command, CommandRegistry } from '@theia/core/lib/common/command';
+import { Command } from '@theia/core/lib/common/command';
 import { ArcWorkflowGraphWidget } from './arc-workflow-graph-widget';
 
 export const OpenWorkflowGraphCommand: Command = {
@@ -22,10 +22,4 @@ export class ArcWorkflowContribution
     });
   }
 
-  override registerCommands(registry: CommandRegistry): void {
-    super.registerCommands(registry);
-    registry.registerCommand(OpenWorkflowGraphCommand, {
-      execute: () => this.openView({ activate: true }),
-    });
-  }
 }

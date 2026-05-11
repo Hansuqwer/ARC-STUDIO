@@ -13,10 +13,9 @@ Current state: handoff-ready prototype, not production-ready. See `STATUS.md` an
 
 ## What Does Not Work Yet
 
-- Theia browser/electron build is not verified in this environment because `pnpm` is missing.
-- Normal product paths no longer silently return mock success when backend/runtime execution is unavailable.
-- SwarmGraph and LangGraph real runtime execution are not implemented.
-- Electron packaging/signing and E2E tests are not verified.
+- Electron packaging/signing is not verified.
+- Live/provider-backed SwarmGraph execution requires explicit approval before running external calls.
+- LangGraph real runtime execution is not implemented.
 
 ## Setup
 
@@ -34,6 +33,35 @@ cd ..
 pnpm install
 pnpm build
 pnpm start:browser
+```
+
+## SwarmGraph Stub Run Quickstart
+
+Default SwarmGraph runs use the local `stub` backend and do not call paid/provider services.
+
+```bash
+cd python
+uv run arc run wf-swarmgraph-001 \
+  --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph \
+  --prompt "ARC local stub smoke run" \
+  --json
+
+uv run arc runs --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph --json
+uv run arc runs get <run-id> --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph --json
+uv run arc runs prune --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph --keep 20 --json
+uv run arc runs prune --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph --keep 20 --yes --json
+```
+
+Open the Run Timeline directly in Theia:
+
+```text
+http://127.0.0.1:3000/?arc-view=run-timeline
+```
+
+PR hygiene:
+
+```bash
+pnpm check:pr
 ```
 
 ## Verified Python Commands

@@ -131,6 +131,51 @@ class TestSwarmGraphAdapter:
             assert any(event.type == "RUN_COMPLETED" for event in run.events)
 
     @pytest.mark.asyncio
+    async def test_run_workflow_passes_prompt_to_cli(self, monkeypatch):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            args_file = tdp / "args.txt"
+            cli = tdp / "swarmgraph"
+            cli.write_text(
+                "#!/usr/bin/env sh\n"
+                f"printf '%s\\n' \"$@\" > {args_file}\n"
+                "printf '%s\\n' '{\"swarm_id\":\"sg-prompt\",\"status\":\"completed\",\"worker_count\":0,\"final_output\":\"ok\"}'\n"
+            )
+            cli.chmod(cli.stat().st_mode | 0o111)
+            monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))
+            run = await self.adapter.run_workflow("wf-test", {"workspace": td, "prompt": "custom local prompt"})
+            assert run.status.value == "completed"
+            assert run.metadata["prompt"] == "custom local prompt"
+            assert "custom local prompt" in args_file.read_text()
+
+    @pytest.mark.asyncio
+    async def test_run_workflow_nonzero_exit_includes_diagnostics(self, monkeypatch):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            cli = tdp / "swarmgraph"
+            cli.write_text("#!/usr/bin/env sh\nprintf 'bad stderr' >&2\nexit 7\n")
+            cli.chmod(cli.stat().st_mode | 0o111)
+            monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))
+            run = await self.adapter.run_workflow("wf-test", {"workspace": td})
+            assert run.status.value == "failed"
+            assert run.metadata["exit_code"] == 7
+            assert "bad stderr" in run.metadata["stderr"]
+            assert any(event.type == "RUN_FAILED" and event.data["exit_code"] == 7 for event in run.events)
+
+    @pytest.mark.asyncio
+    async def test_run_workflow_invalid_json_includes_stdout(self, monkeypatch):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            cli = tdp / "swarmgraph"
+            cli.write_text("#!/usr/bin/env sh\nprintf 'not-json'\n")
+            cli.chmod(cli.stat().st_mode | 0o111)
+            monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))
+            run = await self.adapter.run_workflow("wf-test", {"workspace": td})
+            assert run.status.value == "failed"
+            assert run.metadata["stdout"] == "not-json"
+            assert any(event.type == "RUN_FAILED" and "Invalid SwarmGraph JSON" in event.data["error"] for event in run.events)
+
+    @pytest.mark.asyncio
     async def test_demo_run_workflow_returns_marked_run_record(self):
         from agent_runtime_cockpit.protocol.schemas import RunRecord, RunStatus
         run = await self.adapter.demo_run_workflow("wf-test")

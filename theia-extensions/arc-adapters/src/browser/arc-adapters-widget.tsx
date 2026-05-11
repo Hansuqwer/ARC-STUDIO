@@ -51,7 +51,10 @@ export class ArcAdaptersWidget extends ReactWidget {
     if (this.loading) return <div style={{ padding: 24 }}>Loading adapters…</div>;
     return (
       <div style={{ padding: 16, fontFamily: 'var(--theia-ui-font-family)', color: 'var(--theia-foreground)', height: '100%', overflow: 'auto' }}>
-        <h2 style={{ margin: '0 0 16px 0', fontSize: 15 }}>🔌 Registered Adapters</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h2 style={{ margin: 0, fontSize: 15 }}>🔌 Registered Adapters</h2>
+          <button style={refreshBtnStyle} onClick={() => this.load()}>Refresh</button>
+        </div>
         {this.renderWorkspaceDiagnostics()}
         {this.renderProviderSettings()}
         {['swarmgraph', 'langgraph', 'crewai', 'openai-agents', 'ag2'].map(adapter => {
@@ -110,3 +113,13 @@ export class ArcAdaptersWidget extends ReactWidget {
     );
   }
 }
+
+const refreshBtnStyle: React.CSSProperties = {
+  backgroundColor: 'var(--theia-secondaryButton-background)',
+  color: 'var(--theia-secondaryButton-foreground)',
+  border: 'none',
+  borderRadius: 4,
+  padding: '4px 10px',
+  cursor: 'pointer',
+  fontSize: 11,
+};

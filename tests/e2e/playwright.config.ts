@@ -20,5 +20,11 @@ export default defineConfig({
     url: process.env.ARC_E2E_URL || 'http://localhost:3000',
     reuseExistingServer: true,
     timeout: 60_000,
+    env: {
+      ...process.env,
+      ARC_SWARMGRAPH_CLI: process.env.ARC_SWARMGRAPH_CLI || '/Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph/swarmgraph',
+      ARC_WORKSPACE_PATH: process.env.ARC_WORKSPACE_PATH || '/Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph',
+      ARC_SWARMGRAPH_RUN_BACKEND: process.env.ARC_SWARMGRAPH_RUN_BACKEND || 'stub',
+    },
   },
 });
