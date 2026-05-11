@@ -12,6 +12,7 @@ Generated during GitHub handoff prep.
 - `.venv/bin/arc adapter test langgraph --json` passes conformance.
 - `node tests/unit/arc-protocol.test.js` passes bootstrap protocol tests.
 - `node packages/arc-test-fixtures/src/index.js` passes fixture self-test.
+- `bash scripts/check-artifacts.sh` fails if venvs, caches, node modules, generated builds, or trace JSONL files are tracked.
 
 ## Mock/Demo-Only
 

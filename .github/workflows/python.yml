@@ -16,6 +16,8 @@ jobs:
       - name: Ruff
         working-directory: python
         run: .venv/bin/ruff check src tests
+      - name: Artifact guard
+        run: bash scripts/check-artifacts.sh
       - name: Tests
         working-directory: python
         run: .venv/bin/python -m pytest

@@ -3,6 +3,8 @@
 .pytest_cache/
 .venv/
 .venv2/
+.arc/traces/
+python/.arc/traces/
 node_modules/
 dist/
 lib/
