@@ -149,6 +149,24 @@ class TestSwarmGraphAdapter:
             assert "custom local prompt" in args_file.read_text()
 
     @pytest.mark.asyncio
+    async def test_run_workflow_omits_no_cost_when_explicitly_allowed(self, monkeypatch):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            args_file = tdp / "args.txt"
+            cli = tdp / "swarmgraph"
+            cli.write_text(
+                "#!/usr/bin/env sh\n"
+                f"printf '%s\\n' \"$@\" > {args_file}\n"
+                "printf '%s\n' '{\"swarm_id\":\"sg-live\",\"status\":\"completed\",\"worker_count\":0,\"final_output\":\"ok\"}'\n"
+            )
+            cli.chmod(cli.stat().st_mode | 0o111)
+            monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))
+            monkeypatch.setenv("ARC_SWARMGRAPH_ALLOW_COSTS", "true")
+            run = await self.adapter.run_workflow("wf-test", {"workspace": td})
+            assert run.metadata["cost_allowed"] is True
+            assert "--no-cost" not in args_file.read_text()
+
+    @pytest.mark.asyncio
     async def test_run_workflow_nonzero_exit_includes_diagnostics(self, monkeypatch):
         with tempfile.TemporaryDirectory() as td:
             tdp = Path(td)
@@ -232,6 +250,21 @@ class TestLangGraphAdapter:
         import asyncio
         with pytest.raises(NotImplementedError):
             asyncio.run(self.adapter.run_workflow("test"))
+
+    def test_real_export_uses_configured_workspace_symbol(self, monkeypatch, tmp_path):
+        (tmp_path / "graph_module.py").write_text(
+            "class Graph:\n"
+            "    nodes = {'start': object(), 'agent': object()}\n"
+            "    edges = [('start', 'agent')]\n"
+            "def export_graph():\n"
+            "    return Graph()\n"
+        )
+        monkeypatch.setenv("ARC_LANGGRAPH_EXPORT", "graph_module:export_graph")
+        workflows = self.adapter._real_export(tmp_path)
+        assert workflows[0].metadata["_langgraph_export"] == "graph_module:export_graph"
+        assert [node.id for node in workflows[0].nodes] == ["start", "agent"]
+        assert workflows[0].edges[0].from_node == "start"
+        assert workflows[0].edges[0].to_node == "agent"
 
 
 # ─── Registry ─────────────────────────────────────────────────────────────────

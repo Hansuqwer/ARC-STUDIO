@@ -13,7 +13,10 @@ REMOVE_BEFORE: Beta
 from __future__ import annotations
 
 import ast
+import importlib
 import logging
+import os
+import sys
 from pathlib import Path
 
 from ..protocol.capabilities import RuntimeCapabilities
@@ -113,9 +116,51 @@ class LangGraphAdapter(RuntimeAdapter):
 
     def _real_export(self, workspace: Path) -> list[WorkflowInfo]:
         """Attempt real LangGraph export using the installed library."""
-        from langgraph.graph import StateGraph  # type: ignore  # noqa
-        # TODO: dynamically load workspace graphs
-        raise NotImplementedError("Dynamic LangGraph workspace loading not yet implemented")
+        from langgraph.graph import StateGraph  # type: ignore  # noqa: F401
+        target = os.environ.get("ARC_LANGGRAPH_EXPORT", "")
+        if not target or ":" not in target:
+            raise NotImplementedError("Set ARC_LANGGRAPH_EXPORT=module:function to export a workspace LangGraph")
+
+        module_name, attr_name = target.split(":", 1)
+        sys.path.insert(0, str(workspace))
+        try:
+            exported = getattr(importlib.import_module(module_name), attr_name)
+            graph = exported() if callable(exported) else exported
+        finally:
+            try:
+                sys.path.remove(str(workspace))
+            except ValueError:
+                pass
+
+        return [self._workflow_from_graph(workspace, target, graph)]
+
+    def _workflow_from_graph(self, workspace: Path, target: str, graph: object) -> WorkflowInfo:
+        drawable = graph.get_graph() if hasattr(graph, "get_graph") else graph
+        raw_nodes = getattr(drawable, "nodes", {})
+        raw_edges = getattr(drawable, "edges", [])
+        nodes = [
+            WorkflowNode(id=str(node_id), label=str(node_id), type=NodeType.AGENT, metadata={})
+            for node_id in (raw_nodes.keys() if hasattr(raw_nodes, "keys") else raw_nodes)
+        ]
+        edges: list[WorkflowEdge] = []
+        for index, edge in enumerate(raw_edges):
+            source = getattr(edge, "source", None) or getattr(edge, "start", None) or (edge[0] if isinstance(edge, (tuple, list)) and len(edge) > 1 else None)
+            target_node = getattr(edge, "target", None) or getattr(edge, "end", None) or (edge[1] if isinstance(edge, (tuple, list)) and len(edge) > 1 else None)
+            if source is None or target_node is None:
+                continue
+            edges.append(WorkflowEdge(id=f"e{index}", from_node=str(source), to_node=str(target_node), conditional=False, metadata={}))
+        if not nodes:
+            raise ValueError("Exported LangGraph has no nodes")
+        return WorkflowInfo(
+            id=f"wf-langgraph-{hash(target) % 10000:04d}",
+            name="LangGraph Project",
+            runtime="langgraph",
+            source_file=str(workspace),
+            nodes=nodes,
+            edges=edges,
+            entry_points=[nodes[0].id],
+            metadata={"_langgraph_export": target},
+        )
 
     def _ast_scan(self, workspace: Path) -> list[WorkflowInfo]:
         """Scan for StateGraph definitions via AST."""

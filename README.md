@@ -38,6 +38,7 @@ pnpm start:browser
 ## SwarmGraph Stub Run Quickstart
 
 Default SwarmGraph runs use the local `stub` backend and do not call paid/provider services.
+Provider-backed runs require explicit opt-in with `ARC_SWARMGRAPH_RUN_BACKEND=<backend>` and `ARC_SWARMGRAPH_ALLOW_COSTS=true`; otherwise ARC adds `--no-cost`.
 
 ```bash
 cd python
@@ -57,6 +58,12 @@ Open the Run Timeline directly in Theia:
 
 ```text
 http://127.0.0.1:3000/?arc-view=run-timeline
+```
+
+LangGraph dynamic export can load a workspace symbol when the library is installed:
+
+```bash
+ARC_LANGGRAPH_EXPORT=graph_module:export_graph uv run arc workflows --workspace /path/to/langgraph/project --runtime langgraph --json
 ```
 
 PR hygiene:
