@@ -1,0 +1,40 @@
+{
+  "private": true,
+  "name": "arc-theia-studio",
+  "version": "0.1.0-alpha",
+  "description": "ARC Studio — Agent Runtime Cockpit IDE (Eclipse Theia-based)",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.9",
+  "workspaces": [
+    "applications/browser",
+    "applications/electron",
+    "theia-extensions/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "install:all": "pnpm install",
+    "build": "pnpm -r build",
+    "build:browser": "pnpm --filter @arc-studio/browser build",
+    "build:electron": "pnpm --filter @arc-studio/electron build",
+    "start:browser": "pnpm --filter @arc-studio/browser start",
+    "start:electron": "pnpm --filter @arc-studio/electron start",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @arc-studio/e2e-tests test",
+    "package:electron": "pnpm --filter @arc-studio/electron package",
+    "check": "pnpm -r check",
+    "clean": "pnpm -r clean && rimraf node_modules",
+    "download:plugins": "theia download:plugins --rate-limit=15 --parallel=false",
+    "lint": "pnpm -r lint",
+    "format": "pnpm -r format"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.10",
+    "typescript": "^5.4.5"
+  },
+  "theiaPluginsDir": "plugins",
+  "theiaPlugins": {}
+}
