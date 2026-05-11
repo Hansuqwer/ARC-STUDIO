@@ -32,8 +32,7 @@ export class ArcWorkflowGraphWidget extends ReactWidget {
   protected loading = false;
 
   @postConstruct()
-  protected override init(): void {
-    super.init();
+  protected init(): void {
     this.id = ArcWorkflowGraphWidget.ID;
     this.title.label = ArcWorkflowGraphWidget.LABEL;
     this.title.closable = true;

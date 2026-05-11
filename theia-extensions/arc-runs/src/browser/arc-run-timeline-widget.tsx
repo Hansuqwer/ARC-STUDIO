@@ -37,8 +37,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
   protected liveEvents: RunEvent[] = [];
 
   @postConstruct()
-  protected override init(): void {
-    super.init();
+  protected init(): void {
     this.id = ArcRunTimelineWidget.ID;
     this.title.label = ArcRunTimelineWidget.LABEL;
     this.title.closable = true;
@@ -52,14 +51,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
     try {
       const result = await this.arcService.listRuns();
       this.runs = result.data ?? [];
-      // Load the mock fixture run for demo
-      if (this.runs.length === 0) {
-        const mockRun = await this.arcService.startRun('wf-swarmgraph-001');
-        if (mockRun.data) {
-          this.runs = [mockRun.data];
-          this.selectedRun = mockRun.data;
-        }
-      }
+      this.selectedRun = this.runs[0] ?? null;
     } finally {
       this.loading = false;
       this.update();
@@ -105,7 +97,8 @@ export class ArcRunTimelineWidget extends ReactWidget {
         <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
           {this.selectedRun ? this.renderTimeline(this.selectedRun) : (
             <div style={{ textAlign: 'center', paddingTop: '48px', color: 'var(--theia-descriptionForeground)' }}>
-              Select a run to view timeline
+              <p>Select a run to view timeline</p>
+              <button style={primaryBtnStyle} onClick={() => this.startSwarmGraphRun()}>Start SwarmGraph Run</button>
             </div>
           )}
         </div>
@@ -120,7 +113,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
       : null;
 
     return (
-      <>
+      <div>
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ margin: '0 0 4px 0', fontSize: '15px' }}>
             {this.statusIcon(run.status)} Run: {run.id}
@@ -152,7 +145,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
 
           {events.map((event, i) => this.renderEvent(event, i, run.started_at))}
         </div>
-      </>
+      </div>
     );
   }
 
@@ -220,6 +213,21 @@ export class ArcRunTimelineWidget extends ReactWidget {
     return icons[status] ?? '?';
   }
 
+  protected async startSwarmGraphRun(): Promise<void> {
+    this.loading = true;
+    this.update();
+    try {
+      const result = await this.arcService.startRun('wf-swarmgraph-001');
+      if (result.data) {
+        this.runs = [result.data, ...this.runs];
+        this.selectedRun = result.data;
+      }
+    } finally {
+      this.loading = false;
+      this.update();
+    }
+  }
+
   protected statusColor(status: string): string {
     const colors: Record<string, string> = {
       pending: '#ffb74d',
@@ -239,4 +247,13 @@ const iconBtnStyle: React.CSSProperties = {
   color: 'var(--theia-foreground)',
   fontSize: '14px',
   padding: '0 2px',
+};
+
+const primaryBtnStyle: React.CSSProperties = {
+  backgroundColor: 'var(--theia-button-background)',
+  color: 'var(--theia-button-foreground)',
+  border: 'none',
+  borderRadius: '4px',
+  padding: '6px 12px',
+  cursor: 'pointer',
 };

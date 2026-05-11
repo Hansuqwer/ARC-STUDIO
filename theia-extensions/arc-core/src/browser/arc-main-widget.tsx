@@ -35,8 +35,7 @@ export class ArcMainWidget extends ReactWidget {
   protected activeTab: 'overview' | 'runtimes' | 'workflows' | 'schemas' | 'runs' = 'overview';
 
   @postConstruct()
-  protected override init(): void {
-    super.init();
+  protected init(): void {
     this.id = ArcMainWidget.ID;
     this.title.label = ArcMainWidget.LABEL;
     this.title.caption = 'ARC — Agent Runtime Cockpit';

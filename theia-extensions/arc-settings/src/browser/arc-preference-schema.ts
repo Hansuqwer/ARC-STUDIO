@@ -2,10 +2,9 @@
  * ARC Preference Schema
  * All ARC Studio user preferences.
  */
-import { PreferenceSchema } from '@theia/core/lib/browser/preferences';
+import { PreferenceSchema } from '@theia/core/lib/common/preferences/preference-schema';
 
 export const ArcPreferenceSchema: PreferenceSchema = {
-  type: 'object',
   properties: {
     'arc.daemon.port': {
       type: 'number',
@@ -56,6 +55,16 @@ export const ArcPreferenceSchema: PreferenceSchema = {
       type: 'boolean',
       default: true,
       description: 'Show warnings when ARC is using fixture/mock data.',
+    },
+    'arc.swarmgraph.provider': {
+      type: 'string',
+      default: '9router',
+      description: 'Default SwarmGraph provider. This is non-secret; API keys must come from environment or future secure storage.',
+    },
+    'arc.swarmgraph.baseUrl': {
+      type: 'string',
+      default: '',
+      description: 'Optional SwarmGraph provider base URL override. Leave empty for provider default.',
     },
   },
 };

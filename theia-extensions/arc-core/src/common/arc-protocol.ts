@@ -128,6 +128,15 @@ export interface ContextPackEntry {
   relevance_score: number;
 }
 
+export interface ProviderStatus {
+  provider: string;
+  baseUrlConfigured: boolean;
+  apiKeyConfigured: boolean;
+  apiKeySource?: string;
+  runtimeAvailable: boolean;
+  message: string;
+}
+
 /** Source location for jump-to-definition */
 export interface SourceLocation {
   file: string;
@@ -151,4 +160,6 @@ export interface ArcService {
   listRuns(workspacePath: string): Promise<ArcEnvelope<RunRecord[]>>;
   generateContextPack(task: string, workspacePath?: string): Promise<ArcEnvelope<ContextPackEntry[]>>;
   getDaemonStatus(): Promise<ArcEnvelope<{ running: boolean; version: string; pid?: number }>>;
+  getProviderStatus(provider: string, baseUrl?: string): Promise<ArcEnvelope<ProviderStatus>>;
+  getWorkspaceStatus(workspacePath: string): Promise<ArcEnvelope<{ frontendPath: string; backendPath: string; source: string }>>;
 }

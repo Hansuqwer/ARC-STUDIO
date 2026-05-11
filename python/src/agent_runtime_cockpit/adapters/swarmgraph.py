@@ -16,8 +16,12 @@ REMOVE_BEFORE: Beta release
 from __future__ import annotations
 
 import ast
+import asyncio
+import json
 import logging
+import os
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +46,7 @@ _DETECTION_SIGNALS = [
     ("swarmgraph.yaml",    0.9),
     ("swarmgraph.yml",     0.9),
     ("swarmgraph.toml",    0.8),
+    ("swarmgraph",         0.7),
     ("graph.py",           0.3),
     ("swarm.py",           0.4),
     ("agents.py",          0.2),
@@ -62,7 +67,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
     def capabilities(self) -> RuntimeCapabilities:
         return RuntimeCapabilities(
             can_inspect=True,
-            can_run=False,
+            can_run=True,
             can_trace=False,
             can_replay=False,       # not yet implemented
             can_export_schema=True,
@@ -176,6 +181,125 @@ class SwarmGraphAdapter(RuntimeAdapter):
             metadata={"_scanned": True},
         )]
 
+    async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
+        """Run a SwarmGraph workflow via the real local SwarmGraph CLI.
+
+        The default backend is SwarmGraph's local `stub` backend, which avoids
+        paid/provider calls while still exercising the actual SwarmGraph command.
+        Set ARC_SWARMGRAPH_RUN_BACKEND explicitly to opt into another backend.
+        """
+        inputs = inputs or {}
+        workspace = Path(str(inputs.get("workspace") or ".")).resolve()
+        cli = self._resolve_cli(workspace)
+        backend = os.environ.get("ARC_SWARMGRAPH_RUN_BACKEND", "stub")
+        provider = os.environ.get("AI_PROVIDER_SWARM_GATEWAY_DEFAULT_PROVIDER", "9router")
+        prompt = str(inputs.get("prompt") or f"Run ARC workflow {workflow_id}")
+        run_id = f"run-sg-{uuid.uuid4().hex[:8]}"
+        started = datetime.now(timezone.utc)
+
+        cmd = [
+            str(cli),
+            "swarm",
+            "--prompt",
+            prompt,
+            "--backend",
+            backend,
+            "--provider",
+            provider,
+            "--max-agents",
+            str(inputs.get("max_agents", 1)),
+            "--max-tokens",
+            str(inputs.get("max_tokens", 128)),
+            "--no-cost",
+            "--json",
+        ]
+
+        events = [self._event(run_id, 0, "RUN_STARTED", {"workflow_id": workflow_id, "backend": backend})]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=str(workspace),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env={**os.environ, "PYTHONWARNINGS": "ignore"},
+        )
+        stdout_b, stderr_b = await proc.communicate()
+        stdout = stdout_b.decode(errors="replace").strip()
+        stderr = stderr_b.decode(errors="replace").strip()
+        ended = datetime.now(timezone.utc)
+
+        if proc.returncode != 0:
+            events.append(self._event(run_id, 1, "RUN_FAILED", {"exit_code": proc.returncode, "stderr": stderr[-2000:]}))
+            return RunRecord(
+                id=run_id,
+                workflow_id=workflow_id,
+                runtime="swarmgraph",
+                status=RunStatus.FAILED,
+                started_at=started.isoformat(),
+                ended_at=ended.isoformat(),
+                events=events,
+                metadata={"backend": backend, "provider": provider, "exit_code": proc.returncode},
+            )
+
+        try:
+            payload = json.loads(stdout)
+        except json.JSONDecodeError as exc:
+            events.append(self._event(run_id, 1, "RUN_FAILED", {"error": f"Invalid SwarmGraph JSON: {exc}", "stdout": stdout[:2000]}))
+            return RunRecord(
+                id=run_id,
+                workflow_id=workflow_id,
+                runtime="swarmgraph",
+                status=RunStatus.FAILED,
+                started_at=started.isoformat(),
+                ended_at=ended.isoformat(),
+                events=events,
+                metadata={"backend": backend, "provider": provider},
+            )
+
+        events.append(self._event(run_id, 1, "NODE_COMPLETED", {"node": "swarmgraph.cli", "status": payload.get("status")}))
+        events.append(self._event(run_id, 2, "MESSAGE", {"output": payload.get("final_output", "")}))
+        events.append(self._event(run_id, 3, "RUN_COMPLETED", {"swarm_id": payload.get("swarm_id"), "worker_count": payload.get("worker_count", 0)}))
+        return RunRecord(
+            id=run_id,
+            workflow_id=workflow_id,
+            runtime="swarmgraph",
+            status=RunStatus.COMPLETED if payload.get("status") == "completed" else RunStatus.FAILED,
+            started_at=started.isoformat(),
+            ended_at=ended.isoformat(),
+            events=events,
+            metadata={
+                "backend": backend,
+                "provider": provider,
+                "swarm_id": payload.get("swarm_id"),
+                "swarm_status": payload.get("status"),
+                "final_output": payload.get("final_output", ""),
+                "_external_command": "swarmgraph swarm --json",
+            },
+        )
+
+    def _resolve_cli(self, workspace: Path) -> Path:
+        if os.environ.get("ARC_SWARMGRAPH_CLI"):
+            configured = Path(os.environ["ARC_SWARMGRAPH_CLI"])
+            if configured.exists():
+                return configured
+            raise FileNotFoundError(f"Configured SwarmGraph launcher not found: {configured}")
+        candidates = [
+            workspace / "swarmgraph",
+            Path("/Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph/swarmgraph"),
+        ]
+        for candidate in candidates:
+            if candidate and candidate.exists():
+                return candidate
+        raise FileNotFoundError("SwarmGraph launcher not found. Set ARC_SWARMGRAPH_CLI or open the SwarmGraph install workspace.")
+
+    def _event(self, run_id: str, sequence: int, event_type: str, data: dict[str, Any]) -> RunEvent:
+        return RunEvent(
+            type=event_type,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            run_id=run_id,
+            sequence=sequence,
+            data=data,
+        )
+
     def _fixture_workflow(self) -> WorkflowInfo:
         """Return fixture workflow for demo/testing."""
         return WorkflowInfo(
@@ -281,15 +405,6 @@ class SwarmGraphAdapter(RuntimeAdapter):
             },
             source_file="examples/sample-swarmgraph-project/state.py",
         )
-
-    async def run_workflow(self, workflow_id: str, inputs: dict | None = None) -> RunRecord:
-        """Run a workflow.
-
-        Real SwarmGraph execution is not wired yet. Demo runs are intentionally
-        unavailable from the normal product path so callers do not receive fake
-        success.
-        """
-        raise NotImplementedError("Real SwarmGraph execution is not implemented yet")
 
     async def demo_run_workflow(self, workflow_id: str, inputs: dict | None = None) -> RunRecord:
         """Return a clearly marked demo run for tests/manual demos only."""

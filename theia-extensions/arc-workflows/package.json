@@ -17,7 +17,7 @@
   ],
   "dependencies": {
     "@theia/core": "1.71.0",
-    "arc-core": "0.1.0-alpha"
+    "arc-core": "workspace:*"
   },
   "devDependencies": {
     "@theia/cli": "1.71.0",

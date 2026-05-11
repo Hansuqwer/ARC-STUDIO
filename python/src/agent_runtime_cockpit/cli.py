@@ -231,7 +231,7 @@ def run_workflow(
         _out(err(ArcErrorCode.NOT_IMPLEMENTED, "No adapter supports real workflow execution yet"), json_output)
         raise typer.Exit(1)
 
-    run_record = asyncio.run(adapter.run_workflow(workflow))
+    run_record = asyncio.run(adapter.run_workflow(workflow, {"workspace": str(ws)}))
 
     from .storage.jsonl import JsonlTraceStore
     JsonlTraceStore().save(run_record)
