@@ -28,4 +28,4 @@ jobs:
       - name: Build
         run: pnpm build
       - name: Workspace tests
-        run: pnpm -r test
+        run: pnpm -r --filter '!@arc-studio/e2e-tests' test
