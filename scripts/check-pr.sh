@@ -4,6 +4,7 @@ set -euo pipefail
 echo "Checking PR hygiene..."
 
 bash scripts/check-artifacts.sh
+bash scripts/check-licenses.sh
 
 if git grep -nE 'mockFallback|MOCK_DATA|fake_success' -- \
   ':(exclude)*.md' \

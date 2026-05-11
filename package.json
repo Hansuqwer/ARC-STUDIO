@@ -28,6 +28,8 @@
     "test:e2e": "pnpm --filter @arc-studio/e2e-tests test",
     "check:pr": "bash scripts/check-pr.sh",
     "package:electron": "pnpm --filter @arc-studio/electron package",
+    "package:electron:dir": "pnpm --filter @arc-studio/electron package:dir",
+    "check:licenses": "bash scripts/check-licenses.sh",
     "check": "pnpm -r check",
     "clean": "pnpm -r clean && rimraf node_modules",
     "download:plugins": "theia download:plugins --rate-limit=15 --parallel=false",

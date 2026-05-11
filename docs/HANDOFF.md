@@ -36,6 +36,8 @@ cd python && uv run ruff check src tests
 cd python && uv run arc runs get <run-id> --workspace <workspace> --json
 cd python && uv run arc runs trace <run-id> --workspace <workspace> --tail 5 --json
 cd python && uv run arc runs prune --workspace <workspace> --keep 20 --json
+pnpm check:licenses
+pnpm package:electron:dir
 ```
 
 ## Expected Results
@@ -44,6 +46,8 @@ cd python && uv run arc runs prune --workspace <workspace> --keep 20 --json
 - Node fixture/protocol tests pass.
 - `pnpm -r build` passes locally.
 - Run Timeline E2E opens through `?arc-view=run-timeline`, executes a local stub-backed run, and verifies reload history through `arc runs`.
+- Daemon integration tests cover run listing and SSE event replay.
+- Electron packaging smoke creates an unsigned directory build only; signing remains blocked on credentials.
 
 ## Completion Plan
 
