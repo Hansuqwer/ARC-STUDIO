@@ -56,7 +56,7 @@ uv run arc context pack --task "build theia extension"
 - [ ] Add AG2 adapter
 - [ ] Implement A2UI v1.0 renderer (when spec stable)
 - [ ] Add Flutter project extension (enable via settings)
-- [ ] Expand CI artifact upload for Playwright traces/screenshots
+- [x] Upload Playwright traces/screenshots from E2E CI failures
 - [ ] Auto-update (electron-updater)
 
 ## Production Criteria
