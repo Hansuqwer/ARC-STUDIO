@@ -90,6 +90,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
               <div style={{ fontSize: '11px', fontWeight: 500 }}>
                 {this.statusIcon(run.status)} {run.id.substring(0, 12)}
               </div>
+              <div style={{ fontSize: '10px', color: this.statusColor(run.status), fontWeight: 600 }}>{run.status}</div>
               <div style={{ fontSize: '10px', opacity: 0.7 }}>{run.workflow_id}</div>
               <div style={{ fontSize: '10px', opacity: 0.6 }}>
                 {new Date(run.started_at).toLocaleTimeString()}

@@ -35,6 +35,7 @@ cd tests/e2e && pnpm exec playwright test
 cd python && uv run pytest -q
 cd python && uv run ruff check src tests
 cd python && uv run arc runs get <run-id> --workspace <workspace> --json
+cd python && uv run arc runs trace <run-id> --workspace <workspace> --tail 5 --json
 cd python && uv run arc runs prune --workspace <workspace> --keep 20 --json
 ```
 
@@ -44,7 +45,7 @@ cd python && uv run arc runs prune --workspace <workspace> --keep 20 --json
 - Node fixture/protocol tests pass.
 - `pnpm -r build` passes locally.
 - E2E smoke currently passes with command-palette tests skipped.
-- Run Timeline E2E opens through `?arc-view=run-timeline` and executes a local stub-backed run.
+- Run Timeline E2E opens through `?arc-view=run-timeline`, executes a local stub-backed run, and verifies reload history through `arc runs`.
 
 ## Completion Plan
 

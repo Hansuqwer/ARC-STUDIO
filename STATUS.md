@@ -18,6 +18,7 @@ Generated during GitHub handoff prep.
 - Run Timeline supports prompt input, workspace refresh, trace path display, and explicit run status feedback.
 - `arc runs --workspace <path>` lists workspace-scoped traces newest-first.
 - `arc runs get <run-id> --workspace <path>` returns one stored run record or a truthful `NOT_FOUND` error.
+- `arc runs trace <run-id> --workspace <path> --tail N` returns trace metadata and bounded tail lines.
 - `arc runs prune --workspace <path> --keep N` dry-runs trace cleanup unless `--yes` is passed.
 
 ## Mock/Demo-Only
@@ -30,7 +31,7 @@ Generated during GitHub handoff prep.
 ## Broken Or Not Verified
 
 - Electron packaging/signing is not verified.
-- Some E2E command-palette and Run Timeline command-service tests skip because Theia browser globals are not stable test hooks.
+- E2E no longer relies on command-palette shortcuts; Run Timeline opens through `?arc-view=run-timeline`.
 
 ## Not Yet Implemented
 
