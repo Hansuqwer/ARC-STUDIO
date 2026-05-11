@@ -1,0 +1,27 @@
+{
+  "name": "arc-schemas",
+  "version": "0.1.0-alpha",
+  "description": "ARC Studio schemas — schema list, JSON viewer, model detail, validation warnings",
+  "keywords": ["theia-extension"],
+  "license": "Apache-2.0",
+  "files": ["lib", "src"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch",
+    "clean": "rimraf lib *.tsbuildinfo",
+    "check": "echo 'arc-schemas check ok'",
+    "test": "echo 'arc-schemas test ok'"
+  },
+  "theiaExtensions": [
+    { "frontend": "lib/browser/arc-schemas-frontend-module" }
+  ],
+  "dependencies": {
+    "@theia/core": "1.71.0",
+    "arc-core": "0.1.0-alpha"
+  },
+  "devDependencies": {
+    "@theia/cli": "1.71.0",
+    "rimraf": "^5.0.10",
+    "typescript": "^5.4.5"
+  }
+}

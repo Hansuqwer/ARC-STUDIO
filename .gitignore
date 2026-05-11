@@ -1,0 +1,15 @@
+.DS_Store
+.cache/
+.pytest_cache/
+.venv/
+.venv2/
+node_modules/
+dist/
+lib/
+src-gen/
+coverage/
+htmlcov/
+*.pyc
+__pycache__/
+python/docs/context-packs/*.json
+docs/context-packs/*.json

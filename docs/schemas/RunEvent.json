@@ -1,0 +1,33 @@
+{
+  "properties": {
+    "type": {
+      "title": "Type",
+      "type": "string"
+    },
+    "timestamp": {
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "sequence": {
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "data": {
+      "additionalProperties": true,
+      "title": "Data",
+      "type": "object"
+    }
+  },
+  "required": [
+    "type",
+    "timestamp",
+    "run_id",
+    "sequence"
+  ],
+  "title": "RunEvent",
+  "type": "object"
+}

@@ -1,0 +1,41 @@
+version: "1"
+name: ResearchSwarm
+description: Sample SwarmGraph project for ARC Studio demonstration
+
+agents:
+  researcher:
+    role: researcher
+    description: Researches topics and collects notes
+  writer:
+    role: writer
+    description: Writes drafts based on research notes
+  reviewer:
+    role: reviewer
+    description: Reviews drafts and provides feedback
+
+graph:
+  entry: start
+  nodes:
+    - id: start
+      type: start
+    - id: researcher
+      agent: researcher
+    - id: writer
+      agent: writer
+    - id: reviewer
+      agent: reviewer
+    - id: end
+      type: end
+  edges:
+    - from: start
+      to: researcher
+    - from: researcher
+      to: writer
+    - from: writer
+      to: reviewer
+    - from: reviewer
+      to: end
+      condition: approved
+    - from: reviewer
+      to: writer
+      condition: needs_revision

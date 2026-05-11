@@ -1,0 +1,61 @@
+# ARC Studio Electron Builder Configuration
+# Source: https://www.electron.build/configuration/configuration
+# NOTE: Code signing is NOT configured here. See docs/PACKAGING.md for signing steps.
+
+appId: "ai.arena.arc-studio"
+productName: "ARC Studio"
+copyright: "Copyright 2025 ARC Studio Contributors"
+
+# MOCK_REASON: Signing certificates not available in build environment
+# REAL_IMPLEMENTATION_PATH: scripts/sign-electron.sh
+# LOCAL_FIX_STEPS: Set CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD
+# OWNER: Packaging Agent
+# REMOVE_BEFORE: Beta release
+forceCodeSigning: false
+
+directories:
+  output: dist
+  buildResources: resources
+
+files:
+  - "src-gen/**/*"
+  - "node_modules/**/*"
+  - "package.json"
+
+extraResources:
+  - from: "../../python"
+    to: "arc-python"
+    filter:
+      - "**/*"
+      - "!**/__pycache__/**"
+      - "!**/*.pyc"
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  category: "public.app-category.developer-tools"
+  icon: "resources/icons/icon.icns"
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  category: "Development"
+  icon: "resources/icons"
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: "resources/icons/icon.ico"
+
+nsis:
+  oneClick: false
+  allowDirChange: true
+  installerIcon: "resources/icons/icon.ico"
+  installerHeaderIcon: "resources/icons/icon.ico"
+  createDesktopShortcut: true
+  createStartMenuShortcut: true

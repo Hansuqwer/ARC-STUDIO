@@ -1,0 +1,40 @@
+{
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "runtime": {
+      "title": "Runtime",
+      "type": "string"
+    },
+    "schema": {
+      "additionalProperties": true,
+      "title": "Schema",
+      "type": "object"
+    },
+    "source_file": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source File"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "runtime"
+  ],
+  "title": "SchemaInfo",
+  "type": "object"
+}

@@ -1,0 +1,126 @@
+{
+  "$defs": {
+    "ConfidenceLevel": {
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "title": "ConfidenceLevel",
+      "type": "string"
+    },
+    "RuntimeCapabilities": {
+      "properties": {
+        "can_inspect": {
+          "default": false,
+          "title": "Can Inspect",
+          "type": "boolean"
+        },
+        "can_run": {
+          "default": false,
+          "title": "Can Run",
+          "type": "boolean"
+        },
+        "can_trace": {
+          "default": false,
+          "title": "Can Trace",
+          "type": "boolean"
+        },
+        "can_replay": {
+          "default": false,
+          "title": "Can Replay",
+          "type": "boolean"
+        },
+        "can_export_schema": {
+          "default": false,
+          "title": "Can Export Schema",
+          "type": "boolean"
+        },
+        "can_export_workflow": {
+          "default": false,
+          "title": "Can Export Workflow",
+          "type": "boolean"
+        },
+        "can_stream_events": {
+          "default": false,
+          "title": "Can Stream Events",
+          "type": "boolean"
+        },
+        "can_audit": {
+          "default": false,
+          "title": "Can Audit",
+          "type": "boolean"
+        }
+      },
+      "title": "RuntimeCapabilities",
+      "type": "object"
+    },
+    "RuntimeInfo": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "adapter": {
+          "title": "Adapter",
+          "type": "string"
+        },
+        "confidence": {
+          "$ref": "#/$defs/ConfidenceLevel"
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "capabilities": {
+          "$ref": "#/$defs/RuntimeCapabilities"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "adapter",
+        "confidence"
+      ],
+      "title": "RuntimeInfo",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "path": {
+      "title": "Path",
+      "type": "string"
+    },
+    "runtimes": {
+      "items": {
+        "$ref": "#/$defs/RuntimeInfo"
+      },
+      "title": "Runtimes",
+      "type": "array"
+    },
+    "files_scanned": {
+      "default": 0,
+      "title": "Files Scanned",
+      "type": "integer"
+    },
+    "detection_warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Detection Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "path"
+  ],
+  "title": "WorkspaceInfo",
+  "type": "object"
+}
