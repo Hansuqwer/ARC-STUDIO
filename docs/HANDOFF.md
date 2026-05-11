@@ -9,7 +9,6 @@ This repo is a prototype prepared for GitHub handoff. Python core commands, Thei
 - Provider-backed SwarmGraph execution requires explicit approval before running paid/external calls.
 - Real LangGraph dynamic graph loading is not implemented.
 - Electron packaging/signing is not verified.
-- Run Timeline Playwright prompt-control coverage skips when Theia command service is not exposed to browser globals.
 
 ## Commands Run
 
@@ -44,18 +43,16 @@ cd python && uv run arc runs prune --workspace <workspace> --keep 20 --json
 - Python tests pass.
 - Node fixture/protocol tests pass.
 - `pnpm -r build` passes locally.
-- E2E smoke currently passes with command-palette tests skipped.
 - Run Timeline E2E opens through `?arc-view=run-timeline`, executes a local stub-backed run, and verifies reload history through `arc runs`.
 
 ## Completion Plan
 
 1. Keep CI passing Python tests and Node build/tests.
-2. Replace brittle command-palette E2E skips with stable Theia page objects.
-3. Extend SwarmGraph trace/audit paths beyond JSONL run records.
-4. Implement real LangGraph graph loading or narrow capability claims.
-5. Add daemon integration tests and E2E tests.
-6. Implement replay viewer and live event streaming.
-7. Package unsigned Electron locally, then signed builds.
+2. Extend SwarmGraph trace/audit paths beyond JSONL run records.
+3. Implement real LangGraph graph loading or narrow capability claims.
+4. Add daemon integration tests and E2E tests.
+5. Implement replay viewer and live event streaming.
+6. Package unsigned Electron locally, then signed builds.
 
 ## Ownership Assumptions
 

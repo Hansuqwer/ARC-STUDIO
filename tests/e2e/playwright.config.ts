@@ -1,8 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
-import { existsSync } from 'fs';
+import { join } from 'path';
 
-const localSwarmGraphCli = '/Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph/swarmgraph';
-const localSwarmGraphWorkspace = '/Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph';
+const e2eWorkspace = join(__dirname, '..', '..');
+const e2eSwarmGraphCli = join(__dirname, 'fixtures', 'swarmgraph-stub.sh');
 
 export default defineConfig({
   testDir: '.',
@@ -26,8 +26,8 @@ export default defineConfig({
     timeout: 60_000,
     env: {
       ...process.env,
-      ...(process.env.ARC_SWARMGRAPH_CLI || existsSync(localSwarmGraphCli) ? { ARC_SWARMGRAPH_CLI: process.env.ARC_SWARMGRAPH_CLI || localSwarmGraphCli } : {}),
-      ...(process.env.ARC_WORKSPACE_PATH || existsSync(localSwarmGraphWorkspace) ? { ARC_WORKSPACE_PATH: process.env.ARC_WORKSPACE_PATH || localSwarmGraphWorkspace } : {}),
+      ARC_SWARMGRAPH_CLI: process.env.ARC_SWARMGRAPH_CLI || e2eSwarmGraphCli,
+      ARC_WORKSPACE_PATH: process.env.ARC_WORKSPACE_PATH || e2eWorkspace,
       ARC_SWARMGRAPH_RUN_BACKEND: process.env.ARC_SWARMGRAPH_RUN_BACKEND || 'stub',
     },
   },
