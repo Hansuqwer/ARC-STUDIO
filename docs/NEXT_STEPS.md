@@ -2,28 +2,32 @@
 
 ## Immediate (Alpha → Beta)
 
-### 1. Run the Theia build locally (30 min)
+### 1. Run the verified checks
 
 ```bash
-# Requires Node.js 20+, pnpm 9+
-pnpm install        # ~5 min (downloads Theia packages)
-pnpm build          # ~15 min (compiles extensions)
-pnpm start:browser  # starts on http://localhost:3000
+pnpm build
+pnpm -r test
+cd python && uv run pytest -q
+cd python && uv run ruff check src tests
+cd tests/e2e && pnpm exec playwright test
+pnpm check:pr
 ```
 
-### 2. Connect the Python daemon
+### 2. Start the browser IDE
+
+```bash
+ARC_WORKSPACE_PATH=/path/to/swarmgraph/workspace \
+ARC_SWARMGRAPH_CLI=/path/to/swarmgraph \
+pnpm start:browser:swarmgraph
+```
+
+### 3. Inspect local run history
 
 ```bash
 cd python
-uv run arc serve
-# ARC panel in browser IDE will show live data
-```
-
-### 3. Run E2E tests
-
-```bash
-pnpm test:e2e
-# Requires: pnpm start:browser running in another terminal
+uv run arc runs --workspace /path/to/swarmgraph/workspace --json
+uv run arc runs trace <run-id> --workspace /path/to/swarmgraph/workspace --tail 5 --json
+uv run arc runs prune --workspace /path/to/swarmgraph/workspace --keep 20 --json
 ```
 
 ### 4. Enable live context providers
@@ -36,12 +40,12 @@ uv run arc context pack --task "build theia extension"
 
 ## Short Term (Beta)
 
-- [ ] Wire `arc-workflows` graph widget to real workflow data via Theia ↔ Python IPC
+- [ ] Add trace viewer panel for `arc runs trace`
 - [ ] Implement real-time event streaming (SSE → Theia widget)
 - [ ] Add Theia ↔ Python integration test (spawn real daemon)
 - [ ] Implement replay viewer (JSONL playback)
 - [ ] Add LangGraph live execution (install `langgraph`)
-- [ ] Add SwarmGraph live execution (install from GitHub)
+- [ ] Add provider-backed SwarmGraph live execution behind explicit opt-in
 - [ ] Electron packaging (set signing certs)
 - [ ] Add more Open VSX extensions (JSON, Python, YAML viewers)
 
@@ -52,7 +56,7 @@ uv run arc context pack --task "build theia extension"
 - [ ] Add AG2 adapter
 - [ ] Implement A2UI v1.0 renderer (when spec stable)
 - [ ] Add Flutter project extension (enable via settings)
-- [ ] CI/CD pipeline (GitHub Actions)
+- [ ] Expand CI artifact upload for Playwright traces/screenshots
 - [ ] Auto-update (electron-updater)
 
 ## Production Criteria

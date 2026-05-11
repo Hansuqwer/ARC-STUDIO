@@ -29,6 +29,7 @@ import { join } from 'path';
 const APP_URL = process.env.ARC_E2E_URL || 'http://localhost:3000';
 const TIMEOUT = 30_000;
 const REPO_ROOT = join(__dirname, '..', '..');
+const ARC_WORKSPACE = process.env.ARC_WORKSPACE_PATH || REPO_ROOT;
 
 test.describe('ARC Studio — Smoke Tests', () => {
 
@@ -105,7 +106,7 @@ test.describe('ARC Studio — Smoke Tests', () => {
     await expect(page.getByText('completed').first()).toBeVisible({ timeout: TIMEOUT });
     const { execSync } = require('child_process');
     const output = execSync(
-      `cd "${join(REPO_ROOT, 'python')}" && .venv/bin/arc runs --workspace "${process.env.ARC_WORKSPACE_PATH || '/Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph'}" --json`,
+      `cd "${join(REPO_ROOT, 'python')}" && .venv/bin/arc runs --workspace "${ARC_WORKSPACE}" --json`,
       { cwd: __dirname, timeout: 15000, encoding: 'utf8' }
     );
     const envelope = JSON.parse(output);
