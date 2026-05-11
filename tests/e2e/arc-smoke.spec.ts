@@ -23,7 +23,7 @@
  * REMOVE_BEFORE: Alpha release
  */
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { join } from 'path';
 
 const APP_URL = process.env.ARC_E2E_URL || 'http://localhost:3000';
@@ -71,25 +71,6 @@ test.describe('ARC Studio — Smoke Tests', () => {
     console.log(`ARC icon elements found: ${count}`);
   });
 
-  test.skip('command palette can be opened', async ({ page }) => {
-    await openCommandPalette(page);
-    const palette = page.locator('.quick-open-widget, .monaco-quick-input-widget, .quick-input-widget, [class*="quick"]');
-    await expect(palette.first()).toBeVisible({ timeout: 5000 });
-    // Close it
-    await page.keyboard.press('Escape');
-  });
-
-  test.skip('ARC: Inspect Workspace command exists in palette', async ({ page }) => {
-    await openCommandPalette(page);
-    const input = page.locator('input.input, .quick-open-input input, .quick-input-widget input, [class*="quickinput"] input');
-    await input.first().fill('ARC: Inspect', { timeout: 5000 });
-    // Should show the ARC command
-    const items = page.locator('.monaco-list-row, .quick-open-entry, [class*="quick-open-row"]');
-    const count = await items.count();
-    console.log(`Command palette items for "ARC: Inspect": ${count}`);
-    await page.keyboard.press('Escape');
-  });
-
   test('run timeline prompt controls are available through deep link', async ({ page }) => {
     await page.goto(`${APP_URL}/?arc-view=run-timeline`, { waitUntil: 'networkidle', timeout: TIMEOUT });
 
@@ -109,6 +90,27 @@ test.describe('ARC Studio — Smoke Tests', () => {
     if (await failed.isVisible()) {
       test.skip(true, 'Local SwarmGraph launcher unavailable to Theia backend in this environment');
     }
+  });
+
+  test('run timeline shows completed run after reload', async ({ page }) => {
+    await page.goto(`${APP_URL}/?arc-view=run-timeline`, { waitUntil: 'networkidle', timeout: TIMEOUT });
+
+    await page.getByPlaceholder('Prompt for local SwarmGraph stub run').fill('ARC E2E reload history run.');
+    await page.getByText('Start SwarmGraph Run').click();
+    await expect(page.getByText('Run completed.')).toBeVisible({ timeout: TIMEOUT });
+    const runId = (await page.locator('h2', { hasText: 'Run: run-sg-' }).first().textContent())?.match(/run-sg-[a-f0-9]+/)?.[0];
+    expect(runId).toBeTruthy();
+
+    await page.reload({ waitUntil: 'networkidle', timeout: TIMEOUT });
+    await expect(page.getByText('completed').first()).toBeVisible({ timeout: TIMEOUT });
+    const { execSync } = require('child_process');
+    const output = execSync(
+      `cd "${join(REPO_ROOT, 'python')}" && .venv/bin/arc runs --workspace "${process.env.ARC_WORKSPACE_PATH || '/Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph'}" --json`,
+      { cwd: __dirname, timeout: 15000, encoding: 'utf8' }
+    );
+    const envelope = JSON.parse(output);
+    expect(envelope.ok).toBe(true);
+    expect(envelope.data.some((run: { id: string }) => run.id === runId)).toBe(true);
   });
 });
 
@@ -148,7 +150,3 @@ test.describe('ARC Python CLI — Integration', () => {
     }
   });
 });
-
-async function openCommandPalette(page: Page): Promise<void> {
-  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Shift+P' : 'Control+Shift+P');
-}

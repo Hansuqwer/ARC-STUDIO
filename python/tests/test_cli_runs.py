@@ -45,9 +45,24 @@ def test_runs_command_reads_workspace_traces(monkeypatch, tmp_path):
     assert get_result.exit_code == 0, get_result.output
     assert json.loads(get_result.output)["data"]["id"] == run_id
 
+    trace_result = CliRunner().invoke(app, ["runs", "trace", run_id, "--workspace", str(tmp_path), "--tail", "1", "--json"])
+    assert trace_result.exit_code == 0, trace_result.output
+    trace_data = json.loads(trace_result.output)["data"]
+    assert trace_data["run_id"] == run_id
+    assert trace_data["line_count"] == 1
+    assert len(trace_data["tail"]) == 1
+
 
 def test_runs_get_missing_returns_error(tmp_path):
     result = CliRunner().invoke(app, ["runs", "get", "missing-run", "--workspace", str(tmp_path), "--json"])
+    assert result.exit_code == 1
+    envelope = json.loads(result.output)
+    assert envelope["ok"] is False
+    assert envelope["error"]["code"] == "RUN_NOT_FOUND"
+
+
+def test_runs_trace_missing_returns_error(tmp_path):
+    result = CliRunner().invoke(app, ["runs", "trace", "missing-run", "--workspace", str(tmp_path), "--json"])
     assert result.exit_code == 1
     envelope = json.loads(result.output)
     assert envelope["ok"] is False

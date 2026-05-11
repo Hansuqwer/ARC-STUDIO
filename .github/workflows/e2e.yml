@@ -16,4 +16,16 @@ jobs:
           version: 9.15.9
       - run: pnpm install --frozen-lockfile=false
       - run: pnpm build
+      - name: Prepare local SwarmGraph stub launcher
+        run: |
+          mkdir -p .ci
+          cat > .ci/swarmgraph <<'SH'
+          #!/usr/bin/env sh
+          printf '%s\n' '{"swarm_id":"sg-ci","status":"completed","worker_count":0,"final_output":"ci stub ok"}'
+          SH
+          chmod +x .ci/swarmgraph
       - run: pnpm test:e2e
+        env:
+          ARC_SWARMGRAPH_CLI: ${{ github.workspace }}/.ci/swarmgraph
+          ARC_WORKSPACE_PATH: ${{ github.workspace }}
+          ARC_SWARMGRAPH_RUN_BACKEND: stub

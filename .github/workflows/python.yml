@@ -15,12 +15,12 @@ jobs:
         run: uv sync --all-extras --dev
       - name: Ruff
         working-directory: python
-        run: .venv/bin/ruff check src tests
+        run: uv run ruff check src tests
       - name: Artifact guard
         run: bash scripts/check-artifacts.sh
       - name: Tests
         working-directory: python
-        run: .venv/bin/python -m pytest
+        run: uv run pytest -q
       - name: CLI smoke
         working-directory: python
         run: |

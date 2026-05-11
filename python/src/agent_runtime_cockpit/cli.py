@@ -318,6 +318,33 @@ def runs_get(
     _out(ok(run_record.model_dump(), workspace=str(ws)), json_output)
 
 
+@runs_app.command("trace")
+def runs_trace(
+    run_id: str = typer.Argument(..., help="Run ID to inspect"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    tail: int = typer.Option(20, "--tail", min=0, help="Number of trace lines to return"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Return trace file metadata and optional tail lines for one run."""
+    _setup_logging(debug)
+    from .storage.jsonl import JsonlTraceStore
+    ws = _workspace(workspace)
+    store = JsonlTraceStore(ws / ".arc" / "traces")
+    path = store.trace_path(run_id)
+    if not path.exists():
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Trace not found: {run_id}"), json_output)
+        raise typer.Exit(1)
+    lines = path.read_text().splitlines()
+    payload = {
+        "run_id": run_id,
+        "trace_path": str(path),
+        "line_count": len(lines),
+        "tail": lines[-tail:] if tail else [],
+    }
+    _out(ok(payload, workspace=str(ws)), json_output)
+
+
 # ─── context pack ─────────────────────────────────────────────────────────────
 
 @context_app.command("pack")

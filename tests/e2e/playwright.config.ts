@@ -1,4 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
+import { existsSync } from 'fs';
+
+const localSwarmGraphCli = '/Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph/swarmgraph';
+const localSwarmGraphWorkspace = '/Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph';
 
 export default defineConfig({
   testDir: '.',
@@ -22,8 +26,8 @@ export default defineConfig({
     timeout: 60_000,
     env: {
       ...process.env,
-      ARC_SWARMGRAPH_CLI: process.env.ARC_SWARMGRAPH_CLI || '/Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph/swarmgraph',
-      ARC_WORKSPACE_PATH: process.env.ARC_WORKSPACE_PATH || '/Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph',
+      ...(process.env.ARC_SWARMGRAPH_CLI || existsSync(localSwarmGraphCli) ? { ARC_SWARMGRAPH_CLI: process.env.ARC_SWARMGRAPH_CLI || localSwarmGraphCli } : {}),
+      ...(process.env.ARC_WORKSPACE_PATH || existsSync(localSwarmGraphWorkspace) ? { ARC_WORKSPACE_PATH: process.env.ARC_WORKSPACE_PATH || localSwarmGraphWorkspace } : {}),
       ARC_SWARMGRAPH_RUN_BACKEND: process.env.ARC_SWARMGRAPH_RUN_BACKEND || 'stub',
     },
   },

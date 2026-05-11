@@ -48,6 +48,7 @@ uv run arc run wf-swarmgraph-001 \
 
 uv run arc runs --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph --json
 uv run arc runs get <run-id> --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph --json
+uv run arc runs trace <run-id> --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph --tail 5 --json
 uv run arc runs prune --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph --keep 20 --json
 uv run arc runs prune --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/SwarmGraph --keep 20 --yes --json
 ```
