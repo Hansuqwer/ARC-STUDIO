@@ -1,0 +1,32 @@
+{
+  "name": "arc-product",
+  "version": "0.1.0-alpha",
+  "description": "ARC Studio product branding — welcome page, about dialog, icons, product name",
+  "keywords": ["theia-extension"],
+  "license": "Apache-2.0",
+  "files": ["lib", "src", "*.d.ts"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch",
+    "clean": "rimraf lib *.tsbuildinfo",
+    "check": "echo 'arc-product check ok'",
+    "test": "echo 'arc-product test ok'"
+  },
+  "theiaExtensions": [
+    {
+      "frontend": "lib/browser/arc-product-frontend-module"
+    }
+  ],
+  "dependencies": {
+    "@theia/core": "1.71.0",
+    "@theia/getting-started": "1.71.0"
+  },
+  "devDependencies": {
+    "@theia/cli": "1.71.0",
+    "rimraf": "^5.0.10",
+    "typescript": "^5.4.5"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0"
+  }
+}

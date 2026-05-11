@@ -1,0 +1,36 @@
+name: e2e
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - name: Native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libx11-dev libxkbfile-dev libsecret-1-dev
+      - run: pnpm install --frozen-lockfile=false
+      - run: pnpm --filter @arc-studio/e2e-tests exec playwright install chromium
+      - run: pnpm build
+      - run: pnpm test:e2e
+        env:
+          ARC_WORKSPACE_PATH: ${{ github.workspace }}
+          ARC_SWARMGRAPH_RUN_BACKEND: stub
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            test-results/
+            tests/e2e/test-results/
+          if-no-files-found: ignore

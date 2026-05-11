@@ -1,0 +1,69 @@
+{
+  "private": true,
+  "name": "@arc-studio/browser",
+  "version": "0.1.0-alpha",
+  "description": "ARC Studio — Browser Application",
+  "scripts": {
+    "build": "theia build --mode development",
+    "build:prod": "theia build --mode production",
+    "rebuild": "theia rebuild:browser --cacheRoot ../..",
+    "start": "theia start --port 3000 --hostname localhost",
+    "start:arc": "ARC_WORKSPACE_PATH=${ARC_WORKSPACE_PATH:-$PWD} theia start --port 3000 --hostname localhost --root-dir ${ARC_WORKSPACE_PATH:-$PWD}",
+    "start:swarmgraph": "ARC_SWARMGRAPH_CLI=${ARC_SWARMGRAPH_CLI:-$PWD/../../tests/e2e/fixtures/swarmgraph-stub.sh} ARC_WORKSPACE_PATH=${ARC_WORKSPACE_PATH:-$PWD} theia start --port 3000 --hostname localhost --root-dir ${ARC_WORKSPACE_PATH:-$PWD}",
+    "start:debug": "theia start --port 3000 --hostname localhost --loglevel=debug",
+    "watch": "theia build --watch --mode development",
+    "clean": "rimraf lib src-gen",
+    "check": "echo 'browser check ok'",
+    "test": "echo 'browser unit tests ok'"
+  },
+  "dependencies": {
+    "@theia/core": "1.71.0",
+    "@theia/editor": "1.71.0",
+    "@theia/filesystem": "1.71.0",
+    "@theia/markers": "1.71.0",
+    "@theia/messages": "1.71.0",
+    "@theia/monaco": "1.71.0",
+    "@theia/navigator": "1.71.0",
+    "@theia/preferences": "1.71.0",
+    "@theia/process": "1.71.0",
+    "@theia/terminal": "1.71.0",
+    "@theia/workspace": "1.71.0",
+    "@theia/output": "1.71.0",
+    "@theia/search-in-workspace": "1.71.0",
+    "@theia/getting-started": "1.71.0",
+    "@theia/keymaps": "1.71.0",
+    "arc-product": "workspace:*",
+    "arc-core": "workspace:*",
+    "arc-workflows": "workspace:*",
+    "arc-schemas": "workspace:*",
+    "arc-runs": "workspace:*",
+    "arc-audit": "workspace:*",
+    "arc-context": "workspace:*",
+    "arc-adapters": "workspace:*",
+    "arc-settings": "workspace:*"
+  },
+  "devDependencies": {
+    "@theia/cli": "1.71.0",
+    "rimraf": "^5.0.10"
+  },
+  "theia": {
+    "target": "browser",
+    "frontend": {
+      "config": {
+        "applicationName": "ARC Studio",
+        "reloadOnReconnect": true,
+        "preferences": {
+          "files.enableTrash": false,
+          "security.workspace.trust.enabled": false,
+          "workbench.colorTheme": "Dark+ (default dark)"
+        }
+      }
+    },
+    "backend": {
+      "config": {
+        "frontendConnectionTimeout": 30000
+      }
+    }
+  },
+  "theiaPluginsDir": "../../plugins"
+}

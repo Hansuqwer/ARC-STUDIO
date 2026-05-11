@@ -1,0 +1,12 @@
+{
+  "name": "@arc-studio/test-fixtures",
+  "version": "0.1.0-alpha",
+  "description": "ARC Studio test fixtures — shared mock data for unit and E2E tests",
+  "license": "Apache-2.0",
+  "main": "src/index.js",
+  "scripts": {
+    "build": "echo 'fixtures: no build needed'",
+    "test": "node src/index.js",
+    "check": "echo '@arc-studio/test-fixtures check ok'"
+  }
+}

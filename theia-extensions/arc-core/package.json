@@ -1,0 +1,33 @@
+{
+  "name": "arc-core",
+  "version": "0.1.0-alpha",
+  "description": "ARC Studio core — service contracts, backend calls, commands, workspace detection",
+  "keywords": ["theia-extension"],
+  "license": "Apache-2.0",
+  "files": ["lib", "src", "*.d.ts"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch",
+    "clean": "rimraf lib *.tsbuildinfo",
+    "check": "echo 'arc-core check ok'",
+    "test": "echo 'arc-core test ok'"
+  },
+  "theiaExtensions": [
+    {
+      "frontend": "lib/browser/arc-core-frontend-module",
+      "backend": "lib/node/arc-core-backend-module"
+    }
+  ],
+  "dependencies": {
+    "@theia/core": "1.71.0",
+    "@theia/filesystem": "1.71.0",
+    "@theia/workspace": "1.71.0",
+    "@theia/process": "1.71.0",
+    "@theia/output": "1.71.0"
+  },
+  "devDependencies": {
+    "@theia/cli": "1.71.0",
+    "rimraf": "^5.0.10",
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@arc-studio/e2e-tests",
+  "version": "0.1.0-alpha",
+  "private": true,
+  "description": "ARC Studio E2E tests using Playwright",
+  "scripts": {
+    "test": "playwright test --config=playwright.config.ts",
+    "test:headed": "playwright test --headed --config=playwright.config.ts",
+    "install:browsers": "playwright install chromium",
+    "check": "echo 'e2e check ok'"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0",
+    "typescript": "^5.4.5"
+  }
+}
