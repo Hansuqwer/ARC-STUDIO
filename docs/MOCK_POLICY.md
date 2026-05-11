@@ -26,3 +26,7 @@ Every remaining mock must document:
 ## Normal Product Behavior
 
 If the daemon, CLI, external service, or runtime is unavailable, the product must return an explicit error envelope and render an error state.
+
+The normal SwarmGraph run path invokes the real local `swarmgraph swarm --json` CLI. Its default backend is `stub`, which is local and non-paid. Provider-backed execution requires explicit approval before changing `ARC_SWARMGRAPH_RUN_BACKEND` to a live backend.
+
+Run traces are stored under `<workspace>/.arc/traces`. `arc runs prune --workspace <path> --keep N` is dry-run by default and deletes only with `--yes`.

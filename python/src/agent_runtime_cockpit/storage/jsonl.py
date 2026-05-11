@@ -22,6 +22,10 @@ class JsonlTraceStore:
     def _run_path(self, run_id: str) -> Path:
         return self.base_dir / f"{run_id}.jsonl"
 
+    def trace_path(self, run_id: str) -> Path:
+        """Return the trace path used for a run ID."""
+        return self._run_path(run_id)
+
     def save(self, run: RunRecord) -> None:
         """Persist a completed RunRecord."""
         try:
@@ -50,7 +54,25 @@ class JsonlTraceStore:
         """Return all stored run IDs."""
         if not self.base_dir.exists():
             return []
-        return [p.stem for p in self.base_dir.glob("*.jsonl")]
+        paths = sorted(self.base_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+        return [p.stem for p in paths]
+
+    def prune(self, keep: int, dry_run: bool = True) -> list[Path]:
+        """Delete oldest trace files beyond keep count, or return would-delete paths."""
+        if keep < 0:
+            raise ValueError("keep must be >= 0")
+        if not self.base_dir.exists():
+            return []
+        root = self.base_dir.resolve()
+        paths = sorted(self.base_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+        victims = paths[keep:]
+        for path in victims:
+            resolved = path.resolve()
+            if root not in resolved.parents:
+                raise ValueError(f"refusing to delete outside trace dir: {path}")
+            if not dry_run:
+                resolved.unlink()
+        return victims
 
     def append_event(self, run_id: str, event: dict) -> None:
         """Append a single event to a run's JSONL file (streaming mode)."""

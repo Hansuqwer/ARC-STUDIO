@@ -1,6 +1,6 @@
 import { injectable } from '@theia/core/shared/inversify';
 import { AbstractViewContribution } from '@theia/core/lib/browser';
-import { Command, CommandRegistry } from '@theia/core/lib/common/command';
+import { Command } from '@theia/core/lib/common/command';
 import { ArcRunTimelineWidget } from './arc-run-timeline-widget';
 
 export const OpenRunTimelineCommand: Command = {
@@ -20,10 +20,11 @@ export class ArcRunsContribution extends AbstractViewContribution<ArcRunTimeline
     });
   }
 
-  override registerCommands(registry: CommandRegistry): void {
-    super.registerCommands(registry);
-    registry.registerCommand(OpenRunTimelineCommand, {
-      execute: () => this.openView({ activate: true }),
-    });
+  async initializeLayout(): Promise<void> {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('arc-view') === 'run-timeline') {
+      await this.openView({ activate: true });
+    }
   }
+
 }

@@ -2,15 +2,14 @@
 
 ## Current Status
 
-This repo is a prototype prepared for GitHub handoff. Python core commands and tests are verified. Theia build and Electron packaging are not verified in this environment because `pnpm` is unavailable.
+This repo is a prototype prepared for GitHub handoff. Python core commands, Theia build, Node tests, and Playwright smoke coverage are verified locally on the handoff branch.
 
 ## Known Failures / Blockers
 
-- `pnpm -r build` cannot run here: `pnpm` command not found.
-- Theia browser/electron apps need a machine with Node 20+ and pnpm 9+.
-- Real SwarmGraph execution is not implemented.
+- Provider-backed SwarmGraph execution requires explicit approval before running paid/external calls.
 - Real LangGraph dynamic graph loading is not implemented.
-- E2E Playwright tests require a running browser app.
+- Electron packaging/signing is not verified.
+- Run Timeline Playwright prompt-control coverage skips when Theia command service is not exposed to browser globals.
 
 ## Commands Run
 
@@ -30,19 +29,28 @@ node tests/unit/arc-protocol.test.js
 node packages/arc-test-fixtures/src/index.js
 bash scripts/check-artifacts.sh
 pnpm -r build
+pnpm -r test
+pnpm check:pr
+cd tests/e2e && pnpm exec playwright test
+cd python && uv run pytest -q
+cd python && uv run ruff check src tests
+cd python && uv run arc runs get <run-id> --workspace <workspace> --json
+cd python && uv run arc runs prune --workspace <workspace> --keep 20 --json
 ```
 
 ## Expected Results
 
 - Python tests pass.
 - Node fixture/protocol tests pass.
-- `pnpm -r build` is blocked until pnpm is installed.
+- `pnpm -r build` passes locally.
+- E2E smoke currently passes with command-palette tests skipped.
+- Run Timeline E2E opens through `?arc-view=run-timeline` and executes a local stub-backed run.
 
 ## Completion Plan
 
-1. Install Node 20+ and pnpm 9+; prove Theia build.
-2. Add CI passing Python tests and Node build/tests.
-3. Implement real SwarmGraph run/trace/audit paths or keep `can_run=False`.
+1. Keep CI passing Python tests and Node build/tests.
+2. Replace brittle command-palette E2E skips with stable Theia page objects.
+3. Extend SwarmGraph trace/audit paths beyond JSONL run records.
 4. Implement real LangGraph graph loading or narrow capability claims.
 5. Add daemon integration tests and E2E tests.
 6. Implement replay viewer and live event streaming.

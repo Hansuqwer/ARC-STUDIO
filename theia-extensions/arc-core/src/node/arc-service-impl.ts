@@ -38,6 +38,13 @@ const ARC_DAEMON_PORT = 7777;
 const ARC_DAEMON_HOST = 'localhost';
 const ARC_CLI_TIMEOUT_MS = 30000;
 
+class ArcCliError extends Error {
+  constructor(message: string, readonly stderr = '', readonly stdout = '') {
+    super(message);
+    this.name = 'ArcCliError';
+  }
+}
+
 @injectable()
 export class ArcServiceImpl implements ArcService {
 
@@ -99,13 +106,13 @@ export class ArcServiceImpl implements ArcService {
 
       proc.on('close', code => {
         if (code !== 0 && !stdout.trim()) {
-          reject(new Error(`ARC CLI failed (exit ${code}): ${stderr.substring(0, 500)}`));
+          reject(new ArcCliError(`ARC CLI failed (exit ${code})`, stderr, stdout));
           return;
         }
         try {
           resolve(JSON.parse(stdout));
         } catch (e) {
-          reject(new Error(`ARC CLI returned invalid JSON: ${stdout.substring(0, 200)}`));
+          reject(new ArcCliError('ARC CLI returned invalid JSON', stderr, stdout));
         }
       });
 
@@ -154,19 +161,36 @@ export class ArcServiceImpl implements ArcService {
 
   /** Error envelope — never fake successful product data. */
   private errorEnvelope<T>(command: string, error: unknown): ArcEnvelope<T> {
+    const err = error instanceof Error ? error : new Error(String(error));
+    const stderr = error instanceof ArcCliError ? this.sanitize(error.stderr).slice(-2000) : undefined;
+    const stdout = error instanceof ArcCliError ? this.sanitize(error.stdout).slice(-2000) : undefined;
     return {
       version: ARC_PROTOCOL_VERSION,
       ok: false,
       data: null,
       error: {
         code: 'BACKEND_UNAVAILABLE',
-        message: `ARC backend unavailable for ${command}: ${error}`,
+        message: `ARC backend unavailable for ${command}: ${this.sanitize(err.message)}`,
+        details: {
+          command,
+          name: err.name,
+          message: this.sanitize(err.message),
+          ...(stderr ? { stderr } : {}),
+          ...(stdout ? { stdout } : {}),
+        },
       },
       meta: {
         duration_ms: 1,
         timestamp: new Date().toISOString(),
       },
     };
+  }
+
+  private sanitize(value: string): string {
+    return value
+      .replace(/sk-[A-Za-z0-9_-]{8,}/g, 'sk-REDACTED')
+      .replace(/(api[_-]?key\s*[=:]\s*)[^\s]+/ig, '$1REDACTED')
+      .replace(/(authorization:\s*bearer\s+)[^\s]+/ig, '$1REDACTED');
   }
 
   async inspectWorkspace(workspacePath: string): Promise<ArcEnvelope<WorkspaceInfo>> {
@@ -230,6 +254,8 @@ export class ArcServiceImpl implements ArcService {
       const args = ['run', workflowId];
       const workspace = this.workspacePath('');
       if (workspace) args.push('--workspace', workspace);
+      const prompt = typeof inputs?.prompt === 'string' ? inputs.prompt.trim() : '';
+      if (prompt) args.push('--prompt', prompt);
       return this.runCli(args);
     } catch (e) {
       return this.errorEnvelope('run', e);

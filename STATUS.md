@@ -13,6 +13,12 @@ Generated during GitHub handoff prep.
 - `node tests/unit/arc-protocol.test.js` passes bootstrap protocol tests.
 - `node packages/arc-test-fixtures/src/index.js` passes fixture self-test.
 - `bash scripts/check-artifacts.sh` fails if venvs, caches, node modules, generated builds, or trace JSONL files are tracked.
+- `pnpm build`, `pnpm -r test`, `pnpm check:pr`, and Playwright smoke tests pass locally.
+- SwarmGraph runs execute through the real local CLI with default `stub` backend.
+- Run Timeline supports prompt input, workspace refresh, trace path display, and explicit run status feedback.
+- `arc runs --workspace <path>` lists workspace-scoped traces newest-first.
+- `arc runs get <run-id> --workspace <path>` returns one stored run record or a truthful `NOT_FOUND` error.
+- `arc runs prune --workspace <path> --keep N` dry-runs trace cleanup unless `--yes` is passed.
 
 ## Mock/Demo-Only
 
@@ -23,14 +29,11 @@ Generated during GitHub handoff prep.
 
 ## Broken Or Not Verified
 
-- `pnpm` is missing in this environment, so Theia install/build/start is not verified.
 - Electron packaging/signing is not verified.
-- E2E Playwright tests are present but not verified.
-- `uv run pytest` may use the wrong system Python in this environment; direct `.venv/bin/python -m pytest` is verified.
+- Some E2E command-palette and Run Timeline command-service tests skip because Theia browser globals are not stable test hooks.
 
 ## Not Yet Implemented
 
-- Real SwarmGraph workflow execution.
 - Real LangGraph dynamic graph export/execution.
 - Replay viewer.
 - SSE event streaming wired into Theia UI.

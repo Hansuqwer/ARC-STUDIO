@@ -1,6 +1,6 @@
 import { injectable } from '@theia/core/shared/inversify';
 import { AbstractViewContribution } from '@theia/core/lib/browser';
-import { Command, CommandRegistry } from '@theia/core/lib/common/command';
+import { Command } from '@theia/core/lib/common/command';
 import { ArcSchemaInspectorWidget } from './arc-schema-inspector-widget';
 
 export const OpenSchemaInspectorCommand: Command = {
@@ -20,10 +20,4 @@ export class ArcSchemasContribution extends AbstractViewContribution<ArcSchemaIn
     });
   }
 
-  override registerCommands(registry: CommandRegistry): void {
-    super.registerCommands(registry);
-    registry.registerCommand(OpenSchemaInspectorCommand, {
-      execute: () => this.openView({ activate: true }),
-    });
-  }
 }

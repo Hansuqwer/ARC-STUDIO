@@ -214,7 +214,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
             "--json",
         ]
 
-        events = [self._event(run_id, 0, "RUN_STARTED", {"workflow_id": workflow_id, "backend": backend})]
+        events = [self._event(run_id, 0, "RUN_STARTED", {"workflow_id": workflow_id, "backend": backend, "prompt": prompt})]
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=str(workspace),
@@ -228,7 +228,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
         ended = datetime.now(timezone.utc)
 
         if proc.returncode != 0:
-            events.append(self._event(run_id, 1, "RUN_FAILED", {"exit_code": proc.returncode, "stderr": stderr[-2000:]}))
+            events.append(self._event(run_id, 1, "RUN_FAILED", {"exit_code": proc.returncode, "stderr": stderr[-2000:], "stdout": stdout[-2000:]}))
             return RunRecord(
                 id=run_id,
                 workflow_id=workflow_id,
@@ -237,13 +237,20 @@ class SwarmGraphAdapter(RuntimeAdapter):
                 started_at=started.isoformat(),
                 ended_at=ended.isoformat(),
                 events=events,
-                metadata={"backend": backend, "provider": provider, "exit_code": proc.returncode},
+                metadata={
+                    "backend": backend,
+                    "provider": provider,
+                    "prompt": prompt,
+                    "exit_code": proc.returncode,
+                    "stderr": stderr[-2000:],
+                    "_external_command": "swarmgraph swarm --json",
+                },
             )
 
         try:
             payload = json.loads(stdout)
         except json.JSONDecodeError as exc:
-            events.append(self._event(run_id, 1, "RUN_FAILED", {"error": f"Invalid SwarmGraph JSON: {exc}", "stdout": stdout[:2000]}))
+            events.append(self._event(run_id, 1, "RUN_FAILED", {"error": f"Invalid SwarmGraph JSON: {exc}", "stdout": stdout[:2000], "stderr": stderr[-2000:]}))
             return RunRecord(
                 id=run_id,
                 workflow_id=workflow_id,
@@ -252,7 +259,14 @@ class SwarmGraphAdapter(RuntimeAdapter):
                 started_at=started.isoformat(),
                 ended_at=ended.isoformat(),
                 events=events,
-                metadata={"backend": backend, "provider": provider},
+                metadata={
+                    "backend": backend,
+                    "provider": provider,
+                    "prompt": prompt,
+                    "stdout": stdout[:2000],
+                    "stderr": stderr[-2000:],
+                    "_external_command": "swarmgraph swarm --json",
+                },
             )
 
         events.append(self._event(run_id, 1, "NODE_COMPLETED", {"node": "swarmgraph.cli", "status": payload.get("status")}))
@@ -269,6 +283,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
             metadata={
                 "backend": backend,
                 "provider": provider,
+                "prompt": prompt,
                 "swarm_id": payload.get("swarm_id"),
                 "swarm_status": payload.get("status"),
                 "final_output": payload.get("final_output", ""),
