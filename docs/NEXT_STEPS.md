@@ -40,12 +40,12 @@ uv run arc context pack --task "build theia extension"
 
 ## Short Term (Beta)
 
-- [ ] Add trace viewer panel for `arc runs trace`
-- [ ] Implement real-time event streaming (SSE → Theia widget)
+- [x] Add timeline replay controls for stored JSONL events
+- [x] Connect Theia run timeline to local daemon SSE stream
 - [ ] Add Theia ↔ Python integration test (spawn real daemon)
 - [ ] Implement replay viewer (JSONL playback)
-- [ ] Add LangGraph live execution (install `langgraph`)
-- [ ] Add provider-backed SwarmGraph live execution behind explicit opt-in
+- [x] Add LangGraph dynamic export hook via `ARC_LANGGRAPH_EXPORT=module:function`
+- [x] Add provider-backed SwarmGraph execution behind `ARC_SWARMGRAPH_ALLOW_COSTS=true`
 - [ ] Electron packaging (set signing certs)
 - [ ] Add more Open VSX extensions (JSON, Python, YAML viewers)
 

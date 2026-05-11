@@ -193,6 +193,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
         cli = self._resolve_cli(workspace)
         backend = os.environ.get("ARC_SWARMGRAPH_RUN_BACKEND", "stub")
         provider = os.environ.get("AI_PROVIDER_SWARM_GATEWAY_DEFAULT_PROVIDER", "9router")
+        allow_costs = os.environ.get("ARC_SWARMGRAPH_ALLOW_COSTS", "").lower() in {"1", "true", "yes"}
         prompt = str(inputs.get("prompt") or f"Run ARC workflow {workflow_id}")
         run_id = f"run-sg-{uuid.uuid4().hex[:8]}"
         started = datetime.now(timezone.utc)
@@ -210,11 +211,12 @@ class SwarmGraphAdapter(RuntimeAdapter):
             str(inputs.get("max_agents", 1)),
             "--max-tokens",
             str(inputs.get("max_tokens", 128)),
-            "--no-cost",
             "--json",
         ]
+        if not allow_costs:
+            cmd.insert(-1, "--no-cost")
 
-        events = [self._event(run_id, 0, "RUN_STARTED", {"workflow_id": workflow_id, "backend": backend, "prompt": prompt})]
+        events = [self._event(run_id, 0, "RUN_STARTED", {"workflow_id": workflow_id, "backend": backend, "prompt": prompt, "cost_allowed": allow_costs})]
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=str(workspace),
@@ -241,6 +243,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
                     "backend": backend,
                     "provider": provider,
                     "prompt": prompt,
+                    "cost_allowed": allow_costs,
                     "exit_code": proc.returncode,
                     "stderr": stderr[-2000:],
                     "_external_command": "swarmgraph swarm --json",
@@ -263,6 +266,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
                     "backend": backend,
                     "provider": provider,
                     "prompt": prompt,
+                    "cost_allowed": allow_costs,
                     "stdout": stdout[:2000],
                     "stderr": stderr[-2000:],
                     "_external_command": "swarmgraph swarm --json",
@@ -284,6 +288,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
                 "backend": backend,
                 "provider": provider,
                 "prompt": prompt,
+                "cost_allowed": allow_costs,
                 "swarm_id": payload.get("swarm_id"),
                 "swarm_status": payload.get("status"),
                 "final_output": payload.get("final_output", ""),

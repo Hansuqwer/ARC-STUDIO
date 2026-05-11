@@ -20,6 +20,9 @@ Generated during GitHub handoff prep.
 - `arc runs get <run-id> --workspace <path>` returns one stored run record or a truthful `NOT_FOUND` error.
 - `arc runs trace <run-id> --workspace <path> --tail N` returns trace metadata and bounded tail lines.
 - `arc runs prune --workspace <path> --keep N` dry-runs trace cleanup unless `--yes` is passed.
+- Run Timeline can replay stored JSONL events and connect to the local daemon SSE stream.
+- SwarmGraph provider-backed execution is gated by `ARC_SWARMGRAPH_ALLOW_COSTS=true`.
+- LangGraph dynamic workflow export is available through `ARC_LANGGRAPH_EXPORT=module:function`.
 
 ## Mock/Demo-Only
 
@@ -36,8 +39,7 @@ Generated during GitHub handoff prep.
 ## Not Yet Implemented
 
 - Real LangGraph dynamic graph export/execution.
-- Replay viewer.
-- SSE event streaming wired into Theia UI.
+- Full trace viewer panel beyond timeline replay.
 - CrewAI, OpenAI Agents SDK, AG2 adapters.
 - CI-backed Theia build/e2e proof.
 - Signed Electron installers and auto-update.

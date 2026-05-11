@@ -118,7 +118,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
   }
 
   protected renderTimeline(run: RunRecord): React.ReactNode {
-    const events = run.events;
+    const events = this.liveEvents.length > 0 ? this.liveEvents : run.events;
     const duration = run.ended_at
       ? new Date(run.ended_at).getTime() - new Date(run.started_at).getTime()
       : null;
@@ -130,6 +130,8 @@ export class ArcRunTimelineWidget extends ReactWidget {
             {this.statusIcon(run.status)} Run: {run.id}
           </h2>
           <button style={secondaryBtnStyle} onClick={() => this.copyText('Run ID', run.id)}>Copy Run ID</button>
+          <button style={secondaryBtnStyle} onClick={() => this.replayRun(run)}>Replay Events</button>
+          <button style={secondaryBtnStyle} onClick={() => this.connectSseStream(run.id)}>Connect SSE Stream</button>
           <div style={{ fontSize: '12px', color: 'var(--theia-descriptionForeground)' }}>
             Workflow: <strong>{run.workflow_id}</strong> ·
             Runtime: <strong>{run.runtime}</strong> ·
@@ -172,7 +174,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
       ['Swarm ID', metadata['swarm_id']],
       ['Command', metadata['_external_command']],
     ].filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].length > 0);
-    const finalOutput = this.eventValue(run, 'RUN_COMPLETED', 'final_output') ?? this.eventValue(run, 'MESSAGE', 'message');
+    const finalOutput = this.eventValue(run, 'RUN_COMPLETED', 'final_output') ?? this.eventValue(run, 'MESSAGE', 'output') ?? this.eventValue(run, 'MESSAGE', 'message');
     const errorOutput = this.eventValue(run, 'RUN_FAILED', 'error') ?? this.eventValue(run, 'RUN_FAILED', 'stderr');
 
     if (summary.length === 0 && !finalOutput && !errorOutput) {
@@ -333,6 +335,46 @@ export class ArcRunTimelineWidget extends ReactWidget {
   protected async refreshWorkspace(): Promise<void> {
     this.workspaceStatus = (await this.arcService.getWorkspaceStatus().catch(() => undefined))?.data ?? undefined;
     await this.loadRuns();
+  }
+
+  protected async replayRun(run: RunRecord): Promise<void> {
+    this.liveEvents = [];
+    this.runStatusMessage = `Replaying ${run.events.length} events...`;
+    this.update();
+    for (const event of run.events) {
+      this.liveEvents = [...this.liveEvents, event];
+      this.update();
+      await new Promise(resolve => setTimeout(resolve, 120));
+    }
+    this.runStatusMessage = 'Replay complete.';
+    this.update();
+  }
+
+  protected connectSseStream(runId: string): void {
+    const url = `http://localhost:7777/api/runs/${encodeURIComponent(runId)}/events`;
+    this.liveEvents = [];
+    this.streaming = true;
+    this.runStatusMessage = 'Connecting to local SSE stream...';
+    const source = new EventSource(url);
+    source.onmessage = message => {
+      const event = JSON.parse(message.data) as RunEvent;
+      if (event.type === 'STREAM_END') {
+        source.close();
+        this.streaming = false;
+        this.runStatusMessage = 'SSE stream complete.';
+      } else {
+        this.liveEvents = [...this.liveEvents, event];
+        this.runStatusMessage = `Streaming ${this.liveEvents.length} events...`;
+      }
+      this.update();
+    };
+    source.onerror = () => {
+      source.close();
+      this.streaming = false;
+      this.lastError = 'SSE stream unavailable. Start `uv run arc serve` on localhost:7777.';
+      this.update();
+    };
+    this.update();
   }
 
   protected async copyText(label: string, value: string): Promise<void> {
