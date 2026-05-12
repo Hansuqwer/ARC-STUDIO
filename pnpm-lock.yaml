@@ -77,6 +77,9 @@ importers:
       arc-core:
         specifier: workspace:*
         version: link:../../theia-extensions/arc-core
+      arc-event-stream:
+        specifier: workspace:*
+        version: link:../../theia-extensions/arc-event-stream
       arc-product:
         specifier: workspace:*
         version: link:../../theia-extensions/arc-product
@@ -95,7 +98,7 @@ importers:
     devDependencies:
       '@theia/cli':
         specifier: 1.71.0
-        version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(postcss@8.5.14)(typescript@5.9.3)
+        version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(typescript@5.9.3)
       rimraf:
         specifier: ^5.0.10
         version: 5.0.10
@@ -162,6 +165,9 @@ importers:
       arc-core:
         specifier: workspace:*
         version: link:../../theia-extensions/arc-core
+      arc-event-stream:
+        specifier: workspace:*
+        version: link:../../theia-extensions/arc-event-stream
       arc-product:
         specifier: workspace:*
         version: link:../../theia-extensions/arc-product
@@ -190,6 +196,15 @@ importers:
       rimraf:
         specifier: ^5.0.10
         version: 5.0.10
+
+  packages/arc-ag-ui:
+    devDependencies:
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
+      typescript:
+        specifier: ~5.4.0
+        version: 5.4.5
 
   packages/arc-protocol-ts:
     devDependencies:
@@ -295,6 +310,25 @@ importers:
       typescript:
         specifier: ^5.4.5
         version: 5.9.3
+
+  theia-extensions/arc-event-stream:
+    dependencies:
+      '@theia/core':
+        specifier: 1.71.0
+        version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))
+      arc-core:
+        specifier: workspace:*
+        version: link:../arc-core
+    devDependencies:
+      '@theia/cli':
+        specifier: 1.71.0
+        version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(postcss@8.5.14)(typescript@5.4.5)
+      rimraf:
+        specifier: ^5.0.10
+        version: 5.0.10
+      typescript:
+        specifier: ^5.4.5
+        version: 5.4.5
 
   theia-extensions/arc-product:
     dependencies:
@@ -4664,6 +4698,11 @@ packages:
   typedarray@0.0.6:
     resolution: {integrity: sha512-/aCDEGatGvZ2BIk+HmLf4ifCJFwvKFNb9/JeZPMulfgFracn9QFcAf5GO8B/mweUjSoblS5In0cWhqpfs/5PQA==}
 
+  typescript@5.4.5:
+    resolution: {integrity: sha512-vcI4UpRgg81oIRUFwR0WSIHKt11nJ7SAVlYNIu+QpqeyXP+gpQJy/Z4+F0aGxSE4MqwjyXvW/TzgkLAx2AGHwQ==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   typescript@5.9.3:
     resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
     engines: {node: '>=14.17'}
@@ -6213,7 +6252,7 @@ snapshots:
     transitivePeerDependencies:
       - debug
 
-  '@theia/cli@1.71.0(@theia/electron@1.71.0(electron@39.8.7))(postcss@8.5.14)(typescript@5.9.3)':
+  '@theia/cli@1.71.0(@theia/electron@1.71.0(electron@39.8.7))(postcss@8.5.14)(typescript@5.4.5)':
     dependencies:
       '@theia/application-manager': 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(postcss@8.5.14)
       '@theia/application-package': 1.71.0
@@ -6234,7 +6273,7 @@ snapshots:
       log-update: 4.0.0
       mocha: 10.8.2
       patch-package: 8.0.1
-      puppeteer: 23.1.0(typescript@5.9.3)
+      puppeteer: 23.1.0(typescript@5.4.5)
       puppeteer-core: 23.1.0
       puppeteer-to-istanbul: 1.4.0
       temp: 0.9.4
@@ -7201,7 +7240,7 @@ snapshots:
 
   '@webpack-cli/configtest@1.2.0(webpack-cli@4.7.0)(webpack@5.106.2)':
     dependencies:
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
       webpack-cli: 4.7.0(webpack@5.106.2)
 
   '@webpack-cli/info@1.5.0(webpack-cli@4.7.0)':
@@ -7437,7 +7476,7 @@ snapshots:
       loader-utils: 2.0.4
       make-dir: 3.1.0
       schema-utils: 2.7.1
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   babel-plugin-polyfill-corejs2@0.4.17(@babel/core@7.29.0):
     dependencies:
@@ -7846,7 +7885,7 @@ snapshots:
     dependencies:
       schema-utils: 4.3.3
       serialize-javascript: 6.0.2
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   concat-map@0.0.1: {}
 
@@ -7873,7 +7912,7 @@ snapshots:
   config-file-ts@0.2.6:
     dependencies:
       glob: 10.5.0
-      typescript: 5.9.3
+      typescript: 5.4.5
 
   content-disposition@0.5.4:
     dependencies:
@@ -7902,7 +7941,7 @@ snapshots:
       p-limit: 3.1.0
       schema-utils: 3.3.0
       serialize-javascript: 5.0.1
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   core-js-compat@3.49.0:
     dependencies:
@@ -7919,6 +7958,15 @@ snapshots:
       vary: 1.1.2
 
   corser@2.0.1: {}
+
+  cosmiconfig@9.0.1(typescript@5.4.5):
+    dependencies:
+      env-paths: 2.2.1
+      import-fresh: 3.3.1
+      js-yaml: 4.1.1
+      parse-json: 5.2.0
+    optionalDependencies:
+      typescript: 5.4.5
 
   cosmiconfig@9.0.1(typescript@5.9.3):
     dependencies:
@@ -7958,7 +8006,7 @@ snapshots:
       postcss-value-parser: 4.2.0
       semver: 7.8.0
     optionalDependencies:
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   cssesc@3.0.0: {}
 
@@ -9236,7 +9284,7 @@ snapshots:
     dependencies:
       schema-utils: 4.3.3
       tapable: 2.3.3
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   minimatch@10.2.5:
     dependencies:
@@ -9410,7 +9458,7 @@ snapshots:
   node-loader@2.1.0(webpack@5.106.2):
     dependencies:
       loader-utils: 2.0.4
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   node-pty@1.2.0-beta.12:
     dependencies:
@@ -9771,6 +9819,23 @@ snapshots:
       mkdirp: 1.0.4
       v8-to-istanbul: 1.2.1
       yargs: 15.4.1
+
+  puppeteer@23.1.0(typescript@5.4.5):
+    dependencies:
+      '@puppeteer/browsers': 2.3.1
+      chromium-bidi: 0.6.4(devtools-protocol@0.0.1312386)
+      cosmiconfig: 9.0.1(typescript@5.4.5)
+      devtools-protocol: 0.0.1312386
+      puppeteer-core: 23.1.0
+      typed-query-selector: 2.12.2
+    transitivePeerDependencies:
+      - bare-abort-controller
+      - bare-buffer
+      - bufferutil
+      - react-native-b4a
+      - supports-color
+      - typescript
+      - utf-8-validate
 
   puppeteer@23.1.0(typescript@5.9.3):
     dependencies:
@@ -10264,7 +10329,7 @@ snapshots:
       abab: 2.0.6
       iconv-lite: 0.6.3
       source-map-js: 0.6.2
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   source-map-support@0.5.21:
     dependencies:
@@ -10298,7 +10363,7 @@ snapshots:
   string-replace-loader@3.3.0(webpack@5.106.2):
     dependencies:
       schema-utils: 4.3.3
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   string-width@4.2.3:
     dependencies:
@@ -10342,7 +10407,7 @@ snapshots:
     dependencies:
       loader-utils: 2.0.4
       schema-utils: 3.3.0
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   sumchecker@3.0.1:
     dependencies:
@@ -10551,6 +10616,8 @@ snapshots:
 
   typedarray@0.0.6: {}
 
+  typescript@5.4.5: {}
+
   typescript@5.9.3: {}
 
   uc.micro@2.1.0: {}
@@ -10711,7 +10778,7 @@ snapshots:
       interpret: 2.2.0
       rechoir: 0.7.1
       v8-compile-cache: 2.4.0
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
       webpack-merge: 5.10.0
 
   webpack-merge@5.10.0:
@@ -10836,7 +10903,7 @@ snapshots:
     dependencies:
       loader-utils: 2.0.4
       schema-utils: 3.3.0
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   workerpool@6.5.1: {}
 
