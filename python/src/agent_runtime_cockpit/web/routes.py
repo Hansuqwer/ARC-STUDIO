@@ -41,6 +41,7 @@ log = logging.getLogger(__name__)
 redactor = Redactor()
 ctx_gen = ContextPackGenerator()
 RUNTIME_IDS = set(runtime_router.KNOWN_RUNTIMES) | {"auto"}
+START_TIME = time.time()
 
 
 def _workspace(request: web.Request) -> Path:
@@ -71,7 +72,18 @@ def _trace_store(request: web.Request) -> JsonlTraceStore:
 
 
 async def health(request: web.Request) -> web.Response:
-    return _json({"status": "ok", "version": "0.1.0a0", "arc": True})
+    """Health check endpoint with daemon status."""
+    store = _trace_store(request)
+    all_runs = store.list_runs()
+    active_runs = [r for r in all_runs if r.status in ('running', 'pending')]
+    
+    return _json({
+        "status": "healthy",
+        "version": "0.1.0-alpha",
+        "uptime_seconds": int(time.time() - START_TIME),
+        "active_runs": len(active_runs),
+        "arc": True,
+    })
 
 
 async def inspect(request: web.Request) -> web.Response:
