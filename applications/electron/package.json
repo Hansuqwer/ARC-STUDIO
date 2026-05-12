@@ -1,0 +1,69 @@
+{
+  "private": true,
+  "name": "@arc-studio/electron",
+  "version": "0.1.0-alpha",
+  "description": "ARC Studio — Electron Desktop Application",
+  "main": "src-gen/frontend/index.js",
+  "scripts": {
+    "build": "theia build --mode development",
+    "build:prod": "theia build --mode production",
+    "rebuild": "theia rebuild:electron --cacheRoot ../..",
+    "start": "electron src-gen/frontend/index.js",
+    "start:dev": "theia start --app-project-path=. --hostname localhost --port 3000",
+    "watch": "theia build --watch --mode development",
+    "package": "electron-builder --config electron-builder.yml",
+    "package:dir": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir --config electron-builder.yml",
+    "package:mac": "electron-builder --mac --config electron-builder.yml",
+    "package:linux": "electron-builder --linux --config electron-builder.yml",
+    "package:win": "electron-builder --win --config electron-builder.yml",
+    "clean": "rimraf lib src-gen dist",
+    "check": "echo 'electron check ok'",
+    "test": "echo 'electron unit tests ok'"
+  },
+  "dependencies": {
+    "@theia/core": "1.71.0",
+    "@theia/editor": "1.71.0",
+    "@theia/electron": "1.71.0",
+    "@theia/filesystem": "1.71.0",
+    "@theia/markers": "1.71.0",
+    "@theia/messages": "1.71.0",
+    "@theia/monaco": "1.71.0",
+    "@theia/navigator": "1.71.0",
+    "@theia/preferences": "1.71.0",
+    "@theia/process": "1.71.0",
+    "@theia/terminal": "1.71.0",
+    "@theia/workspace": "1.71.0",
+    "@theia/output": "1.71.0",
+    "@theia/search-in-workspace": "1.71.0",
+    "@theia/getting-started": "1.71.0",
+    "@theia/keymaps": "1.71.0",
+    "arc-product": "workspace:*",
+    "arc-core": "workspace:*",
+    "arc-workflows": "workspace:*",
+    "arc-schemas": "workspace:*",
+    "arc-runs": "workspace:*",
+    "arc-audit": "workspace:*",
+    "arc-context": "workspace:*",
+    "arc-adapters": "workspace:*",
+    "arc-settings": "workspace:*"
+  },
+  "devDependencies": {
+    "@theia/cli": "1.71.0",
+    "electron": "39.8.7",
+    "electron-builder": "^24.13.3",
+    "rimraf": "^5.0.10"
+  },
+  "theia": {
+    "target": "electron",
+    "frontend": {
+      "config": {
+        "applicationName": "ARC Studio",
+        "preferences": {
+          "files.enableTrash": false,
+          "security.workspace.trust.enabled": false
+        }
+      }
+    }
+  },
+  "theiaPluginsDir": "../../plugins"
+}

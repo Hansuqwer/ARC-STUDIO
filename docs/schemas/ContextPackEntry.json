@@ -1,0 +1,74 @@
+{
+  "$defs": {
+    "SourceType": {
+      "enum": [
+        "local_repo",
+        "context7",
+        "vercel_grep",
+        "github_search",
+        "web_search"
+      ],
+      "title": "SourceType",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "task": {
+      "title": "Task",
+      "type": "string"
+    },
+    "source": {
+      "title": "Source",
+      "type": "string"
+    },
+    "source_type": {
+      "$ref": "#/$defs/SourceType"
+    },
+    "content": {
+      "title": "Content",
+      "type": "string"
+    },
+    "url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Url"
+    },
+    "freshness": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Freshness"
+    },
+    "relevance_score": {
+      "default": 0.0,
+      "title": "Relevance Score",
+      "type": "number"
+    }
+  },
+  "required": [
+    "id",
+    "task",
+    "source",
+    "source_type",
+    "content"
+  ],
+  "title": "ContextPackEntry",
+  "type": "object"
+}

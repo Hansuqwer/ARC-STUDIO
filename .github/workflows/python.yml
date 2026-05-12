@@ -1,0 +1,30 @@
+name: python
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Sync dependencies
+        working-directory: python
+        run: uv sync --all-extras --dev
+      - name: Ruff
+        working-directory: python
+        run: uv run ruff check src tests
+      - name: Artifact guard
+        run: bash scripts/check-artifacts.sh
+      - name: Tests
+        working-directory: python
+        run: uv run pytest -q
+      - name: CLI smoke
+        working-directory: python
+        run: |
+          .venv/bin/arc --help
+          .venv/bin/arc inspect --json
+          .venv/bin/arc adapter test swarmgraph --json
+          .venv/bin/arc adapter test langgraph --json
