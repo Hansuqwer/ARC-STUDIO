@@ -42,14 +42,16 @@ export function sanitizePrompt(prompt: string): string {
 
 /**
  * Validates trace ID to prevent path traversal attacks
+ * Supports multiple runtime prefixes: sg (SwarmGraph), lg (LangGraph), 
+ * ca (Claude), openai
  */
 export function validateTraceId(traceId: string): string {
     if (!traceId || typeof traceId !== 'string') {
         throw new Error('Invalid trace ID: must be a non-empty string');
     }
 
-    // Trace IDs should match the pattern: run-sg-[hexadecimal]
-    const traceIdPattern = /^run-sg-[a-f0-9]+$/;
+    // Trace IDs should match the pattern: run-[prefix]-[hexadecimal]
+    const traceIdPattern = /^run-(sg|lg|ca|openai)-[a-f0-9]+$/;
     if (!traceIdPattern.test(traceId)) {
         throw new Error('Invalid trace ID format');
     }
@@ -89,9 +91,10 @@ export function validateFilePath(filePath: string, workspaceRoot: string): strin
 
 /**
  * Validates backend option
+ * Canonical set: stub | local | gateway
  */
 export function validateBackend(backend: string): string {
-    const allowedBackends = ['gateway', 'local', 'remote'];
+    const allowedBackends = ['stub', 'local', 'gateway'];
     
     if (!backend || typeof backend !== 'string') {
         throw new Error('Invalid backend: must be a non-empty string');

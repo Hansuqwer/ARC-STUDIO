@@ -24,6 +24,13 @@ import {
     ArcError,
     ArcErrorCode
 } from '../common/arc-protocol';
+import {
+    sanitizePrompt as strictSanitizePrompt,
+    validateTraceId as strictValidateTraceId,
+    validateBackend as strictValidateBackend,
+    sanitizeErrorMessage as strictSanitizeErrorMessage,
+    validateWorkspaceRoot as strictValidateWorkspaceRoot,
+} from './security-utils';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import { spawn, ChildProcess } from 'child_process';
@@ -34,7 +41,7 @@ export class ArcBackendService implements ArcService {
     private runningProcesses: Map<string, ChildProcess> = new Map();
 
     constructor() {
-        this.workspaceRoot = this.validateWorkspaceRoot(process.cwd());
+        this.workspaceRoot = strictValidateWorkspaceRoot(process.cwd());
     }
 
     // ========== Public API ==========
@@ -57,7 +64,7 @@ export class ArcBackendService implements ArcService {
             this.validatePrompt(prompt);
 
             // Validate and sanitize options
-            const backend = this.validateBackend(options?.backend || 'gateway');
+            const backend = strictValidateBackend(options?.backend || 'gateway');
             const costAllowed = options?.costAllowed !== false;
             const timeout = options?.timeout || 300000;
             const workspaceRoot = options?.workspaceRoot || this.workspaceRoot;
@@ -73,7 +80,7 @@ export class ArcBackendService implements ArcService {
             }
 
             // Sanitize prompt for safe command execution
-            const sanitizedPrompt = this.sanitizePrompt(prompt);
+            const sanitizedPrompt = strictSanitizePrompt(prompt);
 
             // Build command arguments:
             // swarmgraph swarm --json "<prompt>" [--backend gateway|stub]
@@ -142,7 +149,7 @@ export class ArcBackendService implements ArcService {
             return {
                 runId: 'failed',
                 status: 'failed',
-                error: this.sanitizeErrorMessage(error),
+                error: strictSanitizeErrorMessage(error),
                 tracePath: '',
                 duration
             };
@@ -189,7 +196,7 @@ export class ArcBackendService implements ArcService {
             throw new ArcError(
                 ArcErrorCode.UNKNOWN,
                 'Failed to retrieve trace files',
-                { error: this.sanitizeErrorMessage(error) }
+                { error: strictSanitizeErrorMessage(error) }
             );
         }
     }
@@ -200,7 +207,7 @@ export class ArcBackendService implements ArcService {
      async readTrace(traceId: string): Promise<TraceData> {
         const startTime = Date.now();
         try {
-            this.validateTraceId(traceId);
+            strictValidateTraceId(traceId);
 
             const tracePath = path.join(this.workspaceRoot, '.arc', 'traces', `${traceId}.jsonl`);
 
@@ -234,7 +241,7 @@ export class ArcBackendService implements ArcService {
             throw new ArcError(
                 ArcErrorCode.UNKNOWN,
                 `Failed to read trace: ${traceId}`,
-                { error: this.sanitizeErrorMessage(error) }
+                { error: strictSanitizeErrorMessage(error) }
             );
         }
     }
@@ -245,7 +252,7 @@ export class ArcBackendService implements ArcService {
      * Uses line-by-line parsing to handle large trace files efficiently.
      */
     async streamTrace(traceId: string): Promise<AsyncIterable<TraceEvent>> {
-        this.validateTraceId(traceId);
+        strictValidateTraceId(traceId);
 
         const tracePath = path.join(this.workspaceRoot, '.arc', 'traces', `${traceId}.jsonl`);
 
@@ -307,7 +314,7 @@ export class ArcBackendService implements ArcService {
         let format: 'json' | 'jsonl' | 'unknown' = 'unknown';
 
         try {
-            this.validateTraceId(traceId);
+            strictValidateTraceId(traceId);
 
             const tracePath = path.join(this.workspaceRoot, '.arc', 'traces', `${traceId}.jsonl`);
 
@@ -385,7 +392,7 @@ export class ArcBackendService implements ArcService {
                 format
             };
         } catch (error) {
-            errors.push(`Validation error: ${this.sanitizeErrorMessage(error)}`);
+            errors.push(`Validation error: ${strictSanitizeErrorMessage(error)}`);
             return { valid: false, errors, warnings, format };
         }
     }
@@ -417,7 +424,7 @@ export class ArcBackendService implements ArcService {
             return {
                 success: false,
                 runId,
-                message: this.sanitizeErrorMessage(error)
+                message: strictSanitizeErrorMessage(error)
             };
         }
     }
@@ -911,7 +918,7 @@ export class ArcBackendService implements ArcService {
             try {
                 JSON.parse(line);
             } catch (error) {
-                errors.push(`Line ${i + 1}: Invalid JSON - ${this.sanitizeErrorMessage(error)}`);
+                errors.push(`Line ${i + 1}: Invalid JSON - ${strictSanitizeErrorMessage(error)}`);
             }
         }
 
@@ -1247,85 +1254,6 @@ export class ArcBackendService implements ArcService {
     }
 
     /**
-     * Validate workspace root.
-     */
-    private validateWorkspaceRoot(root: string): string {
-        if (!root || typeof root !== 'string') {
-            throw new ArcError(
-                ArcErrorCode.INVALID_INPUT,
-                'Invalid workspace root',
-                { root }
-            );
-        }
-
-        const normalized = path.normalize(root);
-
-        // Prevent path traversal
-        if (normalized.includes('..')) {
-            throw new ArcError(
-                ArcErrorCode.INVALID_INPUT,
-                'Workspace root contains invalid path traversal',
-                { root }
-            );
-        }
-
-        return normalized;
-    }
-
-    /**
-     * Validate backend option.
-     */
-    private validateBackend(backend: string): 'gateway' | 'stub' {
-        if (backend !== 'gateway' && backend !== 'stub') {
-            throw new ArcError(
-                ArcErrorCode.INVALID_INPUT,
-                'Invalid backend option. Must be "gateway" or "stub"',
-                { backend }
-            );
-        }
-        return backend;
-    }
-
-    /**
-     * Validate trace ID format.
-     */
-    private validateTraceId(traceId: string): void {
-        if (!traceId || typeof traceId !== 'string') {
-            throw new ArcError(
-                ArcErrorCode.INVALID_INPUT,
-                'Invalid trace ID',
-                { traceId }
-            );
-        }
-
-        // Only allow alphanumeric, hyphens, and underscores
-        if (!/^[a-zA-Z0-9_-]+$/.test(traceId)) {
-            throw new ArcError(
-                ArcErrorCode.INVALID_INPUT,
-                'Trace ID contains invalid characters',
-                { traceId }
-            );
-        }
-
-        // Prevent path traversal
-        if (traceId.includes('..') || traceId.includes('/') || traceId.includes('\\')) {
-            throw new ArcError(
-                ArcErrorCode.INVALID_INPUT,
-                'Trace ID contains invalid path characters',
-                { traceId }
-            );
-        }
-    }
-
-    /**
-     * Sanitize prompt for safe command execution.
-     */
-    private sanitizePrompt(prompt: string): string {
-        // Remove null bytes and control characters
-        return prompt.replace(/[\x00-\x1F\x7F]/g, '');
-    }
-
-    /**
      * Extract run ID from command output.
      */
     private extractRunId(output: string): string | null {
@@ -1351,20 +1279,5 @@ export class ArcBackendService implements ArcService {
         }
 
         return null;
-    }
-
-    /**
-     * Sanitize error messages to prevent information leakage.
-     */
-    private sanitizeErrorMessage(error: any): string {
-        if (typeof error === 'string') {
-            return error;
-        }
-
-        if (error instanceof Error) {
-            return error.message;
-        }
-
-        return 'An unknown error occurred';
     }
 }

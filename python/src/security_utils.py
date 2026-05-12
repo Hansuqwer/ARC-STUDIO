@@ -69,8 +69,9 @@ def validate_trace_id(trace_id: str) -> str:
     if not trace_id or not isinstance(trace_id, str):
         raise SecurityError("Invalid trace ID: must be a non-empty string")
     
-    # Trace IDs should match the pattern: run-sg-[hexadecimal]
-    if not re.match(r'^run-sg-[a-f0-9]+$', trace_id):
+    # Trace IDs should match the pattern: run-[prefix]-[hexadecimal]
+    # Supports: sg (SwarmGraph), lg (LangGraph), ca (Claude), openai
+    if not re.match(r'^run-(sg|lg|ca|openai)-[a-f0-9]+$', trace_id):
         raise SecurityError("Invalid trace ID format")
     
     # Additional check: ensure no path traversal characters
@@ -117,6 +118,7 @@ def validate_file_path(file_path: str, workspace_root: str) -> Path:
 def validate_backend(backend: str) -> str:
     """
     Validates backend option.
+    Canonical set: stub | local | gateway
     
     Args:
         backend: Backend identifier
@@ -127,7 +129,7 @@ def validate_backend(backend: str) -> str:
     Raises:
         SecurityError: If backend is invalid
     """
-    allowed_backends = ['gateway', 'local', 'remote']
+    allowed_backends = ['stub', 'local', 'gateway']
     
     if not backend or not isinstance(backend, str):
         raise SecurityError("Invalid backend: must be a non-empty string")

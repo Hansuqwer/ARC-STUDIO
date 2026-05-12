@@ -65,9 +65,15 @@ async def execute_workflow(request: ExecutionRequest):
         sanitized_prompt = sanitize_prompt(request.prompt)
         validated_backend = validate_backend(request.backend)
         
-        # Use subprocess with list arguments to prevent command injection
-        # Pass prompt as separate argument, not interpolated into command string
-        cmd = ["swarmgraph", "swarm", "--json", sanitized_prompt]
+        # Build command with validated backend and cost flags
+        cmd = [
+            "swarmgraph", "swarm",
+            "--json",
+            "--backend", validated_backend,
+            "--prompt", sanitized_prompt,
+        ]
+        if not request.cost_allowed:
+            cmd.append("--no-cost")
         
         result = subprocess.run(
             cmd,
