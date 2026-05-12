@@ -82,6 +82,15 @@ async def test_runs_api_and_sse_events(tmp_path, unused_tcp_port):
                 assert events[1]["type"] == "RUN_COMPLETED"
                 assert events[-1]["type"] == "STREAM_END"
 
+            async with session.get(f"{base_url}/api/runs/missing-run/events") as response:
+                body = await response.text()
+                assert response.status == 200
+                lines = [line.removeprefix("data: ") for line in body.splitlines() if line.startswith("data: ")]
+                events = [json.loads(line) for line in lines]
+                assert events[0]["type"] == "RUN_ERROR"
+                assert events[0]["data"]["code"] == "RUN_NOT_FOUND"
+                assert events[-1]["type"] == "STREAM_END"
+
             async with session.get(f"{base_url}/api/providers") as response:
                 payload = await response.json()
                 assert response.status == 200

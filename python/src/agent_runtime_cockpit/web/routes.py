@@ -313,7 +313,19 @@ async def run_events_sse(request: web.Request) -> web.StreamResponse:
     await response.prepare(request)
 
     run = _trace_store(request).load(run_id)
-    if run:
+    if not run:
+        error = {
+            "type": "RUN_ERROR",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "run_id": run_id,
+            "sequence": 0,
+            "data": {
+                "code": "RUN_NOT_FOUND",
+                "error": f"Run not found: {run_id}",
+            },
+        }
+        await response.write(f"data: {json.dumps(error)}\n\n".encode())
+    else:
         for event in run.events:
             data = json.dumps(event.model_dump(), default=str)
             await response.write(f"data: {data}\n\n".encode())
