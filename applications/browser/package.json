@@ -41,6 +41,7 @@
     "arc-context": "workspace:*",
     "arc-adapters": "workspace:*",
     "arc-settings": "workspace:*",
+    "arc-health": "workspace:*",
     "arc-event-stream": "workspace:*"
   },
   "devDependencies": {

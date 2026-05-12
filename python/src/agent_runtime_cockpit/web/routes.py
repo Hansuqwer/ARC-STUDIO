@@ -23,6 +23,7 @@ from ..protocol.schemas import WorkspaceInfo
 from ..security.validation import validate_workspace_path
 from ..security.redaction import Redactor
 from ..storage.jsonl import JsonlTraceStore
+from ..telemetry.otlp_exporter import export_run_to_otlp, validate_otlp_endpoint
 from ..workspace import iter_workspace_files
 from ..providers import (
     PROVIDERS,
@@ -334,6 +335,38 @@ async def run_events_sse(request: web.Request) -> web.StreamResponse:
     return response
 
 
+async def export_trace(request: web.Request) -> web.Response:
+    """Export run trace to OTLP endpoint."""
+    run_id = request.match_info["run_id"]
+    
+    try:
+        body = await request.json()
+        endpoint = body.get("endpoint", "")
+    except Exception:
+        return _json(err(ArcErrorCode.INVALID_INPUT, "Invalid JSON body").model_dump(), 400)
+    
+    # Validate endpoint
+    is_valid, warning = validate_otlp_endpoint(endpoint)
+    if not is_valid:
+        return _json(err(ArcErrorCode.INVALID_INPUT, warning or "Invalid endpoint").model_dump(), 400)
+    
+    # Load run
+    run = _trace_store(request).load(run_id)
+    if not run:
+        return _json(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}").model_dump(), 404)
+    
+    # Export
+    try:
+        success = export_run_to_otlp(run, endpoint)
+        result = {"exported": success}
+        if warning:
+            result["warning"] = warning
+        return _json(ok(result).model_dump())
+    except Exception as e:
+        log.error(f"OTLP export failed: {e}")
+        return _json(err(ArcErrorCode.INTERNAL_ERROR, f"Export failed: {str(e)}").model_dump(), 500)
+
+
 def setup_routes(app: web.Application) -> None:
     app.router.add_get("/health",                health)
     app.router.add_get("/api/inspect",           inspect)
@@ -346,6 +379,7 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_post("/api/runs/start",       start_run)
     app.router.add_get("/api/runs/{run_id}",     get_run)
     app.router.add_get("/api/runs/{run_id}/events", run_events_sse)
+    app.router.add_post("/api/telemetry/export/{run_id}", export_trace)
     app.router.add_get("/api/context/pack",      context_pack)
     app.router.add_get("/api/providers",         providers)
     app.router.add_get("/api/providers/status",  providers_status)
