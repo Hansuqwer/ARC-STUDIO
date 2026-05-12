@@ -13,6 +13,7 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { ArcFrontendService } from 'arc-core/lib/browser/arc-frontend-service';
 import { RunRecord, RunEvent } from 'arc-core/lib/common/arc-protocol';
 import { AGUIEventType, safeEvent } from '@arc/ag-ui';
+import { List, ListImperativeAPI } from 'react-window';
 
 // AG-UI Event Type Icons (33 canonical types from packages/arc-ag-ui/src/event-types.ts)
 const EVENT_ICONS: Record<string, string> = {
@@ -155,6 +156,8 @@ export class ArcEventStreamWidget extends ReactWidget {
   protected reconnectAttempts = 0;
   protected readonly MAX_RECONNECT_ATTEMPTS = 5;
   protected readonly RECONNECT_DELAY = 2000;
+  protected readonly EVENT_ITEM_HEIGHT = 60;
+  protected listRef = React.createRef<ListImperativeAPI>();
 
   @postConstruct()
   protected init(): void {
@@ -227,11 +230,62 @@ export class ArcEventStreamWidget extends ReactWidget {
   }
 
   protected scrollToBottom(): void {
-    const eventList = this.node.querySelector('.event-list');
-    if (eventList) {
-      eventList.scrollTop = eventList.scrollHeight;
+    if (this.listRef.current) {
+      const filteredEvents = this.getFilteredEvents();
+      this.listRef.current.scrollToRow({ index: filteredEvents.length - 1, align: 'end' });
     }
   }
+
+  protected renderEventRow = ({ index, style, ariaAttributes }: { 
+    index: number; 
+    style: React.CSSProperties;
+    ariaAttributes: {
+      'aria-posinset': number;
+      'aria-setsize': number;
+      role: 'listitem';
+    };
+  }): React.ReactElement => {
+    const filteredEvents = this.getFilteredEvents();
+    const event = filteredEvents[index];
+    
+    return (
+      <div
+        {...ariaAttributes}
+        key={`${event.sequence}-${index}`}
+        data-testid={`arc-event-stream-event-${event.type}`}
+        onClick={() => this.selectEvent(event)}
+        style={{
+          ...style,
+          padding: '8px 12px',
+          cursor: 'pointer',
+          borderBottom: '1px solid var(--theia-widget-border)',
+          fontSize: '12px',
+          backgroundColor: this.state.selectedEvent?.sequence === event.sequence
+            ? 'var(--theia-list-activeSelectionBackground)'
+            : index % 2 === 0
+            ? 'var(--theia-list-hoverBackground)'
+            : 'transparent',
+        }}
+      >
+        <div style={styles.eventHeader}>
+          <span style={styles.eventSequence}>#{event.sequence}</span>
+          <span style={styles.eventIcon}>{EVENT_ICONS[event.type] || '📄'}</span>
+          <span
+            style={{
+              ...styles.eventType,
+              color: EVENT_COLORS[event.type] || 'var(--theia-foreground)',
+            }}
+          >
+            {event.type}
+          </span>
+          <span style={styles.eventTimestamp}>
+            {new Date(event.timestamp).toLocaleTimeString()}
+          </span>
+        </div>
+        {this.renderEventPreview(event)}
+      </div>
+    );
+  };
 
   protected connectSSE(runId: string): void {
     if (this.eventSource) {
@@ -423,38 +477,14 @@ export class ArcEventStreamWidget extends ReactWidget {
                   </span>
                 </div>
                 <div className="event-list" style={styles.eventList}>
-                  {filteredEvents.map((event, idx) => (
-                    <div
-                      key={`${event.sequence}-${idx}`}
-                      data-testid={`arc-event-stream-event-${event.type}`}
-                      onClick={() => this.selectEvent(event)}
-                      style={{
-                        ...styles.eventItem,
-                        backgroundColor: this.state.selectedEvent?.sequence === event.sequence
-                          ? 'var(--theia-list-activeSelectionBackground)'
-                          : idx % 2 === 0
-                          ? 'var(--theia-list-hoverBackground)'
-                          : 'transparent',
-                      }}
-                    >
-                      <div style={styles.eventHeader}>
-                        <span style={styles.eventSequence}>#{event.sequence}</span>
-                        <span style={styles.eventIcon}>{EVENT_ICONS[event.type] || '📄'}</span>
-                        <span
-                          style={{
-                            ...styles.eventType,
-                            color: EVENT_COLORS[event.type] || 'var(--theia-foreground)',
-                          }}
-                        >
-                          {event.type}
-                        </span>
-                        <span style={styles.eventTimestamp}>
-                          {new Date(event.timestamp).toLocaleTimeString()}
-                        </span>
-                      </div>
-                      {this.renderEventPreview(event)}
-                    </div>
-                  ))}
+                  <List
+                    listRef={this.listRef}
+                    rowCount={filteredEvents.length}
+                    rowHeight={this.EVENT_ITEM_HEIGHT}
+                    rowComponent={this.renderEventRow}
+                    rowProps={{}}
+                    style={{ overflow: 'auto' }}
+                  />
                 </div>
               </React.Fragment>
             ) : (
