@@ -5,7 +5,7 @@
 | PR1 | grep -q "AG-UI" docs/VERIFICATION.md                                                | yes        | ✅ PASS |
 | PR2 | cd packages/arc-ag-ui && pnpm test                                                  | yes        | ✅ PASS |
 | PR3 | cd packages/arc-ag-ui && pnpm test  (golden fixtures included)                     | yes        | ✅ PASS |
-| PR4 | uv run pytest python/arc_daemon/adapters/test_openai_agents.py                     | yes        | PENDING |
+| PR4 | cd python && uv run pytest tests/adapters/test_openai_agents.py                    | yes        | ✅ PASS |
 | PR5 | pnpm test --workspace theia-extensions/arc-event-stream                             | yes        | PENDING |
 | ... | ...                                                                                 |            |        |
 
@@ -56,7 +56,7 @@ is accepted, otherwise the agent halts.
 - `.github/workflows/arc-roadmap-gate.yml` - CI gate workflow
 
 ### Next Steps
-Ready for PR4: OpenAI Agents SDK Adapter Skeleton
+Ready for PR5: AG-UI Event Stream View Shell
 
 ### Security Checklist ✅
 - [x] No API keys, tokens, or credentials in code
@@ -76,3 +76,72 @@ Ready for PR4: OpenAI Agents SDK Adapter Skeleton
 - [x] Golden fixture tests pass
 - [x] Schema validation works
 - [x] Documentation complete
+
+---
+
+## PR4 Completion Summary (2026-05-12)
+
+### Completed Items
+✅ **PR4: OpenAI Agents SDK Adapter** - Full adapter implementation with dual gating and event capture
+
+### Implementation Details
+- **Dual Gating Enforced**: Requires both `ARC_OPENAI_RUN_BACKEND` and `ARC_OPENAI_ALLOW_COSTS` to be set
+- **RunHooks Integration**: Captures agent lifecycle events (agent start/end, tool calls, handoffs)
+- **Event Capture**: AGENT_START, AGENT_END, TOOL_START, TOOL_END, HANDOFF events
+- **SDK Detection**: Detects OpenAI Agents projects via dependency and import analysis
+- **Capability Reporting**: Honest reporting of SDK availability and gating status
+
+### Test Results
+```
+18 passed in 0.04s
+
+✓ test_adapter_id
+✓ test_adapter_name
+✓ test_capabilities_without_sdk
+✓ test_capabilities_with_sdk
+✓ test_detect_with_agents_file
+✓ test_detect_without_agents
+✓ test_capability_report_missing_sdk
+✓ test_capability_report_missing_backend_env
+✓ test_capability_report_missing_allow_costs
+✓ test_capability_report_fully_gated
+✓ test_run_workflow_missing_backend_gate
+✓ test_run_workflow_missing_allow_costs_gate
+✓ test_run_workflow_missing_sdk
+✓ test_run_workflow_with_fake_sdk
+✓ test_run_workflow_captures_events
+✓ test_export_workflow
+✓ test_export_workflow_not_detected
+✓ test_no_live_provider_regression
+```
+
+### Full Test Suite
+```
+165 passed in 5.29s (all Python tests)
+```
+
+### Files Modified
+- `python/src/agent_runtime_cockpit/adapters/openai_agents.py` - Full adapter implementation (287 lines added)
+- `python/tests/adapters/test_openai_agents.py` - Comprehensive test suite (307 lines added)
+
+### Security Checklist ✅
+- [x] Dual gating enforced (ARC_OPENAI_RUN_BACKEND + ARC_OPENAI_ALLOW_COSTS)
+- [x] No live calls without both gates enabled
+- [x] SDK availability checked before execution
+- [x] RunRecord returned on failure (no exceptions leak to user)
+- [x] Event data truncated to prevent memory issues
+- [x] No secrets in test fixtures
+- [x] No-live-provider regression test passes
+
+### Acceptance Criteria Met ✅
+- [x] Adapter registered in registry
+- [x] Dual gating implemented and tested
+- [x] RunHooks capture agent/tool/handoff events
+- [x] SDK availability detection works
+- [x] Capability reporting accurate
+- [x] Stub execution works without SDK
+- [x] Live execution blocked without gates
+- [x] All 18 adapter tests pass
+- [x] Full test suite passes (165 tests)
+- [x] No regressions in existing adapters
+
