@@ -2,9 +2,14 @@
   "name": "arc-event-stream",
   "version": "0.1.0-alpha",
   "description": "ARC Studio event stream — universal AG-UI event renderer",
-  "keywords": ["theia-extension"],
+  "keywords": [
+    "theia-extension"
+  ],
   "license": "Apache-2.0",
-  "files": ["lib", "src"],
+  "files": [
+    "lib",
+    "src"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "watch": "tsc -p tsconfig.json --watch",
@@ -13,12 +18,16 @@
     "test": "echo 'arc-event-stream test ok'"
   },
   "theiaExtensions": [
-    { "frontend": "lib/browser/arc-event-stream-frontend-module" }
+    {
+      "frontend": "lib/browser/arc-event-stream-frontend-module"
+    }
   ],
   "dependencies": {
-    "@theia/core": "1.71.0",
     "@arc/ag-ui": "workspace:*",
-    "arc-core": "workspace:*"
+    "@theia/core": "1.71.0",
+    "@types/react-window": "^2.0.0",
+    "arc-core": "workspace:*",
+    "react-window": "^2.2.7"
   },
   "devDependencies": {
     "@theia/cli": "1.71.0",
