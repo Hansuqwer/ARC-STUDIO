@@ -112,4 +112,8 @@ export class ArcFrontendService {
   async getProviderRouting(): Promise<ArcEnvelope<ProviderRoutingPolicy>> {
     return this.arcService.getProviderRouting();
   }
+
+  async exportTraceToOTLP(runId: string, endpoint: string): Promise<ArcEnvelope<{ exported: boolean; warning?: string }>> {
+    return this.arcService.exportTraceToOTLP(runId, endpoint);
+  }
 }
