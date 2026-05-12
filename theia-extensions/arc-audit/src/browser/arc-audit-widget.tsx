@@ -1,22 +1,9 @@
-/**
- * ARC Audit Widget — audit chain viewer
- *
- * MOCK_REASON: Audit chain not yet implemented in Python backend
- * REAL_IMPLEMENTATION_PATH: python/src/agent_runtime_cockpit/storage/jsonl.py (audit log)
- * LOCAL_FIX_STEPS: Implement audit JSONL persistence and /api/audit endpoint
- * OWNER: Audit Viewer Agent
- * REMOVE_BEFORE: Beta
- */
+/** ARC Audit Widget — audit chain viewer. */
 import * as React from 'react';
 import { injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 
-const MOCK_AUDIT_ENTRIES = [
-  { id: 'audit-001', timestamp: new Date(Date.now() - 10000).toISOString(), action: 'RUN_STARTED', actor: 'user', details: { run_id: 'run-mock-001', workflow: 'ResearchSwarm' }, verified: true },
-  { id: 'audit-002', timestamp: new Date(Date.now() - 9000).toISOString(), action: 'NODE_EXECUTED', actor: 'system', details: { node: 'researcher', duration_ms: 1200 }, verified: true },
-  { id: 'audit-003', timestamp: new Date(Date.now() - 7000).toISOString(), action: 'NODE_EXECUTED', actor: 'system', details: { node: 'writer', duration_ms: 800 }, verified: true },
-  { id: 'audit-004', timestamp: new Date(Date.now() - 5000).toISOString(), action: 'RUN_COMPLETED', actor: 'system', details: { status: 'success' }, verified: true },
-];
+const AUDIT_ENTRIES: Array<{ id: string; timestamp: string; action: string; actor: string; details: Record<string, unknown>; verified: boolean }> = [];
 
 @injectable()
 export class ArcAuditWidget extends ReactWidget {
@@ -36,13 +23,18 @@ export class ArcAuditWidget extends ReactWidget {
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
           <h2 style={{ margin: 0, fontSize: '15px' }}>🔐 Audit Chain</h2>
           <span style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: '#3d2500', color: '#ffb74d', borderRadius: '10px', border: '1px solid #ffb74d' }}>
-            MOCK — fixture data
+            Not implemented
           </span>
         </div>
         <div style={{ marginBottom: '16px', padding: '8px 12px', backgroundColor: '#3d2500', border: '1px solid #ffb74d', borderRadius: '4px', fontSize: '12px', color: '#ffb74d' }}>
-          ⚠ Audit chain uses fixture data. Real audit persistence requires ARC daemon with JSONL storage.
+          Audit chain persistence is not implemented yet. No audit entries are shown until the ARC daemon exposes an audit endpoint.
         </div>
-        {MOCK_AUDIT_ENTRIES.map(entry => (
+        {AUDIT_ENTRIES.length === 0 && (
+          <div style={{ padding: '12px', color: 'var(--theia-descriptionForeground)', fontSize: '12px' }}>
+            No audit entries available.
+          </div>
+        )}
+        {AUDIT_ENTRIES.map(entry => (
           <div key={entry.id} style={{ marginBottom: '8px', padding: '10px 14px', backgroundColor: 'var(--theia-editor-background)', border: `1px solid ${entry.verified ? '#4caf50' : '#ef5350'}`, borderRadius: '6px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span style={{ fontWeight: 600, fontSize: '12px' }}>{entry.action}</span>

@@ -3,15 +3,6 @@ Context7 Provider
 
 Retrieves current, version-specific library documentation via the Context7 API.
 Source: https://context7.com/docs/api-guide
-
-MOCK_REASON: Context7 API key not available in sandbox environment.
-REAL_IMPLEMENTATION_PATH: Set ARC_CONTEXT7_API_KEY env var or arc.context.context7ApiKey preference.
-LOCAL_FIX_STEPS:
-    1. Get API key from https://context7.com/
-    2. Set env: export ARC_CONTEXT7_API_KEY=your_key
-    3. Or set in ARC settings: arc.context.context7ApiKey
-OWNER: Context Retrieval Agent
-REMOVE_BEFORE: Beta
 """
 from __future__ import annotations
 
@@ -22,12 +13,6 @@ from pathlib import Path
 from ...protocol.schemas import ContextPackEntry, SourceType
 
 log = logging.getLogger(__name__)
-
-MOCK_REASON = "Context7 API key not set"
-REAL_IMPLEMENTATION_PATH = "context/providers/context7.py → _real_retrieve()"
-LOCAL_FIX_STEPS = "export ARC_CONTEXT7_API_KEY=<your_key>"
-OWNER = "Context Retrieval Agent"
-REMOVE_BEFORE = "Beta"
 
 CONTEXT7_BASE_URL = "https://api.context7.com/v1"
 
@@ -44,19 +29,19 @@ KNOWN_LIBRARY_IDS = {
 
 
 class Context7Provider:
-    """Retrieves docs from Context7 API. Falls back to mock when key absent."""
+    """Retrieves docs from Context7 API when configured."""
 
     source_type = SourceType.CONTEXT7
 
     def __init__(self) -> None:
         self.api_key = os.environ.get("ARC_CONTEXT7_API_KEY", "")
-        self._mock = not bool(self.api_key)
-        if self._mock:
-            log.warning("Context7: API key not set — using mock provider. Set ARC_CONTEXT7_API_KEY.")
+        self._offline = not bool(self.api_key)
+        if self._offline:
+            log.info("Context7 disabled: ARC_CONTEXT7_API_KEY not set.")
 
     def retrieve(self, task: str, workspace: Optional[Path] = None) -> list[ContextPackEntry]:
-        if self._mock:
-            return self._mock_retrieve(task)
+        if self._offline:
+            return []
         return self._real_retrieve(task)
 
     def _real_retrieve(self, task: str) -> list[ContextPackEntry]:
@@ -99,29 +84,4 @@ class Context7Provider:
             return results
         except ImportError:
             log.warning("httpx not installed — cannot use real Context7 provider")
-            return self._mock_retrieve(task)
-
-    def _mock_retrieve(self, task: str) -> list[ContextPackEntry]:
-        """Mock retrieval — clearly marked, returns plausible fixture."""
-        return [
-            ContextPackEntry(
-                id="ctx7-mock-theia-001",
-                task=task,
-                source="context7:eclipse-theia/theia [MOCK]",
-                source_type=SourceType.CONTEXT7,
-                content=(
-                    "[MOCK — Context7 API key not set]\n\n"
-                    "# Theia Extension Pattern (fixture)\n\n"
-                    "```ts\n"
-                    "// CommandContribution example\n"
-                    "import { CommandContribution, CommandRegistry } from '@theia/core/lib/common';\n"
-                    "// theiaExtensions: [{ frontend: 'lib/browser/my-module' }]\n"
-                    "// bind(CommandContribution).toService(MyContribution);\n"
-                    "```\n\n"
-                    "Real docs: https://theia-ide.org/docs/extensions/"
-                ),
-                url="https://theia-ide.org/docs/extensions/",
-                freshness="1.71.0",
-                relevance_score=0.4,
-            ),
-        ]
+            return []

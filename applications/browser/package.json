@@ -7,10 +7,10 @@
     "build": "theia build --mode development",
     "build:prod": "theia build --mode production",
     "rebuild": "theia rebuild:browser --cacheRoot ../..",
-    "start": "theia start --port 3000 --hostname localhost",
-    "start:arc": "ARC_WORKSPACE_PATH=${ARC_WORKSPACE_PATH:-$PWD} theia start --port 3000 --hostname localhost --root-dir ${ARC_WORKSPACE_PATH:-$PWD}",
-    "start:swarmgraph": "ARC_SWARMGRAPH_CLI=${ARC_SWARMGRAPH_CLI:-$PWD/../../tests/e2e/fixtures/swarmgraph-stub.sh} ARC_WORKSPACE_PATH=${ARC_WORKSPACE_PATH:-$PWD} theia start --port 3000 --hostname localhost --root-dir ${ARC_WORKSPACE_PATH:-$PWD}",
-    "start:debug": "theia start --port 3000 --hostname localhost --loglevel=debug",
+    "start": "theia start --port 3000 --hostname 127.0.0.1",
+    "start:arc": "node ../../scripts/start-browser-arc.mjs",
+    "start:stub": "node ../../scripts/start-browser-stub.mjs",
+    "start:debug": "theia start --port 3000 --hostname 127.0.0.1 --loglevel=debug",
     "watch": "theia build --watch --mode development",
     "clean": "rimraf lib src-gen",
     "check": "echo 'browser check ok'",
@@ -53,8 +53,8 @@
         "applicationName": "ARC Studio",
         "reloadOnReconnect": true,
         "preferences": {
-          "files.enableTrash": false,
-          "security.workspace.trust.enabled": false,
+          "files.enableTrash": true,
+          "security.workspace.trust.enabled": true,
           "workbench.colorTheme": "Dark+ (default dark)"
         }
       }

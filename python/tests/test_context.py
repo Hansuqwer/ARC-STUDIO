@@ -44,40 +44,39 @@ class TestLocalRepoProvider:
                 assert 0.0 <= e.relevance_score <= 1.0
 
 
-class TestMockProviders:
-    """All external providers must return mock data (not fail) when credentials absent."""
+class TestOfflineProviders:
+    """External providers must return honest empty results when credentials are absent."""
 
-    def test_context7_mock_returns_entries(self):
+    def test_context7_offline_returns_empty(self, monkeypatch):
+        monkeypatch.delenv("ARC_CONTEXT7_API_KEY", raising=False)
         provider = Context7Provider()
-        # Force mock mode
-        provider._mock = True
         entries = provider.retrieve("theia extension")
-        assert len(entries) > 0
-        assert all("[MOCK" in e.content for e in entries)
+        assert entries == []
 
-    def test_vercel_grep_mock_returns_entries(self):
+    def test_vercel_grep_unavailable_returns_empty(self, monkeypatch):
         provider = VercelGrepProvider()
-        entries = provider._mock_retrieve("theia widget")
-        assert len(entries) > 0
-        assert entries[0].source_type == SourceType.VERCEL_GREP
+        monkeypatch.setattr(provider, "_scrape", lambda task: (_ for _ in ()).throw(RuntimeError("offline")))
+        entries = provider.retrieve("theia widget")
+        assert entries == []
 
-    def test_github_mock_returns_entries(self):
+    def test_github_offline_returns_empty(self, monkeypatch):
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
         provider = GitHubCodeSearchProvider()
-        provider._mock = True
         entries = provider.retrieve("CommandContribution")
-        assert len(entries) > 0
+        assert entries == []
 
-    def test_web_search_mock_returns_entries(self):
+    def test_web_search_offline_returns_empty(self, monkeypatch):
+        monkeypatch.delenv("ARC_SEARCH_API_KEY", raising=False)
         provider = WebSearchProvider()
-        provider._mock = True
         entries = provider.retrieve("langgraph 2025 changes")
-        assert len(entries) > 0
+        assert entries == []
 
-    def test_mock_entries_have_source_type(self):
+    def test_offline_entries_are_empty_or_well_formed(self, monkeypatch):
+        monkeypatch.delenv("ARC_CONTEXT7_API_KEY", raising=False)
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        monkeypatch.delenv("ARC_SEARCH_API_KEY", raising=False)
         for ProviderClass in [Context7Provider, VercelGrepProvider, GitHubCodeSearchProvider, WebSearchProvider]:
             provider = ProviderClass()
-            if hasattr(provider, '_mock'):
-                provider._mock = True
             entries = provider.retrieve("test task")
             for e in entries:
                 assert e.source_type is not None

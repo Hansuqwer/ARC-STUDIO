@@ -18,6 +18,8 @@ import {
   RunRecord,
   ContextPackEntry,
   ProviderStatus,
+  ProviderDefinition,
+  ProviderRoutingPolicy,
 } from '../common/arc-protocol';
 
 @injectable()
@@ -57,7 +59,8 @@ export class ArcFrontendService {
   }
 
   async startRun(workflowId: string, inputs?: Record<string, unknown>): Promise<ArcEnvelope<RunRecord>> {
-    return this.arcService.startRun(workflowId, inputs);
+    const path = await this.getWorkspacePath();
+    return this.arcService.startRun(workflowId, { ...(inputs ?? {}), workspacePath: path });
   }
 
   async getRun(runId: string): Promise<ArcEnvelope<RunRecord>> {
@@ -85,5 +88,17 @@ export class ArcFrontendService {
   async getWorkspaceStatus(): Promise<ArcEnvelope<{ frontendPath: string; backendPath: string; source: string }>> {
     const path = await this.getWorkspacePath();
     return this.arcService.getWorkspaceStatus(path);
+  }
+
+  async listProviders(): Promise<ArcEnvelope<ProviderDefinition[]>> {
+    return this.arcService.listProviders();
+  }
+
+  async listProviderStatuses(): Promise<ArcEnvelope<ProviderStatus[]>> {
+    return this.arcService.listProviderStatuses();
+  }
+
+  async getProviderRouting(): Promise<ArcEnvelope<ProviderRoutingPolicy>> {
+    return this.arcService.getProviderRouting();
   }
 }

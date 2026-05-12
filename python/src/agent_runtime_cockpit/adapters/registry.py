@@ -81,12 +81,26 @@ class AdapterRegistry:
 
     def build_default(self) -> "AdapterRegistry":
         """Build registry with all built-in adapters."""
+        from .crewai import CrewAIAdapter
         from .swarmgraph import SwarmGraphAdapter
         from .langgraph import LangGraphAdapter
+        from .llamaindex import LlamaIndexAdapter
+        from .openai_agents import OpenAIAgentsAdapter
         self.register(SwarmGraphAdapter())
         self.register(LangGraphAdapter())
+        self.register(CrewAIAdapter())
+        self.register(OpenAIAgentsAdapter())
+        self.register(LlamaIndexAdapter())
         return self
 
 
 def default_registry() -> AdapterRegistry:
     return AdapterRegistry().build_default()
+
+
+def get_adapter(adapter_id: str) -> Optional[RuntimeAdapter]:
+    return default_registry().get(adapter_id)
+
+
+def iter_adapters() -> list[RuntimeAdapter]:
+    return default_registry().all()

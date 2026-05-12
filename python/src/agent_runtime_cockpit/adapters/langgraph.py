@@ -3,12 +3,6 @@ LangGraph Runtime Adapter
 
 Detects and inspects LangGraph-based agent projects.
 Source: https://docs.langchain.com/oss/python/langgraph/
-
-MOCK_REASON: LangGraph library may not be installed. AST heuristics used as fallback.
-REAL_IMPLEMENTATION_PATH: from langgraph.graph import StateGraph; graph.get_graph()
-LOCAL_FIX_STEPS: pip install langgraph && use graph.get_graph().draw_mermaid_png() or .nodes/.edges
-OWNER: LangGraph Adapter Agent
-REMOVE_BEFORE: Beta
 """
 from __future__ import annotations
 
@@ -17,8 +11,10 @@ import importlib
 import logging
 import os
 import sys
+import warnings
 from pathlib import Path
 
+from ..adapters.base import CapabilityReport
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import (
     WorkflowInfo, WorkflowNode, WorkflowEdge, SchemaInfo,
@@ -29,11 +25,10 @@ from .base import RuntimeAdapter
 
 log = logging.getLogger(__name__)
 
-MOCK_REASON = "LangGraph library not installed; using AST scan + fixture"
-REAL_IMPLEMENTATION_PATH = "adapters/langgraph.py → from langgraph.graph import StateGraph"
+HEURISTIC_REASON = "LangGraph library not installed; using AST scan"
+REAL_IMPLEMENTATION_PATH = "adapters/langgraph.py -> from langgraph.graph import StateGraph"
 LOCAL_FIX_STEPS = "pip install langgraph && call graph.get_graph() directly"
 OWNER = "LangGraph Adapter Agent"
-REMOVE_BEFORE = "Beta"
 
 
 class LangGraphAdapter(RuntimeAdapter):
@@ -56,6 +51,38 @@ class LangGraphAdapter(RuntimeAdapter):
             can_export_workflow=True,
             can_stream_events=False,
             can_audit=False,
+        )
+
+    def capability_report(self, workspace: Path) -> CapabilityReport:
+        detected, _, evidence = self.detect(workspace)
+        if importlib.util.find_spec("langgraph") is None:
+            return CapabilityReport(
+                runtime_id=self.adapter_id,
+                detected=detected,
+                can_run=False,
+                availability="missing_dependency",
+                reason="Install langgraph in this Python environment.",
+                detected_artifacts=evidence,
+                required_env=["ARC_LANGGRAPH_EXPORT"],
+            )
+        if not os.environ.get("ARC_LANGGRAPH_EXPORT"):
+            return CapabilityReport(
+                runtime_id=self.adapter_id,
+                detected=detected,
+                can_run=False,
+                availability="missing_export_target",
+                reason="Set ARC_LANGGRAPH_EXPORT=module:function to run a LangGraph workflow.",
+                detected_artifacts=evidence,
+                required_env=["ARC_LANGGRAPH_EXPORT"],
+            )
+        return CapabilityReport(
+            runtime_id=self.adapter_id,
+            detected=detected,
+            can_run=False,
+            availability="detected_not_runnable",
+            reason="LangGraph run support is planned after CrewAI MVP.",
+            detected_artifacts=evidence,
+            required_env=["ARC_LANGGRAPH_EXPORT"],
         )
 
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
@@ -116,7 +143,9 @@ class LangGraphAdapter(RuntimeAdapter):
 
     def _real_export(self, workspace: Path) -> list[WorkflowInfo]:
         """Attempt real LangGraph export using the installed library."""
-        from langgraph.graph import StateGraph  # type: ignore  # noqa: F401
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*default value of `allowed_objects` will change.*")
+            from langgraph.graph import StateGraph  # type: ignore  # noqa: F401
         target = os.environ.get("ARC_LANGGRAPH_EXPORT", "")
         if not target or ":" not in target:
             raise NotImplementedError("Set ARC_LANGGRAPH_EXPORT=module:function to export a workspace LangGraph")

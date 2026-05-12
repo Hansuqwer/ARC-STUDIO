@@ -55,7 +55,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
     { name = "typer", specifier = ">=0.12" },
 ]
-provides-extras = ["swarmgraph", "langgraph", "context", "all", "dev"]
+provides-extras = ["langgraph", "context", "all", "dev"]
 
 [[package]]
 name = "aiofiles"

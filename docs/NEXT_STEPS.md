@@ -18,7 +18,7 @@ pnpm check:pr
 ```bash
 ARC_WORKSPACE_PATH=/path/to/swarmgraph/workspace \
 ARC_SWARMGRAPH_CLI=/path/to/swarmgraph \
-pnpm start:browser:swarmgraph
+pnpm start:browser:stub
 ```
 
 ### 3. Inspect local run history

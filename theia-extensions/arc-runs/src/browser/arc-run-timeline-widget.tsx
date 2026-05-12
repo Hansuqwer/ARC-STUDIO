@@ -34,6 +34,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
   protected selectedRun: RunRecord | null = null;
   protected loading = false;
   protected streaming = false;
+  protected sseSource?: EventSource;
   protected liveEvents: RunEvent[] = [];
   protected prompt = 'ARC local SwarmGraph smoke run: return one short status sentence.';
   protected workspaceStatus?: { frontendPath: string; backendPath: string; source: string };
@@ -134,7 +135,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
           <button style={secondaryBtnStyle} onClick={() => this.copyText('Run ID', run.id)}>Copy Run ID</button>
           <button style={secondaryBtnStyle} onClick={() => this.replayRun(run)}>Replay Events</button>
           <button style={secondaryBtnStyle} onClick={() => this.clearReplay()}>Show Stored Trace</button>
-          <button style={secondaryBtnStyle} onClick={() => this.connectSseStream(run.id)}>Connect SSE Stream</button>
+          <button style={secondaryBtnStyle} disabled={this.streaming} onClick={() => this.connectSseStream(run.id)}>Connect SSE Stream</button>
           <button style={secondaryBtnStyle} onClick={() => this.exportRunJson(run)}>Export Run JSON</button>
           <div style={{ fontSize: '12px', color: 'var(--theia-descriptionForeground)' }}>
             Workflow: <strong>{run.workflow_id}</strong> ·
@@ -185,7 +186,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
           <option value="">All events</option>
           {types.map(type => <option key={type} value={type}>{type}</option>)}
         </select>
-        <button style={secondaryBtnStyle} onClick={() => this.copyText('Trace JSON', JSON.stringify(run.events, null, 2))}>Copy Trace JSON</button>
+            <button style={secondaryBtnStyle} onClick={() => this.copyText('Trace JSON', JSON.stringify(this.redactValue(run.events), null, 2))}>Copy Trace JSON</button>
       </div>
     );
   }
@@ -200,7 +201,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
           <strong>Selected Event: {this.selectedEvent.type}</strong>
           <button style={secondaryBtnStyle} onClick={() => { this.selectedEvent = null; this.update(); }}>Close</button>
         </div>
-        <pre style={outputBoxStyle}>{JSON.stringify(this.selectedEvent, null, 2)}</pre>
+        <pre style={outputBoxStyle}>{JSON.stringify(this.redactValue(this.selectedEvent), null, 2)}</pre>
       </div>
     );
   }
@@ -327,7 +328,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
               color: 'var(--theia-descriptionForeground)',
               whiteSpace: 'pre-wrap',
             }}>
-              {JSON.stringify(event.data, null, 2)}
+              {JSON.stringify(this.redactValue(event.data), null, 2)}
             </pre>
           )}
         </div>
@@ -352,7 +353,10 @@ export class ArcRunTimelineWidget extends ReactWidget {
     this.runStatusMessage = 'Starting local SwarmGraph run...';
     this.update();
     try {
-      const result = await this.arcService.startRun('wf-swarmgraph-001', { prompt: this.prompt });
+      const result = await this.arcService.startRun('wf-swarmgraph-001', {
+        prompt: this.prompt,
+        workspacePath: this.workspaceStatus?.frontendPath,
+      });
       if (result.data) {
         this.runs = [result.data, ...this.runs];
         this.selectedRun = result.data;
@@ -389,7 +393,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
   }
 
   protected exportRunJson(run: RunRecord): void {
-    const json = JSON.stringify(run, null, 2);
+    const json = JSON.stringify(this.redactValue(run), null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -415,16 +419,21 @@ export class ArcRunTimelineWidget extends ReactWidget {
   }
 
   protected connectSseStream(runId: string): void {
-    const host = window.location.hostname || 'localhost';
+    if (this.sseSource) {
+      this.sseSource.close();
+    }
+    const host = window.location.hostname || '127.0.0.1';
     const url = `http://${host}:7777/api/runs/${encodeURIComponent(runId)}/events`;
     this.liveEvents = [];
     this.streaming = true;
     this.runStatusMessage = 'Connecting to local SSE stream...';
     const source = new EventSource(url);
+    this.sseSource = source;
     source.onmessage = message => {
       const event = JSON.parse(message.data) as RunEvent;
       if (event.type === 'STREAM_END') {
         source.close();
+        this.sseSource = undefined;
         this.streaming = false;
         this.runStatusMessage = 'SSE stream complete.';
       } else {
@@ -435,11 +444,31 @@ export class ArcRunTimelineWidget extends ReactWidget {
     };
     source.onerror = () => {
       source.close();
+      this.sseSource = undefined;
       this.streaming = false;
       this.lastError = `SSE stream unavailable at ${url}. Start \`uv run arc serve\`.`;
       this.update();
     };
     this.update();
+  }
+
+  protected redactValue(value: unknown): unknown {
+    if (typeof value === 'string') {
+      return value
+        .replace(/sk-[A-Za-z0-9_-]{8,}/g, 'sk-REDACTED')
+        .replace(/(api[_-]?key\s*[=:]\s*)[^\s]+/ig, '$1REDACTED')
+        .replace(/(authorization:\s*bearer\s+)[^\s]+/ig, '$1REDACTED');
+    }
+    if (Array.isArray(value)) {
+      return value.map(item => this.redactValue(item));
+    }
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+        key,
+        /(key|token|password|secret|credential|auth)/i.test(key) ? '[REDACTED]' : this.redactValue(item),
+      ]));
+    }
+    return value;
   }
 
   protected async copyText(label: string, value: string): Promise<void> {

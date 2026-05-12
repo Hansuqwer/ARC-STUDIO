@@ -59,5 +59,25 @@ async def test_runs_api_and_sse_events(tmp_path, unused_tcp_port):
                 assert events[0]["type"] == "RUN_STARTED"
                 assert events[1]["type"] == "RUN_COMPLETED"
                 assert events[-1]["type"] == "STREAM_END"
+
+            async with session.get(f"{base_url}/api/providers") as response:
+                payload = await response.json()
+                assert response.status == 200
+                assert payload["ok"] is True
+                assert {provider["id"] for provider in payload["data"]} >= {"openai", "anthropic", "openrouter", "qwen", "kimi"}
+
+            async with session.get(f"{base_url}/api/providers/routing") as response:
+                payload = await response.json()
+                assert response.status == 200
+                assert payload["data"]["dry_run"] is True
+                assert payload["data"]["allow_paid_calls"] is False
+
+            async with session.get(f"{base_url}/api/runtimes/capabilities") as response:
+                payload = await response.json()
+                assert response.status == 200
+                assert payload["data"]["auto_priority"] == ["swarmgraph", "langgraph", "crewai"]
+                ids = {runtime["runtime_id"] for runtime in payload["data"]["runtimes"]}
+                assert ids >= {"swarmgraph", "langgraph", "crewai"}
+                assert all("requires_paid_calls" in runtime for runtime in payload["data"]["runtimes"])
     finally:
         await runner.cleanup()

@@ -20,3 +20,4 @@ applications/*/gen-webpack.node.config.js
 applications/*/webpack.config.js
 test-results/
 tests/e2e/test-results/
+.gitnexus
