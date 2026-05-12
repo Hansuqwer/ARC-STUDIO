@@ -1,0 +1,1045 @@
+/**
+ * ARC Widget Styles
+ * 
+ * Enhanced styles for the ARC Studio widget with UX improvements
+ */
+
+/* ============================================
+   CSS Variables for consistent theming
+   ============================================ */
+:root {
+    --arc-primary-color: var(--theia-ui-font-color, #4a4a4a);
+    --arc-accent-color: #0066cc;
+    --arc-success-color: #28a745;
+    --arc-warning-color: #ffc107;
+    --arc-error-color: #dc3545;
+    --arc-info-color: #17a2b8;
+    --arc-border-radius: 4px;
+    --arc-transition-speed: 0.2s;
+    --arc-font-size-base: 13px;
+}
+
+/* ============================================
+   Base Container Styles
+   ============================================ */
+.arc-widget-container {
+    font-family: var(--theia-ui-font-family);
+    font-size: var(--arc-font-size-base);
+    color: var(--arc-primary-color);
+    padding: 0;
+    margin: 0;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--theia-ui-background);
+}
+
+/* ============================================
+   Header Styles
+   ============================================ */
+.arc-header {
+    position: relative;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, var(--theia-titlePanel-gradient-background1, #f8f9fa) 0%, var(--theia-titlePanel-gradient-background2, #e9ecef) 100%);
+    border-bottom: 1px solid var(--theia-border-color, #ddd);
+    margin-bottom: 0;
+}
+
+.arc-header h2 {
+    margin: 0 0 4px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--theia-ui-font-color1, #333);
+}
+
+.arc-header p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-header-help {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--theia-border-color, #ccc);
+    background: var(--theia-ui-button-background, #fff);
+    color: var(--theia-ui-font-color, #666);
+    font-weight: bold;
+    cursor: pointer;
+    transition: all var(--arc-transition-speed) ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.arc-header-help:hover {
+    background: var(--theia-ui-button-hover-background, #e9ecef);
+    border-color: var(--arc-accent-color);
+    color: var(--arc-accent-color);
+}
+
+.arc-header-help:focus {
+    outline: 2px solid var(--theia-focusBorder, #0066cc);
+    outline-offset: 2px;
+}
+
+/* ============================================
+   Toast Notification Styles
+   ============================================ */
+.arc-toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    max-width: 360px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.arc-toast {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-radius: var(--arc-border-radius);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: toastSlideIn 0.3s ease-out;
+    background: var(--theia-ui-background, #fff);
+    border-left: 4px solid;
+}
+
+.arc-toast-success {
+    border-left-color: var(--arc-success-color);
+}
+
+.arc-toast-error {
+    border-left-color: var(--arc-error-color);
+}
+
+.arc-toast-warning {
+    border-left-color: var(--arc-warning-color);
+}
+
+.arc-toast-info {
+    border-left-color: var(--arc-info-color);
+}
+
+.arc-toast-icon {
+    margin-right: 12px;
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+}
+
+.arc-toast-success .arc-toast-icon { color: var(--arc-success-color); }
+.arc-toast-error .arc-toast-icon { color: var(--arc-error-color); }
+.arc-toast-warning .arc-toast-icon { color: var(--arc-warning-color); }
+.arc-toast-info .arc-toast-icon { color: var(--arc-info-color); }
+
+.arc-toast-message {
+    flex: 1;
+    font-size: 13px;
+    color: var(--theia-ui-font-color, #333);
+}
+
+.arc-toast-dismiss {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--theia-ui-font-color2, #999);
+    padding: 0 0 0 8px;
+    line-height: 1;
+    transition: color var(--arc-transition-speed) ease;
+}
+
+.arc-toast-dismiss:hover {
+    color: var(--theia-ui-font-color, #333);
+}
+
+@keyframes toastSlideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* ============================================
+   Modal Styles
+   ============================================ */
+.arc-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1001;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.arc-modal {
+    background: var(--theia-ui-background, #fff);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    max-width: 500px;
+    width: 90%;
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+.arc-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--theia-border-color, #ddd);
+}
+
+.arc-modal-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.arc-modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--theia-ui-font-color2, #999);
+    padding: 0;
+    line-height: 1;
+    transition: color var(--arc-transition-speed) ease;
+}
+
+.arc-modal-close:hover {
+    color: var(--theia-ui-font-color, #333);
+}
+
+.arc-modal-content {
+    padding: 20px;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes modalSlideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ============================================
+   Keyboard Shortcuts Table
+   ============================================ */
+.arc-shortcuts-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.arc-shortcuts-table th,
+.arc-shortcuts-table td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--theia-border-color, #eee);
+}
+
+.arc-shortcuts-table th {
+    font-weight: 600;
+    color: var(--theia-ui-font-color2, #666);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.arc-shortcuts-table td {
+    font-size: 13px;
+}
+
+.arc-shortcuts-table kbd {
+    display: inline-block;
+    padding: 4px 8px;
+    font-family: monospace;
+    font-size: 12px;
+    background: var(--theia-ui-background, #f5f5f5);
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    color: var(--theia-ui-font-color, #333);
+}
+
+/* ============================================
+   Error Alert Styles
+   ============================================ */
+.arc-error {
+    margin: 16px 20px;
+    padding: 16px;
+    background: #fff5f5;
+    border: 1px solid var(--arc-error-color);
+    border-radius: var(--arc-border-radius);
+    animation: errorSlideIn 0.3s ease-out;
+}
+
+.arc-error-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.arc-error-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+    color: var(--arc-error-color);
+}
+
+.arc-error-text {
+    flex: 1;
+}
+
+.arc-error-title {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--arc-error-color);
+    font-weight: 600;
+}
+
+.arc-error-details {
+    margin: 4px 0 0 0;
+    font-size: 12px;
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-error-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    align-items: center;
+}
+
+.arc-error-dismiss {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--theia-ui-font-color2, #999);
+    padding: 4px 8px;
+}
+
+.arc-error-dismiss:hover {
+    color: var(--theia-ui-font-color, #333);
+}
+
+@keyframes errorSlideIn {
+    from {
+        transform: translateY(-10px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ============================================
+   Content Area Styles
+   ============================================ */
+.arc-content {
+    flex: 1;
+    padding: 16px 20px;
+    overflow-y: auto;
+}
+
+/* ============================================
+   Section Styles (Collapsible)
+   ============================================ */
+.arc-section {
+    margin-bottom: 16px;
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: var(--arc-border-radius);
+    background: var(--theia-ui-background, #fff);
+    overflow: hidden;
+}
+
+.arc-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--theia-ui-header-background, #f8f9fa);
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    transition: background var(--arc-transition-speed) ease;
+}
+
+.arc-section-header:hover {
+    background: var(--theia-ui-header-hover-background, #e9ecef);
+}
+
+.arc-section-header:focus {
+    outline: 2px solid var(--theia-focusBorder, #0066cc);
+    outline-offset: -2px;
+}
+
+.arc-section-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--theia-ui-font-color1, #333);
+}
+
+.arc-section-toggle {
+    font-size: 12px;
+    color: var(--theia-ui-font-color2, #666);
+    transition: transform var(--arc-transition-speed) ease;
+}
+
+.arc-section-content {
+    padding: 16px;
+}
+
+.arc-section-collapsed .arc-section-content {
+    display: none;
+}
+
+.arc-section-description {
+    margin: 0 0 12px 0;
+    font-size: 12px;
+    color: var(--theia-ui-font-color2, #666);
+}
+
+/* ============================================
+   Input Styles
+   ============================================ */
+.arc-input-group {
+    margin-bottom: 12px;
+}
+
+.arc-input-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 500;
+    font-size: 12px;
+    color: var(--theia-ui-font-color, #333);
+}
+
+.arc-input-group input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--theia-input-border, #ccc);
+    border-radius: var(--arc-border-radius);
+    font-size: 13px;
+    background: var(--theia-input-background, #fff);
+    color: var(--theia-ui-font-color, #333);
+    transition: border-color var(--arc-transition-speed) ease, box-shadow var(--arc-transition-speed) ease;
+}
+
+.arc-input-group input:focus {
+    outline: none;
+    border-color: var(--theia-focusBorder, #0066cc);
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.arc-input-group input:disabled {
+    background: var(--theia-input-disabled-background, #f5f5f5);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.arc-help-text {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--theia-ui-font-color2, #888);
+}
+
+.arc-help-text kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    font-family: monospace;
+    font-size: 11px;
+    background: var(--theia-ui-background, #f5f5f5);
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: 3px;
+    color: var(--theia-ui-font-color, #666);
+}
+
+/* ============================================
+   Button Styles
+   ============================================ */
+.arc-widget-container .theia-button {
+    cursor: pointer;
+    transition: all var(--arc-transition-speed) ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: var(--arc-border-radius);
+    border: 1px solid transparent;
+}
+
+.arc-widget-container .theia-button.primary {
+    background: var(--arc-accent-color);
+    color: #fff;
+    border-color: var(--arc-accent-color);
+}
+
+.arc-widget-container .theia-button.primary:hover:not(:disabled) {
+    background: #0052a3;
+}
+
+.arc-widget-container .theia-button:not(.primary) {
+    background: var(--theia-ui-button-background, #fff);
+    border-color: var(--theia-border-color, #ccc);
+    color: var(--theia-ui-font-color, #333);
+}
+
+.arc-widget-container .theia-button:not(.primary):hover:not(:disabled) {
+    background: var(--theia-ui-button-hover-background, #e9ecef);
+}
+
+.arc-widget-container .theia-button:focus {
+    outline: 2px solid var(--theia-focusBorder, #0066cc);
+    outline-offset: 2px;
+}
+
+.arc-widget-container .theia-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.arc-widget-container .theia-button.secondary {
+    background: var(--theia-ui-button-background, #fff);
+    border-color: var(--theia-border-color, #ccc);
+}
+
+.arc-button-loading {
+    position: relative;
+}
+
+.arc-button-text {
+    display: inline-block;
+}
+
+/* ============================================
+   Spinner Styles
+   ============================================ */
+.arc-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .arc-spinner {
+        animation-duration: 1.5s;
+    }
+    
+    .arc-toast,
+    .arc-error,
+    .arc-modal {
+        animation: none;
+    }
+}
+
+/* ============================================
+   Progress Bar Styles
+   ============================================ */
+.arc-progress-container {
+    margin: 12px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.arc-progress-bar {
+    height: 6px;
+    background: var(--theia-ui-progressBar-background, #e9ecef);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.arc-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--arc-accent-color) 0%, #4d94ff 100%);
+    border-radius: 3px;
+    transition: width 0.3s ease-out;
+    position: relative;
+}
+
+.arc-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.3) 50%,
+        transparent 100%
+    );
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.arc-progress-label {
+    font-size: 11px;
+    color: var(--theia-ui-font-color2, #666);
+    text-align: right;
+}
+
+/* ============================================
+   Execution Steps Styles
+   ============================================ */
+.arc-execution-steps {
+    margin: 12px 0;
+    padding: 12px;
+    background: var(--theia-ui-background, #f8f9fa);
+    border-radius: var(--arc-border-radius);
+}
+
+.arc-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 12px;
+}
+
+.arc-step-indicator {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    border-radius: 50%;
+}
+
+.arc-step-pending .arc-step-indicator {
+    color: var(--theia-ui-font-color2, #999);
+}
+
+.arc-step-in-progress .arc-step-indicator {
+    color: var(--arc-accent-color);
+    animation: spin 1s linear infinite;
+}
+
+.arc-step-completed .arc-step-indicator {
+    color: var(--arc-success-color);
+}
+
+.arc-step-failed .arc-step-indicator {
+    color: var(--arc-error-color);
+}
+
+.arc-step-label {
+    color: var(--theia-ui-font-color, #333);
+}
+
+.arc-step-pending .arc-step-label {
+    color: var(--theia-ui-font-color2, #999);
+}
+
+.arc-step-failed .arc-step-label {
+    color: var(--arc-error-color);
+}
+
+/* ============================================
+   Status Indicator Styles
+   ============================================ */
+.arc-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0;
+    padding: 10px 12px;
+    border-radius: var(--arc-border-radius);
+    font-size: 13px;
+}
+
+.arc-status-icon {
+    font-size: 16px;
+}
+
+.arc-status-idle {
+    background: var(--theia-ui-background, #f5f5f5);
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-status-running {
+    background: #fff3cd;
+    color: #856404;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.arc-status-completed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.arc-status-failed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* ============================================
+   Result Styles
+   ============================================ */
+.arc-result {
+    margin: 16px 0;
+    padding: 16px;
+    background: var(--theia-ui-background, #f8f9fa);
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: var(--arc-border-radius);
+}
+
+.arc-result h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--theia-ui-font-color1, #333);
+}
+
+.arc-result-list {
+    margin: 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 12px;
+    font-size: 12px;
+}
+
+.arc-result-list dt {
+    font-weight: 500;
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-result-list dd {
+    margin: 0;
+    color: var(--theia-ui-font-color, #333);
+}
+
+.arc-result-list code {
+    font-family: monospace;
+    padding: 2px 6px;
+    background: var(--theia-ui-background, #fff);
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+.arc-status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.arc-status-badge-success {
+    background: #d4edda;
+    color: #155724;
+}
+
+/* ============================================
+   Trace List Styles
+   ============================================ */
+.arc-trace-list {
+    margin: 12px 0;
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: var(--arc-border-radius);
+    overflow: hidden;
+}
+
+.arc-trace-list-header {
+    display: grid;
+    grid-template-columns: 60px 1fr 140px;
+    padding: 10px 12px;
+    background: var(--theia-ui-header-background, #f8f9fa);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--theia-ui-font-color2, #666);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.arc-trace-item {
+    display: grid;
+    grid-template-columns: 60px 1fr 140px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--theia-border-color, #ddd);
+    cursor: pointer;
+    transition: background var(--arc-transition-speed) ease;
+}
+
+.arc-trace-item:hover {
+    background: var(--theia-list-hoverBackground, #f5f5f5);
+}
+
+.arc-trace-item:focus {
+    outline: 2px solid var(--theia-focusBorder, #0066cc);
+    outline-offset: -2px;
+}
+
+.arc-trace-item-selected {
+    background: var(--theia-list-activeSelectionBackground, #e3f2fd) !important;
+    border-left: 3px solid var(--arc-accent-color);
+}
+
+.arc-trace-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.arc-trace-status-completed {
+    color: var(--arc-success-color);
+}
+
+.arc-trace-status-failed {
+    color: var(--arc-error-color);
+}
+
+.arc-trace-id {
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--theia-ui-font-color, #333);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.arc-trace-time {
+    font-size: 11px;
+    color: var(--theia-ui-font-color2, #666);
+}
+
+/* ============================================
+   Workflow List Styles
+   ============================================ */
+.arc-workflow-list {
+    margin: 12px 0;
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: var(--arc-border-radius);
+    overflow: hidden;
+}
+
+.arc-workflow-list-header {
+    display: grid;
+    grid-template-columns: 100px 1fr 140px;
+    padding: 10px 12px;
+    background: var(--theia-ui-header-background, #f8f9fa);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--theia-ui-font-color2, #666);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.arc-workflow-item {
+    display: grid;
+    grid-template-columns: 100px 1fr 140px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--theia-border-color, #ddd);
+    transition: background var(--arc-transition-speed) ease;
+}
+
+.arc-workflow-item:hover {
+    background: var(--theia-list-hoverBackground, #f5f5f5);
+}
+
+.arc-workflow-type {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    background: var(--theia-ui-background, #e9ecef);
+    border-radius: 4px;
+    color: var(--theia-ui-font-color2, #666);
+    text-transform: uppercase;
+}
+
+.arc-workflow-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--theia-ui-font-color, #333);
+}
+
+.arc-workflow-path {
+    font-size: 11px;
+    font-family: monospace;
+    color: var(--theia-ui-font-color2, #666);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ============================================
+   Empty State Styles
+   ============================================ */
+.arc-empty-state {
+    padding: 24px;
+    text-align: center;
+    color: var(--theia-ui-font-color2, #999);
+    font-size: 13px;
+    background: var(--theia-ui-background, #f8f9fa);
+    border-radius: var(--arc-border-radius);
+}
+
+/* ============================================
+   Footer Styles
+   ============================================ */
+.arc-footer {
+    padding: 12px 20px;
+    background: var(--theia-ui-background, #f8f9fa);
+    border-top: 1px solid var(--theia-border-color, #ddd);
+    text-align: center;
+}
+
+.arc-footer small {
+    font-size: 11px;
+    color: var(--theia-ui-font-color2, #888);
+}
+
+.arc-footer kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    font-family: monospace;
+    font-size: 10px;
+    background: var(--theia-ui-background, #fff);
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: 3px;
+    color: var(--theia-ui-font-color, #666);
+    margin: 0 2px;
+}
+
+/* ============================================
+   Scrollbar Styling
+   ============================================ */
+.arc-content::-webkit-scrollbar {
+    width: 10px;
+}
+
+.arc-content::-webkit-scrollbar-track {
+    background: var(--theia-scrollbar-shadow, #f1f1f1);
+}
+
+.arc-content::-webkit-scrollbar-thumb {
+    background: var(--theia-scrollbarSlider-background, #c1c1c1);
+    border-radius: 5px;
+}
+
+.arc-content::-webkit-scrollbar-thumb:hover {
+    background: var(--theia-scrollbarSlider-hoverBackground, #a8a8a8);
+}
+
+/* ============================================
+   Animation Keyframes
+   ============================================ */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* ============================================
+   Input Focus Styles
+   ============================================ */
+.arc-widget-container textarea:focus,
+.arc-widget-container select:focus,
+.arc-widget-container input:focus {
+    outline: 2px solid var(--theia-focusBorder, #0066cc);
+    outline-offset: -1px;
+}
+
+/* ============================================
+   Checkbox Styles
+   ============================================ */
+.arc-widget-container input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+/* ============================================
+   Accessibility: Focus Visible
+   ============================================ */
+.arc-widget-container *:focus-visible {
+    outline: 2px solid var(--theia-focusBorder, #0066cc);
+    outline-offset: 2px;
+}
+
+/* ============================================
+   High Contrast Mode Support
+   ============================================ */
+@media (prefers-contrast: high) {
+    .arc-section {
+        border-width: 2px;
+    }
+    
+    .arc-button:focus,
+    .arc-section-header:focus {
+        outline-width: 3px;
+    }
+    
+    .arc-trace-item,
+    .arc-workflow-item {
+        border-bottom-width: 2px;
+    }
+}
+
+/* ============================================
+   Print Styles
+   ============================================ */
+@media print {
+    .arc-toast-container,
+    .arc-header-help,
+    .arc-section-toggle,
+    .arc-footer {
+        display: none;
+    }
+    
+    .arc-section {
+        break-inside: avoid;
+    }
+}

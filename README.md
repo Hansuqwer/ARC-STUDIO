@@ -85,28 +85,102 @@ uv run ruff check        # Lint Python code
 uv run mypy src tests    # Type check Python code
 ```
 
+## Current Status
+
+### Development Phase
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Phase 1: Bootstrap Lock | ✅ Complete | Project structure and Theia scaffold |
+| Phase 2: Research Lock | ✅ Complete | Technology research and selection |
+| Phase 3: Discovery Lock | ✅ Complete | Architecture decisions finalized |
+| Phase 4: Independent Fixes | 🔄 In Progress | Current development phase |
+| Phase 5: Integration Fixes | ⏳ Pending | Integration and testing |
+| Phase 6: Alpha Acceptance | ⏳ Pending | Alpha release |
+| Phase 7: Final Handover | ⏳ Pending | Production release |
+
+### What's Working
+
+- ✅ Project structure with pnpm workspaces
+- ✅ Theia extension scaffold with React widget
+- ✅ Python FastAPI backend with security validation
+- ✅ SwarmGraph CLI integration (subprocess execution)
+- ✅ Trace file management (JSONL format)
+- ✅ Security utilities (input sanitization, path validation)
+
+### What's In Progress (Phase 4)
+
+- 🔄 Protocol interface implementation completion
+- 🔄 Build configuration fixes
+- 🔄 LangGraph workflow detection
+- 🔄 Trace parsing full implementation
+
+### Known Limitations
+
+- Build may have TypeScript interface errors (protocol implementation in progress)
+- Trace visualization is basic (UI improvements planned)
+- LangGraph detection not yet implemented
+- No automated tests (test infrastructure planned for Phase 5)
+
 ## Features
 
-### Current (Phase 1 - Bootstrap)
+### Workflow Execution
 
-- ✅ Project structure initialized
-- ✅ Theia extension scaffold
-- ✅ Basic UI widget
-- ✅ Backend service structure
-- ✅ Python API endpoints
-- ✅ Build configuration
+Execute SwarmGraph workflows directly from the IDE:
 
-### Planned
+```typescript
+// Via JSON-RPC (Theia extension)
+const result = await arcService.executeWorkflow(
+  "Summarize the latest news",
+  { backend: 'gateway', costAllowed: true }
+);
+console.log(`Run ID: ${result.runId}`);
+console.log(`Trace: ${result.tracePath}`);
+```
 
-- Phase 2: Research Lock ✅ (Complete)
-- Phase 3: Discovery Lock ✅ (Complete)
-- Phase 4: Independent Fixes (In Progress)
-  - SwarmGraph execution
-  - Trace file parsing
-  - Workflow detection
-- Phase 5: Integration Fixes
-- Phase 6: Alpha Acceptance
-- Phase 7: Final Handover
+```bash
+# Via REST API
+curl -X POST http://localhost:8000/api/execute \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "What is 2+2?", "backend": "stub"}'
+```
+
+### Trace Visualization
+
+Browse and inspect execution traces stored in `.arc/traces/`:
+
+```bash
+# List all traces
+curl http://localhost:8000/api/traces
+
+# Get a specific trace
+curl http://localhost:8000/api/traces/run-sg-abc123
+```
+
+Traces are stored in JSONL format — one event per line:
+
+```jsonl
+{"type":"RUN_STARTED","timestamp":"2026-05-12T20:30:00Z","runId":"run-sg-abc123","sequence":0,"data":{}}
+{"type":"NODE_COMPLETED","timestamp":"2026-05-12T20:30:10Z","runId":"run-sg-abc123","sequence":1,"data":{"nodeId":"agent-1"}}
+{"type":"RUN_COMPLETED","timestamp":"2026-05-12T20:30:15Z","runId":"run-sg-abc123","sequence":2,"data":{}}
+```
+
+### Workflow Detection
+
+Automatically detect SwarmGraph and LangGraph workflows in your workspace:
+
+```typescript
+const workflows = await arcService.detectWorkflows();
+// [{ type: 'swarmgraph', path: '/usr/local/bin/swarmgraph', name: 'SwarmGraph CLI' }]
+```
+
+### Security
+
+Multi-layered security model:
+- Input sanitization (prompts, trace IDs)
+- Path traversal prevention
+- Subprocess isolation (`shell: false`)
+- Workspace boundary enforcement
 
 ## Documentation
 
@@ -129,9 +203,84 @@ Key architectural decisions (see [docs/IMPLEMENTATION_DECISIONS.md](docs/IMPLEME
 6. **Security**: Multi-layered (workspace, keychain, sandbox)
 7. **Offline-first**: Full functionality without internet
 
+## Troubleshooting
+
+### Build Errors
+
+**Issue:** TypeScript compilation fails with interface implementation errors
+
+```bash
+error TS2420: Class 'ArcBackendService' incorrectly implements interface 'ArcService'
+```
+
+**Solution:** This is a known issue in Phase 4. The protocol interface has been updated but implementations are incomplete. To work around:
+
+1. Check the interface definition in `packages/arc-extension/src/common/arc-protocol.ts`
+2. Ensure all methods are implemented in `packages/arc-extension/src/node/arc-backend-service.ts`
+3. Run `pnpm build` to verify fixes
+
+### Installation Issues
+
+**Issue:** `pnpm install` fails or takes too long
+
+**Solution:**
+- Ensure Node.js >= 18.0.0: `node --version`
+- Ensure pnpm >= 8.0.0: `pnpm --version`
+- Clear pnpm cache: `pnpm store prune`
+- Retry installation: `pnpm install`
+
+**Issue:** Python dependencies fail to install
+
+**Solution:**
+- Ensure Python >= 3.11: `python --version`
+- Install uv if missing: `pip install uv`
+- Navigate to python directory: `cd python`
+- Install dependencies: `uv pip install -e .`
+
+### Runtime Issues
+
+**Issue:** SwarmGraph command not found
+
+**Solution:**
+- Verify SwarmGraph is installed: `which swarmgraph`
+- If missing, install from: https://github.com/Hansuqwer/SwarmGraph
+- Ensure it's in your PATH
+
+**Issue:** Application won't start
+
+**Solution:**
+- Build all packages first: `pnpm build`
+- If build fails, see "Build Errors" above
+- Check port 3000 is available: `lsof -i :3000`
+- Try starting: `pnpm start:browser`
+
+### Known Issues
+
+- **Build fails with protocol errors** - Phase 4 in progress, protocol interface incomplete
+- **Trace parsing not implemented** - Planned for Phase 4
+- **Workflow detection incomplete** - LangGraph detection pending
+- **No tests yet** - Test infrastructure planned for Phase 5
+- **Electron app not functional** - Planned for later phases
+
+For more issues, see [GitHub Issues](https://github.com/Hansuqwer/arc-theia-studio/issues).
+
 ## Contributing
 
 This project follows a 7-phase development workflow. See `arc_prompt.txt` for detailed phase descriptions.
+
+### Development Workflow
+
+1. Create a feature branch from `build/no-mockups-handoff`
+2. Make changes following the architectural decisions in `docs/IMPLEMENTATION_DECISIONS.md`
+3. Add tests (when test infrastructure is available)
+4. Run `pnpm build` and `pnpm lint` to verify
+5. Submit a pull request
+
+### Code Style
+
+- TypeScript: Follow Theia conventions
+- Python: Follow PEP 8, use type hints
+- Documentation: Add JSDoc comments for public APIs
 
 ## License
 
@@ -142,3 +291,4 @@ EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
 - Repository: https://github.com/Hansuqwer/arc-theia-studio
 - SwarmGraph: https://github.com/Hansuqwer/SwarmGraph
 - Eclipse Theia: https://theia-ide.org/
+- Documentation: [docs/](docs/)

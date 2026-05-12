@@ -10,8 +10,24 @@ from typing import Optional, List
 import subprocess
 import json
 from pathlib import Path
+import os
+from security_utils import (
+    sanitize_prompt,
+    validate_trace_id,
+    validate_file_path,
+    validate_backend,
+    sanitize_error_message,
+    validate_workspace_root,
+    SecurityError
+)
 
 app = FastAPI(title="ARC Studio API", version="0.1.0")
+
+# Initialize workspace root
+try:
+    WORKSPACE_ROOT = validate_workspace_root(os.getcwd())
+except SecurityError as e:
+    raise RuntimeError(f"Failed to initialize workspace: {e}")
 
 
 class ExecutionRequest(BaseModel):
@@ -45,13 +61,21 @@ async def root():
 async def execute_workflow(request: ExecutionRequest):
     """Execute a SwarmGraph workflow"""
     try:
-        # Execute swarmgraph CLI
-        cmd = ["swarmgraph", "swarm", "--json", request.prompt]
+        # Validate and sanitize inputs
+        sanitized_prompt = sanitize_prompt(request.prompt)
+        validated_backend = validate_backend(request.backend)
+        
+        # Use subprocess with list arguments to prevent command injection
+        # Pass prompt as separate argument, not interpolated into command string
+        cmd = ["swarmgraph", "swarm", "--json", sanitized_prompt]
+        
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            timeout=300  # 5 minute timeout
+            timeout=300,  # 5 minute timeout
+            cwd=str(WORKSPACE_ROOT),  # Execute in workspace root
+            shell=False  # Critical: disable shell to prevent command injection
         )
         
         # Parse run ID from output
@@ -66,53 +90,82 @@ async def execute_workflow(request: ExecutionRequest):
             run_id=run_id,
             status="completed" if result.returncode == 0 else "failed",
             output=result.stdout if result.returncode == 0 else None,
-            error=result.stderr if result.returncode != 0 else None,
+            error="Workflow execution failed" if result.returncode != 0 else None,
             trace_path=f".arc/traces/{run_id}.jsonl"
         )
     except subprocess.TimeoutExpired:
         raise HTTPException(status_code=408, detail="Execution timeout")
+    except SecurityError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=sanitize_error_message(e))
 
 
 @app.get("/api/traces", response_model=List[TraceInfo])
 async def get_traces():
     """Get list of trace files"""
-    traces_dir = Path(".arc/traces")
-    
-    if not traces_dir.exists():
+    try:
+        traces_dir = WORKSPACE_ROOT / ".arc" / "traces"
+        
+        # Validate traces directory is within workspace
+        validated_traces_dir = validate_file_path(".arc/traces", str(WORKSPACE_ROOT))
+        
+        if not validated_traces_dir.exists():
+            return []
+        
+        traces = []
+        for trace_file in validated_traces_dir.glob("*.jsonl"):
+            try:
+                # Additional validation: ensure file is still within traces directory
+                if not str(trace_file.resolve()).startswith(str(validated_traces_dir.resolve())):
+                    continue
+                
+                with open(trace_file, 'r') as f:
+                    try:
+                        data = json.load(f)
+                        traces.append(TraceInfo(
+                            id=data.get("id", trace_file.stem),
+                            path=str(trace_file),
+                            timestamp=data.get("started_at", ""),
+                            status=data.get("status", "unknown")
+                        ))
+                    except json.JSONDecodeError:
+                        # Skip malformed JSON files
+                        continue
+            except Exception:
+                # Skip files that can't be read
+                continue
+        
+        return sorted(traces, key=lambda x: x.timestamp, reverse=True)
+    except Exception:
+        # Return empty array on error rather than exposing error details
         return []
-    
-    traces = []
-    for trace_file in traces_dir.glob("*.jsonl"):
-        try:
-            with open(trace_file, 'r') as f:
-                data = json.load(f)
-                traces.append(TraceInfo(
-                    id=data.get("id", trace_file.stem),
-                    path=str(trace_file),
-                    timestamp=data.get("started_at", ""),
-                    status=data.get("status", "unknown")
-                ))
-        except Exception:
-            continue
-    
-    return sorted(traces, key=lambda x: x.timestamp, reverse=True)
 
 
 @app.get("/api/traces/{trace_id}")
 async def get_trace(trace_id: str):
     """Get a specific trace file"""
-    trace_path = Path(f".arc/traces/{trace_id}.jsonl")
-    
-    if not trace_path.exists():
-        raise HTTPException(status_code=404, detail="Trace not found")
-    
     try:
-        with open(trace_path, 'r') as f:
+        # Validate trace ID to prevent path traversal
+        validated_trace_id = validate_trace_id(trace_id)
+        
+        # Construct path within workspace
+        trace_path = WORKSPACE_ROOT / ".arc" / "traces" / f"{validated_trace_id}.jsonl"
+        
+        # Validate the full path is within workspace
+        validated_path = validate_file_path(str(trace_path), str(WORKSPACE_ROOT))
+        
+        if not validated_path.exists():
+            raise HTTPException(status_code=404, detail="Trace not found")
+        
+        with open(validated_path, 'r') as f:
             return json.load(f)
+    except HTTPException:
+        raise
+    except SecurityError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=sanitize_error_message(e))
 
 
 if __name__ == "__main__":

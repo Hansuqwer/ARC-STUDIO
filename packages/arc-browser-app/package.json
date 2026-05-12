@@ -5,16 +5,29 @@
   "license": "EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0",
   "dependencies": {
     "@theia/core": "^1.45.0",
-    "@theia/filesystem": "^1.45.0",
-    "@theia/workspace": "^1.45.0",
-    "@theia/navigator": "^1.45.0",
-    "@theia/terminal": "^1.45.0",
     "@theia/editor": "^1.45.0",
+    "@theia/file-search": "^1.45.0",
+    "@theia/filesystem": "^1.45.0",
+    "@theia/markers": "^1.45.0",
     "@theia/monaco": "^1.45.0",
+    "@theia/monaco-editor-core": "^1.45.0",
+    "@theia/navigator": "^1.45.0",
+    "@theia/outline-view": "^1.45.0",
+    "@theia/process": "^1.45.0",
+    "@theia/terminal": "^1.45.0",
+    "@theia/variable-resolver": "^1.45.0",
+    "@theia/workspace": "^1.45.0",
     "arc-extension": "workspace:*"
   },
   "devDependencies": {
-    "@theia/cli": "^1.45.0"
+    "@theia/cli": "^1.45.0",
+    "css-loader": "^6.8.1",
+    "node-loader": "^2.1.0",
+    "reflect-metadata": "^0.1.13",
+    "source-map-loader": "^4.0.1",
+    "string-replace-loader": "^3.3.0",
+    "style-loader": "^4.0.0",
+    "umd-compat-loader": "^2.1.2"
   },
   "scripts": {
     "prepare": "pnpm run clean && pnpm run build",
