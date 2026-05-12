@@ -39,7 +39,7 @@ _ALLOWED_ENV = {
 
 def _allowed_subprocess_env() -> dict[str, str]:
     """Build a filtered environment dict containing only allow-listed vars."""
-    return {k: v for k, v in os.environ.items() if k in _ALLOW_ENV}
+    return {k: v for k, v in os.environ.items() if k in _ALLOWED_ENV}
 
 
 class ExecutionRequest(BaseModel):
