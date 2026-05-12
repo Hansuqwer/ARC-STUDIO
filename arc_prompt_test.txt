@@ -1,0 +1,31 @@
+Output ONLY this. No extra text.
+
+## Commands
+~~~bash
+git clone https://github.com/Hansuqwer/arc-theia-studio
+cd arc-theia-studio
+git fetch origin
+git checkout build/no-mockups-handoff
+git pull
+cd ..
+git clone https://github.com/Hansuqwer/SwarmGraph
+cd arc-theia-studio
+git branch --show-current
+bash scripts/check-artifacts.sh
+~~~
+
+## Branch
+build/no-mockups-handoff
+
+## Inspect First
+README.md
+STATUS.md
+docs/HANDOFF.md
+python/pyproject.toml
+python/src/agent_runtime_cockpit/web/routes.py
+
+## First PR
+Title: Add reproducible bootstrap docs
+Branch: agent/bootstrap-research
+Base: build/no-mockups-handoff
+Scope: Add bootstrap docs and verified fresh-run command matrix.

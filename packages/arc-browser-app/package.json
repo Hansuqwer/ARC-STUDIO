@@ -1,0 +1,29 @@
+{
+  "name": "arc-browser-app",
+  "version": "0.1.0",
+  "description": "ARC Studio Browser Application",
+  "license": "EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0",
+  "dependencies": {
+    "@theia/core": "^1.45.0",
+    "@theia/filesystem": "^1.45.0",
+    "@theia/workspace": "^1.45.0",
+    "@theia/navigator": "^1.45.0",
+    "@theia/terminal": "^1.45.0",
+    "@theia/editor": "^1.45.0",
+    "@theia/monaco": "^1.45.0",
+    "arc-extension": "workspace:*"
+  },
+  "devDependencies": {
+    "@theia/cli": "^1.45.0"
+  },
+  "scripts": {
+    "prepare": "pnpm run clean && pnpm run build",
+    "clean": "theia clean",
+    "build": "theia build --mode development",
+    "start": "theia start --hostname=0.0.0.0 --port=3000",
+    "watch": "theia build --watch --mode development"
+  },
+  "theia": {
+    "target": "browser"
+  }
+}

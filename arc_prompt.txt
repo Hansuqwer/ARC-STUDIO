@@ -1,0 +1,996 @@
+# ARC Studio Fresh-Run, Research-First, Multi-Agent Implementation Handover
+
+You are taking over these repositories:
+
+Primary repository:
+https://github.com/Hansuqwer/arc-theia-studio
+
+Primary integration PR:
+https://github.com/Hansuqwer/arc-theia-studio/pull/1
+
+Important branch rule:
+Do not work from `main` unless explicitly creating the final merge.
+`main` is an intentionally minimal baseline.
+Start from:
+
+```bash
+git clone https://github.com/Hansuqwer/arc-theia-studio
+cd arc-theia-studio
+git fetch origin
+git checkout build/no-mockups-handoff
+git pull
+Companion runtime/adapter repository: https://github.com/Hansuqwer/SwarmGraph
+
+Clone the companion separately next to ARC Studio:
+
+cd ..
+git clone https://github.com/Hansuqwer/SwarmGraph
+Your job is not to perform another generic audit.
+
+Your job is to bootstrap the full stack from a fresh clone, do comprehensive research, then push the project forward toward a credible alpha developer release using a coordinated multi-agent workflow.
+
+Do not start feature implementation immediately.
+
+Order of operations:
+
+Clone and inspect both repositories.
+Check out build/no-mockups-handoff in ARC Studio.
+Detect and install the required stack.
+Make the project reproducible from a fresh environment.
+Research official docs and relevant implementation examples.
+Record implementation decisions.
+Implement in small, reviewable, parallel patches.
+Use mocks only when truly blocked.
+Keep docs honest and up to date.
+End with a clear handover, command matrix, changed files list, and next PR queue.
+Primary goal: Turn ARC Studio from an architectural scaffold into a credible alpha developer release.
+
+Secondary goal: Prepare the architecture for beta-level real LangGraph and SwarmGraph execution, AG-UI-style streaming, trace persistence, audit chain, and hardened external context providers.
+
+Known product: ARC Studio — Agent Runtime Cockpit IDE.
+
+Known intended architecture:
+
+Eclipse Theia/Electron frontend.
+Theia node backend.
+Python ARC Core daemon.
+Local JSON HTTP/SSE between Theia backend and Python daemon.
+Current prototype daemon routes may differ; verify actual configured port before changing.
+Runtime adapters: LangGraph first, SwarmGraph second.
+SwarmGraph source/reference repo: https://github.com/Hansuqwer/SwarmGraph
+Context providers: local repo, Context7, Vercel Grep, GitHub code search, and web search.
+Trace/replay events are modeled after AG-UI-style events.
+Known current state from prior handoff branch:
+
+Python tests pass: 82 passed.
+Ruff passes on build/no-mockups-handoff.
+Node bootstrap tests pass: 10 passed.
+Mock fallback was removed from normal Theia backend product path.
+arc run wf-swarmgraph-001 --json returns NOT_IMPLEMENTED instead of fake success.
+Accidental generated trace artifact was removed.
+Artifact guard exists: scripts/check-artifacts.sh.
+Python CI exists: .github/workflows/python.yml.
+Node CI exists: .github/workflows/node.yml.
+Manual e2e workflow exists: .github/workflows/e2e.yml.
+Root package lockfile is missing.
+TypeScript/Theia build has not been fully verified.
+Several UI widgets remain alpha/scaffold-level.
+LangGraph topology extraction exists but real execution does not.
+SwarmGraph support is scaffolded and requires verification against the companion repo.
+Security is alpha-grade: localhost trust, no complete bearer-token/consent model.
+Some historical docs may still need reconciliation.
+Execution philosophy: Do not optimize for appearing complete.
+
+Optimize for:
+
+reproducible setup
+verified commands
+real local functionality
+visible limitations
+small mergeable patches
+honest docs
+safe external integrations
+research-backed implementation choices
+Push forward aggressively, but do not fake completion.
+
+When blocked:
+
+document the blocker
+implement the safest real subset
+add a visible degraded state
+add a follow-up PR item
+continue to the next unblockable task
+Mocks, fixtures, canned events, and placeholder panels are allowed only when:
+
+the real implementation is blocked by missing credentials, unavailable external service, unsafe execution, undocumented behavior, or missing product decision
+the mock is visibly labeled in the UI
+the mock is labeled in API responses with fields such as:
+demo: true
+mock: true
+source: "fixture"
+reason: "..."
+the mock is documented in docs/MOCK_POLICY.md and docs/MOCKS_AND_BLOCKERS.md
+there is a concrete follow-up PR to replace it
+tests assert the mock/demo label exists
+Forbidden:
+
+silent fixture fallback
+fake success states
+docs claiming real behavior when mocked
+run streams that look real but are canned
+context provider results that appear live when they are stubs
+continuing from the wrong branch and duplicating already completed work
+Preferred alpha path:
+
+real daemon status
+real workspace root detection
+real static adapter inspection
+real schema generation
+real context provider configuration state
+explicit demo-only run stream only if real execution is not safe yet
+================================================================================ AGENT -1 — STACK BOOTSTRAP / FRESH ENVIRONMENT OWNER
+Role: Make a fresh checkout installable and reproducible before any feature implementation starts.
+
+Do not assume the environment already has the right Node, npm/pnpm, Python, uv, Playwright, Electron, Theia, or native build dependencies.
+
+Own files:
+
+README.md
+docs/RUNBOOK.md
+docs/BOOTSTRAP.md
+docs/HANDOFF.md
+STATUS.md
+package.json
+package-lock.json, if npm is chosen
+pnpm-lock.yaml, if pnpm is chosen
+.npmrc
+.nvmrc or .node-version, if needed
+python/pyproject.toml
+python/uv.lock
+scripts/bootstrap-dev.sh
+scripts/check-env.sh
+scripts/check-artifacts.sh
+.github/workflows/python.yml
+.github/workflows/node.yml
+.github/workflows/e2e.yml
+Tasks:
+
+Clone repositories and select the correct branch:
+git clone https://github.com/Hansuqwer/arc-theia-studio
+cd arc-theia-studio
+git fetch origin
+git checkout build/no-mockups-handoff
+git pull
+cd ..
+git clone https://github.com/Hansuqwer/SwarmGraph
+Detect the stack from repo files. Inspect:
+package.json
+.npmrc
+pnpm-workspace.yaml
+python/pyproject.toml
+python/uv.lock
+.github/workflows/*.yml
+applications/
+theia-extensions/
+packages/
+tests/e2e/
+scripts/
+SwarmGraph package/runtime files
+Determine required runtime versions.
+Node version:
+Prefer packageManager, engines.node, .nvmrc, or official Theia compatibility docs.
+Package manager:
+Respect current repo metadata first. Do not switch npm/pnpm without a decision note.
+Python version:
+Use requires-python from python/pyproject.toml.
+uv:
+Ensure uv is installed or document installation.
+Playwright:
+Detect whether browser dependencies are required for e2e.
+Electron/Theia:
+Detect native dependencies and install requirements.
+Create or update scripts/check-env.sh. It must print:
+OS
+Node version
+package manager version
+Python version
+uv version
+Git version
+whether lockfile exists
+whether Python uv environment is usable
+whether Playwright browsers are installed, if relevant
+whether the SwarmGraph companion repo is present or configured
+current git branch
+Create or update scripts/bootstrap-dev.sh. It must:
+fail fast with readable errors
+verify correct branch
+install/check uv
+install Python dependencies using uv
+install Node dependencies using the chosen package manager
+generate or validate lockfile
+install Playwright browsers/deps if e2e requires them
+optionally link or reference the local SwarmGraph repo if adapter tests need it
+run a minimal smoke command at the end
+Lockfile policy:
+If using npm, generate and commit package-lock.json.
+If using pnpm, generate and commit pnpm-lock.yaml.
+Align .npmrc, CI, and local docs.
+If lockfile generation is impossible in the current environment, document exact blocker and create a follow-up PR item.
+Fresh-run commands must be documented exactly in docs/BOOTSTRAP.md:
+git checkout build/no-mockups-handoff
+bash scripts/check-env.sh
+bash scripts/bootstrap-dev.sh
+bash scripts/check-artifacts.sh
+cd python && uv run pytest -q
+cd python && uv run ruff check src tests
+cd python && uv run mypy src tests
+node tests/unit/arc-protocol.test.js
+node packages/arc-test-fixtures/src/index.js
+pnpm build
+pnpm start:browser
+pnpm test:e2e
+Do not proceed to feature implementation until bootstrap status is known.
+Acceptance tests:
+
+A fresh clone has one documented bootstrap path.
+Environment checks are explicit.
+Install failures are actionable.
+CI install command matches local install command.
+Lockfile policy is explicit.
+Missing system dependencies are documented.
+================================================================================ MANDATORY RESEARCH-FIRST GATE
+Before editing implementation files, complete a research pass.
+
+Create or update:
+
+docs/RESEARCH_NOTES.md
+docs/IMPLEMENTATION_DECISIONS.md
+Research must include official docs and relevant open-source examples.
+
+Required research sources:
+
+Eclipse Theia docs Research:
+Theia application structure
+frontend contribution pattern
+backend service pattern
+workspace service / active workspace root
+Electron app hardening
+extension/plugin model
+Open VSX behavior
+frontend-backend communication
+Context7 docs Research:
+API authentication
+rate limits
+library ID resolution
+best practices
+failure modes
+cache behavior
+how to safely integrate as an opt-in context provider
+Vercel Grep / code search Research:
+API or supported query model, if public
+expected response shape
+rate limits or access constraints
+examples of similar code-search integrations
+failure handling
+GitHub search docs Research:
+code search API
+auth requirements
+rate limits
+query limits
+pagination
+incomplete results
+result metadata
+safe handling of private repo queries
+how to search the SwarmGraph repo safely
+Vercel platform docs, if relevant Research:
+REST API auth
+environment variable APIs
+project/deployment APIs
+sandbox APIs, if relevant
+whether Vercel is actually needed for ARC Studio or only for external context lookup
+LangGraph docs and examples Research:
+graph construction patterns
+compiled graph execution
+streaming events
+checkpointers
+interrupt/resume
+common dynamic graph patterns that static AST extraction may miss
+SwarmGraph repository Research:
+actual package layout
+graph construction model
+runtime execution model
+streaming/event capabilities
+public APIs
+examples/tests
+how ARC Studio should detect SwarmGraph workflows
+how ARC Studio should eventually execute SwarmGraph workflows safely
+AG-UI or event-streaming references, if used Research:
+event naming
+event payload shape
+run lifecycle events
+cancellation/disconnect semantics
+trace persistence model
+Required output in docs/RESEARCH_NOTES.md:
+
+source name
+link or citation
+what was learned
+implementation consequence
+confidence level
+unresolved questions
+Required output in docs/IMPLEMENTATION_DECISIONS.md: Use this table:
+
+| Decision | Chosen approach | Alternatives considered | Reason | Files affected | Confidence |
+
+Implementation rule: No agent may introduce a new external integration, API shape, Theia pattern, runtime execution behavior, SwarmGraph behavior, or security boundary without first adding a research note and implementation decision.
+
+================================================================================ EXTERNAL CONTEXT PROVIDER STRATEGY
+ARC Studio should support context providers, but alpha must be safe and honest.
+
+Providers:
+
+Local repo provider
+Must work without credentials.
+Must stay within workspace root.
+Must handle symlinks/path traversal safely.
+Should be the default provider for alpha.
+Context7 provider
+Must be opt-in.
+Must require clear configuration.
+Must handle missing API key or unavailable docs gracefully.
+Must cache responses where appropriate.
+Must not send workspace code unless user explicitly enables that behavior.
+Vercel Grep provider
+Must be opt-in.
+Must only search public code unless authenticated/private behavior is deliberately implemented.
+Must show source and query used.
+Must handle unavailable or undocumented API behavior by degrading visibly.
+GitHub code search provider
+Must be opt-in for authenticated/private searches.
+Must respect rate limits.
+Must paginate safely.
+Must label incomplete results.
+Must avoid silently mixing public and private results.
+Must support using https://github.com/Hansuqwer/SwarmGraph as an explicit companion source.
+Web search provider
+Must be opt-in.
+Must show query and source URLs.
+Must not be used for local/private project analysis unless explicitly requested.
+Provider UI requirements:
+
+Settings panel must show provider status:
+disabled
+configured
+missing credentials
+rate-limited
+error
+Context panel must show whether results are:
+local
+external
+cached
+mock/demo
+Provider calls must be logged in a safe trace event without leaking secrets.
+================================================================================ AGENT 0 — ORCHESTRATOR / INTEGRATOR
+Role: Coordinate all agents. Do not do deep implementation unless another agent is blocked.
+
+Responsibilities:
+
+Enforce correct branch: build/no-mockups-handoff.
+Enforce the bootstrap gate.
+Enforce the research-first gate.
+Enforce the mock-last policy.
+Ensure every agent checks docs/RESEARCH_NOTES.md before implementation.
+Ensure every external integration has:
+config path
+failure mode
+opt-in status
+tests
+docs
+Create or update docs/HANDOVER.md.
+Create or update docs/ALPHA_PLAN.md.
+Create or update docs/BETA_PLAN.md.
+Create or update docs/IMPLEMENTATION_STATUS.md.
+Maintain a global patch queue.
+Prevent overlapping edits unless explicitly coordinated.
+Merge outputs in dependency order.
+Maintain docs/IMPLEMENTATION_STATUS.md with these categories:
+
+real and verified
+real but unverified
+scaffolded
+mocked/demo
+blocked
+planned
+Dependency order:
+
+Stack bootstrap.
+Research notes.
+Build/CI hygiene.
+Protocol/API compatibility.
+Workspace-root integration.
+Runtime adapter correctness.
+UI panel realism.
+Runs/demo behavior.
+Security hardening.
+Docs reconciliation.
+Beta execution design.
+Output:
+
+Final docs/HANDOVER.md.
+Final docs/ALPHA_PLAN.md.
+Final docs/BETA_PLAN.md.
+Final docs/IMPLEMENTATION_STATUS.md.
+Final PR sequence with acceptance criteria.
+================================================================================ AGENT 1 — BUILD, CI, AND DEPENDENCY HEALTH
+Role: Make the project installable, testable, and honest in CI.
+
+Depend on Agent -1 bootstrap output.
+
+Own files:
+
+package.json
+lockfile chosen by repo package manager
+.npmrc
+.github/workflows/*.yml
+python/pyproject.toml
+python/uv.lock
+scripts/
+docs that describe setup/build/test commands
+Tasks:
+
+Run:
+bash scripts/check-artifacts.sh
+cd python && uv run pytest -q
+cd python && uv run ruff check src tests
+cd python && uv run mypy src tests
+node tests/unit/arc-protocol.test.js
+node packages/arc-test-fixtures/src/index.js
+pnpm install
+pnpm build
+pnpm -r test
+pnpm start:browser
+pnpm test:e2e
+Fix ruff failures or document exact failures that require product decisions.
+Decide whether mypy should be blocking for alpha or non-blocking.
+Generate and commit the correct root lockfile if feasible.
+Align .npmrc, packageManager, and CI install command.
+Replace ambiguous install behavior with deterministic lockfile install once a lockfile exists.
+Make CI run the same commands documented in docs/BOOTSTRAP.md.
+Add a CI job that fails if docs list commands that do not exist.
+Add a CI job or script that checks schema generation drift.
+Add dependency/security jobs where feasible:
+pip-audit
+npm/pnpm audit
+license check
+GitHub dependency review
+If TypeScript/Theia install is too heavy, create a separate optional CI job and document why.
+Acceptance tests:
+
+CI commands are documented and reproducible.
+Ruff is green or explicitly non-blocking with a tracked reason.
+Python tests remain green.
+Artifact guard remains green.
+Lockfile policy is explicit.
+Any skipped TypeScript/Electron checks are clearly documented.
+================================================================================ AGENT 2 — PROTOCOL AND API CONTRACT
+Role: Eliminate Python/TypeScript protocol drift.
+
+Own files:
+
+packages/arc-protocol-ts/src/index.ts
+python/src/agent_runtime_cockpit/**/*.py
+python/src/agent_runtime_cockpit/web/routes.py
+scripts/generate-schemas.py
+generated schema files, if present
+protocol-related tests
+Known issue: Python models and API responses may use snake_case fields such as:
+
+workspace_root
+runtime_id
+context_pack
+thread_id
+TypeScript types may expect camelCase fields such as:
+
+workspaceRoot
+runtimeId
+contextPack
+threadId
+Tasks:
+
+Inspect all Pydantic models exposed over HTTP/SSE.
+Inspect all TypeScript protocol types.
+Choose one external wire convention: Preferred:
+camelCase for JSON wire format
+Python Pydantic aliases for internal snake_case Alternative:
+snake_case everywhere and update TypeScript
+Add tests that compare generated JSON schema against TypeScript expectations.
+Ensure routes return typed models where feasible, not loose dicts.
+Add consistent error response envelopes.
+Check SSE event payload shape for AG-UI-style event compatibility.
+Prevent frontend fixture fallbacks from masking protocol failures.
+Acceptance tests:
+
+One schema-generation command proves protocol shape.
+At least one Python test validates JSON alias output.
+At least one TypeScript or schema test catches casing drift.
+API docs or protocol docs state the canonical wire format.
+================================================================================ AGENT 3 — THEIA WORKSPACE AND FRONTEND INTEGRATION
+Role: Make the UI communicate with the daemon using the actual active workspace.
+
+Own files:
+
+theia-extensions/arc-core/src/browser/**
+theia-extensions/arc-core/src/node/**
+relevant frontend tests
+Research before implementation: Research official Theia patterns for:
+
+retrieving active workspace root
+frontend contribution lifecycle
+frontend-to-backend service calls
+Electron vs browser differences
+safe external links
+plugin/extension behavior
+Known issue: The frontend may call inspection without passing the actual workspace root, so the daemon may inspect its own working directory instead of the open project.
+
+Tasks:
+
+Find how Theia exposes the active workspace root.
+Pass workspace root from frontend/browser layer to Theia backend service.
+Pass workspace root from Theia backend service to Python daemon.
+Display current daemon status in the UI.
+Display current inspected workspace path in the UI.
+If no workspace is open, show a clear empty state instead of silently inspecting the wrong directory.
+Add visible banners for demo/mock data.
+Avoid silent fallback to fixtures unless the UI clearly labels it.
+Acceptance tests:
+
+Opening a workspace causes daemon inspection of that exact path.
+No-workspace state is explicit.
+Daemon unavailable state is explicit.
+Mock/demo data cannot be mistaken for real runtime state.
+================================================================================ AGENT 4 — RUNTIME ADAPTERS AND RUN SEMANTICS
+Role: Separate real runtime inspection from demo execution, then design beta execution.
+
+Own files:
+
+python/src/agent_runtime_cockpit/adapters/**
+python/src/agent_runtime_cockpit/web/routes.py
+run/trace/replay-related Python modules
+tests for LangGraph and SwarmGraph detection
+SwarmGraph integration docs/tests
+Known issues:
+
+LangGraph adapter performs static topology extraction but does not execute workflows.
+SwarmGraph detection must be verified against https://github.com/Hansuqwer/SwarmGraph.
+SwarmGraph detection must not rely on naive string matching.
+Real execution requires explicit consent and sandboxing.
+Tasks:
+
+Audit LangGraph detection and extraction.
+Audit SwarmGraph repository structure and examples.
+Define what counts as a SwarmGraph workflow using the actual SwarmGraph repo, not guesses.
+Replace comment/docstring string-matching false positives where possible.
+Add tests for LangGraph:
+normal LangGraph graph
+graph hidden behind factory function
+comments mentioning LangGraph
+unsupported dynamic graph construction
+malformed files
+Add tests for SwarmGraph:
+normal SwarmGraph workflow
+imports without workflow construction
+comments/docstrings mentioning SwarmGraph
+dynamic workflow construction
+malformed files
+companion repo examples, if available
+Make /api/runs honest:
+either explicit demo mode with demo: true
+or 501 Not Implemented for real execution
+Design beta execution:
+consent gate
+dry-run inspection
+controlled working directory
+command allowlist
+timeout
+env-var filtering
+SSE streaming of AG-UI-style events
+trace persistence
+cancellation/disconnect behavior
+Do not implement unsafe real execution without consent.
+Acceptance tests:
+
+Demo run events are labeled demo.
+Real execution endpoint does not claim support until implemented.
+LangGraph adapter tests cover false positives.
+SwarmGraph adapter tests are grounded in the companion repo.
+Beta execution design is documented with file paths and event model.
+================================================================================ AGENT 5 — SECURITY, PRIVACY, AND LOCAL DAEMON HARDENING
+Role: Make the alpha safer and define beta security requirements.
+
+Own files:
+
+python/src/agent_runtime_cockpit/daemon.py
+python/src/agent_runtime_cockpit/web/routes.py
+context provider modules
+trace/redaction modules
+Electron/Theia app config
+docs/SECURITY_REVIEW.md
+Known issues:
+
+Daemon trusts localhost.
+No complete bearer token.
+CLI may allow binding to non-localhost.
+Context providers can contact external services.
+Consent model is incomplete.
+Trace redaction is not fully wired into runs.
+Electron hardening is not fully verified.
+Tasks:
+
+Treat all external context providers as data-exfiltration risks until opt-in is implemented.
+Add provider consent checks before Context7, Vercel Grep, GitHub, or web search calls.
+Add local bearer token support for daemon requests if feasible for alpha.
+Ensure default bind is localhost/127.0.0.1.
+Add explicit warning or refusal for 0.0.0.0 unless dev override is set.
+Audit CORS and CSRF assumptions.
+Add path normalization and workspace-bound path checks.
+Check symlink/path traversal risks.
+Ensure context providers are opt-in.
+Add provider-level consent flags.
+Expand secret redaction patterns:
+OpenAI keys
+Anthropic keys
+GitHub tokens
+Vercel tokens
+AWS keys
+GCP service-account JSON hints
+generic bearer tokens
+.env-style secrets
+Add redaction tests before trace persistence is considered acceptable.
+Review Electron settings:
+nodeIntegration
+contextIsolation
+preload exposure
+external link handling
+extension/plugin trust
+Add daemon remote-bind protection before beta execution work.
+Add docs explaining what data leaves the machine for each provider.
+Recommend dependency/security CI:
+pip-audit
+npm/pnpm audit
+license check
+dependency review
+Acceptance tests:
+
+Daemon rejects unauthenticated requests if token mode enabled.
+Remote bind requires explicit unsafe/dev flag.
+Path traversal tests fail safely.
+Context providers cannot exfiltrate data without user-visible opt-in.
+Redaction tests cover common token formats.
+================================================================================ AGENT 6 — PRODUCT SURFACE AND ALPHA UX
+Role: Make the app feel honest and usable for an alpha demo.
+
+Own files:
+
+feature widgets under theia-extensions/*/src/browser/
+frontend client/service files
+UI docs/screenshots if present
+Known issue: Several feature widgets may be placeholders:
+
+workflows
+schemas
+runs
+audit
+context
+adapters
+settings
+Tasks:
+
+Replace empty placeholder panels with minimum useful alpha panels.
+Workflows panel:
+show detected workflows/adapters from daemon.
+Schemas panel:
+show generated schema/export status.
+Runs panel:
+show demo run state clearly if real runs are not implemented.
+Audit panel:
+show not implemented yet plus planned model.
+Context panel:
+show available providers and opt-in status.
+Adapters panel:
+show detected adapter type and confidence.
+Settings panel:
+show daemon URL
+auth status
+mock/demo mode
+provider toggles
+SwarmGraph companion repo status, if relevant
+Every mocked/demo value must be visibly labeled.
+Acceptance tests:
+
+Browser app has no misleading blank panels.
+Demo values are labeled.
+Daemon disconnected state is visible.
+Alpha user can understand what works and what is planned.
+================================================================================ AGENT 7 — DOCUMENTATION AND RELEASE TRUTHFULNESS
+Role: Make documentation match implementation.
+
+Own files:
+
+README.md
+STATUS.md
+docs/ARCHITECTURE.md
+docs/FINAL_STATUS.md
+docs/NEXT_STEPS.md
+docs/SECURITY_REVIEW.md
+docs/MOCKS_AND_BLOCKERS.md
+docs/HANDOVER.md
+docs/ALPHA_PLAN.md
+docs/BETA_PLAN.md
+docs/IMPLEMENTATION_STATUS.md
+docs/RUNBOOK.md
+docs/BOOTSTRAP.md
+docs/RESEARCH_NOTES.md
+docs/IMPLEMENTATION_DECISIONS.md
+docs/PROVIDERS.md
+Tasks:
+
+Compare docs against actual code and command output.
+Remove or qualify overclaims.
+Clearly label:
+implemented
+installed
+configured
+verified
+scaffolded
+mocked/demo
+planned
+blocked
+Add alpha runbook:
+prerequisites
+install
+start daemon
+start browser app
+run tests
+known failures
+troubleshooting
+Add beta roadmap:
+real LangGraph execution
+real SwarmGraph execution
+AG-UI-style streaming
+audit chain
+trace persistence
+context hardening
+Add release checklist.
+Every external provider doc must include:
+purpose
+required credentials
+data sent
+data received
+opt-in setting
+failure modes
+mock/degraded behavior
+Acceptance tests:
+
+A new contributor can tell what is real.
+No doc claims real execution unless code implements it.
+Known failing checks are documented honestly.
+Setup instructions match actual package manager behavior.
+SwarmGraph integration status is accurately documented.
+================================================================================ PARALLEL WORKFLOW
+Run the work in phases.
+
+Phase 1 — Bootstrap lock Agent -1 checks out build/no-mockups-handoff, inspects the stack, creates environment checks, documents install commands, and verifies the fresh-run state.
+
+No feature implementation before this phase is complete.
+
+Phase 2 — Research lock All agents complete research notes for their area.
+
+Required docs:
+
+docs/RESEARCH_NOTES.md
+docs/IMPLEMENTATION_DECISIONS.md
+No new external integration, runtime behavior, or Theia implementation should be added before the relevant research note exists.
+
+Phase 3 — Discovery lock All agents inspect their owned files and write a short status note.
+
+No code changes except command verification and docs recording.
+
+Phase 4 — Independent fixes Agents work in parallel where ownership does not overlap:
+
+Agent 1 fixes CI/package hygiene.
+Agent 2 fixes protocol contract.
+Agent 4 fixes adapter detection tests and run honesty.
+Agent 5 hardens daemon/provider security.
+Agent 7 starts doc truth pass.
+Phase 5 — Integration fixes Coordinate overlapping files:
+
+routes.py changes must be coordinated between Agent 2, Agent 4, and Agent 5.
+frontend service changes must be coordinated between Agent 2, Agent 3, and Agent 6.
+docs must be reconciled after implementation changes.
+Phase 6 — Alpha acceptance Run:
+
+git branch --show-current
+bash scripts/check-env.sh
+bash scripts/bootstrap-dev.sh
+bash scripts/check-artifacts.sh
+cd python && uv run pytest -q
+cd python && uv run ruff check src tests
+cd python && uv run mypy src tests || true  # only if documented non-blocking
+node tests/unit/arc-protocol.test.js
+node packages/arc-test-fixtures/src/index.js
+pnpm install
+pnpm build
+pnpm -r test
+pnpm start:browser
+pnpm test:e2e
+Phase 7 — Final handover Produce:
+
+summary of what changed
+exact commands run
+pass/fail matrix
+remaining blockers
+next 10 PRs
+updated docs list
+================================================================================ REQUIRED FINAL OUTPUT
+Return the final result in this structure:
+
+A. State of the repository
+
+What is now fixed
+What remains scaffolded
+What remains blocked
+B. Commands run Use this table:
+
+| Command | Result | Notes |
+
+C. Files changed Use this table:
+
+| File | Agent | Purpose |
+
+D. Alpha readiness Use this table:
+
+| Requirement | Status | Evidence | Remaining work |
+
+E. Beta readiness Use this table:
+
+| Capability | Current state | Required next step |
+
+F. Security status Use this table:
+
+| Risk | Status | Fix or mitigation |
+
+G. Documentation produced List all docs created or edited.
+
+H. Remaining PR queue List the next 10 PRs.
+
+For each PR include:
+
+title
+files touched
+rationale
+acceptance criteria
+I. Warnings Clearly state any behavior that is still:
+
+mock
+demo
+fake
+scaffolded
+blocked
+unverified
+J. Research summary List the key official docs and references consulted, with:
+
+source
+finding
+implementation consequence
+K. SwarmGraph status Specifically state:
+
+what was learned from https://github.com/Hansuqwer/SwarmGraph
+whether ARC Studio can detect SwarmGraph workflows
+whether ARC Studio can execute SwarmGraph workflows
+what remains needed for beta SwarmGraph support
+================================================================================ FIRST PRIORITY PATCH QUEUE
+Prefer small, reviewable PRs.
+
+Start with these unless research discovers a better order:
+
+Bootstrap and environment scripts Files:
+scripts/check-env.sh
+scripts/bootstrap-dev.sh
+docs/BOOTSTRAP.md
+README.md
+Acceptance:
+
+fresh clone has documented install path
+script fails with readable errors
+branch check prevents accidental main work
+CI and lockfile hygiene Files:
+package.json
+lockfile
+.npmrc
+.github/workflows/*.yml
+Acceptance:
+
+lockfile policy is explicit
+CI install command matches local install
+Type/lint cleanup Files:
+python/src/**
+python/tests/**
+Acceptance:
+
+cd python && uv run ruff check src tests passes
+tests still pass
+mypy status is documented as blocking or non-blocking
+Protocol casing/schema parity Files:
+packages/arc-protocol-ts/src/index.ts
+python/src/agent_runtime_cockpit/**
+scripts/generate-schemas.py
+tests
+Acceptance:
+
+wire format is documented
+schema drift is caught by tests
+Active workspace root integration Files:
+theia-extensions/arc-core/src/browser/**
+theia-extensions/arc-core/src/node/**
+Python inspect route if needed
+Acceptance:
+
+daemon inspects actual Theia workspace
+no-workspace state is explicit
+Run endpoint honesty Files:
+python/src/agent_runtime_cockpit/web/routes.py
+run-related modules
+UI run panel
+Acceptance:
+
+demo runs are visibly labeled
+real execution is not falsely claimed
+LangGraph adapter reliability Files:
+python/src/agent_runtime_cockpit/adapters/**
+tests
+Acceptance:
+
+static extraction tests cover false positives and dynamic limitations
+SwarmGraph adapter grounding Files:
+python/src/agent_runtime_cockpit/adapters/**
+docs/RESEARCH_NOTES.md
+docs/IMPLEMENTATION_DECISIONS.md
+tests
+Acceptance:
+
+detection is based on actual SwarmGraph repo patterns
+false positives are tested
+Local daemon security Files:
+python/src/agent_runtime_cockpit/daemon.py
+python/src/agent_runtime_cockpit/web/routes.py
+security tests
+docs/SECURITY_REVIEW.md
+Acceptance:
+
+optional bearer token mode exists or explicit alpha deferral exists
+remote bind requires explicit unsafe/dev override
+path traversal tests exist
+Provider consent and docs Files:
+context provider modules
+settings UI
+docs/PROVIDERS.md
+docs/MOCKS_AND_BLOCKERS.md
+Acceptance:
+
+external providers are opt-in
+data sent/received is documented
+mock/degraded behavior is labeled
+================================================================================ FINAL REMINDER
+Do not fake done.
+
+Do not hide failed commands.
+
+Do not silently use mocks.
+
+Do not claim real LangGraph or SwarmGraph execution unless real execution exists and is covered by tests.
+
+Do not start from main.
+
+Research first, then implement.
+
+Push forward with the safest real subset whenever blocked

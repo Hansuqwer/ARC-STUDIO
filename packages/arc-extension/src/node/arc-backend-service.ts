@@ -1,0 +1,108 @@
+/**
+ * ARC Backend Service
+ * 
+ * Implements the ARC service protocol for executing workflows,
+ * managing traces, and detecting workflows in the workspace.
+ */
+
+import { injectable } from '@theia/core/shared/inversify';
+import { ArcService, ExecutionOptions, ExecutionResult, TraceFile, TraceData, WorkflowInfo } from '../common/arc-protocol';
+import * as fs from 'fs-extra';
+import * as path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
+@injectable()
+export class ArcBackendService implements ArcService {
+
+    async executeWorkflow(prompt: string, options?: ExecutionOptions): Promise<ExecutionResult> {
+        const backend = options?.backend || 'gateway';
+        const costAllowed = options?.costAllowed !== false;
+
+        try {
+            // Execute swarmgraph CLI
+            const command = `swarmgraph swarm --json "${prompt.replace(/"/g, '\\"')}"`;
+            const { stdout, stderr } = await execAsync(command);
+
+            // Parse the output to get run ID
+            const runIdMatch = stdout.match(/run-sg-([a-f0-9]+)/);
+            const runId = runIdMatch ? `run-sg-${runIdMatch[1]}` : 'unknown';
+
+            return {
+                runId,
+                status: 'completed',
+                output: stdout,
+                tracePath: `.arc/traces/${runId}.jsonl`
+            };
+        } catch (error: any) {
+            return {
+                runId: 'failed',
+                status: 'failed',
+                error: error.message,
+                tracePath: ''
+            };
+        }
+    }
+
+    async getTraces(): Promise<TraceFile[]> {
+        const tracesDir = path.join(process.cwd(), '.arc', 'traces');
+        
+        if (!await fs.pathExists(tracesDir)) {
+            return [];
+        }
+
+        const files = await fs.readdir(tracesDir);
+        const traces: TraceFile[] = [];
+
+        for (const file of files) {
+            if (file.endsWith('.jsonl')) {
+                const filePath = path.join(tracesDir, file);
+                const stats = await fs.stat(filePath);
+                const content = await fs.readFile(filePath, 'utf-8');
+                const data = JSON.parse(content);
+
+                traces.push({
+                    id: data.id || file.replace('.jsonl', ''),
+                    path: filePath,
+                    timestamp: stats.mtime.toISOString(),
+                    status: data.status || 'unknown'
+                });
+            }
+        }
+
+        return traces.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    }
+
+    async readTrace(traceId: string): Promise<TraceData> {
+        const tracePath = path.join(process.cwd(), '.arc', 'traces', `${traceId}.jsonl`);
+        
+        if (!await fs.pathExists(tracePath)) {
+            throw new Error(`Trace file not found: ${traceId}`);
+        }
+
+        const content = await fs.readFile(tracePath, 'utf-8');
+        return JSON.parse(content);
+    }
+
+    async detectWorkflows(): Promise<WorkflowInfo[]> {
+        const workflows: WorkflowInfo[] = [];
+        const workspaceRoot = process.cwd();
+
+        // Detect SwarmGraph workflows (check for swarmgraph executable)
+        const swarmgraphPath = path.join(workspaceRoot, 'swarmgraph');
+        if (await fs.pathExists(swarmgraphPath)) {
+            workflows.push({
+                type: 'swarmgraph',
+                path: swarmgraphPath,
+                name: 'SwarmGraph CLI'
+            });
+        }
+
+        // TODO: Detect LangGraph workflows (scan for StateGraph imports)
+        // This will be implemented in Phase 4
+
+        return workflows;
+    }
+}
