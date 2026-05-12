@@ -35,6 +35,7 @@ dev = [
     "pytest>=8.2",
     "pytest-asyncio>=0.23",
     "pytest-cov>=5.0",
+    "pytest-benchmark>=4.0",
     "httpx>=0.27",
     "ruff>=0.4",
     "mypy>=1.10",
@@ -50,6 +51,9 @@ packages = ["src/agent_runtime_cockpit"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-v --tb=short"
+markers = [
+    "benchmark: marks tests as benchmarks (off-gate, not required for CI)",
+]
 filterwarnings = [
     # Category C: transitive LangGraph warning until upstream resolves allowed_objects default.
     "ignore:.*default value of `allowed_objects` will change.*:langchain_core._api.deprecation.LangChainPendingDeprecationWarning:langgraph\\.cache.*",
