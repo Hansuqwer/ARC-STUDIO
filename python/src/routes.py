@@ -29,6 +29,18 @@ try:
 except SecurityError as e:
     raise RuntimeError(f"Failed to initialize workspace: {e}")
 
+# Allow-list of environment variables passed to child processes
+_ALLOWED_ENV = {
+    "PATH", "HOME", "USER", "LANG", "LC_ALL", "TZ", "TMPDIR",
+    "ARC_SWARMGRAPH_CLI",
+    "ARC_SWARMGRAPH_RUN_BACKEND", "ARC_SWARMGRAPH_ALLOW_COSTS",
+    "ARC_SWARMGRAPH_GATEWAY_URL", "ARC_SWARMGRAPH_GATEWAY_TOKEN",
+}
+
+def _allowed_subprocess_env() -> dict[str, str]:
+    """Build a filtered environment dict containing only allow-listed vars."""
+    return {k: v for k, v in os.environ.items() if k in _ALLOW_ENV}
+
 
 class ExecutionRequest(BaseModel):
     prompt: str
@@ -81,7 +93,8 @@ async def execute_workflow(request: ExecutionRequest):
             text=True,
             timeout=300,  # 5 minute timeout
             cwd=str(WORKSPACE_ROOT),  # Execute in workspace root
-            shell=False  # Critical: disable shell to prevent command injection
+            shell=False,  # Critical: disable shell to prevent command injection
+            env=_allowed_subprocess_env()  # P1: env allow-list
         )
         
         # Parse run ID from output

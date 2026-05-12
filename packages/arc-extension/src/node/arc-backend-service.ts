@@ -35,6 +35,28 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import { spawn, ChildProcess } from 'child_process';
 
+/**
+ * Allow-list of environment variables passed to child processes.
+ * Prevents unbounded environment inheritance (P1 security fix).
+ */
+const SUBPROCESS_ENV_ALLOWLIST = [
+    'PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR',
+    'ARC_SWARMGRAPH_CLI',
+    'ARC_SWARMGRAPH_RUN_BACKEND',
+    'ARC_SWARMGRAPH_ALLOW_COSTS',
+    'ARC_SWARMGRAPH_GATEWAY_URL',
+    'ARC_SWARMGRAPH_GATEWAY_TOKEN',
+];
+
+function buildChildEnv(): NodeJS.ProcessEnv {
+    const env: NodeJS.ProcessEnv = {};
+    for (const key of SUBPROCESS_ENV_ALLOWLIST) {
+        const value = process.env[key];
+        if (value !== undefined) env[key] = value;
+    }
+    return env;
+}
+
 @injectable()
 export class ArcBackendService implements ArcService {
     private workspaceRoot: string;
@@ -464,7 +486,7 @@ export class ArcBackendService implements ArcService {
             const child = spawn(command, args, {
                 cwd,
                 shell: false, // Critical: disable shell to prevent command injection
-                env: { ...process.env },
+                env: buildChildEnv(),
                 stdio: ['ignore', 'pipe', 'pipe'] // stdin disconnected, capture stdout/stderr
             });
 
@@ -1083,7 +1105,14 @@ export class ArcBackendService implements ArcService {
      * Find all Python files in the workspace (recursive, excluding common ignore dirs).
      */
     private async findPythonFiles(dir: string): Promise<string[]> {
-        const ignoreDirs = new Set(['node_modules', '.git', '__pycache__', '.venv', 'venv', '.arc', 'docs', 'scripts']);
+        const ignoreDirs = new Set([
+            'node_modules', '.git', '__pycache__', '.venv', 'venv',
+            '.arc', 'docs', 'scripts',
+            // Python project artifacts
+            'env', '.env', 'virtualenv', 'site-packages',
+            'build', 'dist', '.tox', '.pytest_cache', '.mypy_cache',
+            '.ruff_cache', '.next', 'coverage',
+        ]);
         const results: string[] = [];
 
         const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -1221,12 +1250,13 @@ export class ArcBackendService implements ArcService {
      */
     private async whichExecutable(name: string): Promise<string | null> {
         try {
+            const opId = `which-${name}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             const { stdout } = await this.executeCommandWithTimeout(
                 'which',
                 [name],
                 5000,
                 this.workspaceRoot,
-                'which'
+                opId
             );
             const execPath = stdout.trim();
             if (execPath && await fs.pathExists(execPath)) {
@@ -1242,15 +1272,32 @@ export class ArcBackendService implements ArcService {
 
     /**
      * Find executable in workspace or PATH.
+     * 
+     * Priority:
+     * 1. ARC_SWARMGRAPH_CLI env var (explicit override)
+     * 2. System PATH (via which)
+     * 3. Workspace local (only if ARC_TRUST_WORKSPACE_LAUNCHER=1)
      */
     private async findExecutable(name: string): Promise<string | null> {
-        // Check in workspace
-        const localPath = path.join(this.workspaceRoot, name);
-        if (await fs.pathExists(localPath)) {
-            return localPath;
+        // Explicit env var override takes priority
+        const configured = process.env.ARC_SWARMGRAPH_CLI;
+        if (configured && await fs.pathExists(configured)) {
+            return configured;
         }
 
-        return this.whichExecutable(name);
+        // System PATH first (safer default)
+        const systemPath = await this.whichExecutable(name);
+        if (systemPath) return systemPath;
+
+        // Workspace fallback only if explicit opt-in
+        if (process.env.ARC_TRUST_WORKSPACE_LAUNCHER === '1') {
+            const localPath = path.join(this.workspaceRoot, name);
+            if (await fs.pathExists(localPath)) {
+                return localPath;
+            }
+        }
+
+        return null;
     }
 
     /**
