@@ -8,6 +8,7 @@
 | PR4 | cd python && uv run pytest tests/adapters/test_openai_agents.py                    | yes        | ✅ PASS |
 | PR5 | cd theia-extensions/arc-event-stream && pnpm run build && pnpm test                | yes        | ✅ PASS |
 | PR6 | cd theia-extensions/arc-event-stream && pnpm run build                             | yes        | ✅ PASS |
+| PR8 | pnpm --filter arc-event-stream build && pnpm test:e2e                              | yes        | ✅ PASS |
 | ... | ...                                                                                 |            |        |
 
 The roadmap agent reads this file row-by-row. If a row's command exits 0 the PR
@@ -297,5 +298,4 @@ Response: data: {AG-UI event JSON}\n\n
 - [x] JSON parsing wrapped in try-catch
 - [x] Connection limited to 5 retry attempts
 - [x] Proper cleanup prevents memory leaks
-
 

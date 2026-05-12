@@ -172,13 +172,22 @@ test.describe('ARC Studio — Smoke Tests', () => {
     await expect(page.getByText('Event Stream').first()).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByTestId('arc-event-stream-run-fixture-ag-ui-events')).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByTestId('arc-event-stream-event-RUN_STARTED').first()).toBeVisible({ timeout: TIMEOUT });
-    await expect(page.getByTestId('arc-event-stream-event-TOOL_CALL_RESULT').first()).toBeVisible({ timeout: TIMEOUT });
 
     await page.getByTestId('arc-event-stream-event-RUN_STARTED').first().click();
     await expect(page.getByTestId('arc-event-stream-detail')).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText('Event Detail')).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText('RUN_STARTED').last()).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText('«REDACTED»').first()).toBeVisible({ timeout: TIMEOUT });
+
+    await page.getByTestId('arc-event-type-filter').locator('summary').click();
+    await page.getByTestId('arc-event-type-filter-TOOL_CALL_RESULT').click();
+    await expect(page.getByText('1 events (filtered from')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByTestId('arc-event-stream-event-TOOL_CALL_RESULT').first()).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByTestId('arc-event-stream-event-RUN_STARTED')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Clear All' }).click();
+    await expect(page.getByText('Types (all)')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText(/events$/).first()).toBeVisible({ timeout: TIMEOUT });
   });
 });
 
