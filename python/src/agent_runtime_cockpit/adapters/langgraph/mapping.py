@@ -9,7 +9,7 @@ from agent_runtime_cockpit.ag_ui import AGUIEventType, MappingContext, register_
 
 def _map(native: dict[str, Any], ctx: MappingContext) -> list[dict[str, Any]]:
     event = native.get("event", "")
-    ts = time.time()
+    ts = native.get("timestamp", time.time())
     if event == "on_chain_start":
         return [{"type": AGUIEventType.STEP_STARTED.value, "timestamp": ts,
                  "stepName": native.get("name", "?")}]

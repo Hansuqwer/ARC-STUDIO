@@ -6,12 +6,15 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable
 
+from .validator import validate_events
+
 __all__ = [
     "AGUIEventType",
     "MappingContext",
     "register_mapper",
     "map_event",
     "EVENT_SCHEMAS",
+    "validate_events",
 ]
 
 
@@ -67,5 +70,11 @@ def map_event(runtime: str, native: dict[str, Any], ctx: MappingContext) -> list
     for ev in events:
         ev.setdefault("threadId", ctx.thread_id)
         ev.setdefault("runId", ctx.run_id)
-        ev.setdefault("timestamp", time.time())
+        # Only set timestamp if not already present (preserve mapper's timestamp)
+        if "timestamp" not in ev:
+            ev["timestamp"] = time.time()
+    
+    # Validate events (logs warnings, doesn't raise)
+    validate_events(events, runtime)
+    
     return events
