@@ -107,6 +107,15 @@ export interface RunRecord {
   metadata: Record<string, unknown>;
 }
 
+export type RuntimeId = 'auto' | 'swarmgraph' | 'langgraph' | 'crewai';
+
+export interface StartRunRequest {
+  workflow_id: string;
+  runtime?: RuntimeId;
+  inputs?: Record<string, unknown>;
+  allow_paid_calls?: boolean;
+}
+
 /** AG-UI compatible run event */
 export interface RunEvent {
   type: string;

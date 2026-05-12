@@ -39,6 +39,7 @@ from .keys import WORKSPACE_KEY
 log = logging.getLogger(__name__)
 redactor = Redactor()
 ctx_gen = ContextPackGenerator()
+RUNTIME_IDS = set(runtime_router.KNOWN_RUNTIMES) | {"auto"}
 
 
 def _workspace(request: web.Request) -> Path:
@@ -162,11 +163,21 @@ async def schemas(request: web.Request) -> web.Response:
 
 
 async def start_run(request: web.Request) -> web.Response:
+    """Start a run. GET is legacy; POST JSON is canonical. Both share runtime routing."""
     t0 = time.time()
-    workflow_id = request.query.get("workflow_id", "wf-swarmgraph-fixture")
-    runtime = request.query.get("runtime", "auto")
+    body: dict = {}
+    if request.method == "POST":
+        try:
+            body = await request.json()
+        except Exception:
+            return _json(err(ArcErrorCode.INVALID_INPUT, "Invalid JSON request body", details={"code": "invalid_json"}).model_dump(), 400)
+    workflow_id = str(body.get("workflow_id") or request.query.get("workflow_id", "wf-swarmgraph-fixture"))
+    runtime = str(body.get("runtime") or request.query.get("runtime", "auto"))
+    if runtime not in RUNTIME_IDS:
+        return _json(err("invalid_runtime", f"Invalid runtime: {runtime}").model_dump(), 400)
     workspace = _workspace(request)
-    allow_paid_calls = request.query.get("allow_paid_calls", "").lower() in {"1", "true", "yes"}
+    allow_paid_calls = bool(body.get("allow_paid_calls")) or request.query.get("allow_paid_calls", "").lower() in {"1", "true", "yes"}
+    inputs = body.get("inputs") if isinstance(body.get("inputs"), dict) else {}
     try:
         routed = runtime_router.resolve(workspace, runtime, allow_paid_calls=allow_paid_calls)
     except runtime_router.UnknownRuntime as exc:
@@ -177,7 +188,7 @@ async def start_run(request: web.Request) -> web.Response:
         return _json(err(ArcErrorCode.NOT_IMPLEMENTED, str(exc), details={"code": exc.code}).model_dump(), 501)
 
     try:
-        run = await routed.adapter.run_workflow(workflow_id, {"workspace": str(workspace), "allow_paid_calls": allow_paid_calls})
+        run = await routed.adapter.run_workflow(workflow_id, {**inputs, "workspace": str(workspace), "allow_paid_calls": allow_paid_calls})
         _trace_store(request).save(run)
         envelope = ok(
             run.model_dump(),
@@ -320,6 +331,7 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_get("/api/schemas",           schemas)
     app.router.add_get("/api/runs",              list_runs)
     app.router.add_get("/api/runs/start",        start_run)
+    app.router.add_post("/api/runs/start",       start_run)
     app.router.add_get("/api/runs/{run_id}",     get_run)
     app.router.add_get("/api/runs/{run_id}/events", run_events_sse)
     app.router.add_get("/api/context/pack",      context_pack)
