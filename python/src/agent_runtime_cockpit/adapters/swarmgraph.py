@@ -11,7 +11,6 @@ import asyncio
 import json
 import logging
 import os
-import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +22,7 @@ from ..protocol.schemas import (
     WorkflowInfo, WorkflowNode, WorkflowEdge, SchemaInfo,
     NodeType, RunRecord, RunEvent, RunStatus
 )
+from ..security.redaction import Redactor
 from ..workspace import iter_workspace_files
 from .base import RuntimeAdapter
 
@@ -33,21 +33,17 @@ REAL_IMPLEMENTATION_PATH = "adapters/swarmgraph.py -> import swarmgraph; graph.e
 LOCAL_FIX_STEPS = "pip install git+https://github.com/Hansuqwer/SwarmGraph"
 OWNER = "SwarmGraph Adapter Agent"
 
-# Environment variable allow-list for subprocess execution
-# Only these variables (plus ARC_SWARMGRAPH_* prefixed vars) are passed to subprocesses
-_ALLOWED_ENV_VARS = frozenset({
+# Environment variable allowlist for subprocess execution
+# Only these system vars + ARC_SWARMGRAPH_* vars are passed to subprocess
+SWARMGRAPH_ENV_ALLOWLIST = [
     "PATH",
     "HOME",
     "LANG",
     "LC_ALL",
-    "LC_CTYPE",
-    "TMPDIR",
-    "TEMP",
-    "TMP",
     "SHELL",
-    "USER",
-    "LOGNAME",
-})
+    "TMPDIR",
+    "VIRTUAL_ENV",
+]
 
 # Detection signals for SwarmGraph projects
 _DETECTION_SIGNALS = [
@@ -62,84 +58,12 @@ _DETECTION_SIGNALS = [
 ]
 
 
-def _build_safe_env() -> dict[str, str]:
-    """
-    Build a safe environment dict for subprocess execution.
-    
-    Only includes:
-    - Explicitly allowed system variables (PATH, HOME, etc.)
-    - ARC_SWARMGRAPH_* prefixed variables
-    
-    This prevents leaking secrets like OPENAI_API_KEY, AWS_*, etc.
-    """
-    safe_env = {}
-    
-    # Add allowed system variables
-    for key in _ALLOWED_ENV_VARS:
-        if key in os.environ:
-            safe_env[key] = os.environ[key]
-    
-    # Add all ARC_SWARMGRAPH_* variables
-    for key, value in os.environ.items():
-        if key.startswith("ARC_SWARMGRAPH_"):
-            safe_env[key] = value
-    
-    # Add PYTHONWARNINGS to suppress warnings
-    safe_env["PYTHONWARNINGS"] = "ignore"
-    
-    return safe_env
-
-
-def _redact(text: str) -> str:
-    """
-    Redact sensitive information from text before logging or storing.
-    
-    Redacts:
-    - API keys (sk-*, sk-ant-*, etc.)
-    - Authorization headers
-    - Bearer tokens
-    - API key parameters
-    - Token parameters
-    
-    Returns redacted text safe for logging.
-    """
-    if not text:
-        return text
-    
-    patterns = [
-        # OpenAI/Anthropic style API keys
-        (r'sk-[A-Za-z0-9_-]{20,}', 'sk-REDACTED'),
-        (r'sk-ant-[A-Za-z0-9_-]{20,}', 'sk-ant-REDACTED'),
-        # Generic API key patterns
-        (r'(api[_-]?key\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED'),
-        (r'(apikey\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED'),
-        # Authorization headers
-        (r'(authorization:\s*bearer\s+)[^\s]+', r'\1REDACTED', re.IGNORECASE),
-        (r'(authorization:\s*)[^\s]+', r'\1REDACTED', re.IGNORECASE),
-        # Token parameters
-        (r'(token\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED'),
-        (r'(access[_-]?token\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED'),
-        # AWS credentials
-        (r'(aws[_-]?access[_-]?key[_-]?id\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED', re.IGNORECASE),
-        (r'(aws[_-]?secret[_-]?access[_-]?key\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED', re.IGNORECASE),
-        # Generic secret patterns
-        (r'(secret\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED', re.IGNORECASE),
-        (r'(password\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED', re.IGNORECASE),
-    ]
-    
-    redacted = text
-    for pattern_tuple in patterns:
-        if len(pattern_tuple) == 2:
-            pattern, replacement = pattern_tuple
-            flags = 0
-        else:
-            pattern, replacement, flags = pattern_tuple
-        redacted = re.sub(pattern, replacement, redacted, flags=flags)
-    
-    return redacted
-
-
 class SwarmGraphAdapter(RuntimeAdapter):
+
+    def __init__(self):
+        """Initialize SwarmGraph adapter with redactor for output sanitization."""
+        super().__init__()
+        self._redactor = Redactor()
 
     @property
     def adapter_id(self) -> str:
@@ -148,6 +72,39 @@ class SwarmGraphAdapter(RuntimeAdapter):
     @property
     def adapter_name(self) -> str:
         return "SwarmGraph"
+
+    def _filtered_env(self) -> dict[str, str]:
+        """Return filtered environment variables safe for subprocess execution.
+        
+        Only passes through:
+        - Allowlisted system variables (PATH, HOME, etc.)
+        - ARC_SWARMGRAPH_* prefixed variables
+        - PYTHONPATH if present
+        - PYTHONWARNINGS override
+        
+        This prevents leaking sensitive environment variables like API keys,
+        AWS credentials, GitHub tokens, etc. to subprocess execution.
+        """
+        env = {}
+        
+        # Add allowlisted system vars
+        for key in SWARMGRAPH_ENV_ALLOWLIST:
+            if key in os.environ:
+                env[key] = os.environ[key]
+        
+        # Add all ARC_SWARMGRAPH_* vars
+        for key, value in os.environ.items():
+            if key.startswith("ARC_SWARMGRAPH_"):
+                env[key] = value
+        
+        # Add PYTHONPATH if present
+        if "PYTHONPATH" in os.environ:
+            env["PYTHONPATH"] = os.environ["PYTHONPATH"]
+        
+        # Add PYTHONWARNINGS override
+        env["PYTHONWARNINGS"] = "ignore"
+        
+        return env
 
     def capabilities(self) -> RuntimeCapabilities:
         return RuntimeCapabilities(
@@ -330,7 +287,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
             cwd=str(workspace),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=_build_safe_env(),  # Security: Use allow-listed env vars only
+            env=self._filtered_env(),
         )
         stdout_b, stderr_b = await proc.communicate()
         stdout = stdout_b.decode(errors="replace").strip()
@@ -338,7 +295,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
         ended = datetime.now(timezone.utc)
 
         if proc.returncode != 0:
-            events.append(self._event(run_id, 1, "RUN_FAILED", {"exit_code": proc.returncode, "stderr": _redact(stderr[-2000:]), "stdout": _redact(stdout[-2000:])}))
+            events.append(self._event(run_id, 1, "RUN_FAILED", {"exit_code": proc.returncode, "stderr": self._redactor.redact_string(stderr[-2000:]), "stdout": self._redactor.redact_string(stdout[-2000:])}))
             return RunRecord(
                 id=run_id,
                 workflow_id=workflow_id,
@@ -353,7 +310,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
                     "prompt": prompt,
                     "cost_allowed": allow_costs,
                     "exit_code": proc.returncode,
-                    "stderr": _redact(stderr[-2000:]),
+                    "stderr": self._redactor.redact_string(stderr[-2000:]),
                     "_external_command": "swarmgraph swarm --json",
                 },
             )
@@ -361,7 +318,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
         try:
             payload = json.loads(stdout)
         except json.JSONDecodeError as exc:
-            events.append(self._event(run_id, 1, "RUN_FAILED", {"error": f"Invalid SwarmGraph JSON: {exc}", "stdout": _redact(stdout[:2000]), "stderr": _redact(stderr[-2000:])}))
+            events.append(self._event(run_id, 1, "RUN_FAILED", {"error": f"Invalid SwarmGraph JSON: {exc}", "stdout": self._redactor.redact_string(stdout[:2000]), "stderr": self._redactor.redact_string(stderr[-2000:])}))
             return RunRecord(
                 id=run_id,
                 workflow_id=workflow_id,
@@ -375,8 +332,8 @@ class SwarmGraphAdapter(RuntimeAdapter):
                     "provider": provider,
                     "prompt": prompt,
                     "cost_allowed": allow_costs,
-                    "stdout": _redact(stdout[:2000]),
-                    "stderr": _redact(stderr[-2000:]),
+                    "stdout": self._redactor.redact_string(stdout[:2000]),
+                    "stderr": self._redactor.redact_string(stderr[-2000:]),
                     "_external_command": "swarmgraph swarm --json",
                 },
             )

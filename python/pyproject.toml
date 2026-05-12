@@ -54,10 +54,11 @@ addopts = "-v --tb=short"
 markers = [
     "benchmark: marks tests as benchmarks (off-gate, not required for CI)",
 ]
-filterwarnings = [
-    # Category C: transitive LangGraph warning until upstream resolves allowed_objects default.
-    "ignore:.*default value of `allowed_objects` will change.*:langchain_core._api.deprecation.LangChainPendingDeprecationWarning:langgraph\\.cache.*",
-]
+# Temporarily disabled due to missing langchain_core module
+# filterwarnings = [
+#     # Category C: transitive LangGraph warning until upstream resolves allowed_objects default.
+#     "ignore:.*default value of `allowed_objects` will change.*:langchain_core._api.deprecation.LangChainPendingDeprecationWarning:langgraph\\.cache.*",
+# ]
 
 [tool.ruff]
 line-length = 100

@@ -24,3 +24,9 @@ tests/e2e/test-results/
 .claude/
 AGENTS.md
 CLAUDE.md
+
+# Environment files - prevent committing secrets
+.env
+.env.*
+*.env
+!.env.example

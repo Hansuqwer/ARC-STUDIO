@@ -17,6 +17,7 @@ SECRET_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("aws_key",       re.compile(r'AKIA[0-9A-Z]{16}')),
     ("github_token",  re.compile(r'(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{32,}')),
     ("openai_key",    re.compile(r'sk-[A-Za-z0-9]{32,}')),
+    ("anthropic_key", re.compile(r'sk-ant-[A-Za-z0-9\-]{10,}')),
 ]
 
 REDACT_PLACEHOLDER = "[REDACTED]"
