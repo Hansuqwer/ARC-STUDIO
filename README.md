@@ -15,7 +15,7 @@ Current state: handoff-ready prototype, not production-ready. See `STATUS.md` an
 
 - Electron smoke packaging is local-only; release packaging requires signing credentials.
 - Live/provider-backed SwarmGraph execution requires explicit approval before running external calls.
-- LangGraph real runtime execution is not implemented.
+- LangGraph runtime execution requires explicit `ARC_LANGGRAPH_EXPORT`; streaming is not implemented yet.
 
 ## Setup
 
@@ -100,7 +100,7 @@ node packages/arc-test-fixtures/src/index.js
 | Runtime | Current support | Missing |
 | --- | --- | --- |
 | SwarmGraph | Detection, AST workflow/schema export heuristics, local/gateway execution, JSONL trace replay/export | Audit integrations |
-| LangGraph | Detection, AST workflow heuristics, dynamic export hook, fixture schema | Real runtime execution |
+| LangGraph | Detection, AST workflow heuristics, dynamic export/run hook, fixture schema | Streaming/events; see `docs/RUNTIMES.md` |
 | CrewAI | Not implemented | Adapter |
 | OpenAI Agents SDK | Not implemented | Adapter |
 | AG2 | Not implemented | Adapter |

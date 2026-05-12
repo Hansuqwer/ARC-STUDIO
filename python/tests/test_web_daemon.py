@@ -1,4 +1,6 @@
 import json
+from pathlib import Path
+import sys
 
 from aiohttp import ClientSession
 from aiohttp.web import AppRunner, TCPSite
@@ -6,6 +8,26 @@ from aiohttp.web import AppRunner, TCPSite
 from agent_runtime_cockpit.protocol.schemas import RunEvent, RunRecord, RunStatus
 from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
 from agent_runtime_cockpit.web.server import create_app
+
+
+def _write_swarmgraph_cli(workspace: Path) -> None:
+    cli = workspace / "swarmgraph"
+    cli.write_text(
+        "#!/usr/bin/env sh\n"
+        "printf '%s\n' '{\"swarm_id\":\"sg-api\",\"status\":\"completed\",\"worker_count\":0,\"final_output\":\"ok\"}'\n"
+    )
+    cli.chmod(cli.stat().st_mode | 0o111)
+
+
+def _write_langgraph_export(workspace: Path) -> None:
+    sys.modules.pop("graph_module", None)
+    (workspace / "graph_module.py").write_text(
+        "class Graph:\n"
+        "    def invoke(self, inputs):\n"
+        "        return {'messages': ['langgraph-ok'], 'inputs': inputs}\n"
+        "def build_graph():\n"
+        "    return Graph()\n"
+    )
 
 
 async def test_runs_api_and_sse_events(tmp_path, unused_tcp_port):
@@ -60,6 +82,15 @@ async def test_runs_api_and_sse_events(tmp_path, unused_tcp_port):
                 assert events[1]["type"] == "RUN_COMPLETED"
                 assert events[-1]["type"] == "STREAM_END"
 
+            async with session.get(f"{base_url}/api/runs/missing-run/events") as response:
+                body = await response.text()
+                assert response.status == 200
+                lines = [line.removeprefix("data: ") for line in body.splitlines() if line.startswith("data: ")]
+                events = [json.loads(line) for line in lines]
+                assert events[0]["type"] == "RUN_ERROR"
+                assert events[0]["data"]["code"] == "RUN_NOT_FOUND"
+                assert events[-1]["type"] == "STREAM_END"
+
             async with session.get(f"{base_url}/api/providers") as response:
                 payload = await response.json()
                 assert response.status == 200
@@ -79,5 +110,159 @@ async def test_runs_api_and_sse_events(tmp_path, unused_tcp_port):
                 ids = {runtime["runtime_id"] for runtime in payload["data"]["runtimes"]}
                 assert ids >= {"swarmgraph", "langgraph", "crewai"}
                 assert all("requires_paid_calls" in runtime for runtime in payload["data"]["runtimes"])
+    finally:
+        await runner.cleanup()
+
+
+async def test_start_run_runtime_body_selects_langgraph(monkeypatch, tmp_path, unused_tcp_port):
+    _write_swarmgraph_cli(tmp_path)
+    _write_langgraph_export(tmp_path)
+    monkeypatch.setenv("ARC_LANGGRAPH_EXPORT", "graph_module:build_graph")
+
+    app = await create_app(tmp_path)
+    runner = AppRunner(app)
+    await runner.setup()
+    site = TCPSite(runner, "127.0.0.1", unused_tcp_port)
+    await site.start()
+    try:
+        async with ClientSession() as session:
+            async with session.post(
+                f"http://127.0.0.1:{unused_tcp_port}/api/runs/start",
+                json={"workflow_id": "wf-lg", "runtime": "langgraph", "inputs": {"prompt": "hello"}},
+            ) as response:
+                payload = await response.json()
+                assert response.status == 200
+                assert payload["data"]["runtime"] == "langgraph"
+                assert payload["data"]["runtime_selection"]["runtime"] == "langgraph"
+                assert payload["data"]["events"][-1]["data"]["state"]["messages"] == ["langgraph-ok"]
+    finally:
+        await runner.cleanup()
+
+
+async def test_start_run_runtime_body_rejects_unknown(tmp_path, unused_tcp_port):
+    app = await create_app(tmp_path)
+    runner = AppRunner(app)
+    await runner.setup()
+    site = TCPSite(runner, "127.0.0.1", unused_tcp_port)
+    await site.start()
+    try:
+        async with ClientSession() as session:
+            async with session.post(
+                f"http://127.0.0.1:{unused_tcp_port}/api/runs/start",
+                json={"workflow_id": "wf-bad", "runtime": "garbage"},
+            ) as response:
+                payload = await response.json()
+                assert response.status == 400
+                assert payload["error"]["code"] == "invalid_runtime"
+    finally:
+        await runner.cleanup()
+
+
+async def test_start_run_get_runtime_query_uses_same_router(monkeypatch, tmp_path, unused_tcp_port):
+    _write_langgraph_export(tmp_path)
+    monkeypatch.setenv("ARC_LANGGRAPH_EXPORT", "graph_module:build_graph")
+
+    app = await create_app(tmp_path)
+    runner = AppRunner(app)
+    await runner.setup()
+    site = TCPSite(runner, "127.0.0.1", unused_tcp_port)
+    await site.start()
+    try:
+        async with ClientSession() as session:
+            async with session.get(
+                f"http://127.0.0.1:{unused_tcp_port}/api/runs/start?workflow_id=wf-get-lg&runtime=langgraph",
+            ) as response:
+                payload = await response.json()
+                assert response.status == 200
+                assert payload["data"]["runtime"] == "langgraph"
+                assert payload["data"]["runtime_selection"]["runtime"] == "langgraph"
+    finally:
+        await runner.cleanup()
+
+
+async def test_start_run_allow_paid_calls_true_does_not_change_swarmgraph_stub(monkeypatch, tmp_path, unused_tcp_port):
+    _write_swarmgraph_cli(tmp_path)
+    monkeypatch.delenv("ARC_LANGGRAPH_EXPORT", raising=False)
+
+    app = await create_app(tmp_path)
+    runner = AppRunner(app)
+    await runner.setup()
+    site = TCPSite(runner, "127.0.0.1", unused_tcp_port)
+    await site.start()
+    try:
+        async with ClientSession() as session:
+            async with session.post(
+                f"http://127.0.0.1:{unused_tcp_port}/api/runs/start",
+                json={"workflow_id": "wf-paid-flag", "runtime": "auto", "allow_paid_calls": True},
+            ) as response:
+                payload = await response.json()
+                assert response.status == 200
+                assert payload["data"]["runtime"] == "swarmgraph"
+                assert payload["data"]["metadata"]["cost_allowed"] is False
+    finally:
+        await runner.cleanup()
+
+
+async def test_start_run_runtime_body_crewai_not_runnable(tmp_path, unused_tcp_port):
+    app = await create_app(tmp_path)
+    runner = AppRunner(app)
+    await runner.setup()
+    site = TCPSite(runner, "127.0.0.1", unused_tcp_port)
+    await site.start()
+    try:
+        async with ClientSession() as session:
+            async with session.post(
+                f"http://127.0.0.1:{unused_tcp_port}/api/runs/start",
+                json={"workflow_id": "wf-ca", "runtime": "crewai"},
+            ) as response:
+                payload = await response.json()
+                assert response.status == 501
+                assert payload["error"]["details"]["code"] == "RUNTIME_NOT_RUNNABLE"
+    finally:
+        await runner.cleanup()
+
+
+async def test_start_run_runtime_body_omitted_uses_auto(monkeypatch, tmp_path, unused_tcp_port):
+    _write_swarmgraph_cli(tmp_path)
+    monkeypatch.delenv("ARC_LANGGRAPH_EXPORT", raising=False)
+
+    app = await create_app(tmp_path)
+    runner = AppRunner(app)
+    await runner.setup()
+    site = TCPSite(runner, "127.0.0.1", unused_tcp_port)
+    await site.start()
+    try:
+        async with ClientSession() as session:
+            async with session.post(
+                f"http://127.0.0.1:{unused_tcp_port}/api/runs/start",
+                json={"workflow_id": "wf-auto"},
+            ) as response:
+                payload = await response.json()
+                assert response.status == 200
+                assert payload["data"]["runtime_selection"]["chosen_by"] == "auto"
+                assert payload["data"]["runtime_selection"]["runtime"] == "swarmgraph"
+    finally:
+        await runner.cleanup()
+
+
+async def test_start_run_runtime_body_auto_selects_only_langgraph(monkeypatch, tmp_path, unused_tcp_port):
+    _write_langgraph_export(tmp_path)
+    monkeypatch.setenv("ARC_LANGGRAPH_EXPORT", "graph_module:build_graph")
+
+    app = await create_app(tmp_path)
+    runner = AppRunner(app)
+    await runner.setup()
+    site = TCPSite(runner, "127.0.0.1", unused_tcp_port)
+    await site.start()
+    try:
+        async with ClientSession() as session:
+            async with session.post(
+                f"http://127.0.0.1:{unused_tcp_port}/api/runs/start",
+                json={"workflow_id": "wf-auto-lg", "runtime": "auto"},
+            ) as response:
+                payload = await response.json()
+                assert response.status == 200
+                assert payload["data"]["runtime_selection"]["chosen_by"] == "auto"
+                assert payload["data"]["runtime_selection"]["runtime"] == "langgraph"
     finally:
         await runner.cleanup()

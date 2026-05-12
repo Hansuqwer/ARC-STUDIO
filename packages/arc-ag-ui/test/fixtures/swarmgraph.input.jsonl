@@ -1,0 +1,6 @@
+{"kind":"run.start","ts":1}
+{"kind":"agent.text","ts":2,"agent":"queen","text":"Hello"}
+{"kind":"tool.call","ts":3,"tool":{"id":"t1","name":"search","args":{"q":"foo"},"result":{"hits":1}}}
+{"kind":"handoff","ts":4,"agent":"worker-1"}
+{"kind":"state","ts":5,"state":{"step":2}}
+{"kind":"run.finish","ts":6}
