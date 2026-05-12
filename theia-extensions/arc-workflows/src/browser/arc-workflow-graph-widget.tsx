@@ -4,13 +4,8 @@
  * Renders workflow topology as an SVG graph.
  * Uses a simple force-directed layout for the alpha.
  *
- * NOTE: Production implementation should use a proper graph library
+ * NOTE: More advanced rendering can use a graph library later
  * (e.g., @eclipse-glsp/client or reactflow).
- * MOCK_REASON: No graph rendering library bundled yet
- * REAL_IMPLEMENTATION_PATH: Integrate @eclipse-glsp/client or reactflow
- * LOCAL_FIX_STEPS: pnpm add reactflow && replace SVG renderer
- * OWNER: Workflow Graph Agent
- * REMOVE_BEFORE: Beta
  */
 
 import * as React from 'react';

@@ -25,7 +25,8 @@ Generated during GitHub handoff prep.
 - SwarmGraph provider-backed execution is gated by `ARC_SWARMGRAPH_ALLOW_COSTS=true`.
 - LangGraph dynamic workflow export is available through `ARC_LANGGRAPH_EXPORT=module:function`.
 - Daemon integration tests cover `/api/runs` and `/api/runs/{run_id}/events` SSE.
-- Unsigned Electron directory packaging smoke passes with signing disabled.
+- Unsigned Electron directory packaging is smoke-only and uses `electron-builder.smoke.yml`.
+- Signed Electron release packaging requires signing credentials and uses `electron-builder.release.yml`.
 - E2E workflow runs on push and pull requests.
 
 ## Mock/Demo-Only

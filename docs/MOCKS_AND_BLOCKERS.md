@@ -28,7 +28,7 @@
 
 | Mock | File | Reason | Fix |
 |------|------|--------|-----|
-| Electron code signing | `applications/electron/electron-builder.yml` | No certs in CI | Set `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID` |
+| Electron code signing | `applications/electron/electron-builder.release.yml` | No certs in CI | Set `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID` |
 | VS Code plugin download | `plugins/README.md` | No plugins configured | Add to `theiaPlugins` in root `package.json` |
 
 ## Hard Blockers

@@ -1,12 +1,4 @@
-"""
-SQLite store for ARC metadata (runs index, audit log).
-
-MOCK_REASON: SQLite store is secondary to JSONL for alpha; not wired to daemon yet.
-REAL_IMPLEMENTATION_PATH: storage/sqlite.py → RunIndex, AuditLog tables
-LOCAL_FIX_STEPS: Call SqliteStore.init_db() in daemon startup
-OWNER: Trace Store Agent
-REMOVE_BEFORE: Beta
-"""
+"""SQLite store for ARC metadata (runs index, audit log)."""
 from __future__ import annotations
 
 import sqlite3

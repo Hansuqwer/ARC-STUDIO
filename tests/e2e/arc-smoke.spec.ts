@@ -6,36 +6,46 @@
  *   2. Page title contains "ARC Studio"
  *   3. ARC activity bar icon is present
  *   4. ARC main widget can be opened
- *   5. Runtime list appears (or mock warning)
+ *   5. Runtime list appears with explicit local-vs-beta runtime handling
  *
  * Source: https://github.com/eclipse-theia/theia/blob/master/examples/playwright/README.md
  *
  * Run: pnpm test:e2e
  * Requirements: Browser app must be running on http://localhost:3000
  *
- * MOCK_REASON: Full Playwright/Theia page objects require @theia/playwright installed.
- * REAL_IMPLEMENTATION_PATH: tests/e2e/arc-smoke.spec.ts using TheiaApp page objects
- * LOCAL_FIX_STEPS:
- *   1. pnpm install (installs @playwright/test)
- *   2. pnpm start:browser (in another terminal)
- *   3. pnpm test:e2e
- * OWNER: Theia Playwright Agent
- * REMOVE_BEFORE: Alpha release
  */
 
 import { test, expect } from '@playwright/test';
 import { join } from 'path';
 
-const APP_URL = process.env.ARC_E2E_URL || 'http://localhost:3000';
+const APP_URL = process.env.ARC_E2E_URL || `http://localhost:${process.env.ARC_E2E_PORT || '3010'}`;
 const TIMEOUT = 60_000;
 const REPO_ROOT = join(__dirname, '..', '..');
 const ARC_WORKSPACE = process.env.ARC_WORKSPACE_PATH || REPO_ROOT;
+const REQUIRE_RUNTIME = process.env.ARC_E2E_REQUIRE_RUNTIME === 'true';
 
-async function skipIfRuntimeUnavailable(page: import('@playwright/test').Page): Promise<void> {
+async function skipIfRuntimeUnavailable(page: import('@playwright/test').Page, testInfo?: import('@playwright/test').TestInfo): Promise<void> {
   const failed = page.getByText('Run failed.');
   if (await failed.isVisible()) {
     const error = (await page.locator('text=/Error:/').first().textContent().catch(() => '')) || '';
+    const diagnosticsText = await page.locator('text=/diagnostics/').first().textContent({ timeout: 1000 }).catch(() => '');
+    if (diagnosticsText && testInfo) {
+      await testInfo.attach('arc-cli-diagnostics', {
+        body: diagnosticsText,
+        contentType: 'text/plain',
+      });
+    }
+    if (REQUIRE_RUNTIME) {
+      throw new Error(`Required SwarmGraph runtime unavailable to Theia backend: ${error}`);
+    }
     test.skip(true, `Local SwarmGraph runtime unavailable to Theia backend: ${error}`);
+  }
+}
+
+async function acceptWorkspaceTrustIfShown(page: import('@playwright/test').Page): Promise<void> {
+  const trustButton = page.getByRole('button', { name: /^yes,? i trust the authors$/i });
+  if (await trustButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await trustButton.click();
   }
 }
 
@@ -43,6 +53,7 @@ test.describe('ARC Studio — Smoke Tests', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto(APP_URL, { waitUntil: 'networkidle', timeout: TIMEOUT });
+    await acceptWorkspaceTrustIfShown(page);
   });
 
   test('browser app loads without crash', async ({ page }) => {
@@ -82,35 +93,38 @@ test.describe('ARC Studio — Smoke Tests', () => {
 
   test('run timeline prompt controls are available through deep link', async ({ page }) => {
     await page.goto(`${APP_URL}/?arc-view=run-timeline`, { waitUntil: 'networkidle', timeout: TIMEOUT });
+    await acceptWorkspaceTrustIfShown(page);
 
     await expect(page.getByText('Start SwarmGraph Run')).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByPlaceholder('Prompt for local SwarmGraph stub run')).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText('Refresh Workspace')).toBeVisible({ timeout: TIMEOUT });
   });
 
-  test('run timeline executes a local stub-backed SwarmGraph run', async ({ page }) => {
+  test('run timeline executes a local stub-backed SwarmGraph run', async ({ page }, testInfo) => {
     await page.goto(`${APP_URL}/?arc-view=run-timeline`, { waitUntil: 'networkidle', timeout: TIMEOUT });
+    await acceptWorkspaceTrustIfShown(page);
 
     await page.getByPlaceholder('Prompt for local SwarmGraph stub run').fill('ARC E2E local stub run: return one sentence.');
     await page.getByText('Start SwarmGraph Run').click();
     const completed = page.getByText('Run completed.');
     const failed = page.getByText('Run failed.');
     await expect(completed.or(failed).first()).toBeVisible({ timeout: TIMEOUT });
-    await skipIfRuntimeUnavailable(page);
+    await skipIfRuntimeUnavailable(page, testInfo);
     await expect(page.getByText('Replay Events')).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText('Connect SSE Stream')).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText('Export Run JSON')).toBeAttached({ timeout: TIMEOUT });
   });
 
-  test('run timeline shows completed run after reload', async ({ page }) => {
+  test('run timeline shows completed run after reload', async ({ page }, testInfo) => {
     await page.goto(`${APP_URL}/?arc-view=run-timeline`, { waitUntil: 'networkidle', timeout: TIMEOUT });
+    await acceptWorkspaceTrustIfShown(page);
 
     await page.getByPlaceholder('Prompt for local SwarmGraph stub run').fill('ARC E2E reload history run.');
     await page.getByText('Start SwarmGraph Run').click();
     const completed = page.getByText('Run completed.');
     const failed = page.getByText('Run failed.');
     await expect(completed.or(failed).first()).toBeVisible({ timeout: TIMEOUT });
-    await skipIfRuntimeUnavailable(page);
+    await skipIfRuntimeUnavailable(page, testInfo);
     const runId = (await page.locator('h2', { hasText: 'Run: run-sg-' }).first().textContent())?.match(/run-sg-[a-f0-9]+/)?.[0];
     expect(runId).toBeTruthy();
 

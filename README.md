@@ -13,7 +13,7 @@ Current state: handoff-ready prototype, not production-ready. See `STATUS.md` an
 
 ## What Does Not Work Yet
 
-- Electron packaging/signing is not verified.
+- Electron smoke packaging is local-only; release packaging requires signing credentials.
 - Live/provider-backed SwarmGraph execution requires explicit approval before running external calls.
 - LangGraph real runtime execution is not implemented.
 
@@ -39,6 +39,7 @@ pnpm start:browser
 
 Default SwarmGraph runs use the local `stub` backend and do not call paid/provider services.
 Provider-backed runs require explicit opt-in with `ARC_SWARMGRAPH_RUN_BACKEND=<backend>` and `ARC_SWARMGRAPH_ALLOW_COSTS=true`; otherwise ARC adds `--no-cost`.
+ARC does not install SwarmGraph as a Python extra yet; set `ARC_SWARMGRAPH_CLI` or open a workspace that contains an executable `swarmgraph` launcher.
 
 ```bash
 cd python
@@ -110,6 +111,7 @@ node packages/arc-test-fixtures/src/index.js
 - `docs/HANDOFF.md`: commands run, known failures, completion plan.
 - `docs/ROADMAP.md`: prioritized work list.
 - `docs/MOCK_POLICY.md`: mock/demo rules.
+- `docs/SECURITY.md`: trust boundaries, secrets, daemon, and release security notes.
 - `CONTRIBUTING.md`: setup and definition of done.
 
 ## License

@@ -3,15 +3,6 @@ SwarmGraph Runtime Adapter
 
 Detects and inspects SwarmGraph-based agent projects.
 Source: https://github.com/Hansuqwer/SwarmGraph
-
-MOCK_REASON: Real SwarmGraph inspection requires the library installed.
-             Fixture data is used when the library is absent.
-REAL_IMPLEMENTATION_PATH: Install swarmgraph from the repo and call its graph export API.
-LOCAL_FIX_STEPS:
-    1. pip install git+https://github.com/Hansuqwer/SwarmGraph
-    2. Remove FIXTURE_MODE check and call real graph.export() API
-OWNER: SwarmGraph Adapter Agent
-REMOVE_BEFORE: Beta release
 """
 from __future__ import annotations
 
@@ -25,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ..adapters.base import CapabilityReport
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import (
     WorkflowInfo, WorkflowNode, WorkflowEdge, SchemaInfo,
@@ -35,11 +27,10 @@ from .base import RuntimeAdapter
 
 log = logging.getLogger(__name__)
 
-MOCK_REASON = "SwarmGraph library not installed; using file-scan heuristics + fixture topology"
-REAL_IMPLEMENTATION_PATH = "adapters/swarmgraph.py → import swarmgraph; graph.export()"
-LOCAL_FIX_STEPS = "pip install git+https://github.com/Hansuqwer/SwarmGraph && remove FIXTURE_MODE"
+HEURISTIC_REASON = "SwarmGraph library not installed; using file-scan heuristics"
+REAL_IMPLEMENTATION_PATH = "adapters/swarmgraph.py -> import swarmgraph; graph.export()"
+LOCAL_FIX_STEPS = "pip install git+https://github.com/Hansuqwer/SwarmGraph"
 OWNER = "SwarmGraph Adapter Agent"
-REMOVE_BEFORE = "Beta"
 
 # Detection signals for SwarmGraph projects
 _DETECTION_SIGNALS = [
@@ -74,6 +65,29 @@ class SwarmGraphAdapter(RuntimeAdapter):
             can_export_workflow=True,
             can_stream_events=False,
             can_audit=False,        # planned
+        )
+
+    def capability_report(self, workspace: Path) -> CapabilityReport:
+        detected, _, evidence = self.detect(workspace)
+        try:
+            self._resolve_cli(workspace)
+        except Exception as exc:
+            return CapabilityReport(
+                runtime_id=self.adapter_id,
+                detected=detected,
+                can_run=False,
+                availability="missing_dependency",
+                reason=str(exc),
+                detected_artifacts=evidence,
+                required_env=["ARC_SWARMGRAPH_CLI"],
+            )
+        return CapabilityReport(
+            runtime_id=self.adapter_id,
+            detected=detected,
+            can_run=True,
+            availability="runnable",
+            detected_artifacts=evidence,
+            required_env=["ARC_SWARMGRAPH_CLI"],
         )
 
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
@@ -192,7 +206,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
         workspace = Path(str(inputs.get("workspace") or ".")).resolve()
         cli = self._resolve_cli(workspace)
         backend = os.environ.get("ARC_SWARMGRAPH_RUN_BACKEND", "stub")
-        provider = os.environ.get("AI_PROVIDER_SWARM_GATEWAY_DEFAULT_PROVIDER", "9router")
+        provider = os.environ.get("AI_PROVIDER_SWARM_GATEWAY_DEFAULT_PROVIDER", "openai")
         allow_costs = os.environ.get("ARC_SWARMGRAPH_ALLOW_COSTS", "").lower() in {"1", "true", "yes"}
         prompt = str(inputs.get("prompt") or f"Run ARC workflow {workflow_id}")
         run_id = f"run-sg-{uuid.uuid4().hex[:8]}"

@@ -13,7 +13,7 @@ export const ArcPreferenceSchema: PreferenceSchema = {
     },
     'arc.daemon.host': {
       type: 'string',
-      default: 'localhost',
+      default: '127.0.0.1',
       description: 'Host for the ARC Python daemon.',
     },
     'arc.daemon.autoStart': {
@@ -58,8 +58,8 @@ export const ArcPreferenceSchema: PreferenceSchema = {
     },
     'arc.swarmgraph.provider': {
       type: 'string',
-      default: '9router',
-      description: 'Default SwarmGraph provider. This is non-secret; API keys must come from environment or future secure storage.',
+      default: 'openai',
+      description: 'Default provider id for ARC runs. This is non-secret; API keys must come from environment or future secure storage.',
     },
     'arc.swarmgraph.baseUrl': {
       type: 'string',

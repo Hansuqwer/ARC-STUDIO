@@ -1,0 +1,106 @@
+import pytest
+
+from agent_runtime_cockpit.adapters.base import CapabilityReport
+from agent_runtime_cockpit.orchestration import runtime_router
+
+
+class _FakeRegistry:
+    def __init__(self, adapters):
+        self._adapters = adapters
+
+    def all(self):
+        return list(self._adapters.values())
+
+    def get(self, adapter_id):
+        return self._adapters.get(adapter_id)
+
+
+class _FakeAdapter:
+    def __init__(self, runtime_id, can_run, requires_paid_calls=False):
+        self.adapter_id = runtime_id
+        self._report = CapabilityReport(
+            runtime_id=runtime_id,
+            detected=True,
+            can_run=can_run,
+            availability="runnable" if can_run else "detected_not_runnable",
+            requires_paid_calls=requires_paid_calls,
+        )
+
+    def capability_report(self, workspace):
+        return self._report
+
+
+def _install_fake_registry(monkeypatch, specs):
+    adapters = {key: _FakeAdapter(key, **value) for key, value in specs.items()}
+    monkeypatch.setattr(runtime_router, "default_registry", lambda: _FakeRegistry(adapters))
+
+
+def test_resolve_unknown_runtime(tmp_path):
+    with pytest.raises(runtime_router.UnknownRuntime):
+        runtime_router.resolve(tmp_path, "nope")
+
+
+def test_resolve_combo_rejected_for_mvp(tmp_path):
+    with pytest.raises(runtime_router.ComboNotImplemented):
+        runtime_router.resolve(tmp_path, ["crewai", "swarmgraph"])
+
+
+def test_auto_selects_swarmgraph_by_priority(monkeypatch, tmp_path):
+    cli = tmp_path / "swarmgraph"
+    cli.write_text("#!/usr/bin/env sh\nprintf '%s\n' '{\"status\":\"completed\"}'\n")
+    cli.chmod(cli.stat().st_mode | 0o111)
+    monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))
+
+    routed = runtime_router.resolve(tmp_path, "auto")
+
+    assert routed.adapter.adapter_id == "swarmgraph"
+    assert routed.chosen_by == "auto"
+
+
+def test_explicit_crewai_not_runnable_without_target(tmp_path):
+    with pytest.raises(runtime_router.RuntimeNotRunnable):
+        runtime_router.resolve(tmp_path, "crewai")
+
+
+def test_auto_skips_paid_when_flag_off(monkeypatch, tmp_path):
+    _install_fake_registry(monkeypatch, {
+        "swarmgraph": {"can_run": False},
+        "langgraph": {"can_run": False},
+        "crewai": {"can_run": True, "requires_paid_calls": True},
+    })
+
+    with pytest.raises(runtime_router.RuntimeNotRunnable, match="paid-call runtimes"):
+        runtime_router.resolve(tmp_path, "auto", allow_paid_calls=False)
+
+
+def test_auto_picks_paid_when_flag_on(monkeypatch, tmp_path):
+    _install_fake_registry(monkeypatch, {
+        "swarmgraph": {"can_run": False},
+        "langgraph": {"can_run": False},
+        "crewai": {"can_run": True, "requires_paid_calls": True},
+    })
+
+    routed = runtime_router.resolve(tmp_path, "auto", allow_paid_calls=True)
+
+    assert routed.adapter.adapter_id == "crewai"
+    assert routed.chosen_by == "auto"
+
+
+def test_explicit_paid_runtime_still_routes_without_flag(monkeypatch, tmp_path):
+    _install_fake_registry(monkeypatch, {"crewai": {"can_run": True, "requires_paid_calls": True}})
+
+    routed = runtime_router.resolve(tmp_path, "crewai", allow_paid_calls=False)
+
+    assert routed.adapter.adapter_id == "crewai"
+
+
+def test_auto_priority_holds_when_first_priority_is_paid_and_blocked(monkeypatch, tmp_path):
+    _install_fake_registry(monkeypatch, {
+        "swarmgraph": {"can_run": True, "requires_paid_calls": True},
+        "langgraph": {"can_run": True},
+        "crewai": {"can_run": False},
+    })
+
+    routed = runtime_router.resolve(tmp_path, "auto", allow_paid_calls=False)
+
+    assert routed.adapter.adapter_id == "langgraph"

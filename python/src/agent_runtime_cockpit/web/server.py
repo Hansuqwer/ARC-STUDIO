@@ -1,7 +1,7 @@
 """
 ARC HTTP Daemon
 
-Starts a local aiohttp server on localhost:7777.
+Starts a local aiohttp server on 127.0.0.1:7777.
 All endpoints return ARC protocol envelopes (JSON).
 """
 from __future__ import annotations
@@ -12,6 +12,7 @@ from pathlib import Path
 
 import aiohttp.web as web
 
+from .keys import WORKSPACE_KEY
 from .routes import setup_routes
 
 log = logging.getLogger(__name__)
@@ -19,12 +20,13 @@ log = logging.getLogger(__name__)
 
 async def create_app(workspace: Path | None = None) -> web.Application:
     app = web.Application()
-    app["workspace"] = workspace or Path.cwd()
+    ws = workspace or Path.cwd()
+    app[WORKSPACE_KEY] = ws
     setup_routes(app)
     return app
 
 
-def run_server(host: str = "localhost", port: int = 7777,
+def run_server(host: str = "127.0.0.1", port: int = 7777,
                workspace: Path | None = None) -> None:
     import asyncio
 

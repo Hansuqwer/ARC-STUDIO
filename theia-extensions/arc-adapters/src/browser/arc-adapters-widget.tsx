@@ -30,7 +30,7 @@ export class ArcAdaptersWidget extends ReactWidget {
   protected async load(): Promise<void> {
     this.loading = true; this.update();
     try {
-      const provider = this.preferences.get<string>('arc.swarmgraph.provider', '9router');
+      const provider = this.preferences.get<string>('arc.swarmgraph.provider', 'openai');
       const baseUrl = this.preferences.get<string>('arc.swarmgraph.baseUrl', '');
       const [runtimes, providerStatus] = await Promise.all([
         this.arcService.listRuntimes().catch(error => {
@@ -84,7 +84,7 @@ export class ArcAdaptersWidget extends ReactWidget {
 
   protected renderProviderSettings(): React.ReactNode {
     const status = this.providerStatus;
-    const provider = status?.provider ?? this.preferences.get<string>('arc.swarmgraph.provider', '9router');
+    const provider = status?.provider ?? this.preferences.get<string>('arc.swarmgraph.provider', 'openai');
     const apiKeyOk = Boolean(status?.apiKeyConfigured);
     return (
       <div style={{ marginBottom: 16, padding: 12, backgroundColor: 'var(--theia-editor-background)', border: '1px solid var(--theia-widget-border)', borderRadius: 6 }}>

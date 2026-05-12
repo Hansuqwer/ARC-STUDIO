@@ -28,7 +28,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-swarmgraph = []
 langgraph = ["langgraph>=0.2"]
 context = ["httpx>=0.27"]
 all = ["agent-runtime-cockpit[langgraph,context]"]
@@ -51,6 +50,10 @@ packages = ["src/agent_runtime_cockpit"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-v --tb=short"
+filterwarnings = [
+    # Category C: transitive LangGraph warning until upstream resolves allowed_objects default.
+    "ignore:.*default value of `allowed_objects` will change.*:langchain_core._api.deprecation.LangChainPendingDeprecationWarning:langgraph\\.cache.*",
+]
 
 [tool.ruff]
 line-length = 100

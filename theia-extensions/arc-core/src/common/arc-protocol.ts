@@ -130,11 +130,37 @@ export interface ContextPackEntry {
 
 export interface ProviderStatus {
   provider: string;
+  display_name?: string;
+  enabled?: boolean;
+  dry_run?: boolean;
+  base_url_configured?: boolean;
   baseUrlConfigured: boolean;
+  api_key_configured?: boolean;
   apiKeyConfigured: boolean;
   apiKeySource?: string;
   runtimeAvailable: boolean;
   message: string;
+}
+
+export interface ProviderDefinition {
+  id: string;
+  display_name: string;
+  default_base_url: string;
+  env_key_names: string[];
+  auth_header: 'bearer' | 'x-api-key';
+  default_models: string[];
+  supports_streaming: boolean;
+  supports_tools: boolean;
+}
+
+export interface ProviderRoutingPolicy {
+  mode: 'manual' | 'priority' | 'fallback';
+  default_provider: string;
+  default_model: string;
+  dry_run: boolean;
+  allow_paid_calls: boolean;
+  max_retries: number;
+  timeout_ms: number;
 }
 
 /** Source location for jump-to-definition */
@@ -161,5 +187,8 @@ export interface ArcService {
   generateContextPack(task: string, workspacePath?: string): Promise<ArcEnvelope<ContextPackEntry[]>>;
   getDaemonStatus(): Promise<ArcEnvelope<{ running: boolean; version: string; pid?: number }>>;
   getProviderStatus(provider: string, baseUrl?: string): Promise<ArcEnvelope<ProviderStatus>>;
+  listProviders(): Promise<ArcEnvelope<ProviderDefinition[]>>;
+  listProviderStatuses(): Promise<ArcEnvelope<ProviderStatus[]>>;
+  getProviderRouting(): Promise<ArcEnvelope<ProviderRoutingPolicy>>;
   getWorkspaceStatus(workspacePath: string): Promise<ArcEnvelope<{ frontendPath: string; backendPath: string; source: string }>>;
 }
