@@ -8,7 +8,7 @@ import * as React from 'react';
 import { injectable, inject, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { ArcFrontendService } from 'arc-core/lib/browser/arc-frontend-service';
-import { RunRecord, RunEvent } from 'arc-core/lib/common/arc-protocol';
+import { RunRecord, RunEvent, RuntimeCapabilityReport, RuntimeId } from 'arc-core/lib/common/arc-protocol';
 
 const EVENT_ICONS: Record<string, string> = {
   RUN_STARTED: '▶',
@@ -42,6 +42,9 @@ export class ArcRunTimelineWidget extends ReactWidget {
   protected runStatusMessage?: string;
   protected eventFilter = '';
   protected selectedEvent: RunEvent | null = null;
+  protected runtimeCapabilities: RuntimeCapabilityReport[] = [];
+  protected selectedRuntime: RuntimeId = 'auto';
+  protected runtimeError?: string;
 
   @postConstruct()
   protected init(): void {
@@ -59,7 +62,16 @@ export class ArcRunTimelineWidget extends ReactWidget {
       const result = await this.arcService.listRuns();
       this.runs = result.data ?? [];
       this.selectedRun = this.runs[0] ?? null;
-      this.workspaceStatus = (await this.arcService.getWorkspaceStatus().catch(() => undefined))?.data ?? undefined;
+      const [workspaceStatus, capabilities] = await Promise.all([
+        this.arcService.getWorkspaceStatus().catch(() => undefined),
+        this.arcService.listRuntimeCapabilities().catch(error => {
+          this.runtimeError = String(error);
+          return undefined;
+        }),
+      ]);
+      this.workspaceStatus = workspaceStatus?.data ?? undefined;
+      this.runtimeCapabilities = capabilities?.data?.runtimes ?? [];
+      this.runtimeError = capabilities?.error?.message ?? this.runtimeError;
     } finally {
       this.loading = false;
       this.update();
@@ -262,10 +274,28 @@ export class ArcRunTimelineWidget extends ReactWidget {
           onChange={event => { this.prompt = event.currentTarget.value; this.update(); }}
           placeholder="Prompt for local SwarmGraph stub run"
         />
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-          <button style={primaryBtnStyle} onClick={() => this.startSwarmGraphRun()}>Start SwarmGraph Run</button>
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+          <label style={{ fontSize: '11px' }}>
+            Runtime:{' '}
+            <select
+              aria-label="Runtime"
+              data-testid="arc-runtime-picker"
+              style={selectStyle}
+              value={this.selectedRuntime}
+              onChange={event => { this.selectedRuntime = event.currentTarget.value as RuntimeId; this.update(); }}
+            >
+              <option value="auto">Auto</option>
+              {this.runtimeCapabilities.map(runtime => (
+                <option key={runtime.runtime_id} value={runtime.runtime_id} disabled={!runtime.can_run}>
+                  {this.runtimeLabel(runtime)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button style={primaryBtnStyle} onClick={() => this.startRuntimeRun()}>Start Run</button>
           <button style={secondaryBtnStyle} onClick={() => this.refreshWorkspace()}>Refresh Workspace</button>
         </div>
+        {this.runtimeError && <div style={{ fontSize: '11px', color: '#ffb74d' }}>Runtime capabilities: {this.runtimeError}</div>}
         {this.runStatusMessage && <div style={statusMessageStyle}>{this.runStatusMessage}</div>}
         {this.lastError && <pre style={{ ...outputBoxStyle, borderColor: '#ef5350', color: '#ef9a9a' }}>{this.lastError}</pre>}
       </div>
@@ -347,16 +377,22 @@ export class ArcRunTimelineWidget extends ReactWidget {
     return icons[status] ?? '?';
   }
 
-  protected async startSwarmGraphRun(): Promise<void> {
+  protected runtimeLabel(runtime: RuntimeCapabilityReport): string {
+    const status = runtime.can_run ? 'run' : runtime.availability.replace(/_/g, ' ');
+    const paid = runtime.requires_paid_calls ? ', paid' : '';
+    return `${runtime.runtime_id} (${status}${paid})`;
+  }
+
+  protected async startRuntimeRun(): Promise<void> {
     this.loading = true;
     this.lastError = undefined;
-    this.runStatusMessage = 'Starting local SwarmGraph run...';
+    this.runStatusMessage = `Starting ${this.selectedRuntime} run...`;
     this.update();
     try {
       const result = await this.arcService.startRun('wf-swarmgraph-001', {
         prompt: this.prompt,
         workspacePath: this.workspaceStatus?.frontendPath,
-      });
+      }, this.selectedRuntime);
       if (result.data) {
         this.runs = [result.data, ...this.runs];
         this.selectedRun = result.data;

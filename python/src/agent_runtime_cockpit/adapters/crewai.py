@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import importlib.util
 import importlib
+import asyncio
 import os
+import sys
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Iterator
 from typing import Any
 
 from ..adapters.base import CapabilityReport
@@ -97,8 +101,12 @@ class CrewAIAdapter(RuntimeAdapter):
             return self._failed(workflow_id, run_id, started, events, report.availability.upper(), report.reason or "CrewAI is not runnable.")
 
         try:
-            crew = self._resolve_crew(os.environ[EXPORT_ENV], inputs)
+            crew = self._resolve_crew(workspace, os.environ[EXPORT_ENV], inputs)
             result = await self._kickoff(crew, inputs)
+        except asyncio.TimeoutError:
+            return self._failed(workflow_id, run_id, started, events, "CREWAI_TIMEOUT", "CrewAI execution timed out before returning a result.")
+        except asyncio.CancelledError:
+            return self._cancelled(workflow_id, run_id, started, events)
         except Exception as exc:
             return self._failed(workflow_id, run_id, started, events, "CREWAI_RUN_FAILED", self._redact(str(exc)))
 
@@ -124,18 +132,19 @@ class CrewAIAdapter(RuntimeAdapter):
             return False, None
         return True, getattr(module, "__version__", None)
 
-    def _resolve_crew(self, target: str, inputs: dict[str, Any]) -> Any:
+    def _resolve_crew(self, workspace: Path, target: str, inputs: dict[str, Any]) -> Any:
         if ":" not in target:
             raise ValueError(f"{EXPORT_ENV} must be module:attribute")
         module_name, attr_name = target.split(":", 1)
-        module = importlib.import_module(module_name)
+        with _workspace_import_path(workspace):
+            module = importlib.import_module(module_name)
         obj = getattr(module, attr_name)
         if callable(obj):
             try:
                 obj = obj(inputs)
             except TypeError:
                 obj = obj()
-        if hasattr(obj, "kickoff"):
+        if hasattr(obj, "kickoff") or hasattr(obj, "akickoff") or hasattr(obj, "kickoff_async"):
             return obj
         if hasattr(obj, "crew") and callable(obj.crew):
             crew = obj.crew()
@@ -144,12 +153,24 @@ class CrewAIAdapter(RuntimeAdapter):
         raise TypeError(f"{target} did not resolve to an object with kickoff() or crew().kickoff()")
 
     async def _kickoff(self, crew: Any, inputs: dict[str, Any]) -> Any:
+        timeout_seconds = self._timeout_seconds(inputs)
         if hasattr(crew, "akickoff"):
-            return await crew.akickoff(inputs=inputs)
-        if hasattr(crew, "kickoff_async"):
-            return await crew.kickoff_async(inputs=inputs)
-        import asyncio
-        return await asyncio.to_thread(crew.kickoff, inputs=inputs)
+            task = crew.akickoff(inputs=inputs)
+        elif hasattr(crew, "kickoff_async"):
+            task = crew.kickoff_async(inputs=inputs)
+        else:
+            task = asyncio.to_thread(crew.kickoff, inputs=inputs)
+        return await asyncio.wait_for(task, timeout=timeout_seconds) if timeout_seconds else await task
+
+    def _timeout_seconds(self, inputs: dict[str, Any]) -> float | None:
+        value = inputs.get("timeout_seconds")
+        if value is None:
+            return None
+        try:
+            timeout = float(value)
+        except (TypeError, ValueError):
+            return None
+        return timeout if timeout > 0 else None
 
     def _normalize_output(self, result: Any) -> dict[str, Any]:
         output: dict[str, Any] = {}
@@ -162,10 +183,24 @@ class CrewAIAdapter(RuntimeAdapter):
             output["pydantic"] = pydantic_value.model_dump() if hasattr(pydantic_value, "model_dump") else str(pydantic_value)
         tasks = getattr(result, "tasks_output", None)
         if tasks:
-            output["tasks_output"] = [str(task) for task in tasks]
+            output["tasks_output"] = [self._normalize_task_output(index, task) for index, task in enumerate(tasks)]
         if not output:
             output["raw"] = str(result)
         return output
+
+    def _normalize_task_output(self, index: int, task: Any) -> dict[str, Any]:
+        raw = getattr(task, "raw", None)
+        output_text = raw if isinstance(raw, str) else str(task)
+        task_id = getattr(task, "task_id", None) or getattr(task, "id", None) or getattr(task, "name", None) or f"task-{index}"
+        agent = getattr(task, "agent", None) or getattr(task, "agent_role", None)
+        if agent is not None and not isinstance(agent, str):
+            agent = getattr(agent, "role", None) or getattr(agent, "name", None) or str(agent)
+        return {
+            "task_id": str(task_id),
+            "agent": str(agent) if agent is not None else "",
+            "output_text": output_text,
+            "raw": raw if isinstance(raw, (str, int, float, bool, dict, list)) else str(task),
+        }
 
     def _failed(self, workflow_id: str, run_id: str, started: datetime, events: list[RunEvent], code: str, message: str) -> RunRecord:
         ended = datetime.now(timezone.utc)
@@ -181,6 +216,20 @@ class CrewAIAdapter(RuntimeAdapter):
             metadata={"error_code": code, "error": message},
         )
 
+    def _cancelled(self, workflow_id: str, run_id: str, started: datetime, events: list[RunEvent]) -> RunRecord:
+        ended = datetime.now(timezone.utc)
+        events.append(self._event(run_id, len(events), "RUN_CANCELLED", {"code": "CREWAI_CANCELLED", "message": "CrewAI execution was cancelled before returning a result."}))
+        return RunRecord(
+            id=run_id,
+            workflow_id=workflow_id,
+            runtime=self.adapter_id,
+            status=RunStatus.CANCELLED,
+            started_at=started.isoformat(),
+            ended_at=ended.isoformat(),
+            events=events,
+            metadata={"error_code": "CREWAI_CANCELLED", "error": "CrewAI execution was cancelled before returning a result."},
+        )
+
     def _event(self, run_id: str, sequence: int, event_type: str, data: dict[str, Any]) -> RunEvent:
         return RunEvent(type=event_type, timestamp=datetime.now(timezone.utc).isoformat(), run_id=run_id, sequence=sequence, data=data)
 
@@ -189,3 +238,22 @@ class CrewAIAdapter(RuntimeAdapter):
         if any(hint in lowered for hint in ("api_key", "authorization", "bearer", "secret", "token=")):
             return "[redacted: message contained possible secret material]"
         return text[:cap]
+
+
+@contextmanager
+def _workspace_import_path(workspace: Path) -> Iterator[None]:
+    added: list[str] = []
+    for candidate in (workspace, workspace / "src"):
+        if candidate.exists():
+            value = str(candidate.resolve())
+            if value not in sys.path:
+                sys.path.insert(0, value)
+                added.append(value)
+    try:
+        yield
+    finally:
+        for value in added:
+            try:
+                sys.path.remove(value)
+            except ValueError:
+                pass
