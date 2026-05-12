@@ -17,6 +17,7 @@
   ],
   "dependencies": {
     "@theia/core": "1.71.0",
+    "@arc/ag-ui": "workspace:*",
     "arc-core": "workspace:*"
   },
   "devDependencies": {

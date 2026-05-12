@@ -163,6 +163,23 @@ test.describe('ARC Studio — Smoke Tests', () => {
     expect(envelope.ok).toBe(true);
     expect(envelope.data.some((run: { id: string }) => run.id === runId)).toBe(true);
   });
+
+  test('event stream deep link shows selectable AG-UI event detail', async ({ page }) => {
+    await page.goto(`${APP_URL}/?arc-view=event-stream`, { waitUntil: 'networkidle', timeout: TIMEOUT });
+    await acceptWorkspaceTrustIfShown(page);
+
+    await expect(page.getByTestId('arc-event-stream-widget')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('Event Stream').first()).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByTestId('arc-event-stream-run-fixture-ag-ui-events')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByTestId('arc-event-stream-event-RUN_STARTED').first()).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByTestId('arc-event-stream-event-TOOL_CALL_RESULT').first()).toBeVisible({ timeout: TIMEOUT });
+
+    await page.getByTestId('arc-event-stream-event-RUN_STARTED').first().click();
+    await expect(page.getByTestId('arc-event-stream-detail')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('Event Detail')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('RUN_STARTED').last()).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('«REDACTED»').first()).toBeVisible({ timeout: TIMEOUT });
+  });
 });
 
 test.describe('ARC Python CLI — Integration', () => {
