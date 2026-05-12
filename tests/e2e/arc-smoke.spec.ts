@@ -95,7 +95,8 @@ test.describe('ARC Studio — Smoke Tests', () => {
     await page.goto(`${APP_URL}/?arc-view=run-timeline`, { waitUntil: 'networkidle', timeout: TIMEOUT });
     await acceptWorkspaceTrustIfShown(page);
 
-    await expect(page.getByText('Start SwarmGraph Run')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByLabel('Runtime')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByRole('button', { name: 'Start Run' })).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByPlaceholder('Prompt for local SwarmGraph stub run')).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText('Refresh Workspace')).toBeVisible({ timeout: TIMEOUT });
   });
@@ -105,7 +106,7 @@ test.describe('ARC Studio — Smoke Tests', () => {
     await acceptWorkspaceTrustIfShown(page);
 
     await page.getByPlaceholder('Prompt for local SwarmGraph stub run').fill('ARC E2E local stub run: return one sentence.');
-    await page.getByText('Start SwarmGraph Run').click();
+    await page.getByRole('button', { name: 'Start Run' }).click();
     const completed = page.getByText('Run completed.');
     const failed = page.getByText('Run failed.');
     await expect(completed.or(failed).first()).toBeVisible({ timeout: TIMEOUT });
@@ -115,12 +116,26 @@ test.describe('ARC Studio — Smoke Tests', () => {
     await expect(page.getByText('Export Run JSON')).toBeAttached({ timeout: TIMEOUT });
   });
 
+  test('runtime picker selection is used for run start', async ({ page }, testInfo) => {
+    await page.goto(`${APP_URL}/?arc-view=run-timeline`, { waitUntil: 'networkidle', timeout: TIMEOUT });
+    await acceptWorkspaceTrustIfShown(page);
+
+    await page.getByTestId('arc-runtime-picker').selectOption('swarmgraph');
+    await page.getByPlaceholder('Prompt for local SwarmGraph stub run').fill('ARC E2E explicit runtime run.');
+    await page.getByRole('button', { name: 'Start Run' }).click();
+    const completed = page.getByText('Run completed.');
+    const failed = page.getByText('Run failed.');
+    await expect(completed.or(failed).first()).toBeVisible({ timeout: TIMEOUT });
+    await skipIfRuntimeUnavailable(page, testInfo);
+    await expect(page.getByText('Runtime: swarmgraph')).toBeVisible({ timeout: TIMEOUT });
+  });
+
   test('run timeline shows completed run after reload', async ({ page }, testInfo) => {
     await page.goto(`${APP_URL}/?arc-view=run-timeline`, { waitUntil: 'networkidle', timeout: TIMEOUT });
     await acceptWorkspaceTrustIfShown(page);
 
     await page.getByPlaceholder('Prompt for local SwarmGraph stub run').fill('ARC E2E reload history run.');
-    await page.getByText('Start SwarmGraph Run').click();
+    await page.getByRole('button', { name: 'Start Run' }).click();
     const completed = page.getByText('Run completed.');
     const failed = page.getByText('Run failed.');
     await expect(completed.or(failed).first()).toBeVisible({ timeout: TIMEOUT });

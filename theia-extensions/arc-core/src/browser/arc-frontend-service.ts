@@ -20,6 +20,8 @@ import {
   ProviderStatus,
   ProviderDefinition,
   ProviderRoutingPolicy,
+  RuntimeCapabilitiesResponse,
+  RuntimeId,
 } from '../common/arc-protocol';
 
 @injectable()
@@ -48,6 +50,11 @@ export class ArcFrontendService {
     return this.arcService.listRuntimes(path);
   }
 
+  async listRuntimeCapabilities(): Promise<ArcEnvelope<RuntimeCapabilitiesResponse>> {
+    const path = await this.getWorkspacePath();
+    return this.arcService.listRuntimeCapabilities(path);
+  }
+
   async listWorkflows(runtimeId?: string): Promise<ArcEnvelope<WorkflowInfo[]>> {
     const path = await this.getWorkspacePath();
     return this.arcService.listWorkflows(path, runtimeId);
@@ -58,9 +65,13 @@ export class ArcFrontendService {
     return this.arcService.listSchemas(path, runtimeId);
   }
 
-  async startRun(workflowId: string, inputs?: Record<string, unknown>): Promise<ArcEnvelope<RunRecord>> {
+  async startRun(workflowId: string, inputs?: Record<string, unknown>, runtime: RuntimeId = 'auto'): Promise<ArcEnvelope<RunRecord>> {
     const path = await this.getWorkspacePath();
-    return this.arcService.startRun(workflowId, { ...(inputs ?? {}), workspacePath: path });
+    return this.arcService.startRun({
+      workflow_id: workflowId,
+      runtime,
+      inputs: { ...(inputs ?? {}), workspacePath: path },
+    });
   }
 
   async getRun(runId: string): Promise<ArcEnvelope<RunRecord>> {

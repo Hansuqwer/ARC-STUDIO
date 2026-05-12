@@ -57,6 +57,24 @@ export interface RuntimeCapabilities {
   can_export_workflow: boolean;
 }
 
+export interface RuntimeCapabilityReport {
+  runtime_id: string;
+  detected: boolean;
+  can_run: boolean;
+  availability: string;
+  reason?: string | null;
+  detected_artifacts: string[];
+  required_env: string[];
+  version?: string | null;
+  requires_paid_calls: boolean;
+}
+
+export interface RuntimeCapabilitiesResponse {
+  workspace: string;
+  auto_priority: RuntimeId[];
+  runtimes: RuntimeCapabilityReport[];
+}
+
 /** Workflow topology */
 export interface WorkflowInfo {
   id: string;
@@ -188,9 +206,10 @@ export const ArcServiceSymbol = Symbol('ArcService');
 export interface ArcService {
   inspectWorkspace(workspacePath: string): Promise<ArcEnvelope<WorkspaceInfo>>;
   listRuntimes(workspacePath: string): Promise<ArcEnvelope<RuntimeInfo[]>>;
+  listRuntimeCapabilities(workspacePath: string): Promise<ArcEnvelope<RuntimeCapabilitiesResponse>>;
   listWorkflows(workspacePath: string, runtimeId?: string): Promise<ArcEnvelope<WorkflowInfo[]>>;
   listSchemas(workspacePath: string, runtimeId?: string): Promise<ArcEnvelope<SchemaInfo[]>>;
-  startRun(workflowId: string, inputs?: Record<string, unknown>): Promise<ArcEnvelope<RunRecord>>;
+  startRun(request: StartRunRequest): Promise<ArcEnvelope<RunRecord>>;
   getRun(runId: string): Promise<ArcEnvelope<RunRecord>>;
   listRuns(workspacePath: string): Promise<ArcEnvelope<RunRecord[]>>;
   generateContextPack(task: string, workspacePath?: string): Promise<ArcEnvelope<ContextPackEntry[]>>;

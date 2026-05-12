@@ -27,6 +27,8 @@ import {
   ProviderStatus,
   ProviderDefinition,
   ProviderRoutingPolicy,
+  RuntimeCapabilitiesResponse,
+  StartRunRequest,
   ARC_PROTOCOL_VERSION,
 } from '../common/arc-protocol';
 
@@ -97,6 +99,39 @@ export class ArcServiceImpl implements ArcService {
       });
       req.on('error', reject);
       req.on('timeout', () => { req.destroy(); reject(new Error('Daemon request timed out')); });
+    });
+  }
+
+  private async postDaemon<T>(endpoint: string, body: Record<string, unknown>): Promise<ArcEnvelope<T>> {
+    const payload = JSON.stringify(body);
+    const options: http.RequestOptions = {
+      hostname: ARC_DAEMON_HOST,
+      port: ARC_DAEMON_PORT,
+      path: endpoint,
+      method: 'POST',
+      timeout: ARC_CLI_TIMEOUT_MS,
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+      },
+    };
+
+    return new Promise((resolve, reject) => {
+      const req = http.request(options, res => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            reject(new Error(`Invalid JSON from daemon: ${data.substring(0, 200)}`));
+          }
+        });
+      });
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('Daemon request timed out')); });
+      req.write(payload);
+      req.end();
     });
   }
 
@@ -314,6 +349,18 @@ export class ArcServiceImpl implements ArcService {
     }
   }
 
+  async listRuntimeCapabilities(workspacePath: string): Promise<ArcEnvelope<RuntimeCapabilitiesResponse>> {
+    const workspace = this.workspacePath(workspacePath);
+    try {
+      if (await this.isDaemonRunning()) {
+        return this.callDaemon('/api/runtimes/capabilities', { workspace });
+      }
+      return this.runCli(['runtimes', '--workspace', workspace, '--capabilities']);
+    } catch (e) {
+      return this.errorEnvelope('runtimes capabilities', e);
+    }
+  }
+
   async listWorkflows(workspacePath: string, runtimeId?: string): Promise<ArcEnvelope<WorkflowInfo[]>> {
     const workspace = this.workspacePath(workspacePath);
     try {
@@ -342,18 +389,20 @@ export class ArcServiceImpl implements ArcService {
     }
   }
 
-  async startRun(workflowId: string, inputs?: Record<string, unknown>): Promise<ArcEnvelope<RunRecord>> {
+  async startRun(request: StartRunRequest): Promise<ArcEnvelope<RunRecord>> {
     try {
       if (process.env.ARC_SWARMGRAPH_RUN_BACKEND !== 'stub' && await this.isDaemonRunning()) {
-        return this.callDaemon('/api/runs/start', { workflow_id: workflowId });
+        return this.postDaemon('/api/runs/start', request as unknown as Record<string, unknown>);
       }
-      const args = ['run', workflowId];
+      const args = ['run', request.workflow_id];
+      // Keep CLI fallback equivalent to daemon POST defaulting semantics.
+      args.push('--runtime', request.runtime ?? 'auto');
       const requestedWorkspace = process.env.ARC_SWARMGRAPH_RUN_BACKEND === 'stub' && process.env.ARC_WORKSPACE_PATH
         ? process.env.ARC_WORKSPACE_PATH
-        : typeof inputs?.workspacePath === 'string' ? inputs.workspacePath : '';
+        : typeof request.inputs?.workspacePath === 'string' ? request.inputs.workspacePath : '';
       const workspace = this.workspacePath(requestedWorkspace);
       if (workspace) args.push('--workspace', workspace);
-      const prompt = typeof inputs?.prompt === 'string' ? inputs.prompt.trim() : '';
+      const prompt = typeof request.inputs?.prompt === 'string' ? request.inputs.prompt.trim() : '';
       if (prompt) args.push('--prompt', prompt);
       return this.runCli(args);
     } catch (e) {
