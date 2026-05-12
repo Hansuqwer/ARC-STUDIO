@@ -343,17 +343,17 @@ async def export_trace(request: web.Request) -> web.Response:
         body = await request.json()
         endpoint = body.get("endpoint", "")
     except Exception:
-        return _json(err(ArcErrorCode.INVALID_REQUEST, "Invalid JSON body").model_dump(), 400)
+        return _json(err(ArcErrorCode.INVALID_INPUT, "Invalid JSON body").model_dump(), 400)
     
     # Validate endpoint
     is_valid, warning = validate_otlp_endpoint(endpoint)
     if not is_valid:
-        return _json(err(ArcErrorCode.INVALID_REQUEST, warning or "Invalid endpoint").model_dump(), 400)
+        return _json(err(ArcErrorCode.INVALID_INPUT, warning or "Invalid endpoint").model_dump(), 400)
     
     # Load run
     run = _trace_store(request).load(run_id)
     if not run:
-        return _json(err(ArcErrorCode.NOT_FOUND, f"Run not found: {run_id}").model_dump(), 404)
+        return _json(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}").model_dump(), 404)
     
     # Export
     try:

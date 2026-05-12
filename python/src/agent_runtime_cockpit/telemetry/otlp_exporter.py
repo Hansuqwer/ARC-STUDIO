@@ -147,7 +147,7 @@ def export_run_to_otlp(run: RunRecord, endpoint: str) -> bool:
         raise ValueError(warning or "Invalid endpoint")
     
     # Convert to OTLP spans
-    spans = convert_run_to_otlp_spans(run)
+    convert_run_to_otlp_spans(run)
     
     # In a real implementation, this would use the OpenTelemetry SDK
     # to export spans to the OTLP endpoint. For now, we simulate success.
