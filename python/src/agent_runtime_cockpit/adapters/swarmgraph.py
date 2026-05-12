@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,6 +33,22 @@ REAL_IMPLEMENTATION_PATH = "adapters/swarmgraph.py -> import swarmgraph; graph.e
 LOCAL_FIX_STEPS = "pip install git+https://github.com/Hansuqwer/SwarmGraph"
 OWNER = "SwarmGraph Adapter Agent"
 
+# Environment variable allow-list for subprocess execution
+# Only these variables (plus ARC_SWARMGRAPH_* prefixed vars) are passed to subprocesses
+_ALLOWED_ENV_VARS = frozenset({
+    "PATH",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "SHELL",
+    "USER",
+    "LOGNAME",
+})
+
 # Detection signals for SwarmGraph projects
 _DETECTION_SIGNALS = [
     ("swarmgraph.yaml",    0.9),
@@ -43,6 +60,34 @@ _DETECTION_SIGNALS = [
     ("agents.py",          0.2),
     ("pyproject.toml",     0.1),  # needs swarmgraph in deps
 ]
+
+
+def _build_safe_env() -> dict[str, str]:
+    """
+    Build a safe environment dict for subprocess execution.
+    
+    Only includes:
+    - Explicitly allowed system variables (PATH, HOME, etc.)
+    - ARC_SWARMGRAPH_* prefixed variables
+    
+    This prevents leaking secrets like OPENAI_API_KEY, AWS_*, etc.
+    """
+    safe_env = {}
+    
+    # Add allowed system variables
+    for key in _ALLOWED_ENV_VARS:
+        if key in os.environ:
+            safe_env[key] = os.environ[key]
+    
+    # Add all ARC_SWARMGRAPH_* variables
+    for key, value in os.environ.items():
+        if key.startswith("ARC_SWARMGRAPH_"):
+            safe_env[key] = value
+    
+    # Add PYTHONWARNINGS to suppress warnings
+    safe_env["PYTHONWARNINGS"] = "ignore"
+    
+    return safe_env
 
 
 class SwarmGraphAdapter(RuntimeAdapter):
@@ -236,7 +281,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
             cwd=str(workspace),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env={**os.environ, "PYTHONWARNINGS": "ignore"},
+            env=_build_safe_env(),  # Security: Use allow-listed env vars only
         )
         stdout_b, stderr_b = await proc.communicate()
         stdout = stdout_b.decode(errors="replace").strip()
