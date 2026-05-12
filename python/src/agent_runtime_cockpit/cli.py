@@ -299,13 +299,11 @@ def run_workflow(
     _setup_logging(debug)
     ws = _workspace(workspace)
     try:
-        routed = runtime_router.resolve(ws, runtime.lower(), allow_paid_calls=allow_paid_calls)
+        requested_runtime = [part.strip().lower() for part in runtime.split(",") if part.strip()] if "," in runtime else runtime.lower()
+        routed = runtime_router.resolve(ws, requested_runtime, allow_paid_calls=allow_paid_calls)
     except runtime_router.UnknownRuntime as exc:
         _out(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": exc.code}), json_output)
         raise typer.Exit(2)
-    except runtime_router.ComboNotImplemented as exc:
-        _out(err(ArcErrorCode.NOT_IMPLEMENTED, str(exc), details={"code": exc.code}), json_output)
-        raise typer.Exit(1)
     except runtime_router.RuntimeRouterError as exc:
         _out(err(ArcErrorCode.NOT_IMPLEMENTED, str(exc), details={"code": exc.code}), json_output)
         raise typer.Exit(1)

@@ -7,8 +7,6 @@ These tests verify:
 3. Event capture via RunHooks
 4. Conformance with adapter interface
 """
-import os
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

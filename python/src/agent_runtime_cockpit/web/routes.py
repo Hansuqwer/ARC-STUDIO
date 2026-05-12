@@ -172,8 +172,10 @@ async def start_run(request: web.Request) -> web.Response:
         except Exception:
             return _json(err(ArcErrorCode.INVALID_INPUT, "Invalid JSON request body", details={"code": "invalid_json"}).model_dump(), 400)
     workflow_id = str(body.get("workflow_id") or request.query.get("workflow_id", "wf-swarmgraph-fixture"))
-    runtime = str(body.get("runtime") or request.query.get("runtime", "auto"))
-    if runtime not in RUNTIME_IDS:
+    raw_runtime = body.get("runtime") if "runtime" in body else request.query.get("runtime", "auto")
+    runtime = [str(item) for item in raw_runtime] if isinstance(raw_runtime, list) else str(raw_runtime)
+    runtime_ids = runtime if isinstance(runtime, list) else [runtime]
+    if any(runtime_id not in RUNTIME_IDS for runtime_id in runtime_ids):
         return _json(err("invalid_runtime", f"Invalid runtime: {runtime}").model_dump(), 400)
     workspace = _workspace(request)
     allow_paid_calls = bool(body.get("allow_paid_calls")) or request.query.get("allow_paid_calls", "").lower() in {"1", "true", "yes"}
@@ -182,8 +184,6 @@ async def start_run(request: web.Request) -> web.Response:
         routed = runtime_router.resolve(workspace, runtime, allow_paid_calls=allow_paid_calls)
     except runtime_router.UnknownRuntime as exc:
         return _json(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": exc.code}).model_dump(), 400)
-    except runtime_router.ComboNotImplemented as exc:
-        return _json(err(ArcErrorCode.NOT_IMPLEMENTED, str(exc), details={"code": exc.code}).model_dump(), 501)
     except runtime_router.RuntimeRouterError as exc:
         return _json(err(ArcErrorCode.NOT_IMPLEMENTED, str(exc), details={"code": exc.code}).model_dump(), 501)
 

@@ -1,7 +1,10 @@
 import pytest
 
+from datetime import datetime, timezone
+
 from agent_runtime_cockpit.adapters.base import CapabilityReport
 from agent_runtime_cockpit.orchestration import runtime_router
+from agent_runtime_cockpit.protocol.schemas import RunRecord, RunStatus
 
 
 class _FakeRegistry:
@@ -29,6 +32,19 @@ class _FakeAdapter:
     def capability_report(self, workspace):
         return self._report
 
+    async def run_workflow(self, workflow_id, inputs=None):
+        now = datetime.now(timezone.utc).isoformat()
+        return RunRecord(
+            id=f"run-{self.adapter_id}",
+            workflow_id=workflow_id,
+            runtime=self.adapter_id,
+            status=RunStatus.COMPLETED,
+            started_at=now,
+            ended_at=now,
+            events=[],
+            metadata={"inputs": inputs or {}},
+        )
+
 
 def _install_fake_registry(monkeypatch, specs):
     adapters = {key: _FakeAdapter(key, **value) for key, value in specs.items()}
@@ -40,9 +56,34 @@ def test_resolve_unknown_runtime(tmp_path):
         runtime_router.resolve(tmp_path, "nope")
 
 
-def test_resolve_combo_rejected_for_mvp(tmp_path):
-    with pytest.raises(runtime_router.ComboNotImplemented):
+def test_resolve_combo_requires_runnable_members(monkeypatch, tmp_path):
+    _install_fake_registry(monkeypatch, {"crewai": {"can_run": False}, "swarmgraph": {"can_run": True}})
+
+    with pytest.raises(runtime_router.ComboNotRunnable):
         runtime_router.resolve(tmp_path, ["crewai", "swarmgraph"])
+
+
+def test_resolve_combo_returns_combo_adapter(monkeypatch, tmp_path):
+    _install_fake_registry(monkeypatch, {"langgraph": {"can_run": True}, "swarmgraph": {"can_run": True}})
+
+    routed = runtime_router.resolve(tmp_path, ["langgraph", "swarmgraph"])
+
+    assert routed.adapter.adapter_id == "combo"
+    assert routed.chosen_by == "combo"
+    assert routed.report.can_run is True
+
+
+@pytest.mark.asyncio
+async def test_combo_adapter_runs_members_sequentially(monkeypatch, tmp_path):
+    _install_fake_registry(monkeypatch, {"langgraph": {"can_run": True}, "swarmgraph": {"can_run": True}})
+    routed = runtime_router.resolve(tmp_path, ["langgraph", "swarmgraph"])
+
+    run = await routed.adapter.run_workflow("wf-combo", {"workspace": str(tmp_path)})
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.runtime == "combo"
+    assert run.metadata["runtimes"] == ["langgraph", "swarmgraph"]
+    assert [child["runtime"] for child in run.metadata["child_runs"]] == ["langgraph", "swarmgraph"]
 
 
 def test_auto_selects_swarmgraph_by_priority(monkeypatch, tmp_path):
