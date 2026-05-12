@@ -189,6 +189,17 @@ test.describe('ARC Studio — Smoke Tests', () => {
     await expect(page.getByText('Types (all)')).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText(/events$/).first()).toBeVisible({ timeout: TIMEOUT });
   });
+
+  test('health monitor deep link shows local daemon status', async ({ page }) => {
+    await page.goto(`${APP_URL}/?arc-view=health-monitor`, { waitUntil: 'networkidle', timeout: TIMEOUT });
+    await acceptWorkspaceTrustIfShown(page);
+
+    await expect(page.getByTestId('arc-health-monitor')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('ARC Health Monitor')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('127.0.0.1:7777 /health')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('Active Runs')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('Poll Interval')).toBeVisible({ timeout: TIMEOUT });
+  });
 });
 
 test.describe('ARC Python CLI — Integration', () => {
