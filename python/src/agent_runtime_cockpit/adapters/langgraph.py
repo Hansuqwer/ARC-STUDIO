@@ -125,7 +125,13 @@ class LangGraphAdapter(RuntimeAdapter):
         try:
             exported = self._resolve_export(workspace, target, load_target=True)
             graph = await self._materialize_graph(exported)
-            final_state = graph.invoke(inputs)
+            stream_result = self._stream_graph(run_id, events, graph, inputs)
+            if stream_result is None:
+                final_state = graph.invoke(inputs)
+                streamed = False
+            else:
+                final_state = stream_result
+                streamed = True
         except LangGraphRunError as exc:
             return self._failed(workflow_id, run_id, started, events, exc.code, exc.message)
         except Exception as exc:
@@ -142,8 +148,54 @@ class LangGraphAdapter(RuntimeAdapter):
             started_at=started.isoformat(),
             ended_at=ended.isoformat(),
             events=events,
-            metadata={"state": payload["state"], "_external_target": target},
+            metadata={"state": payload["state"], "_external_target": target, "streamed": streamed},
         )
+
+    def _stream_graph(self, run_id: str, events: list[RunEvent], graph: Any, inputs: dict[str, Any]) -> dict[str, Any] | None:
+        if not hasattr(graph, "stream"):
+            return None
+
+        final_state: dict[str, Any] = {}
+        for part in graph.stream(inputs, stream_mode=["updates", "messages"]):
+            mode, data = self._stream_part(part)
+            if mode == "messages":
+                # MESSAGE_CHUNK is intentionally ephemeral; persisted traces keep coalesced node updates only.
+                continue
+            if mode != "updates":
+                continue
+            update = data if isinstance(data, dict) else {"value": data}
+            final_state.update(self._flatten_update(update))
+            events.append(self._event(run_id, len(events), "NODE_UPDATE", {"update": self._redact_value(update)}))
+        return final_state
+
+    def _stream_part(self, part: Any) -> tuple[str | None, Any]:
+        if isinstance(part, tuple) and len(part) == 2 and isinstance(part[0], str):
+            return part[0], part[1]
+        if isinstance(part, dict) and "type" in part:
+            return str(part.get("type")), part.get("data")
+        if isinstance(part, dict):
+            return "updates", part
+        return None, part
+
+    def _flatten_update(self, update: dict[str, Any]) -> dict[str, Any]:
+        flattened: dict[str, Any] = {}
+        for key, value in update.items():
+            if isinstance(value, dict):
+                flattened.update(value)
+            else:
+                flattened[key] = value
+        return flattened
+
+    def _redact_value(self, value: Any) -> Any:
+        if isinstance(value, str):
+            return self._redact(value)
+        if isinstance(value, dict):
+            return {str(key): self._redact_value(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self._redact_value(item) for item in value]
+        if isinstance(value, tuple):
+            return [self._redact_value(item) for item in value]
+        return value
 
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
         evidence: list[str] = []

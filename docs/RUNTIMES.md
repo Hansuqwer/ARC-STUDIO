@@ -17,6 +17,20 @@ Security model: `ARC_LANGGRAPH_EXPORT` is treated as untrusted workspace configu
 
 MVP run output: the non-streaming `run_workflow` path emits exactly `RUN_STARTED` then `RUN_COMPLETED` with `{ "state": <final_state_dict> }`. Per-node events are reserved for the streaming implementation.
 
+### Streaming Persistence
+
+LangGraph streaming uses `graph.stream(..., stream_mode=["updates", "messages"])` when the compiled graph exposes `.stream()`. If `.stream()` is unavailable, ARC falls back to the existing non-streaming `.invoke()` path.
+
+Persistence rules:
+
+- Raw token-level `MESSAGE_CHUNK` events are SSE-only and ephemeral. They are never written to the persisted `RunRecord.events` trace.
+- Coalesced `NODE_UPDATE` events are persisted. They contain the per-node update payload returned by LangGraph `updates` mode.
+- `RUN_STARTED`, `RUN_COMPLETED`, and `RUN_FAILED` are persisted.
+- The final persisted `RUN_COMPLETED` event still includes `{ "state": <final_state_dict> }` when ARC can derive a final state from stream output.
+- Stream payloads are redacted before entering ARC events. Messages containing secret-like material are replaced with the same redacted marker used by non-streaming failures.
+
+Current limitation: ARC's persisted run-start endpoints return completed `RunRecord` objects, so token chunks are not exposed by the existing REST response. A future live SSE runner may forward ephemeral `MESSAGE_CHUNK` events while persisting only coalesced updates.
+
 Error codes:
 
 | Code | Meaning |

@@ -71,6 +71,21 @@ async def test_langgraph_fake_graph_happy_path(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_langgraph_streaming_persists_node_updates_not_chunks(monkeypatch, tmp_path):
+    _copy_fixture(tmp_path)
+    monkeypatch.setenv(EXPORT_ENV, "fixtures.fake_langgraph_export:make_streaming_graph")
+
+    run = await LangGraphAdapter().run_workflow("wf-lg", {"workspace": str(tmp_path), "prompt": "hi"})
+
+    assert run.status == RunStatus.COMPLETED
+    assert [event.type for event in run.events] == ["RUN_STARTED", "NODE_UPDATE", "RUN_COMPLETED"]
+    assert "MESSAGE_CHUNK" not in [event.type for event in run.events]
+    assert run.events[1].data["update"]["agent"]["messages"] == ["hello world"]
+    assert run.events[-1].data["state"]["messages"] == ["hello world"]
+    assert run.metadata["streamed"] is True
+
+
+@pytest.mark.asyncio
 async def test_langgraph_failed_invoke_returns_redacted_error(monkeypatch, tmp_path):
     _copy_fixture(tmp_path)
     monkeypatch.setenv(EXPORT_ENV, "fixtures.fake_langgraph_export:make_failing_graph")

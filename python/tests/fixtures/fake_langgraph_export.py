@@ -8,6 +8,21 @@ class FakeCompiledGraph:
         return {"messages": ["ok"], "inputs": inputs}
 
 
+class FakeStreamingGraph:
+    def stream(self, inputs, stream_mode=None):
+        yield ("messages", (FakeMessageChunk("hello "), {"langgraph_node": "agent"}))
+        yield ("messages", (FakeMessageChunk("world"), {"langgraph_node": "agent"}))
+        yield ("updates", {"agent": {"messages": ["hello world"], "inputs": inputs}})
+
+    def invoke(self, inputs):
+        return {"messages": ["fallback"], "inputs": inputs}
+
+
+class FakeMessageChunk:
+    def __init__(self, content: str) -> None:
+        self.content = content
+
+
 class FakeStateGraph:
     def compile(self):
         return FakeCompiledGraph()
@@ -27,6 +42,10 @@ def make_compiled_graph():
 
 def make_failing_graph():
     return FakeCompiledGraph(fail=True)
+
+
+def make_streaming_graph():
+    return FakeStreamingGraph()
 
 
 def not_a_graph():
