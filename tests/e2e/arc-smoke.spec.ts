@@ -195,7 +195,7 @@ test.describe('ARC Studio — Smoke Tests', () => {
     await acceptWorkspaceTrustIfShown(page);
 
     await expect(page.getByTestId('arc-health-monitor')).toBeVisible({ timeout: TIMEOUT });
-    await expect(page.getByText('ARC Health Monitor')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByRole('heading', { name: 'ARC Health Monitor' })).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText('127.0.0.1:7777 /health')).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText('Active Runs')).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText('Poll Interval')).toBeVisible({ timeout: TIMEOUT });
