@@ -63,3 +63,21 @@ Run:
 ```bash
 ARC_LANGGRAPH_EXPORT=graph_module:build_graph arc run wf-langgraph --runtime langgraph --json
 ```
+
+## CrewAI
+
+Set `ARC_CREWAI_EXPORT=module:attribute` to run a CrewAI crew. The target may be a crew object with `.kickoff()`, an object with `.crew().kickoff()`, or a factory returning either shape.
+
+CrewAI is treated as `requires_paid_calls=true`; explicit runs are blocked unless the request sets `allow_paid_calls=true`.
+
+Output normalization:
+
+- Crew output preserves `raw`, `json_dict`, `pydantic`, and `token_usage` when present.
+- `tasks_output` is normalized to `list[{task_id, agent, output_text, raw}]`.
+- Missing task IDs fall back to `task-<index>`.
+
+Timeout/cancellation honesty:
+
+- `timeout_seconds` in run inputs wraps CrewAI kickoff with a local timeout and returns `CREWAI_TIMEOUT` on expiry.
+- Cancelled kickoff returns status `cancelled` with a `RUN_CANCELLED` event and `CREWAI_CANCELLED` metadata.
+- ARC does not claim provider-side cancellation; timeout/cancellation only describes the local adapter wait path.
