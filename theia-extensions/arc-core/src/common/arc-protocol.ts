@@ -219,4 +219,5 @@ export interface ArcService {
   listProviderStatuses(): Promise<ArcEnvelope<ProviderStatus[]>>;
   getProviderRouting(): Promise<ArcEnvelope<ProviderRoutingPolicy>>;
   getWorkspaceStatus(workspacePath: string): Promise<ArcEnvelope<{ frontendPath: string; backendPath: string; source: string }>>;
+  exportTraceToOTLP(runId: string, endpoint: string): Promise<ArcEnvelope<{ exported: boolean; warning?: string }>>;
 }

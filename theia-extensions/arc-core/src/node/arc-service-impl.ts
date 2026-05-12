@@ -577,4 +577,15 @@ export class ArcServiceImpl implements ArcService {
   private envProviderName(provider: string): string {
     return provider.toUpperCase().replace(/[^A-Z0-9]/g, '_');
   }
+
+  async exportTraceToOTLP(runId: string, endpoint: string): Promise<ArcEnvelope<{ exported: boolean; warning?: string }>> {
+    try {
+      if (await this.isDaemonRunning()) {
+        return this.postDaemon(`/api/telemetry/export/${runId}`, { endpoint });
+      }
+      return this.errorEnvelope('export-trace', new Error('Daemon not running'));
+    } catch (e) {
+      return this.errorEnvelope('export-trace', e);
+    }
+  }
 }
