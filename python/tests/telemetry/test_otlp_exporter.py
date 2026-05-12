@@ -127,6 +127,8 @@ def test_convert_run_redacts_secrets():
 
 def test_export_run_requires_endpoint():
     """Export should fail without endpoint."""
+    import pytest
+    
     run = RunRecord(
         id="test-run",
         workflow_id="test",
@@ -137,13 +139,14 @@ def test_export_run_requires_endpoint():
         metadata={},
     )
     
-    success, message = export_run_to_otlp(run, "")
-    assert not success
-    assert "not configured" in message
+    with pytest.raises(ValueError, match="not configured"):
+        export_run_to_otlp(run, "")
 
 
 def test_export_run_validates_endpoint():
     """Export should validate endpoint format."""
+    import pytest
+    
     run = RunRecord(
         id="test-run",
         workflow_id="test",
@@ -154,9 +157,8 @@ def test_export_run_validates_endpoint():
         metadata={},
     )
     
-    success, message = export_run_to_otlp(run, "invalid-url")
-    assert not success
-    assert "Invalid" in message
+    with pytest.raises(ValueError, match="Invalid"):
+        export_run_to_otlp(run, "invalid-url")
 
 
 def test_export_run_success():
@@ -171,14 +173,12 @@ def test_export_run_success():
         metadata={},
     )
     
-    success, message = export_run_to_otlp(run, "http://localhost:4317")
+    success = export_run_to_otlp(run, "http://localhost:4317")
     assert success
-    assert "Exported" in message
-    assert "localhost:4317" in message
 
 
 def test_export_run_warns_remote():
-    """Export should warn for remote endpoints."""
+    """Export should succeed for remote endpoints (warning handled by caller)."""
     run = RunRecord(
         id="test-run",
         workflow_id="test",
@@ -189,7 +189,6 @@ def test_export_run_warns_remote():
         metadata={},
     )
     
-    success, message = export_run_to_otlp(run, "http://example.com:4317")
+    # Remote endpoints are valid, warning is returned by validate_otlp_endpoint
+    success = export_run_to_otlp(run, "http://example.com:4317")
     assert success
-    assert "Non-localhost" in message
-    assert "example.com" in message

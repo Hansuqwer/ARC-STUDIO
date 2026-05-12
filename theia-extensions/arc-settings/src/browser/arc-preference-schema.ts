@@ -66,5 +66,10 @@ export const ArcPreferenceSchema: PreferenceSchema = {
       default: '',
       description: 'Optional SwarmGraph provider base URL override. Leave empty for provider default.',
     },
+    'arc.telemetry.otlpEndpoint': {
+      type: 'string',
+      default: '',
+      description: 'OTLP endpoint for trace export (e.g., http://localhost:4317). Leave empty to disable telemetry export.',
+    },
   },
 };

@@ -127,7 +127,7 @@ def convert_run_to_otlp_spans(run: RunRecord) -> list[dict]:
     return spans
 
 
-def export_run_to_otlp(run: RunRecord, endpoint: str) -> tuple[bool, str]:
+def export_run_to_otlp(run: RunRecord, endpoint: str) -> bool:
     """
     Export run trace to OTLP endpoint.
     
@@ -136,20 +136,18 @@ def export_run_to_otlp(run: RunRecord, endpoint: str) -> tuple[bool, str]:
         endpoint: OTLP endpoint URL (e.g., http://localhost:4317)
     
     Returns:
-        (success, message)
-        - success: True if export succeeded
-        - message: Success message or error description
+        True if export succeeded, False otherwise
+    
+    Raises:
+        ValueError: If endpoint is invalid
     """
     # Validate endpoint
     is_valid, warning = validate_otlp_endpoint(endpoint)
     if not is_valid:
-        return False, warning or "Invalid endpoint"
+        raise ValueError(warning or "Invalid endpoint")
     
     # Convert to OTLP spans
-    try:
-        spans = convert_run_to_otlp_spans(run)
-    except Exception as e:
-        return False, f"Failed to convert run to OTLP format: {str(e)}"
+    spans = convert_run_to_otlp_spans(run)
     
     # In a real implementation, this would use the OpenTelemetry SDK
     # to export spans to the OTLP endpoint. For now, we simulate success.
@@ -158,12 +156,8 @@ def export_run_to_otlp(run: RunRecord, endpoint: str) -> tuple[bool, str]:
     # from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     # from opentelemetry.sdk.trace.export import BatchSpanProcessor
     
-    # Simulate export
-    message = f"Exported {len(spans)} spans to {endpoint}"
-    if warning:
-        message = f"{warning}\n\n{message}"
-    
-    return True, message
+    # Simulate successful export
+    return True
 
 
 def _to_nano(timestamp: str) -> int:
