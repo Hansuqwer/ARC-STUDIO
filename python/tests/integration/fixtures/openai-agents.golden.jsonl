@@ -1,0 +1,4 @@
+{"type":"RUN_STARTED","threadId":"th-3","runId":"r3","timestamp":1}
+{"type":"TOOL_CALL_START","threadId":"th-3","runId":"r3","timestamp":2,"toolCallId":"t1","toolCallName":"search"}
+{"type":"TOOL_CALL_RESULT","threadId":"th-3","runId":"r3","timestamp":3,"toolCallId":"t1","content":"{}"}
+{"type":"RUN_FINISHED","threadId":"th-3","runId":"r3","timestamp":4}
