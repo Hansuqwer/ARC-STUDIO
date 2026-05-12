@@ -90,6 +90,55 @@ def _build_safe_env() -> dict[str, str]:
     return safe_env
 
 
+def _redact(text: str) -> str:
+    """
+    Redact sensitive information from text before logging or storing.
+    
+    Redacts:
+    - API keys (sk-*, sk-ant-*, etc.)
+    - Authorization headers
+    - Bearer tokens
+    - API key parameters
+    - Token parameters
+    
+    Returns redacted text safe for logging.
+    """
+    if not text:
+        return text
+    
+    patterns = [
+        # OpenAI/Anthropic style API keys
+        (r'sk-[A-Za-z0-9_-]{20,}', 'sk-REDACTED'),
+        (r'sk-ant-[A-Za-z0-9_-]{20,}', 'sk-ant-REDACTED'),
+        # Generic API key patterns
+        (r'(api[_-]?key\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED'),
+        (r'(apikey\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED'),
+        # Authorization headers
+        (r'(authorization:\s*bearer\s+)[^\s]+', r'\1REDACTED', re.IGNORECASE),
+        (r'(authorization:\s*)[^\s]+', r'\1REDACTED', re.IGNORECASE),
+        # Token parameters
+        (r'(token\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED'),
+        (r'(access[_-]?token\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED'),
+        # AWS credentials
+        (r'(aws[_-]?access[_-]?key[_-]?id\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED', re.IGNORECASE),
+        (r'(aws[_-]?secret[_-]?access[_-]?key\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED', re.IGNORECASE),
+        # Generic secret patterns
+        (r'(secret\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED', re.IGNORECASE),
+        (r'(password\s*[=:]\s*)[^\s\'"]+', r'\1REDACTED', re.IGNORECASE),
+    ]
+    
+    redacted = text
+    for pattern_tuple in patterns:
+        if len(pattern_tuple) == 2:
+            pattern, replacement = pattern_tuple
+            flags = 0
+        else:
+            pattern, replacement, flags = pattern_tuple
+        redacted = re.sub(pattern, replacement, redacted, flags=flags)
+    
+    return redacted
+
+
 class SwarmGraphAdapter(RuntimeAdapter):
 
     @property
@@ -289,7 +338,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
         ended = datetime.now(timezone.utc)
 
         if proc.returncode != 0:
-            events.append(self._event(run_id, 1, "RUN_FAILED", {"exit_code": proc.returncode, "stderr": stderr[-2000:], "stdout": stdout[-2000:]}))
+            events.append(self._event(run_id, 1, "RUN_FAILED", {"exit_code": proc.returncode, "stderr": _redact(stderr[-2000:]), "stdout": _redact(stdout[-2000:])}))
             return RunRecord(
                 id=run_id,
                 workflow_id=workflow_id,
@@ -304,7 +353,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
                     "prompt": prompt,
                     "cost_allowed": allow_costs,
                     "exit_code": proc.returncode,
-                    "stderr": stderr[-2000:],
+                    "stderr": _redact(stderr[-2000:]),
                     "_external_command": "swarmgraph swarm --json",
                 },
             )
@@ -312,7 +361,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
         try:
             payload = json.loads(stdout)
         except json.JSONDecodeError as exc:
-            events.append(self._event(run_id, 1, "RUN_FAILED", {"error": f"Invalid SwarmGraph JSON: {exc}", "stdout": stdout[:2000], "stderr": stderr[-2000:]}))
+            events.append(self._event(run_id, 1, "RUN_FAILED", {"error": f"Invalid SwarmGraph JSON: {exc}", "stdout": _redact(stdout[:2000]), "stderr": _redact(stderr[-2000:])}))
             return RunRecord(
                 id=run_id,
                 workflow_id=workflow_id,
@@ -326,8 +375,8 @@ class SwarmGraphAdapter(RuntimeAdapter):
                     "provider": provider,
                     "prompt": prompt,
                     "cost_allowed": allow_costs,
-                    "stdout": stdout[:2000],
-                    "stderr": stderr[-2000:],
+                    "stdout": _redact(stdout[:2000]),
+                    "stderr": _redact(stderr[-2000:]),
                     "_external_command": "swarmgraph swarm --json",
                 },
             )
