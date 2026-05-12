@@ -512,6 +512,7 @@ export class ArcServiceImpl implements ArcService {
         { id: 'openrouter', display_name: 'OpenRouter', default_base_url: 'https://openrouter.ai/api/v1', env_key_names: ['OPENROUTER_API_KEY'], auth_header: 'bearer', default_models: ['openai/gpt-4.1-mini', 'anthropic/claude-sonnet-4'], supports_streaming: true, supports_tools: true },
         { id: 'qwen', display_name: 'Qwen', default_base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', env_key_names: ['QWEN_API_KEY', 'DASHSCOPE_API_KEY'], auth_header: 'bearer', default_models: ['qwen-max', 'qwen-plus', 'qwen-turbo'], supports_streaming: true, supports_tools: true },
         { id: 'kimi', display_name: 'Kimi / Moonshot', default_base_url: 'https://api.moonshot.ai/v1', env_key_names: ['MOONSHOT_API_KEY', 'KIMI_API_KEY'], auth_header: 'bearer', default_models: ['kimi-k2', 'moonshot-v1-128k', 'moonshot-v1-32k'], supports_streaming: true, supports_tools: true },
+        { id: 'g4f', display_name: 'GPT4Free', default_base_url: 'https://g4f.space/v1', env_key_names: ['G4F_API_KEY'], auth_header: 'bearer', default_models: ['gpt-4o', 'gpt-4.1', 'deepseek-v3', 'claude-sonnet-4'], supports_streaming: true, supports_tools: true },
       ],
       error: null,
       meta: { timestamp: new Date().toISOString() },
@@ -570,6 +571,9 @@ export class ArcServiceImpl implements ArcService {
     }
     if (provider.toLowerCase() === 'kimi') {
       return ['MOONSHOT_API_KEY', 'KIMI_API_KEY'];
+    }
+    if (provider.toLowerCase() === 'g4f') {
+      return ['G4F_API_KEY'];
     }
     return [`ARC_PROVIDER_${this.envProviderName(provider)}_API_KEY`];
   }
