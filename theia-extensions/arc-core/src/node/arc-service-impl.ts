@@ -3,7 +3,7 @@
  *
  * Calls the Python ARC daemon via:
  * 1. CLI mode: spawn `uv run arc <cmd> --json` (no daemon required)
- * 2. HTTP mode: call localhost:7777 (daemon mode)
+ * 2. HTTP mode: call 127.0.0.1:7777 (daemon mode)
  *
  * Returns an error if neither daemon nor CLI is available. Fixture data lives
  * in tests/fixtures only, not the normal product path.
@@ -33,7 +33,7 @@ import {
 } from '../common/arc-protocol';
 
 const ARC_DAEMON_PORT = 7777;
-const ARC_DAEMON_HOST = 'localhost';
+const ARC_DAEMON_HOST = '127.0.0.1';
 const ARC_CLI_TIMEOUT_MS = 30000;
 const ARC_CLI_ENV_ALLOWLIST = ['PATH', 'HOME', 'LANG', 'LC_ALL', 'SHELL', 'TMPDIR', 'VIRTUAL_ENV'];
 const ARC_CLI_DIAGNOSTIC_TAIL_BYTES = 2048;

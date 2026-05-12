@@ -5,7 +5,7 @@ const e2eWorkspace = join(__dirname, '..', '..');
 const e2eSwarmGraphCli = join(__dirname, 'fixtures', 'swarmgraph-stub.sh');
 const reuseExistingServer = process.env.ARC_E2E_REUSE_SERVER === 'true';
 const e2ePort = process.env.ARC_E2E_PORT || '3010';
-const e2eUrl = process.env.ARC_E2E_URL || `http://localhost:${e2ePort}`;
+const e2eUrl = process.env.ARC_E2E_URL || `http://127.0.0.1:${e2ePort}`;
 
 process.env.ARC_E2E_REQUIRE_RUNTIME = process.env.ARC_E2E_REQUIRE_RUNTIME || 'true';
 process.env.ARC_E2E_PORT = e2ePort;

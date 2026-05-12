@@ -11,14 +11,14 @@
  * Source: https://github.com/eclipse-theia/theia/blob/master/examples/playwright/README.md
  *
  * Run: pnpm test:e2e
- * Requirements: Browser app must be running on http://localhost:3000
+ * Requirements: Browser app must be running on http://127.0.0.1:3000
  *
  */
 
 import { test, expect } from '@playwright/test';
 import { join } from 'path';
 
-const APP_URL = process.env.ARC_E2E_URL || `http://localhost:${process.env.ARC_E2E_PORT || '3010'}`;
+const APP_URL = process.env.ARC_E2E_URL || `http://127.0.0.1:${process.env.ARC_E2E_PORT || '3010'}`;
 const TIMEOUT = 60_000;
 const REPO_ROOT = join(__dirname, '..', '..');
 const ARC_WORKSPACE = process.env.ARC_WORKSPACE_PATH || REPO_ROOT;
