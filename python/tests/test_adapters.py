@@ -246,10 +246,11 @@ class TestLangGraphAdapter:
             assert isinstance(result, list)
             assert len(result) > 0
 
-    def test_run_workflow_raises_not_implemented(self):
+    def test_run_workflow_returns_truthful_failure_without_export(self):
         import asyncio
-        with pytest.raises(NotImplementedError):
-            asyncio.run(self.adapter.run_workflow("test"))
+        run = asyncio.run(self.adapter.run_workflow("test"))
+        assert run.status.value == "failed"
+        assert run.events[-1].type == "RUN_FAILED"
 
     def test_real_export_uses_configured_workspace_symbol(self, monkeypatch, tmp_path):
         (tmp_path / "graph_module.py").write_text(

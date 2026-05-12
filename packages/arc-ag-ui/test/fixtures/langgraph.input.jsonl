@@ -1,0 +1,7 @@
+{"event":"on_chain_start","name":"langgraph","run_id":"r1","ts":1}
+{"event":"on_chain_start","name":"router","run_id":"s1","ts":2}
+{"event":"on_chat_model_stream","run_id":"m1","ts":3,"data":{"chunk":{"content":"Hi"}}}
+{"event":"on_tool_start","name":"search","run_id":"tool-1","ts":4,"data":{"input":{"q":"x"}}}
+{"event":"on_tool_end","run_id":"tool-1","ts":5,"data":{"output":{"hits":1}}}
+{"event":"on_chain_end","name":"router","run_id":"s1","ts":6}
+{"event":"on_chain_end","name":"langgraph","run_id":"r1","ts":7}

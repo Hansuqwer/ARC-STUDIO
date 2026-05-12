@@ -12,11 +12,11 @@ ARC Studio is an alpha Theia IDE and Python daemon. Treat unknown workspaces as 
 
 ## Workspace Trust
 
-Workspace trust is enabled in browser and Electron app preferences. Do not disable it to work around extension bugs.
+Workspace trust is enabled in browser and Electron app preferences (`security.workspace.trust.enabled=true`). Do not disable it to work around extension bugs.
 
 ## Local Daemon
 
-The daemon binds to `127.0.0.1` by default. CORS defaults to `http://127.0.0.1:3000` and can be overridden with `ARC_CORS_ORIGIN` for local development only.
+The daemon binds to `127.0.0.1` by default, and Theia backend daemon calls use `127.0.0.1` rather than `localhost` to avoid host resolution drift. CORS defaults to `http://127.0.0.1:3000` and can be overridden with `ARC_CORS_ORIGIN` for local development only.
 
 ## Secrets
 

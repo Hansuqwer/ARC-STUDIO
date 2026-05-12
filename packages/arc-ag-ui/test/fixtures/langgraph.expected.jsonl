@@ -1,0 +1,9 @@
+{"type":"RUN_STARTED","threadId":"th-1","runId":"r1"}
+{"type":"STEP_STARTED","stepName":"router"}
+{"type":"TEXT_MESSAGE_CHUNK","messageId":"m1","role":"assistant","delta":"Hi"}
+{"type":"TOOL_CALL_START","toolCallId":"tool-1","toolCallName":"search"}
+{"type":"TOOL_CALL_ARGS","toolCallId":"tool-1","delta":"{\"q\":\"x\"}"}
+{"type":"TOOL_CALL_END","toolCallId":"tool-1"}
+{"type":"TOOL_CALL_RESULT","toolCallId":"tool-1","messageId":"tool-1:result","content":"{\"hits\":1}"}
+{"type":"STEP_FINISHED","stepName":"router"}
+{"type":"RUN_FINISHED","threadId":"th-1","runId":"r1"}

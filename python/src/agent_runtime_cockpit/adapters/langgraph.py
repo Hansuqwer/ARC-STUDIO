@@ -7,18 +7,23 @@ Source: https://docs.langchain.com/oss/python/langgraph/
 from __future__ import annotations
 
 import ast
+import inspect
 import importlib
 import logging
 import os
 import sys
 import warnings
+import uuid
+from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Iterator
 
 from ..adapters.base import CapabilityReport
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import (
     WorkflowInfo, WorkflowNode, WorkflowEdge, SchemaInfo,
-    NodeType
+    NodeType, RunRecord, RunEvent, RunStatus
 )
 from ..workspace import iter_workspace_files
 from .base import RuntimeAdapter
@@ -29,6 +34,12 @@ HEURISTIC_REASON = "LangGraph library not installed; using AST scan"
 REAL_IMPLEMENTATION_PATH = "adapters/langgraph.py -> from langgraph.graph import StateGraph"
 LOCAL_FIX_STEPS = "pip install langgraph && call graph.get_graph() directly"
 OWNER = "LangGraph Adapter Agent"
+EXPORT_ENV = "ARC_LANGGRAPH_EXPORT"
+LG_DEP_MISSING = "LG_DEP_MISSING"
+LG_EXPORT_UNSET = "LG_EXPORT_UNSET"
+LG_EXPORT_NOT_FOUND = "LG_EXPORT_NOT_FOUND"
+LG_TARGET_INVALID = "LG_TARGET_INVALID"
+LG_INVOKE_FAILED = "LG_INVOKE_FAILED"
 
 
 class LangGraphAdapter(RuntimeAdapter):
@@ -61,29 +72,130 @@ class LangGraphAdapter(RuntimeAdapter):
                 detected=detected,
                 can_run=False,
                 availability="missing_dependency",
-                reason="Install langgraph in this Python environment.",
+                reason=LG_DEP_MISSING,
                 detected_artifacts=evidence,
-                required_env=["ARC_LANGGRAPH_EXPORT"],
+                required_env=[EXPORT_ENV],
             )
-        if not os.environ.get("ARC_LANGGRAPH_EXPORT"):
+        target = os.environ.get(EXPORT_ENV)
+        if not target:
             return CapabilityReport(
                 runtime_id=self.adapter_id,
                 detected=detected,
                 can_run=False,
                 availability="missing_export_target",
-                reason="Set ARC_LANGGRAPH_EXPORT=module:function to run a LangGraph workflow.",
+                reason=LG_EXPORT_UNSET,
                 detected_artifacts=evidence,
-                required_env=["ARC_LANGGRAPH_EXPORT"],
+                required_env=[EXPORT_ENV],
+            )
+        try:
+            exported = self._resolve_export(workspace, target, load_target=True)
+            if not callable(exported) and not self._is_graph_like(exported):
+                raise LangGraphRunError(LG_TARGET_INVALID, "LangGraph export must be a graph or factory")
+        except LangGraphRunError as exc:
+            return CapabilityReport(
+                runtime_id=self.adapter_id,
+                detected=detected,
+                can_run=False,
+                availability="detected_not_runnable",
+                reason=exc.code,
+                detected_artifacts=evidence,
+                required_env=[EXPORT_ENV],
             )
         return CapabilityReport(
             runtime_id=self.adapter_id,
             detected=detected,
-            can_run=False,
-            availability="detected_not_runnable",
-            reason="LangGraph run support is planned after CrewAI MVP.",
+            can_run=True,
+            availability="runnable",
             detected_artifacts=evidence,
-            required_env=["ARC_LANGGRAPH_EXPORT"],
+            required_env=[EXPORT_ENV],
         )
+
+    async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
+        inputs = inputs or {}
+        workspace = Path(str(inputs.get("workspace") or ".")).resolve()
+        run_id = f"run-lg-{uuid.uuid4().hex[:8]}"
+        started = datetime.now(timezone.utc)
+        events = [self._event(run_id, 0, "RUN_STARTED", {"workflow_id": workflow_id, "runtime": self.adapter_id})]
+
+        if importlib.util.find_spec("langgraph") is None:
+            return self._failed(workflow_id, run_id, started, events, LG_DEP_MISSING, "Install langgraph in this Python environment.")
+        target = os.environ.get(EXPORT_ENV)
+        if not target:
+            return self._failed(workflow_id, run_id, started, events, LG_EXPORT_UNSET, f"Set {EXPORT_ENV}=module:function")
+        try:
+            exported = self._resolve_export(workspace, target, load_target=True)
+            graph = await self._materialize_graph(exported)
+            stream_result = self._stream_graph(run_id, events, graph, inputs)
+            if stream_result is None:
+                final_state = graph.invoke(inputs)
+                streamed = False
+            else:
+                final_state = stream_result
+                streamed = True
+        except LangGraphRunError as exc:
+            return self._failed(workflow_id, run_id, started, events, exc.code, exc.message)
+        except Exception as exc:
+            return self._failed(workflow_id, run_id, started, events, LG_INVOKE_FAILED, self._redact(str(exc)))
+
+        ended = datetime.now(timezone.utc)
+        payload = {"state": final_state if isinstance(final_state, dict) else {"value": final_state}}
+        events.append(self._event(run_id, 1, "RUN_COMPLETED", payload))
+        return RunRecord(
+            id=run_id,
+            workflow_id=workflow_id,
+            runtime=self.adapter_id,
+            status=RunStatus.COMPLETED,
+            started_at=started.isoformat(),
+            ended_at=ended.isoformat(),
+            events=events,
+            metadata={"state": payload["state"], "_external_target": target, "streamed": streamed},
+        )
+
+    def _stream_graph(self, run_id: str, events: list[RunEvent], graph: Any, inputs: dict[str, Any]) -> dict[str, Any] | None:
+        if not hasattr(graph, "stream"):
+            return None
+
+        final_state: dict[str, Any] = {}
+        for part in graph.stream(inputs, stream_mode=["updates", "messages"]):
+            mode, data = self._stream_part(part)
+            if mode == "messages":
+                # MESSAGE_CHUNK is intentionally ephemeral; persisted traces keep coalesced node updates only.
+                continue
+            if mode != "updates":
+                continue
+            update = data if isinstance(data, dict) else {"value": data}
+            final_state.update(self._flatten_update(update))
+            events.append(self._event(run_id, len(events), "NODE_UPDATE", {"update": self._redact_value(update)}))
+        return final_state
+
+    def _stream_part(self, part: Any) -> tuple[str | None, Any]:
+        if isinstance(part, tuple) and len(part) == 2 and isinstance(part[0], str):
+            return part[0], part[1]
+        if isinstance(part, dict) and "type" in part:
+            return str(part.get("type")), part.get("data")
+        if isinstance(part, dict):
+            return "updates", part
+        return None, part
+
+    def _flatten_update(self, update: dict[str, Any]) -> dict[str, Any]:
+        flattened: dict[str, Any] = {}
+        for key, value in update.items():
+            if isinstance(value, dict):
+                flattened.update(value)
+            else:
+                flattened[key] = value
+        return flattened
+
+    def _redact_value(self, value: Any) -> Any:
+        if isinstance(value, str):
+            return self._redact(value)
+        if isinstance(value, dict):
+            return {str(key): self._redact_value(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self._redact_value(item) for item in value]
+        if isinstance(value, tuple):
+            return [self._redact_value(item) for item in value]
+        return value
 
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
         evidence: list[str] = []
@@ -146,22 +258,82 @@ class LangGraphAdapter(RuntimeAdapter):
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message=".*default value of `allowed_objects` will change.*")
             from langgraph.graph import StateGraph  # type: ignore  # noqa: F401
-        target = os.environ.get("ARC_LANGGRAPH_EXPORT", "")
+        target = os.environ.get(EXPORT_ENV, "")
         if not target or ":" not in target:
             raise NotImplementedError("Set ARC_LANGGRAPH_EXPORT=module:function to export a workspace LangGraph")
 
-        module_name, attr_name = target.split(":", 1)
-        sys.path.insert(0, str(workspace))
-        try:
-            exported = getattr(importlib.import_module(module_name), attr_name)
-            graph = exported() if callable(exported) else exported
-        finally:
-            try:
-                sys.path.remove(str(workspace))
-            except ValueError:
-                pass
+        exported = self._resolve_export(workspace, target, load_target=True)
+        graph = exported() if callable(exported) and not self._is_graph_like(exported) else exported
 
         return [self._workflow_from_graph(workspace, target, graph)]
+
+    def _resolve_export(self, workspace: Path, target: str, load_target: bool) -> Any:
+        module_name, attr_name = self._parse_export_target(target)
+        with _workspace_import_path(workspace):
+            spec = importlib.util.find_spec(module_name)
+            if spec is None:
+                raise LangGraphRunError(LG_EXPORT_NOT_FOUND, f"LangGraph export module not found: {module_name}")
+            origin = Path(str(spec.origin or "")).resolve()
+            allowed = [workspace.resolve()]
+            src = (workspace / "src").resolve()
+            if src.exists():
+                allowed.append(src)
+            if not any(origin == base or base in origin.parents for base in allowed):
+                raise LangGraphRunError(LG_TARGET_INVALID, f"LangGraph export module resolves outside workspace: {module_name}")
+            if not load_target:
+                return None
+            module = importlib.import_module(module_name)
+        if not hasattr(module, attr_name):
+            raise LangGraphRunError(LG_EXPORT_NOT_FOUND, f"LangGraph export attribute not found: {target}")
+        return getattr(module, attr_name)
+
+    def _parse_export_target(self, target: str) -> tuple[str, str]:
+        if ":" not in target:
+            raise LangGraphRunError(LG_EXPORT_UNSET, f"{EXPORT_ENV} must be module:function")
+        module_name, attr_name = target.split(":", 1)
+        if not module_name or not attr_name:
+            raise LangGraphRunError(LG_EXPORT_UNSET, f"{EXPORT_ENV} must be module:function")
+        if any(part in target for part in ("/", "\\", "..")) or module_name.startswith("."):
+            raise LangGraphRunError(LG_TARGET_INVALID, "LangGraph export target must be a dotted module name")
+        return module_name, attr_name
+
+    async def _materialize_graph(self, exported: Any) -> Any:
+        graph = exported
+        if callable(graph) and not self._is_graph_like(graph):
+            graph = graph()
+            if inspect.isawaitable(graph):
+                graph = await graph
+        if hasattr(graph, "compile"):
+            graph = graph.compile()
+        if not hasattr(graph, "invoke"):
+            raise LangGraphRunError(LG_TARGET_INVALID, "LangGraph export must resolve to an object with invoke()")
+        return graph
+
+    def _is_graph_like(self, value: Any) -> bool:
+        return hasattr(value, "compile") or hasattr(value, "invoke")
+
+    def _failed(self, workflow_id: str, run_id: str, started: datetime, events: list[RunEvent], code: str, message: str) -> RunRecord:
+        ended = datetime.now(timezone.utc)
+        events.append(self._event(run_id, 1, "RUN_FAILED", {"error_code": code, "redacted_message": self._redact(message)}))
+        return RunRecord(
+            id=run_id,
+            workflow_id=workflow_id,
+            runtime=self.adapter_id,
+            status=RunStatus.FAILED,
+            started_at=started.isoformat(),
+            ended_at=ended.isoformat(),
+            events=events,
+            metadata={"error_code": code, "error": self._redact(message)},
+        )
+
+    def _event(self, run_id: str, sequence: int, event_type: str, data: dict[str, Any]) -> RunEvent:
+        return RunEvent(type=event_type, timestamp=datetime.now(timezone.utc).isoformat(), run_id=run_id, sequence=sequence, data=data)
+
+    def _redact(self, text: str, cap: int = 4000) -> str:
+        lowered = text.lower()
+        if any(hint in lowered for hint in ("api_key", "authorization", "bearer", "secret", "token=")):
+            return "[redacted: message contained possible secret material]"
+        return text[:cap]
 
     def _workflow_from_graph(self, workspace: Path, target: str, graph: object) -> WorkflowInfo:
         drawable = graph.get_graph() if hasattr(graph, "get_graph") else graph
@@ -295,3 +467,29 @@ class LangGraphAdapter(RuntimeAdapter):
             },
             source_file="examples/sample-langgraph-project/state.py",
         )]
+
+
+class LangGraphRunError(Exception):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+@contextmanager
+def _workspace_import_path(workspace: Path) -> Iterator[None]:
+    added: list[str] = []
+    for candidate in (workspace, workspace / "src"):
+        if candidate.exists():
+            value = str(candidate.resolve())
+            if value not in sys.path:
+                sys.path.insert(0, value)
+                added.append(value)
+    try:
+        yield
+    finally:
+        for value in added:
+            try:
+                sys.path.remove(value)
+            except ValueError:
+                pass

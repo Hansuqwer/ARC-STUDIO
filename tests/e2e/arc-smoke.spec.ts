@@ -11,14 +11,14 @@
  * Source: https://github.com/eclipse-theia/theia/blob/master/examples/playwright/README.md
  *
  * Run: pnpm test:e2e
- * Requirements: Browser app must be running on http://localhost:3000
+ * Requirements: Browser app must be running on http://127.0.0.1:3000
  *
  */
 
 import { test, expect } from '@playwright/test';
 import { join } from 'path';
 
-const APP_URL = process.env.ARC_E2E_URL || `http://localhost:${process.env.ARC_E2E_PORT || '3010'}`;
+const APP_URL = process.env.ARC_E2E_URL || `http://127.0.0.1:${process.env.ARC_E2E_PORT || '3010'}`;
 const TIMEOUT = 60_000;
 const REPO_ROOT = join(__dirname, '..', '..');
 const ARC_WORKSPACE = process.env.ARC_WORKSPACE_PATH || REPO_ROOT;
@@ -95,7 +95,8 @@ test.describe('ARC Studio — Smoke Tests', () => {
     await page.goto(`${APP_URL}/?arc-view=run-timeline`, { waitUntil: 'networkidle', timeout: TIMEOUT });
     await acceptWorkspaceTrustIfShown(page);
 
-    await expect(page.getByText('Start SwarmGraph Run')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByLabel('Runtime')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByRole('button', { name: 'Start Run' })).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByPlaceholder('Prompt for local SwarmGraph stub run')).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText('Refresh Workspace')).toBeVisible({ timeout: TIMEOUT });
   });
@@ -105,7 +106,7 @@ test.describe('ARC Studio — Smoke Tests', () => {
     await acceptWorkspaceTrustIfShown(page);
 
     await page.getByPlaceholder('Prompt for local SwarmGraph stub run').fill('ARC E2E local stub run: return one sentence.');
-    await page.getByText('Start SwarmGraph Run').click();
+    await page.getByRole('button', { name: 'Start Run' }).click();
     const completed = page.getByText('Run completed.');
     const failed = page.getByText('Run failed.');
     await expect(completed.or(failed).first()).toBeVisible({ timeout: TIMEOUT });
@@ -115,12 +116,26 @@ test.describe('ARC Studio — Smoke Tests', () => {
     await expect(page.getByText('Export Run JSON')).toBeAttached({ timeout: TIMEOUT });
   });
 
+  test('runtime picker selection is used for run start', async ({ page }, testInfo) => {
+    await page.goto(`${APP_URL}/?arc-view=run-timeline`, { waitUntil: 'networkidle', timeout: TIMEOUT });
+    await acceptWorkspaceTrustIfShown(page);
+
+    await page.getByTestId('arc-runtime-picker').selectOption('swarmgraph');
+    await page.getByPlaceholder('Prompt for local SwarmGraph stub run').fill('ARC E2E explicit runtime run.');
+    await page.getByRole('button', { name: 'Start Run' }).click();
+    const completed = page.getByText('Run completed.');
+    const failed = page.getByText('Run failed.');
+    await expect(completed.or(failed).first()).toBeVisible({ timeout: TIMEOUT });
+    await skipIfRuntimeUnavailable(page, testInfo);
+    await expect(page.getByText('Runtime: swarmgraph')).toBeVisible({ timeout: TIMEOUT });
+  });
+
   test('run timeline shows completed run after reload', async ({ page }, testInfo) => {
     await page.goto(`${APP_URL}/?arc-view=run-timeline`, { waitUntil: 'networkidle', timeout: TIMEOUT });
     await acceptWorkspaceTrustIfShown(page);
 
     await page.getByPlaceholder('Prompt for local SwarmGraph stub run').fill('ARC E2E reload history run.');
-    await page.getByText('Start SwarmGraph Run').click();
+    await page.getByRole('button', { name: 'Start Run' }).click();
     const completed = page.getByText('Run completed.');
     const failed = page.getByText('Run failed.');
     await expect(completed.or(failed).first()).toBeVisible({ timeout: TIMEOUT });
@@ -147,6 +162,23 @@ test.describe('ARC Studio — Smoke Tests', () => {
     const envelope = JSON.parse(output);
     expect(envelope.ok).toBe(true);
     expect(envelope.data.some((run: { id: string }) => run.id === runId)).toBe(true);
+  });
+
+  test('event stream deep link shows selectable AG-UI event detail', async ({ page }) => {
+    await page.goto(`${APP_URL}/?arc-view=event-stream`, { waitUntil: 'networkidle', timeout: TIMEOUT });
+    await acceptWorkspaceTrustIfShown(page);
+
+    await expect(page.getByTestId('arc-event-stream-widget')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('Event Stream').first()).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByTestId('arc-event-stream-run-fixture-ag-ui-events')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByTestId('arc-event-stream-event-RUN_STARTED').first()).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByTestId('arc-event-stream-event-TOOL_CALL_RESULT').first()).toBeVisible({ timeout: TIMEOUT });
+
+    await page.getByTestId('arc-event-stream-event-RUN_STARTED').first().click();
+    await expect(page.getByTestId('arc-event-stream-detail')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('Event Detail')).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('RUN_STARTED').last()).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('«REDACTED»').first()).toBeVisible({ timeout: TIMEOUT });
   });
 });
 
