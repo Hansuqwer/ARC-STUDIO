@@ -1,0 +1,5 @@
+{"type":"RUN_STARTED","threadId":"th-1","runId":"r1","timestamp":1}
+{"type":"TEXT_MESSAGE_START","threadId":"th-1","runId":"r1","timestamp":2,"messageId":"m1","role":"assistant"}
+{"type":"TEXT_MESSAGE_CONTENT","threadId":"th-1","runId":"r1","timestamp":2,"messageId":"m1","delta":"hello"}
+{"type":"TEXT_MESSAGE_END","threadId":"th-1","runId":"r1","timestamp":2,"messageId":"m1"}
+{"type":"RUN_FINISHED","threadId":"th-1","runId":"r1","timestamp":3}
