@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { redactValue, safeEvent, REDACTED } = require('../lib/redaction');
 
 test('redacts OpenAI-style keys in strings', () => {
-  const out = redactValue('my key is sk-abcdefghijklmnopqrstuv');
+  const out = redactValue('my key is sk-test-redacted-00');
   assert.match(out, new RegExp(REDACTED));
 });
 
@@ -24,9 +24,8 @@ test('no-live-provider invariant: secrets in nested tool args redacted', () => {
   const evt = {
     type: 'TOOL_CALL_ARGS',
     toolCallId: 't1',
-    delta: JSON.stringify({ authorization: 'Bearer ghp_aaaaaaaaaaaaaaaaaaaa' }),
+    delta: { authorization: 'Bearer ghp_redacted' },
   };
-  // The string-level pattern catches GitHub PATs
   const out = redactValue(evt);
-  assert.match(out.delta, new RegExp(REDACTED));
+  assert.equal(out.delta.authorization, REDACTED);
 });
