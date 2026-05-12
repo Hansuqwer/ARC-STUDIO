@@ -12,6 +12,7 @@ import { injectable, inject, postConstruct } from '@theia/core/shared/inversify'
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { ArcFrontendService } from 'arc-core/lib/browser/arc-frontend-service';
 import { RunRecord, RunEvent } from 'arc-core/lib/common/arc-protocol';
+import { AGUIEventType, safeEvent } from '@arc/ag-ui';
 
 // AG-UI Event Type Icons (33 canonical types from packages/arc-ag-ui/src/event-types.ts)
 const EVENT_ICONS: Record<string, string> = {
@@ -97,6 +98,36 @@ interface EventStreamState {
   loading: boolean;
   filter: string;
   autoScroll: boolean;
+  connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
+  liveRunId: string | null;
+}
+
+const FIXTURE_RUN_ID = 'fixture-ag-ui-events';
+
+function createFixtureRun(): RunRecord {
+  const started = new Date().toISOString();
+  const events = Object.values(AGUIEventType).map((type, sequence) => ({
+    type,
+    timestamp: started,
+    run_id: FIXTURE_RUN_ID,
+    sequence,
+    data: safeEvent({
+      message: `Fixture event for ${type}`,
+      threadId: 'fixture-thread',
+      runId: FIXTURE_RUN_ID,
+      api_key: 'fixture-secret-value',
+    }) as Record<string, unknown>,
+  }));
+  return {
+    id: FIXTURE_RUN_ID,
+    workflow_id: 'wf-ag-ui-fixture',
+    runtime: 'ag-ui-fixture',
+    status: 'completed',
+    started_at: started,
+    ended_at: started,
+    events,
+    metadata: { fixture: true },
+  };
 }
 
 @injectable()
@@ -115,7 +146,15 @@ export class ArcEventStreamWidget extends ReactWidget {
     loading: false,
     filter: '',
     autoScroll: true,
+    connectionStatus: 'disconnected',
+    liveRunId: null,
   };
+
+  protected eventSource: EventSource | null = null;
+  protected reconnectTimer: NodeJS.Timeout | null = null;
+  protected reconnectAttempts = 0;
+  protected readonly MAX_RECONNECT_ATTEMPTS = 5;
+  protected readonly RECONNECT_DELAY = 2000;
 
   @postConstruct()
   protected init(): void {
@@ -126,12 +165,20 @@ export class ArcEventStreamWidget extends ReactWidget {
     this.loadRuns();
   }
 
+  dispose(): void {
+    this.disconnectSSE();
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
+    super.dispose();
+  }
+
   protected async loadRuns(): Promise<void> {
     this.state.loading = true;
     this.update();
     try {
       const result = await this.arcService.listRuns();
-      this.state.runs = result.data ?? [];
+      this.state.runs = [createFixtureRun(), ...(result.data ?? [])];
       if (this.state.runs.length > 0 && !this.state.selectedRun) {
         await this.selectRun(this.state.runs[0]);
       }
@@ -147,6 +194,15 @@ export class ArcEventStreamWidget extends ReactWidget {
     this.state.selectedRun = run;
     this.state.events = run.events ?? [];
     this.state.selectedEvent = null;
+    
+    // Disconnect previous SSE connection
+    this.disconnectSSE();
+    
+    // Connect to live events if run is active
+    if (run.status === 'running' || run.status === 'pending') {
+      this.connectSSE(run.id);
+    }
+    
     this.update();
     
     // Auto-scroll to bottom if enabled
@@ -177,6 +233,97 @@ export class ArcEventStreamWidget extends ReactWidget {
     }
   }
 
+  protected connectSSE(runId: string): void {
+    if (this.eventSource) {
+      this.disconnectSSE();
+    }
+
+    this.state.connectionStatus = 'connecting';
+    this.state.liveRunId = runId;
+    this.update();
+
+    const baseUrl = window.location.origin;
+    const sseUrl = `${baseUrl}/api/runs/${runId}/events`;
+
+    try {
+      this.eventSource = new EventSource(sseUrl);
+
+      this.eventSource.onopen = () => {
+        this.state.connectionStatus = 'connected';
+        this.reconnectAttempts = 0;
+        this.update();
+        console.log(`[EventStream] Connected to SSE: ${runId}`);
+      };
+
+      this.eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          // Check for stream end
+          if (data.type === 'STREAM_END') {
+            console.log(`[EventStream] Stream ended for run: ${runId}`);
+            this.disconnectSSE();
+            return;
+          }
+
+          // Add new event to the list
+          if (this.state.selectedRun?.id === runId) {
+            this.state.events.push(data as RunEvent);
+            this.update();
+
+            // Auto-scroll if enabled
+            if (this.state.autoScroll) {
+              setTimeout(() => this.scrollToBottom(), 50);
+            }
+          }
+        } catch (error) {
+          console.error('[EventStream] Failed to parse SSE event:', error);
+        }
+      };
+
+      this.eventSource.onerror = (error) => {
+        console.error('[EventStream] SSE error:', error);
+        this.state.connectionStatus = 'error';
+        this.update();
+
+        // Attempt reconnection with exponential backoff
+        if (this.reconnectAttempts < this.MAX_RECONNECT_ATTEMPTS) {
+          this.reconnectAttempts++;
+          const delay = this.RECONNECT_DELAY * Math.pow(2, this.reconnectAttempts - 1);
+          console.log(`[EventStream] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS})`);
+          
+          this.reconnectTimer = setTimeout(() => {
+            if (this.state.liveRunId) {
+              this.connectSSE(this.state.liveRunId);
+            }
+          }, delay);
+        } else {
+          console.error('[EventStream] Max reconnection attempts reached');
+          this.disconnectSSE();
+        }
+      };
+    } catch (error) {
+      console.error('[EventStream] Failed to create EventSource:', error);
+      this.state.connectionStatus = 'error';
+      this.update();
+    }
+  }
+
+  protected disconnectSSE(): void {
+    if (this.eventSource) {
+      this.eventSource.close();
+      this.eventSource = null;
+    }
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.state.connectionStatus = 'disconnected';
+    this.state.liveRunId = null;
+    this.reconnectAttempts = 0;
+    this.update();
+  }
+
   protected getFilteredEvents(): RunEvent[] {
     if (!this.state.filter) {
       return this.state.events;
@@ -196,7 +343,7 @@ export class ArcEventStreamWidget extends ReactWidget {
     const filteredEvents = this.getFilteredEvents();
 
     return (
-      <div style={styles.container}>
+      <div style={styles.container} data-testid="arc-event-stream-widget">
         {/* Header */}
         <div style={styles.header}>
           <div style={styles.headerTitle}>
@@ -207,6 +354,7 @@ export class ArcEventStreamWidget extends ReactWidget {
                 {this.state.selectedRun.runtime} · {this.state.selectedRun.id}
               </span>
             )}
+            {this.renderConnectionStatus()}
           </div>
           <div style={styles.headerActions}>
             <input
@@ -242,6 +390,7 @@ export class ArcEventStreamWidget extends ReactWidget {
               {this.state.runs.map(run => (
                 <div
                   key={run.id}
+                  data-testid={`arc-event-stream-run-${run.id}`}
                   onClick={() => this.selectRun(run)}
                   style={{
                     ...styles.runItem,
@@ -277,6 +426,7 @@ export class ArcEventStreamWidget extends ReactWidget {
                   {filteredEvents.map((event, idx) => (
                     <div
                       key={`${event.sequence}-${idx}`}
+                      data-testid={`arc-event-stream-event-${event.type}`}
                       onClick={() => this.selectEvent(event)}
                       style={{
                         ...styles.eventItem,
@@ -317,7 +467,7 @@ export class ArcEventStreamWidget extends ReactWidget {
 
           {/* Event Detail Drawer */}
           {this.state.selectedEvent && (
-            <div style={styles.detailDrawer}>
+            <div style={styles.detailDrawer} data-testid="arc-event-stream-detail">
               <div style={styles.detailHeader}>
                 <span style={styles.detailTitle}>Event Detail</span>
                 <button
@@ -346,6 +496,34 @@ export class ArcEventStreamWidget extends ReactWidget {
       case 'cancelled': return '⏹️';
       default: return '❓';
     }
+  }
+
+  protected renderConnectionStatus(): React.ReactNode {
+    if (this.state.connectionStatus === 'disconnected') {
+      return null;
+    }
+
+    const statusConfig = {
+      connecting: { icon: '🔄', color: '#FFA726', text: 'Connecting...' },
+      connected: { icon: '🟢', color: '#66BB6A', text: 'Live' },
+      error: { icon: '🔴', color: '#EF5350', text: 'Connection Error' },
+    };
+
+    const config = statusConfig[this.state.connectionStatus];
+    if (!config) return null;
+
+    return (
+      <span
+        style={{
+          ...styles.connectionStatus,
+          color: config.color,
+        }}
+        title={config.text}
+      >
+        <span style={styles.connectionIcon}>{config.icon}</span>
+        <span style={styles.connectionText}>{config.text}</span>
+      </span>
+    );
   }
 
   protected renderEventPreview(event: RunEvent): React.ReactNode {
@@ -642,5 +820,19 @@ const styles = {
     borderRadius: '3px',
     overflow: 'auto',
     maxHeight: '400px',
+  },
+  connectionStatus: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    marginLeft: '12px',
+    fontSize: '12px',
+    fontWeight: 600,
+  },
+  connectionIcon: {
+    fontSize: '10px',
+  },
+  connectionText: {
+    fontSize: '11px',
   },
 };
