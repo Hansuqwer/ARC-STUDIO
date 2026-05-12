@@ -94,9 +94,9 @@ uv run mypy src tests    # Type check Python code
 | Phase 1: Bootstrap Lock | ✅ Complete | Project structure and Theia scaffold |
 | Phase 2: Research Lock | ✅ Complete | Technology research and selection |
 | Phase 3: Discovery Lock | ✅ Complete | Architecture decisions finalized |
-| Phase 4: Independent Fixes | 🔄 In Progress | Current development phase |
-| Phase 5: Integration Fixes | ⏳ Pending | Integration and testing |
-| Phase 6: Alpha Acceptance | ⏳ Pending | Alpha release |
+| Phase 4: Independent Fixes | ✅ Complete | Security hardening, JSONL parser, perf instrumentation |
+| Phase 5: Integration Fixes | ✅ Complete | Run timeline + schema inspector extensions wired |
+| Phase 6: Alpha Acceptance | ⏳ Pending | Test coverage and verification reports |
 | Phase 7: Final Handover | ⏳ Pending | Production release |
 
 ### What's Working

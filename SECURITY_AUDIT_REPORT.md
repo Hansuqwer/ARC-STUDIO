@@ -441,7 +441,7 @@ Backend parameter accepted without validation, potentially allowing unexpected v
 The ARC Studio project has been significantly hardened against common security vulnerabilities. All critical and high-severity issues have been resolved with comprehensive input validation, secure command execution, and workspace isolation.
 
 **Key Achievements**:
-- ✅ Command injection vulnerabilities eliminated
+- ✅ Command injection mitigated via list-form argv + shell:false (TS) / shell=False (Python); shared security-utils layer additionally rejects shell metacharacters as defence-in-depth
 - ✅ Path traversal attacks prevented
 - ✅ Workspace boundaries enforced
 - ✅ Error messages sanitized
@@ -449,6 +449,8 @@ The ARC Studio project has been significantly hardened against common security v
 - ✅ Security documentation provided
 
 **Security Posture**: The application is now secure for development and testing environments. Before production deployment, implement the recommended high-priority enhancements (authentication, rate limiting, audit logging).
+
+**Note on Defence-in-Depth**: The primary mitigation for command injection is the use of list-form argv with shell disabled (shell:false in TypeScript, shell=False in Python). This makes classical shell injection impossible regardless of input content. The shared security-utils layer additionally rejects shell metacharacters in user-supplied prompts as a defence-in-depth measure. Both layers are wired in the backend service as of commit ff1f68f.
 
 ---
 
