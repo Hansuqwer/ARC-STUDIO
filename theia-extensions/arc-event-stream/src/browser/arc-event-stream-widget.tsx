@@ -101,6 +101,8 @@ interface EventStreamState {
   autoScroll: boolean;
   connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
   liveRunId: string | null;
+  selectedEventTypes: Set<string>;
+  showEventTypeFilter: boolean;
 }
 
 const FIXTURE_RUN_ID = 'fixture-ag-ui-events';
@@ -149,6 +151,8 @@ export class ArcEventStreamWidget extends ReactWidget {
     autoScroll: true,
     connectionStatus: 'disconnected',
     liveRunId: null,
+    selectedEventTypes: new Set<string>(),
+    showEventTypeFilter: false,
   };
 
   protected eventSource: EventSource | null = null;
@@ -221,6 +225,27 @@ export class ArcEventStreamWidget extends ReactWidget {
 
   protected setFilter(filter: string): void {
     this.state.filter = filter;
+    this.update();
+  }
+
+  protected toggleEventType(type: string): void {
+    const selected = new Set(this.state.selectedEventTypes);
+    if (selected.has(type)) {
+      selected.delete(type);
+    } else {
+      selected.add(type);
+    }
+    this.state.selectedEventTypes = selected;
+    this.update();
+  }
+
+  protected selectAllEventTypes(): void {
+    this.state.selectedEventTypes = new Set(Object.values(AGUIEventType));
+    this.update();
+  }
+
+  protected clearEventTypeFilter(): void {
+    this.state.selectedEventTypes = new Set<string>();
     this.update();
   }
 
@@ -379,14 +404,18 @@ export class ArcEventStreamWidget extends ReactWidget {
   }
 
   protected getFilteredEvents(): RunEvent[] {
-    if (!this.state.filter) {
-      return this.state.events;
-    }
+    const selectedTypes = this.state.selectedEventTypes;
     const filterLower = this.state.filter.toLowerCase();
-    return this.state.events.filter(event =>
-      event.type.toLowerCase().includes(filterLower) ||
-      JSON.stringify(event.data).toLowerCase().includes(filterLower)
-    );
+    return this.state.events.filter(event => {
+      if (selectedTypes.size > 0 && !selectedTypes.has(event.type)) {
+        return false;
+      }
+      if (!filterLower) {
+        return true;
+      }
+      return event.type.toLowerCase().includes(filterLower) ||
+        JSON.stringify(event.data).toLowerCase().includes(filterLower);
+    });
   }
 
   protected render(): React.ReactNode {
@@ -418,6 +447,7 @@ export class ArcEventStreamWidget extends ReactWidget {
               onChange={e => this.setFilter(e.target.value)}
               style={styles.filterInput}
             />
+            {this.renderEventTypeFilter()}
             <button
               onClick={() => this.toggleAutoScroll()}
               style={{
@@ -473,7 +503,7 @@ export class ArcEventStreamWidget extends ReactWidget {
                 <div style={styles.eventListHeader}>
                   <span>
                     {filteredEvents.length} events
-                    {this.state.filter && ` (filtered from ${this.state.events.length})`}
+                    {(this.state.filter || this.state.selectedEventTypes.size > 0) && ` (filtered from ${this.state.events.length})`}
                   </span>
                 </div>
                 <div className="event-list" style={styles.eventList}>
@@ -553,6 +583,34 @@ export class ArcEventStreamWidget extends ReactWidget {
         <span style={styles.connectionIcon}>{config.icon}</span>
         <span style={styles.connectionText}>{config.text}</span>
       </span>
+    );
+  }
+
+  protected renderEventTypeFilter(): React.ReactNode {
+    const selected = this.state.selectedEventTypes;
+    return (
+      <details style={styles.typeFilter} data-testid="arc-event-type-filter">
+        <summary style={styles.typeFilterSummary}>
+          Types {selected.size > 0 ? `(${selected.size})` : '(all)'}
+        </summary>
+        <div style={styles.typeFilterMenu}>
+          <div style={styles.typeFilterActions}>
+            <button style={styles.smallButton} onClick={() => this.selectAllEventTypes()}>Select All</button>
+            <button style={styles.smallButton} onClick={() => this.clearEventTypeFilter()}>Clear All</button>
+          </div>
+          {Object.values(AGUIEventType).map(type => (
+            <label key={type} style={styles.typeFilterOption}>
+              <input
+                type="checkbox"
+                checked={selected.size === 0 || selected.has(type)}
+                onChange={() => this.toggleEventType(type)}
+                data-testid={`arc-event-type-filter-${type}`}
+              />
+              <span>{type}</span>
+            </label>
+          ))}
+        </div>
+      </details>
     );
   }
 
@@ -672,6 +730,53 @@ const styles = {
     color: 'var(--theia-button-foreground)',
     cursor: 'pointer',
     borderRadius: '3px',
+  },
+  smallButton: {
+    padding: '2px 6px',
+    fontSize: '11px',
+    border: '1px solid var(--theia-button-border)',
+    backgroundColor: 'transparent',
+    color: 'var(--theia-button-foreground)',
+    cursor: 'pointer',
+    borderRadius: '3px',
+  },
+  typeFilter: {
+    position: 'relative' as const,
+    fontSize: '12px',
+  },
+  typeFilterSummary: {
+    padding: '4px 8px',
+    border: '1px solid var(--theia-input-border)',
+    borderRadius: '3px',
+    cursor: 'pointer',
+    listStyle: 'none',
+  },
+  typeFilterMenu: {
+    position: 'absolute' as const,
+    top: '26px',
+    right: 0,
+    zIndex: 10,
+    width: '280px',
+    maxHeight: '360px',
+    overflow: 'auto',
+    padding: '8px',
+    border: '1px solid var(--theia-widget-border)',
+    borderRadius: '4px',
+    backgroundColor: 'var(--theia-dropdown-background)',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.35)',
+  },
+  typeFilterActions: {
+    display: 'flex',
+    gap: '6px',
+    marginBottom: '8px',
+  },
+  typeFilterOption: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '3px 0',
+    fontFamily: 'monospace',
+    fontSize: '11px',
   },
   content: {
     display: 'flex',
