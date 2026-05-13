@@ -21,15 +21,27 @@
     "watch": "pnpm -r --parallel run watch",
     "clean": "pnpm -r run clean",
     "test": "pnpm -r run test",
-    "lint": "pnpm -r run lint",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
     "start:browser": "pnpm --filter arc-browser-app start",
     "start:electron": "pnpm --filter arc-electron-app start",
     "test:e2e": "pnpm --filter arc-e2e-tests test"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@types/node": "^18.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.3",
+    "@typescript-eslint/parser": "^8.59.3",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "lerna": "^8.0.0",
+    "prettier": "^3.8.3",
     "typescript": "^5.3.0",
-    "lerna": "^8.0.0"
+    "typescript-eslint": "^8.59.3"
   },
   "pnpm": {
     "overrides": {
