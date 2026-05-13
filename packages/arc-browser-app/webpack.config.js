@@ -60,6 +60,46 @@ if (configs.length > 0) {
         maxEntrypointSize: 10 * 1024 * 1024,
         maxAssetSize: 10 * 1024 * 1024
     };
+
+    // Add split chunks for better caching and reduced main bundle size
+    frontendConfig.optimization = frontendConfig.optimization || {};
+    frontendConfig.optimization.splitChunks = {
+        chunks: 'all',
+        cacheGroups: {
+            // Theia core framework
+            theia: {
+                test: /[\\/]node_modules[\\/](@theia|@phosphor)[\\/]/,
+                name: 'theia-core',
+                chunks: 'all',
+                priority: 10,
+                reuseExistingChunk: true
+            },
+            // Monaco editor is the largest vendor
+            monaco: {
+                test: /[\\/]node_modules[\\/](vscode|monaco-editor|@theia\/monaco|@theia\/monaco-editor-core)[\\/]/,
+                name: 'monaco-editor',
+                chunks: 'all',
+                priority: 20,
+                reuseExistingChunk: true
+            },
+            // React and related
+            react: {
+                test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+                name: 'react-vendor',
+                chunks: 'all',
+                priority: 5,
+                reuseExistingChunk: true
+            },
+            // Common vendor dependencies
+            vendors: {
+                test: /[\\/]node_modules[\\/]/,
+                name: 'vendors',
+                chunks: 'all',
+                priority: -10,
+                reuseExistingChunk: true
+            }
+        }
+    };
 }
 
 // Add plugin to remove source maps and unnecessary files in production
