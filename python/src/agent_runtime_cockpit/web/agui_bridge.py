@@ -12,12 +12,6 @@ AG-UI event types used:
   MESSAGE       → TextMessageStart / TextMessageContent / TextMessageEnd
   TOOL_CALL     → ToolCallStart / ToolCallArgs / ToolCallEnd
   STATE_SNAPSHOT→ StateSnapshot (ARC extension)
-
-MOCK_REASON: Full AG-UI event model not yet wired to live adapter streams.
-REAL_IMPLEMENTATION_PATH: web/agui_bridge.py → wrap adapter.stream_events()
-LOCAL_FIX_STEPS: Implement streaming in SwarmGraph/LangGraph adapters then call wrap_stream()
-OWNER: AG-UI Bridge Agent
-REMOVE_BEFORE: Beta
 """
 from __future__ import annotations
 

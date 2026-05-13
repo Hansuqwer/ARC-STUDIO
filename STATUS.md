@@ -23,9 +23,10 @@ Generated during GitHub handoff prep.
 - Run Timeline can replay stored JSONL events and connect to the local daemon SSE stream.
 - Run Timeline includes trace filtering, selected-event JSON inspection, trace JSON copy, and run JSON export.
 - SwarmGraph provider-backed execution is gated by `ARC_SWARMGRAPH_ALLOW_COSTS=true`.
-- LangGraph dynamic workflow export is available through `ARC_LANGGRAPH_EXPORT=module:function`.
+- LangGraph dynamic workflow export and explicit runtime execution are available through `ARC_LANGGRAPH_EXPORT=module:function`.
 - Daemon integration tests cover `/api/runs` and `/api/runs/{run_id}/events` SSE.
-- Unsigned Electron directory packaging smoke passes with signing disabled.
+- Unsigned Electron directory packaging is smoke-only and uses `electron-builder.smoke.yml`.
+- Signed Electron release packaging requires signing credentials and uses `electron-builder.release.yml`.
 - E2E workflow runs on push and pull requests.
 
 ## Mock/Demo-Only
@@ -42,7 +43,7 @@ Generated during GitHub handoff prep.
 
 ## Not Yet Implemented
 
-- Real LangGraph runtime execution beyond dynamic workflow export.
+- LangGraph streaming/events beyond one-shot `.invoke()` execution.
 - CrewAI, OpenAI Agents SDK, AG2 adapters.
 - Signed Electron installers and auto-update.
 

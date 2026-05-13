@@ -1,0 +1,3 @@
+{"type":"STEP_STARTED","threadId":"th-2","runId":"r2","timestamp":1,"stepName":"agent"}
+{"type":"TEXT_MESSAGE_CHUNK","threadId":"th-2","runId":"r2","timestamp":2,"role":"assistant","delta":"hi","messageId":"m2"}
+{"type":"STEP_FINISHED","threadId":"th-2","runId":"r2","timestamp":3,"stepName":"agent"}

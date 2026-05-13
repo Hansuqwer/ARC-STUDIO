@@ -18,6 +18,10 @@ import {
   RunRecord,
   ContextPackEntry,
   ProviderStatus,
+  ProviderDefinition,
+  ProviderRoutingPolicy,
+  RuntimeCapabilitiesResponse,
+  RuntimeId,
 } from '../common/arc-protocol';
 
 @injectable()
@@ -46,6 +50,11 @@ export class ArcFrontendService {
     return this.arcService.listRuntimes(path);
   }
 
+  async listRuntimeCapabilities(): Promise<ArcEnvelope<RuntimeCapabilitiesResponse>> {
+    const path = await this.getWorkspacePath();
+    return this.arcService.listRuntimeCapabilities(path);
+  }
+
   async listWorkflows(runtimeId?: string): Promise<ArcEnvelope<WorkflowInfo[]>> {
     const path = await this.getWorkspacePath();
     return this.arcService.listWorkflows(path, runtimeId);
@@ -56,8 +65,13 @@ export class ArcFrontendService {
     return this.arcService.listSchemas(path, runtimeId);
   }
 
-  async startRun(workflowId: string, inputs?: Record<string, unknown>): Promise<ArcEnvelope<RunRecord>> {
-    return this.arcService.startRun(workflowId, inputs);
+  async startRun(workflowId: string, inputs?: Record<string, unknown>, runtime: RuntimeId = 'auto'): Promise<ArcEnvelope<RunRecord>> {
+    const path = await this.getWorkspacePath();
+    return this.arcService.startRun({
+      workflow_id: workflowId,
+      runtime,
+      inputs: { ...(inputs ?? {}), workspacePath: path },
+    });
   }
 
   async getRun(runId: string): Promise<ArcEnvelope<RunRecord>> {
@@ -85,5 +99,21 @@ export class ArcFrontendService {
   async getWorkspaceStatus(): Promise<ArcEnvelope<{ frontendPath: string; backendPath: string; source: string }>> {
     const path = await this.getWorkspacePath();
     return this.arcService.getWorkspaceStatus(path);
+  }
+
+  async listProviders(): Promise<ArcEnvelope<ProviderDefinition[]>> {
+    return this.arcService.listProviders();
+  }
+
+  async listProviderStatuses(): Promise<ArcEnvelope<ProviderStatus[]>> {
+    return this.arcService.listProviderStatuses();
+  }
+
+  async getProviderRouting(): Promise<ArcEnvelope<ProviderRoutingPolicy>> {
+    return this.arcService.getProviderRouting();
+  }
+
+  async exportTraceToOTLP(runId: string, endpoint: string): Promise<ArcEnvelope<{ exported: boolean; warning?: string }>> {
+    return this.arcService.exportTraceToOTLP(runId, endpoint);
   }
 }

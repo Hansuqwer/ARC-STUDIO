@@ -57,6 +57,24 @@ export interface RuntimeCapabilities {
   can_export_workflow: boolean;
 }
 
+export interface RuntimeCapabilityReport {
+  runtime_id: string;
+  detected: boolean;
+  can_run: boolean;
+  availability: string;
+  reason?: string | null;
+  detected_artifacts: string[];
+  required_env: string[];
+  version?: string | null;
+  requires_paid_calls: boolean;
+}
+
+export interface RuntimeCapabilitiesResponse {
+  workspace: string;
+  auto_priority: RuntimeId[];
+  runtimes: RuntimeCapabilityReport[];
+}
+
 /** Workflow topology */
 export interface WorkflowInfo {
   id: string;
@@ -107,6 +125,15 @@ export interface RunRecord {
   metadata: Record<string, unknown>;
 }
 
+export type RuntimeId = 'auto' | 'swarmgraph' | 'langgraph' | 'crewai';
+
+export interface StartRunRequest {
+  workflow_id: string;
+  runtime?: RuntimeId;
+  inputs?: Record<string, unknown>;
+  allow_paid_calls?: boolean;
+}
+
 /** AG-UI compatible run event */
 export interface RunEvent {
   type: string;
@@ -130,11 +157,37 @@ export interface ContextPackEntry {
 
 export interface ProviderStatus {
   provider: string;
+  display_name?: string;
+  enabled?: boolean;
+  dry_run?: boolean;
+  base_url_configured?: boolean;
   baseUrlConfigured: boolean;
+  api_key_configured?: boolean;
   apiKeyConfigured: boolean;
   apiKeySource?: string;
   runtimeAvailable: boolean;
   message: string;
+}
+
+export interface ProviderDefinition {
+  id: string;
+  display_name: string;
+  default_base_url: string;
+  env_key_names: string[];
+  auth_header: 'bearer' | 'x-api-key';
+  default_models: string[];
+  supports_streaming: boolean;
+  supports_tools: boolean;
+}
+
+export interface ProviderRoutingPolicy {
+  mode: 'manual' | 'priority' | 'fallback';
+  default_provider: string;
+  default_model: string;
+  dry_run: boolean;
+  allow_paid_calls: boolean;
+  max_retries: number;
+  timeout_ms: number;
 }
 
 /** Source location for jump-to-definition */
@@ -153,13 +206,18 @@ export const ArcServiceSymbol = Symbol('ArcService');
 export interface ArcService {
   inspectWorkspace(workspacePath: string): Promise<ArcEnvelope<WorkspaceInfo>>;
   listRuntimes(workspacePath: string): Promise<ArcEnvelope<RuntimeInfo[]>>;
+  listRuntimeCapabilities(workspacePath: string): Promise<ArcEnvelope<RuntimeCapabilitiesResponse>>;
   listWorkflows(workspacePath: string, runtimeId?: string): Promise<ArcEnvelope<WorkflowInfo[]>>;
   listSchemas(workspacePath: string, runtimeId?: string): Promise<ArcEnvelope<SchemaInfo[]>>;
-  startRun(workflowId: string, inputs?: Record<string, unknown>): Promise<ArcEnvelope<RunRecord>>;
+  startRun(request: StartRunRequest): Promise<ArcEnvelope<RunRecord>>;
   getRun(runId: string): Promise<ArcEnvelope<RunRecord>>;
   listRuns(workspacePath: string): Promise<ArcEnvelope<RunRecord[]>>;
   generateContextPack(task: string, workspacePath?: string): Promise<ArcEnvelope<ContextPackEntry[]>>;
   getDaemonStatus(): Promise<ArcEnvelope<{ running: boolean; version: string; pid?: number }>>;
   getProviderStatus(provider: string, baseUrl?: string): Promise<ArcEnvelope<ProviderStatus>>;
+  listProviders(): Promise<ArcEnvelope<ProviderDefinition[]>>;
+  listProviderStatuses(): Promise<ArcEnvelope<ProviderStatus[]>>;
+  getProviderRouting(): Promise<ArcEnvelope<ProviderRoutingPolicy>>;
   getWorkspaceStatus(workspacePath: string): Promise<ArcEnvelope<{ frontendPath: string; backendPath: string; source: string }>>;
+  exportTraceToOTLP(runId: string, endpoint: string): Promise<ArcEnvelope<{ exported: boolean; warning?: string }>>;
 }

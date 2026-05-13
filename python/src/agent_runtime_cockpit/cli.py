@@ -15,6 +15,8 @@ Commands:
 from __future__ import annotations
 
 import logging
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -26,6 +28,7 @@ from rich import print as rprint
 
 from .adapters.registry import default_registry
 from .context.pack import ContextPackGenerator
+from .orchestration import runtime_router
 from .protocol.envelope import ok, err, ArcEnvelope
 from .protocol.errors import ArcErrorCode
 from .security.validation import validate_workspace_path
@@ -39,8 +42,10 @@ app = typer.Typer(
 
 context_app = typer.Typer(name="context", help="Context retrieval commands")
 adapter_app = typer.Typer(name="adapter", help="Adapter management commands")
+doctor_app = typer.Typer(name="doctor", help="ARC diagnostics")
 app.add_typer(context_app)
 app.add_typer(adapter_app)
+app.add_typer(doctor_app)
 
 console = Console()
 err_console = Console(stderr=True)
@@ -73,6 +78,41 @@ def _out(envelope: ArcEnvelope, as_json: bool) -> None:
             err_console.print(f"[red]Error [{envelope.error.code}]: {envelope.error.message}[/red]")
         else:
             rprint(JSON(envelope.model_dump_json()))
+
+
+def check_swarmgraph_runtime(timeout: float = 5.0) -> dict[str, object]:
+    """Check local SwarmGraph CLI availability without network calls."""
+    candidates = [
+        ("swarmgraph", ["--version"]),
+        ("arc-swarmgraph", ["--version"]),
+        ("arc", ["run", "--help"]),
+    ]
+    checks: list[dict[str, object]] = []
+    for command, args in candidates:
+        resolved = shutil.which(command)
+        if not resolved:
+            checks.append({"command": command, "available": False, "reason": "not_found"})
+            continue
+        try:
+            result = subprocess.run(
+                [resolved, *args],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            checks.append({"command": command, "path": resolved, "available": False, "reason": "timeout"})
+            continue
+        output = (result.stdout or result.stderr).strip().splitlines()
+        checks.append({
+            "command": command,
+            "path": resolved,
+            "available": result.returncode == 0,
+            "exit_code": result.returncode,
+            "version": output[0][:200] if output else "",
+        })
+    return {"ok": any(bool(check.get("available")) for check in checks), "checks": checks}
 
 
 # ─── inspect ──────────────────────────────────────────────────────────────────
@@ -124,12 +164,43 @@ def inspect(
 @app.command()
 def runtimes(
     workspace: Optional[str] = WORKSPACE_FLAG,
+    capabilities: bool = typer.Option(False, "--capabilities", help="List all adapter capability reports"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
     """List detected runtimes in a workspace."""
     _setup_logging(debug)
     ws = _workspace(workspace)
+    if capabilities:
+        reports = runtime_router.list_runtimes(ws)
+        payload = {
+            "workspace": str(ws),
+            "auto_priority": list(runtime_router.AUTO_PRIORITY),
+            "runtimes": [report.model_dump() for report in reports],
+        }
+        if json_output:
+            _out(ok(payload, workspace=str(ws)), json_output)
+            return
+        console.print(f"workspace: {ws}")
+        console.print(f"auto priority: {' > '.join(runtime_router.AUTO_PRIORITY)}")
+        table = Table(title="Runtime Capabilities")
+        table.add_column("Runtime")
+        table.add_column("Detected")
+        table.add_column("Can Run")
+        table.add_column("Paid")
+        table.add_column("Availability")
+        table.add_column("Reason")
+        for report in reports:
+            table.add_row(
+                report.runtime_id,
+                "yes" if report.detected else "no",
+                "yes" if report.can_run else "no",
+                "yes" if report.requires_paid_calls else "no",
+                report.availability,
+                (report.reason or "")[:80],
+            )
+        console.print(table)
+        return
     registry = default_registry()
     detected = registry.detect_all(ws)
     envelope = ok([r.model_dump() for r in detected], workspace=str(ws))
@@ -198,7 +269,7 @@ def schemas(
 
 @app.command()
 def serve(
-    host: str = typer.Option("localhost", "--host"),
+    host: str = typer.Option("127.0.0.1", "--host"),
     port: int = typer.Option(7777, "--port"),
     workspace: Optional[str] = WORKSPACE_FLAG,
     debug: bool = DEBUG_FLAG,
@@ -217,7 +288,9 @@ def serve(
 def run_workflow(
     workflow: str = typer.Argument("wf-swarmgraph-fixture", help="Workflow ID"),
     workspace: Optional[str] = WORKSPACE_FLAG,
+    runtime: str = typer.Option("auto", "--runtime", "-r", help="Runtime: auto, swarmgraph, langgraph, crewai"),
     prompt: Optional[str] = typer.Option(None, "--prompt", help="Prompt passed to runnable adapters"),
+    allow_paid_calls: bool = typer.Option(False, "--allow-paid-calls", help="Allow runtimes to make provider calls"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
@@ -225,17 +298,23 @@ def run_workflow(
     import asyncio
     _setup_logging(debug)
     ws = _workspace(workspace)
-    registry = default_registry()
-    registry.detect_all(ws)
-    adapter = next((a for a in registry.all() if a.capabilities().can_run), None)
-    if adapter is None:
-        _out(err(ArcErrorCode.NOT_IMPLEMENTED, "No adapter supports real workflow execution yet"), json_output)
+    try:
+        requested_runtime = [part.strip().lower() for part in runtime.split(",") if part.strip()] if "," in runtime else runtime.lower()
+        routed = runtime_router.resolve(ws, requested_runtime, allow_paid_calls=allow_paid_calls)
+    except runtime_router.UnknownRuntime as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": exc.code}), json_output)
+        raise typer.Exit(2)
+    except runtime_router.RuntimeRouterError as exc:
+        _out(err(ArcErrorCode.NOT_IMPLEMENTED, str(exc), details={"code": exc.code}), json_output)
         raise typer.Exit(1)
 
-    inputs = {"workspace": str(ws)}
+    if not json_output:
+        console.print(f"[dim]Runtime:[/dim] {routed.adapter.adapter_id} ({routed.chosen_by})")
+
+    inputs = {"workspace": str(ws), "allow_paid_calls": allow_paid_calls}
     if prompt:
         inputs["prompt"] = prompt
-    run_record = asyncio.run(adapter.run_workflow(workflow, inputs))
+    run_record = asyncio.run(routed.adapter.run_workflow(workflow, inputs))
 
     from .storage.jsonl import JsonlTraceStore
     store = JsonlTraceStore(ws / ".arc" / "traces")
@@ -252,6 +331,121 @@ def run_workflow(
 
 runs_app = typer.Typer(name="runs", help="List and manage stored run records", invoke_without_command=True)
 app.add_typer(runs_app)
+
+providers_app = typer.Typer(name="providers", help="Provider definitions and dry-run routing")
+app.add_typer(providers_app)
+
+
+@providers_app.command("list")
+def providers_list(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
+    """List built-in provider definitions. No network calls are made."""
+    _setup_logging(debug)
+    from .providers import PROVIDERS
+    _out(ok([provider.model_dump() for provider in PROVIDERS]), json_output)
+
+
+@doctor_app.command("swarmgraph")
+def doctor_swarmgraph(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
+    """Check SwarmGraph runtime availability without executing a workflow."""
+    _setup_logging(debug)
+    report = check_swarmgraph_runtime()
+    _out(ok(report), json_output)
+    if not report["ok"]:
+        raise typer.Exit(1)
+
+
+@providers_app.command("status")
+def providers_status(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
+    """Return dry-run provider status from environment presence only."""
+    import os
+    _setup_logging(debug)
+    from .providers import provider_statuses
+    _out(ok([status.model_dump() for status in provider_statuses(os.environ)]), json_output)
+
+
+accounts_app = typer.Typer(name="accounts", help="Provider account metadata")
+providers_app.add_typer(accounts_app)
+
+
+@accounts_app.command("list")
+def providers_accounts_list(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
+    """List provider accounts without exposing secrets."""
+    _setup_logging(debug)
+    from .providers import ProviderAccountStore
+    accounts = ProviderAccountStore().list_accounts()
+    _out(ok([account.model_dump() for account in accounts]), json_output)
+
+
+@accounts_app.command("add")
+def providers_accounts_add(
+    provider: str = typer.Option(..., "--provider", help="Provider id"),
+    label: str = typer.Option(..., "--label", help="Account label"),
+    api_key_env: str = typer.Option(..., "--api-key-env", help="Environment variable containing the key"),
+    default_model: Optional[str] = typer.Option(None, "--model", help="Default model"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Add an env-var-backed provider account. The key is never printed."""
+    _setup_logging(debug)
+    from .providers import ProviderAccountStore
+    account = ProviderAccountStore().add_env_account(provider, label, api_key_env, default_model)
+    _out(ok(account.model_dump()), json_output)
+
+
+@accounts_app.command("disable")
+def providers_accounts_disable(
+    account_id: str = typer.Argument(..., help="Account id"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Disable a provider account."""
+    _setup_logging(debug)
+    from .providers import ProviderAccountStore
+    account = ProviderAccountStore().set_enabled(account_id, False)
+    if account is None:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Provider account not found: {account_id}"), json_output)
+        raise typer.Exit(1)
+    _out(ok(account.model_dump()), json_output)
+
+
+@accounts_app.command("delete")
+def providers_accounts_delete(
+    account_id: str = typer.Argument(..., help="Account id"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Delete a provider account metadata record."""
+    _setup_logging(debug)
+    from .providers import ProviderAccountStore
+    deleted = ProviderAccountStore().delete(account_id)
+    _out(ok({"deleted": deleted, "account_id": account_id}), json_output)
+
+
+routing_app = typer.Typer(name="routing", help="Provider routing policy")
+providers_app.add_typer(routing_app)
+
+
+@routing_app.command("get")
+def providers_routing_get(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
+    """Return persisted dry-run routing policy."""
+    _setup_logging(debug)
+    from .providers import ProviderRoutingStore
+    _out(ok(ProviderRoutingStore().get().model_dump()), json_output)
+
+
+@routing_app.command("set")
+def providers_routing_set(
+    mode: str = typer.Option("manual", "--mode", help="manual | priority | fallback"),
+    provider: str = typer.Option("openai", "--provider", help="Default provider"),
+    model: str = typer.Option("gpt-4.1-mini", "--model", help="Default model"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Persist provider routing policy. Live calls remain gated."""
+    _setup_logging(debug)
+    from .providers import ProviderRoutingPolicy, ProviderRoutingStore
+    policy = ProviderRoutingPolicy(mode=mode, default_provider=provider, default_model=model)
+    _out(ok(ProviderRoutingStore().set(policy).model_dump()), json_output)
 
 
 @runs_app.callback(invoke_without_command=True)

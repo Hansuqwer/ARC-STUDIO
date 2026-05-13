@@ -9,11 +9,34 @@ from __future__ import annotations
 
 import abc
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Literal
+
+from pydantic import BaseModel, Field
 
 from ..protocol.schemas import (
     WorkspaceInfo, WorkflowInfo, SchemaInfo, RunRecord, RunEvent, RuntimeCapabilities
 )
+
+RuntimeAvailability = Literal[
+    "runnable",
+    "detected_not_runnable",
+    "missing_dependency",
+    "missing_export_target",
+    "paid_calls_blocked",
+    "not_detected",
+]
+
+
+class CapabilityReport(BaseModel):
+    runtime_id: str
+    detected: bool
+    can_run: bool
+    availability: RuntimeAvailability
+    reason: str | None = None
+    detected_artifacts: list[str] = Field(default_factory=list)
+    required_env: list[str] = Field(default_factory=list)
+    version: str | None = None
+    requires_paid_calls: bool = False
 
 
 class RuntimeAdapter(abc.ABC):
@@ -43,6 +66,19 @@ class RuntimeAdapter(abc.ABC):
     def capabilities(self) -> RuntimeCapabilities:
         """Return HONEST capabilities for this adapter."""
         ...
+
+    def capability_report(self, workspace: Path) -> CapabilityReport:
+        """Return runnable status with a reason for UI/router decisions."""
+        detected, _, evidence = self.detect(workspace)
+        can_run = self.capabilities().can_run
+        return CapabilityReport(
+            runtime_id=self.adapter_id,
+            detected=detected,
+            can_run=can_run,
+            availability="runnable" if can_run else ("detected_not_runnable" if detected else "not_detected"),
+            reason=None if can_run else "Runtime is detected but does not expose a runnable path.",
+            detected_artifacts=evidence,
+        )
 
     @abc.abstractmethod
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:

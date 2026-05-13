@@ -1,0 +1,4 @@
+{"type":"RUN_STARTED","threadId":"th-4","runId":"r4","timestamp":1}
+{"type":"STEP_STARTED","threadId":"th-4","runId":"r4","timestamp":2,"stepName":"agent:researcher"}
+{"type":"TEXT_MESSAGE_CHUNK","threadId":"th-4","runId":"r4","timestamp":3,"role":"assistant","delta":"done"}
+{"type":"RUN_FINISHED","threadId":"th-4","runId":"r4","timestamp":4}
