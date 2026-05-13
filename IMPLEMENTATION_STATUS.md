@@ -361,25 +361,43 @@ All P0 critical tasks are complete. The repository is production-ready with:
 
 ---
 
+## ✅ Critical Review Fixes Applied
+
+### High-Risk Findings Fixed
+- **P0-3.1** ✅ `workflow-executor.ts`: `executeCommandWithTimeout` now uses discovered `cliPath` instead of literal `'swarmgraph'`
+- **P0-3.2** ✅ `findExecutable` now accepts and uses `workspaceRoot` parameter instead of `process.cwd()` for workspace-local launcher lookup
+- **P0-3.3** ✅ `null as any` replaced with `null!` for running-process preinsert
+- **P1-7.2** ✅ Added spawn-mocked tests for `WorkflowExecutor`: `ARC_SWARMGRAPH_CLI` path, workspace-local CLI, timeout, success/failure parsing, cancel workflow
+
+### Remaining Caveats
+- **Lint:** ESLint configured but **not passing** (247 problems: 113 errors, 134 warnings). All pre-existing in other packages; our files have 0 errors.
+- **UI coverage:** UI component tests are **static source-pattern contract tests**, not runtime jsdom tests. Browser files show 0% executed coverage.
+- **Coverage target:** 70% not reached for statements (61.84%), functions (53.78%), lines (63.18%). Only branches (67.34%) is close.
+- **Bundle size:** Total frontend entrypoint ~28.8 MiB (expected: Monaco 15.9 MiB + Theia core 6.72 MiB + vendors). ARC Studio code chunk: **50 KiB**.
+
 ## 📊 Final Progress Summary
 
-**All P0 + P1 Tasks Complete ✅**
+**All P0 + P1 Tasks Complete ✅ (with known caveats documented above)**
 
 | Task | Status | Key Result |
 |------|--------|------------|
 | P0-1 | ✅ | Python build fixed |
 | P0-2 | ✅ | Backup artifacts cleaned |
 | P0-3 | ✅ | Backend: 1329→276 lines + 4 services |
+| P0-3.1-3 | ✅ | Critical review fixes applied (cliPath, workspaceRoot, null!) |
 | P0-4 | ✅ | Frontend: 974→450 lines + 8 components |
 | P0-5 | ✅ | Strict mode verified |
-| P1-6 | ✅ | ESLint + Prettier configured |
-| P1-7 | ✅ | 233 tests, 67.34% branch coverage |
-| P1-8 | ✅ | Our bundle: 27 MiB → 50 KiB |
+| P1-6 | ✅ | ESLint + Prettier configured (⚠️ 113 errors, 134 warnings pre-existing) |
+| P1-7 | ✅ | 239 tests, 67.34% branch coverage (⚠️ static UI contract tests only) |
+| P1-7.2 | ✅ | Spawn-mocked WorkflowExecutor tests added |
+| P1-8 | ✅ | ARC chunk: 27 MiB → 50 KiB (total entry: ~28.8 MiB) |
 | P1-9 | ✅ | AGENTS.md created, docs consolidated |
+| P2-1 | ✅ | Historical docs archived under docs/archive/ |
 
 **Repository Status:**
-- All tests passing: 233/233
-- Build: Clean (no TypeScript errors)
-- Linting: Operational (37 files with minor issues)
-- Bundles: Optimized with split chunks
+- All tests passing: **239/239** ✅
+- Build: Clean (no TypeScript errors) ✅
+- Linting: Configured but **not passing** (247 pre-existing problems)
+- Bundles: Optimized with split chunks (ARC chunk: 50 KiB)
 - Architecture: Modular, typed, tested, documented
+- Critical findings: All 3 fixed and verified

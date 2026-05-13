@@ -68,7 +68,7 @@ export class WorkflowExecutor {
             const workspaceRoot = options?.workspaceRoot || process.cwd();
 
             // Check SwarmGraph CLI availability
-            const cliPath = await this.findExecutable('swarmgraph');
+            const cliPath = await this.findExecutable('swarmgraph', workspaceRoot);
             if (!cliPath) {
                 throw new ArcError(
                     ArcErrorCode.EXECUTION_FAILED,
@@ -85,11 +85,11 @@ export class WorkflowExecutor {
 
             // Generate tentative run ID for tracking
             const tentativeRunId = `run-sg-${Date.now().toString(16)}`;
-            this.runningProcesses.set(tentativeRunId, null as any);
+            this.runningProcesses.set(tentativeRunId, null!);
 
             // Execute command with streaming support
             const result = await this.executeCommandWithTimeout(
-                'swarmgraph',
+                cliPath,
                 args,
                 timeout,
                 workspaceRoot,
@@ -431,7 +431,7 @@ export class WorkflowExecutor {
     /**
      * Find executable in workspace or PATH.
      */
-    private async findExecutable(name: string): Promise<string | null> {
+    private async findExecutable(name: string, workspaceRoot: string): Promise<string | null> {
         const configured = process.env.ARC_SWARMGRAPH_CLI;
         if (configured && await fs.pathExists(configured)) {
             return configured;
@@ -441,7 +441,7 @@ export class WorkflowExecutor {
         if (systemPath) return systemPath;
 
         if (process.env.ARC_TRUST_WORKSPACE_LAUNCHER === '1') {
-            const localPath = path.join(process.cwd(), name);
+            const localPath = path.join(workspaceRoot, name);
             if (await fs.pathExists(localPath)) {
                 return localPath;
             }

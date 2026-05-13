@@ -106,7 +106,8 @@ pnpm start:browser
 ### Test Configuration
 - Framework: Jest with ts-jest
 - Environment: Node (for backend), source-pattern matching (for UI components)
-- Coverage: 61.84% statements, 67.34% branches
+- Coverage: 61.84% statements, 67.34% branches, 53.78% functions, 63.18% lines
+- Total tests: 239 (across 6 test suites)
 - Location: `packages/arc-extension/jest.config.js`
 
 ## Architecture Decisions
@@ -131,10 +132,11 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - JS files linted with Node globals, no type checks
 
 ### P1-7: Test Coverage
-- 75 new tests added (233 total)
-- UI components tested via source-pattern contract tests
+- 81 new tests added (239 total)
+- UI components tested via source-pattern contract tests (NOT runtime jsdom tests)
 - Backend services tested with Jest unit tests
 - Branch coverage improved from 57.51% → 67.34%
+- Added spawn-mocked tests for WorkflowExecutor (ARC_SWARMGRAPH_CLI, workspace-local CLI, timeout, parsing, cancel)
 
 ### P1-8: Build Optimization
 - Webpack split chunks configured
@@ -153,17 +155,26 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 
 ### Completed (P1 - High)
 - ✅ P1-6: ESLint + Prettier configured
-- ✅ P1-7: Test coverage improved (233 tests, 67.34% branches)
+- ✅ P1-7: Test coverage improved (239 tests, 67.34% branches)
 - ✅ P1-8: Build optimization (split chunks)
 - ✅ P1-9: Documentation consolidated
 
+### Completed (P2 - Critical Review Fixes)
+- ✅ P2-1: Historical docs archived under docs/archive/
+- ✅ P2-2: workflow-executor.ts uses discovered cliPath (not literal 'swarmgraph')
+- ✅ P2-3: findExecutable accepts workspaceRoot (not process.cwd())
+- ✅ P2-4: replaced `null as any` with `null!` for running-process preinsert
+- ✅ P2-5: Spawn-mocked WorkflowExecutor tests added (6 new test cases)
+
 ### Known Issues
-- ESLint has ~37 files with warnings (mostly pre-existing, non-blocking)
-- Browser files (arc-widget.tsx, etc.) show 0% coverage due to Theia runtime dependency
+- ESLint has 247 problems (113 errors, 134 warnings) — all pre-existing in other packages; our files have 0 errors
+- Browser files (arc-widget.tsx, etc.) show 0% coverage due to Theia runtime dependency — UI tests are static contract tests only
+- Coverage targets: 70% not reached for statements (61.84%), functions (53.78%), lines (63.18%). Only branches (67.34%) close
 - Monaco editor bundle is 15.9 MiB (expected, not reducible)
+- Total frontend entrypoint ~28.8 MiB (Monaco + Theia core + React + vendors); ARC Studio code chunk is 50 KiB
 
 ## Related Documentation (Archived Handover)
-The following documents contain historical context and are preserved for reference:
+The following documents contain historical context and are preserved for reference in `docs/archive/`:
 - `CRITICAL_REVIEW_GENSPARK.md` - Initial code review
 - `IMPLEMENTATION_PLAN_KIMI.md` - Original implementation plan with code examples
 - `EXECUTE_NEXT_PROMPT.md` - Task execution prompts

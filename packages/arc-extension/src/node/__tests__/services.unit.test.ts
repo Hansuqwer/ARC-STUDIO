@@ -12,12 +12,19 @@ import { ArcError, ArcErrorCode } from '../../common/arc-protocol';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
+// Mock child_process spawn
+jest.mock('child_process', () => ({
+    spawn: jest.fn()
+}));
+
+const mockSpawn = jest.requireMock('child_process').spawn;
 
 describe('WorkflowExecutor', () => {
     let executor: WorkflowExecutor;
 
     beforeEach(() => {
         executor = new WorkflowExecutor();
+        jest.clearAllMocks();
     });
 
     describe('executeWorkflow validation', () => {
@@ -48,9 +55,242 @@ describe('WorkflowExecutor', () => {
         });
 
         it('should return failed result when swarmgraph CLI is not found', async () => {
+            // Mock 'which' command to return empty (CLI not found)
+            mockSpawn.mockImplementation(() => {
+                const mockChild = {
+                    stdout: { on: jest.fn() },
+                    stderr: { on: jest.fn() },
+                    on: jest.fn((event, handler) => {
+                        if (event === 'close') {
+                            setTimeout(() => handler(1), 0);
+                        }
+                    }),
+                    kill: jest.fn()
+                };
+                return mockChild;
+            });
+
             const result = await executor.executeWorkflow('test prompt');
             expect(result.status).toBe('failed');
             expect(result.error).toContain('swarmgraph');
+        });
+    });
+
+    describe('executeWorkflow with ARC_SWARMGRAPH_CLI', () => {
+        let tempDir: string;
+        let mockCliPath: string;
+
+        beforeEach(async () => {
+            tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arc-exec-test-'));
+            mockCliPath = path.join(tempDir, 'mock-swarmgraph');
+            await fs.writeFile(mockCliPath, '#!/bin/bash\necho "mock"');
+            process.env.ARC_SWARMGRAPH_CLI = mockCliPath;
+        });
+
+        afterEach(async () => {
+            delete process.env.ARC_SWARMGRAPH_CLI;
+            await fs.remove(tempDir);
+        });
+
+        it('should use ARC_SWARMGRAPH_CLI when set', async () => {
+            mockSpawn.mockImplementation((cmd: string, args: string[]) => {
+                const mockChild = {
+                    stdout: { on: jest.fn((event, handler) => {
+                        if (event === 'data') {
+                            setTimeout(() => handler(Buffer.from(JSON.stringify({ id: 'run-123', status: 'completed' }))), 0);
+                        }
+                    }) },
+                    stderr: { on: jest.fn() },
+                    on: jest.fn((event, handler) => {
+                        if (event === 'close') {
+                            setTimeout(() => handler(0), 0);
+                        }
+                    }),
+                    kill: jest.fn()
+                };
+                return mockChild;
+            });
+
+            const result = await executor.executeWorkflow('test prompt', { workspaceRoot: tempDir });
+            expect(result.status).toBe('completed');
+            expect(mockSpawn).toHaveBeenCalledWith(
+                mockCliPath,
+                expect.arrayContaining(['swarm', '--json']),
+                expect.any(Object)
+            );
+        });
+    });
+
+    describe('executeWorkflow with workspace-local CLI', () => {
+        let tempDir: string;
+        let localCliPath: string;
+
+        beforeEach(async () => {
+            tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arc-local-test-'));
+            localCliPath = path.join(tempDir, 'swarmgraph');
+            await fs.writeFile(localCliPath, '#!/bin/bash\necho "local"');
+            process.env.ARC_TRUST_WORKSPACE_LAUNCHER = '1';
+        });
+
+        afterEach(async () => {
+            delete process.env.ARC_TRUST_WORKSPACE_LAUNCHER;
+            await fs.remove(tempDir);
+        });
+
+        it('should use workspace-local CLI under ARC_TRUST_WORKSPACE_LAUNCHER=1', async () => {
+            // Mock 'which' to fail (no system CLI)
+            let callCount = 0;
+            mockSpawn.mockImplementation((cmd: string, args: string[]) => {
+                callCount++;
+                if (cmd === 'which' && callCount === 1) {
+                    // First call: 'which swarmgraph' fails
+                    const mockChild = {
+                        stdout: { on: jest.fn() },
+                        stderr: { on: jest.fn() },
+                        on: jest.fn((event, handler) => {
+                            if (event === 'close') {
+                                setTimeout(() => handler(1), 0);
+                            }
+                        }),
+                        kill: jest.fn()
+                    };
+                    return mockChild;
+                } else {
+                    // Second call: actual execution with local CLI
+                    const mockChild = {
+                        stdout: { on: jest.fn((event, handler) => {
+                            if (event === 'data') {
+                                setTimeout(() => handler(Buffer.from(JSON.stringify({ id: 'run-local', status: 'completed' }))), 0);
+                            }
+                        }) },
+                        stderr: { on: jest.fn() },
+                        on: jest.fn((event, handler) => {
+                            if (event === 'close') {
+                                setTimeout(() => handler(0), 0);
+                            }
+                        }),
+                        kill: jest.fn()
+                    };
+                    return mockChild;
+                }
+            });
+
+            const result = await executor.executeWorkflow('test prompt', { workspaceRoot: tempDir });
+            expect(result.status).toBe('completed');
+            expect(mockSpawn).toHaveBeenCalledWith(
+                localCliPath,
+                expect.arrayContaining(['swarm', '--json']),
+                expect.any(Object)
+            );
+        });
+    });
+
+    describe('executeWorkflow timeout', () => {
+        let tempDir: string;
+        let mockCliPath: string;
+
+        beforeEach(async () => {
+            tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arc-timeout-test-'));
+            mockCliPath = path.join(tempDir, 'mock-swarmgraph');
+            await fs.writeFile(mockCliPath, '#!/bin/bash\necho "mock"');
+            process.env.ARC_SWARMGRAPH_CLI = mockCliPath;
+        });
+
+        afterEach(async () => {
+            delete process.env.ARC_SWARMGRAPH_CLI;
+            await fs.remove(tempDir);
+        });
+
+        it('should timeout after specified duration', async () => {
+            mockSpawn.mockImplementation(() => {
+                const mockChild = {
+                    stdout: { on: jest.fn() },
+                    stderr: { on: jest.fn() },
+                    on: jest.fn((event, handler) => {
+                        // Never close to simulate long-running process
+                    }),
+                    kill: jest.fn()
+                };
+                return mockChild;
+            });
+
+            const result = await executor.executeWorkflow('test prompt', { timeout: 100 });
+            expect(result.status).toBe('failed');
+            expect(result.error).toContain('timed out');
+        });
+    });
+
+    describe('executeWorkflow output parsing', () => {
+        let tempDir: string;
+        let mockCliPath: string;
+
+        beforeEach(async () => {
+            tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arc-parse-test-'));
+            mockCliPath = path.join(tempDir, 'mock-swarmgraph');
+            await fs.writeFile(mockCliPath, '#!/bin/bash\necho "mock"');
+            process.env.ARC_SWARMGRAPH_CLI = mockCliPath;
+        });
+
+        afterEach(async () => {
+            delete process.env.ARC_SWARMGRAPH_CLI;
+            await fs.remove(tempDir);
+        });
+
+        it('should parse successful execution output', async () => {
+            mockSpawn.mockImplementation(() => {
+                const mockChild = {
+                    stdout: { on: jest.fn((event, handler) => {
+                        if (event === 'data') {
+                            setTimeout(() => handler(Buffer.from(JSON.stringify({ 
+                                id: 'run-success', 
+                                status: 'completed',
+                                output: 'Task completed successfully'
+                            }))), 0);
+                        }
+                    }) },
+                    stderr: { on: jest.fn() },
+                    on: jest.fn((event, handler) => {
+                        if (event === 'close') {
+                            setTimeout(() => handler(0), 0);
+                        }
+                    }),
+                    kill: jest.fn()
+                };
+                return mockChild;
+            });
+
+            const result = await executor.executeWorkflow('test prompt');
+            expect(result.status).toBe('completed');
+            expect(result.runId).toBe('run-success');
+            expect(result.output).toContain('Task completed successfully');
+        });
+
+        it('should parse failed execution output', async () => {
+            mockSpawn.mockImplementation(() => {
+                const mockChild = {
+                    stdout: { on: jest.fn((event, handler) => {
+                        if (event === 'data') {
+                            setTimeout(() => handler(Buffer.from(JSON.stringify({ 
+                                id: 'run-fail', 
+                                status: 'failed',
+                                error: 'Execution failed'
+                            }))), 0);
+                        }
+                    }) },
+                    stderr: { on: jest.fn() },
+                    on: jest.fn((event, handler) => {
+                        if (event === 'close') {
+                            setTimeout(() => handler(1), 0);
+                        }
+                    }),
+                    kill: jest.fn()
+                };
+                return mockChild;
+            });
+
+            const result = await executor.executeWorkflow('test prompt');
+            expect(result.status).toBe('failed');
+            expect(result.error).toContain('Execution failed');
         });
     });
 
@@ -59,6 +299,50 @@ describe('WorkflowExecutor', () => {
             const result = await executor.cancelWorkflow('nonexistent-run-id');
             expect(result.success).toBe(false);
             expect(result.message).toContain('No running process');
+        });
+
+        it('should cancel running workflow', async () => {
+            const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arc-cancel-test-'));
+            const mockCliPath = path.join(tempDir, 'mock-swarmgraph');
+            await fs.writeFile(mockCliPath, '#!/bin/bash\necho "mock"');
+            process.env.ARC_SWARMGRAPH_CLI = mockCliPath;
+
+            const mockKill = jest.fn();
+            mockSpawn.mockImplementation(() => {
+                const mockChild = {
+                    stdout: { on: jest.fn() },
+                    stderr: { on: jest.fn() },
+                    on: jest.fn((event, handler) => {
+                        // Never close - simulates long-running process
+                    }),
+                    kill: mockKill
+                };
+                return mockChild;
+            });
+
+            // Start execution (don't await - it will hang)
+            const execPromise = executor.executeWorkflow('long running task', { timeout: 60000 });
+
+            // Wait for process to register
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Access the internal runningProcesses map to get the run ID
+            const processes = (executor as any).runningProcesses as Map<string, any>;
+            const keys = Array.from(processes.keys());
+            expect(keys.length).toBeGreaterThan(0);
+            const runId = keys[0];
+
+            // Cancel it
+            const cancelResult = await executor.cancelWorkflow(runId);
+            expect(cancelResult.success).toBe(true);
+            expect(mockKill).toHaveBeenCalledWith('SIGTERM');
+
+            // Verify process was removed
+            expect(processes.has(runId)).toBe(false);
+
+            // Clean up
+            delete process.env.ARC_SWARMGRAPH_CLI;
+            await fs.remove(tempDir);
         });
     });
 });
