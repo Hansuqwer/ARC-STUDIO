@@ -145,7 +145,7 @@ export interface RunRecord {
   metadata: Record<string, unknown>;
 }
 
-export type RuntimeId = 'auto' | 'swarmgraph' | 'langgraph' | 'crewai' | 'openai-agents';
+export type RuntimeId = 'auto' | 'swarmgraph' | 'langgraph' | 'crewai' | 'openai-agents' | 'lmarena';
 export type RuntimeSelection = RuntimeId | RuntimeId[];
 
 export interface StartRunRequest {

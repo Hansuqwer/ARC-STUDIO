@@ -289,7 +289,7 @@ def serve(
 def run_workflow(
     workflow: str = typer.Argument("wf-swarmgraph-fixture", help="Workflow ID"),
     workspace: Optional[str] = WORKSPACE_FLAG,
-    runtime: str = typer.Option("auto", "--runtime", "-r", help="Runtime: auto, swarmgraph, langgraph, crewai"),
+    runtime: str = typer.Option("auto", "--runtime", "-r", help="Runtime: auto, swarmgraph, langgraph, crewai, lmarena"),
     prompt: Optional[str] = typer.Option(None, "--prompt", help="Prompt passed to runnable adapters"),
     allow_paid_calls: bool = typer.Option(False, "--allow-paid-calls", help="Allow runtimes to make provider calls"),
     json_output: bool = JSON_FLAG,

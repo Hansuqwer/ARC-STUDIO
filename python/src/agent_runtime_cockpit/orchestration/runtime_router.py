@@ -11,9 +11,9 @@ from ..adapters.registry import default_registry
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import RunEvent, RunRecord, RunStatus
 
-RuntimeId = Literal["swarmgraph", "langgraph", "crewai"]
-KNOWN_RUNTIMES: tuple[RuntimeId, ...] = ("swarmgraph", "langgraph", "crewai")
-AUTO_PRIORITY: tuple[RuntimeId, ...] = ("swarmgraph", "langgraph", "crewai")
+RuntimeId = Literal["swarmgraph", "langgraph", "crewai", "lmarena"]
+KNOWN_RUNTIMES: tuple[RuntimeId, ...] = ("swarmgraph", "langgraph", "crewai", "lmarena")
+AUTO_PRIORITY: tuple[RuntimeId, ...] = ("swarmgraph", "langgraph", "crewai", "lmarena")
 
 
 class RuntimeRouterError(Exception):

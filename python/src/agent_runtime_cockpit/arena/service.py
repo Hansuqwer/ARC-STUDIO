@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import random
 import uuid
@@ -26,6 +27,8 @@ from .models import (
     ArenaVote,
     PrivacyLevel,
 )
+
+log = logging.getLogger(__name__)
 
 # ── Known Arena models (mirrors Copilot Arena model config) ──────────────
 
@@ -165,6 +168,246 @@ def _stub_agent_preview(ws: Path, prompt: str, model: str) -> ArenaResponse:
     )
 
 
+# ── Live provider configuration (model → provider mapping) ──────────────
+
+_LIVE_MODEL_MAP: dict[str, dict[str, str]] = {
+    # OpenAI models
+    "gpt-4o-mini-2024-07-18": {
+        "provider": "openai",
+        "base_url": "https://api.openai.com/v1",
+        "api_key_env": "OPENAI_API_KEY",
+    },
+    "gpt-4o-2024-08-06": {
+        "provider": "openai",
+        "base_url": "https://api.openai.com/v1",
+        "api_key_env": "OPENAI_API_KEY",
+    },
+    # Anthropic models
+    "claude-sonnet-4-20250514": {
+        "provider": "anthropic",
+        "base_url": "https://api.anthropic.com/v1",
+        "api_key_env": "ANTHROPIC_API_KEY",
+    },
+    # Mistral models
+    "codestral-2405": {
+        "provider": "mistral",
+        "base_url": "https://api.mistral.ai/v1",
+        "api_key_env": "MISTRAL_API_KEY",
+    },
+    # DeepSeek models
+    "deepseek-coder-v2": {
+        "provider": "deepseek",
+        "base_url": "https://api.deepseek.com/v1",
+        "api_key_env": "DEEPSEEK_API_KEY",
+    },
+    # Llama models via OpenRouter
+    "llama-3.1-70b": {
+        "provider": "openrouter",
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key_env": "OPENROUTER_API_KEY",
+    },
+    "llama-3.1-405b": {
+        "provider": "openrouter",
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key_env": "OPENROUTER_API_KEY",
+    },
+}
+
+
+def _redact_live(text: str) -> str:
+    """Redact sensitive content from log messages."""
+    redacted = text.replace("sk-", "sk-REDACTED")
+    for key_word in ["api_key", "apikey", "API_KEY", "Authorization", "Bearer"]:
+        redacted = redacted.replace(key_word, "REDACTED")
+    return redacted
+
+
+def _live_provider_chat(
+    model_id: str,
+    prompt: str,
+    system_prompt: str = "",
+    allow_paid_calls: bool = False,
+) -> str:
+    """Make a live provider API call for a single model.
+
+    Returns the model response text.
+    Raises RuntimeError on failure.
+    """
+    if model_id not in _LIVE_MODEL_MAP:
+        raise RuntimeError(f"No live provider configuration for model '{model_id}'")
+
+    config = _LIVE_MODEL_MAP[model_id]
+    api_key = os.environ.get(config["api_key_env"])
+    if not api_key:
+        raise RuntimeError(
+            f"Live arena requires {config['api_key_env']} environment variable "
+            f"for model '{model_id}' ({config['provider']})"
+        )
+
+    provider = config["provider"]
+    base_url = config["base_url"]
+
+    # Anthropic uses a different API format
+    if provider == "anthropic":
+        return _live_anthropic_chat(model_id, prompt, system_prompt, api_key, base_url)
+
+    # OpenAI-compatible API
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=api_key, base_url=base_url)
+        messages: list[dict[str, str]] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        response = client.chat.completions.create(
+            model=model_id,
+            messages=messages,
+            temperature=0.7,
+            max_tokens=4096,
+        )
+        return response.choices[0].message.content or ""
+    except Exception as exc:
+        raise RuntimeError(f"Live provider call failed for '{model_id}': {_redact_live(str(exc))}")
+
+
+def _live_anthropic_chat(
+    model_id: str,
+    prompt: str,
+    system_prompt: str,
+    api_key: str,
+    base_url: str,
+) -> str:
+    """Make a live Anthropic API call."""
+    try:
+        from anthropic import Anthropic
+
+        client = Anthropic(api_key=api_key)
+        kwargs: dict[str, Any] = {
+            "model": model_id,
+            "max_tokens": 4096,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if system_prompt:
+            kwargs["system"] = system_prompt
+
+        response = client.messages.create(**kwargs)
+        text = ""
+        for block in response.content:
+            if hasattr(block, "text"):
+                text += block.text
+        return text
+    except Exception as exc:
+        raise RuntimeError(f"Live Anthropic call failed for '{model_id}': {_redact_live(str(exc))}")
+
+
+def _live_response(ws: Path, req: ArenaRequest) -> ArenaResponse:
+    """Generate a live Arena response by calling actual provider APIs.
+
+    Gated behind ARC_ALLOW_LIVE_ARENA=true.
+    """
+    prompt = req.prompt
+    model_id = req.model
+    allow_paid_calls = req.allow_paid_calls
+
+    if not allow_paid_calls:
+        return ArenaResponse(
+            run_id=f"arena-{uuid.uuid4().hex[:12]}",
+            mode=req.mode,
+            warnings=["Live arena blocked: allow_paid_calls must be true."],
+        )
+
+    run_id = f"arena-{uuid.uuid4().hex[:12]}"
+    warnings: list[str] = []
+    candidates: list[ArenaCandidate] = []
+    system_prompt = f"Context workspace: {ws}\n\n"
+
+    if req.mode == ArenaMode.BATTLE:
+        # For battle, get all supported models (up to 2)
+        battle_models = [
+            m for m in list_models()
+            if m.id in _LIVE_MODEL_MAP and m.supports_battle
+        ][:2]
+        if not battle_models:
+            warnings.append("No live-capable models for battle mode; falling back to stub.")
+            return _stub_battle(ws, prompt, req.model_tags)
+        for m in battle_models:
+            try:
+                text = _live_provider_chat(m.id, prompt, system_prompt, allow_paid_calls)
+                candidates.append(ArenaCandidate(
+                    id=f"{run_id}-{m.id.split('-')[0]}",
+                    model=m.id,
+                    text=text,
+                ))
+            except RuntimeError as exc:
+                warnings.append(str(exc))
+        if not candidates:
+            warnings.append("All live battle calls failed; falling back to stub.")
+            return _stub_battle(ws, prompt, req.model_tags)
+
+    elif req.mode == ArenaMode.DIRECT:
+        try:
+            text = _live_provider_chat(model_id, prompt, system_prompt, allow_paid_calls)
+            candidates.append(ArenaCandidate(
+                id=f"{run_id}-{model_id.split('-')[0]}",
+                model=model_id,
+                text=text,
+            ))
+        except RuntimeError as exc:
+            warnings.append(str(exc))
+            if not candidates:
+                warnings.append("Live direct call failed; falling back to stub.")
+                return _stub_direct(ws, prompt, model_id)
+
+    elif req.mode == ArenaMode.CODE:
+        code_prompt = f"{system_prompt}Generate only code for the following request. Return the complete implementation.\n\n{prompt}"
+        try:
+            text = _live_provider_chat(model_id, code_prompt, "", allow_paid_calls)
+            candidates.append(ArenaCandidate(
+                id=f"{run_id}-{model_id.split('-')[0]}",
+                model=model_id,
+                text=f"Code generated by {model_id}",
+                patch=f"--- a/src/generated.py\n+++ b/src/generated.py\n@@ -0,0 +1,{len(text.splitlines())} @@\n+{text.replace(chr(10), chr(10)+'+')}",
+                diff=f"diff --git a/src/generated.py b/src/generated.py\nnew file mode 100644\n--- /dev/null\n+++ b/src/generated.py\n@@ -0,0 +1,{len(text.splitlines())} @@\n+{text.replace(chr(10), chr(10)+'+')}",
+                files_changed=["src/generated.py"],
+            ))
+        except RuntimeError as exc:
+            warnings.append(str(exc))
+            if not candidates:
+                warnings.append("Live code call failed; falling back to stub.")
+                return _stub_code(ws, prompt, model_id)
+
+    elif req.mode == ArenaMode.AGENT_ARENA_PREVIEW:
+        agent_prompt = (
+            f"{system_prompt}You are an AI agent. Create a plan and implementation for:\n\n{prompt}\n\n"
+            "Return your response as:\n## Plan\n...\n## Implementation\n...\n## Files to modify\n..."
+        )
+        try:
+            text = _live_provider_chat(model_id, agent_prompt, "", allow_paid_calls)
+            candidates.append(ArenaCandidate(
+                id=f"{run_id}-{model_id.split('-')[0]}",
+                model=model_id,
+                text=text,
+                plan=text,
+                files_changed=["src/main.py", "tests/test_main.py"],
+                risks=["Review before adopting"],
+            ))
+        except RuntimeError as exc:
+            warnings.append(str(exc))
+            if not candidates:
+                warnings.append("Live agent preview call failed; falling back to stub.")
+                return _stub_agent_preview(ws, prompt, model_id)
+
+    return ArenaResponse(
+        run_id=run_id,
+        mode=req.mode,
+        candidates=candidates,
+        recommended=candidates[0].id if candidates else "",
+        warnings=warnings,
+    )
+
+
 # ── Public API ───────────────────────────────────────────────────────────
 
 
@@ -180,29 +423,26 @@ def arena_request(ws: Path, req: ArenaRequest) -> ArenaResponse:
     model_tags = req.model_tags
 
     live = os.environ.get("ARC_ALLOW_LIVE_ARENA", "").lower() in {"true", "1"}
+    allow_paid = req.allow_paid_calls
+
+    if live and mode in (ArenaMode.BATTLE, ArenaMode.DIRECT, ArenaMode.CODE, ArenaMode.AGENT_ARENA_PREVIEW):
+        try:
+            live_resp = _live_response(ws, req)
+            if live_resp.candidates:
+                return live_resp
+        except Exception:
+            log.warning("Live arena call failed, falling back to stub", exc_info=True)
 
     if mode == ArenaMode.BATTLE:
-        if live:
-            # TODO: Implement live battle via provider API
-            pass
         return _stub_battle(ws, prompt, model_tags)
 
     if mode == ArenaMode.DIRECT:
-        if live:
-            # TODO: Implement live direct via provider API
-            pass
         return _stub_direct(ws, prompt, model)
 
     if mode == ArenaMode.CODE:
-        if live:
-            # TODO: Implement live code generation
-            pass
         return _stub_code(ws, prompt, model)
 
     if mode == ArenaMode.AGENT_ARENA_PREVIEW:
-        if live:
-            # TODO: Implement live agent preview
-            pass
         return _stub_agent_preview(ws, prompt, model)
 
     return ArenaResponse(

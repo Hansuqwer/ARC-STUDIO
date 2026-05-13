@@ -46,9 +46,9 @@ def test_runtimes_capabilities_json(tmp_path):
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)["data"]
-    assert payload["auto_priority"] == ["swarmgraph", "langgraph", "crewai"]
+    assert payload["auto_priority"] == ["swarmgraph", "langgraph", "crewai", "lmarena"]
     ids = {runtime["runtime_id"] for runtime in payload["runtimes"]}
-    assert ids >= {"swarmgraph", "langgraph", "crewai"}
+    assert ids >= {"swarmgraph", "langgraph", "crewai", "lmarena"}
     assert all("requires_paid_calls" in runtime for runtime in payload["runtimes"])
 
 
@@ -56,7 +56,7 @@ def test_runtimes_capabilities_table(tmp_path):
     result = CliRunner().invoke(app, ["runtimes", "--workspace", str(tmp_path), "--capabilities"])
 
     assert result.exit_code == 0, result.output
-    assert "auto priority: swarmgraph > langgraph > crewai" in result.output
+    assert "auto priority: swarmgraph > langgraph > crewai > lmarena" in result.output
     assert "swarmgraph" in result.output
     assert "crewai" in result.output
 

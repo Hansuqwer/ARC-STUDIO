@@ -12,6 +12,17 @@ type ChatMessage = {
   runId?: string;
 };
 
+const ARENA_MODES = ['direct', 'battle', 'code', 'agent-arena-preview'] as const;
+type ArenaMode = (typeof ARENA_MODES)[number];
+
+const DEFAULT_ARENA_MODELS: Record<string, string> = {
+  'gpt-4o-mini-2024-07-18': 'GPT-4o Mini',
+  'gpt-4o-2024-08-06': 'GPT-4o',
+  'claude-sonnet-4-20250514': 'Claude Sonnet 4',
+  'codestral-2405': 'Codestral',
+  'deepseek-coder-v2': 'DeepSeek Coder V2',
+};
+
 @injectable()
 export class ArcChatWidget extends ReactWidget {
   static readonly ID = 'arc:chat';
@@ -34,6 +45,8 @@ export class ArcChatWidget extends ReactWidget {
   protected allowPaidCalls = false;
   protected profileId = 'stub';
   protected lastError?: string;
+  protected arenaMode: ArenaMode = 'direct';
+  protected arenaModel = 'gpt-4o-mini-2024-07-18';
   protected messages: ChatMessage[] = [
     { role: 'system', text: 'Prompt local ARC runtimes. Select one runtime or multiple runtimes for combo mode.' },
   ];
@@ -153,7 +166,39 @@ export class ArcChatWidget extends ReactWidget {
             <option value="gateway">Gateway (Full Access)</option>
           </select>
         </label>
+        {this.selectedRuntime === 'lmarena' && this.renderArenaControls()}
         {this.renderReadiness()}
+      </div>
+    );
+  }
+
+  protected renderArenaControls(): React.ReactNode {
+    return (
+      <div style={{ ...styles.runtimeBox, marginTop: 4 }}>
+        <label>
+          Arena Mode:{' '}
+          <select
+            style={styles.select}
+            value={this.arenaMode}
+            onChange={event => { this.arenaMode = event.currentTarget.value as ArenaMode; this.update(); }}
+          >
+            {ARENA_MODES.map(mode => (
+              <option key={mode} value={mode}>{mode}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Arena Model:{' '}
+          <select
+            style={styles.select}
+            value={this.arenaModel}
+            onChange={event => { this.arenaModel = event.currentTarget.value; this.update(); }}
+          >
+            {Object.entries(DEFAULT_ARENA_MODELS).map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+          </select>
+        </label>
       </div>
     );
   }
@@ -210,7 +255,18 @@ export class ArcChatWidget extends ReactWidget {
     this.messages.push({ role: 'user', text: prompt });
     this.update();
     try {
-      const result = await this.arcService.startRun('wf-swarmgraph-001', { prompt }, this.runtimeSelection(), this.allowPaidCalls ? true : undefined);
+      const runtime = this.runtimeSelection();
+      const inputs: Record<string, unknown> = { prompt };
+      let workflowId = 'wf-swarmgraph-001';
+
+      // When lmarena is selected, route through the Arena adapter
+      if (runtime === 'lmarena') {
+        workflowId = `arena-${this.arenaMode}`;
+        inputs.arena_mode = this.arenaMode;
+        inputs.arena_model = this.arenaModel;
+      }
+
+      const result = await this.arcService.startRun(workflowId, inputs, runtime, this.allowPaidCalls ? true : undefined);
       if (result.data) {
         this.messages.push(this.messageFromRun(result.data));
       } else {
@@ -227,6 +283,14 @@ export class ArcChatWidget extends ReactWidget {
   }
 
   protected messageFromRun(run: RunRecord): ChatMessage {
+    const isArena = run.runtime === 'lmarena' || run.workflow_id.startsWith('arena-');
+    if (isArena) {
+      const mode = run.metadata?.arena_mode ?? run.workflow_id.replace('arena-', '');
+      const model = run.metadata?.arena_model ?? '';
+      const warnings = Array.isArray(run.metadata?.warnings) ? (run.metadata.warnings as string[]).join('; ') : '';
+      const output = this.finalOutput(run) || `Arena ${mode} completed (${model || 'stub'}).`;
+      return { role: 'assistant', text: `${output}${warnings ? `\n\n⚠ ${warnings}` : ''}`, runId: run.id };
+    }
     const output = this.finalOutput(run) || `Run ${run.status}. Runtime: ${run.runtime}.`;
     return { role: 'assistant', text: output, runId: run.id };
   }

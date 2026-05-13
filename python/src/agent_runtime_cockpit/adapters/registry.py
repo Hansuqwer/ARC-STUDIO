@@ -85,12 +85,14 @@ class AdapterRegistry:
         from .swarmgraph import SwarmGraphAdapter
         from .langgraph import LangGraphAdapter
         from .llamaindex import LlamaIndexAdapter
+        from .lmarena import LmarenaAdapter
         from .openai_agents import OpenAIAgentsAdapter
         self.register(SwarmGraphAdapter())
         self.register(LangGraphAdapter())
         self.register(CrewAIAdapter())
         self.register(OpenAIAgentsAdapter())
         self.register(LlamaIndexAdapter())
+        self.register(LmarenaAdapter())
         return self
 
 

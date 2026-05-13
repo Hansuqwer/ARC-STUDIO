@@ -54,7 +54,7 @@ from .keys import WORKSPACE_KEY
 log = logging.getLogger(__name__)
 redactor = Redactor()
 ctx_gen = ContextPackGenerator()
-RUNTIME_IDS = set(runtime_router.KNOWN_RUNTIMES) | {"auto"}
+RUNTIME_IDS = set(runtime_router.KNOWN_RUNTIMES) | {"auto", "lmarena"}
 START_TIME = time.time()
 
 

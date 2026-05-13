@@ -58,7 +58,7 @@ importers:
         version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))
       '@theia/search-in-workspace':
         specifier: 1.71.0
-        version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(@types/react@18.3.28)(react@18.3.1)(typescript@5.9.3)
+        version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(react@18.3.1)(typescript@5.9.3)
       '@theia/terminal':
         specifier: 1.71.0
         version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(typescript@5.9.3)
@@ -101,7 +101,7 @@ importers:
     devDependencies:
       '@theia/cli':
         specifier: 1.71.0
-        version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(postcss@8.5.14)(typescript@5.9.3)
+        version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(typescript@5.9.3)
       rimraf:
         specifier: ^5.0.10
         version: 5.0.10
@@ -149,7 +149,7 @@ importers:
         version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))
       '@theia/search-in-workspace':
         specifier: 1.71.0
-        version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(@types/react@18.3.28)(react@18.3.1)(typescript@5.9.3)
+        version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(react@18.3.1)(typescript@5.9.3)
       '@theia/terminal':
         specifier: 1.71.0
         version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(typescript@5.9.3)
@@ -250,6 +250,25 @@ importers:
       typescript:
         specifier: ^5.4.5
         version: 5.9.3
+
+  theia-extensions/arc-arena:
+    dependencies:
+      '@theia/core':
+        specifier: 1.71.0
+        version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))
+      arc-core:
+        specifier: workspace:*
+        version: link:../arc-core
+    devDependencies:
+      '@theia/cli':
+        specifier: 1.71.0
+        version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(postcss@8.5.14)(typescript@5.4.5)
+      rimraf:
+        specifier: ^5.0.10
+        version: 5.0.10
+      typescript:
+        specifier: ^5.4.5
+        version: 5.4.5
 
   theia-extensions/arc-audit:
     dependencies:
@@ -1328,7 +1347,7 @@ packages:
 
   '@theia/native-webpack-plugin@1.71.0':
     resolution: {integrity: sha512-6Zbwc9VMo/cpdjGTtpagnoTWLw3q5TCxI7EMtKMz0PP8NCmJT7R8stgxBGgz3YFD7mfkRVmAkj1cDSa7t2WX7w==}
-    deprecated: Renamed to @theia/bundle-plugin as of v1.72.0. Please migrate.
+    deprecated: 'Package renamed to @theia/bundle-plugin starting with Theia v1.72.0. Final release under this package name: 1.71.1.'
 
   '@theia/navigator@1.71.0':
     resolution: {integrity: sha512-QX43Ub3s+r6IC0j8VfFTkA3U1ncPFP39Pfma7FxXkPt4IvW5H8nCSI3I5ht+bcI8ktnvFVd2WU0bfD8vkZNK2w==}
@@ -6296,7 +6315,7 @@ snapshots:
     transitivePeerDependencies:
       - debug
 
-  '@theia/cli@1.71.0(@theia/electron@1.71.0(electron@39.8.7))(postcss@8.5.14)(typescript@5.9.3)':
+  '@theia/cli@1.71.0(@theia/electron@1.71.0(electron@39.8.7))(postcss@8.5.14)(typescript@5.4.5)':
     dependencies:
       '@theia/application-manager': 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(postcss@8.5.14)
       '@theia/application-package': 1.71.0
@@ -6317,7 +6336,7 @@ snapshots:
       log-update: 4.0.0
       mocha: 10.8.2
       patch-package: 8.0.1
-      puppeteer: 23.1.0(typescript@5.9.3)
+      puppeteer: 23.1.0(typescript@5.4.5)
       puppeteer-core: 23.1.0
       puppeteer-to-istanbul: 1.4.0
       temp: 0.9.4
@@ -6914,7 +6933,7 @@ snapshots:
       tslib: 2.8.1
       undici: 7.25.0
 
-  '@theia/search-in-workspace@1.71.0(@theia/electron@1.71.0(electron@39.8.7))(@types/react@18.3.28)(react@18.3.1)(typescript@5.9.3)':
+  '@theia/search-in-workspace@1.71.0(@theia/electron@1.71.0(electron@39.8.7))(react@18.3.1)(typescript@5.9.3)':
     dependencies:
       '@theia/core': 1.71.0(@theia/electron@1.71.0(electron@39.8.7))
       '@theia/editor': 1.71.0(@theia/electron@1.71.0(electron@39.8.7))
@@ -6924,7 +6943,7 @@ snapshots:
       '@theia/workspace': 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(typescript@5.9.3)
       '@vscode/ripgrep': 1.17.1
       minimatch: 10.2.5
-      react-textarea-autosize: 8.5.9(@types/react@18.3.28)(react@18.3.1)
+      react-textarea-autosize: 8.5.9(react@18.3.1)
       tslib: 2.8.1
     transitivePeerDependencies:
       - '@theia/electron'
@@ -7346,7 +7365,7 @@ snapshots:
 
   '@webpack-cli/configtest@1.2.0(webpack-cli@4.7.0)(webpack@5.106.2)':
     dependencies:
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
       webpack-cli: 4.7.0(webpack@5.106.2)
 
   '@webpack-cli/info@1.5.0(webpack-cli@4.7.0)':
@@ -7582,7 +7601,7 @@ snapshots:
       loader-utils: 2.0.4
       make-dir: 3.1.0
       schema-utils: 2.7.1
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   babel-plugin-polyfill-corejs2@0.4.17(@babel/core@7.29.0):
     dependencies:
@@ -7991,7 +8010,7 @@ snapshots:
     dependencies:
       schema-utils: 4.3.3
       serialize-javascript: 6.0.2
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   concat-map@0.0.1: {}
 
@@ -8047,7 +8066,7 @@ snapshots:
       p-limit: 3.1.0
       schema-utils: 3.3.0
       serialize-javascript: 5.0.1
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   core-js-compat@3.49.0:
     dependencies:
@@ -8112,7 +8131,7 @@ snapshots:
       postcss-value-parser: 4.2.0
       semver: 7.8.0
     optionalDependencies:
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   cssesc@3.0.0: {}
 
@@ -9390,7 +9409,7 @@ snapshots:
     dependencies:
       schema-utils: 4.3.3
       tapable: 2.3.3
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   minimatch@10.2.5:
     dependencies:
@@ -9564,7 +9583,7 @@ snapshots:
   node-loader@2.1.0(webpack@5.106.2):
     dependencies:
       loader-utils: 2.0.4
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   node-pty@1.2.0-beta.12:
     dependencies:
@@ -10007,12 +10026,12 @@ snapshots:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
 
-  react-textarea-autosize@8.5.9(@types/react@18.3.28)(react@18.3.1):
+  react-textarea-autosize@8.5.9(react@18.3.1):
     dependencies:
       '@babel/runtime': 7.29.2
       react: 18.3.1
-      use-composed-ref: 1.4.0(@types/react@18.3.28)(react@18.3.1)
-      use-latest: 1.3.0(@types/react@18.3.28)(react@18.3.1)
+      use-composed-ref: 1.4.0(react@18.3.1)
+      use-latest: 1.3.0(react@18.3.1)
     transitivePeerDependencies:
       - '@types/react'
 
@@ -10440,7 +10459,7 @@ snapshots:
       abab: 2.0.6
       iconv-lite: 0.6.3
       source-map-js: 0.6.2
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   source-map-support@0.5.21:
     dependencies:
@@ -10474,7 +10493,7 @@ snapshots:
   string-replace-loader@3.3.0(webpack@5.106.2):
     dependencies:
       schema-utils: 4.3.3
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   string-width@4.2.3:
     dependencies:
@@ -10518,7 +10537,7 @@ snapshots:
     dependencies:
       loader-utils: 2.0.4
       schema-utils: 3.3.0
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   sumchecker@3.0.1:
     dependencies:
@@ -10799,24 +10818,18 @@ snapshots:
 
   urlpattern-polyfill@10.0.0: {}
 
-  use-composed-ref@1.4.0(@types/react@18.3.28)(react@18.3.1):
+  use-composed-ref@1.4.0(react@18.3.1):
     dependencies:
       react: 18.3.1
-    optionalDependencies:
-      '@types/react': 18.3.28
 
-  use-isomorphic-layout-effect@1.2.1(@types/react@18.3.28)(react@18.3.1):
+  use-isomorphic-layout-effect@1.2.1(react@18.3.1):
     dependencies:
       react: 18.3.1
-    optionalDependencies:
-      '@types/react': 18.3.28
 
-  use-latest@1.3.0(@types/react@18.3.28)(react@18.3.1):
+  use-latest@1.3.0(react@18.3.1):
     dependencies:
       react: 18.3.1
-      use-isomorphic-layout-effect: 1.2.1(@types/react@18.3.28)(react@18.3.1)
-    optionalDependencies:
-      '@types/react': 18.3.28
+      use-isomorphic-layout-effect: 1.2.1(react@18.3.1)
 
   user-home@2.0.0:
     dependencies:
@@ -10889,7 +10902,7 @@ snapshots:
       interpret: 2.2.0
       rechoir: 0.7.1
       v8-compile-cache: 2.4.0
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
       webpack-merge: 5.10.0
 
   webpack-merge@5.10.0:
@@ -11014,7 +11027,7 @@ snapshots:
     dependencies:
       loader-utils: 2.0.4
       schema-utils: 3.3.0
-      webpack: 5.106.2(postcss@8.5.14)(webpack-cli@4.7.0)
+      webpack: 5.106.2(webpack-cli@4.7.0)
 
   workerpool@6.5.1: {}
 
