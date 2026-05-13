@@ -1,133 +1,624 @@
-# ARC Studio — Architecture
+# ARC Studio Architecture
 
-## 1. System Boundaries
+**Version:** 0.1.0  
+**Last Updated:** 2026-05-13  
+**Status:** Phase 6 - Alpha Acceptance
 
-```
-ARC Studio = Theia IDE shell + 9 native Theia extensions
-ARC Core   = Python daemon/CLI + 2 adapters + context engine + storage + security
-```
+---
 
-The Theia frontend **never imports Python code**. All communication crosses a JSON boundary.
+## Overview
 
-## 2. Communication Model
+ARC Studio is an IDE for agent workflow development built on Eclipse Theia. It provides a complete environment for building, executing, and debugging agent workflows using SwarmGraph and LangGraph.
 
-```
-┌─────────────────────────────────────────────────────┐
-│                 Theia Frontend (Browser)             │
-│  ReactWidget → ArcFrontendService → WebSocket proxy │
-└──────────────────────────┬──────────────────────────┘
-                           │ JSON-RPC (WebSocket)
-┌──────────────────────────▼──────────────────────────┐
-│              Theia Backend (Node.js)                 │
-│  ArcServiceImpl → HTTP GET localhost:7777            │
-│              OR  spawn "uv run arc <cmd> --json"     │
-└──────────────────────────┬──────────────────────────┘
-                           │ ARC Protocol Envelope JSON
-┌──────────────────────────▼──────────────────────────┐
-│              Python ARC Daemon / CLI                 │
-│  cli.py → adapters → context → storage → web        │
-└─────────────────────────────────────────────────────┘
-```
+### Key Components
 
-## 3. ARC Protocol Envelope
+1. **Theia Extension** - Frontend UI and backend services
+2. **Python API** - REST endpoints for workflow execution
+3. **SwarmGraph Integration** - CLI execution and trace parsing
+4. **Trace System** - JSONL-based event storage and visualization
 
-Every response from the Python backend uses this envelope:
+---
 
-```json
-{
-  "version": "1.0",
-  "ok": true,
-  "data": { ... },
-  "error": null,
-  "meta": {
-    "duration_ms": 42,
-    "adapter": "swarmgraph",
-    "workspace": "/path/to/project",
-    "timestamp": "2025-01-01T00:00:00Z"
-  }
-}
-```
-
-TypeScript validates every response before rendering. Invalid responses show an error state.
-
-## 4. Runtime Adapter Protocol
-
-Every adapter must implement `adapters/base.py::RuntimeAdapter`:
-
-```python
-class RuntimeAdapter(abc.ABC):
-    def detect(workspace: Path) -> (bool, confidence_0_to_1, [evidence])
-    def capabilities() -> RuntimeCapabilities
-    def export_workflow(workspace: Path) -> [WorkflowInfo]
-    def export_schemas(workspace: Path) -> [SchemaInfo]
-    async def run_workflow(workflow_id, inputs) -> RunRecord
-    async def stream_events(run_id) -> AsyncIterator[RunEvent]
-```
-
-Rules:
-- `capabilities()` must never lie
-- `detect()` must check real files; no false positives
-- Unsupported methods raise `NotImplementedError`
-
-## 5. Theia Extension Layering
+## System Architecture
 
 ```
-arc-product     ← branding, welcome page, about
-arc-core        ← IPC, commands, widget contributions, service proxy
-arc-workflows   ← workflow graph widget
-arc-schemas     ← schema inspector widget
-arc-runs        ← run timeline, trace viewer
-arc-audit       ← audit chain viewer
-arc-context     ← context pack viewer
-arc-adapters    ← adapter status widget
-arc-settings    ← preferences schema
+┌─────────────────────────────────────────────────────────────┐
+│                     Theia Browser App                        │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │              ARC Widget (React)                        │ │
+│  │  - Workflow execution UI                               │ │
+│  │  - Trace visualization                                 │ │
+│  │  - Workflow detection                                  │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                          │                                   │
+│                          │ JSON-RPC                          │
+│                          ▼                                   │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │         ARC Backend Service (Node.js)                  │ │
+│  │  - Workflow execution                                  │ │
+│  │  - Trace file management                               │ │
+│  │  - Workspace scanning                                  │ │
+│  └────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+                          │
+                          │ Subprocess
+                          ▼
+         ┌────────────────────────────────┐
+         │    SwarmGraph CLI              │
+         │  - Graph execution             │
+         │  - LLM provider routing        │
+         │  - Trace generation            │
+         └────────────────────────────────┘
+                          │
+                          │ JSONL
+                          ▼
+         ┌────────────────────────────────┐
+         │    .arc/traces/                │
+         │  - run-sg-{hash}.jsonl         │
+         │  - Event stream storage        │
+         └────────────────────────────────┘
+
+         ┌────────────────────────────────┐
+         │    Python REST API (Optional)  │
+         │  - FastAPI endpoints           │
+         │  - External tool integration   │
+         └────────────────────────────────┘
 ```
 
-## 6. AG-UI Event Mapping
+---
 
-ARC run events are mapped to AG-UI-compatible types:
+## Component Details
 
-| ARC Type | AG-UI Type |
-|----------|------------|
-| RUN_STARTED | RunStarted |
-| RUN_COMPLETED | RunFinished |
-| NODE_STARTED | StepStarted |
-| NODE_COMPLETED | StepFinished |
-| MESSAGE | TextMessageStart |
-| TOOL_CALL | ToolCallStart |
+### 1. Theia Extension
 
-SSE endpoint: `GET /api/runs/:id/events`
+**Location:** `packages/arc-extension/`
 
-## 7. Context Retrieval Pipeline
+The Theia extension provides the core IDE functionality.
+
+#### Frontend (Browser)
+
+**Files:**
+- `src/browser/arc-widget.tsx` - Main UI widget
+- `src/browser/arc-widget-contribution.ts` - Widget registration
+- `src/browser/arc-extension-frontend-module.ts` - Dependency injection
+
+**Responsibilities:**
+- Render workflow execution UI
+- Display trace visualizations
+- Handle user interactions
+- Communicate with backend via JSON-RPC
+
+**Technology:**
+- React for UI components
+- Theia's ReactWidget base class
+- Inversify for dependency injection
+
+#### Backend (Node.js)
+
+**Files:**
+- `src/node/arc-backend-service.ts` - Service implementation
+- `src/node/arc-extension-backend-module.ts` - Dependency injection
+- `src/common/arc-protocol.ts` - Shared protocol definitions
+
+**Responsibilities:**
+- Execute SwarmGraph CLI as subprocess
+- Read/write trace files
+- Scan workspace for workflows
+- Manage file system operations
+
+**Technology:**
+- Node.js with TypeScript
+- fs-extra for file operations
+- child_process for subprocess execution
+
+#### Protocol Layer
+
+**File:** `src/common/arc-protocol.ts`
+
+**Interfaces:**
+- `ArcService` - Main service interface
+- `ExecutionOptions` - Workflow execution configuration
+- `ExecutionResult` - Execution result data
+- `TraceFile` - Trace file metadata
+- `TraceData` - Complete trace data
+- `TraceEvent` - Individual trace event
+- `WorkflowInfo` - Workflow detection result
+
+**Communication:**
+- JSON-RPC over Theia's connection handler
+- Service path: `/services/arc`
+- Bidirectional frontend-backend communication
+
+---
+
+### 2. Python API
+
+**Location:** `python/src/`
+
+Optional REST API for external tool integration.
+
+#### Endpoints
+
+**File:** `src/routes.py`
+
+- `GET /` - Health check
+- `POST /api/execute` - Execute workflow
+- `GET /api/traces` - List traces
+- `GET /api/traces/{trace_id}` - Get trace details
+
+#### Security
+
+**File:** `src/security_utils.py`
+
+**Features:**
+- Input sanitization (prompts, trace IDs)
+- Path validation (prevent traversal)
+- Backend type validation
+- Workspace boundary enforcement
+
+**Technology:**
+- FastAPI for REST endpoints
+- Pydantic for request/response models
+- uvicorn for ASGI server
+
+---
+
+### 3. SwarmGraph Integration
+
+**Execution Model:**
 
 ```
-Task string
-    ↓
-LocalRepoProvider  (no API key required)
-Context7Provider   (requires ARC_CONTEXT7_API_KEY)
-VercelGrepProvider (best-effort scraping)
-GitHubCodeSearch   (requires GITHUB_TOKEN)
-WebSearchProvider  (requires ARC_SEARCH_API_KEY)
-    ↓
-Deduplication + Ranking
-    ↓
-ContextPackEntry[] → saved to docs/context-packs/
+User Input (Prompt)
+        │
+        ▼
+ARC Backend Service
+        │
+        │ spawn subprocess
+        ▼
+swarmgraph swarm --json "prompt"
+        │
+        │ writes JSONL
+        ▼
+.arc/traces/run-sg-{hash}.jsonl
+        │
+        │ read & parse
+        ▼
+ARC Widget (Visualization)
 ```
 
-## 8. Security Boundary
+**Trace File Format:**
 
-- Daemon only listens on `localhost` (never `0.0.0.0`)
-- All paths validated against traversal (`..` blocked)
-- All responses redacted for secrets before leaving Python
-- Trust boundary: TypeScript validates every Python response
-- No user-supplied input reaches the filesystem unvalidated
+JSONL (JSON Lines) - one event per line:
 
-## 9. Mock Policy
+```jsonl
+{"type":"RUN_STARTED","timestamp":"2026-05-12T20:30:00Z","runId":"run-sg-abc123","sequence":0,"data":{}}
+{"type":"NODE_COMPLETED","timestamp":"2026-05-12T20:30:10Z","runId":"run-sg-abc123","sequence":1,"data":{"nodeId":"agent-1"}}
+{"type":"RUN_COMPLETED","timestamp":"2026-05-12T20:30:15Z","runId":"run-sg-abc123","sequence":2,"data":{}}
+```
 
-See [DECISIONS/ADR-0004-mock-policy.md](DECISIONS/ADR-0004-mock-policy.md).
+**Benefits:**
+- Streaming-friendly (append-only)
+- Human-readable for debugging
+- Easy to parse incrementally
+- Matches SwarmGraph's native format
 
-Every mock is:
-- Behind the real interface
-- Clearly marked with `MOCK_REASON`, `LOCAL_FIX_STEPS`
-- Covered by tests
-- Replaced by real implementation when external services available
+---
+
+### 4. Trace System
+
+**Directory Structure:**
+
+```
+.arc/
+└── traces/
+    ├── run-sg-abc123.jsonl
+    ├── run-sg-def456.jsonl
+    └── run-sg-ghi789.jsonl
+```
+
+**Event Types:**
+
+1. **RUN_STARTED** - Execution begins
+2. **NODE_COMPLETED** - Graph node finishes
+3. **MESSAGE** - Message sent/received
+4. **RUN_COMPLETED** - Execution succeeds
+5. **RUN_FAILED** - Execution fails
+
+**Metadata:**
+- Run ID (unique identifier)
+- Timestamps (ISO 8601)
+- Sequence numbers (ordering)
+- Event-specific data
+
+---
+
+## Data Flow
+
+### Workflow Execution Flow
+
+```
+1. User enters prompt in ARC Widget
+        │
+        ▼
+2. Widget calls arcService.executeWorkflow() via JSON-RPC
+        │
+        ▼
+3. Backend spawns SwarmGraph CLI subprocess
+        │
+        ▼
+4. SwarmGraph executes workflow
+   - Routes to LLM providers
+   - Executes graph nodes
+   - Writes events to trace file
+        │
+        ▼
+5. Backend parses CLI output for run ID
+        │
+        ▼
+6. Backend returns ExecutionResult to frontend
+        │
+        ▼
+7. Widget displays result and trace path
+```
+
+### Trace Retrieval Flow
+
+```
+1. User clicks "Load Traces" in ARC Widget
+        │
+        ▼
+2. Widget calls arcService.getTraces() via JSON-RPC
+        │
+        ▼
+3. Backend scans .arc/traces/ directory
+        │
+        ▼
+4. Backend reads each .jsonl file
+        │
+        ▼
+5. Backend extracts metadata (ID, timestamp, status)
+        │
+        ▼
+6. Backend returns sorted TraceFile[] to frontend
+        │
+        ▼
+7. Widget displays trace list
+        │
+        ▼
+8. User selects a trace
+        │
+        ▼
+9. Widget calls arcService.readTrace(traceId)
+        │
+        ▼
+10. Backend reads and parses full trace file
+        │
+        ▼
+11. Backend returns TraceData with all events
+        │
+        ▼
+12. Widget visualizes trace events
+```
+
+---
+
+## Security Architecture
+
+### Multi-Layer Security Model
+
+**Layer 1: Workspace Isolation**
+- All file operations restricted to workspace root
+- Path validation prevents traversal attacks
+- Trace files must be in `.arc/traces/`
+
+**Layer 2: Input Validation**
+- Prompts sanitized before execution
+- Trace IDs validated (alphanumeric + hyphens only)
+- Backend types validated against whitelist
+
+**Layer 3: Subprocess Isolation**
+- SwarmGraph runs in separate process
+- Resource limits (planned for Phase 5)
+- Timeout enforcement (5 minutes)
+
+**Layer 4: Credential Storage** (Planned)
+- System keychain integration
+- No plaintext credentials
+- OS-managed encryption
+
+**Layer 5: Sandbox Execution** (Planned)
+- User code runs in isolated environment
+- Memory and CPU limits
+- Network access controls
+
+---
+
+## Technology Stack
+
+### Frontend
+- **Framework:** Eclipse Theia 1.45.0
+- **UI Library:** React
+- **Language:** TypeScript 5.3.0
+- **DI Container:** Inversify
+- **Build Tool:** Webpack
+
+### Backend (Node.js)
+- **Runtime:** Node.js >= 18.0.0
+- **Language:** TypeScript 5.3.0
+- **File System:** fs-extra
+- **Process Management:** child_process
+
+### Backend (Python)
+- **Runtime:** Python >= 3.11
+- **Framework:** FastAPI
+- **Server:** uvicorn
+- **Validation:** Pydantic
+
+### Build System
+- **Package Manager:** pnpm >= 8.0.0
+- **Monorepo:** pnpm workspaces
+- **Compiler:** TypeScript compiler (tsc)
+
+### External Dependencies
+- **SwarmGraph:** CLI for workflow execution
+- **LangGraph:** (Planned) Python library for stateful agents
+
+---
+
+## Design Patterns
+
+### 1. Service-Oriented Architecture
+
+**Pattern:** Frontend-Backend separation via JSON-RPC
+
+**Benefits:**
+- Clear separation of concerns
+- Backend can be tested independently
+- Frontend can be swapped (browser/Electron)
+
+### 2. Subprocess Execution
+
+**Pattern:** Execute external tools via subprocess
+
+**Benefits:**
+- Isolation from main process
+- Language-agnostic (can call any CLI)
+- Easy to timeout and kill
+
+**Tradeoffs:**
+- Overhead of process spawning
+- IPC complexity
+- Error handling across process boundaries
+
+### 3. Event Sourcing (Traces)
+
+**Pattern:** Store execution as sequence of events
+
+**Benefits:**
+- Complete execution history
+- Replay capability
+- Debugging and analysis
+- Streaming-friendly
+
+**Tradeoffs:**
+- Storage overhead
+- Parsing complexity
+- Event schema evolution
+
+### 4. Dependency Injection
+
+**Pattern:** Inversify for component wiring
+
+**Benefits:**
+- Testability (mock dependencies)
+- Loose coupling
+- Follows Theia conventions
+
+---
+
+## File Organization
+
+```
+arc-theia-studio/
+├── packages/
+│   ├── arc-extension/          # Main Theia extension
+│   │   ├── src/
+│   │   │   ├── browser/        # Frontend code
+│   │   │   ├── node/           # Backend code
+│   │   │   └── common/         # Shared protocol
+│   │   ├── lib/                # Compiled output
+│   │   └── package.json
+│   ├── arc-browser-app/        # Browser application
+│   │   ├── src-gen/            # Generated Theia app
+│   │   └── package.json
+│   ├── arc-electron-app/       # Electron application (TODO)
+│   └── arc-test-fixtures/      # Test utilities (TODO)
+├── python/
+│   ├── src/
+│   │   ├── routes.py           # REST API endpoints
+│   │   └── security_utils.py   # Security utilities
+│   └── tests/                  # Python tests (TODO)
+├── docs/                       # Documentation
+│   ├── API.md                  # API documentation
+│   ├── ARCHITECTURE.md         # This file
+│   ├── DEVELOPMENT.md          # Development guide
+│   ├── IMPLEMENTATION_DECISIONS.md
+│   └── RESEARCH_NOTES.md
+├── scripts/                    # Build and setup scripts
+├── .arc/                       # Runtime data
+│   └── traces/                 # Trace files
+├── package.json                # Monorepo root
+├── pnpm-workspace.yaml         # Workspace configuration
+└── README.md                   # Project README
+```
+
+---
+
+## Extension Points
+
+### Adding New Workflow Types
+
+To add support for a new workflow runtime:
+
+1. **Update Protocol** (`arc-protocol.ts`)
+   - Add new runtime type to `WorkflowInfo.type`
+
+2. **Implement Detection** (`arc-backend-service.ts`)
+   - Add detection logic in `detectWorkflows()`
+   - Scan for runtime-specific files
+
+3. **Implement Execution** (`arc-backend-service.ts`)
+   - Add execution logic in `executeWorkflow()`
+   - Handle runtime-specific CLI/API
+
+4. **Update UI** (`arc-widget.tsx`)
+   - Add runtime-specific controls
+   - Handle runtime-specific visualization
+
+### Adding New Event Types
+
+To add a new trace event type:
+
+1. **Update Protocol** (`arc-protocol.ts`)
+   - Add new type to `TraceEvent.type` union
+
+2. **Document Event** (`API.md`)
+   - Add event type documentation
+   - Specify data field schema
+
+3. **Update Visualization** (`arc-widget.tsx`)
+   - Add rendering logic for new event type
+
+---
+
+## Performance Considerations
+
+### Current State (Phase 6)
+
+- **Trace Loading:** Async file reads with JSONL streaming support
+- **Subprocess Execution:** Environment allow-list, timeout with SIGTERM/SIGKILL escalation
+- **Memory Usage:** Streaming trace parsing available via `streamTrace()` for large files
+- **Performance:** Timing logs for key operations (trace loading, workflow detection)
+
+### Planned Optimizations (Phase 7+)
+
+- **Execution Queue:** Limit concurrent workflow executions
+- **Trace Pagination:** Load events in chunks for UI
+- **Caching:** Cache parsed trace metadata
+- **Structured Metrics:** Replace console.log timing with proper metrics
+
+---
+
+## Scalability
+
+### Current Limits
+
+- **Trace File Size:** Limited by available memory
+- **Concurrent Executions:** No limit (can overwhelm system)
+- **Workspace Size:** No limit on workflow detection
+
+### Future Improvements
+
+- **Large Trace Handling:** Stream processing for >100MB files
+- **Execution Throttling:** Queue with configurable concurrency
+- **Incremental Scanning:** Watch filesystem for workflow changes
+
+---
+
+## Testing Strategy
+
+### Current State (Phase 6)
+
+- ✅ Python test suite: 82 tests passing
+- ✅ Node.js unit tests: arc-protocol.test.js (8 tests)
+- ✅ Test fixtures self-test passing
+- ✅ E2E Playwright smoke tests configured
+- ✅ Conformance tests: SwarmGraph 8/8, LangGraph 9/9
+- ✅ Daemon integration tests for `/api/runs` and SSE
+
+### Test Coverage
+
+**Python Tests:**
+- `test_protocol.py` — 13 tests (envelope, error codes, domain models)
+- `test_adapters.py` — 26+ tests (SwarmGraph, LangGraph, registry, conformance)
+- `test_agui_bridge.py` — 7 tests (AG-UI event mapping)
+- `test_context.py` — 16 tests (providers, cache, ranker, engine)
+- `test_security.py` — 12 tests (redaction, path validation)
+- `test_storage.py` — 5 tests (JSONL save/load/list)
+
+**Node.js Tests:**
+- `tests/unit/arc-protocol.test.js` — 8 bootstrap protocol tests
+- `packages/arc-test-fixtures/src/index.js` — fixture self-test
+
+**E2E Tests (Playwright):**
+- Browser app loads without crash
+- ARC Studio branding present
+- Theia workbench and activity bar rendered
+- Command palette and ARC commands registered
+- Python CLI integration verified
+
+---
+
+## Deployment
+
+### Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build all packages
+pnpm build
+
+# Start browser app
+pnpm start:browser
+```
+
+### Production (Planned)
+
+- **Browser App:** Static hosting (Vercel, Netlify)
+- **Electron App:** Native installers (DMG, EXE, AppImage)
+- **Python API:** Docker container or systemd service
+
+---
+
+## Known Issues
+
+### Phase 6 (Current)
+
+- ⚠️ Electron signing/notarization not configured
+- ⚠️ LangGraph runtime execution limited to dynamic workflow export
+- ⚠️ No rate limiting or authentication (planned for Phase 7)
+- ⚠️ CrewAI, OpenAI Agents SDK, AG2 adapters not yet implemented
+
+### Technical Debt
+
+- Synchronous file I/O in some trace operations (should be fully async)
+- No input validation in frontend (relies on backend validation)
+- Performance logging could be replaced with structured metrics
+
+---
+
+## Future Architecture
+
+### Phase 7: Final Handover
+
+- Production deployment configuration
+- Authentication and authorization
+- Rate limiting and API throttling
+- Metrics and monitoring infrastructure
+- Signed Electron installers and auto-update
+- CrewAI, OpenAI Agents SDK, AG2 adapters
+- Performance optimization
+- Handover to maintainers
+
+---
+
+## References
+
+- [Eclipse Theia Documentation](https://theia-ide.org/docs/)
+- [SwarmGraph Repository](https://github.com/Hansuqwer/SwarmGraph)
+- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
+- [Implementation Decisions](IMPLEMENTATION_DECISIONS.md)
+- [API Documentation](API.md)
+- [Development Guide](DEVELOPMENT.md)

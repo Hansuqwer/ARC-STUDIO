@@ -1,25 +1,78 @@
-.DS_Store
-.cache/
-.pytest_cache/
-.venv/
-.venv2/
-.arc/traces/
-python/.arc/traces/
-node_modules/
-dist/
+# Ignore build artifacts
 lib/
-src-gen/
-coverage/
-htmlcov/
-*.pyc
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map
+!webpack.config.js
+
+# Ignore dependencies
+node_modules/
+.pnpm-store/
+
+# Ignore Python artifacts
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Ignore environment files
+.env
+.env.local
+.env.*.local
+
+# Ignore test coverage
+coverage/
+.nyc_output/
+.pytest_cache/
+
+# Keep .arc directory but ignore large trace files
+.arc/traces/*.jsonl
+
+# Keep docs
+!docs/
+
+# Keep scripts
+!scripts/
+
+# Additional ignores from main
 python/docs/context-packs/*.json
 docs/context-packs/*.json
-applications/*/gen-webpack.config.js
-applications/*/gen-webpack.node.config.js
-applications/*/webpack.config.js
 test-results/
-tests/e2e/test-results/
 .gitnexus
 .claude/
 AGENTS.md

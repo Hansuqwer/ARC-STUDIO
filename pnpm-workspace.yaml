@@ -1,5 +1,2 @@
 packages:
-  - 'applications/*'
-  - 'theia-extensions/*'
   - 'packages/*'
-  - 'tests/*'
