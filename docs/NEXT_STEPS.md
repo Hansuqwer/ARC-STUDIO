@@ -18,7 +18,7 @@ pnpm check:pr
 ```bash
 ARC_WORKSPACE_PATH=/path/to/swarmgraph/workspace \
 ARC_SWARMGRAPH_CLI=/path/to/swarmgraph \
-pnpm start:browser:swarmgraph
+pnpm start:browser:stub
 ```
 
 ### 3. Inspect local run history
@@ -45,9 +45,11 @@ uv run arc context pack --task "build theia extension"
 - [x] Add daemon integration test coverage for `/api/runs` and SSE events
 - [x] Add trace filtering, event detail inspection, trace copy, and run JSON export
 - [x] Add LangGraph dynamic export hook via `ARC_LANGGRAPH_EXPORT=module:function`
+- [x] Add LangGraph real run path via explicit `ARC_LANGGRAPH_EXPORT`
 - [x] Add provider-backed SwarmGraph execution behind `ARC_SWARMGRAPH_ALLOW_COSTS=true`
 - [x] Add unsigned Electron packaging smoke
 - [ ] Add more Open VSX extensions (JSON, Python, YAML viewers)
+- [ ] Add LangGraph streaming/event support
 
 ## Medium Term
 

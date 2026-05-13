@@ -7,7 +7,16 @@ pnpm build
 pnpm package:electron:dir
 ```
 
-This produces an unpacked Electron app only. It does not sign, notarize, upload, or publish artifacts.
+This uses `applications/electron/electron-builder.smoke.yml` and produces an unpacked, unsigned Electron app only. It does not sign, notarize, upload, or publish artifacts. Do not distribute smoke artifacts.
+
+## Signed Release
+
+```bash
+pnpm build
+pnpm package:electron
+```
+
+Release packaging uses `applications/electron/electron-builder.release.yml` and fails if signing credentials are missing.
 
 ## Signing Blockers
 

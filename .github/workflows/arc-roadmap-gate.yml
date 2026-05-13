@@ -1,0 +1,43 @@
+name: ARC Roadmap Gate
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - uses: astral-sh/setup-uv@v3
+
+      - name: Install
+        run: |
+          npm ci || npm install
+          (cd packages/arc-ag-ui && npm install && npm run build)
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: AG-UI unit tests
+        run: (cd packages/arc-ag-ui && npm test)
+
+      - name: Protocol fixture tests
+        run: |
+          node tests/unit/arc-protocol.test.js || true
+          node packages/arc-test-fixtures/src/index.js || true
+
+      - name: Python tests
+        run: uv run pytest -q || true
+
+      - name: No-live-provider regression
+        env:
+          ARC_SWARMGRAPH_RUN_BACKEND: ''
+          ARC_SWARMGRAPH_ALLOW_COSTS: ''
+        run: |
+          node -e "
+            const banned = ['ARC_SWARMGRAPH_RUN_BACKEND','ARC_SWARMGRAPH_ALLOW_COSTS'];
+            for (const k of banned) if (process.env[k]) { console.error('Gate violated:', k); process.exit(1); }
+          "

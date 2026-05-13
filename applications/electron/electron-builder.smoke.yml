@@ -1,0 +1,58 @@
+# ARC Studio Electron smoke packaging configuration.
+# Produces unsigned local artifacts only. Do not distribute these builds.
+
+appId: "ai.arc-studio.smoke"
+productName: "ARC Studio Smoke"
+copyright: "Copyright 2025 ARC Studio Contributors"
+
+forceCodeSigning: false
+
+directories:
+  output: dist-smoke
+  buildResources: resources
+
+files:
+  - "src-gen/**/*"
+  - "node_modules/**/*"
+  - "package.json"
+
+extraResources:
+  - from: "../../python"
+    to: "arc-python"
+    filter:
+      - "src/**/*"
+      - "pyproject.toml"
+      - "README.md"
+      - "!**/__pycache__/**"
+      - "!**/*.pyc"
+      - "!**/.venv/**"
+      - "!**/.pytest_cache/**"
+      - "!**/.ruff_cache/**"
+      - "!**/.mypy_cache/**"
+      - "!**/*.egg-info/**"
+      - "!**/tests/**"
+      - "!**/.env"
+      - "!**/.env.*"
+      - "!**/.arc/**"
+      - "!**/dist/**"
+      - "!**/build/**"
+
+mac:
+  target:
+    - target: dir
+      arch: [x64, arm64]
+  category: "public.app-category.developer-tools"
+  icon: "resources/icons/icon.icns"
+
+linux:
+  target:
+    - target: dir
+      arch: [x64]
+  category: "Development"
+  icon: "resources/icons"
+
+win:
+  target:
+    - target: dir
+      arch: [x64]
+  icon: "resources/icons/icon.ico"

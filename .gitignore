@@ -68,3 +68,12 @@ coverage/
 
 # Keep scripts
 !scripts/
+
+# Additional ignores from main
+python/docs/context-packs/*.json
+docs/context-packs/*.json
+test-results/
+.gitnexus
+.claude/
+AGENTS.md
+CLAUDE.md

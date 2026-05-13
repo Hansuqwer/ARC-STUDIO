@@ -4,24 +4,10 @@ A2UI Extension (Experimental)
 Detects and validates A2UI declarative UI payloads.
 Source: https://github.com/google/A2UI
 Status: EXPERIMENTAL — disabled by default.
-
-MOCK_REASON: A2UI v0.9 specification is experimental; renderer not stable.
-REAL_IMPLEMENTATION_PATH: Implement A2UI renderer per spec at
-    https://github.com/google/A2UI/tree/main/specification/v0_9/docs
-LOCAL_FIX_STEPS: Check A2UI GitHub for latest renderer implementation.
-OWNER: A2UI Extension Agent
-REMOVE_BEFORE: A2UI v1.0 stable release
 """
 from __future__ import annotations
 from pathlib import Path
 from .base import ArcExtension
-
-MOCK_REASON = "A2UI v0.9 is experimental; validator is a stub"
-REAL_IMPLEMENTATION_PATH = "extensions/a2ui.py → _validate_payload()"
-LOCAL_FIX_STEPS = "Implement A2UI JSON Schema validation per v0.9 spec"
-OWNER = "A2UI Extension Agent"
-REMOVE_BEFORE = "A2UI v1.0"
-
 
 class A2UIExtension(ArcExtension):
     """EXPERIMENTAL: A2UI declarative UI payload support."""
@@ -43,8 +29,8 @@ class A2UIExtension(ArcExtension):
         return {
             "detected": self.detect(workspace),
             "status": "experimental",
-            "mock": True,
-            "reason": MOCK_REASON,
+            "can_render": False,
+            "reason": "A2UI v0.9 is experimental; renderer and validator are not implemented.",
             "spec": "https://github.com/google/A2UI/tree/main/specification/v0_9/docs",
         }
 

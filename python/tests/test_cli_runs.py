@@ -23,6 +23,44 @@ def test_run_command_persists_trace_in_workspace(monkeypatch, tmp_path):
     assert "cli prompt" in result.output
 
 
+def test_run_command_rejects_unknown_runtime(tmp_path):
+    result = CliRunner().invoke(app, ["run", "wf-test", "--workspace", str(tmp_path), "--runtime", "nope", "--json"])
+
+    assert result.exit_code == 2
+    envelope = json.loads(result.output)
+    assert envelope["ok"] is False
+    assert envelope["error"]["details"]["code"] == "UNKNOWN_RUNTIME"
+
+
+def test_run_command_reports_crewai_missing_target(tmp_path):
+    result = CliRunner().invoke(app, ["run", "wf-test", "--workspace", str(tmp_path), "--runtime", "crewai", "--json"])
+
+    assert result.exit_code == 1
+    envelope = json.loads(result.output)
+    assert envelope["ok"] is False
+    assert envelope["error"]["details"]["code"] == "RUNTIME_NOT_RUNNABLE"
+
+
+def test_runtimes_capabilities_json(tmp_path):
+    result = CliRunner().invoke(app, ["runtimes", "--workspace", str(tmp_path), "--capabilities", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)["data"]
+    assert payload["auto_priority"] == ["swarmgraph", "langgraph", "crewai"]
+    ids = {runtime["runtime_id"] for runtime in payload["runtimes"]}
+    assert ids >= {"swarmgraph", "langgraph", "crewai"}
+    assert all("requires_paid_calls" in runtime for runtime in payload["runtimes"])
+
+
+def test_runtimes_capabilities_table(tmp_path):
+    result = CliRunner().invoke(app, ["runtimes", "--workspace", str(tmp_path), "--capabilities"])
+
+    assert result.exit_code == 0, result.output
+    assert "auto priority: swarmgraph > langgraph > crewai" in result.output
+    assert "swarmgraph" in result.output
+    assert "crewai" in result.output
+
+
 def test_runs_command_reads_workspace_traces(monkeypatch, tmp_path):
     cli = tmp_path / "swarmgraph"
     cli.write_text(

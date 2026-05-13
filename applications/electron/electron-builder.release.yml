@@ -1,17 +1,11 @@
-# ARC Studio Electron Builder Configuration
-# Source: https://www.electron.build/configuration/configuration
-# NOTE: Code signing is NOT configured here. See docs/PACKAGING.md for signing steps.
+# ARC Studio Electron release packaging configuration.
+# Signing credentials are required. Use electron-builder.smoke.yml for local smoke builds.
 
-appId: "ai.arena.arc-studio"
+appId: "ai.arc-studio.desktop"
 productName: "ARC Studio"
 copyright: "Copyright 2025 ARC Studio Contributors"
 
-# MOCK_REASON: Signing certificates not available in build environment
-# REAL_IMPLEMENTATION_PATH: scripts/sign-electron.sh
-# LOCAL_FIX_STEPS: Set CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD
-# OWNER: Packaging Agent
-# REMOVE_BEFORE: Beta release
-forceCodeSigning: false
+forceCodeSigning: true
 
 directories:
   output: dist
@@ -26,9 +20,22 @@ extraResources:
   - from: "../../python"
     to: "arc-python"
     filter:
-      - "**/*"
+      - "src/**/*"
+      - "pyproject.toml"
+      - "README.md"
       - "!**/__pycache__/**"
       - "!**/*.pyc"
+      - "!**/.venv/**"
+      - "!**/.pytest_cache/**"
+      - "!**/.ruff_cache/**"
+      - "!**/.mypy_cache/**"
+      - "!**/*.egg-info/**"
+      - "!**/tests/**"
+      - "!**/.env"
+      - "!**/.env.*"
+      - "!**/.arc/**"
+      - "!**/dist/**"
+      - "!**/build/**"
 
 mac:
   target:

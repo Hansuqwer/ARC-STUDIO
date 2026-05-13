@@ -1,0 +1,25 @@
+name: signing-preflight
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  macos-preflight:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Signing preflight
+        run: |
+          set +e
+          node scripts/require-electron-signing.mjs
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ] || [ "$status" -eq 10 ]; then
+            exit 0
+          fi
+          exit "$status"

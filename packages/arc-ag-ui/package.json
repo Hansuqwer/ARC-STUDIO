@@ -1,0 +1,20 @@
+{
+  "name": "@arc/ag-ui",
+  "version": "0.1.0",
+  "description": "Canonical AG-UI event types, mappers, and redaction for ARC Studio.",
+  "license": "Apache-2.0",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "files": ["lib", "src"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test ./test/**/*.test.js",
+    "clean": "rimraf lib"
+  },
+  "dependencies": {
+  },
+  "devDependencies": {
+    "typescript": "~5.4.0",
+    "rimraf": "^5.0.0"
+  }
+}

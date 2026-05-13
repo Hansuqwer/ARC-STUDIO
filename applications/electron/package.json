@@ -9,13 +9,15 @@
     "build:prod": "theia build --mode production",
     "rebuild": "theia rebuild:electron --cacheRoot ../..",
     "start": "electron src-gen/frontend/index.js",
-    "start:dev": "theia start --app-project-path=. --hostname localhost --port 3000",
+    "start:dev": "theia start --app-project-path=. --hostname 127.0.0.1 --port 3000",
     "watch": "theia build --watch --mode development",
-    "package": "electron-builder --config electron-builder.yml",
-    "package:dir": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir --config electron-builder.yml",
-    "package:mac": "electron-builder --mac --config electron-builder.yml",
-    "package:linux": "electron-builder --linux --config electron-builder.yml",
-    "package:win": "electron-builder --win --config electron-builder.yml",
+    "package": "pnpm run package:release",
+    "package:dir": "pnpm run package:smoke",
+    "package:smoke": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir --config electron-builder.smoke.yml",
+    "package:release": "node ../../scripts/require-electron-signing.mjs && electron-builder --config electron-builder.release.yml",
+    "package:mac": "node ../../scripts/require-electron-signing.mjs && electron-builder --mac --config electron-builder.release.yml",
+    "package:linux": "node ../../scripts/require-electron-signing.mjs && electron-builder --linux --config electron-builder.release.yml",
+    "package:win": "node ../../scripts/require-electron-signing.mjs && electron-builder --win --config electron-builder.release.yml",
     "clean": "rimraf lib src-gen dist",
     "check": "echo 'electron check ok'",
     "test": "echo 'electron unit tests ok'"
@@ -45,7 +47,9 @@
     "arc-audit": "workspace:*",
     "arc-context": "workspace:*",
     "arc-adapters": "workspace:*",
-    "arc-settings": "workspace:*"
+    "arc-settings": "workspace:*",
+    "arc-health": "workspace:*",
+    "arc-event-stream": "workspace:*"
   },
   "devDependencies": {
     "@theia/cli": "1.71.0",
@@ -59,8 +63,8 @@
       "config": {
         "applicationName": "ARC Studio",
         "preferences": {
-          "files.enableTrash": false,
-          "security.workspace.trust.enabled": false
+          "files.enableTrash": true,
+          "security.workspace.trust.enabled": true
         }
       }
     }
