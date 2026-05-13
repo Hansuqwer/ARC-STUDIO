@@ -28,7 +28,7 @@ from ..protocol.schemas import (
     WorkflowInfo, RunRecord, RunEvent, RunStatus
 )
 from ._static import dependency_evidence, import_evidence, static_workflow
-from .base import RuntimeAdapter, CapabilityReport
+from .base import RuntimeAdapter, CapabilityReport, DoctorAction
 
 log = logging.getLogger(__name__)
 
@@ -67,6 +67,15 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                 detected_artifacts=evidence,
                 required_env=["OPENAI_API_KEY"],
                 requires_paid_calls=True,
+                doctor_actions=[
+                    DoctorAction(
+                        id="install-openai-agents",
+                        label="Install OpenAI Agents SDK",
+                        description="Install the openai-agents package",
+                        command="pip install openai-agents",
+                        safe_to_auto_run=False,
+                    ),
+                ],
             )
         
         # Check dual gating
@@ -82,6 +91,15 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                 detected_artifacts=evidence,
                 required_env=["ARC_OPENAI_RUN_BACKEND", "ARC_OPENAI_ALLOW_COSTS", "OPENAI_API_KEY"],
                 requires_paid_calls=True,
+                doctor_actions=[
+                    DoctorAction(
+                        id="config-openai-gating",
+                        label="Configure OpenAI Gating",
+                        description="Set ARC_OPENAI_RUN_BACKEND and ARC_OPENAI_ALLOW_COSTS",
+                        command="export ARC_OPENAI_RUN_BACKEND=stub && export ARC_OPENAI_ALLOW_COSTS=true",
+                        safe_to_auto_run=False,
+                    ),
+                ],
             )
         
         return CapabilityReport(
@@ -93,6 +111,24 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
             required_env=["ARC_OPENAI_RUN_BACKEND", "ARC_OPENAI_ALLOW_COSTS", "OPENAI_API_KEY"],
             requires_paid_calls=True,
         )
+
+    def _doctor_actions(self, workspace: Path) -> list[DoctorAction]:
+        return [
+            DoctorAction(
+                id="install-openai-agents",
+                label="Install OpenAI Agents SDK",
+                description="Install the openai-agents package",
+                command="pip install openai-agents",
+                safe_to_auto_run=False,
+            ),
+            DoctorAction(
+                id="config-openai-gating",
+                label="Configure OpenAI Gating",
+                description="Set ARC_OPENAI_RUN_BACKEND=stub and optionally ARC_OPENAI_ALLOW_COSTS=true",
+                command="export ARC_OPENAI_RUN_BACKEND=stub",
+                safe_to_auto_run=False,
+            ),
+        ]
 
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
         dep_score, evidence = dependency_evidence(

@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-from ..adapters.base import CapabilityReport
+from ..adapters.base import CapabilityReport, DoctorAction
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import (
     WorkflowInfo, WorkflowNode, WorkflowEdge, SchemaInfo,
@@ -75,6 +75,15 @@ class LangGraphAdapter(RuntimeAdapter):
                 reason=LG_DEP_MISSING,
                 detected_artifacts=evidence,
                 required_env=[EXPORT_ENV],
+                doctor_actions=[
+                    DoctorAction(
+                        id="install-langgraph",
+                        label="Install LangGraph",
+                        description="Install langgraph in this Python environment",
+                        command="pip install langgraph",
+                        safe_to_auto_run=False,
+                    ),
+                ],
             )
         target = os.environ.get(EXPORT_ENV)
         if not target:
@@ -86,6 +95,15 @@ class LangGraphAdapter(RuntimeAdapter):
                 reason=LG_EXPORT_UNSET,
                 detected_artifacts=evidence,
                 required_env=[EXPORT_ENV],
+                doctor_actions=[
+                    DoctorAction(
+                        id="set-langgraph-export",
+                        label="Set ARC_LANGGRAPH_EXPORT",
+                        description=f"Set {EXPORT_ENV}=module:function to your compiled LangGraph graph",
+                        command=f"export {EXPORT_ENV}=my_graph:graph",
+                        safe_to_auto_run=False,
+                    ),
+                ],
             )
         try:
             exported = self._resolve_export(workspace, target, load_target=True)
@@ -100,6 +118,15 @@ class LangGraphAdapter(RuntimeAdapter):
                 reason=exc.code,
                 detected_artifacts=evidence,
                 required_env=[EXPORT_ENV],
+                doctor_actions=[
+                    DoctorAction(
+                        id="fix-langgraph-export",
+                        label="Fix LangGraph Export",
+                        description=f"Check {target}: it must resolve to a compiled graph",
+                        command=f"python -c \"import {target.split(':')[0]}; print('ok')\"",
+                        safe_to_auto_run=False,
+                    ),
+                ],
             )
         return CapabilityReport(
             runtime_id=self.adapter_id,
@@ -109,6 +136,25 @@ class LangGraphAdapter(RuntimeAdapter):
             detected_artifacts=evidence,
             required_env=[EXPORT_ENV],
         )
+
+    def _doctor_actions(self, workspace: Path) -> list[DoctorAction]:
+        target = os.environ.get(EXPORT_ENV, "")
+        return [
+            DoctorAction(
+                id="install-langgraph",
+                label="Install LangGraph",
+                description="Install langgraph in this Python environment",
+                command="pip install langgraph",
+                safe_to_auto_run=False,
+            ),
+            DoctorAction(
+                id="set-langgraph-export",
+                label="Set ARC_LANGGRAPH_EXPORT",
+                description=f"Set {EXPORT_ENV}=module:function to your compiled LangGraph graph",
+                command=f"export {EXPORT_ENV}=my_graph:graph" if not target else f"export {EXPORT_ENV}={target}",
+                safe_to_auto_run=False,
+            ),
+        ]
 
     async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
         inputs = inputs or {}

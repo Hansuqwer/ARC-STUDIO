@@ -55,6 +55,11 @@ export const ArcCommands = {
     label: 'ARC: Export Trace to OTLP',
     category: 'ARC',
   },
+  RUNTIME_DOCTOR: {
+    id: 'arc:runtime-doctor',
+    label: 'ARC: Runtime Doctor',
+    category: 'ARC',
+  },
 };
 
 @injectable()
@@ -197,6 +202,12 @@ export class ArcCommandContribution implements CommandContribution, MenuContribu
         } catch (e) {
           this.messageService.error(`Export failed: ${e}`);
         }
+      },
+    });
+
+    registry.registerCommand(ArcCommands.RUNTIME_DOCTOR, {
+      execute: async () => {
+        await this.commandService.executeCommand('arc:open-adapters');
       },
     });
   }

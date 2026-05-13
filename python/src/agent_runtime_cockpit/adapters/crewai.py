@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Iterator
 from typing import Any
 
-from ..adapters.base import CapabilityReport
+from ..adapters.base import CapabilityReport, DoctorAction
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import WorkflowInfo, RunRecord, RunEvent, RunStatus
 from ._static import dependency_evidence, import_evidence, static_workflow
@@ -46,6 +46,15 @@ class CrewAIAdapter(RuntimeAdapter):
                 detected_artifacts=evidence,
                 required_env=[EXPORT_ENV],
                 requires_paid_calls=True,
+                doctor_actions=[
+                    DoctorAction(
+                        id="install-crewai",
+                        label="Install CrewAI",
+                        description="Install crewai in this Python environment",
+                        command="pip install crewai",
+                        safe_to_auto_run=False,
+                    ),
+                ],
             )
         if not os.environ.get(EXPORT_ENV):
             return CapabilityReport(
@@ -58,6 +67,15 @@ class CrewAIAdapter(RuntimeAdapter):
                 required_env=[EXPORT_ENV],
                 version=version,
                 requires_paid_calls=True,
+                doctor_actions=[
+                    DoctorAction(
+                        id="set-crewai-export",
+                        label="Set ARC_CREWAI_EXPORT",
+                        description=f"Set {EXPORT_ENV}=module:attribute to your Crew entry point",
+                        command=f"export {EXPORT_ENV}=my_crew:crew",
+                        safe_to_auto_run=False,
+                    ),
+                ],
             )
         return CapabilityReport(
             runtime_id=self.adapter_id,
@@ -68,7 +86,19 @@ class CrewAIAdapter(RuntimeAdapter):
             required_env=[EXPORT_ENV],
             version=version,
             requires_paid_calls=True,
+            doctor_actions=self._doctor_actions(workspace),
         )
+
+    def _doctor_actions(self, workspace: Path) -> list[DoctorAction]:
+        return [
+            DoctorAction(
+                id="set-crewai-export",
+                label="Set ARC_CREWAI_EXPORT",
+                description=f"Set {EXPORT_ENV}=module:attribute to your Crew entry point",
+                command=f"export {EXPORT_ENV}=my_crew:crew",
+                safe_to_auto_run=False,
+            ),
+        ]
 
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
         dep_score, evidence = dependency_evidence(workspace, ("crewai",))

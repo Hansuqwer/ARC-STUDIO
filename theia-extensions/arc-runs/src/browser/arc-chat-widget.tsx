@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { injectable, inject, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
+import { CommandService } from '@theia/core/lib/common/command';
+import { PreferenceService } from '@theia/core/lib/common/preferences/preference-service';
 import { ArcFrontendService } from 'arc-core/lib/browser/arc-frontend-service';
 import { RuntimeCapabilityReport, RuntimeId, RunRecord } from 'arc-core/lib/common/arc-protocol';
 
@@ -18,12 +20,19 @@ export class ArcChatWidget extends ReactWidget {
   @inject(ArcFrontendService)
   protected readonly arcService: ArcFrontendService;
 
+  @inject(CommandService)
+  protected readonly commandService: CommandService;
+
+  @inject(PreferenceService)
+  protected readonly preferences: PreferenceService;
+
   protected prompt = '';
   protected loading = false;
   protected capabilities: RuntimeCapabilityReport[] = [];
   protected selectedRuntime: RuntimeId = 'auto';
   protected selectedRuntimes = new Set<RuntimeId>();
   protected allowPaidCalls = false;
+  protected profileId = 'stub';
   protected lastError?: string;
   protected messages: ChatMessage[] = [
     { role: 'system', text: 'Prompt local ARC runtimes. Select one runtime or multiple runtimes for combo mode.' },
@@ -36,6 +45,7 @@ export class ArcChatWidget extends ReactWidget {
     this.title.caption = 'ARC Chat';
     this.title.closable = true;
     this.title.iconClass = 'codicon codicon-comment-discussion';
+    this.profileId = this.preferences.get<string>('arc.run.defaultProfile', 'stub');
     this.loadCapabilities();
   }
 
@@ -79,7 +89,12 @@ export class ArcChatWidget extends ReactWidget {
       <div key={index} style={{ ...styles.message, ...(message.role === 'user' ? styles.userMessage : {}) }}>
         <strong>{message.role}</strong>
         <div style={styles.messageText}>{message.text}</div>
-        {message.runId && <div style={styles.runId}>Run: {message.runId}</div>}
+        {message.runId && (
+          <div style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span style={styles.runId}>Run: {message.runId}</span>
+            <button style={styles.secondaryButton} onClick={() => this.openTimeline(message.runId!)}>Open in Timeline</button>
+          </div>
+        )}
       </div>
     );
   }
@@ -125,6 +140,19 @@ export class ArcChatWidget extends ReactWidget {
           />
           Allow paid/provider calls
         </label>
+        <label style={styles.checkboxLabel}>
+          Profile:{' '}
+          <select
+            style={styles.select}
+            value={this.profileId}
+            onChange={event => { this.profileId = event.currentTarget.value; this.update(); }}
+          >
+            <option value="stub">Stub (Safe)</option>
+            <option value="local-safe">Local Safe</option>
+            <option value="local-paid">Local Paid</option>
+            <option value="gateway">Gateway (Full Access)</option>
+          </select>
+        </label>
         {this.renderReadiness()}
       </div>
     );
@@ -165,6 +193,10 @@ export class ArcChatWidget extends ReactWidget {
   protected runtimeSelection(): RuntimeId | RuntimeId[] {
     const combo = Array.from(this.selectedRuntimes);
     return combo.length > 1 ? combo : this.selectedRuntime;
+  }
+
+  protected async openTimeline(runId: string): Promise<void> {
+    await this.commandService.executeCommand('arc:open-run-timeline');
   }
 
   protected async submitPrompt(): Promise<void> {

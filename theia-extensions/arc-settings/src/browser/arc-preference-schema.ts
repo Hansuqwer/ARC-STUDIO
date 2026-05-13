@@ -66,6 +66,12 @@ export const ArcPreferenceSchema: PreferenceSchema = {
       default: '',
       description: 'Optional SwarmGraph provider base URL override. Leave empty for provider default.',
     },
+    'arc.run.defaultProfile': {
+      type: 'string',
+      default: 'stub',
+      enum: ['stub', 'local-safe', 'local-paid', 'gateway'],
+      description: 'Default run profile: stub (safe), local-safe (network), local-paid (network+paid), gateway (full access).',
+    },
     'arc.telemetry.otlpEndpoint': {
       type: 'string',
       default: '',

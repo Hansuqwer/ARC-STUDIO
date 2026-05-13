@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..adapters.base import CapabilityReport
+from ..adapters.base import CapabilityReport, DoctorAction
 from ..gating import require_dual_gate
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import (
@@ -121,9 +121,17 @@ class SwarmGraphAdapter(RuntimeAdapter):
 
     def capability_report(self, workspace: Path) -> CapabilityReport:
         detected, _, evidence = self.detect(workspace)
+        doctor: list[DoctorAction] = []
         try:
             self._resolve_cli(workspace)
         except Exception as exc:
+            doctor.append(DoctorAction(
+                id="install-swarmgraph",
+                label="Install SwarmGraph",
+                description="Install the SwarmGraph Python package",
+                command="pip install git+https://github.com/Hansuqwer/SwarmGraph",
+                safe_to_auto_run=False,
+            ))
             return CapabilityReport(
                 runtime_id=self.adapter_id,
                 detected=detected,
@@ -132,6 +140,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
                 reason=str(exc),
                 detected_artifacts=evidence,
                 required_env=["ARC_SWARMGRAPH_CLI"],
+                doctor_actions=doctor,
             )
         return CapabilityReport(
             runtime_id=self.adapter_id,
@@ -140,7 +149,31 @@ class SwarmGraphAdapter(RuntimeAdapter):
             availability="runnable",
             detected_artifacts=evidence,
             required_env=["ARC_SWARMGRAPH_CLI"],
+            doctor_actions=doctor,
         )
+
+    def _doctor_actions(self, workspace: Path) -> list[DoctorAction]:
+        """Return fix actions for SwarmGraph configuration issues."""
+        actions: list[DoctorAction] = []
+        try:
+            self._resolve_cli(workspace)
+        except Exception:
+            actions.append(DoctorAction(
+                id="install-swarmgraph",
+                label="Install SwarmGraph",
+                description="Install the SwarmGraph Python package",
+                command="pip install git+https://github.com/Hansuqwer/SwarmGraph",
+                safe_to_auto_run=False,
+            ))
+        if not os.environ.get("ARC_SWARMGRAPH_CLI"):
+            actions.append(DoctorAction(
+                id="set-swarmgraph-cli",
+                label="Set ARC_SWARMGRAPH_CLI",
+                description="Set the SwarmGraph CLI environment variable",
+                command="export ARC_SWARMGRAPH_CLI=swarmgraph",
+                safe_to_auto_run=False,
+            ))
+        return actions
 
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
         evidence: list[str] = []

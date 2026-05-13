@@ -23,6 +23,7 @@ from ..protocol.schemas import WorkspaceInfo
 from ..security.validation import validate_workspace_path
 from ..security.redaction import Redactor
 from ..storage.jsonl import JsonlTraceStore
+from ..evals.diff import diff_runs
 from ..telemetry.otlp_exporter import export_run_to_otlp, validate_otlp_endpoint
 from ..workspace import iter_workspace_files
 from ..providers import (
@@ -382,6 +383,37 @@ async def export_trace(request: web.Request) -> web.Response:
         return _json(err(ArcErrorCode.INTERNAL_ERROR, f"Export failed: {str(e)}").model_dump(), 500)
 
 
+# ─── Diff ──────────────────────────────────────────────────────────────────────
+
+async def runs_diff(request: web.Request) -> web.Response:
+    """Compare two runs by run IDs: GET /api/runs/diff?run_a=...&run_b=..."""
+    run_a_id = request.query.get("run_a", "")
+    run_b_id = request.query.get("run_b", "")
+    if not run_a_id or not run_b_id:
+        return _json(err("missing_params", "Both run_a and run_b are required").model_dump(), 400)
+    store = _trace_store(request)
+    run_a = store.load(run_a_id)
+    run_b = store.load(run_b_id)
+    if run_a is None or run_b is None:
+        return _json(err("not_found", "One or both runs not found").model_dump(), 404)
+    result = diff_runs(run_a, run_b)
+    return _json(ok(result.model_dump()).model_dump())
+
+
+async def runs_eval(request: web.Request) -> web.Response:
+    """Evaluate a run against a golden trace: POST /api/evals/run"""
+    from ..evals.golden import GoldenTrace, eval_run
+    body = await request.json()
+    run_id = body.get("run_id", "")
+    golden = GoldenTrace.model_validate(body.get("golden", {}))
+    store = _trace_store(request)
+    run = store.load(run_id)
+    if run is None:
+        return _json(err("not_found", f"Run {run_id} not found").model_dump(), 404)
+    result = eval_run(run, golden)
+    return _json(ok(result.model_dump()).model_dump())
+
+
 def setup_routes(app: web.Application) -> None:
     app.router.add_get("/health",                health)
     app.router.add_get("/api/inspect",           inspect)
@@ -408,3 +440,5 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_post("/api/providers/proxy/chat", providers_proxy_chat)
     app.router.add_post("/api/providers/proxy/responses", providers_proxy_chat)
     app.router.add_post("/api/providers/diagnostics/redacted", providers_diagnostics)
+    app.router.add_get("/api/runs/diff",                runs_diff)
+    app.router.add_post("/api/evals/run",                runs_eval)

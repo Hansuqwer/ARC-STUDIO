@@ -55,6 +55,25 @@ export interface RuntimeCapabilities {
   can_replay: boolean;
   can_export_schema: boolean;
   can_export_workflow: boolean;
+  can_stream_events: boolean;
+  can_audit: boolean;
+  can_checkpoint: boolean;
+  can_resume: boolean;
+  can_fork: boolean;
+  can_diff: boolean;
+  can_eval: boolean;
+  requires_paid_calls: boolean;
+  requires_network: boolean;
+  requires_shell: boolean;
+  requires_secrets: boolean;
+}
+
+export interface DoctorAction {
+  id: string;
+  label: string;
+  description: string;
+  command: string;
+  safe_to_auto_run: boolean;
 }
 
 export interface RuntimeCapabilityReport {
@@ -67,6 +86,7 @@ export interface RuntimeCapabilityReport {
   required_env: string[];
   version?: string | null;
   requires_paid_calls: boolean;
+  doctor_actions: DoctorAction[];
 }
 
 export interface RuntimeCapabilitiesResponse {
