@@ -6,7 +6,7 @@
  */
 
 import { injectable, inject, postConstruct } from '@theia/core/shared/inversify';
-import { CommandContribution, CommandRegistry, MenuContribution, MenuModelRegistry } from '@theia/core/lib/common';
+import { CommandContribution, CommandRegistry, CommandService, MenuContribution, MenuModelRegistry } from '@theia/core/lib/common';
 import { CommonMenus } from '@theia/core/lib/browser/common-frontend-contribution';
 import { MessageService } from '@theia/core/lib/common/message-service';
 import { PreferenceService } from '@theia/core/lib/common/preferences/preference-service';
@@ -69,6 +69,9 @@ export class ArcCommandContribution implements CommandContribution, MenuContribu
   @inject(ArcFrontendService)
   protected readonly arcService: ArcFrontendService;
 
+  @inject(CommandService)
+  protected readonly commandService: CommandService;
+
   registerCommands(registry: CommandRegistry): void {
     registry.registerCommand(ArcCommands.INSPECT_WORKSPACE, {
       execute: async () => {
@@ -130,7 +133,7 @@ export class ArcCommandContribution implements CommandContribution, MenuContribu
 
     registry.registerCommand(ArcCommands.START_RUN, {
       execute: async () => {
-        this.messageService.info('ARC: Run launcher coming in next iteration. Open the Runs tab.');
+        await this.commandService.executeCommand('arc:open-chat');
       },
     });
 

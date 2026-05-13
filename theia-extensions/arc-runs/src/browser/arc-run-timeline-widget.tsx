@@ -44,6 +44,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
   protected selectedEvent: RunEvent | null = null;
   protected runtimeCapabilities: RuntimeCapabilityReport[] = [];
   protected selectedRuntime: RuntimeId = 'auto';
+  protected selectedRuntimes = new Set<RuntimeId>();
   protected runtimeError?: string;
 
   @postConstruct()
@@ -295,6 +296,21 @@ export class ArcRunTimelineWidget extends ReactWidget {
           <button style={primaryBtnStyle} onClick={() => this.startRuntimeRun()}>Start Run</button>
           <button style={secondaryBtnStyle} onClick={() => this.refreshWorkspace()}>Refresh Workspace</button>
         </div>
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', fontSize: '11px' }}>
+          <strong>Combo:</strong>
+          {this.runtimeCapabilities.filter(runtime => runtime.runtime_id !== 'auto').map(runtime => (
+            <label key={runtime.runtime_id} title={runtime.reason ?? ''}>
+              <input
+                type="checkbox"
+                disabled={!runtime.can_run}
+                checked={this.selectedRuntimes.has(runtime.runtime_id as RuntimeId)}
+                onChange={event => this.toggleComboRuntime(runtime.runtime_id as RuntimeId, event.currentTarget.checked)}
+              />
+              {this.runtimeLabel(runtime)}
+            </label>
+          ))}
+        </div>
+        {this.renderReadiness()}
         {this.runtimeError && <div style={{ fontSize: '11px', color: '#ffb74d' }}>Runtime capabilities: {this.runtimeError}</div>}
         {this.runStatusMessage && <div style={statusMessageStyle}>{this.runStatusMessage}</div>}
         {this.lastError && <pre style={{ ...outputBoxStyle, borderColor: '#ef5350', color: '#ef9a9a' }}>{this.lastError}</pre>}
@@ -383,19 +399,50 @@ export class ArcRunTimelineWidget extends ReactWidget {
     return `${runtime.runtime_id} (${status}${paid})`;
   }
 
+  protected toggleComboRuntime(runtime: RuntimeId, checked: boolean): void {
+    if (checked) {
+      this.selectedRuntimes.add(runtime);
+    } else {
+      this.selectedRuntimes.delete(runtime);
+    }
+    this.update();
+  }
+
+  protected runtimeSelection(): RuntimeId | RuntimeId[] {
+    const combo = Array.from(this.selectedRuntimes);
+    return combo.length > 1 ? combo : this.selectedRuntime;
+  }
+
+  protected renderReadiness(): React.ReactNode {
+    const missing = this.runtimeCapabilities.filter(runtime => !runtime.can_run);
+    if (missing.length === 0) return null;
+    return (
+      <div style={{ fontSize: '11px', color: '#ffb74d', display: 'grid', gap: '4px' }}>
+        {missing.map(runtime => (
+          <div key={runtime.runtime_id}>
+            <strong>{runtime.runtime_id}</strong>: {runtime.reason || runtime.availability}
+            {runtime.required_env.length > 0 && ` Set ${runtime.required_env.join(', ')}.`}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   protected async startRuntimeRun(): Promise<void> {
     this.loading = true;
     this.lastError = undefined;
     this.runStatusMessage = `Starting ${this.selectedRuntime} run...`;
     this.update();
     try {
-      const paid = this.runtimeCapabilities.find(
-        r => r.runtime_id === this.selectedRuntime
-      )?.requires_paid_calls === true;
+      const selection = this.runtimeSelection();
+      const selected = Array.isArray(selection) ? selection : [selection];
+      const paid = this.runtimeCapabilities.some(
+        r => selected.includes(r.runtime_id as RuntimeId) && r.requires_paid_calls === true
+      );
       const result = await this.arcService.startRun('wf-swarmgraph-001', {
         prompt: this.prompt,
         workspacePath: this.workspaceStatus?.frontendPath,
-      }, this.selectedRuntime, paid ? true : undefined);
+      }, selection, paid ? true : undefined);
       if (result.data) {
         this.runs = [result.data, ...this.runs];
         this.selectedRun = result.data;

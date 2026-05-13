@@ -22,6 +22,7 @@ import {
   ProviderRoutingPolicy,
   RuntimeCapabilitiesResponse,
   RuntimeId,
+  RuntimeSelection,
 } from '../common/arc-protocol';
 
 @injectable()
@@ -65,7 +66,7 @@ export class ArcFrontendService {
     return this.arcService.listSchemas(path, runtimeId);
   }
 
-  async startRun(workflowId: string, inputs?: Record<string, unknown>, runtime: RuntimeId = 'auto', allowPaidCalls?: boolean): Promise<ArcEnvelope<RunRecord>> {
+  async startRun(workflowId: string, inputs?: Record<string, unknown>, runtime: RuntimeSelection = 'auto', allowPaidCalls?: boolean): Promise<ArcEnvelope<RunRecord>> {
     const path = await this.getWorkspacePath();
     return this.arcService.startRun({
       workflow_id: workflowId,

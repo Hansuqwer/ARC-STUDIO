@@ -29,6 +29,11 @@ describe('buildStartRunArgs', () => {
     const args = buildStartRunArgs({ workflow_id: 'demo', allow_paid_calls: true });
     assert.ok(args.includes('--allow-paid-calls'));
   });
+
+  test('serializes combo runtime selections for the CLI', () => {
+    const args = buildStartRunArgs({ workflow_id: 'demo', runtime: ['swarmgraph', 'crewai'] });
+    assert.deepEqual(args.slice(0, 4), ['run', 'demo', '--runtime', 'swarmgraph,crewai']);
+  });
 });
 
 describe('runtime validators', () => {

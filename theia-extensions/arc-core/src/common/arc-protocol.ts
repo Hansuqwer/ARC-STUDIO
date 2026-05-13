@@ -126,10 +126,11 @@ export interface RunRecord {
 }
 
 export type RuntimeId = 'auto' | 'swarmgraph' | 'langgraph' | 'crewai';
+export type RuntimeSelection = RuntimeId | RuntimeId[];
 
 export interface StartRunRequest {
   workflow_id: string;
-  runtime?: RuntimeId;
+  runtime?: RuntimeSelection;
   inputs?: Record<string, unknown>;
   /**
    * Whether the run is permitted to make paid API calls.
