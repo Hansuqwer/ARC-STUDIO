@@ -337,6 +337,9 @@ def run_workflow(
 runs_app = typer.Typer(name="runs", help="List and manage stored run records", invoke_without_command=True)
 app.add_typer(runs_app)
 
+eval_app = typer.Typer(name="eval", help="Evaluate runs against golden traces")
+app.add_typer(eval_app)
+
 providers_app = typer.Typer(name="providers", help="Provider definitions and dry-run routing")
 app.add_typer(providers_app)
 
@@ -626,6 +629,79 @@ def adapter_list(debug: bool = DEBUG_FLAG) -> None:
         cap_str = " ".join(k.replace("can_", "") for k, v in caps.model_dump().items() if v)
         table.add_row(a.adapter_id, a.adapter_name, cap_str)
     console.print(table)
+
+
+# ─── eval ─────────────────────────────────────────────────────────────────────
+
+@eval_app.command("run")
+def eval_run(
+    run_id: str = typer.Argument(..., help="Run ID to evaluate"),
+    golden_id: str = typer.Option("", "--golden", "-g", help="Golden trace ID"),
+    expected_output: str = typer.Option("", "--expected-final-output", help="Expected substring in final output"),
+    expected_event_types: str = typer.Option("", "--expected-event-types", help="Comma-separated expected event types"),
+    expected_status: str = typer.Option("completed", "--expected-status", help="Expected run status"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Evaluate a run against a golden trace.
+
+    Provide --golden to load a saved golden trace, or specify
+    --expected-final-output/--expected-status/--expected-event-types inline.
+
+    Example:
+        uv run arc eval run <run_id> --expected-final-output "hello" --expected-status completed
+        uv run arc eval run <run_id> --golden my-golden-id
+    """
+    _setup_logging(debug)
+    from .storage.jsonl import JsonlTraceStore
+    from .evals.golden import GoldenTrace, eval_run as do_eval
+
+    ws = _workspace(workspace)
+    store = JsonlTraceStore(ws / ".arc" / "traces")
+    run = store.load(run_id)
+    if run is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
+        raise typer.Exit(1)
+
+    events = [t.strip() for t in expected_event_types.split(",") if t.strip()] if expected_event_types else []
+
+    golden = GoldenTrace(
+        id=golden_id or f"cli-{run_id}",
+        workflow_id=run.workflow_id,
+        expected_status=expected_status,
+        expected_event_types=events,
+        expected_final_output_contains=expected_output,
+    )
+    result = do_eval(run, golden)
+    _out(ok(result.model_dump(), workspace=str(ws)), json_output)
+
+    if not json_output:
+        color = "green" if result.passed else "red"
+        console.print(f"Eval [bold {color}]{'PASS' if result.passed else 'FAIL'}[/bold {color}]  score={result.score}")
+        console.print(f"  status_match={result.status_match}  event_type_match={result.event_type_match}  output_contains_match={result.output_contains_match}")
+
+
+@eval_app.command("list")
+def eval_list(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """List saved golden traces."""
+    _setup_logging(debug)
+    from .evals.golden import list_goldens
+    ws = _workspace(workspace)
+    goldens = list_goldens(ws)
+    _out(ok([g.model_dump() for g in goldens]), json_output)
+    if not json_output:
+        table = Table(title="Golden Traces")
+        table.add_column("ID")
+        table.add_column("Workflow")
+        table.add_column("Expected Output (truncated)")
+        for g in goldens:
+            table.add_row(g.id, g.workflow_id, g.expected_output[:60] if g.expected_output else "")
+        console.print(table)
 
 
 if __name__ == "__main__":

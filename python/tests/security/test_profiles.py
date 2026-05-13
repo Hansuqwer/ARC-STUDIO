@@ -1,5 +1,4 @@
 """Tests for run profiles."""
-import os
 from agent_runtime_cockpit.security.profiles import (
     BUILTIN_PROFILES,
     resolve_profile,
@@ -42,18 +41,18 @@ def test_gateway_has_full_access():
     assert p.allow_secrets
 
 
-def test_enforce_stub_profile():
+def test_enforce_stub_profile(monkeypatch):
     profile = resolve_profile("stub")
-    os.environ["ARC_SWARMGRAPH_RUN_BACKEND"] = "stub"
-    os.environ["ARC_SWARMGRAPH_ALLOW_COSTS"] = ""
+    monkeypatch.setenv("ARC_SWARMGRAPH_RUN_BACKEND", "stub")
+    monkeypatch.setenv("ARC_SWARMGRAPH_ALLOW_COSTS", "")
     # Should not raise
     enforce_profile(profile, "SWARMGRAPH")
 
 
-def test_enforce_stub_rejects_costs():
+def test_enforce_stub_rejects_costs(monkeypatch):
     profile = resolve_profile("stub")
-    os.environ["ARC_SWARMGRAPH_RUN_BACKEND"] = "stub"
-    os.environ["ARC_SWARMGRAPH_ALLOW_COSTS"] = "true"
+    monkeypatch.setenv("ARC_SWARMGRAPH_RUN_BACKEND", "stub")
+    monkeypatch.setenv("ARC_SWARMGRAPH_ALLOW_COSTS", "true")
     try:
         enforce_profile(profile, "SWARMGRAPH")
         assert False, "Should have raised GatingError"
@@ -61,18 +60,18 @@ def test_enforce_stub_rejects_costs():
         pass
 
 
-def test_enforce_local_safe_no_paid():
+def test_enforce_local_safe_no_paid(monkeypatch):
     profile = resolve_profile("local-safe")
-    os.environ["ARC_SWARMGRAPH_RUN_BACKEND"] = "stub"
-    os.environ["ARC_SWARMGRAPH_ALLOW_COSTS"] = ""
+    monkeypatch.setenv("ARC_SWARMGRAPH_RUN_BACKEND", "stub")
+    monkeypatch.setenv("ARC_SWARMGRAPH_ALLOW_COSTS", "")
     # local-safe uses stub backend, no paid calls
     enforce_profile(profile, "SWARMGRAPH")
 
 
-def test_enforce_local_safe_rejects_paid_when_disallowed():
+def test_enforce_local_safe_rejects_paid_when_disallowed(monkeypatch):
     profile = resolve_profile("local-safe")  # allow_paid_calls=False
-    os.environ["ARC_SWARMGRAPH_RUN_BACKEND"] = "local"
-    os.environ["ARC_SWARMGRAPH_ALLOW_COSTS"] = "true"
+    monkeypatch.setenv("ARC_SWARMGRAPH_RUN_BACKEND", "local")
+    monkeypatch.setenv("ARC_SWARMGRAPH_ALLOW_COSTS", "true")
     try:
         enforce_profile(profile, "SWARMGRAPH")
         assert False, "Should have raised GatingError"

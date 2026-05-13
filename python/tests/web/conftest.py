@@ -83,6 +83,10 @@ async def client(app):
             async def get(self, path, **kwargs):
                 resp = await self._client.get(path, **kwargs)
                 return ResponseWrapper(resp)
+
+            async def post(self, path, **kwargs):
+                resp = await self._client.post(path, **kwargs)
+                return ResponseWrapper(resp)
         
         async with TestServer(app) as server:
             async with TestClient(server) as c:

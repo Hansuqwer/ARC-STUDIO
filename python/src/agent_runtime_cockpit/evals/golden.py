@@ -1,6 +1,9 @@
 """Golden trace evaluation — compare a run against an expected golden trace."""
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from pydantic import BaseModel, Field
 
 from ..protocol.schemas import RunRecord, RunStatus
@@ -64,3 +67,41 @@ def eval_run(run: RunRecord, golden: GoldenTrace) -> EvalResult:
         score=round(score, 2),
         details="; ".join(parts) if parts else "all checks passed",
     )
+
+
+GOLDENS_DIR = ".arc/goldens"
+
+
+def _goldens_dir(workspace: Path) -> Path:
+    d = workspace / GOLDENS_DIR
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def save_golden(workspace: Path, golden: GoldenTrace) -> None:
+    """Persist a golden trace to the workspace."""
+    d = _goldens_dir(workspace)
+    (d / f"{golden.id}.json").write_text(golden.model_dump_json(indent=2))
+
+
+def load_golden(workspace: Path, golden_id: str) -> GoldenTrace | None:
+    """Load a saved golden trace by ID."""
+    p = _goldens_dir(workspace) / f"{golden_id}.json"
+    if not p.exists():
+        return None
+    return GoldenTrace.model_validate(json.loads(p.read_text()))
+
+
+def list_goldens(workspace: Path) -> list[GoldenTrace]:
+    """List all saved golden traces in the workspace."""
+    d = _goldens_dir(workspace)
+    result: list[GoldenTrace] = []
+    if not d.exists():
+        return result
+    for f in sorted(d.iterdir()):
+        if f.suffix == ".json":
+            try:
+                result.append(GoldenTrace.model_validate(json.loads(f.read_text())))
+            except Exception:
+                continue
+    return result

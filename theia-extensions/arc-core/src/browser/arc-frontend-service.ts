@@ -23,6 +23,8 @@ import {
   RuntimeCapabilitiesResponse,
   RuntimeId,
   RuntimeSelection,
+  GoldenTrace,
+  EvalResult,
 } from '../common/arc-protocol';
 
 @injectable()
@@ -117,5 +119,9 @@ export class ArcFrontendService {
 
   async exportTraceToOTLP(runId: string, endpoint: string): Promise<ArcEnvelope<{ exported: boolean; warning?: string }>> {
     return this.arcService.exportTraceToOTLP(runId, endpoint);
+  }
+
+  async evalRun(runId: string, golden: GoldenTrace): Promise<ArcEnvelope<EvalResult>> {
+    return this.arcService.evalRun(runId, golden);
   }
 }

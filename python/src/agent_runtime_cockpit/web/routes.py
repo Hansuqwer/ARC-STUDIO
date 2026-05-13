@@ -10,6 +10,8 @@ import json
 import logging
 import os
 import time
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 import aiohttp.web as web
@@ -23,7 +25,18 @@ from ..protocol.schemas import WorkspaceInfo
 from ..security.validation import validate_workspace_path
 from ..security.redaction import Redactor
 from ..storage.jsonl import JsonlTraceStore
+from ..arena.models import ArenaAdoptRequest, ArenaMode, ArenaRequest, ArenaVote, PrivacyLevel
+from ..arena.service import (
+    adopt_candidate,
+    arena_request,
+    list_models,
+    list_tags,
+    store_arena_run,
+)
+from ..protocol.schemas import RunEvent
 from ..evals.diff import diff_runs
+from ..gating import GatingError
+from ..security.profiles import enforce_profile, resolve_profile
 from ..telemetry.otlp_exporter import export_run_to_otlp, validate_otlp_endpoint
 from ..workspace import iter_workspace_files
 from ..providers import (
@@ -193,6 +206,15 @@ async def start_run(request: web.Request) -> web.Response:
         return _json(err("invalid_runtime", f"Invalid runtime: {runtime}").model_dump(), 400)
     workspace = _workspace(request)
     allow_paid_calls = bool(body.get("allow_paid_calls")) or request.query.get("allow_paid_calls", "").lower() in {"1", "true", "yes"}
+    paid_calls_explicit = "allow_paid_calls" in body or "allow_paid_calls" in request.query
+    profile_id = str(body.get("profile_id") or request.query.get("profile_id", ""))
+    if not profile_id:
+        # Auto-select profile based on allow_paid_calls
+        profile_id = "local-paid" if paid_calls_explicit and allow_paid_calls else "local-safe"
+    profile = resolve_profile(profile_id)
+    # Profile's allow_paid_calls overrides if not explicitly set in request
+    if not paid_calls_explicit:
+        allow_paid_calls = profile.allow_paid_calls
     inputs = body.get("inputs") if isinstance(body.get("inputs"), dict) else {}
     try:
         routed = runtime_router.resolve(workspace, runtime, allow_paid_calls=allow_paid_calls)
@@ -200,6 +222,12 @@ async def start_run(request: web.Request) -> web.Response:
         return _json(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": exc.code}).model_dump(), 400)
     except runtime_router.RuntimeRouterError as exc:
         return _json(err(ArcErrorCode.NOT_IMPLEMENTED, str(exc), details={"code": exc.code}).model_dump(), 501)
+
+    # Enforce profile for the selected runtime
+    try:
+        enforce_profile(profile, routed.adapter.adapter_id)
+    except GatingError as exc:
+        return _json(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "PROFILE_ENFORCEMENT_FAILED"}).model_dump(), 403)
 
     try:
         run = await routed.adapter.run_workflow(workflow_id, {**inputs, "workspace": str(workspace), "allow_paid_calls": allow_paid_calls})
@@ -414,6 +442,115 @@ async def runs_eval(request: web.Request) -> web.Response:
     return _json(ok(result.model_dump()).model_dump())
 
 
+# ─── Arena (LM Arena) ───────────────────────────────────────────────────────
+
+async def arena_models(request: web.Request) -> web.Response:
+    """GET /api/arena/models — list available Arena models."""
+    tags_raw = request.query.get("tags", "")
+    tags = [t.strip() for t in tags_raw.split(",") if t.strip()] if tags_raw else None
+    models = list_models(tags)
+    return _json(ok([m.model_dump() for m in models]).model_dump())
+
+
+async def arena_tags(request: web.Request) -> web.Response:
+    """GET /api/arena/tags — list model tag descriptions."""
+    return _json(ok(list_tags()).model_dump())
+
+
+async def arena_chat(request: web.Request) -> web.Response:
+    """POST /api/arena/chat — main entry point for all Arena modes.
+
+    Body accepts ArenaRequest JSON.
+    Returns ArenaResponse with candidates for battle/direct/code/agent-arena-preview.
+    """
+    t0 = time.time()
+    workspace = _workspace(request)
+    try:
+        body = await request.json()
+    except Exception:
+        return _json(err(ArcErrorCode.INVALID_INPUT, "Invalid JSON body").model_dump(), 400)
+
+    req = ArenaRequest.model_validate(body)
+    req.workspace = str(workspace)
+
+    # Validate mode
+    try:
+        mode = ArenaMode(req.mode) if isinstance(req.mode, str) else req.mode
+    except ValueError:
+        return _json(err(ArcErrorCode.INVALID_INPUT, f"Invalid mode: {req.mode}").model_dump(), 400)
+
+    req.mode = mode
+
+    # Enforce profile
+    try:
+        profile = resolve_profile(req.profile_id)
+        enforce_profile(profile, "lmarena")
+    except GatingError as exc:
+        return _json(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "PROFILE_ENFORCEMENT_FAILED"}).model_dump(), 403)
+
+    # Process request
+    response = arena_request(workspace, req)
+    if not response.run_id:
+        response.run_id = f"arena-{uuid.uuid4().hex[:12]}"
+
+    # Store as ARC run
+    store = _trace_store(request)
+    store_arena_run(store, response, req)
+
+    envelope = ok(response.model_dump(), workspace=str(workspace),
+                  duration_ms=(time.time() - t0) * 1000)
+    envelope.data["_run_id"] = response.run_id
+    return _json(envelope.model_dump())
+
+
+async def arena_vote(request: web.Request) -> web.Response:
+    """POST /api/arena/vote — record a vote for a battle candidate."""
+    try:
+        body = await request.json()
+    except Exception:
+        return _json(err(ArcErrorCode.INVALID_INPUT, "Invalid JSON body").model_dump(), 400)
+
+    vote = ArenaVote.model_validate(body)
+    # Store vote in arena runs metadata
+    store = _trace_store(request)
+    run = store.load(vote.run_id)
+    if run is None:
+        return _json(err(ArcErrorCode.RUN_NOT_FOUND, f"Run {vote.run_id} not found").model_dump(), 404)
+
+    # Add vote event to existing run record
+    events = list(run.events)
+    events.append(RunEvent(
+        type="LMARENA_VOTE_RECORDED",
+        timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        run_id=vote.run_id,
+        sequence=len(events),
+        data={
+            "winner_candidate_id": vote.winner_candidate_id,
+            "loser_candidate_id": vote.loser_candidate_id,
+            "voter": vote.voter,
+        },
+    ))
+    run.events = events
+    run.metadata["vote"] = vote.winner_candidate_id
+    store.save(run)
+
+    return _json(ok({"recorded": True, "run_id": vote.run_id}).model_dump())
+
+
+async def arena_adopt(request: web.Request) -> web.Response:
+    """POST /api/arena/adopt — adopt a candidate's code patch."""
+    try:
+        body = await request.json()
+    except Exception:
+        return _json(err(ArcErrorCode.INVALID_INPUT, "Invalid JSON body").model_dump(), 400)
+
+    ws = _workspace(request)
+    req = ArenaAdoptRequest.model_validate(body)
+    req.workspace = str(ws)
+    result = adopt_candidate(ws, req)
+    return _json(ok(result.model_dump()).model_dump())
+
+
 def setup_routes(app: web.Application) -> None:
     app.router.add_get("/health",                health)
     app.router.add_get("/api/inspect",           inspect)
@@ -442,3 +579,8 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_post("/api/providers/diagnostics/redacted", providers_diagnostics)
     app.router.add_get("/api/runs/diff",                runs_diff)
     app.router.add_post("/api/evals/run",                runs_eval)
+    app.router.add_get("/api/arena/models",              arena_models)
+    app.router.add_get("/api/arena/tags",                arena_tags)
+    app.router.add_post("/api/arena/chat",               arena_chat)
+    app.router.add_post("/api/arena/vote",               arena_vote)
+    app.router.add_post("/api/arena/adopt",              arena_adopt)

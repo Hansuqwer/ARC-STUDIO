@@ -29,6 +29,8 @@ import {
   ProviderRoutingPolicy,
   RuntimeCapabilitiesResponse,
   StartRunRequest,
+  GoldenTrace,
+  EvalResult,
   ARC_PROTOCOL_VERSION,
 } from '../common/arc-protocol';
 
@@ -694,6 +696,17 @@ export class ArcServiceImpl implements ArcService {
       return this.errorEnvelope('export-trace', new Error('Daemon not running'));
     } catch (e) {
       return this.errorEnvelope('export-trace', e);
+    }
+  }
+
+  async evalRun(runId: string, golden: GoldenTrace): Promise<ArcEnvelope<EvalResult>> {
+    try {
+      if (await this.isDaemonRunning()) {
+        return this.postDaemon('/api/evals/run', { run_id: runId, golden });
+      }
+      return this.errorEnvelope('eval-run', new Error('Daemon not running'));
+    } catch (e) {
+      return this.errorEnvelope('eval-run', e);
     }
   }
 

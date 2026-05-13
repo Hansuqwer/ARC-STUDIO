@@ -8,7 +8,7 @@ import * as React from 'react';
 import { injectable, inject, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { ArcFrontendService } from 'arc-core/lib/browser/arc-frontend-service';
-import { RunRecord, RunEvent, RuntimeCapabilityReport, RuntimeId } from 'arc-core/lib/common/arc-protocol';
+import { RunRecord, RunEvent, RuntimeCapabilityReport, RuntimeId, GoldenTrace, EvalResult } from 'arc-core/lib/common/arc-protocol';
 
 const EVENT_ICONS: Record<string, string> = {
   RUN_STARTED: '▶',
@@ -46,6 +46,8 @@ export class ArcRunTimelineWidget extends ReactWidget {
   protected selectedRuntime: RuntimeId = 'auto';
   protected selectedRuntimes = new Set<RuntimeId>();
   protected runtimeError?: string;
+  protected evalResult?: EvalResult;
+  protected evalLoading = false;
 
   @postConstruct()
   protected init(): void {
@@ -150,6 +152,9 @@ export class ArcRunTimelineWidget extends ReactWidget {
           <button style={secondaryBtnStyle} onClick={() => this.clearReplay()}>Show Stored Trace</button>
           <button style={secondaryBtnStyle} disabled={this.streaming} onClick={() => this.connectSseStream(run.id)}>Connect SSE Stream</button>
           <button style={secondaryBtnStyle} onClick={() => this.exportRunJson(run)}>Export Run JSON</button>
+          <button style={evalBtnStyle(run)} disabled={this.evalLoading} onClick={() => this.evalRun(run)}>
+            {this.evalLoading ? 'Eval...' : this.evalResult ? `Eval: ${this.evalResult.passed ? 'PASS' : 'FAIL'}` : 'Eval vs Golden'}
+          </button>
           <div style={{ fontSize: '12px', color: 'var(--theia-descriptionForeground)' }}>
             Workflow: <strong>{run.workflow_id}</strong> ·
             Runtime: <strong>{run.runtime}</strong> ·
@@ -258,6 +263,17 @@ export class ArcRunTimelineWidget extends ReactWidget {
           </div>
         )}
         {errorOutput && <pre style={{ ...outputBoxStyle, borderColor: '#ef5350', color: '#ef9a9a' }}>{errorOutput}</pre>}
+        {this.evalResult && (
+          <div style={{ ...metadataBoxStyle, borderColor: this.evalResult.passed ? '#4caf50' : '#ef5350' }}>
+            <div><strong>Eval: {this.evalResult.passed ? 'PASS' : 'FAIL'}</strong> (score: {this.evalResult.score})</div>
+            <div style={{ fontSize: '10px', opacity: 0.7 }}>
+              status_match={String(this.evalResult.status_match)} ·
+              event_type_match={String(this.evalResult.event_type_match)} ·
+              output_match={String(this.evalResult.output_contains_match)}
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--theia-descriptionForeground)' }}>{this.evalResult.details}</div>
+          </div>
+        )}
       </div>
     );
   }
@@ -568,6 +584,33 @@ export class ArcRunTimelineWidget extends ReactWidget {
     this.update();
   }
 
+  protected async evalRun(run: RunRecord): Promise<void> {
+    this.evalLoading = true;
+    this.evalResult = undefined;
+    this.update();
+    try {
+      const golden: GoldenTrace = {
+        id: `inline-${run.id}`,
+        workflow_id: run.workflow_id,
+        expected_status: 'completed',
+        expected_event_types: ['RUN_STARTED', 'RUN_COMPLETED'],
+        expected_final_output_contains: '',
+        description: `Inline eval for ${run.id}`,
+      };
+      const result = await this.arcService.evalRun(run.id, golden);
+      if (result.data) {
+        this.evalResult = result.data;
+      } else {
+        this.lastError = result.error?.message ?? 'Eval failed';
+      }
+    } catch (error) {
+      this.lastError = String(error);
+    } finally {
+      this.evalLoading = false;
+      this.update();
+    }
+  }
+
   protected statusColor(status: string): string {
     const colors: Record<string, string> = {
       pending: '#ffb74d',
@@ -661,3 +704,9 @@ const statusMessageStyle: React.CSSProperties = {
   backgroundColor: 'var(--theia-editor-background)',
   fontSize: '11px',
 };
+
+const evalBtnStyle = (run: RunRecord): React.CSSProperties => ({
+  ...secondaryBtnStyle,
+  borderColor: run.status === 'completed' ? '#4caf50' : 'var(--theia-widget-border)',
+  border: '1px solid',
+});

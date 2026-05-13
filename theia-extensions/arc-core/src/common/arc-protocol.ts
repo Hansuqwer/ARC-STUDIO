@@ -145,7 +145,7 @@ export interface RunRecord {
   metadata: Record<string, unknown>;
 }
 
-export type RuntimeId = 'auto' | 'swarmgraph' | 'langgraph' | 'crewai';
+export type RuntimeId = 'auto' | 'swarmgraph' | 'langgraph' | 'crewai' | 'openai-agents';
 export type RuntimeSelection = RuntimeId | RuntimeId[];
 
 export interface StartRunRequest {
@@ -248,6 +248,28 @@ export interface ArcService {
   getProviderRouting(): Promise<ArcEnvelope<ProviderRoutingPolicy>>;
   getWorkspaceStatus(workspacePath: string): Promise<ArcEnvelope<{ frontendPath: string; backendPath: string; source: string }>>;
   exportTraceToOTLP(runId: string, endpoint: string): Promise<ArcEnvelope<{ exported: boolean; warning?: string }>>;
-  /** Cancel a running CLI-backed workflow. Returns true if a process was killed. */
+    /** Cancel a running CLI-backed workflow. Returns true if a process was killed. */
   cancelRun(runId: string): Promise<ArcEnvelope<{ cancelled: boolean }>>;
+  /** Evaluate a run against a golden trace */
+  evalRun(runId: string, golden: GoldenTrace): Promise<ArcEnvelope<EvalResult>>;
+}
+
+export interface GoldenTrace {
+  id: string;
+  workflow_id: string;
+  expected_status: string;
+  expected_event_types: string[];
+  expected_final_output_contains: string;
+  description: string;
+}
+
+export interface EvalResult {
+  run_id: string;
+  golden_id: string;
+  passed: boolean;
+  status_match: boolean;
+  event_type_match: boolean;
+  output_contains_match: boolean;
+  score: number;
+  details: string;
 }
