@@ -1,119 +1,166 @@
 # ARC Studio
 
-ARC Studio is an early prototype for an Eclipse Theia based IDE plus Python ARC daemon/CLI for inspecting agent runtime projects.
+ARC Studio is a local developer tool for inspecting, running, and debugging agent workflows built on SwarmGraph, LangGraph, CrewAI, OpenAI Agents SDK, and (partial) LlamaIndex. It ships as a Python CLI and daemon plus an Eclipse Theia IDE shell available as a browser app or an Electron desktop app.
 
-Current state: handoff-ready prototype, not production-ready. See `STATUS.md` and `docs/HANDOFF.md` for verified results and blockers.
+ARC Studio runs entirely on your workstation. No telemetry is sent. No data leaves the loopback interface.
 
-## What Works
+## Status
 
-- Python ARC package installs with `uv`.
-- Python tests pass after dev dependency sync.
-- CLI inspection, runtime detection, workflow/schema export, and adapter conformance commands run.
-- Node fixture/protocol bootstrap tests pass without installing Theia.
+Pre-release. There are no git tags yet; `main` is the canonical state. See [CHANGELOG.md](./CHANGELOG.md) and [docs/SECURITY_AUDIT_REPORT.md](./docs/SECURITY_AUDIT_REPORT.md) for what changed recently and what is still outstanding.
 
-## What Does Not Work Yet
+## Prerequisites
 
-- Electron smoke packaging is local-only; release packaging requires signing credentials.
-- Live/provider-backed SwarmGraph execution requires explicit approval before running external calls.
-- LangGraph runtime execution requires explicit `ARC_LANGGRAPH_EXPORT`; streaming is not implemented yet.
+The toolchain versions are pinned in [`.tool-versions`](./.tool-versions). If you use `asdf` or `mise` they will be picked up automatically; otherwise install manually:
 
-## Setup
+- Node.js 20.18.0
+- pnpm 9.12.0
+- Python 3.11.10
+- [`uv`](https://github.com/astral-sh/uv) for Python dependency management
+
+## Quick Start
 
 ```bash
+# 1. Clone and install JS deps
+git clone <this-repo>
 cd arc-theia-studio
+pnpm install --frozen-lockfile
 
-# Python
+# 2. Install Python deps
 cd python
 uv sync --all-extras --dev
-.venv/bin/python -m pytest
-.venv/bin/arc --help
-
-# Node/Theia, requires Node 20+ and pnpm 9+
 cd ..
-pnpm install
-pnpm build
-pnpm start:browser
+
+# 3. Build everything
+pnpm -r build
+
+# 4. Verify your install
+cd python
+uv run arc --help
+uv run arc runtimes --capabilities --json
+cd ..
 ```
 
-## SwarmGraph Stub Run Quickstart
+If the commands above fail, see Troubleshooting below.
 
-Default SwarmGraph runs use the local `stub` backend and do not call paid/provider services.
-Provider-backed runs require explicit opt-in with `ARC_SWARMGRAPH_RUN_BACKEND=<backend>` and `ARC_SWARMGRAPH_ALLOW_COSTS=true`; otherwise ARC adds `--no-cost`.
-ARC does not install SwarmGraph as a Python extra yet; set `ARC_SWARMGRAPH_CLI` or open a workspace that contains an executable `swarmgraph` launcher.
+## Running
+
+### Browser shell (recommended for development)
+
+```bash
+# Real backend (requires runtimes configured; see "Runtime Support")
+pnpm start:browser:arc
+
+# Stub backend (no real agents; useful for UI work)
+pnpm start:browser:stub
+```
+
+The browser shell listens on `http://127.0.0.1:3000` and talks to the ARC daemon at `http://127.0.0.1:7777`. CORS is restricted to the browser shell's origin.
+
+### Electron shell
+
+```bash
+pnpm start:electron
+```
+
+To produce an unsigned installer for local testing:
+
+```bash
+pnpm package:electron:dir
+```
+
+The unsigned build writes to `applications/electron/dist/`. A signed release build (`pnpm package:electron`) requires the macOS signing environment variables described in `.env.example`.
+
+### Daemon only (headless)
 
 ```bash
 cd python
-uv run arc run wf-swarmgraph-001 \
-  --workspace /path/to/swarmgraph/workspace \
-  --prompt "ARC local stub smoke run" \
-  --json
-
-uv run arc runs --workspace /path/to/swarmgraph/workspace --json
-uv run arc runs get <run-id> --workspace /path/to/swarmgraph/workspace --json
-uv run arc runs trace <run-id> --workspace /path/to/swarmgraph/workspace --tail 5 --json
-uv run arc runs prune --workspace /path/to/swarmgraph/workspace --keep 20 --json
-uv run arc runs prune --workspace /path/to/swarmgraph/workspace --keep 20 --yes --json
+uv run arc serve
+uv run arc serve --help
 ```
 
-Open the Run Timeline directly in Theia:
+The daemon binds `127.0.0.1:7777` by default.
+
+## CLI
+
+The `arc` CLI is the canonical surface; the Theia shell is a thin UI over it. Available commands:
 
 ```text
-http://127.0.0.1:3000/?arc-view=run-timeline
+arc inspect       Inspect a workflow file's structure
+arc runtimes      List detected runtimes and their capabilities
+arc workflows     Enumerate workflows in the current workspace
+arc schemas       Print or validate workflow schemas
+arc serve         Start the local daemon
+arc run           Execute a workflow
+arc context       Manage context providers
+arc adapter       Manage and test runtime adapters
+arc doctor        Runtime-specific diagnostics
+arc runs          Inspect past runs and traces
+arc providers     Manage credential providers
 ```
 
-LangGraph dynamic export can load a workspace symbol when the library is installed:
+Run `uv run arc <command> --help` for the flags on any subcommand.
 
-```bash
-ARC_LANGGRAPH_EXPORT=graph_module:export_graph uv run arc workflows --workspace /path/to/langgraph/project --runtime langgraph --json
+## Runtime Support
+
+The table below is generated from `cd python && uv run arc runtimes --capabilities --json`.
+
+| Runtime | Detected | Can run | Paid | Notes |
+|---|---:|---:|---:|---|
+| swarmgraph | yes | no | no | install missing; set `ARC_SWARMGRAPH_CLI` |
+| langgraph | yes | no | no | requires `ARC_LANGGRAPH_EXPORT=module:function` |
+| crewai | yes | no | yes | install missing; set `ARC_CREWAI_EXPORT` |
+| openai-agents | no | no | yes | install missing; requires `OPENAI_API_KEY` |
+| llamaindex | no | no | no | not detected |
+
+"Detected" means the adapter is importable. "Can run" means the adapter plus its required configuration are both present. "Paid" means a successful run will make billable API calls; such runs are gated behind the `allow_paid_calls` flag and are opt-in.
+
+## Security
+
+ARC Studio is designed as a single-user, loopback-only tool. The daemon binds to `127.0.0.1` and does not currently require authentication; any process running as your user on the same host can reach it. This is acceptable for a personal developer workstation; it is not acceptable on multi-tenant hosts, shared dev containers, or anywhere a non-trusted process can open a localhost socket.
+
+For the full threat model, resolved findings, and residual items, see [docs/SECURITY_AUDIT_REPORT.md](./docs/SECURITY_AUDIT_REPORT.md).
+
+To report a security issue, please open a private security advisory on GitHub rather than a public issue.
+
+## Project Layout
+
+```text
+applications/             Theia app shells (browser, electron)
+theia-extensions/         Theia extensions (arc-core is the live one)
+python/                   Python CLI, daemon, and adapters
+  src/agent_runtime_cockpit/
+docs/                     Documentation; see docs/history/ for older working notes
+scripts/                  Build, lint, and dev-loop helpers
 ```
 
-PR hygiene:
+The `packages/arc-extension/` tree present in older drafts of the repository is not used; the live extension is `theia-extensions/arc-core`.
 
-```bash
-pnpm check:pr
-```
+## Troubleshooting
 
-## Verified Python Commands
+### `pnpm install` fails with a lockfile error
 
-```bash
-cd python
-uv sync --all-extras --dev
-.venv/bin/python -m pytest
-.venv/bin/arc --help
-.venv/bin/arc inspect --json
-.venv/bin/arc runtimes --json
-.venv/bin/arc workflows --json
-.venv/bin/arc schemas --json
-.venv/bin/arc adapter test swarmgraph --json
-.venv/bin/arc adapter test langgraph --json
-```
+Make sure you are on pnpm 9.12.0 (`pnpm --version`). The CI uses `--frozen-lockfile` and so should you.
 
-## Verified Node Bootstrap Commands
+### `arc runtimes` shows `can_run=false` for everything
 
-```bash
-node tests/unit/arc-protocol.test.js
-node packages/arc-test-fixtures/src/index.js
-```
+This is expected on a fresh install. Each runtime has a required env var (see the table above). Set the one(s) you need in your `.env` (copy from `.env.example`).
 
-## Runtime Status
+### `arc doctor` says "Missing command"
 
-| Runtime | Current support | Missing |
-| --- | --- | --- |
-| SwarmGraph | Detection, AST workflow/schema export heuristics, local/gateway execution, JSONL trace replay/export | Audit integrations |
-| LangGraph | Detection, AST workflow heuristics, dynamic export/run hook, fixture schema | Streaming/events; see `docs/RUNTIMES.md` |
-| CrewAI | Not implemented | Adapter |
-| OpenAI Agents SDK | Not implemented | Adapter |
-| AG2 | Not implemented | Adapter |
+`arc doctor` is a command group. Use a concrete subcommand such as `cd python && uv run arc doctor swarmgraph`.
 
-## Docs
+### The browser shell loads but shows no workflows
 
-- `STATUS.md`: evidence-based current status.
-- `docs/HANDOFF.md`: commands run, known failures, completion plan.
-- `docs/ROADMAP.md`: prioritized work list.
-- `docs/MOCK_POLICY.md`: mock/demo rules.
-- `docs/SECURITY.md`: trust boundaries, secrets, daemon, and release security notes.
-- `CONTRIBUTING.md`: setup and definition of done.
+ARC Studio scans the workspace you open in Theia. The default workspace is the repo root; switch via File → Open Workspace.
+
+### Build emits a Node.js DEP0190 warning
+
+Known issue in `@theia/cli`. Build succeeds. Will be tracked upstream; not a regression in ARC.
+
+## Contributing
+
+Branch from `main`. Run `pnpm check:pr` before opening a PR; this runs the secret scan, type-check, and tests. New behaviour needs a test; new public APIs need a CHANGELOG entry.
 
 ## License
 
-Apache-2.0. See `LICENSE`.
+Apache-2.0. See [LICENSE](./LICENSE).
