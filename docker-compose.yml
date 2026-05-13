@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  arc-studio:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - ARC_SWARMGRAPH_CLI=/usr/local/bin/swarmgraph
+      - ARC_SWARMGRAPH_GATEWAY_URL=${ARC_SWARMGRAPH_GATEWAY_URL:-}
+      - ARC_SWARMGRAPH_GATEWAY_TOKEN=${ARC_SWARMGRAPH_GATEWAY_TOKEN:-}
+    volumes:
+      - ./workspace:/app/workspace
+      - ./traces:/app/.arc/traces
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3

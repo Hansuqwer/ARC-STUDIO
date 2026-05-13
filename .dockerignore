@@ -1,0 +1,11 @@
+node_modules
+.git
+.arc/traces/*
+!.arc/traces/.gitkeep
+*.md
+!README.md
+docs/
+scripts/
+.venv/
+python/
+reports/
