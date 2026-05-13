@@ -66,6 +66,8 @@ export class ArcWidget extends ReactWidget {
 
     private keyboardHandler: ((e: KeyboardEvent) => void) | undefined;
     private toastTimeouts: Map<string, NodeJS.Timeout> = new Map();
+    private filterDebounceTimer: NodeJS.Timeout | undefined;
+    private pendingFilterValue: string = '';
 
     private state: ArcWidgetState = {
         isExecuting: false,
@@ -114,6 +116,10 @@ export class ArcWidget extends ReactWidget {
         }
         this.toastTimeouts.forEach((timeout) => clearTimeout(timeout));
         this.toastTimeouts.clear();
+        if (this.filterDebounceTimer) {
+            clearTimeout(this.filterDebounceTimer);
+            this.filterDebounceTimer = undefined;
+        }
         super.dispose();
     }
 
@@ -157,7 +163,7 @@ export class ArcWidget extends ReactWidget {
         this.node.addEventListener('keydown', this.keyboardHandler);
     }
 
-    private toggleShortcutsHelp(): void {
+    toggleShortcutsHelp(): void {
         this.updateState({ showShortcutsHelp: !this.state.showShortcutsHelp });
     }
 
@@ -199,6 +205,26 @@ export class ArcWidget extends ReactWidget {
         });
     }
 
+    private handleTraceFilterChange(value: string): void {
+        this.pendingFilterValue = value;
+        if (this.filterDebounceTimer) {
+            clearTimeout(this.filterDebounceTimer);
+        }
+        this.filterDebounceTimer = setTimeout(() => {
+            this.updateState({ traceFilter: this.pendingFilterValue });
+            this.filterDebounceTimer = undefined;
+        }, 300);
+    }
+
+    private clearTraceFilter(): void {
+        if (this.filterDebounceTimer) {
+            clearTimeout(this.filterDebounceTimer);
+            this.filterDebounceTimer = undefined;
+        }
+        this.pendingFilterValue = '';
+        this.updateState({ traceFilter: '' });
+    }
+
     private updateExecutionStep(stepId: string, status: ProgressStep['status']): void {
         const steps = this.state.executionSteps.map(step => 
             step.id === stepId ? { ...step, status } : step
@@ -213,7 +239,7 @@ export class ArcWidget extends ReactWidget {
         this.update();
     }
 
-    private async handleExecuteWorkflow(): Promise<void> {
+    async handleExecuteWorkflow(): Promise<void> {
         if (this.state.isExecuting || !this.state.prompt.trim()) {
             if (!this.state.prompt.trim()) {
                 this.messageService.warn('Please enter a prompt for workflow execution');
@@ -314,7 +340,7 @@ export class ArcWidget extends ReactWidget {
         }
     }
 
-    private async handleLoadTraces(): Promise<void> {
+    async handleLoadTraces(): Promise<void> {
         if (this.state.isLoadingTraces) {
             return;
         }
@@ -366,7 +392,7 @@ export class ArcWidget extends ReactWidget {
         }
     }
 
-    private async handleScanWorkspace(): Promise<void> {
+    async handleScanWorkspace(): Promise<void> {
         if (this.state.isScanning) {
             return;
         }
@@ -653,9 +679,16 @@ export class ArcWidget extends ReactWidget {
                             aria-controls='workflow-execution-content'
                         >
                             <h3 id='workflow-execution-heading'>Workflow Execution</h3>
-                            <span className='arc-section-toggle' aria-hidden='true'>
-                                {isCollapsed['workflow-execution'] ? '▸' : '▾'}
-                            </span>
+                            <div className='arc-section-header-right'>
+                                {isCollapsed['workflow-execution'] && executionStatus !== 'idle' && (
+                                    <span className='arc-section-badge' aria-label={`Status: ${executionStatus}`}>
+                                        {executionStatus === 'running' ? '⟳' : executionStatus === 'completed' ? '✓' : '✗'}
+                                    </span>
+                                )}
+                                <span className='arc-section-toggle' aria-hidden='true'>
+                                    {isCollapsed['workflow-execution'] ? '▸' : '▾'}
+                                </span>
+                            </div>
                         </button>
                         
                         <div id='workflow-execution-content' className='arc-section-content'>
@@ -748,9 +781,16 @@ export class ArcWidget extends ReactWidget {
                             aria-controls='trace-viewer-content'
                         >
                             <h3 id='trace-viewer-heading'>Trace Viewer</h3>
-                            <span className='arc-section-toggle' aria-hidden='true'>
-                                {isCollapsed['trace-viewer'] ? '▸' : '▾'}
-                            </span>
+                            <div className='arc-section-header-right'>
+                                {isCollapsed['trace-viewer'] && filteredTraces.length > 0 && (
+                                    <span className='arc-section-badge' aria-label={`${filteredTraces.length} trace(s)`}>
+                                        {filteredTraces.length}
+                                    </span>
+                                )}
+                                <span className='arc-section-toggle' aria-hidden='true'>
+                                    {isCollapsed['trace-viewer'] ? '▸' : '▾'}
+                                </span>
+                            </div>
                         </button>
                         
                         <div id='trace-viewer-content' className='arc-section-content'>
@@ -760,15 +800,27 @@ export class ArcWidget extends ReactWidget {
                                     
                                     <div className='arc-input-group'>
                                         <label htmlFor='trace-filter'>Filter traces:</label>
-                                        <input
-                                            id='trace-filter'
-                                            type='text'
-                                            className='theia-input'
-                                            placeholder='Filter by ID...'
-                                            value={traceFilter}
-                                            onChange={(e) => this.updateState({ traceFilter: e.target.value })}
-                                            aria-label='Filter traces by ID'
-                                        />
+                                        <div className='arc-filter-input-wrapper'>
+                                            <input
+                                                id='trace-filter'
+                                                type='text'
+                                                className='theia-input'
+                                                placeholder='Filter by ID...'
+                                                value={traceFilter}
+                                                onChange={(e) => this.handleTraceFilterChange(e.target.value)}
+                                                aria-label='Filter traces by ID'
+                                            />
+                                            {traceFilter && (
+                                                <button
+                                                    className='arc-filter-clear'
+                                                    onClick={() => this.clearTraceFilter()}
+                                                    aria-label='Clear filter'
+                                                    title='Clear filter'
+                                                >
+                                                    ×
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
 
                                     <button 
@@ -840,9 +892,16 @@ export class ArcWidget extends ReactWidget {
                             aria-controls='workflow-detection-content'
                         >
                             <h3 id='workflow-detection-heading'>Workflow Detection</h3>
-                            <span className='arc-section-toggle' aria-hidden='true'>
-                                {isCollapsed['workflow-detection'] ? '▸' : '▾'}
-                            </span>
+                            <div className='arc-section-header-right'>
+                                {isCollapsed['workflow-detection'] && workflows.length > 0 && (
+                                    <span className='arc-section-badge' aria-label={`${workflows.length} workflow(s)`}>
+                                        {workflows.length}
+                                    </span>
+                                )}
+                                <span className='arc-section-toggle' aria-hidden='true'>
+                                    {isCollapsed['workflow-detection'] ? '▸' : '▾'}
+                                </span>
+                            </div>
                         </button>
                         
                         <div id='workflow-detection-content' className='arc-section-content'>

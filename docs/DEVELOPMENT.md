@@ -1,8 +1,8 @@
 # ARC Studio Development Guide
 
 **Version:** 0.1.0  
-**Last Updated:** 2026-05-12  
-**Status:** Phase 4 - In Progress
+**Last Updated:** 2026-05-13  
+**Status:** Phase 6 - Alpha Acceptance
 
 ---
 
@@ -69,7 +69,7 @@ pnpm build
 echo $?  # Should output 0
 ```
 
-**Note:** Build may fail in Phase 4 due to incomplete protocol implementation. See [Common Issues](#common-issues) for solutions.
+**Note:** If build fails, see [Common Issues](#common-issues) for solutions.
 
 ---
 
@@ -406,9 +406,40 @@ git commit -m "docs: update API documentation"
 
 ## Testing
 
-### Current State (Phase 4)
+### Current State (Phase 6)
 
-⚠️ **No automated tests yet** - Test infrastructure planned for Phase 5
+✅ **Automated tests available** — 82 Python tests + 8 Node.js unit tests + E2E smoke tests
+
+### Running Tests
+
+```bash
+# Python tests
+cd python
+uv run pytest              # all tests
+uv run pytest -v           # verbose
+uv run pytest -k adapter   # filter by keyword
+uv run pytest --cov        # with coverage
+
+# Node.js unit tests
+node tests/unit/arc-protocol.test.js
+node packages/arc-test-fixtures/src/index.js
+
+# All checks
+pnpm -r test
+bash scripts/check.sh
+
+# E2E tests (Playwright)
+pnpm start:browser         # in terminal 1
+cd tests/e2e && pnpm install:browsers  # first time only
+pnpm test:e2e              # from root
+```
+
+### Conformance Tests
+
+```bash
+uv run arc adapter test swarmgraph  # 8/8 pass
+uv run arc adapter test langgraph   # 9/9 pass
+```
 
 ### Manual Testing
 
@@ -447,25 +478,17 @@ curl -X POST http://localhost:8000/api/execute \
 curl http://localhost:8000/api/traces
 ```
 
-### Future Testing (Phase 5+)
+### Test Files
 
-**Unit Tests:**
-```bash
-# Run all tests
-pnpm test
-
-# Run specific package tests
-pnpm --filter arc-extension test
-
-# Run Python tests
-cd python && pytest
-```
-
-**E2E Tests:**
-```bash
-# Run end-to-end tests
-pnpm test:e2e
-```
+| File | Tests | Coverage |
+|------|-------|---------|
+| `python/test_protocol.py` | 13 | Envelope, error codes, domain models |
+| `python/test_adapters.py` | 26+ | SwarmGraph, LangGraph, registry, conformance |
+| `python/test_agui_bridge.py` | 7 | AG-UI event mapping, roundtrip |
+| `python/test_context.py` | 16 | All 5 providers, cache, ranker, engine |
+| `python/test_security.py` | 12 | Redaction, path validation |
+| `python/test_storage.py` | 5 | JSONL save/load/list |
+| `tests/unit/arc-protocol.test.js` | 8 | Bootstrap protocol tests |
 
 ---
 
@@ -475,22 +498,12 @@ pnpm test:e2e
 
 #### Issue: TypeScript compilation fails
 
-```
-error TS2420: Class 'ArcBackendService' incorrectly implements interface 'ArcService'
-```
-
-**Cause:** Protocol interface updated but implementation incomplete (Phase 4)
-
 **Solution:**
-1. Check interface in `packages/arc-extension/src/common/arc-protocol.ts`
-2. Ensure all methods implemented in `packages/arc-extension/src/node/arc-backend-service.ts`
-3. Add missing methods with TODO comments:
-   ```typescript
-   async streamTrace(traceId: string): Promise<void> {
-       // TODO: Implement in Phase 4
-       throw new Error('Not implemented');
-   }
-   ```
+1. Clean and reinstall: `pnpm clean && pnpm install && pnpm build`
+2. Check for missing dependencies: `pnpm install`
+3. Verify Node.js >= 18.0.0: `node --version`
+4. Check interface in `packages/arc-extension/src/common/arc-protocol.ts`
+5. Ensure all methods implemented in `packages/arc-extension/src/node/arc-backend-service.ts`
 
 #### Issue: Module not found errors
 

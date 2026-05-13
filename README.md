@@ -96,7 +96,7 @@ uv run mypy src tests    # Type check Python code
 | Phase 3: Discovery Lock | ✅ Complete | Architecture decisions finalized |
 | Phase 4: Independent Fixes | ✅ Complete | Security hardening, JSONL parser, perf instrumentation |
 | Phase 5: Integration Fixes | ✅ Complete | Run timeline + schema inspector extensions wired |
-| Phase 6: Alpha Acceptance | ⏳ Pending | Test coverage and verification reports |
+| Phase 6: Alpha Acceptance | 🔄 In Progress | Documentation review, test coverage, verification |
 | Phase 7: Final Handover | ⏳ Pending | Production release |
 
 ### What's Working
@@ -108,19 +108,18 @@ uv run mypy src tests    # Type check Python code
 - ✅ Trace file management (JSONL format)
 - ✅ Security utilities (input sanitization, path validation)
 
-### What's In Progress (Phase 4)
+### What's In Progress (Phase 6)
 
-- 🔄 Protocol interface implementation completion
-- 🔄 Build configuration fixes
-- 🔄 LangGraph workflow detection
-- 🔄 Trace parsing full implementation
+- 🔄 Documentation review and completion
+- 🔄 Test coverage expansion
+- 🔄 Alpha acceptance verification
 
 ### Known Limitations
 
-- Build may have TypeScript interface errors (protocol implementation in progress)
-- Trace visualization is basic (UI improvements planned)
-- LangGraph detection not yet implemented
-- No automated tests (test infrastructure planned for Phase 5)
+- Electron signing/notarization is not configured
+- LangGraph runtime execution beyond dynamic workflow export not yet implemented
+- CrewAI, OpenAI Agents SDK, AG2 adapters not yet implemented
+- Rate limiting and authentication not yet implemented (planned for Phase 7)
 
 ## Features
 
@@ -186,10 +185,16 @@ Multi-layered security model:
 
 Comprehensive documentation is available in the `docs/` directory:
 
+- [API Reference](docs/API.md) - REST API and JSON-RPC protocol
+- [Architecture](docs/ARCHITECTURE.md) - System architecture and components
+- [Development Guide](docs/DEVELOPMENT.md) - Setup and development workflow
+- [Security](docs/SECURITY.md) - Security implementation and best practices
+- [Testing](docs/TESTING.md) - Test setup and execution
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
+- [Extensions](docs/EXTENSIONS.md) - Theia extension development
+- [Roadmap](docs/ROADMAP.md) - Future development plans
 - [Research Notes](docs/RESEARCH_NOTES.md) - Technology research findings
 - [Implementation Decisions](docs/IMPLEMENTATION_DECISIONS.md) - Architectural decisions
-- [Phase 2 Complete](docs/PHASE_2_COMPLETE.md) - Research phase sign-off
-- [Phase 3 Discovery](docs/PHASE_3_DISCOVERY.md) - Current state analysis
 
 ## Architecture Decisions
 
@@ -207,17 +212,12 @@ Key architectural decisions (see [docs/IMPLEMENTATION_DECISIONS.md](docs/IMPLEME
 
 ### Build Errors
 
-**Issue:** TypeScript compilation fails with interface implementation errors
+**Issue:** TypeScript compilation fails
 
-```bash
-error TS2420: Class 'ArcBackendService' incorrectly implements interface 'ArcService'
-```
-
-**Solution:** This is a known issue in Phase 4. The protocol interface has been updated but implementations are incomplete. To work around:
-
-1. Check the interface definition in `packages/arc-extension/src/common/arc-protocol.ts`
-2. Ensure all methods are implemented in `packages/arc-extension/src/node/arc-backend-service.ts`
-3. Run `pnpm build` to verify fixes
+**Solution:**
+1. Clean and rebuild: `pnpm clean && pnpm build`
+2. Check for missing dependencies: `pnpm install`
+3. Verify Node.js >= 18.0.0: `node --version`
 
 ### Installation Issues
 
@@ -256,11 +256,10 @@ error TS2420: Class 'ArcBackendService' incorrectly implements interface 'ArcSer
 
 ### Known Issues
 
-- **Build fails with protocol errors** - Phase 4 in progress, protocol interface incomplete
-- **Trace parsing not implemented** - Planned for Phase 4
-- **Workflow detection incomplete** - LangGraph detection pending
-- **No tests yet** - Test infrastructure planned for Phase 5
-- **Electron app not functional** - Planned for later phases
+- **Electron signing not configured** - Requires CSC_LINK, CSC_KEY_PASSWORD, and Apple ID
+- **LangGraph runtime execution** - Only dynamic workflow export is implemented
+- **No rate limiting** - Planned for Phase 7
+- **No authentication** - Planned for Phase 7
 
 For more issues, see [GitHub Issues](https://github.com/Hansuqwer/arc-theia-studio/issues).
 

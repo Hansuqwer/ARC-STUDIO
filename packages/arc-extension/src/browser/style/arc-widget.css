@@ -407,6 +407,27 @@
     color: var(--theia-ui-font-color1, #333);
 }
 
+.arc-section-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.arc-section-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--arc-accent-color);
+    color: #fff;
+    line-height: 1;
+}
+
 .arc-section-toggle {
     font-size: 12px;
     color: var(--theia-ui-font-color2, #666);
@@ -481,6 +502,50 @@
     border: 1px solid var(--theia-border-color, #ddd);
     border-radius: 3px;
     color: var(--theia-ui-font-color, #666);
+}
+
+/* ============================================
+   Filter Input Styles
+   ============================================ */
+.arc-filter-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.arc-filter-input-wrapper input {
+    padding-right: 32px;
+}
+
+.arc-filter-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--theia-ui-font-color2, #999);
+    padding: 0;
+    line-height: 1;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all var(--arc-transition-speed) ease;
+}
+
+.arc-filter-clear:hover {
+    background: var(--theia-ui-button-hover-background, #e9ecef);
+    color: var(--theia-ui-font-color, #333);
+}
+
+.arc-filter-clear:focus {
+    outline: 2px solid var(--theia-focusBorder, #0066cc);
+    outline-offset: 1px;
 }
 
 /* ============================================

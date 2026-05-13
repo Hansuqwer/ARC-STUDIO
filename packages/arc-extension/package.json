@@ -25,7 +25,8 @@
   "scripts": {
     "prepare": "pnpm run clean && pnpm run build",
     "clean": "rimraf lib",
-    "build": "tsc",
+    "build": "tsc && pnpm run copy-assets",
+    "copy-assets": "mkdir -p lib/browser/style && cp src/browser/style/*.css lib/browser/style/",
     "watch": "tsc -w",
     "lint": "echo 'Linting not configured yet'",
     "test": "jest --passWithNoTests",

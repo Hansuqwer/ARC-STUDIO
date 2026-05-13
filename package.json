@@ -30,5 +30,10 @@
     "@types/node": "^18.0.0",
     "typescript": "^5.3.0",
     "lerna": "^8.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@vscode/ripgrep": "1.15.14"
+    }
   }
 }

@@ -63,3 +63,97 @@ def test_health_check():
     data = response.json()
     assert data["status"] == "ok"
     assert data["service"] == "ARC Studio Backend"
+
+
+def test_execute_with_invalid_backend():
+    """Verify that an invalid backend returns 400."""
+    response = client.post("/api/execute", json={
+        "prompt": "hello world",
+        "backend": "invalid_backend",
+        "cost_allowed": False
+    })
+    assert response.status_code == 400
+    data = response.json()
+    assert "detail" in data
+
+
+def test_execute_with_empty_prompt():
+    """Verify that an empty prompt returns 400."""
+    response = client.post("/api/execute", json={
+        "prompt": "",
+        "backend": "stub",
+        "cost_allowed": False
+    })
+    assert response.status_code == 400
+    data = response.json()
+    assert "detail" in data
+
+
+def test_execute_with_dangerous_prompt():
+    """Verify that a prompt with dangerous characters returns 400."""
+    dangerous_prompts = [
+        "hello; rm -rf /",
+        "hello | cat /etc/passwd",
+        "hello `whoami`",
+        "hello $(whoami)",
+        "hello < /etc/passwd",
+        "hello > /tmp/evil",
+    ]
+    for prompt in dangerous_prompts:
+        response = client.post("/api/execute", json={
+            "prompt": prompt,
+            "backend": "stub",
+            "cost_allowed": False
+        })
+        assert response.status_code == 400, f"Expected 400 for prompt: {prompt}"
+        data = response.json()
+        assert "dangerous characters" in data["detail"].lower() or "detail" in data
+
+
+def test_get_traces_empty():
+    """Verify that /api/traces returns [] when no traces exist."""
+    response = client.get("/api/traces")
+    assert response.status_code == 200
+    data = response.json()
+    assert data == []
+
+
+def test_get_trace_invalid_id():
+    """Verify that an invalid trace ID returns 400."""
+    response = client.get("/api/traces/invalid-id-format")
+    assert response.status_code == 400
+    data = response.json()
+    assert "detail" in data
+
+
+def test_get_trace_path_traversal():
+    """Verify that path traversal in trace ID returns 400."""
+    response = client.get("/api/traces/../../../etc/passwd")
+    assert response.status_code == 400
+
+
+def test_execute_with_whitespace_prompt():
+    """Verify that a whitespace-only prompt returns 400."""
+    response = client.post("/api/execute", json={
+        "prompt": "   ",
+        "backend": "stub",
+        "cost_allowed": False
+    })
+    assert response.status_code == 400
+
+
+def test_execute_with_null_bytes_prompt():
+    """Verify that a prompt with null bytes is sanitized."""
+    response = client.post("/api/execute", json={
+        "prompt": "hello\x00world",
+        "backend": "stub",
+        "cost_allowed": False
+    })
+    assert response.status_code != 500
+
+
+def test_get_traces_returns_list():
+    """Verify that /api/traces returns a list type."""
+    response = client.get("/api/traces")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)

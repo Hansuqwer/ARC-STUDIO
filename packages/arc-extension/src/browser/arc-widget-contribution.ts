@@ -100,4 +100,24 @@ export class ArcWidgetContribution extends AbstractViewContribution<ArcWidget> {
     registerMenus(menus: MenuModelRegistry): void {
         super.registerMenus(menus);
     }
+
+    async executeWorkflow(): Promise<void> {
+        const widget = await this.openView({ activate: true, reveal: true });
+        widget.handleExecuteWorkflow();
+    }
+
+    async loadTraces(): Promise<void> {
+        const widget = await this.openView({ activate: true, reveal: true });
+        widget.handleLoadTraces();
+    }
+
+    async scanWorkspace(): Promise<void> {
+        const widget = await this.openView({ activate: true, reveal: true });
+        widget.handleScanWorkspace();
+    }
+
+    async showShortcuts(): Promise<void> {
+        const widget = await this.openView({ activate: true, reveal: true });
+        widget.toggleShortcutsHelp();
+    }
 }

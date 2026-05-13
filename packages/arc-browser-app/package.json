@@ -33,7 +33,9 @@
     "prepare": "pnpm run clean && pnpm run build",
     "clean": "theia clean",
     "build": "theia build --mode development",
+    "build:prod": "NODE_ENV=production theia build --mode production",
     "start": "theia start --hostname=0.0.0.0 --port=3000",
+    "start:prod": "NODE_ENV=production theia start --hostname=0.0.0.0 --port=3000",
     "watch": "theia build --watch --mode development"
   },
   "theia": {

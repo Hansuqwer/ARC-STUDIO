@@ -1,8 +1,8 @@
 # ARC Studio Architecture
 
 **Version:** 0.1.0  
-**Last Updated:** 2026-05-12  
-**Status:** Phase 4 - In Progress
+**Last Updated:** 2026-05-13  
+**Status:** Phase 6 - Alpha Acceptance
 
 ---
 
@@ -493,18 +493,19 @@ To add a new trace event type:
 
 ## Performance Considerations
 
-### Current State (Phase 4)
+### Current State (Phase 6)
 
-- **Trace Loading:** Synchronous file reads (blocking)
-- **Subprocess Execution:** No concurrency limits
-- **Memory Usage:** Full trace files loaded into memory
+- **Trace Loading:** Async file reads with JSONL streaming support
+- **Subprocess Execution:** Environment allow-list, timeout with SIGTERM/SIGKILL escalation
+- **Memory Usage:** Streaming trace parsing available via `streamTrace()` for large files
+- **Performance:** Timing logs for key operations (trace loading, workflow detection)
 
-### Planned Optimizations (Phase 5+)
+### Planned Optimizations (Phase 7+)
 
-- **Streaming Trace Parsing:** Read JSONL incrementally
 - **Execution Queue:** Limit concurrent workflow executions
-- **Trace Pagination:** Load events in chunks
+- **Trace Pagination:** Load events in chunks for UI
 - **Caching:** Cache parsed trace metadata
+- **Structured Metrics:** Replace console.log timing with proper metrics
 
 ---
 
@@ -526,29 +527,35 @@ To add a new trace event type:
 
 ## Testing Strategy
 
-### Current State (Phase 4)
+### Current State (Phase 6)
 
-- ❌ No automated tests yet
-- ✅ Manual testing via browser app
-- ✅ SwarmGraph CLI integration tested
+- ✅ Python test suite: 82 tests passing
+- ✅ Node.js unit tests: arc-protocol.test.js (8 tests)
+- ✅ Test fixtures self-test passing
+- ✅ E2E Playwright smoke tests configured
+- ✅ Conformance tests: SwarmGraph 8/8, LangGraph 9/9
+- ✅ Daemon integration tests for `/api/runs` and SSE
 
-### Planned Testing (Phase 5+)
+### Test Coverage
 
-**Unit Tests:**
-- Protocol interface contracts
-- Backend service methods
-- Security utilities
-- Trace parsing logic
+**Python Tests:**
+- `test_protocol.py` — 13 tests (envelope, error codes, domain models)
+- `test_adapters.py` — 26+ tests (SwarmGraph, LangGraph, registry, conformance)
+- `test_agui_bridge.py` — 7 tests (AG-UI event mapping)
+- `test_context.py` — 16 tests (providers, cache, ranker, engine)
+- `test_security.py` — 12 tests (redaction, path validation)
+- `test_storage.py` — 5 tests (JSONL save/load/list)
 
-**Integration Tests:**
-- End-to-end workflow execution
-- Trace file generation and reading
-- Workflow detection
+**Node.js Tests:**
+- `tests/unit/arc-protocol.test.js` — 8 bootstrap protocol tests
+- `packages/arc-test-fixtures/src/index.js` — fixture self-test
 
-**E2E Tests:**
-- Full Theia application startup
-- UI interactions
-- Multi-step workflows
+**E2E Tests (Playwright):**
+- Browser app loads without crash
+- ARC Studio branding present
+- Theia workbench and activity bar rendered
+- Command palette and ARC commands registered
+- Python CLI integration verified
 
 ---
 
@@ -577,44 +584,32 @@ pnpm start:browser
 
 ## Known Issues
 
-### Phase 4 (Current)
+### Phase 6 (Current)
 
-- ❌ Build fails with protocol interface errors
-- ❌ Trace parsing not implemented
-- ❌ Workflow detection incomplete (LangGraph)
-- ❌ No error handling in UI
-- ❌ No tests
+- ⚠️ Electron signing/notarization not configured
+- ⚠️ LangGraph runtime execution limited to dynamic workflow export
+- ⚠️ No rate limiting or authentication (planned for Phase 7)
+- ⚠️ CrewAI, OpenAI Agents SDK, AG2 adapters not yet implemented
 
 ### Technical Debt
 
-- Synchronous file I/O (should be async)
-- No input validation in frontend
-- Hardcoded workspace paths
-- No logging infrastructure
+- Synchronous file I/O in some trace operations (should be fully async)
+- No input validation in frontend (relies on backend validation)
+- Performance logging could be replaced with structured metrics
 
 ---
 
 ## Future Architecture
 
-### Phase 5: Integration Fixes
-
-- Complete trace parsing implementation
-- Add LangGraph detection
-- Implement error handling
-- Add logging
-
-### Phase 6: Alpha Acceptance
-
-- Add authentication/authorization
-- Implement rate limiting
-- Add metrics and monitoring
-- Complete test coverage
-
 ### Phase 7: Final Handover
 
 - Production deployment configuration
+- Authentication and authorization
+- Rate limiting and API throttling
+- Metrics and monitoring infrastructure
+- Signed Electron installers and auto-update
+- CrewAI, OpenAI Agents SDK, AG2 adapters
 - Performance optimization
-- Documentation completion
 - Handover to maintainers
 
 ---
