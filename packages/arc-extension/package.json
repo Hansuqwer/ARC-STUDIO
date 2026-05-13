@@ -1,6 +1,6 @@
 {
   "name": "arc-extension",
-  "version": "0.1.0",
+  "version": "0.6.0-alpha",
   "description": "ARC Studio Theia Extension",
   "license": "EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0",
   "main": "lib/node/arc-extension-backend-module.js",

@@ -2,6 +2,34 @@
 
 All notable changes to ARC Studio.
 
+## [v0.6.0-alpha] - 2026-05-13
+
+### Added
+- ARC Studio Theia extension with workflow execution, trace viewing, workspace scanning
+- Production build optimization (93% size reduction: 521 MB → 38 MB)
+- Security hardening: input validation, command injection prevention, env allow-list
+- 159 automated tests (63.86% coverage)
+- Global keyboard shortcuts (Cmd+E/L/Shift+S/H)
+- Comprehensive documentation (API, Architecture, Security, Deployment)
+
+### Fixed
+- Monaco ESM webpack build (added direct dependency)
+- Security-utils wired into backend service (was dead code)
+- Python env allow-list typo (_ALLOW_ENV → _ALLOWED_ENV)
+- Keyboard shortcuts now global (not widget-scoped)
+- Toast timeout memory leak (dispose cleanup)
+
+### Security
+- Command injection: list-form argv + shell:false (primary) + metacharacter rejection (defence-in-depth)
+- Path traversal: workspace isolation on all file operations
+- Environment: allow-listed vars only (12 vars, no unbounded inheritance)
+- Error sanitization: no file paths or stack traces leaked
+
+### Known Limitations
+- @theia/file-search unavailable (ripgrep/Node.js v25 incompatibility)
+- Test coverage: 63.86% (target 70%, widget tests need jsdom harness)
+- No automated E2E tests (manual testing completed)
+
 ## [0.1.0] — 2026-05-13
 
 ### Added
