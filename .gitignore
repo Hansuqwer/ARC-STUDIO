@@ -77,3 +77,8 @@ test-results/
 .claude/
 AGENTS.md
 CLAUDE.md
+
+# Backup files
+*.backup
+*.bak
+*.bak2
