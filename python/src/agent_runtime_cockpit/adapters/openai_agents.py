@@ -8,7 +8,8 @@ This adapter uses the OpenAI Agents SDK's built-in RunHooks to capture
 agent lifecycle events (agent start/end, tool calls, handoffs) and maps
 them to AG-UI events via the canonical mapping layer.
 
-Security: Dual gating enforced via ARC_OPENAI_RUN_BACKEND and ARC_OPENAI_ALLOW_COSTS.
+Security: Dual gating enforced via centralized require_dual_gate("OPENAI").
+Set ARC_OPENAI_RUN_BACKEND=stub (free) or local/gateway (requires ARC_OPENAI_ALLOW_COSTS=true).
 """
 from __future__ import annotations
 
@@ -18,6 +19,8 @@ import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+
+from agent_runtime_cockpit.gating import require_dual_gate, BackendMode, GatingError
 from typing import Any
 
 from ..protocol.capabilities import RuntimeCapabilities
@@ -67,28 +70,15 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
             )
         
         # Check dual gating
-        backend = os.environ.get("ARC_OPENAI_RUN_BACKEND", "")
-        allow_costs = os.environ.get("ARC_OPENAI_ALLOW_COSTS", "").lower() in {"1", "true", "yes"}
-        
-        if not backend:
+        try:
+            backend, allow_costs = require_dual_gate("OPENAI")
+        except GatingError as exc:
             return CapabilityReport(
                 runtime_id=self.adapter_id,
                 detected=detected,
                 can_run=False,
                 availability="paid_calls_blocked",
-                reason="ARC_OPENAI_RUN_BACKEND not set. Set to 'openai' to enable live runs.",
-                detected_artifacts=evidence,
-                required_env=["ARC_OPENAI_RUN_BACKEND", "ARC_OPENAI_ALLOW_COSTS", "OPENAI_API_KEY"],
-                requires_paid_calls=True,
-            )
-        
-        if not allow_costs:
-            return CapabilityReport(
-                runtime_id=self.adapter_id,
-                detected=detected,
-                can_run=False,
-                availability="paid_calls_blocked",
-                reason="ARC_OPENAI_ALLOW_COSTS not set to true. Live OpenAI calls require explicit cost approval.",
+                reason=str(exc),
                 detected_artifacts=evidence,
                 required_env=["ARC_OPENAI_RUN_BACKEND", "ARC_OPENAI_ALLOW_COSTS", "OPENAI_API_KEY"],
                 requires_paid_calls=True,
@@ -132,23 +122,16 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
         """
         Execute an OpenAI Agents SDK workflow with dual gating.
         
-        Dual gating enforced:
-        1. ARC_OPENAI_RUN_BACKEND must be set (e.g., 'openai')
-        2. ARC_OPENAI_ALLOW_COSTS must be '1', 'true', or 'yes'
+        Dual gating enforced via require_dual_gate("OPENAI"):
+        1. ARC_OPENAI_RUN_BACKEND must be set (stub/local/gateway)
+        2. ARC_OPENAI_ALLOW_COSTS must be 'true' for non-stub backends
         
-        Without both gates, this method raises an error.
+        Without both gates, this method raises GatingError.
         """
         inputs = inputs or {}
         
         # Dual gating check
-        backend = os.environ.get("ARC_OPENAI_RUN_BACKEND", "")
-        allow_costs = os.environ.get("ARC_OPENAI_ALLOW_COSTS", "").lower() in {"1", "true", "yes"}
-        
-        if not backend or not allow_costs:
-            raise RuntimeError(
-                "OpenAI Agents SDK requires dual gating. "
-                "Set ARC_OPENAI_RUN_BACKEND=openai and ARC_OPENAI_ALLOW_COSTS=true to enable live runs."
-            )
+        backend, allow_costs = require_dual_gate("OPENAI")
         
         run_id = f"run-openai-{uuid.uuid4().hex[:8]}"
         started = datetime.now(timezone.utc)

@@ -131,6 +131,13 @@ export interface StartRunRequest {
   workflow_id: string;
   runtime?: RuntimeId;
   inputs?: Record<string, unknown>;
+  /**
+   * Whether the run is permitted to make paid API calls.
+   * Opt-in by design: callers MUST set this to `true` explicitly.
+   * When omitted, falsy, or non-boolean, paid calls are disallowed
+   * and the CLI is invoked without `--allow-paid-calls`.
+   * @default false
+   */
   allow_paid_calls?: boolean;
 }
 

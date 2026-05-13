@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from ..adapters.base import CapabilityReport
+from ..gating import require_dual_gate
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import (
     WorkflowInfo, WorkflowNode, WorkflowEdge, SchemaInfo,
@@ -256,9 +257,8 @@ class SwarmGraphAdapter(RuntimeAdapter):
         inputs = inputs or {}
         workspace = Path(str(inputs.get("workspace") or ".")).resolve()
         cli = self._resolve_cli(workspace)
-        backend = os.environ.get("ARC_SWARMGRAPH_RUN_BACKEND", "stub")
+        backend, allow_costs = require_dual_gate("SWARMGRAPH")
         provider = os.environ.get("AI_PROVIDER_SWARM_GATEWAY_DEFAULT_PROVIDER", "openai")
-        allow_costs = os.environ.get("ARC_SWARMGRAPH_ALLOW_COSTS", "").lower() in {"1", "true", "yes"}
         prompt = str(inputs.get("prompt") or f"Run ARC workflow {workflow_id}")
         run_id = f"run-sg-{uuid.uuid4().hex[:8]}"
         started = datetime.now(timezone.utc)
@@ -269,7 +269,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
             "--prompt",
             prompt,
             "--backend",
-            backend,
+            backend.value,
             "--provider",
             provider,
             "--max-agents",
@@ -281,7 +281,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
         if not allow_costs:
             cmd.insert(-1, "--no-cost")
 
-        events = [self._event(run_id, 0, "RUN_STARTED", {"workflow_id": workflow_id, "backend": backend, "prompt": prompt, "cost_allowed": allow_costs})]
+        events = [self._event(run_id, 0, "RUN_STARTED", {"workflow_id": workflow_id, "backend": backend.value, "prompt": prompt, "cost_allowed": allow_costs})]
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=str(workspace),

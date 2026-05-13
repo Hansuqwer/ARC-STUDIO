@@ -28,6 +28,7 @@ from rich import print as rprint
 
 from .adapters.registry import default_registry
 from .context.pack import ContextPackGenerator
+from .gating import GatingError
 from .orchestration import runtime_router
 from .protocol.envelope import ok, err, ArcEnvelope
 from .protocol.errors import ArcErrorCode
@@ -314,7 +315,11 @@ def run_workflow(
     inputs = {"workspace": str(ws), "allow_paid_calls": allow_paid_calls}
     if prompt:
         inputs["prompt"] = prompt
-    run_record = asyncio.run(routed.adapter.run_workflow(workflow, inputs))
+    try:
+        run_record = asyncio.run(routed.adapter.run_workflow(workflow, inputs))
+    except GatingError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "DUAL_GATE_REQUIRED"}), json_output)
+        raise typer.Exit(2)
 
     from .storage.jsonl import JsonlTraceStore
     store = JsonlTraceStore(ws / ".arc" / "traces")

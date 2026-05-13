@@ -9,8 +9,8 @@
     "build": "tsc -p tsconfig.json",
     "watch": "tsc -p tsconfig.json --watch",
     "clean": "rimraf lib *.tsbuildinfo",
-    "check": "echo 'arc-core check ok'",
-    "test": "node --test ./test/**/*.test.js",
+    "check": "tsc --noEmit",
+    "test": "node --test --test-reporter=spec ./test/**/*.test.js",
     "test:coverage": "node --test --experimental-test-coverage ./test/**/*.test.js"
   },
   "theiaExtensions": [
