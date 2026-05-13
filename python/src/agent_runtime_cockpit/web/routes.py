@@ -225,12 +225,14 @@ async def start_run(request: web.Request) -> web.Response:
 
     # Enforce profile for the selected runtime
     try:
+        if allow_paid_calls and not profile.allow_paid_calls:
+            raise GatingError(f"Profile '{profile.id}' does not allow paid calls.")
         enforce_profile(profile, routed.adapter.adapter_id)
     except GatingError as exc:
         return _json(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "PROFILE_ENFORCEMENT_FAILED"}).model_dump(), 403)
 
     try:
-        run = await routed.adapter.run_workflow(workflow_id, {**inputs, "workspace": str(workspace), "allow_paid_calls": allow_paid_calls})
+        run = await routed.adapter.run_workflow(workflow_id, {**inputs, "workspace": str(workspace), "allow_paid_calls": allow_paid_calls, "profile_id": profile_id})
         _trace_store(request).save(run)
         envelope = ok(
             run.model_dump(),
@@ -484,6 +486,8 @@ async def arena_chat(request: web.Request) -> web.Response:
     # Enforce profile
     try:
         profile = resolve_profile(req.profile_id)
+        if req.allow_paid_calls and not profile.allow_paid_calls:
+            raise GatingError(f"Profile '{profile.id}' does not allow paid calls.")
         enforce_profile(profile, "lmarena")
     except GatingError as exc:
         return _json(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "PROFILE_ENFORCEMENT_FAILED"}).model_dump(), 403)

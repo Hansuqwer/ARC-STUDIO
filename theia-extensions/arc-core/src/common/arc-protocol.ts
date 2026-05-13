@@ -151,6 +151,7 @@ export type RuntimeSelection = RuntimeId | RuntimeId[];
 export interface StartRunRequest {
   workflow_id: string;
   runtime?: RuntimeSelection;
+  profile_id?: string;
   inputs?: Record<string, unknown>;
   /**
    * Whether the run is permitted to make paid API calls.

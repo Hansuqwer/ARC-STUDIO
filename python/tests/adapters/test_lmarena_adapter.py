@@ -40,6 +40,18 @@ def test_capability_report():
     assert report.requires_paid_calls is False
 
 
+def test_live_capability_report(monkeypatch):
+    monkeypatch.setenv("ARC_ALLOW_LIVE_ARENA", "true")
+    adapter = LmarenaAdapter()
+    caps = adapter.capabilities()
+    report = adapter.capability_report(Path("/tmp"))
+    assert caps.requires_paid_calls is True
+    assert caps.requires_network is True
+    assert caps.requires_secrets is True
+    assert report.requires_paid_calls is True
+    assert "ARC_LMARENA_ALLOW_COSTS" in report.required_env
+
+
 async def test_run_workflow_direct(tmp_path):
     """Default mode (direct) should produce a single candidate."""
     adapter = LmarenaAdapter()
@@ -89,6 +101,21 @@ async def test_run_workflow_agent_preview(tmp_path):
     })
     assert run.runtime == "lmarena"
     assert run.metadata.get("arena_mode") == "agent-arena-preview"
+
+
+async def test_run_workflow_rejects_paid_calls_with_safe_profile(tmp_path):
+    adapter = LmarenaAdapter()
+    try:
+        await adapter.run_workflow("arena-direct", {
+            "workspace": str(tmp_path),
+            "prompt": "Hello",
+            "allow_paid_calls": True,
+            "profile_id": "local-safe",
+        })
+    except Exception as exc:
+        assert "does not allow paid calls" in str(exc)
+    else:
+        raise AssertionError("Expected paid-call profile rejection")
 
 
 def test_registered_in_default_registry():

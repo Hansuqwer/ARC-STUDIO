@@ -82,6 +82,9 @@ export function validateOtlpEndpoint(endpoint: unknown): string {
 export function buildStartRunArgs(request: StartRunRequest): string[] {
   const runtime = Array.isArray(request.runtime) ? request.runtime.join(',') : request.runtime ?? 'auto';
   const args = ['run', request.workflow_id, '--runtime', runtime];
+  if (request.profile_id) {
+    args.push('--profile-id', request.profile_id);
+  }
   if (request.allow_paid_calls === true) {
     args.push('--allow-paid-calls');
   }

@@ -80,6 +80,7 @@ def test_store_arena_run(tmp_path):
     assert run.workflow_id == "arena-direct"
     assert len(run.events) == 2
     assert run.events[0].type == "LMARENA_REQUESTED"
+    assert "stub direct response" in run.events[1].data["final_output"].lower()
     # Verify it was persisted
     loaded = store.load(run.id)
     assert loaded is not None
@@ -109,9 +110,11 @@ def test_live_arena_disabled_by_default():
     assert "stub" in resp.candidates[0].text.lower() or "response" in resp.candidates[0].text.lower()
 
 
-def test_live_arena_enabled_missing_api_key_falls_back_to_stub(monkeypatch):
-    """Live mode enabled but no API key — falls back to stub with warning."""
+def test_live_arena_enabled_missing_api_key_returns_warning(monkeypatch):
+    """Live mode enabled but no API key — returns an explicit warning."""
     monkeypatch.setenv("ARC_ALLOW_LIVE_ARENA", "true")
+    monkeypatch.setenv("ARC_LMARENA_ALLOW_COSTS", "true")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     req = ArenaRequest(
         mode=ArenaMode.DIRECT,
         prompt="Hello",
@@ -120,12 +123,29 @@ def test_live_arena_enabled_missing_api_key_falls_back_to_stub(monkeypatch):
     )
     resp = arena_request(Path("/tmp"), req)
     assert resp.mode == ArenaMode.DIRECT
-    assert len(resp.candidates) >= 1
+    assert resp.candidates == []
+    assert any("OPENAI_API_KEY" in warning for warning in resp.warnings)
+
+
+def test_live_arena_requires_lmarena_cost_gate(monkeypatch):
+    """Live mode needs both live flag and LM Arena cost gate."""
+    monkeypatch.setenv("ARC_ALLOW_LIVE_ARENA", "true")
+    monkeypatch.delenv("ARC_LMARENA_ALLOW_COSTS", raising=False)
+    req = ArenaRequest(
+        mode=ArenaMode.DIRECT,
+        prompt="Hello",
+        model="gpt-4o-mini-2024-07-18",
+        allow_paid_calls=True,
+    )
+    resp = arena_request(Path("/tmp"), req)
+    assert resp.candidates == []
+    assert any("ARC_LMARENA_ALLOW_COSTS" in warning for warning in resp.warnings)
 
 
 def test_live_arena_enabled_no_paid_calls_gate(monkeypatch):
     """Live mode enabled but allow_paid_calls=False — blocked with warning."""
     monkeypatch.setenv("ARC_ALLOW_LIVE_ARENA", "true")
+    monkeypatch.setenv("ARC_LMARENA_ALLOW_COSTS", "true")
     req = ArenaRequest(
         mode=ArenaMode.DIRECT,
         prompt="Hello",
@@ -134,13 +154,16 @@ def test_live_arena_enabled_no_paid_calls_gate(monkeypatch):
     )
     resp = arena_request(Path("/tmp"), req)
     assert resp.mode == ArenaMode.DIRECT
-    # Falls back to stub
-    assert len(resp.candidates) >= 1
+    assert resp.candidates == []
+    assert "allow_paid_calls" in " ".join(resp.warnings)
 
 
-def test_live_arena_battle_fallback(monkeypatch):
-    """Battle mode with live enabled but no keys — falls back to stub."""
+def test_live_arena_battle_failure_returns_warning(monkeypatch):
+    """Battle mode with live enabled but no keys — returns an explicit warning."""
     monkeypatch.setenv("ARC_ALLOW_LIVE_ARENA", "true")
+    monkeypatch.setenv("ARC_LMARENA_ALLOW_COSTS", "true")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     req = ArenaRequest(
         mode=ArenaMode.BATTLE,
         prompt="Compare",
@@ -149,12 +172,14 @@ def test_live_arena_battle_fallback(monkeypatch):
     )
     resp = arena_request(Path("/tmp"), req)
     assert resp.mode == ArenaMode.BATTLE
-    assert len(resp.candidates) >= 1
+    assert resp.candidates == []
+    assert any("API_KEY" in warning for warning in resp.warnings)
 
 
-def test_live_arena_unknown_model(monkeypatch):
-    """Unknown model in live mode — falls back to stub."""
+def test_live_arena_unknown_model_returns_warning(monkeypatch):
+    """Unknown model in live mode — returns an explicit warning."""
     monkeypatch.setenv("ARC_ALLOW_LIVE_ARENA", "true")
+    monkeypatch.setenv("ARC_LMARENA_ALLOW_COSTS", "true")
     req = ArenaRequest(
         mode=ArenaMode.DIRECT,
         prompt="Hello",
@@ -163,13 +188,14 @@ def test_live_arena_unknown_model(monkeypatch):
     )
     resp = arena_request(Path("/tmp"), req)
     assert resp.mode == ArenaMode.DIRECT
-    # Falls back to stub with the unknown model
-    assert len(resp.candidates) >= 1
+    assert resp.candidates == []
+    assert any("No live provider configuration" in warning for warning in resp.warnings)
 
 
 def test_live_arena_no_api_key_leakage(monkeypatch):
     """Secrets are not leaked in warnings or candidate text."""
     monkeypatch.setenv("ARC_ALLOW_LIVE_ARENA", "true")
+    monkeypatch.setenv("ARC_LMARENA_ALLOW_COSTS", "true")
     # Set a real-looking key so the provider attempts a call but it fails.
     # The key should never appear in response text or warnings.
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-live-arena-secret-abc123")

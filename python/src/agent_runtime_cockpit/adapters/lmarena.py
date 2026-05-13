@@ -16,14 +16,16 @@ Modes are inferred from the workflow_id:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+import os
 
 from ..arena.models import ArenaMode, ArenaRequest, PrivacyLevel
 from ..arena.service import arena_request, store_arena_run
+from ..gating import GatingError
 from ..protocol.capabilities import RuntimeCapabilities
-from ..protocol.schemas import RunEvent, RunRecord, RunStatus
+from ..protocol.schemas import RunRecord, RunStatus
+from ..security.profiles import enforce_profile, resolve_profile
 from ..storage.jsonl import JsonlTraceStore
 from .base import CapabilityReport, RuntimeAdapter
 
@@ -50,6 +52,7 @@ class LmarenaAdapter(RuntimeAdapter):
         return "LM Arena"
 
     def capabilities(self) -> RuntimeCapabilities:
+        live = os.environ.get("ARC_ALLOW_LIVE_ARENA", "").lower() in {"true", "1"}
         return RuntimeCapabilities(
             can_inspect=False,
             can_run=True,
@@ -64,17 +67,19 @@ class LmarenaAdapter(RuntimeAdapter):
             can_fork=False,
             can_diff=False,
             can_eval=False,
-            requires_paid_calls=False,
-            requires_network=False,
+            requires_paid_calls=live,
+            requires_network=live,
             requires_shell=False,
-            requires_secrets=False,
+            requires_secrets=live,
         )
 
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
         """Always detected — the Arena stub backend is always available."""
-        return True, 0.5, ["Arena runtime available (stub mode)"]
+        mode = "live mode" if os.environ.get("ARC_ALLOW_LIVE_ARENA", "").lower() in {"true", "1"} else "stub mode"
+        return True, 0.5, [f"Arena runtime available ({mode})"]
 
     def capability_report(self, workspace: Path) -> CapabilityReport:
+        live = os.environ.get("ARC_ALLOW_LIVE_ARENA", "").lower() in {"true", "1"}
         return CapabilityReport(
             runtime_id=self.adapter_id,
             detected=True,
@@ -82,8 +87,8 @@ class LmarenaAdapter(RuntimeAdapter):
             availability="runnable",
             reason=None,
             detected_artifacts=["Arena runtime is always available"],
-            required_env=[],
-            requires_paid_calls=False,
+            required_env=["ARC_LMARENA_RUN_BACKEND", "ARC_LMARENA_ALLOW_COSTS"] if live else [],
+            requires_paid_calls=live,
             version=None,
             doctor_actions=[],
         )
@@ -104,6 +109,10 @@ class LmarenaAdapter(RuntimeAdapter):
         prompt = str(inputs.get("prompt", "")).strip()
         allow_paid_calls = bool(inputs.get("allow_paid_calls", False))
         profile_id = str(inputs.get("profile_id", "local-safe"))
+        profile = resolve_profile(profile_id)
+        if allow_paid_calls and not profile.allow_paid_calls:
+            raise GatingError(f"Profile '{profile_id}' does not allow paid calls.")
+        enforce_profile(profile, self.adapter_id)
 
         # Determine mode from workflow_id or explicit input
         raw_mode = str(inputs.get("arena_mode", "")).strip().lower()

@@ -292,6 +292,7 @@ def run_workflow(
     runtime: str = typer.Option("auto", "--runtime", "-r", help="Runtime: auto, swarmgraph, langgraph, crewai, lmarena"),
     prompt: Optional[str] = typer.Option(None, "--prompt", help="Prompt passed to runnable adapters"),
     allow_paid_calls: bool = typer.Option(False, "--allow-paid-calls", help="Allow runtimes to make provider calls"),
+    profile_id: str = typer.Option("local-safe", "--profile-id", help="Run profile ID"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
@@ -312,7 +313,7 @@ def run_workflow(
     if not json_output:
         console.print(f"[dim]Runtime:[/dim] {routed.adapter.adapter_id} ({routed.chosen_by})")
 
-    inputs = {"workspace": str(ws), "allow_paid_calls": allow_paid_calls}
+    inputs = {"workspace": str(ws), "allow_paid_calls": allow_paid_calls, "profile_id": profile_id}
     if prompt:
         inputs["prompt"] = prompt
     try:

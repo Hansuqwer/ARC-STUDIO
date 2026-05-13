@@ -330,8 +330,7 @@ def _live_response(ws: Path, req: ArenaRequest) -> ArenaResponse:
             if m.id in _LIVE_MODEL_MAP and m.supports_battle
         ][:2]
         if not battle_models:
-            warnings.append("No live-capable models for battle mode; falling back to stub.")
-            return _stub_battle(ws, prompt, req.model_tags)
+            return ArenaResponse(run_id=run_id, mode=req.mode, warnings=["No live-capable models for battle mode."])
         for m in battle_models:
             try:
                 text = _live_provider_chat(m.id, prompt, system_prompt, allow_paid_calls)
@@ -343,8 +342,7 @@ def _live_response(ws: Path, req: ArenaRequest) -> ArenaResponse:
             except RuntimeError as exc:
                 warnings.append(str(exc))
         if not candidates:
-            warnings.append("All live battle calls failed; falling back to stub.")
-            return _stub_battle(ws, prompt, req.model_tags)
+            warnings.append("All live battle calls failed.")
 
     elif req.mode == ArenaMode.DIRECT:
         try:
@@ -357,8 +355,7 @@ def _live_response(ws: Path, req: ArenaRequest) -> ArenaResponse:
         except RuntimeError as exc:
             warnings.append(str(exc))
             if not candidates:
-                warnings.append("Live direct call failed; falling back to stub.")
-                return _stub_direct(ws, prompt, model_id)
+                warnings.append("Live direct call failed.")
 
     elif req.mode == ArenaMode.CODE:
         code_prompt = f"{system_prompt}Generate only code for the following request. Return the complete implementation.\n\n{prompt}"
@@ -375,8 +372,7 @@ def _live_response(ws: Path, req: ArenaRequest) -> ArenaResponse:
         except RuntimeError as exc:
             warnings.append(str(exc))
             if not candidates:
-                warnings.append("Live code call failed; falling back to stub.")
-                return _stub_code(ws, prompt, model_id)
+                warnings.append("Live code call failed.")
 
     elif req.mode == ArenaMode.AGENT_ARENA_PREVIEW:
         agent_prompt = (
@@ -396,8 +392,7 @@ def _live_response(ws: Path, req: ArenaRequest) -> ArenaResponse:
         except RuntimeError as exc:
             warnings.append(str(exc))
             if not candidates:
-                warnings.append("Live agent preview call failed; falling back to stub.")
-                return _stub_agent_preview(ws, prompt, model_id)
+                warnings.append("Live agent preview call failed.")
 
     return ArenaResponse(
         run_id=run_id,
@@ -423,13 +418,16 @@ def arena_request(ws: Path, req: ArenaRequest) -> ArenaResponse:
     model_tags = req.model_tags
 
     live = os.environ.get("ARC_ALLOW_LIVE_ARENA", "").lower() in {"true", "1"}
-    allow_paid = req.allow_paid_calls
 
     if live and mode in (ArenaMode.BATTLE, ArenaMode.DIRECT, ArenaMode.CODE, ArenaMode.AGENT_ARENA_PREVIEW):
+        if os.environ.get("ARC_LMARENA_ALLOW_COSTS", "").strip().lower() != "true":
+            return ArenaResponse(
+                run_id=f"arena-{uuid.uuid4().hex[:12]}",
+                mode=mode,
+                warnings=["Live arena blocked: ARC_LMARENA_ALLOW_COSTS=true is required."],
+            )
         try:
-            live_resp = _live_response(ws, req)
-            if live_resp.candidates:
-                return live_resp
+            return _live_response(ws, req)
         except Exception:
             log.warning("Live arena call failed, falling back to stub", exc_info=True)
 
@@ -452,6 +450,9 @@ def arena_request(ws: Path, req: ArenaRequest) -> ArenaResponse:
 
 def store_arena_run(store: JsonlTraceStore, response: ArenaResponse, req: ArenaRequest) -> RunRecord:
     """Store an Arena response as an ARC run record for traceability."""
+    final_output = response.candidates[0].text if response.candidates else ""
+    final_patch = response.candidates[0].patch if response.candidates else ""
+    final_diff = response.candidates[0].diff if response.candidates else ""
     run = RunRecord(
         id=response.run_id,
         workflow_id=f"arena-{req.mode.value}",
@@ -482,6 +483,10 @@ def store_arena_run(store: JsonlTraceStore, response: ArenaResponse, req: ArenaR
                     "candidate_count": len(response.candidates),
                     "candidate_models": [c.model for c in response.candidates],
                     "recommended": response.recommended,
+                    "final_output": final_output,
+                    "patch": final_patch,
+                    "diff": final_diff,
+                    "warnings": response.warnings,
                 },
             ),
         ],

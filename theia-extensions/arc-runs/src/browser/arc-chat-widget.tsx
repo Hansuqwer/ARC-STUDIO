@@ -266,7 +266,7 @@ export class ArcChatWidget extends ReactWidget {
         inputs.arena_model = this.arenaModel;
       }
 
-      const result = await this.arcService.startRun(workflowId, inputs, runtime, this.allowPaidCalls ? true : undefined);
+      const result = await this.arcService.startRun(workflowId, inputs, runtime, this.allowPaidCalls ? true : undefined, this.profileId);
       if (result.data) {
         this.messages.push(this.messageFromRun(result.data));
       } else {
@@ -289,7 +289,7 @@ export class ArcChatWidget extends ReactWidget {
       const model = run.metadata?.arena_model ?? '';
       const warnings = Array.isArray(run.metadata?.warnings) ? (run.metadata.warnings as string[]).join('; ') : '';
       const output = this.finalOutput(run) || `Arena ${mode} completed (${model || 'stub'}).`;
-      return { role: 'assistant', text: `${output}${warnings ? `\n\n⚠ ${warnings}` : ''}`, runId: run.id };
+      return { role: 'assistant', text: `${output}${warnings ? `\n\nWarning: ${warnings}` : ''}`, runId: run.id };
     }
     const output = this.finalOutput(run) || `Run ${run.status}. Runtime: ${run.runtime}.`;
     return { role: 'assistant', text: output, runId: run.id };
