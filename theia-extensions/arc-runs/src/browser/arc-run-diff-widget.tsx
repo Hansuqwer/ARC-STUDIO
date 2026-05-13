@@ -41,7 +41,7 @@ export class ArcRunDiffWidget extends ReactWidget {
   protected render(): React.ReactNode {
     return (
       <div style={{ padding: 16, fontFamily: 'var(--theia-ui-font-family)', color: 'var(--theia-foreground)', height: '100%', overflow: 'auto' }}>
-        <h2 style={{ margin: '0 0 12px', fontSize: 15 }}>Run Diff</h2>
+        <h2 style={{ margin: '0 0 12px', fontSize: 15 }}>Compare Runs</h2>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
           <select
             style={selectStyle}
@@ -67,13 +67,14 @@ export class ArcRunDiffWidget extends ReactWidget {
             style={primaryBtnStyle}
             disabled={!this.runAId || !this.runBId || this.loading}
             onClick={() => this.runDiff()}
+            aria-label="Compare selected runs"
           >
             {this.loading ? 'Diffing...' : 'Diff'}
           </button>
-          <button style={refreshBtnStyle} onClick={() => this.loadRuns()}>Refresh</button>
+          <button style={refreshBtnStyle} onClick={() => this.loadRuns()} aria-label="Refresh run list">Refresh</button>
         </div>
-        {this.lastError && <div style={{ color: '#ffb74d', fontSize: 11 }}>{this.lastError}</div>}
-        {this.diffResult && <pre style={diffStyle}>{this.diffResult}</pre>}
+        {this.lastError && <div style={{ color: 'var(--theia-editorWarning-foreground)', fontSize: 11 }} role="alert">{this.lastError}</div>}
+        {this.diffResult && <pre style={diffStyle} role="region" aria-label="Diff output">{this.diffResult}</pre>}
       </div>
     );
   }
@@ -131,7 +132,7 @@ const refreshBtnStyle: React.CSSProperties = {
 const diffStyle: React.CSSProperties = {
   marginTop: 8,
   padding: 12,
-  backgroundColor: '#1e1e1e',
+  backgroundColor: 'var(--theia-textCodeBlock-background)',
   border: '1px solid var(--theia-widget-border)',
   borderRadius: 4,
   fontSize: 11,

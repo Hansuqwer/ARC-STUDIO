@@ -1,7 +1,8 @@
 /**
  * ARC Main Widget — the primary ARC Studio panel
  *
- * Renders in the left Activity Bar panel.
+ * Renders in the left Activity Bar panel with a workflow-first layout:
+ * Quick Actions, Runtime Readiness, and Recent Runs.
  * Source: https://theia-ide.org/docs/widgets/
  * Source: https://theia-ide.org/docs/widgets/#react-based-widget
  */
@@ -10,8 +11,9 @@ import * as React from 'react';
 import { injectable, inject, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common/message-service';
+import { CommandService } from '@theia/core/lib/common/command';
 import { ArcFrontendService } from './arc-frontend-service';
-import { RuntimeInfo, WorkflowInfo, SchemaInfo, WorkspaceInfo } from '../common/arc-protocol';
+import { RuntimeInfo, WorkflowInfo, SchemaInfo, WorkspaceInfo, RunRecord, RuntimeCapabilityReport } from '../common/arc-protocol';
 
 @injectable()
 export class ArcMainWidget extends ReactWidget {
@@ -24,6 +26,9 @@ export class ArcMainWidget extends ReactWidget {
   @inject(ArcFrontendService)
   protected readonly arcService: ArcFrontendService;
 
+  @inject(CommandService)
+  protected readonly commandService: CommandService;
+
   // State
   protected loading = false;
   protected error: string | null = null;
@@ -32,7 +37,9 @@ export class ArcMainWidget extends ReactWidget {
   protected workflows: WorkflowInfo[] = [];
   protected schemas: SchemaInfo[] = [];
   protected daemonStatus: { running: boolean; version: string } | null = null;
-  protected activeTab: 'overview' | 'runtimes' | 'workflows' | 'schemas' | 'runs' = 'overview';
+  protected recentRuns: RunRecord[] = [];
+  protected capabilities: RuntimeCapabilityReport[] = [];
+  protected expandedRuntime: string | null = null;
 
   @postConstruct()
   protected init(): void {
@@ -52,13 +59,17 @@ export class ArcMainWidget extends ReactWidget {
     this.update();
 
     try {
-      const [statusResult, runtimesResult] = await Promise.all([
+      const [statusResult, runtimesResult, capabilitiesResult, runsResult] = await Promise.all([
         this.arcService.getDaemonStatus(),
         this.arcService.listRuntimes(),
+        this.arcService.listRuntimeCapabilities().catch(() => undefined),
+        this.arcService.listRuns().catch(() => undefined),
       ]);
 
       this.daemonStatus = statusResult.data;
       this.runtimes = runtimesResult.data ?? [];
+      this.capabilities = capabilitiesResult?.data?.runtimes ?? [];
+      this.recentRuns = (runsResult?.data ?? []).slice(0, 5);
 
       if (this.runtimes.length > 0) {
         const [workflowsResult, schemasResult] = await Promise.all([
@@ -79,11 +90,27 @@ export class ArcMainWidget extends ReactWidget {
   }
 
   protected render(): React.ReactNode {
+    if (this.loading && !this.daemonStatus) {
+      return (
+        <div style={styles.panel}>
+          {this.renderHeader()}
+          <div style={styles.loading}>
+            <div style={styles.spinner}>⟳</div>
+            <span>Loading ARC data...</span>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="arc-panel" style={styles.panel}>
         {this.renderHeader()}
-        {this.renderTabs()}
-        {this.renderContent()}
+        {this.error && this.renderError()}
+        <div style={styles.content}>
+          {this.renderQuickActions()}
+          {this.renderRuntimeReadiness()}
+          {this.renderRecentRuns()}
+        </div>
       </div>
     );
   }
@@ -100,6 +127,7 @@ export class ArcMainWidget extends ReactWidget {
             style={styles.iconBtn}
             onClick={() => this.loadAll()}
             title="Refresh"
+            aria-label="Refresh ARC data"
           >
             ↻
           </button>
@@ -107,7 +135,7 @@ export class ArcMainWidget extends ReactWidget {
         {this.daemonStatus && (
           <div style={{
             ...styles.daemonBadge,
-            backgroundColor: this.daemonStatus.running ? '#2d5a2d' : '#5a2d2d',
+            backgroundColor: this.daemonStatus.running ? 'var(--theia-charts-green)' : 'var(--theia-inputValidation-errorBackground)',
           }}>
             {this.daemonStatus.running ? '● daemon online' : '○ daemon offline'}
           </div>
@@ -116,206 +144,207 @@ export class ArcMainWidget extends ReactWidget {
     );
   }
 
-  protected renderTabs(): React.ReactNode {
-    const tabs: Array<{ id: typeof this.activeTab; label: string; count?: number }> = [
-      { id: 'overview', label: 'Overview' },
-      { id: 'runtimes', label: 'Runtimes', count: this.runtimes.length },
-      { id: 'workflows', label: 'Workflows', count: this.workflows.length },
-      { id: 'schemas', label: 'Schemas', count: this.schemas.length },
-      { id: 'runs', label: 'Runs' },
-    ];
-
+  protected renderError(): React.ReactNode {
     return (
-      <div style={styles.tabs}>
-        {tabs.map(tab => (
+      <div style={styles.error}>
+        <div style={styles.errorIcon}>⚠</div>
+        <div style={styles.errorText}>{this.error}</div>
+        <button style={styles.retryBtn} onClick={() => this.loadAll()}>Retry</button>
+      </div>
+    );
+  }
+
+  // ─── Quick Actions ─────────────────────────────────────────────────────
+
+  protected renderQuickActions(): React.ReactNode {
+    return (
+      <div style={styles.section}>
+        <div style={styles.sectionTitle}>Quick Actions</div>
+        <div style={styles.quickActions}>
           <button
-            key={tab.id}
-            style={{
-              ...styles.tab,
-              ...(this.activeTab === tab.id ? styles.tabActive : {}),
-            }}
-            onClick={() => { this.activeTab = tab.id; this.update(); }}
+            style={styles.actionBtn}
+            onClick={() => this.commandService.executeCommand('arc:open-chat')}
+            title="Run an agent workflow"
+            aria-label="Run Agent"
           >
-            {tab.label}
-            {tab.count !== undefined && (
-              <span style={styles.tabCount}>{tab.count}</span>
-            )}
+            <span style={styles.actionIcon}>▶</span>
+            <span>Run Agent</span>
           </button>
-        ))}
-      </div>
-    );
-  }
-
-  protected renderContent(): React.ReactNode {
-    if (this.loading) {
-      return (
-        <div style={styles.loading}>
-          <div style={styles.spinner}>⟳</div>
-          <span>Loading ARC data...</span>
+          <button
+            style={styles.actionBtn}
+            onClick={() => this.commandService.executeCommand('arc:open-arena')}
+            title="Compare models side by side"
+            aria-label="Compare Models"
+          >
+            <span style={styles.actionIcon}>⚔</span>
+            <span>Compare Models</span>
+          </button>
+          <button
+            style={styles.actionBtn}
+            onClick={() => this.commandService.executeCommand('arc:open-run-timeline')}
+            title="View run history and timeline"
+            aria-label="Open Timeline"
+          >
+            <span style={styles.actionIcon}>📊</span>
+            <span>Run Timeline</span>
+          </button>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
-    if (this.error) {
-      return (
-        <div style={styles.error}>
-          <div style={styles.errorIcon}>⚠</div>
-          <div style={styles.errorText}>{this.error}</div>
-          <button style={styles.retryBtn} onClick={() => this.loadAll()}>Retry</button>
+  // ─── Runtime Readiness ─────────────────────────────────────────────────
+
+  protected renderRuntimeReadiness(): React.ReactNode {
+    const allRuntimes = this.capabilities.length > 0 ? this.capabilities : this.runtimes.map(rt => ({
+      runtime_id: rt.id as any,
+      can_run: rt.confidence === 'high',
+      availability: rt.confidence,
+      reason: rt.evidence.join('; '),
+      required_env: [],
+      detected_artifacts: rt.evidence,
+      doctor_actions: [],
+      requires_paid_calls: false,
+      requires_network: false,
+      requires_secrets: false,
+    }));
+
+    return (
+      <div style={styles.section}>
+        <div style={styles.sectionTitle}>
+          Runtime Readiness
+          <span style={styles.sectionCount}>{allRuntimes.length}</span>
         </div>
-      );
-    }
-
-    switch (this.activeTab) {
-      case 'overview': return this.renderOverview();
-      case 'runtimes': return this.renderRuntimes();
-      case 'workflows': return this.renderWorkflows();
-      case 'schemas': return this.renderSchemas();
-      case 'runs': return this.renderRuns();
-      default: return null;
-    }
-  }
-
-  protected renderOverview(): React.ReactNode {
-    const mockWarnings = this.runtimes.some(r =>
-      r.evidence.some(e => e.includes('[MOCK]'))
-    );
-
-    return (
-      <div style={styles.content}>
-        {mockWarnings && (
-          <div style={styles.mockWarning}>
-            ⚠ Using fixture data. Run <code>uv run arc serve</code> for live data.
-          </div>
-        )}
-
-        <div style={styles.statsGrid}>
-          <div style={styles.stat}>
-            <div style={styles.statNumber}>{this.runtimes.length}</div>
-            <div style={styles.statLabel}>Runtimes</div>
-          </div>
-          <div style={styles.stat}>
-            <div style={styles.statNumber}>{this.workflows.length}</div>
-            <div style={styles.statLabel}>Workflows</div>
-          </div>
-          <div style={styles.stat}>
-            <div style={styles.statNumber}>{this.schemas.length}</div>
-            <div style={styles.statLabel}>Schemas</div>
-          </div>
-        </div>
-
-        {this.runtimes.length === 0 && (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>📂</div>
-            <div style={styles.emptyText}>No runtimes detected</div>
-            <div style={styles.emptyHint}>
-              Open a workspace containing a SwarmGraph or LangGraph project
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  protected renderRuntimes(): React.ReactNode {
-    return (
-      <div style={styles.content}>
-        {this.runtimes.map(rt => (
-          <div key={rt.id} style={styles.card}>
-            <div style={styles.cardHeader}>
-              <span style={styles.cardTitle}>{rt.name}</span>
-              <span style={{
-                ...styles.confidence,
-                color: rt.confidence === 'high' ? '#4fc3f7' : rt.confidence === 'medium' ? '#ffb74d' : '#ef5350',
-              }}>
-                {rt.confidence}
-              </span>
-            </div>
-            <div style={styles.cardMeta}>
-              <span style={styles.badge}>{rt.adapter}</span>
-            </div>
-            <div style={styles.cardCapabilities}>
-              {Object.entries(rt.capabilities).map(([cap, val]) => (
-                <span key={cap} style={{ ...styles.cap, opacity: val ? 1 : 0.4 }}>
-                  {val ? '✓' : '✗'} {cap.replace('can_', '').replace(/_/g, ' ')}
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  protected renderWorkflows(): React.ReactNode {
-    return (
-      <div style={styles.content}>
-        {this.workflows.map(wf => (
-          <div key={wf.id} style={styles.card}>
-            <div style={styles.cardHeader}>
-              <span style={styles.cardTitle}>{wf.name}</span>
-              <span style={styles.badge}>{wf.runtime}</span>
-            </div>
-            <div style={styles.cardMeta}>
-              <span style={styles.metaItem}>
-                {wf.nodes.length} nodes · {wf.edges.length} edges
-              </span>
-            </div>
-            {wf.source_file && (
-              <div style={styles.cardMeta}>
-                <code style={styles.codeSmall}>{wf.source_file}</code>
-              </div>
-            )}
-          </div>
-        ))}
-        {this.workflows.length === 0 && (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>⎘</div>
-            <div style={styles.emptyText}>No workflows found</div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  protected renderSchemas(): React.ReactNode {
-    return (
-      <div style={styles.content}>
-        {this.schemas.map(s => (
-          <div key={s.id} style={styles.card}>
-            <div style={styles.cardHeader}>
-              <span style={styles.cardTitle}>{s.name}</span>
-              <span style={styles.badge}>{s.runtime}</span>
-            </div>
-            {s.source_file && (
-              <div style={styles.cardMeta}>
-                <code style={styles.codeSmall}>{s.source_file}</code>
-              </div>
-            )}
-            <details style={styles.details}>
-              <summary style={styles.detailsSummary}>View JSON Schema</summary>
-              <pre style={styles.jsonPre}>
-                {JSON.stringify(s.schema, null, 2)}
-              </pre>
-            </details>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  protected renderRuns(): React.ReactNode {
-    return (
-      <div style={styles.content}>
-        <div style={styles.emptyState}>
-          <div style={styles.emptyIcon}>▶</div>
-          <div style={styles.emptyText}>No runs yet</div>
+        {allRuntimes.length === 0 && (
           <div style={styles.emptyHint}>
-            Select a workflow and press "Run" to start
+            No runtimes detected. Open a workspace with an agent project.
           </div>
-        </div>
+        )}
+        {allRuntimes.map(rt => this.renderRuntimeItem(rt))}
       </div>
     );
+  }
+
+  protected renderRuntimeItem(rt: RuntimeCapabilityReport | ({ runtime_id: string; can_run: boolean; availability: string; reason: string; required_env: string[]; detected_artifacts: string[]; doctor_actions: any[]; requires_paid_calls: boolean; requires_network: boolean; requires_secrets: boolean })): React.ReactNode {
+    const isReady = rt.can_run;
+    const isExpanded = this.expandedRuntime === rt.runtime_id;
+    const color = isReady ? 'var(--theia-charts-green)' : 'var(--theia-editorWarning-foreground)';
+    const icon = isReady ? '✓' : '⚠';
+
+    return (
+      <div key={rt.runtime_id} style={styles.runtimeItem}>
+        <div
+          style={styles.runtimeHeader}
+          onClick={() => {
+            this.expandedRuntime = isExpanded ? null : rt.runtime_id;
+            this.update();
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label={`${rt.runtime_id} - ${isReady ? 'ready' : 'not ready'}`}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { this.expandedRuntime = isExpanded ? null : rt.runtime_id; this.update(); }}}
+        >
+          <span style={{ color, fontWeight: 600, fontSize: 12 }}>
+            {icon} {rt.runtime_id}
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--theia-descriptionForeground)' }}>
+            {isReady ? 'ready' : rt.availability.replace(/_/g, ' ')}
+          </span>
+        </div>
+        {isExpanded && (
+          <div style={styles.runtimeDetails}>
+            {rt.reason && (
+              <div style={styles.runtimeDetailText}>{rt.reason}</div>
+            )}
+            {rt.required_env.length > 0 && (
+              <div style={styles.runtimeDetailText}>
+                Required: <code>{rt.required_env.join(', ')}</code>
+              </div>
+            )}
+            {'doctor_actions' in rt && rt.doctor_actions.length > 0 && (
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                {rt.doctor_actions.map((action: any) => (
+                  <button key={action.id} style={styles.doctorBtn} title={action.description}>
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {rt.requires_paid_calls && (
+              <div style={{ fontSize: 10, color: 'var(--theia-editorWarning-foreground)', marginTop: 2 }}>
+                Requires paid/provider calls
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ─── Recent Runs ───────────────────────────────────────────────────────
+
+  protected renderRecentRuns(): React.ReactNode {
+    return (
+      <div style={styles.section}>
+        <div style={styles.sectionTitle}>
+          Recent Runs
+          {this.recentRuns.length > 0 && (
+            <span style={styles.sectionCount}>{this.recentRuns.length}</span>
+          )}
+        </div>
+        {this.recentRuns.length === 0 ? (
+          <div style={styles.emptyHint}>
+            No runs yet. Click "Run Agent" to start.
+          </div>
+        ) : (
+          this.recentRuns.map(run => (
+            <div
+              key={run.id}
+              style={styles.runItem}
+              onClick={() => this.commandService.executeCommand('arc:open-run-timeline')}
+              role="button"
+              tabIndex={0}
+              aria-label={`Run ${run.id.substring(0, 12)} - ${run.status}`}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { this.commandService.executeCommand('arc:open-run-timeline'); }}}
+            >
+              <div style={styles.runItemHeader}>
+                <span style={{ fontSize: 11, fontWeight: 500 }}>
+                  {this.statusIcon(run.status)} {run.id.substring(0, 12)}
+                </span>
+                <span style={{ fontSize: 10, fontWeight: 600, color: this.statusColor(run.status) }}>
+                  {run.status}
+                </span>
+              </div>
+              <div style={styles.runItemMeta}>
+                {run.workflow_id} · {new Date(run.started_at).toLocaleTimeString()}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    );
+  }
+
+  protected statusIcon(status: string): string {
+    const icons: Record<string, string> = {
+      pending: '⏸',
+      running: '▶',
+      completed: '✓',
+      failed: '✗',
+      cancelled: '⊘',
+    };
+    return icons[status] ?? '?';
+  }
+
+  protected statusColor(status: string): string {
+    const colors: Record<string, string> = {
+      pending: 'var(--theia-editorWarning-foreground)',
+      running: 'var(--theia-textLink-foreground)',
+      completed: 'var(--theia-charts-green)',
+      failed: 'var(--theia-errorForeground)',
+      cancelled: 'var(--theia-descriptionForeground)',
+    };
+    return colors[status] ?? 'inherit';
   }
 }
 
@@ -341,7 +370,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
     marginBottom: '4px',
   },
-  headerIcon: { fontSize: '18px', color: '#4fc3f7' },
+  headerIcon: { fontSize: '18px', color: 'var(--theia-textLink-foreground)' },
   headerText: { fontWeight: 600, fontSize: '14px' },
   headerActions: { position: 'absolute', right: '12px', top: '12px' },
   iconBtn: {
@@ -357,44 +386,14 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '10px',
     padding: '2px 8px',
     borderRadius: '10px',
-    color: '#fff',
+    color: 'var(--theia-badge-foreground)',
     marginTop: '4px',
     display: 'inline-block',
-  },
-  tabs: {
-    display: 'flex',
-    borderBottom: '1px solid var(--theia-widget-border)',
-    overflowX: 'auto',
-    flexShrink: 0,
-  },
-  tab: {
-    padding: '8px 12px',
-    background: 'none',
-    border: 'none',
-    borderBottom: '2px solid transparent',
-    cursor: 'pointer',
-    color: 'var(--theia-descriptionForeground)',
-    fontSize: '12px',
-    whiteSpace: 'nowrap',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-  },
-  tabActive: {
-    color: 'var(--theia-foreground)',
-    borderBottomColor: '#4fc3f7',
-  },
-  tabCount: {
-    backgroundColor: 'var(--theia-badge-background)',
-    color: 'var(--theia-badge-foreground)',
-    borderRadius: '8px',
-    padding: '0 5px',
-    fontSize: '10px',
   },
   content: {
     flex: 1,
     overflowY: 'auto',
-    padding: '12px',
+    padding: '8px 12px',
   },
   loading: {
     display: 'flex',
@@ -410,110 +409,120 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    padding: '24px',
-    gap: '12px',
+    padding: '16px',
+    gap: '8px',
   },
-  errorIcon: { fontSize: '32px', color: '#ef5350' },
+  errorIcon: { fontSize: '24px', color: 'var(--theia-errorForeground)' },
   errorText: {
-    color: '#ef5350',
-    fontSize: '13px',
+    color: 'var(--theia-errorForeground)',
+    fontSize: '12px',
     textAlign: 'center',
     maxWidth: '300px',
   },
   retryBtn: {
     padding: '6px 16px',
-    backgroundColor: '#4fc3f7',
-    color: '#000',
+    backgroundColor: 'var(--theia-button-background)',
+    color: 'var(--theia-button-foreground)',
     border: 'none',
     borderRadius: '4px',
     cursor: 'pointer',
   },
-  mockWarning: {
-    backgroundColor: '#5a3d00',
-    border: '1px solid #ffb74d',
-    borderRadius: '4px',
-    padding: '8px 12px',
-    marginBottom: '12px',
-    fontSize: '12px',
-    color: '#ffb74d',
-  },
-  statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '8px',
+  // ─── Sections ──────────────────────────────────────────────────────────
+  section: {
     marginBottom: '16px',
   },
-  stat: {
-    backgroundColor: 'var(--theia-editor-background)',
-    border: '1px solid var(--theia-widget-border)',
-    borderRadius: '6px',
-    padding: '12px',
-    textAlign: 'center',
+  sectionTitle: {
+    fontSize: '11px',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+    color: 'var(--theia-descriptionForeground)',
+    marginBottom: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
   },
-  statNumber: { fontSize: '24px', fontWeight: 700, color: '#4fc3f7' },
-  statLabel: { fontSize: '11px', color: 'var(--theia-descriptionForeground)', marginTop: '4px' },
-  emptyState: {
+  sectionCount: {
+    fontSize: '10px',
+    backgroundColor: 'var(--theia-badge-background)',
+    color: 'var(--theia-badge-foreground)',
+    borderRadius: '8px',
+    padding: '0 5px',
+  },
+  // ─── Quick Actions ────────────────────────────────────────────────────
+  quickActions: {
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
-    padding: '32px 16px',
-    gap: '8px',
+    gap: '4px',
   },
-  emptyIcon: { fontSize: '32px' },
-  emptyText: { fontWeight: 600, color: 'var(--theia-foreground)' },
-  emptyHint: { fontSize: '12px', color: 'var(--theia-descriptionForeground)', textAlign: 'center' },
-  card: {
+  actionBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 12px',
     backgroundColor: 'var(--theia-editor-background)',
     border: '1px solid var(--theia-widget-border)',
     borderRadius: '6px',
-    padding: '12px',
-    marginBottom: '8px',
+    cursor: 'pointer',
+    color: 'var(--theia-foreground)',
+    fontSize: '13px',
+    fontWeight: 500,
+    textAlign: 'left' as any,
+    transition: 'border-color 0.15s, background-color 0.15s',
   },
-  cardHeader: {
+  actionIcon: { fontSize: '16px' },
+  // ─── Runtime Readiness ────────────────────────────────────────────────
+  runtimeItem: {
+    border: '1px solid var(--theia-widget-border)',
+    borderRadius: '4px',
+    marginBottom: '4px',
+    backgroundColor: 'var(--theia-editor-background)',
+  },
+  runtimeHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '6px',
-  },
-  cardTitle: { fontWeight: 600, fontSize: '13px' },
-  cardMeta: { marginBottom: '4px' },
-  cardCapabilities: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '4px',
-    marginTop: '8px',
-  },
-  cap: { fontSize: '10px', color: 'var(--theia-descriptionForeground)' },
-  confidence: { fontSize: '11px', fontWeight: 600 },
-  badge: {
-    backgroundColor: 'var(--theia-badge-background)',
-    color: 'var(--theia-badge-foreground)',
-    padding: '2px 6px',
-    borderRadius: '4px',
-    fontSize: '11px',
-  },
-  metaItem: { fontSize: '12px', color: 'var(--theia-descriptionForeground)' },
-  codeSmall: {
-    fontSize: '11px',
-    backgroundColor: 'var(--theia-textCodeBlock-background)',
-    padding: '1px 4px',
-    borderRadius: '2px',
-    color: 'var(--theia-descriptionForeground)',
-  },
-  details: { marginTop: '8px' },
-  detailsSummary: {
+    padding: '6px 10px',
     cursor: 'pointer',
-    fontSize: '12px',
-    color: 'var(--theia-textLink-foreground)',
   },
-  jsonPre: {
+  runtimeDetails: {
+    padding: '4px 10px 8px',
+    borderTop: '1px solid var(--theia-widget-border)',
     fontSize: '11px',
-    backgroundColor: 'var(--theia-textCodeBlock-background)',
-    padding: '8px',
+  },
+  runtimeDetailText: {
+    color: 'var(--theia-descriptionForeground)',
+    marginTop: '2px',
+  },
+  doctorBtn: {
+    backgroundColor: 'var(--theia-button-background)',
+    color: 'var(--theia-button-foreground)',
+    border: 'none',
     borderRadius: '4px',
-    overflow: 'auto',
-    maxHeight: '300px',
-    color: 'var(--theia-foreground)',
-    margin: '8px 0 0 0',
+    padding: '2px 8px',
+    cursor: 'pointer',
+    fontSize: '10px',
+  },
+  // ─── Recent Runs ─────────────────────────────────────────────────────
+  runItem: {
+    padding: '8px 10px',
+    borderBottom: '1px solid var(--theia-widget-border)',
+    cursor: 'pointer',
+  },
+  runItemHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  runItemMeta: {
+    fontSize: '10px',
+    color: 'var(--theia-descriptionForeground)',
+    marginTop: '2px',
+  },
+  emptyHint: {
+    fontSize: '11px',
+    color: 'var(--theia-descriptionForeground)',
+    textAlign: 'center' as any,
+    padding: '12px 8px',
   },
 };

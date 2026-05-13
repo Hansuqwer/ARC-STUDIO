@@ -71,7 +71,7 @@ export class ArcAdaptersWidget extends ReactWidget {
 
   protected renderCard(cap: RuntimeCapabilityReport): React.ReactNode {
     const isReady = cap.can_run;
-    const color = isReady ? '#4caf50' : '#ffb74d';
+    const color = isReady ? 'var(--theia-charts-green)' : 'var(--theia-editorWarning-foreground)';
     const icon = isReady ? '✓' : '⚠';
     return (
       <div key={cap.runtime_id} style={{
@@ -129,7 +129,7 @@ export class ArcAdaptersWidget extends ReactWidget {
         )}
 
         {cap.requires_paid_calls && (
-          <div style={{ marginTop: 4, fontSize: 10, color: '#ffb74d' }}>
+          <div style={{ marginTop: 4, fontSize: 10, color: 'var(--theia-editorWarning-foreground)' }}>
             This runtime requires paid/provider calls.
           </div>
         )}
@@ -164,11 +164,11 @@ export class ArcAdaptersWidget extends ReactWidget {
           <h3 style={{ margin: '0 0 8px 0' }}>Run Doctor Action?</h3>
           <p style={{ margin: 0, fontSize: 13 }}>{this.confirmAction.description}</p>
           <pre style={{
-            margin: '12px 0', padding: 10, backgroundColor: '#1e1e1e',
+            margin: '12px 0', padding: 10, backgroundColor: 'var(--theia-textCodeBlock-background)',
             borderRadius: 4, fontSize: 12, whiteSpace: 'pre-wrap',
           }}>{this.confirmAction.command}</pre>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button style={{ ...doctorBtnStyle, backgroundColor: '#c62828' }} onClick={() => {
+            <button style={{ ...doctorBtnStyle, backgroundColor: 'var(--theia-errorForeground)' }} onClick={() => {
               navigator.clipboard.writeText(this.confirmAction!.command).catch(() => {});
               this.confirmAction = undefined;
               this.update();
@@ -193,7 +193,7 @@ export class ArcAdaptersWidget extends ReactWidget {
         <div style={{ fontSize: 12, lineHeight: 1.6 }}>
           <div>Provider: <strong>{provider}</strong></div>
           <div>Base URL override: <strong>{status?.baseUrlConfigured ? 'configured' : 'default'}</strong></div>
-          <div>API key: <strong style={{ color: apiKeyOk ? '#4caf50' : '#ffb74d' }}>{apiKeyOk ? `configured via ${status?.apiKeySource}` : 'missing'}</strong></div>
+          <div>API key: <strong style={{ color: apiKeyOk ? 'var(--theia-charts-green)' : 'var(--theia-editorWarning-foreground)' }}>{apiKeyOk ? `configured via ${status?.apiKeySource}` : 'missing'}</strong></div>
           <p style={{ margin: '8px 0 0 0', color: 'var(--theia-descriptionForeground)' }}>{status?.message ?? 'Provider status unavailable.'}</p>
         </div>
       </div>
@@ -205,14 +205,14 @@ export class ArcAdaptersWidget extends ReactWidget {
       <div style={{ marginBottom: 12, padding: 10, backgroundColor: 'var(--theia-editor-background)', border: '1px solid var(--theia-widget-border)', borderRadius: 6, fontSize: 11, lineHeight: 1.5 }}>
         <div>Workspace: <strong>{this.workspaceStatus?.backendPath || 'unresolved'}</strong></div>
         <div style={{ color: 'var(--theia-descriptionForeground)' }}>Source: {this.workspaceStatus?.source ?? 'unknown'}</div>
-        {this.runtimeError && <div style={{ color: '#ffb74d' }}>Runtime API: {this.runtimeError}</div>}
+        {this.runtimeError && <div style={{ color: 'var(--theia-editorWarning-foreground)' }}>Runtime API: {this.runtimeError}</div>}
       </div>
     );
   }
 
   protected renderConformanceTip(): React.ReactNode {
     return (
-      <div style={{ marginTop: 16, padding: 10, backgroundColor: '#1a2d47', border: '1px solid #4fc3f7', borderRadius: 6, fontSize: 11, color: '#4fc3f7' }}>
+      <div style={{ marginTop: 16, padding: 10, backgroundColor: 'var(--theia-editor-background)', border: '1px solid var(--theia-textLink-foreground)', borderRadius: 6, fontSize: 11, color: 'var(--theia-textLink-foreground)' }}>
         Run conformance tests: <code>uv run arc adapter test swarmgraph</code>
       </div>
     );

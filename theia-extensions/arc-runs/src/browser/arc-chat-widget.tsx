@@ -87,10 +87,10 @@ export class ArcChatWidget extends ReactWidget {
           placeholder="Ask ARC to run a workflow prompt..."
         />
         <div style={styles.actions}>
-          <button style={styles.primaryButton} disabled={this.loading || !this.prompt.trim()} onClick={() => this.submitPrompt()}>
+          <button style={styles.primaryButton} disabled={this.loading || !this.prompt.trim()} onClick={() => this.submitPrompt()} aria-label="Send prompt">
             {this.loading ? 'Running...' : 'Send Prompt'}
           </button>
-          <button style={styles.secondaryButton} disabled={this.loading} onClick={() => this.loadCapabilities()}>Refresh Runtimes</button>
+          <button style={styles.secondaryButton} disabled={this.loading} onClick={() => this.loadCapabilities()} aria-label="Refresh runtimes">Refresh Runtimes</button>
         </div>
         {this.lastError && <pre style={styles.error}>{this.lastError}</pre>}
       </div>
@@ -317,11 +317,11 @@ const styles: Record<string, React.CSSProperties> = {
   runtimeBox: { display: 'grid', gap: 8, padding: 10, border: '1px solid var(--theia-widget-border)', borderRadius: 6 },
   comboList: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: 12 },
   checkboxLabel: { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 },
-  readiness: { display: 'grid', gap: 4, color: '#ffb74d', fontSize: 11 },
+  readiness: { display: 'grid', gap: 4, color: 'var(--theia-editorWarning-foreground)', fontSize: 11 },
   prompt: { resize: 'vertical', color: 'var(--theia-input-foreground)', backgroundColor: 'var(--theia-input-background)', border: '1px solid var(--theia-input-border)', borderRadius: 4, padding: 8, fontFamily: 'inherit' },
   select: { color: 'var(--theia-input-foreground)', backgroundColor: 'var(--theia-input-background)', border: '1px solid var(--theia-input-border)', borderRadius: 4, padding: '4px 6px' },
   actions: { display: 'flex', gap: 8 },
   primaryButton: { padding: '6px 12px', color: 'var(--theia-button-foreground)', backgroundColor: 'var(--theia-button-background)', border: 'none', borderRadius: 4 },
   secondaryButton: { padding: '6px 12px', color: 'var(--theia-secondaryButton-foreground)', backgroundColor: 'var(--theia-secondaryButton-background)', border: 'none', borderRadius: 4 },
-  error: { color: '#ef9a9a', border: '1px solid #ef5350', borderRadius: 4, padding: 8, whiteSpace: 'pre-wrap' },
+  error: { color: 'var(--theia-errorForeground)', border: '1px solid var(--theia-inputValidation-errorBorder)', borderRadius: 4, padding: 8, whiteSpace: 'pre-wrap' },
 };

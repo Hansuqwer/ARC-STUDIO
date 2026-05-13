@@ -64,7 +64,8 @@
         "applicationName": "ARC Studio",
         "preferences": {
           "files.enableTrash": true,
-          "security.workspace.trust.enabled": true
+          "security.workspace.trust.enabled": true,
+          "workbench.colorTheme": "Dark+ (default dark)"
         }
       }
     }

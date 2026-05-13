@@ -308,7 +308,7 @@ export class ArcArenaWidget extends ReactWidget {
                     key={c.id}
                     style={{
                       ...candidateCardStyle,
-                      borderColor: ci === this.selectedCandidateIdx ? '#4fc3f7' : 'var(--theia-widget-border)',
+                      borderColor: ci === this.selectedCandidateIdx ? 'var(--theia-textLink-foreground)' : 'var(--theia-widget-border)',
                     }}
                     onClick={() => { this.selectedCandidateIdx = ci; this.update(); }}
                   >
@@ -316,9 +316,9 @@ export class ArcArenaWidget extends ReactWidget {
                     <div style={{ fontSize: 10, opacity: 0.7, maxHeight: 80, overflow: 'hidden' }}>
                       {c.text.substring(0, 200)}
                     </div>
-                    {c.plan && <div style={{ fontSize: 10, color: '#4fc3f7' }}>Has plan</div>}
-                    {c.patch && <div style={{ fontSize: 10, color: '#4caf50' }}>Has patch</div>}
-                    {c.risks.length > 0 && <div style={{ fontSize: 10, color: '#ffb74d' }}>{c.risks.length} risk(s)</div>}
+                    {c.plan && <div style={{ fontSize: 10, color: 'var(--theia-textLink-foreground)' }}>Has plan</div>}
+                    {c.patch && <div style={{ fontSize: 10, color: 'var(--theia-charts-green)' }}>Has patch</div>}
+                    {c.risks.length > 0 && <div style={{ fontSize: 10, color: 'var(--theia-editorWarning-foreground)' }}>{c.risks.length} risk(s)</div>}
                   </div>
                 ))}
               </div>
@@ -340,12 +340,12 @@ export class ArcArenaWidget extends ReactWidget {
         <div style={{ ...battlePanelStyle, borderRight: '1px solid var(--theia-widget-border)' }}>
           <div style={battleHeaderStyle}>A: {a.model}</div>
           <pre style={battleContentStyle}>{a.text}</pre>
-          <button style={voteBtnStyle} onClick={() => this.voteA()}>Vote A (Ctrl+Shift+1)</button>
+          <button style={voteBtnStyle} onClick={() => this.voteA()} aria-label="Vote for candidate A">Vote A (Ctrl+Shift+1)</button>
         </div>
         <div style={battlePanelStyle}>
           <div style={battleHeaderStyle}>B: {b.model}</div>
           <pre style={battleContentStyle}>{b.text}</pre>
-          <button style={voteBtnStyle} onClick={() => this.voteB()}>Vote B (Ctrl+Shift+2)</button>
+          <button style={voteBtnStyle} onClick={() => this.voteB()} aria-label="Vote for candidate B">Vote B (Ctrl+Shift+2)</button>
         </div>
       </div>
     );
@@ -363,13 +363,13 @@ export class ArcArenaWidget extends ReactWidget {
           placeholder={`Enter prompt for ${this.mode} mode... (Cmd+Enter to send)`}
         />
         <div style={{ display: 'flex', gap: 8 }}>
-          <button style={primaryBtnStyle} onClick={() => this.submitPrompt()} disabled={this.loading}>
+          <button style={primaryBtnStyle} onClick={() => this.submitPrompt()} disabled={this.loading} aria-label="Send prompt">
             {this.loading ? 'Generating...' : 'Send'}
           </button>
           {this.arenaResponse && this.arenaResponse.mode !== 'battle' && (
             <>
-              <button style={secondaryBtnStyle} onClick={() => this.adoptSelected()}>Adopt (Ctrl+1)</button>
-              <button style={secondaryBtnStyle} onClick={() => this.rejectAll()}>Reject (Ctrl+3)</button>
+              <button style={secondaryBtnStyle} onClick={() => this.adoptSelected()} aria-label="Adopt selected candidate">Adopt (Ctrl+1)</button>
+              <button style={secondaryBtnStyle} onClick={() => this.rejectAll()} aria-label="Reject all candidates">Reject (Ctrl+3)</button>
             </>
           )}
         </div>

@@ -162,7 +162,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
             {duration !== null && ` · Duration: ${duration}ms`}
           </div>
           {run.metadata?.['_mock'] && (
-            <div style={{ marginTop: '8px', padding: '6px 10px', backgroundColor: '#3d2500', border: '1px solid #ffb74d', borderRadius: '4px', fontSize: '11px', color: '#ffb74d' }}>
+            <div style={{ marginTop: '8px', padding: '6px 10px', backgroundColor: 'var(--theia-editorWarning-background)', border: '1px solid var(--theia-editorWarning-foreground)', borderRadius: '4px', fontSize: '11px', color: 'var(--theia-editorWarning-foreground)' }}>
               ⚠ [MOCK] Fixture run — connect ARC daemon for live runs
             </div>
           )}
@@ -262,9 +262,9 @@ export class ArcRunTimelineWidget extends ReactWidget {
             <button style={secondaryBtnStyle} onClick={() => this.copyText('Final output', finalOutput)}>Copy Final Output</button>
           </div>
         )}
-        {errorOutput && <pre style={{ ...outputBoxStyle, borderColor: '#ef5350', color: '#ef9a9a' }}>{errorOutput}</pre>}
+        {errorOutput && <pre style={{ ...outputBoxStyle, borderColor: 'var(--theia-inputValidation-errorBorder)', color: 'var(--theia-errorForeground)' }}>{errorOutput}</pre>}
         {this.evalResult && (
-          <div style={{ ...metadataBoxStyle, borderColor: this.evalResult.passed ? '#4caf50' : '#ef5350' }}>
+          <div style={{ ...metadataBoxStyle, borderColor: this.evalResult.passed ? 'var(--theia-charts-green)' : 'var(--theia-errorForeground)' }}>
             <div><strong>Eval: {this.evalResult.passed ? 'PASS' : 'FAIL'}</strong> (score: {this.evalResult.score})</div>
             <div style={{ fontSize: '10px', opacity: 0.7 }}>
               status_match={String(this.evalResult.status_match)} ·
@@ -327,9 +327,9 @@ export class ArcRunTimelineWidget extends ReactWidget {
           ))}
         </div>
         {this.renderReadiness()}
-        {this.runtimeError && <div style={{ fontSize: '11px', color: '#ffb74d' }}>Runtime capabilities: {this.runtimeError}</div>}
+        {this.runtimeError && <div style={{ fontSize: '11px', color: 'var(--theia-editorWarning-foreground)' }}>Runtime capabilities: {this.runtimeError}</div>}
         {this.runStatusMessage && <div style={statusMessageStyle}>{this.runStatusMessage}</div>}
-        {this.lastError && <pre style={{ ...outputBoxStyle, borderColor: '#ef5350', color: '#ef9a9a' }}>{this.lastError}</pre>}
+        {this.lastError && <pre style={{ ...outputBoxStyle, borderColor: 'var(--theia-inputValidation-errorBorder)', color: 'var(--theia-errorForeground)' }}>{this.lastError}</pre>}
       </div>
     );
   }
@@ -359,8 +359,8 @@ export class ArcRunTimelineWidget extends ReactWidget {
           width: '20px',
           height: '20px',
           borderRadius: '50%',
-          backgroundColor: isError ? '#ef5350' : 'var(--theia-editor-background)',
-          border: `2px solid ${isError ? '#ef5350' : '#4fc3f7'}`,
+          backgroundColor: isError ? 'var(--theia-errorForeground)' : 'var(--theia-editor-background)',
+          border: `2px solid ${isError ? 'var(--theia-errorForeground)' : 'var(--theia-textLink-foreground)'}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -373,7 +373,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
         <div style={{
           flex: 1,
           backgroundColor: 'var(--theia-editor-background)',
-          border: `1px solid ${isError ? '#ef5350' : 'var(--theia-widget-border)'}`,
+          border: `1px solid ${isError ? 'var(--theia-errorForeground)' : 'var(--theia-widget-border)'}`,
           borderRadius: '6px',
           padding: '8px 12px',
         }} onClick={() => { this.selectedEvent = event; this.update(); }}>
@@ -433,7 +433,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
     const missing = this.runtimeCapabilities.filter(runtime => !runtime.can_run);
     if (missing.length === 0) return null;
     return (
-      <div style={{ fontSize: '11px', color: '#ffb74d', display: 'grid', gap: '4px' }}>
+      <div style={{ fontSize: '11px', color: 'var(--theia-editorWarning-foreground)', display: 'grid', gap: '4px' }}>
         {missing.map(runtime => (
           <div key={runtime.runtime_id}>
             <strong>{runtime.runtime_id}</strong>: {runtime.reason || runtime.availability}
@@ -611,13 +611,13 @@ export class ArcRunTimelineWidget extends ReactWidget {
     }
   }
 
-  protected statusColor(status: string): string {
+  protected   statusColor(status: string): string {
     const colors: Record<string, string> = {
-      pending: '#ffb74d',
-      running: '#4fc3f7',
-      completed: '#4caf50',
-      failed: '#ef5350',
-      cancelled: '#9e9e9e',
+      pending: 'var(--theia-editorWarning-foreground)',
+      running: 'var(--theia-textLink-foreground)',
+      completed: 'var(--theia-charts-green)',
+      failed: 'var(--theia-errorForeground)',
+      cancelled: 'var(--theia-descriptionForeground)',
     };
     return colors[status] ?? 'inherit';
   }
@@ -707,6 +707,6 @@ const statusMessageStyle: React.CSSProperties = {
 
 const evalBtnStyle = (run: RunRecord): React.CSSProperties => ({
   ...secondaryBtnStyle,
-  borderColor: run.status === 'completed' ? '#4caf50' : 'var(--theia-widget-border)',
+  borderColor: run.status === 'completed' ? 'var(--theia-charts-green)' : 'var(--theia-widget-border)',
   border: '1px solid',
 });

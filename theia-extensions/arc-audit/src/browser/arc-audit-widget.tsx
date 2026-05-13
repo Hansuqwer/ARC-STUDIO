@@ -22,11 +22,11 @@ export class ArcAuditWidget extends ReactWidget {
       <div style={{ padding: '16px', fontFamily: 'var(--theia-ui-font-family)', color: 'var(--theia-foreground)', height: '100%', overflow: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
           <h2 style={{ margin: 0, fontSize: '15px' }}>🔐 Audit Chain</h2>
-          <span style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: '#3d2500', color: '#ffb74d', borderRadius: '10px', border: '1px solid #ffb74d' }}>
+          <span style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: 'var(--theia-editorWarning-background)', color: 'var(--theia-editorWarning-foreground)', borderRadius: '10px', border: '1px solid var(--theia-editorWarning-foreground)' }}>
             Not implemented
           </span>
         </div>
-        <div style={{ marginBottom: '16px', padding: '8px 12px', backgroundColor: '#3d2500', border: '1px solid #ffb74d', borderRadius: '4px', fontSize: '12px', color: '#ffb74d' }}>
+        <div style={{ marginBottom: '16px', padding: '8px 12px', backgroundColor: 'var(--theia-editorWarning-background)', border: '1px solid var(--theia-editorWarning-foreground)', borderRadius: '4px', fontSize: '12px', color: 'var(--theia-editorWarning-foreground)' }}>
           Audit chain persistence is not implemented yet. No audit entries are shown until the ARC daemon exposes an audit endpoint.
         </div>
         {AUDIT_ENTRIES.length === 0 && (
@@ -35,14 +35,14 @@ export class ArcAuditWidget extends ReactWidget {
           </div>
         )}
         {AUDIT_ENTRIES.map(entry => (
-          <div key={entry.id} style={{ marginBottom: '8px', padding: '10px 14px', backgroundColor: 'var(--theia-editor-background)', border: `1px solid ${entry.verified ? '#4caf50' : '#ef5350'}`, borderRadius: '6px' }}>
+          <div key={entry.id} style={{ marginBottom: '8px', padding: '10px 14px', backgroundColor: 'var(--theia-editor-background)', border: `1px solid ${entry.verified ? 'var(--theia-charts-green)' : 'var(--theia-errorForeground)'}`, borderRadius: '6px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
               <span style={{ fontWeight: 600, fontSize: '12px' }}>{entry.action}</span>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <span style={{ fontSize: '10px', color: 'var(--theia-descriptionForeground)' }}>
                   {new Date(entry.timestamp).toLocaleTimeString()}
                 </span>
-                <span style={{ fontSize: '10px', color: entry.verified ? '#4caf50' : '#ef5350' }}>
+                <span style={{ fontSize: '10px', color: entry.verified ? 'var(--theia-charts-green)' : 'var(--theia-errorForeground)' }}>
                   {entry.verified ? '✓ verified' : '⚠ unverified'}
                 </span>
               </div>
