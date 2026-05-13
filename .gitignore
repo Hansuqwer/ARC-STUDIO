@@ -75,7 +75,7 @@ docs/context-packs/*.json
 test-results/
 .gitnexus
 .claude/
-AGENTS.md
+# AGENTS.md is tracked intentionally - remove this line if you disagree
 CLAUDE.md
 
 # Backup files
