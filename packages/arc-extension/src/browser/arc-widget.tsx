@@ -45,7 +45,7 @@ interface ArcWidgetState {
 
     toasts: ToastNotification[];
 
-    isCollapsed: { [key: string]: boolean };
+    isCollapsed: Record<string, boolean>;
     showShortcutsHelp: boolean;
 }
 
@@ -62,9 +62,9 @@ export class ArcWidget extends ReactWidget {
     protected readonly arcService!: ArcService;
 
     private keyboardHandler: ((e: KeyboardEvent) => void) | undefined;
-    private toastTimeouts: Map<string, NodeJS.Timeout> = new Map();
+    private toastTimeouts = new Map<string, NodeJS.Timeout>();
     private filterDebounceTimer: NodeJS.Timeout | undefined;
-    private pendingFilterValue: string = '';
+    private pendingFilterValue = '';
 
     private state: ArcWidgetState = {
         isExecuting: false,

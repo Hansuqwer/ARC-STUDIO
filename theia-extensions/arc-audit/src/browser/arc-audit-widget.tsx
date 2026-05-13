@@ -3,7 +3,7 @@ import * as React from 'react';
 import { injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 
-const AUDIT_ENTRIES: Array<{ id: string; timestamp: string; action: string; actor: string; details: Record<string, unknown>; verified: boolean }> = [];
+const AUDIT_ENTRIES: { id: string; timestamp: string; action: string; actor: string; details: Record<string, unknown>; verified: boolean }[] = [];
 
 @injectable()
 export class ArcAuditWidget extends ReactWidget {

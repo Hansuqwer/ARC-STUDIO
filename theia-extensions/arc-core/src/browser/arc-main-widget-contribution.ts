@@ -48,7 +48,7 @@ export class ArcMainWidgetContribution
       execute: async () => {
         const widget = await this.openView({ activate: false });
         if (widget) {
-          (widget as ArcMainWidget)['loadAll']();
+          (widget)['loadAll']();
         }
       },
     });

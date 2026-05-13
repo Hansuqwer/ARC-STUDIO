@@ -46,7 +46,7 @@ function buildChildEnv(): NodeJS.ProcessEnv {
 
 @injectable()
 export class WorkflowExecutor {
-    private runningProcesses: Map<string, ChildProcess> = new Map();
+    private runningProcesses = new Map<string, ChildProcess>();
 
     /**
      * Execute a SwarmGraph workflow with enhanced validation and error handling.

@@ -117,7 +117,7 @@ export class ArcMainWidget extends ReactWidget {
   }
 
   protected renderTabs(): React.ReactNode {
-    const tabs: Array<{ id: typeof this.activeTab; label: string; count?: number }> = [
+    const tabs: { id: typeof this.activeTab; label: string; count?: number }[] = [
       { id: 'overview', label: 'Overview' },
       { id: 'runtimes', label: 'Runtimes', count: this.runtimes.length },
       { id: 'workflows', label: 'Workflows', count: this.workflows.length },

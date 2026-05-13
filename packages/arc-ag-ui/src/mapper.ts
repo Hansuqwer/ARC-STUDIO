@@ -35,7 +35,7 @@ export function mapEvent(runtime: string, native: unknown, ctx: MappingContext):
       timestamp: Date.now(),
       event: native,
       source: runtime,
-    } as AGUIBaseEvent & { event: unknown; source: string })];
+    })];
   }
   try {
     return mapper.map(native, ctx).map(safeEvent);
@@ -47,7 +47,7 @@ export function mapEvent(runtime: string, native: unknown, ctx: MappingContext):
       runId: ctx.runId,
       message: (err as Error).message,
       code: 'MAPPER_THREW',
-    } as AGUIBaseEvent & Record<string, unknown>)];
+    })];
   }
 }
 
