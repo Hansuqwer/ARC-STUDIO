@@ -10,19 +10,16 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common/message-service';
 import * as React from '@theia/core/shared/react';
 import { ArcService, ExecutionResult, TraceFile, WorkflowInfo } from '../common/arc-protocol';
-
-interface ProgressStep {
-    id: string;
-    label: string;
-    status: 'pending' | 'in-progress' | 'completed' | 'failed';
-}
-
-interface ToastNotification {
-    id: string;
-    type: 'success' | 'error' | 'info' | 'warning';
-    message: string;
-    timestamp: number;
-}
+import {
+    ToastContainer,
+    ToastNotification,
+    ShortcutsModal,
+    ProgressStep,
+    WorkflowExecutionSection,
+    TraceViewerSection,
+    WorkflowDetectionSection,
+    ErrorBanner
+} from './components';
 
 interface ArcWidgetState {
     isExecuting: boolean;
@@ -454,147 +451,6 @@ export class ArcWidget extends ReactWidget {
         });
     }
 
-    private renderProgressBar(value: number, label?: string): React.ReactNode {
-        return (
-            <div className='arc-progress-container' role='progressbar' aria-valuenow={value} aria-valuemin={0} aria-valuemax={100}>
-                <div className='arc-progress-bar'>
-                    <div className='arc-progress-fill' style={{ width: `${value}%` }}></div>
-                </div>
-                {label && <span className='arc-progress-label'>{label}</span>}
-            </div>
-        );
-    }
-
-    private renderToastContainer(): React.ReactNode {
-        return (
-            <div className='arc-toast-container' role='region' aria-label='Notifications' aria-live='polite'>
-                {this.state.toasts.map((toast: ToastNotification) => (
-                    <div 
-                        key={toast.id} 
-                        className={`arc-toast arc-toast-${toast.type}`}
-                        role='alert'
-                        aria-atomic='true'
-                    >
-                        <span className='arc-toast-icon' aria-hidden='true'>
-                            {toast.type === 'success' && '✓'}
-                            {toast.type === 'error' && '✗'}
-                            {toast.type === 'info' && 'ℹ'}
-                            {toast.type === 'warning' && '⚠'}
-                        </span>
-                        <span className='arc-toast-message'>{toast.message}</span>
-                        <button 
-                            className='arc-toast-dismiss'
-                            onClick={() => this.removeToast(toast.id)}
-                            aria-label='Dismiss notification'
-                        >
-                            ×
-                        </button>
-                    </div>
-                ))}
-            </div>
-        );
-    }
-
-    private renderShortcutsModal(): React.ReactNode {
-        if (!this.state.showShortcutsHelp) {
-            return null;
-        }
-
-        return (
-            <div 
-                className='arc-modal-overlay' 
-                role='dialog' 
-                aria-modal='true' 
-                aria-labelledby='shortcuts-title'
-                onClick={(e) => {
-                    if (e.target === e.currentTarget) {
-                        this.toggleShortcutsHelp();
-                    }
-                }}
-            >
-                <div className='arc-modal'>
-                    <div className='arc-modal-header'>
-                        <h3 id='shortcuts-title'>Keyboard Shortcuts</h3>
-                        <button 
-                            className='arc-modal-close'
-                            onClick={() => this.toggleShortcutsHelp()}
-                            aria-label='Close shortcuts help'
-                        >
-                            ×
-                        </button>
-                    </div>
-                    <div className='arc-modal-content'>
-                        <table className='arc-shortcuts-table'>
-                            <thead>
-                                <tr>
-                                    <th>Action</th>
-                                    <th>Windows/Linux</th>
-                                    <th>Mac</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Execute Workflow</td>
-                                    <td><kbd>Ctrl+E</kbd></td>
-                                    <td><kbd>⌘+E</kbd></td>
-                                </tr>
-                                <tr>
-                                    <td>Load Traces</td>
-                                    <td><kbd>Ctrl+L</kbd></td>
-                                    <td><kbd>⌘+L</kbd></td>
-                                </tr>
-                                <tr>
-                                    <td>Scan Workspace</td>
-                                    <td><kbd>Ctrl+S</kbd></td>
-                                    <td><kbd>⌘+S</kbd></td>
-                                </tr>
-                                <tr>
-                                    <td>Show Shortcuts</td>
-                                    <td><kbd>Ctrl+H</kbd></td>
-                                    <td><kbd>⌘+H</kbd></td>
-                                </tr>
-                                <tr>
-                                    <td>Close Modal</td>
-                                    <td><kbd>Esc</kbd></td>
-                                    <td><kbd>Esc</kbd></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    private renderExecutionSteps(): React.ReactNode {
-        const { executionSteps } = this.state;
-        
-        if (executionSteps.length === 0) {
-            return null;
-        }
-
-        return (
-            <div className='arc-execution-steps' role='list' aria-label='Execution progress steps'>
-                {executionSteps.map((step: ProgressStep) => (
-                    <div 
-                        key={step.id} 
-                        className={`arc-step arc-step-${step.status}`}
-                        role='listitem'
-                        aria-current={step.status === 'in-progress' ? 'step' : undefined}
-                    >
-                        <span className='arc-step-indicator' aria-hidden='true'>
-                            {step.status === 'completed' && '✓'}
-                            {step.status === 'in-progress' && '⟳'}
-                            {step.status === 'pending' && '○'}
-                            {step.status === 'failed' && '✗'}
-                        </span>
-                        <span className='arc-step-label'>{step.label}</span>
-                    </div>
-                ))}
-            </div>
-        );
-    }
-
     protected render(): React.ReactNode {
         const renderStart = performance.now();
 
@@ -615,17 +471,16 @@ export class ArcWidget extends ReactWidget {
             workflows,
             error,
             errorDetails,
-            isCollapsed
+            isCollapsed,
+            toasts,
+            showShortcutsHelp,
+            executionSteps
         } = this.state;
-
-        const filteredTraces = traces.filter((t: TraceFile) => 
-            t.id.toLowerCase().includes(traceFilter.toLowerCase())
-        );
 
         const result = (
             <div className='arc-widget-container' role='main' aria-label='ARC Studio'>
-                {this.renderToastContainer()}
-                {this.renderShortcutsModal()}
+                <ToastContainer toasts={toasts} onDismiss={(id) => this.removeToast(id)} />
+                <ShortcutsModal isOpen={showShortcutsHelp} onClose={() => this.toggleShortcutsHelp()} />
                 
                 <div className='arc-header'>
                     <h2>ARC Studio</h2>
@@ -640,320 +495,45 @@ export class ArcWidget extends ReactWidget {
                     </button>
                 </div>
 
-                {error && (
-                    <div className='arc-error' role='alert' aria-live='assertive'>
-                        <div className='arc-error-content'>
-                            <span className='arc-error-icon' aria-hidden='true'>⚠</span>
-                            <div className='arc-error-text'>
-                                <strong className='arc-error-title'>{error}</strong>
-                                {errorDetails && (
-                                    <p className='arc-error-details'>{errorDetails}</p>
-                                )}
-                            </div>
-                        </div>
-                        <div className='arc-error-actions'>
-                            <button 
-                                className='theia-button secondary'
-                                onClick={() => this.handleRetry()}
-                                aria-label='Try again'
-                            >
-                                Try Again
-                            </button>
-                            <button 
-                                className='arc-error-dismiss'
-                                onClick={() => this.handleRetry()}
-                                aria-label='Dismiss error'
-                            >
-                                ×
-                            </button>
-                        </div>
-                    </div>
-                )}
+                <ErrorBanner error={error} errorDetails={errorDetails} onRetry={() => this.handleRetry()} />
 
                 <div className='arc-content'>
-                    <section className={`arc-section ${isCollapsed['workflow-execution'] ? 'arc-section-collapsed' : ''}`} aria-labelledby='workflow-execution-heading'>
-                        <button 
-                            className='arc-section-header'
-                            onClick={() => this.toggleSection('workflow-execution')}
-                            aria-expanded={!isCollapsed['workflow-execution']}
-                            aria-controls='workflow-execution-content'
-                        >
-                            <h3 id='workflow-execution-heading'>Workflow Execution</h3>
-                            <div className='arc-section-header-right'>
-                                {isCollapsed['workflow-execution'] && executionStatus !== 'idle' && (
-                                    <span className='arc-section-badge' aria-label={`Status: ${executionStatus}`}>
-                                        {executionStatus === 'running' ? '⟳' : executionStatus === 'completed' ? '✓' : '✗'}
-                                    </span>
-                                )}
-                                <span className='arc-section-toggle' aria-hidden='true'>
-                                    {isCollapsed['workflow-execution'] ? '▸' : '▾'}
-                                </span>
-                            </div>
-                        </button>
-                        
-                        <div id='workflow-execution-content' className='arc-section-content'>
-                            {!isCollapsed['workflow-execution'] && (
-                                <>
-                                    <p className='arc-section-description'>Execute SwarmGraph and LangGraph workflows</p>
-                                    
-                                    <div className='arc-input-group'>
-                                        <label htmlFor='prompt-input'>Prompt:</label>
-                                        <input
-                                            id='prompt-input'
-                                            type='text'
-                                            className='theia-input'
-                                            placeholder='Enter workflow prompt...'
-                                            value={prompt}
-                                            onChange={(e) => this.updateState({ prompt: e.target.value })}
-                                            onKeyDown={(e) => {
-                                                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                                                    this.handleExecuteWorkflow();
-                                                }
-                                            }}
-                                            disabled={isExecuting}
-                                            aria-required='true'
-                                            aria-describedby='prompt-help'
-                                        />
-                                        <small id='prompt-help' className='arc-help-text'>
-                                            Press <kbd>Ctrl+Enter</kbd> to execute or <kbd>Ctrl+E</kbd>
-                                        </small>
-                                    </div>
+                    <WorkflowExecutionSection
+                        isCollapsed={isCollapsed['workflow-execution']}
+                        onToggle={() => this.toggleSection('workflow-execution')}
+                        prompt={prompt}
+                        onPromptChange={(value) => this.updateState({ prompt: value })}
+                        isExecuting={isExecuting}
+                        executionStatus={executionStatus}
+                        executionProgress={executionProgress}
+                        executionSteps={executionSteps}
+                        executionResult={executionResult}
+                        executionTime={executionTime}
+                        onExecute={() => this.handleExecuteWorkflow()}
+                    />
 
-                                    <button 
-                                        className={`theia-button primary ${isExecuting ? 'arc-button-loading' : ''}`}
-                                        onClick={() => this.handleExecuteWorkflow()}
-                                        disabled={isExecuting || !prompt.trim()}
-                                        aria-busy={isExecuting}
-                                        aria-label='Execute workflow'
-                                    >
-                                        {isExecuting ? (
-                                            <>
-                                                <span className='arc-spinner' aria-hidden='true'></span>
-                                                <span className='arc-button-text'>Executing...</span>
-                                            </>
-                                        ) : (
-                                            'Execute Workflow'
-                                        )}
-                                    </button>
+                    <TraceViewerSection
+                        isCollapsed={isCollapsed['trace-viewer']}
+                        onToggle={() => this.toggleSection('trace-viewer')}
+                        isLoadingTraces={isLoadingTraces}
+                        traceProgress={traceProgress}
+                        traces={traces}
+                        selectedTrace={selectedTrace}
+                        traceFilter={traceFilter}
+                        onTraceFilterChange={(value) => this.handleTraceFilterChange(value)}
+                        onClearFilter={() => this.clearTraceFilter()}
+                        onLoadTraces={() => this.handleLoadTraces()}
+                        onSelectTrace={(trace) => this.updateState({ selectedTrace: trace })}
+                    />
 
-                                    {isExecuting && this.renderProgressBar(executionProgress, `${executionProgress}% complete`)}
-                                    {this.renderExecutionSteps()}
-
-                                    {executionStatus !== 'idle' && (
-                                        <div className={`arc-status arc-status-${executionStatus}`} role='status' aria-live='polite'>
-                                            <span className='arc-status-icon' aria-hidden='true'>
-                                                {executionStatus === 'running' && '⏳'}
-                                                {executionStatus === 'completed' && '✓'}
-                                                {executionStatus === 'failed' && '✗'}
-                                            </span>
-                                            <span className='arc-status-text'>
-                                                {executionStatus === 'running' && 'Workflow is running...'}
-                                                {executionStatus === 'completed' && executionTime !== undefined && `Completed in ${(executionTime / 1000).toFixed(2)}s`}
-                                                {executionStatus === 'completed' && executionTime === undefined && 'Completed'}
-                                                {executionStatus === 'failed' && 'Execution failed'}
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    {executionResult && executionStatus === 'completed' && (
-                                        <div className='arc-result'>
-                                            <h4>Execution Result</h4>
-                                            <dl className='arc-result-list'>
-                                                <dt>Run ID:</dt>
-                                                <dd><code>{executionResult.runId}</code></dd>
-                                                <dt>Trace:</dt>
-                                                <dd><code>{executionResult.tracePath}</code></dd>
-                                                <dt>Status:</dt>
-                                                <dd><span className='arc-status-badge arc-status-badge-success'>Completed</span></dd>
-                                            </dl>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    </section>
-
-                    <section className={`arc-section ${isCollapsed['trace-viewer'] ? 'arc-section-collapsed' : ''}`} aria-labelledby='trace-viewer-heading'>
-                        <button 
-                            className='arc-section-header'
-                            onClick={() => this.toggleSection('trace-viewer')}
-                            aria-expanded={!isCollapsed['trace-viewer']}
-                            aria-controls='trace-viewer-content'
-                        >
-                            <h3 id='trace-viewer-heading'>Trace Viewer</h3>
-                            <div className='arc-section-header-right'>
-                                {isCollapsed['trace-viewer'] && filteredTraces.length > 0 && (
-                                    <span className='arc-section-badge' aria-label={`${filteredTraces.length} trace(s)`}>
-                                        {filteredTraces.length}
-                                    </span>
-                                )}
-                                <span className='arc-section-toggle' aria-hidden='true'>
-                                    {isCollapsed['trace-viewer'] ? '▸' : '▾'}
-                                </span>
-                            </div>
-                        </button>
-                        
-                        <div id='trace-viewer-content' className='arc-section-content'>
-                            {!isCollapsed['trace-viewer'] && (
-                                <>
-                                    <p className='arc-section-description'>View execution traces from .arc/traces/</p>
-                                    
-                                    <div className='arc-input-group'>
-                                        <label htmlFor='trace-filter'>Filter traces:</label>
-                                        <div className='arc-filter-input-wrapper'>
-                                            <input
-                                                id='trace-filter'
-                                                type='text'
-                                                className='theia-input'
-                                                placeholder='Filter by ID...'
-                                                value={traceFilter}
-                                                onChange={(e) => this.handleTraceFilterChange(e.target.value)}
-                                                aria-label='Filter traces by ID'
-                                            />
-                                            {traceFilter && (
-                                                <button
-                                                    className='arc-filter-clear'
-                                                    onClick={() => this.clearTraceFilter()}
-                                                    aria-label='Clear filter'
-                                                    title='Clear filter'
-                                                >
-                                                    ×
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <button 
-                                        className={`theia-button ${isLoadingTraces ? 'arc-button-loading' : ''}`}
-                                        onClick={() => this.handleLoadTraces()}
-                                        disabled={isLoadingTraces}
-                                        aria-busy={isLoadingTraces}
-                                        aria-label='Load traces'
-                                    >
-                                        {isLoadingTraces ? (
-                                            <>
-                                                <span className='arc-spinner' aria-hidden='true'></span>
-                                                <span className='arc-button-text'>Loading...</span>
-                                            </>
-                                        ) : (
-                                            'Load Traces'
-                                        )}
-                                    </button>
-
-                                    {isLoadingTraces && this.renderProgressBar(traceProgress, 'Loading traces...')}
-
-                                    {traces.length > 0 && (
-                                        <div className='arc-trace-list' role='listbox' aria-label='Trace files'>
-                                            <div className='arc-trace-list-header'>
-                                                <span>Status</span>
-                                                <span>Run ID</span>
-                                                <span>Timestamp</span>
-                                            </div>
-                                            {filteredTraces.map((trace: TraceFile) => (
-                                                <div 
-                                                    key={trace.id} 
-                                                    className={`arc-trace-item ${selectedTrace?.id === trace.id ? 'arc-trace-item-selected' : ''}`}
-                                                    role='option'
-                                                    onClick={() => this.updateState({ selectedTrace: trace })}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter' || e.key === ' ') {
-                                                            this.updateState({ selectedTrace: trace });
-                                                        }
-                                                    }}
-                                                    tabIndex={0}
-                                                    aria-selected={selectedTrace?.id === trace.id}
-                                                >
-                                                    <span className={`arc-trace-status arc-trace-status-${trace.status}`} aria-label={`Status: ${trace.status}`}>
-                                                        {trace.status === 'completed' ? '✓' : '✗'}
-                                                    </span>
-                                                    <span className='arc-trace-id'>{trace.id}</span>
-                                                    <span className='arc-trace-time'>{new Date(trace.timestamp).toLocaleString()}</span>
-                                                </div>
-                                            ))}
-                                            {filteredTraces.length === 0 && (
-                                                <p className='arc-empty-state'>No traces match the filter</p>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {traces.length === 0 && !isLoadingTraces && (
-                                        <p className='arc-empty-state'>No traces loaded. Click "Load Traces" to view traces.</p>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    </section>
-
-                    <section className={`arc-section ${isCollapsed['workflow-detection'] ? 'arc-section-collapsed' : ''}`} aria-labelledby='workflow-detection-heading'>
-                        <button 
-                            className='arc-section-header'
-                            onClick={() => this.toggleSection('workflow-detection')}
-                            aria-expanded={!isCollapsed['workflow-detection']}
-                            aria-controls='workflow-detection-content'
-                        >
-                            <h3 id='workflow-detection-heading'>Workflow Detection</h3>
-                            <div className='arc-section-header-right'>
-                                {isCollapsed['workflow-detection'] && workflows.length > 0 && (
-                                    <span className='arc-section-badge' aria-label={`${workflows.length} workflow(s)`}>
-                                        {workflows.length}
-                                    </span>
-                                )}
-                                <span className='arc-section-toggle' aria-hidden='true'>
-                                    {isCollapsed['workflow-detection'] ? '▸' : '▾'}
-                                </span>
-                            </div>
-                        </button>
-                        
-                        <div id='workflow-detection-content' className='arc-section-content'>
-                            {!isCollapsed['workflow-detection'] && (
-                                <>
-                                    <p className='arc-section-description'>Detect workflows in workspace</p>
-                                    
-                                    <button 
-                                        className={`theia-button ${isScanning ? 'arc-button-loading' : ''}`}
-                                        onClick={() => this.handleScanWorkspace()}
-                                        disabled={isScanning}
-                                        aria-busy={isScanning}
-                                        aria-label='Scan workspace for workflows'
-                                    >
-                                        {isScanning ? (
-                                            <>
-                                                <span className='arc-spinner' aria-hidden='true'></span>
-                                                <span className='arc-button-text'>Scanning...</span>
-                                            </>
-                                        ) : (
-                                            'Scan Workspace'
-                                        )}
-                                    </button>
-
-                                    {isScanning && this.renderProgressBar(scanProgress, 'Scanning workspace...')}
-
-                                    {workflows.length > 0 && (
-                                        <div className='arc-workflow-list' role='list' aria-label='Detected workflows'>
-                                            <div className='arc-workflow-list-header'>
-                                                <span>Type</span>
-                                                <span>Name</span>
-                                                <span>Path</span>
-                                            </div>
-                                            {workflows.map((workflow: WorkflowInfo, idx: number) => (
-                                                <div key={idx} className='arc-workflow-item' role='listitem'>
-                                                    <span className='arc-workflow-type' aria-label={`Type: ${workflow.type}`}>
-                                                        {workflow.type}
-                                                    </span>
-                                                    <span className='arc-workflow-name'>{workflow.name}</span>
-                                                    <span className='arc-workflow-path'>{workflow.path}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {workflows.length === 0 && !isScanning && (
-                                        <p className='arc-empty-state'>No workflows detected. Click "Scan Workspace" to detect workflows.</p>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    </section>
+                    <WorkflowDetectionSection
+                        isCollapsed={isCollapsed['workflow-detection']}
+                        onToggle={() => this.toggleSection('workflow-detection')}
+                        isScanning={isScanning}
+                        scanProgress={scanProgress}
+                        workflows={workflows}
+                        onScanWorkspace={() => this.handleScanWorkspace()}
+                    />
                 </div>
 
                 <div className='arc-footer' role='contentinfo'>

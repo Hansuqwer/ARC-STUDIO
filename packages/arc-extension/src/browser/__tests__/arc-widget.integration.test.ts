@@ -97,32 +97,28 @@ describe('ArcWidget Integration Tests', () => {
             expect(widgetSource).toMatch(/Agent Runtime Cockpit/);
         });
 
-        it('should render a Workflow Execution section', () => {
-            expect(widgetSource).toMatch(/Workflow Execution/);
+        it('should use WorkflowExecutionSection component', () => {
+            expect(widgetSource).toMatch(/WorkflowExecutionSection/);
         });
 
-        it('should render a Trace Viewer section', () => {
-            expect(widgetSource).toMatch(/Trace Viewer/);
+        it('should use TraceViewerSection component', () => {
+            expect(widgetSource).toMatch(/TraceViewerSection/);
         });
 
-        it('should render a Workflow Detection section', () => {
-            expect(widgetSource).toMatch(/Workflow Detection/);
+        it('should use WorkflowDetectionSection component', () => {
+            expect(widgetSource).toMatch(/WorkflowDetectionSection/);
         });
 
-        it('should render Execute Workflow button', () => {
-            expect(widgetSource).toMatch(/Execute Workflow/);
+        it('should use ToastContainer component', () => {
+            expect(widgetSource).toMatch(/ToastContainer/);
         });
 
-        it('should render Load Traces button', () => {
-            expect(widgetSource).toMatch(/Load Traces/);
+        it('should use ShortcutsModal component', () => {
+            expect(widgetSource).toMatch(/ShortcutsModal/);
         });
 
-        it('should render Scan Workspace button', () => {
-            expect(widgetSource).toMatch(/Scan Workspace/);
-        });
-
-        it('should use theia-button class for buttons', () => {
-            expect(widgetSource).toMatch(/theia-button/);
+        it('should use ErrorBanner component', () => {
+            expect(widgetSource).toMatch(/ErrorBanner/);
         });
     });
 
@@ -606,19 +602,19 @@ describe('ArcWidget Integration Tests', () => {
             expect(widgetSource).toMatch(/dispose\s*\(\s*\)\s*:/);
         });
 
-        it('should filter traces case-insensitively in render', () => {
-            expect(widgetSource).toMatch(/filteredTraces.*=.*traces\.filter/);
-            expect(widgetSource).toMatch(/\.toLowerCase\(\)/);
+        it('should use TraceViewerSection component with filtering', () => {
+            expect(widgetSource).toMatch(/TraceViewerSection/);
+            expect(widgetSource).toMatch(/traceFilter/);
         });
 
-        it('should render toast container', () => {
-            expect(widgetSource).toMatch(/renderToastContainer/);
-            expect(widgetSource).toMatch(/arc-toast-container/);
+        it('should use ToastContainer component', () => {
+            expect(widgetSource).toMatch(/ToastContainer/);
+            expect(widgetSource).toMatch(/toasts/);
         });
 
-        it('should render error section with retry button', () => {
+        it('should use ErrorBanner component with retry', () => {
+            expect(widgetSource).toMatch(/ErrorBanner/);
             expect(widgetSource).toMatch(/handleRetry/);
-            expect(widgetSource).toMatch(/Try Again/);
         });
     });
 });
