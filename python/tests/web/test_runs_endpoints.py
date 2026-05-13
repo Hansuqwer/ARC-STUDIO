@@ -107,21 +107,21 @@ async def test_list_runs_with_seed(client, workspace):
 
 
 async def test_filter_by_runtime(client, workspace):
-    _seed_trace(workspace, "aaaaaaaaaaaa", "swarmgraph")
-    _seed_trace(workspace, "bbbbbbbbbbbb", "langgraph")
+    _seed_trace(workspace, "aaaaaaaaaaaa", runtime="swarmgraph")
+    _seed_trace(workspace, "bbbbbbbbbbbb", runtime="langgraph")
     
     for path in ("/runs?runtime=langgraph", "/api/runs?runtime=langgraph"):
         r = await client.get(path)
         if r.status_code == 404:
             continue
-        if r.status_code == 200:
-            body = await r.json()
-            assert body["ok"] is True
-            items = body["data"]
-            if items:
-                if not all(item["runtime"] == "langgraph" for item in items):
-                    pytest.skip("/runs runtime filtering not implemented")
-                return
+        assert r.status_code == 200
+        body = await r.json()
+        assert body["ok"] is True, f"Expected ok=True, got {body}"
+        items = body["data"]
+        assert len(items) == 1, f"Expected 1 langgraph run, got {len(items)}: {items}"
+        assert items[0]["runtime"] == "langgraph"
+        assert items[0]["id"] == "bbbbbbbbbbbb"
+        return
         return
     pytest.skip("/runs filtering not implemented")
 

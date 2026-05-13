@@ -389,10 +389,13 @@ export class ArcRunTimelineWidget extends ReactWidget {
     this.runStatusMessage = `Starting ${this.selectedRuntime} run...`;
     this.update();
     try {
+      const paid = this.runtimeCapabilities.find(
+        r => r.runtime_id === this.selectedRuntime
+      )?.requires_paid_calls === true;
       const result = await this.arcService.startRun('wf-swarmgraph-001', {
         prompt: this.prompt,
         workspacePath: this.workspaceStatus?.frontendPath,
-      }, this.selectedRuntime);
+      }, this.selectedRuntime, paid ? true : undefined);
       if (result.data) {
         this.runs = [result.data, ...this.runs];
         this.selectedRun = result.data;

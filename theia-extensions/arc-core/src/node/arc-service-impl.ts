@@ -146,6 +146,10 @@ export class ArcServiceImpl implements ArcService {
   @inject(ILogger)
   protected readonly logger: ILogger;
 
+  /** Tracks active CLI subprocesses for cancellation support. */
+  private static readonly runningProcs: Map<string, cp.ChildProcess> = new Map();
+  private static procCounter = 0;
+
   /** Check if the ARC daemon is running */
   private async isDaemonRunning(): Promise<boolean> {
     return new Promise(resolve => {
@@ -159,13 +163,19 @@ export class ArcServiceImpl implements ArcService {
     });
   }
 
+  /** Return an Authorization header if ARC_DAEMON_TOKEN is set */
+  private daemonAuthHeaders(): Record<string, string> {
+    const token = process.env.ARC_DAEMON_TOKEN;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
   /** Call the daemon HTTP API */
   private async callDaemon<T>(endpoint: string, params?: Record<string, string>): Promise<ArcEnvelope<T>> {
     const queryStr = params ? '?' + new URLSearchParams(params).toString() : '';
     const url = `http://${ARC_DAEMON_HOST}:${ARC_DAEMON_PORT}${endpoint}${queryStr}`;
 
     return new Promise((resolve, reject) => {
-      const req = http.get(url, { timeout: ARC_CLI_TIMEOUT_MS }, res => {
+      const req = http.get(url, { timeout: ARC_CLI_TIMEOUT_MS, headers: { ...this.daemonAuthHeaders() } }, res => {
         let data = '';
         res.on('data', chunk => data += chunk);
         res.on('end', () => {
@@ -192,6 +202,7 @@ export class ArcServiceImpl implements ArcService {
       headers: {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(payload),
+        ...this.daemonAuthHeaders(),
       },
     };
 
@@ -216,6 +227,7 @@ export class ArcServiceImpl implements ArcService {
 
   /** Spawn ARC CLI and parse JSON output */
   private async runCli<T>(args: string[], envOverrides: NodeJS.ProcessEnv = {}): Promise<ArcEnvelope<T>> {
+    const procKey = `cli-${++ArcServiceImpl.procCounter}`;
     return new Promise((resolve, reject) => {
       const fullArgs = [...args, '--json'];
       const pythonDir = this.pythonProjectDir();
@@ -231,12 +243,15 @@ export class ArcServiceImpl implements ArcService {
         env,
       });
 
+      ArcServiceImpl.runningProcs.set(procKey, proc);
+
       let stdout = '';
       let stderr = '';
       proc.stdout?.on('data', d => stdout += d);
       proc.stderr?.on('data', d => stderr += d);
 
       proc.on('close', code => {
+        ArcServiceImpl.runningProcs.delete(procKey);
         if (code !== 0 && !stdout.trim()) {
           reject(new ArcCliError(
             `ARC CLI failed (exit ${code})`,
@@ -261,6 +276,7 @@ export class ArcServiceImpl implements ArcService {
       });
 
       proc.on('error', err => {
+        ArcServiceImpl.runningProcs.delete(procKey);
         reject(new ArcCliError(
           `ARC CLI spawn failed: ${err.message}`,
           stderr,
@@ -678,5 +694,30 @@ export class ArcServiceImpl implements ArcService {
     } catch (e) {
       return this.errorEnvelope('export-trace', e);
     }
+  }
+
+  async cancelRun(_runId: string): Promise<ArcEnvelope<{ cancelled: boolean }>> {
+    // The CLI subprocess tracking uses internal counters since the runId
+    // is only known after the CLI exits. For cancellation we kill all
+    // tracked running processes — coarse but sufficient for alpha.
+    let cancelled = false;
+    for (const [key, proc] of ArcServiceImpl.runningProcs.entries()) {
+      if (proc.pid !== undefined && !proc.killed) {
+        try {
+          proc.kill('SIGTERM');
+          cancelled = true;
+        } catch {
+          // process already exited
+        }
+      }
+      ArcServiceImpl.runningProcs.delete(key);
+    }
+    return {
+      version: ARC_PROTOCOL_VERSION,
+      ok: true,
+      data: { cancelled },
+      error: null,
+      meta: { duration_ms: 1, timestamp: new Date().toISOString() },
+    };
   }
 }

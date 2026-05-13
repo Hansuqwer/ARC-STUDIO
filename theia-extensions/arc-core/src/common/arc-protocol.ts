@@ -227,4 +227,6 @@ export interface ArcService {
   getProviderRouting(): Promise<ArcEnvelope<ProviderRoutingPolicy>>;
   getWorkspaceStatus(workspacePath: string): Promise<ArcEnvelope<{ frontendPath: string; backendPath: string; source: string }>>;
   exportTraceToOTLP(runId: string, endpoint: string): Promise<ArcEnvelope<{ exported: boolean; warning?: string }>>;
+  /** Cancel a running CLI-backed workflow. Returns true if a process was killed. */
+  cancelRun(runId: string): Promise<ArcEnvelope<{ cancelled: boolean }>>;
 }

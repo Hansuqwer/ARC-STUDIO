@@ -230,6 +230,9 @@ async def list_runs(request: web.Request) -> web.Response:
     store = _trace_store(request)
     run_ids = store.list_runs()
     runs = [r for rid in run_ids if (r := store.load(rid)) is not None]
+    runtime_filter = request.query.get("runtime")
+    if runtime_filter:
+        runs = [r for r in runs if r.runtime == runtime_filter]
     return _json(ok([r.model_dump() for r in runs]).model_dump())
 
 

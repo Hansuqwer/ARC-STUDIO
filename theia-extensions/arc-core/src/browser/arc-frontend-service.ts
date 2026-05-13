@@ -65,11 +65,12 @@ export class ArcFrontendService {
     return this.arcService.listSchemas(path, runtimeId);
   }
 
-  async startRun(workflowId: string, inputs?: Record<string, unknown>, runtime: RuntimeId = 'auto'): Promise<ArcEnvelope<RunRecord>> {
+  async startRun(workflowId: string, inputs?: Record<string, unknown>, runtime: RuntimeId = 'auto', allowPaidCalls?: boolean): Promise<ArcEnvelope<RunRecord>> {
     const path = await this.getWorkspacePath();
     return this.arcService.startRun({
       workflow_id: workflowId,
       runtime,
+      allow_paid_calls: allowPaidCalls,
       inputs: { ...(inputs ?? {}), workspacePath: path },
     });
   }

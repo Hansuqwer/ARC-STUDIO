@@ -102,15 +102,21 @@ Run `uv run arc <command> --help` for the flags on any subcommand.
 
 ## Runtime Support
 
-The table below is generated from `cd python && uv run arc runtimes --capabilities --json`.
+The table below is auto-generated. To refresh it, run:
 
-| Runtime | Detected | Can run | Paid | Notes |
-|---|---:|---:|---:|---|
-| swarmgraph | yes | no | no | install missing; set `ARC_SWARMGRAPH_CLI` |
-| langgraph | yes | no | no | requires `ARC_LANGGRAPH_EXPORT=module:function` |
-| crewai | yes | no | yes | install missing; set `ARC_CREWAI_EXPORT` |
-| openai-agents | no | no | yes | install missing; requires `OPENAI_API_KEY` |
-| llamaindex | no | no | no | not detected |
+```bash
+bash scripts/generate-runtime-table.sh
+```
+
+<!-- RUNTIMES:START -->
+| Runtime       | Detected | Can run | Paid | Notes                                              |
+|:--------------|--------:|-------:|----:|:---------------------------------------------------|
+| swarmgraph    | yes      | no      | no   | install missing; set `ARC_SWARMGRAPH_CLI`          |
+| langgraph     | yes      | no      | no   | requires export target; set `ARC_LANGGRAPH_EXPORT` |
+| crewai        | yes      | no      | yes  | install missing; set `ARC_CREWAI_EXPORT`           |
+| openai-agents | no       | no      | yes  | not detected; set `OPENAI_API_KEY`                 |
+| llamaindex    | no       | no      | no   | not detected                                       |
+<!-- RUNTIMES:END -->
 
 "Detected" means the adapter is importable. "Can run" means the adapter plus its required configuration are both present. "Paid" means a successful run will make billable API calls; such runs are gated behind the `allow_paid_calls` flag and are opt-in.
 

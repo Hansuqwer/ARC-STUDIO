@@ -68,13 +68,24 @@ Each finding below was remediated in or before commit `f08ef52`. CWE references 
 
 These items are accepted, deferred, or out of scope for the current release. They are tracked in the roadmap and should be reconsidered before any non-loopback deployment.
 
-### U-1. `.env` is still present in pre-`f08ef52` history
+### U-1. `.env` is present in pre-`f08ef52` history (accepted risk)
 
-The leaked key has been rotated, but the value remains retrievable from prior commits. Recommended action: `git filter-repo --invert-paths --path .env` followed by a force-push and a public notice. Not done because it rewrites SHAs for every collaborator.
+A `G4F_API_KEY` (free GPT4Free service key) was committed in commit
+`e5d1414` and later made unnecessary when the G4F provider switched
+to a no-key endpoint. The key has been removed from tracking and
+rotated. The value remains retrievable from prior commits. The
+recommended remediation (`git filter-repo`) rewrites SHAs for every
+collaborator; the project owner has accepted this risk for the alpha
+release.
 
-### U-2. No authentication on the local daemon
+### U-2. No authentication on the local daemon (mitigated)
 
-The daemon binds to `127.0.0.1:7777` with no token. Any local process running as the same user can issue requests. This is acceptable for a single-user developer tool but is **not** acceptable for multi-user hosts or container/dev-container setups where other tenants share the loopback interface. A bearer-token scheme using `ARC_DAEMON_TOKEN` is planned.
+The daemon binds to `127.0.0.1:7777`. An optional bearer-token scheme
+using `ARC_DAEMON_TOKEN` was added in this release. When set, all
+requests except `/health` must carry `Authorization: Bearer <token>`.
+When unset, the daemon remains open to localhost (backward-compatible
+single-user default). The TypeScript client sends the token
+automatically when the env var is present.
 
 ### U-3. No rate limiting on the daemon
 
