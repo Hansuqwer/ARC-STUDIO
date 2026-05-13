@@ -10,18 +10,14 @@
 import * as React from 'react';
 import { injectable, inject, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
-import { MessageService } from '@theia/core/lib/common/message-service';
 import { CommandService } from '@theia/core/lib/common/command';
 import { ArcFrontendService } from './arc-frontend-service';
-import { RuntimeInfo, WorkflowInfo, SchemaInfo, WorkspaceInfo, RunRecord, RuntimeCapabilityReport } from '../common/arc-protocol';
+import { RuntimeInfo, RunRecord, RuntimeCapabilityReport, DoctorAction } from '../common/arc-protocol';
 
 @injectable()
 export class ArcMainWidget extends ReactWidget {
   static readonly ID = 'arc:main-widget';
   static readonly LABEL = 'ARC';
-
-  @inject(MessageService)
-  protected readonly messageService: MessageService;
 
   @inject(ArcFrontendService)
   protected readonly arcService: ArcFrontendService;
@@ -32,10 +28,7 @@ export class ArcMainWidget extends ReactWidget {
   // State
   protected loading = false;
   protected error: string | null = null;
-  protected workspaceInfo: WorkspaceInfo | null = null;
   protected runtimes: RuntimeInfo[] = [];
-  protected workflows: WorkflowInfo[] = [];
-  protected schemas: SchemaInfo[] = [];
   protected daemonStatus: { running: boolean; version: string } | null = null;
   protected recentRuns: RunRecord[] = [];
   protected capabilities: RuntimeCapabilityReport[] = [];
@@ -70,15 +63,6 @@ export class ArcMainWidget extends ReactWidget {
       this.runtimes = runtimesResult.data ?? [];
       this.capabilities = capabilitiesResult?.data?.runtimes ?? [];
       this.recentRuns = (runsResult?.data ?? []).slice(0, 5);
-
-      if (this.runtimes.length > 0) {
-        const [workflowsResult, schemasResult] = await Promise.all([
-          this.arcService.listWorkflows(),
-          this.arcService.listSchemas(),
-        ]);
-        this.workflows = workflowsResult.data ?? [];
-        this.schemas = schemasResult.data ?? [];
-      }
 
       this.error = null;
     } catch (e) {
@@ -264,7 +248,7 @@ export class ArcMainWidget extends ReactWidget {
             {'doctor_actions' in rt && rt.doctor_actions.length > 0 && (
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
                 {rt.doctor_actions.map((action: any) => (
-                  <button key={action.id} style={styles.doctorBtn} title={action.description}>
+                  <button key={action.id} style={styles.doctorBtn} title={action.description} onClick={() => this.runDoctorAction(action)}>
                     {action.label}
                   </button>
                 ))}
@@ -345,6 +329,12 @@ export class ArcMainWidget extends ReactWidget {
       cancelled: 'var(--theia-descriptionForeground)',
     };
     return colors[status] ?? 'inherit';
+  }
+
+  protected runDoctorAction(action: DoctorAction): void {
+    if (action.command) {
+      navigator.clipboard.writeText(action.command).catch(() => undefined);
+    }
   }
 }
 

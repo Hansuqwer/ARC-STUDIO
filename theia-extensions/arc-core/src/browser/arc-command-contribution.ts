@@ -15,6 +15,8 @@ import { PreferenceService } from '@theia/core/lib/common/preferences/preference
 import { ArcFrontendService } from './arc-frontend-service';
 
 export const ARC_MENU_MAIN = [...CommonMenus.VIEW, 'arc'];
+const OPEN_RUN_TIMELINE_COMMAND = 'arc:open-run-timeline';
+const OPEN_RUN_DIFF_COMMAND = 'arc:open-run-diff';
 
 /**
  * Consolidated ARC commands (8 primary commands, down from 20+).
@@ -31,12 +33,12 @@ export const ArcCommands = {
     category: 'ARC',
   },
   OPEN_TIMELINE: {
-    id: 'arc:open-run-timeline',
+    id: 'arc:open-timeline',
     label: 'ARC: Open Timeline',
     category: 'ARC',
   },
   COMPARE_RUNS: {
-    id: 'arc:open-run-diff',
+    id: 'arc:compare-runs',
     label: 'ARC: Compare Runs',
     category: 'ARC',
   },
@@ -95,21 +97,21 @@ export class ArcCommandContribution implements CommandContribution, MenuContribu
     // Open Timeline → delegates to arc-runs command
     registry.registerCommand(ArcCommands.OPEN_TIMELINE, {
       execute: async () => {
-        await this.commandService.executeCommand('arc:open-run-timeline');
+        await this.commandService.executeCommand(OPEN_RUN_TIMELINE_COMMAND);
       },
     });
 
     // Compare Runs → delegates to arc-runs diff command
     registry.registerCommand(ArcCommands.COMPARE_RUNS, {
       execute: async () => {
-        await this.commandService.executeCommand('arc:open-run-diff');
+        await this.commandService.executeCommand(OPEN_RUN_DIFF_COMMAND);
       },
     });
 
     // Evaluate Run → opens timeline (eval available from there)
     registry.registerCommand(ArcCommands.EVALUATE_RUN, {
       execute: async () => {
-        await this.commandService.executeCommand('arc:open-run-timeline');
+        await this.commandService.executeCommand(OPEN_RUN_TIMELINE_COMMAND);
       },
     });
 
@@ -185,12 +187,6 @@ export class ArcCommandContribution implements CommandContribution, MenuContribu
       label: 'Compare Models',
     });
 
-    // Separator
-    menus.registerMenuAction(ARC_MENU_MAIN, {
-      commandId: '',
-      label: '',
-    });
-
     // Group 2: Views
     menus.registerMenuAction(ARC_MENU_MAIN, {
       commandId: ArcCommands.OPEN_TIMELINE.id,
@@ -205,12 +201,6 @@ export class ArcCommandContribution implements CommandContribution, MenuContribu
       label: 'Evaluate Run',
     });
 
-    // Separator
-    menus.registerMenuAction(ARC_MENU_MAIN, {
-      commandId: '',
-      label: '',
-    });
-
     // Group 3: Tools
     menus.registerMenuAction(ARC_MENU_MAIN, {
       commandId: ArcCommands.RUNTIME_DOCTOR.id,
@@ -219,12 +209,6 @@ export class ArcCommandContribution implements CommandContribution, MenuContribu
     menus.registerMenuAction(ARC_MENU_MAIN, {
       commandId: ArcCommands.INSPECT_WORKSPACE.id,
       label: 'Inspect Workspace',
-    });
-
-    // Separator
-    menus.registerMenuAction(ARC_MENU_MAIN, {
-      commandId: '',
-      label: '',
     });
 
     // Group 4: Export

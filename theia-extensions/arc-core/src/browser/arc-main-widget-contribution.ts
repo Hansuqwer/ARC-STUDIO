@@ -6,11 +6,12 @@
  * Source: https://theia-ide.org/docs/widgets/
  */
 
-import { injectable } from '@theia/core/shared/inversify';
+import { injectable, inject } from '@theia/core/shared/inversify';
 import { AbstractViewContribution, FrontendApplicationContribution } from '@theia/core/lib/browser';
 import { TabBarToolbarContribution, TabBarToolbarRegistry } from '@theia/core/lib/browser/shell/tab-bar-toolbar';
 import { Command, CommandRegistry } from '@theia/core/lib/common/command';
 import { KeybindingRegistry } from '@theia/core/lib/browser/keybinding';
+import { PreferenceService } from '@theia/core/lib/common/preferences/preference-service';
 import { ArcMainWidget } from './arc-main-widget';
 
 export const ArcOpenCommand: Command = {
@@ -29,6 +30,9 @@ export const ArcRefreshCommand: Command = {
 export class ArcMainWidgetContribution
   extends AbstractViewContribution<ArcMainWidget>
   implements FrontendApplicationContribution, TabBarToolbarContribution {
+
+  @inject(PreferenceService)
+  protected readonly preferences: PreferenceService;
 
   constructor() {
     super({
@@ -81,7 +85,8 @@ export class ArcMainWidgetContribution
   }
 
   async initializeLayout(): Promise<void> {
-    // Auto-open ARC sidebar on startup
-    await this.openView({ activate: false });
+    if (this.preferences.get<boolean>('arc.ui.autoOpenSidebar', true)) {
+      await this.openView({ activate: false });
+    }
   }
 }

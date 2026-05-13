@@ -8,7 +8,6 @@
 import { injectable, inject, postConstruct } from '@theia/core/shared/inversify';
 import { StatusBar, StatusBarAlignment, FrontendApplicationContribution } from '@theia/core/lib/browser';
 import { PreferenceService } from '@theia/core/lib/common/preferences/preference-service';
-import { CommandService } from '@theia/core/lib/common/command';
 import { ArcFrontendService } from './arc-frontend-service';
 
 const DAEMON_STATUS_ID = 'arc-daemon-status';
@@ -27,9 +26,6 @@ export class ArcStatusBarContribution implements FrontendApplicationContribution
   @inject(PreferenceService)
   protected readonly preferences: PreferenceService;
 
-  @inject(CommandService)
-  protected readonly commandService: CommandService;
-
   protected pollTimer: ReturnType<typeof setInterval> | undefined;
 
   @postConstruct()
@@ -45,6 +41,15 @@ export class ArcStatusBarContribution implements FrontendApplicationContribution
   }
 
   protected async updateStatusBar(): Promise<void> {
+    if (!this.preferences.get<boolean>('arc.ui.showStatusBar', true)) {
+      await Promise.all([
+        this.statusBar.removeElement(DAEMON_STATUS_ID),
+        this.statusBar.removeElement(PROFILE_STATUS_ID),
+        this.statusBar.removeElement(RUN_STATUS_ID),
+      ]);
+      return;
+    }
+
     await Promise.all([
       this.updateDaemonStatus(),
       this.updateProfileStatus(),

@@ -5,7 +5,7 @@
  * Controlled by the `arc.ui.showOnboarding` preference.
  */
 
-import { injectable, inject, postConstruct } from '@theia/core/shared/inversify';
+import { injectable, inject } from '@theia/core/shared/inversify';
 import { AbstractViewContribution, FrontendApplicationContribution } from '@theia/core/lib/browser';
 import { PreferenceService } from '@theia/core/lib/common/preferences/preference-service';
 import { Command, CommandRegistry } from '@theia/core/lib/common/command';
@@ -50,7 +50,7 @@ export class ArcWelcomeContribution
     if (showOnboarding) {
       await this.openView({ activate: true });
       // Disable onboarding after first view
-      this.preferences.set('arc.ui.showOnboarding', false);
+      await this.preferences.set('arc.ui.showOnboarding', false);
     }
   }
 }
