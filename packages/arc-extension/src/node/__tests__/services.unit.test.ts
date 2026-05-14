@@ -526,6 +526,24 @@ describe('WorkflowDetector', () => {
     beforeEach(async () => {
         detector = new WorkflowDetector();
         tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arc-wd-test-'));
+        // Mock spawn for WorkflowDetector's whichExecutable calls
+        // The 'which' command returns exit code 1 (not found) for 'swarmgraph'
+        mockSpawn.mockImplementation((cmd: string, args: string[]) => {
+            if (cmd === 'which') {
+                const mockChild: any = {
+                    stdout: { on: jest.fn() },
+                    stderr: { on: jest.fn() },
+                    on: jest.fn((event: string, handler: Function) => {
+                        if (event === 'close') {
+                            setTimeout(() => handler(1), 0); // exit code 1 = not found
+                        }
+                    }),
+                    kill: jest.fn(),
+                };
+                return mockChild;
+            }
+            return { stdout: { on: jest.fn() }, stderr: { on: jest.fn() }, on: jest.fn(), kill: jest.fn() };
+        });
     });
 
     afterEach(async () => {

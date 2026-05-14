@@ -9,7 +9,8 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 
 describe('UI Components Contracts', () => {
-    const componentsDir = path.join(__dirname, '..', 'components');
+    // When running from lib/, we need to point back to src/
+    const componentsDir = path.join(__dirname, '..', '..', '..', 'src', 'browser', 'components');
 
     describe('ProgressBar', () => {
         let source: string;
