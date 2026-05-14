@@ -8,6 +8,12 @@ ARC Studio runs entirely on your workstation. No telemetry is sent. No data leav
 
 Pre-release. There are no git tags yet; `main` is the canonical state. See [CHANGELOG.md](./CHANGELOG.md) and [docs/SECURITY_AUDIT_REPORT.md](./docs/SECURITY_AUDIT_REPORT.md) for what changed recently and what is still outstanding.
 
+ARC Studio supports the following runtimes:
+- **SwarmGraph** - In-repo canonical runtime for AI provider routing and quota management (`runtimes/swarmgraph/`)
+- **LangGraph** - Stateful agent orchestration
+- **Trace Visualization** - Real-time execution monitoring
+- **Workflow Detection** - Automatic workflow discovery
+
 ## Prerequisites
 
 The toolchain versions are pinned in [`.tool-versions`](./.tool-versions). If you use `asdf` or `mise` they will be picked up automatically; otherwise install manually:
@@ -25,7 +31,54 @@ git clone <this-repo>
 cd arc-theia-studio
 pnpm install --frozen-lockfile
 
-# 2. Install Python deps
+# 2. Bootstrap development environment
+bash scripts/bootstrap-dev.sh
+```
+
+Visit http://localhost:3000 to access ARC Studio.
+
+## Development
+
+### Project Structure
+
+```
+arc-theia-studio/
+├── packages/
+│   ├── arc-extension/       # Main Theia extension
+│   ├── arc-browser-app/     # Browser application
+│   ├── arc-electron-app/    # Electron application (TODO)
+│   └── arc-test-fixtures/   # Test utilities (TODO)
+├── runtimes/
+│   └── swarmgraph/          # Vendored SwarmGraph runtime sub-project
+├── python/
+│   ├── src/                 # Python backend
+│   └── tests/               # Python tests
+├── docs/                    # Documentation
+└── scripts/                 # Build and setup scripts
+```
+
+### Available Commands
+
+```bash
+# Development
+pnpm install              # Install dependencies
+pnpm build               # Build all packages
+pnpm watch               # Watch mode for development
+pnpm clean               # Clean build artifacts
+
+# Running
+pnpm start:browser       # Start browser app (port 3000)
+pnpm start:electron      # Start Electron app (TODO)
+
+# Testing
+pnpm test                # Run all tests
+pnpm test:e2e            # Run E2E tests (TODO)
+pnpm lint                # Lint code
+```
+
+Then set up Python:
+
+```bash
 cd python
 uv sync --all-extras --dev
 cd ..
@@ -97,6 +150,14 @@ arc doctor        Runtime-specific diagnostics
 arc runs          Inspect past runs and traces
 arc providers     Manage credential providers
 ```
+
+| Runtime | Current support | Missing |
+| --- | --- | --- |
+| SwarmGraph | Source lives in `runtimes/swarmgraph/`; ARC Studio talks to it through the existing CLI/subprocess contract | Audit integrations |
+| LangGraph | Detection, AST workflow heuristics, dynamic export/run hook, fixture schema | Streaming/events; see `docs/RUNTIMES.md` |
+| CrewAI | Not implemented | Adapter |
+| OpenAI Agents SDK | Not implemented | Adapter |
+| AG2 | Not implemented | Adapter |
 
 Run `uv run arc <command> --help` for the flags on any subcommand.
 

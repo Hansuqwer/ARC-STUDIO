@@ -1,0 +1,76 @@
+name: Security
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"  # Every Monday 06:00 UTC
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Secret scan (recent diff)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show --stat --no-patch HEAD
+
+          if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+            diff_output=$(git diff HEAD~1 HEAD -- '*.py' '*.md' '*.yaml' '*.yml' '*.json' '*.toml')
+          else
+            diff_output=$(git show --format= --no-ext-diff --unified=0 HEAD -- '*.py' '*.md' '*.yaml' '*.yml' '*.json' '*.toml')
+          fi
+
+          if grep -E 'sk-[a-z0-9]{20}|AKIA[0-9A-Z]{16}|gh[opusr]_[A-Za-z0-9]{20,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|Bearer [A-Za-z0-9._-]{20,}' <<<"$diff_output"; then
+            echo "::error::Potential secret detected in diff"
+            exit 1
+          fi
+
+          if grep -E -- '-----BEGIN [A-Z ]*PRIVATE KEY-----' <<<"$diff_output"; then
+            echo "::error::Potential secret detected in diff"
+            exit 1
+          fi
+
+          echo "Secret scan: clean"
+
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras --dev
+
+      - name: Run pip-audit
+        run: uv run pip-audit --desc --skip-editable
+
+  bandit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras --dev
+
+      - name: Run bandit
+        run: |
+          uv run bandit \
+            -r packages/swarm-shared/swarm_shared packages/hive-swarm/swarm packages/ai-provider-swarm-gateway/src \
+            -f screen

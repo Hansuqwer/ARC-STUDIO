@@ -1,13 +1,18 @@
 # ARC Studio — Architecture
 
+## Repository Layout
+
+This repository contains two related products:
+
+**ARC Studio** is a Theia-based IDE and Python daemon for inspecting and running agent workflows. Its source lives at the repository root in `applications/`, `theia-extensions/`, `packages/`, and `python/`.
+
+**SwarmGraph** is the canonical agent runtime that ARC Studio was built to drive. Its source lives under `runtimes/swarmgraph/` as a vendored sub-project. SwarmGraph builds and tests independently of ARC Studio; the two communicate at runtime via the CLI contract documented in `python/src/agent_runtime_cockpit/adapters/swarmgraph.py`.
+
+ARC Studio also adapts to several third-party runtimes (LangGraph, CrewAI, OpenAI Agents SDK, and lmarena). Those are external projects and live only as adapter shims under `python/src/agent_runtime_cockpit/adapters/`; their source is not in this repository.
+
+History note: SwarmGraph was developed in a separate repository (`Hansuqwer/SwarmGraph`) until 2026-05-14, when it was merged here via `git merge --allow-unrelated-histories` preserving its commit history under the `runtimes/swarmgraph/` prefix for path-level `git log` and `git blame`. The original repository is retained for original SHA references and will be archived.
+
 ## 1. System Boundaries
-
-```
-ARC Studio = Theia IDE shell + 9 native Theia extensions
-ARC Core   = Python daemon/CLI + 2 adapters + context engine + storage + security
-```
-
-The Theia frontend **never imports Python code**. All communication crosses a JSON boundary.
 
 ## 2. Communication Model
 
