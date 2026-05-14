@@ -41,6 +41,12 @@ def _map(native: dict[str, Any], ctx: MappingContext) -> list[dict[str, Any]]:
         return [{"type": AGUIEventType.TOOL_CALL_RESULT.value, "timestamp": ts,
                  "toolCallId": native.get("tool_id", "?"),
                  "content": str(native.get("result", ""))}]
+    if kind == "handoff":
+        return [{"type": AGUIEventType.STEP_STARTED.value, "timestamp": ts,
+                 "stepName": f"handoff:{native.get('agent', '?')}"}]
+    if kind == "state":
+        return [{"type": AGUIEventType.STATE_SNAPSHOT.value, "timestamp": ts,
+                 "snapshot": native.get("state", {})}]
     return [{"type": AGUIEventType.RAW.value, "timestamp": ts,
              "event": native, "source": "swarmgraph"}]
 

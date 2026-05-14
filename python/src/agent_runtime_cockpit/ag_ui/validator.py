@@ -27,6 +27,7 @@ class AGUIEventType(str, enum.Enum):
     TOOL_CALL_RESULT = "TOOL_CALL_RESULT"
     TOOL_CALL_ERROR = "TOOL_CALL_ERROR"
     HANDOFF = "HANDOFF"
+    STATE_SNAPSHOT = "STATE_SNAPSHOT"
     CUSTOM = "CUSTOM"
     RAW = "RAW"
 
@@ -46,6 +47,7 @@ EVENT_REQUIRED_FIELDS = {
     AGUIEventType.TOOL_CALL_RESULT: {"toolCallId", "content"},
     AGUIEventType.STEP_STARTED: {"stepName"},
     AGUIEventType.STEP_FINISHED: {"stepName"},
+    AGUIEventType.STATE_SNAPSHOT: {"snapshot"},
     AGUIEventType.RUN_ERROR: {"message"},
 }
 
