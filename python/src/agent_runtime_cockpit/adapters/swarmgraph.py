@@ -1,7 +1,16 @@
 """
 SwarmGraph Runtime Adapter
 
-Detects and inspects SwarmGraph-based agent projects.
+DEPRECATED — Prefer `adapters.swarmgraph.runner.SwarmGraphRunner` for new code.
+
+This module retains the original monolithic adapter path for backward
+compatibility. The modular runner in `adapters.swarmgraph.runner` handles
+all backends (STUB / LOCAL / GATEWAY) with real-time event streaming,
+unified cost gating, and the full audit chain.
+
+PRs that modify this file should be reviewed with attention to whether
+the change should land in the canonical runner instead.
+
 Source: https://github.com/Hansuqwer/SwarmGraph
 """
 from __future__ import annotations

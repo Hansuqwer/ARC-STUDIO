@@ -116,6 +116,25 @@ def test_rejects_symlink_to_workspace_launcher(layout, monkeypatch):
         adapter._resolve_cli(ws)
 
 
+def test_rejects_path_traversal_into_workspace(layout, monkeypatch):
+    """CLI with '../' that resolves into workspace → PermissionError.
+
+    E.g. ARC_SWARMGRAPH_CLI=/tools/../workspace/swarmgraph → resolves to
+    /workspace/swarmgraph which is inside workspace.
+    """
+    ws, tools = layout
+    launcher = ws / "swarmgraph"
+    launcher.write_text("#!/bin/bash\necho hi")
+    launcher.chmod(launcher.stat().st_mode | stat.S_IEXEC)
+    # /tools/../workspace/swarmgraph resolves to /workspace/swarmgraph
+    traversed = tools / ".." / ws.name / "swarmgraph"
+    monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(traversed))
+
+    adapter = SwarmGraphAdapter()
+    with pytest.raises(PermissionError, match="must not point inside"):
+        adapter._resolve_cli(ws)
+
+
 def test_rejects_cli_equal_to_workspace(layout, monkeypatch):
     """CLI path equals workspace path itself → FileNotFoundError (directory, not a file)."""
     ws, _ = layout
