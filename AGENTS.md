@@ -185,14 +185,24 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - ✅ #19 fix: StatsJsonPlugin disabled in CI (stats.toJson all:true removed + !CI guard) — CI verified: webpack no longer crashes
 - ✅ #20 fix: replaced deprecated `datetime.datetime.utcnow()` with `datetime.datetime.now(datetime.timezone.utc)` across 8 Python files — resolves all 52 CI test failures (both web 500s and CLI deprecation errors)
 
-### Known Issues
+### Known Issues (2026-05-14)
 - ESLint has 247 problems (113 errors, 134 warnings) — all pre-existing in other packages; our files have 0 errors
 - Browser files (arc-widget.tsx, etc.) show 0% coverage due to Theia runtime dependency — UI tests are static contract tests only
 - Coverage targets: 70% not reached for statements (61.84%), functions (53.78%), lines (63.18%). Only branches (67.34%) close
 - Monaco editor bundle is 15.9 MiB (expected, not reducible)
 - Total frontend entrypoint ~28.8 MiB (Monaco + Theia core + React + vendors); ARC Studio code chunk is 50 KiB
-- **#19 (webpack V8 crash on CI)**: Root cause confirmed — `stats.toJson({ all: true })` produced JSON exceeding V8's string-length cap (~512 MB). Fixed by removing `all: true` and skipping `StatsJsonPlugin` entirely when `process.env.CI` is set. Pending CI verification.
-- **#20 (Python 3.12 web test 500s)**: Resolved. Root cause: `datetime.datetime.utcnow()` raises `DeprecationWarning` in Python 3.12; with `-W error` this crashes any handler calling `envelope.ok()` or `envelope.err()`. Fixed by replacing all 8 `utcnow()` calls with `now(timezone.utc)` across the Python codebase.
+- **#19 (webpack V8 crash on CI)**: ✅ RESOLVED. Fixed by removing `all: true` from `stats.toJson()` and skipping `StatsJsonPlugin` when `process.env.CI` is set. CI verified: webpack no longer crashes.
+- **#20 (Python 3.12 web test 500s)**: ✅ RESOLVED. Fixed by replacing all 8 `utcnow()` calls with `now(timezone.utc)`. CI verified: 245 passed, 6 skipped, 0 failed, 2 errors (AG2 pre-existing).
+
+### Remaining Issues (2026-05-14)
+See `docs/handover/REMAINING_ISSUES_PLAN.md` for full details. Summary:
+
+- **R-1 (Node CI: arc-ag-ui test exits 1)**: Unquoted glob `./test/**/*.test.js` fails under POSIX sh. Fix: quote the glob. **Original diagnosis in handover was incorrect** — test/ directory exists with 4 real tests; the issue is shell glob expansion, not missing tests.
+- **R-2 (ARC Roadmap Gate: native-keymap gyp crash)**: Missing `apt-get install libx11-dev libxkbfile-dev` step. Fix: add native build deps step (mirrors node.yml).
+- **R-3 (Python CI: 2 AG2 adapter test errors)**: `conftest.py` autouse fixture calls `get_event_loop()` which emits `DeprecationWarning` on Python 3.12 for synchronous tests. Fix: delete the fixture (pytest-asyncio ≥0.23 owns loop lifecycle).
+- **R-4 (10 unmerged remote branches)**: `handoff/no-mockups-github-ready` safe to delete; `recovered/troubleshooting-docs` and `runtime/api-runs-start-field` may have salvageable work; 7 `roadmap/*` branches intentionally parked.
+- **R-5 (.env history scrub)**: Schedule `git filter-repo` ≥7 days before public release.
+- **e2e workflow**: Still in progress (expected, builds full Theia app).
 
 ## Related Documentation (Archived Handover)
 The following documents contain historical context and are preserved for reference in `docs/archive/`:
