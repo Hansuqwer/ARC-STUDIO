@@ -53,6 +53,7 @@ testpaths = ["tests"]
 addopts = "-v --tb=short"
 markers = [
     "benchmark: marks tests as benchmarks (off-gate, not required for CI)",
+    "needs(dep): mark test as requiring a specific CLI subcommand or fixture",
 ]
 # Temporarily disabled due to missing langchain_core module
 # filterwarnings = [
