@@ -1,6 +1,6 @@
 # ARC Studio
 
-ARC Studio is a local developer tool for inspecting, running, and debugging agent workflows built on SwarmGraph, LangGraph, CrewAI, OpenAI Agents SDK, and (partial) LlamaIndex. It ships as a Python CLI and daemon plus an Eclipse Theia IDE shell available as a browser app or an Electron desktop app.
+ARC Studio is a local developer tool for inspecting, running, and debugging agent workflows. It ships as a Python CLI and loopback daemon plus an Eclipse Theia shell. The canonical Theia extension is `packages/arc-extension`.
 
 ARC Studio runs entirely on your workstation. No telemetry is sent. No data leaves the loopback interface.
 
@@ -8,11 +8,15 @@ ARC Studio runs entirely on your workstation. No telemetry is sent. No data leav
 
 Pre-release (`v0.1.0-alpha`, tagged 2026-05-14). Pin against tags or commit SHAs; the public API surface may still change. See [CHANGELOG.md](./CHANGELOG.md) and [docs/SECURITY_AUDIT_REPORT.md](./docs/SECURITY_AUDIT_REPORT.md) for what changed recently and what is still outstanding.
 
-ARC Studio supports the following runtimes:
-- **SwarmGraph** - In-repo canonical runtime for AI provider routing and quota management (`runtimes/swarmgraph/`)
-- **LangGraph** - Stateful agent orchestration
-- **Trace Visualization** - Real-time execution monitoring
-- **Workflow Detection** - Automatic workflow discovery
+ARC Studio currently supports these standalone runtime surfaces:
+- **SwarmGraph** - In-repo runtime with queen/worker orchestration, consensus, HITL, audit, provider gateway, and CLI execution (`runtimes/swarmgraph/`). ARC calls it through a configured CLI launcher.
+- **LangGraph** - Detection, workflow inspection, explicit export/run via `ARC_LANGGRAPH_EXPORT`, and persisted node-update events when `.stream()` is available.
+- **CrewAI** - Detection and exported crew execution via `ARC_CREWAI_EXPORT`, gated as potentially paid provider calls.
+- **OpenAI Agents SDK** - Partial adapter. Detection and SDK-backed execution exist, but project entrypoint/export wiring is not complete.
+- **LlamaIndex** - Detection/static workflow export only. No run path.
+- **Trace Visualization** - Stored run/event inspection in the Theia shell.
+
+ARC does **not** yet compose CrewAI, LangGraph, OpenAI Agents, AG2, or LlamaIndex inside SwarmGraph. “Runtime + SwarmGraph” orchestration is planned work, not current product behavior.
 
 ## Prerequisites
 
@@ -46,8 +50,9 @@ arc-theia-studio/
 ├── packages/
 │   ├── arc-extension/       # Main Theia extension
 │   ├── arc-browser-app/     # Browser application
-│   ├── arc-electron-app/    # Electron application (TODO)
-│   └── arc-test-fixtures/   # Test utilities (TODO)
+│   ├── arc-ag-ui/           # AG-UI helpers/tests
+│   ├── arc-protocol-ts/     # TypeScript protocol types
+│   └── arc-test-fixtures/   # Test fixtures
 ├── runtimes/
 │   └── swarmgraph/          # Vendored SwarmGraph runtime sub-project
 ├── python/
@@ -152,13 +157,15 @@ arc runs          Inspect past runs and traces
 arc providers     Manage credential providers
 ```
 
-| Runtime | Current support | Missing |
+| Runtime | Current standalone support | Missing / limitation |
 | --- | --- | --- |
-| SwarmGraph | Source lives in `runtimes/swarmgraph/`; ARC Studio talks to it through the existing CLI/subprocess contract | Audit integrations |
-| LangGraph | Detection, AST workflow heuristics, dynamic export/run hook, fixture schema | Streaming/events; see `docs/RUNTIMES.md` |
-| CrewAI | Not implemented | Adapter |
-| OpenAI Agents SDK | Not implemented | Adapter |
-| AG2 | Not implemented | Adapter |
+| SwarmGraph | CLI/subprocess runner via `ARC_SWARMGRAPH_CLI`; detects SwarmGraph projects; exports heuristic workflow/schema data | ARC does not expose full vendored SwarmGraph audit/replay/HITL UX; SSE trace replay is available, active-run streaming is planned |
+| LangGraph | Detection, AST workflow heuristics, dynamic export/run hook via `ARC_LANGGRAPH_EXPORT`, `.invoke()` and `.stream()` support when available | No live token stream UI; persisted traces keep coalesced node updates only |
+| CrewAI | Detection and real exported crew execution via `ARC_CREWAI_EXPORT` with paid-call gating | Static workflow export only; no rich graph extraction or provider-side cancellation |
+| OpenAI Agents SDK | Detection and SDK-backed execution when `agents` is installed and OpenAI cost gates are configured | User project entrypoint/export target is not complete; current run path uses an internal test agent |
+| AG2 | Modular adapter/runner code exists under `python/src/agent_runtime_cockpit/adapters/ag2/` | Not registered in the default adapter registry; not visible to `arc runtimes` yet |
+| LlamaIndex | Detection and static workflow export only | No run path |
+| LM Arena | Stub/offline battle/direct/code/agent-preview responses | No live model calls |
 
 Run `uv run arc <command> --help` for the flags on any subcommand.
 
@@ -180,7 +187,15 @@ bash scripts/generate-runtime-table.sh
 | llamaindex    | no       | no      | no   | not detected                                       |
 <!-- RUNTIMES:END -->
 
-"Detected" means the adapter is importable. "Can run" means the adapter plus its required configuration are both present. "Paid" means a successful run will make billable API calls; such runs are gated behind the `allow_paid_calls` flag and are opt-in.
+"Detected" means the adapter found runtime evidence or an importable dependency. "Can run" means the adapter plus its required configuration are both present. "Paid" means a successful run may make billable API calls; such runs are gated behind explicit cost flags and are opt-in.
+
+CrewAI, LangGraph, OpenAI Agents, AG2, LlamaIndex, and LM Arena are ARC adapter surfaces, not SwarmGraph backends. ARC can run supported standalone adapters beside SwarmGraph from the same cockpit, but it does not currently compose them inside a SwarmGraph queen/worker/consensus/HITL/audit graph unless user code implements that composition.
+
+## SwarmGraph Adoption Layer Status
+
+The intended product direction is runtime-agnostic execution with optional SwarmGraph adoption mode. In that future mode, external runtimes such as CrewAI, LangGraph, OpenAI Agents SDK, AG2, and LlamaIndex would be wrapped by SwarmGraph queen/worker decomposition, votes, consensus, HITL approval, deterministic orchestration, and signed audit records.
+
+That adoption layer is **not implemented yet**. Current code has standalone adapters plus a sequential combo adapter; it is not SwarmGraph composition.
 
 ## Security
 
@@ -194,14 +209,15 @@ To report a security issue, please open a private security advisory on GitHub ra
 
 ```text
 applications/             Theia app shells (browser, electron)
-theia-extensions/         Theia extensions (arc-core is the live one)
+packages/arc-extension/   Canonical ARC Theia extension
+theia-extensions/         Secondary/experimental Theia extensions; not the canonical shell path
 python/                   Python CLI, daemon, and adapters
   src/agent_runtime_cockpit/
 docs/                     Documentation; see docs/history/ for older working notes
 scripts/                  Build, lint, and dev-loop helpers
 ```
 
-The `packages/arc-extension/` tree present in older drafts of the repository is not used; the live extension is `theia-extensions/arc-core`.
+Historical docs may still refer to `theia-extensions/arc-core` as the live extension. Treat `packages/arc-extension` as canonical unless that architecture is explicitly changed.
 
 ## Troubleshooting
 
