@@ -1,7 +1,4 @@
 """Parity tests for SwarmGraph event mapping — Python matches TypeScript output."""
-import json
-import time
-
 from agent_runtime_cockpit.ag_ui import AGUIEventType, MappingContext, map_event
 from agent_runtime_cockpit.adapters.swarmgraph import mapping  # noqa: F401 — registers mapper
 
