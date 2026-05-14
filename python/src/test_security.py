@@ -16,7 +16,6 @@ from security_utils import (
 )
 from pathlib import Path
 import tempfile
-import os
 
 
 class TestPromptSanitization:

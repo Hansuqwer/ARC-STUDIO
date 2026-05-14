@@ -1,8 +1,5 @@
 """Tests for the 'arc eval' CLI commands."""
-import json
-from pathlib import Path
 
-import pytest
 
 from agent_runtime_cockpit.evals.golden import GoldenTrace, save_golden, list_goldens
 

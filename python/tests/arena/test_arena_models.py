@@ -5,7 +5,6 @@ from agent_runtime_cockpit.arena.models import (
     ArenaResponse,
     ArenaCandidate,
     ArenaVote,
-    ArenaAdoptRequest,
     ArenaAdoptResult,
     PrivacyLevel,
 )

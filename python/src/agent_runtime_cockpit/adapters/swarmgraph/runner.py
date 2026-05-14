@@ -1,7 +1,6 @@
 """Real SwarmGraph execution path with dual-gating, audit chain and AG-UI emission."""
 from __future__ import annotations
 
-import asyncio
 import datetime as dt
 import os
 import pathlib

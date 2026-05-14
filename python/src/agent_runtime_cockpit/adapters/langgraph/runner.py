@@ -1,14 +1,13 @@
 """Real LangGraph runner. Streams astream_events(version='v2')."""
 from __future__ import annotations
 
-import asyncio
 import pathlib
 import uuid
 from typing import Any, AsyncIterator
 
 from agent_runtime_cockpit.ag_ui import map_event, MappingContext
 from agent_runtime_cockpit.audit.chain import AuditChainWriter
-from agent_runtime_cockpit.gating import require_dual_gate, BackendMode
+from agent_runtime_cockpit.gating import require_dual_gate
 from agent_runtime_cockpit.tracing.jsonl_writer import JsonlTraceWriter
 
 from .loader import load_graph

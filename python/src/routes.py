@@ -9,7 +9,6 @@ from pydantic import BaseModel
 from typing import Optional, List
 import subprocess
 import json
-from pathlib import Path
 import os
 from security_utils import (
     sanitize_prompt,

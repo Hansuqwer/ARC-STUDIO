@@ -25,7 +25,7 @@ from ..protocol.schemas import WorkspaceInfo
 from ..security.validation import validate_workspace_path
 from ..security.redaction import Redactor
 from ..storage.jsonl import JsonlTraceStore
-from ..arena.models import ArenaAdoptRequest, ArenaMode, ArenaRequest, ArenaVote, PrivacyLevel
+from ..arena.models import ArenaAdoptRequest, ArenaMode, ArenaRequest, ArenaVote
 from ..arena.service import (
     adopt_candidate,
     arena_request,

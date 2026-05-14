@@ -15,12 +15,11 @@ from __future__ import annotations
 
 import importlib.util
 import logging
-import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from agent_runtime_cockpit.gating import require_dual_gate, BackendMode, GatingError
+from agent_runtime_cockpit.gating import require_dual_gate, GatingError
 from typing import Any
 
 from ..protocol.capabilities import RuntimeCapabilities

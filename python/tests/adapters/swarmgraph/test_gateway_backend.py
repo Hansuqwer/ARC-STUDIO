@@ -1,5 +1,4 @@
 """Tests for SwarmGraph gateway backend - focused on configuration and error handling."""
-import os
 import pytest
 
 from agent_runtime_cockpit.adapters.swarmgraph.gateway_client import GatewayClient

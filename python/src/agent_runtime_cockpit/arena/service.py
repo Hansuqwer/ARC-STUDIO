@@ -1,7 +1,6 @@
 """Core Arena service — handles battle, direct, code, and agent-arena-preview modes."""
 from __future__ import annotations
 
-import json
 import logging
 import os
 import random
@@ -10,11 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..gating import GatingError, require_dual_gate
-from ..protocol.envelope import ArcEnvelope, ok, err
-from ..protocol.errors import ArcErrorCode
 from ..protocol.schemas import RunEvent, RunRecord, RunStatus
-from ..security.profiles import enforce_profile, resolve_profile
 from ..storage.jsonl import JsonlTraceStore
 from .models import (
     ArenaAdoptRequest,
@@ -24,8 +19,6 @@ from .models import (
     ArenaModelInfo,
     ArenaRequest,
     ArenaResponse,
-    ArenaVote,
-    PrivacyLevel,
 )
 
 log = logging.getLogger(__name__)

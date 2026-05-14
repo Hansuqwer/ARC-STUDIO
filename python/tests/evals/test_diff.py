@@ -1,7 +1,6 @@
 """Tests for run diff."""
-from pathlib import Path
 from datetime import datetime, timezone
-from agent_runtime_cockpit.evals.diff import diff_runs, RunDiff
+from agent_runtime_cockpit.evals.diff import diff_runs
 from agent_runtime_cockpit.protocol.schemas import RunRecord, RunEvent, RunStatus
 
 

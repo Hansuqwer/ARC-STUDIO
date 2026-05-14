@@ -11,7 +11,6 @@ from agent_runtime_cockpit.arena.models import (
     ArenaMode,
     ArenaRequest,
     ArenaAdoptRequest,
-    PrivacyLevel,
 )
 from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
 

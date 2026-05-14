@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import time
-import uuid
 from typing import Any
 
 from agent_runtime_cockpit.ag_ui import AGUIEventType, MappingContext, register_mapper

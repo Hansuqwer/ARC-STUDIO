@@ -7,7 +7,6 @@ for the ARC Studio Python backend.
 
 import re
 from pathlib import Path
-from typing import Optional
 
 
 class SecurityError(Exception):

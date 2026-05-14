@@ -1,7 +1,6 @@
 """AG2 adapter. Uses a_run_group_chat → async event iterator."""
 from __future__ import annotations
 
-import asyncio
 import pathlib
 import uuid
 from typing import Any

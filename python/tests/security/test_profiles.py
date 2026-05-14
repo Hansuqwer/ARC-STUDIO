@@ -3,7 +3,6 @@ from agent_runtime_cockpit.security.profiles import (
     BUILTIN_PROFILES,
     resolve_profile,
     enforce_profile,
-    RunProfile,
 )
 from agent_runtime_cockpit.gating import GatingError
 

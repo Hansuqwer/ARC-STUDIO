@@ -1,7 +1,7 @@
 """Run profiles and tool firewall — permission model for ARC runs."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ..gating import BackendMode, GatingError, require_dual_gate
 

@@ -26,7 +26,6 @@ async def test_health_allows_without_token(client):
 
 async def test_request_without_token_rejected(app):
     """When token is set, requests without auth header get 401."""
-    import aiohttp.web as web
     from aiohttp.test_utils import TestClient, TestServer
 
     os.environ["ARC_DAEMON_TOKEN"] = "test-token-123"
@@ -43,7 +42,6 @@ async def test_request_without_token_rejected(app):
 
 async def test_request_with_wrong_token_rejected(app):
     """Wrong bearer token returns 401."""
-    import aiohttp.web as web
     from aiohttp.test_utils import TestClient, TestServer
 
     os.environ["ARC_DAEMON_TOKEN"] = "correct-token"
@@ -60,7 +58,6 @@ async def test_request_with_wrong_token_rejected(app):
 
 async def test_request_with_correct_token_succeeds(app):
     """Correct bearer token succeeds."""
-    import aiohttp.web as web
     from aiohttp.test_utils import TestClient, TestServer
 
     os.environ["ARC_DAEMON_TOKEN"] = "correct-token"
@@ -75,7 +72,6 @@ async def test_request_with_correct_token_succeeds(app):
 
 async def test_health_succeeds_even_with_token(app):
     """/health is exempt from auth when token is set."""
-    import aiohttp.web as web
     from aiohttp.test_utils import TestClient, TestServer
 
     os.environ["ARC_DAEMON_TOKEN"] = "test-token-123"

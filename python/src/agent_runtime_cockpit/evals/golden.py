@@ -55,7 +55,7 @@ def eval_run(run: RunRecord, golden: GoldenTrace) -> EvalResult:
     if not event_type_match:
         parts.append(f"missing event types: {expected_set - actual_types}")
     if not output_contains_match:
-        parts.append(f"output missing expected text")
+        parts.append("output missing expected text")
 
     return EvalResult(
         run_id=run.id,

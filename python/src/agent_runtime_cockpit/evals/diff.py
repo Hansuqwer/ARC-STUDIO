@@ -1,12 +1,12 @@
 """Run diff — compare two RunRecord objects."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..protocol.schemas import RunRecord, RunStatus
+from ..protocol.schemas import RunRecord
 
 
 class RunDiff(BaseModel):

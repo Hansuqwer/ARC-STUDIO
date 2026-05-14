@@ -10,7 +10,6 @@ import importlib
 import io
 import os
 import shlex
-import sys
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from typing import Any, Iterable

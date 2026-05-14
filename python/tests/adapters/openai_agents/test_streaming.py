@@ -1,5 +1,5 @@
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, AsyncIterator, List
 
 from agent_runtime_cockpit.adapters.openai_agents.streaming import stream_to_ag_ui
