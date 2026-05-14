@@ -17,7 +17,7 @@ import dataclasses
 import logging
 from pathlib import Path
 
-from .base import RuntimeAdapter
+from .base import RuntimeAdapter, DoctorAction
 from ..protocol.schemas import WorkflowInfo, SchemaInfo
 
 log = logging.getLogger(__name__)
@@ -136,5 +136,33 @@ def run_conformance(adapter: RuntimeAdapter, workspace: Path) -> ConformanceResu
             result.record("run_not_implemented_when_unsupported", True)  # other errors are OK
     else:
         result.record("run_capability_skipped", True, skipped=True)
+
+    # ── Test 7: capability_report returns doctor_actions list
+    try:
+        report = adapter.capability_report(workspace)
+        ok = isinstance(report.doctor_actions, list)
+        if ok and report.doctor_actions:
+            all_valid = all(
+                isinstance(a, DoctorAction) and bool(a.id) and bool(a.label)
+                for a in report.doctor_actions
+            )
+            result.record("doctor_actions_valid", all_valid,
+                          "" if all_valid else "Some doctor_actions missing id or label")
+        else:
+            result.record("doctor_actions_list", ok,
+                          "" if ok else "doctor_actions is not a list")
+    except Exception as e:
+        result.record("doctor_actions_valid", False, str(e))
+
+    # ── Test 8: RuntimeCapabilities includes v2 fields
+    try:
+        v2_fields = ["can_checkpoint", "can_resume", "can_fork", "can_diff", "can_eval",
+                     "requires_network", "requires_shell", "requires_secrets"]
+        v2 = RuntimeCapabilities() if not hasattr(adapter, 'capabilities') else adapter.capabilities()
+        missing = [f for f in v2_fields if not hasattr(v2, f) and f not in v2.model_fields]
+        result.record("capabilities_v2_fields", len(missing) == 0,
+                      f"Missing v2 capability fields: {missing}" if missing else "")
+    except Exception as e:
+        result.record("capabilities_v2_fields", False, str(e))
 
     return result

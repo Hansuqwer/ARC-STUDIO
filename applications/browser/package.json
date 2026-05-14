@@ -13,8 +13,8 @@
     "start:debug": "theia start --port 3000 --hostname 127.0.0.1 --loglevel=debug",
     "watch": "theia build --watch --mode development",
     "clean": "rimraf lib src-gen",
-    "check": "echo 'browser check ok'",
-    "test": "echo 'browser unit tests ok'"
+    "check": "tsc --noEmit -p .",
+    "test": "echo 'no unit tests for app shell' && exit 0"
   },
   "dependencies": {
     "@theia/core": "1.71.0",
@@ -32,17 +32,18 @@
     "@theia/search-in-workspace": "1.71.0",
     "@theia/getting-started": "1.71.0",
     "@theia/keymaps": "1.71.0",
-    "arc-product": "workspace:*",
     "arc-core": "workspace:*",
     "arc-workflows": "workspace:*",
-    "arc-schemas": "workspace:*",
     "arc-runs": "workspace:*",
-    "arc-audit": "workspace:*",
+    "arc-schemas": "workspace:*",
     "arc-context": "workspace:*",
     "arc-adapters": "workspace:*",
-    "arc-settings": "workspace:*",
+    "arc-arena": "workspace:*",
+    "arc-audit": "workspace:*",
     "arc-health": "workspace:*",
-    "arc-event-stream": "workspace:*"
+    "arc-event-stream": "workspace:*",
+    "arc-product": "workspace:*",
+    "arc-settings": "workspace:*"
   },
   "devDependencies": {
     "@theia/cli": "1.71.0",

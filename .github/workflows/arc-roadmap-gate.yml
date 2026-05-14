@@ -14,23 +14,36 @@ jobs:
       - uses: astral-sh/setup-uv@v3
 
       - name: Install
-        run: |
-          npm ci || npm install
-          (cd packages/arc-ag-ui && npm install && npm run build)
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint --if-present
+        run: pnpm run lint --if-present
+
+      - name: TypeScript type-check
+        run: pnpm typecheck
 
       - name: AG-UI unit tests
-        run: (cd packages/arc-ag-ui && npm test)
+        run: (cd packages/arc-ag-ui && pnpm test)
 
       - name: Protocol fixture tests
         run: |
-          node tests/unit/arc-protocol.test.js || true
-          node packages/arc-test-fixtures/src/index.js || true
+          node tests/unit/arc-protocol.test.js
+          node packages/arc-test-fixtures/src/index.js
 
-      - name: Python tests
-        run: uv run pytest -q || true
+      - name: Python lint
+        run: uv run ruff check
+
+      - name: Python type-check
+        run: uv run mypy src tests
+
+      - name: Python tests with coverage
+        run: |
+          uv run pytest --cov=agent_runtime_cockpit \
+                        --cov-report=xml \
+                        --cov-fail-under=60
+
+      - name: PR hygiene
+        run: pnpm check:pr
 
       - name: No-live-provider regression
         env:

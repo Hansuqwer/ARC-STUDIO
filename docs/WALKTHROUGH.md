@@ -232,7 +232,8 @@ If no workflows are detected:
 **To install SwarmGraph:**
 
 ```bash
-# Visit https://github.com/Hansuqwer/SwarmGraph for installation instructions
+# SwarmGraph source now lives in this repo under runtimes/swarmgraph/.
+# The archived Hansuqwer/SwarmGraph repository remains available for old SHA references.
 which swarmgraph  # Verify installation
 ```
 

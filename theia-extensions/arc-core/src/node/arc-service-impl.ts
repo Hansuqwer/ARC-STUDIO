@@ -29,6 +29,8 @@ import {
   ProviderRoutingPolicy,
   RuntimeCapabilitiesResponse,
   StartRunRequest,
+  GoldenTrace,
+  EvalResult,
   ARC_PROTOCOL_VERSION,
 } from '../common/arc-protocol';
 
@@ -37,6 +39,89 @@ const ARC_DAEMON_HOST = '127.0.0.1';
 const ARC_CLI_TIMEOUT_MS = 30000;
 const ARC_CLI_ENV_ALLOWLIST = ['PATH', 'HOME', 'LANG', 'LC_ALL', 'SHELL', 'TMPDIR', 'VIRTUAL_ENV'];
 const ARC_CLI_DIAGNOSTIC_TAIL_BYTES = 2048;
+const RUN_ID_RE = /^run-(sg|lg|ca|oa|ag2)-[a-f0-9]{6,64}$/;
+
+export function validateRunId(runId: unknown): string {
+  if (typeof runId !== 'string' || !RUN_ID_RE.test(runId)) {
+    throw new Error('invalid run id');
+  }
+  return runId;
+}
+
+export function validateOtlpEndpoint(endpoint: unknown): string {
+  if (typeof endpoint !== 'string' || endpoint.length === 0 || endpoint.length > 2048) {
+    throw new Error('invalid otlp endpoint');
+  }
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    throw new Error('invalid otlp endpoint');
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('otlp endpoint must be http(s)');
+  }
+  if (url.username || url.password) {
+    throw new Error('otlp endpoint must not embed credentials');
+  }
+  const host = url.hostname.toLowerCase();
+  const isPrivate = host === 'localhost'
+    || host === '::1'
+    || host.startsWith('127.')
+    || host.startsWith('10.')
+    || host.startsWith('192.168.')
+    || /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+    || host.endsWith('.local')
+    || host === '0.0.0.0';
+  if (isPrivate && process.env.ARC_OTLP_ALLOW_PRIVATE !== 'true') {
+    throw new Error('private/loopback otlp endpoint requires ARC_OTLP_ALLOW_PRIVATE=true');
+  }
+  return url.toString();
+}
+
+export function buildStartRunArgs(request: StartRunRequest): string[] {
+  const runtime = Array.isArray(request.runtime) ? request.runtime.join(',') : request.runtime ?? 'auto';
+  const args = ['run', request.workflow_id, '--runtime', runtime];
+  if (request.profile_id) {
+    args.push('--profile-id', request.profile_id);
+  }
+  if (request.allow_paid_calls === true) {
+    args.push('--allow-paid-calls');
+  }
+  return args;
+}
+
+export function resolveWorkspaceRoot(raw: string | undefined): string {
+  if (!raw || typeof raw !== 'string') {
+    throw new Error('workspace path is not set');
+  }
+  const stripped = raw.startsWith('file://') ? new URL(raw).pathname : raw;
+  const abs = path.resolve(stripped);
+  if (!path.isAbsolute(abs)) {
+    throw new Error('workspace path must be absolute');
+  }
+  if (abs.includes('\0')) {
+    throw new Error('workspace path contains null byte');
+  }
+  try {
+    if (!fs.statSync(abs).isDirectory()) {
+      throw new Error('workspace path is not a directory');
+    }
+  } catch {
+    throw new Error('workspace path is not accessible');
+  }
+  return abs;
+}
+
+export function safeJoinInsideWorkspace(workspaceRoot: string, ...segments: string[]): string {
+  const root = resolveWorkspaceRoot(workspaceRoot);
+  const joined = path.resolve(root, ...segments);
+  const rel = path.relative(root, joined);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new Error('path escapes workspace');
+  }
+  return joined;
+}
 
 interface RedactedDiagnostics {
   readonly resolvedBinary: string;
@@ -67,6 +152,10 @@ export class ArcServiceImpl implements ArcService {
   @inject(ILogger)
   protected readonly logger: ILogger;
 
+  /** Tracks active CLI subprocesses for cancellation support. */
+  private static readonly runningProcs: Map<string, cp.ChildProcess> = new Map();
+  private static procCounter = 0;
+
   /** Check if the ARC daemon is running */
   private async isDaemonRunning(): Promise<boolean> {
     return new Promise(resolve => {
@@ -80,13 +169,19 @@ export class ArcServiceImpl implements ArcService {
     });
   }
 
+  /** Return an Authorization header if ARC_DAEMON_TOKEN is set */
+  private daemonAuthHeaders(): Record<string, string> {
+    const token = process.env.ARC_DAEMON_TOKEN;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
   /** Call the daemon HTTP API */
   private async callDaemon<T>(endpoint: string, params?: Record<string, string>): Promise<ArcEnvelope<T>> {
     const queryStr = params ? '?' + new URLSearchParams(params).toString() : '';
     const url = `http://${ARC_DAEMON_HOST}:${ARC_DAEMON_PORT}${endpoint}${queryStr}`;
 
     return new Promise((resolve, reject) => {
-      const req = http.get(url, { timeout: ARC_CLI_TIMEOUT_MS }, res => {
+      const req = http.get(url, { timeout: ARC_CLI_TIMEOUT_MS, headers: { ...this.daemonAuthHeaders() } }, res => {
         let data = '';
         res.on('data', chunk => data += chunk);
         res.on('end', () => {
@@ -113,6 +208,7 @@ export class ArcServiceImpl implements ArcService {
       headers: {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(payload),
+        ...this.daemonAuthHeaders(),
       },
     };
 
@@ -136,14 +232,15 @@ export class ArcServiceImpl implements ArcService {
   }
 
   /** Spawn ARC CLI and parse JSON output */
-  private async runCli<T>(args: string[]): Promise<ArcEnvelope<T>> {
+  private async runCli<T>(args: string[], envOverrides: NodeJS.ProcessEnv = {}): Promise<ArcEnvelope<T>> {
+    const procKey = `cli-${++ArcServiceImpl.procCounter}`;
     return new Promise((resolve, reject) => {
       const fullArgs = [...args, '--json'];
       const pythonDir = this.pythonProjectDir();
       const arcBin = path.join(pythonDir, '.venv', 'bin', 'arc');
       const command = fs.existsSync(arcBin) ? arcBin : 'uv';
       const commandArgs = fs.existsSync(arcBin) ? fullArgs : ['run', 'arc', ...fullArgs];
-      const env = this.cliEnv({ ARC_JSON_OUTPUT: '1' });
+      const env = this.cliEnv({ ARC_JSON_OUTPUT: '1', ...envOverrides });
       this.logger.debug(`ARC CLI: ${command} ${commandArgs.join(' ')}`);
 
       const proc = cp.spawn(command, commandArgs, {
@@ -152,12 +249,15 @@ export class ArcServiceImpl implements ArcService {
         env,
       });
 
+      ArcServiceImpl.runningProcs.set(procKey, proc);
+
       let stdout = '';
       let stderr = '';
       proc.stdout?.on('data', d => stdout += d);
       proc.stderr?.on('data', d => stderr += d);
 
       proc.on('close', code => {
+        ArcServiceImpl.runningProcs.delete(procKey);
         if (code !== 0 && !stdout.trim()) {
           reject(new ArcCliError(
             `ARC CLI failed (exit ${code})`,
@@ -182,6 +282,7 @@ export class ArcServiceImpl implements ArcService {
       });
 
       proc.on('error', err => {
+        ArcServiceImpl.runningProcs.delete(procKey);
         reject(new ArcCliError(
           `ARC CLI spawn failed: ${err.message}`,
           stderr,
@@ -258,14 +359,14 @@ export class ArcServiceImpl implements ArcService {
 
   private workspacePath(workspacePath: string): string {
     if (workspacePath) {
-      return workspacePath;
+      return resolveWorkspaceRoot(workspacePath);
     }
     if (process.env.ARC_WORKSPACE_PATH) {
-      return process.env.ARC_WORKSPACE_PATH;
+      return resolveWorkspaceRoot(process.env.ARC_WORKSPACE_PATH);
     }
     const rootDirIndex = process.argv.indexOf('--root-dir');
     if (rootDirIndex >= 0 && process.argv[rootDirIndex + 1]) {
-      return process.argv[rootDirIndex + 1];
+      return resolveWorkspaceRoot(process.argv[rootDirIndex + 1]);
     }
     return workspacePath;
   }
@@ -394,9 +495,10 @@ export class ArcServiceImpl implements ArcService {
       if (process.env.ARC_SWARMGRAPH_RUN_BACKEND !== 'stub' && await this.isDaemonRunning()) {
         return this.postDaemon('/api/runs/start', request as unknown as Record<string, unknown>);
       }
-      const args = ['run', request.workflow_id];
-      // Keep CLI fallback equivalent to daemon POST defaulting semantics.
-      args.push('--runtime', request.runtime ?? 'auto');
+      const args = buildStartRunArgs(request);
+      const extraEnv = request.allow_paid_calls === true
+        ? { ARC_SWARMGRAPH_ALLOW_COSTS: 'true' }
+        : {};
       const requestedWorkspace = process.env.ARC_SWARMGRAPH_RUN_BACKEND === 'stub' && process.env.ARC_WORKSPACE_PATH
         ? process.env.ARC_WORKSPACE_PATH
         : typeof request.inputs?.workspacePath === 'string' ? request.inputs.workspacePath : '';
@@ -404,7 +506,7 @@ export class ArcServiceImpl implements ArcService {
       if (workspace) args.push('--workspace', workspace);
       const prompt = typeof request.inputs?.prompt === 'string' ? request.inputs.prompt.trim() : '';
       if (prompt) args.push('--prompt', prompt);
-      return this.runCli(args);
+      return this.runCli(args, extraEnv);
     } catch (e) {
       return this.errorEnvelope('run', e);
     }
@@ -589,12 +691,50 @@ export class ArcServiceImpl implements ArcService {
 
   async exportTraceToOTLP(runId: string, endpoint: string): Promise<ArcEnvelope<{ exported: boolean; warning?: string }>> {
     try {
+      const safeRunId = validateRunId(runId);
+      const safeEndpoint = validateOtlpEndpoint(endpoint);
       if (await this.isDaemonRunning()) {
-        return this.postDaemon(`/api/telemetry/export/${runId}`, { endpoint });
+        return this.postDaemon(`/api/telemetry/export/${safeRunId}`, { endpoint: safeEndpoint });
       }
       return this.errorEnvelope('export-trace', new Error('Daemon not running'));
     } catch (e) {
       return this.errorEnvelope('export-trace', e);
     }
+  }
+
+  async evalRun(runId: string, golden: GoldenTrace): Promise<ArcEnvelope<EvalResult>> {
+    try {
+      if (await this.isDaemonRunning()) {
+        return this.postDaemon('/api/evals/run', { run_id: runId, golden });
+      }
+      return this.errorEnvelope('eval-run', new Error('Daemon not running'));
+    } catch (e) {
+      return this.errorEnvelope('eval-run', e);
+    }
+  }
+
+  async cancelRun(_runId: string): Promise<ArcEnvelope<{ cancelled: boolean }>> {
+    // The CLI subprocess tracking uses internal counters since the runId
+    // is only known after the CLI exits. For cancellation we kill all
+    // tracked running processes — coarse but sufficient for alpha.
+    let cancelled = false;
+    for (const [key, proc] of ArcServiceImpl.runningProcs.entries()) {
+      if (proc.pid !== undefined && !proc.killed) {
+        try {
+          proc.kill('SIGTERM');
+          cancelled = true;
+        } catch {
+          // process already exited
+        }
+      }
+      ArcServiceImpl.runningProcs.delete(key);
+    }
+    return {
+      version: ARC_PROTOCOL_VERSION,
+      ok: true,
+      data: { cancelled },
+      error: null,
+      meta: { duration_ms: 1, timestamp: new Date().toISOString() },
+    };
   }
 }

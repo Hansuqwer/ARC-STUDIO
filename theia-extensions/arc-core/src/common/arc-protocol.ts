@@ -55,6 +55,25 @@ export interface RuntimeCapabilities {
   can_replay: boolean;
   can_export_schema: boolean;
   can_export_workflow: boolean;
+  can_stream_events: boolean;
+  can_audit: boolean;
+  can_checkpoint: boolean;
+  can_resume: boolean;
+  can_fork: boolean;
+  can_diff: boolean;
+  can_eval: boolean;
+  requires_paid_calls: boolean;
+  requires_network: boolean;
+  requires_shell: boolean;
+  requires_secrets: boolean;
+}
+
+export interface DoctorAction {
+  id: string;
+  label: string;
+  description: string;
+  command: string;
+  safe_to_auto_run: boolean;
 }
 
 export interface RuntimeCapabilityReport {
@@ -67,6 +86,7 @@ export interface RuntimeCapabilityReport {
   required_env: string[];
   version?: string | null;
   requires_paid_calls: boolean;
+  doctor_actions: DoctorAction[];
 }
 
 export interface RuntimeCapabilitiesResponse {
@@ -125,12 +145,21 @@ export interface RunRecord {
   metadata: Record<string, unknown>;
 }
 
-export type RuntimeId = 'auto' | 'swarmgraph' | 'langgraph' | 'crewai';
+export type RuntimeId = 'auto' | 'swarmgraph' | 'langgraph' | 'crewai' | 'openai-agents' | 'lmarena';
+export type RuntimeSelection = RuntimeId | RuntimeId[];
 
 export interface StartRunRequest {
   workflow_id: string;
-  runtime?: RuntimeId;
+  runtime?: RuntimeSelection;
+  profile_id?: string;
   inputs?: Record<string, unknown>;
+  /**
+   * Whether the run is permitted to make paid API calls.
+   * Opt-in by design: callers MUST set this to `true` explicitly.
+   * When omitted, falsy, or non-boolean, paid calls are disallowed
+   * and the CLI is invoked without `--allow-paid-calls`.
+   * @default false
+   */
   allow_paid_calls?: boolean;
 }
 
@@ -220,4 +249,28 @@ export interface ArcService {
   getProviderRouting(): Promise<ArcEnvelope<ProviderRoutingPolicy>>;
   getWorkspaceStatus(workspacePath: string): Promise<ArcEnvelope<{ frontendPath: string; backendPath: string; source: string }>>;
   exportTraceToOTLP(runId: string, endpoint: string): Promise<ArcEnvelope<{ exported: boolean; warning?: string }>>;
+    /** Cancel a running CLI-backed workflow. Returns true if a process was killed. */
+  cancelRun(runId: string): Promise<ArcEnvelope<{ cancelled: boolean }>>;
+  /** Evaluate a run against a golden trace */
+  evalRun(runId: string, golden: GoldenTrace): Promise<ArcEnvelope<EvalResult>>;
+}
+
+export interface GoldenTrace {
+  id: string;
+  workflow_id: string;
+  expected_status: string;
+  expected_event_types: string[];
+  expected_final_output_contains: string;
+  description: string;
+}
+
+export interface EvalResult {
+  run_id: string;
+  golden_id: string;
+  passed: boolean;
+  status_match: boolean;
+  event_type_match: boolean;
+  output_contains_match: boolean;
+  score: number;
+  details: string;
 }

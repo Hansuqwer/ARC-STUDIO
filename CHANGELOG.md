@@ -1,106 +1,51 @@
 # Changelog
 
-All notable changes to ARC Studio.
+All notable changes to ARC Studio are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follow [SemVer](https://semver.org/spec/v2.0.0.html); pre-release identifiers (`-alpha`, `-alphaN`) precede a stable `1.0.0`.
 
-## [v0.6.0-alpha] - 2026-05-13
+There are no git tags yet. The "Unreleased" section below describes what is currently on `main`. The first tag will be cut once the items under "Required before tagging" are resolved.
 
-### Added
-- ARC Studio Theia extension with workflow execution, trace viewing, workspace scanning
-- Production build optimization (93% size reduction: 521 MB → 38 MB)
-- Security hardening: input validation, command injection prevention, env allow-list
-- 159 automated tests (63.86% coverage)
-- Global keyboard shortcuts (Cmd+E/L/Shift+S/H)
-- Comprehensive documentation (API, Architecture, Security, Deployment)
-
-### Fixed
-- Monaco ESM webpack build (added direct dependency)
-- Security-utils wired into backend service (was dead code)
-- Python env allow-list typo (_ALLOW_ENV → _ALLOWED_ENV)
-- Keyboard shortcuts now global (not widget-scoped)
-- Toast timeout memory leak (dispose cleanup)
-
-### Security
-- Command injection: list-form argv + shell:false (primary) + metacharacter rejection (defence-in-depth)
-- Path traversal: workspace isolation on all file operations
-- Environment: allow-listed vars only (12 vars, no unbounded inheritance)
-- Error sanitization: no file paths or stack traces leaked
-
-### Known Limitations
-- @theia/file-search unavailable (ripgrep/Node.js v25 incompatibility)
-- Test coverage: 63.86% (target 70%, widget tests need jsdom harness)
-- No automated E2E tests (manual testing completed)
-
-## [0.1.0] — 2026-05-13
+## [Unreleased]
 
 ### Added
 
-- **Phase 1**: Project bootstrap with pnpm workspace and Eclipse Theia scaffold
-- **Phase 2**: Technology research and selection (SwarmGraph, LangGraph, Theia)
-- **Phase 3**: Architecture decisions finalized, JSONL trace format, security model
-- **Phase 4**: Security hardening — command injection prevention, path traversal protection, input sanitization
-- **Phase 4**: Robust JSONL trace parser with line-by-line streaming support
-- **Phase 4**: Performance instrumentation with timing logs
-- **Phase 4**: Comprehensive workflow detection (SwarmGraph CLI + LangGraph AST scanning)
-- **Phase 5**: Run Timeline Theia extension with prompt input, trace replay, and status feedback
-- **Phase 5**: Schema Inspector extension for runtime schema export
-- **Phase 5**: Daemon server with SSE streaming for real-time trace updates
-- **Phase 5**: AG-UI-compatible event format and bridge
-- **Phase 5**: Context pack generation with 5 providers (Context7, GitHub, local repo, web search, Vercel grep)
-- **Phase 5**: Adapter registry with conformance testing (SwarmGraph 8/8, LangGraph 9/9)
-- **Phase 5**: JSONL trace store with save/load/list/prune operations
-- **Phase 5**: Python CLI (`arc`) with inspect, adapter, runs, context commands
-- **Phase 5**: Run management commands: `arc runs`, `arc runs get`, `arc runs trace`, `arc runs prune`
-- **Phase 5**: Daemon integration tests for `/api/runs` and SSE replay
-- **Phase 5**: E2E Playwright smoke tests
-- **Phase 5**: Unsigned Electron packaging smoke test
-- **Phase 6**: Comprehensive API documentation (all 7 ArcService methods, both REST servers)
-- **Phase 6**: Documentation review — README, ARCHITECTURE, DEVELOPMENT, SECURITY updated
-- **Phase 6**: CHANGELOG.md created
+- Input validators in `theia-extensions/arc-core/src/node/arc-service-impl.ts`: `validateRunId`, `validateOtlpEndpoint`, `resolveWorkspaceRoot`, `safeJoinInsideWorkspace`.
+- `theia-extensions/arc-core/test/start-run-paid-calls.test.js` covering paid-call gating and traversal validators.
+- Root `tsconfig.check.json` + `pnpm typecheck` script.
+- `.env.example` template; `.tool-versions` pinning Node 20.18.0, pnpm 9.12.0, Python 3.11.10.
+- `docs/SECURITY_AUDIT_REPORT.md` describing the live tree.
+- `scripts/apply-phase3.sh` for one-shot cleanup tasks.
+- `python/tests/web/` — daemon auth tests (`test_daemon_auth.py`), protocol contract tests (`test_protocol_contract.py`), health endpoint test (`test_health.py`), SSE replay tests (`test_runs_sse.py`).
+- `ARC_DAEMON_TOKEN` bearer-token middleware in `python/src/agent_runtime_cockpit/web/server.py` (optional, U-2).
+- `GET /api/runs?runtime=` filter parameter on the daemon runs endpoint.
+- `ArcService.cancelRun(runId)` protocol method + implementation in `ArcServiceImpl` (coarse kill-all-running-procs for alpha).
+- `arc-frontend-service.ts` passes `allowPaidCalls` from `runtimeCapabilities.requires_paid_calls` to `startRun()`.
+- `arc-run-timeline-widget.tsx` reads `runtimeCapabilities` and passes `paid ? true : undefined` to `startRun()`.
+- `scripts/generate-runtime-table.sh` and `scripts/generate-runtime-table.py` — auto-generate the runtime capabilities table in `README.md` between `<!-- RUNTIMES:START/END -->` markers.
 
-### Security
+### Changed
 
-- Command injection prevention via `spawn()` with `shell: false` (TypeScript) and `subprocess.run()` with `shell=False` (Python)
-- Path traversal protection with strict trace ID validation (`run-{prefix}-{hex}` pattern)
-- Workspace boundary enforcement for all file operations
-- Input sanitization — shell metacharacter rejection, control character removal, length limits
-- Error message sanitization to prevent information leakage
-- Subprocess environment allow-list to prevent credential leakage
-- CORS restricted to `localhost:3000` on daemon server
-- Security test suite: 12 Python tests covering redaction and path validation
+- `theia-extensions/arc-core/src/node/arc-service-impl.ts`: `startRun()` now forwards `--allow-paid-calls` and `ARC_SWARMGRAPH_ALLOW_COSTS=true` **only** when `request.allow_paid_calls === true`. Non-boolean truthy values are ignored. `exportTraceToOTLP()` validates both arguments. `workspacePath()` is normalised and validated; all derived paths use `safeJoinInsideWorkspace()`. `runCli()` tracks spawned processes in `runningProcs` Map. Added `cancelRun()` method.
+- `theia-extensions/arc-core/src/common/arc-protocol.ts`: `StartRunRequest.allow_paid_calls` JSDoc documents opt-in default. Added `cancelRun(runId)` to `ArcService` interface.
+- `applications/browser/package.json`, `applications/electron/package.json`: workspace dependencies retargeted to the real `theia-extensions/arc-*` packages.
+- `.github/workflows/arc-roadmap-gate.yml`: removed `|| true`, enforced `pnpm install --frozen-lockfile`, added `pnpm typecheck`.
+- `applications/electron/electron-builder.release.yml`: ships a pre-built Python wheel under `arc-python/` rather than raw sources.
+- `scripts/start-browser-arc.mjs`, `scripts/start-browser-stub.mjs`: explicit env allow-list, no `process.env` spread.
+- `scripts/check-pr.sh`: extended secret-pattern scan; rejects any tracked `.env`. Added exclusions for test fixture files and auth middleware docstrings to eliminate false positives.
+- `scripts/check-artifacts.sh`: excluded `.env.example` from generated-artifact detection.
+- `README.md`: runtime table now auto-generated via `scripts/generate-runtime-table.sh` between `<!-- RUNTIMES:START/END -->` markers.
+- `python/src/agent_runtime_cockpit/web/routes.py`: `GET /api/runs` accepts optional `runtime` query parameter for filtering.
+- `theia-extensions/arc-core/src/browser/arc-frontend-service.ts`: `startRun()` accepts optional `allowPaidCalls` parameter and forwards it to backend.
 
-### Fixed
+### Removed
 
-- SwarmGraph fixture workflows restricted to test/demo paths only (no mock data in product)
-- LangGraph dynamic workflow export via `ARC_LANGGRAPH_EXPORT=module:function`
-- Provider-backed execution gated by `ARC_SWARMGRAPH_ALLOW_COSTS=true`
-- Python workspace scanning excludes `.venv`, `node_modules`, `__pycache__`, and other cache dirs
-- Trace parsing handles both single-line JSON and multi-line JSONL formats
-- Trace status derived from event types when explicit status is missing
-- Run ID extraction from multiple output formats (JSON fields, regex fallback)
+- Tracked `.env` (free G4F key, rotated, risk accepted; see `docs/SECURITY_AUDIT_REPORT.md` U-1).
+- Unused backup/debris files targeted by `scripts/apply-phase3.sh`.
 
-### Known Limitations
+### Moved
 
-- Electron signing/notarization not configured (requires CSC_LINK, CSC_KEY_PASSWORD, Apple ID)
-- LangGraph runtime execution limited to dynamic workflow export only
-- CrewAI, OpenAI Agents SDK, AG2 adapters not yet implemented
-- Rate limiting and authentication not yet implemented
-- Auto-update pipeline not configured
+- `docs/FINAL_STATUS.md`, `docs/HANDOFF.md`, `docs/ORCHESTRATOR_HANDOVER_PROMPT.md` → `docs/history/`.
 
-### Testing
+### Required before tagging
 
-- 82 Python tests passing
-- 8 Node.js unit tests passing
-- Test fixtures self-test passing
-- E2E Playwright smoke tests configured
-- Conformance tests: SwarmGraph 8/8, LangGraph 9/9
-- Daemon integration tests for `/api/runs` and SSE
-
-### Dependencies
-
-- **Node.js**: >= 18.0.0
-- **pnpm**: >= 8.0.0
-- **Python**: >= 3.11
-- **Eclipse Theia**: 1.45.0+
-- **TypeScript**: 5.3.0
-- **FastAPI**: Python REST framework
-- **uv**: Python package manager
+- Decide a first version: `0.1.0-alpha1` or `0.2.0-alpha` depending on whether the runtime hardening counts as additive or breaking.
+- Verify U-1 (`.env` in git history) documented risk acceptance is acknowledged by the release owner.

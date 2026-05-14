@@ -8,7 +8,7 @@ import * as React from 'react';
 import { injectable, inject, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { ArcFrontendService } from 'arc-core/lib/browser/arc-frontend-service';
-import { RunRecord, RunEvent, RuntimeCapabilityReport, RuntimeId } from 'arc-core/lib/common/arc-protocol';
+import { RunRecord, RunEvent, RuntimeCapabilityReport, RuntimeId, GoldenTrace, EvalResult } from 'arc-core/lib/common/arc-protocol';
 
 const EVENT_ICONS: Record<string, string> = {
   RUN_STARTED: '▶',
@@ -44,7 +44,10 @@ export class ArcRunTimelineWidget extends ReactWidget {
   protected selectedEvent: RunEvent | null = null;
   protected runtimeCapabilities: RuntimeCapabilityReport[] = [];
   protected selectedRuntime: RuntimeId = 'auto';
+  protected selectedRuntimes = new Set<RuntimeId>();
   protected runtimeError?: string;
+  protected evalResult?: EvalResult;
+  protected evalLoading = false;
 
   @postConstruct()
   protected init(): void {
@@ -149,6 +152,9 @@ export class ArcRunTimelineWidget extends ReactWidget {
           <button style={secondaryBtnStyle} onClick={() => this.clearReplay()}>Show Stored Trace</button>
           <button style={secondaryBtnStyle} disabled={this.streaming} onClick={() => this.connectSseStream(run.id)}>Connect SSE Stream</button>
           <button style={secondaryBtnStyle} onClick={() => this.exportRunJson(run)}>Export Run JSON</button>
+          <button style={evalBtnStyle(run)} disabled={this.evalLoading} onClick={() => this.evalRun(run)}>
+            {this.evalLoading ? 'Eval...' : this.evalResult ? `Eval: ${this.evalResult.passed ? 'PASS' : 'FAIL'}` : 'Eval vs Golden'}
+          </button>
           <div style={{ fontSize: '12px', color: 'var(--theia-descriptionForeground)' }}>
             Workflow: <strong>{run.workflow_id}</strong> ·
             Runtime: <strong>{run.runtime}</strong> ·
@@ -156,7 +162,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
             {duration !== null && ` · Duration: ${duration}ms`}
           </div>
           {run.metadata?.['_mock'] && (
-            <div style={{ marginTop: '8px', padding: '6px 10px', backgroundColor: '#3d2500', border: '1px solid #ffb74d', borderRadius: '4px', fontSize: '11px', color: '#ffb74d' }}>
+            <div style={{ marginTop: '8px', padding: '6px 10px', backgroundColor: 'var(--theia-editorWarning-background)', border: '1px solid var(--theia-editorWarning-foreground)', borderRadius: '4px', fontSize: '11px', color: 'var(--theia-editorWarning-foreground)' }}>
               ⚠ [MOCK] Fixture run — connect ARC daemon for live runs
             </div>
           )}
@@ -256,7 +262,18 @@ export class ArcRunTimelineWidget extends ReactWidget {
             <button style={secondaryBtnStyle} onClick={() => this.copyText('Final output', finalOutput)}>Copy Final Output</button>
           </div>
         )}
-        {errorOutput && <pre style={{ ...outputBoxStyle, borderColor: '#ef5350', color: '#ef9a9a' }}>{errorOutput}</pre>}
+        {errorOutput && <pre style={{ ...outputBoxStyle, borderColor: 'var(--theia-inputValidation-errorBorder)', color: 'var(--theia-errorForeground)' }}>{errorOutput}</pre>}
+        {this.evalResult && (
+          <div style={{ ...metadataBoxStyle, borderColor: this.evalResult.passed ? 'var(--theia-charts-green)' : 'var(--theia-errorForeground)' }}>
+            <div><strong>Eval: {this.evalResult.passed ? 'PASS' : 'FAIL'}</strong> (score: {this.evalResult.score})</div>
+            <div style={{ fontSize: '10px', opacity: 0.7 }}>
+              status_match={String(this.evalResult.status_match)} ·
+              event_type_match={String(this.evalResult.event_type_match)} ·
+              output_match={String(this.evalResult.output_contains_match)}
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--theia-descriptionForeground)' }}>{this.evalResult.details}</div>
+          </div>
+        )}
       </div>
     );
   }
@@ -295,9 +312,24 @@ export class ArcRunTimelineWidget extends ReactWidget {
           <button style={primaryBtnStyle} onClick={() => this.startRuntimeRun()}>Start Run</button>
           <button style={secondaryBtnStyle} onClick={() => this.refreshWorkspace()}>Refresh Workspace</button>
         </div>
-        {this.runtimeError && <div style={{ fontSize: '11px', color: '#ffb74d' }}>Runtime capabilities: {this.runtimeError}</div>}
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', fontSize: '11px' }}>
+          <strong>Combo:</strong>
+          {this.runtimeCapabilities.filter(runtime => runtime.runtime_id !== 'auto').map(runtime => (
+            <label key={runtime.runtime_id} title={runtime.reason ?? ''}>
+              <input
+                type="checkbox"
+                disabled={!runtime.can_run}
+                checked={this.selectedRuntimes.has(runtime.runtime_id as RuntimeId)}
+                onChange={event => this.toggleComboRuntime(runtime.runtime_id as RuntimeId, event.currentTarget.checked)}
+              />
+              {this.runtimeLabel(runtime)}
+            </label>
+          ))}
+        </div>
+        {this.renderReadiness()}
+        {this.runtimeError && <div style={{ fontSize: '11px', color: 'var(--theia-editorWarning-foreground)' }}>Runtime capabilities: {this.runtimeError}</div>}
         {this.runStatusMessage && <div style={statusMessageStyle}>{this.runStatusMessage}</div>}
-        {this.lastError && <pre style={{ ...outputBoxStyle, borderColor: '#ef5350', color: '#ef9a9a' }}>{this.lastError}</pre>}
+        {this.lastError && <pre style={{ ...outputBoxStyle, borderColor: 'var(--theia-inputValidation-errorBorder)', color: 'var(--theia-errorForeground)' }}>{this.lastError}</pre>}
       </div>
     );
   }
@@ -327,8 +359,8 @@ export class ArcRunTimelineWidget extends ReactWidget {
           width: '20px',
           height: '20px',
           borderRadius: '50%',
-          backgroundColor: isError ? '#ef5350' : 'var(--theia-editor-background)',
-          border: `2px solid ${isError ? '#ef5350' : '#4fc3f7'}`,
+          backgroundColor: isError ? 'var(--theia-errorForeground)' : 'var(--theia-editor-background)',
+          border: `2px solid ${isError ? 'var(--theia-errorForeground)' : 'var(--theia-textLink-foreground)'}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -341,7 +373,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
         <div style={{
           flex: 1,
           backgroundColor: 'var(--theia-editor-background)',
-          border: `1px solid ${isError ? '#ef5350' : 'var(--theia-widget-border)'}`,
+          border: `1px solid ${isError ? 'var(--theia-errorForeground)' : 'var(--theia-widget-border)'}`,
           borderRadius: '6px',
           padding: '8px 12px',
         }} onClick={() => { this.selectedEvent = event; this.update(); }}>
@@ -383,16 +415,50 @@ export class ArcRunTimelineWidget extends ReactWidget {
     return `${runtime.runtime_id} (${status}${paid})`;
   }
 
+  protected toggleComboRuntime(runtime: RuntimeId, checked: boolean): void {
+    if (checked) {
+      this.selectedRuntimes.add(runtime);
+    } else {
+      this.selectedRuntimes.delete(runtime);
+    }
+    this.update();
+  }
+
+  protected runtimeSelection(): RuntimeId | RuntimeId[] {
+    const combo = Array.from(this.selectedRuntimes);
+    return combo.length > 1 ? combo : this.selectedRuntime;
+  }
+
+  protected renderReadiness(): React.ReactNode {
+    const missing = this.runtimeCapabilities.filter(runtime => !runtime.can_run);
+    if (missing.length === 0) return null;
+    return (
+      <div style={{ fontSize: '11px', color: 'var(--theia-editorWarning-foreground)', display: 'grid', gap: '4px' }}>
+        {missing.map(runtime => (
+          <div key={runtime.runtime_id}>
+            <strong>{runtime.runtime_id}</strong>: {runtime.reason || runtime.availability}
+            {runtime.required_env.length > 0 && ` Set ${runtime.required_env.join(', ')}.`}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   protected async startRuntimeRun(): Promise<void> {
     this.loading = true;
     this.lastError = undefined;
     this.runStatusMessage = `Starting ${this.selectedRuntime} run...`;
     this.update();
     try {
+      const selection = this.runtimeSelection();
+      const selected = Array.isArray(selection) ? selection : [selection];
+      const paid = this.runtimeCapabilities.some(
+        r => selected.includes(r.runtime_id as RuntimeId) && r.requires_paid_calls === true
+      );
       const result = await this.arcService.startRun('wf-swarmgraph-001', {
         prompt: this.prompt,
         workspacePath: this.workspaceStatus?.frontendPath,
-      }, this.selectedRuntime);
+      }, selection, paid ? true : undefined);
       if (result.data) {
         this.runs = [result.data, ...this.runs];
         this.selectedRun = result.data;
@@ -518,13 +584,40 @@ export class ArcRunTimelineWidget extends ReactWidget {
     this.update();
   }
 
-  protected statusColor(status: string): string {
+  protected async evalRun(run: RunRecord): Promise<void> {
+    this.evalLoading = true;
+    this.evalResult = undefined;
+    this.update();
+    try {
+      const golden: GoldenTrace = {
+        id: `inline-${run.id}`,
+        workflow_id: run.workflow_id,
+        expected_status: 'completed',
+        expected_event_types: ['RUN_STARTED', 'RUN_COMPLETED'],
+        expected_final_output_contains: '',
+        description: `Inline eval for ${run.id}`,
+      };
+      const result = await this.arcService.evalRun(run.id, golden);
+      if (result.data) {
+        this.evalResult = result.data;
+      } else {
+        this.lastError = result.error?.message ?? 'Eval failed';
+      }
+    } catch (error) {
+      this.lastError = String(error);
+    } finally {
+      this.evalLoading = false;
+      this.update();
+    }
+  }
+
+  protected   statusColor(status: string): string {
     const colors: Record<string, string> = {
-      pending: '#ffb74d',
-      running: '#4fc3f7',
-      completed: '#4caf50',
-      failed: '#ef5350',
-      cancelled: '#9e9e9e',
+      pending: 'var(--theia-editorWarning-foreground)',
+      running: 'var(--theia-textLink-foreground)',
+      completed: 'var(--theia-charts-green)',
+      failed: 'var(--theia-errorForeground)',
+      cancelled: 'var(--theia-descriptionForeground)',
     };
     return colors[status] ?? 'inherit';
   }
@@ -611,3 +704,9 @@ const statusMessageStyle: React.CSSProperties = {
   backgroundColor: 'var(--theia-editor-background)',
   fontSize: '11px',
 };
+
+const evalBtnStyle = (run: RunRecord): React.CSSProperties => ({
+  ...secondaryBtnStyle,
+  borderColor: run.status === 'completed' ? 'var(--theia-charts-green)' : 'var(--theia-widget-border)',
+  border: '1px solid',
+});

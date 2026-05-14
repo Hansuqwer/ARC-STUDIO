@@ -32,7 +32,7 @@ export class ResilientSSEClient {
             ? `${this.opts.url}${sep}lastEventId=${encodeURIComponent(this.lastEventId)}`
             : this.opts.url;
 
-        const es = new EventSource(url, { withCredentials: false });
+        const es = new EventSource(url, { withCredentials: false } as EventSourceInit);
         this.es = es;
 
         es.onmessage = ev => {

@@ -16,12 +16,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..adapters.base import CapabilityReport
+from ..adapters.base import CapabilityReport, DoctorAction
+from ..gating import require_dual_gate
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import (
     WorkflowInfo, WorkflowNode, WorkflowEdge, SchemaInfo,
     NodeType, RunRecord, RunEvent, RunStatus
 )
+from ..security.redaction import Redactor
 from ..workspace import iter_workspace_files
 from .base import RuntimeAdapter
 
@@ -31,6 +33,18 @@ HEURISTIC_REASON = "SwarmGraph library not installed; using file-scan heuristics
 REAL_IMPLEMENTATION_PATH = "adapters/swarmgraph.py -> import swarmgraph; graph.export()"
 LOCAL_FIX_STEPS = "pip install git+https://github.com/Hansuqwer/SwarmGraph"
 OWNER = "SwarmGraph Adapter Agent"
+
+# Environment variable allowlist for subprocess execution
+# Only these system vars + ARC_SWARMGRAPH_* vars are passed to subprocess
+SWARMGRAPH_ENV_ALLOWLIST = [
+    "PATH",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "SHELL",
+    "TMPDIR",
+    "VIRTUAL_ENV",
+]
 
 # Detection signals for SwarmGraph projects
 _DETECTION_SIGNALS = [
@@ -47,6 +61,11 @@ _DETECTION_SIGNALS = [
 
 class SwarmGraphAdapter(RuntimeAdapter):
 
+    def __init__(self):
+        """Initialize SwarmGraph adapter with redactor for output sanitization."""
+        super().__init__()
+        self._redactor = Redactor()
+
     @property
     def adapter_id(self) -> str:
         return "swarmgraph"
@@ -54,6 +73,39 @@ class SwarmGraphAdapter(RuntimeAdapter):
     @property
     def adapter_name(self) -> str:
         return "SwarmGraph"
+
+    def _filtered_env(self) -> dict[str, str]:
+        """Return filtered environment variables safe for subprocess execution.
+        
+        Only passes through:
+        - Allowlisted system variables (PATH, HOME, etc.)
+        - ARC_SWARMGRAPH_* prefixed variables
+        - PYTHONPATH if present
+        - PYTHONWARNINGS override
+        
+        This prevents leaking sensitive environment variables like API keys,
+        AWS credentials, GitHub tokens, etc. to subprocess execution.
+        """
+        env = {}
+        
+        # Add allowlisted system vars
+        for key in SWARMGRAPH_ENV_ALLOWLIST:
+            if key in os.environ:
+                env[key] = os.environ[key]
+        
+        # Add all ARC_SWARMGRAPH_* vars
+        for key, value in os.environ.items():
+            if key.startswith("ARC_SWARMGRAPH_"):
+                env[key] = value
+        
+        # Add PYTHONPATH if present
+        if "PYTHONPATH" in os.environ:
+            env["PYTHONPATH"] = os.environ["PYTHONPATH"]
+        
+        # Add PYTHONWARNINGS override
+        env["PYTHONWARNINGS"] = "ignore"
+        
+        return env
 
     def capabilities(self) -> RuntimeCapabilities:
         return RuntimeCapabilities(
@@ -69,9 +121,17 @@ class SwarmGraphAdapter(RuntimeAdapter):
 
     def capability_report(self, workspace: Path) -> CapabilityReport:
         detected, _, evidence = self.detect(workspace)
+        doctor: list[DoctorAction] = []
         try:
             self._resolve_cli(workspace)
         except Exception as exc:
+            doctor.append(DoctorAction(
+                id="install-swarmgraph",
+                label="Install SwarmGraph",
+                description="Install the SwarmGraph Python package",
+                command="pip install git+https://github.com/Hansuqwer/SwarmGraph",
+                safe_to_auto_run=False,
+            ))
             return CapabilityReport(
                 runtime_id=self.adapter_id,
                 detected=detected,
@@ -80,6 +140,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
                 reason=str(exc),
                 detected_artifacts=evidence,
                 required_env=["ARC_SWARMGRAPH_CLI"],
+                doctor_actions=doctor,
             )
         return CapabilityReport(
             runtime_id=self.adapter_id,
@@ -88,7 +149,31 @@ class SwarmGraphAdapter(RuntimeAdapter):
             availability="runnable",
             detected_artifacts=evidence,
             required_env=["ARC_SWARMGRAPH_CLI"],
+            doctor_actions=doctor,
         )
+
+    def _doctor_actions(self, workspace: Path) -> list[DoctorAction]:
+        """Return fix actions for SwarmGraph configuration issues."""
+        actions: list[DoctorAction] = []
+        try:
+            self._resolve_cli(workspace)
+        except Exception:
+            actions.append(DoctorAction(
+                id="install-swarmgraph",
+                label="Install SwarmGraph",
+                description="Install the SwarmGraph Python package",
+                command="pip install git+https://github.com/Hansuqwer/SwarmGraph",
+                safe_to_auto_run=False,
+            ))
+        if not os.environ.get("ARC_SWARMGRAPH_CLI"):
+            actions.append(DoctorAction(
+                id="set-swarmgraph-cli",
+                label="Set ARC_SWARMGRAPH_CLI",
+                description="Set the SwarmGraph CLI environment variable",
+                command="export ARC_SWARMGRAPH_CLI=swarmgraph",
+                safe_to_auto_run=False,
+            ))
+        return actions
 
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
         evidence: list[str] = []
@@ -205,9 +290,8 @@ class SwarmGraphAdapter(RuntimeAdapter):
         inputs = inputs or {}
         workspace = Path(str(inputs.get("workspace") or ".")).resolve()
         cli = self._resolve_cli(workspace)
-        backend = os.environ.get("ARC_SWARMGRAPH_RUN_BACKEND", "stub")
+        backend, allow_costs = require_dual_gate("SWARMGRAPH")
         provider = os.environ.get("AI_PROVIDER_SWARM_GATEWAY_DEFAULT_PROVIDER", "openai")
-        allow_costs = os.environ.get("ARC_SWARMGRAPH_ALLOW_COSTS", "").lower() in {"1", "true", "yes"}
         prompt = str(inputs.get("prompt") or f"Run ARC workflow {workflow_id}")
         run_id = f"run-sg-{uuid.uuid4().hex[:8]}"
         started = datetime.now(timezone.utc)
@@ -218,7 +302,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
             "--prompt",
             prompt,
             "--backend",
-            backend,
+            backend.value,
             "--provider",
             provider,
             "--max-agents",
@@ -230,13 +314,13 @@ class SwarmGraphAdapter(RuntimeAdapter):
         if not allow_costs:
             cmd.insert(-1, "--no-cost")
 
-        events = [self._event(run_id, 0, "RUN_STARTED", {"workflow_id": workflow_id, "backend": backend, "prompt": prompt, "cost_allowed": allow_costs})]
+        events = [self._event(run_id, 0, "RUN_STARTED", {"workflow_id": workflow_id, "backend": backend.value, "prompt": prompt, "cost_allowed": allow_costs})]
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=str(workspace),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env={**os.environ, "PYTHONWARNINGS": "ignore"},
+            env=self._filtered_env(),
         )
         stdout_b, stderr_b = await proc.communicate()
         stdout = stdout_b.decode(errors="replace").strip()
@@ -244,7 +328,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
         ended = datetime.now(timezone.utc)
 
         if proc.returncode != 0:
-            events.append(self._event(run_id, 1, "RUN_FAILED", {"exit_code": proc.returncode, "stderr": stderr[-2000:], "stdout": stdout[-2000:]}))
+            events.append(self._event(run_id, 1, "RUN_FAILED", {"exit_code": proc.returncode, "stderr": self._redactor.redact_string(stderr[-2000:]), "stdout": self._redactor.redact_string(stdout[-2000:])}))
             return RunRecord(
                 id=run_id,
                 workflow_id=workflow_id,
@@ -259,7 +343,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
                     "prompt": prompt,
                     "cost_allowed": allow_costs,
                     "exit_code": proc.returncode,
-                    "stderr": stderr[-2000:],
+                    "stderr": self._redactor.redact_string(stderr[-2000:]),
                     "_external_command": "swarmgraph swarm --json",
                 },
             )
@@ -267,7 +351,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
         try:
             payload = json.loads(stdout)
         except json.JSONDecodeError as exc:
-            events.append(self._event(run_id, 1, "RUN_FAILED", {"error": f"Invalid SwarmGraph JSON: {exc}", "stdout": stdout[:2000], "stderr": stderr[-2000:]}))
+            events.append(self._event(run_id, 1, "RUN_FAILED", {"error": f"Invalid SwarmGraph JSON: {exc}", "stdout": self._redactor.redact_string(stdout[:2000]), "stderr": self._redactor.redact_string(stderr[-2000:])}))
             return RunRecord(
                 id=run_id,
                 workflow_id=workflow_id,
@@ -281,8 +365,8 @@ class SwarmGraphAdapter(RuntimeAdapter):
                     "provider": provider,
                     "prompt": prompt,
                     "cost_allowed": allow_costs,
-                    "stdout": stdout[:2000],
-                    "stderr": stderr[-2000:],
+                    "stdout": self._redactor.redact_string(stdout[:2000]),
+                    "stderr": self._redactor.redact_string(stderr[-2000:]),
                     "_external_command": "swarmgraph swarm --json",
                 },
             )

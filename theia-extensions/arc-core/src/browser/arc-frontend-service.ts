@@ -22,6 +22,9 @@ import {
   ProviderRoutingPolicy,
   RuntimeCapabilitiesResponse,
   RuntimeId,
+  RuntimeSelection,
+  GoldenTrace,
+  EvalResult,
 } from '../common/arc-protocol';
 
 @injectable()
@@ -65,12 +68,14 @@ export class ArcFrontendService {
     return this.arcService.listSchemas(path, runtimeId);
   }
 
-  async startRun(workflowId: string, inputs?: Record<string, unknown>, runtime: RuntimeId = 'auto'): Promise<ArcEnvelope<RunRecord>> {
+  async startRun(workflowId: string, inputs?: Record<string, unknown>, runtime: RuntimeSelection = 'auto', allowPaidCalls?: boolean, profileId?: string): Promise<ArcEnvelope<RunRecord>> {
     const path = await this.getWorkspacePath();
     return this.arcService.startRun({
       workflow_id: workflowId,
       runtime,
-      inputs: { ...(inputs ?? {}), workspacePath: path },
+      profile_id: profileId,
+      allow_paid_calls: allowPaidCalls,
+      inputs: { ...(inputs ?? {}), workspacePath: path, ...(profileId ? { profile_id: profileId } : {}) },
     });
   }
 
@@ -115,5 +120,9 @@ export class ArcFrontendService {
 
   async exportTraceToOTLP(runId: string, endpoint: string): Promise<ArcEnvelope<{ exported: boolean; warning?: string }>> {
     return this.arcService.exportTraceToOTLP(runId, endpoint);
+  }
+
+  async evalRun(runId: string, golden: GoldenTrace): Promise<ArcEnvelope<EvalResult>> {
+    return this.arcService.evalRun(runId, golden);
   }
 }

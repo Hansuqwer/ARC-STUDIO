@@ -12,30 +12,26 @@ directories:
   buildResources: resources
 
 files:
-  - "src-gen/**/*"
-  - "node_modules/**/*"
+  - "src-gen/**"
+  - "lib/**"
   - "package.json"
+  - "!**/*.map"
+  - "!**/*.ts"
+  - "!**/__tests__/**"
+  - "!**/test/**"
+  - "!**/.git/**"
+  - "!**/PHASE_*.md"
+  - "!**/PROMPT_*.md"
+  - "!**/*.bak"
+  - "!**/*.backup"
 
 extraResources:
-  - from: "../../python"
+  - from: "../../python/dist"
     to: "arc-python"
     filter:
-      - "src/**/*"
-      - "pyproject.toml"
-      - "README.md"
-      - "!**/__pycache__/**"
-      - "!**/*.pyc"
-      - "!**/.venv/**"
-      - "!**/.pytest_cache/**"
-      - "!**/.ruff_cache/**"
-      - "!**/.mypy_cache/**"
-      - "!**/*.egg-info/**"
-      - "!**/tests/**"
-      - "!**/.env"
-      - "!**/.env.*"
-      - "!**/.arc/**"
-      - "!**/dist/**"
-      - "!**/build/**"
+      - "agent_runtime_cockpit-*.whl"
+  - from: "../../python/pyproject.toml"
+    to: "arc-python/pyproject.toml"
 
 mac:
   target:

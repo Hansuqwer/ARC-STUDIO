@@ -10,7 +10,7 @@
     "watch": "tsc -p tsconfig.json --watch",
     "clean": "rimraf lib *.tsbuildinfo",
     "check": "echo 'arc-runs check ok'",
-    "test": "echo 'arc-runs test ok'"
+    "test": "node --test --test-reporter=spec ./test/**/*.test.js"
   },
   "theiaExtensions": [
     { "frontend": "lib/browser/arc-runs-frontend-module" }

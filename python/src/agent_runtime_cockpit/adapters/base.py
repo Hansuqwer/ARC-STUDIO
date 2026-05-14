@@ -27,6 +27,15 @@ RuntimeAvailability = Literal[
 ]
 
 
+class DoctorAction(BaseModel):
+    """A suggested action to make this runtime runnable."""
+    id: str
+    label: str
+    description: str
+    command: str = ""
+    safe_to_auto_run: bool = False
+
+
 class CapabilityReport(BaseModel):
     runtime_id: str
     detected: bool
@@ -37,6 +46,7 @@ class CapabilityReport(BaseModel):
     required_env: list[str] = Field(default_factory=list)
     version: str | None = None
     requires_paid_calls: bool = False
+    doctor_actions: list[DoctorAction] = Field(default_factory=list)
 
 
 class RuntimeAdapter(abc.ABC):
@@ -78,7 +88,12 @@ class RuntimeAdapter(abc.ABC):
             availability="runnable" if can_run else ("detected_not_runnable" if detected else "not_detected"),
             reason=None if can_run else "Runtime is detected but does not expose a runnable path.",
             detected_artifacts=evidence,
+            doctor_actions=self._doctor_actions(workspace),
         )
+
+    def _doctor_actions(self, workspace: Path) -> list[DoctorAction]:
+        """Subclasses may override to return runtime-specific fix actions."""
+        return []
 
     @abc.abstractmethod
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:

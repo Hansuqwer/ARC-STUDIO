@@ -45,7 +45,7 @@ export const LangGraphMapper: RuntimeEventMapper<LangGraphEvent> = {
         ];
       }
       case 'on_chain_state':
-        return [{ ...base, type: AGUIEventType.STATE_SNAPSHOT, snapshot: (native.data ?? {}) } as AGUIBaseEvent];
+        return [{ ...base, type: AGUIEventType.STATE_SNAPSHOT, snapshot: (native.data ?? {}) as Record<string, unknown> } as AGUIBaseEvent];
       case 'on_error':
         return [{ ...base, type: AGUIEventType.RUN_ERROR, message: String(native.data?.error ?? 'unknown'), code: 'LANGGRAPH_ERROR' } as AGUIBaseEvent];
       default:

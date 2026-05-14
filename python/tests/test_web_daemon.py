@@ -106,9 +106,9 @@ async def test_runs_api_and_sse_events(tmp_path, unused_tcp_port):
             async with session.get(f"{base_url}/api/runtimes/capabilities") as response:
                 payload = await response.json()
                 assert response.status == 200
-                assert payload["data"]["auto_priority"] == ["swarmgraph", "langgraph", "crewai"]
+                assert payload["data"]["auto_priority"] == ["swarmgraph", "langgraph", "crewai", "lmarena"]
                 ids = {runtime["runtime_id"] for runtime in payload["data"]["runtimes"]}
-                assert ids >= {"swarmgraph", "langgraph", "crewai"}
+                assert ids >= {"swarmgraph", "langgraph", "crewai", "lmarena"}
                 assert all("requires_paid_calls" in runtime for runtime in payload["data"]["runtimes"])
     finally:
         await runner.cleanup()

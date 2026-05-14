@@ -81,7 +81,7 @@ export class ArcHealthWidget extends ReactWidget {
         <div style={styles.card}>
           <div style={styles.row}>
             <span>Daemon</span>
-            <strong style={{ color: this.state.running ? '#4caf50' : '#ffb74d' }}>{status}</strong>
+            <strong style={{ color: this.state.running ? 'var(--theia-charts-green)' : 'var(--theia-editorWarning-foreground)' }}>{status}</strong>
           </div>
           <div style={styles.row}>
             <span>Endpoint</span>
@@ -102,7 +102,7 @@ export class ArcHealthWidget extends ReactWidget {
           {this.state.checkedAt && <div style={styles.muted}>Last checked: {this.state.checkedAt}</div>}
           {this.state.error && <pre style={styles.error}>{this.state.error}</pre>}
         </div>
-        <button style={styles.button} onClick={() => this.refreshHealth()}>Refresh Health</button>
+        <button style={styles.button} onClick={() => this.refreshHealth()} aria-label="Refresh health status">Refresh Health</button>
       </div>
     );
   }
@@ -139,7 +139,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   error: {
     marginTop: '10px',
-    color: '#ffb74d',
+    color: 'var(--theia-editorWarning-foreground)',
     whiteSpace: 'pre-wrap',
   },
   button: {

@@ -119,7 +119,7 @@ function createFixtureRun(): RunRecord {
       threadId: 'fixture-thread',
       runId: FIXTURE_RUN_ID,
       api_key: 'fixture-secret-value',
-    }),
+    }) as Record<string, unknown>,
   }));
   return {
     id: FIXTURE_RUN_ID,
@@ -531,7 +531,7 @@ export class ArcEventStreamWidget extends ReactWidget {
               <div style={styles.detailHeader}>
                 <span style={styles.detailTitle}>Event Detail</span>
                 <button
-                  onClick={() => this.selectEvent(this.state.selectedEvent)}
+                  onClick={() => this.selectEvent(this.state.selectedEvent!)}
                   style={styles.closeButton}
                 >
                   ✕

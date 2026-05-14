@@ -6,7 +6,7 @@ from pathlib import Path
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import WorkflowInfo
 from ._static import dependency_evidence, import_evidence, static_workflow
-from .base import RuntimeAdapter
+from .base import RuntimeAdapter, DoctorAction
 
 
 class LlamaIndexAdapter(RuntimeAdapter):

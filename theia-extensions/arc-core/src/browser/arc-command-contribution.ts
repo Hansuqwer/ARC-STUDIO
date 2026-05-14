@@ -2,52 +2,59 @@
  * ARC Command Contribution
  *
  * Registers all ARC commands in the command palette and menus.
+ * Commands are consolidated per the UX redesign plan:
+ * 8 primary commands, grouped with separators.
  * Source: https://theia-ide.org/docs/extensions/#contributing-commands
  */
 
-import { injectable, inject, postConstruct } from '@theia/core/shared/inversify';
-import { CommandContribution, CommandRegistry, MenuContribution, MenuModelRegistry } from '@theia/core/lib/common';
+import { injectable, inject } from '@theia/core/shared/inversify';
+import { CommandContribution, CommandRegistry, CommandService, MenuContribution, MenuModelRegistry } from '@theia/core/lib/common';
 import { CommonMenus } from '@theia/core/lib/browser/common-frontend-contribution';
 import { MessageService } from '@theia/core/lib/common/message-service';
 import { PreferenceService } from '@theia/core/lib/common/preferences/preference-service';
 import { ArcFrontendService } from './arc-frontend-service';
 
 export const ARC_MENU_MAIN = [...CommonMenus.VIEW, 'arc'];
+const OPEN_RUN_TIMELINE_COMMAND = 'arc:open-run-timeline';
+const OPEN_RUN_DIFF_COMMAND = 'arc:open-run-diff';
 
+/**
+ * Consolidated ARC commands (8 primary commands, down from 20+).
+ */
 export const ArcCommands = {
+  RUN_AGENT: {
+    id: 'arc:run-agent',
+    label: 'ARC: Run Agent',
+    category: 'ARC',
+  },
+  COMPARE_MODELS: {
+    id: 'arc:compare-models',
+    label: 'ARC: Compare Models',
+    category: 'ARC',
+  },
+  OPEN_TIMELINE: {
+    id: 'arc:open-timeline',
+    label: 'ARC: Open Timeline',
+    category: 'ARC',
+  },
+  COMPARE_RUNS: {
+    id: 'arc:compare-runs',
+    label: 'ARC: Compare Runs',
+    category: 'ARC',
+  },
+  EVALUATE_RUN: {
+    id: 'arc:evaluate-run',
+    label: 'ARC: Evaluate Run',
+    category: 'ARC',
+  },
+  RUNTIME_DOCTOR: {
+    id: 'arc:runtime-doctor',
+    label: 'ARC: Runtime Doctor',
+    category: 'ARC',
+  },
   INSPECT_WORKSPACE: {
     id: 'arc:inspect-workspace',
     label: 'ARC: Inspect Workspace',
-    category: 'ARC',
-  },
-  LIST_RUNTIMES: {
-    id: 'arc:list-runtimes',
-    label: 'ARC: List Runtimes',
-    category: 'ARC',
-  },
-  LIST_WORKFLOWS: {
-    id: 'arc:list-workflows',
-    label: 'ARC: List Workflows',
-    category: 'ARC',
-  },
-  LIST_SCHEMAS: {
-    id: 'arc:list-schemas',
-    label: 'ARC: List Schemas',
-    category: 'ARC',
-  },
-  START_RUN: {
-    id: 'arc:start-run',
-    label: 'ARC: Start Run',
-    category: 'ARC',
-  },
-  GENERATE_CONTEXT_PACK: {
-    id: 'arc:generate-context-pack',
-    label: 'ARC: Generate Context Pack',
-    category: 'ARC',
-  },
-  SHOW_DAEMON_STATUS: {
-    id: 'arc:daemon-status',
-    label: 'ARC: Show Daemon Status',
     category: 'ARC',
   },
   EXPORT_TRACE_TO_OTLP: {
@@ -69,7 +76,53 @@ export class ArcCommandContribution implements CommandContribution, MenuContribu
   @inject(ArcFrontendService)
   protected readonly arcService: ArcFrontendService;
 
+  @inject(CommandService)
+  protected readonly commandService: CommandService;
+
   registerCommands(registry: CommandRegistry): void {
+    // Run Agent → opens chat widget
+    registry.registerCommand(ArcCommands.RUN_AGENT, {
+      execute: async () => {
+        await this.commandService.executeCommand('arc:open-chat');
+      },
+    });
+
+    // Compare Models → opens arena widget
+    registry.registerCommand(ArcCommands.COMPARE_MODELS, {
+      execute: async () => {
+        await this.commandService.executeCommand('arc:open-arena');
+      },
+    });
+
+    // Open Timeline → delegates to arc-runs command
+    registry.registerCommand(ArcCommands.OPEN_TIMELINE, {
+      execute: async () => {
+        await this.commandService.executeCommand(OPEN_RUN_TIMELINE_COMMAND);
+      },
+    });
+
+    // Compare Runs → delegates to arc-runs diff command
+    registry.registerCommand(ArcCommands.COMPARE_RUNS, {
+      execute: async () => {
+        await this.commandService.executeCommand(OPEN_RUN_DIFF_COMMAND);
+      },
+    });
+
+    // Evaluate Run → opens timeline (eval available from there)
+    registry.registerCommand(ArcCommands.EVALUATE_RUN, {
+      execute: async () => {
+        await this.commandService.executeCommand(OPEN_RUN_TIMELINE_COMMAND);
+      },
+    });
+
+    // Runtime Doctor → opens adapters widget
+    registry.registerCommand(ArcCommands.RUNTIME_DOCTOR, {
+      execute: async () => {
+        await this.commandService.executeCommand('arc:open-adapters');
+      },
+    });
+
+    // Inspect Workspace → refresh sidebar data
     registry.registerCommand(ArcCommands.INSPECT_WORKSPACE, {
       execute: async () => {
         try {
@@ -88,88 +141,11 @@ export class ArcCommandContribution implements CommandContribution, MenuContribu
       },
     });
 
-    registry.registerCommand(ArcCommands.LIST_RUNTIMES, {
-      execute: async () => {
-        try {
-          const result = await this.arcService.listRuntimes();
-          if (result.ok && result.data) {
-            const names = result.data.map(r => r.name).join(', ');
-            this.messageService.info(`ARC Runtimes: ${names || 'none detected'}`);
-          }
-        } catch (e) {
-          this.messageService.error(`ARC runtimes failed: ${e}`);
-        }
-      },
-    });
-
-    registry.registerCommand(ArcCommands.LIST_WORKFLOWS, {
-      execute: async () => {
-        try {
-          const result = await this.arcService.listWorkflows();
-          if (result.ok && result.data) {
-            this.messageService.info(`ARC: Found ${result.data.length} workflow(s)`);
-          }
-        } catch (e) {
-          this.messageService.error(`ARC workflows failed: ${e}`);
-        }
-      },
-    });
-
-    registry.registerCommand(ArcCommands.LIST_SCHEMAS, {
-      execute: async () => {
-        try {
-          const result = await this.arcService.listSchemas();
-          if (result.ok && result.data) {
-            this.messageService.info(`ARC: Found ${result.data.length} schema(s)`);
-          }
-        } catch (e) {
-          this.messageService.error(`ARC schemas failed: ${e}`);
-        }
-      },
-    });
-
-    registry.registerCommand(ArcCommands.START_RUN, {
-      execute: async () => {
-        this.messageService.info('ARC: Run launcher coming in next iteration. Open the Runs tab.');
-      },
-    });
-
-    registry.registerCommand(ArcCommands.GENERATE_CONTEXT_PACK, {
-      execute: async () => {
-        const task = 'inspect agent runtime';
-        try {
-          const result = await this.arcService.generateContextPack(task);
-          if (result.ok && result.data) {
-            this.messageService.info(`ARC Context Pack: ${result.data.length} entries generated`);
-          }
-        } catch (e) {
-          this.messageService.error(`Context pack failed: ${e}`);
-        }
-      },
-    });
-
-    registry.registerCommand(ArcCommands.SHOW_DAEMON_STATUS, {
-      execute: async () => {
-        try {
-          const result = await this.arcService.getDaemonStatus();
-          if (result.data) {
-            const { running, version } = result.data;
-            this.messageService.info(
-              running
-                ? `ARC Daemon: running (v${version})`
-                : 'ARC Daemon: not running. Start with `uv run arc serve`'
-            );
-          }
-        } catch (e) {
-          this.messageService.error(`Daemon status check failed: ${e}`);
-        }
-      },
-    });
-
+    // Export Trace to OTLP
     registry.registerCommand(ArcCommands.EXPORT_TRACE_TO_OTLP, {
       execute: async (runId?: string) => {
         const endpoint = this.preferences.get<string>('arc.telemetry.otlpEndpoint', '');
-        
+
         if (!endpoint) {
           this.messageService.warn('OTLP endpoint not configured. Set arc.telemetry.otlpEndpoint in Preferences.');
           return;
@@ -201,11 +177,44 @@ export class ArcCommandContribution implements CommandContribution, MenuContribu
   registerMenus(menus: MenuModelRegistry): void {
     menus.registerSubmenu(ARC_MENU_MAIN, 'ARC');
 
-    Object.values(ArcCommands).forEach(cmd => {
-      menus.registerMenuAction(ARC_MENU_MAIN, {
-        commandId: cmd.id,
-        label: cmd.label,
-      });
+    // Group 1: Run
+    menus.registerMenuAction(ARC_MENU_MAIN, {
+      commandId: ArcCommands.RUN_AGENT.id,
+      label: 'Run Agent',
+    });
+    menus.registerMenuAction(ARC_MENU_MAIN, {
+      commandId: ArcCommands.COMPARE_MODELS.id,
+      label: 'Compare Models',
+    });
+
+    // Group 2: Views
+    menus.registerMenuAction(ARC_MENU_MAIN, {
+      commandId: ArcCommands.OPEN_TIMELINE.id,
+      label: 'Open Timeline',
+    });
+    menus.registerMenuAction(ARC_MENU_MAIN, {
+      commandId: ArcCommands.COMPARE_RUNS.id,
+      label: 'Compare Runs',
+    });
+    menus.registerMenuAction(ARC_MENU_MAIN, {
+      commandId: ArcCommands.EVALUATE_RUN.id,
+      label: 'Evaluate Run',
+    });
+
+    // Group 3: Tools
+    menus.registerMenuAction(ARC_MENU_MAIN, {
+      commandId: ArcCommands.RUNTIME_DOCTOR.id,
+      label: 'Runtime Doctor',
+    });
+    menus.registerMenuAction(ARC_MENU_MAIN, {
+      commandId: ArcCommands.INSPECT_WORKSPACE.id,
+      label: 'Inspect Workspace',
+    });
+
+    // Group 4: Export
+    menus.registerMenuAction(ARC_MENU_MAIN, {
+      commandId: ArcCommands.EXPORT_TRACE_TO_OTLP.id,
+      label: 'Export Trace to OTLP',
     });
   }
 }
