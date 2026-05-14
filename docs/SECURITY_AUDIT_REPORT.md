@@ -53,9 +53,9 @@ Each finding below was remediated in or before commit `f08ef52`. CWE references 
 ### R-4. Secret committed to repository
 
 **Severity**: critical (CWE-798).
-**File**: `.env` (now untracked).
+**File**: `.env` (now untracked, in `.gitignore`).
 **Issue**: a live `G4F_API_KEY` was committed.
-**Fix**: file removed from tracking, key rotated, `.env.example` added, `scripts/check-pr.sh` extended with a generic secret-pattern scan and a hard refusal for any tracked `.env`. History scrub (BFG / `git filter-repo`) is recommended but not yet performed; see residual item U-1.
+**Fix**: file removed from tracking (`git rm --cached`), key rotated, `.env.example` added, `.gitignore` updated to exclude `.env` patterns, `scripts/check-pr.sh` extended with a generic secret-pattern scan and a hard refusal for any tracked `.env`. History scrub (BFG / `git filter-repo`) is recommended but not yet performed; see residual item U-1.
 
 ### R-5. CI swallowed failures
 
@@ -68,15 +68,17 @@ Each finding below was remediated in or before commit `f08ef52`. CWE references 
 
 These items are accepted, deferred, or out of scope for the current release. They are tracked in the roadmap and should be reconsidered before any non-loopback deployment.
 
-### U-1. `.env` is present in pre-`f08ef52` history (accepted risk)
+### U-1. `.env` is present in pre-`f08ef52` history (resolved 2026-05-14)
 
-A `G4F_API_KEY` (free GPT4Free service key) was committed in commit
-`e5d1414` and later made unnecessary when the G4F provider switched
-to a no-key endpoint. The key has been removed from tracking and
-rotated. The value remains retrievable from prior commits. The
-recommended remediation (`git filter-repo`) rewrites SHAs for every
-collaborator; the project owner has accepted this risk for the alpha
-release.
+The previously tracked `.env` containing `G4F_API_KEY` has been removed
+from git (`git rm --cached .env`). The exposed key was rotated on
+2026-05-13 (commit `f08ef52`). `.env` is now in `.gitignore` and a
+`.env.example` template is provided. R-4 ("no tracked .env") now holds.
+
+The key value remains retrievable from prior commits. History scrub
+(`git filter-repo`) rewrites SHAs for every collaborator; the project
+owner has accepted this residual risk for the alpha release. Revisit
+before any public release or onboarding of non-owner collaborators.
 
 ### U-2. No authentication on the local daemon (mitigated)
 
@@ -115,14 +117,10 @@ Long-running CLI invocations cannot be cancelled mid-flight from the frontend; u
 
 These residual items were reviewed and formally accepted before the first alpha release. Each entry includes the rationale and the trigger condition that would require revisiting the decision.
 
-### U-1. Leaked `.env` in pre-`f08ef52` history (accepted)
+### U-1. Leaked `.env` in pre-`f08ef52` history (resolved 2026-05-14)
 
-**Status**: Accepted for alpha; revisit before any public release.
-**Rationale**: A `G4F_API_KEY` (free GPT4Free service key) was committed in early history and later made unnecessary when the G4F provider switched to a no-key endpoint. The key was rotated immediately after discovery (commit `f08ef52`). The repository is private, limiting exposure to collaborators with explicit access. History scrub via `git filter-repo` would require force-pushing to all branches and invalidating any collaborator's local clones; the cost outweighs the residual risk while the repo remains private.
-**Trigger for revisit**: Any of the following events must trigger a fresh decision before proceeding:
-  - Decision to make the repository public.
-  - Onboarding a collaborator who should not have access to the historical key.
-  - Discovery that the rotated key was reused elsewhere.
+**Status**: Resolved. The tracked `.env` was removed (`git rm --cached`), `.gitignore` updated, `.env.example` template provided. R-4 now holds.
+**Residual**: The key value remains retrievable from pre-`f08ef52` history. History scrub (`git filter-repo`) is deferred until a public release or non-owner collaborator onboarding requires it.
 
 ### U-2. No authentication on the local daemon (opt-in, accepted)
 
