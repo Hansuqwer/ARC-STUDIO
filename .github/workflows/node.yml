@@ -9,23 +9,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
       - name: Native build dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libx11-dev libxkbfile-dev libsecret-1-dev
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - name: Bootstrap tests
         run: |
           node tests/unit/arc-protocol.test.js
           node packages/arc-test-fixtures/src/index.js
       - name: PR hygiene
         run: bash scripts/check-pr.sh
-      - name: Install
-        run: pnpm install --frozen-lockfile=false
-      - name: Build
-        run: pnpm build
+      - name: Build all packages
+        run: pnpm -r build
       - name: Workspace tests
         run: pnpm -r --filter '!@arc-studio/e2e-tests' test
