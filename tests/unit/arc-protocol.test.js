@@ -81,8 +81,8 @@ test('Fixture is clearly marked as mock', () => {
 test('Theia startRun uses positional workflow CLI argument', () => {
   const servicePath = path.join(__dirname, '../../theia-extensions/arc-core/src/node/arc-service-impl.ts');
   const source = fs.readFileSync(servicePath, 'utf8');
-  assert.ok(source.includes("const args = ['run', workflowId];"));
-  assert.ok(!source.includes("['run', '--workflow', workflowId]"));
+  assert.ok(source.includes("const args = ['run', request.workflow_id,"));
+  assert.ok(!source.includes("['run', '--workflow',"));
 });
 
 test('Theia backend error envelope preserves sanitized details', () => {
