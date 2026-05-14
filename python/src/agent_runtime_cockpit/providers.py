@@ -14,7 +14,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 
 
-ProviderId = Literal["openai", "anthropic", "openrouter", "qwen", "kimi", "g4f-groq", "g4f-gemini", "g4f-nvidia", "g4f-pollinations", "g4f-ollama"]
+ProviderId = Literal["openai", "anthropic", "openrouter", "qwen", "kimi"]
 
 
 class AuthHeaderStyle(str, Enum):
@@ -257,11 +257,6 @@ PROVIDERS: list[ProviderDefinition] = [
     ProviderDefinition(id="openrouter", display_name="OpenRouter", default_base_url="https://openrouter.ai/api/v1", env_key_names=["OPENROUTER_API_KEY"], default_models=["openai/gpt-4.1-mini", "anthropic/claude-sonnet-4"], supports_tools=True),
     ProviderDefinition(id="qwen", display_name="Qwen", default_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1", env_key_names=["QWEN_API_KEY", "DASHSCOPE_API_KEY"], default_models=["qwen-max", "qwen-plus", "qwen-turbo"], supports_tools=True),
     ProviderDefinition(id="kimi", display_name="Kimi / Moonshot", default_base_url="https://api.moonshot.ai/v1", env_key_names=["MOONSHOT_API_KEY", "KIMI_API_KEY"], default_models=["kimi-k2", "moonshot-v1-128k", "moonshot-v1-32k"], supports_tools=True),
-    ProviderDefinition(id="g4f-groq", display_name="G4F: Groq (Free)", default_base_url="https://g4f.space/api/groq", env_key_names=[], default_models=["llama-3.1-8b-instant", "llama-3.3-70b-versatile", "qwen/qwen3-32b"], supports_tools=True),
-    ProviderDefinition(id="g4f-gemini", display_name="G4F: Gemini (Free)", default_base_url="https://g4f.space/api/gemini", env_key_names=[], default_models=["models/gemini-2.5-flash", "models/gemini-3-flash-preview", "models/gemini-flash-latest"], supports_tools=True),
-    ProviderDefinition(id="g4f-nvidia", display_name="G4F: Nvidia (Free)", default_base_url="https://g4f.space/api/nvidia", env_key_names=[], default_models=["deepseek-ai/deepseek-v4-pro", "nvidia/nemotron-3-super-120b-a12b", "meta/llama-3.3-70b-instruct"], supports_tools=True),
-    ProviderDefinition(id="g4f-pollinations", display_name="G4F: Pollinations (Free)", default_base_url="https://g4f.space/api/pollinations", env_key_names=[], default_models=["openai-fast", "claude-fast", "gemini-fast", "mistral"], supports_tools=True),
-    ProviderDefinition(id="g4f-ollama", display_name="G4F: Ollama (Free)", default_base_url="https://g4f.space/api/ollama", env_key_names=[], default_models=["deepseek-v4-pro", "glm-5.1", "qwen3.5:397b", "nemotron-3-super"], supports_tools=True),
 ]
 
 DEFAULT_ROUTING = ProviderRoutingPolicy()
