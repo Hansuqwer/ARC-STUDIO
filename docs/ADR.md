@@ -229,5 +229,26 @@ Plan to collapse into single canonical backend in future phase.
 
 ---
 
-**Last Reviewed:** 2026-05-13  
+## ADR-011: SwarmGraph Runner Canonical Path
+
+**Status:** Accepted  
+**Date:** 2026-05-14
+
+**Context:**  
+Two parallel SwarmGraph implementations existed with divergent security, gating, and event streaming behavior. The CLI subprocess path had a P0 security vulnerability ([#10](https://github.com/Hansuqwer/arc-theia-studio/issues/10)).
+
+**Decision:**  
+Modular `SwarmGraphRunner` is canonical. CLI subprocess path is deprecated. Cost gating unified via `require_dual_gate()`. Workspace-rooted launchers permanently removed.
+
+**Consequences:**
+- ✅ Security: no executable from untrusted workspaces
+- ✅ Gating: single source of truth (`require_dual_gate`)
+- ✅ Streaming: real-time AG-UI events for all backends
+- ✅ 23 security-focused and gating tests added
+- ⚠️ Breaking change: users must configure `ARC_SWARMGRAPH_CLI`
+- ⚠️ Monolithic path emits deprecation warning
+
+---
+
+**Last Reviewed:** 2026-05-14  
 **Next Review:** When major architecture changes are made

@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import uuid
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -291,6 +292,13 @@ class SwarmGraphAdapter(RuntimeAdapter):
         workspace = Path(str(inputs.get("workspace") or ".")).resolve()
         cli = self._resolve_cli(workspace)
         backend, allow_costs = require_dual_gate("SWARMGRAPH")
+
+        warnings.warn(
+            "SwarmGraph.run_workflow() (CLI subprocess path) is deprecated. "
+            "Use SwarmGraphRunner with ARC_SWARMGRAPH_RUN_BACKEND=stub|local|gateway.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         provider = os.environ.get("AI_PROVIDER_SWARM_GATEWAY_DEFAULT_PROVIDER", "openai")
         prompt = str(inputs.get("prompt") or f"Run ARC workflow {workflow_id}")
         run_id = f"run-sg-{uuid.uuid4().hex[:8]}"
