@@ -7,7 +7,9 @@ const source = fs.readFileSync(path.join(__dirname, '../src/browser/arc-chat-wid
 
 test('ARC Chat submits prompts via ArcFrontendService.startRun', () => {
   assert.match(source, /class ArcChatWidget/);
-  assert.match(source, /this\.arcService\.startRun\('wf-swarmgraph-001', \{ prompt \}/);
+  assert.match(source, /let workflowId = 'wf-swarmgraph-001'/);
+  assert.match(source, /const inputs: Record<string, unknown> = \{ prompt \}/);
+  assert.match(source, /this\.arcService\.startRun\(workflowId, inputs, runtime/);
 });
 
 test('ARC Chat exposes combo runtime selection and readiness messaging', () => {

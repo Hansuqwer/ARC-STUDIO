@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "packages/arc-protocol-ts" },
+    { "path": "packages/arc-ag-ui" },
     { "path": "theia-extensions/arc-core" },
     { "path": "theia-extensions/arc-workflows" },
     { "path": "theia-extensions/arc-runs" },
@@ -12,7 +13,6 @@
     { "path": "theia-extensions/arc-health" },
     { "path": "theia-extensions/arc-event-stream" },
     { "path": "theia-extensions/arc-product" },
-    { "path": "theia-extensions/arc-settings" },
-    { "path": "packages/arc-ag-ui" }
+    { "path": "theia-extensions/arc-settings" }
   ]
 }
