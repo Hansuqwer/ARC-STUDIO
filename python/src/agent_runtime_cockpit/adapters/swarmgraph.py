@@ -525,7 +525,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
         """Return a clearly marked demo run for tests/manual demos only."""
         import datetime
         run_id = f"run-sg-{uuid.uuid4().hex[:8]}"
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.timezone.utc)
 
         events = [
             RunEvent(type="RUN_STARTED",      timestamp=now.isoformat()+"Z", run_id=run_id, sequence=0, data={"workflow": workflow_id}),

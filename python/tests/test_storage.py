@@ -8,7 +8,7 @@ from agent_runtime_cockpit.protocol.schemas import RunRecord, RunEvent, RunStatu
 
 
 def make_run(run_id: str = "run-test-001") -> RunRecord:
-    now = datetime.datetime.utcnow().isoformat() + "Z"
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
     return RunRecord(
         id=run_id,
         workflow_id="wf-test",

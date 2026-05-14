@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -45,7 +45,7 @@ class ContextPackGenerator:
         try:
             self.output_dir.mkdir(parents=True, exist_ok=True)
             slug = task.lower().replace(" ", "-")[:40]
-            ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
             out_path = self.output_dir / f"pack-{slug}-{ts}.json"
             out_path.write_text(json.dumps(
                 [e.model_dump() for e in entries], indent=2, default=str

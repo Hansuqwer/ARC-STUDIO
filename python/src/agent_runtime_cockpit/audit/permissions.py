@@ -34,7 +34,7 @@ def log_permission_decision(
         "profile_id": profile_id,
         "decision": decision,
         "reason": reason,
-        "timestamp": dt.datetime.utcnow().isoformat() + "Z",
+        "timestamp": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
     }
     if details:
         event["details"] = details

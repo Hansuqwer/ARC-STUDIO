@@ -39,7 +39,7 @@ class AuditChainWriter:
         chain_hash = sha256_hex(f"{self._prev}:{event_hash}".encode("utf-8"))
         record = {
             "seq": self._seq,
-            "ts": dt.datetime.utcnow().isoformat() + "Z",
+            "ts": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
             "event_hash": event_hash,
             "prev_hash": self._prev,
             "chain_hash": chain_hash,

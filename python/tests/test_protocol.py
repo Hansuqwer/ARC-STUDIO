@@ -84,7 +84,7 @@ class TestDomainModels:
         import datetime
         run = RunRecord(
             id="run-001", workflow_id="wf-001", runtime="swarmgraph",
-            status=RunStatus.COMPLETED, started_at=datetime.datetime.utcnow().isoformat(),
+            status=RunStatus.COMPLETED, started_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         )
         assert run.status == RunStatus.COMPLETED
         assert run.events == []

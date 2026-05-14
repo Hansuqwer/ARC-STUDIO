@@ -48,7 +48,7 @@ def ok(data: T, *, adapter: str | None = None, workspace: str | None = None,
             adapter=adapter,
             workspace=workspace,
             duration_ms=duration_ms,
-            timestamp=datetime.datetime.utcnow().isoformat() + "Z",
+            timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
         ),
     )
 
@@ -59,5 +59,5 @@ def err(code: str, message: str, details: dict | None = None) -> ArcEnvelope[Non
     return ArcEnvelope(
         ok=False,
         error=ArcError(code=code, message=message, details=details),
-        meta=ArcMeta(timestamp=datetime.datetime.utcnow().isoformat() + "Z"),
+        meta=ArcMeta(timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")),
     )

@@ -44,7 +44,7 @@ class SwarmGraphRunner:
                         "runtime": "swarmgraph",
                         "backend": backend.value,
                         "estimated_provider": os.environ.get("ARC_SWARMGRAPH_PROVIDER", "unknown"),
-                        "gated_at": dt.datetime.utcnow().isoformat() + "Z",
+                        "gated_at": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
                     },
                 }
                 trace.write(warning)
