@@ -48,10 +48,8 @@ export class TraceParser {
 
             const duration = Date.now() - startTime;
             const eventCount = result?.events?.length || 0;
-            console.log(
-                `[ARC Performance] Parsed trace in ${duration}ms ` +
-                `(${eventCount} events, ${content.split('\n').length} lines)`
-            );
+            // [ARC Performance] Parsed trace in ${duration}ms
+            // (${eventCount} events, ${content.split('\n').length} lines)
 
             return result;
         } catch (error) {
