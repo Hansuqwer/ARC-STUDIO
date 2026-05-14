@@ -12,7 +12,7 @@ from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import RunEvent, RunRecord, RunStatus
 
 RuntimeId = Literal["swarmgraph", "langgraph", "crewai", "lmarena"]
-KNOWN_RUNTIMES: tuple[RuntimeId, ...] = ("swarmgraph", "langgraph", "crewai", "lmarena")
+KNOWN_RUNTIMES: tuple[RuntimeId, ...] = ("swarmgraph", "langgraph", "crewai", "openai-agents", "ag2", "llamaindex", "lmarena")
 AUTO_PRIORITY: tuple[RuntimeId, ...] = ("swarmgraph", "langgraph", "crewai", "lmarena")
 
 

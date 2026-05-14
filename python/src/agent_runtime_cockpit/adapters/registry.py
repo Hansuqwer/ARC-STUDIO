@@ -81,6 +81,7 @@ class AdapterRegistry:
 
     def build_default(self) -> "AdapterRegistry":
         """Build registry with all built-in adapters."""
+        from .ag2_adapter import AG2Adapter
         from .crewai import CrewAIAdapter
         from .swarmgraph import SwarmGraphAdapter
         from .langgraph import LangGraphAdapter
@@ -91,6 +92,7 @@ class AdapterRegistry:
         self.register(LangGraphAdapter())
         self.register(CrewAIAdapter())
         self.register(OpenAIAgentsAdapter())
+        self.register(AG2Adapter())
         self.register(LlamaIndexAdapter())
         self.register(LmarenaAdapter())
         return self
