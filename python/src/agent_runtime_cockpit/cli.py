@@ -2,6 +2,8 @@
 ARC CLI — Agent Runtime Cockpit command-line interface.
 
 Commands:
+  arc version    — print ARC version information
+  arc health     — check ARC daemon and environment health
   arc inspect    — inspect workspace, detect runtimes
   arc runtimes   — list detected runtimes
   arc workflows  — list detected workflows
@@ -26,6 +28,7 @@ from rich.table import Table
 from rich.json import JSON
 from rich import print as rprint
 
+from . import __version__ as arc_version
 from .adapters.registry import default_registry
 from .context.pack import ContextPackGenerator
 from .gating import GatingError
@@ -114,6 +117,85 @@ def check_swarmgraph_runtime(timeout: float = 5.0) -> dict[str, object]:
             "version": output[0][:200] if output else "",
         })
     return {"ok": any(bool(check.get("available")) for check in checks), "checks": checks}
+
+
+# ─── version ──────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def version(
+    json_output: bool = JSON_FLAG,
+) -> None:
+    """Print ARC version information."""
+    import sys
+    data = {
+        "version": arc_version,
+        "python": sys.version.split()[0],
+        "platform": sys.platform,
+    }
+    envelope = ok(data)
+    _out(envelope, json_output)
+
+
+# ─── health ───────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def health(
+    json_output: bool = JSON_FLAG,
+) -> None:
+    """Check ARC daemon and environment health."""
+    import os
+    import sys
+    import time
+    t0 = time.time()
+
+    checks: list[dict] = []
+    all_ok = True
+
+    # Check daemon reachability (optional, non-blocking)
+    daemon_host = os.environ.get("ARC_DAEMON_HOST", "127.0.0.1")
+    daemon_port = os.environ.get("ARC_DAEMON_PORT", "7777")
+    try:
+        import urllib.request
+        req = urllib.request.Request(f"http://{daemon_host}:{daemon_port}/health")
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            daemon_ok = resp.status == 200
+            if not daemon_ok:
+                all_ok = False
+            checks.append({
+                "check": "daemon",
+                "ok": daemon_ok,
+                "status": resp.status if daemon_ok else "unhealthy",
+            })
+    except Exception as exc:
+        all_ok = False
+        checks.append({
+            "check": "daemon",
+            "ok": False,
+            "status": f"unreachable: {type(exc).__name__}",
+        })
+
+    # Check Python environment
+    checks.append({
+        "check": "python",
+        "ok": True,
+        "version": sys.version.split()[0],
+    })
+
+    # Check CLI available
+    checks.append({
+        "check": "cli",
+        "ok": True,
+        "version": arc_version,
+    })
+
+    data = {
+        "ok": all_ok,
+        "checks": checks,
+    }
+    envelope = ok(data, duration_ms=(time.time() - t0) * 1000)
+    _out(envelope, json_output)
 
 
 # ─── inspect ──────────────────────────────────────────────────────────────────
