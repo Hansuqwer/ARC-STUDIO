@@ -4,6 +4,7 @@ ARC CLI — Agent Runtime Cockpit command-line interface.
 Commands:
   arc version    — print ARC version information
   arc health     — check ARC daemon and environment health
+  arc status     — show ARC workspace and runtime status overview
   arc inspect    — inspect workspace, detect runtimes
   arc runtimes   — list detected runtimes
   arc workflows  — list detected workflows
@@ -11,6 +12,7 @@ Commands:
   arc serve      — start HTTP daemon
   arc run        — execute a workflow
   arc runs       — list stored runs
+  arc doctor     — diagnostics (swarmgraph, all)
   arc context    — context retrieval commands
   arc adapter    — adapter management and conformance testing
 """
@@ -195,6 +197,62 @@ def health(
         "checks": checks,
     }
     envelope = ok(data, duration_ms=(time.time() - t0) * 1000)
+    _out(envelope, json_output)
+
+
+# ─── status ───────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def status(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show ARC workspace and runtime status overview."""
+    import time
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    t0 = time.time()
+
+    # Detect runtimes
+    registry = default_registry()
+    runtimes = registry.detect_all(ws)
+    runtime_list = []
+    for rt in runtimes:
+        adapter = registry.get(rt.adapter)
+        if adapter is not None:
+            report = adapter.capability_report(ws)
+            runtime_list.append({
+                "id": rt.adapter,
+                "detected": True,
+                "can_run": report.can_run,
+                "paid": report.requires_paid_calls,
+            })
+        else:
+            runtime_list.append({
+                "id": rt.adapter,
+                "detected": True,
+                "can_run": False,
+                "note": "adapter not found in registry",
+            })
+
+    # Trace count
+    from .storage.jsonl import JsonlTraceStore
+    store = JsonlTraceStore(ws / ".arc" / "traces")
+    trace_ids = store.list_runs()
+
+    # Python files in workspace
+    py_files = len(list(ws.rglob("*.py"))) if ws.is_dir() else 0
+
+    data = {
+        "workspace": str(ws),
+        "runtimes": runtime_list,
+        "runtime_count": len(runtime_list),
+        "trace_count": len(trace_ids),
+        "python_files": py_files,
+    }
+    envelope = ok(data, workspace=str(ws), duration_ms=(time.time() - t0) * 1000)
     _out(envelope, json_output)
 
 
@@ -442,6 +500,102 @@ def doctor_swarmgraph(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -
     report = check_swarmgraph_runtime()
     _out(ok(report), json_output)
     if not report["ok"]:
+        raise typer.Exit(1)
+
+
+@doctor_app.command("all")
+def doctor_all(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
+    """Run all diagnostic checks and report overall health.
+
+    Runs runtime detection, daemon connectivity, and environment checks
+    without executing any workflow.
+    """
+    import os
+    import sys
+    _setup_logging(debug)
+
+    checks: list[dict] = []
+    all_ok = True
+
+    # 1. Python environment
+    checks.append({
+        "check": "python",
+        "ok": True,
+        "version": sys.version.split()[0],
+    })
+
+    # 2. Package version
+    checks.append({
+        "check": "cli",
+        "ok": True,
+        "version": arc_version,
+    })
+
+    # 3. Runtime detection
+    try:
+        ws = Path.cwd()
+        registry = default_registry()
+        runtimes = registry.detect_all(ws)
+        runtime_names = [r.adapter for r in runtimes]
+        checks.append({
+            "check": "runtimes",
+            "ok": True,
+            "detected": runtime_names,
+            "count": len(runtime_names),
+        })
+    except Exception as e:
+        all_ok = False
+        checks.append({
+            "check": "runtimes",
+            "ok": False,
+            "error": str(e),
+        })
+
+    # 4. Daemon connectivity (best-effort, non-blocking)
+    daemon_host = os.environ.get("ARC_DAEMON_HOST", "127.0.0.1")
+    daemon_port = os.environ.get("ARC_DAEMON_PORT", "7777")
+    try:
+        import urllib.request
+        req = urllib.request.Request(f"http://{daemon_host}:{daemon_port}/health")
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            daemon_reachable = resp.status == 200
+            checks.append({
+                "check": "daemon",
+                "ok": daemon_reachable,
+                "reachable": daemon_reachable,
+            })
+            if not daemon_reachable:
+                all_ok = False
+    except Exception:
+        checks.append({
+            "check": "daemon",
+            "ok": False,
+            "reachable": False,
+            "note": "daemon not running (offline-first is normal)",
+        })
+
+    # 5. SwarmGraph CLI availability
+    try:
+        sg = check_swarmgraph_runtime()
+        sg_ok = sg.get("ok", False)
+        checks.append({
+            "check": "swarmgraph_cli",
+            "ok": sg_ok,
+            "details": sg,
+        })
+        if not sg_ok:
+            all_ok = False
+    except Exception as e:
+        all_ok = False
+        checks.append({
+            "check": "swarmgraph_cli",
+            "ok": False,
+            "error": str(e),
+        })
+
+    data = {"ok": all_ok, "checks": checks}
+    _out(ok(data), json_output)
+    if not all_ok:
         raise typer.Exit(1)
 
 
