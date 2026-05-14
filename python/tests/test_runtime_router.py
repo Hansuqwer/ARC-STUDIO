@@ -87,12 +87,16 @@ async def test_combo_adapter_runs_members_sequentially(monkeypatch, tmp_path):
 
 
 def test_auto_selects_swarmgraph_by_priority(monkeypatch, tmp_path):
-    cli = tmp_path / "swarmgraph"
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    tools = tmp_path / "bin"
+    tools.mkdir()
+    cli = tools / "swarmgraph"
     cli.write_text("#!/usr/bin/env sh\nprintf '%s\n' '{\"status\":\"completed\"}'\n")
     cli.chmod(cli.stat().st_mode | 0o111)
     monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))
 
-    routed = runtime_router.resolve(tmp_path, "auto")
+    routed = runtime_router.resolve(ws, "auto")
 
     assert routed.adapter.adapter_id == "swarmgraph"
     assert routed.chosen_by == "auto"

@@ -13,7 +13,9 @@ def test_run_blocks_non_stub_without_allow_costs(run_cli, cli_app, workspace, mo
     if not _has(cli_app, "run"):
         import pytest
         pytest.skip("no `run` subcommand")
-    cli = workspace / "swarmgraph"
+    tools = workspace.parent / "bin"
+    tools.mkdir(parents=True, exist_ok=True)
+    cli = tools / "swarmgraph"
     cli.write_text("#!/usr/bin/env sh\nprintf '%s\n' '{}'\n")
     cli.chmod(cli.stat().st_mode | 0o111)
     monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))

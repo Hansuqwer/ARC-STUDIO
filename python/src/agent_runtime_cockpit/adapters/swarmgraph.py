@@ -395,16 +395,29 @@ class SwarmGraphAdapter(RuntimeAdapter):
         )
 
     def _resolve_cli(self, workspace: Path) -> Path:
-        if os.environ.get("ARC_SWARMGRAPH_CLI"):
-            configured = Path(os.environ["ARC_SWARMGRAPH_CLI"])
-            if configured.exists():
-                return configured
-            raise FileNotFoundError(f"Configured SwarmGraph launcher not found: {configured}")
-        candidates = [workspace / "swarmgraph"]
-        for candidate in candidates:
-            if candidate and candidate.exists():
-                return candidate
-        raise FileNotFoundError("SwarmGraph launcher not found. Set ARC_SWARMGRAPH_CLI or open the SwarmGraph install workspace.")
+        configured = os.environ.get("ARC_SWARMGRAPH_CLI")
+        if not configured:
+            raise FileNotFoundError(
+                "SwarmGraph launcher not configured. Set ARC_SWARMGRAPH_CLI to "
+                "a trusted launcher outside the workspace."
+            )
+
+        cli = Path(configured).expanduser().resolve()
+        root = workspace.resolve()
+
+        if not cli.exists() or not cli.is_file():
+            raise FileNotFoundError(f"Configured SwarmGraph launcher not found: {cli}")
+        if root in cli.parents or cli == root:
+            raise PermissionError(
+                "ARC_SWARMGRAPH_CLI must not point inside the workspace. "
+                "Workspace-rooted launchers are rejected for security."
+            )
+        if not os.access(str(cli), os.X_OK):
+            raise PermissionError(
+                f"Configured SwarmGraph launcher is not executable: {cli}"
+            )
+
+        return cli
 
     def _event(self, run_id: str, sequence: int, event_type: str, data: dict[str, Any]) -> RunEvent:
         return RunEvent(

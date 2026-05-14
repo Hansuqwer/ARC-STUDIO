@@ -10,13 +10,15 @@ from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
 from agent_runtime_cockpit.web.server import create_app
 
 
-def _write_swarmgraph_cli(workspace: Path) -> None:
-    cli = workspace / "swarmgraph"
+def _write_swarmgraph_cli(tools_dir: Path) -> Path:
+    cli = tools_dir / "swarmgraph"
+    cli.parent.mkdir(parents=True, exist_ok=True)
     cli.write_text(
         "#!/usr/bin/env sh\n"
         "printf '%s\n' '{\"swarm_id\":\"sg-api\",\"status\":\"completed\",\"worker_count\":0,\"final_output\":\"ok\"}'\n"
     )
     cli.chmod(cli.stat().st_mode | 0o111)
+    return cli
 
 
 def _write_langgraph_export(workspace: Path) -> None:
@@ -115,11 +117,14 @@ async def test_runs_api_and_sse_events(tmp_path, unused_tcp_port):
 
 
 async def test_start_run_runtime_body_selects_langgraph(monkeypatch, tmp_path, unused_tcp_port):
-    _write_swarmgraph_cli(tmp_path)
-    _write_langgraph_export(tmp_path)
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    cli = _write_swarmgraph_cli(tmp_path / "bin")
+    monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))
+    _write_langgraph_export(ws)
     monkeypatch.setenv("ARC_LANGGRAPH_EXPORT", "graph_module:build_graph")
 
-    app = await create_app(tmp_path)
+    app = await create_app(ws)
     runner = AppRunner(app)
     await runner.setup()
     site = TCPSite(runner, "127.0.0.1", unused_tcp_port)
@@ -181,10 +186,13 @@ async def test_start_run_get_runtime_query_uses_same_router(monkeypatch, tmp_pat
 
 
 async def test_start_run_allow_paid_calls_true_does_not_change_swarmgraph_stub(monkeypatch, tmp_path, unused_tcp_port):
-    _write_swarmgraph_cli(tmp_path)
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    cli = _write_swarmgraph_cli(tmp_path / "bin")
+    monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))
     monkeypatch.delenv("ARC_LANGGRAPH_EXPORT", raising=False)
 
-    app = await create_app(tmp_path)
+    app = await create_app(ws)
     runner = AppRunner(app)
     await runner.setup()
     site = TCPSite(runner, "127.0.0.1", unused_tcp_port)
@@ -223,10 +231,13 @@ async def test_start_run_runtime_body_crewai_not_runnable(tmp_path, unused_tcp_p
 
 
 async def test_start_run_runtime_body_omitted_uses_auto(monkeypatch, tmp_path, unused_tcp_port):
-    _write_swarmgraph_cli(tmp_path)
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    cli = _write_swarmgraph_cli(tmp_path / "bin")
+    monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))
     monkeypatch.delenv("ARC_LANGGRAPH_EXPORT", raising=False)
 
-    app = await create_app(tmp_path)
+    app = await create_app(ws)
     runner = AppRunner(app)
     await runner.setup()
     site = TCPSite(runner, "127.0.0.1", unused_tcp_port)
