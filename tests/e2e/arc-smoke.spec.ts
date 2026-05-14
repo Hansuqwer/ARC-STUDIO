@@ -153,7 +153,7 @@ test.describe('ARC Studio — Smoke Tests', () => {
     await expect(page.getByText('Connect SSE Stream')).toBeAttached({ timeout: TIMEOUT });
 
     await page.reload({ waitUntil: 'networkidle', timeout: TIMEOUT });
-    await expect(page.getByText('completed').first()).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText(runId!.substring(0, 12)).first()).toBeVisible({ timeout: TIMEOUT });
     const { execSync } = require('child_process');
     const output = execSync(
       `cd "${join(REPO_ROOT, 'python')}" && .venv/bin/arc runs --workspace "${ARC_WORKSPACE}" --json`,
