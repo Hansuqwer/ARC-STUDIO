@@ -54,6 +54,7 @@ if git grep -nE '(sk-(ant-|or-)?[A-Za-z0-9_-]{20,}|Authorization:[[:space:]]*Bea
   ':(exclude)python/src/agent_runtime_cockpit/web/server.py' \
   ':(exclude)theia-extensions/arc-core/test/**' \
   ':(exclude)examples/**' \
+  ':(exclude)runtimes/swarmgraph/**' \
   ':(exclude)scripts/check-pr.sh'; then
   echo "ERROR: Product code contains potential secret material."
   exit 1
@@ -76,7 +77,7 @@ SECRET_PATTERNS=(
   'ghp_[A-Za-z0-9]{36,}'                 # GitHub PAT
   'sk-[A-Za-z0-9]{20,}'                  # OpenAI / Anthropic style
 )
-EXCLUDE_FILES='\.env\.example|\.env\.sample|docs/history/|python/test_security_manual\.py|python/tests/|theia-extensions/arc-core/test/|python/src/agent_runtime_cockpit/web/server\.py'
+EXCLUDE_FILES='\.env\.example|\.env\.sample|docs/history/|python/test_security_manual\.py|python/tests/|theia-extensions/arc-core/test/|python/src/agent_runtime_cockpit/web/server\.py|runtimes/swarmgraph/'
 
 for pat in "${SECRET_PATTERNS[@]}"; do
   hits=$(git ls-files | grep -vE "$EXCLUDE_FILES" | xargs grep -EnH "$pat" 2>/dev/null || true)

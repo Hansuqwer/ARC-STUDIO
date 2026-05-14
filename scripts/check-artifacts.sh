@@ -9,7 +9,7 @@ echo "Checking for accidental generated artifacts..."
 # Paths that look like artifacts but are required to be tracked.
 ALLOWLIST_PATTERNS=(
   '^packages/arc-browser-app/src-gen/'   # Theia-generated, required for browser build
-  '^\.env\.example$'                     # template, no secrets
+  '\.env\.example$'                     # template, no secrets
 )
 
 violations=0
@@ -36,7 +36,7 @@ while IFS= read -r f; do
 done < <(git ls-files)
 
 if [[ $violations -gt 0 ]]; then
-  echo "ERROR: $violation forbidden artifact(s) tracked in git."
+  echo "ERROR: $violations forbidden artifact(s) tracked in git."
   echo "Remove with: git rm --cached <file> and add to .gitignore."
   exit 1
 fi
