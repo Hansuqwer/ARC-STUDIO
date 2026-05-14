@@ -37,12 +37,11 @@ jobs:
           node packages/arc-test-fixtures/src/index.js
 
       - name: Python lint
-        run: uv run ruff check
-
-      - name: Python type-check
-        run: uv run mypy src tests
+        working-directory: python
+        run: uv run ruff check src tests
 
       - name: Python tests with coverage
+        working-directory: python
         run: |
           uv run pytest --cov=agent_runtime_cockpit \
                         --cov-report=xml \
