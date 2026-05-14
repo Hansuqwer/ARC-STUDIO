@@ -2,7 +2,6 @@
 from .entrypoint import resolve_python_entrypoint
 
 # Re-export from workspace.py module for backward compatibility
-import sys
 from pathlib import Path
 
 # Import iter_workspace_files from the workspace.py module

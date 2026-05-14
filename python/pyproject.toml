@@ -64,6 +64,13 @@ markers = [
 line-length = 100
 target-version = "py311"
 
+[tool.ruff.lint]
+# E701/E702: multiple-statement-per-line style is intentional in tight loops
+#   and compact class declarations (ag2/runner.py, test_streaming.py)
+# E741: ambiguous variable name 'l' is accepted in short list comprehensions
+#   (audit/chain.py, test_real_execution.py)
+ignore = ["E701", "E702", "E741"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = false

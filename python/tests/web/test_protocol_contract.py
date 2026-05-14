@@ -27,10 +27,8 @@ async def test_list_runs_envelope_shape(client):
 
 async def test_list_runs_data_are_valid_run_records(client, workspace):
     """Every item in data validates as RunRecord."""
-    from pathlib import Path
     from tests.web.test_runs_endpoints import _seed_trace
 
-    traces_dir = Path(workspace) / ".arc" / "traces"
     _seed_trace(workspace, "run-sg-aaa111", "swarmgraph", "completed")
     _seed_trace(workspace, "run-sg-bbb222", "langgraph", "failed")
 

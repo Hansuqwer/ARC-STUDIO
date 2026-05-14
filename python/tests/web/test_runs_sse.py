@@ -43,7 +43,7 @@ async def _read_sse(response, max_events=10):
                         events.append({"__raw__": body})
                 if len(events) >= max_events:
                     break
-        except:
+        except Exception:
             pass
     return events
 
@@ -65,7 +65,7 @@ async def test_sse_replays_existing_trace(client, workspace):
             assert r.status_code == 200
             # Just verify we can connect to SSE endpoint
             return
-        except:
+        except Exception:
             continue
     pytest.skip("SSE endpoint not mounted")
 
@@ -78,6 +78,6 @@ async def test_sse_unknown_run_returns_404(client):
                 return  # Expected
             if r.status_code == 200:
                 pytest.skip("daemon serves empty SSE for unknown runs; no 404 contract")
-        except:
+        except Exception:
             continue
     pytest.skip("SSE endpoint not mounted")

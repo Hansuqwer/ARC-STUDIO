@@ -123,8 +123,6 @@ async def execute_workflow(request: ExecutionRequest):
 async def get_traces():
     """Get list of trace files"""
     try:
-        traces_dir = WORKSPACE_ROOT / ".arc" / "traces"
-        
         # Validate traces directory is within workspace
         validated_traces_dir = validate_file_path(".arc/traces", str(WORKSPACE_ROOT))
         
