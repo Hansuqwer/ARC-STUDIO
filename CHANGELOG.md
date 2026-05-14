@@ -2,12 +2,13 @@
 
 All notable changes to ARC Studio are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follow [SemVer](https://semver.org/spec/v2.0.0.html); pre-release identifiers (`-alpha`, `-alphaN`) precede a stable `1.0.0`.
 
-There are no git tags yet. The "Unreleased" section below describes what is currently on `main`. The first tag will be cut once the items under "Required before tagging" are resolved.
+The "Unreleased" section below describes what is currently on `main`. The first tag (`v0.1.0-alpha`, cut 2026-05-14) is the alpha release; see [git tag](https://github.com/Hansuqwer/arc-theia-studio/tags).
 
 ## [Unreleased]
 
 ### Added
 
+- `docs/audits/audit-2026-05-14-55b9c25.md` — full 6-dimension health audit (accessibility, architecture, code quality, performance, security, test/CI integrity).
 - Input validators in `theia-extensions/arc-core/src/node/arc-service-impl.ts`: `validateRunId`, `validateOtlpEndpoint`, `resolveWorkspaceRoot`, `safeJoinInsideWorkspace`.
 - `theia-extensions/arc-core/test/start-run-paid-calls.test.js` covering paid-call gating and traversal validators.
 - Root `tsconfig.check.json` + `pnpm typecheck` script.
@@ -24,6 +25,17 @@ There are no git tags yet. The "Unreleased" section below describes what is curr
 
 ### Changed
 
+- `pnpm-lock.yaml` regenerated (was broken: empty `specifiers: {}` for `packages/arc-extension`). `pnpm install --frozen-lockfile` now works on clean clones.
+- `.tool-versions`: pnpm pinned to `9.15.9` (was `9.12.0`).
+- `pnpm-workspace.yaml`: `!theia-extensions/arc-arena` exclusion added (TS build has 5 Theia API drift errors; source retained for revival).
+- `applications/electron/package.json`: removed `arc-arena` dependency.
+- `README.md`: status now references `v0.1.0-alpha` tag; CLI command table includes `eval` (was missing, 12 total); pnpm troubleshooting version synced.
+- `scripts/check-artifacts.sh`: allowlists `packages/arc-browser-app/src-gen/` and `*.env.example` (were falsely flagged as generated artifacts).
+- `scripts/check-pr.sh`: excludes `runtimes/swarmgraph/` from secret scan (vendored project has test fixtures with fake keys).
+- `.github/workflows/node.yml`: steps reordered (install before hygiene), `--frozen-lockfile` restored (was `=false`), pnpm cache added.
+- `.github/workflows/arc-roadmap-gate.yml`: added `pnpm/action-setup@v4` (was missing, causing `pnpm: command not found`), bumped `setup-uv` to v5.
+- `python/pyproject.toml`: registered `needs` pytest marker (was causing `-W error` CI failure); ruff ignores `E701`/`E702`/`E741` (intentional project style patterns).
+- `docs/SECURITY_AUDIT_REPORT.md`: U-1 marked resolved (`.env` untracked, key rotated), R-4 updated.
 - `theia-extensions/arc-core/src/node/arc-service-impl.ts`: `startRun()` now forwards `--allow-paid-calls` and `ARC_SWARMGRAPH_ALLOW_COSTS=true` **only** when `request.allow_paid_calls === true`. Non-boolean truthy values are ignored. `exportTraceToOTLP()` validates both arguments. `workspacePath()` is normalised and validated; all derived paths use `safeJoinInsideWorkspace()`. `runCli()` tracks spawned processes in `runningProcs` Map. Added `cancelRun()` method.
 - `theia-extensions/arc-core/src/common/arc-protocol.ts`: `StartRunRequest.allow_paid_calls` JSDoc documents opt-in default. Added `cancelRun(runId)` to `ArcService` interface.
 - `applications/browser/package.json`, `applications/electron/package.json`: workspace dependencies retargeted to the real `theia-extensions/arc-*` packages.
@@ -38,14 +50,18 @@ There are no git tags yet. The "Unreleased" section below describes what is curr
 
 ### Removed
 
-- Tracked `.env` (free G4F key, rotated, risk accepted; see `docs/SECURITY_AUDIT_REPORT.md` U-1).
+- Tracked `.env` (free G4F key, rotated, untracked via `git rm --cached`; see `docs/SECURITY_AUDIT_REPORT.md` U-1).
+- G4F (GPT4Free) provider definitions — 5 entries removed from both `python/src/agent_runtime_cockpit/providers.py` and `theia-extensions/arc-core/src/node/arc-service-impl.ts`. **Breaking**: configs referencing `g4f-*` provider IDs will now get a runtime error. Migrate to direct provider entries (OpenAI, Anthropic, etc.).
+- `python/tests/test_routes_execute.py` (159 lines, stale FastAPI test, `fastapi` not a dependency).
+- `console.log()` call in `packages/arc-extension/src/node/services/trace-parser.ts` (replaced with breadcrumb comment).
+- Unused `typing.Iterable` import in `ag_ui/__init__.py`, unused `sys` import in `workspace/__init__.py`, unused `traces_dir` assignment in `src/routes.py` and `tests/web/test_protocol_contract.py`.
 - Unused backup/debris files targeted by `scripts/apply-phase3.sh`.
 
 ### Moved
 
 - `docs/FINAL_STATUS.md`, `docs/HANDOFF.md`, `docs/ORCHESTRATOR_HANDOVER_PROMPT.md` → `docs/history/`.
 
-### Required before tagging
+### Known CI gaps
 
-- Decide a first version: `0.1.0-alpha1` or `0.2.0-alpha` depending on whether the runtime hardening counts as additive or breaking.
-- Verify U-1 (`.env` in git history) documented risk acceptance is acknowledged by the release owner.
+- **Node/E2E**: webpack `Aborted (core dump)` exit code 134 during `packages/arc-browser-app prepare` on Ubuntu CI runner. V8 crash during JSON stringification in Theia's webpack pipeline. Workaround: set `NODE_OPTIONS=--max-old-space-size=8192` in CI, or pin Node to a version compatible with this Theia release.
+- **Python**: 52 web/daemon tests return HTTP 500 on Python 3.12/Ubuntu (all pass on Python 3.11/macOS). Suspect asyncio event-loop compatibility (`asyncio.get_event_loop()` vs `asyncio.get_running_loop()` on 3.12). Check `pytest-asyncio` version pin and `asyncio_mode` config.
