@@ -12,6 +12,7 @@ src-gen/
 coverage/
 htmlcov/
 *.pyc
+*.tsbuildinfo
 __pycache__/
 python/docs/context-packs/*.json
 docs/context-packs/*.json
