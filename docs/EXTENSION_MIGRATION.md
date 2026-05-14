@@ -1,0 +1,121 @@
+# Extension Migration Inventory
+
+**Date:** 2026-05-14
+**Source:** `docs/IMPLEMENTATION_PLAN.md` (migration policy), code audit of `theia-extensions/*`
+
+Canonical extension: `packages/arc-extension`
+Status: Wired into `applications/browser` since PR 5 (commit 765beb4), coexisting with
+duplicate `theia-extensions/*` during transition.
+
+---
+
+## Inventory
+
+| # | Extension | Type | Files / Lines | Tests | Overlap w/ canonical | Action | Priority | Notes |
+|---|---|---|---|---|---|---|---|---|
+| 1 | `arc-core` | Both | 14 / 694 | 4 | **Heavy** — protocol types, backend service, main widget, commands, preferences | Archive after salvage | P0 | Duplicate of `packages/arc-extension`. Must port any unique features (status bar, welcome widget, SSE client) before archiving. |
+| 2 | `arc-runs` | FE | 5 / 1181 | 2 | **Heavy** — run timeline, trace viewer, execution | Port | P0 | Largest extension. Run timeline (712 lines) and chat widget (327 lines) are more feature-rich than inline `TraceViewerSection` / `WorkflowExecutionSection`. |
+| 3 | `arc-adapters` | FE | 3 / 240 | 0 | None | Port | P0 | Runtime readiness cards and doctor actions are product-critical. No equivalent in canonical extension. |
+| 4 | `arc-workflows` | FE | 3 / 238 | 0 | None | Port | P0 | Workflow graph SVG visualization. No equivalent in canonical extension. |
+| 5 | `arc-event-stream` | FE | 3 / 973 | 0 | Partial — replaces `TraceViewerSection` | Port | P0 | Significantly richer event visualization than inline component. |
+| 6 | `arc-schemas` | FE | 3 / 162 | 0 | None | Port | P1 | Schema inspector. No equivalent in canonical extension. |
+| 7 | `arc-health` | FE | 3 / 150 | 0 | None | Port small pieces | P1 | Daemon status polling (5s interval). Simple enough to inline. |
+| 8 | `arc-context` | FE | 3 / 114 | 0 | None | Port if in scope | P1 | Context pack viewer. Thin wrapper over existing service. |
+| 9 | `arc-settings` | FE | 2 / 93 | 0 | Partial — prefs overlap | Port prefs only | P1 | Preference schema may duplicate `arc-ui-preferences.ts` in arc-core. Consolidate into canonical. |
+| 10 | `arc-audit` | FE | 3 / 59 | 0 | None (stub) | Archive or rewrite | P1 | Currently shows "Not implemented" with empty array. Keep concept, archive code. |
+| 11 | `arc-arena` | Both | 6 / 520 | 1 | None | Archive | P0 | LM Arena is out of v0.1 scope. Already excluded from workspace config. |
+| 12 | `arc-product` | FE | 2 / 231 | 0 | None (branding) | Archive/delete | P0 | Branding shell. The canonical extension provides its own widget identity. |
+
+---
+
+## Migration Sequence
+
+### Phase A — Port critical UI (P0, ~3 PRs)
+
+These extensions provide product-critical UX missing from `packages/arc-extension`. Port them
+one at a time, adding tests and removing theia-extensions dependency after each port.
+
+| Step | Extension | Method | Gate |
+|------|-----------|--------|------|
+| A.1 | `arc-adapters` | Copy widget and contribution code into `packages/arc-extension/src/browser/components/` | Build + UI contract tests |
+| A.2 | `arc-workflows` | Copy workflow graph widget into canonical extension | Build + UI contract tests |
+| A.3 | `arc-runs` | Copy run timeline widget, replacing inline `TraceViewerSection` and `WorkflowExecutionSection` | Build + all tests pass |
+
+After A.3, the canonical extension should have equivalent or better UI than the
+extensions it replaces.
+
+### Phase B — Port remaining useful UI (P1, ~3 PRs)
+
+| Step | Extension | Method | Gate |
+|------|-----------|--------|------|
+| B.1 | `arc-event-stream` | Replace `TraceViewerSection` with ported event stream widget | Build + UI contract tests |
+| B.2 | `arc-schemas` | Copy schema inspector widget | Build + UI contract tests |
+| B.3 | `arc-health` | Inline daemon health checker into canonical extension | Build |
+| B.4 | `arc-context` | Copy context pack viewer (if context UX remains in scope) | Build |
+| B.5 | `arc-settings` | Consolidate preference schemas; remove from theia-extensions | Build + preference tests |
+
+### Phase C — Archive/delete remaining (P1)
+
+After all useful code is ported:
+
+| Step | Extension | Action |
+|------|-----------|--------|
+| C.1 | `arc-core` | Remove from `applications/browser` deps, add deprecation banner, archive |
+| C.2 | `arc-adapters` | Remove from `applications/browser` deps, archive |
+| C.3 | `arc-runs` | Remove from `applications/browser` deps, archive |
+| C.4 | `arc-workflows` | Remove from `applications/browser` deps, archive |
+| C.5 | `arc-event-stream` | Remove from `applications/browser` deps, archive |
+| C.6 | `arc-schemas` | Remove from `applications/browser` deps, archive |
+| C.7 | `arc-context` | Remove from `applications/browser` deps, archive |
+| C.8 | `arc-settings` | Remove from `applications/browser` deps, archive |
+| C.9 | `arc-health` | Remove from `applications/browser` deps, archive |
+| C.10 | `arc-audit` | Archive directory; document concept for future rewrite |
+| C.11 | `arc-arena` | Already excluded; ensure no import paths remain |
+| C.12 | `arc-product` | Archive directory; branding merged into canonical extension |
+
+---
+
+## Dependency Graph
+
+```
+arc-core ──┬── arc-adapters
+           ├── arc-audit
+           ├── arc-context
+           ├── arc-event-stream
+           ├── arc-health
+           ├── arc-runs
+           ├── arc-schemas
+           └── arc-workflows
+
+arc-arena (standalone, its own backend service)
+arc-product (standalone, no arc-core dependency)
+arc-settings (depends on arc-core for theia types)
+```
+
+All extensions except `arc-product` depend on `arc-core` for:
+- Protocol types (`ArcEnvelope`, `RunRecord`, etc.)
+- `ArcFrontendService` proxy (JSON-RPC to backend)
+- `ArcServiceImpl` (backend CLI/daemon caller)
+- Command registrations
+
+This means `arc-core` must be the LAST extension removed, after its protocol and
+service types are properly represented in `packages/arc-extension` and the Python daemon.
+
+---
+
+## Current State
+
+| Extension | Status |
+|-----------|--------|
+| `arc-adapters` | ⏳ Awaiting port (Phase A.1) |
+| `arc-audit` | 📁 Archive candidate (Phase C) |
+| `arc-arena` | 🗑️ Already excluded from workspace config |
+| `arc-context` | ⏳ Awaiting port decision (Phase B) |
+| `arc-core` | 🏗️ Active — duplicate of canonical extension |
+| `arc-event-stream` | ⏳ Awaiting port (Phase B) |
+| `arc-health` | ⏳ Awaiting port (Phase B) |
+| `arc-product` | 🗑️ Archive/delete candidate (Phase C) |
+| `arc-runs` | ⏳ Awaiting port (Phase A) |
+| `arc-schemas` | ⏳ Awaiting port (Phase B) |
+| `arc-settings` | ⏳ Awaiting consolidation (Phase B) |
+| `arc-workflows` | ⏳ Awaiting port (Phase A) |
