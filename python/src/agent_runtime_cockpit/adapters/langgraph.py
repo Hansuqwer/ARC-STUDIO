@@ -164,10 +164,10 @@ class LangGraphAdapter(RuntimeAdapter):
         events = [self._event(run_id, 0, "RUN_STARTED", {"workflow_id": workflow_id, "runtime": self.adapter_id})]
 
         if importlib.util.find_spec("langgraph") is None:
-            return self._failed(workflow_id, run_id, started, events, LG_DEP_MISSING, "Install langgraph in this Python environment.")
+            raise NotImplementedError("Install langgraph in this Python environment.")
         target = os.environ.get(EXPORT_ENV)
         if not target:
-            return self._failed(workflow_id, run_id, started, events, LG_EXPORT_UNSET, f"Set {EXPORT_ENV}=module:function")
+            raise NotImplementedError(f"Set {EXPORT_ENV}=module:function")
         try:
             exported = self._resolve_export(workspace, target, load_target=True)
             graph = await self._materialize_graph(exported)
