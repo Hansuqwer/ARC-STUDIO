@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+wheels/
+*.whl
+*.tar.gz
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# uv
+uv.lock.bak
+
+# Backup artifacts
+*.bak
+*.bak.*
+
+# Local binary artifacts
+/*.pdf
+/*.png
+
+# pytest
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# ruff / mypy / pyright
+.ruff_cache/
+.mypy_cache/
+pyrightconfig.json
+
+# mkdocs
+site/
+
+# IDE
+.idea/
+*.iml
+.vscode/*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — never commit these
+.env
+*.env
+.env.*
+!.env.example
+*_secrets.*
+*_secret.*
+*.pem
+*.p12
+secrets/
+
+# Local scratch
+/tmp/
+scratch/
+*.local.py
+
+# Local review bundles
+docs/patches/
+**/PATCH_NOTE_*.md
+.gitnexus
+
+# Local AI/GitNexus agent context
+.claude/
+AGENTS.md
+CLAUDE.md

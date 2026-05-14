@@ -1,0 +1,70 @@
+site_name: SwarmGraph
+site_description: Pydantic v2 + LangGraph swarm framework with multi-provider gateway
+site_url: https://hansuqwer.github.io/SwarmGraph/
+repo_url: https://github.com/Hansuqwer/SwarmGraph
+repo_name: Hansuqwer/SwarmGraph
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - content.code.copy
+    - search.highlight
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - packages/swarm-shared
+            - packages/hive-swarm
+            - packages/ai-provider-swarm-gateway/src
+
+not_in_nav: |
+  history/**
+  patches/**
+  upstream/**
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Local Install: INSTALL.md
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - Smoke Tests: getting-started/smoke-tests.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Pydantic Discipline: architecture/pydantic-discipline.md
+      - LangGraph Graph: architecture/langgraph-graph.md
+      - Consensus Protocols: architecture/consensus-protocols.md
+      - Audit Signing: architecture/audit-signing.md
+      - Multi-Tenant Quota: architecture/multi-tenant-quota.md
+  - Reference:
+      - swarm-shared API: reference/swarm-shared-api.md
+      - hive-swarm API: reference/hive-swarm-api.md
+      - Gateway CLI: reference/gateway-cli.md
+      - Environment Variables: reference/env-vars.md
+  - Operations:
+      - Security: operations/security.md
+      - Secret Scanning: operations/secret-scanning.md
+      - Flutter Local Agent Profile: operations/flutter-local-agent-profile.md
+      - Production Profile: operations/production-profile.md
+      - OrbStack Local Isolation: operations/orbstack-local-isolation.md
+      - Release Prep Handover 0.8.1: operations/release-prep-handover-0.8.1.md
+      - Vault Backup And Restore: operations/vault-backup-restore.md
+      - Flutter Local Agent Handover: operations/flutter-local-agent-handover.md
+      - Audit Verification: operations/audit-verification.md
+      - Cost Tracking: operations/cost-tracking.md
+      - Deployment: operations/deployment.md
+      - GitHub Setup: operations/github-setup.md
+      - Production Checklist: operations/production-checklist.md
+      - Troubleshooting: operations/troubleshooting.md
+  - History:
+      - Provenance Archive: history/README.md
+  - ADR:
+      - 0001 Monorepo Structure: adr/0001-monorepo-structure.md
+      - 0002 Pydantic v2 Discipline: adr/0002-pydantic-v2-discipline.md
+      - 0003 Multi-Tenant Quota: adr/0003-multi-tenant-quota.md
+      - 0004 Audit Signing: adr/0004-audit-signing-hmac-chain.md
