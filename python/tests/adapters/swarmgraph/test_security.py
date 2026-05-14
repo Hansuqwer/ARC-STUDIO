@@ -101,6 +101,21 @@ def test_rejects_cli_deep_inside_workspace(layout, monkeypatch):
         adapter._resolve_cli(ws)
 
 
+def test_rejects_symlink_to_workspace_launcher(layout, monkeypatch):
+    """External-looking symlink resolving inside workspace -> PermissionError."""
+    ws, tools = layout
+    target = ws / "swarmgraph"
+    target.write_text("#!/bin/bash\necho hi")
+    target.chmod(target.stat().st_mode | stat.S_IEXEC)
+    link = tools / "swarmgraph"
+    link.symlink_to(target)
+    monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(link))
+
+    adapter = SwarmGraphAdapter()
+    with pytest.raises(PermissionError, match="must not point inside"):
+        adapter._resolve_cli(ws)
+
+
 def test_rejects_cli_equal_to_workspace(layout, monkeypatch):
     """CLI path equals workspace path itself → FileNotFoundError (directory, not a file)."""
     ws, _ = layout
@@ -172,3 +187,37 @@ def test_monolithic_gating_matches_modular(layout, monkeypatch):
     except Exception:
         pass  # Other errors mean gating passed
 
+
+def test_stub_backend_adds_no_cost_flag(layout, monkeypatch):
+    """Monolithic CLI path passes --no-cost for default stub backend."""
+    import asyncio
+
+    ws, tools = layout
+    launcher = tools / "swarmgraph"
+    launcher.write_text("#!/bin/bash\necho '{}'\n")
+    launcher.chmod(launcher.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(launcher))
+    monkeypatch.delenv("ARC_SWARMGRAPH_RUN_BACKEND", raising=False)
+    monkeypatch.delenv("ARC_SWARMGRAPH_ALLOW_COSTS", raising=False)
+    captured: list[tuple[str, ...]] = []
+
+    class FakeProcess:
+        returncode = 0
+
+        async def communicate(self):
+            return b'{"status":"completed"}', b""
+
+    async def fake_create_subprocess_exec(*cmd, **kwargs):
+        captured.append(tuple(str(part) for part in cmd))
+        return FakeProcess()
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+
+    adapter = SwarmGraphAdapter()
+    run = asyncio.run(adapter.run_workflow("wf-test", {"workspace": str(ws)}))
+
+    assert run.status.value == "completed"
+    assert captured
+    assert "--backend" in captured[0]
+    assert "stub" in captured[0]
+    assert "--no-cost" in captured[0]

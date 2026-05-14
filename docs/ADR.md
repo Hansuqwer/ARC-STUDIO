@@ -246,7 +246,7 @@ Modular `SwarmGraphRunner` is canonical. CLI subprocess path is deprecated. Cost
 - ✅ Streaming: real-time AG-UI events for all backends
 - ✅ 23 security-focused and gating tests added
 - ⚠️ Breaking change: users must configure `ARC_SWARMGRAPH_CLI`
-- ⚠️ Monolithic path emits deprecation warning
+- ⚠️ Monolithic path remains for compatibility; deprecation is documented, not emitted at runtime
 
 ---
 

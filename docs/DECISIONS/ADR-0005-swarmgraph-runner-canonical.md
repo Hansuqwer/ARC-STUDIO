@@ -33,7 +33,7 @@ Additionally, the monolithic path had a **P0 security vulnerability**: it search
 - ✅ Gating: Single source of truth for cost approval—no bypass possible.
 - ✅ Streaming: Real-time AG-UI events with audit chain integrity for all backends.
 - ✅ Extensibility: New backends (e.g., REMOTE, DOCKER) are added to the runner's `_produce()` dispatch, not as new branches.
-- ⚠️ Breaking change: Users relying on the old CLI-subprocess path (without `ARC_SWARMGRAPH_CLI`) must configure the env var. This is documented in the deprecation warning.
+- ⚠️ Breaking change: Users relying on the old CLI-subprocess path (without `ARC_SWARMGRAPH_CLI`) must configure the env var. This is documented in this ADR and release notes.
 - ⚠️ The monolithic `run_workflow` remains for backward compatibility but is untested for new features.
 
 ## Migration Path
@@ -41,7 +41,7 @@ Additionally, the monolithic path had a **P0 security vulnerability**: it search
 1. Set `ARC_SWARMGRAPH_CLI` to a trusted launcher **outside** any workspace.
 2. Use `ARC_SWARMGRAPH_RUN_BACKEND` to select stub, local, or gateway modes.
 3. Cost gating is automatic via `ARC_SWARMGRAPH_ALLOW_COSTS=true` for non-stub backends.
-4. The deprecated monolithic path emits a `DeprecationWarning` at runtime.
+4. The deprecated monolithic path remains available for compatibility but does not emit runtime warnings because CLI and daemon tests run with warnings as errors.
 
 ## Related
 

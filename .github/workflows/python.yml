@@ -18,7 +18,7 @@ jobs:
         run: uv run ruff check src tests
       - name: Mypy (scoped)
         working-directory: python
-        run: uv run mypy src/agent_runtime_cockpit/ag_ui/ src/agent_runtime_cockpit/gating.py src/agent_runtime_cockpit/security/
+        run: uv run mypy src/agent_runtime_cockpit/ag_ui/ src/agent_runtime_cockpit/gating.py src/agent_runtime_cockpit/security/ src/agent_runtime_cockpit/protocol/ src/agent_runtime_cockpit/workspace.py
       - name: Artifact guard
         run: bash scripts/check-artifacts.sh
       - name: Tests (strict warnings)
