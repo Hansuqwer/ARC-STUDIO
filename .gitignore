@@ -30,3 +30,9 @@ CLAUDE.md
 .env.*
 *.env
 !.env.example
+# Audit reports
+audit-*.md
+
+# Theia-generated webpack config in packages/
+packages/*/gen-webpack.config.js
+packages/*/gen-webpack.node.config.js
