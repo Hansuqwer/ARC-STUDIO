@@ -111,6 +111,28 @@ Long-running CLI invocations cannot be cancelled mid-flight from the frontend; u
 | Frozen lockfile in CI | `pnpm install --frozen-lockfile` |
 | Daemon binds loopback only | `rg -n '127\.0\.0\.1|localhost' theia-extensions/arc-core/src python/src` |
 
+## Accepted Decisions (2026-05-14)
+
+These residual items were reviewed and formally accepted before the first alpha release. Each entry includes the rationale and the trigger condition that would require revisiting the decision.
+
+### U-1. Leaked `.env` in pre-`f08ef52` history (accepted)
+
+**Status**: Accepted for alpha; revisit before any public release.
+**Rationale**: A `G4F_API_KEY` (free GPT4Free service key) was committed in early history and later made unnecessary when the G4F provider switched to a no-key endpoint. The key was rotated immediately after discovery (commit `f08ef52`). The repository is private, limiting exposure to collaborators with explicit access. History scrub via `git filter-repo` would require force-pushing to all branches and invalidating any collaborator's local clones; the cost outweighs the residual risk while the repo remains private.
+**Trigger for revisit**: Any of the following events must trigger a fresh decision before proceeding:
+  - Decision to make the repository public.
+  - Onboarding a collaborator who should not have access to the historical key.
+  - Discovery that the rotated key was reused elsewhere.
+
+### U-2. No authentication on the local daemon (opt-in, accepted)
+
+**Status**: Accepted for alpha; revisit before any multi-tenant or shared-host deployment.
+**Rationale**: The daemon binds to `127.0.0.1:7777` (loopback only). An optional bearer-token scheme (`ARC_DAEMON_TOKEN`) exists with constant-time comparison and `/health` exemption. When unset, the daemon remains open to localhost (backward-compatible single-user default). This follows the same convention as Docker, Redis, and Postgres — no auth on localhost by default. The TypeScript client sends the token automatically when the env var is present. Requiring a token by default would break the zero-config developer experience and create a token-discovery problem for the frontend client.
+**Trigger for revisit**: Any of the following events must trigger a fresh decision:
+  - Multi-tenant support is added.
+  - The daemon is deployed to a shared dev container or CI runner.
+  - A security audit or user reports the default as a concern.
+
 ## Out-of-scope
 
 Supply-chain auditing (transitive npm/PyPI deps), formal verification of subprocess spawn helpers, and review of Electron's own update channel are not covered by this report. The Electron auto-update path is not yet enabled; see CHANGELOG.
