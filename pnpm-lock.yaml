@@ -159,9 +159,6 @@ importers:
       arc-adapters:
         specifier: workspace:*
         version: link:../../theia-extensions/arc-adapters
-      arc-arena:
-        specifier: workspace:*
-        version: link:../../theia-extensions/arc-arena
       arc-audit:
         specifier: workspace:*
         version: link:../../theia-extensions/arc-audit
@@ -366,25 +363,6 @@ importers:
       typescript:
         specifier: ^5.4.5
         version: 5.9.3
-
-  theia-extensions/arc-arena:
-    dependencies:
-      '@theia/core':
-        specifier: 1.71.0
-        version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))
-      arc-core:
-        specifier: workspace:*
-        version: link:../arc-core
-    devDependencies:
-      '@theia/cli':
-        specifier: 1.71.0
-        version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(typescript@5.4.5)
-      rimraf:
-        specifier: ^5.0.10
-        version: 5.0.10
-      typescript:
-        specifier: ^5.4.5
-        version: 5.4.5
 
   theia-extensions/arc-audit:
     dependencies:
