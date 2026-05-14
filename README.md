@@ -6,7 +6,7 @@ ARC Studio runs entirely on your workstation. No telemetry is sent. No data leav
 
 ## Status
 
-Pre-release. There are no git tags yet; `main` is the canonical state. See [CHANGELOG.md](./CHANGELOG.md) and [docs/SECURITY_AUDIT_REPORT.md](./docs/SECURITY_AUDIT_REPORT.md) for what changed recently and what is still outstanding.
+Pre-release (`v0.1.0-alpha`, tagged 2026-05-14). Pin against tags or commit SHAs; the public API surface may still change. See [CHANGELOG.md](./CHANGELOG.md) and [docs/SECURITY_AUDIT_REPORT.md](./docs/SECURITY_AUDIT_REPORT.md) for what changed recently and what is still outstanding.
 
 ARC Studio supports the following runtimes:
 - **SwarmGraph** - In-repo canonical runtime for AI provider routing and quota management (`runtimes/swarmgraph/`)
@@ -19,7 +19,7 @@ ARC Studio supports the following runtimes:
 The toolchain versions are pinned in [`.tool-versions`](./.tool-versions). If you use `asdf` or `mise` they will be picked up automatically; otherwise install manually:
 
 - Node.js 20.18.0
-- pnpm 9.12.0
+- pnpm 9.15.9
 - Python 3.11.10
 - [`uv`](https://github.com/astral-sh/uv) for Python dependency management
 
@@ -147,6 +147,7 @@ arc run           Execute a workflow
 arc context       Manage context providers
 arc adapter       Manage and test runtime adapters
 arc doctor        Runtime-specific diagnostics
+arc eval          Evaluate runs against golden traces
 arc runs          Inspect past runs and traces
 arc providers     Manage credential providers
 ```
@@ -206,7 +207,7 @@ The `packages/arc-extension/` tree present in older drafts of the repository is 
 
 ### `pnpm install` fails with a lockfile error
 
-Make sure you are on pnpm 9.12.0 (`pnpm --version`). The CI uses `--frozen-lockfile` and so should you.
+Make sure you are on pnpm 9.15.9 (`pnpm --version`). The version is pinned in `.tool-versions`. The CI uses `--frozen-lockfile` and so should you.
 
 ### `arc runtimes` shows `can_run=false` for everything
 
