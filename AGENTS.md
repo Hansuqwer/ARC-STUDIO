@@ -183,7 +183,7 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - ✅ F-13: console.log in trace-parser.ts replaced with breadcrumb comment
 - ✅ G4F removed: 5 provider definitions deleted from providers.py & arc-service-impl.ts
 - ✅ #19 fix: StatsJsonPlugin disabled in CI (stats.toJson all:true removed + !CI guard) — CI verified: webpack no longer crashes
-- ✅ #20 diagnostic: verbose logging step added to python.yml (--log-cli-level=DEBUG -s), with `if: always()` so it runs after failures
+- ✅ #20 fix: replaced deprecated `datetime.datetime.utcnow()` with `datetime.datetime.now(datetime.timezone.utc)` across 8 Python files — resolves all 52 CI test failures (both web 500s and CLI deprecation errors)
 
 ### Known Issues
 - ESLint has 247 problems (113 errors, 134 warnings) — all pre-existing in other packages; our files have 0 errors
@@ -192,7 +192,7 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - Monaco editor bundle is 15.9 MiB (expected, not reducible)
 - Total frontend entrypoint ~28.8 MiB (Monaco + Theia core + React + vendors); ARC Studio code chunk is 50 KiB
 - **#19 (webpack V8 crash on CI)**: Root cause confirmed — `stats.toJson({ all: true })` produced JSON exceeding V8's string-length cap (~512 MB). Fixed by removing `all: true` and skipping `StatsJsonPlugin` entirely when `process.env.CI` is set. Pending CI verification.
-- **#20 (Python 3.12 web test 500s)**: 52 web tests return HTTP 500 on CI. Server-side error not captured in current CI logs. Diagnostic step added to `python.yml` with `--log-cli-level=DEBUG -s`. Pending CI run for stack trace analysis.
+- **#20 (Python 3.12 web test 500s)**: Resolved. Root cause: `datetime.datetime.utcnow()` raises `DeprecationWarning` in Python 3.12; with `-W error` this crashes any handler calling `envelope.ok()` or `envelope.err()`. Fixed by replacing all 8 `utcnow()` calls with `now(timezone.utc)` across the Python codebase.
 
 ## Related Documentation (Archived Handover)
 The following documents contain historical context and are preserved for reference in `docs/archive/`:
