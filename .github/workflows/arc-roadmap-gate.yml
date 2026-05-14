@@ -36,6 +36,10 @@ jobs:
           node tests/unit/arc-protocol.test.js
           node packages/arc-test-fixtures/src/index.js
 
+      - name: Python sync dependencies
+        working-directory: python
+        run: uv sync --all-extras --dev
+
       - name: Python lint
         working-directory: python
         run: uv run ruff check src tests
