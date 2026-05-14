@@ -21,6 +21,9 @@ jobs:
       - name: Tests (strict warnings)
         working-directory: python
         run: uv run pytest -q -W error
+      - name: Web tests (diagnostic - verbose logging)
+        working-directory: python
+        run: uv run pytest -q -W error tests/web/ --log-cli-level=DEBUG -s || true
       - name: CLI smoke
         working-directory: python
         run: |

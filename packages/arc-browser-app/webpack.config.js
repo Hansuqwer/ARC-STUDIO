@@ -31,7 +31,7 @@ if (configs.length > 0) {
     const frontendConfig = configs[0];
     const originalPlugins = frontendConfig.plugins || [];
     
-    if (!isProduction) {
+    if (!isProduction && !process.env.CI) {
         frontendConfig.plugins = [
             ...originalPlugins,
             {
@@ -39,11 +39,9 @@ if (configs.length > 0) {
                     compiler.hooks.done.tap('StatsJsonPlugin', (stats) => {
                         const statsPath = path.join(compiler.outputPath, 'stats.json');
                         const statsJson = stats.toJson({
-                            all: true,
                             modules: true,
                             chunks: true,
                             timings: true,
-                            colors: true,
                             performance: true
                         });
                         fs.writeFileSync(statsPath, JSON.stringify(statsJson, null, 2));

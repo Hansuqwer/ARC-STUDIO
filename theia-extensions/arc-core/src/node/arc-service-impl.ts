@@ -673,8 +673,7 @@ export class ArcServiceImpl implements ArcService {
     if (provider.toLowerCase() === 'kimi') {
       return ['MOONSHOT_API_KEY', 'KIMI_API_KEY'];
     }
-    // Default fallback: any unrecognised provider (including legacy g4f-*
-    // names removed in 2026-05-14 audit) gets a generic env-var lookup.
+    // Fallthrough for unrecognised providers (e.g., legacy g4f-* names removed 2026-05-14).
     return [`ARC_PROVIDER_${this.envProviderName(provider)}_API_KEY`];
   }
 
