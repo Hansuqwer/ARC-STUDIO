@@ -9,7 +9,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 
 describe('UI Components Contracts', () => {
-    // When running from lib/, we need to point back to src/
+    // Reads TSX source directly; update this if src/ or the compiled outDir changes.
     const componentsDir = path.join(__dirname, '..', '..', '..', 'src', 'browser', 'components');
 
     describe('ProgressBar', () => {

@@ -16,7 +16,7 @@ describe('ArcWidget Integration Tests', () => {
     let widgetSource: string;
 
     beforeAll(async () => {
-        // When running from lib/, we need to point back to src/
+        // Reads TSX source directly; update this if src/ or the compiled outDir changes.
         const widgetPath = path.join(__dirname, '..', '..', '..', 'src', 'browser', 'arc-widget.tsx');
         widgetSource = await fs.readFile(widgetPath, 'utf-8');
     });

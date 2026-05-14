@@ -1,4 +1,6 @@
 import asyncio
+import importlib.machinery
+import importlib.util
 import json
 import pathlib
 import textwrap
@@ -9,6 +11,7 @@ from agent_runtime_cockpit.adapters.langgraph.loader import (
     LangGraphLoadError, load_graph,
 )
 from agent_runtime_cockpit.adapters.langgraph.runner import LangGraphRunner
+from agent_runtime_cockpit.adapters.langgraph import LangGraphAdapter
 
 
 def _make_workspace(tmp_path: pathlib.Path) -> pathlib.Path:
@@ -49,3 +52,27 @@ def test_real_streaming_no_mock(tmp_path, monkeypatch):
     assert "RUN_STARTED" in text or "STEP_STARTED" in text
     assert "TEXT_MESSAGE_CHUNK" in text
     assert "STEP_FINISHED" in text
+
+
+def test_capability_report_runnable_when_langgraph_and_export_available(tmp_path, monkeypatch):
+    (tmp_path / "graph_export.py").write_text(textwrap.dedent("""
+        class FakeGraph:
+            def invoke(self, inputs):
+                return inputs
+
+        graph = FakeGraph()
+    """))
+    monkeypatch.setenv("ARC_LANGGRAPH_EXPORT", "graph_export:graph")
+    original_find_spec = importlib.util.find_spec
+
+    def fake_find_spec(name):
+        if name == "langgraph":
+            return importlib.machinery.ModuleSpec("langgraph", loader=None)
+        return original_find_spec(name)
+
+    monkeypatch.setattr(importlib.util, "find_spec", fake_find_spec)
+
+    report = LangGraphAdapter().capability_report(tmp_path)
+
+    assert report.can_run is True
+    assert report.availability == "runnable"
