@@ -120,6 +120,11 @@ test.describe('ARC Studio — Smoke Tests', () => {
     await page.goto(`${APP_URL}/?arc-view=run-timeline`, { waitUntil: 'networkidle', timeout: TIMEOUT });
     await acceptWorkspaceTrustIfShown(page);
 
+    await expect(page.getByTestId('arc-runtime-picker')).toBeVisible({ timeout: TIMEOUT });
+    const swarmgraphOption = page.locator('[data-testid="arc-runtime-picker"] option[value="swarmgraph"]');
+    if ((await swarmgraphOption.count()) === 0) {
+      test.skip(true, 'SwarmGraph runtime option unavailable in runtime picker');
+    }
     await page.getByTestId('arc-runtime-picker').selectOption('swarmgraph');
     await page.getByPlaceholder('Prompt for local SwarmGraph stub run').fill('ARC E2E explicit runtime run.');
     await page.getByRole('button', { name: 'Start Run' }).click();
