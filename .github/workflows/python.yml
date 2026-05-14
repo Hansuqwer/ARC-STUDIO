@@ -19,6 +19,11 @@ jobs:
       - name: Mypy (scoped)
         working-directory: python
         run: uv run mypy src/agent_runtime_cockpit/ag_ui/ src/agent_runtime_cockpit/gating.py src/agent_runtime_cockpit/security/ src/agent_runtime_cockpit/protocol/ src/agent_runtime_cockpit/workspace.py
+      - name: Dependency audit (Python)
+        working-directory: python
+        run: |
+          SITE_PACKAGES=$(uv run python -c "import site; print(site.getsitepackages()[0])")
+          uv run pip-audit --skip-editable --path "$SITE_PACKAGES" --progress-spinner off
       - name: Artifact guard
         run: bash scripts/check-artifacts.sh
       - name: Tests (strict warnings)

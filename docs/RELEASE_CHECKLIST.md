@@ -147,7 +147,7 @@ uv run pytest tests/adapters/swarmgraph/test_security.py tests/adapters/swarmgra
 
 ### 8. No critical-severity advisories; high-severity advisories reviewed and documented
 
-**Status:** ⚠️ Partial
+**Status:** ✅ Complete for Python, ⚠️ Partial for Node
 
 **Threshold:**
 - **0 critical** — gating. A critical advisory blocks release unless a
@@ -164,17 +164,16 @@ The 8 high advisories are all in transitive dependencies of
 `electron-builder` (the `tar` package), not in ARC Studio's own code.
 Reviewed and accepted as acceptable risk for an alpha release.
 
-**Missing:**
-- `pip-audit` is not installed and not configured in CI.
-- No Python advisory scanning exists.
-- `pip-audit` should be added to the Python CI workflow (`python.yml`)
-  before this item can be fully checked.
+**Python state:** `pip-audit` is installed in dev dependencies and runs in
+both `python.yml` and `arc-roadmap-gate.yml` against the installed virtualenv
+site-packages. The local editable project is skipped because it is not
+published on PyPI and cannot be audited there.
 
 **Action:**
 ```
-# Install and run before next release evaluation
-pip install pip-audit
-cd python && pip-audit
+cd python
+SITE_PACKAGES=$(uv run python -c "import site; print(site.getsitepackages()[0])")
+uv run pip-audit --skip-editable --path "$SITE_PACKAGES" --progress-spinner off
 ```
 
 ---
@@ -189,8 +188,7 @@ git status --short
 # (empty — clean working tree)
 ```
 
-**Rollback procedure:** ❌ No `docs/RELEASE.md` exists. The following must be
-documented before the first release tag:
+**Rollback procedure:** ✅ `docs/RELEASE.md` exists. It documents:
 
 1. **How to tag:**
    - `git tag -a v0.6.0-alpha -m "ARC Studio v0.6.0-alpha"`
