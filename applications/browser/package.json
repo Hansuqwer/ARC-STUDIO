@@ -32,6 +32,7 @@
     "@theia/search-in-workspace": "1.71.0",
     "@theia/getting-started": "1.71.0",
     "@theia/keymaps": "1.71.0",
+    "arc-extension": "workspace:*",
     "arc-core": "workspace:*",
     "arc-workflows": "workspace:*",
     "arc-runs": "workspace:*",
