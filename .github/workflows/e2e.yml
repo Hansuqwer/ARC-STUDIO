@@ -16,6 +16,7 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
+      - uses: astral-sh/setup-uv@v5
       - name: Native build dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libx11-dev libxkbfile-dev libsecret-1-dev
       - name: Prepare workspace
@@ -23,6 +24,11 @@ jobs:
           mkdir -p "${{ runner.temp }}/arc-workspace"
           echo "ARC_WORKSPACE_PATH=${{ runner.temp }}/arc-workspace" >> "$GITHUB_ENV"
       - run: pnpm install --frozen-lockfile
+      - name: Sync Python dependencies
+        working-directory: python
+        run: uv sync --all-extras --dev
+      - name: Add ARC Python CLI to PATH
+        run: echo "${{ github.workspace }}/python/.venv/bin" >> "$GITHUB_PATH"
       - run: pnpm --filter @arc-studio/e2e-tests exec playwright install chromium
       - run: pnpm build
       - run: pnpm test:e2e
