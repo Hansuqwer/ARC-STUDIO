@@ -49,9 +49,11 @@ app = typer.Typer(
 context_app = typer.Typer(name="context", help="Context retrieval commands")
 adapter_app = typer.Typer(name="adapter", help="Adapter management commands")
 doctor_app = typer.Typer(name="doctor", help="ARC diagnostics")
+workspace_app = typer.Typer(name="workspace", help="Workspace configuration and trust management")
 app.add_typer(context_app)
 app.add_typer(adapter_app)
 app.add_typer(doctor_app)
+app.add_typer(workspace_app)
 
 console = Console()
 err_console = Console(stderr=True)
@@ -1027,6 +1029,51 @@ def eval_list(
         for g in goldens:
             table.add_row(g.id, g.workflow_id, g.expected_output[:60] if g.expected_output else "")
         console.print(table)
+
+
+# ─── workspace trust ───────────────────────────────────────────────────────────
+
+@workspace_app.command("trust-status")
+def workspace_trust_status(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show workspace trust status (P1a advisory)."""
+    _setup_logging(debug)
+    from .security.trust import resolve_trust
+    ws = _workspace(workspace)
+    resolution = resolve_trust(ws)
+    _out(ok(resolution.model_dump(), workspace=str(ws)), json_output)
+
+
+@workspace_app.command("trust")
+def workspace_trust(
+    note: str = typer.Option("", "--note", help="Optional note for trust entry"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Mark the workspace as trusted (external DB, outside repo)."""
+    _setup_logging(debug)
+    from .security.trust import trust_workspace
+    ws = _workspace(workspace)
+    resolution = trust_workspace(ws, note=note)
+    _out(ok(resolution.model_dump(), workspace=str(ws)), json_output)
+
+
+@workspace_app.command("untrust")
+def workspace_untrust(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Remove workspace from the external trust database."""
+    _setup_logging(debug)
+    from .security.trust import untrust_workspace
+    ws = _workspace(workspace)
+    resolution = untrust_workspace(ws)
+    _out(ok(resolution.model_dump(), workspace=str(ws)), json_output)
 
 
 if __name__ == "__main__":
