@@ -159,6 +159,15 @@ class SqliteStore:
         except Exception as e:
             log.warning("SQLite update_run_audit_path failed for %s: %s", run_id, e)
 
+    def delete_run(self, run_id: str) -> None:
+        """Delete a run metadata row from the SQLite index."""
+        try:
+            with self._conn() as conn:
+                conn.execute("DELETE FROM audit_log WHERE run_id=?", (run_id,))
+                conn.execute("DELETE FROM runs WHERE id=?", (run_id,))
+        except Exception as e:
+            log.warning("SQLite delete_run failed for %s: %s", run_id, e)
+
     def get_run(self, run_id: str) -> Optional[dict[str, Any]]:
         """Fetch a single run metadata row."""
         try:

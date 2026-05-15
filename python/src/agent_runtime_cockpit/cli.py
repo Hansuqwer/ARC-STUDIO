@@ -928,6 +928,7 @@ def runs_delete(
         _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
         raise typer.Exit(1)
     trace_path.unlink()
+    store.sqlite.delete_run(run_id)
     payload = {
         "deleted_run_id": run_id,
         "trace_path": str(trace_path),

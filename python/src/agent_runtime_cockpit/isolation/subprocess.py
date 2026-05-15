@@ -56,7 +56,6 @@ class SubprocessIsolationProvider(IsolationProvider):
 
         Only includes:
         - Variables in ``self._safe_env_keys``
-        - Any ``ARC_*`` prefixed variables
         - Variables explicitly passed in ``extra_env`` (if also in allowlist)
         """
         result: dict[str, str] = {}
@@ -66,15 +65,10 @@ class SubprocessIsolationProvider(IsolationProvider):
             if key in os.environ:
                 result[key] = os.environ[key]
 
-        # Include ARC_* prefixed vars (ARC-specific config)
-        for key, value in os.environ.items():
-            if key.startswith("ARC_") and key in self._safe_env_keys:
-                result[key] = value
-
-        # Include extra env, but only if allowlisted
+        # Include extra env, but only if explicitly allowlisted.
         if extra_env:
             for key, value in extra_env.items():
-                if key in self._safe_env_keys or key.startswith("ARC_"):
+                if key in self._safe_env_keys:
                     result[key] = value
 
         return result

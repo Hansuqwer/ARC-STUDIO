@@ -278,3 +278,68 @@ def test_runs_prune_refuses_symlink_outside_trace_dir(tmp_path):
     result = CliRunner().invoke(app, ["runs", "prune", "--workspace", str(tmp_path), "--keep", "0", "--yes", "--json"])
     assert result.exit_code != 0
     assert outside.exists()
+
+
+def test_runs_status_export_backfill_delete_contract(tmp_path):
+    from datetime import datetime, timezone
+
+    from agent_runtime_cockpit.protocol.schemas import RunRecord, RunStatus
+    from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
+    from agent_runtime_cockpit.storage.sqlite import SqliteStore
+
+    ws = tmp_path / "ws"
+    traces = ws / ".arc" / "traces"
+    traces.mkdir(parents=True)
+    now = datetime.now(timezone.utc).isoformat()
+    run = RunRecord(
+        id="run-cli-contract",
+        workflow_id="wf-contract",
+        runtime="swarmgraph",
+        status=RunStatus.COMPLETED,
+        started_at=now,
+        ended_at=now,
+    )
+    JsonlTraceStore(traces).save(run)
+
+    backfill = CliRunner().invoke(app, ["runs", "backfill", "--workspace", str(ws), "--json"])
+    assert backfill.exit_code == 0, backfill.output
+    assert json.loads(backfill.output)["data"]["indexed"] == 1
+
+    status = CliRunner().invoke(app, ["runs", "status", run.id, "--workspace", str(ws), "--json"])
+    assert status.exit_code == 0, status.output
+    status_data = json.loads(status.output)["data"]
+    assert status_data["run_id"] == run.id
+    assert status_data["status"] == "completed"
+
+    exported = CliRunner().invoke(app, ["runs", "export", run.id, "--workspace", str(ws), "--json"])
+    assert exported.exit_code == 0, exported.output
+    assert json.loads(exported.output)["data"]["id"] == run.id
+
+    db = SqliteStore(ws / ".arc" / "arc.db")
+    assert db.run_exists(run.id) is True
+    deleted = CliRunner().invoke(app, ["runs", "delete", run.id, "--workspace", str(ws), "--json"])
+    assert deleted.exit_code == 0, deleted.output
+    assert not (traces / f"{run.id}.jsonl").exists()
+    assert db.run_exists(run.id) is False
+
+
+def test_isolation_cli_contracts():
+    status = CliRunner().invoke(app, ["isolation", "status", "--json"])
+    assert status.exit_code == 0, status.output
+    provider_ids = {p["provider_id"] for p in json.loads(status.output)["data"]["providers"]}
+    assert provider_ids == {"none", "subprocess"}
+
+    listed = CliRunner().invoke(app, ["isolation", "list", "--json"])
+    assert listed.exit_code == 0, listed.output
+    listed_ids = {p["provider_id"] for p in json.loads(listed.output)["data"]["providers"]}
+    assert listed_ids == {"none", "subprocess"}
+
+    doctor = CliRunner().invoke(app, ["isolation", "doctor", "subprocess", "--json"])
+    assert doctor.exit_code == 0, doctor.output
+    diagnostics = json.loads(doctor.output)["data"]["diagnostics"]
+    assert diagnostics[0]["provider_id"] == "subprocess"
+    assert diagnostics[0]["healthy"] is True
+
+    unknown = CliRunner().invoke(app, ["isolation", "doctor", "missing", "--json"])
+    assert unknown.exit_code == 1
+    assert json.loads(unknown.output)["error"]["code"] == "INVALID_INPUT"

@@ -98,8 +98,7 @@ class TestSubprocessIsolationProvider:
         assert "SECRET_KEY" not in filtered
         assert "PATH" in filtered
 
-    def test_filter_env_allows_arc_vars(self):
-        """ARC_* prefixed vars are allowed through."""
+    def test_filter_env_allows_explicitly_allowlisted_arc_vars(self):
         provider = SubprocessIsolationProvider(
             safe_env_keys=frozenset({"PATH", "ARC_SOME_VAR"}),
         )
@@ -108,6 +107,15 @@ class TestSubprocessIsolationProvider:
         )
         assert "ARC_SOME_VAR" in filtered
         assert "SECRET" not in filtered
+
+    def test_filter_env_blocks_unlisted_arc_secrets(self):
+        provider = SubprocessIsolationProvider(
+            safe_env_keys=frozenset({"PATH"}),
+        )
+        filtered = provider.filter_env(
+            extra_env={"ARC_HMAC_KEY": "should-be-blocked", "PATH": "/usr/bin"},
+        )
+        assert "ARC_HMAC_KEY" not in filtered
 
     def test_filter_env_respects_safe_keys(self):
         provider = SubprocessIsolationProvider(

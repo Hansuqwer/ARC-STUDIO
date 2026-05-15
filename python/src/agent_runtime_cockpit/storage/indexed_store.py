@@ -93,7 +93,7 @@ class IndexedTraceStore:
         """Return the trace path used for a run ID (delegates to JSONL store)."""
         return self.jsonl.trace_path(run_id)
 
-    def backfill_index(self) -> tuple[int, int]:
+    def backfill_index(self) -> tuple[int, int, int]:
         """Rebuild SQLite index from existing JSONL traces. Idempotent."""
         indexed = 0
         skipped = 0
