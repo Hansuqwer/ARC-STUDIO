@@ -50,10 +50,12 @@ context_app = typer.Typer(name="context", help="Context retrieval commands")
 adapter_app = typer.Typer(name="adapter", help="Adapter management commands")
 doctor_app = typer.Typer(name="doctor", help="ARC diagnostics")
 workspace_app = typer.Typer(name="workspace", help="Workspace configuration and trust management")
+isolation_app = typer.Typer(name="isolation", help="Execution isolation providers")
 app.add_typer(context_app)
 app.add_typer(adapter_app)
 app.add_typer(doctor_app)
 app.add_typer(workspace_app)
+app.add_typer(isolation_app)
 
 console = Console()
 err_console = Console(stderr=True)
@@ -979,6 +981,80 @@ def runs_backfill(
     _out(ok(payload, workspace=str(ws)), json_output)
     if not json_output and failed > 0:
         err_console.print(f"[yellow]Warning: {failed} trace(s) failed to index[/yellow]")
+
+
+# ─── isolation ──────────────────────────────────────────────────────────────────
+
+@isolation_app.command("status")
+def isolation_status(
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show available isolation providers and their health status."""
+    _setup_logging(debug)
+    from .isolation import NoneIsolationProvider, SubprocessIsolationProvider
+
+    providers = [
+        NoneIsolationProvider(),
+        SubprocessIsolationProvider(),
+    ]
+    results = []
+    for p in providers:
+        import asyncio
+        healthy = asyncio.run(p.health_check())
+        results.append({
+            "provider_id": p.provider_id,
+            "healthy": healthy,
+        })
+    _out(ok({"providers": results}), json_output)
+
+
+@isolation_app.command("doctor")
+def isolation_doctor(
+    provider: str = typer.Argument("all", help="Provider ID or 'all'"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Run diagnostics on an isolation provider."""
+    _setup_logging(debug)
+    from .isolation import NoneIsolationProvider, SubprocessIsolationProvider
+
+    provider_map = {
+        "none": NoneIsolationProvider(),
+        "subprocess": SubprocessIsolationProvider(),
+    }
+    if provider != "all":
+        if provider not in provider_map:
+            _out(err(ArcErrorCode.INVALID_INPUT, f"Unknown provider: {provider}. Available: {', '.join(provider_map)}"), json_output)
+            raise typer.Exit(1)
+        provider_map = {provider: provider_map[provider]}
+
+    import asyncio
+    results = []
+    for pid, p in provider_map.items():
+        healthy = asyncio.run(p.health_check())
+        results.append({
+            "provider_id": pid,
+            "healthy": healthy,
+            "description": p.describe(),
+        })
+    _out(ok({"diagnostics": results}), json_output)
+
+
+@isolation_app.command("list")
+def isolation_list(
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """List available isolation providers."""
+    _setup_logging(debug)
+    from .isolation import NoneIsolationProvider, SubprocessIsolationProvider
+
+    providers = [
+        NoneIsolationProvider().describe(),
+        SubprocessIsolationProvider().describe(),
+    ]
+    _out(ok({"providers": providers}), json_output)
 
 
 # ─── context pack ─────────────────────────────────────────────────────────────
