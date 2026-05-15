@@ -1328,10 +1328,12 @@ def isolation_status(
     """Show available isolation providers and their health status."""
     _setup_logging(debug)
     from .isolation import NoneIsolationProvider, SubprocessIsolationProvider
+    from .isolation.docker_provider import DockerIsolationProvider
 
     providers = [
         NoneIsolationProvider(),
         SubprocessIsolationProvider(),
+        DockerIsolationProvider(),
     ]
     results = []
     for p in providers:
@@ -1353,10 +1355,12 @@ def isolation_doctor(
     """Run diagnostics on an isolation provider."""
     _setup_logging(debug)
     from .isolation import NoneIsolationProvider, SubprocessIsolationProvider
+    from .isolation.docker_provider import DockerIsolationProvider
 
     provider_map = {
         "none": NoneIsolationProvider(),
         "subprocess": SubprocessIsolationProvider(),
+        "docker": DockerIsolationProvider(),
     }
     if provider != "all":
         if provider not in provider_map:
@@ -1384,12 +1388,91 @@ def isolation_list(
     """List available isolation providers."""
     _setup_logging(debug)
     from .isolation import NoneIsolationProvider, SubprocessIsolationProvider
+    from .isolation.docker_provider import DockerIsolationProvider
 
     providers = [
         NoneIsolationProvider().describe(),
         SubprocessIsolationProvider().describe(),
+        DockerIsolationProvider().describe(),
     ]
     _out(ok({"providers": providers}), json_output)
+
+
+@isolation_app.command("setup")
+def isolation_setup(
+    provider: str = typer.Argument(..., help="Provider to set up (docker)"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Set up an isolation provider.
+
+    For Docker, checks if the daemon is reachable and provides guidance.
+    """
+    _setup_logging(debug)
+    from .isolation.docker_provider import DockerIsolationProvider
+
+    if provider != "docker":
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Setup not available for: {provider}"), json_output)
+        raise typer.Exit(1)
+
+    docker = DockerIsolationProvider()
+    runtime = docker.detect_runtime()
+    import asyncio
+    healthy = asyncio.run(docker.health_check())
+
+    payload = {
+        "provider": "docker",
+        "healthy": healthy,
+        "runtime": runtime,
+        "installed": runtime["available"],
+    }
+    _out(ok(payload), json_output)
+    if not json_output:
+        if healthy:
+            console.print(f"[green]Docker is available[/green] (runtime: {runtime['runtime']})")
+            console.print(f"  Version: {runtime.get('version', 'unknown')}")
+        else:
+            console.print("[yellow]Docker is not available[/yellow]")
+            if runtime.get("error"):
+                console.print(f"  Error: {runtime['error']}")
+            console.print("")
+            console.print("[dim]Install Docker Desktop, OrbStack, or Podman to enable container isolation.[/dim]")
+
+
+@isolation_app.command("test")
+def isolation_test(
+    provider: str = typer.Argument("subprocess", help="Provider to test"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Test an isolation provider with a simple command."""
+    _setup_logging(debug)
+    from .isolation import NoneIsolationProvider, SubprocessIsolationProvider
+    from .isolation.docker_provider import DockerIsolationProvider
+
+    provider_map = {
+        "none": NoneIsolationProvider(),
+        "subprocess": SubprocessIsolationProvider(),
+        "docker": DockerIsolationProvider(),
+    }
+    if provider not in provider_map:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Unknown provider: {provider}. Available: {', '.join(provider_map)}"), json_output)
+        raise typer.Exit(1)
+
+    p = provider_map[provider]
+    import asyncio
+    result = asyncio.run(p.execute(["echo", "ARC isolation test OK"]))
+    payload = result.model_dump()
+    _out(ok(payload), json_output)
+    if not json_output:
+        if result.exit_code == 0:
+            console.print(f"[green]{provider} test passed[/green]")
+            console.print(f"  Output: {result.stdout.strip()}")
+            console.print(f"  Duration: {result.duration_ms}ms")
+        else:
+            console.print(f"[red]{provider} test failed[/red]")
+            console.print(f"  Exit code: {result.exit_code}")
+            console.print(f"  Error: {result.stderr.strip()}")
 
 
 # ─── context pack ─────────────────────────────────────────────────────────────

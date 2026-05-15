@@ -327,12 +327,12 @@ def test_isolation_cli_contracts():
     status = CliRunner().invoke(app, ["isolation", "status", "--json"])
     assert status.exit_code == 0, status.output
     provider_ids = {p["provider_id"] for p in json.loads(status.output)["data"]["providers"]}
-    assert provider_ids == {"none", "subprocess"}
+    assert provider_ids == {"none", "subprocess", "docker"}
 
     listed = CliRunner().invoke(app, ["isolation", "list", "--json"])
     assert listed.exit_code == 0, listed.output
     listed_ids = {p["provider_id"] for p in json.loads(listed.output)["data"]["providers"]}
-    assert listed_ids == {"none", "subprocess"}
+    assert listed_ids == {"none", "subprocess", "docker"}
 
     doctor = CliRunner().invoke(app, ["isolation", "doctor", "subprocess", "--json"])
     assert doctor.exit_code == 0, doctor.output
