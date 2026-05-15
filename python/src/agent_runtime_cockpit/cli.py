@@ -757,6 +757,30 @@ def runs_get(
     _out(ok(run_record.model_dump(), workspace=str(ws)), json_output)
 
 
+@runs_app.command("diff")
+def runs_diff(
+    run_a: str = typer.Argument(..., help="First run ID"),
+    run_b: str = typer.Argument(..., help="Second run ID"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Compare two stored run records."""
+    _setup_logging(debug)
+    from .storage.jsonl import JsonlTraceStore
+    from .evals.diff import diff_runs
+    ws = _workspace(workspace)
+    store = JsonlTraceStore(ws / ".arc" / "traces")
+    rec_a = store.load(run_a)
+    rec_b = store.load(run_b)
+    if rec_a is None or rec_b is None:
+        missing = [r for r, rec in [(run_a, rec_a), (run_b, rec_b)] if rec is None]
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run(s) not found: {', '.join(missing)}"), json_output)
+        raise typer.Exit(1)
+    result = diff_runs(rec_a, rec_b)
+    _out(ok(result.model_dump(), workspace=str(ws)), json_output)
+
+
 @runs_app.command("trace")
 def runs_trace(
     run_id: str = typer.Argument(..., help="Run ID to inspect"),

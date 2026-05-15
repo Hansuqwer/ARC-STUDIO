@@ -205,6 +205,63 @@ def test_runs_prune_deletes_only_with_yes(monkeypatch, tmp_path):
     assert len(list((ws / ".arc" / "traces").glob("*.jsonl"))) == 1
 
 
+def test_runs_diff_compares_two_runs(tmp_path):
+    """arc runs diff produces a RunDiff for two stored traces."""
+    from agent_runtime_cockpit.protocol.schemas import RunRecord, RunEvent, RunStatus
+    from datetime import datetime, timezone
+    ws = tmp_path / "ws"
+    traces = ws / ".arc" / "traces"
+    traces.mkdir(parents=True)
+    now = datetime.now(timezone.utc)
+
+    def _write(run):
+        (traces / f"{run.id}.jsonl").write_text(run.model_dump_json())
+
+    a = RunRecord(
+        id="run-a", workflow_id="wf", runtime="swarmgraph",
+        status=RunStatus.COMPLETED,
+        started_at=now.isoformat(), ended_at=now.isoformat(),
+        events=[RunEvent(type="RUN_STARTED", timestamp=now.isoformat(), run_id="run-a", sequence=0, data={}),
+                RunEvent(type="TOOL_CALL", timestamp=now.isoformat(), run_id="run-a", sequence=1, data={}),
+                RunEvent(type="RUN_COMPLETED", timestamp=now.isoformat(), run_id="run-a", sequence=2, data={})],
+    )
+    b = RunRecord(
+        id="run-b", workflow_id="wf", runtime="langgraph",
+        status=RunStatus.FAILED,
+        started_at=now.isoformat(), ended_at=now.isoformat(),
+        events=[RunEvent(type="RUN_STARTED", timestamp=now.isoformat(), run_id="run-b", sequence=0, data={}),
+                RunEvent(type="RUN_FAILED", timestamp=now.isoformat(), run_id="run-b", sequence=1, data={})],
+    )
+    _write(a)
+    _write(b)
+
+    result = CliRunner().invoke(app, ["runs", "diff", "run-a", "run-b", "--workspace", str(ws), "--json"])
+    assert result.exit_code == 0, result.output
+    diff = json.loads(result.output)["data"]
+    assert diff["run_a_id"] == "run-a"
+    assert diff["run_b_id"] == "run-b"
+    assert diff["status_a"] == "completed"
+    assert diff["status_b"] == "failed"
+    assert diff["event_count_a"] == 3
+    assert diff["event_count_b"] == 2
+    assert "TOOL_CALL" in diff["types_only_in_a"]
+    assert "RUN_FAILED" in diff["types_only_in_b"]
+    assert "RUN_STARTED" in diff["types_common"]
+    assert diff["tool_calls_a"] == 1
+    assert diff["tool_calls_b"] == 0
+
+
+def test_runs_diff_missing_run_returns_error(tmp_path):
+    """arc runs diff with missing run IDs returns RUN_NOT_FOUND."""
+    ws = tmp_path / "ws"
+    (ws / ".arc" / "traces").mkdir(parents=True)
+    result = CliRunner().invoke(app, ["runs", "diff", "missing-a", "missing-b", "--workspace", str(ws), "--json"])
+    assert result.exit_code == 1
+    envelope = json.loads(result.output)
+    assert envelope["ok"] is False
+    assert envelope["error"]["code"] == "RUN_NOT_FOUND"
+
+
 def test_runs_prune_rejects_negative_keep(tmp_path):
     result = CliRunner().invoke(app, ["runs", "prune", "--workspace", str(tmp_path), "--keep", "-1", "--json"])
     assert result.exit_code != 0
