@@ -282,6 +282,10 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 - ✅ **Eval/observability CLI**: `arc runs search` (SQLite index), `arc doctor env/network/storage`, `arc bug-report`
 - ✅ **Docker-compatible isolation**: `DockerIsolationProvider` with OrbStack/Podman/Colima detection; `arc isolation setup/test`; optional `docker>=7.1`; 13 Docker tests
 
+### Completed (P4 — Audit, Replay, HITL, Security Hardening)
+- ✅ **Eval batch mode**: `arc eval run --batch` evaluates against all saved golden traces
+- ✅ **HITL persistence hardening**: single-use tokens, expiry/TTL, replay-attack protection, `prune_expired`; 6 new HITL tests
+
 ### P1a Items Still Open
 - Add ARC trace/audit refs (adapters should populate `audit_path` on RunRecord) — P2 scope (HMAC wiring)
 - Hard subprocess env allowlists — covered by existing `SwarmGraphAdapter._filtered_env()`; other adapters are in-process
@@ -294,7 +298,7 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 - Total frontend entrypoint ~28.8 MiB (Monaco + Theia core + React + vendors); ARC Studio code chunk is 50 KiB
 
 ### Test Metrics
-- Python: 526 passed, 6 skipped (was 435 before P2/P3 work)
+- Python: 531 passed, 6 skipped (was 435 before P2/P3/P4 work)
 - TypeScript protocol build: clean
 - arc-extension build: clean
 
