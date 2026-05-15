@@ -194,6 +194,19 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 8. Verify TypeScript builds: `pnpm --filter @arc-studio/protocol build && pnpm --filter arc-extension build`
 9. Commit with descriptive message
 
+### Green-Test Continuation Rule
+When a slice is implemented and verification is green, continue directly to the next ordered item in `docs/handover/HANDOVER.md`, `docs/IMPLEMENTATION_PLAN.md`, or the active todo list. Do not stop to ask for permission unless:
+- tests/builds fail and the failure is not quickly fixable
+- the next item requires destructive action, secrets, paid/live provider calls, external publishing, or force-push/reset
+- requirements conflict or are ambiguous enough that implementation would be guesswork
+- the user explicitly asks to pause, summarize only, or wait
+
+Use this prompt when resuming continuation work:
+
+```text
+Continue implementing the next ordered ARC Studio plan item. First read `docs/handover/HANDOVER.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/research/IMPLEMENTATION_RESEARCH.md`, and relevant ADRs. Pick the smallest correct vertical slice, implement it, add/update tests, run `cd python && uv run pytest -q` plus `pnpm --filter @arc-studio/protocol build && pnpm --filter arc-extension build`, fix issues, then continue to the next slice if all verification is green. Preserve unrelated worktree changes. Do not overclaim features; document scaffolds and not-wired behavior honestly.
+```
+
 ## Current Status
 
 ### Completed (P0 - Critical)
@@ -254,6 +267,21 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 ### Completed (P1b — Adoption Foundation)
 - ✅ **SwarmGraph import path spike**: vendored `swarm_shared` and `hive-swarm` modules import from ARC Python venv; documented in `docs/SPIKE_SWARMGRAPH_IMPORT.md`
 
+### Completed (P2 — Runtime + SwarmGraph Integrations)
+- ✅ **Prompt optimizer foundation**: `optimizer/local.py` with rule-based prompt structuring, `arc prompt optimize/diff` CLI; optional `tiktoken>=0.12`
+- ✅ **Adoption runners**: LangGraph (SwarmGraph queen/consensus), AG2, CrewAI, OpenAI Agents, LlamaIndex — all with fake-tested paths, real deps gated
+- ✅ **HMAC audit**: `audit/key_manager.py`, `audit/hmac_chain.py`, `audit/hitl.py`, CLI `arc audit verify/export/key *`
+- ✅ **Trust enforcement**: `ensure_trusted()` blocks untrusted workspaces before run record creation
+- ✅ **HITL supervisor flow**: event types `HITL_PROMPT`, `HITL_RESPONSE`, `HITL_TIMEOUT`; `JobSupervisor.request_hitl()`, `respond_hitl()`, `pending_hitl()`
+- ✅ **Eval CLI basics**: `arc eval save/delete/report/list`, `arc eval run --batch`; 9 eval tests
+- ✅ **Trace replay + HITL CLI**: `arc runs import/replay`, `arc hitl pending/respond/approve/reject`
+
+### Completed (P3 — Theia UX Productization)
+- ✅ **Theia UI ports**: workflow graph, run timeline, event stream, adapters widgets into canonical `packages/arc-extension`
+- ✅ **Product config CLI**: `arc profiles list/show`, `arc workspace init/info/config`, `arc providers quota show/reset`
+- ✅ **Eval/observability CLI**: `arc runs search` (SQLite index), `arc doctor env/network/storage`, `arc bug-report`
+- ✅ **Docker-compatible isolation**: `DockerIsolationProvider` with OrbStack/Podman/Colima detection; `arc isolation setup/test`; optional `docker>=7.1`; 13 Docker tests
+
 ### P1a Items Still Open
 - Add ARC trace/audit refs (adapters should populate `audit_path` on RunRecord) — P2 scope (HMAC wiring)
 - Hard subprocess env allowlists — covered by existing `SwarmGraphAdapter._filtered_env()`; other adapters are in-process
@@ -266,7 +294,7 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - Total frontend entrypoint ~28.8 MiB (Monaco + Theia core + React + vendors); ARC Studio code chunk is 50 KiB
 
 ### Test Metrics
-- Python: 435 passed, 6 skipped (was 402 before P1a work)
+- Python: 526 passed, 6 skipped (was 435 before P2/P3 work)
 - TypeScript protocol build: clean
 - arc-extension build: clean
 
