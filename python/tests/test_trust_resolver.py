@@ -1,5 +1,5 @@
 """
-Tests: Workspace trust resolver — ADR-006 P1a advisory mode (PR 22).
+Tests: Workspace trust resolver — ADR-006 trust status + execution enforcement.
 
 Tests the external trust database, CLI commands, and the security
 guarantee that a committed .arc/trusted file does not self-authorize.
@@ -17,6 +17,8 @@ from agent_runtime_cockpit.security.trust import (
     trust_workspace,
     untrust_workspace,
     list_trusted,
+    ensure_trusted,
+    WorkspaceUntrusted,
     TrustLevel,
     TRUST_DB,
 )
@@ -73,6 +75,18 @@ class TestTrustResolver:
         assert list_trusted(trust_db=trust_db) == {}
         resolution = resolve_trust(tmp_path, trust_db=trust_db)
         assert resolution.level == TrustLevel.UNTRUSTED
+
+    def test_ensure_trusted_blocks_untrusted_workspace(self, tmp_path):
+        with pytest.raises(WorkspaceUntrusted):
+            ensure_trusted(tmp_path, trust_db=tmp_path / "trust-db.json")
+
+    def test_ensure_trusted_allows_trusted_workspace(self, tmp_path):
+        trust_db = tmp_path / "trust-db.json"
+        trust_workspace(tmp_path, trust_db=trust_db)
+
+        resolution = ensure_trusted(tmp_path, trust_db=trust_db)
+
+        assert resolution.level == TrustLevel.TRUSTED
 
 
 class TestTrustCLI:

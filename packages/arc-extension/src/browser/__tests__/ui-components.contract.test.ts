@@ -259,7 +259,201 @@ describe('UI Components Contracts', () => {
         });
     });
 
-    describe('index exports', () => {
+    describe('ArcAdaptersWidget', () => {
+    let source: string;
+
+    beforeAll(async () => {
+        source = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'browser', 'arc-adapters-widget.tsx'), 'utf-8');
+    });
+
+    it('should be an injectable ReactWidget', () => {
+        expect(source).toMatch(/@injectable/);
+        expect(source).toMatch(/extends ReactWidget/);
+    });
+
+    it('should have static ID and LABEL', () => {
+        expect(source).toMatch(/static readonly ID/);
+        expect(source).toMatch(/static readonly LABEL/);
+    });
+
+    it('should inject ArcService', () => {
+        expect(source).toMatch(/@inject\(ArcService\)/);
+    });
+
+    it('should render runtime readiness heading', () => {
+        expect(source).toMatch(/Runtime Readiness/);
+    });
+
+    it('should render Refresh button', () => {
+        expect(source).toMatch(/Refresh/);
+    });
+
+    it('should render capability cards', () => {
+        expect(source).toMatch(/renderCard/);
+        expect(source).toMatch(/runtime_id/);
+    });
+
+    it('should render doctor action buttons', () => {
+        expect(source).toMatch(/doctor_actions/);
+        expect(source).toMatch(/runDoctorAction/);
+    });
+
+    it('should render confirm dialog for unsafe actions', () => {
+        expect(source).toMatch(/confirmAction/);
+        expect(source).toMatch(/renderConfirmDialog/);
+    });
+});
+
+describe('ArcAdaptersContribution', () => {
+    let source: string;
+
+    beforeAll(async () => {
+        source = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'browser', 'arc-adapters-contribution.ts'), 'utf-8');
+    });
+
+    it('should be injectable', () => {
+        expect(source).toMatch(/@injectable/);
+    });
+
+    it('should extend AbstractViewContribution', () => {
+        expect(source).toMatch(/extends AbstractViewContribution/);
+    });
+
+    it('should have open adapters command', () => {
+        expect(source).toMatch(/arc:open-adapters/);
+    });
+});
+
+describe('ArcWorkflowGraphWidget', () => {
+    let source: string;
+
+    beforeAll(async () => {
+        source = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'browser', 'arc-workflow-graph-widget.tsx'), 'utf-8');
+    });
+
+    it('should be an injectable ReactWidget', () => {
+        expect(source).toMatch(/@injectable/);
+        expect(source).toMatch(/extends ReactWidget/);
+    });
+
+    it('should inject ArcService', () => {
+        expect(source).toMatch(/@inject\(ArcService\)/);
+    });
+
+    it('should use existing workflow detection RPC', () => {
+        expect(source).toMatch(/detectWorkflows/);
+    });
+
+    it('should render unavailable topology honestly', () => {
+        expect(source).toMatch(/Topology metadata is not available yet/);
+    });
+
+    it('should include graph layout helpers', () => {
+        expect(source).toMatch(/computeLayout/);
+        expect(source).toMatch(/nodeColor/);
+    });
+});
+
+describe('ArcWorkflowContribution', () => {
+    let source: string;
+
+    beforeAll(async () => {
+        source = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'browser', 'arc-workflow-contribution.ts'), 'utf-8');
+    });
+
+    it('should register workflow graph command', () => {
+        expect(source).toMatch(/arc:open-workflow-graph/);
+        expect(source).toMatch(/ArcWorkflowGraphWidget\.ID/);
+    });
+});
+
+describe('ArcRunTimelineWidget', () => {
+    let source: string;
+
+    beforeAll(async () => {
+        source = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'browser', 'arc-run-timeline-widget.tsx'), 'utf-8');
+    });
+
+    it('should be an injectable ReactWidget', () => {
+        expect(source).toMatch(/@injectable/);
+        expect(source).toMatch(/extends ReactWidget/);
+    });
+
+    it('should use trace-backed RPC methods', () => {
+        expect(source).toMatch(/getTraces/);
+        expect(source).toMatch(/readTrace/);
+    });
+
+    it('should render HITL event markers', () => {
+        expect(source).toMatch(/HITL_PROMPT/);
+        expect(source).toMatch(/HITL_RESPONSE/);
+        expect(source).toMatch(/HITL_TIMEOUT/);
+    });
+
+    it('should support event filtering and selected event details', () => {
+        expect(source).toMatch(/eventFilter/);
+        expect(source).toMatch(/selectedEvent/);
+        expect(source).toMatch(/filteredEvents/);
+    });
+});
+
+describe('ArcRunsContribution', () => {
+    let source: string;
+
+    beforeAll(async () => {
+        source = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'browser', 'arc-runs-contribution.ts'), 'utf-8');
+    });
+
+    it('should register run timeline command', () => {
+        expect(source).toMatch(/arc:open-run-timeline/);
+        expect(source).toMatch(/ArcRunTimelineWidget\.ID/);
+    });
+});
+
+describe('ArcEventStreamWidget', () => {
+    let source: string;
+
+    beforeAll(async () => {
+        source = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'browser', 'arc-event-stream-widget.tsx'), 'utf-8');
+    });
+
+    it('should be an injectable ReactWidget', () => {
+        expect(source).toMatch(/@injectable/);
+        expect(source).toMatch(/extends ReactWidget/);
+    });
+
+    it('should render trace-backed events without claiming live SSE', () => {
+        expect(source).toMatch(/getTraces/);
+        expect(source).toMatch(/readTrace/);
+        expect(source).toMatch(/trace-backed renderer/);
+    });
+
+    it('should support event type chips and text filtering', () => {
+        expect(source).toMatch(/selectedEventTypes/);
+        expect(source).toMatch(/getFilteredEvents/);
+        expect(source).toMatch(/Filter text or event type/);
+    });
+
+    it('should render event details panel', () => {
+        expect(source).toMatch(/renderDetails/);
+        expect(source).toMatch(/selectedEvent/);
+    });
+});
+
+describe('ArcEventStreamContribution', () => {
+    let source: string;
+
+    beforeAll(async () => {
+        source = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'browser', 'arc-event-stream-contribution.ts'), 'utf-8');
+    });
+
+    it('should register event stream command', () => {
+        expect(source).toMatch(/arc:open-event-stream/);
+        expect(source).toMatch(/ArcEventStreamWidget\.ID/);
+    });
+});
+
+describe('index exports', () => {
         let source: string;
 
         beforeAll(async () => {

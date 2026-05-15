@@ -27,6 +27,30 @@ class AdoptionRegistry:
     _runners: dict[AdoptionMode, AdoptionRunner] = {}
 
     @classmethod
+    def _auto_register(cls) -> None:
+        """Auto-register available adoption runners on first use."""
+        if cls._runners:
+            return
+        # LangGraph runner
+        try:
+            from .langgraph_runner import LangGraphAdoptionRunner
+            cls.register(LangGraphAdoptionRunner())
+        except ImportError:
+            pass
+        # CrewAI runner
+        try:
+            from .crewai_runner import CrewAIAdoptionRunner
+            cls.register(CrewAIAdoptionRunner())
+        except ImportError:
+            pass
+        # AG2 runner
+        try:
+            from .ag2_runner import AG2AdoptionRunner
+            cls.register(AG2AdoptionRunner())
+        except ImportError:
+            pass
+
+    @classmethod
     def register(cls, runner: AdoptionRunner) -> None:
         """Register a runner for its mode."""
         cls._runners[runner.mode] = runner
@@ -34,6 +58,7 @@ class AdoptionRegistry:
     @classmethod
     def get(cls, mode: AdoptionMode) -> Optional[AdoptionRunner]:
         """Look up a runner by adoption mode."""
+        cls._auto_register()
         return cls._runners.get(mode)
 
     @classmethod
@@ -43,6 +68,7 @@ class AdoptionRegistry:
         Modes without a registered runner report NOT_IMPLEMENTED.
         Registered runners are asked via ``check_availability()``.
         """
+        cls._auto_register()
         caps: list[AdoptionCapability] = []
         for mode in AdoptionMode:
             runner = cls._runners.get(mode)

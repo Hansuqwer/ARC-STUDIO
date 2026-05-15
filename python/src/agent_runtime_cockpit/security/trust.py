@@ -1,9 +1,12 @@
 """
-Workspace trust resolver — ADR-006 P1a advisory mode.
+Workspace trust resolver — ADR-006 P2 enforcement mode.
 
 Trust state is stored outside the workspace (``~/.arc/trusted-workspaces.json``).
 A committed ``.arc/trusted`` file is explicitly ignored — the workspace must
 not self-authorize.
+
+``ensure_trusted()`` raises ``WorkspaceUntrusted`` for untrusted workspaces,
+blocking execution. Use ``resolve_trust()`` for advisory inspection.
 """
 from __future__ import annotations
 
@@ -14,6 +17,31 @@ from pathlib import Path
 from pydantic import BaseModel
 
 TRUST_DB = Path.home() / ".arc" / "trusted-workspaces.json"
+
+
+class TrustError(Exception):
+    """Base exception for trust-related errors."""
+
+
+class WorkspaceUntrusted(TrustError):
+    """Raised when an untrusted workspace attempts to execute code.
+
+    Attributes:
+        workspace_path: Absolute path to the untrusted workspace.
+        reason: Human-readable explanation of why it is untrusted.
+    """
+
+    def __init__(
+        self,
+        workspace_path: str,
+        reason: str = "Workspace is not in external trust database",
+    ) -> None:
+        self.workspace_path = workspace_path
+        self.reason = reason
+        super().__init__(
+            f"Workspace '{workspace_path}' is untrusted: {reason}. "
+            f"Run 'arc workspace trust' to approve this workspace."
+        )
 
 
 class TrustLevel(str, Enum):
@@ -33,11 +61,11 @@ def resolve_trust(
     workspace: Path,
     trust_db: Path = TRUST_DB,
 ) -> TrustResolution:
-    """Resolve workspace trust level.
+    """Resolve workspace trust level (advisory).
 
-    P1a: advisory only — does not block execution.
     Returns ``TRUSTED`` if the workspace path is in the external trust DB,
-    ``UNTRUSTED`` otherwise.
+    ``UNTRUSTED`` otherwise. Does NOT block execution — use
+    ``ensure_trusted()`` for enforcement.
     """
     workspace_path = str(workspace.resolve())
     try:
@@ -126,3 +154,38 @@ def list_trusted(trust_db: Path = TRUST_DB) -> dict[str, dict]:
         return json.loads(trust_db.read_text(encoding="utf-8"))
     except FileNotFoundError:
         return {}
+
+
+def ensure_trusted(
+    workspace: Path,
+    trust_db: Path = TRUST_DB,
+    allow_if_no_db: bool = False,
+) -> TrustResolution:
+    """Resolve workspace trust and raise if untrusted.
+
+    P2 enforcement: unlike the advisory ``resolve_trust()``, this function
+    raises ``WorkspaceUntrusted`` when the workspace is not in the external
+    trust database. This is called by ``JobSupervisor.start_run()`` before
+    execution begins.
+
+    Args:
+        workspace: Path to the workspace to check.
+        trust_db: Path to the external trust database.
+        allow_if_no_db: If True, allow execution when no trust DB exists
+            (useful for first-run scenarios before the user has set up trust).
+
+    Returns:
+        TrustResolution if the workspace is trusted.
+
+    Raises:
+        WorkspaceUntrusted: If the workspace is untrusted.
+    """
+    resolution = resolve_trust(workspace, trust_db=trust_db)
+    if resolution.level == TrustLevel.UNTRUSTED:
+        if allow_if_no_db and not trust_db.exists():
+            return resolution
+        raise WorkspaceUntrusted(
+            workspace_path=str(workspace.resolve()),
+            reason=resolution.reason,
+        )
+    return resolution

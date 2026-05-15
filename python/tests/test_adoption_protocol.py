@@ -1,9 +1,9 @@
 """
-Tests: Adoption protocol skeleton (P1b).
+Tests: Adoption protocol skeleton (P1b) + LangGraph runner (P2).
 
-Tests the Pydantic models, registry, and runner skeleton.
-No executable adoption mode is provided — all tests check honest
-NOT_IMPLEMENTED / NOT_RUNNABLE status.
+Tests the Pydantic models, registry, and runner.
+LangGraph runner is auto-registered and reports RUNNABLE when
+LangGraph is installed.
 """
 from __future__ import annotations
 
@@ -96,18 +96,47 @@ class TestAdoptionModels:
 
 
 class TestAdoptionRegistry:
-    """AdoptionRegistry auto-reports NOT_IMPLEMENTED for unregistered modes."""
+    """AdoptionRegistry auto-registers LangGraph; other modes are NOT_IMPLEMENTED."""
 
-    def test_unregistered_modes_report_not_implemented(self, tmp_path):
+    def test_langgraph_is_auto_registered(self, tmp_path):
+        """LangGraph runner should be auto-registered and report RUNNABLE."""
         caps = AdoptionRegistry.list_capabilities(tmp_path)
-        for cap in caps:
-            assert cap.status == AdoptionStatus.NOT_IMPLEMENTED
+        lg_cap = next((c for c in caps if c.mode == AdoptionMode.LANGGRAPH), None)
+        assert lg_cap is not None
+        assert lg_cap.status == AdoptionStatus.RUNNABLE
+        assert "LangGraph" in lg_cap.reason
+
+    def test_other_modes_report_not_implemented(self, tmp_path):
+        """Non-LangGraph modes should still report NOT_IMPLEMENTED."""
+        caps = AdoptionRegistry.list_capabilities(tmp_path)
+        other_modes = [
+            c for c in caps
+            if c.mode not in {AdoptionMode.LANGGRAPH, AdoptionMode.AG2, AdoptionMode.CREWAI}
+        ]
+        for cap in other_modes:
+            assert cap.status == AdoptionStatus.NOT_IMPLEMENTED, (
+                f"{cap.mode} expected NOT_IMPLEMENTED, got {cap.status}"
+            )
             assert "not yet implemented" in cap.reason
 
     def test_list_contains_all_modes(self, tmp_path):
         caps = AdoptionRegistry.list_capabilities(tmp_path)
         modes = {cap.mode for cap in caps}
         assert modes == set(AdoptionMode)
+
+    def test_ag2_runner_registered(self, tmp_path):
+        runner = AdoptionRegistry.get(AdoptionMode.AG2)
+        assert runner is not None
+        cap = runner.check_availability(tmp_path)
+        assert cap.mode == AdoptionMode.AG2
+        assert cap.status in {AdoptionStatus.RUNNABLE, AdoptionStatus.NOT_RUNNABLE}
+
+    def test_crewai_runner_registered(self, tmp_path):
+        runner = AdoptionRegistry.get(AdoptionMode.CREWAI)
+        assert runner is not None
+        cap = runner.check_availability(tmp_path)
+        assert cap.mode == AdoptionMode.CREWAI
+        assert cap.status in {AdoptionStatus.RUNNABLE, AdoptionStatus.NOT_RUNNABLE}
 
     def test_parse_runtime_id_standard(self):
         base, mode = AdoptionRegistry.parse_runtime_id("langgraph+swarmgraph")
@@ -126,19 +155,87 @@ class TestAdoptionRegistry:
 
 
 class TestLangGraphRunner:
-    """LangGraphAdoptionRunner reports NOT_RUNNABLE correctly."""
+    """LangGraphAdoptionRunner integration tests."""
 
-    def test_runner_reports_not_runnable(self, tmp_path):
+    def test_runner_reports_runnable(self, tmp_path):
         from agent_runtime_cockpit.adoption.langgraph_runner import (
             LangGraphAdoptionRunner,
         )
         runner = LangGraphAdoptionRunner()
         cap = runner.check_availability(tmp_path)
-        assert cap.status == AdoptionStatus.NOT_RUNNABLE
-        assert "not installed" in cap.reason or "scaffold-only" in cap.reason
-        assert len(cap.doctor_actions) >= 1
+        assert cap.status == AdoptionStatus.RUNNABLE
+        assert "LangGraph" in cap.reason
+        assert "SwarmGraph" in cap.reason
 
-    def test_runner_run_raises_not_implemented(self):
+    def test_runner_mode(self):
+        from agent_runtime_cockpit.adoption.langgraph_runner import (
+            LangGraphAdoptionRunner,
+        )
+        runner = LangGraphAdoptionRunner()
+        assert runner.mode == AdoptionMode.LANGGRAPH
+
+    @pytest.mark.asyncio
+    async def test_runner_executes_langgraph_graph(self):
+        """Run a simple LangGraph graph through the adoption runner."""
+        try:
+            from langgraph.graph import StateGraph
+        except ImportError:
+            from langgraph.graph.state import StateGraph  # type: ignore[import-not-found]
+        from typing_extensions import TypedDict
+
+        class SimpleState(TypedDict):
+            messages: list[str]
+
+        def add_message(state: SimpleState) -> dict:
+            return {"messages": state["messages"] + ["processed"]}
+
+        builder = StateGraph(SimpleState)
+        builder.add_node("process", add_message)
+        builder.set_entry_point("process")
+        builder.set_finish_point("process")
+        graph = builder.compile()
+
+        from agent_runtime_cockpit.adoption.langgraph_runner import (
+            LangGraphAdoptionRunner,
+        )
+        runner = LangGraphAdoptionRunner()
+
+        events: list[tuple[str, dict]] = []
+
+        def emit(run_id: str, etype: str, data: dict) -> None:
+            events.append((etype, data))
+
+        spec = AdoptionSpec(
+            mode=AdoptionMode.LANGGRAPH,
+            runtime_config={
+                "graph": graph,
+                "input": {"messages": ["hello"]},
+            },
+        )
+
+        result = await runner.run(spec, "test-run", emit)
+
+        assert result.consensus_reached is True
+        assert result.confidence > 0
+        assert len(result.votes) >= 1
+        assert result.winning_proposal.output is not None
+        assert "hello" in result.winning_proposal.output
+        assert "processed" in result.winning_proposal.output
+
+        # Verify event flow
+        event_types = [e[0] for e in events]
+        assert "STEP_STARTED" in event_types
+        assert "STEP_COMPLETED" in event_types
+        assert "WORKER_RUNNING" in event_types
+        assert "WORKER_COMPLETED" in event_types
+        assert "RUN_COMPLETED" in event_types
+        consensus_events = [
+            data for event_type, data in events
+            if event_type == "STEP_COMPLETED" and data.get("step") == "consensus"
+        ]
+        assert consensus_events[-1]["swarmgraph"] is True
+
+    def test_runner_run_without_graph_raises(self):
         from agent_runtime_cockpit.adoption.langgraph_runner import (
             LangGraphAdoptionRunner,
         )
@@ -149,8 +246,142 @@ class TestLangGraphRunner:
             await runner.run(
                 AdoptionSpec(mode=AdoptionMode.LANGGRAPH),
                 "run-id",
-                lambda x: None,
+                lambda *a: None,
             )
 
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(ValueError, match="No LangGraph graph provided"):
             asyncio.run(_run())
+
+    @pytest.mark.asyncio
+    async def test_runner_run_with_custom_input(self):
+        """Test that custom input is passed through to the graph."""
+        try:
+            from langgraph.graph import StateGraph
+        except ImportError:
+            from langgraph.graph.state import StateGraph  # type: ignore[import-not-found]
+        from typing_extensions import TypedDict
+
+        class SimpleState(TypedDict):
+            value: str
+
+        def echo(state: SimpleState) -> dict:
+            return {"value": f"echo: {state['value']}"}
+
+        builder = StateGraph(SimpleState)
+        builder.add_node("echo", echo)
+        builder.set_entry_point("echo")
+        builder.set_finish_point("echo")
+        graph = builder.compile()
+
+        from agent_runtime_cockpit.adoption.langgraph_runner import (
+            LangGraphAdoptionRunner,
+        )
+        runner = LangGraphAdoptionRunner()
+
+        spec = AdoptionSpec(
+            mode=AdoptionMode.LANGGRAPH,
+            runtime_config={
+                "graph": graph,
+                "input": {"value": "test-input"},
+            },
+        )
+
+        result = await runner.run(spec, "run-custom", lambda *a: None)
+        assert "echo: test-input" in result.winning_proposal.output
+
+
+class TestAG2Runner:
+    @pytest.mark.asyncio
+    async def test_ag2_runner_fake_team_consensus(self):
+        from agent_runtime_cockpit.adoption.ag2_runner import AG2AdoptionRunner
+
+        class _Event:
+            def __init__(self, sender: str, content: str) -> None:
+                self.sender = sender
+                self.content = content
+
+        class _Resp:
+            def __aiter__(self):
+                self._events = iter([_Event("agent-a", "proposal one"), _Event("agent-b", "proposal one")])
+                return self
+
+            async def __anext__(self):
+                try:
+                    return next(self._events)
+                except StopIteration:
+                    raise StopAsyncIteration
+
+            @property
+            def events(self):
+                return self
+
+        class _Team:
+            async def a_run_group_chat(self, messages):
+                return _Resp()
+
+        events: list[tuple[str, dict]] = []
+        runner = AG2AdoptionRunner()
+        result = await runner.run(
+            AdoptionSpec(
+                mode=AdoptionMode.AG2,
+                runtime_config={"team": _Team(), "message": "decide"},
+            ),
+            "ag2-run",
+            lambda run_id, event_type, data: events.append((event_type, data)),
+        )
+
+        assert result.consensus_reached is True
+        assert result.confidence > 0
+        assert len(result.votes) == 2
+        assert result.winning_proposal.output == "proposal one"
+        assert any(data.get("swarmgraph") is True for event_type, data in events if event_type == "STEP_COMPLETED")
+
+    @pytest.mark.asyncio
+    async def test_ag2_runner_requires_team(self):
+        from agent_runtime_cockpit.adoption.ag2_runner import AG2AdoptionRunner
+
+        with pytest.raises(ValueError, match="team"):
+            await AG2AdoptionRunner().run(
+                AdoptionSpec(mode=AdoptionMode.AG2, runtime_config={"message": "x"}),
+                "ag2-run",
+                lambda *args: None,
+            )
+
+
+class TestCrewAIRunner:
+    @pytest.mark.asyncio
+    async def test_crewai_runner_fake_crew_consensus(self):
+        from agent_runtime_cockpit.adoption.crewai_runner import CrewAIAdoptionRunner
+
+        class _Task:
+            raw = "crew task result"
+            agent = "crew-agent"
+
+        class _Result:
+            tasks_output = [_Task()]
+
+        class _Crew:
+            def kickoff(self, inputs):
+                return _Result()
+
+        events: list[tuple[str, dict]] = []
+        result = await CrewAIAdoptionRunner().run(
+            AdoptionSpec(mode=AdoptionMode.CREWAI, runtime_config={"crew": _Crew(), "inputs": {"topic": "x"}}),
+            "crew-run",
+            lambda run_id, event_type, data: events.append((event_type, data)),
+        )
+
+        assert result.consensus_reached is True
+        assert result.winning_proposal.output == "crew task result"
+        assert any(data.get("swarmgraph") is True for event_type, data in events if event_type == "STEP_COMPLETED")
+
+    @pytest.mark.asyncio
+    async def test_crewai_runner_requires_crew(self):
+        from agent_runtime_cockpit.adoption.crewai_runner import CrewAIAdoptionRunner
+
+        with pytest.raises(ValueError, match="crew"):
+            await CrewAIAdoptionRunner().run(
+                AdoptionSpec(mode=AdoptionMode.CREWAI),
+                "crew-run",
+                lambda *args: None,
+            )

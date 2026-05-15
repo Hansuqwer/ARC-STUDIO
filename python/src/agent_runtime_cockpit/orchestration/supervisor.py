@@ -2,6 +2,7 @@
 JobSupervisor — owns run lifecycle, cancellation, and orphan recovery (ADR-002).
 
 Wires the EventBroker for live event streaming during execution.
+Enforces workspace trust before starting runs (ADR-006 P2).
 """
 from __future__ import annotations
 
@@ -10,11 +11,14 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Optional
 
 from pydantic import BaseModel, Field
 
+from ..audit.hitl import HitlPrompt, HitlResponse
 from ..protocol.schemas import RunRecord, RunStatus
+from ..security.trust import ensure_trusted
 from ..storage.jsonl import JsonlTraceStore
 from .event_broker import EventBroker
 from .events import create_event
@@ -31,6 +35,14 @@ class RunRequest(BaseModel):
     profile_id: str = "stub"
     timeout_seconds: int = 300
     metadata: dict[str, Any] = Field(default_factory=dict)
+    workspace_root: Optional[str] = None
+    """Workspace root path for trust enforcement.
+
+    If set, ``start_run()`` enforces workspace trust before execution.
+    Untrusted workspaces raise ``WorkspaceUntrusted``.
+    """
+    workspace_trust_db: Optional[str] = None
+    """Optional external trust DB path, primarily for tests/embedded daemons."""
 
 
 @dataclass
@@ -39,6 +51,14 @@ class ActiveRun:
     run_id: str
     task: Optional[asyncio.Task] = None
     cancelled: bool = False
+
+
+class HitlTimeoutError(TimeoutError):
+    """Raised when a HITL prompt receives no response before timeout."""
+
+
+class HitlNotFoundError(KeyError):
+    """Raised when responding to an unknown or expired HITL prompt."""
 
 
 class JobSupervisor:
@@ -57,6 +77,7 @@ class JobSupervisor:
         self.broker = broker or EventBroker(store)
         self._active_runs: dict[str, ActiveRun] = {}
         self._sequence_counters: dict[str, int] = {}
+        self._pending_hitl: dict[str, asyncio.Future[HitlResponse]] = {}
 
     async def start_run(
         self,
@@ -67,7 +88,18 @@ class JobSupervisor:
 
         ``executor_fn`` receives ``(run_id, request, emit_event)`` where
         ``emit_event`` is a callable to publish events during execution.
+
+        Enforces workspace trust (ADR-006 P2): if ``request.workspace_root``
+        is set, the workspace must be trusted. Raises ``WorkspaceUntrusted``
+        if the workspace is not in the external trust database.
         """
+        if request.workspace_root:
+            trust_db = Path(request.workspace_trust_db) if request.workspace_trust_db else None
+            if trust_db:
+                ensure_trusted(Path(request.workspace_root), trust_db=trust_db)
+            else:
+                ensure_trusted(Path(request.workspace_root))
+
         run_id = f"run-{uuid.uuid4().hex[:12]}"
         now = datetime.now(timezone.utc).isoformat()
         run = RunRecord(
@@ -182,6 +214,62 @@ class JobSupervisor:
     def get_active_run(self, run_id: str) -> Optional[ActiveRun]:
         """Return the ActiveRun for a run_id, or None if not active."""
         return self._active_runs.get(run_id)
+
+    async def request_hitl(self, prompt: HitlPrompt) -> HitlResponse:
+        """Emit a HITL prompt and wait for a single-user response.
+
+        The prompt is persisted as a run event and streamed through the broker.
+        ``respond_hitl()`` completes the pending future. On timeout the prompt
+        is closed, a timeout event is emitted, and ``HitlTimeoutError`` is raised.
+        """
+        if prompt.hitl_id in self._pending_hitl:
+            raise ValueError(f"HITL prompt already pending: {prompt.hitl_id}")
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[HitlResponse] = loop.create_future()
+        self._pending_hitl[prompt.hitl_id] = future
+        self._emit_event(prompt.run_id, "HITL_PROMPT", {
+            "hitl_id": prompt.hitl_id,
+            "step_id": prompt.step_id,
+            "prompt_text": prompt.prompt_text,
+            "context": prompt.context,
+            "options": prompt.options,
+            "timeout_seconds": prompt.timeout_seconds,
+            "created_at": prompt.created_at,
+        })
+        try:
+            return await asyncio.wait_for(future, timeout=prompt.timeout_seconds)
+        except asyncio.TimeoutError as exc:
+            self._emit_event(prompt.run_id, "HITL_TIMEOUT", {
+                "hitl_id": prompt.hitl_id,
+                "timeout_seconds": prompt.timeout_seconds,
+            })
+            raise HitlTimeoutError(f"HITL prompt timed out: {prompt.hitl_id}") from exc
+        finally:
+            self._pending_hitl.pop(prompt.hitl_id, None)
+
+    def respond_hitl(self, response: HitlResponse) -> None:
+        """Resolve a pending HITL prompt and emit the response event."""
+        future = self._pending_hitl.get(response.hitl_id)
+        if future is None or future.done():
+            raise HitlNotFoundError(response.hitl_id)
+        future.set_result(response)
+        self._emit_event(response.run_id, "HITL_RESPONSE", {
+            "hitl_id": response.hitl_id,
+            "decision": response.decision.value,
+            "operator_id": response.operator_id,
+            "modified_data": response.modified_data,
+            "notes": response.notes,
+            "responded_at": response.responded_at,
+        })
+
+    def pending_hitl(self, run_id: str | None = None) -> list[dict[str, str]]:
+        """Return pending HITL ids. Kept minimal until persistence/CLI lands."""
+        items: list[dict[str, str]] = []
+        for hitl_id, future in self._pending_hitl.items():
+            if future.done():
+                continue
+            items.append({"hitl_id": hitl_id})
+        return items
 
     @staticmethod
     def _now_ms() -> int:

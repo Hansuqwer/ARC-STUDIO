@@ -1225,7 +1225,7 @@ def workspace_trust_status(
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
-    """Show workspace trust status (P1a advisory)."""
+    """Show workspace trust status used for execution enforcement."""
     _setup_logging(debug)
     from .security.trust import resolve_trust
     ws = _workspace(workspace)
@@ -1290,6 +1290,263 @@ def config_show(
     ws = _workspace(workspace)
     config = load_config(ws)
     _out(ok(config.flatten(), workspace=str(ws)), json_output)
+
+
+# ─── audit (ADR-005) ─────────────────────────────────────────────────────────
+
+
+audit_app = typer.Typer(name="audit", help="Audit chain verification and key management (ADR-005)")
+app.add_typer(audit_app)
+
+
+@audit_app.command("verify")
+def audit_verify(
+    run_id: str = typer.Argument(..., help="Run ID to verify audit chain for"),
+    chain_path: str = typer.Option(
+        "", "--chain", "-c", help="Path to audit chain file (default: .arc/audit/{run_id}.jsonl)"
+    ),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Verify HMAC-SHA256 audit chain integrity for a run.
+
+    Authenticates every record in the chain and checks chain continuity.
+    Requires ARC_AUDIT_HMAC_KEY env var or keychain-stored key.
+    """
+    _setup_logging(debug)
+    from pathlib import Path
+    from .audit.key_manager import AuditKeyManager
+    from .audit.hmac_chain import verify_hmac_chain
+
+    mgr = AuditKeyManager()
+    key, status = mgr.get_key()
+    if not status.available:
+        _out(err(ArcErrorCode.INVALID_INPUT, status.warning), json_output)
+        raise typer.Exit(1)
+
+    ws = Path.cwd()
+    chain = Path(chain_path) if chain_path else ws / ".arc" / "audit" / f"{run_id}.jsonl"
+
+    ok, reason = verify_hmac_chain(chain, key)
+    payload = {
+        "run_id": run_id,
+        "chain_path": str(chain),
+        "verified": ok,
+        "reason": reason,
+        "key_source": status.source,
+        "key_degraded": status.degraded,
+    }
+    _out(ok(payload), json_output)
+    if not json_output:
+        color = "green" if ok else "red"
+        console.print(f"Audit chain: [bold {color}]{'VERIFIED' if ok else 'FAILED'}[/bold {color}]")
+        console.print(f"  Path: {chain}")
+        console.print(f"  Reason: {reason}")
+        if status.degraded:
+            console.print(f"[yellow]Warning:[/yellow] {status.warning}")
+    if not ok:
+        raise typer.Exit(1)
+
+
+@audit_app.command("export")
+def audit_export(
+    run_id: str = typer.Argument(..., help="Run ID to export audit records for"),
+    chain_path: str = typer.Option(
+        "", "--chain", "-c", help="Path to audit chain file (default: .arc/audit/{run_id}.jsonl)"
+    ),
+    format: str = typer.Option("jsonl", "--format", help="Output format: jsonl, json"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Export audit chain records for a run."""
+    _setup_logging(debug)
+    import json as json_mod
+    from pathlib import Path
+
+    ws = Path.cwd()
+    chain = Path(chain_path) if chain_path else ws / ".arc" / "audit" / f"{run_id}.jsonl"
+    if not chain.exists():
+        _out(
+            err(ArcErrorCode.RUN_NOT_FOUND, f"Audit chain not found: {chain}"),
+            json_output,
+        )
+        raise typer.Exit(1)
+
+    lines = chain.read_text(encoding="utf-8").splitlines()
+    records = [json_mod.loads(l) for l in lines if l.strip()]
+
+    if format == "json":
+        payload = {"run_id": run_id, "record_count": len(records), "records": records}
+    else:
+        payload = {"run_id": run_id, "record_count": len(records), "chain_path": str(chain)}
+
+    _out(ok(payload), json_output)
+    if not json_output:
+        console.print(f"Audit records for {run_id}: {len(records)} records at {chain}")
+        if format == "jsonl":
+            for r in records:
+                console.print(json_mod.dumps(r, sort_keys=True))
+
+
+key_app = typer.Typer(name="key", help="HMAC audit key management")
+audit_app.add_typer(key_app)
+
+
+@key_app.command("init")
+def audit_key_init(
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Generate and store a new HMAC audit key in keychain."""
+    _setup_logging(debug)
+    from .audit.key_manager import AuditKeyManager
+
+    mgr = AuditKeyManager()
+    new_key = mgr.generate_key()
+    stored = mgr.set_key(new_key)
+    payload = {
+        "generated": True,
+        "stored_to_keychain": stored,
+        "key_hint": new_key[:8] + "..." if stored else new_key,
+    }
+    _out(ok(payload), json_output)
+    if not json_output:
+        if stored:
+            console.print("[green]Audit key generated and stored in keychain.[/green]")
+        else:
+            console.print("[yellow]Key generated but could not store in keychain. Set via env:[/yellow]")
+            console.print(f"  export ARC_AUDIT_HMAC_KEY={new_key}")
+
+
+@key_app.command("show")
+def audit_key_show(
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show audit key status (key is never printed)."""
+    _setup_logging(debug)
+    from .audit.key_manager import AuditKeyManager
+
+    mgr = AuditKeyManager()
+    key, status = mgr.get_key()
+    payload = status.model_dump()
+    _out(ok(payload), json_output)
+    if not json_output:
+        if status.available:
+            console.print(f"Audit key: [green]available[/green] (source: {status.source})")
+        else:
+            console.print(f"Audit key: [red]not available[/red]")
+            console.print(f"  {status.warning}")
+
+
+@key_app.command("delete")
+def audit_key_delete(
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Delete the stored HMAC audit key from keychain."""
+    _setup_logging(debug)
+    from .audit.key_manager import AuditKeyManager
+
+    mgr = AuditKeyManager()
+    deleted = mgr.delete_key()
+    payload = {"deleted_from_keychain": deleted}
+    _out(ok(payload), json_output)
+    if not json_output:
+        if deleted:
+            console.print("[green]Audit key deleted from keychain.[/green]")
+        else:
+            console.print("[yellow]No key found in keychain or keychain unavailable.[/yellow]")
+
+
+# ─── prompt optimizer ─────────────────────────────────────────────────────────
+
+
+prompt_app = typer.Typer(name="prompt", help="Prompt optimization commands (P1b local)")
+app.add_typer(prompt_app)
+
+
+@prompt_app.command("optimize")
+def prompt_optimize(
+    prompt: str = typer.Argument(..., help="Prompt text to optimize"),
+    model: str = typer.Option("gpt-4o", "--model", "-m", help="Model for token counting"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Apply rule-based optimization to a prompt.
+
+    No provider calls are made. Uses tiktoken for counting (falls back to
+    word estimate if tiktoken is not installed).
+    """
+    _setup_logging(debug)
+    from .optimizer import optimize_prompt, estimate_cost
+
+    result = optimize_prompt(prompt, model=model)
+    payload = {
+        "original_length": len(prompt),
+        "optimized_length": len(result.optimized),
+        "original_tokens": result.original_tokens.count,
+        "optimized_tokens": result.optimized_tokens.count,
+        "tokens_saved": result.tokens_saved,
+        "changes": result.changes,
+        "encoding": result.original_tokens.encoding,
+    }
+
+    # Add cost estimate if pricing is known
+    cost = estimate_cost(result.original_tokens.count, model)
+    if cost is not None:
+        payload["estimated_cost_usd"] = round(cost, 6)
+        cost_after = estimate_cost(result.optimized_tokens.count, model)
+        if cost_after is not None:
+            payload["estimated_cost_after_usd"] = round(cost_after, 6)
+            payload["estimated_savings_usd"] = round(cost - cost_after, 6)
+
+    _out(ok(payload), json_output)
+    if not json_output:
+        console.print(f"[dim]Original:[/dim] {result.original_tokens.count} tokens ({result.original_tokens.encoding})")
+        console.print(f"[green]Optimized:[/green] {result.optimized_tokens.count} tokens")
+        console.print(f"[bold]Saved:[/bold] {result.tokens_saved} tokens")
+        if result.changes:
+            console.print(f"[dim]Rules applied:[/dim] {', '.join(result.changes)}")
+        else:
+            console.print("[dim]No changes needed[/dim]")
+        if cost is not None:
+            console.print(f"[dim]Est. cost before:[/dim] ${payload['estimated_cost_usd']:.6f}")
+            console.print(f"[green]Est. cost after:[/green] ${payload['estimated_cost_after_usd']:.6f}")
+
+
+@prompt_app.command("diff")
+def prompt_diff(
+    prompt_a: str = typer.Argument(..., help="First prompt text"),
+    prompt_b: str = typer.Argument(..., help="Second prompt text"),
+    context_lines: int = typer.Option(3, "--context", "-c", help="Context lines for diff"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Compare two prompts using unified diff."""
+    _setup_logging(debug)
+    from .optimizer import diff_prompts, count_tokens
+
+    diff_text = diff_prompts(prompt_a, prompt_b, context_lines=context_lines)
+    tokens_a = count_tokens(prompt_a)
+    tokens_b = count_tokens(prompt_b)
+
+    payload = {
+        "prompt_a_tokens": tokens_a.count,
+        "prompt_b_tokens": tokens_b.count,
+        "token_diff": tokens_b.count - tokens_a.count,
+        "diff": diff_text,
+    }
+    _out(ok(payload), json_output)
+    if not json_output:
+        console.print(f"Prompt A: {tokens_a.count} tokens")
+        console.print(f"Prompt B: {tokens_b.count} tokens")
+        console.print(f"Token diff: {payload['token_diff']:+d}")
+        console.print("")
+        if diff_text:
+            console.print(diff_text)
+        else:
+            console.print("[dim]No differences[/dim]")
 
 
 if __name__ == "__main__":

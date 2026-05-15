@@ -158,6 +158,20 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         optional_fields={"redacted"},
     ),
 
+    # ── Human-in-the-loop ────────────────────────────────────────────────
+    "HITL_PROMPT": EventTypeDef(
+        required_fields={"hitl_id", "step_id", "prompt_text", "options", "timeout_seconds"},
+        optional_fields={"context", "created_at"},
+    ),
+    "HITL_RESPONSE": EventTypeDef(
+        required_fields={"hitl_id", "decision", "operator_id", "responded_at"},
+        optional_fields={"modified_data", "notes"},
+    ),
+    "HITL_TIMEOUT": EventTypeDef(
+        required_fields={"hitl_id", "timeout_seconds"},
+        optional_fields=set(),
+    ),
+
     # ── Raw / fallback ───────────────────────────────────────────────────
     "RAW": EventTypeDef(
         required_fields={"raw"},

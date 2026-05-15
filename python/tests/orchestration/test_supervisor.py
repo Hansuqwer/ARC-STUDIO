@@ -15,8 +15,11 @@ from agent_runtime_cockpit.orchestration.supervisor import (
     JobSupervisor,
     RunRequest,
     ActiveRun,
+    HitlNotFoundError,
 )
 from agent_runtime_cockpit.orchestration.event_broker import EventBroker
+from agent_runtime_cockpit.audit.hitl import HitlDecision, HitlPrompt, HitlResponse
+from agent_runtime_cockpit.security.trust import WorkspaceUntrusted, trust_workspace
 from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
 from agent_runtime_cockpit.protocol.schemas import RunStatus
 
@@ -64,6 +67,42 @@ class TestStartRun:
         assert [event.type for event in loaded.events] == [
             "RUN_STARTED", "STEP_STARTED", "RUN_COMPLETED",
         ]
+
+    @pytest.mark.asyncio
+    async def test_untrusted_workspace_is_blocked(
+        self, supervisor: JobSupervisor, tmp_path: Path,
+    ):
+        trust_db = tmp_path / "trust-db.json"
+        request = RunRequest(
+            workflow_id="wf-test",
+            runtime="swarmgraph",
+            workspace_root=str(tmp_path / "workspace"),
+            workspace_trust_db=str(trust_db),
+        )
+
+        with pytest.raises(WorkspaceUntrusted):
+            await supervisor.start_run(request, lambda run_id, req, emit: asyncio.sleep(0.01))
+
+        assert supervisor.store.list_runs() == []
+
+    @pytest.mark.asyncio
+    async def test_trusted_workspace_can_start_run(
+        self, supervisor: JobSupervisor, tmp_path: Path,
+    ):
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        trust_db = tmp_path / "trust-db.json"
+        trust_workspace(workspace, trust_db=trust_db)
+        request = RunRequest(
+            workflow_id="wf-test",
+            runtime="swarmgraph",
+            workspace_root=str(workspace),
+            workspace_trust_db=str(trust_db),
+        )
+
+        run = await supervisor.start_run(request, lambda run_id, req, emit: asyncio.sleep(0.01))
+
+        assert run.status == RunStatus.PENDING
 
 
 class TestCancelRun:
@@ -189,3 +228,66 @@ class TestBrokerIntegration:
         assert "RUN_STARTED" in types, f"Got types: {types}"
         assert "STEP_STARTED" in types, f"Got types: {types}"
         assert "RUN_COMPLETED" in types, f"Got types: {types}"
+
+
+class TestHitlFlow:
+    """Supervisor can pause execution for single-user HITL responses."""
+
+    @pytest.mark.asyncio
+    async def test_request_hitl_emits_prompt_and_returns_response(self, supervisor: JobSupervisor):
+        captured: list[HitlResponse] = []
+
+        async def executor(run_id, req, emit_event):
+            prompt = HitlPrompt(
+                hitl_id="hitl-1",
+                run_id=run_id,
+                step_id="step-1",
+                prompt_text="Approve?",
+                timeout_seconds=1,
+            )
+            task = asyncio.create_task(supervisor.request_hitl(prompt))
+            await asyncio.sleep(0)
+            supervisor.respond_hitl(HitlResponse(
+                hitl_id="hitl-1",
+                run_id=run_id,
+                decision=HitlDecision.APPROVE,
+                operator_id="tester",
+            ))
+            captured.append(await task)
+
+        run = await supervisor.start_run(_make_request(), executor)
+        await asyncio.sleep(0.2)
+
+        assert captured[0].decision == HitlDecision.APPROVE
+        loaded = supervisor.store.load(run.id)
+        assert loaded is not None
+        assert [event.type for event in loaded.events] == [
+            "RUN_STARTED", "HITL_PROMPT", "HITL_RESPONSE", "RUN_COMPLETED",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_request_hitl_timeout_fails_run(self, supervisor: JobSupervisor):
+        async def executor(run_id, req, emit_event):
+            await supervisor.request_hitl(HitlPrompt(
+                hitl_id="hitl-timeout",
+                run_id=run_id,
+                step_id="step-1",
+                prompt_text="Approve?",
+                timeout_seconds=0,
+            ))
+
+        run = await supervisor.start_run(_make_request(), executor)
+        await asyncio.sleep(0.2)
+
+        loaded = supervisor.store.load(run.id)
+        assert loaded is not None
+        assert loaded.status == RunStatus.FAILED
+        assert "HITL_TIMEOUT" in [event.type for event in loaded.events]
+
+    def test_respond_hitl_unknown_prompt_raises(self, supervisor: JobSupervisor):
+        with pytest.raises(HitlNotFoundError):
+            supervisor.respond_hitl(HitlResponse(
+                hitl_id="missing",
+                run_id="run-missing",
+                decision=HitlDecision.REJECT,
+            ))
