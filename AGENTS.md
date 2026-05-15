@@ -51,6 +51,10 @@ arc-theia-studio/
 - `security/redaction.py` — Secret redaction in adapter outputs
 - `security/profiles.py` — `RunProfile` with env allowlist, paid-call gating
 
+**Configuration:**
+- `config/model.py` — Pydantic models for workspace ARC config (ADR-001)
+- `config/loader.py` — YAML loader with 4-level precedence (env > workspace > user > defaults)
+
 **Isolation:**
 - `isolation/base.py` — `IsolationProvider` ABC + `IsolationResult`
 - `isolation/none.py` — `NoneIsolationProvider` (direct subprocess, no filtering)
@@ -247,9 +251,8 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - ✅ **Combo semantics**: Already implemented via `ComboRuntimeAdapter` (sequential multi-runtime)
 
 ### P1a Items Still Open
-- Add ARC trace/audit refs (adapters should populate `audit_path` on RunRecord)
-- Hard subprocess env allowlists (existing adapters don't use `SubprocessIsolationProvider` yet)
-- Config model (ADR-001) — `config/` package with YAML loader not yet implemented
+- Add ARC trace/audit refs (adapters should populate `audit_path` on RunRecord) — P2 scope (HMAC wiring)
+- Hard subprocess env allowlists — covered by existing `SwarmGraphAdapter._filtered_env()`; other adapters are in-process
 
 ### Known Issues
 - ESLint has 247 problems (113 errors, 134 warnings) — all pre-existing in other packages; our files have 0 errors
