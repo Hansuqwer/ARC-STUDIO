@@ -62,6 +62,120 @@ class TestRuntimeCapabilities:
         assert isinstance(d, dict)
         assert "can_inspect" in d
 
+    # ── Schema versioning ──────────────────────────────────────────────────
+
+    def test_schema_version_default(self):
+        caps = RuntimeCapabilities()
+        assert caps.schema_version == 1
+
+    def test_schema_version_exported(self):
+        caps = RuntimeCapabilities()
+        d = caps.model_dump()
+        assert d["schema_version"] == 1
+
+    def test_schema_version_custom(self):
+        caps = RuntimeCapabilities(schema_version=2)
+        assert caps.schema_version == 2
+
+    # ── Support level ──────────────────────────────────────────────────────
+
+    def test_support_level_default(self):
+        caps = RuntimeCapabilities()
+        from agent_runtime_cockpit.protocol.capabilities import SupportLevel
+        assert caps.support_level == SupportLevel.EXPERIMENTAL
+
+    def test_support_level_custom(self):
+        from agent_runtime_cockpit.protocol.capabilities import SupportLevel
+        caps = RuntimeCapabilities(support_level=SupportLevel.BETA)
+        assert caps.support_level == SupportLevel.BETA
+
+    def test_support_level_stable(self):
+        from agent_runtime_cockpit.protocol.capabilities import SupportLevel
+        caps = RuntimeCapabilities(support_level=SupportLevel.STABLE)
+        assert caps.support_level == SupportLevel.STABLE
+
+    # ── Execution modes ────────────────────────────────────────────────────
+
+    def test_execution_modes_default(self):
+        caps = RuntimeCapabilities()
+        from agent_runtime_cockpit.protocol.capabilities import ExecutionMode
+        assert ExecutionMode.STANDALONE in caps.execution_modes
+        assert len(caps.execution_modes) == 1
+
+    def test_execution_modes_custom(self):
+        from agent_runtime_cockpit.protocol.capabilities import ExecutionMode
+        caps = RuntimeCapabilities(execution_modes=[ExecutionMode.STANDALONE, ExecutionMode.SEQUENCE])
+        assert len(caps.execution_modes) == 2
+        assert ExecutionMode.STANDALONE in caps.execution_modes
+        assert ExecutionMode.SEQUENCE in caps.execution_modes
+
+    def test_execution_modes_serialized(self):
+        caps = RuntimeCapabilities()
+        d = caps.model_dump()
+        assert d["execution_modes"] == ["standalone"]
+
+    # ── Adoption modes ─────────────────────────────────────────────────────
+
+    def test_adoption_modes_default_empty(self):
+        caps = RuntimeCapabilities()
+        assert caps.adoption_modes == []
+
+    def test_adoption_modes_custom(self):
+        caps = RuntimeCapabilities(adoption_modes=["langgraph+swarmgraph"])
+        assert "langgraph+swarmgraph" in caps.adoption_modes
+
+    # ── Audit level ────────────────────────────────────────────────────────
+
+    def test_audit_level_default(self):
+        from agent_runtime_cockpit.protocol.capabilities import AuditLevel
+        caps = RuntimeCapabilities()
+        assert caps.audit_level == AuditLevel.NONE
+
+    def test_audit_level_custom(self):
+        from agent_runtime_cockpit.protocol.capabilities import AuditLevel
+        caps = RuntimeCapabilities(audit_level=AuditLevel.ARC_SHA256)
+        assert caps.audit_level == AuditLevel.ARC_SHA256
+
+    # ── HITL level ─────────────────────────────────────────────────────────
+
+    def test_hitl_level_default(self):
+        from agent_runtime_cockpit.protocol.capabilities import HitlLevel
+        caps = RuntimeCapabilities()
+        assert caps.hitl_level == HitlLevel.NONE
+
+    def test_hitl_level_custom(self):
+        from agent_runtime_cockpit.protocol.capabilities import HitlLevel
+        caps = RuntimeCapabilities(hitl_level=HitlLevel.ADVISORY)
+        assert caps.hitl_level == HitlLevel.ADVISORY
+
+    # ── Full serialization round-trip ──────────────────────────────────────
+
+    def test_full_serialization_roundtrip(self):
+        from agent_runtime_cockpit.protocol.capabilities import (
+            SupportLevel, ExecutionMode, AuditLevel, HitlLevel,
+        )
+        caps = RuntimeCapabilities(
+            schema_version=1,
+            support_level=SupportLevel.ALPHA,
+            execution_modes=[ExecutionMode.STANDALONE, ExecutionMode.SEQUENCE],
+            adoption_modes=["langgraph+swarmgraph"],
+            audit_level=AuditLevel.ARC_SHA256,
+            hitl_level=HitlLevel.ADVISORY,
+            can_inspect=True,
+            can_run=True,
+            can_export_workflow=True,
+        )
+        json_str = caps.model_dump_json()
+        restored = RuntimeCapabilities.model_validate_json(json_str)
+        assert restored.schema_version == 1
+        assert restored.support_level == SupportLevel.ALPHA
+        assert ExecutionMode.STANDALONE in restored.execution_modes
+        assert "langgraph+swarmgraph" in restored.adoption_modes
+        assert restored.audit_level == AuditLevel.ARC_SHA256
+        assert restored.hitl_level == HitlLevel.ADVISORY
+        assert restored.can_inspect is True
+        assert restored.can_run is True
+
 
 class TestDomainModels:
     def test_runtime_info_valid(self):

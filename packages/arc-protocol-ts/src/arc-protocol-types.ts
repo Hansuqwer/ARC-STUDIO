@@ -41,7 +41,23 @@ export interface RuntimeInfo {
   capabilities: RuntimeCapabilities;
 }
 
+export const CAPABILITY_SCHEMA_VERSION = 1;
+
+export type SupportLevel = 'stable' | 'beta' | 'alpha' | 'experimental' | 'deprecated';
+
+export type ExecutionMode = 'standalone' | 'sequence' | 'adoption';
+
+export type AuditLevel = 'none' | 'arc_sha256' | 'swarmgraph_hmac';
+
+export type HitlLevel = 'none' | 'advisory' | 'enforced';
+
 export interface RuntimeCapabilities {
+  schema_version: number;
+  support_level: SupportLevel;
+  execution_modes: ExecutionMode[];
+  adoption_modes: string[];
+  audit_level: AuditLevel;
+  hitl_level: HitlLevel;
   can_inspect: boolean;
   can_run: boolean;
   can_trace: boolean;
