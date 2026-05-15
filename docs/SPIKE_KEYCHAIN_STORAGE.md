@@ -11,8 +11,9 @@ succeed. Missing keys return `None`. No `__version__` attribute on the module.
 
 ## Recommendations
 
-1. **Do NOT add `keyring` as a dependency yet.** The HMAC audit key management
-   (ADR-005) is P2 work. Keep it as an optional dependency.
+1. **Do NOT add `keyring` as a dependency yet.** ADR-005 (audit key management)
+   is planned for P2. Keep `keyring` as an optional dependency until the
+   audit chain implementation (P2) requires it.
 2. **Env fallback strategy:** When `keyring` is unavailable, fall back to
    `ARC_HMAC_KEY` env var with a degraded-status warning.
 3. **Platform caveats:**
