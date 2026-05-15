@@ -1168,7 +1168,7 @@ def eval_run(
     """
     _setup_logging(debug)
     from .storage.jsonl import JsonlTraceStore
-    from .evals.golden import GoldenTrace, eval_run as do_eval
+    from .evals.golden import GoldenTrace, eval_run as do_eval, load_golden
 
     ws = _workspace(workspace)
     store = JsonlTraceStore(ws / ".arc" / "traces")
@@ -1179,8 +1179,12 @@ def eval_run(
 
     events = [t.strip() for t in expected_event_types.split(",") if t.strip()] if expected_event_types else []
 
-    golden = GoldenTrace(
-        id=golden_id or f"cli-{run_id}",
+    golden = load_golden(ws, golden_id) if golden_id else None
+    if golden_id and golden is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Golden not found: {golden_id}"), json_output)
+        raise typer.Exit(1)
+    golden = golden or GoldenTrace(
+        id=f"cli-{run_id}",
         workflow_id=run.workflow_id,
         expected_status=expected_status,
         expected_event_types=events,
@@ -1193,6 +1197,68 @@ def eval_run(
         color = "green" if result.passed else "red"
         console.print(f"Eval [bold {color}]{'PASS' if result.passed else 'FAIL'}[/bold {color}]  score={result.score}")
         console.print(f"  status_match={result.status_match}  event_type_match={result.event_type_match}  output_contains_match={result.output_contains_match}")
+
+
+@eval_app.command("save")
+def eval_save(
+    golden_id: str = typer.Argument(..., help="Golden trace ID to save"),
+    workflow_id: str = typer.Option("", "--workflow-id", help="Expected workflow id"),
+    expected_output: str = typer.Option("", "--expected-final-output", help="Expected substring in final output"),
+    expected_event_types: str = typer.Option("", "--expected-event-types", help="Comma-separated expected event types"),
+    expected_status: str = typer.Option("completed", "--expected-status", help="Expected run status"),
+    description: str = typer.Option("", "--description", help="Golden description"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Save a golden trace expectation."""
+    _setup_logging(debug)
+    from .evals.golden import GoldenTrace, save_golden
+
+    ws = _workspace(workspace)
+    events = [t.strip() for t in expected_event_types.split(",") if t.strip()] if expected_event_types else []
+    golden = GoldenTrace(
+        id=golden_id,
+        workflow_id=workflow_id or "*",
+        expected_status=expected_status,
+        expected_event_types=events,
+        expected_final_output_contains=expected_output,
+        description=description,
+    )
+    save_golden(ws, golden)
+    _out(ok(golden.model_dump(), workspace=str(ws)), json_output)
+
+
+@eval_app.command("delete")
+def eval_delete(
+    golden_id: str = typer.Argument(..., help="Golden trace ID to delete"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Delete a saved golden trace."""
+    _setup_logging(debug)
+    from .evals.golden import delete_golden
+
+    ws = _workspace(workspace)
+    deleted = delete_golden(ws, golden_id)
+    _out(ok({"golden_id": golden_id, "deleted": deleted}, workspace=str(ws)), json_output)
+
+
+@eval_app.command("report")
+def eval_report(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Report saved golden trace inventory."""
+    _setup_logging(debug)
+    from .evals.golden import list_goldens
+
+    ws = _workspace(workspace)
+    goldens = list_goldens(ws)
+    data = {"count": len(goldens), "goldens": [golden.model_dump() for golden in goldens]}
+    _out(ok(data, workspace=str(ws)), json_output)
 
 
 @eval_app.command("list")
@@ -1213,7 +1279,7 @@ def eval_list(
         table.add_column("Workflow")
         table.add_column("Expected Output (truncated)")
         for g in goldens:
-            table.add_row(g.id, g.workflow_id, g.expected_output[:60] if g.expected_output else "")
+            table.add_row(g.id, g.workflow_id, g.expected_final_output_contains[:60] if g.expected_final_output_contains else "")
         console.print(table)
 
 

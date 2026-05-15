@@ -16,6 +16,26 @@ def test_eval_list_help(run_cli):
     assert "List saved golden traces" in r.stdout
 
 
+def test_eval_save_delete_report(run_cli, tmp_path):
+    save = run_cli([
+        "eval", "save", "golden-1",
+        "--workspace", str(tmp_path),
+        "--workflow-id", "wf-test",
+        "--expected-final-output", "hello",
+        "--expected-event-types", "RUN_STARTED,RUN_COMPLETED",
+        "--json",
+    ])
+    assert save.exit_code == 0, save.stdout + save.stderr
+
+    report = run_cli(["eval", "report", "--workspace", str(tmp_path), "--json"])
+    assert report.exit_code == 0, report.stdout + report.stderr
+    assert '"count": 1' in report.stdout
+
+    delete = run_cli(["eval", "delete", "golden-1", "--workspace", str(tmp_path), "--json"])
+    assert delete.exit_code == 0, delete.stdout + delete.stderr
+    assert '"deleted": true' in delete.stdout
+
+
 def test_eval_run_missing_run(run_cli):
     r = run_cli(["eval", "run", "nonexistent-run-id"])
     assert r.exit_code != 0

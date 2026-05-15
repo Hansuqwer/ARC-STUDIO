@@ -92,6 +92,15 @@ def load_golden(workspace: Path, golden_id: str) -> GoldenTrace | None:
     return GoldenTrace.model_validate(json.loads(p.read_text()))
 
 
+def delete_golden(workspace: Path, golden_id: str) -> bool:
+    """Delete a saved golden trace. Returns True if a file was removed."""
+    p = _goldens_dir(workspace) / f"{golden_id}.json"
+    if not p.exists():
+        return False
+    p.unlink()
+    return True
+
+
 def list_goldens(workspace: Path) -> list[GoldenTrace]:
     """List all saved golden traces in the workspace."""
     d = _goldens_dir(workspace)
