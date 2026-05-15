@@ -349,6 +349,52 @@ async def providers_diagnostics(request: web.Request) -> web.Response:
     return _json(ok(redacted_diagnostics(os.environ)).model_dump())
 
 
+async def sse_proof(request: web.Request) -> web.StreamResponse:
+    """Manual SSE proof endpoint — streams fake events with heartbeats.
+
+    Proves that manual ``aiohttp.web.StreamResponse`` works for SSE
+    without the ``aiohttp-sse`` package. Delivers 3 fake events plus
+    heartbeats, then ends with STREAM_END.
+    """
+    import asyncio
+
+    # Allow tests to override sleep intervals (0 in tests means fastest path).
+    event_delay = float(request.query.get("event_delay", "0.01"))
+    heartbeat_interval = float(request.query.get("heartbeat_interval", "0.1"))
+    heartbeat_count = int(request.query.get("heartbeat_count", "2"))
+
+    response = web.StreamResponse(headers={
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Access-Control-Allow-Origin": _cors_origin(),
+    })
+    await response.prepare(request)
+
+    events = [
+        {"type": "RUN_STARTED", "timestamp": time.time(), "data": {"workflow_id": "proof", "runtime": "sse-proof"}},
+        {"type": "STEP_STARTED", "timestamp": time.time(), "data": {"step_id": "s1", "step_name": "SSE proof step"}},
+        {"type": "RUN_COMPLETED", "timestamp": time.time(), "data": {"duration_ms": 42}},
+    ]
+
+    for i, event in enumerate(events):
+        event["sequence"] = i
+        event["run_id"] = "proof-run"
+        payload = json.dumps(event, default=str)
+        await response.write(f"data: {payload}\n\n".encode())
+        if event_delay > 0:
+            await asyncio.sleep(event_delay)
+
+    # Heartbeat cycle
+    for i in range(heartbeat_count):
+        if heartbeat_interval > 0:
+            await asyncio.sleep(heartbeat_interval)
+        heartbeat = {"type": "HEARTBEAT", "timestamp": time.time(), "sequence": len(events) + i}
+        await response.write(f": heartbeat {i+1}\ndata: {json.dumps(heartbeat, default=str)}\n\n".encode())
+
+    await response.write(b"data: {\"type\": \"STREAM_END\"}\n\n")
+    return response
+
+
 async def run_events_sse(request: web.Request) -> web.StreamResponse:
     """AG-UI-compatible SSE stream for run events."""
     run_id = request.match_info["run_id"]
@@ -567,6 +613,7 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_post("/api/runs/start",       start_run)
     app.router.add_get("/api/runs/{run_id}",     get_run)
     app.router.add_get("/api/runs/{run_id}/events", run_events_sse)
+    app.router.add_get("/api/sse/proof",             sse_proof)
     app.router.add_post("/api/telemetry/export/{run_id}", export_trace)
     app.router.add_get("/api/context/pack",      context_pack)
     app.router.add_get("/api/providers",         providers)
