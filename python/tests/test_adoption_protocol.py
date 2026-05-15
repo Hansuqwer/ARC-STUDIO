@@ -7,6 +7,7 @@ LangGraph is installed.
 """
 from __future__ import annotations
 
+import os
 
 import pytest
 
@@ -21,6 +22,17 @@ from agent_runtime_cockpit.adoption import (
     AdoptionCapability,
     AdoptionRegistry,
 )
+
+
+def _langgraph_state_graph_or_skip():
+    try:
+        from langgraph.graph import StateGraph
+    except ImportError:
+        try:
+            from langgraph.graph.state import StateGraph  # type: ignore[import-not-found]
+        except ImportError:
+            pytest.skip("installed langgraph package does not expose StateGraph")
+    return StateGraph
 
 
 class TestAdoptionModels:
@@ -193,12 +205,13 @@ class TestLangGraphRunner:
         assert runner.mode == AdoptionMode.LANGGRAPH
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.environ.get("ARC_REAL_RUNTIME_SMOKE") != "1",
+        reason="real LangGraph graph execution is covered by opt-in smoke tests",
+    )
     async def test_runner_executes_langgraph_graph(self):
         """Run a simple LangGraph graph through the adoption runner."""
-        try:
-            from langgraph.graph import StateGraph
-        except ImportError:
-            from langgraph.graph.state import StateGraph  # type: ignore[import-not-found]
+        StateGraph = _langgraph_state_graph_or_skip()
         from typing_extensions import TypedDict
 
         class SimpleState(TypedDict):
@@ -271,12 +284,13 @@ class TestLangGraphRunner:
             asyncio.run(_run())
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        os.environ.get("ARC_REAL_RUNTIME_SMOKE") != "1",
+        reason="real LangGraph graph execution is covered by opt-in smoke tests",
+    )
     async def test_runner_run_with_custom_input(self):
         """Test that custom input is passed through to the graph."""
-        try:
-            from langgraph.graph import StateGraph
-        except ImportError:
-            from langgraph.graph.state import StateGraph  # type: ignore[import-not-found]
+        StateGraph = _langgraph_state_graph_or_skip()
         from typing_extensions import TypedDict
 
         class SimpleState(TypedDict):

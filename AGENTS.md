@@ -311,7 +311,7 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 - Total frontend entrypoint ~28.8 MiB (Monaco + Theia core + React + vendors); ARC Studio code chunk is 50 KiB
 
 ### Test Metrics
-- Python: 552 passed, 8 skipped (was 435 before P2/P3/P4/P5 work)
+- Python: 550 passed, 10 skipped (was 435 before P2/P3/P4/P5 work)
 - TypeScript protocol build: clean
 - arc-extension build: clean
 

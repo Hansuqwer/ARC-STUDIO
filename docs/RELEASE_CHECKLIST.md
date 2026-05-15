@@ -95,7 +95,7 @@ bash scripts/check-banned-claims.sh README.md docs/IMPLEMENTATION_PLAN.md docs/R
 
 **Status:** ✅ Passing locally (2026-05-15)
 
-Latest local run: `551 passed, 8 skipped, 1 warning`. The warning is a LangGraph transitive deprecation warning and does not fail the strict command in this environment.
+Latest local run: `550 passed, 10 skipped`. Real LangGraph graph execution is covered by the opt-in smoke path because dependency shape differs across platforms.
 
 **Check:**
 ```bash
