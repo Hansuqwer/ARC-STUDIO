@@ -107,6 +107,7 @@ class RunStatus(str, Enum):
 
 
 class RunEvent(BaseModel):
+    schema_version: int = 1  # Event schema version (ADR-004)
     type: str
     timestamp: str
     run_id: str

@@ -112,12 +112,36 @@ export interface RunRecord {
   metadata: Record<string, unknown>;
 }
 
+/** Event schema version constant — mirrors Python CURRENT_SCHEMA_VERSION */
+export const EVENT_SCHEMA_VERSION = 1;
+
 export interface RunEvent {
+  schema_version: number;
   type: string;
   timestamp: string;
   run_id: string;
   sequence: number;
   data: Record<string, unknown>;
+}
+
+/**
+ * Parse a raw JSON event string, defaulting schema_version to 1 for old traces.
+ * Returns the parsed event. If the version exceeds EVENT_SCHEMA_VERSION, wraps
+ * the event as a RAW type for forward compatibility.
+ */
+export function parseEvent(raw: string): RunEvent {
+  const event: RunEvent = JSON.parse(raw);
+  if (!event.schema_version) {
+    event.schema_version = 1;
+  }
+  if (event.schema_version > EVENT_SCHEMA_VERSION) {
+    return {
+      ...event,
+      type: 'RAW',
+      data: { raw: { ...event } },
+    };
+  }
+  return event;
 }
 
 export interface ContextPackEntry {
