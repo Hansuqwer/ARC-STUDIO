@@ -249,6 +249,10 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - ✅ **Run lifecycle CLI**: `arc runs status/delete/export/backfill` commands added (15 CLI run tests)
 - ✅ **Audit path on RunRecord**: `audit_path` field added to `RunRecord` schema for trace-to-audit-chain linkage
 - ✅ **Combo semantics**: Already implemented via `ComboRuntimeAdapter` (sequential multi-runtime)
+- ✅ **Config model (ADR-001)**: `ArcConfig` Pydantic model, YAML loader, env/workspace/user/default precedence, `arc config init/show`; 14 tests
+
+### Completed (P1b — Adoption Foundation)
+- ✅ **SwarmGraph import path spike**: vendored `swarm_shared` and `hive-swarm` modules import from ARC Python venv; documented in `docs/SPIKE_SWARMGRAPH_IMPORT.md`
 
 ### P1a Items Still Open
 - Add ARC trace/audit refs (adapters should populate `audit_path` on RunRecord) — P2 scope (HMAC wiring)
@@ -262,7 +266,7 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - Total frontend entrypoint ~28.8 MiB (Monaco + Theia core + React + vendors); ARC Studio code chunk is 50 KiB
 
 ### Test Metrics
-- Python: 418 passed, 6 skipped (was 402 before P1a work)
+- Python: 435 passed, 6 skipped (was 402 before P1a work)
 - TypeScript protocol build: clean
 - arc-extension build: clean
 
