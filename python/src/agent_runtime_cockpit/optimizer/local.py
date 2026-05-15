@@ -7,6 +7,16 @@ Provides:
   - diff_prompts: structural comparison of two prompts
 
 No provider calls are made. Works fully offline.
+
+P4 gated provider modes:
+  - 'off': send prompt unchanged (default, allowed everywhere)
+  - 'local': rule-based cleanup (current implementation, no provider calls)
+  - 'local-model': local model rewrite (future, requires local runtime)
+  - 'provider': paid provider model rewrite (future, requires privacy/paid gates)
+  - 'swarmgraph': consensus optimization (future, requires adoption protocol)
+
+Provider modes are gated behind explicit privacy and paid-call gates.
+Silent rewrites of high-assurance prompts are never allowed.
 """
 from __future__ import annotations
 
@@ -19,6 +29,22 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 log = logging.getLogger(__name__)
+
+
+class OptimizerMode(str):
+    """Optimizer mode — controls what optimization is applied.
+    
+    'off': send prompt unchanged
+    'local': rule-based cleanup (default, no provider calls)
+    'local-model': local model rewrite (future, gated)
+    'provider': paid provider rewrite (future, gated)
+    'swarmgraph': consensus optimization (future, gated)
+    """
+    OFF = "off"
+    LOCAL = "local"
+    LOCAL_MODEL = "local-model"
+    PROVIDER = "provider"
+    SWARMGRAPH = "swarmgraph"
 
 
 class TokenCount(BaseModel):
@@ -81,17 +107,37 @@ RULES: list[tuple[str, str, str]] = [
 ]
 
 
-def optimize_prompt(prompt: str, model: str = "gpt-4") -> OptimizationResult:
+def optimize_prompt(prompt: str, model: str = "gpt-4", mode: str = "local") -> OptimizationResult:
     """Apply rule-based optimization to a prompt.
 
-    Rules applied (in order):
-      1. Collapse 3+ consecutive newlines to 2.
-      2. Strip trailing whitespace from each line.
-      3. Normalize over-deep indentation to 4 spaces.
-      4. Remove trailing newlines (keep one).
+    Modes:
+      - 'off': return prompt unchanged
+      - 'local': rule-based cleanup (default, no provider calls)
+      - 'local-model': not yet implemented (raises NotImplementedError)
+      - 'provider': not yet implemented (raises NotImplementedError)
+      - 'swarmgraph': not yet implemented (raises NotImplementedError)
 
-    No provider calls are made.
+    Provider modes are gated and will raise NotImplementedError until
+    privacy/paid-call gates are implemented.
     """
+    if mode == "off":
+        tokens = count_tokens(prompt, model)
+        return OptimizationResult(
+            original=prompt,
+            optimized=prompt,
+            original_tokens=tokens,
+            optimized_tokens=tokens,
+            tokens_saved=0,
+            changes=[],
+        )
+    
+    if mode in ("local-model", "provider", "swarmgraph"):
+        raise NotImplementedError(
+            f"Optimizer mode '{mode}' is not yet implemented. "
+            f"Use 'local' for rule-based optimization or 'off' for no optimization. "
+            f"Provider modes require privacy/paid-call gates."
+        )
+    
     original_tokens = count_tokens(prompt, model)
     optimized = prompt
     changes: list[str] = []

@@ -122,3 +122,39 @@ def test_estimate_cost_zero_tokens():
 def test_token_count_model_field():
     result = count_tokens("test", model="gpt-4o")
     assert result.model == "gpt-4o"
+
+
+def test_optimize_prompt_mode_off():
+    """Mode 'off' returns prompt unchanged."""
+    prompt = "Hello\n\n\n\nWorld   \n"
+    result = optimize_prompt(prompt, mode="off")
+    assert result.optimized == prompt
+    assert result.tokens_saved == 0
+    assert result.changes == []
+
+
+def test_optimize_prompt_mode_local():
+    """Mode 'local' applies rule-based optimization."""
+    prompt = "Hello\n\n\n\nWorld   \n"
+    result = optimize_prompt(prompt, mode="local")
+    assert result.optimized != prompt
+    assert result.tokens_saved >= 0
+    assert len(result.changes) > 0
+
+
+def test_optimize_prompt_mode_local_model_not_implemented():
+    """Mode 'local-model' raises NotImplementedError (gated)."""
+    with pytest.raises(NotImplementedError, match="local-model"):
+        optimize_prompt("test", mode="local-model")
+
+
+def test_optimize_prompt_mode_provider_not_implemented():
+    """Mode 'provider' raises NotImplementedError (gated)."""
+    with pytest.raises(NotImplementedError, match="provider"):
+        optimize_prompt("test", mode="provider")
+
+
+def test_optimize_prompt_mode_swarmgraph_not_implemented():
+    """Mode 'swarmgraph' raises NotImplementedError (gated)."""
+    with pytest.raises(NotImplementedError, match="swarmgraph"):
+        optimize_prompt("test", mode="swarmgraph")
