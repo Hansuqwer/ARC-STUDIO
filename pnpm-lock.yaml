@@ -80,6 +80,9 @@ importers:
       arc-event-stream:
         specifier: workspace:*
         version: link:../../theia-extensions/arc-event-stream
+      arc-extension:
+        specifier: workspace:*
+        version: link:../../packages/arc-extension
       arc-health:
         specifier: workspace:*
         version: link:../../theia-extensions/arc-health
@@ -285,19 +288,19 @@ importers:
   packages/arc-extension:
     dependencies:
       '@theia/core':
-        specifier: ^1.45.0
+        specifier: ^1.71.0
         version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))
       '@theia/filesystem':
-        specifier: ^1.45.0
+        specifier: ^1.71.0
         version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(typescript@5.4.5)
       '@theia/navigator':
-        specifier: ^1.45.0
+        specifier: ^1.71.0
         version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(typescript@5.4.5)
       '@theia/terminal':
-        specifier: ^1.45.0
+        specifier: ^1.71.0
         version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(typescript@5.4.5)
       '@theia/workspace':
-        specifier: ^1.45.0
+        specifier: ^1.71.0
         version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(typescript@5.4.5)
       '@types/fs-extra':
         specifier: ^11.0.4

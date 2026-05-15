@@ -12,6 +12,7 @@
  */
 
 import { injectable } from '@theia/core/shared/inversify';
+import { execFileSync } from 'child_process';
 import {
     ArcService,
     ExecutionOptions,
@@ -23,13 +24,28 @@ import {
     ValidationResult,
     CancelResult,
     ArcError,
-    ArcErrorCode
+    ArcErrorCode,
+    RuntimeCapabilitiesResponse,
+    ProviderStatus,
 } from '../common/arc-protocol';
 import { validateWorkspaceRoot, validateTraceId } from './security-utils';
 import { WorkflowExecutor } from './services/workflow-executor';
 import { TraceParser } from './services/trace-parser';
 import { WorkflowDetector } from './services/workflow-detector';
 import { FileManager } from './services/file-manager';
+
+const ARC_CLI_ENV_ALLOWLIST = ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR'];
+
+function buildArcCliEnv(): NodeJS.ProcessEnv {
+    const env: NodeJS.ProcessEnv = {};
+    for (const key of ARC_CLI_ENV_ALLOWLIST) {
+        const value = process.env[key];
+        if (value !== undefined) {
+            env[key] = value;
+        }
+    }
+    return env;
+}
 
 @injectable()
 export class ArcBackendService implements ArcService {
@@ -254,6 +270,88 @@ export class ArcBackendService implements ArcService {
      */
     async detectWorkflows(): Promise<WorkflowInfo[]> {
         return this.detector.detectWorkflows(this.workspaceRoot);
+    }
+
+    // ========== Runtime Capabilities (arc-adapters) ==========
+
+    /**
+     * List runtime capability reports by calling the Python CLI.
+     */
+    async listRuntimeCapabilities(): Promise<RuntimeCapabilitiesResponse> {
+        try {
+            const output = execFileSync('arc', [
+                'runtimes',
+                '--capabilities',
+                '--workspace',
+                this.workspaceRoot,
+                '--json',
+            ], {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            if (parsed.ok && parsed.data) {
+                return parsed.data as RuntimeCapabilitiesResponse;
+            }
+            throw new ArcError(
+                ArcErrorCode.UNKNOWN,
+                parsed?.error?.message || 'CLI returned no data',
+            );
+        } catch (error) {
+            if (error instanceof ArcError) throw error;
+            throw new ArcError(
+                ArcErrorCode.EXECUTION_FAILED,
+                `Failed to list capabilities: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+        }
+    }
+
+    /**
+     * Get provider configuration status by calling the Python CLI.
+     */
+    async getProviderStatus(provider: string, baseUrl?: string): Promise<ProviderStatus> {
+        try {
+            const output = execFileSync('arc', ['providers', 'status', '--json'], {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            if (parsed.ok && Array.isArray(parsed.data)) {
+                const found = parsed.data.find((p: { provider: string }) => p.provider === provider);
+                if (found) return found as ProviderStatus;
+            }
+            // Return a default status if provider not found
+            return {
+                provider,
+                baseUrlConfigured: !!baseUrl,
+                apiKeyConfigured: false,
+                runtimeAvailable: false,
+                message: 'Provider not configured',
+            };
+        } catch (error) {
+            return {
+                provider,
+                baseUrlConfigured: !!baseUrl,
+                apiKeyConfigured: false,
+                runtimeAvailable: false,
+                message: `Status unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            };
+        }
+    }
+
+    /**
+     * Get current workspace status.
+     */
+    async getWorkspaceStatus(): Promise<{ frontendPath: string; backendPath: string; source: string }> {
+        return {
+            frontendPath: this.workspaceRoot,
+            backendPath: this.workspaceRoot,
+            source: 'filesystem',
+        };
     }
 
     // ========== Private Helpers ==========

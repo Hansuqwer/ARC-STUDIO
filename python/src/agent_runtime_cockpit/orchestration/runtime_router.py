@@ -109,12 +109,15 @@ class ComboRuntimeAdapter(RuntimeAdapter):
 def list_runtimes(workspace: Path) -> list[CapabilityReport]:
     reports = [adapter.capability_report(workspace) for adapter in default_registry().all()]
     for capability in AdoptionRegistry.list_capabilities(workspace):
+        reason = capability.reason
+        if capability.status.value == "runnable":
+            reason = f"{capability.reason}; adoption runner ready but runtime router is not wired"
         reports.append(CapabilityReport(
             runtime_id=capability.mode.value,
             detected=False,
             can_run=False,
             availability="detected_not_runnable",
-            reason=capability.reason,
+            reason=reason,
             doctor_actions=[_doctor_action_from_dict(action) for action in capability.doctor_actions],
         ))
     return reports

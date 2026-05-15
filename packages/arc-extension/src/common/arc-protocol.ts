@@ -290,6 +290,61 @@ export interface WorkflowInfo {
     description?: string;
 }
 
+// ========== Runtime Adapter Status (ported from arc-core) ==========
+
+/**
+ * A doctor action for a runtime capability report.
+ */
+export interface DoctorAction {
+    id: string;
+    label: string;
+    description: string;
+    command: string;
+    safe_to_auto_run: boolean;
+}
+
+/**
+ * Capability report for a runtime adapter.
+ */
+export interface RuntimeCapabilityReport {
+    runtime_id: string;
+    detected: boolean;
+    can_run: boolean;
+    availability: string;
+    reason?: string | null;
+    detected_artifacts: string[];
+    required_env: string[];
+    version?: string | null;
+    requires_paid_calls: boolean;
+    doctor_actions: DoctorAction[];
+}
+
+/**
+ * Response envelope for runtime capability listing.
+ */
+export interface RuntimeCapabilitiesResponse {
+    workspace: string;
+    auto_priority: string[];
+    runtimes: RuntimeCapabilityReport[];
+}
+
+/**
+ * Provider configuration status for the adapter status widget.
+ */
+export interface ProviderStatus {
+    provider: string;
+    display_name?: string;
+    enabled?: boolean;
+    dry_run?: boolean;
+    base_url_configured?: boolean;
+    baseUrlConfigured: boolean;
+    api_key_configured?: boolean;
+    apiKeyConfigured: boolean;
+    apiKeySource?: string;
+    runtimeAvailable: boolean;
+    message: string;
+}
+
 // ========== Streaming ==========
 
 /**
@@ -435,4 +490,22 @@ export interface ArcService {
      * ```
      */
     detectWorkflows(): Promise<WorkflowInfo[]>;
+
+    /**
+     * List runtime capability reports for the current workspace.
+     * Returns detected runtimes with their readiness status.
+     */
+    listRuntimeCapabilities(): Promise<RuntimeCapabilitiesResponse>;
+
+    /**
+     * Get provider configuration status.
+     * @param provider - Provider ID (e.g. 'openai', 'anthropic')
+     * @param baseUrl - Optional base URL override
+     */
+    getProviderStatus(provider: string, baseUrl?: string): Promise<ProviderStatus>;
+
+    /**
+     * Get current workspace status (frontend/backend paths).
+     */
+    getWorkspaceStatus(): Promise<{ frontendPath: string; backendPath: string; source: string }>;
 }

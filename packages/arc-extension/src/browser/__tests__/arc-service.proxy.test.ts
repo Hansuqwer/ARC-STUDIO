@@ -9,7 +9,11 @@ import {
     ValidationResult,
     CancelResult,
     WorkflowInfo,
-    TraceEvent
+    TraceEvent,
+    RuntimeCapabilitiesResponse,
+    ProviderStatus,
+    DoctorAction,
+    RuntimeCapabilityReport,
 } from '../../common/arc-protocol';
 
 describe('ArcService Proxy Tests', () => {
@@ -48,7 +52,10 @@ describe('ArcService Proxy Tests', () => {
                 'readTrace',
                 'streamTrace',
                 'validateTrace',
-                'detectWorkflows'
+                'detectWorkflows',
+                'listRuntimeCapabilities',
+                'getProviderStatus',
+                'getWorkspaceStatus',
             ];
 
             const mockService: any = {
@@ -58,7 +65,10 @@ describe('ArcService Proxy Tests', () => {
                 readTrace: async () => ({}),
                 streamTrace: async () => ({}),
                 validateTrace: async () => ({}),
-                detectWorkflows: async () => []
+                detectWorkflows: async () => [],
+                listRuntimeCapabilities: async () => ({}),
+                getProviderStatus: async () => ({}),
+                getWorkspaceStatus: async () => ({}),
             };
 
             for (const method of requiredMethods) {
@@ -162,6 +172,85 @@ describe('ArcService Proxy Tests', () => {
             const workflows = await mockService.detectWorkflows();
             expect(workflows.length).toBe(1);
             expect(workflows[0].type).toBe('swarmgraph');
+        });
+
+        it('listRuntimeCapabilities should return RuntimeCapabilitiesResponse', async () => {
+            const mockService = {
+                listRuntimeCapabilities: async (): Promise<RuntimeCapabilitiesResponse> => ({
+                    workspace: '/test',
+                    auto_priority: ['swarmgraph'],
+                    runtimes: [
+                        {
+                            runtime_id: 'swarmgraph',
+                            detected: true,
+                            can_run: true,
+                            availability: 'available',
+                            detected_artifacts: [],
+                            required_env: [],
+                            requires_paid_calls: false,
+                            doctor_actions: [],
+                        },
+                    ],
+                }),
+            };
+
+            const result = await mockService.listRuntimeCapabilities();
+            expect(result.workspace).toBe('/test');
+            expect(result.runtimes.length).toBe(1);
+            expect(result.runtimes[0].runtime_id).toBe('swarmgraph');
+        });
+
+        it('getProviderStatus should return ProviderStatus', async () => {
+            const mockService = {
+                getProviderStatus: async (provider: string): Promise<ProviderStatus> => ({
+                    provider,
+                    baseUrlConfigured: false,
+                    apiKeyConfigured: true,
+                    runtimeAvailable: true,
+                    message: 'Provider configured',
+                }),
+            };
+
+            const result = await mockService.getProviderStatus('openai');
+            expect(result.provider).toBe('openai');
+            expect(result.apiKeyConfigured).toBe(true);
+        });
+
+        it('getWorkspaceStatus should return workspace paths', async () => {
+            const mockService = {
+                getWorkspaceStatus: async (): Promise<{ frontendPath: string; backendPath: string; source: string }> => ({
+                    frontendPath: '/workspace',
+                    backendPath: '/workspace',
+                    source: 'filesystem',
+                }),
+            };
+
+            const result = await mockService.getWorkspaceStatus();
+            expect(result.frontendPath).toBe('/workspace');
+            expect(result.backendPath).toBe('/workspace');
+        });
+
+        it('RuntimeCapabilityReport should support doctor_actions', () => {
+            const report: RuntimeCapabilityReport = {
+                runtime_id: 'test',
+                detected: true,
+                can_run: false,
+                availability: 'missing_deps',
+                detected_artifacts: ['file.py'],
+                required_env: ['API_KEY'],
+                requires_paid_calls: true,
+                doctor_actions: [
+                    {
+                        id: 'install-deps',
+                        label: 'Install Dependencies',
+                        description: 'Run pip install',
+                        command: 'pip install -r requirements.txt',
+                        safe_to_auto_run: true,
+                    },
+                ],
+            };
+            expect(report.doctor_actions.length).toBe(1);
+            expect(report.doctor_actions[0].id).toBe('install-deps');
         });
     });
 
