@@ -10,11 +10,19 @@ them to AG-UI events via the canonical mapping layer.
 
 Security: Dual gating enforced via centralized require_dual_gate("OPENAI").
 Set ARC_OPENAI_RUN_BACKEND=stub (free) or local/gateway (requires ARC_OPENAI_ALLOW_COSTS=true).
+
+Export target: The actual Agent/workflow is loaded via the
+ARC_OPENAI_AGENTS_EXPORT environment variable in ``module:attr`` format
+(e.g. ``my_project.agent:agent``). The module must reside inside the
+workspace unless explicitly trusted.
 """
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import logging
+import os
+import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,13 +32,138 @@ from typing import Any
 
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import (
-    WorkflowInfo, RunRecord, RunEvent, RunStatus
+    WorkflowInfo, RunRecord, RunEvent, RunStatus,
 )
 from ._static import dependency_evidence, import_evidence, static_workflow
 from .base import RuntimeAdapter, CapabilityReport, DoctorAction
 
 log = logging.getLogger(__name__)
 
+# Environment variable name for the export target.
+_EXPORT_ENV = "ARC_OPENAI_AGENTS_EXPORT"
+
+
+# ---------------------------------------------------------------------------
+# Export-target loader
+# ---------------------------------------------------------------------------
+
+class ExportTargetError(Exception):
+    """Raised when the export target cannot be resolved."""
+
+
+def _load_exported_agent(
+    inputs: dict[str, Any] | None,
+) -> tuple[Any, str]:
+    """Load the Agent object from the ``ARC_OPENAI_AGENTS_EXPORT`` env var.
+
+    Returns
+    -------
+    (agent_instance, source_descr)
+        The imported Agent instance and a human-readable source string
+        (e.g. ``"my_project.agent:my_agent"``).
+
+    Raises
+    ------
+    ExportTargetError
+        If the variable is unset, malformed, points outside the workspace
+        (unless explicitly trusted), the module cannot be imported, or the
+        exported attribute is not an ``Agent`` instance.
+    """
+    raw = os.environ.get(_EXPORT_ENV)
+    if not raw:
+        raise ExportTargetError(
+            f"{_EXPORT_ENV} is not set. "
+            "Specify an export target, e.g. "
+            f"export {_EXPORT_ENV}=my_project.agent:my_agent"
+        )
+
+    # Parse module:attr
+    parts = raw.rsplit(":", 1)
+    if len(parts) != 2 or not parts[0] or not parts[1]:
+        raise ExportTargetError(
+            f"Invalid {_EXPORT_ENV} format: {raw!r}. "
+            "Expected ``module:attr``, e.g. ``my_project.agent:my_agent``."
+        )
+    module_name, attr_name = parts[0], parts[1]
+
+    # Resolve module file path for workspace-boundary check.
+    spec = importlib.util.find_spec(module_name)
+    if spec is None or spec.origin is None:
+        raise ExportTargetError(
+            f"Module {module_name!r} (from {_EXPORT_ENV}={raw!r}) "
+            "not found. Make sure it is importable from the workspace."
+        )
+    module_path = Path(spec.origin).resolve()
+
+    # Security: refuse targets outside the workspace unless explicitly trusted.
+    workspace_str = (inputs or {}).get("workspace")
+    trusted_env = os.environ.get("ARC_TRUSTED_PATHS", "")
+    trusted_paths = {Path(p).resolve() for p in trusted_env.split(":") if p}
+
+    if workspace_str:
+        workspace_path = Path(workspace_str).resolve()
+    else:
+        workspace_path = Path.cwd().resolve()
+
+    # Allow if module is inside workspace OR on an explicit trusted path.
+    is_inside_workspace = _is_subpath(module_path, workspace_path)
+    is_on_trusted_path = any(
+        _is_subpath(module_path, tp) for tp in trusted_paths
+    )
+
+    if not is_inside_workspace and not is_on_trusted_path:
+        raise ExportTargetError(
+            f"Export target {raw!r} resolves to {module_path}, "
+            "which is outside the workspace. "
+            "Set ARC_TRUSTED_PATHS to allow additional directories."
+        )
+
+    # Import the module and extract the attribute.
+    try:
+        mod = importlib.import_module(module_name)
+    except Exception as exc:
+        raise ExportTargetError(
+            f"Failed to import module {module_name!r} "
+            f"(from {_EXPORT_ENV}={raw!r}): {exc}"
+        ) from exc
+
+    agent = getattr(mod, attr_name, None)
+    if agent is None:
+        raise ExportTargetError(
+            f"Module {module_name!r} has no attribute {attr_name!r} "
+            f"(from {_EXPORT_ENV}={raw!r})."
+        )
+
+    # We import Agent lazily so the adapter module can be imported
+    # without the SDK being installed.
+    try:
+        from agents import Agent as OpenAIAgent
+    except ImportError as exc:
+        raise ExportTargetError(
+            "OpenAI Agents SDK is not installed."
+        ) from exc
+
+    if not isinstance(agent, OpenAIAgent):
+        raise ExportTargetError(
+            f"Export target {raw!r} resolved to {type(agent).__name__}, "
+            "not an Agent instance."
+        )
+
+    return agent, raw
+
+
+def _is_subpath(child: Path, parent: Path) -> bool:
+    """Return True when *child* is a descendant of *parent*."""
+    try:
+        child.relative_to(parent)
+        return True
+    except ValueError:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Adapter
+# ---------------------------------------------------------------------------
 
 class OpenAIAgentsAdapter(RuntimeAdapter):
     @property
@@ -64,7 +197,7 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                 availability="missing_dependency",
                 reason="OpenAI Agents SDK not installed. Install with: pip install openai-agents",
                 detected_artifacts=evidence,
-                required_env=["OPENAI_API_KEY"],
+                required_env=["OPENAI_API_KEY", _EXPORT_ENV],
                 requires_paid_calls=True,
                 doctor_actions=[
                     DoctorAction(
@@ -88,7 +221,7 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                 availability="paid_calls_blocked",
                 reason=str(exc),
                 detected_artifacts=evidence,
-                required_env=["ARC_OPENAI_RUN_BACKEND", "ARC_OPENAI_ALLOW_COSTS", "OPENAI_API_KEY"],
+                required_env=["ARC_OPENAI_RUN_BACKEND", "ARC_OPENAI_ALLOW_COSTS", "OPENAI_API_KEY", _EXPORT_ENV],
                 requires_paid_calls=True,
                 doctor_actions=[
                     DoctorAction(
@@ -101,13 +234,42 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                 ],
             )
         
+        # Check export target configuration
+        export_target = os.environ.get(_EXPORT_ENV)
+        if not export_target:
+            return CapabilityReport(
+                runtime_id=self.adapter_id,
+                detected=detected,
+                can_run=False,
+                availability="missing_export_target",
+                reason=(
+                    f"Export target not configured. "
+                    f"Set {_EXPORT_ENV}=module:attr to specify the Agent to run."
+                ),
+                detected_artifacts=evidence,
+                required_env=["ARC_OPENAI_RUN_BACKEND", "ARC_OPENAI_ALLOW_COSTS", "OPENAI_API_KEY", _EXPORT_ENV],
+                requires_paid_calls=True,
+                doctor_actions=[
+                    DoctorAction(
+                        id="set-openai-export-target",
+                        label="Set OpenAI Agents Export Target",
+                        description=(
+                            f"Set {_EXPORT_ENV} to the module:attr "
+                            "pointing to your Agent (e.g. my_agent:agent)"
+                        ),
+                        command=f"export {_EXPORT_ENV}=my_project.agent:my_agent",
+                        safe_to_auto_run=False,
+                    ),
+                ],
+            )
+        
         return CapabilityReport(
             runtime_id=self.adapter_id,
             detected=detected,
             can_run=True,
             availability="runnable",
             detected_artifacts=evidence,
-            required_env=["ARC_OPENAI_RUN_BACKEND", "ARC_OPENAI_ALLOW_COSTS", "OPENAI_API_KEY"],
+            required_env=["ARC_OPENAI_RUN_BACKEND", "ARC_OPENAI_ALLOW_COSTS", "OPENAI_API_KEY", _EXPORT_ENV],
             requires_paid_calls=True,
         )
 
@@ -156,6 +318,9 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
     async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
         """
         Execute an OpenAI Agents SDK workflow with dual gating.
+        
+        The Agent to run is loaded from the ``ARC_OPENAI_AGENTS_EXPORT``
+        environment variable (``module:attr`` format).
         
         Dual gating enforced via require_dual_gate("OPENAI"):
         1. ARC_OPENAI_RUN_BACKEND must be set (stub/local/gateway)
@@ -206,6 +371,25 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                 ended_at=datetime.now(timezone.utc).isoformat(),
                 events=events,
                 metadata={"error": str(exc)},
+            )
+        
+        # Load the actual Agent from the export target.
+        try:
+            agent, export_source = _load_exported_agent(inputs)
+        except ExportTargetError as exc:
+            events.append(self._event(run_id, 0, "RUN_FAILED", {
+                "error": str(exc),
+                "workflow_id": workflow_id,
+            }))
+            return RunRecord(
+                id=run_id,
+                workflow_id=workflow_id,
+                runtime="openai-agents",
+                status=RunStatus.FAILED,
+                started_at=started.isoformat(),
+                ended_at=datetime.now(timezone.utc).isoformat(),
+                events=events,
+                metadata={"export_error": str(exc)},
             )
         
         # Event capture hooks
@@ -262,18 +446,12 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
             "workflow_id": workflow_id,
             "backend": backend,
             "cost_allowed": allow_costs,
+            "export_target": export_source,
         }))
         
-        # Create a simple agent for testing
-        # In production, this would load the actual workflow from workspace
-        prompt = str(inputs.get("prompt", "Hello, test the agent system."))
+        prompt = str(inputs.get("prompt", ""))
         
         try:
-            agent = Agent(
-                name="TestAgent",
-                instructions="You are a helpful assistant. Be concise.",
-            )
-            
             result = await Runner.run(
                 agent,
                 prompt,
@@ -296,6 +474,7 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                     "backend": backend,
                     "cost_allowed": allow_costs,
                     "prompt": prompt,
+                    "export_target": export_source,
                 },
             )
         
@@ -318,6 +497,7 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                     "backend": backend,
                     "cost_allowed": allow_costs,
                     "prompt": prompt,
+                    "export_target": export_source,
                     "error": str(exc),
                 },
             )
