@@ -593,6 +593,25 @@ def doctor_all(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
             "error": str(e),
         })
 
+    # 6. Provider diagnostics (env presence only, no network calls)
+    try:
+        from .providers import provider_statuses
+        providers = provider_statuses(os.environ)
+        configured_count = sum(1 for p in providers if p.api_key_configured)
+        checks.append({
+            "check": "providers",
+            "ok": True,
+            "total": len(providers),
+            "configured": configured_count,
+            "providers": [p.model_dump() for p in providers],
+        })
+    except Exception as e:
+        checks.append({
+            "check": "providers",
+            "ok": False,
+            "error": str(e),
+        })
+
     data = {"ok": all_ok, "checks": checks}
     _out(ok(data), json_output)
     if not all_ok:
@@ -606,6 +625,51 @@ def providers_status(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) ->
     _setup_logging(debug)
     from .providers import provider_statuses
     _out(ok([status.model_dump() for status in provider_statuses(os.environ)]), json_output)
+
+
+@providers_app.command("diagnostics")
+def providers_diagnostics(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
+    """Return redacted provider diagnostics (statuses, routing, accounts, quota).
+
+    No network calls are made. All secrets are redacted.
+    """
+    import os
+    _setup_logging(debug)
+    from .providers import redacted_diagnostics
+    _out(ok(redacted_diagnostics(os.environ)), json_output)
+
+
+@providers_app.command("proxy")
+def providers_proxy(
+    provider: Optional[str] = typer.Option(None, "--provider", help="Provider id (default: routing default)"),
+    model: Optional[str] = typer.Option(None, "--model", help="Model name (default: routing default)"),
+    prompt: str = typer.Option("Hello", "--prompt", help="Prompt text for dry-run proxy"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Dry-run provider proxy. No network call is made.
+
+    Validates routing, quota reservation, and gating without
+    invoking any LLM API. Set ARC_ALLOW_LIVE_PROVIDER_TESTS=true
+    and --allow-paid-calls for a live proxy call.
+    """
+    _setup_logging(debug)
+    from .providers import ProviderRequest, ProviderResponse, dry_run_proxy
+    from .providers import ProviderRoutingStore
+    routing = ProviderRoutingStore().get()
+    req = ProviderRequest(
+        provider=provider or routing.default_provider,
+        model=model or routing.default_model,
+        prompt=prompt,
+        dry_run=True,
+        allow_paid_calls=False,
+    )
+    try:
+        resp = dry_run_proxy(req)
+        _out(ok(resp.model_dump()), json_output)
+    except RuntimeError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(1)
 
 
 accounts_app = typer.Typer(name="accounts", help="Provider account metadata")
