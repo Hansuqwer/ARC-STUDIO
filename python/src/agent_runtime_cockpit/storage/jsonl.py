@@ -57,14 +57,23 @@ class JsonlTraceStore:
         paths = sorted(self.base_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
         return [p.stem for p in paths]
 
-    def prune(self, keep: int, dry_run: bool = True) -> list[Path]:
-        """Delete oldest trace files beyond keep count, or return would-delete paths."""
+    def prune(self, keep: int, dry_run: bool = True, older_than_days: int | None = None) -> list[Path]:
+        """Delete oldest trace files beyond keep count, or return would-delete paths.
+        
+        If older_than_days is set, only delete files older than that many days.
+        """
+        import time
         if keep < 0:
             raise ValueError("keep must be >= 0")
         if not self.base_dir.exists():
             return []
         root = self.base_dir.resolve()
         paths = sorted(self.base_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+        
+        if older_than_days is not None:
+            cutoff = time.time() - (older_than_days * 86400)
+            paths = [p for p in paths if p.stat().st_mtime < cutoff]
+        
         victims = paths[keep:]
         for path in victims:
             resolved = path.resolve()
