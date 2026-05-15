@@ -1568,6 +1568,7 @@ def eval_run(
     expected_output: str = typer.Option("", "--expected-final-output", help="Expected substring in final output"),
     expected_event_types: str = typer.Option("", "--expected-event-types", help="Comma-separated expected event types"),
     expected_status: str = typer.Option("completed", "--expected-status", help="Expected run status"),
+    batch: bool = typer.Option(False, "--batch", "-b", help="Run against all saved golden traces"),
     workspace: Optional[str] = WORKSPACE_FLAG,
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
@@ -1576,14 +1577,16 @@ def eval_run(
 
     Provide --golden to load a saved golden trace, or specify
     --expected-final-output/--expected-status/--expected-event-types inline.
+    Use --batch to evaluate against all saved golden traces.
 
     Example:
         uv run arc eval run <run_id> --expected-final-output "hello" --expected-status completed
         uv run arc eval run <run_id> --golden my-golden-id
+        uv run arc eval run <run_id> --batch
     """
     _setup_logging(debug)
     from .storage.jsonl import JsonlTraceStore
-    from .evals.golden import GoldenTrace, eval_run as do_eval, load_golden
+    from .evals.golden import GoldenTrace, eval_run as do_eval, load_golden, list_goldens
 
     ws = _workspace(workspace)
     store = JsonlTraceStore(ws / ".arc" / "traces")
@@ -1591,6 +1594,32 @@ def eval_run(
     if run is None:
         _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
         raise typer.Exit(1)
+
+    if batch:
+        goldens = list_goldens(ws)
+        if not goldens:
+            _out(err(ArcErrorCode.INVALID_INPUT, "No saved golden traces found. Use 'arc eval save' first."), json_output)
+            raise typer.Exit(1)
+        results = []
+        for golden in goldens:
+            result = do_eval(run, golden)
+            results.append(result.model_dump())
+        passed = sum(1 for r in results if r["passed"])
+        payload = {
+            "run_id": run_id,
+            "batch": True,
+            "total": len(results),
+            "passed": passed,
+            "failed": len(results) - passed,
+            "results": results,
+        }
+        _out(ok(payload, workspace=str(ws)), json_output)
+        if not json_output:
+            console.print(f"[bold]Batch Eval:[/bold] {passed}/{len(results)} passed")
+            for r in results:
+                color = "green" if r["passed"] else "red"
+                console.print(f"  [{color}]{'PASS' if r['passed'] else 'FAIL'}[/{color}] {r['golden_id']} score={r['score']}")
+        return
 
     events = [t.strip() for t in expected_event_types.split(",") if t.strip()] if expected_event_types else []
 
