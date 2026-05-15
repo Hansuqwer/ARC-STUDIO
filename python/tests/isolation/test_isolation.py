@@ -148,3 +148,91 @@ class TestSubprocessIsolationProvider:
         desc = provider.describe()
         assert desc["provider_id"] == "subprocess"
         assert desc["available"] is True
+
+    def test_filter_env_blocks_api_keys(self):
+        """Blocked patterns prevent *_API_KEY vars from passing through."""
+        from agent_runtime_cockpit.isolation.subprocess import _is_blocked_env_key
+        assert _is_blocked_env_key("OPENAI_API_KEY") is True
+        assert _is_blocked_env_key("ANTHROPIC_API_KEY") is True
+        assert _is_blocked_env_key("MY_API_KEY") is True
+        assert _is_blocked_env_key("PATH") is False
+
+    def test_filter_env_blocks_tokens(self):
+        """Blocked patterns prevent *_TOKEN vars from passing through."""
+        from agent_runtime_cockpit.isolation.subprocess import _is_blocked_env_key
+        assert _is_blocked_env_key("GITHUB_TOKEN") is True
+        assert _is_blocked_env_key("AUTH_TOKEN") is True
+        assert _is_blocked_env_key("HOME") is False
+
+    def test_filter_env_blocks_secrets(self):
+        """Blocked patterns prevent *_SECRET vars from passing through."""
+        from agent_runtime_cockpit.isolation.subprocess import _is_blocked_env_key
+        assert _is_blocked_env_key("CLIENT_SECRET") is True
+        assert _is_blocked_env_key("AWS_SECRET_ACCESS_KEY") is True
+        assert _is_blocked_env_key("LANG") is False
+
+    def test_filter_env_blocks_aws_prefix(self):
+        """Blocked patterns prevent AWS_* vars from passing through."""
+        from agent_runtime_cockpit.isolation.subprocess import _is_blocked_env_key
+        assert _is_blocked_env_key("AWS_ACCESS_KEY_ID") is True
+        assert _is_blocked_env_key("AWS_DEFAULT_REGION") is True
+
+    def test_output_redaction_openai_key(self):
+        """Output redaction removes OpenAI API keys."""
+        from agent_runtime_cockpit.isolation.subprocess import redact_output
+        text = "Using key sk-abc123def456ghi789jkl012mno345pqr678 for API"
+        result = redact_output(text)
+        assert "sk-abc123def456ghi789jkl012mno345pqr678" not in result
+        assert "[REDACTED]" in result
+
+    def test_output_redaction_anthropic_key(self):
+        """Output redaction removes Anthropic API keys."""
+        from agent_runtime_cockpit.isolation.subprocess import redact_output
+        text = "ANTHROPIC_API_KEY=sk-ant-api03-abc123def456ghi789jkl"
+        result = redact_output(text)
+        assert "sk-ant-api03" not in result
+        assert "[REDACTED]" in result
+
+    def test_output_redaction_bearer_token(self):
+        """Output redaction removes bearer tokens."""
+        from agent_runtime_cockpit.isolation.subprocess import redact_output
+        text = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.abc123"
+        result = redact_output(text)
+        assert "eyJhbGci" not in result
+        assert "[REDACTED]" in result
+
+    def test_output_redaction_password_url(self):
+        """Output redaction removes passwords from URLs."""
+        from agent_runtime_cockpit.isolation.subprocess import redact_output
+        text = "postgresql://admin:supersecret@localhost:5432/db"
+        result = redact_output(text)
+        assert "supersecret" not in result
+        assert "[REDACTED]" in result
+
+    def test_output_redaction_no_secrets(self):
+        """Output without secrets is unchanged."""
+        from agent_runtime_cockpit.isolation.subprocess import redact_output
+        text = "Hello world, this is normal output"
+        result = redact_output(text)
+        assert result == text
+
+    @pytest.mark.asyncio
+    async def test_execute_redacts_output(self):
+        """Subprocess output is redacted by default."""
+        provider = SubprocessIsolationProvider()
+        result = await provider.execute(
+            ["sh", "-c", "echo 'key=sk-abc123def456ghi789jkl012mno345pqr678'"],
+        )
+        assert result.exit_code == 0
+        assert "sk-abc123def456ghi789jkl012mno345pqr678" not in result.stdout
+        assert "[REDACTED]" in result.stdout
+
+    @pytest.mark.asyncio
+    async def test_execute_no_redaction_when_disabled(self):
+        """Subprocess output is not redacted when redact_output=False."""
+        provider = SubprocessIsolationProvider(redact_output=False)
+        result = await provider.execute(
+            ["sh", "-c", "echo 'key=sk-abc123def456ghi789jkl012mno345pqr678'"],
+        )
+        assert result.exit_code == 0
+        assert "sk-abc123def456ghi789jkl012mno345pqr678" in result.stdout
