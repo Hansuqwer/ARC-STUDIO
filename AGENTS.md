@@ -291,14 +291,17 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 
 ### Completed (P5 — Release Readiness)
 - ✅ **Trace retention + storage management**: `arc runs prune --older-than N`, `arc storage vacuum`, `arc storage status`; 5 new tests
+- ✅ **Opt-in real-runtime smoke scaffold**: `python/tests/integration/real_runtime/` with `ARC_REAL_RUNTIME_SMOKE=1` gated SwarmGraph/LangGraph smoke tests
+- ✅ **Nightly/manual real-runtime smoke workflow**: `.github/workflows/real-runtime-smoke.yml` keeps PR/push CI offline and runs opt-in smoke tests on schedule/manual dispatch
+- ⚠️ **Release checklist dry-run started**: frozen install, full build, Python tests, extension tests, CLI help, runtime capabilities JSON, and scoped release-doc banned-claim checks pass locally; GitHub main CI is currently red for python/node/roadmap gate
 
 ### P4 Items Explicitly Deferred
 - **Consensus/voting, queen/worker topology IDE dashboards**: requires stable adoption events and Theia UI work; deferred until adoption protocol matures
 - **SwarmGraph insight IDE**: requires adoption/audit events backing real run data
 
-### P1a Items Still Open
-- Add ARC trace/audit refs (adapters should populate `audit_path` on RunRecord) — P2 scope (HMAC wiring)
-- Hard subprocess env allowlists — covered by existing `SwarmGraphAdapter._filtered_env()`; other adapters are in-process
+### P1a Follow-up Notes
+- `audit_path` exists on `RunRecord` and SQLite index; adapter-wide audit-path population still needs targeted verification before public audit claims
+- Hard subprocess env allowlists are covered by `SwarmGraphAdapter._filtered_env()` and `SubprocessIsolationProvider`; other adapters are in-process unless explicitly routed through isolation
 
 ### Known Issues
 - ESLint has 247 problems (113 errors, 134 warnings) — all pre-existing in other packages; our files have 0 errors
@@ -308,7 +311,7 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 - Total frontend entrypoint ~28.8 MiB (Monaco + Theia core + React + vendors); ARC Studio code chunk is 50 KiB
 
 ### Test Metrics
-- Python: 551 passed, 6 skipped (was 435 before P2/P3/P4/P5 work)
+- Python: 552 passed, 8 skipped (was 435 before P2/P3/P4/P5 work)
 - TypeScript protocol build: clean
 - arc-extension build: clean
 
@@ -316,10 +319,10 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 See `docs/handover/REMAINING_ISSUES_PLAN.md` for full details. Summary:
 
 - **R-1 (Node CI: arc-ag-ui test exits 1)**: Unquoted glob `./test/**/*.test.js` fails under POSIX sh. Fix: quote the glob.
-- **R-2 (ARC Roadmap Gate: native-keymap gyp crash)**: Missing `apt-get install libx11-dev libxkbfile-dev` step.
-- **R-3 (Python CI: 2 AG2 adapter test errors)**: `conftest.py` autouse fixture calls `get_event_loop()` which emits `DeprecationWarning` on Python 3.12.
+- **R-2 (ARC Roadmap Gate: native-keymap gyp crash)**: Native deps now present in CI workflows; confirm on GitHub.
+- **R-3 (Python CI: 2 AG2 adapter test errors)**: Local strict-warning Python suite is green after removing the stale event-loop fixture; confirm on GitHub.
 - **R-4 (10 unmerged remote branches)**: 3 may have salvageable work; 7 intentionally parked.
-- **R-5 (.env history scrub)**: Schedule `git filter-repo` ≥7 days before public release.
+- **R-5 (.env history scrub)**: Plan documented in `docs/ENV_HISTORY_SCRUB_PLAN.md`; execute only after release date approval.
 - **e2e workflow**: Still in progress.
 
 ## Related Documentation

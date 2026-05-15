@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import sys
 import time
+import warnings
 from pathlib import Path
 from typing import Any, AsyncIterator
 
@@ -59,12 +60,14 @@ class LangGraphAdoptionRunner(AdoptionRunner):
     def check_availability(self, workspace: Path) -> AdoptionCapability:
         """Report RUNNABLE when LangGraph and vendored SwarmGraph imports work."""
         try:
-            import langgraph  # noqa: F401
-            _setup_swarmgraph_paths()
-            from swarm.models.config import SwarmConfig  # noqa: F401
-            from swarm.models.state import SwarmState  # noqa: F401
-            from swarm.nodes.consensus import consensus_node  # noqa: F401
-            from swarm.nodes.queen import queen_decompose_node  # noqa: F401
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                import langgraph  # noqa: F401
+                _setup_swarmgraph_paths()
+                from swarm.models.config import SwarmConfig  # noqa: F401
+                from swarm.models.state import SwarmState  # noqa: F401
+                from swarm.nodes.consensus import consensus_node  # noqa: F401
+                from swarm.nodes.queen import queen_decompose_node  # noqa: F401
 
             version = getattr(langgraph, "__version__", "unknown")
             return AdoptionCapability(

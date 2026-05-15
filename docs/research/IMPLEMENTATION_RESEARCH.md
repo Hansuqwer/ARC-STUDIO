@@ -6787,7 +6787,7 @@ Common secret patterns that must be redacted from logs, traces, and SSE output:
 | OpenAI API key | `sk-[a-zA-Z0-9]{20,}` | `sk-abc123def456...` |
 | Anthropic API key | `sk-ant-[a-zA-Z0-9\-_]{20,}` | `sk-ant-api03-...` |
 | Generic bearer token | `Bearer [a-zA-Z0-9\-_\.]{20,}` | `Bearer eyJhbGci...` |
-| AWS access key | `AKIA[0-9A-Z]{16}` | `AKIAIOSFODNN7EXAMPLE` |
+| AWS access key | `AKIA[0-9A-Z]{16}` | `<example-aws-access-key>` |
 | AWS secret key | (context-dependent, 40-char base64) | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
 | GitHub token | `gh[ps]_[a-zA-Z0-9]{36,}` | `ghp_ABC123...` |
 | Password in URL | `://[^:]+:[^@]+@` | `://user:pass@host` |
@@ -7126,16 +7126,16 @@ from agent_runtime_cockpit.security.redaction import (
 
 
 def test_redact_openai_key():
-    text = "Using key sk-abc123def456ghi789jkl012mno345 for API calls"
+    text = "Using key <example-openai-key> for API calls"
     result = redact_string(text)
-    assert "sk-abc123def456ghi789jkl012mno345" not in result
+    assert "<example-openai-key>" not in result
     assert "[REDACTED:openai_key]" in result
 
 
 def test_redact_anthropic_key():
-    text = "ANTHROPIC_API_KEY=sk-ant-api03-abc123def456ghi789jkl"
+    text = "ANTHROPIC_API_KEY:<example-anthropic-key>"
     result = redact_string(text)
-    assert "sk-ant-api03" not in result
+    assert "<example-anthropic-key>" not in result
     assert "[REDACTED:anthropic_key]" in result
 
 
@@ -7168,20 +7168,20 @@ def test_redact_no_secrets():
 
 def test_redact_value_dict():
     data = {
-        "prompt": "What is the API key sk-abc123def456ghi789jkl012mno345?",
-        "response": "The key is sk-abc123def456ghi789jkl012mno345",
+        "prompt": "What is the API key <example-openai-key>?",
+        "response": "The key is <example-openai-key>",
         "metadata": {"user": "test"},
     }
     result = redact_value(data)
-    assert "sk-abc123def456ghi789jkl012mno345" not in result["prompt"]
-    assert "sk-abc123def456ghi789jkl012mno345" not in result["response"]
+    assert "<example-openai-key>" not in result["prompt"]
+    assert "<example-openai-key>" not in result["response"]
     assert result["metadata"]["user"] == "test"
 
 
 def test_redact_value_list():
-    data = ["normal text", "secret: sk-abc123def456ghi789jkl012mno345", 42]
+    data = ["normal text", "secret: <example-openai-key>", 42]
     result = redact_value(data)
-    assert "sk-abc123def456ghi789jkl012mno345" not in result[1]
+    assert "<example-openai-key>" not in result[1]
     assert result[0] == "normal text"
     assert result[2] == 42
 
@@ -7201,13 +7201,13 @@ def test_redact_event():
 def test_redact_nested_structures():
     data = {
         "messages": [
-            {"role": "user", "content": "My key is sk-abc123def456ghi789jkl012mno345"},
+            {"role": "user", "content": "My key is <example-openai-key>"},
             {"role": "assistant", "content": "I see your key"},
         ],
-        "config": {"api_key": "sk-abc123def456ghi789jkl012mno345"},
+        "config": {"api_key": "<example-openai-key>"},
     }
     result = redact_value(data)
-    assert "sk-abc123def456ghi789jkl012mno345" not in str(result)
+    assert "<example-openai-key>" not in str(result)
 ```
 
 ### e. How to Verify This Still Works
@@ -7238,10 +7238,10 @@ cd python && uv run pytest tests/security/test_redaction.py -v
 python3 -c "
 from agent_runtime_cockpit.security.redaction import redact_string
 tests = [
-    'sk-abc123def456ghi789jkl012mno345pqr678',
+    '<example-openai-key>',
     'sk-ant-api03-abc123def456ghi789jkl012mno',
-    'AKIAIOSFODNN7EXAMPLE0',
-    'ghp_ABC123DEF456GHI789JKL012MNO345PQR678',
+    '<example-aws-access-key>',
+    '<example-github-token>',
 ]
 for t in tests:
     result = redact_string(t)
@@ -8388,10 +8388,10 @@ cd python && uv run pytest tests/security/test_redaction.py -v
 python3 -c "
 from agent_runtime_cockpit.security.redaction import redact_string
 tests = [
-    'sk-abc123def456ghi789jkl012mno345pqr678',
+    '<example-openai-key>',
     'sk-ant-api03-abc123def456ghi789jkl012mno',
-    'AKIAIOSFODNN7EXAMPLE0',
-    'ghp_ABC123DEF456GHI789JKL012MNO345PQR678',
+    '<example-aws-access-key>',
+    '<example-github-token>',
 ]
 for t in tests:
     result = redact_string(t)

@@ -1,0 +1,25 @@
+name: real-runtime-smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * *'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    env:
+      ARC_REAL_RUNTIME_SMOKE: '1'
+      ARC_SWARMGRAPH_RUN_BACKEND: ''
+      ARC_SWARMGRAPH_ALLOW_COSTS: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Sync dependencies
+        working-directory: python
+        run: uv sync --all-extras --dev
+
+      - name: Real-runtime smoke tests
+        working-directory: python
+        run: uv run pytest -q -W error tests/integration/real_runtime/

@@ -66,7 +66,13 @@ class LangGraphAdapter(RuntimeAdapter):
 
     def capability_report(self, workspace: Path) -> CapabilityReport:
         detected, _, evidence = self.detect(workspace)
-        if importlib.util.find_spec("langgraph") is None:
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=".*default value of `allowed_objects` will change.*",
+            )
+            langgraph_spec = importlib.util.find_spec("langgraph")
+        if langgraph_spec is None:
             return CapabilityReport(
                 runtime_id=self.adapter_id,
                 detected=detected,

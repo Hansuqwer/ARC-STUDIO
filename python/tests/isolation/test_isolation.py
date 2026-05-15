@@ -90,7 +90,7 @@ class TestSubprocessIsolationProvider:
         assert "hello" in result.stdout
         assert result.provider == "subprocess"
 
-    def test_filter_env_blocks_secrets(self):
+    def test_filter_env_blocks_secret_key(self):
         provider = SubprocessIsolationProvider()
         filtered = provider.filter_env(
             extra_env={"SECRET_KEY": "should-be-blocked", "PATH": "/usr/bin"},

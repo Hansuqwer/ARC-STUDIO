@@ -22,7 +22,6 @@ import importlib
 import importlib.util
 import logging
 import os
-import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -356,7 +355,7 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
         
         # Import SDK (only after gating checks pass)
         try:
-            from agents import Agent, Runner, RunHooks
+            from agents import Runner, RunHooks
         except ImportError as exc:
             events.append(self._event(run_id, 0, "RUN_FAILED", {
                 "error": f"Failed to import OpenAI Agents SDK: {exc}",

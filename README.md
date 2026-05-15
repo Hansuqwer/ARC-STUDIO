@@ -114,7 +114,7 @@ pnpm start:browser:stub
 
 The browser shell listens on `http://127.0.0.1:3000` and talks to the ARC daemon at `http://127.0.0.1:7777`. CORS is restricted to the browser shell's origin.
 
-### Electron shell
+### Electron shell (post-v0.1)
 
 ```bash
 pnpm start:electron
@@ -126,7 +126,7 @@ To produce an unsigned installer for local testing:
 pnpm package:electron:dir
 ```
 
-The unsigned build writes to `applications/electron/dist/`. A signed release build (`pnpm package:electron`) requires the macOS signing environment variables described in `.env.example`.
+Electron packaging is a post-v0.1 spike. The commands above are development/proof paths, not the v0.1 release target. The v0.1 release scope is the browser app plus Python CLI/wheel.
 
 ### Daemon only (headless)
 
@@ -163,7 +163,7 @@ arc providers     Manage credential providers
 | LangGraph | Detection, AST workflow heuristics, dynamic export/run hook via `ARC_LANGGRAPH_EXPORT`, `.invoke()` and `.stream()` support when available | No live token stream UI; persisted traces keep coalesced node updates only |
 | CrewAI | Detection and real exported crew execution via `ARC_CREWAI_EXPORT` with paid-call gating | Static workflow export only; no rich graph extraction or provider-side cancellation |
 | OpenAI Agents SDK | Detection and SDK-backed execution when `agents` is installed and OpenAI cost gates are configured | User project entrypoint/export target is not complete; current run path uses an internal test agent |
-| AG2 | Modular adapter/runner code exists under `python/src/agent_runtime_cockpit/adapters/ag2/` | Not registered in the default adapter registry; not visible to `arc runtimes` yet |
+| AG2 | Registered standalone adapter with detection/run scaffolding under `python/src/agent_runtime_cockpit/adapters/ag2/` | Real dependency/runtime path is gated; availability depends on project deps and config |
 | LlamaIndex | Detection and static workflow export only | No run path |
 | LM Arena | Stub/offline battle/direct/code/agent-preview responses | No live model calls |
 

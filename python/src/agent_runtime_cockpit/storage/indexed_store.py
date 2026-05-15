@@ -1,14 +1,14 @@
 """Dual-write store: JSONL canonical + SQLite index (ADR-003)."""
 from __future__ import annotations
 
-import json
 import logging
 import os
 import tempfile
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
-from ..protocol.schemas import RunRecord, RunStatus
+from ..protocol.schemas import RunRecord
 from .jsonl import JsonlTraceStore
 from .sqlite import SqliteStore
 
@@ -119,8 +119,6 @@ class IndexedTraceStore:
 def _compute_duration_ms(started_at: str, ended_at: str) -> Optional[int]:
     """Compute duration in ms between two ISO-8601 timestamps."""
     try:
-        from datetime import datetime, timezone
-
         # Handle both Z and +00:00 suffixes
         start = _parse_iso(started_at)
         end = _parse_iso(ended_at)
@@ -133,8 +131,6 @@ def _compute_duration_ms(started_at: str, ended_at: str) -> Optional[int]:
 
 def _parse_iso(s: str) -> Optional[datetime]:
     """Parse ISO-8601 string with optional Z suffix."""
-    from datetime import datetime
-
     try:
         if s.endswith("Z"):
             s = s[:-1] + "+00:00"

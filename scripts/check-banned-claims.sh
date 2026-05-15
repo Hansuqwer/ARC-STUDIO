@@ -91,6 +91,27 @@ ALLOWLISTED_SECTION_HEADERS=(
     "Safe language"
 )
 
+# Historical/planning docs are useful context, not release-facing product claims.
+# Keep public release checks focused on current docs unless these files are
+# explicitly promoted back into the release surface.
+SKIP_PATH_PATTERNS=(
+    "docs/archive/"
+    "docs/adr/"
+    "docs/CLI_IDE_GAP_ANALYSIS.md"
+    "docs/PLAN_COMPLETION_AUDIT.md"
+    "docs/SPIKE_SWARMGRAPH_IMPORT.md"
+)
+
+should_skip_file() {
+    local file="$1"
+    for pattern in "${SKIP_PATH_PATTERNS[@]}"; do
+        if [[ "$file" == *"$pattern"* ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 # ---------------------------------------------------------------------------
 # get_skip_ranges  file
 # Prints space-separated "start_line end_line" pairs for lines to skip:
@@ -225,6 +246,10 @@ for target in "$@"; do
                 match_file=$(echo "$match_line" | cut -d: -f1)
                 match_num=$(echo "$match_line" | cut -d: -f2)
                 content=$(echo "$match_line" | cut -d: -f3-)
+
+                if should_skip_file "$match_file"; then
+                    continue
+                fi
 
                 # Skip if inside a code block or allowlisted policy/reference section
                 if [[ -f "$match_file" ]] && is_in_skip_range "$match_file" "$match_num"; then

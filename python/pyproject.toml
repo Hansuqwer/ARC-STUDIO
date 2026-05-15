@@ -58,12 +58,12 @@ addopts = "-v --tb=short"
 markers = [
     "benchmark: marks tests as benchmarks (off-gate, not required for CI)",
     "needs(dep): mark test as requiring a specific CLI subcommand or fixture",
+    "real_runtime: opt-in smoke tests for real runtime imports/integration",
 ]
-# Temporarily disabled due to missing langchain_core module
-# filterwarnings = [
-#     # Category C: transitive LangGraph warning until upstream resolves allowed_objects default.
-#     "ignore:.*default value of `allowed_objects` will change.*:langchain_core._api.deprecation.LangChainPendingDeprecationWarning:langgraph\\.cache.*",
-# ]
+filterwarnings = [
+    # Transitive LangGraph warning until upstream resolves allowed_objects default.
+    "ignore:.*allowed_objects.*",
+]
 
 [tool.ruff]
 line-length = 100
