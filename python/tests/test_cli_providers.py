@@ -56,3 +56,50 @@ def test_providers_proxy_dry_run():
     assert "No network call" in resp["message"]
     assert resp["provider"] == "openai"
     assert resp["model"] == "gpt-4.1-mini"
+
+
+def test_providers_quota_show(tmp_path, monkeypatch):
+    """arc providers quota show returns today's usage."""
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
+    result = CliRunner().invoke(app, ["providers", "quota", "show", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert "date" in data
+    assert "counters" in data
+
+
+def test_providers_quota_reset(tmp_path, monkeypatch):
+    """arc providers quota reset clears today's counters."""
+    quota_file = tmp_path / "quota.json"
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(quota_file))
+    from agent_runtime_cockpit.providers import ProviderQuotaStore
+    store = ProviderQuotaStore(path=quota_file)
+    store.reserve("openai", dry_run=True)
+    usage_before = store.usage()
+    assert usage_before["counters"].get("dry_run:provider:openai", 0) > 0
+    result = CliRunner().invoke(app, ["providers", "quota", "reset", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert data["reset"] is True
+    usage_after = store.usage()
+    assert usage_after["counters"] == {}
+
+
+def test_providers_quota_show_filtered(tmp_path, monkeypatch):
+    """arc providers quota show --provider filters counters."""
+    quota_file = tmp_path / "quota.json"
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(quota_file))
+    from agent_runtime_cockpit.providers import ProviderQuotaStore
+    store = ProviderQuotaStore(path=quota_file)
+    store.reserve("openai", dry_run=True)
+    store.reserve("anthropic", dry_run=True)
+    result = CliRunner().invoke(app, [
+        "providers", "quota", "show",
+        "--provider", "openai",
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert data["provider"] == "openai"
+    assert "dry_run:provider:openai" in data["counters"]
+    assert "dry_run:provider:anthropic" not in data["counters"]

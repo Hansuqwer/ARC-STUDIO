@@ -738,6 +738,42 @@ def providers_accounts_delete(
     _out(ok({"deleted": deleted, "account_id": account_id}), json_output)
 
 
+quota_app = typer.Typer(name="quota", help="Provider quota management")
+providers_app.add_typer(quota_app)
+
+
+@quota_app.command("show")
+def providers_quota_show(
+    provider: Optional[str] = typer.Option(None, "--provider", help="Filter by provider id"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show today's provider quota usage."""
+    _setup_logging(debug)
+    from .providers import ProviderQuotaStore
+    store = ProviderQuotaStore()
+    usage = store.usage()
+    if provider:
+        filtered = {k: v for k, v in usage.get("counters", {}).items() if f":{provider}" in k}
+        payload = {"date": usage["date"], "provider": provider, "counters": filtered}
+    else:
+        payload = usage
+    _out(ok(payload), json_output)
+
+
+@quota_app.command("reset")
+def providers_quota_reset(
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Reset today's provider quota counters."""
+    _setup_logging(debug)
+    from .providers import ProviderQuotaStore
+    store = ProviderQuotaStore()
+    store.reset()
+    _out(ok({"reset": True}), json_output)
+
+
 routing_app = typer.Typer(name="routing", help="Provider routing policy")
 providers_app.add_typer(routing_app)
 
@@ -1645,6 +1681,179 @@ def audit_key_delete(
             console.print("[green]Audit key deleted from keychain.[/green]")
         else:
             console.print("[yellow]No key found in keychain or keychain unavailable.[/yellow]")
+
+
+# ─── run profiles ─────────────────────────────────────────────────────────────
+
+
+profiles_app = typer.Typer(name="profiles", help="Run profile management")
+app.add_typer(profiles_app)
+
+
+@profiles_app.command("list")
+def profiles_list(
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """List available run profiles."""
+    _setup_logging(debug)
+    from .security.profiles import BUILTIN_PROFILES
+    profiles = [
+        {
+            "id": p.id,
+            "name": p.name,
+            "allow_paid_calls": p.allow_paid_calls,
+            "allow_network": p.allow_network,
+            "allow_shell": p.allow_shell,
+            "allow_secrets": p.allow_secrets,
+            "backend": p.backend.value,
+        }
+        for p in BUILTIN_PROFILES.values()
+    ]
+    _out(ok(profiles), json_output)
+    if not json_output:
+        table = Table(title="Run Profiles")
+        table.add_column("ID")
+        table.add_column("Name")
+        table.add_column("Backend")
+        table.add_column("Paid")
+        table.add_column("Network")
+        for p in profiles:
+            table.add_row(
+                p["id"],
+                p["name"],
+                p["backend"],
+                "yes" if p["allow_paid_calls"] else "no",
+                "yes" if p["allow_network"] else "no",
+            )
+        console.print(table)
+
+
+@profiles_app.command("show")
+def profiles_show(
+    profile_id: str = typer.Argument(..., help="Profile id"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show details for a specific run profile."""
+    _setup_logging(debug)
+    from .security.profiles import resolve_profile
+    profile = resolve_profile(profile_id)
+    payload = {
+        "id": profile.id,
+        "name": profile.name,
+        "allow_paid_calls": profile.allow_paid_calls,
+        "allow_network": profile.allow_network,
+        "allow_shell": profile.allow_shell,
+        "allow_secrets": profile.allow_secrets,
+        "env_allowlist": list(profile.env_allowlist),
+        "backend": profile.backend.value,
+    }
+    _out(ok(payload), json_output)
+    if not json_output:
+        console.print(f"[bold]{profile.name}[/bold] ({profile.id})")
+        console.print(f"  Backend: {profile.backend.value}")
+        console.print(f"  Paid calls: {'yes' if profile.allow_paid_calls else 'no'}")
+        console.print(f"  Network: {'yes' if profile.allow_network else 'no'}")
+        console.print(f"  Shell: {'yes' if profile.allow_shell else 'no'}")
+        console.print(f"  Secrets: {'yes' if profile.allow_secrets else 'no'}")
+        if profile.env_allowlist:
+            console.print(f"  Env allowlist: {', '.join(profile.env_allowlist)}")
+
+
+# ─── workspace init/info/config ───────────────────────────────────────────────
+
+
+@workspace_app.command("init")
+def workspace_init(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    name: Optional[str] = typer.Option(None, "--name", help="Workspace name"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Initialize ARC configuration in a workspace."""
+    _setup_logging(debug)
+    from .config.loader import init_config, load_config
+    ws = _workspace(workspace)
+    config_path = ws / ".arc" / "config.yaml"
+    if config_path.exists():
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Config already exists at {config_path}"), json_output)
+        raise typer.Exit(1)
+    init_config(ws)
+    if name:
+        import yaml
+        data = yaml.safe_load(config_path.read_text()) or {}
+        data.setdefault("workspace", {})["name"] = name
+        config_path.write_text(yaml.dump(data, default_flow_style=False))
+    payload = {"created": str(config_path), "workspace": str(ws)}
+    _out(ok(payload), json_output)
+    if not json_output:
+        console.print(f"[green]Created[/green] {config_path}")
+
+
+@workspace_app.command("info")
+def workspace_info(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show workspace information including config and trust status."""
+    _setup_logging(debug)
+    from .config.loader import load_config
+    from .security.trust import resolve_trust
+    ws = _workspace(workspace)
+    config = load_config(workspace=ws)
+    trust_status = resolve_trust(ws)
+    config_path = ws / ".arc" / "config.yaml"
+    payload = {
+        "workspace": str(ws),
+        "name": config.workspace.name,
+        "config_exists": config_path.exists(),
+        "trust_level": trust_status.level.value,
+        "trust_reason": trust_status.reason,
+    }
+    _out(ok(payload), json_output)
+    if not json_output:
+        console.print(f"[bold]Workspace:[/bold] {ws}")
+        if config.workspace.name:
+            console.print(f"[bold]Name:[/bold] {config.workspace.name}")
+        console.print(f"[bold]Config:[/bold] {'exists' if config_path.exists() else 'not found'}")
+        console.print(f"[bold]Trust:[/bold] {trust_status.level.value}")
+        console.print(f"[dim]{trust_status.reason}[/dim]")
+
+
+@workspace_app.command("config")
+def workspace_config_cmd(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    key: Optional[str] = typer.Option(None, "--key", "-k", help="Config key to set (e.g. runtime.default)"),
+    value: Optional[str] = typer.Option(None, "--value", "-v", help="Config value"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show or update workspace configuration."""
+    _setup_logging(debug)
+    from .config.loader import load_config
+    ws = _workspace(workspace)
+    config_path = ws / ".arc" / "config.yaml"
+    if key and value:
+        if not config_path.exists():
+            _out(err(ArcErrorCode.INVALID_INPUT, "Config file not found. Run 'arc workspace init' first."), json_output)
+            raise typer.Exit(1)
+        import yaml
+        data = yaml.safe_load(config_path.read_text()) or {}
+        parts = key.split(".")
+        target = data
+        for part in parts[:-1]:
+            target = target.setdefault(part, {})
+        target[parts[-1]] = value
+        config_path.write_text(yaml.dump(data, default_flow_style=False))
+        payload = {"updated": key, "value": value, "config_path": str(config_path)}
+        _out(ok(payload), json_output)
+        if not json_output:
+            console.print(f"[green]Updated[/green] {key} = {value}")
+    else:
+        config = load_config(workspace=ws)
+        _out(ok(config.flatten()), json_output)
 
 
 # ─── prompt optimizer ─────────────────────────────────────────────────────────
