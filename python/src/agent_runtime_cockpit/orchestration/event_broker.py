@@ -90,24 +90,18 @@ class EventBroker:
         self, run_id: str, from_event_id: int,
     ) -> AsyncIterator[dict[str, Any]]:
         """Replay missed events from stored trace."""
-        trace_path = self.store.trace_path(run_id)
-        if not trace_path.exists():
-            return
-        with open(trace_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    event = json.loads(line)
-                    eid = event.get("event_id", 0)
-                    if eid > from_event_id:
-                        yield event
-                except json.JSONDecodeError:
-                    continue
+        async for event in self._iter_trace_events(run_id):
+            eid = event.get("event_id", 0)
+            if eid > from_event_id:
+                yield event
 
     async def _replay_stored(self, run_id: str) -> AsyncIterator[dict[str, Any]]:
         """Replay all events from stored trace."""
+        async for event in self._iter_trace_events(run_id):
+            yield event
+
+    async def _iter_trace_events(self, run_id: str) -> AsyncIterator[dict[str, Any]]:
+        """Yield events from either event-per-line JSONL or stored RunRecord JSONL."""
         trace_path = self.store.trace_path(run_id)
         if not trace_path.exists():
             return
@@ -117,9 +111,17 @@ class EventBroker:
                 if not line:
                     continue
                 try:
-                    yield json.loads(line)
+                    item = json.loads(line)
                 except json.JSONDecodeError:
                     continue
+                events = item.get("events")
+                if isinstance(events, list):
+                    for index, event in enumerate(events, start=1):
+                        if isinstance(event, dict):
+                            event.setdefault("event_id", index)
+                            yield event
+                    continue
+                yield item
 
     async def sse_handler(self, request: web.Request) -> web.StreamResponse:
         """HTTP handler for SSE event streaming with heartbeat.

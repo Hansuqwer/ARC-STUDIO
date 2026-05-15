@@ -8,11 +8,16 @@ import uuid
 
 from ..adapters.base import CapabilityReport, RuntimeAdapter
 from ..adapters.registry import default_registry
+from ..adoption.registry import AdoptionRegistry
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import RunEvent, RunRecord, RunStatus
 
 RuntimeId = Literal["swarmgraph", "langgraph", "crewai", "lmarena"]
-KNOWN_RUNTIMES: tuple[RuntimeId, ...] = ("swarmgraph", "langgraph", "crewai", "openai-agents", "ag2", "llamaindex", "lmarena")
+KNOWN_RUNTIMES: tuple[str, ...] = (
+    "swarmgraph", "langgraph", "crewai", "openai-agents", "ag2", "llamaindex", "lmarena",
+    "langgraph+swarmgraph", "ag2+swarmgraph", "crewai+swarmgraph",
+    "openai_agents+swarmgraph", "llamaindex+swarmgraph",
+)
 AUTO_PRIORITY: tuple[RuntimeId, ...] = ("swarmgraph", "langgraph", "crewai", "lmarena")
 
 
@@ -102,13 +107,32 @@ class ComboRuntimeAdapter(RuntimeAdapter):
 
 
 def list_runtimes(workspace: Path) -> list[CapabilityReport]:
-    return [adapter.capability_report(workspace) for adapter in default_registry().all()]
+    reports = [adapter.capability_report(workspace) for adapter in default_registry().all()]
+    for capability in AdoptionRegistry.list_capabilities(workspace):
+        reports.append(CapabilityReport(
+            runtime_id=capability.mode.value,
+            detected=False,
+            can_run=False,
+            availability="detected_not_runnable",
+            reason=capability.reason,
+            doctor_actions=[_doctor_action_from_dict(action) for action in capability.doctor_actions],
+        ))
+    return reports
 
 
 def resolve(workspace: Path, runtime: str | Sequence[str] | None = "auto", allow_paid_calls: bool = False) -> RoutedRuntime:
     if runtime is None or runtime == "auto":
         return _resolve_auto(workspace, allow_paid_calls=allow_paid_calls)
     if isinstance(runtime, str):
+        base_runtime, adoption_mode = AdoptionRegistry.parse_runtime_id(runtime)
+        if adoption_mode is not None:
+            capability = next(
+                cap for cap in AdoptionRegistry.list_capabilities(workspace)
+                if cap.mode == adoption_mode
+            )
+            raise RuntimeNotRunnable(
+                f"Runtime '{runtime}' is not runnable: {capability.status.value} ({capability.reason or 'no detail'})"
+            )
         if runtime not in KNOWN_RUNTIMES:
             raise UnknownRuntime(f"Unknown runtime '{runtime}'. Known: {', '.join(KNOWN_RUNTIMES)}")
         adapter = default_registry().get(runtime)
@@ -173,3 +197,15 @@ def _resolve_auto(workspace: Path, allow_paid_calls: bool) -> RoutedRuntime:
             f"(pass --allow-paid-calls to include): {', '.join(skipped_paid)}."
         )
     raise RuntimeNotRunnable("No runnable runtime detected. Set --runtime and verify dependencies/export targets.")
+
+
+def _doctor_action_from_dict(action: dict[str, str]):
+    from ..adapters.base import DoctorAction
+
+    return DoctorAction(
+        id=action.get("id", "adoption-action"),
+        label=action.get("label", "Adoption action"),
+        description=action.get("description", ""),
+        command=action.get("command", ""),
+        safe_to_auto_run=False,
+    )

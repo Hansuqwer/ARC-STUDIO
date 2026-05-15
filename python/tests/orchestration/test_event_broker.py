@@ -153,6 +153,36 @@ class TestReplay:
         assert replayed[2]["type"] == "RUN_COMPLETED"
 
     @pytest.mark.asyncio
+    async def test_replay_stored_run_record_events(self, tmp_path: Path):
+        """Replay handles JsonlTraceStore files containing a full RunRecord."""
+        from datetime import datetime, timezone
+        from agent_runtime_cockpit.protocol.schemas import RunEvent, RunRecord, RunStatus
+
+        store = JsonlTraceStore(base_dir=tmp_path / "traces")
+        now = datetime.now(timezone.utc).isoformat()
+        run = RunRecord(
+            id="record-run",
+            workflow_id="wf",
+            runtime="swarmgraph",
+            status=RunStatus.COMPLETED,
+            started_at=now,
+            ended_at=now,
+            events=[
+                RunEvent(type="RUN_STARTED", timestamp=now, run_id="record-run", sequence=0, data={}),
+                RunEvent(type="RUN_COMPLETED", timestamp=now, run_id="record-run", sequence=1, data={}),
+            ],
+        )
+        store.save(run)
+
+        broker = EventBroker(store=store)
+        replayed: list[dict] = []
+        async for event in broker._replay_stored("record-run"):
+            replayed.append(event)
+
+        assert [event["type"] for event in replayed] == ["RUN_STARTED", "RUN_COMPLETED"]
+        assert [event["event_id"] for event in replayed] == [1, 2]
+
+    @pytest.mark.asyncio
     async def test_replay_from_event_id(self, tmp_path: Path):
         """Replay from a specific event ID (reconnection)."""
         store = JsonlTraceStore(base_dir=tmp_path / "traces")

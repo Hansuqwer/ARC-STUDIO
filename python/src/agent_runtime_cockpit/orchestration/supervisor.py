@@ -147,6 +147,10 @@ class JobSupervisor:
         seq = self._sequence_counters.get(run_id, 0)
         event = create_event(run_id, seq, event_type, data)
         self._sequence_counters[run_id] = seq + 1
+        run = self.store.load(run_id)
+        if run:
+            run.events.append(event)
+            self.store.save(run)
         self.broker.publish(run_id, event.model_dump())
 
     async def cancel_run(self, run_id: str) -> bool:

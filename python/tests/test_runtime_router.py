@@ -107,6 +107,23 @@ def test_explicit_crewai_not_runnable_without_target(tmp_path):
         runtime_router.resolve(tmp_path, "crewai")
 
 
+def test_adoption_runtime_resolves_as_not_runnable(tmp_path):
+    with pytest.raises(runtime_router.RuntimeNotRunnable, match="not_implemented"):
+        runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
+
+
+def test_list_runtimes_includes_adoption_modes(monkeypatch, tmp_path):
+    _install_fake_registry(monkeypatch, {"swarmgraph": {"can_run": False}})
+
+    reports = runtime_router.list_runtimes(tmp_path)
+    ids = {report.runtime_id for report in reports}
+
+    assert "langgraph+swarmgraph" in ids
+    adoption = next(report for report in reports if report.runtime_id == "langgraph+swarmgraph")
+    assert adoption.can_run is False
+    assert adoption.availability == "detected_not_runnable"
+
+
 def test_auto_skips_paid_when_flag_off(monkeypatch, tmp_path):
     _install_fake_registry(monkeypatch, {
         "swarmgraph": {"can_run": False},

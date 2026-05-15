@@ -61,6 +61,9 @@ class TestStartRun:
         assert loaded is not None
         assert loaded.status == RunStatus.COMPLETED
         assert loaded.ended_at is not None
+        assert [event.type for event in loaded.events] == [
+            "RUN_STARTED", "STEP_STARTED", "RUN_COMPLETED",
+        ]
 
 
 class TestCancelRun:
