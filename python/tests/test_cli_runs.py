@@ -343,3 +343,54 @@ def test_isolation_cli_contracts():
     unknown = CliRunner().invoke(app, ["isolation", "doctor", "missing", "--json"])
     assert unknown.exit_code == 1
     assert json.loads(unknown.output)["error"]["code"] == "INVALID_INPUT"
+
+
+def test_runs_import_and_replay(tmp_path):
+    from datetime import datetime, timezone
+    from agent_runtime_cockpit.protocol.schemas import RunRecord, RunEvent, RunStatus
+
+    ws = tmp_path / "ws"
+    traces = ws / ".arc" / "traces"
+    traces.mkdir(parents=True)
+    now = datetime.now(timezone.utc).isoformat()
+    run = RunRecord(
+        id="run-replay",
+        workflow_id="wf-replay",
+        runtime="swarmgraph",
+        status=RunStatus.COMPLETED,
+        started_at=now,
+        ended_at=now,
+        events=[RunEvent(type="RUN_COMPLETED", timestamp=now, run_id="run-replay", sequence=0, data={"duration_ms": 1})],
+    )
+    export_path = tmp_path / "run-export.json"
+    export_path.write_text(run.model_dump_json())
+
+    imported = CliRunner().invoke(app, ["runs", "import", str(export_path), "--workspace", str(ws), "--json"])
+    assert imported.exit_code == 0, imported.output
+    assert json.loads(imported.output)["data"]["imported_run_id"] == run.id
+
+    replayed = CliRunner().invoke(app, ["runs", "replay", run.id, "--workspace", str(ws), "--json"])
+    assert replayed.exit_code == 0, replayed.output
+    data = json.loads(replayed.output)["data"]
+    assert data["event_count"] == 1
+    assert data["events"][0]["type"] == "RUN_COMPLETED"
+
+
+def test_hitl_cli_pending_and_approve(tmp_path):
+    from agent_runtime_cockpit.audit.hitl import HitlPrompt
+    from agent_runtime_cockpit.audit.hitl_store import save_prompt
+
+    save_prompt(tmp_path, HitlPrompt(
+        hitl_id="hitl-cli-1",
+        run_id="run-1",
+        step_id="step-1",
+        prompt_text="Approve?",
+    ))
+
+    pending = CliRunner().invoke(app, ["hitl", "pending", "--workspace", str(tmp_path), "--json"])
+    assert pending.exit_code == 0, pending.output
+    assert json.loads(pending.output)["data"][0]["hitl_id"] == "hitl-cli-1"
+
+    approved = CliRunner().invoke(app, ["hitl", "approve", "hitl-cli-1", "--workspace", str(tmp_path), "--json"])
+    assert approved.exit_code == 0, approved.output
+    assert json.loads(approved.output)["data"]["decision"] == "approve"

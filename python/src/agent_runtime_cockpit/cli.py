@@ -52,12 +52,14 @@ doctor_app = typer.Typer(name="doctor", help="ARC diagnostics")
 workspace_app = typer.Typer(name="workspace", help="Workspace configuration and trust management")
 isolation_app = typer.Typer(name="isolation", help="Execution isolation providers")
 config_app = typer.Typer(name="config", help="ARC workspace configuration (ADR-001)")
+hitl_app = typer.Typer(name="hitl", help="Human-in-the-loop approval commands")
 app.add_typer(context_app)
 app.add_typer(adapter_app)
 app.add_typer(doctor_app)
 app.add_typer(workspace_app)
 app.add_typer(isolation_app)
 app.add_typer(config_app)
+app.add_typer(hitl_app)
 
 console = Console()
 err_console = Console(stderr=True)
@@ -960,6 +962,60 @@ def runs_export(
     _out(ok(run_record.model_dump(), workspace=str(ws)), json_output)
 
 
+@runs_app.command("import")
+def runs_import(
+    path: str = typer.Argument(..., help="Path to exported run JSON"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Import a run record JSON into the workspace trace store."""
+    _setup_logging(debug)
+    import json
+    from .protocol.schemas import RunRecord
+    from .storage.indexed_store import IndexedTraceStore
+
+    ws = _workspace(workspace)
+    source = Path(path).expanduser().resolve()
+    if not source.exists():
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Import file not found: {source}"), json_output)
+        raise typer.Exit(1)
+    try:
+        run_record = RunRecord.model_validate(json.loads(source.read_text()))
+    except Exception as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid run export: {exc}"), json_output)
+        raise typer.Exit(1)
+    store = IndexedTraceStore(trace_dir=ws / ".arc" / "traces", db_path=ws / ".arc" / "arc.db")
+    store.init()
+    store.save(run_record)
+    _out(ok({"imported_run_id": run_record.id}, workspace=str(ws)), json_output)
+
+
+@runs_app.command("replay")
+def runs_replay(
+    run_id: str = typer.Argument(..., help="Run ID to replay from stored trace"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Replay stored trace events without re-executing the runtime."""
+    _setup_logging(debug)
+    from .storage.jsonl import JsonlTraceStore
+
+    ws = _workspace(workspace)
+    store = JsonlTraceStore(ws / ".arc" / "traces")
+    run_record = store.load(run_id)
+    if run_record is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
+        raise typer.Exit(1)
+    payload = {
+        "run_id": run_record.id,
+        "event_count": len(run_record.events),
+        "events": [event.model_dump() for event in run_record.events],
+    }
+    _out(ok(payload, workspace=str(ws)), json_output)
+
+
 @runs_app.command("backfill")
 def runs_backfill(
     workspace: Optional[str] = WORKSPACE_FLAG,
@@ -1284,6 +1340,72 @@ def eval_list(
 
 
 # ─── workspace trust ───────────────────────────────────────────────────────────
+
+
+@hitl_app.command("pending")
+def hitl_pending(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """List pending workspace-local HITL prompts."""
+    _setup_logging(debug)
+    from .audit.hitl_store import list_prompts
+
+    ws = _workspace(workspace)
+    prompts = list_prompts(ws)
+    _out(ok([prompt.model_dump() for prompt in prompts], workspace=str(ws)), json_output)
+
+
+@hitl_app.command("respond")
+def hitl_respond(
+    hitl_id: str = typer.Argument(..., help="Pending HITL prompt ID"),
+    decision: str = typer.Option(..., "--decision", help="approve | reject | modify | skip"),
+    notes: str = typer.Option("", "--notes", help="Operator notes"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Respond to a pending workspace-local HITL prompt."""
+    _setup_logging(debug)
+    from .audit.hitl import HitlDecision
+    from .audit.hitl_store import respond
+
+    ws = _workspace(workspace)
+    try:
+        parsed = HitlDecision(decision)
+    except ValueError:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid HITL decision: {decision}"), json_output)
+        raise typer.Exit(1)
+    response = respond(ws, hitl_id, parsed, notes=notes)
+    if response is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"HITL prompt not found: {hitl_id}"), json_output)
+        raise typer.Exit(1)
+    _out(ok(response.model_dump(), workspace=str(ws)), json_output)
+
+
+@hitl_app.command("approve")
+def hitl_approve(
+    hitl_id: str = typer.Argument(..., help="Pending HITL prompt ID"),
+    notes: str = typer.Option("", "--notes", help="Operator notes"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Approve a pending workspace-local HITL prompt."""
+    hitl_respond(hitl_id, "approve", notes, workspace, json_output, debug)
+
+
+@hitl_app.command("reject")
+def hitl_reject(
+    hitl_id: str = typer.Argument(..., help="Pending HITL prompt ID"),
+    notes: str = typer.Option("", "--notes", help="Operator notes"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Reject a pending workspace-local HITL prompt."""
+    hitl_respond(hitl_id, "reject", notes, workspace, json_output, debug)
 
 @workspace_app.command("trust-status")
 def workspace_trust_status(
