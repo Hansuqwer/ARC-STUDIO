@@ -1,26 +1,31 @@
-"""Tests: Storage — JSONL trace store."""
+"""Tests: Storage — JSONL trace store and SQLite index (ADR-003)."""
+import datetime
 import tempfile
 from pathlib import Path
-import datetime
 
+from agent_runtime_cockpit.protocol.schemas import RunEvent, RunRecord, RunStatus
+from agent_runtime_cockpit.storage.indexed_store import IndexedTraceStore, _compute_duration_ms
 from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
-from agent_runtime_cockpit.protocol.schemas import RunRecord, RunEvent, RunStatus
+from agent_runtime_cockpit.storage.sqlite import SqliteStore
 
 
-def make_run(run_id: str = "run-test-001") -> RunRecord:
+def make_run(run_id: str = "run-test-001", status: RunStatus = RunStatus.COMPLETED) -> RunRecord:
     now = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
     return RunRecord(
         id=run_id,
         workflow_id="wf-test",
         runtime="swarmgraph",
-        status=RunStatus.COMPLETED,
+        status=status,
         started_at=now,
-        ended_at=now,
+        ended_at=now if status != RunStatus.RUNNING else None,
         events=[
             RunEvent(type="RUN_STARTED", timestamp=now, run_id=run_id, sequence=0, data={}),
             RunEvent(type="RUN_COMPLETED", timestamp=now, run_id=run_id, sequence=1, data={}),
         ],
     )
+
+
+# ─── JSONL tests ───────────────────────────────────────────────────────────────
 
 
 class TestJsonlTraceStore:
@@ -70,3 +75,198 @@ class TestJsonlTraceStore:
             store.save(run2)
             loaded = store.load("run-overwrite")
             assert loaded.status == RunStatus.FAILED
+
+
+# ─── SQLite index tests ────────────────────────────────────────────────────────
+
+
+class TestSqliteStore:
+    def test_init_and_insert(self):
+        with tempfile.TemporaryDirectory() as td:
+            db = SqliteStore(Path(td) / "arc.db")
+            db.init_db()
+            db.insert_run("run-001", "wf-1", "swarmgraph", "completed", "2026-01-01T00:00:00Z")
+            run = db.get_run("run-001")
+            assert run is not None
+            assert run["id"] == "run-001"
+            assert run["status"] == "completed"
+
+    def test_update_run_status(self):
+        with tempfile.TemporaryDirectory() as td:
+            db = SqliteStore(Path(td) / "arc.db")
+            db.init_db()
+            db.insert_run("run-001", "wf-1", "swarmgraph", "running", "2026-01-01T00:00:00Z")
+            db.update_run_status(
+                "run-001", "completed", "2026-01-01T01:00:00Z",
+                duration_ms=3600000,
+            )
+            run = db.get_run("run-001")
+            assert run is not None
+            assert run["status"] == "completed"
+            assert run["duration_ms"] == 3600000
+
+    def test_list_runs_with_filters(self):
+        with tempfile.TemporaryDirectory() as td:
+            db = SqliteStore(Path(td) / "arc.db")
+            db.init_db()
+            db.insert_run("r1", "wf-1", "swarmgraph", "completed", "2026-01-01T00:00:00Z")
+            db.insert_run("r2", "wf-1", "langgraph", "failed", "2026-01-02T00:00:00Z")
+            db.insert_run("r3", "wf-2", "swarmgraph", "completed", "2026-01-03T00:00:00Z")
+
+            all_runs = db.list_runs()
+            assert len(all_runs) == 3
+
+            failed_runs = db.list_runs(status="failed")
+            assert len(failed_runs) == 1
+            assert failed_runs[0]["id"] == "r2"
+
+            swarm_runs = db.list_runs(runtime="swarmgraph")
+            assert len(swarm_runs) == 2
+
+    def test_update_audit_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            db = SqliteStore(Path(td) / "arc.db")
+            db.init_db()
+            db.insert_run("run-001", "wf-1", "swarmgraph", "completed", "2026-01-01T00:00:00Z")
+            db.update_run_audit_path("run-001", "/path/to/audit.chain.jsonl")
+            run = db.get_run("run-001")
+            assert run is not None
+            assert run["audit_path"] == "/path/to/audit.chain.jsonl"
+
+    def test_run_exists(self):
+        with tempfile.TemporaryDirectory() as td:
+            db = SqliteStore(Path(td) / "arc.db")
+            db.init_db()
+            db.insert_run("run-001", "wf-1", "swarmgraph", "completed", "2026-01-01T00:00:00Z")
+            assert db.run_exists("run-001") is True
+            assert db.run_exists("nonexistent") is False
+
+    def test_count_runs(self):
+        with tempfile.TemporaryDirectory() as td:
+            db = SqliteStore(Path(td) / "arc.db")
+            db.init_db()
+            assert db.count_runs() == 0
+            db.insert_run("r1", "wf-1", "swarmgraph", "completed", "2026-01-01T00:00:00Z")
+            assert db.count_runs() == 1
+            db.insert_run("r2", "wf-1", "langgraph", "completed", "2026-01-02T00:00:00Z")
+            assert db.count_runs() == 2
+
+
+# ─── IndexedTraceStore tests (dual-write) ──────────────────────────────────────
+
+
+class TestIndexedTraceStore:
+    def test_save_and_load(self):
+        with tempfile.TemporaryDirectory() as td:
+            store = IndexedTraceStore(
+                trace_dir=Path(td) / "traces",
+                db_path=Path(td) / "arc.db",
+            )
+            store.init()
+            run = make_run("run-001")
+            store.save(run)
+            loaded = store.load("run-001")
+            assert loaded is not None
+            assert loaded.id == "run-001"
+            assert loaded.status == RunStatus.COMPLETED
+
+    def test_save_updates_sqlite_index(self):
+        with tempfile.TemporaryDirectory() as td:
+            store = IndexedTraceStore(
+                trace_dir=Path(td) / "traces",
+                db_path=Path(td) / "arc.db",
+            )
+            store.init()
+            run = make_run("run-001")
+            store.save(run)
+            # Verify SQLite has the index
+            row = store.sqlite.get_run("run-001")
+            assert row is not None
+            assert row["status"] == "completed"
+            assert row["runtime"] == "swarmgraph"
+
+    def test_jsonl_is_canonical_when_sqlite_fails(self):
+        """JSONL write succeeds even if SQLite is corrupted."""
+        with tempfile.TemporaryDirectory() as td:
+            db_path = Path(td) / "bad.db"
+            db_path.write_text("not a database")
+            store = IndexedTraceStore(
+                trace_dir=Path(td) / "traces",
+                db_path=db_path,
+            )
+            run = make_run("resilient-run")
+            # Should not raise; SQLite failure is logged, not propagated
+            store.save(run)
+            loaded = store.load("resilient-run")
+            assert loaded is not None
+            assert loaded.id == "resilient-run"
+
+    def test_backfill_index(self):
+        with tempfile.TemporaryDirectory() as td:
+            store = IndexedTraceStore(
+                trace_dir=Path(td) / "traces",
+                db_path=Path(td) / "arc.db",
+            )
+            store.init()
+            # Write runs directly to JSONL (as if old system created them)
+            runs = [make_run(f"run-{i}") for i in range(5)]
+            for r in runs:
+                store.jsonl.save(r)
+            # Backfill should index them into SQLite
+            indexed, skipped, failed = store.backfill_index()
+            assert indexed == 5
+            assert skipped == 0
+            assert failed == 0
+            # Verify SQLite has them
+            assert store.sqlite.count_runs() == 5
+
+    def test_backfill_idempotent(self):
+        with tempfile.TemporaryDirectory() as td:
+            store = IndexedTraceStore(
+                trace_dir=Path(td) / "traces",
+                db_path=Path(td) / "arc.db",
+            )
+            store.init()
+            runs = [make_run(f"run-{i}") for i in range(3)]
+            for r in runs:
+                store.jsonl.save(r)
+            # First backfill
+            indexed1, skipped1, failed1 = store.backfill_index()
+            assert indexed1 == 3
+            # Second backfill — should skip already-indexed runs
+            indexed2, skipped2, failed2 = store.backfill_index()
+            assert indexed2 == 0
+            assert skipped2 == 3
+            assert failed2 == 0
+
+    def test_list_runs(self):
+        with tempfile.TemporaryDirectory() as td:
+            store = IndexedTraceStore(
+                trace_dir=Path(td) / "traces",
+                db_path=Path(td) / "arc.db",
+            )
+            store.init()
+            store.save(make_run("run-a"))
+            store.save(make_run("run-b"))
+            run_ids = store.list_runs()
+            assert "run-a" in run_ids
+            assert "run-b" in run_ids
+
+
+# ─── Utility tests ─────────────────────────────────────────────────────────────
+
+
+class TestComputeDuration:
+    def test_duration_ms(self):
+        result = _compute_duration_ms("2026-01-01T00:00:00Z", "2026-01-01T01:00:00Z")
+        assert result == 3600000  # 1 hour
+
+    def test_duration_with_offset(self):
+        result = _compute_duration_ms(
+            "2026-01-01T00:00:00+00:00", "2026-01-01T00:30:00+00:00"
+        )
+        assert result == 1800000  # 30 minutes
+
+    def test_duration_with_invalid_date(self):
+        result = _compute_duration_ms("not-a-date", "2026-01-01T00:00:00Z")
+        assert result is None

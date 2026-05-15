@@ -124,6 +124,7 @@ class RunRecord(BaseModel):
     ended_at: Optional[str] = None
     events: list[RunEvent] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    audit_path: Optional[str] = None  # Path to audit chain file (ADR-003)
 
 
 # ─── Context ──────────────────────────────────────────────────────────────────

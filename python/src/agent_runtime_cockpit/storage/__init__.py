@@ -1,3 +1,6 @@
 """ARC storage — SQLite and JSONL backends."""
+from .indexed_store import IndexedTraceStore
 from .jsonl import JsonlTraceStore
-__all__ = ["JsonlTraceStore"]
+from .sqlite import SqliteStore
+
+__all__ = ["IndexedTraceStore", "JsonlTraceStore", "SqliteStore"]
