@@ -286,9 +286,15 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 - ✅ **Eval batch mode**: `arc eval run --batch` evaluates against all saved golden traces
 - ✅ **HITL persistence hardening**: single-use tokens, expiry/TTL, replay-attack protection, `prune_expired`; 6 new HITL tests
 - ✅ **Advanced subprocess isolation hardening**: blocked env patterns (`*_API_KEY`, `*_TOKEN`, `*_SECRET`, `AWS_*`), output redaction (OpenAI/Anthropic keys, bearer tokens, passwords); 11 new tests
+- ✅ **Gated prompt optimizer providers**: `OptimizerMode` enum with `off`/`local`/`local-model`/`provider`/`swarmgraph`; provider modes gated with `NotImplementedError` until privacy/paid-call gates exist; 5 new tests
+- ✅ **Deterministic replay**: explicitly scoped behind SwarmGraph runtime support; trace replay (`arc runs replay`) covers P2 baseline
 
 ### Completed (P5 — Release Readiness)
 - ✅ **Trace retention + storage management**: `arc runs prune --older-than N`, `arc storage vacuum`, `arc storage status`; 5 new tests
+
+### P4 Items Explicitly Deferred
+- **Consensus/voting, queen/worker topology IDE dashboards**: requires stable adoption events and Theia UI work; deferred until adoption protocol matures
+- **SwarmGraph insight IDE**: requires adoption/audit events backing real run data
 
 ### P1a Items Still Open
 - Add ARC trace/audit refs (adapters should populate `audit_path` on RunRecord) — P2 scope (HMAC wiring)
@@ -302,7 +308,7 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 - Total frontend entrypoint ~28.8 MiB (Monaco + Theia core + React + vendors); ARC Studio code chunk is 50 KiB
 
 ### Test Metrics
-- Python: 546 passed, 6 skipped (was 435 before P2/P3/P4/P5 work)
+- Python: 551 passed, 6 skipped (was 435 before P2/P3/P4/P5 work)
 - TypeScript protocol build: clean
 - arc-extension build: clean
 
