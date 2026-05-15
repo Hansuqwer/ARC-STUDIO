@@ -285,6 +285,10 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 ### Completed (P4 — Audit, Replay, HITL, Security Hardening)
 - ✅ **Eval batch mode**: `arc eval run --batch` evaluates against all saved golden traces
 - ✅ **HITL persistence hardening**: single-use tokens, expiry/TTL, replay-attack protection, `prune_expired`; 6 new HITL tests
+- ✅ **Advanced subprocess isolation hardening**: blocked env patterns (`*_API_KEY`, `*_TOKEN`, `*_SECRET`, `AWS_*`), output redaction (OpenAI/Anthropic keys, bearer tokens, passwords); 11 new tests
+
+### Completed (P5 — Release Readiness)
+- ✅ **Trace retention + storage management**: `arc runs prune --older-than N`, `arc storage vacuum`, `arc storage status`; 5 new tests
 
 ### P1a Items Still Open
 - Add ARC trace/audit refs (adapters should populate `audit_path` on RunRecord) — P2 scope (HMAC wiring)
@@ -298,7 +302,7 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 - Total frontend entrypoint ~28.8 MiB (Monaco + Theia core + React + vendors); ARC Studio code chunk is 50 KiB
 
 ### Test Metrics
-- Python: 531 passed, 6 skipped (was 435 before P2/P3/P4 work)
+- Python: 546 passed, 6 skipped (was 435 before P2/P3/P4/P5 work)
 - TypeScript protocol build: clean
 - arc-extension build: clean
 
