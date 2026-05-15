@@ -378,7 +378,7 @@ def test_runs_import_and_replay(tmp_path):
 
 def test_hitl_cli_pending_and_approve(tmp_path):
     from agent_runtime_cockpit.audit.hitl import HitlPrompt
-    from agent_runtime_cockpit.audit.hitl_store import save_prompt
+    from agent_runtime_cockpit.audit.hitl_store import save_prompt, get_token
 
     save_prompt(tmp_path, HitlPrompt(
         hitl_id="hitl-cli-1",
@@ -389,8 +389,15 @@ def test_hitl_cli_pending_and_approve(tmp_path):
 
     pending = CliRunner().invoke(app, ["hitl", "pending", "--workspace", str(tmp_path), "--json"])
     assert pending.exit_code == 0, pending.output
-    assert json.loads(pending.output)["data"][0]["hitl_id"] == "hitl-cli-1"
+    data = json.loads(pending.output)["data"][0]
+    assert data["hitl_id"] == "hitl-cli-1"
+    assert "token" in data
 
-    approved = CliRunner().invoke(app, ["hitl", "approve", "hitl-cli-1", "--workspace", str(tmp_path), "--json"])
+    token = get_token(tmp_path, "hitl-cli-1")
+    approved = CliRunner().invoke(app, [
+        "hitl", "approve", "hitl-cli-1",
+        "--token", token,
+        "--workspace", str(tmp_path), "--json",
+    ])
     assert approved.exit_code == 0, approved.output
     assert json.loads(approved.output)["data"]["decision"] == "approve"
