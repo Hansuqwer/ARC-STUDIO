@@ -874,6 +874,113 @@ def runs_trace(
     _out(ok(payload, workspace=str(ws)), json_output)
 
 
+@runs_app.command("status")
+def runs_status(
+    run_id: str = typer.Argument(..., help="Run ID to check"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show status of a stored run record."""
+    _setup_logging(debug)
+    from .storage.indexed_store import IndexedTraceStore
+    ws = _workspace(workspace)
+    store = IndexedTraceStore(
+        trace_dir=ws / ".arc" / "traces",
+        db_path=ws / ".arc" / "arc.db",
+    )
+    run_record = store.load(run_id)
+    if run_record is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
+        raise typer.Exit(1)
+    payload = {
+        "run_id": run_record.id,
+        "status": run_record.status.value,
+        "workflow_id": run_record.workflow_id,
+        "runtime": run_record.runtime,
+        "started_at": run_record.started_at,
+        "ended_at": run_record.ended_at,
+        "event_count": len(run_record.events),
+        "audit_path": run_record.audit_path,
+    }
+    _out(ok(payload, workspace=str(ws)), json_output)
+
+
+@runs_app.command("delete")
+def runs_delete(
+    run_id: str = typer.Argument(..., help="Run ID to delete"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Delete a stored run record and its trace file."""
+    _setup_logging(debug)
+    from .storage.indexed_store import IndexedTraceStore
+    ws = _workspace(workspace)
+    store = IndexedTraceStore(
+        trace_dir=ws / ".arc" / "traces",
+        db_path=ws / ".arc" / "arc.db",
+    )
+    trace_path = store.trace_path(run_id)
+    if not trace_path.exists():
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
+        raise typer.Exit(1)
+    trace_path.unlink()
+    payload = {
+        "deleted_run_id": run_id,
+        "trace_path": str(trace_path),
+    }
+    _out(ok(payload, workspace=str(ws)), json_output)
+
+
+@runs_app.command("export")
+def runs_export(
+    run_id: str = typer.Argument(..., help="Run ID to export"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Export a run record as JSON."""
+    _setup_logging(debug)
+    from .storage.indexed_store import IndexedTraceStore
+    ws = _workspace(workspace)
+    store = IndexedTraceStore(
+        trace_dir=ws / ".arc" / "traces",
+        db_path=ws / ".arc" / "arc.db",
+    )
+    run_record = store.load(run_id)
+    if run_record is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
+        raise typer.Exit(1)
+    _out(ok(run_record.model_dump(), workspace=str(ws)), json_output)
+
+
+@runs_app.command("backfill")
+def runs_backfill(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Backfill SQLite index from existing JSONL traces. Idempotent."""
+    _setup_logging(debug)
+    from .storage.indexed_store import IndexedTraceStore
+    ws = _workspace(workspace)
+    store = IndexedTraceStore(
+        trace_dir=ws / ".arc" / "traces",
+        db_path=ws / ".arc" / "arc.db",
+    )
+    store.init()
+    indexed, skipped, failed = store.backfill_index()
+    payload = {
+        "indexed": indexed,
+        "skipped": skipped,
+        "failed": failed,
+    }
+    _out(ok(payload, workspace=str(ws)), json_output)
+    if not json_output and failed > 0:
+        err_console.print(f"[yellow]Warning: {failed} trace(s) failed to index[/yellow]")
+
+
 # ─── context pack ─────────────────────────────────────────────────────────────
 
 @context_app.command("pack")
