@@ -626,6 +626,186 @@ def doctor_all(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
         raise typer.Exit(1)
 
 
+@doctor_app.command("env")
+def doctor_env(
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Check environment variables and Python configuration."""
+    import os
+    import sys
+    _setup_logging(debug)
+    checks = []
+    all_ok = True
+    checks.append({
+        "check": "python_version",
+        "ok": True,
+        "version": sys.version.split()[0],
+        "executable": sys.executable,
+    })
+    checks.append({
+        "check": "arc_version",
+        "ok": True,
+        "version": arc_version,
+    })
+    key_envs = [
+        "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY",
+        "QWEN_API_KEY", "MOONSHOT_API_KEY", "KIMI_API_KEY",
+    ]
+    configured = [name for name in key_envs if os.environ.get(name)]
+    checks.append({
+        "check": "provider_keys",
+        "ok": True,
+        "configured": configured,
+        "count": len(configured),
+        "total": len(key_envs),
+    })
+    arc_envs = {k: v for k, v in os.environ.items() if k.startswith("ARC_")}
+    checks.append({
+        "check": "arc_env_vars",
+        "ok": True,
+        "vars": list(arc_envs.keys()),
+        "count": len(arc_envs),
+    })
+    data = {"ok": all_ok, "checks": checks}
+    _out(ok(data), json_output)
+
+
+@doctor_app.command("network")
+def doctor_network(
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Check network connectivity to common provider endpoints."""
+    import urllib.request
+    _setup_logging(debug)
+    endpoints = [
+        ("openai", "https://api.openai.com"),
+        ("anthropic", "https://api.anthropic.com"),
+        ("openrouter", "https://openrouter.ai"),
+    ]
+    checks = []
+    all_ok = True
+    for name, url in endpoints:
+        try:
+            req = urllib.request.Request(url, method="HEAD")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                reachable = resp.status < 500
+                checks.append({
+                    "check": name,
+                    "ok": reachable,
+                    "url": url,
+                    "status": resp.status,
+                })
+                if not reachable:
+                    all_ok = False
+        except Exception as e:
+            all_ok = False
+            checks.append({
+                "check": name,
+                "ok": False,
+                "url": url,
+                "error": str(e),
+            })
+    data = {"ok": all_ok, "checks": checks}
+    _out(ok(data), json_output)
+
+
+@doctor_app.command("storage")
+def doctor_storage(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Check workspace storage and trace files."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    traces_dir = ws / ".arc" / "traces"
+    db_path = ws / ".arc" / "arc.db"
+    evals_dir = ws / ".arc" / "evals"
+    checks = []
+    checks.append({
+        "check": "traces_dir",
+        "ok": traces_dir.exists(),
+        "path": str(traces_dir),
+        "trace_count": len(list(traces_dir.glob("*.jsonl"))) if traces_dir.exists() else 0,
+    })
+    checks.append({
+        "check": "sqlite_index",
+        "ok": db_path.exists(),
+        "path": str(db_path),
+        "size_bytes": db_path.stat().st_size if db_path.exists() else 0,
+    })
+    if db_path.exists():
+        from .storage.sqlite import SqliteStore
+        store = SqliteStore(db_path)
+        checks.append({
+            "check": "indexed_runs",
+            "ok": True,
+            "count": store.count_runs(),
+        })
+    checks.append({
+        "check": "evals_dir",
+        "ok": evals_dir.exists(),
+        "path": str(evals_dir),
+    })
+    all_ok = all(c["ok"] for c in checks if c["check"] != "evals_dir")
+    data = {"ok": all_ok, "checks": checks, "workspace": str(ws)}
+    _out(ok(data), json_output)
+
+
+@app.command("bug-report")
+def bug_report(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Collect diagnostic information for a bug report.
+
+    Gathers environment, runtime, storage, and config info.
+    All secrets are redacted.
+    """
+    import os
+    import sys
+    _setup_logging(debug)
+    from .providers import redacted_diagnostics
+    from .config.loader import load_config
+    ws = _workspace(workspace)
+    config = load_config(workspace=ws)
+    traces_dir = ws / ".arc" / "traces"
+    db_path = ws / ".arc" / "arc.db"
+    trace_count = len(list(traces_dir.glob("*.jsonl"))) if traces_dir.exists() else 0
+    indexed_count = 0
+    if db_path.exists():
+        from .storage.sqlite import SqliteStore
+        indexed_count = SqliteStore(db_path).count_runs()
+    payload = {
+        "arc_version": arc_version,
+        "python_version": sys.version.split()[0],
+        "platform": sys.platform,
+        "workspace": str(ws),
+        "traces": trace_count,
+        "indexed_runs": indexed_count,
+        "config": {
+            "version": config.version,
+            "runtime_default": config.runtime.default,
+            "isolation": config.execution.isolation,
+        },
+        "providers": redacted_diagnostics(os.environ),
+    }
+    _out(ok(payload), json_output)
+    if not json_output:
+        console.print("[bold]ARC Bug Report[/bold]")
+        console.print(f"  Version: {arc_version}")
+        console.print(f"  Python: {sys.version.split()[0]}")
+        console.print(f"  Platform: {sys.platform}")
+        console.print(f"  Workspace: {ws}")
+        console.print(f"  Traces: {trace_count}")
+        console.print(f"  Indexed: {indexed_count}")
+        console.print("")
+        console.print("[dim]Include this output when reporting bugs.[/dim]")
+
+
 @providers_app.command("status")
 def providers_status(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
     """Return dry-run provider status from environment presence only."""
@@ -1076,6 +1256,66 @@ def runs_backfill(
     _out(ok(payload, workspace=str(ws)), json_output)
     if not json_output and failed > 0:
         err_console.print(f"[yellow]Warning: {failed} trace(s) failed to index[/yellow]")
+
+
+@runs_app.command("search")
+def runs_search(
+    workflow: Optional[str] = typer.Option(None, "--workflow", "-f", help="Filter by workflow ID"),
+    runtime: Optional[str] = typer.Option(None, "--runtime", "-r", help="Filter by runtime"),
+    status: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status"),
+    limit: int = typer.Option(20, "--limit", "-l", help="Maximum results"),
+    offset: int = typer.Option(0, "--offset", "-o", help="Result offset"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Search runs using the SQLite index."""
+    _setup_logging(debug)
+    from .storage.sqlite import SqliteStore
+    ws = _workspace(workspace)
+    db_path = ws / ".arc" / "arc.db"
+    if not db_path.exists():
+        _out(err(ArcErrorCode.INVALID_INPUT, "SQLite index not found. Run 'arc runs backfill' first."), json_output)
+        raise typer.Exit(1)
+    store = SqliteStore(db_path)
+    results = store.list_runs(
+        status=status,
+        runtime=runtime,
+        workflow_id=workflow,
+        limit=limit,
+        offset=offset,
+    )
+    total = store.count_runs()
+    payload = {
+        "results": results,
+        "count": len(results),
+        "total_indexed": total,
+        "filters": {
+            "workflow": workflow,
+            "runtime": runtime,
+            "status": status,
+        },
+    }
+    _out(ok(payload, workspace=str(ws)), json_output)
+    if not json_output:
+        if not results:
+            console.print("[dim]No matching runs found.[/dim]")
+            return
+        table = Table(title=f"Runs ({len(results)} of {total} indexed)")
+        table.add_column("Run ID")
+        table.add_column("Workflow")
+        table.add_column("Runtime")
+        table.add_column("Status")
+        table.add_column("Started")
+        for run in results:
+            table.add_row(
+                run["id"][:12],
+                run.get("workflow_id", "")[:20],
+                run.get("runtime", ""),
+                run.get("status", ""),
+                run.get("started_at", "")[:19],
+            )
+        console.print(table)
 
 
 # ─── isolation ──────────────────────────────────────────────────────────────────

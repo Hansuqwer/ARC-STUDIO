@@ -103,3 +103,123 @@ def test_providers_quota_show_filtered(tmp_path, monkeypatch):
     assert data["provider"] == "openai"
     assert "dry_run:provider:openai" in data["counters"]
     assert "dry_run:provider:anthropic" not in data["counters"]
+
+
+def test_doctor_env_json():
+    """arc doctor env returns environment checks."""
+    result = CliRunner().invoke(app, ["doctor", "env", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert data["ok"] is True
+    check_names = {c["check"] for c in data["checks"]}
+    assert "python_version" in check_names
+    assert "arc_version" in check_names
+    assert "provider_keys" in check_names
+
+
+def test_doctor_network_json():
+    """arc doctor network returns connectivity checks."""
+    result = CliRunner().invoke(app, ["doctor", "network", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert "checks" in data
+    check_names = {c["check"] for c in data["checks"]}
+    assert "openai" in check_names
+    assert "anthropic" in check_names
+
+
+def test_doctor_storage_json(tmp_path, monkeypatch):
+    """arc doctor storage returns storage status."""
+    traces_dir = tmp_path / ".arc" / "traces"
+    traces_dir.mkdir(parents=True)
+    result = CliRunner().invoke(app, [
+        "doctor", "storage",
+        "--workspace", str(tmp_path),
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert "checks" in data
+    check_names = {c["check"] for c in data["checks"]}
+    assert "traces_dir" in check_names
+    assert "sqlite_index" in check_names
+
+
+def test_bug_report_json(tmp_path):
+    """arc bug-report returns diagnostic payload."""
+    result = CliRunner().invoke(app, [
+        "bug-report",
+        "--workspace", str(tmp_path),
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert "arc_version" in data
+    assert "python_version" in data
+    assert "platform" in data
+    assert "workspace" in data
+    assert "providers" in data
+    assert "config" in data
+
+
+def test_runs_search_no_index(tmp_path):
+    """arc runs search fails gracefully when SQLite index missing."""
+    result = CliRunner().invoke(app, [
+        "runs", "search",
+        "--workspace", str(tmp_path),
+        "--json",
+    ])
+    assert result.exit_code == 1
+    assert "not found" in result.output
+
+
+def test_runs_search_with_index(tmp_path):
+    """arc runs search returns results from SQLite index."""
+    from agent_runtime_cockpit.storage.indexed_store import IndexedTraceStore
+    from agent_runtime_cockpit.protocol.schemas import RunRecord, RunStatus
+    store = IndexedTraceStore(
+        trace_dir=tmp_path / ".arc" / "traces",
+        db_path=tmp_path / ".arc" / "arc.db",
+    )
+    store.init()
+    record = RunRecord(
+        id="test-run-1",
+        workflow_id="test-workflow",
+        runtime="swarmgraph",
+        status=RunStatus.COMPLETED,
+        started_at="2026-05-15T00:00:00Z",
+    )
+    store.save(record)
+    result = CliRunner().invoke(app, [
+        "runs", "search",
+        "--workspace", str(tmp_path),
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert data["count"] >= 1
+    assert data["total_indexed"] >= 1
+    assert len(data["results"]) >= 1
+    assert data["results"][0]["id"] == "test-run-1"
+
+
+def test_runs_search_filtered(tmp_path):
+    """arc runs search filters by runtime."""
+    from agent_runtime_cockpit.storage.indexed_store import IndexedTraceStore
+    from agent_runtime_cockpit.protocol.schemas import RunRecord, RunStatus
+    store = IndexedTraceStore(
+        trace_dir=tmp_path / ".arc" / "traces",
+        db_path=tmp_path / ".arc" / "arc.db",
+    )
+    store.init()
+    store.save(RunRecord(id="run-sg", workflow_id="wf1", runtime="swarmgraph", status=RunStatus.COMPLETED, started_at="2026-05-15T00:00:00Z"))
+    store.save(RunRecord(id="run-lg", workflow_id="wf2", runtime="langgraph", status=RunStatus.COMPLETED, started_at="2026-05-15T00:01:00Z"))
+    result = CliRunner().invoke(app, [
+        "runs", "search",
+        "--runtime", "langgraph",
+        "--workspace", str(tmp_path),
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert all(r["runtime"] == "langgraph" for r in data["results"])
