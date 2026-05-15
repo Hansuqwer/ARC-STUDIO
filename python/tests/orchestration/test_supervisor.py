@@ -14,7 +14,6 @@ import pytest
 from agent_runtime_cockpit.orchestration.supervisor import (
     JobSupervisor,
     RunRequest,
-    ActiveRun,
     HitlNotFoundError,
 )
 from agent_runtime_cockpit.orchestration.event_broker import EventBroker

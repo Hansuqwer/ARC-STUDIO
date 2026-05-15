@@ -844,7 +844,7 @@ def providers_proxy(
     and --allow-paid-calls for a live proxy call.
     """
     _setup_logging(debug)
-    from .providers import ProviderRequest, ProviderResponse, dry_run_proxy
+    from .providers import ProviderRequest, dry_run_proxy
     from .providers import ProviderRoutingStore
     routing = ProviderRoutingStore().get()
     req = ProviderRequest(
@@ -2135,7 +2135,7 @@ def audit_key_show(
         if status.available:
             console.print(f"Audit key: [green]available[/green] (source: {status.source})")
         else:
-            console.print(f"Audit key: [red]not available[/red]")
+            console.print("Audit key: [red]not available[/red]")
             console.print(f"  {status.warning}")
 
 
@@ -2249,7 +2249,7 @@ def workspace_init(
 ) -> None:
     """Initialize ARC configuration in a workspace."""
     _setup_logging(debug)
-    from .config.loader import init_config, load_config
+    from .config.loader import init_config
     ws = _workspace(workspace)
     config_path = ws / ".arc" / "config.yaml"
     if config_path.exists():

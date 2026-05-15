@@ -7,7 +7,6 @@ guarantee that a committed .arc/trusted file does not self-authorize.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
@@ -20,7 +19,6 @@ from agent_runtime_cockpit.security.trust import (
     ensure_trusted,
     WorkspaceUntrusted,
     TrustLevel,
-    TRUST_DB,
 )
 from agent_runtime_cockpit.cli import app
 

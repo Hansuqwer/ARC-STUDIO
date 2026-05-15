@@ -6,13 +6,11 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from agent_runtime_cockpit.audit.key_manager import (
     AuditKeyManager,
     sign_audit_record,
     verify_audit_signature,
-    AuditKeyStatus,
 )
 from agent_runtime_cockpit.audit.hmac_chain import (
     HmacAuditChainWriter,

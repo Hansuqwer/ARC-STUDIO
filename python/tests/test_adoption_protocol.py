@@ -7,7 +7,6 @@ LangGraph is installed.
 """
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -20,7 +19,6 @@ from agent_runtime_cockpit.adoption import (
     ConsensusResult,
     AdoptionStatus,
     AdoptionCapability,
-    AdoptionRunner,
     AdoptionRegistry,
 )
 

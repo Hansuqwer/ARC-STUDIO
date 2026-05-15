@@ -8,7 +8,6 @@ from __future__ import annotations
 from agent_runtime_cockpit.protocol.events import (
     CURRENT_SCHEMA_VERSION,
     EVENT_TYPES,
-    EventTypeDef,
     create_event,
     validate_event_data,
 )

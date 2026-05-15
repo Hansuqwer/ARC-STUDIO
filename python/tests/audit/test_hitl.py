@@ -1,5 +1,4 @@
 """Tests for HITL decision records (ADR-005 audit scaffold)."""
-import pytest
 from agent_runtime_cockpit.audit.hitl import (
     HitlPrompt,
     HitlResponse,
