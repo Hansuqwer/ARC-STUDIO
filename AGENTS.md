@@ -149,6 +149,26 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - Monaco editor, Theia core, React, and vendors cached separately
 - Custom `webpack.config.js` in `packages/arc-browser-app/`
 
+## Workflow
+
+### Before Each PR Implementation
+**ALWAYS read the research document first:**
+1. Search `docs/research/IMPLEMENTATION_RESEARCH.md` for the relevant PR section
+2. Read any code scaffolds provided there
+3. Check `docs/adr/` for relevant ADRs
+4. Then implement following the research doc guidance
+
+### Implementation Flow
+1. Understand the PR spec from `docs/IMPLEMENTATION_PLAN.md` (table rows)
+2. Research the existing codebase for relevant code
+3. Read `docs/research/IMPLEMENTATION_RESEARCH.md` for scaffolds/guidance
+4. Check `docs/adr/` for architecture decisions
+5. Implement the change
+6. Write tests
+7. Run full test suite: `cd python && uv run pytest -q`
+8. Verify TypeScript builds: `pnpm --filter @arc-studio/protocol build && pnpm --filter arc-extension build`
+9. Commit with descriptive message
+
 ## Current Status
 
 ### Completed (P0 - Critical)
@@ -171,45 +191,60 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - ✅ P2-4: replaced `null as any` with `null!` for running-process preinsert
 - ✅ P2-5: Spawn-mocked WorkflowExecutor tests added (6 new test cases)
 
-### Completed (P3 - Audit Fixes, 2026-05-14)
-- ✅ F-0: Broken lockfile regenerated (pnpm install --frozen-lockfile passes)
-- ✅ F-1: Stale FastAPI test deleted (python/tests/test_routes_execute.py)
-- ✅ F-2/F-4/F-9: arc-arena excluded from workspace & electron deps
-- ✅ F-3: .env untracked (git rm --cached)
-- ✅ F-5/F-6/F-11: README tag claim fixed, CLI table eval added, .tool-versions pnpm 9.15.9
-- ✅ F-7: CI step ordering fixed (install before hygiene, --frozen-lockfile restored)
-- ✅ F-8/F-10: check-artifacts.sh allowlists src-gen/, check-pr.sh excludes swarmgraph/
-- ✅ F-12: ruff --fix applied (44 issues), 14 style-only ignored in pyproject.toml
-- ✅ F-13: console.log in trace-parser.ts replaced with breadcrumb comment
-- ✅ G4F removed: 5 provider definitions deleted from providers.py & arc-service-impl.ts
-- ✅ #19 fix: StatsJsonPlugin disabled in CI (stats.toJson all:true removed + !CI guard) — CI verified: webpack no longer crashes
-- ✅ #20 fix: replaced deprecated `datetime.datetime.utcnow()` with `datetime.datetime.now(datetime.timezone.utc)` across 8 Python files — resolves all 52 CI test failures (both web 500s and CLI deprecation errors)
+### Completed (P3 - Audit Fixes)
+- ✅ F-0 through F-13, G4F, #19, #20 — all resolved
 
-### Known Issues (2026-05-14)
+### Completed (Recommended First 23 PRs)
+- ✅ PR 1: Docs truth cleanup
+- ✅ PR 2: Release checklist
+- ✅ PR 3: Theia version-skew audit
+- ✅ PR 4: Extension build on Theia 1.71
+- ✅ PR 5: Browser app canonical wiring
+- ✅ PR 6: Extension migration inventory
+- ✅ PR 7: CLI discoverability A (version, health)
+- ✅ PR 8: CLI discoverability B (status, doctor all)
+- ✅ PR 9: Register/hide AG2
+- ✅ PR 10: Capability schema v1
+- ✅ PR 11: OpenAI Agents export target
+- ✅ PR 12: CLI daemon parity A (arc runs diff)
+- ✅ PR 13: CLI daemon parity B (provider diagnostics/proxy)
+- ✅ PR 14: Event schema registry (ADR-004)
+- ✅ PR 15-16: Adoption protocol + registry skeleton
+- ✅ PR 17: Delete stale deploy script
+- ✅ PR 18: Manual SSE proof endpoint
+- 🔄 PR 19: Event broker core (in progress)
+
+### Known Issues
 - ESLint has 247 problems (113 errors, 134 warnings) — all pre-existing in other packages; our files have 0 errors
 - Browser files (arc-widget.tsx, etc.) show 0% coverage due to Theia runtime dependency — UI tests are static contract tests only
 - Coverage targets: 70% not reached for statements (61.84%), functions (53.78%), lines (63.18%). Only branches (67.34%) close
 - Monaco editor bundle is 15.9 MiB (expected, not reducible)
 - Total frontend entrypoint ~28.8 MiB (Monaco + Theia core + React + vendors); ARC Studio code chunk is 50 KiB
-- **#19 (webpack V8 crash on CI)**: ✅ RESOLVED. Fixed by removing `all: true` from `stats.toJson()` and skipping `StatsJsonPlugin` when `process.env.CI` is set. CI verified: webpack no longer crashes.
-- **#20 (Python 3.12 web test 500s)**: ✅ RESOLVED. Fixed by replacing all 8 `utcnow()` calls with `now(timezone.utc)`. CI verified: 245 passed, 6 skipped, 0 failed, 2 errors (AG2 pre-existing).
 
-### Remaining Issues (2026-05-14)
+### Remaining Issues
 See `docs/handover/REMAINING_ISSUES_PLAN.md` for full details. Summary:
 
-- **R-1 (Node CI: arc-ag-ui test exits 1)**: Unquoted glob `./test/**/*.test.js` fails under POSIX sh. Fix: quote the glob. **Original diagnosis in handover was incorrect** — test/ directory exists with 4 real tests; the issue is shell glob expansion, not missing tests.
-- **R-2 (ARC Roadmap Gate: native-keymap gyp crash)**: Missing `apt-get install libx11-dev libxkbfile-dev` step. Fix: add native build deps step (mirrors node.yml).
-- **R-3 (Python CI: 2 AG2 adapter test errors)**: `conftest.py` autouse fixture calls `get_event_loop()` which emits `DeprecationWarning` on Python 3.12 for synchronous tests. Fix: delete the fixture (pytest-asyncio ≥0.23 owns loop lifecycle).
-- **R-4 (10 unmerged remote branches)**: `handoff/no-mockups-github-ready` safe to delete; `recovered/troubleshooting-docs` and `runtime/api-runs-start-field` may have salvageable work; 7 `roadmap/*` branches intentionally parked.
+- **R-1 (Node CI: arc-ag-ui test exits 1)**: Unquoted glob `./test/**/*.test.js` fails under POSIX sh. Fix: quote the glob.
+- **R-2 (ARC Roadmap Gate: native-keymap gyp crash)**: Missing `apt-get install libx11-dev libxkbfile-dev` step.
+- **R-3 (Python CI: 2 AG2 adapter test errors)**: `conftest.py` autouse fixture calls `get_event_loop()` which emits `DeprecationWarning` on Python 3.12.
+- **R-4 (10 unmerged remote branches)**: 3 may have salvageable work; 7 intentionally parked.
 - **R-5 (.env history scrub)**: Schedule `git filter-repo` ≥7 days before public release.
-- **e2e workflow**: Still in progress (expected, builds full Theia app).
+- **e2e workflow**: Still in progress.
 
-## Related Documentation (Archived Handover)
-The following documents contain historical context and are preserved for reference in `docs/archive/`:
-- `CRITICAL_REVIEW_GENSPARK.md` - Initial code review
-- `IMPLEMENTATION_PLAN_KIMI.md` - Original implementation plan with code examples
-- `EXECUTE_NEXT_PROMPT.md` - Task execution prompts
-- `FINAL_HANDOFF_GENSPARK.md` - Phase handoff documentation
-- `HANDOVER_SUMMARY.md` - Summary of handover
-- `PROOF_OF_CONCEPT_COMPLETE.md` - PoC completion notes
-- `README_HANDOVER.md` - Handover instructions
+## Related Documentation
+
+### Source of Truth
+- `docs/IMPLEMENTATION_PLAN.md` — Canonical PR list "Recommended First 23 PRs"
+- `docs/research/IMPLEMENTATION_RESEARCH.md` — Detailed scaffolds and guidance (MUST READ before each PR)
+- `docs/adr/` — Architecture Decision Records (000-008)
+- `docs/RELEASE_CHECKLIST.md` — v0.1.0-alpha release checklist
+
+### Archived Handover
+The following documents contain historical context in `docs/archive/`:
+- `CRITICAL_REVIEW_GENSPARK.md`
+- `IMPLEMENTATION_PLAN_KIMI.md`
+- `EXECUTE_NEXT_PROMPT.md`
+- `FINAL_HANDOFF_GENSPARK.md`
+- `HANDOVER_SUMMARY.md`
+- `PROOF_OF_CONCEPT_COMPLETE.md`
+- `README_HANDOVER.md`
