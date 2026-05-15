@@ -35,6 +35,27 @@ arc-theia-studio/
 
 ### Key Packages
 
+#### Python Backend (`python/src/agent_runtime_cockpit/`)
+**Storage:**
+- `storage/jsonl.py` — `JsonlTraceStore` (JSONL canonical traces)
+- `storage/sqlite.py` — `SqliteStore` (run metadata index, ADR-003 schema)
+- `storage/indexed_store.py` — `IndexedTraceStore` (dual-write: JSONL + SQLite index)
+
+**Orchestration:**
+- `orchestration/event_broker.py` — `EventBroker` (bounded queue pub/sub, SSE, replay)
+- `orchestration/supervisor.py` — `JobSupervisor` (run lifecycle, cancel, orphan recovery)
+- `orchestration/runtime_router.py` — `RuntimeRouter` with combo/adoption routing
+
+**Security:**
+- `security/trust.py` — Workspace trust resolver (external DB at `~/.arc/trusted-workspaces.json`)
+- `security/redaction.py` — Secret redaction in adapter outputs
+- `security/profiles.py` — `RunProfile` with env allowlist, paid-call gating
+
+**Isolation:**
+- `isolation/base.py` — `IsolationProvider` ABC + `IsolationResult`
+- `isolation/none.py` — `NoneIsolationProvider` (direct subprocess, no filtering)
+- `isolation/subprocess.py` — `SubprocessIsolationProvider` (env-filtered, blocked secrets)
+
 #### `packages/arc-extension`
 The primary extension package. Contains backend services and frontend widgets.
 
@@ -212,7 +233,23 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - ✅ PR 15-16: Adoption protocol + registry skeleton
 - ✅ PR 17: Delete stale deploy script
 - ✅ PR 18: Manual SSE proof endpoint
-- 🔄 PR 19: Event broker core (in progress)
+- ✅ PR 19: Event broker core
+- ✅ PR 20: Supervisor wiring
+- ✅ PR 21: Keychain storage spike
+- ✅ PR 22: Trust resolver external store
+- ✅ PR 23: Dossier scaffold hardening
+
+### Completed (P1a — Execution Core Infrastructure)
+- ✅ **SQLite index beside JSONL (ADR-003)**: `IndexedTraceStore` wraps JSONL + SQLite with dual-write; `backfill_index()` for idempotent rebuild; 20 storage tests
+- ✅ **Isolation provider interface (ADR-006)**: `isolation/` package with `IsolationProvider` base, `NoneIsolationProvider` (direct subprocess), `SubprocessIsolationProvider` (env-filtered); `arc isolation status/doctor/list` CLI; 16 tests
+- ✅ **Run lifecycle CLI**: `arc runs status/delete/export/backfill` commands added (15 CLI run tests)
+- ✅ **Audit path on RunRecord**: `audit_path` field added to `RunRecord` schema for trace-to-audit-chain linkage
+- ✅ **Combo semantics**: Already implemented via `ComboRuntimeAdapter` (sequential multi-runtime)
+
+### P1a Items Still Open
+- Add ARC trace/audit refs (adapters should populate `audit_path` on RunRecord)
+- Hard subprocess env allowlists (existing adapters don't use `SubprocessIsolationProvider` yet)
+- Config model (ADR-001) — `config/` package with YAML loader not yet implemented
 
 ### Known Issues
 - ESLint has 247 problems (113 errors, 134 warnings) — all pre-existing in other packages; our files have 0 errors
@@ -220,6 +257,11 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - Coverage targets: 70% not reached for statements (61.84%), functions (53.78%), lines (63.18%). Only branches (67.34%) close
 - Monaco editor bundle is 15.9 MiB (expected, not reducible)
 - Total frontend entrypoint ~28.8 MiB (Monaco + Theia core + React + vendors); ARC Studio code chunk is 50 KiB
+
+### Test Metrics
+- Python: 418 passed, 6 skipped (was 402 before P1a work)
+- TypeScript protocol build: clean
+- arc-extension build: clean
 
 ### Remaining Issues
 See `docs/handover/REMAINING_ISSUES_PLAN.md` for full details. Summary:
