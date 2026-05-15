@@ -111,7 +111,13 @@ class TestAdoptionRegistry:
         caps = AdoptionRegistry.list_capabilities(tmp_path)
         other_modes = [
             c for c in caps
-            if c.mode not in {AdoptionMode.LANGGRAPH, AdoptionMode.AG2, AdoptionMode.CREWAI}
+            if c.mode not in {
+                AdoptionMode.LANGGRAPH,
+                AdoptionMode.AG2,
+                AdoptionMode.CREWAI,
+                AdoptionMode.OPENAI_AGENTS,
+                AdoptionMode.LLAMAINDEX,
+            }
         ]
         for cap in other_modes:
             assert cap.status == AdoptionStatus.NOT_IMPLEMENTED, (
@@ -136,6 +142,20 @@ class TestAdoptionRegistry:
         assert runner is not None
         cap = runner.check_availability(tmp_path)
         assert cap.mode == AdoptionMode.CREWAI
+        assert cap.status in {AdoptionStatus.RUNNABLE, AdoptionStatus.NOT_RUNNABLE}
+
+    def test_openai_agents_runner_registered(self, tmp_path):
+        runner = AdoptionRegistry.get(AdoptionMode.OPENAI_AGENTS)
+        assert runner is not None
+        cap = runner.check_availability(tmp_path)
+        assert cap.mode == AdoptionMode.OPENAI_AGENTS
+        assert cap.status in {AdoptionStatus.RUNNABLE, AdoptionStatus.NOT_RUNNABLE}
+
+    def test_llamaindex_runner_registered(self, tmp_path):
+        runner = AdoptionRegistry.get(AdoptionMode.LLAMAINDEX)
+        assert runner is not None
+        cap = runner.check_availability(tmp_path)
+        assert cap.mode == AdoptionMode.LLAMAINDEX
         assert cap.status in {AdoptionStatus.RUNNABLE, AdoptionStatus.NOT_RUNNABLE}
 
     def test_parse_runtime_id_standard(self):
@@ -383,5 +403,79 @@ class TestCrewAIRunner:
             await CrewAIAdoptionRunner().run(
                 AdoptionSpec(mode=AdoptionMode.CREWAI),
                 "crew-run",
+                lambda *args: None,
+            )
+
+
+class TestOpenAIAgentsRunner:
+    @pytest.mark.asyncio
+    async def test_openai_agents_runner_fake_agent_consensus(self):
+        from agent_runtime_cockpit.adoption.openai_agents_runner import OpenAIAgentsAdoptionRunner
+
+        class _Agent:
+            name = "agent-a"
+
+        class _Result:
+            final_output = "agent result"
+
+        class _Runner:
+            @staticmethod
+            async def run(agent, prompt):
+                return _Result()
+
+        events: list[tuple[str, dict]] = []
+        result = await OpenAIAgentsAdoptionRunner().run(
+            AdoptionSpec(mode=AdoptionMode.OPENAI_AGENTS, runtime_config={"agent": _Agent(), "prompt": "x", "runner": _Runner}),
+            "oa-run",
+            lambda run_id, event_type, data: events.append((event_type, data)),
+        )
+
+        assert result.consensus_reached is True
+        assert result.winning_proposal.output == "agent result"
+        assert any(data.get("swarmgraph") is True for event_type, data in events if event_type == "STEP_COMPLETED")
+
+    @pytest.mark.asyncio
+    async def test_openai_agents_runner_requires_agent(self):
+        from agent_runtime_cockpit.adoption.openai_agents_runner import OpenAIAgentsAdoptionRunner
+
+        with pytest.raises(ValueError, match="agent"):
+            await OpenAIAgentsAdoptionRunner().run(
+                AdoptionSpec(mode=AdoptionMode.OPENAI_AGENTS, runtime_config={"prompt": "x"}),
+                "oa-run",
+                lambda *args: None,
+            )
+
+
+class TestLlamaIndexRunner:
+    @pytest.mark.asyncio
+    async def test_llamaindex_runner_fake_query_engine_consensus(self):
+        from agent_runtime_cockpit.adoption.llamaindex_runner import LlamaIndexAdoptionRunner
+
+        class _Response:
+            response = "llama answer"
+
+        class _QueryEngine:
+            async def aquery(self, query):
+                return _Response()
+
+        events: list[tuple[str, dict]] = []
+        result = await LlamaIndexAdoptionRunner().run(
+            AdoptionSpec(mode=AdoptionMode.LLAMAINDEX, runtime_config={"query_engine": _QueryEngine(), "query": "x"}),
+            "li-run",
+            lambda run_id, event_type, data: events.append((event_type, data)),
+        )
+
+        assert result.consensus_reached is True
+        assert result.winning_proposal.output == "llama answer"
+        assert any(data.get("swarmgraph") is True for event_type, data in events if event_type == "STEP_COMPLETED")
+
+    @pytest.mark.asyncio
+    async def test_llamaindex_runner_requires_target(self):
+        from agent_runtime_cockpit.adoption.llamaindex_runner import LlamaIndexAdoptionRunner
+
+        with pytest.raises(ValueError, match="workflow/query_engine/agent"):
+            await LlamaIndexAdoptionRunner().run(
+                AdoptionSpec(mode=AdoptionMode.LLAMAINDEX, runtime_config={"query": "x"}),
+                "li-run",
                 lambda *args: None,
             )

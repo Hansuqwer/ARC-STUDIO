@@ -37,6 +37,18 @@ class AdoptionRegistry:
             cls.register(LangGraphAdoptionRunner())
         except ImportError:
             pass
+        # LlamaIndex runner
+        try:
+            from .llamaindex_runner import LlamaIndexAdoptionRunner
+            cls.register(LlamaIndexAdoptionRunner())
+        except ImportError:
+            pass
+        # OpenAI Agents runner
+        try:
+            from .openai_agents_runner import OpenAIAgentsAdoptionRunner
+            cls.register(OpenAIAgentsAdoptionRunner())
+        except ImportError:
+            pass
         # CrewAI runner
         try:
             from .crewai_runner import CrewAIAdoptionRunner
