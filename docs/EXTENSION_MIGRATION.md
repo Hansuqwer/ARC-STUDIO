@@ -10,9 +10,8 @@ duplicate `theia-extensions/*` browser dependencies during transition.
 **Migration status (2026-05-17):** Phase C nearly complete — critical widgets/services
 are canonical in `packages/arc-extension` (adapters, workflow graph, run timeline,
 event stream, safe settings prefs, health, status bar, welcome widget, chat launch UI,
-and run diff UI/service). `arc-runs` has been removed from
-`applications/browser/package.json`; `arc-core` remains wired until the final browser
-build/removal slice passes.
+and run diff UI/service). `arc-runs` and `arc-core` have been removed from
+`applications/browser/package.json`; legacy source dirs remain for rollback/history until archive.
 
 ---
 
@@ -20,7 +19,7 @@ build/removal slice passes.
 
 | # | Extension | Type | Files / Lines | Tests | Overlap w/ canonical | Action | Priority | Notes |
 |---|---|---|---|---|---|---|---|---|
-| 1 | `arc-core` | Both | 14 / 694 | 4 | **Heavy** — protocol types, backend service, main widget, commands, preferences | Archive after salvage | P0 | Duplicate of `packages/arc-extension`. Must port any unique features (status bar, welcome widget, SSE client) before archiving. |
+| 1 | `arc-core` | Both | 14 / 694 | 4 | Ported for release scope — protocol/service/main widget/status bar/welcome/prefs now canonical | Archive after smoke | P0 | Removed from browser app deps; legacy source retained for rollback/history until archive. |
 | 2 | `arc-runs` | FE | 5 / 1181 | 2 | Ported for release scope — timeline, chat launch controls, and run diff now canonical | Archive after smoke | P0 | Removed from browser app deps; legacy source retained for rollback/history until archive. |
 | 3 | `arc-adapters` | FE | 3 / 240 | 0 | None | Port | P0 | Runtime readiness cards and doctor actions are product-critical. No equivalent in canonical extension. |
 | 4 | `arc-workflows` | FE | 3 / 238 | 0 | None | Port | P0 | Workflow graph SVG visualization. No equivalent in canonical extension. |
@@ -67,7 +66,7 @@ After all useful code is ported:
 
 | Step | Extension | Action |
 |------|-----------|--------|
-| C.1 | `arc-core` | Remove from `applications/browser` deps, add deprecation banner, archive |
+| C.1 | `arc-core` | ✅ Removed from `applications/browser` deps after canonical service/protocol/status/welcome/prefs landed; archive source after browser smoke |
 | C.2 | `arc-adapters` | ✅ Removed from `applications/browser` deps; archive source after browser smoke |
 | C.3 | `arc-runs` | ✅ Removed from `applications/browser` deps after canonical chat launch controls and run diff UI landed; archive source after browser smoke |
 | C.4 | `arc-workflows` | ✅ Removed from `applications/browser` deps; archive source after browser smoke |
@@ -118,7 +117,7 @@ service types are properly represented in `packages/arc-extension` and the Pytho
 | `arc-audit` | ✅ Static stub removed from browser app deps; per-run audit verification lives in canonical Runs tab |
 | `arc-arena` | 🗑️ ARCHIVE CANDIDATE — out of v0.1 scope; still present in workspace |
 | `arc-context` | ✅ Old-core context-pack viewer removed from browser app deps; port later only if context-pack UX returns to release scope |
-| `arc-core` | 🗑️ DEPRECATED — duplicate of canonical extension, still wired in browser app |
+| `arc-core` | ✅ Removed from browser app deps; canonical extension owns service/protocol/status/welcome/prefs |
 | `arc-event-stream` | ✅ Ported into arc-extension and removed from browser app deps; source still present for rollback until browser smoke |
 | `arc-health` | ✅ Ported into arc-extension and removed from browser app deps |
 | `arc-product` | ✅ Branding shell removed from browser app deps; canonical extension owns ARC Studio identity |
