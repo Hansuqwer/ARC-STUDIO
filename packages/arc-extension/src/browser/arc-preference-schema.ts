@@ -42,6 +42,11 @@ export const ArcPreferenceSchema: PreferenceSchema = {
             default: true,
             description: 'Show warnings when ARC is using fixture/mock data.',
         },
+        'arc.ui.showStatusBar': {
+            type: 'boolean',
+            default: true,
+            description: 'Show ARC status bar items.',
+        },
         'arc.swarmgraph.provider': {
             type: 'string',
             default: 'openai',

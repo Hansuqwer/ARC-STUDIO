@@ -380,6 +380,7 @@ describe('ArcPreferenceSchema', () => {
         expect(source).toMatch(/arc\.python\.executable/);
         expect(source).toMatch(/arc\.run\.defaultProfile/);
         expect(source).toMatch(/arc\.telemetry\.otlpEndpoint/);
+        expect(source).toMatch(/arc\.ui\.showStatusBar/);
     });
 
     it('should not define raw secret preferences', () => {
@@ -388,6 +389,29 @@ describe('ArcPreferenceSchema', () => {
         expect(source).not.toMatch(/apiKey/i);
         expect(source).not.toMatch(/token/i);
         expect(source).not.toMatch(/secret/i);
+    });
+});
+
+describe('ArcStatusBarContribution', () => {
+    let source: string;
+
+    beforeAll(async () => {
+        source = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'browser', 'arc-status-bar-contribution.ts'), 'utf-8');
+    });
+
+    it('should use Theia status bar APIs', () => {
+        expect(source).toMatch(/StatusBar/);
+        expect(source).toMatch(/StatusBarAlignment/);
+    });
+
+    it('should respect status bar preference', () => {
+        expect(source).toMatch(/arc\.ui\.showStatusBar/);
+        expect(source).toMatch(/removeElement/);
+    });
+
+    it('should use canonical ARC service health', () => {
+        expect(source).toMatch(/@inject\(ArcService\)/);
+        expect(source).toMatch(/getConfigStatus/);
     });
 });
 

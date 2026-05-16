@@ -13,6 +13,7 @@ import { ArcEventStreamWidget } from './arc-event-stream-widget';
 import { ArcEventStreamContribution } from './arc-event-stream-contribution';
 import { ArcHealthWidget } from './arc-health-widget';
 import { ArcHealthContribution } from './arc-health-contribution';
+import { ArcStatusBarContribution } from './arc-status-bar-contribution';
 import { ArcStudioWidget } from './arc-studio-widget';
 import { ArcStudioWidgetContribution } from './arc-studio-widget-contribution';
 import { ArcPreferenceSchema } from './arc-preference-schema';
@@ -23,6 +24,7 @@ import './style/arc-studio-widget.css';
 
 export default new ContainerModule(bind => {
     bind(PreferenceContribution).toConstantValue({ schema: ArcPreferenceSchema });
+    bind(FrontendApplicationContribution).to(ArcStatusBarContribution).inSingletonScope();
 
     // Bind the ARC service client (connects to backend via WebSocket)
     bind(ArcService).toDynamicValue(ctx => {
