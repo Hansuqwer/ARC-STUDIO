@@ -21,6 +21,7 @@ from agent_runtime_cockpit.audit.hitl import HitlDecision, HitlPrompt, HitlRespo
 from agent_runtime_cockpit.security.trust import WorkspaceUntrusted, trust_workspace
 from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
 from agent_runtime_cockpit.protocol.schemas import RunStatus
+from agent_runtime_cockpit.protocol.evidence_refs import EvidenceKind, EvidenceRef
 
 
 @pytest.fixture
@@ -65,10 +66,68 @@ class TestStartRun:
         assert loaded.ended_at is not None
         assert [event.type for event in loaded.events] == [
             "CONTRACT_PROPOSED", "RUN_STARTED", "STEP_STARTED", "RUN_COMPLETED",
+            "CONTRACT_FULFILLED",
             "RECEIPT_GENERATED",
         ]
         assert supervisor.store.load_contract(run_id) is not None
         assert supervisor.store.load_receipt(run_id) is not None
+
+    @pytest.mark.asyncio
+    async def test_receipt_cost_enforces_contract_ceiling(self, supervisor: JobSupervisor):
+        request = RunRequest(
+            workflow_id="wf-test",
+            runtime="swarmgraph",
+            metadata={"cost_ceiling_usd": 1.0, "cost_usd": 2.5},
+        )
+
+        run = await supervisor.start_run(request, lambda run_id, req, emit: asyncio.sleep(0.01))
+        await asyncio.sleep(0.2)
+
+        receipt = supervisor.store.load_receipt(run.id)
+        contract = supervisor.store.load_contract(run.id)
+        loaded = supervisor.store.load(run.id)
+        assert receipt is not None
+        assert receipt.cost_usd == 2.5
+        assert contract is not None
+        assert contract.status.value == "violated"
+        assert loaded is not None
+        assert "CONTRACT_VIOLATED" in [event.type for event in loaded.events]
+
+    @pytest.mark.asyncio
+    async def test_receipt_evidence_refs_allowlisted_and_deduped(self, supervisor: JobSupervisor):
+        evidence = {
+            "schema_version": 1,
+            "evidence_id": "ev_01JDEADBEEF1234567890",
+            "kind": "file",
+            "target": "a.py",
+            "redacted": False,
+            "metadata": {},
+        }
+        ledger = {**evidence, "evidence_id": "ev_01JDEADBEEF1234567891", "kind": "ledger"}
+
+        async def fake_executor(run_id, req, emit_event):
+            emit_event(run_id, "MESSAGE", {"text": "one", "evidence_refs": [evidence, ledger]})
+            emit_event(run_id, "MESSAGE", {"text": "two", "evidence_refs": [evidence]})
+
+        run = await supervisor.start_run(_make_request(), fake_executor)
+        await asyncio.sleep(0.2)
+
+        receipt = supervisor.store.load_receipt(run.id)
+        assert receipt is not None
+        assert len(receipt.evidence_refs) == 1
+        assert receipt.evidence_refs[0].kind.value == "file"
+
+    def test_valid_evidence_does_not_mutate_caller(self, supervisor: JobSupervisor):
+        ref = EvidenceRef(
+            evidence_id="ev_01JDEADBEEF1234567890",
+            kind=EvidenceKind.FILE,
+            target="/abs/secret",
+        )
+
+        valid = supervisor._valid_evidence([ref])
+
+        assert valid[0].target == "/abs/secret"
+        assert ref.target == "/abs/secret"
 
     @pytest.mark.asyncio
     async def test_untrusted_workspace_is_blocked(
@@ -268,7 +327,7 @@ class TestHitlFlow:
         assert loaded is not None
         assert [event.type for event in loaded.events] == [
             "CONTRACT_PROPOSED", "RUN_STARTED", "HITL_PROMPT", "HITL_RESPONSE",
-            "RUN_COMPLETED", "RECEIPT_GENERATED",
+            "RUN_COMPLETED", "CONTRACT_FULFILLED", "RECEIPT_GENERATED",
         ]
 
     @pytest.mark.asyncio

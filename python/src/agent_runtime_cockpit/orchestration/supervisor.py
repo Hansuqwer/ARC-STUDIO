@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 from ..audit.hitl import HitlPrompt, HitlResponse
 from ..audit.key_manager import AuditKeyManager
 from ..protocol.schemas import RunRecord, RunStatus
-from ..protocol.evidence_refs import EvidenceRef
+from ..protocol.evidence_refs import EvidenceKind, EvidenceRef
 from ..protocol.failure_autopsy import FailureAutopsy, RetryOption
 from ..protocol.run_contract import ContractStatus, RunContract
 from ..protocol.run_receipt import RunReceipt
@@ -33,6 +33,8 @@ from .event_broker import EventBroker
 from .events import create_event
 
 log = logging.getLogger(__name__)
+
+ALLOWED_EVIDENCE_KINDS = {EvidenceKind.FILE, EvidenceKind.TOOL_OUTPUT}
 
 
 class RunRequest(BaseModel):
@@ -207,6 +209,7 @@ class JobSupervisor:
         seq = self._sequence_counters.get(run_id, 0)
         data = self._redacted(self._attach_verified_evidence(run_id, seq, event_type, data))
         event = create_event(run_id, seq, event_type, data)
+        event.data = self._redacted(event.data)
         self._sequence_counters[run_id] = seq + 1
         run = self.store.load(run_id)
         if run:
@@ -254,6 +257,7 @@ class JobSupervisor:
             contract_id=contract.contract_id if contract else None,
             status=status.value,
             summary=self._receipt_summary(run),
+            cost_usd=self._run_cost_usd(run, request),
             duration_ms=duration_ms,
             evidence_refs=evidence_refs,
             audit_chain_ref=run.audit_path if run else None,
@@ -266,6 +270,20 @@ class JobSupervisor:
             contract.status = ContractStatus.FULFILLED
             contract.fulfilled_at = datetime.now(timezone.utc).isoformat()
             self.store.save_contract(contract)
+            self._emit_event(run_id, "CONTRACT_FULFILLED", {
+                "contract_id": contract.contract_id,
+                "run_id": run_id,
+            })
+        elif contract and status == RunStatus.COMPLETED:
+            contract.status = ContractStatus.VIOLATED
+            self.store.save_contract(contract)
+            self._emit_event(run_id, "CONTRACT_VIOLATED", {
+                "contract_id": contract.contract_id,
+                "run_id": run_id,
+                "reason": "contract terms not satisfied",
+            })
+        if run:
+            run = self.store.load(run_id)
         if run:
             run.metadata["receipt_id"] = receipt.receipt_id
             self.store.save(run)
@@ -305,8 +323,13 @@ class JobSupervisor:
 
     def _run_evidence_refs(self, run: RunRecord) -> list[EvidenceRef]:
         refs: list[EvidenceRef] = []
+        seen: set[str] = set()
         for event in run.events:
-            refs.extend(self._valid_evidence(event.data.get("evidence_refs", [])))
+            for ref in self._valid_evidence(event.data.get("evidence_refs", [])):
+                if ref.evidence_id in seen:
+                    continue
+                seen.add(ref.evidence_id)
+                refs.append(ref)
         return refs
 
     def _valid_evidence(self, refs: Any) -> list[EvidenceRef]:
@@ -315,13 +338,28 @@ class JobSupervisor:
             return valid
         for ref in refs:
             try:
-                ev = ref if isinstance(ref, EvidenceRef) else EvidenceRef.model_validate(ref)
+                ev = EvidenceRef.model_validate(
+                    ref.model_dump(by_alias=True) if isinstance(ref, EvidenceRef) else ref
+                )
             except Exception:
                 continue
-            if ev.kind.value in {"file", "tool_output"}:
-                ev.target = self._redactor.redact_string(ev.target)
-                valid.append(ev)
+            if ev.kind not in ALLOWED_EVIDENCE_KINDS:
+                continue
+            ev.target = self._redactor.redact_string(ev.target)
+            valid.append(ev)
         return valid
+
+    def _run_cost_usd(self, run: RunRecord | None, request: RunRequest) -> float | str:
+        sources = [
+            request.metadata.get("cost_usd"),
+            request.metadata.get("estimated_cost_usd"),
+            run.metadata.get("cost_usd") if run else None,
+            run.metadata.get("estimated_cost_usd") if run else None,
+        ]
+        for value in sources:
+            if isinstance(value, (int, float)) and value >= 0:
+                return float(value)
+        return "unknown"
 
     def _tool_evidence(self, run_id: str, sequence: int) -> EvidenceRef:
         return EvidenceRef(
