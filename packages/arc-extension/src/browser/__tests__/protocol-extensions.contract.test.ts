@@ -190,6 +190,15 @@ describe('Protocol Extensions (Session B + B7)', () => {
             expect(source).toMatch(/getAuditChainInfo\(runId:\s*string\)/);
             expect(source).toMatch(/replayRun\(runId:\s*string\):\s*Promise<ReplayResult>/);
         });
+
+        it('should expose run diff protocol types and method', () => {
+            expect(source).toMatch(/export interface RunDiffResult/);
+            expect(source).toMatch(/runAId:\s*string/);
+            expect(source).toMatch(/typesOnlyInA:\s*string\[\]/);
+            expect(source).toMatch(/errorEventsA:\s*Record<string, unknown>\[\]/);
+            expect(source).toMatch(/toolCallsA:\s*number/);
+            expect(source).toMatch(/diffRuns\(runAId:\s*string,\s*runBId:\s*string\):\s*Promise<RunDiffResult>/);
+        });
     });
 
     describe('ProviderStatus safety', () => {
@@ -348,6 +357,16 @@ describe('Backend Service Extensions (Session B + B7)', () => {
         it('should map Python snake_case to camelCase for replay events', () => {
             expect(source).toMatch(/run_id/);
             expect(source).toMatch(/runId/);
+        });
+
+        it('should implement run diff via CLI with validation and snake-case mapping', () => {
+            expect(source).toMatch(/async diffRuns\(runAId:\s*string,\s*runBId:\s*string\)/);
+            expect(source).toMatch(/validateRunId\(runAId\)/);
+            expect(source).toMatch(/validateRunId\(runBId\)/);
+            expect(source).toMatch(/runs.*diff.*--json/);
+            expect(source).toMatch(/run_a_id/);
+            expect(source).toMatch(/types_only_in_a/);
+            expect(source).toMatch(/typesOnlyInA/);
         });
     });
 });

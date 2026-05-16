@@ -79,6 +79,7 @@ describe('ArcService Proxy Tests', () => {
                 'respondHitlPrompt',
                 'getAuditChainInfo',
                 'replayRun',
+                'diffRuns',
             ];
 
             const mockService: any = {
@@ -104,6 +105,7 @@ describe('ArcService Proxy Tests', () => {
                 respondHitlPrompt: async () => ({}),
                 getAuditChainInfo: async () => ({}),
                 replayRun: async () => ({}),
+                diffRuns: async () => ({}),
             };
 
             for (const method of requiredMethods) {

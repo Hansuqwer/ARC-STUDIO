@@ -791,6 +791,30 @@ export interface ReplayResult {
     totalEvents: number;
 }
 
+// ========== Run Diff ==========
+
+export interface RunDiffResult {
+    runAId: string;
+    runBId: string;
+    statusA: string;
+    statusB: string;
+    runtimeA: string;
+    runtimeB: string;
+    durationAMs?: number | null;
+    durationBMs?: number | null;
+    eventCountA: number;
+    eventCountB: number;
+    typesOnlyInA: string[];
+    typesOnlyInB: string[];
+    typesCommon: string[];
+    finalOutputA?: string | null;
+    finalOutputB?: string | null;
+    errorEventsA: Record<string, unknown>[];
+    errorEventsB: Record<string, unknown>[];
+    toolCallsA: number;
+    toolCallsB: number;
+}
+
 /**
  * Capability diff produced when runtime capabilities change.
  */
@@ -1141,6 +1165,9 @@ export interface ArcService {
      * Calls `arc runs replay <runId> --json` via the Python CLI.
      */
     replayRun(runId: string): Promise<ReplayResult>;
+
+    /** Diff two stored runs using the Python CLI. */
+    diffRuns(runAId: string, runBId: string): Promise<RunDiffResult>;
 
     // ========== Capability Diff (Session B) ==========
 

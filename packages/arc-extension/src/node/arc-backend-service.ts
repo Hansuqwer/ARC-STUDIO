@@ -50,6 +50,7 @@ import {
     AuditChainInfo,
     ReplayResult,
     ReplayEvent,
+    RunDiffResult,
 } from '../common/arc-protocol';
 import { validateWorkspaceRoot, validateTraceId, validateRunId } from './security-utils';
 import { WorkflowExecutor } from './services/workflow-executor';
@@ -976,6 +977,57 @@ export class ArcBackendService implements ArcService {
             throw new ArcError(
                 ArcErrorCode.EXECUTION_FAILED,
                 `Failed to replay run: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+        }
+    }
+
+    /**
+     * Diff two stored runs by calling the Python CLI.
+     */
+    async diffRuns(runAId: string, runBId: string): Promise<RunDiffResult> {
+        try {
+            validateRunId(runAId);
+            validateRunId(runBId);
+            const output = execFileSync('arc', ['runs', 'diff', runAId, runBId, '--workspace', this.workspaceRoot, '--json'], {
+                timeout: 30000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            if (parsed.ok && parsed.data) {
+                const data = parsed.data;
+                return {
+                    runAId: data.run_a_id || data.runAId || runAId,
+                    runBId: data.run_b_id || data.runBId || runBId,
+                    statusA: data.status_a || data.statusA || 'unknown',
+                    statusB: data.status_b || data.statusB || 'unknown',
+                    runtimeA: data.runtime_a || data.runtimeA || 'unknown',
+                    runtimeB: data.runtime_b || data.runtimeB || 'unknown',
+                    durationAMs: data.duration_a_ms ?? data.durationAMs ?? null,
+                    durationBMs: data.duration_b_ms ?? data.durationBMs ?? null,
+                    eventCountA: data.event_count_a ?? data.eventCountA ?? 0,
+                    eventCountB: data.event_count_b ?? data.eventCountB ?? 0,
+                    typesOnlyInA: data.types_only_in_a || data.typesOnlyInA || [],
+                    typesOnlyInB: data.types_only_in_b || data.typesOnlyInB || [],
+                    typesCommon: data.types_common || data.typesCommon || [],
+                    finalOutputA: data.final_output_a ?? data.finalOutputA ?? null,
+                    finalOutputB: data.final_output_b ?? data.finalOutputB ?? null,
+                    errorEventsA: data.error_events_a || data.errorEventsA || [],
+                    errorEventsB: data.error_events_b || data.errorEventsB || [],
+                    toolCallsA: data.tool_calls_a ?? data.toolCallsA ?? 0,
+                    toolCallsB: data.tool_calls_b ?? data.toolCallsB ?? 0,
+                };
+            }
+            throw new ArcError(
+                ArcErrorCode.EXECUTION_FAILED,
+                parsed?.error?.message || 'CLI returned no data for run diff',
+            );
+        } catch (error) {
+            if (error instanceof ArcError) throw error;
+            throw new ArcError(
+                ArcErrorCode.EXECUTION_FAILED,
+                `Failed to diff runs: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
         }
     }
