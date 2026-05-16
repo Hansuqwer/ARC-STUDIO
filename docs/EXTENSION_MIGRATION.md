@@ -30,7 +30,7 @@ ported widgets are verified as functionally equivalent.
 | 9 | `arc-settings` | FE | 2 / 93 | 0 | Partial — prefs overlap | Port prefs only | P1 | Preference schema may duplicate `arc-ui-preferences.ts` in arc-core. Consolidate into canonical. |
 | 10 | `arc-audit` | FE | 3 / 59 | 0 | None (stub) | Archive or rewrite | P1 | Currently shows "Not implemented" with empty array. Keep concept, archive code. |
 | 11 | `arc-arena` | Both | 6 / 520 | 1 | None | Archive | P0 | LM Arena is out of v0.1 scope. Already excluded from workspace config. |
-| 12 | `arc-product` | FE | 2 / 231 | 0 | None (branding) | Archive/delete | P0 | Branding shell. The canonical extension provides its own widget identity. |
+| 12 | `arc-product` | FE | 2 / 231 | 0 | None (branding) | Archive/delete | P0 | Branding shell removed from browser app deps; canonical extension provides its own widget identity. |
 
 ---
 
@@ -77,7 +77,7 @@ After all useful code is ported:
 | C.9 | `arc-health` | Remove from `applications/browser` deps, archive |
 | C.10 | `arc-audit` | ✅ Removed static stub from `applications/browser` deps; archive source after browser smoke |
 | C.11 | `arc-arena` | Already excluded; ensure no import paths remain |
-| C.12 | `arc-product` | Archive directory; branding merged into canonical extension |
+| C.12 | `arc-product` | ✅ Removed branding shell from `applications/browser` deps; archive source after browser smoke |
 
 ---
 
@@ -120,7 +120,7 @@ service types are properly represented in `packages/arc-extension` and the Pytho
 | `arc-core` | 🗑️ DEPRECATED — duplicate of canonical extension, still wired in browser app |
 | `arc-event-stream` | ✅ Ported into arc-extension and removed from browser app deps; source still present for rollback until browser smoke |
 | `arc-health` | ⏳ Awaiting port (Phase B) |
-| `arc-product` | 🗑️ DEPRECATED — branding merged into canonical extension |
+| `arc-product` | ✅ Branding shell removed from browser app deps; canonical extension owns ARC Studio identity |
 | `arc-runs` | ⏳ Partially ported: run timeline is canonical, but chat and run-diff widgets remain only in original; keep wired |
 | `arc-schemas` | ✅ Old-core schema inspector removed from browser app deps; port later only if schema UI returns to release scope |
 | `arc-settings` | ⏳ Awaiting consolidation (Phase B) |
