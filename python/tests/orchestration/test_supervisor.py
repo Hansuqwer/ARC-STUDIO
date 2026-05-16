@@ -64,8 +64,11 @@ class TestStartRun:
         assert loaded.status == RunStatus.COMPLETED
         assert loaded.ended_at is not None
         assert [event.type for event in loaded.events] == [
-            "RUN_STARTED", "STEP_STARTED", "RUN_COMPLETED",
+            "CONTRACT_PROPOSED", "RUN_STARTED", "STEP_STARTED", "RUN_COMPLETED",
+            "RECEIPT_GENERATED",
         ]
+        assert supervisor.store.load_contract(run_id) is not None
+        assert supervisor.store.load_receipt(run_id) is not None
 
     @pytest.mark.asyncio
     async def test_untrusted_workspace_is_blocked(
@@ -125,6 +128,9 @@ class TestCancelRun:
         loaded = supervisor.store.load(run_id)
         assert loaded is not None
         assert loaded.status == RunStatus.CANCELLED
+        receipt = supervisor.store.load_receipt(run_id)
+        assert receipt is not None
+        assert receipt.status == "cancelled"
 
     @pytest.mark.asyncio
     async def test_cancel_nonexistent_run(self, supervisor: JobSupervisor):
@@ -261,7 +267,8 @@ class TestHitlFlow:
         loaded = supervisor.store.load(run.id)
         assert loaded is not None
         assert [event.type for event in loaded.events] == [
-            "RUN_STARTED", "HITL_PROMPT", "HITL_RESPONSE", "RUN_COMPLETED",
+            "CONTRACT_PROPOSED", "RUN_STARTED", "HITL_PROMPT", "HITL_RESPONSE",
+            "RUN_COMPLETED", "RECEIPT_GENERATED",
         ]
 
     @pytest.mark.asyncio
@@ -282,6 +289,58 @@ class TestHitlFlow:
         assert loaded is not None
         assert loaded.status == RunStatus.FAILED
         assert "HITL_TIMEOUT" in [event.type for event in loaded.events]
+        assert supervisor.store.load_autopsy(run.id) is not None
+
+
+class TestCockpitArtifacts:
+    @pytest.mark.asyncio
+    async def test_failed_run_gets_receipt_autopsy_and_redacted_output(
+        self, supervisor: JobSupervisor,
+    ):
+        async def executor(run_id, req, emit_event):
+            emit_event(run_id, "TOOL_CALL_ERROR", {
+                "tool_call_id": "tool-1",
+                "error": "api_key=supersecret12345 failed",
+            })
+            raise RuntimeError("password=supersecret12345 failed")
+
+        run = await supervisor.start_run(_make_request(), executor)
+        await asyncio.sleep(0.2)
+
+        receipt = supervisor.store.load_receipt(run.id)
+        autopsy = supervisor.store.load_autopsy(run.id)
+        loaded = supervisor.store.load(run.id)
+
+        assert receipt is not None
+        assert receipt.status == "failed"
+        assert receipt.evidence_refs
+        assert "supersecret" not in receipt.summary
+        assert autopsy is not None
+        assert autopsy.knows
+        assert autopsy.guesses
+        assert "supersecret" not in autopsy.stack_summary
+        assert loaded is not None
+        assert "FAILURE_AUTOPSY_GENERATED" in [event.type for event in loaded.events]
+
+    @pytest.mark.asyncio
+    async def test_invalid_evidence_refs_are_stripped(self, supervisor: JobSupervisor):
+        async def executor(run_id, req, emit_event):
+            emit_event(run_id, "TOOL_CALL_RESULT", {
+                "tool_call_id": "tool-1",
+                "result": "ok",
+                "evidence_refs": [
+                    {"evidence_id": "bad", "kind": "file", "target": "x"},
+                    {"evidence_id": "ev_01JDEADBEEF1234567890", "kind": "ledger", "target": "x"},
+                    {"evidence_id": "ev_01JDEADBEEF1234567891", "kind": "file", "target": "a.py"},
+                ],
+            })
+
+        run = await supervisor.start_run(_make_request(), executor)
+        await asyncio.sleep(0.2)
+
+        receipt = supervisor.store.load_receipt(run.id)
+        assert receipt is not None
+        assert [ref.target for ref in receipt.evidence_refs] == ["a.py"]
 
     def test_respond_hitl_unknown_prompt_raises(self, supervisor: JobSupervisor):
         with pytest.raises(HitlNotFoundError):

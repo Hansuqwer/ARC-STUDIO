@@ -9,6 +9,9 @@ from pathlib import Path
 from typing import Optional
 
 from ..protocol.schemas import RunRecord
+from ..protocol.failure_autopsy import FailureAutopsy
+from ..protocol.run_contract import RunContract
+from ..protocol.run_receipt import RunReceipt
 from .jsonl import JsonlTraceStore
 from .sqlite import SqliteStore
 
@@ -92,6 +95,24 @@ class IndexedTraceStore:
     def trace_path(self, run_id: str) -> Path:
         """Return the trace path used for a run ID (delegates to JSONL store)."""
         return self.jsonl.trace_path(run_id)
+
+    def save_contract(self, contract: RunContract) -> None:
+        self.jsonl.save_contract(contract)
+
+    def load_contract(self, run_id: str) -> Optional[RunContract]:
+        return self.jsonl.load_contract(run_id)
+
+    def save_receipt(self, receipt: RunReceipt) -> None:
+        self.jsonl.save_receipt(receipt)
+
+    def load_receipt(self, run_id: str) -> Optional[RunReceipt]:
+        return self.jsonl.load_receipt(run_id)
+
+    def save_autopsy(self, autopsy: FailureAutopsy) -> None:
+        self.jsonl.save_autopsy(autopsy)
+
+    def load_autopsy(self, run_id: str) -> Optional[FailureAutopsy]:
+        return self.jsonl.load_autopsy(run_id)
 
     def backfill_index(self) -> tuple[int, int, int]:
         """Rebuild SQLite index from existing JSONL traces. Idempotent."""

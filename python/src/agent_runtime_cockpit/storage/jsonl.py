@@ -7,6 +7,9 @@ import threading
 from pathlib import Path
 from typing import Optional
 from ..protocol.schemas import RunRecord
+from ..protocol.failure_autopsy import FailureAutopsy
+from ..protocol.run_contract import RunContract
+from ..protocol.run_receipt import RunReceipt
 
 log = logging.getLogger(__name__)
 DEFAULT_STORE_PATH = Path(".arc") / "traces"
@@ -25,6 +28,47 @@ class JsonlTraceStore:
     def trace_path(self, run_id: str) -> Path:
         """Return the trace path used for a run ID."""
         return self._run_path(run_id)
+
+    def _artifact_path(self, run_id: str, suffix: str) -> Path:
+        return self.base_dir / f"{run_id}.{suffix}.json"
+
+    def _receipt_path(self, run_id: str) -> Path:
+        return self.base_dir.parent / "receipts" / f"{run_id}.receipt.json"
+
+    def save_contract(self, contract: RunContract) -> None:
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        self._artifact_path(str(contract.run_id), "contract").write_text(
+            contract.model_dump_json(indent=2), encoding="utf-8"
+        )
+
+    def load_contract(self, run_id: str) -> Optional[RunContract]:
+        path = self._artifact_path(run_id, "contract")
+        if not path.exists():
+            return None
+        return RunContract.model_validate_json(path.read_text(encoding="utf-8"))
+
+    def save_receipt(self, receipt: RunReceipt) -> None:
+        path = self._receipt_path(receipt.run_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(receipt.model_dump_json(indent=2, by_alias=True), encoding="utf-8")
+
+    def load_receipt(self, run_id: str) -> Optional[RunReceipt]:
+        path = self._receipt_path(run_id)
+        if not path.exists():
+            return None
+        return RunReceipt.model_validate_json(path.read_text(encoding="utf-8"))
+
+    def save_autopsy(self, autopsy: FailureAutopsy) -> None:
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        self._artifact_path(autopsy.run_id, "autopsy").write_text(
+            autopsy.model_dump_json(indent=2, by_alias=True), encoding="utf-8"
+        )
+
+    def load_autopsy(self, run_id: str) -> Optional[FailureAutopsy]:
+        path = self._artifact_path(run_id, "autopsy")
+        if not path.exists():
+            return None
+        return FailureAutopsy.model_validate_json(path.read_text(encoding="utf-8"))
 
     def save(self, run: RunRecord) -> None:
         """Persist a completed RunRecord."""

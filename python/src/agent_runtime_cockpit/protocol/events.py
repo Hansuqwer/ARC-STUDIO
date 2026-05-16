@@ -41,7 +41,7 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
     ),
     "RUN_COMPLETED": EventTypeDef(
         required_fields={"duration_ms"},
-        optional_fields={"output"},
+        optional_fields={"output", "evidence_refs"},
     ),
     "RUN_FAILED": EventTypeDef(
         required_fields={"error"},
@@ -95,11 +95,11 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
     ),
     "TOOL_CALL_RESULT": EventTypeDef(
         required_fields={"tool_call_id", "result"},
-        optional_fields=set(),
+        optional_fields={"evidence_refs"},
     ),
     "TOOL_CALL_ERROR": EventTypeDef(
         required_fields={"tool_call_id", "error"},
-        optional_fields=set(),
+        optional_fields={"evidence_refs"},
     ),
     "TOOL_END": EventTypeDef(
         required_fields={"tool_name", "result"},
@@ -129,7 +129,7 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
     # ── Messages ─────────────────────────────────────────────────────────
     "MESSAGE": EventTypeDef(
         required_fields={"text"},
-        optional_fields={"source", "coalesced"},
+        optional_fields={"source", "coalesced", "evidence_refs"},
     ),
     "MESSAGE_CHUNK": EventTypeDef(
         required_fields={"text"},
@@ -180,6 +180,22 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
     "CUSTOM": EventTypeDef(
         required_fields={"custom_type"},
         optional_fields={"data"},
+    ),
+    "CONTRACT_PROPOSED": EventTypeDef(
+        required_fields={"contract"},
+        optional_fields=set(),
+    ),
+    "RECEIPT_GENERATED": EventTypeDef(
+        required_fields={"receipt"},
+        optional_fields=set(),
+    ),
+    "FAILURE_AUTOPSY_GENERATED": EventTypeDef(
+        required_fields={"autopsy"},
+        optional_fields=set(),
+    ),
+    "EVIDENCE_REF_CREATED": EventTypeDef(
+        required_fields={"evidence_ref"},
+        optional_fields=set(),
     ),
 }
 
