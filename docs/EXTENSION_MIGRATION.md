@@ -71,7 +71,7 @@ After all useful code is ported:
 | C.3 | `arc-runs` | Keep wired until `ArcChatWidget` and `ArcRunDiffWidget` are ported or explicitly parked |
 | C.4 | `arc-workflows` | ✅ Removed from `applications/browser` deps; archive source after browser smoke |
 | C.5 | `arc-event-stream` | ✅ Removed from `applications/browser` deps; archive source after browser smoke |
-| C.6 | `arc-schemas` | Remove from `applications/browser` deps, archive |
+| C.6 | `arc-schemas` | ✅ Removed old-core schema inspector from `applications/browser` deps; archive source after browser smoke |
 | C.7 | `arc-context` | Remove from `applications/browser` deps, archive |
 | C.8 | `arc-settings` | Remove from `applications/browser` deps, archive |
 | C.9 | `arc-health` | Remove from `applications/browser` deps, archive |
@@ -122,6 +122,6 @@ service types are properly represented in `packages/arc-extension` and the Pytho
 | `arc-health` | ⏳ Awaiting port (Phase B) |
 | `arc-product` | 🗑️ DEPRECATED — branding merged into canonical extension |
 | `arc-runs` | ⏳ Partially ported: run timeline is canonical, but chat and run-diff widgets remain only in original; keep wired |
-| `arc-schemas` | ⏳ Awaiting port (Phase B) |
+| `arc-schemas` | ✅ Old-core schema inspector removed from browser app deps; port later only if schema UI returns to release scope |
 | `arc-settings` | ⏳ Awaiting consolidation (Phase B) |
 | `arc-workflows` | ✅ Ported into arc-extension and removed from browser app deps; source still present for rollback until browser smoke |

@@ -83,9 +83,6 @@ importers:
       arc-runs:
         specifier: workspace:*
         version: link:../../theia-extensions/arc-runs
-      arc-schemas:
-        specifier: workspace:*
-        version: link:../../theia-extensions/arc-schemas
       arc-settings:
         specifier: workspace:*
         version: link:../../theia-extensions/arc-settings

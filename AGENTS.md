@@ -339,7 +339,7 @@ Historical details are archived at `docs/archive/handover/REMAINING_ISSUES_PLAN.
 - **R-4 (10 unmerged remote branches)**: 3 may have salvageable work; 7 intentionally parked.
 - **R-5 (.env history scrub)**: Plan documented in `docs/ENV_HISTORY_SCRUB_PLAN.md`; execute only after release date approval.
 - **e2e workflow**: Still in progress.
-- **theia-extensions migration**: PARTIAL — ported widgets exist in arc-extension (arc-adapters-widget, arc-workflow-graph, arc-run-timeline, arc-event-stream); `arc-adapters`, `arc-workflows`, `arc-event-stream`, and static stub `arc-audit` have been removed from `applications/browser/package.json`, while remaining duplicate theia-extensions are still wired. Full migration Phase C continues.
+- **theia-extensions migration**: PARTIAL — ported widgets exist in arc-extension (arc-adapters-widget, arc-workflow-graph, arc-run-timeline, arc-event-stream); `arc-adapters`, `arc-workflows`, `arc-event-stream`, static stub `arc-audit`, and old-core `arc-schemas` have been removed from `applications/browser/package.json`, while remaining duplicate theia-extensions are still wired. Full migration Phase C continues.
 
 ## Related Documentation
 
