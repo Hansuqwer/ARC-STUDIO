@@ -20,6 +20,11 @@ import {
     ConfigStatus,
     SafeConfigUpdate,
     RunLinksResponse,
+    HitlPromptInfo,
+    HitlRespondRequest,
+    AuditChainInfo,
+    ReplayResult,
+    ReplayEvent,
 } from '../../common/arc-protocol';
 
 describe('ArcService Proxy Tests', () => {
@@ -60,6 +65,8 @@ describe('ArcService Proxy Tests', () => {
                 'validateTrace',
                 'detectWorkflows',
                 'listRuntimeCapabilities',
+                'preflightRun',
+                'startRun',
                 'getProviderStatus',
                 'getWorkspaceStatus',
                 'getRunReceipt',
@@ -68,6 +75,10 @@ describe('ArcService Proxy Tests', () => {
                 'getConfigStatus',
                 'saveConfig',
                 'getRunLinks',
+                'listPendingHitlPrompts',
+                'respondHitlPrompt',
+                'getAuditChainInfo',
+                'replayRun',
             ];
 
             const mockService: any = {
@@ -79,6 +90,8 @@ describe('ArcService Proxy Tests', () => {
                 validateTrace: async () => ({}),
                 detectWorkflows: async () => [],
                 listRuntimeCapabilities: async () => ({}),
+                preflightRun: async () => ({}),
+                startRun: async () => ({}),
                 getProviderStatus: async () => ({}),
                 getWorkspaceStatus: async () => ({}),
                 getRunReceipt: async () => ({}),
@@ -87,6 +100,10 @@ describe('ArcService Proxy Tests', () => {
                 getConfigStatus: async () => ({}),
                 saveConfig: async () => ({}),
                 getRunLinks: async () => ({}),
+                listPendingHitlPrompts: async () => [],
+                respondHitlPrompt: async () => ({}),
+                getAuditChainInfo: async () => ({}),
+                replayRun: async () => ({}),
             };
 
             for (const method of requiredMethods) {
@@ -388,6 +405,125 @@ describe('ArcService Proxy Tests', () => {
 
             const result = await mockService.getRunContract('run_no_contract');
             expect(result).toBeNull();
+        });
+
+        // ========== Slice 7: HITL / Audit / Replay ==========
+
+        it('listPendingHitlPrompts should return HitlPromptInfo array', async () => {
+            const mockService = {
+                listPendingHitlPrompts: async (): Promise<HitlPromptInfo[]> => [
+                    {
+                        promptId: 'hitl_01JR6X7ABC123DEF456GHI789',
+                        runId: 'run_01HQ3WNOPQR456STU789VWX012',
+                        prompt: 'Approve write to /etc/config?',
+                        createdAt: '2024-01-01T00:00:00.000Z',
+                        expiresAt: '2024-01-01T01:00:00.000Z',
+                        promptType: 'file_write',
+                        token: 'tok_test',
+                    },
+                ],
+            };
+
+            const prompts = await mockService.listPendingHitlPrompts();
+            expect(Array.isArray(prompts)).toBe(true);
+            expect(prompts.length).toBe(1);
+            expect(prompts[0].promptId).toContain('hitl');
+            expect(prompts[0].prompt).toContain('Approve');
+        });
+
+        it('respondHitlPrompt should return success status', async () => {
+            const mockService = {
+                respondHitlPrompt: async (request: HitlRespondRequest): Promise<{ success: boolean; message: string }> => ({
+                    success: true,
+                    message: `HITL ${request.decision} for ${request.promptId}`,
+                }),
+            };
+
+            const result = await mockService.respondHitlPrompt({
+                promptId: 'hitl_01JR6X7ABC123DEF456GHI789',
+                decision: 'approve',
+                token: 'tok_test',
+            });
+            expect(result.success).toBe(true);
+            expect(result.message).toContain('approve');
+        });
+
+        it('respondHitlPrompt should support reject decision', async () => {
+            const mockService = {
+                respondHitlPrompt: async (request: HitlRespondRequest): Promise<{ success: boolean; message: string }> => ({
+                    success: true,
+                    message: `HITL ${request.decision} for ${request.promptId}`,
+                }),
+            };
+
+            const result = await mockService.respondHitlPrompt({
+                promptId: 'hitl_01JR6X7ABC123DEF456GHI789',
+                decision: 'reject',
+                token: 'tok_test',
+            });
+            expect(result.success).toBe(true);
+            expect(result.message).toContain('reject');
+        });
+
+        it('getAuditChainInfo should return audit info for a run', async () => {
+            const mockService = {
+                getAuditChainInfo: async (runId: string): Promise<AuditChainInfo> => ({
+                    runId,
+                    auditPath: '/home/user/.arc/audit/chain.json',
+                    chainVerified: true,
+                    recordCount: 5,
+                    signature: 'abcd1234efgh5678',
+                    hmacAlgo: 'sha256',
+                }),
+            };
+
+            const info = await mockService.getAuditChainInfo('run_01HQ3WNOPQR456STU789VWX012');
+            expect(info.runId).toBe('run_01HQ3WNOPQR456STU789VWX012');
+            expect(info.chainVerified).toBe(true);
+            expect(info.recordCount).toBe(5);
+            expect(info.hmacAlgo).toBe('sha256');
+        });
+
+        it('getAuditChainInfo should return null when no audit path exists', async () => {
+            const mockService = {
+                getAuditChainInfo: async (_runId: string): Promise<AuditChainInfo | null> => null,
+            };
+
+            const info = await mockService.getAuditChainInfo('run_no_audit');
+            expect(info).toBeNull();
+        });
+
+        it('replayRun should return ReplayResult with events', async () => {
+            const mockService = {
+                replayRun: async (runId: string): Promise<ReplayResult> => ({
+                    runId,
+                    events: [
+                        { type: 'RUN_STARTED', timestamp: '2024-01-01T00:00:00.000Z', runId, sequence: 0, data: { prompt: 'test' } },
+                        { type: 'RUN_COMPLETED', timestamp: '2024-01-01T00:01:00.000Z', runId, sequence: 1, data: { output: 'done' } },
+                    ],
+                    totalEvents: 2,
+                }),
+            };
+
+            const result = await mockService.replayRun('run_01HQ3WNOPQR456STU789VWX012');
+            expect(result.runId).toBe('run_01HQ3WNOPQR456STU789VWX012');
+            expect(result.totalEvents).toBe(2);
+            expect(result.events[0].type).toBe('RUN_STARTED');
+            expect(result.events[1].type).toBe('RUN_COMPLETED');
+        });
+
+        it('replayRun should handle empty event list', async () => {
+            const mockService = {
+                replayRun: async (runId: string): Promise<ReplayResult> => ({
+                    runId,
+                    events: [],
+                    totalEvents: 0,
+                }),
+            };
+
+            const result = await mockService.replayRun('run_empty');
+            expect(result.totalEvents).toBe(0);
+            expect(result.events).toEqual([]);
         });
 
         describe('Protocol Types', () => {

@@ -361,6 +361,59 @@ export interface SafeProviderKeyStatus {
     envOverride?: string;
 }
 
+export type ProviderAuthKind =
+    | 'api_key'
+    | 'bearer_token'
+    | 'oauth_device'
+    | 'oauth_web'
+    | 'web_session'
+    | 'local'
+    | 'research_only';
+
+export type ProviderCatalogStatus =
+    | 'supported'
+    | 'env_ref_only'
+    | 'oauth_planned'
+    | 'research_only'
+    | 'not_recommended';
+
+/**
+ * Provider auth catalog entry. Contains only metadata, never raw credentials.
+ */
+export interface ProviderCatalogEntry {
+    id: string;
+    display_name: string;
+    displayName?: string;
+    category: string;
+    auth_kind: ProviderAuthKind;
+    authKind?: ProviderAuthKind;
+    credential_label: string;
+    credentialLabel?: string;
+    env_key_names: string[];
+    envKeyNames?: string[];
+    default_base_url: string;
+    defaultBaseUrl?: string;
+    docs_url: string;
+    docsUrl?: string;
+    supports_chat: boolean;
+    supports_tools: boolean;
+    supports_embeddings: boolean;
+    supports_images: boolean;
+    supports_web_auth: boolean;
+    status: ProviderCatalogStatus;
+    warnings: string[];
+}
+
+/**
+ * Request to save a provider key reference. envVar is a variable name only.
+ */
+export interface ProviderKeyRefRequest {
+    provider: string;
+    envVar: string;
+    label?: string;
+    model?: string;
+}
+
 /**
  * Workspace trust status for Config tab.
  */
@@ -677,6 +730,67 @@ export interface CapabilitySnapshot {
     timestamp: string;
 }
 
+// ========== HITL (Human-in-the-Loop) ==========
+
+/**
+ * HITL prompt info for IDE display.
+ */
+export interface HitlPromptInfo {
+    promptId: string;
+    runId: string;
+    prompt: string;
+    createdAt: string;
+    expiresAt?: string;
+    promptType?: string;
+    token?: string;
+}
+
+/**
+ * Request to respond to a HITL prompt.
+ */
+export interface HitlRespondRequest {
+    promptId: string;
+    decision: 'approve' | 'reject' | 'modify';
+    response?: string;
+    token: string;
+}
+
+// ========== Audit ==========
+
+/**
+ * Audit chain info for a run.
+ */
+export interface AuditChainInfo {
+    runId: string;
+    auditPath: string;
+    chainVerified: boolean;
+    recordCount: number;
+    signature?: string;
+    hmacAlgo?: string;
+}
+
+// ========== Replay ==========
+
+/**
+ * Replay event from stored trace.
+ */
+export interface ReplayEvent {
+    type: string;
+    timestamp: string;
+    runId: string;
+    sequence: number;
+    data: Record<string, unknown>;
+}
+
+/**
+ * Replay result for a run.
+ */
+export interface ReplayResult {
+    runId: string;
+    events: ReplayEvent[];
+    totalEvents: number;
+}
+
 /**
  * Capability diff produced when runtime capabilities change.
  */
@@ -739,6 +853,54 @@ export interface TraceEventChunk {
     event: TraceEvent;
     /** True when this is the last event in the stream. */
     done: boolean;
+}
+
+// ========== Run Preflight ==========
+
+export interface RunBlocker {
+    code: string;
+    message: string;
+}
+
+export interface RunPreflightRequest {
+    workflow: string;
+    prompt?: string;
+    runtimeId: string;
+    profileId?: string;
+    allowPaidCalls?: boolean;
+    dryRun: true;
+}
+
+export interface RunPreflightResponse {
+    workflow: string;
+    runtime: string;
+    profile?: Record<string, unknown> | null;
+    runnable: boolean;
+    blockers: RunBlocker[];
+    warnings: string[];
+    doctorActions: Array<Record<string, unknown>>;
+    paidCallRequired: boolean;
+    keyRefStatus: Record<string, unknown>;
+    exportTargetStatus: Record<string, unknown>;
+    dependencyStatus: Record<string, unknown>;
+    dryRun: true;
+    providerCall: false;
+}
+
+export interface StartRunRequest {
+    workflow: string;
+    prompt?: string;
+    runtimeId: string;
+    profileId?: string;
+    allowPaidCalls?: boolean;
+}
+
+export interface StartRunResponse {
+    runId: string;
+    status: string;
+    runtime: string;
+    tracePath?: string;
+    metadata: Record<string, unknown>;
 }
 
 // ========== Service Interface ==========
@@ -880,6 +1042,12 @@ export interface ArcService {
      */
     listRuntimeCapabilities(): Promise<RuntimeCapabilitiesResponse>;
 
+    /** Dry-run a runtime launch through the Python CLI. No provider calls are made. */
+    preflightRun(request: RunPreflightRequest): Promise<RunPreflightResponse>;
+
+    /** Start a runtime launch through the Python CLI after explicit user action. */
+    startRun(request: StartRunRequest): Promise<StartRunResponse>;
+
     /**
      * Get provider configuration status.
      * @param provider - Provider ID (e.g. 'openai', 'anthropic')
@@ -909,6 +1077,15 @@ export interface ArcService {
      */
     saveConfig(update: SafeConfigUpdate): Promise<{ success: boolean; message: string }>;
 
+    /** List provider catalog entries. No raw credentials are returned. */
+    getProviderCatalog(): Promise<ProviderCatalogEntry[]>;
+
+    /** Save an env-var provider key reference. Rejects raw key material. */
+    setProviderKeyRef(request: ProviderKeyRefRequest): Promise<{ success: boolean; message: string }>;
+
+    /** Remove an env-var provider key reference by provider id or account id. */
+    unsetProviderKeyRef(providerOrAccountId: string): Promise<{ success: boolean; message: string }>;
+
     // ========== Run Links Methods (Session B7) ==========
 
     /**
@@ -934,6 +1111,36 @@ export interface ArcService {
      * Get the run contract for a run. Returns null if no contract exists.
      */
     getRunContract(runId: string): Promise<RunContract | null>;
+
+    // ========== HITL Methods (Slice 7) ==========
+
+    /**
+     * List pending HITL prompts that need user response.
+     * Calls `arc hitl pending --json` via the Python CLI.
+     */
+    listPendingHitlPrompts(): Promise<HitlPromptInfo[]>;
+
+    /**
+     * Respond to a HITL prompt with approve/reject/modify.
+     * Calls `arc hitl respond <promptId> --decision <decision> --json` via the Python CLI.
+     */
+    respondHitlPrompt(request: HitlRespondRequest): Promise<{ success: boolean; message: string }>;
+
+    // ========== Audit Methods (Slice 7) ==========
+
+    /**
+     * Get audit chain info for a run.
+     * Calls `arc audit verify <auditPath> --json` via the Python CLI.
+     */
+    getAuditChainInfo(runId: string): Promise<AuditChainInfo | null>;
+
+    // ========== Replay Methods (Slice 7) ==========
+
+    /**
+     * Replay stored trace events for a run.
+     * Calls `arc runs replay <runId> --json` via the Python CLI.
+     */
+    replayRun(runId: string): Promise<ReplayResult>;
 
     // ========== Capability Diff (Session B) ==========
 

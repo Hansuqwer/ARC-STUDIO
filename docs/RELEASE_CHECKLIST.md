@@ -95,7 +95,7 @@ bash scripts/check-banned-claims.sh README.md docs/IMPLEMENTATION_PLAN.md docs/R
 
 **Status:** ✅ Passing locally (2026-05-15)
 
-Latest local run: `550 passed, 10 skipped`. Real LangGraph graph execution is covered by the opt-in smoke path because dependency shape differs across platforms.
+Latest local run: `782 passed, 14 skipped`. Real-runtime smoke paths are opt-in because dependency shape and provider availability differ across platforms.
 
 **Check:**
 ```bash
@@ -109,7 +109,7 @@ cd python && uv run pytest -q -W error
 
 **Status:** ✅ Passing locally (2026-05-15)
 
-Latest local run: `270 passed`. Jest reports an open-handle notice after completion; tests still exit successfully.
+Latest local run: `563 passed, 9 suites`. Jest reports an open-handle notice after completion; tests still exit successfully.
 
 **Check:**
 ```bash

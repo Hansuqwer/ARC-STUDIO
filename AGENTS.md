@@ -139,7 +139,7 @@ cd python && uv run pytest tests/web/ --log-cli-level=DEBUG -s  # Web tests with
 - Framework: Jest with ts-jest
 - Environment: Node (for backend), source-pattern matching (for UI components)
 - Coverage: 61.84% statements, 67.34% branches, 53.78% functions, 63.18% lines
-- Total tests: 523 arc-extension (9 suites) + 772 Python + 11 arc-ag-ui
+- Total tests: 563 arc-extension (9 suites) + 782 passed / 14 skipped Python + 11 arc-ag-ui
 - Location: `packages/arc-extension/jest.config.js`
 
 ## Architecture Decisions
@@ -168,7 +168,7 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - Note: `pnpm lint` delegates to per-package scripts; root eslint config not yet wired into workspace lint command. Prettier not installed as a root dependency — `format`/`format:check` scripts need proper wiring as a separate task.
 
 ### P1-7: Test Coverage
-- 284 new tests beyond baseline (523 arc-extension tests across 9 suites; 772 Python tests)
+- arc-extension grew from 239 to 563 tests; Python now has 782 passed, 14 skipped
 - UI components tested via source-pattern contract tests (NOT runtime jsdom tests)
 - Backend services tested with Jest unit tests
 - Branch coverage improved from 57.51% → 67.34%
@@ -276,6 +276,7 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 ### Completed (P2 — Runtime + SwarmGraph Integrations)
 - ✅ **Prompt optimizer foundation**: `optimizer/local.py` with rule-based prompt structuring, `arc prompt optimize/diff` CLI; optional `tiktoken>=0.12`
 - ✅ **Adoption runners**: LangGraph (SwarmGraph queen/consensus), AG2, CrewAI, OpenAI Agents, LlamaIndex — all with fake-tested paths, real deps gated
+- ✅ **CrewAI + SwarmGraph fake/offline CLI path**: `arc run --runtime crewai+swarmgraph` uses fake CrewAI adoption with trace events and `real_provider_call=false`; real provider-backed adoption remains gated/not claimed
 - ✅ **HMAC audit**: `audit/key_manager.py`, `audit/hmac_chain.py`, `audit/hitl.py`, CLI `arc audit verify/export/key *`
 - ✅ **Trust enforcement**: `ensure_trusted()` blocks untrusted workspaces before run record creation
 - ✅ **HITL supervisor flow**: event types `HITL_PROMPT`, `HITL_RESPONSE`, `HITL_TIMEOUT`; `JobSupervisor.request_hitl()`, `respond_hitl()`, `pending_hitl()`
@@ -284,7 +285,8 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 
 ### Completed (P3 — Theia UX Productization)
 - ✅ **Theia UI ports**: workflow graph, run timeline, event stream, adapters widgets into canonical `packages/arc-extension`
-- ✅ **Product config CLI**: `arc profiles list/show`, `arc workspace init/info/config`, `arc providers quota show/reset`
+- ✅ **Product config CLI**: `arc profiles list/show/create`, `arc run --dry-run`, `arc workspace init/info/config`, `arc providers quota show/reset`
+- ✅ **IDE run preflight/launch basics**: modern ChatTab exposes runtime/profile selectors, `crewai+swarmgraph` fake/offline preflight, and explicit fake/offline run launch via backend CLI bridge
 - ✅ **Eval/observability CLI**: `arc runs search` (SQLite index), `arc doctor env/network/storage`, `arc bug-report`
 - ✅ **Docker-compatible isolation**: `DockerIsolationProvider` with OrbStack/Podman/Colima detection; `arc isolation setup/test`; optional `docker>=7.1`; 13 Docker tests
 
@@ -317,9 +319,16 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 - Total frontend entrypoint ~28.8 MiB (Monaco + Theia core + React + vendors); ARC Studio code chunk is 50 KiB
 
 ### Test Metrics
-- Python: 772 passed, 10 skipped (was 435 before P2/P3/P4/P5 work)
+- Python: 782 passed, 14 skipped (was 435 before P2/P3/P4/P5 work)
 - TypeScript protocol build: clean
-- arc-extension build: clean
+- arc-extension build/test: clean (563 tests, 9 suites)
+
+### Slice 7 — HITL/Audit/Replay UX Hardening (Completed)
+- ✅ **Protocol types**: Added `HitlPromptInfo`, `HitlRespondRequest`, `AuditChainInfo`, `ReplayResult`, `ReplayEvent` to `arc-protocol.ts`
+- ✅ **Service methods**: Added `listPendingHitlPrompts()`, `respondHitlPrompt()`, `getAuditChainInfo()`, `replayRun()` to `ArcService` interface and `ArcBackendService` implementation
+- ✅ **RunsTab enhancements**: Added audit chain verification button + info display, replay events button + event list view, HITL pending prompts listing with approve/reject buttons in header
+- ✅ **Tests**: 11+ new proxy/contract tests covering HITL, audit, and replay protocol types and backend methods
+- ✅ **Backend wiring**: All new methods call Python CLI (`arc hitl pending/respond`, `arc runs status`, `arc audit verify`, `arc runs replay`) following existing `execFileSync` pattern with env filtering
 
 ### Remaining Issues
 Historical details are archived at `docs/archive/handover/REMAINING_ISSUES_PLAN.md`. Current summary:

@@ -78,6 +78,31 @@ describe('Protocol Extensions (Session B + B7)', () => {
         it('should have saveConfig method on ArcService', () => {
             expect(source).toMatch(/saveConfig\(update:\s*SafeConfigUpdate\)/);
         });
+
+        it('should export provider catalog and key-ref protocol types', () => {
+            expect(source).toMatch(/export interface ProviderCatalogEntry/);
+            expect(source).toMatch(/export interface ProviderKeyRefRequest/);
+            expect(source).toMatch(/ProviderAuthKind/);
+        });
+
+        it('should expose provider catalog and key-ref service methods', () => {
+            expect(source).toMatch(/getProviderCatalog\(\):\s*Promise<ProviderCatalogEntry\[\]>/);
+            expect(source).toMatch(/setProviderKeyRef\(request:\s*ProviderKeyRefRequest\)/);
+            expect(source).toMatch(/unsetProviderKeyRef\(providerOrAccountId:\s*string\)/);
+        });
+
+        it('should export run preflight protocol types', () => {
+            expect(source).toMatch(/export interface RunPreflightRequest/);
+            expect(source).toMatch(/export interface RunPreflightResponse/);
+            expect(source).toMatch(/export interface RunBlocker/);
+            expect(source).toMatch(/export interface StartRunRequest/);
+            expect(source).toMatch(/export interface StartRunResponse/);
+        });
+
+        it('should expose preflightRun service method', () => {
+            expect(source).toMatch(/preflightRun\(request:\s*RunPreflightRequest\):\s*Promise<RunPreflightResponse>/);
+            expect(source).toMatch(/startRun\(request:\s*StartRunRequest\):\s*Promise<StartRunResponse>/);
+        });
     });
 
     describe('Run Links Types (Session B7)', () => {
@@ -111,6 +136,59 @@ describe('Protocol Extensions (Session B + B7)', () => {
 
         it('should have getRunLinks method on ArcService', () => {
             expect(source).toMatch(/getRunLinks\(runId:\s*string/);
+        });
+    });
+
+    describe('HITL/Audit/Replay Types (Slice 7)', () => {
+        it('should export HitlPromptInfo', () => {
+            expect(source).toMatch(/export interface HitlPromptInfo/);
+        });
+
+        it('should have HitlPromptInfo with promptId, runId, prompt fields', () => {
+            expect(source).toMatch(/HitlPromptInfo/);
+            expect(source).toMatch(/promptId:\s*string/);
+            expect(source).toMatch(/runId:\s*string/);
+            expect(source).toMatch(/prompt:\s*string/);
+        });
+
+        it('should export HitlRespondRequest', () => {
+            expect(source).toMatch(/export interface HitlRespondRequest/);
+        });
+
+        it('should have HitlRespondRequest with promptId and decision', () => {
+            expect(source).toMatch(/HitlRespondRequest/);
+            expect(source).toMatch(/promptId:\s*string/);
+            expect(source).toMatch(/decision:\s*'approve'\s*\|\s*'reject'\s*\|\s*'modify'/);
+            expect(source).toMatch(/token:\s*string/);
+        });
+
+        it('should export AuditChainInfo', () => {
+            expect(source).toMatch(/export interface AuditChainInfo/);
+        });
+
+        it('should have AuditChainInfo with chainVerified, recordCount, signature', () => {
+            expect(source).toMatch(/AuditChainInfo/);
+            expect(source).toMatch(/chainVerified:\s*boolean/);
+            expect(source).toMatch(/recordCount:\s*number/);
+            expect(source).toMatch(/signature/);
+        });
+
+        it('should export ReplayResult', () => {
+            expect(source).toMatch(/export interface ReplayResult/);
+        });
+
+        it('should have ReplayResult with runId, events, totalEvents', () => {
+            expect(source).toMatch(/ReplayResult/);
+            expect(source).toMatch(/runId:\s*string/);
+            expect(source).toMatch(/events:\s*ReplayEvent\[\]/);
+            expect(source).toMatch(/totalEvents:\s*number/);
+        });
+
+        it('should have ArcService HITL/audit/replay methods', () => {
+            expect(source).toMatch(/listPendingHitlPrompts\(\):\s*Promise<HitlPromptInfo\[\]>/);
+            expect(source).toMatch(/respondHitlPrompt\(request:\s*HitlRespondRequest\)/);
+            expect(source).toMatch(/getAuditChainInfo\(runId:\s*string\)/);
+            expect(source).toMatch(/replayRun\(runId:\s*string\):\s*Promise<ReplayResult>/);
         });
     });
 
@@ -163,6 +241,23 @@ describe('Backend Service Extensions (Session B + B7)', () => {
             expect(source).not.toMatch(/rawKey/);
             expect(source).not.toMatch(/rawApiKey/);
         });
+
+        it('should call provider catalog and key-ref CLI commands', () => {
+            expect(source).toMatch(/providers.*catalog.*--json/);
+            expect(source).toMatch(/providers.*key.*set/);
+            expect(source).toMatch(/providers.*key.*unset/);
+        });
+
+        it('should implement dry-run preflight via CLI without provider calls', () => {
+            expect(source).toMatch(/async preflightRun\(request:\s*RunPreflightRequest\)/);
+            expect(source).toMatch(/--dry-run/);
+            expect(source).toMatch(/providerCall:\s*false/);
+        });
+
+        it('should implement startRun via CLI JSON output', () => {
+            expect(source).toMatch(/async startRun\(request:\s*StartRunRequest\)/);
+            expect(source).toMatch(/tracePath:\s*data\.metadata\?\.trace_path/);
+        });
     });
 
     describe('Run links methods', () => {
@@ -198,6 +293,61 @@ describe('Backend Service Extensions (Session B + B7)', () => {
 
         it('should import RunLinksResponse', () => {
             expect(source).toMatch(/RunLinksResponse/);
+        });
+
+        it('should import HitlPromptInfo, HitlRespondRequest, AuditChainInfo, ReplayResult', () => {
+            expect(source).toMatch(/HitlPromptInfo/);
+            expect(source).toMatch(/HitlRespondRequest/);
+            expect(source).toMatch(/AuditChainInfo/);
+            expect(source).toMatch(/ReplayResult/);
+            expect(source).toMatch(/ReplayEvent/);
+        });
+    });
+
+    describe('HITL/Audit/Replay methods', () => {
+        it('should implement listPendingHitlPrompts', () => {
+            expect(source).toMatch(/async listPendingHitlPrompts\(\)/);
+        });
+
+        it('should call arc hitl pending CLI', () => {
+            expect(source).toMatch(/hitl.*pending.*--json/);
+        });
+
+        it('should implement respondHitlPrompt', () => {
+            expect(source).toMatch(/async respondHitlPrompt\(request:\s*HitlRespondRequest\)/);
+        });
+
+        it('should call arc hitl respond CLI', () => {
+            expect(source).toMatch(/hitl/);
+            expect(source).toMatch(/respond/);
+            expect(source).toMatch(/--token/);
+        });
+
+        it('should implement getAuditChainInfo', () => {
+            expect(source).toMatch(/async getAuditChainInfo\(runId:\s*string\)/);
+        });
+
+        it('should call arc runs status to get audit path', () => {
+            expect(source).toMatch(/runs.*status/);
+            expect(source).toMatch(/audit_path/);
+        });
+
+        it('should call arc audit verify CLI', () => {
+            expect(source).toMatch(/audit.*verify/);
+            expect(source).toMatch(/--chain/);
+        });
+
+        it('should implement replayRun', () => {
+            expect(source).toMatch(/async replayRun\(runId:\s*string\)/);
+        });
+
+        it('should call arc runs replay CLI', () => {
+            expect(source).toMatch(/runs.*replay.*--json/);
+        });
+
+        it('should map Python snake_case to camelCase for replay events', () => {
+            expect(source).toMatch(/run_id/);
+            expect(source).toMatch(/runId/);
         });
     });
 });

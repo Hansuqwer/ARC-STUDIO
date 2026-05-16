@@ -33,12 +33,23 @@ import {
     SafeProviderKeyStatus,
     SafeRuntimeConfig,
     TrustStatus,
+    ProviderCatalogEntry,
+    ProviderKeyRefRequest,
+    RunPreflightRequest,
+    RunPreflightResponse,
+    StartRunRequest,
+    StartRunResponse,
     RunLinksResponse,
     RunReceipt,
     FailureAutopsy,
     RunContract,
     CapabilityDiffResponse,
     CapabilityDiff,
+    HitlPromptInfo,
+    HitlRespondRequest,
+    AuditChainInfo,
+    ReplayResult,
+    ReplayEvent,
 } from '../common/arc-protocol';
 import { validateWorkspaceRoot, validateTraceId, validateRunId } from './security-utils';
 import { WorkflowExecutor } from './services/workflow-executor';
@@ -328,6 +339,107 @@ export class ArcBackendService implements ArcService {
         }
     }
 
+    async preflightRun(request: RunPreflightRequest): Promise<RunPreflightResponse> {
+        try {
+            const args = [
+                'run',
+                request.workflow || 'crew.py',
+                '--runtime',
+                request.runtimeId,
+                '--profile-id',
+                request.profileId || 'local-safe',
+                '--workspace',
+                this.workspaceRoot,
+                '--dry-run',
+                '--json',
+            ];
+            if (request.prompt) {
+                args.push('--prompt', request.prompt);
+            }
+            if (request.allowPaidCalls) {
+                args.push('--allow-paid-calls');
+            }
+            const output = execFileSync('arc', args, {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            if (!parsed.ok || !parsed.data) {
+                throw new ArcError(ArcErrorCode.EXECUTION_FAILED, parsed?.error?.message || 'Preflight failed');
+            }
+            const data = parsed.data;
+            return {
+                workflow: data.workflow,
+                runtime: data.runtime,
+                profile: data.profile,
+                runnable: Boolean(data.runnable),
+                blockers: data.blockers || [],
+                warnings: data.warnings || [],
+                doctorActions: data.doctor_actions || data.doctorActions || [],
+                paidCallRequired: Boolean(data.paid_call_required),
+                keyRefStatus: data.key_ref_status || {},
+                exportTargetStatus: data.export_target_status || {},
+                dependencyStatus: data.dependency_status || {},
+                dryRun: true,
+                providerCall: false,
+            };
+        } catch (error) {
+            if (error instanceof ArcError) throw error;
+            throw new ArcError(
+                ArcErrorCode.EXECUTION_FAILED,
+                `Failed to preflight run: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+        }
+    }
+
+    async startRun(request: StartRunRequest): Promise<StartRunResponse> {
+        try {
+            const args = [
+                'run',
+                request.workflow || 'crew.py',
+                '--runtime',
+                request.runtimeId,
+                '--profile-id',
+                request.profileId || 'local-safe',
+                '--workspace',
+                this.workspaceRoot,
+                '--json',
+            ];
+            if (request.prompt) {
+                args.push('--prompt', request.prompt);
+            }
+            if (request.allowPaidCalls) {
+                args.push('--allow-paid-calls');
+            }
+            const output = execFileSync('arc', args, {
+                timeout: 120000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            if (!parsed.ok || !parsed.data) {
+                throw new ArcError(ArcErrorCode.EXECUTION_FAILED, parsed?.error?.message || 'Run failed');
+            }
+            const data = parsed.data;
+            return {
+                runId: data.id,
+                status: data.status,
+                runtime: data.runtime,
+                tracePath: data.metadata?.trace_path,
+                metadata: data.metadata || {},
+            };
+        } catch (error) {
+            if (error instanceof ArcError) throw error;
+            throw new ArcError(
+                ArcErrorCode.EXECUTION_FAILED,
+                `Failed to start run: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+        }
+    }
+
     /**
      * Get provider configuration status by calling the Python CLI.
      */
@@ -530,6 +642,58 @@ export class ArcBackendService implements ArcService {
         }
     }
 
+    async getProviderCatalog(): Promise<ProviderCatalogEntry[]> {
+        const output = execFileSync('arc', ['providers', 'catalog', '--json'], {
+            timeout: 10000,
+            encoding: 'utf-8',
+            windowsHide: true,
+            env: buildArcCliEnv(),
+        });
+        const parsed = JSON.parse(output);
+        if (parsed.ok && Array.isArray(parsed.data)) {
+            return parsed.data.map((p: any) => ({
+                ...p,
+                displayName: p.display_name,
+                authKind: p.auth_kind,
+                credentialLabel: p.credential_label,
+                envKeyNames: p.env_key_names,
+                defaultBaseUrl: p.default_base_url,
+                docsUrl: p.docs_url,
+            })) as ProviderCatalogEntry[];
+        }
+        return [];
+    }
+
+    async setProviderKeyRef(request: ProviderKeyRefRequest): Promise<{ success: boolean; message: string }> {
+        if (/sk-|bearer\s+|token[:=]|api[_-]?key[:=]/i.test(request.envVar)) {
+            return { success: false, message: 'Rejected raw key material. Enter an environment variable name only.' };
+        }
+        const args = ['providers', 'key', 'set', request.provider, '--env', request.envVar, '--json'];
+        if (request.label) {
+            args.push('--label', request.label);
+        }
+        if (request.model) {
+            args.push('--model', request.model);
+        }
+        execFileSync('arc', args, {
+            timeout: 10000,
+            encoding: 'utf-8',
+            windowsHide: true,
+            env: buildArcCliEnv(),
+        });
+        return { success: true, message: `Saved ${request.provider} key reference (${request.envVar}).` };
+    }
+
+    async unsetProviderKeyRef(providerOrAccountId: string): Promise<{ success: boolean; message: string }> {
+        execFileSync('arc', ['providers', 'key', 'unset', providerOrAccountId, '--json'], {
+            timeout: 10000,
+            encoding: 'utf-8',
+            windowsHide: true,
+            env: buildArcCliEnv(),
+        });
+        return { success: true, message: `Removed provider key reference: ${providerOrAccountId}.` };
+    }
+
     // ========== Run Links Methods (Session B7) ==========
 
     /**
@@ -648,6 +812,174 @@ export class ArcBackendService implements ArcService {
         }
     }
 
+    // ========== HITL Methods (Slice 7) ==========
+
+    /**
+     * List pending HITL prompts by calling the Python CLI.
+     */
+    async listPendingHitlPrompts(): Promise<HitlPromptInfo[]> {
+        try {
+            const output = execFileSync('arc', ['hitl', 'pending', '--workspace', this.workspaceRoot, '--json'], {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            if (parsed.ok && Array.isArray(parsed.data)) {
+                return parsed.data.map((p: any) => ({
+                    promptId: p.hitl_id || p.prompt_id || p.promptId,
+                    runId: p.run_id || p.runId,
+                    prompt: p.prompt_text || p.prompt || '',
+                    createdAt: p.created_at || p.createdAt || '',
+                    expiresAt: p.expires_at || p.expiresAt,
+                    promptType: p.prompt_type || p.promptType,
+                    token: p.token,
+                })) as HitlPromptInfo[];
+            }
+            return [];
+        } catch (error) {
+            throw new ArcError(
+                ArcErrorCode.EXECUTION_FAILED,
+                `Failed to list HITL prompts: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+        }
+    }
+
+    /**
+     * Respond to a HITL prompt by calling the Python CLI.
+     */
+    async respondHitlPrompt(request: HitlRespondRequest): Promise<{ success: boolean; message: string }> {
+        try {
+            const args = [
+                'hitl',
+                'respond',
+                request.promptId,
+                '--decision',
+                request.decision,
+                '--token',
+                request.token,
+                '--workspace',
+                this.workspaceRoot,
+                '--json',
+            ];
+            if (request.response) {
+                args.push('--notes', request.response);
+            }
+            const output = execFileSync('arc', args, {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            if (parsed.ok) {
+                return { success: true, message: parsed.data?.message || `HITL ${request.decision} for ${request.promptId}` };
+            }
+            throw new ArcError(
+                ArcErrorCode.EXECUTION_FAILED,
+                parsed?.error?.message || 'HITL respond failed',
+            );
+        } catch (error) {
+            if (error instanceof ArcError) throw error;
+            throw new ArcError(
+                ArcErrorCode.EXECUTION_FAILED,
+                `Failed to respond to HITL prompt: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+        }
+    }
+
+    // ========== Audit Methods (Slice 7) ==========
+
+    /**
+     * Get audit chain info for a run by calling the Python CLI.
+     */
+    async getAuditChainInfo(runId: string): Promise<AuditChainInfo | null> {
+        try {
+            // First check if there's an audit path for this run
+            const traceOutput = execFileSync('arc', ['runs', 'status', runId, '--workspace', this.workspaceRoot, '--json'], {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const traceParsed = JSON.parse(traceOutput);
+            const auditPath = traceParsed?.data?.audit_path || traceParsed?.data?.auditPath;
+
+            if (!auditPath) {
+                return null;
+            }
+
+            const output = execFileSync('arc', ['audit', 'verify', runId, '--chain', auditPath, '--json'], {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            if (parsed.ok && parsed.data) {
+                const data = parsed.data;
+                return {
+                    runId,
+                    auditPath,
+                    chainVerified: Boolean(data.chain_verified ?? data.verified),
+                    recordCount: data.record_count ?? data.recordCount ?? this.extractAuditRecordCount(data.reason),
+                    signature: data.signature || undefined,
+                    hmacAlgo: data.hmac_algo || data.hmacAlgo || 'sha256',
+                } as AuditChainInfo;
+            }
+            return null;
+        } catch (error) {
+            if (error instanceof ArcError) throw error;
+            throw new ArcError(
+                ArcErrorCode.EXECUTION_FAILED,
+                `Failed to get audit chain info: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+        }
+    }
+
+    // ========== Replay Methods (Slice 7) ==========
+
+    /**
+     * Replay stored trace events for a run by calling the Python CLI.
+     */
+    async replayRun(runId: string): Promise<ReplayResult> {
+        try {
+            const output = execFileSync('arc', ['runs', 'replay', runId, '--workspace', this.workspaceRoot, '--json'], {
+                timeout: 30000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            if (parsed.ok && parsed.data) {
+                const data = parsed.data;
+                const events: ReplayEvent[] = (data.events || []).map((ev: any) => ({
+                    type: ev.type || 'UNKNOWN',
+                    timestamp: ev.timestamp || '',
+                    runId: ev.run_id || ev.runId || runId,
+                    sequence: ev.sequence ?? 0,
+                    data: ev.data || {},
+                }));
+                return {
+                    runId,
+                    events,
+                    totalEvents: events.length,
+                };
+            }
+            throw new ArcError(
+                ArcErrorCode.UNKNOWN,
+                parsed?.error?.message || 'CLI returned no data for replay',
+            );
+        } catch (error) {
+            if (error instanceof ArcError) throw error;
+            throw new ArcError(
+                ArcErrorCode.EXECUTION_FAILED,
+                `Failed to replay run: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+        }
+    }
+
     // ========== Capability Diff (Session B) ==========
 
     /**
@@ -729,5 +1061,13 @@ export class ArcBackendService implements ArcService {
     private async readFileContent(filePath: string): Promise<string> {
         const fs = await import('fs-extra');
         return fs.readFile(filePath, 'utf-8');
+    }
+
+    private extractAuditRecordCount(reason?: string): number {
+        if (!reason) {
+            return 0;
+        }
+        const match = reason.match(/verified\s+(\d+)\s+records?/i);
+        return match ? Number(match[1]) : 0;
     }
 }

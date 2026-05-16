@@ -23,6 +23,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from typing import Optional
+import os
 
 import typer
 from rich.console import Console
@@ -94,6 +95,95 @@ def _out(envelope: ArcEnvelope, as_json: bool) -> None:
             err_console.print(f"[red]Error [{envelope.error.code}]: {envelope.error.message}[/red]")
         else:
             rprint(JSON(envelope.model_dump_json()))
+
+
+def _profile_payload(profile) -> dict[str, object]:
+    return {
+        "id": profile.id,
+        "name": profile.name,
+        "allow_paid_calls": profile.allow_paid_calls,
+        "allow_network": profile.allow_network,
+        "allow_shell": profile.allow_shell,
+        "allow_secrets": profile.allow_secrets,
+        "env_allowlist": list(profile.env_allowlist),
+        "backend": profile.backend.value,
+    }
+
+
+def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str, allow_paid_calls: bool) -> dict[str, object]:
+    from .adoption.registry import AdoptionRegistry
+    from .security.profiles import ProfileNotFound, enforce_profile, resolve_profile_strict
+
+    blockers: list[dict[str, str]] = []
+    warnings: list[str] = []
+    doctor_actions: list[dict[str, str]] = []
+    profile_payload: dict[str, object] | None = None
+    paid_required = runtime == "crewai"
+
+    try:
+        profile = resolve_profile_strict(profile_id)
+        profile_payload = _profile_payload(profile)
+    except ProfileNotFound:
+        blockers.append({"code": "UNKNOWN_PROFILE", "message": f"Profile '{profile_id}' does not exist"})
+        profile = None
+
+    if profile is not None:
+        try:
+            enforce_profile(profile, runtime)
+        except GatingError as exc:
+            blockers.append({"code": "PROFILE_BLOCKED", "message": str(exc)})
+        if paid_required and not profile.allow_paid_calls:
+            blockers.append({"code": "PAID_PROFILE_REQUIRED", "message": f"Runtime '{runtime}' requires a profile with paid calls enabled"})
+        if paid_required and not allow_paid_calls:
+            blockers.append({"code": "PAID_FLAG_REQUIRED", "message": "Pass --allow-paid-calls after selecting a paid profile"})
+
+    key_ref_status = {"provider": "openai", "env": "OPENAI_API_KEY", "present": bool(os.environ.get("OPENAI_API_KEY"))}
+    dependency_status: dict[str, object] = {}
+    export_target_status: dict[str, object] = {}
+
+    if runtime == "crewai+swarmgraph":
+        base_runtime, adoption_mode = AdoptionRegistry.parse_runtime_id(runtime)
+        capability = next((cap for cap in AdoptionRegistry.list_capabilities(workspace) if cap.mode == adoption_mode), None)
+        dependency_status = {
+            "crewai": capability.status.value if capability else "unknown",
+            "adoption_runner": bool(capability),
+        }
+        if capability:
+            warnings.append("CrewAI + SwarmGraph is fake/offline only; no real provider calls or HMAC audit claims.")
+            doctor_actions.extend(capability.doctor_actions)
+        export_target = os.environ.get("ARC_CREWAI_EXPORT")
+        export_target_status = {"env": "ARC_CREWAI_EXPORT", "present": bool(export_target), "format": "module:attr"}
+        if not export_target:
+            blockers.append({"code": "MISSING_CREWAI_EXPORT", "message": "Set ARC_CREWAI_EXPORT=module:attr for CrewAI export discovery"})
+        elif ":" not in export_target:
+            blockers.append({"code": "INVALID_CREWAI_EXPORT", "message": "ARC_CREWAI_EXPORT must use module:attr format"})
+        dependency_status["runtime_mode"] = "fake/offline"
+    else:
+        try:
+            requested_runtime = [part.strip().lower() for part in runtime.split(",") if part.strip()] if "," in runtime else runtime.lower()
+            routed = runtime_router.resolve(workspace, requested_runtime, allow_paid_calls=allow_paid_calls)
+            report = routed.report
+            dependency_status = {"availability": report.availability, "detected": report.detected, "can_run": report.can_run}
+            if report.requires_paid_calls and not allow_paid_calls:
+                blockers.append({"code": "PAID_FLAG_REQUIRED", "message": f"Runtime '{runtime}' requires --allow-paid-calls"})
+        except runtime_router.RuntimeRouterError as exc:
+            blockers.append({"code": exc.code, "message": str(exc)})
+
+    return {
+        "workflow": workflow,
+        "runtime": runtime,
+        "profile": profile_payload,
+        "runnable": not blockers,
+        "blockers": blockers,
+        "warnings": warnings,
+        "doctor_actions": doctor_actions,
+        "paid_call_required": paid_required,
+        "key_ref_status": key_ref_status,
+        "export_target_status": export_target_status,
+        "dependency_status": dependency_status,
+        "dry_run": True,
+        "provider_call": False,
+    }
 
 
 def check_swarmgraph_runtime(timeout: float = 5.0) -> dict[str, object]:
@@ -466,13 +556,28 @@ def run_workflow(
     prompt: Optional[str] = typer.Option(None, "--prompt", help="Prompt passed to runnable adapters"),
     allow_paid_calls: bool = typer.Option(False, "--allow-paid-calls", help="Allow runtimes to make provider calls"),
     profile_id: str = typer.Option("local-safe", "--profile-id", help="Run profile ID"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Inspect run readiness without executing adapters"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
     """Execute a workflow and return the run record."""
     import asyncio
+    from .security.profiles import ProfileNotFound, enforce_profile, resolve_profile_strict
     _setup_logging(debug)
     ws = _workspace(workspace)
+    if dry_run:
+        payload = _run_preflight(ws, workflow, runtime.lower(), profile_id, allow_paid_calls)
+        _out(ok(payload), json_output)
+        return
+    try:
+        profile = resolve_profile_strict(profile_id)
+        enforce_profile(profile, runtime.lower())
+    except ProfileNotFound:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Profile '{profile_id}' does not exist", details={"code": "UNKNOWN_PROFILE"}), json_output)
+        raise typer.Exit(2)
+    except GatingError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "PROFILE_BLOCKED"}), json_output)
+        raise typer.Exit(2)
     try:
         requested_runtime = [part.strip().lower() for part in runtime.split(",") if part.strip()] if "," in runtime else runtime.lower()
         routed = runtime_router.resolve(ws, requested_runtime, allow_paid_calls=allow_paid_calls)
@@ -521,6 +626,14 @@ app.add_typer(providers_app)
 @providers_app.command("list")
 def providers_list(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
     """List built-in provider definitions. No network calls are made."""
+    _setup_logging(debug)
+    from .providers import PROVIDERS
+    _out(ok([provider.model_dump() for provider in PROVIDERS]), json_output)
+
+
+@providers_app.command("catalog")
+def providers_catalog(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
+    """List provider auth catalog entries. No secrets or network calls."""
     _setup_logging(debug)
     from .providers import PROVIDERS
     _out(ok([provider.model_dump() for provider in PROVIDERS]), json_output)
@@ -887,6 +1000,86 @@ def providers_proxy(
 
 accounts_app = typer.Typer(name="accounts", help="Provider account metadata")
 providers_app.add_typer(accounts_app)
+
+key_app = typer.Typer(name="key", help="Provider key references (env vars only)")
+providers_app.add_typer(key_app)
+
+
+@key_app.command("status")
+def providers_key_status(
+    provider: Optional[str] = typer.Argument(None, help="Provider id filter"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show provider key status from env vars and saved env-ref accounts."""
+    import os
+    _setup_logging(debug)
+    from .providers import PROVIDERS, ProviderAccountStore, provider_statuses
+    env_status = {status.provider: status.model_dump() for status in provider_statuses(os.environ)}
+    accounts = ProviderAccountStore().list_accounts()
+    entries = []
+    for definition in PROVIDERS:
+        if provider and definition.id != provider:
+            continue
+        matching_accounts = [a for a in accounts if a.provider == definition.id]
+        status = env_status.get(definition.id, {})
+        entries.append({
+            "provider": definition.id,
+            "display_name": definition.display_name,
+            "auth_kind": definition.auth_kind.value,
+            "credential_label": definition.credential_label,
+            "status": definition.status,
+            "configured": bool(status.get("api_key_configured")) or any(a.enabled for a in matching_accounts) or definition.auth_kind.value == "local",
+            "source": status.get("api_key_source") and "env" or ("account_ref" if matching_accounts else ("local" if definition.auth_kind.value == "local" else "unset")),
+            "env_key_names": definition.env_key_names,
+            "accounts": [a.model_dump() for a in matching_accounts],
+            "warnings": definition.warnings,
+        })
+    _out(ok(entries), json_output)
+
+
+@key_app.command("set")
+def providers_key_set(
+    provider: str = typer.Argument(..., help="Provider id"),
+    env_var: str = typer.Option(..., "--env", help="Environment variable containing the key"),
+    label: Optional[str] = typer.Option(None, "--label", help="Account label"),
+    model: Optional[str] = typer.Option(None, "--model", help="Default model"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Save an env-var-backed provider key reference. Never stores raw keys."""
+    _setup_logging(debug)
+    from .providers import PROVIDERS, ProviderAccountStore, validate_env_var_name
+    provider_ids = {p.id for p in PROVIDERS}
+    if provider not in provider_ids:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Unknown provider: {provider}"), json_output)
+        raise typer.Exit(2)
+    try:
+        validate_env_var_name(env_var)
+        account = ProviderAccountStore().add_env_account(provider, label or "default", env_var, model)
+    except ValueError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(2)
+    _out(ok(account.model_dump()), json_output)
+
+
+@key_app.command("unset")
+def providers_key_unset(
+    provider_or_account_id: str = typer.Argument(..., help="Provider id or account id"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Delete saved provider key references. Does not modify environment variables."""
+    _setup_logging(debug)
+    from .providers import ProviderAccountStore
+    store = ProviderAccountStore()
+    accounts = store.list_accounts()
+    deleted: list[str] = []
+    for account in accounts:
+        if account.id == provider_or_account_id or account.provider == provider_or_account_id:
+            if store.delete(account.id):
+                deleted.append(account.id)
+    _out(ok({"deleted": deleted, "count": len(deleted)}), json_output)
 
 
 @accounts_app.command("list")
@@ -2336,24 +2529,24 @@ def audit_verify(
     ws = Path.cwd()
     chain = Path(chain_path) if chain_path else ws / ".arc" / "audit" / f"{run_id}.jsonl"
 
-    ok, reason = verify_hmac_chain(chain, key)
+    verified, reason = verify_hmac_chain(chain, key)
     payload = {
         "run_id": run_id,
         "chain_path": str(chain),
-        "verified": ok,
+        "verified": verified,
         "reason": reason,
         "key_source": status.source,
         "key_degraded": status.degraded,
     }
     _out(ok(payload), json_output)
     if not json_output:
-        color = "green" if ok else "red"
-        console.print(f"Audit chain: [bold {color}]{'VERIFIED' if ok else 'FAILED'}[/bold {color}]")
+        color = "green" if verified else "red"
+        console.print(f"Audit chain: [bold {color}]{'VERIFIED' if verified else 'FAILED'}[/bold {color}]")
         console.print(f"  Path: {chain}")
         console.print(f"  Reason: {reason}")
         if status.degraded:
             console.print(f"[yellow]Warning:[/yellow] {status.warning}")
-    if not ok:
+    if not verified:
         raise typer.Exit(1)
 
 
@@ -2482,19 +2675,8 @@ def profiles_list(
 ) -> None:
     """List available run profiles."""
     _setup_logging(debug)
-    from .security.profiles import BUILTIN_PROFILES
-    profiles = [
-        {
-            "id": p.id,
-            "name": p.name,
-            "allow_paid_calls": p.allow_paid_calls,
-            "allow_network": p.allow_network,
-            "allow_shell": p.allow_shell,
-            "allow_secrets": p.allow_secrets,
-            "backend": p.backend.value,
-        }
-        for p in BUILTIN_PROFILES.values()
-    ]
+    from .security.profiles import list_profiles
+    profiles = [_profile_payload(p) for p in list_profiles().values()]
     _out(ok(profiles), json_output)
     if not json_output:
         table = Table(title="Run Profiles")
@@ -2522,18 +2704,13 @@ def profiles_show(
 ) -> None:
     """Show details for a specific run profile."""
     _setup_logging(debug)
-    from .security.profiles import resolve_profile
-    profile = resolve_profile(profile_id)
-    payload = {
-        "id": profile.id,
-        "name": profile.name,
-        "allow_paid_calls": profile.allow_paid_calls,
-        "allow_network": profile.allow_network,
-        "allow_shell": profile.allow_shell,
-        "allow_secrets": profile.allow_secrets,
-        "env_allowlist": list(profile.env_allowlist),
-        "backend": profile.backend.value,
-    }
+    from .security.profiles import ProfileNotFound, resolve_profile_strict
+    try:
+        profile = resolve_profile_strict(profile_id)
+    except ProfileNotFound:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Profile '{profile_id}' does not exist", details={"code": "UNKNOWN_PROFILE"}), json_output)
+        raise typer.Exit(2)
+    payload = _profile_payload(profile)
     _out(ok(payload), json_output)
     if not json_output:
         console.print(f"[bold]{profile.name}[/bold] ({profile.id})")
@@ -2544,6 +2721,43 @@ def profiles_show(
         console.print(f"  Secrets: {'yes' if profile.allow_secrets else 'no'}")
         if profile.env_allowlist:
             console.print(f"  Env allowlist: {', '.join(profile.env_allowlist)}")
+
+
+@profiles_app.command("create")
+def profiles_create(
+    profile_id: str = typer.Argument(..., help="Profile id"),
+    allow_paid_calls: bool = typer.Option(False, "--allow-paid-calls", help="Allow paid/provider calls"),
+    allow_network: bool = typer.Option(False, "--allow-network", help="Allow network access"),
+    allow_shell: bool = typer.Option(False, "--allow-shell", help="Allow shell/tool execution"),
+    allow_secrets: bool = typer.Option(False, "--allow-secrets", help="Allow secret env exposure"),
+    provider: Optional[str] = typer.Option(None, "--provider", help="Default provider metadata only"),
+    default_model: Optional[str] = typer.Option(None, "--default-model", help="Default model metadata only"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Create an external run profile in ~/.arc/profiles.json. No secrets are stored."""
+    _setup_logging(debug)
+    from .gating import BackendMode
+    from .security.profiles import RunProfile, save_custom_profile
+
+    backend = BackendMode.LOCAL if allow_paid_calls or allow_network else BackendMode.STUB
+    profile = RunProfile(
+        id=profile_id,
+        name=profile_id,
+        allow_paid_calls=allow_paid_calls,
+        allow_network=allow_network or allow_paid_calls,
+        allow_shell=allow_shell,
+        allow_secrets=allow_secrets,
+        backend=backend,
+    )
+    try:
+        path = save_custom_profile(profile)
+    except ValueError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "PROFILE_EXISTS"}), json_output)
+        raise typer.Exit(2)
+    payload = _profile_payload(profile)
+    payload.update({"path": str(path), "provider": provider, "default_model": default_model, "stores_secrets": False})
+    _out(ok(payload), json_output)
 
 
 # ─── workspace init/info/config ───────────────────────────────────────────────
