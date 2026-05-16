@@ -71,9 +71,6 @@ importers:
       arc-extension:
         specifier: workspace:*
         version: link:../../packages/arc-extension
-      arc-runs:
-        specifier: workspace:*
-        version: link:../../theia-extensions/arc-runs
     devDependencies:
       '@theia/cli':
         specifier: 1.71.0
