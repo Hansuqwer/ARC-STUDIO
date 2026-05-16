@@ -2,10 +2,10 @@
 
 **Project:** ARC Studio
 **Version:** v0.1.0-alpha
-**Last Updated:** 2026-05-15
+**Last Updated:** 2026-05-16
 
 **v0.1 Scope:**
-- ✅ Browser app (`packages/arc-browser-app`)
+- ✅ Browser app (`applications/browser`)
 - ✅ Python CLI/wheel (`python/`)
 - ❌ Electron packaging — post-v0.1 spike only
 - ❌ LM Arena product feature — stub-default with gated live path, not v0.1 scope

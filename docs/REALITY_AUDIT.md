@@ -2,7 +2,7 @@
 
 Generated: 2026-05-14
 
-> **Prerequisite decision confirmed**: `packages/arc-extension` is the true/canonical Theia extension. The README claim (line 208) that it is unused is **incorrect** — it is wired into the browser app, has 239 tests, recent commits, and active DI bindings. `theia-extensions/arc-core` is a duplicate/alternative that should be reconciled or removed.
+> **Prerequisite decision confirmed**: `packages/arc-extension` is the true/canonical Theia extension. It is wired into the browser app, has 563 tests in the canonical extension suite, recent commits, and active DI bindings. `theia-extensions/arc-core` is a duplicate/alternative that should be reconciled or removed.
 
 ---
 
@@ -127,7 +127,7 @@ Generated: 2026-05-14
 | "Support for LlamaIndex" | README L3 | 38-line detect-only adapter. No `run_workflow()`. Cannot execute any LlamaIndex workflow |
 | "ARC Studio uses SwarmGraph as canonical runtime/adoption layer" | README L12-13 | ARC calls SwarmGraph CLI as subprocess; no adapter adopts SwarmGraph engine. "Adoption layer" is a marketing term |
 | "$ runtime + SwarmGraph adoption layer" | Product vision | Zero code. ComboRuntimeAdapter is sequential, not SwarmGraph |
-| "packages/arc-extension is not used" | README L208 | **FALSE** — confirmed by user as the true extension. Actively maintained, wired into browser app, 239 tests, recent commits |
+| "packages/arc-extension is not used" | Historical README wording | **FALSE** — confirmed as the true extension. Actively maintained, wired into browser app, 563 canonical extension tests, recent commits |
 | "LM Arena with live modes" | `lmarena.py` docstring | All 4 arena modes are 100% stub responses. `ARC_ALLOW_LIVE_ARENA=true` is a fiction — no live provider integration |
 | "CLI has 15 commands" | README L142-155 | Commands exist but `eval`, `context` are thin wrappers; `adapter test` runs conformance only; `run` defaults to fixture ID |
 | "HMAC-SHA256 audit chain in ARC" | `docs/SECURITY_AUDIT_REPORT.md` | ARC's `audit/chain.py` uses SHA-256 hash chaining (no HMAC secret). HMAC exists only in the vendored SwarmGraph package |
@@ -144,7 +144,7 @@ Generated: 2026-05-14
 | SwarmGraph vendor has full queen/worker/consensus/HITL/audit | `hive-swarm/swarm/nodes/` + `swarm_shared/audit.py` | README understates as "vendored SwarmGraph runtime sub-project" |
 | CrewAI adapter has real `importlib` run with timeout/cancellation/paid-gating | `crewai.py:run_workflow()` L119-154 | README says "Adapter implemented" — code is more complete than implied |
 | LangGraph adapter has streaming path | `langgraph.py:_stream_graph()` L200-224 | RUNTIMES.md covers it well, but README says "non-streaming run path" — streaming exists |
-| `packages/arc-extension` is the true, live, canonical extension | Confirmed by user; wired in `applications/browser/package.json`; 239 tests; recent commits | README L208 says it's "not used" — **incorrect** |
+| `packages/arc-extension` is the true, live, canonical extension | Confirmed by user; wired in `applications/browser/package.json`; 563 canonical extension tests; recent commits | Current README correctly treats it as canonical |
 | OTLP telemetry export endpoint | `web/routes.py:export_trace()` L384-413; `telemetry/otlp_exporter.py` | Not mentioned in README or docs |
 | 18 REST API endpoints | `web/routes.py:setup_routes()` L558-590 | README only mentions a few CLI commands |
 | Provider routing store with persistence | `providers.py:ProviderRoutingStore` | Not highlighted; daemon routes hidden |

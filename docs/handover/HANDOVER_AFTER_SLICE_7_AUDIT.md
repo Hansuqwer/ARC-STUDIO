@@ -4,7 +4,7 @@ Generated: 2026-05-16
 
 ## Current Status
 
-Slices 1-7 are implemented and audit-patched. Verification is green locally.
+Slices 1-8.3 are implemented and audit-patched. Verification is green locally.
 
 Completed slices:
 - Slice 1: CLI profiles + run preflight
@@ -14,6 +14,9 @@ Completed slices:
 - Slice 5: CrewAI real-runtime smoke gated by `ARC_REAL_RUNTIME_SMOKE=1`
 - Slice 6: IDE run result linked to Runs tab
 - Slice 7: HITL/audit/replay UX hardening
+- Slice 8.1: removed `arc-adapters` from browser app deps after canonical port
+- Slice 8.2: removed `arc-workflows` from browser app deps after canonical port
+- Slice 8.3: removed `arc-event-stream` from browser app deps after canonical port
 
 ## Audit Findings And Patches
 
@@ -74,6 +77,7 @@ Scope:
 - Port only useful UI-only/product-relevant pieces from `theia-extensions/*` into `packages/arc-extension`.
 - Archive or remove duplicate/stub/static extensions only when canonical replacements exist or docs clearly say why they are parked.
 - Preserve `applications/browser` compatibility; do not break current browser package wiring without a build/smoke proof.
+- Do not remove `arc-runs` as a dependency until `ArcChatWidget` and `ArcRunDiffWidget` are ported or explicitly parked; only `ArcRunTimelineWidget` is currently canonical.
 
 Primary files:
 - `docs/EXTENSION_MIGRATION.md`
@@ -114,5 +118,5 @@ Suggested verification:
 ## Resume Prompt
 
 ```text
-Continue with Slice 8: Theia extension migration Phase C. First read AGENTS.md, docs/handover/HANDOVER_AFTER_SLICE_7_AUDIT.md, docs/EXTENSION_MIGRATION.md, docs/IMPLEMENTATION_PLAN.md, and docs/research/IMPLEMENTATION_RESEARCH.md. Preserve unrelated worktree changes. Port/archive only the smallest correct Theia extension migration slice, avoid product overclaims, add/update static contract tests, run pnpm --filter @arc-studio/protocol build && pnpm --filter arc-extension build && pnpm --filter arc-extension test, and run browser build/smoke if package wiring changes. Do not commit unless explicitly asked.
+Continue with Slice 9: docs/release truth finalization. First read AGENTS.md, docs/handover/HANDOVER_AFTER_SLICE_7_AUDIT.md, docs/EXTENSION_MIGRATION.md, docs/RELEASE_CHECKLIST.md, docs/IMPLEMENTATION_PLAN.md, and docs/research/IMPLEMENTATION_RESEARCH.md. Preserve unrelated worktree changes. Avoid product overclaims, keep historical/archive docs scoped as history, run bash scripts/check-banned-claims.sh README.md docs/IMPLEMENTATION_PLAN.md docs/REALITY_AUDIT.md docs/RELEASE_CHECKLIST.md plus cd python && uv run pytest -q -W error, pnpm --filter @arc-studio/protocol build, pnpm --filter arc-extension build, and pnpm --filter arc-extension test. Do not commit unless explicitly asked.
 ```
