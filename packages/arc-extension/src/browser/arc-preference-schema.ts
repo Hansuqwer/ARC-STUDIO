@@ -47,6 +47,11 @@ export const ArcPreferenceSchema: PreferenceSchema = {
             default: true,
             description: 'Show ARC status bar items.',
         },
+        'arc.ui.showOnboarding': {
+            type: 'boolean',
+            default: false,
+            description: 'Show the ARC Studio welcome widget on startup.',
+        },
         'arc.swarmgraph.provider': {
             type: 'string',
             default: 'openai',

@@ -14,6 +14,8 @@ import { ArcEventStreamContribution } from './arc-event-stream-contribution';
 import { ArcHealthWidget } from './arc-health-widget';
 import { ArcHealthContribution } from './arc-health-contribution';
 import { ArcStatusBarContribution } from './arc-status-bar-contribution';
+import { ArcWelcomeWidget } from './arc-welcome-widget';
+import { ArcWelcomeContribution } from './arc-welcome-contribution';
 import { ArcStudioWidget } from './arc-studio-widget';
 import { ArcStudioWidgetContribution } from './arc-studio-widget-contribution';
 import { ArcPreferenceSchema } from './arc-preference-schema';
@@ -93,4 +95,13 @@ export default new ContainerModule(bind => {
     })).inSingletonScope();
     bindViewContribution(bind, ArcHealthContribution);
     bind(FrontendApplicationContribution).toService(ArcHealthContribution);
+
+    // Bind the ARC Welcome widget (manual command; startup controlled by pref)
+    bind(ArcWelcomeWidget).toSelf();
+    bind(WidgetFactory).toDynamicValue(ctx => ({
+        id: ArcWelcomeWidget.ID,
+        createWidget: () => ctx.container.get<ArcWelcomeWidget>(ArcWelcomeWidget),
+    })).inSingletonScope();
+    bindViewContribution(bind, ArcWelcomeContribution);
+    bind(FrontendApplicationContribution).toService(ArcWelcomeContribution);
 });

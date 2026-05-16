@@ -381,6 +381,7 @@ describe('ArcPreferenceSchema', () => {
         expect(source).toMatch(/arc\.run\.defaultProfile/);
         expect(source).toMatch(/arc\.telemetry\.otlpEndpoint/);
         expect(source).toMatch(/arc\.ui\.showStatusBar/);
+        expect(source).toMatch(/arc\.ui\.showOnboarding/);
     });
 
     it('should not define raw secret preferences', () => {
@@ -412,6 +413,31 @@ describe('ArcStatusBarContribution', () => {
     it('should use canonical ARC service health', () => {
         expect(source).toMatch(/@inject\(ArcService\)/);
         expect(source).toMatch(/getConfigStatus/);
+    });
+});
+
+describe('ArcWelcomeWidget', () => {
+    let widgetSource: string;
+    let contributionSource: string;
+
+    beforeAll(async () => {
+        widgetSource = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'browser', 'arc-welcome-widget.tsx'), 'utf-8');
+        contributionSource = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'browser', 'arc-welcome-contribution.ts'), 'utf-8');
+    });
+
+    it('should provide a command-opened welcome widget', () => {
+        expect(widgetSource).toMatch(/extends ReactWidget/);
+        expect(widgetSource).toMatch(/Welcome to ARC Studio/);
+        expect(contributionSource).toMatch(/arc:open-welcome/);
+    });
+
+    it('should not force onboarding by default', () => {
+        expect(contributionSource).toMatch(/arc\.ui\.showOnboarding/);
+        expect(contributionSource).toMatch(/false/);
+    });
+
+    it('should route users to canonical ARC Studio', () => {
+        expect(widgetSource).toMatch(/arc-studio:open/);
     });
 });
 
