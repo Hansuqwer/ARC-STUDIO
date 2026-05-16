@@ -8,9 +8,9 @@ Status: Wired into `applications/browser` since PR 5 (commit 765beb4), coexistin
 duplicate `theia-extensions/*` during transition.
 
 **Migration status (2026-05-16):** Phase A partially complete — 4 widgets ported into
-arc-extension (adapters, workflow-graph, run-timeline, event-stream) but originals still
-wired in `applications/browser/package.json`. Phase C (archive/remove originals) deferred
-until ported widgets are verified as functionally equivalent.
+arc-extension (adapters, workflow-graph, run-timeline, event-stream). `arc-adapters`
+has been removed from `applications/browser/package.json`; other duplicate originals
+remain wired until their ported widgets are verified as functionally equivalent.
 
 ---
 
@@ -66,7 +66,7 @@ After all useful code is ported:
 | Step | Extension | Action |
 |------|-----------|--------|
 | C.1 | `arc-core` | Remove from `applications/browser` deps, add deprecation banner, archive |
-| C.2 | `arc-adapters` | Remove from `applications/browser` deps, archive |
+| C.2 | `arc-adapters` | ✅ Removed from `applications/browser` deps; archive source after browser smoke |
 | C.3 | `arc-runs` | Remove from `applications/browser` deps, archive |
 | C.4 | `arc-workflows` | Remove from `applications/browser` deps, archive |
 | C.5 | `arc-event-stream` | Remove from `applications/browser` deps, archive |
@@ -112,9 +112,9 @@ service types are properly represented in `packages/arc-extension` and the Pytho
 
 | Extension | Status |
 |-----------|--------|
-| `arc-adapters` | ⏳ Ported into arc-extension (arc-adapters-widget.tsx), original still wired in browser app |
+| `arc-adapters` | ✅ Ported into arc-extension and removed from browser app deps; source still present for rollback until browser smoke |
 | `arc-audit` | 📁 Archive candidate (Phase C) |
-| `arc-arena` | 🗑️ ARCHIVED — out of v0.1 scope |
+| `arc-arena` | 🗑️ ARCHIVE CANDIDATE — out of v0.1 scope; still present in workspace |
 | `arc-context` | ⏳ Awaiting port decision (Phase B) |
 | `arc-core` | 🗑️ DEPRECATED — duplicate of canonical extension, still wired in browser app |
 | `arc-event-stream` | ⏳ Ported into arc-extension (arc-event-stream-widget.tsx), original still wired |

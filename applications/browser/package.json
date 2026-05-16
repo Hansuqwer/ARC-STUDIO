@@ -38,7 +38,6 @@
     "arc-runs": "workspace:*",
     "arc-schemas": "workspace:*",
     "arc-context": "workspace:*",
-    "arc-adapters": "workspace:*",
     "arc-audit": "workspace:*",
     "arc-health": "workspace:*",
     "arc-event-stream": "workspace:*",

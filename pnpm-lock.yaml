@@ -65,9 +65,6 @@ importers:
       '@theia/workspace':
         specifier: 1.71.0
         version: 1.71.0(@theia/electron@1.71.0(electron@39.8.7))(typescript@5.9.3)
-      arc-adapters:
-        specifier: workspace:*
-        version: link:../../theia-extensions/arc-adapters
       arc-audit:
         specifier: workspace:*
         version: link:../../theia-extensions/arc-audit
