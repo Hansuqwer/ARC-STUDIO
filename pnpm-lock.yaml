@@ -95,9 +95,6 @@ importers:
       arc-settings:
         specifier: workspace:*
         version: link:../../theia-extensions/arc-settings
-      arc-workflows:
-        specifier: workspace:*
-        version: link:../../theia-extensions/arc-workflows
     devDependencies:
       '@theia/cli':
         specifier: 1.71.0

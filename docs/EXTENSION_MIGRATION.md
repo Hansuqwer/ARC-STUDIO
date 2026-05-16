@@ -9,8 +9,9 @@ duplicate `theia-extensions/*` during transition.
 
 **Migration status (2026-05-16):** Phase A partially complete — 4 widgets ported into
 arc-extension (adapters, workflow-graph, run-timeline, event-stream). `arc-adapters`
-has been removed from `applications/browser/package.json`; other duplicate originals
-remain wired until their ported widgets are verified as functionally equivalent.
+and `arc-workflows` have been removed from `applications/browser/package.json`; other
+duplicate originals remain wired until their ported widgets are verified as functionally
+equivalent.
 
 ---
 
@@ -68,7 +69,7 @@ After all useful code is ported:
 | C.1 | `arc-core` | Remove from `applications/browser` deps, add deprecation banner, archive |
 | C.2 | `arc-adapters` | ✅ Removed from `applications/browser` deps; archive source after browser smoke |
 | C.3 | `arc-runs` | Remove from `applications/browser` deps, archive |
-| C.4 | `arc-workflows` | Remove from `applications/browser` deps, archive |
+| C.4 | `arc-workflows` | ✅ Removed from `applications/browser` deps; archive source after browser smoke |
 | C.5 | `arc-event-stream` | Remove from `applications/browser` deps, archive |
 | C.6 | `arc-schemas` | Remove from `applications/browser` deps, archive |
 | C.7 | `arc-context` | Remove from `applications/browser` deps, archive |
@@ -123,4 +124,4 @@ service types are properly represented in `packages/arc-extension` and the Pytho
 | `arc-runs` | ⏳ Ported into arc-extension (arc-run-timeline-widget.tsx), original still wired |
 | `arc-schemas` | ⏳ Awaiting port (Phase B) |
 | `arc-settings` | ⏳ Awaiting consolidation (Phase B) |
-| `arc-workflows` | ⏳ Ported into arc-extension (arc-workflow-graph-widget.tsx), original still wired |
+| `arc-workflows` | ✅ Ported into arc-extension and removed from browser app deps; source still present for rollback until browser smoke |
