@@ -7,6 +7,11 @@ Canonical extension: `packages/arc-extension`
 Status: Wired into `applications/browser` since PR 5 (commit 765beb4), coexisting with
 duplicate `theia-extensions/*` during transition.
 
+**Migration status (2026-05-16):** Phase A partially complete — 4 widgets ported into
+arc-extension (adapters, workflow-graph, run-timeline, event-stream) but originals still
+wired in `applications/browser/package.json`. Phase C (archive/remove originals) deferred
+until ported widgets are verified as functionally equivalent.
+
 ---
 
 ## Inventory
@@ -107,15 +112,15 @@ service types are properly represented in `packages/arc-extension` and the Pytho
 
 | Extension | Status |
 |-----------|--------|
-| `arc-adapters` | ⏳ Awaiting port (Phase A.1) |
+| `arc-adapters` | ⏳ Ported into arc-extension (arc-adapters-widget.tsx), original still wired in browser app |
 | `arc-audit` | 📁 Archive candidate (Phase C) |
-| `arc-arena` | 🗑️ Already excluded from workspace config |
+| `arc-arena` | 🗑️ ARCHIVED — out of v0.1 scope |
 | `arc-context` | ⏳ Awaiting port decision (Phase B) |
-| `arc-core` | 🏗️ Active — duplicate of canonical extension |
-| `arc-event-stream` | ⏳ Awaiting port (Phase B) |
+| `arc-core` | 🗑️ DEPRECATED — duplicate of canonical extension, still wired in browser app |
+| `arc-event-stream` | ⏳ Ported into arc-extension (arc-event-stream-widget.tsx), original still wired |
 | `arc-health` | ⏳ Awaiting port (Phase B) |
-| `arc-product` | 🗑️ Archive/delete candidate (Phase C) |
-| `arc-runs` | ⏳ Awaiting port (Phase A) |
+| `arc-product` | 🗑️ DEPRECATED — branding merged into canonical extension |
+| `arc-runs` | ⏳ Ported into arc-extension (arc-run-timeline-widget.tsx), original still wired |
 | `arc-schemas` | ⏳ Awaiting port (Phase B) |
 | `arc-settings` | ⏳ Awaiting consolidation (Phase B) |
-| `arc-workflows` | ⏳ Awaiting port (Phase A) |
+| `arc-workflows` | ⏳ Ported into arc-extension (arc-workflow-graph-widget.tsx), original still wired |

@@ -12,7 +12,7 @@ ARC Studio is an Agent Runtime Cockpit IDE built on Eclipse Theia. It provides a
 arc-theia-studio/
 ├── packages/
 │   ├── arc-ag-ui/           # Agent UI components (React)
-│   ├── arc-browser-app/     # Theia browser application entry
+│   ├── arc-browser-app/     # DEPRECATED — use applications/browser/ instead (Theia ^1.45.0, stale)
 │   ├── arc-extension/       # Main ARC extension (backend + frontend)
 │   ├── arc-protocol-ts/     # TypeScript protocol types
 │   └── arc-test-fixtures/   # Test fixtures and sample projects
@@ -28,6 +28,8 @@ arc-theia-studio/
 │   ├── arc-schemas/         # Schema inspector
 │   ├── arc-settings/        # Settings/preferences
 │   └── arc-workflows/       # Workflow graph visualization
+├── applications/
+│   └── browser/             # Canonical browser app (Theia 1.71.0) — primary release target
 ├── python/
 │   └── src/agent_runtime_cockpit/  # Python backend
 └── tests/                   # E2E and unit tests
@@ -137,32 +139,36 @@ cd python && uv run pytest tests/web/ --log-cli-level=DEBUG -s  # Web tests with
 - Framework: Jest with ts-jest
 - Environment: Node (for backend), source-pattern matching (for UI components)
 - Coverage: 61.84% statements, 67.34% branches, 53.78% functions, 63.18% lines
-- Total tests: 239 (across 6 test suites)
+- Total tests: 523 arc-extension (9 suites) + 772 Python + 11 arc-ag-ui
 - Location: `packages/arc-extension/jest.config.js`
 
 ## Architecture Decisions
 
 ### P0-3: Backend Modularization
 Split the monolithic `arc-backend-service.ts` (1,329 lines) into:
-- Orchestration layer (276 lines)
+- Orchestration layer (now 733 lines — grew post-refactor with config/CLI/receipt/autopsy methods; needs re-split into config-service + run-lifecycle-service)
 - 4 specialized service modules (each < 500 lines)
 - Explicit DI bindings for testability
 - Replaced `execSync` with safe `spawn('which', [name], {shell:false})`
 
 ### P0-4: Frontend Modularization
 Split the monolithic `arc-widget.tsx` (974 lines) into:
-- Orchestration widget (~450 lines)
-- 8 reusable UI components in `components/` directory
+- Orchestration widget (`arc-widget.tsx`, ~440 lines, now marked Legacy)
+- Primary widget: `arc-studio-widget.tsx` (176 lines, tabbed: Chat/Runs/Workflows/Config)
+- 13 reusable UI components in `components/` directory (grew from original 8)
+- 4 tab components in `tabs/` directory (ChatTab, RunsTab, WorkflowsTab, ConfigTab)
+- Ported widgets from theia-extensions: arc-adapters-widget, arc-workflow-graph, arc-run-timeline, arc-event-stream
 - Clean props-based interfaces
 - Centralized exports via `index.ts`
 
 ### P1-6: ESLint + Prettier
-- ESLint v9 flat config with TypeScript type-checked linting
-- Prettier for consistent formatting (single quotes, 100 width, 4-space tabs)
+- ESLint v9 flat config (`eslint.config.mjs`) with TypeScript type-checked linting
+- `.prettierrc.json` configured (single quotes, 100 width, 4-space tabs)
 - JS files linted with Node globals, no type checks
+- Note: `pnpm lint` delegates to per-package scripts; root eslint config not yet wired into workspace lint command. Prettier not installed as a root dependency — `format`/`format:check` scripts need proper wiring as a separate task.
 
 ### P1-7: Test Coverage
-- 81 new tests added (239 total)
+- 284 new tests beyond baseline (523 arc-extension tests across 9 suites; 772 Python tests)
 - UI components tested via source-pattern contract tests (NOT runtime jsdom tests)
 - Backend services tested with Jest unit tests
 - Branch coverage improved from 57.51% → 67.34%
@@ -172,7 +178,7 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - Webpack split chunks configured
 - Main bundle reduced from 27 MiB → 50 KiB (our code)
 - Monaco editor, Theia core, React, and vendors cached separately
-- Custom `webpack.config.js` in `packages/arc-browser-app/`
+- Custom `webpack.config.js` in `packages/arc-browser-app/` (legacy; port to `applications/browser/` for canonical app)
 
 ## Workflow
 
@@ -306,12 +312,12 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 ### Known Issues
 - ESLint has 247 problems (113 errors, 134 warnings) — all pre-existing in other packages; our files have 0 errors
 - Browser files (arc-widget.tsx, etc.) show 0% coverage due to Theia runtime dependency — UI tests are static contract tests only
-- Coverage targets: 70% not reached for statements (61.84%), functions (53.78%), lines (63.18%). Only branches (67.34%) close
+- Coverage targets: 70% not reached for statements (61.84%), functions (53.78%), lines (63.18%). Only branches (67.34%) close. Target lowered to 60% for v0.1.0-alpha.
 - Monaco editor bundle is 15.9 MiB (expected, not reducible)
 - Total frontend entrypoint ~28.8 MiB (Monaco + Theia core + React + vendors); ARC Studio code chunk is 50 KiB
 
 ### Test Metrics
-- Python: 550 passed, 10 skipped (was 435 before P2/P3/P4/P5 work)
+- Python: 772 passed, 10 skipped (was 435 before P2/P3/P4/P5 work)
 - TypeScript protocol build: clean
 - arc-extension build: clean
 
@@ -324,6 +330,7 @@ Historical details are archived at `docs/archive/handover/REMAINING_ISSUES_PLAN.
 - **R-4 (10 unmerged remote branches)**: 3 may have salvageable work; 7 intentionally parked.
 - **R-5 (.env history scrub)**: Plan documented in `docs/ENV_HISTORY_SCRUB_PLAN.md`; execute only after release date approval.
 - **e2e workflow**: Still in progress.
+- **theia-extensions migration**: PARTIAL — ported widgets exist in arc-extension (arc-adapters-widget, arc-workflow-graph, arc-run-timeline, arc-event-stream) but all 12 original theia-extensions remain wired in `applications/browser/package.json`. Full migration (Phase C of `docs/EXTENSION_MIGRATION.md`) deferred.
 
 ## Related Documentation
 
