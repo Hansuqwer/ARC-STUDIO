@@ -39,7 +39,6 @@
     "arc-context": "workspace:*",
     "arc-audit": "workspace:*",
     "arc-health": "workspace:*",
-    "arc-event-stream": "workspace:*",
     "arc-product": "workspace:*",
     "arc-settings": "workspace:*"
   },

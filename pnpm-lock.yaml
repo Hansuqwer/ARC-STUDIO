@@ -74,9 +74,6 @@ importers:
       arc-core:
         specifier: workspace:*
         version: link:../../theia-extensions/arc-core
-      arc-event-stream:
-        specifier: workspace:*
-        version: link:../../theia-extensions/arc-event-stream
       arc-extension:
         specifier: workspace:*
         version: link:../../packages/arc-extension

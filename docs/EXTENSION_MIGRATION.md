@@ -8,10 +8,10 @@ Status: Wired into `applications/browser` since PR 5 (commit 765beb4), coexistin
 duplicate `theia-extensions/*` during transition.
 
 **Migration status (2026-05-16):** Phase A partially complete — 4 widgets ported into
-arc-extension (adapters, workflow-graph, run-timeline, event-stream). `arc-adapters`
-and `arc-workflows` have been removed from `applications/browser/package.json`; other
-duplicate originals remain wired until their ported widgets are verified as functionally
-equivalent.
+arc-extension (adapters, workflow-graph, run-timeline, event-stream). `arc-adapters`,
+`arc-workflows`, and `arc-event-stream` have been removed from
+`applications/browser/package.json`; other duplicate originals remain wired until their
+ported widgets are verified as functionally equivalent.
 
 ---
 
@@ -70,7 +70,7 @@ After all useful code is ported:
 | C.2 | `arc-adapters` | ✅ Removed from `applications/browser` deps; archive source after browser smoke |
 | C.3 | `arc-runs` | Remove from `applications/browser` deps, archive |
 | C.4 | `arc-workflows` | ✅ Removed from `applications/browser` deps; archive source after browser smoke |
-| C.5 | `arc-event-stream` | Remove from `applications/browser` deps, archive |
+| C.5 | `arc-event-stream` | ✅ Removed from `applications/browser` deps; archive source after browser smoke |
 | C.6 | `arc-schemas` | Remove from `applications/browser` deps, archive |
 | C.7 | `arc-context` | Remove from `applications/browser` deps, archive |
 | C.8 | `arc-settings` | Remove from `applications/browser` deps, archive |
@@ -118,7 +118,7 @@ service types are properly represented in `packages/arc-extension` and the Pytho
 | `arc-arena` | 🗑️ ARCHIVE CANDIDATE — out of v0.1 scope; still present in workspace |
 | `arc-context` | ⏳ Awaiting port decision (Phase B) |
 | `arc-core` | 🗑️ DEPRECATED — duplicate of canonical extension, still wired in browser app |
-| `arc-event-stream` | ⏳ Ported into arc-extension (arc-event-stream-widget.tsx), original still wired |
+| `arc-event-stream` | ✅ Ported into arc-extension and removed from browser app deps; source still present for rollback until browser smoke |
 | `arc-health` | ⏳ Awaiting port (Phase B) |
 | `arc-product` | 🗑️ DEPRECATED — branding merged into canonical extension |
 | `arc-runs` | ⏳ Ported into arc-extension (arc-run-timeline-widget.tsx), original still wired |
