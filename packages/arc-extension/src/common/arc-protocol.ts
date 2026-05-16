@@ -345,6 +345,112 @@ export interface ProviderStatus {
     message: string;
 }
 
+// ========== Cockpit Schema Contracts ==========
+
+export type ContractStatus = 'proposed' | 'accepted' | 'fulfilled' | 'violated';
+
+export type EvidenceKind = 'file' | 'tool_output' | 'run' | 'node' | 'ledger' | 'receipt';
+
+export interface EvidenceRef {
+    schema_version: number;
+    evidence_id: string;
+    kind: EvidenceKind;
+    target: string;
+    label?: string;
+    range?: [number, number];
+    redacted: boolean;
+    metadata: Record<string, unknown>;
+}
+
+export interface RunContract {
+    schema_version: number;
+    contract_id: string;
+    run_id?: string;
+    session_id: string;
+    objective: string;
+    runtime: string;
+    mode: 'plan' | 'build' | 'auto';
+    allowed_tools: string[];
+    write_scope: string[];
+    cost_ceiling_usd: number | 'unknown';
+    approval_policy: string;
+    rollback_plan: string;
+    evidence_expected: string[];
+    status: ContractStatus;
+    terms_digest?: string;
+    created_at: string;
+    accepted_at?: string;
+    fulfilled_at?: string;
+    metadata: Record<string, unknown>;
+}
+
+export interface FileChange {
+    path: string;
+    added: number;
+    removed: number;
+}
+
+export interface RunReceipt {
+    schema_version: number;
+    receipt_id: string;
+    run_id: string;
+    session_id?: string;
+    contract_id?: string;
+    status: 'completed' | 'failed' | 'cancelled';
+    summary: string;
+    cost_usd: number | 'unknown';
+    duration_ms: number;
+    files_changed: FileChange[];
+    approvals: string[];
+    evidence_refs: EvidenceRef[];
+    rollback_command?: string;
+    trust_boundaries_crossed: string[];
+    unresolved_risks: string[];
+    audit_chain_ref?: string;
+    signature?: string;
+    created_at: string;
+}
+
+export interface RetryOption {
+    label: string;
+    command?: string;
+    risk: 'low' | 'medium' | 'high';
+}
+
+export interface FailureAutopsy {
+    schema_version: number;
+    run_id: string;
+    probable_cause: string;
+    confidence: 'high' | 'medium' | 'low' | 'unknown';
+    failed_node?: string;
+    last_safe_state?: string;
+    retry_options: RetryOption[];
+    related_issues: string[];
+    knows: string[];
+    guesses: string[];
+    evidence_refs: EvidenceRef[];
+    error_category?: 'tool_timeout' | 'provider_error' | 'validation' | 'internal' | 'unknown';
+    stack_summary?: string;
+    created_at: string;
+    metadata: Record<string, unknown>;
+}
+
+export interface TrustDiff {
+    schema_version: number;
+    diff_id: string;
+    workspace_path: string;
+    before: string[];
+    after: string[];
+    added_capabilities: string[];
+    removed_restrictions: string[];
+    affected_runtimes: string[];
+    reason: 'workspace_first_trust' | 'profile_switch' | 'runtime_added' | 'unknown';
+    requires_confirmation: boolean;
+    confirmed_at?: string;
+    created_at: string;
+    metadata: Record<string, unknown>;
+}
+
 // ========== Streaming ==========
 
 /**
