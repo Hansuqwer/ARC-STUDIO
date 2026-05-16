@@ -2,6 +2,14 @@
 from __future__ import annotations
 
 import json
+import re
+
+
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def plain(text: str) -> str:
+    return ANSI_RE.sub("", text)
 
 
 class TestRuntimesDiffCLI:
@@ -10,8 +18,9 @@ class TestRuntimesDiffCLI:
     def test_diff_help_available(self, run_cli):
         r = run_cli(["runtimes", "--help"])
         assert r.exit_code == 0
-        assert "--diff-from" in r.stdout
-        assert "--diff-to" in r.stdout
+        help_text = plain(r.stdout)
+        assert "--diff-from" in help_text
+        assert "--diff-to" in help_text
 
     def test_diff_unknown_from_runtime(self, run_cli):
         r = run_cli(["runtimes", "--diff-from", "nonexistent_xyz", "--diff-to", "langgraph", "--json"])

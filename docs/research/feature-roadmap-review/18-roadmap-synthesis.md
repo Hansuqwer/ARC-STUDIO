@@ -226,7 +226,7 @@ These contracts must be stable before implementation begins. Changing them after
 #### Testing & Docs
 - axe-core accessibility audits in Playwright E2E
 - Manifest validation tests (valid v1, unknown major, missing fields)
-- Redaction E2E test (inject fake secrets, verify `«REDACTED»` in all surfaces)
+- Redaction E2E test (inject fake secrets, verify redaction marker in all surfaces)
 - Daemon state machine tests (start, healthy, crash, restart, orphan recovery)
 - Automated screenshot generation via Playwright
 - `docs/onboarding.md` (5-step getting started guide)
