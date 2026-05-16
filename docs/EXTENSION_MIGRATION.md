@@ -72,7 +72,7 @@ After all useful code is ported:
 | C.4 | `arc-workflows` | ✅ Removed from `applications/browser` deps; archive source after browser smoke |
 | C.5 | `arc-event-stream` | ✅ Removed from `applications/browser` deps; archive source after browser smoke |
 | C.6 | `arc-schemas` | ✅ Removed old-core schema inspector from `applications/browser` deps; archive source after browser smoke |
-| C.7 | `arc-context` | Remove from `applications/browser` deps, archive |
+| C.7 | `arc-context` | ✅ Removed old-core context-pack viewer from `applications/browser` deps; archive source after browser smoke |
 | C.8 | `arc-settings` | Remove from `applications/browser` deps, archive |
 | C.9 | `arc-health` | Remove from `applications/browser` deps, archive |
 | C.10 | `arc-audit` | ✅ Removed static stub from `applications/browser` deps; archive source after browser smoke |
@@ -116,7 +116,7 @@ service types are properly represented in `packages/arc-extension` and the Pytho
 | `arc-adapters` | ✅ Ported into arc-extension and removed from browser app deps; source still present for rollback until browser smoke |
 | `arc-audit` | ✅ Static stub removed from browser app deps; per-run audit verification lives in canonical Runs tab |
 | `arc-arena` | 🗑️ ARCHIVE CANDIDATE — out of v0.1 scope; still present in workspace |
-| `arc-context` | ⏳ Awaiting port decision (Phase B) |
+| `arc-context` | ✅ Old-core context-pack viewer removed from browser app deps; port later only if context-pack UX returns to release scope |
 | `arc-core` | 🗑️ DEPRECATED — duplicate of canonical extension, still wired in browser app |
 | `arc-event-stream` | ✅ Ported into arc-extension and removed from browser app deps; source still present for rollback until browser smoke |
 | `arc-health` | ⏳ Awaiting port (Phase B) |
