@@ -1,5 +1,6 @@
 import { ContainerModule } from '@theia/core/shared/inversify';
 import { WebSocketConnectionProvider, WidgetFactory, bindViewContribution, FrontendApplicationContribution } from '@theia/core/lib/browser';
+import { PreferenceContribution } from '@theia/core/lib/common/preferences/preference-schema';
 import { ArcWidget } from './arc-widget';
 import { ArcWidgetContribution } from './arc-widget-contribution';
 import { ArcAdaptersWidget } from './arc-adapters-widget';
@@ -14,12 +15,15 @@ import { ArcHealthWidget } from './arc-health-widget';
 import { ArcHealthContribution } from './arc-health-contribution';
 import { ArcStudioWidget } from './arc-studio-widget';
 import { ArcStudioWidgetContribution } from './arc-studio-widget-contribution';
+import { ArcPreferenceSchema } from './arc-preference-schema';
 import { ArcServicePath, ArcService } from '../common/arc-protocol';
 import type { ArcService as IArcService } from '../common/arc-protocol';
 import './style/arc-widget.css';
 import './style/arc-studio-widget.css';
 
 export default new ContainerModule(bind => {
+    bind(PreferenceContribution).toConstantValue({ schema: ArcPreferenceSchema });
+
     // Bind the ARC service client (connects to backend via WebSocket)
     bind(ArcService).toDynamicValue(ctx => {
         const connection = ctx.container.get(WebSocketConnectionProvider);

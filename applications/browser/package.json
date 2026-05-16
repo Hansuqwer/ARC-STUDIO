@@ -34,8 +34,7 @@
     "@theia/keymaps": "1.71.0",
     "arc-extension": "workspace:*",
     "arc-core": "workspace:*",
-    "arc-runs": "workspace:*",
-    "arc-settings": "workspace:*"
+    "arc-runs": "workspace:*"
   },
   "devDependencies": {
     "@theia/cli": "1.71.0",

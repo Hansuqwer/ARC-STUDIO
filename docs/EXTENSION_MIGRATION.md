@@ -27,7 +27,7 @@ ported widgets are verified as functionally equivalent.
 | 6 | `arc-schemas` | FE | 3 / 162 | 0 | None | Port | P1 | Schema inspector. No equivalent in canonical extension. |
 | 7 | `arc-health` | FE | 3 / 150 | 0 | Ported | Port small pieces | P1 | Backend health polling now lives in canonical `arc-extension`; original removed from browser app deps. |
 | 8 | `arc-context` | FE | 3 / 114 | 0 | None | Port if in scope | P1 | Context pack viewer. Thin wrapper over existing service. |
-| 9 | `arc-settings` | FE | 2 / 93 | 0 | Partial — prefs overlap | Port prefs only | P1 | Preference schema may duplicate `arc-ui-preferences.ts` in arc-core. Consolidate into canonical. |
+| 9 | `arc-settings` | FE | 2 / 93 | 0 | Ported | Port prefs only | P1 | Safe preference schema lives in canonical `arc-extension`; raw token prefs intentionally excluded. |
 | 10 | `arc-audit` | FE | 3 / 59 | 0 | None (stub) | Archive or rewrite | P1 | Currently shows "Not implemented" with empty array. Keep concept, archive code. |
 | 11 | `arc-arena` | Both | 6 / 520 | 1 | None | Archive | P0 | LM Arena is out of v0.1 scope. Already excluded from workspace config. |
 | 12 | `arc-product` | FE | 2 / 231 | 0 | None (branding) | Archive/delete | P0 | Branding shell removed from browser app deps; canonical extension provides its own widget identity. |
@@ -58,7 +58,7 @@ extensions it replaces.
 | B.2 | `arc-schemas` | Copy schema inspector widget | Build + UI contract tests |
 | B.3 | `arc-health` | ✅ Inline backend health checker into canonical extension | Build |
 | B.4 | `arc-context` | Copy context pack viewer (if context UX remains in scope) | Build |
-| B.5 | `arc-settings` | Consolidate preference schemas; remove from theia-extensions | Build + preference tests |
+| B.5 | `arc-settings` | ✅ Consolidate safe preference schema; remove from browser deps | Build + preference tests |
 
 ### Phase C — Archive/delete remaining (P1)
 
@@ -73,7 +73,7 @@ After all useful code is ported:
 | C.5 | `arc-event-stream` | ✅ Removed from `applications/browser` deps; archive source after browser smoke |
 | C.6 | `arc-schemas` | ✅ Removed old-core schema inspector from `applications/browser` deps; archive source after browser smoke |
 | C.7 | `arc-context` | ✅ Removed old-core context-pack viewer from `applications/browser` deps; archive source after browser smoke |
-| C.8 | `arc-settings` | Remove from `applications/browser` deps, archive |
+| C.8 | `arc-settings` | ✅ Removed from `applications/browser` deps; archive source after browser smoke |
 | C.9 | `arc-health` | ✅ Removed from `applications/browser` deps; archive source after browser smoke |
 | C.10 | `arc-audit` | ✅ Removed static stub from `applications/browser` deps; archive source after browser smoke |
 | C.11 | `arc-arena` | Already excluded; ensure no import paths remain |
@@ -123,5 +123,5 @@ service types are properly represented in `packages/arc-extension` and the Pytho
 | `arc-product` | ✅ Branding shell removed from browser app deps; canonical extension owns ARC Studio identity |
 | `arc-runs` | ⏳ Partially ported: run timeline is canonical, but chat and run-diff widgets remain only in original; keep wired |
 | `arc-schemas` | ✅ Old-core schema inspector removed from browser app deps; port later only if schema UI returns to release scope |
-| `arc-settings` | ⏳ Awaiting consolidation (Phase B) |
+| `arc-settings` | ✅ Safe prefs ported into arc-extension and removed from browser app deps |
 | `arc-workflows` | ✅ Ported into arc-extension and removed from browser app deps; source still present for rollback until browser smoke |

@@ -368,6 +368,29 @@ describe('ArcHealthContribution', () => {
     });
 });
 
+describe('ArcPreferenceSchema', () => {
+    let source: string;
+
+    beforeAll(async () => {
+        source = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'browser', 'arc-preference-schema.ts'), 'utf-8');
+    });
+
+    it('should define safe ARC preferences', () => {
+        expect(source).toMatch(/arc\.daemon\.port/);
+        expect(source).toMatch(/arc\.python\.executable/);
+        expect(source).toMatch(/arc\.run\.defaultProfile/);
+        expect(source).toMatch(/arc\.telemetry\.otlpEndpoint/);
+    });
+
+    it('should not define raw secret preferences', () => {
+        expect(source).not.toMatch(/context7ApiKey/);
+        expect(source).not.toMatch(/githubToken/);
+        expect(source).not.toMatch(/apiKey/i);
+        expect(source).not.toMatch(/token/i);
+        expect(source).not.toMatch(/secret/i);
+    });
+});
+
 describe('ArcWorkflowGraphWidget', () => {
     let source: string;
 
