@@ -4,6 +4,7 @@ from __future__ import annotations
 import inspect
 from pathlib import Path
 from typing import Any, AsyncIterator
+import importlib.util
 
 from .ag2_runner import AG2AdoptionRunner
 from .langgraph_runner import _setup_swarmgraph_paths
@@ -17,14 +18,14 @@ class LlamaIndexAdoptionRunner(AdoptionRunner):
 
     def check_availability(self, workspace: Path) -> AdoptionCapability:
         try:
-            import llama_index
+            if importlib.util.find_spec("llama_index") is None:
+                raise ImportError("llama_index")
             _setup_swarmgraph_paths()
-            from swarm.nodes.consensus import consensus_node  # noqa: F401
 
             return AdoptionCapability(
                 mode=self.mode,
                 status=AdoptionStatus.RUNNABLE,
-                reason=f"LlamaIndex {getattr(llama_index, '__version__', 'unknown')} and vendored SwarmGraph consensus detected",
+                reason="LlamaIndex package detected; SwarmGraph adoption path is fake-tested/gated",
             )
         except ImportError:
             return AdoptionCapability(

@@ -1,14 +1,12 @@
-"""Tests for stable ID generation and degradation manifest."""
 import pytest
 from agent_runtime_cockpit.protocol.stable_ids import (
+    DegradationManifest,
+    ensure_stable_id,
+    generate_edge_id,
     generate_stable_id,
     generate_node_id,
-    generate_edge_id,
-    ensure_stable_id,
-    parse_stable_id,
     is_valid_stable_id,
-    DegradationManifest,
-    ID_PREFIXES,
+    parse_stable_id,
 )
 
 

@@ -37,165 +37,179 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
     # ── Run lifecycle ────────────────────────────────────────────────────
     "RUN_STARTED": EventTypeDef(
         required_fields={"workflow_id", "runtime"},
-        optional_fields={"profile_id", "isolation"},
+        optional_fields={"profile_id", "isolation", "node_id", "message_id", "evidence_refs"},
     ),
     "RUN_COMPLETED": EventTypeDef(
         required_fields={"duration_ms"},
-        optional_fields={"output", "evidence_refs"},
+        optional_fields={"output", "node_id", "message_id", "evidence_refs"},
     ),
     "RUN_FAILED": EventTypeDef(
         required_fields={"error"},
-        optional_fields={"error_detail", "error_type"},
+        optional_fields={"error_detail", "error_type", "node_id", "message_id", "evidence_refs"},
     ),
     "RUN_CANCELLED": EventTypeDef(
         required_fields={"cancel_reason"},
-        optional_fields=set(),
+        optional_fields={"node_id", "message_id"},
     ),
 
     # ── Step lifecycle ───────────────────────────────────────────────────
     "STEP_STARTED": EventTypeDef(
         required_fields={"step_id", "step_name"},
-        optional_fields={"step_type"},
+        optional_fields={"step_type", "node_id", "message_id", "evidence_refs"},
     ),
     "STEP_COMPLETED": EventTypeDef(
         required_fields={"step_id"},
-        optional_fields={"output", "duration_ms"},
+        optional_fields={"output", "duration_ms", "node_id", "message_id", "evidence_refs"},
     ),
     "STEP_FAILED": EventTypeDef(
         required_fields={"step_id", "error"},
-        optional_fields=set(),
+        optional_fields={"node_id", "message_id", "evidence_refs"},
     ),
 
     # ── Agent lifecycle ──────────────────────────────────────────────────
     "AGENT_START": EventTypeDef(
         required_fields={"agent_name"},
-        optional_fields={"instructions"},
+        optional_fields={"instructions", "node_id", "message_id"},
     ),
     "AGENT_END": EventTypeDef(
         required_fields={"agent_name", "output"},
-        optional_fields={"usage"},
+        optional_fields={"usage", "node_id", "message_id"},
     ),
 
     # ── Tool calls ───────────────────────────────────────────────────────
     "TOOL_CALL": EventTypeDef(
         required_fields={"tool_call_id", "tool_name"},
-        optional_fields=set(),
+        optional_fields={"node_id", "message_id", "evidence_refs"},
     ),
     "TOOL_CALL_START": EventTypeDef(
         required_fields={"tool_call_id", "tool_name"},
-        optional_fields=set(),
+        optional_fields={"node_id", "message_id", "evidence_refs"},
     ),
     "TOOL_CALL_ARGS": EventTypeDef(
         required_fields={"tool_call_id", "delta"},
-        optional_fields=set(),
+        optional_fields={"node_id", "message_id"},
     ),
     "TOOL_CALL_END": EventTypeDef(
         required_fields={"tool_call_id"},
-        optional_fields=set(),
+        optional_fields={"node_id", "message_id", "evidence_refs"},
     ),
     "TOOL_CALL_RESULT": EventTypeDef(
         required_fields={"tool_call_id", "result"},
-        optional_fields={"evidence_refs"},
+        optional_fields={"node_id", "message_id", "evidence_refs"},
     ),
     "TOOL_CALL_ERROR": EventTypeDef(
         required_fields={"tool_call_id", "error"},
-        optional_fields={"evidence_refs"},
+        optional_fields={"node_id", "message_id", "evidence_refs"},
     ),
     "TOOL_END": EventTypeDef(
         required_fields={"tool_name", "result"},
-        optional_fields=set(),
+        optional_fields={"node_id", "message_id", "evidence_refs"},
     ),
 
     # ── Handoffs ─────────────────────────────────────────────────────────
     "HANDOFF": EventTypeDef(
         required_fields={"from_agent", "to_agent"},
-        optional_fields=set(),
+        optional_fields={"node_id", "message_id"},
     ),
 
     # ── Node lifecycle ───────────────────────────────────────────────────
     "NODE_STARTED": EventTypeDef(
         required_fields={"node_id"},
-        optional_fields={"node_name", "node_type"},
+        optional_fields={"node_name", "node_type", "message_id", "evidence_refs"},
     ),
     "NODE_UPDATE": EventTypeDef(
         required_fields={"runtime", "status"},
-        optional_fields={"run_id"},
+        optional_fields={"run_id", "node_id", "message_id"},
     ),
     "NODE_FAILED": EventTypeDef(
         required_fields={"node_id", "error"},
-        optional_fields={"node_name"},
+        optional_fields={"node_name", "message_id", "evidence_refs"},
     ),
 
     # ── Messages ─────────────────────────────────────────────────────────
     "MESSAGE": EventTypeDef(
         required_fields={"text"},
-        optional_fields={"source", "coalesced", "evidence_refs"},
+        optional_fields={"source", "coalesced", "node_id", "message_id", "tool_call_id", "evidence_refs"},
     ),
     "MESSAGE_CHUNK": EventTypeDef(
         required_fields={"text"},
-        optional_fields={"source"},
+        optional_fields={"source", "node_id", "message_id"},
     ),
     "TEXT_MESSAGE_START": EventTypeDef(
         required_fields={"message_id"},
-        optional_fields={"role"},
+        optional_fields={"role", "node_id"},
     ),
     "TEXT_MESSAGE_CONTENT": EventTypeDef(
         required_fields={"message_id", "delta"},
-        optional_fields=set(),
+        optional_fields={"node_id"},
     ),
     "TEXT_MESSAGE_END": EventTypeDef(
         required_fields={"message_id"},
-        optional_fields=set(),
+        optional_fields={"node_id", "evidence_refs"},
     ),
     "TEXT_MESSAGE_CHUNK": EventTypeDef(
         required_fields={"role", "delta"},
-        optional_fields=set(),
+        optional_fields={"node_id", "message_id"},
     ),
 
     # ── State ────────────────────────────────────────────────────────────
     "STATE_SNAPSHOT": EventTypeDef(
         required_fields={"state"},
-        optional_fields={"redacted"},
+        optional_fields={"redacted", "node_id"},
     ),
 
     # ── Human-in-the-loop ────────────────────────────────────────────────
     "HITL_PROMPT": EventTypeDef(
         required_fields={"hitl_id", "step_id", "prompt_text", "options", "timeout_seconds"},
-        optional_fields={"context", "created_at"},
+        optional_fields={"context", "created_at", "node_id", "message_id", "evidence_refs"},
     ),
     "HITL_RESPONSE": EventTypeDef(
         required_fields={"hitl_id", "decision", "operator_id", "responded_at"},
-        optional_fields={"modified_data", "notes"},
+        optional_fields={"modified_data", "notes", "node_id", "message_id"},
     ),
     "HITL_TIMEOUT": EventTypeDef(
         required_fields={"hitl_id", "timeout_seconds"},
-        optional_fields=set(),
+        optional_fields={"node_id", "message_id"},
+    ),
+
+    # ── Cockpit contract lifecycle ───────────────────────────────────────
+    "CONTRACT_PROPOSED": EventTypeDef(
+        required_fields={"contract"},
+        optional_fields={"node_id", "message_id"},
+    ),
+    "CONTRACT_ACCEPTED": EventTypeDef(
+        required_fields={"contract_id"},
+        optional_fields={"node_id", "message_id", "evidence_refs"},
+    ),
+    "CONTRACT_FULFILLED": EventTypeDef(
+        required_fields={"contract_id", "run_id"},
+        optional_fields={"node_id", "message_id", "evidence_refs"},
+    ),
+    "CONTRACT_VIOLATED": EventTypeDef(
+        required_fields={"contract_id", "run_id", "reason"},
+        optional_fields={"node_id", "message_id", "evidence_refs"},
+    ),
+    "RECEIPT_GENERATED": EventTypeDef(
+        required_fields={"receipt"},
+        optional_fields={"node_id", "message_id", "evidence_refs"},
+    ),
+    "FAILURE_AUTOPSY_GENERATED": EventTypeDef(
+        required_fields={"autopsy"},
+        optional_fields={"node_id", "message_id", "evidence_refs"},
+    ),
+    "EVIDENCE_REF_CREATED": EventTypeDef(
+        required_fields={"evidence_ref"},
+        optional_fields={"node_id", "message_id"},
     ),
 
     # ── Raw / fallback ───────────────────────────────────────────────────
     "RAW": EventTypeDef(
         required_fields={"raw"},
-        optional_fields={"source"},
+        optional_fields={"source", "node_id", "message_id"},
     ),
     "CUSTOM": EventTypeDef(
         required_fields={"custom_type"},
-        optional_fields={"data"},
-    ),
-    "CONTRACT_PROPOSED": EventTypeDef(
-        required_fields={"contract"},
-        optional_fields=set(),
-    ),
-    "RECEIPT_GENERATED": EventTypeDef(
-        required_fields={"receipt"},
-        optional_fields=set(),
-    ),
-    "FAILURE_AUTOPSY_GENERATED": EventTypeDef(
-        required_fields={"autopsy"},
-        optional_fields=set(),
-    ),
-    "EVIDENCE_REF_CREATED": EventTypeDef(
-        required_fields={"evidence_ref"},
-        optional_fields=set(),
+        optional_fields={"data", "node_id", "message_id"},
     ),
 }
 

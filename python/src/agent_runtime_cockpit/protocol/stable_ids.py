@@ -10,10 +10,9 @@ Missing IDs degrade safely — consumers treat absent IDs as opaque.
 """
 from __future__ import annotations
 
-import os
 import re
-import time
 import secrets
+import time
 from typing import Optional
 
 # ---------------------------------------------------------------------------

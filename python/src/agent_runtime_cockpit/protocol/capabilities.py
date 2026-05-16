@@ -69,6 +69,15 @@ class RuntimeCapabilities(BaseModel):
     can_stream_events: bool = False
     can_audit: bool = False
 
+    # Cockpit primitive emission (runtime emits structured graph events)
+    can_emit_contract: bool = False
+    can_emit_receipt: bool = False
+    can_emit_autopsy: bool = False
+    can_emit_evidence: bool = False
+
+    # Stable IDs for graph events (node_id, message_id, tool_call_id, evidence_refs)
+    has_stable_ids: bool = False
+
     # Advanced execution (Runtime Contract v2)
     can_checkpoint: bool = False
     can_resume: bool = False

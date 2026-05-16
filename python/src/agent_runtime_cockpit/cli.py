@@ -316,12 +316,35 @@ def inspect(
 def runtimes(
     workspace: Optional[str] = WORKSPACE_FLAG,
     capabilities: bool = typer.Option(False, "--capabilities", help="List all adapter capability reports"),
+    diff_from: Optional[str] = typer.Option(None, "--diff-from", help="Source runtime ID for capability diff"),
+    diff_to: Optional[str] = typer.Option(None, "--diff-to", help="Target runtime ID for capability diff"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
     """List detected runtimes in a workspace."""
     _setup_logging(debug)
     ws = _workspace(workspace)
+
+    if diff_from and diff_to:
+        from .protocol.capability_snapshot import diff_capabilities, snapshot_capabilities
+        registry = default_registry()
+        from_adapter = registry.get(diff_from)
+        to_adapter = registry.get(diff_to)
+        if from_adapter is None:
+            _out(err(ArcErrorCode.INVALID_INPUT, f"Unknown runtime: {diff_from}"), json_output)
+            return
+        if to_adapter is None:
+            _out(err(ArcErrorCode.INVALID_INPUT, f"Unknown runtime: {diff_to}"), json_output)
+            return
+        before_caps = from_adapter.capabilities()
+        after_caps = to_adapter.capabilities()
+        before_snap = snapshot_capabilities(diff_from, before_caps)
+        after_snap = snapshot_capabilities(diff_to, after_caps)
+        diff = diff_capabilities(diff_to, before_snap, after_snap)
+        payload = diff.model_dump()
+        _out(ok(payload, workspace=str(ws)), json_output)
+        return
+
     if capabilities:
         reports = runtime_router.list_runtimes(ws)
         payload = {
@@ -1345,7 +1368,12 @@ def isolation_status(
     results = []
     for p in providers:
         import asyncio
-        healthy = asyncio.run(p.health_check())
+        try:
+            healthy = asyncio.run(p.health_check())
+        finally:
+            close = getattr(p, "close", None)
+            if callable(close):
+                close()
         results.append({
             "provider_id": p.provider_id,
             "healthy": healthy,
@@ -1378,12 +1406,17 @@ def isolation_doctor(
     import asyncio
     results = []
     for pid, p in provider_map.items():
-        healthy = asyncio.run(p.health_check())
-        results.append({
-            "provider_id": pid,
-            "healthy": healthy,
-            "description": p.describe(),
-        })
+        try:
+            healthy = asyncio.run(p.health_check())
+            results.append({
+                "provider_id": pid,
+                "healthy": healthy,
+                "description": p.describe(),
+            })
+        finally:
+            close = getattr(p, "close", None)
+            if callable(close):
+                close()
     _out(ok({"diagnostics": results}), json_output)
 
 
@@ -1397,11 +1430,15 @@ def isolation_list(
     from .isolation import NoneIsolationProvider, SubprocessIsolationProvider
     from .isolation.docker_provider import DockerIsolationProvider
 
-    providers = [
-        NoneIsolationProvider().describe(),
-        SubprocessIsolationProvider().describe(),
-        DockerIsolationProvider().describe(),
-    ]
+    provider_objects = [NoneIsolationProvider(), SubprocessIsolationProvider(), DockerIsolationProvider()]
+    providers = []
+    for p in provider_objects:
+        try:
+            providers.append(p.describe())
+        finally:
+            close = getattr(p, "close", None)
+            if callable(close):
+                close()
     _out(ok({"providers": providers}), json_output)
 
 
@@ -1423,9 +1460,12 @@ def isolation_setup(
         raise typer.Exit(1)
 
     docker = DockerIsolationProvider()
-    runtime = docker.detect_runtime()
-    import asyncio
-    healthy = asyncio.run(docker.health_check())
+    try:
+        runtime = docker.detect_runtime()
+        import asyncio
+        healthy = asyncio.run(docker.health_check())
+    finally:
+        docker.close()
 
     payload = {
         "provider": "docker",
@@ -1468,7 +1508,12 @@ def isolation_test(
 
     p = provider_map[provider]
     import asyncio
-    result = asyncio.run(p.execute(["echo", "ARC isolation test OK"]))
+    try:
+        result = asyncio.run(p.execute(["echo", "ARC isolation test OK"]))
+    finally:
+        close = getattr(p, "close", None)
+        if callable(close):
+            close()
     payload = result.model_dump()
     _out(ok(payload), json_output)
     if not json_output:
@@ -1990,6 +2035,270 @@ def config_show(
     ws = _workspace(workspace)
     config = load_config(ws)
     _out(ok(config.flatten(), workspace=str(ws)), json_output)
+
+
+# ─── receipt ──────────────────────────────────────────────────────────────────
+
+
+receipt_app = typer.Typer(name="receipt", help="Run receipt commands (show/export/verify)")
+app.add_typer(receipt_app)
+
+DEFAULT_RECEIPT_KEY = "arc-dev-key-change-in-production"
+
+
+def _receipt_key() -> str:
+    """Resolve receipt HMAC key: AuditKeyManager → env var → dev key fallback."""
+    from .audit.key_manager import AuditKeyManager
+    key_bytes, status = AuditKeyManager().get_key()
+    if status.available and key_bytes is not None:
+        return key_bytes.decode("utf-8", errors="ignore")
+    import os
+    return os.environ.get("ARC_RECEIPT_HMAC_KEY", DEFAULT_RECEIPT_KEY)
+
+
+@receipt_app.command("show")
+def receipt_show(
+    run_id: str = typer.Argument(..., help="Run ID to show receipt for"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show a human-readable run receipt for a completed/failed run."""
+    _setup_logging(debug)
+    from .storage.jsonl import JsonlTraceStore
+    ws = _workspace(workspace)
+    store = JsonlTraceStore(ws / ".arc" / "traces")
+    receipt = store.load_receipt(run_id)
+    if receipt is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Receipt not found for run: {run_id}"), json_output)
+        raise typer.Exit(1)
+    _out(ok(receipt.model_dump(by_alias=True), workspace=str(ws)), json_output)
+    if not json_output:
+        console.print(f"[bold]Run Receipt:[/bold] {receipt.receipt_id}")
+        console.print(f"  Run ID:  {receipt.run_id}")
+        console.print(f"  Status:  {receipt.status}")
+        console.print(f"  Summary: {receipt.summary}")
+        console.print(f"  Cost:    {receipt.cost_usd}")
+        console.print(f"  Created: {receipt.created_at}")
+        if receipt.files_changed:
+            console.print(f"  Files changed ({len(receipt.files_changed)}):")
+            for fc in receipt.files_changed:
+                console.print(f"    {fc.path}  +{fc.added}/-{fc.removed}")
+        if receipt.evidence_refs:
+            console.print(f"  Evidence refs: {len(receipt.evidence_refs)}")
+        if receipt.audit_chain_ref:
+            console.print(f"  Audit chain: {receipt.audit_chain_ref}")
+        sig = receipt.signature or "unsigned"
+        console.print(f"  Signature: {sig[:20]}...")
+        if receipt.unresolved_risks:
+            console.print(f"  [yellow]Unresolved risks:[/yellow] {len(receipt.unresolved_risks)}")
+        if receipt.trust_boundaries_crossed:
+            console.print(f"  Trust boundaries crossed: {len(receipt.trust_boundaries_crossed)}")
+
+
+@receipt_app.command("export")
+def receipt_export(
+    run_id: str = typer.Argument(..., help="Run ID to export receipt for"),
+    format: str = typer.Option("json", "--format", help="Output format: json, markdown"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path (default: .arc/receipts/{run_id}.receipt.{ext})"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Export a run receipt to a file (JSON or Markdown)."""
+    _setup_logging(debug)
+    from .storage.jsonl import JsonlTraceStore
+    ws = _workspace(workspace)
+    store = JsonlTraceStore(ws / ".arc" / "traces")
+    receipt = store.load_receipt(run_id)
+    if receipt is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Receipt not found for run: {run_id}"), json_output)
+        raise typer.Exit(1)
+
+    ext = ".md" if format == "markdown" else ".json"
+    out_path = Path(output) if output else ws / ".arc" / "receipts" / f"{run_id}.receipt{ext}"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if format == "markdown":
+        md_lines = [
+            f"# Run Receipt: {receipt.receipt_id}",
+            "",
+            f"- **Run ID:** {receipt.run_id}",
+            f"- **Status:** {receipt.status}",
+            f"- **Summary:** {receipt.summary}",
+            f"- **Cost:** {receipt.cost_usd}",
+            f"- **Created:** {receipt.created_at}",
+        ]
+        if receipt.files_changed:
+            md_lines.append("")
+            md_lines.append("## Files Changed")
+            for fc in receipt.files_changed:
+                md_lines.append(f"- `{fc.path}` (+{fc.added}/-{fc.removed})")
+        if receipt.evidence_refs:
+            md_lines.append("")
+            md_lines.append(f"## Evidence ({len(receipt.evidence_refs)} refs)")
+            for er in receipt.evidence_refs:
+                md_lines.append(f"- `{er.evidence_id}`: {er.kind} → {er.target}")
+        if receipt.audit_chain_ref:
+            md_lines.append("")
+            md_lines.append("## Audit Chain")
+            md_lines.append(f"- {receipt.audit_chain_ref}")
+        md_lines.append("")
+        md_lines.append(f"_Signature: {receipt.signature or 'unsigned'}_")
+        out_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+    else:
+        out_path.write_text(receipt.model_dump_json(indent=2, by_alias=True), encoding="utf-8")
+
+    payload = {"exported": True, "path": str(out_path), "run_id": run_id, "format": format}
+    _out(ok(payload, workspace=str(ws)), json_output)
+    if not json_output:
+        console.print(f"[green]Exported[/green] receipt to {out_path}")
+
+
+@receipt_app.command("verify")
+def receipt_verify(
+    file: str = typer.Argument(..., help="Path to receipt JSON file"),
+    key: Optional[str] = typer.Option(None, "--key", help="HMAC key (default: ARC_RECEIPT_HMAC_KEY env or dev key)"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Verify a receipt file's HMAC signature and integrity."""
+    _setup_logging(debug)
+    import json as json_mod
+    from .protocol.run_receipt import RunReceipt
+    path = Path(file).expanduser().resolve()
+    if not path.exists():
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Receipt file not found: {path}"), json_output)
+        raise typer.Exit(1)
+
+    def _try_legacy(r: RunReceipt, k: str) -> bool:
+        try:
+            return r.verify(k)
+        except Exception:
+            return False
+
+    try:
+        data = json_mod.loads(path.read_text(encoding="utf-8"))
+        receipt = RunReceipt.model_validate(data)
+    except Exception as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid receipt file: {exc}"), json_output)
+        raise typer.Exit(1)
+
+    hmac_key = key or _receipt_key()
+    valid = receipt.verify(hmac_key)
+
+    # Legacy fallback: when --key omitted and AuditKeyManager/env key didn't
+    # match, try the dev key for backwards compatibility with existing receipts
+    if not valid and key is None and hmac_key != DEFAULT_RECEIPT_KEY:
+        valid = _try_legacy(receipt, DEFAULT_RECEIPT_KEY)
+
+    payload = {
+        "file": str(path),
+        "receipt_id": receipt.receipt_id,
+        "run_id": receipt.run_id,
+        "valid": valid,
+        "has_signature": receipt.signature is not None,
+    }
+    _out(ok(payload), json_output)
+    if not json_output:
+        color = "green" if valid else "red"
+        label = "VALID" if valid else "INVALID"
+        console.print(f"Receipt signature: [bold {color}]{label}[/bold {color}]")
+        console.print(f"  Receipt ID: {receipt.receipt_id}")
+        console.print(f"  Run ID: {receipt.run_id}")
+        if receipt.signature:
+            console.print(f"  Signature: {receipt.signature[:20]}...")
+        else:
+            console.print("  [yellow]No signature present[/yellow]")
+    if not valid:
+        raise typer.Exit(1)
+
+
+# ─── contract show ────────────────────────────────────────────────────────────
+
+
+@runs_app.command("contract")
+def runs_contract(
+    run_id: str = typer.Argument(..., help="Run ID to show contract for"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show the run contract for a stored run."""
+    _setup_logging(debug)
+    from .storage.jsonl import JsonlTraceStore
+    ws = _workspace(workspace)
+    store = JsonlTraceStore(ws / ".arc" / "traces")
+    contract = store.load_contract(run_id)
+    if contract is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Contract not found for run: {run_id}"), json_output)
+        raise typer.Exit(1)
+    _out(ok(contract.model_dump(), workspace=str(ws)), json_output)
+    if not json_output:
+        console.print(f"[bold]Run Contract:[/bold] {contract.contract_id}")
+        console.print(f"  Status:    {contract.status.value}")
+        console.print(f"  Objective: {contract.objective}")
+        console.print(f"  Runtime:   {contract.runtime}")
+        console.print(f"  Mode:      {contract.mode}")
+        console.print(f"  Allowed tools ({len(contract.allowed_tools)}):")
+        for t in contract.allowed_tools:
+            console.print(f"    - {t}")
+        if contract.write_scope:
+            console.print("  Write scope:")
+            for s in contract.write_scope:
+                console.print(f"    - {s}")
+        if isinstance(contract.cost_ceiling_usd, (int, float)):
+            console.print(f"  Cost ceiling: ${contract.cost_ceiling_usd}")
+        console.print(f"  Created: {contract.created_at}")
+        if contract.accepted_at:
+            console.print(f"  Accepted: {contract.accepted_at}")
+        if contract.fulfilled_at:
+            console.print(f"  Fulfilled: {contract.fulfilled_at}")
+
+
+# ─── autopsy show ─────────────────────────────────────────────────────────────
+
+
+@runs_app.command("autopsy")
+def runs_autopsy(
+    run_id: str = typer.Argument(..., help="Run ID to show autopsy for"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show failure autopsy for a failed run."""
+    _setup_logging(debug)
+    from .storage.jsonl import JsonlTraceStore
+    ws = _workspace(workspace)
+    store = JsonlTraceStore(ws / ".arc" / "traces")
+    autopsy = store.load_autopsy(run_id)
+    if autopsy is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Autopsy not found for run: {run_id}"), json_output)
+        raise typer.Exit(1)
+    _out(ok(autopsy.model_dump(by_alias=True), workspace=str(ws)), json_output)
+    if not json_output:
+        console.print(f"[bold]Failure Autopsy:[/bold] {autopsy.run_id}")
+        console.print(f"  Probable cause: {autopsy.probable_cause}")
+        console.print(f"  Confidence:     {autopsy.confidence}")
+        if autopsy.failed_node:
+            console.print(f"  Failed node:    {autopsy.failed_node}")
+        if autopsy.last_safe_state:
+            console.print(f"  Last safe:      {autopsy.last_safe_state}")
+        if autopsy.knows:
+            console.print("  [green]Known:[/green]")
+            for k in autopsy.knows:
+                console.print(f"    ✓ {k}")
+        if autopsy.guesses:
+            console.print("  [yellow]Guesses:[/yellow]")
+            for g in autopsy.guesses:
+                console.print(f"    ? {g}")
+        if autopsy.retry_options:
+            console.print("  Retry options:")
+            for ro in autopsy.retry_options:
+                risk_color = {"low": "green", "medium": "yellow", "high": "red"}.get(ro.risk, "white")
+                console.print(f"    [{risk_color}]{ro.risk}[/{risk_color}] {ro.label}")
+                if ro.command:
+                    console.print(f"      Command: {ro.command}")
 
 
 # ─── audit (ADR-005) ─────────────────────────────────────────────────────────

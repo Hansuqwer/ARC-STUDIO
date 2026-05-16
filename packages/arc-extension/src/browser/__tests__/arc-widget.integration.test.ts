@@ -102,8 +102,8 @@ describe('ArcWidget Integration Tests', () => {
             expect(widgetSource).toMatch(/WorkflowExecutionSection/);
         });
 
-        it('should use TraceViewerSection component', () => {
-            expect(widgetSource).toMatch(/TraceViewerSection/);
+        it('should NOT use TraceViewerSection component (advanced trace removed from default surface)', () => {
+            expect(widgetSource).not.toMatch(/TraceViewerSection/);
         });
 
         it('should use WorkflowDetectionSection component', () => {
@@ -141,7 +141,6 @@ describe('ArcWidget Integration Tests', () => {
         it('should support nested state updates for isCollapsed', () => {
             const isCollapsed = {
                 'workflow-execution': false,
-                'trace-viewer': false,
                 'workflow-detection': false
             };
 
@@ -151,21 +150,7 @@ describe('ArcWidget Integration Tests', () => {
             };
 
             expect(updated['workflow-execution']).toBe(true);
-            expect(updated['trace-viewer']).toBe(false);
-        });
-
-        it('should support array state updates for traces', () => {
-            const traces: any[] = [];
-            const newTrace = {
-                id: 'run-1',
-                path: '/path',
-                timestamp: '2024-01-01T00:00:00.000Z',
-                status: 'completed' as const
-            };
-
-            const updated = [...traces, newTrace];
-            expect(updated.length).toBe(1);
-            expect(updated[0].id).toBe('run-1');
+            expect(updated['workflow-detection']).toBe(false);
         });
 
         it('should support toast notification state updates', () => {
@@ -197,38 +182,6 @@ describe('ArcWidget Integration Tests', () => {
             const progress = Math.round((completedCount / steps.length) * 100);
 
             expect(progress).toBe(40);
-        });
-    });
-
-    describe('Trace Filtering Logic', () => {
-        it('should filter traces by ID (case-insensitive)', () => {
-            const traces = [
-                { id: 'run-sg-abc123', path: '', timestamp: '', status: 'completed' as const },
-                { id: 'run-sg-def456', path: '', timestamp: '', status: 'completed' as const },
-                { id: 'run-sg-ABC789', path: '', timestamp: '', status: 'failed' as const }
-            ];
-
-            const filter = 'abc';
-            const filtered = traces.filter(t =>
-                t.id.toLowerCase().includes(filter.toLowerCase())
-            );
-
-            expect(filtered.length).toBe(2);
-            expect(filtered.map(t => t.id)).toContain('run-sg-abc123');
-            expect(filtered.map(t => t.id)).toContain('run-sg-ABC789');
-        });
-
-        it('should return all traces with empty filter', () => {
-            const traces = [
-                { id: 'run-1', path: '', timestamp: '', status: 'completed' as const },
-                { id: 'run-2', path: '', timestamp: '', status: 'failed' as const }
-            ];
-
-            const filtered = traces.filter(t =>
-                t.id.toLowerCase().includes(''.toLowerCase())
-            );
-
-            expect(filtered.length).toBe(2);
         });
     });
 
@@ -422,52 +375,6 @@ describe('ArcWidget Integration Tests', () => {
         });
     });
 
-    describe('Trace Filtering', () => {
-        it('should filter traces by ID substring', () => {
-            const traces = [
-                { id: 'run-sg-abc123', path: '', timestamp: '2024-01-01T00:00:00.000Z', status: 'completed' as const },
-                { id: 'run-sg-def456', path: '', timestamp: '2024-01-02T00:00:00.000Z', status: 'failed' as const },
-                { id: 'run-lg-abc789', path: '', timestamp: '2024-01-03T00:00:00.000Z', status: 'completed' as const }
-            ];
-
-            const filtered = traces.filter(t => t.id.toLowerCase().includes('abc'));
-            expect(filtered.length).toBe(2);
-            expect(filtered.map(t => t.id)).toEqual(['run-sg-abc123', 'run-lg-abc789']);
-        });
-
-        it('should filter traces by prefix', () => {
-            const traces = [
-                { id: 'run-sg-001', path: '', timestamp: '', status: 'completed' as const },
-                { id: 'run-lg-002', path: '', timestamp: '', status: 'completed' as const },
-                { id: 'run-ca-003', path: '', timestamp: '', status: 'completed' as const }
-            ];
-
-            const filtered = traces.filter(t => t.id.toLowerCase().includes('run-sg'));
-            expect(filtered.length).toBe(1);
-            expect(filtered[0].id).toBe('run-sg-001');
-        });
-
-        it('should handle empty filter returning all traces', () => {
-            const traces = [
-                { id: 'run-1', path: '', timestamp: '', status: 'completed' as const },
-                { id: 'run-2', path: '', timestamp: '', status: 'failed' as const }
-            ];
-
-            const filter = '';
-            const filtered = traces.filter(t => t.id.toLowerCase().includes(filter.toLowerCase()));
-            expect(filtered.length).toBe(2);
-        });
-
-        it('should handle no matches', () => {
-            const traces = [
-                { id: 'run-sg-001', path: '', timestamp: '', status: 'completed' as const }
-            ];
-
-            const filtered = traces.filter(t => t.id.toLowerCase().includes('nonexistent'));
-            expect(filtered.length).toBe(0);
-        });
-    });
-
     describe('Toast Management', () => {
         it('should add toast notification', () => {
             const toasts: any[] = [];
@@ -546,7 +453,6 @@ describe('ArcWidget Integration Tests', () => {
         it('should toggle section collapsed state', () => {
             const isCollapsed = {
                 'workflow-execution': false,
-                'trace-viewer': false,
                 'workflow-detection': false
             };
 
@@ -556,7 +462,7 @@ describe('ArcWidget Integration Tests', () => {
             };
 
             expect(toggled['workflow-execution']).toBe(true);
-            expect(toggled['trace-viewer']).toBe(false);
+            expect(toggled['workflow-detection']).toBe(false);
 
             const toggledBack = {
                 ...toggled,
@@ -587,25 +493,21 @@ describe('ArcWidget Integration Tests', () => {
             expect(widgetSource).toMatch(/handleExecuteWorkflow/);
         });
 
-        it('should have handleLoadTraces method', () => {
-            expect(widgetSource).toMatch(/handleLoadTraces/);
-        });
-
-        it('should have handleLoadTraces method', () => {
-            expect(widgetSource).toMatch(/async\s+handleLoadTraces\s*\(/);
-        });
-
         it('should have handleScanWorkspace method', () => {
             expect(widgetSource).toMatch(/handleScanWorkspace/);
+        });
+
+        it('should NOT have handleLoadTraces method (advanced trace removed from default surface)', () => {
+            expect(widgetSource).not.toMatch(/handleLoadTraces/);
         });
 
         it('should have dispose method', () => {
             expect(widgetSource).toMatch(/dispose\s*\(\s*\)\s*:/);
         });
 
-        it('should use TraceViewerSection component with filtering', () => {
-            expect(widgetSource).toMatch(/TraceViewerSection/);
-            expect(widgetSource).toMatch(/traceFilter/);
+        it('should NOT use TraceViewerSection component (advanced trace removed from default surface)', () => {
+            expect(widgetSource).not.toMatch(/TraceViewerSection/);
+            expect(widgetSource).not.toMatch(/traceFilter/);
         });
 
         it('should use ToastContainer component', () => {

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import time
+import gc
 from pathlib import Path
 from typing import Any, Optional
 
@@ -50,6 +51,7 @@ class DockerIsolationProvider(IsolationProvider):
             return True
         except Exception as e:
             log.warning("Docker health check failed: %s", e)
+            self.close()
             return False
 
     async def execute(
@@ -131,8 +133,18 @@ class DockerIsolationProvider(IsolationProvider):
                 info["runtime"] = "docker"
         except Exception as e:
             info["error"] = str(e)
+            self.close()
         self._runtime_info = info
         return info
+
+    def close(self) -> None:
+        """Close cached Docker client sockets, if any."""
+        client = self._client
+        self._client = None
+        close = getattr(client, "close", None)
+        if callable(close):
+            close()
+        gc.collect()
 
     def describe(self) -> dict[str, object]:
         runtime = self.detect_runtime()

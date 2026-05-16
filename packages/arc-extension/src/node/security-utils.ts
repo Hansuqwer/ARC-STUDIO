@@ -138,6 +138,27 @@ export function sanitizeErrorMessage(error: any): string {
 }
 
 /**
+ * Validates run ID to prevent path traversal attacks
+ * Supports standard run ID format: run_<prefix>_<hash>
+ */
+export function validateRunId(runId: string): string {
+    if (!runId || typeof runId !== 'string') {
+        throw new Error('Invalid run ID: must be a non-empty string');
+    }
+
+    const runIdPattern = /^run[-_][a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$/;
+    if (!runIdPattern.test(runId)) {
+        throw new Error('Invalid run ID format');
+    }
+
+    if (runId.includes('..') || runId.includes('/') || runId.includes('\\')) {
+        throw new Error('Run ID contains invalid path characters');
+    }
+
+    return runId;
+}
+
+/**
  * Validates workspace root directory
  */
 export function validateWorkspaceRoot(workspaceRoot: string): string {

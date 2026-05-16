@@ -7,7 +7,8 @@
 import * as React from 'react';
 import { injectable, inject, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
-import { ArcService, RuntimeCapabilityReport, RuntimeCapabilitiesResponse, ProviderStatus, DoctorAction } from '../common/arc-protocol';
+import { ArcService, RuntimeCapabilityReport, RuntimeCapabilitiesResponse, ProviderStatus, DoctorAction, CapabilityDiffResponse } from '../common/arc-protocol';
+import { CapabilityDiffViewer } from './components/CapabilityDiffViewer';
 
 interface AdaptersWidgetState {
     loading: boolean;
@@ -16,6 +17,9 @@ interface AdaptersWidgetState {
     workspacePath: string;
     runtimeError?: string;
     confirmAction?: DoctorAction;
+    diffLoading: boolean;
+    diffResponse: CapabilityDiffResponse | null;
+    diffError?: string;
 }
 
 @injectable()
@@ -32,6 +36,9 @@ export class ArcAdaptersWidget extends ReactWidget {
         workspacePath: '',
         runtimeError: undefined,
         confirmAction: undefined,
+        diffLoading: false,
+        diffResponse: null,
+        diffError: undefined,
     };
 
     @postConstruct()
@@ -69,6 +76,7 @@ export class ArcAdaptersWidget extends ReactWidget {
 
     protected render(): React.ReactNode {
         if (this.state.loading) return <div style={{ padding: 24 }}>Loading adapters...</div>;
+        const runtimeIds = this.state.capabilities.map(c => c.runtime_id);
         return (
             <div style={{
                 padding: 16, fontFamily: 'var(--theia-ui-font-family)',
@@ -82,6 +90,15 @@ export class ArcAdaptersWidget extends ReactWidget {
                     <button style={refreshBtnStyle} onClick={() => this.load()}>Refresh</button>
                 </div>
                 {this.renderWorkspaceInfo()}
+                <CapabilityDiffViewer
+                    diffResponse={this.state.diffResponse}
+                    loading={this.state.diffLoading}
+                    error={this.state.diffError}
+                    onConfirm={() => this.handleDiffConfirm()}
+                    onCancel={() => this.handleDiffCancel()}
+                    onCompare={(from, to) => this.handleCompare(from, to)}
+                    availableRuntimes={runtimeIds}
+                />
                 {this.state.capabilities.map(cap => this.renderCard(cap))}
                 {this.state.capabilities.length === 0 && !this.state.runtimeError && (
                     <div style={{
@@ -185,6 +202,27 @@ export class ArcAdaptersWidget extends ReactWidget {
             console.log(`ARC doctor: copying command: ${action.command}`);
             navigator.clipboard.writeText(action.command).catch(() => {});
         }
+    }
+
+    protected async handleCompare(from: string, to: string): Promise<void> {
+        this.updateState({ diffLoading: true, diffError: undefined, diffResponse: null });
+        try {
+            const result = await this.arcService.getCapabilityDiff(from, to);
+            this.updateState({ diffLoading: false, diffResponse: result });
+        } catch (error) {
+            this.updateState({
+                diffLoading: false,
+                diffError: error instanceof Error ? error.message : String(error),
+            });
+        }
+    }
+
+    protected handleDiffConfirm(): void {
+        console.log('ARC adapters: runtime switch confirmed');
+    }
+
+    protected handleDiffCancel(): void {
+        this.updateState({ diffResponse: null });
     }
 
     protected renderConfirmDialog(): React.ReactNode {

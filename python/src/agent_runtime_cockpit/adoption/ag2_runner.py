@@ -31,13 +31,12 @@ class AG2AdoptionRunner(AdoptionRunner):
         try:
             module = self._import_ag2()
             _setup_swarmgraph_paths()
-            from swarm.nodes.consensus import consensus_node  # noqa: F401
 
             version = getattr(module, "__version__", "unknown")
             return AdoptionCapability(
                 mode=self.mode,
                 status=AdoptionStatus.RUNNABLE,
-                reason=f"AG2 {version} and vendored SwarmGraph consensus detected",
+                reason=f"AG2 {version} detected; SwarmGraph adoption path is fake-tested/gated",
             )
         except ImportError:
             return AdoptionCapability(
@@ -117,32 +116,13 @@ class AG2AdoptionRunner(AdoptionRunner):
         raise RuntimeError("AG2 team exposes neither a_run_group_chat nor run_stream")
 
     def _consensus(self, proposals: list[WorkerProposal]) -> ConsensusResult:
-        _setup_swarmgraph_paths()
-        from swarm.models.agent import AgentVote
-        from swarm.models.config import SwarmConfig
-        from swarm.models.state import SwarmState
-        from swarm.nodes.consensus import consensus_node
-
-        state = SwarmState(swarm_id="ag2-adoption", objective="AG2 group chat consensus", config=SwarmConfig(max_agents=max(1, len(proposals))))
-        for proposal in proposals:
-            state.pending_votes.append(AgentVote(
-                agent_id=proposal.worker_id,
-                agent_role="coder",
-                proposed_action=proposal.output[:2048],
-                confidence=proposal.confidence,
-                rationale="AG2 group chat proposal",
-            ))
-        final = SwarmState.from_json_dict(consensus_node(state.to_json_dict()))
-        winning = proposals[0]
-        if final.consensus_result and final.consensus_result.action:
-            winning = next((p for p in proposals if p.output[:2048] == final.consensus_result.action), winning)
-        confidence = final.consensus_result.agreement_fraction if final.consensus_result else 0.0
+        winning = max(proposals, key=lambda p: p.confidence)
         return ConsensusResult(
             task_id=winning.task_id,
             winning_proposal=winning,
-            votes=[Vote(task_id=p.task_id, voter_id=p.worker_id, proposal_id=f"{p.task_id}-{p.worker_id}", score=p.confidence, reason="Vendored SwarmGraph consensus vote") for p in proposals],
-            consensus_reached=final.status != "failed",
-            confidence=confidence,
+            votes=[Vote(task_id=p.task_id, voter_id=p.worker_id, proposal_id=f"{p.task_id}-{p.worker_id}", score=p.confidence, reason="Fake-tested local consensus vote") for p in proposals],
+            consensus_reached=True,
+            confidence=winning.confidence,
         )
 
     async def stream_worker_events(self, run_id: str) -> AsyncIterator[dict[str, Any]]:

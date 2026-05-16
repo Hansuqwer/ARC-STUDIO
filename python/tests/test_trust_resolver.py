@@ -31,6 +31,8 @@ class TestTrustResolver:
         assert resolution.level == TrustLevel.UNTRUSTED
         assert "not found" in resolution.reason
         assert resolution.warning is not None
+        assert "blocked until workspace is trusted" in resolution.warning
+        assert "proceed with subprocess isolation" not in resolution.warning
 
     def test_trust_workspace(self, tmp_path):
         trust_db = tmp_path / "trust-db.json"

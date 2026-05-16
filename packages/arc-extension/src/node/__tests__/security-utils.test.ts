@@ -4,7 +4,8 @@ import {
     validateFilePath,
     validateBackend,
     sanitizeErrorMessage,
-    validateWorkspaceRoot
+    validateWorkspaceRoot,
+    validateRunId,
 } from '../security-utils';
 import * as path from 'path';
 import * as os from 'os';
@@ -187,6 +188,38 @@ describe('security-utils', () => {
             expect(sanitizeErrorMessage(error)).toBe('An error occurred while processing your request');
             expect(sanitizeErrorMessage('not an error' as any)).toBe('An error occurred while processing your request');
             expect(sanitizeErrorMessage(null as any)).toBe('An error occurred while processing your request');
+        });
+    });
+
+    describe('validateRunId', () => {
+        it('should throw on empty string', () => {
+            expect(() => validateRunId('')).toThrow('Invalid run ID: must be a non-empty string');
+        });
+
+        it('should throw on non-string input', () => {
+            expect(() => validateRunId(null as any)).toThrow('Invalid run ID: must be a non-empty string');
+            expect(() => validateRunId(undefined as any)).toThrow('Invalid run ID: must be a non-empty string');
+        });
+
+        it('should accept valid run IDs with underscore', () => {
+            expect(validateRunId('run_01HQ3WNOPQR456STU789VWX012')).toBe('run_01HQ3WNOPQR456STU789VWX012');
+            expect(validateRunId('run_sg_abc123')).toBe('run_sg_abc123');
+        });
+
+        it('should accept valid run IDs with dash', () => {
+            expect(validateRunId('run-sg-abc123')).toBe('run-sg-abc123');
+            expect(validateRunId('run-lg-abc123')).toBe('run-lg-abc123');
+        });
+
+        it('should reject run IDs with path traversal characters', () => {
+            expect(() => validateRunId('run_sg_abc/../evil')).toThrow('Invalid run ID format');
+            expect(() => validateRunId('run_sg_abc\\..\\evil')).toThrow('Invalid run ID format');
+            expect(() => validateRunId('run_sg_abc..')).toThrow('Invalid run ID format');
+        });
+
+        it('should reject malformed run IDs', () => {
+            expect(() => validateRunId('simple')).toThrow('Invalid run ID format');
+            expect(() => validateRunId('')).toThrow('Invalid run ID: must be a non-empty string');
         });
     });
 

@@ -6,7 +6,7 @@ import { ArcEventStreamWidget } from './arc-event-stream-widget';
 
 export const OpenEventStreamCommand: Command = {
     id: 'arc:open-event-stream',
-    label: 'ARC: Open Event Stream',
+    label: 'ARC: Open Event Stream (Advanced Trace)',
     category: 'ARC',
 };
 

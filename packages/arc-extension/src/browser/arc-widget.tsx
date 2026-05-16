@@ -1,22 +1,21 @@
 /**
- * ARC Widget
+ * ARC Widget (Legacy)
  * 
- * Main UI widget for ARC Studio showing workflow execution,
- * trace visualization, and SwarmGraph controls.
+ * Backward-compatible widget for ARC Studio showing workflow execution
+ * and SwarmGraph controls. Trace UI is available via advanced trace widgets.
  */
 
 import { injectable, postConstruct, inject } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common/message-service';
 import * as React from '@theia/core/shared/react';
-import { ArcService, ExecutionResult, TraceFile, WorkflowInfo } from '../common/arc-protocol';
+import { ArcService, ExecutionResult, WorkflowInfo } from '../common/arc-protocol';
 import {
     ToastContainer,
     ToastNotification,
     ShortcutsModal,
     ProgressStep,
     WorkflowExecutionSection,
-    TraceViewerSection,
     WorkflowDetectionSection,
     ErrorBanner
 } from './components';
@@ -29,12 +28,6 @@ interface ArcWidgetState {
     executionResult?: ExecutionResult;
     executionTime?: number;
     prompt: string;
-
-    isLoadingTraces: boolean;
-    traceProgress: number;
-    traces: TraceFile[];
-    selectedTrace?: TraceFile;
-    traceFilter: string;
 
     isScanning: boolean;
     scanProgress: number;
@@ -63,8 +56,6 @@ export class ArcWidget extends ReactWidget {
 
     private keyboardHandler: ((e: KeyboardEvent) => void) | undefined;
     private toastTimeouts = new Map<string, NodeJS.Timeout>();
-    private filterDebounceTimer: NodeJS.Timeout | undefined;
-    private pendingFilterValue = '';
 
     private state: ArcWidgetState = {
         isExecuting: false,
@@ -72,17 +63,12 @@ export class ArcWidget extends ReactWidget {
         executionProgress: 0,
         executionSteps: [],
         prompt: '',
-        isLoadingTraces: false,
-        traceProgress: 0,
-        traces: [],
-        traceFilter: '',
         isScanning: false,
         scanProgress: 0,
         workflows: [],
         toasts: [],
         isCollapsed: {
             'workflow-execution': false,
-            'trace-viewer': false,
             'workflow-detection': false
         },
         showShortcutsHelp: false
@@ -113,10 +99,6 @@ export class ArcWidget extends ReactWidget {
         }
         this.toastTimeouts.forEach((timeout) => clearTimeout(timeout));
         this.toastTimeouts.clear();
-        if (this.filterDebounceTimer) {
-            clearTimeout(this.filterDebounceTimer);
-            this.filterDebounceTimer = undefined;
-        }
         super.dispose();
     }
 
@@ -129,10 +111,6 @@ export class ArcWidget extends ReactWidget {
                     case 'e':
                         e.preventDefault();
                         this.handleExecuteWorkflow();
-                        break;
-                    case 'l':
-                        e.preventDefault();
-                        this.handleLoadTraces();
                         break;
                     case 's':
                         e.preventDefault();
@@ -200,26 +178,6 @@ export class ArcWidget extends ReactWidget {
                 [sectionId]: !this.state.isCollapsed[sectionId]
             }
         });
-    }
-
-    private handleTraceFilterChange(value: string): void {
-        this.pendingFilterValue = value;
-        if (this.filterDebounceTimer) {
-            clearTimeout(this.filterDebounceTimer);
-        }
-        this.filterDebounceTimer = setTimeout(() => {
-            this.updateState({ traceFilter: this.pendingFilterValue });
-            this.filterDebounceTimer = undefined;
-        }, 300);
-    }
-
-    private clearTraceFilter(): void {
-        if (this.filterDebounceTimer) {
-            clearTimeout(this.filterDebounceTimer);
-            this.filterDebounceTimer = undefined;
-        }
-        this.pendingFilterValue = '';
-        this.updateState({ traceFilter: '' });
     }
 
     private updateExecutionStep(stepId: string, status: ProgressStep['status']): void {
@@ -337,58 +295,6 @@ export class ArcWidget extends ReactWidget {
         }
     }
 
-    async handleLoadTraces(): Promise<void> {
-        if (this.state.isLoadingTraces) {
-            return;
-        }
-
-        const perfStart = performance.now();
-
-        this.updateState({ 
-            isLoadingTraces: true, 
-            traceProgress: 0,
-            error: undefined,
-            errorDetails: undefined 
-        });
-
-        try {
-            this.updateState({ traceProgress: 20 });
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            this.updateState({ traceProgress: 50 });
-            
-            const traces = await this.arcService.getTraces();
-            
-            this.updateState({ traceProgress: 80 });
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            this.updateState({
-                isLoadingTraces: false,
-                traces,
-                traceProgress: 100
-            });
-
-            const perfDuration = performance.now() - perfStart;
-            console.log(`[ARC Performance] Trace loading: ${perfDuration.toFixed(2)}ms for ${traces.length} traces`);
-
-            this.messageService.info(`Loaded ${traces.length} trace(s)`);
-            this.addToast('success', `Loaded ${traces.length} trace(s)`);
-        } catch (error: any) {
-            this.updateState({
-                isLoadingTraces: false,
-                error: 'Failed to load traces',
-                errorDetails: error.message || 'Unknown error occurred',
-                traceProgress: 0
-            });
-
-            this.messageService.error(`Failed to load traces: ${error.message}`);
-            this.addToast('error', `Failed to load traces: ${error.message}`);
-
-            const perfDuration = performance.now() - perfStart;
-            console.log(`[ARC Performance] Trace loading (failed): ${perfDuration.toFixed(2)}ms`);
-        }
-    }
-
     async handleScanWorkspace(): Promise<void> {
         if (this.state.isScanning) {
             return;
@@ -461,11 +367,6 @@ export class ArcWidget extends ReactWidget {
             executionResult, 
             executionTime,
             prompt,
-            isLoadingTraces, 
-            traceProgress,
-            traces, 
-            selectedTrace,
-            traceFilter,
             isScanning, 
             scanProgress,
             workflows,
@@ -512,20 +413,6 @@ export class ArcWidget extends ReactWidget {
                         onExecute={() => this.handleExecuteWorkflow()}
                     />
 
-                    <TraceViewerSection
-                        isCollapsed={isCollapsed['trace-viewer']}
-                        onToggle={() => this.toggleSection('trace-viewer')}
-                        isLoadingTraces={isLoadingTraces}
-                        traceProgress={traceProgress}
-                        traces={traces}
-                        selectedTrace={selectedTrace}
-                        traceFilter={traceFilter}
-                        onTraceFilterChange={(value) => this.handleTraceFilterChange(value)}
-                        onClearFilter={() => this.clearTraceFilter()}
-                        onLoadTraces={() => this.handleLoadTraces()}
-                        onSelectTrace={(trace) => this.updateState({ selectedTrace: trace })}
-                    />
-
                     <WorkflowDetectionSection
                         isCollapsed={isCollapsed['workflow-detection']}
                         onToggle={() => this.toggleSection('workflow-detection')}
@@ -538,7 +425,7 @@ export class ArcWidget extends ReactWidget {
 
                 <div className='arc-footer' role='contentinfo'>
                     <small>
-                        <kbd>Ctrl+H</kbd> Show shortcuts | <kbd>Ctrl+E</kbd> Execute | <kbd>Ctrl+L</kbd> Load Traces | <kbd>Ctrl+S</kbd> Scan | <kbd>Esc</kbd> Close
+                        <kbd>Ctrl+H</kbd> Show shortcuts | <kbd>Ctrl+E</kbd> Execute | <kbd>Ctrl+S</kbd> Scan | <kbd>Esc</kbd> Close
                     </small>
                 </div>
             </div>

@@ -1,17 +1,14 @@
 """Tests: Policy loader — PolicyConfig, ApprovalPolicy, load_policy(), compute_trust_diff()."""
 from __future__ import annotations
 
+import yaml
 from pathlib import Path
 
-import pytest
-import yaml
-
 from agent_runtime_cockpit.config.policy import (
-    ApprovalPolicy,
     ApprovalRule,
     PolicyConfig,
-    load_policy,
     compute_trust_diff,
+    load_policy,
 )
 
 
@@ -78,7 +75,7 @@ def test_user_policy_stricter_than_defaults(tmp_path):
 
 
 def test_project_policy_overrides_user_on_unprotected(tmp_path):
-    user_policy = _write_policy(
+    _write_policy(
         tmp_path / "user" / "policy.yaml",
         {"approvals": {"paid_calls": "deny"}},
     )
@@ -94,7 +91,7 @@ def test_project_policy_overrides_user_on_unprotected(tmp_path):
 
 
 def test_project_policy_cannot_weaken_shell_exec(tmp_path):
-    user_policy = _write_policy(
+    _write_policy(
         tmp_path / "user" / "policy.yaml",
         {"approvals": {"shell_exec": "deny"}},
     )
@@ -110,7 +107,7 @@ def test_project_policy_cannot_weaken_shell_exec(tmp_path):
 
 
 def test_project_policy_cannot_weaken_trust_changes(tmp_path):
-    user_policy = _write_policy(
+    _write_policy(
         tmp_path / "user" / "policy.yaml",
         {"approvals": {"trust_changes": "deny"}},
     )
@@ -126,7 +123,7 @@ def test_project_policy_cannot_weaken_trust_changes(tmp_path):
 
 
 def test_project_policy_can_strengthen_protected_fields(tmp_path):
-    user_policy = _write_policy(
+    _write_policy(
         tmp_path / "user" / "policy.yaml",
         {"approvals": {"shell_exec": "ask"}},
     )

@@ -12,12 +12,15 @@ import secrets
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import yaml
 from pydantic import BaseModel, Field
 
 log = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from ..protocol.trust_diff import TrustDiff
 
 DEFAULT_USER_POLICY_PATH = Path.home() / ".config" / "arc-studio" / "policy.yaml"
 DEFAULT_PROJECT_POLICY_PATH = Path(".arc") / "policy.yaml"

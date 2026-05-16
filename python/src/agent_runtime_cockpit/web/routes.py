@@ -19,6 +19,7 @@ import aiohttp.web as web
 from ..adapters.registry import default_registry
 from ..context.pack import ContextPackGenerator
 from ..orchestration import runtime_router
+from ..orchestration.cross_linker import CrossLinker
 from ..protocol.envelope import ok, err
 from ..protocol.errors import ArcErrorCode
 from ..protocol.schemas import WorkspaceInfo
@@ -427,6 +428,71 @@ async def run_events_sse(request: web.Request) -> web.StreamResponse:
     return response
 
 
+async def run_links(request: web.Request) -> web.Response:
+    """GET /api/runs/{id}/links — return linked event chains for a run.
+
+    Query params:
+      - ``filter``: ``"node_id"``, ``"message_id"``, ``"tool_call_id"``,
+        ``"evidence_id"``, or ``"all_ids"`` (default). Returns chains keyed
+        by the chosen stable ID type.
+      - ``stable_id``: optional single ID to narrow results.
+    """
+    run_id = request.match_info["run_id"]
+    run = _trace_store(request).load(run_id)
+    if not run:
+        return _json(err(ArcErrorCode.RUN_NOT_FOUND, f"Run {run_id} not found").model_dump(), 404)
+
+    linker = CrossLinker()
+    linker.index_all(run.events)
+
+    filter_by = request.query.get("filter", "all_ids")
+    single_id = request.query.get("stable_id")
+    if filter_by not in {"all_ids", "node_id", "message_id", "tool_call_id", "evidence_id"}:
+        return _json(err(ArcErrorCode.INVALID_INPUT, f"Invalid links filter: {filter_by}").model_dump(), 400)
+    try:
+        limit = min(max(int(request.query.get("limit", "100")), 1), 500)
+        offset = max(int(request.query.get("offset", "0")), 0)
+    except ValueError:
+        return _json(err(ArcErrorCode.INVALID_INPUT, "limit and offset must be integers").model_dump(), 400)
+
+    def _ids(field: str) -> list[str]:
+        ids = [single_id] if single_id else linker.get_ids(field)
+        return [item for item in ids if item][offset: offset + limit]
+
+    result: dict[str, list[dict]] = {}
+
+    if filter_by in ("all_ids", "node_id"):
+        for nid in _ids("node_id"):
+            chain = linker.get_node_chain(nid)
+            if chain:
+                result.setdefault("node_chains", {})[nid] = [e.model_dump() for e in chain]
+
+    if filter_by in ("all_ids", "message_id"):
+        for mid in _ids("message_id"):
+            chain = linker.get_message_chain(mid)
+            if chain:
+                result.setdefault("message_chains", {})[mid] = [e.model_dump() for e in chain]
+
+    if filter_by in ("all_ids", "tool_call_id"):
+        for tid in _ids("tool_call_id"):
+            chain = linker.get_tool_call_chain(tid)
+            if chain:
+                result.setdefault("tool_call_chains", {})[tid] = [e.model_dump() for e in chain]
+
+    if filter_by in ("all_ids", "evidence_id"):
+        for eid in _ids("evidence_id"):
+            chain = linker.get_evidence_events(eid)
+            if chain:
+                result.setdefault("evidence_chains", {})[eid] = [e.model_dump() for e in chain]
+
+    result["has_stable_ids"] = linker.has_stable_ids()
+    result["stable_id_count"] = len(linker.get_run_event_ids())
+    result["limit"] = limit
+    result["offset"] = offset
+
+    return _json(ok(result).model_dump())
+
+
 async def export_trace(request: web.Request) -> web.Response:
     """Export run trace to OTLP endpoint."""
     run_id = request.match_info["run_id"]
@@ -613,6 +679,7 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_post("/api/runs/start",       start_run)
     app.router.add_get("/api/runs/{run_id}",     get_run)
     app.router.add_get("/api/runs/{run_id}/events", run_events_sse)
+    app.router.add_get("/api/runs/{run_id}/links",  run_links)
     app.router.add_get("/api/sse/proof",             sse_proof)
     app.router.add_post("/api/telemetry/export/{run_id}", export_trace)
     app.router.add_get("/api/context/pack",      context_pack)

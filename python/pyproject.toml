@@ -47,6 +47,7 @@ dev = [
 
 [project.scripts]
 arc = "agent_runtime_cockpit.cli:app"
+arc-studio = "agent_runtime_cockpit.cli_studio:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agent_runtime_cockpit"]

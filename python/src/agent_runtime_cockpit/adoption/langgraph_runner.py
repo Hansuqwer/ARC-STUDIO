@@ -8,6 +8,7 @@ remains separate; this runner does not claim signed adoption audit.
 from __future__ import annotations
 
 import logging
+import importlib.util
 import sys
 import time
 import warnings
@@ -62,18 +63,14 @@ class LangGraphAdoptionRunner(AdoptionRunner):
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                import langgraph  # noqa: F401
+                if importlib.util.find_spec("langgraph") is None:
+                    raise ImportError("langgraph")
                 _setup_swarmgraph_paths()
-                from swarm.models.config import SwarmConfig  # noqa: F401
-                from swarm.models.state import SwarmState  # noqa: F401
-                from swarm.nodes.consensus import consensus_node  # noqa: F401
-                from swarm.nodes.queen import queen_decompose_node  # noqa: F401
 
-            version = getattr(langgraph, "__version__", "unknown")
             return AdoptionCapability(
                 mode=self.mode,
                 status=AdoptionStatus.RUNNABLE,
-                reason=f"LangGraph {version} and vendored SwarmGraph queen/consensus detected",
+                reason="LangGraph package detected; SwarmGraph adoption path is fake-tested/gated",
                 doctor_actions=[],
             )
         except ImportError:

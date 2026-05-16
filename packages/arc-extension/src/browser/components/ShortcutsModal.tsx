@@ -12,6 +12,45 @@ export interface ShortcutsModalProps {
 }
 
 export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose }) => {
+    const modalRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+        const focusable = modalRef.current?.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        focusable?.[0]?.focus();
+    }, [isOpen]);
+
+    const trapFocus = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === 'Escape') {
+            onClose();
+            return;
+        }
+        if (event.key !== 'Tab') {
+            return;
+        }
+        const focusable = Array.from(
+            modalRef.current?.querySelectorAll<HTMLElement>(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            ) || []
+        );
+        if (focusable.length === 0) {
+            return;
+        }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    };
+
     if (!isOpen) {
         return null;
     }
@@ -22,13 +61,14 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
             role='dialog' 
             aria-modal='true' 
             aria-labelledby='shortcuts-title'
+            onKeyDown={trapFocus}
             onClick={(e) => {
                 if (e.target === e.currentTarget) {
                     onClose();
                 }
             }}
         >
-            <div className='arc-modal'>
+            <div className='arc-modal' ref={modalRef}>
                 <div className='arc-modal-header'>
                     <h3 id='shortcuts-title'>Keyboard Shortcuts</h3>
                     <button 

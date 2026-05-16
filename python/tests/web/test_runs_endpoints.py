@@ -33,6 +33,16 @@ def _seed_trace(
     traces_dir.mkdir(parents=True, exist_ok=True)
     path = traces_dir / f"{run_id}.jsonl"
     started = started_at or _iso_now()
+    run_events = [
+        {
+            "type": event.get("type", "AG_UI"),
+            "timestamp": event.get("timestamp", started),
+            "run_id": run_id,
+            "sequence": event.get("sequence", i),
+            "data": event.get("data", {}),
+        }
+        for i, event in enumerate(events or [])
+    ]
     record: dict[str, Any] = {
         "id": run_id,
         "workflow_id": workflow_id,
@@ -40,18 +50,12 @@ def _seed_trace(
         "status": status,
         "started_at": started,
         "ended_at": ended_at,
-        "events": [],
+        "events": run_events,
         "metadata": metadata or {},
     }
     lines = [json.dumps(record)]
-    for i, event in enumerate(events or []):
-        lines.append(json.dumps({
-            "type": event.get("type", "AG_UI"),
-            "timestamp": event.get("timestamp", started),
-            "run_id": run_id,
-            "sequence": event.get("sequence", i),
-            "data": event.get("data", {}),
-        }))
+    for event in run_events:
+        lines.append(json.dumps(event))
     path.write_text("\n".join(lines) + "\n")
     return path
 
@@ -150,3 +154,67 @@ async def test_pagination(client, workspace):
                 return
         return
     pytest.skip("pagination not implemented")
+
+
+async def test_run_links_empty_run(client, workspace):
+    _seed_trace(workspace, "links-empty", events=[])
+
+    r = await client.get("/api/runs/links-empty/links")
+    assert r.status_code == 200
+    body = await r.json()
+    assert body["ok"] is True
+    assert body["data"]["has_stable_ids"] is False
+    assert body["data"]["stable_id_count"] == 0
+
+
+async def test_run_links_filters_node_chain(client, workspace):
+    _seed_trace(workspace, "links-node", events=[
+        {"type": "NODE_STARTED", "data": {"node_id": "node_alpha"}},
+        {"type": "NODE_FAILED", "data": {"node_id": "node_alpha", "error": "boom"}},
+    ])
+
+    r = await client.get("/api/runs/links-node/links?filter=node_id&stable_id=node_alpha")
+    assert r.status_code == 200
+    body = await r.json()
+    assert body["ok"] is True
+    chain = body["data"]["node_chains"]["node_alpha"]
+    assert [event["type"] for event in chain] == ["NODE_STARTED", "NODE_FAILED"]
+
+
+async def test_run_links_malformed_stable_id_returns_empty(client, workspace):
+    _seed_trace(workspace, "links-malformed", events=[
+        {"type": "NODE_STARTED", "data": {"node_id": "node_alpha"}},
+    ])
+
+    r = await client.get("/api/runs/links-malformed/links?filter=node_id&stable_id=not-present")
+    assert r.status_code == 200
+    body = await r.json()
+    assert body["ok"] is True
+    assert "node_chains" not in body["data"]
+    assert body["data"]["has_stable_ids"] is True
+
+
+async def test_run_links_invalid_filter_returns_400(client, workspace):
+    _seed_trace(workspace, "links-invalid-filter", events=[])
+
+    r = await client.get("/api/runs/links-invalid-filter/links?filter=bad")
+    assert r.status_code == 400
+    body = await r.json()
+    assert body["ok"] is False
+    assert "Invalid links filter" in body["error"]["message"]
+
+
+async def test_run_links_limit_and_offset(client, workspace):
+    _seed_trace(workspace, "links-page", events=[
+        {"type": "NODE_STARTED", "data": {"node_id": "node_a"}},
+        {"type": "NODE_STARTED", "data": {"node_id": "node_b"}},
+        {"type": "NODE_STARTED", "data": {"node_id": "node_c"}},
+    ])
+
+    r = await client.get("/api/runs/links-page/links?filter=node_id&limit=1&offset=1")
+    assert r.status_code == 200
+    body = await r.json()
+    assert body["ok"] is True
+    assert list(body["data"]["node_chains"].keys()) == ["node_b"]
+    assert body["data"]["limit"] == 1
+    assert body["data"]["offset"] == 1

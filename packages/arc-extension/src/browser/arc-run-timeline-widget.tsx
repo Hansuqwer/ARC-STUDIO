@@ -18,7 +18,7 @@ const EVENT_ICONS: Record<string, string> = {
 @injectable()
 export class ArcRunTimelineWidget extends ReactWidget {
     static readonly ID = 'arc:run-timeline';
-    static readonly LABEL = 'ARC Run Timeline';
+    static readonly LABEL = 'ARC Run Timeline (Advanced Trace)';
 
     @inject(ArcService)
     protected readonly arcService!: ArcService;

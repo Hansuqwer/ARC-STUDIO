@@ -330,6 +330,7 @@ export interface RuntimeCapabilitiesResponse {
 
 /**
  * Provider configuration status for the adapter status widget.
+ * Secrets are never exposed as raw values — only source/status metadata.
  */
 export interface ProviderStatus {
     provider: string;
@@ -343,6 +344,104 @@ export interface ProviderStatus {
     apiKeySource?: string;
     runtimeAvailable: boolean;
     message: string;
+}
+
+// ========== Config Tab Types (Session B) ==========
+
+/**
+ * Safe provider key status shown in Config tab.
+ * Never contains raw key values — only source and configured status.
+ */
+export interface SafeProviderKeyStatus {
+    provider: string;
+    displayName: string;
+    configured: boolean;
+    source: 'keyring' | 'env' | 'file' | 'unset';
+    defaultModel?: string;
+    envOverride?: string;
+}
+
+/**
+ * Workspace trust status for Config tab.
+ */
+export interface TrustStatus {
+    trusted: boolean;
+    workspacePath: string;
+    trustLevel: 'trusted' | 'untrusted' | 'auto' | 'unknown';
+    reason?: string;
+}
+
+/**
+ * Safe runtime config snapshot for Config tab display.
+ * Contains only non-secret fields.
+ */
+export interface SafeRuntimeConfig {
+    defaultRuntime: string;
+    autoDetect: boolean;
+    fallback: string;
+    isolation: string;
+    timeoutSeconds: number;
+    allowPaidCalls: boolean;
+    dryRun: boolean;
+    routingMode: string;
+}
+
+/**
+ * Full config status response for Config tab.
+ * All secret values are stripped; only source/status metadata included.
+ */
+export interface ConfigStatus {
+    workspace: TrustStatus;
+    runtime: SafeRuntimeConfig;
+    providers: SafeProviderKeyStatus[];
+    mode: 'plan' | 'build' | 'auto';
+    backendAvailable: boolean;
+    backendMessage?: string;
+}
+
+/**
+ * Safe config fields that can be saved from the Config tab.
+ * Excludes all secret values.
+ */
+export interface SafeConfigUpdate {
+    defaultRuntime?: string;
+    mode?: 'plan' | 'build' | 'auto';
+    isolation?: string;
+    allowPaidCalls?: boolean;
+    dryRun?: boolean;
+    routingMode?: string;
+}
+
+// ========== Run Links Types (Session B7) ==========
+
+/**
+ * Linked event chain for a single stable ID.
+ */
+export interface LinkedEventChain {
+    stableId: string;
+    events: TraceEvent[];
+}
+
+/**
+ * Run links response from /api/runs/{id}/links.
+ * Contains cross-referenced event chains keyed by stable ID type.
+ */
+export interface RunLinksResponse {
+    nodeChains: Record<string, TraceEvent[]>;
+    messageChains: Record<string, TraceEvent[]>;
+    toolCallChains: Record<string, TraceEvent[]>;
+    evidenceChains: Record<string, TraceEvent[]>;
+    hasStableIds: boolean;
+    stableIdCount: number;
+}
+
+/**
+ * Evidence selection event emitted when EvidenceChip is opened.
+ */
+export interface EvidenceSelectionEvent {
+    evidenceRef: EvidenceRef;
+    source: 'chip-click' | 'keyboard' | 'context-menu';
+    timestamp: string;
 }
 
 // ========== Cockpit Schema Contracts ==========
@@ -449,6 +548,184 @@ export interface TrustDiff {
     confirmed_at?: string;
     created_at: string;
     metadata: Record<string, unknown>;
+}
+
+// ========== Stable IDs and Graph Linkage (Wave 5) ==========
+
+/**
+ * Stable ID kinds supported by the cockpit.
+ * Format: {prefix}_{ulid}
+ */
+export type StableIdKind =
+    | 'message'     // msg_<ulid>
+    | 'decision'    // dec_<ulid>
+    | 'approval'    // apr_<ulid>
+    | 'policy_decision' // pd_<ulid>
+    | 'node'        // <workflow>.<node_name>
+    | 'tool_call'   // tc_<ulid>
+    | 'edge'        // <from>→<to>
+    | 'run'         // run_<ulid>
+    | 'contract'    // ctr_<ulid>
+    | 'receipt'     // rcpt_<ulid>
+    | 'evidence'    // ev_<ulid>
+    | 'session'     // sess_<ulid>
+    | 'hitl';       // hitl_<ulid>
+
+/**
+ * Graph node data carrying stable IDs and evidence/link references.
+ * Used by the graph visualizer and cross-surface linking.
+ */
+export interface GraphNodeData {
+    /** Stable node ID: <workflow>.<node_name> or node_<ulid> */
+    id: string;
+    /** Human-readable label */
+    label: string;
+    /** Node type for visual styling */
+    type: 'queen' | 'worker' | 'agent' | 'tool' | 'decision' | 'hitl' | 'terminal' | 'router' | 'start' | 'end';
+    /** Runtime that owns this node */
+    runtime: 'swarmgraph' | 'langgraph' | 'crewai' | 'openai-agents' | 'ag2' | 'llamaindex' | 'lmarena';
+    /** Current execution state */
+    state: 'idle' | 'running' | 'waiting' | 'done' | 'failed';
+    /** Optional badges (e.g., 'coalesced', 'burst:3') */
+    badges?: string[];
+    /** Number of events associated with this node */
+    eventCount?: number;
+    /** Subgraph/group ID for nested graphs (v0.2 reserved) */
+    subgraphId?: string;
+    /** Whether this is a group/container node */
+    group?: boolean;
+
+    // Stable cross-link IDs
+    /** Stable message ID if this node produced/consumed a message */
+    messageId?: string;
+    /** Stable tool call ID if this node represents a tool call */
+    toolCallId?: string;
+    /** Stable decision ID if this node is a router/decision */
+    decisionId?: string;
+    /** Stable approval ID if this node requires HITL approval */
+    approvalId?: string;
+
+    // Evidence references
+    /** Evidence refs attached to this node */
+    evidenceRefs?: EvidenceRef[];
+
+    // Runtime metadata
+    /** Last event timestamp for this node */
+    lastEventAt?: string;
+    /** Last event type for this node */
+    lastEventType?: string;
+    /** Duration in ms this node took (when done/failed) */
+    durationMs?: number;
+}
+
+/**
+ * Graph edge data with stable ID.
+ */
+export interface GraphEdgeData {
+    /** Stable edge ID: <from>→<to> or edge_<ulid> */
+    id: string;
+    /** Source node ID */
+    from: string;
+    /** Target node ID */
+    to: string;
+    /** Optional label for conditional/router edges */
+    label?: string;
+    /** Whether this is a conditional edge */
+    conditional?: boolean;
+    /** Message volume bucket for edge width (1, 2, 3) */
+    messageVolume?: number;
+    /** Whether this edge is currently active */
+    active?: boolean;
+}
+
+/**
+ * Cross-link state managed by the widget.
+ * Tracks selections and highlights across graph, chat, runs, and evidence surfaces.
+ */
+export interface CrossLinkState {
+    /** Currently selected graph node ID */
+    selectedNodeId: string | null;
+    /** Message IDs to highlight in chat */
+    highlightedMessageIds: string[];
+    /** Evidence IDs to highlight */
+    highlightedEvidenceIds: string[];
+    /** Tool call IDs to highlight */
+    highlightedToolCallIds: string[];
+    /** Run IDs to highlight in runs panel */
+    highlightedRunIds: string[];
+}
+
+/**
+ * Capability snapshot for runtime switch comparison.
+ */
+export interface CapabilitySnapshot {
+    schemaVersion: number;
+    runtimeId: string;
+    snapshotId: string;
+    capabilities: {
+        canEmitContract: boolean;
+        canEmitReceipt: boolean;
+        canEmitAutopsy: boolean;
+        canEmitEvidence: boolean;
+        hasStableIds: boolean;
+        canRun: boolean;
+        canInspect: boolean;
+        canTrace: boolean;
+        canStreamEvents: boolean;
+        requiresPaidCalls: boolean;
+    };
+    timestamp: string;
+}
+
+/**
+ * Capability diff produced when runtime capabilities change.
+ */
+export interface CapabilityDiff {
+    schemaVersion: number;
+    diffId: string;
+    runtimeId: string;
+    beforeSnapshotId: string;
+    afterSnapshotId: string;
+    addedCapabilities: string[];
+    removedCapabilities: string[];
+    changedFlags: Record<string, { before: unknown; after: unknown }>;
+    requiresConfirmation: boolean;
+    timestamp: string;
+}
+
+/**
+ * Response envelope for capability diff between two runtimes.
+ */
+export interface CapabilityDiffResponse {
+    diff: CapabilityDiff;
+    fromRuntime: string;
+    toRuntime: string;
+    trustBoundaryWidened: boolean;
+    trustSensitiveChanges: string[];
+}
+
+/**
+ * Degradation manifest when stable IDs are missing.
+ */
+export interface DegradationManifest {
+    totalEvents: number;
+    missingNodeIds: number;
+    missingMessageIds: number;
+    missingToolCallIds: number;
+    missingEvidenceRefs: number;
+    isDegraded: boolean;
+    crossLinkingAvailable: boolean;
+}
+
+/**
+ * Graph node selection event for cross-surface linking.
+ */
+export interface GraphNodeSelectionEvent {
+    nodeId: string;
+    nodeData: GraphNodeData;
+    linkedMessageIds: string[];
+    linkedEvidenceIds: string[];
+    linkedToolCallIds: string[];
 }
 
 // ========== Streaming ==========
@@ -614,4 +891,56 @@ export interface ArcService {
      * Get current workspace status (frontend/backend paths).
      */
     getWorkspaceStatus(): Promise<{ frontendPath: string; backendPath: string; source: string }>;
+
+    // ========== Config Tab Methods (Session B) ==========
+
+    /**
+     * Get current config status with all secret values stripped.
+     * Returns runtime config, provider key statuses (source only, no raw keys),
+     * workspace trust state, and current mode.
+     * Gracefully handles unavailable backend.
+     */
+    getConfigStatus(): Promise<ConfigStatus>;
+
+    /**
+     * Save safe config fields only.
+     * Rejects any attempt to save secret values.
+     * Only non-secret fields from SafeConfigUpdate are accepted.
+     */
+    saveConfig(update: SafeConfigUpdate): Promise<{ success: boolean; message: string }>;
+
+    // ========== Run Links Methods (Session B7) ==========
+
+    /**
+     * Get cross-linked event chains for a run.
+     * Calls the Python /api/runs/{id}/links endpoint via CLI.
+     * Returns node, message, tool call, and evidence chains.
+     */
+    getRunLinks(runId: string, filter?: string, stableId?: string): Promise<RunLinksResponse>;
+
+    // ========== Run Details (Cockpit Cards) ==========
+
+    /**
+     * Get the run receipt for a completed/failed/cancelled run.
+     */
+    getRunReceipt(runId: string): Promise<RunReceipt>;
+
+    /**
+     * Get the failure autopsy for a failed run. Returns null if no autopsy exists.
+     */
+    getRunAutopsy(runId: string): Promise<FailureAutopsy | null>;
+
+    /**
+     * Get the run contract for a run. Returns null if no contract exists.
+     */
+    getRunContract(runId: string): Promise<RunContract | null>;
+
+    // ========== Capability Diff (Session B) ==========
+
+    /**
+     * Get capability diff between two runtimes.
+     * Compares capabilities of fromRuntime vs toRuntime and returns
+     * added/removed capabilities with trust boundary analysis.
+     */
+    getCapabilityDiff(fromRuntime: string, toRuntime: string): Promise<CapabilityDiffResponse>;
 }

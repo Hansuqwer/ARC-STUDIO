@@ -7,7 +7,10 @@ import {
     TraceData,
     ValidationResult,
     CancelResult,
-    WorkflowInfo
+    WorkflowInfo,
+    RunReceipt,
+    FailureAutopsy,
+    RunContract,
 } from '../../common/arc-protocol';
 import * as fs from 'fs-extra';
 import * as path from 'path';
@@ -834,6 +837,137 @@ graph = builder.compile(checkpointer=MemorySaver())
             expect(traces.length).toBe(1);
             expect(traces[0].id).toBe('run-sg-aa77');
             expect(traces[0].status).toBe('unknown');
+        });
+    });
+
+    describe('getRunReceipt', () => {
+        it('should throw ArcError when receipt file does not exist', async () => {
+            await expect(service.getRunReceipt('run_01HQ3WNOPQR456STU789VWX012')).rejects.toThrow(ArcError);
+        });
+
+        it('should throw ArcError for invalid run ID', async () => {
+            await expect(service.getRunReceipt('bad')).rejects.toThrow(ArcError);
+        });
+
+        it('should return parsed receipt when file exists', async () => {
+            const receiptsDir = path.join(tempDir, '.arc', 'receipts');
+            await fs.ensureDir(receiptsDir);
+
+            const receipt: RunReceipt = {
+                schema_version: 1,
+                receipt_id: 'rcpt_01JR6X7ABC123DEF456GHI789',
+                run_id: 'run_01HQ3WNOPQR456STU789VWX012',
+                session_id: 'ses_01JX8YABC123DEF456GHI789JK',
+                status: 'completed',
+                summary: 'Workflow completed successfully',
+                cost_usd: 0.04,
+                duration_ms: 48200,
+                files_changed: [],
+                approvals: [],
+                evidence_refs: [],
+                trust_boundaries_crossed: [],
+                unresolved_risks: [],
+                created_at: '2024-01-01T00:00:00.000Z',
+            };
+
+            await fs.writeFile(
+                path.join(receiptsDir, 'run_01HQ3WNOPQR456STU789VWX012.json'),
+                JSON.stringify(receipt),
+                'utf-8'
+            );
+
+            const result = await service.getRunReceipt('run_01HQ3WNOPQR456STU789VWX012');
+            expect(result.receipt_id).toBe('rcpt_01JR6X7ABC123DEF456GHI789');
+            expect(result.status).toBe('completed');
+            expect(result.cost_usd).toBe(0.04);
+        });
+    });
+
+    describe('getRunAutopsy', () => {
+        it('should return null when autopsy file does not exist', async () => {
+            const result = await service.getRunAutopsy('run_01HQ3WNOPQR456STU789VWX012');
+            expect(result).toBeNull();
+        });
+
+        it('should throw ArcError for invalid run ID', async () => {
+            await expect(service.getRunAutopsy('bad')).rejects.toThrow(ArcError);
+        });
+
+        it('should return parsed autopsy when file exists', async () => {
+            const autopsiesDir = path.join(tempDir, '.arc', 'autopsies');
+            await fs.ensureDir(autopsiesDir);
+
+            const autopsy: FailureAutopsy = {
+                schema_version: 1,
+                run_id: 'run_failed',
+                probable_cause: 'Tool execution timeout at node reviewer',
+                confidence: 'high',
+                failed_node: 'reviewer',
+                last_safe_state: "worker 'writer' completed at T+12.4s",
+                retry_options: [{ label: 'Retry with same input', risk: 'low' }],
+                related_issues: [],
+                knows: ["Node 'reviewer' was active for 45.2s before failure"],
+                guesses: ['Search tool may be rate-limited'],
+                evidence_refs: [],
+                created_at: '2024-01-01T00:00:00.000Z',
+                metadata: {},
+            };
+
+            await fs.writeFile(
+                path.join(autopsiesDir, 'run_failed.json'),
+                JSON.stringify(autopsy),
+                'utf-8'
+            );
+
+            const result = await service.getRunAutopsy('run_failed');
+            expect(result).not.toBeNull();
+            expect(result!.probable_cause).toContain('Tool execution timeout');
+            expect(result!.confidence).toBe('high');
+        });
+    });
+
+    describe('getRunContract', () => {
+        it('should return null when contract file does not exist', async () => {
+            const result = await service.getRunContract('run_01HQ3WNOPQR456STU789VWX012');
+            expect(result).toBeNull();
+        });
+
+        it('should throw ArcError for invalid run ID', async () => {
+            await expect(service.getRunContract('bad')).rejects.toThrow(ArcError);
+        });
+
+        it('should return parsed contract when file exists', async () => {
+            const contractsDir = path.join(tempDir, '.arc', 'contracts');
+            await fs.ensureDir(contractsDir);
+
+            const contract: RunContract = {
+                schema_version: 1,
+                contract_id: 'ctr_01K...',
+                session_id: 'ses_01JX...',
+                objective: 'Review code changes',
+                runtime: 'swarmgraph',
+                mode: 'build',
+                allowed_tools: ['search', 'read'],
+                write_scope: ['src/'],
+                cost_ceiling_usd: 'unknown',
+                approval_policy: 'auto',
+                rollback_plan: 'git revert --no-edit HEAD',
+                evidence_expected: [],
+                status: 'fulfilled',
+                created_at: '2024-01-01T00:00:00.000Z',
+                metadata: {},
+            };
+
+            await fs.writeFile(
+                path.join(contractsDir, 'run_with_contract.json'),
+                JSON.stringify(contract),
+                'utf-8'
+            );
+
+            const result = await service.getRunContract('run_with_contract');
+            expect(result).not.toBeNull();
+            expect(result!.objective).toBe('Review code changes');
+            expect(result!.runtime).toBe('swarmgraph');
         });
     });
 });

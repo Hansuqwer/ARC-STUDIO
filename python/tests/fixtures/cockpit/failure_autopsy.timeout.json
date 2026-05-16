@@ -1,0 +1,26 @@
+{
+  "run_id": "run_test_failed_001",
+  "probable_cause": "Tool execution timeout at node 'reviewer'",
+  "confidence": "high",
+  "failed_node": "reviewer",
+  "last_safe_state": "worker 'writer' completed at T+12.4s",
+  "retry_options": [
+    {"label": "Retry with same input", "risk": "low"},
+    {"label": "Retry with timeout=600s", "command": "arc run --timeout 600", "risk": "low"}
+  ],
+  "related_issues": [],
+  "knows": [
+    "Node 'reviewer' was active for 45.2s before failure",
+    "Event 'TOOL_CALL_SEARCH' started at T+15.3s, never completed"
+  ],
+  "guesses": [
+    "Search tool may be rate-limited by external API"
+  ],
+  "evidence_refs": [
+    {"evidence_id": "ev_03JDEADBEEF1234567890", "kind": "tool_output", "target": "reviewer", "redacted": false}
+  ],
+  "error_category": "tool_timeout",
+  "stack_summary": null,
+  "created_at": "2026-05-16T00:00:00+00:00",
+  "metadata": {}
+}

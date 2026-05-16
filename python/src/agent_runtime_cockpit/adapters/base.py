@@ -48,6 +48,13 @@ class CapabilityReport(BaseModel):
     requires_paid_calls: bool = False
     doctor_actions: list[DoctorAction] = Field(default_factory=list)
 
+    # Cockpit primitive flags (mirrors RuntimeCapabilities)
+    can_emit_contract: bool = False
+    can_emit_receipt: bool = False
+    can_emit_autopsy: bool = False
+    can_emit_evidence: bool = False
+    has_stable_ids: bool = False
+
 
 class RuntimeAdapter(abc.ABC):
     """
@@ -80,7 +87,8 @@ class RuntimeAdapter(abc.ABC):
     def capability_report(self, workspace: Path) -> CapabilityReport:
         """Return runnable status with a reason for UI/router decisions."""
         detected, _, evidence = self.detect(workspace)
-        can_run = self.capabilities().can_run
+        caps = self.capabilities()
+        can_run = caps.can_run
         return CapabilityReport(
             runtime_id=self.adapter_id,
             detected=detected,
@@ -89,6 +97,11 @@ class RuntimeAdapter(abc.ABC):
             reason=None if can_run else "Runtime is detected but does not expose a runnable path.",
             detected_artifacts=evidence,
             doctor_actions=self._doctor_actions(workspace),
+            can_emit_contract=caps.can_emit_contract,
+            can_emit_receipt=caps.can_emit_receipt,
+            can_emit_autopsy=caps.can_emit_autopsy,
+            can_emit_evidence=caps.can_emit_evidence,
+            has_stable_ids=caps.has_stable_ids,
         )
 
     def _doctor_actions(self, workspace: Path) -> list[DoctorAction]:

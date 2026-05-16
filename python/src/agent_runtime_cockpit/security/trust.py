@@ -86,7 +86,7 @@ def resolve_trust(
         reason="Workspace not found in external trust database",
         warning=(
             "This workspace is not marked as trusted. "
-            "Execution will proceed with subprocess isolation. "
+            "Execution is blocked until workspace is trusted. "
             "Run 'arc workspace trust' to mark this workspace as trusted "
             "outside the repo."
         ),

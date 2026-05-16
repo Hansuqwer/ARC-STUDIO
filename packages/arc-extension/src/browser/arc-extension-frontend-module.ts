@@ -1,10 +1,3 @@
-/**
- * ARC Studio Frontend Module
- * 
- * This module provides the frontend contributions for ARC Studio,
- * including the SwarmGraph visualization widget and UI components.
- */
-
 import { ContainerModule } from '@theia/core/shared/inversify';
 import { WebSocketConnectionProvider, WidgetFactory, bindViewContribution, FrontendApplicationContribution } from '@theia/core/lib/browser';
 import { ArcWidget } from './arc-widget';
@@ -17,9 +10,12 @@ import { ArcRunTimelineWidget } from './arc-run-timeline-widget';
 import { ArcRunsContribution } from './arc-runs-contribution';
 import { ArcEventStreamWidget } from './arc-event-stream-widget';
 import { ArcEventStreamContribution } from './arc-event-stream-contribution';
+import { ArcStudioWidget } from './arc-studio-widget';
+import { ArcStudioWidgetContribution } from './arc-studio-widget-contribution';
 import { ArcServicePath, ArcService } from '../common/arc-protocol';
 import type { ArcService as IArcService } from '../common/arc-protocol';
 import './style/arc-widget.css';
+import './style/arc-studio-widget.css';
 
 export default new ContainerModule(bind => {
     // Bind the ARC service client (connects to backend via WebSocket)
@@ -28,7 +24,16 @@ export default new ContainerModule(bind => {
         return connection.createProxy<IArcService>(ArcServicePath);
     }).inSingletonScope();
 
-    // Bind the ARC widget
+    // Bind the ARC Studio widget (primary/default)
+    bind(ArcStudioWidget).toSelf();
+    bind(WidgetFactory).toDynamicValue(ctx => ({
+        id: ArcStudioWidget.ID,
+        createWidget: () => ctx.container.get<ArcStudioWidget>(ArcStudioWidget)
+    })).inSingletonScope();
+    bindViewContribution(bind, ArcStudioWidgetContribution);
+    bind(FrontendApplicationContribution).toService(ArcStudioWidgetContribution);
+
+    // Bind the legacy ARC widget (kept for backward compatibility)
     bind(ArcWidget).toSelf();
     bind(WidgetFactory).toDynamicValue(ctx => ({
         id: ArcWidget.ID,
@@ -56,21 +61,19 @@ export default new ContainerModule(bind => {
     bindViewContribution(bind, ArcWorkflowContribution);
     bind(FrontendApplicationContribution).toService(ArcWorkflowContribution);
 
-    // Bind the ARC Run Timeline widget
+    // Bind the ARC Run Timeline widget (advanced trace — available via command, not default-opened)
     bind(ArcRunTimelineWidget).toSelf();
     bind(WidgetFactory).toDynamicValue(ctx => ({
         id: ArcRunTimelineWidget.ID,
         createWidget: () => ctx.container.get<ArcRunTimelineWidget>(ArcRunTimelineWidget),
     })).inSingletonScope();
     bindViewContribution(bind, ArcRunsContribution);
-    bind(FrontendApplicationContribution).toService(ArcRunsContribution);
 
-    // Bind the ARC Event Stream widget
+    // Bind the ARC Event Stream widget (advanced trace — available via command, not default-opened)
     bind(ArcEventStreamWidget).toSelf();
     bind(WidgetFactory).toDynamicValue(ctx => ({
         id: ArcEventStreamWidget.ID,
         createWidget: () => ctx.container.get<ArcEventStreamWidget>(ArcEventStreamWidget),
     })).inSingletonScope();
     bindViewContribution(bind, ArcEventStreamContribution);
-    bind(FrontendApplicationContribution).toService(ArcEventStreamContribution);
 });

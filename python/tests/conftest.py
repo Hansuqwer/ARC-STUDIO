@@ -1,9 +1,13 @@
-# Intentionally empty.
-#
-# A prior autouse fixture (close_pytest_asyncio_fallback_loop) was removed
-# because pytest-asyncio >=0.23 in asyncio_mode = "auto" owns the event loop
-# lifecycle and cleans it up itself. The fixture's call to
-# asyncio.get_event_loop() emitted DeprecationWarning on Python 3.12 for
-# synchronous tests (no loop on current thread), which became an error under
-# -W error. See R-3 in the 2026-05-14 audit follow-up.
+"""Shared pytest cleanup hooks."""
 
+from __future__ import annotations
+
+import gc
+import socket
+
+
+def pytest_sessionfinish(session, exitstatus):  # noqa: ARG001
+    """Close unreachable Docker SDK Unix sockets before pytest's final GC pass."""
+    for obj in gc.get_objects():
+        if isinstance(obj, socket.socket) and obj.family == socket.AF_UNIX and obj.fileno() != -1:
+            obj.close()

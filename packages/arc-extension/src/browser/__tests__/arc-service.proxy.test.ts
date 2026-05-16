@@ -14,6 +14,12 @@ import {
     ProviderStatus,
     DoctorAction,
     RuntimeCapabilityReport,
+    RunReceipt,
+    FailureAutopsy,
+    RunContract,
+    ConfigStatus,
+    SafeConfigUpdate,
+    RunLinksResponse,
 } from '../../common/arc-protocol';
 
 describe('ArcService Proxy Tests', () => {
@@ -56,6 +62,12 @@ describe('ArcService Proxy Tests', () => {
                 'listRuntimeCapabilities',
                 'getProviderStatus',
                 'getWorkspaceStatus',
+                'getRunReceipt',
+                'getRunAutopsy',
+                'getRunContract',
+                'getConfigStatus',
+                'saveConfig',
+                'getRunLinks',
             ];
 
             const mockService: any = {
@@ -69,6 +81,12 @@ describe('ArcService Proxy Tests', () => {
                 listRuntimeCapabilities: async () => ({}),
                 getProviderStatus: async () => ({}),
                 getWorkspaceStatus: async () => ({}),
+                getRunReceipt: async () => ({}),
+                getRunAutopsy: async () => ({}),
+                getRunContract: async () => ({}),
+                getConfigStatus: async () => ({}),
+                saveConfig: async () => ({}),
+                getRunLinks: async () => ({}),
             };
 
             for (const method of requiredMethods) {
@@ -254,9 +272,127 @@ describe('ArcService Proxy Tests', () => {
         });
     });
 
-    describe('Protocol Types', () => {
-        it('ArcErrorCode should have all expected codes', () => {
-            expect(ArcErrorCode.INVALID_INPUT).toBe('INVALID_INPUT');
+        it('getRunReceipt should return RunReceipt', async () => {
+            const mockService = {
+                getRunReceipt: async (runId: string): Promise<RunReceipt> => ({
+                    schema_version: 1,
+                    receipt_id: 'rcpt_01JR6X7ABC123DEF456GHI789',
+                    run_id: runId,
+                    session_id: 'ses_01JX8YABC123DEF456GHI789JK',
+                    status: 'completed',
+                    summary: 'Workflow completed successfully',
+                    cost_usd: 0.04,
+                    duration_ms: 48200,
+                    files_changed: [],
+                    approvals: [],
+                    evidence_refs: [],
+                    trust_boundaries_crossed: [],
+                    unresolved_risks: [],
+                    created_at: '2024-01-01T00:00:00.000Z',
+                }),
+            };
+
+            const result = await mockService.getRunReceipt('run_01HQ3WNOPQR456STU789VWX012');
+            expect(result.receipt_id).toBe('rcpt_01JR6X7ABC123DEF456GHI789');
+            expect(result.run_id).toBe('run_01HQ3WNOPQR456STU789VWX012');
+            expect(result.status).toBe('completed');
+        });
+
+        it('getRunAutopsy should return FailureAutopsy or null', async () => {
+            const mockService = {
+                getRunAutopsy: async (runId: string): Promise<FailureAutopsy | null> => {
+                    if (runId === 'run_failed') {
+                        return {
+                            schema_version: 1,
+                            run_id: runId,
+                            probable_cause: 'Tool execution timeout',
+                            confidence: 'high',
+                            retry_options: [{ label: 'Retry with same input', risk: 'low' }],
+                            related_issues: [],
+                            knows: ['Node was active for 45.2s before failure'],
+                            guesses: ['Search tool may be rate-limited'],
+                            evidence_refs: [],
+                            created_at: '2024-01-01T00:00:00.000Z',
+                            metadata: {},
+                        };
+                    }
+                    return null;
+                },
+            };
+
+            const result1 = await mockService.getRunAutopsy('run_failed');
+            expect(result1).not.toBeNull();
+            expect(result1!.probable_cause).toBe('Tool execution timeout');
+
+            const result2 = await mockService.getRunAutopsy('run_ok');
+            expect(result2).toBeNull();
+        });
+
+        it('getRunContract should return RunContract or null', async () => {
+            const mockService = {
+                getRunContract: async (runId: string): Promise<RunContract | null> => {
+                    if (runId === 'run_with_contract') {
+                        return {
+                            schema_version: 1,
+                            contract_id: 'ctr_01K...',
+                            session_id: 'ses_01JX...',
+                            objective: 'Review code changes',
+                            runtime: 'swarmgraph',
+                            mode: 'build',
+                            allowed_tools: [],
+                            write_scope: [],
+                            cost_ceiling_usd: 'unknown',
+                            approval_policy: 'auto',
+                            rollback_plan: 'git revert',
+                            evidence_expected: [],
+                            status: 'fulfilled',
+                            created_at: '2024-01-01T00:00:00.000Z',
+                            metadata: {},
+                        };
+                    }
+                    return null;
+                },
+            };
+
+            const result1 = await mockService.getRunContract('run_with_contract');
+            expect(result1).not.toBeNull();
+            expect(result1!.objective).toBe('Review code changes');
+
+            const result2 = await mockService.getRunContract('run_no_contract');
+            expect(result2).toBeNull();
+        });
+
+        it('getRunReceipt should handle missing receipt gracefully', async () => {
+            const mockService = {
+                getRunReceipt: async (runId: string): Promise<RunReceipt> => {
+                    throw new ArcError(ArcErrorCode.TRACE_NOT_FOUND, `No receipt found for run: ${runId}`);
+                },
+            };
+
+            await expect(mockService.getRunReceipt('nonexistent')).rejects.toThrow(ArcError);
+        });
+
+        it('getRunAutopsy should return null for non-failed runs', async () => {
+            const mockService = {
+                getRunAutopsy: async (_runId: string) => null,
+            };
+
+            const result = await mockService.getRunAutopsy('run_ok');
+            expect(result).toBeNull();
+        });
+
+        it('getRunContract should return null when no contract exists', async () => {
+            const mockService = {
+                getRunContract: async (_runId: string) => null,
+            };
+
+            const result = await mockService.getRunContract('run_no_contract');
+            expect(result).toBeNull();
+        });
+
+        describe('Protocol Types', () => {
+            it('ArcErrorCode should have all expected codes', () => {
+                expect(ArcErrorCode.INVALID_INPUT).toBe('INVALID_INPUT');
             expect(ArcErrorCode.TRACE_NOT_FOUND).toBe('TRACE_NOT_FOUND');
             expect(ArcErrorCode.EXECUTION_FAILED).toBe('EXECUTION_FAILED');
             expect(ArcErrorCode.PARSE_ERROR).toBe('PARSE_ERROR');

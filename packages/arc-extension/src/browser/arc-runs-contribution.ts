@@ -6,7 +6,7 @@ import { ArcRunTimelineWidget } from './arc-run-timeline-widget';
 
 export const OpenRunTimelineCommand: Command = {
     id: 'arc:open-run-timeline',
-    label: 'ARC: Open Run Timeline',
+    label: 'ARC: Open Run Timeline (Advanced Trace)',
     category: 'ARC',
 };
 

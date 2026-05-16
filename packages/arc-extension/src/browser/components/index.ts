@@ -27,3 +27,18 @@ export type { WorkflowDetectionSectionProps } from './WorkflowDetectionSection';
 
 export { ErrorBanner } from './ErrorBanner';
 export type { ErrorBannerProps } from './ErrorBanner';
+
+export { RunContractCard } from './RunContractCard';
+export type { RunContractCardProps } from './RunContractCard';
+
+export { FailureAutopsyCard } from './FailureAutopsyCard';
+export type { FailureAutopsyCardProps } from './FailureAutopsyCard';
+
+export { EvidenceChip } from './EvidenceChip';
+export type { EvidenceChipProps } from './EvidenceChip';
+
+export { RunReceiptCard } from './RunReceiptCard';
+export type { RunReceiptCardProps } from './RunReceiptCard';
+
+export { CapabilityDiffViewer } from './CapabilityDiffViewer';
+export type { CapabilityDiffViewerProps } from './CapabilityDiffViewer';

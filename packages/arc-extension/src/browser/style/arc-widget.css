@@ -9,14 +9,31 @@
    ============================================ */
 :root {
     --arc-primary-color: var(--theia-ui-font-color, #4a4a4a);
-    --arc-accent-color: #0066cc;
-    --arc-success-color: #28a745;
-    --arc-warning-color: #ffc107;
-    --arc-error-color: #dc3545;
-    --arc-info-color: #17a2b8;
+    --arc-accent-color: #2e59d9;
+    --arc-success-color: var(--theia-testing-iconPassed, #2f8f46);
+    --arc-warning-color: var(--theia-inputValidation-warningBorder, #b8860b);
+    --arc-error-color: var(--theia-inputValidation-errorBorder, #c93c37);
+    --arc-info-color: var(--theia-notificationsInfoIcon-foreground, #267f99);
+    --arc-state-success-bg: var(--theia-inputValidation-infoBackground, rgba(47, 143, 70, 0.14));
+    --arc-state-warning-bg: var(--theia-inputValidation-warningBackground, rgba(184, 134, 11, 0.16));
+    --arc-state-error-bg: var(--theia-inputValidation-errorBackground, rgba(201, 60, 55, 0.14));
+    --arc-state-info-bg: var(--theia-editorInfo-background, rgba(38, 127, 153, 0.14));
+    --arc-state-neutral-bg: var(--theia-badge-background, rgba(127, 127, 127, 0.14));
     --arc-border-radius: 4px;
     --arc-transition-speed: 0.2s;
     --arc-font-size-base: 13px;
+}
+
+.arc-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 /* ============================================
@@ -1094,8 +1111,8 @@
 }
 
 /* ============================================
-   Print Styles
-   ============================================ */
+    Print Styles
+    ============================================ */
 @media print {
     .arc-toast-container,
     .arc-header-help,
@@ -1107,4 +1124,513 @@
     .arc-section {
         break-inside: avoid;
     }
+}
+
+/* ============================================
+    Cockpit Card: Run Contract
+    ============================================ */
+.arc-contract-card {
+    margin: 12px 0;
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: var(--arc-border-radius);
+    background: var(--theia-ui-background, #fff);
+    overflow: hidden;
+}
+
+.arc-contract-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--theia-ui-header-background, #f8f9fa);
+    border-bottom: 1px solid var(--theia-border-color, #ddd);
+}
+
+.arc-contract-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.arc-contract-status--proposed {
+    background: var(--arc-state-warning-bg);
+    color: var(--arc-warning-color);
+}
+
+.arc-contract-status--accepted {
+    background: var(--arc-state-success-bg);
+    color: var(--arc-success-color);
+}
+
+.arc-contract-status--fulfilled {
+    background: var(--arc-state-info-bg);
+    color: var(--arc-info-color);
+}
+
+.arc-contract-status--violated {
+    background: var(--arc-state-error-bg);
+    color: var(--arc-error-color);
+}
+
+.arc-contract-id {
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-contract-card__body {
+    padding: 14px;
+}
+
+.arc-contract-objective {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    color: var(--theia-ui-font-color, #333);
+}
+
+.arc-contract-meta {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    margin: 0 0 12px 0;
+    font-size: 12px;
+}
+
+.arc-contract-meta dt {
+    font-weight: 500;
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-contract-meta dd {
+    margin: 0;
+    color: var(--theia-ui-font-color, #333);
+}
+
+.arc-contract-section {
+    margin-top: 10px;
+}
+
+.arc-contract-section strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-contract-list {
+    margin: 0;
+    padding: 0 0 0 16px;
+    font-size: 12px;
+}
+
+.arc-contract-list li {
+    margin: 2px 0;
+}
+
+.arc-contract-card__actions {
+    display: flex;
+    gap: 8px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--theia-border-color, #ddd);
+    background: var(--theia-ui-background, #f8f9fa);
+}
+
+/* ============================================
+    Cockpit Card: Failure Autopsy
+    ============================================ */
+.arc-autopsy-card {
+    margin: 12px 0;
+    border: 1px solid var(--arc-error-color, #dc3545);
+    border-radius: var(--arc-border-radius);
+    background: var(--arc-state-error-bg);
+    overflow: hidden;
+}
+
+.arc-autopsy-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--arc-state-error-bg);
+    border-bottom: 1px solid var(--arc-error-color, #dc3545);
+}
+
+.arc-autopsy-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--arc-error-color, #dc3545);
+}
+
+.arc-autopsy-node {
+    font-weight: 400;
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-autopsy-confidence {
+    display: inline-flex;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.arc-autopsy-confidence--high {
+    background: var(--arc-state-success-bg);
+    color: var(--arc-success-color);
+}
+
+.arc-autopsy-confidence--medium {
+    background: var(--arc-state-warning-bg);
+    color: var(--arc-warning-color);
+}
+
+.arc-autopsy-confidence--low {
+    background: var(--arc-state-error-bg);
+    color: var(--arc-error-color);
+}
+
+.arc-autopsy-confidence--unknown {
+    background: var(--arc-state-neutral-bg);
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-autopsy-card__body {
+    padding: 14px;
+}
+
+.arc-autopsy-cause {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: var(--theia-ui-font-color, #333);
+}
+
+.arc-autopsy-safe-state {
+    margin: 0 0 12px 0;
+    font-size: 12px;
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-autopsy-section {
+    margin-top: 10px;
+}
+
+.arc-autopsy-section-title {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-autopsy-list {
+    margin: 0;
+    padding: 0 0 0 0;
+    list-style: none;
+    font-size: 12px;
+}
+
+.arc-autopsy-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 3px 0;
+}
+
+.arc-autopsy-icon {
+    flex-shrink: 0;
+    width: 16px;
+    text-align: center;
+    font-weight: 600;
+}
+
+.arc-autopsy-list--knows .arc-autopsy-icon {
+    color: var(--arc-success-color, #28a745);
+}
+
+.arc-autopsy-list--guesses .arc-autopsy-icon {
+    color: var(--arc-warning-color, #ffc107);
+}
+
+.arc-autopsy-evidence {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.arc-autopsy-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--theia-border-color, #ddd);
+    background: var(--theia-ui-background, #f8f9fa);
+}
+
+.arc-widget-container .theia-button.arc-retry-risk--low {
+    border-color: var(--arc-success-color);
+    color: var(--arc-success-color);
+}
+
+.arc-widget-container .theia-button.arc-retry-risk--medium {
+    border-color: var(--arc-warning-color);
+    color: var(--arc-warning-color);
+}
+
+.arc-widget-container .theia-button.arc-retry-risk--high {
+    border-color: var(--arc-error-color);
+    color: var(--arc-error-color);
+}
+
+/* ============================================
+    Cockpit Card: Evidence Chip
+    ============================================ */
+.arc-evidence-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: 12px;
+    background: var(--theia-ui-background, #fff);
+    font-size: 11px;
+    color: var(--theia-ui-font-color, #333);
+    cursor: pointer;
+    transition: all var(--arc-transition-speed) ease;
+    text-align: left;
+}
+
+.arc-evidence-chip:hover {
+    background: var(--theia-list-hoverBackground, #f5f5f5);
+    border-color: var(--arc-accent-color);
+}
+
+.arc-evidence-chip:focus {
+    outline: 2px solid var(--theia-focusBorder, #0066cc);
+    outline-offset: 1px;
+}
+
+.arc-evidence-chip__icon {
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.arc-evidence-chip__label {
+    font-family: monospace;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.arc-evidence-chip__redacted {
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+/* ============================================
+    Cockpit Card: Run Receipt
+    ============================================ */
+.arc-receipt-card {
+    margin: 12px 0;
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: var(--arc-border-radius);
+    background: var(--theia-ui-background, #fff);
+    overflow: hidden;
+}
+
+.arc-receipt-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--theia-ui-header-background, #f8f9fa);
+    border-bottom: 1px solid var(--theia-border-color, #ddd);
+}
+
+.arc-receipt-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.arc-receipt-status--completed {
+    background: var(--arc-state-success-bg);
+    color: var(--arc-success-color);
+}
+
+.arc-receipt-status--failed {
+    background: var(--arc-state-error-bg);
+    color: var(--arc-error-color);
+}
+
+.arc-receipt-status--cancelled {
+    background: var(--arc-state-neutral-bg);
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-inline-copy {
+    margin-left: 8px;
+    padding: 1px 6px;
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: var(--arc-border-radius);
+    background: var(--theia-ui-button-background, transparent);
+    color: var(--theia-ui-font-color2, #666);
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.arc-receipt-command {
+    display: block;
+    padding: 6px 8px;
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: var(--arc-border-radius);
+    background: var(--theia-editor-background, var(--theia-ui-background, transparent));
+    overflow-x: auto;
+}
+
+.arc-receipt-id {
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-receipt-card__body {
+    padding: 14px;
+}
+
+.arc-receipt-summary {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: var(--theia-ui-font-color, #333);
+}
+
+.arc-receipt-meta {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    margin: 0 0 12px 0;
+    font-size: 12px;
+}
+
+.arc-receipt-meta dt {
+    font-weight: 500;
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-receipt-meta dd {
+    margin: 0;
+    color: var(--theia-ui-font-color, #333);
+}
+
+.arc-receipt-signed {
+    color: var(--arc-success-color) !important;
+}
+
+.arc-receipt-unsigned {
+    color: var(--theia-ui-font-color2, #999) !important;
+    font-style: italic;
+}
+
+.arc-receipt-section {
+    margin-top: 10px;
+}
+
+.arc-receipt-section strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-receipt-list {
+    margin: 0;
+    padding: 0 0 0 0;
+    list-style: none;
+    font-size: 12px;
+}
+
+.arc-receipt-file {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--theia-border-color, #eee);
+}
+
+.arc-receipt-file:last-child {
+    border-bottom: none;
+}
+
+.arc-receipt-file__diff {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.arc-receipt-file__added {
+    color: var(--arc-success-color, #28a745);
+}
+
+.arc-receipt-file__removed {
+    color: var(--arc-error-color, #dc3545);
+}
+
+.arc-receipt-evidence {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.arc-receipt-risks {
+    margin-top: 12px;
+    padding: 10px;
+    background: var(--arc-state-warning-bg);
+    border: 1px solid var(--arc-warning-color, #ffc107);
+    border-radius: var(--arc-border-radius);
+}
+
+.arc-receipt-risks strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--arc-warning-color);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .arc-widget-container *,
+    .arc-modal-overlay {
+        animation: none;
+        transition: none;
+    }
+}
+
+.arc-receipt-trust {
+    margin-top: 10px;
+}
+
+.arc-receipt-trust strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--theia-ui-font-color2, #666);
+}
+
+.arc-receipt-card__actions {
+    display: flex;
+    gap: 8px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--theia-border-color, #ddd);
+    background: var(--theia-ui-background, #f8f9fa);
 }

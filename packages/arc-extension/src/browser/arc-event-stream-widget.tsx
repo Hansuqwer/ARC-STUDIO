@@ -19,7 +19,7 @@ const EVENT_COLORS: Record<string, string> = {
 @injectable()
 export class ArcEventStreamWidget extends ReactWidget {
     static readonly ID = 'arc:event-stream';
-    static readonly LABEL = 'ARC Event Stream';
+    static readonly LABEL = 'ARC Event Stream (Advanced Trace)';
 
     @inject(ArcService)
     protected readonly arcService!: ArcService;
@@ -37,7 +37,7 @@ export class ArcEventStreamWidget extends ReactWidget {
         this.id = ArcEventStreamWidget.ID;
         this.title.label = ArcEventStreamWidget.LABEL;
         this.title.closable = true;
-        this.title.caption = 'ARC Event Stream - trace-backed renderer';
+        this.title.caption = 'ARC Event Stream (Advanced Trace)';
         this.loadTraces();
     }
 

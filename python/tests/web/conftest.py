@@ -66,10 +66,16 @@ async def client(app):
                 self.status_code = aiohttp_response.status
             
             async def json(self):
-                return await self._resp.json()
+                try:
+                    return await self._resp.json()
+                finally:
+                    self._resp.release()
             
             async def text(self):
-                return await self._resp.text()
+                try:
+                    return await self._resp.text()
+                finally:
+                    self._resp.release()
             
             @property
             def content(self):
