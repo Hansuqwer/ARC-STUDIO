@@ -5,7 +5,7 @@
 **Test count:** 435 passed, 6 skipped (Python), TS protocol + arc-extension builds clean
 
 ## Goal
-Continue implementation beyond the first 23 recommended PRs from `docs/IMPLEMENTATION_PLAN.md` with green tests and builds, committing each green slice. All P1a execution core infrastructure is done. Next phases are P1b (remaining items), P2 (adoption integrations), and P3 (Theia UX).
+Continue release-readiness work beyond the first 23 recommended PRs from `docs/IMPLEMENTATION_PLAN.md` with green tests and builds, committing each green slice. P1a through most P5 scaffolding are implemented; current work is release verification, doc truth cleanup, and deferred UX hardening.
 
 ## Constraints & Preferences
 - Work in small vertical slices; after each slice run tests/lint/build, fix failures, commit only when green.
@@ -44,8 +44,7 @@ Continue implementation beyond the first 23 recommended PRs from `docs/IMPLEMENT
 - ✅ Subprocess env allowlists (SwarmGraph adapter only; other adapters are in-process)
 
 ### P1b Items Still Open
-- **Port run visualization shell pieces** — Extend `packages/arc-extension` by selectively porting UI from `theia-extensions/arc-adapters`, `arc-runs`, `arc-workflows`, `arc-event-stream`
-- **Local prompt optimizer foundation** — Create `prompt_optimizer/` package with local-only prompt structuring, `arc prompt optimize` CLI, `arc prompt diff`
+- (none; see AGENTS.md current status for completed prompt optimizer, adoption skeleton, and Theia port notes)
 
 ### In Progress
 - (none)
@@ -55,23 +54,16 @@ Continue implementation beyond the first 23 recommended PRs from `docs/IMPLEMENT
 
 ## Next Slices (ordered by impact + dependency)
 
-### Slice A: Local Prompt Optimizer Foundation
-**Why first:** Standalone Python module, no existing code to modify, tests can run without network.
+### Slice A: Release Truth Cleanup
+**Why first:** Several handover/release docs are stale after rapid implementation. Bring release-facing docs back in sync before tagging or more feature work.
 
-**Files to create:**
-- `python/src/agent_runtime_cockpit/prompt_optimizer/__init__.py`
-- `python/src/agent_runtime_cockpit/prompt_optimizer/optimizer.py`
-- `python/tests/prompt_optimizer/__init__.py`
-- `python/tests/prompt_optimizer/test_optimizer.py`
+**Files to review:**
+- `AGENTS.md`
+- `docs/handover/HANDOVER.md`
+- `docs/RELEASE_CHECKLIST.md`
+- `docs/IMPLEMENTATION_PLAN.md`
 
-**CLI commands to add:**
-- `arc prompt optimize --file <path>` — structure a vague prompt
-- `arc prompt optimize --mode off|local` — default to local mode
-- `arc prompt diff <original> <optimized>` — show before/after
-
-**Scaffolds in:** `docs/research/IMPLEMENTATION_RESEARCH.md` section 8 (prompt optimizer).
-
-**Verification tests:** Unit tests with vague/broken-English prompts; no network tests.
+**Verification:** Banned-claim checker plus targeted grep for stale “not implemented”/“still open” claims.
 
 ### Slice B: Port Run Visualization Shell Pieces (Theia UI)
 **Why second:** The most valuable UI work but depends on P1a backends being stable.

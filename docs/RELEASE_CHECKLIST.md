@@ -9,7 +9,7 @@
 - ✅ Python CLI/wheel (`python/`)
 - ❌ Electron packaging — post-v0.1 spike only
 - ❌ LM Arena product feature — stub-default with gated live path, not v0.1 scope
-- ❌ SwarmGraph adoption — not implemented; only standalone adapters exist
+- ❌ SwarmGraph adoption product claim — fake-tested/gated adoption runners exist, but v0.1 release docs must not claim broad live adoption support
 
 ---
 
@@ -134,14 +134,14 @@ bash scripts/check-banned-claims.sh README.md docs/IMPLEMENTATION_PLAN.md docs/R
 
 ---
 
-### 9. `.env` history scrubbed (gated on release date)
+### 9. `.env` history scrubbed (gated on release readiness)
 
-**Status:** ⚠️ Plan documented; not scrubbed
+**Status:** ⚠️ Deferred; no release date set
 
-**Prerequisite:** A release date must be set. Schedule `git filter-repo`
-scrub ≥7 days before that date.
+**Prerequisite:** A release date must be set after ARC Studio works as intended.
+Schedule `git filter-repo` scrub ≥7 days before that date.
 
-Plan: `docs/ENV_HISTORY_SCRUB_PLAN.md`. This remains blocked until release-date approval because it requires coordinated history rewrite and force-push.
+Plan: `docs/ENV_HISTORY_SCRUB_PLAN.md`. This remains blocked until release-readiness and explicit release-date approval because it requires coordinated history rewrite and force-push.
 
 **What must happen:**
 1. Set a release date.
@@ -177,9 +177,9 @@ curl -s http://localhost:3000 | grep -q 'arc-widget'
 
 ### 11. All CI workflows green for 3 consecutive days on main
 
-**Status:** ❌ Failing on GitHub main (2026-05-15)
+**Status:** ⏸️ Deferred until release date is re-set
 
-Offline PR/push gates exist (`python`, `node`, `ARC Roadmap Gate`). Recent `main` runs are red for `python`, `node`, and `ARC Roadmap Gate`; `signing-preflight` and `e2e` are green. A separate `real-runtime-smoke` workflow now runs manually and nightly with `ARC_REAL_RUNTIME_SMOKE=1`; 3-day green-window verification is blocked until those CI failures are fixed and observed on GitHub.
+Offline PR/push gates exist (`python`, `node`, `ARC Roadmap Gate`). A separate `real-runtime-smoke` workflow runs manually and nightly with `ARC_REAL_RUNTIME_SMOKE=1`. The 3-day green-window clock should start only after a release date is re-set.
 
 **Check:** Visit CI dashboard and confirm workflows (python, node, lint)
 have green checkmarks on main for the past 3 days.
@@ -223,7 +223,7 @@ specific event occurs.
 
 | Task | Trigger | Owner |
 |------|---------|-------|
-| `.env` history scrub | Release date is set (≥7 days before) | TBD; plan in `docs/ENV_HISTORY_SCRUB_PLAN.md` |
+| `.env` history scrub | Release date is re-set after product readiness (≥7 days before tag) | TBD; plan in `docs/ENV_HISTORY_SCRUB_PLAN.md` |
 | Electron packaging spike | Canonical extension wiring + v0.1.0-alpha release | TBD |
 | Full historical docs cleanup | Public docs freeze complete | TBD |
 | CI green-window confirmation | Real-runtime smoke workflow merged | TBD |

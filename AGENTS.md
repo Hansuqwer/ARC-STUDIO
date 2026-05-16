@@ -316,11 +316,11 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 - arc-extension build: clean
 
 ### Remaining Issues
-See `docs/handover/REMAINING_ISSUES_PLAN.md` for full details. Summary:
+Historical details are archived at `docs/archive/handover/REMAINING_ISSUES_PLAN.md`. Current summary:
 
-- **R-1 (Node CI: arc-ag-ui test exits 1)**: Unquoted glob `./test/**/*.test.js` fails under POSIX sh. Fix: quote the glob.
-- **R-2 (ARC Roadmap Gate: native-keymap gyp crash)**: Native deps now present in CI workflows; confirm on GitHub.
-- **R-3 (Python CI: 2 AG2 adapter test errors)**: Local strict-warning Python suite is green after removing the stale event-loop fixture; confirm on GitHub.
+- **R-1 (Node CI: arc-ag-ui test exits 1)**: Fixed in repo by using `node --test`; confirm on GitHub.
+- **R-2 (ARC Roadmap Gate: native-keymap gyp crash)**: Fixed in repo by adding native deps; confirm on GitHub.
+- **R-3 (Python CI: 2 AG2 adapter test errors)**: Fixed in repo by removing the stale event-loop fixture; confirm on GitHub.
 - **R-4 (10 unmerged remote branches)**: 3 may have salvageable work; 7 intentionally parked.
 - **R-5 (.env history scrub)**: Plan documented in `docs/ENV_HISTORY_SCRUB_PLAN.md`; execute only after release date approval.
 - **e2e workflow**: Still in progress.

@@ -13,6 +13,7 @@
 
 import { injectable } from '@theia/core/shared/inversify';
 import { execFileSync } from 'child_process';
+import * as path from 'path';
 import {
     ArcService,
     ExecutionOptions,
@@ -27,14 +28,33 @@ import {
     ArcErrorCode,
     RuntimeCapabilitiesResponse,
     ProviderStatus,
+    ConfigStatus,
+    SafeConfigUpdate,
+    SafeProviderKeyStatus,
+    SafeRuntimeConfig,
+    TrustStatus,
+    RunLinksResponse,
+    RunReceipt,
+    FailureAutopsy,
+    RunContract,
+    CapabilityDiffResponse,
+    CapabilityDiff,
 } from '../common/arc-protocol';
-import { validateWorkspaceRoot, validateTraceId } from './security-utils';
+import { validateWorkspaceRoot, validateTraceId, validateRunId } from './security-utils';
 import { WorkflowExecutor } from './services/workflow-executor';
 import { TraceParser } from './services/trace-parser';
 import { WorkflowDetector } from './services/workflow-detector';
 import { FileManager } from './services/file-manager';
 
 const ARC_CLI_ENV_ALLOWLIST = ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR'];
+
+const TRUST_SENSITIVE_FLAGS = [
+    'can_run',
+    'requires_paid_calls',
+    'requires_shell',
+    'requires_secrets',
+    'requires_network',
+];
 
 function buildArcCliEnv(): NodeJS.ProcessEnv {
     const env: NodeJS.ProcessEnv = {};
@@ -352,6 +372,345 @@ export class ArcBackendService implements ArcService {
             backendPath: this.workspaceRoot,
             source: 'filesystem',
         };
+    }
+
+    // ========== Config Tab Methods (Session B) ==========
+
+    /**
+     * Get config status with all secret values stripped.
+     * Calls the Python CLI for provider statuses and reads workspace trust state.
+     * Gracefully handles unavailable backend by returning degraded state.
+     */
+    async getConfigStatus(): Promise<ConfigStatus> {
+        const trustStatus: TrustStatus = {
+            trusted: false,
+            workspacePath: this.workspaceRoot,
+            trustLevel: 'unknown',
+            reason: 'status_unverified',
+        };
+
+        const runtimeConfig: SafeRuntimeConfig = {
+            defaultRuntime: 'swarmgraph',
+            autoDetect: true,
+            fallback: 'stub',
+            isolation: 'none',
+            timeoutSeconds: 300,
+            allowPaidCalls: false,
+            dryRun: true,
+            routingMode: 'manual',
+        };
+
+        let providers: SafeProviderKeyStatus[] = [];
+        let backendAvailable = true;
+        let backendMessage: string | undefined;
+
+        try {
+            const output = execFileSync('arc', ['providers', 'status', '--json'], {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            if (parsed.ok && Array.isArray(parsed.data)) {
+                providers = parsed.data.map((p: any) => ({
+                    provider: p.provider || 'unknown',
+                    displayName: p.display_name || p.provider || 'Unknown',
+                    configured: !!p.apiKeyConfigured || !!p.api_key_configured,
+                    source: p.apiKeySource || (p.apiKeyConfigured ? 'env' : 'unset'),
+                    defaultModel: p.default_model,
+                    envOverride: p.api_key_env,
+                })) as SafeProviderKeyStatus[];
+            }
+        } catch (error) {
+            backendAvailable = false;
+            backendMessage = `Backend unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            providers = [
+                { provider: 'openai', displayName: 'OpenAI', configured: false, source: 'unset' },
+                { provider: 'anthropic', displayName: 'Anthropic', configured: false, source: 'unset' },
+                { provider: 'ollama', displayName: 'Ollama', configured: false, source: 'unset' },
+            ];
+        }
+
+        try {
+            const configOutput = execFileSync('arc', ['config', 'show', '--json'], {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const configParsed = JSON.parse(configOutput);
+            if (configParsed.ok && configParsed.data) {
+                const data = configParsed.data;
+                if (data.runtime) {
+                    runtimeConfig.defaultRuntime = data.runtime.default || runtimeConfig.defaultRuntime;
+                    runtimeConfig.autoDetect = data.runtime.auto_detect ?? runtimeConfig.autoDetect;
+                    runtimeConfig.fallback = data.runtime.fallback || runtimeConfig.fallback;
+                }
+                if (data.execution) {
+                    runtimeConfig.isolation = data.execution.isolation || runtimeConfig.isolation;
+                    runtimeConfig.timeoutSeconds = data.execution.timeout_seconds || runtimeConfig.timeoutSeconds;
+                    runtimeConfig.allowPaidCalls = data.execution.allow_paid_calls ?? runtimeConfig.allowPaidCalls;
+                }
+                if (data.providers) {
+                    runtimeConfig.dryRun = data.providers.dry_run ?? runtimeConfig.dryRun;
+                    runtimeConfig.routingMode = data.providers.routing_mode || runtimeConfig.routingMode;
+                }
+                if (data.workspace) {
+                    trustStatus.trustLevel = data.workspace.trust_level || trustStatus.trustLevel;
+                    trustStatus.trusted = trustStatus.trustLevel === 'trusted';
+                }
+            }
+        } catch {
+            // Config show failed; keep defaults
+        }
+
+        return {
+            workspace: trustStatus,
+            runtime: runtimeConfig,
+            providers,
+            mode: 'build',
+            backendAvailable,
+            backendMessage,
+        };
+    }
+
+    /**
+     * Save safe config fields only.
+     * Validates that no secret values are included before writing.
+     */
+    async saveConfig(update: SafeConfigUpdate): Promise<{ success: boolean; message: string }> {
+        const safeKeys = ['defaultRuntime', 'mode', 'isolation', 'allowPaidCalls', 'dryRun', 'routingMode'];
+        const updateKeys = Object.keys(update);
+
+        for (const key of updateKeys) {
+            if (!safeKeys.includes(key)) {
+                return {
+                    success: false,
+                    message: `Rejected unsafe config field: ${key}. Only non-secret fields are allowed.`,
+                };
+            }
+        }
+
+        if (updateKeys.length === 0) {
+            return { success: false, message: 'No config fields to update.' };
+        }
+
+        try {
+            const args = ['config', 'set'];
+            if (update.defaultRuntime) {
+                args.push(`runtime.default=${update.defaultRuntime}`);
+            }
+            if (update.isolation) {
+                args.push(`execution.isolation=${update.isolation}`);
+            }
+            if (update.allowPaidCalls !== undefined) {
+                args.push(`execution.allow_paid_calls=${update.allowPaidCalls}`);
+            }
+            if (update.dryRun !== undefined) {
+                args.push(`providers.dry_run=${update.dryRun}`);
+            }
+            if (update.routingMode) {
+                args.push(`providers.routing_mode=${update.routingMode}`);
+            }
+
+            execFileSync('arc', args, {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+
+            return { success: true, message: 'Configuration saved.' };
+        } catch (error) {
+            return {
+                success: false,
+                message: `Failed to save config: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            };
+        }
+    }
+
+    // ========== Run Links Methods (Session B7) ==========
+
+    /**
+     * Get cross-linked event chains for a run.
+     * Calls the Python CLI to retrieve linked events by stable ID.
+     */
+    async getRunLinks(runId: string, filter?: string, stableId?: string): Promise<RunLinksResponse> {
+        try {
+            const args = ['runs', 'links', runId, '--json'];
+            if (filter) {
+                args.push('--filter', filter);
+            }
+            if (stableId) {
+                args.push('--stable-id', stableId);
+            }
+
+            const output = execFileSync('arc', args, {
+                timeout: 15000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            if (parsed.ok && parsed.data) {
+                const data = parsed.data;
+                return {
+                    nodeChains: data.node_chains || {},
+                    messageChains: data.message_chains || {},
+                    toolCallChains: data.tool_call_chains || {},
+                    evidenceChains: data.evidence_chains || {},
+                    hasStableIds: !!data.has_stable_ids,
+                    stableIdCount: data.stable_id_count || 0,
+                };
+            }
+            throw new ArcError(
+                ArcErrorCode.UNKNOWN,
+                parsed?.error?.message || 'CLI returned no data for run links',
+            );
+        } catch (error) {
+            if (error instanceof ArcError) throw error;
+            throw new ArcError(
+                ArcErrorCode.UNKNOWN,
+                `Failed to get run links: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+        }
+    }
+
+    // ========== Run Details (Cockpit Cards) ==========
+
+    /**
+     * Get run receipt for a completed/failed/cancelled run.
+     */
+    async getRunReceipt(runId: string): Promise<RunReceipt> {
+        try {
+            validateRunId(runId);
+            const receiptPath = path.join(this.workspaceRoot, '.arc', 'receipts', `${runId}.json`);
+            const fs = await import('fs-extra');
+            if (!await fs.pathExists(receiptPath)) {
+                throw new ArcError(ArcErrorCode.TRACE_NOT_FOUND, `No receipt found for run: ${runId}`, { runId });
+            }
+            const content = await fs.readFile(receiptPath, 'utf-8');
+            return JSON.parse(content) as RunReceipt;
+        } catch (error) {
+            if (error instanceof ArcError) throw error;
+            throw new ArcError(
+                ArcErrorCode.UNKNOWN,
+                `Failed to read receipt: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                { runId }
+            );
+        }
+    }
+
+    /**
+     * Get failure autopsy for a failed run. Returns null if no autopsy exists.
+     */
+    async getRunAutopsy(runId: string): Promise<FailureAutopsy | null> {
+        try {
+            validateRunId(runId);
+            const autopsyPath = path.join(this.workspaceRoot, '.arc', 'autopsies', `${runId}.json`);
+            const fs = await import('fs-extra');
+            if (!await fs.pathExists(autopsyPath)) {
+                return null;
+            }
+            const content = await fs.readFile(autopsyPath, 'utf-8');
+            return JSON.parse(content) as FailureAutopsy;
+        } catch (error) {
+            if (error instanceof ArcError) throw error;
+            throw new ArcError(
+                ArcErrorCode.UNKNOWN,
+                `Failed to read autopsy: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                { runId }
+            );
+        }
+    }
+
+    /**
+     * Get run contract for a run. Returns null if no contract exists.
+     */
+    async getRunContract(runId: string): Promise<RunContract | null> {
+        try {
+            validateRunId(runId);
+            const contractPath = path.join(this.workspaceRoot, '.arc', 'contracts', `${runId}.json`);
+            const fs = await import('fs-extra');
+            if (!await fs.pathExists(contractPath)) {
+                return null;
+            }
+            const content = await fs.readFile(contractPath, 'utf-8');
+            return JSON.parse(content) as RunContract;
+        } catch (error) {
+            if (error instanceof ArcError) throw error;
+            throw new ArcError(
+                ArcErrorCode.UNKNOWN,
+                `Failed to read contract: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                { runId }
+            );
+        }
+    }
+
+    // ========== Capability Diff (Session B) ==========
+
+    /**
+     * Get capability diff between two runtimes.
+     * Calls the Python CLI to compute the diff and analyzes trust boundary changes.
+     */
+    async getCapabilityDiff(fromRuntime: string, toRuntime: string): Promise<CapabilityDiffResponse> {
+        try {
+            const output = execFileSync('arc', [
+                'runtimes',
+                '--diff-from', fromRuntime,
+                '--diff-to', toRuntime,
+                '--workspace', this.workspaceRoot,
+                '--json',
+            ], {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            if (parsed.ok && parsed.data) {
+                const data = parsed.data;
+                const diff: CapabilityDiff = {
+                    schemaVersion: data.schema_version ?? 1,
+                    diffId: data.diff_id,
+                    runtimeId: data.runtime_id,
+                    beforeSnapshotId: data.before_snapshot_id,
+                    afterSnapshotId: data.after_snapshot_id,
+                    addedCapabilities: data.added_capabilities ?? [],
+                    removedCapabilities: data.removed_capabilities ?? [],
+                    changedFlags: data.changed_flags ?? {},
+                    requiresConfirmation: data.requires_confirmation ?? false,
+                    timestamp: data.timestamp,
+                };
+
+                const trustSensitiveChanges = Object.keys(diff.changedFlags).filter(
+                    key => TRUST_SENSITIVE_FLAGS.includes(key)
+                );
+                const trustBoundaryWidened = trustSensitiveChanges.some(key => {
+                    const change = diff.changedFlags[key];
+                    return change.after === true && change.before === false;
+                });
+
+                return {
+                    diff,
+                    fromRuntime,
+                    toRuntime,
+                    trustBoundaryWidened,
+                    trustSensitiveChanges,
+                };
+            }
+            throw new ArcError(
+                ArcErrorCode.UNKNOWN,
+                parsed?.error?.message || 'CLI returned no data for capability diff',
+            );
+        } catch (error) {
+            if (error instanceof ArcError) throw error;
+            throw new ArcError(
+                ArcErrorCode.EXECUTION_FAILED,
+                `Failed to get capability diff: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+        }
     }
 
     // ========== Private Helpers ==========
