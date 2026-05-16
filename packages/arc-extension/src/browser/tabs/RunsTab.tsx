@@ -6,7 +6,7 @@
  */
 
 import * as React from '@theia/core/shared/react';
-import type { ArcService, TraceFile, RunReceipt, FailureAutopsy, RunContract, AuditChainInfo, HitlPromptInfo, ReplayEvent } from '../../common/arc-protocol';
+import type { ArcService, TraceFile, RunReceipt, FailureAutopsy, RunContract, AuditChainInfo, HitlPromptInfo, ReplayEvent, RunDiffResult } from '../../common/arc-protocol';
 import { RunReceiptCard } from '../components/RunReceiptCard';
 import { FailureAutopsyCard } from '../components/FailureAutopsyCard';
 import { RunContractCard } from '../components/RunContractCard';
@@ -33,6 +33,11 @@ interface RunsTabState {
     hitlPrompts: HitlPromptInfo[];
     isListHitl: boolean;
     hitlError: string | null;
+    diffRunAId: string;
+    diffRunBId: string;
+    diffResult: RunDiffResult | null;
+    isDiffing: boolean;
+    diffError: string | null;
 }
 
 function truncateId(id: string, max = 12): string {
@@ -65,13 +70,24 @@ export const RunsTab: React.FC<RunsTabProps> = ({ arcService, initialRunId }) =>
         hitlPrompts: [],
         isListHitl: false,
         hitlError: null,
+        diffRunAId: '',
+        diffRunBId: '',
+        diffResult: null,
+        isDiffing: false,
+        diffError: null,
     });
 
     const loadRuns = React.useCallback(async () => {
         setState(prev => ({ ...prev, isLoadingRuns: true, error: null }));
         try {
             const runs = await arcService.getTraces();
-            setState(prev => ({ ...prev, runs, isLoadingRuns: false }));
+            setState(prev => ({
+                ...prev,
+                runs,
+                isLoadingRuns: false,
+                diffRunAId: prev.diffRunAId || runs[0]?.id || '',
+                diffRunBId: prev.diffRunBId || runs[1]?.id || runs[0]?.id || '',
+            }));
         } catch (err: any) {
             setState(prev => ({
                 ...prev,
@@ -161,6 +177,17 @@ export const RunsTab: React.FC<RunsTabProps> = ({ arcService, initialRunId }) =>
         }
     }, [arcService, listHitlPrompts]);
 
+    const compareRuns = React.useCallback(async () => {
+        if (!state.diffRunAId || !state.diffRunBId) return;
+        setState(prev => ({ ...prev, isDiffing: true, diffResult: null, diffError: null }));
+        try {
+            const diffResult = await arcService.diffRuns(state.diffRunAId, state.diffRunBId);
+            setState(prev => ({ ...prev, diffResult, isDiffing: false }));
+        } catch (err: any) {
+            setState(prev => ({ ...prev, isDiffing: false, diffError: err.message }));
+        }
+    }, [arcService, state.diffRunAId, state.diffRunBId]);
+
     // Auto-select initialRunId when runs first load
     const initialAutoSelected = React.useRef(false);
     React.useEffect(() => {
@@ -179,7 +206,8 @@ export const RunsTab: React.FC<RunsTabProps> = ({ arcService, initialRunId }) =>
     }, [initialRunId, state.runs, selectRun]);
 
     const { runs, selectedRunId, receipt, autopsy, contract, isLoadingRuns, isLoadingDetails, error,
-        auditInfo, isVerifyingAudit, replayEvents, isReplaying, hitlPrompts, isListHitl, hitlError } = state;
+        auditInfo, isVerifyingAudit, replayEvents, isReplaying, hitlPrompts, isListHitl, hitlError,
+        diffRunAId, diffRunBId, diffResult, isDiffing, diffError } = state;
 
     return (
         <div className='arc-studio-runs' role='region' aria-label='Runs panel'>
@@ -249,6 +277,51 @@ export const RunsTab: React.FC<RunsTabProps> = ({ arcService, initialRunId }) =>
                     {error}
                 </div>
             )}
+
+            <div className='arc-studio-runs__diff' aria-label='Run diff'>
+                <h4>Compare Runs</h4>
+                <div className='arc-studio-runs__diff-controls'>
+                    <select
+                        aria-label='Base run'
+                        value={diffRunAId}
+                        onChange={e => setState(prev => ({ ...prev, diffRunAId: e.currentTarget.value }))}
+                        disabled={runs.length === 0 || isDiffing}
+                    >
+                        {runs.map(run => (
+                            <option key={run.id} value={run.id}>{truncateId(run.id)} ({run.status})</option>
+                        ))}
+                    </select>
+                    <select
+                        aria-label='Compare run'
+                        value={diffRunBId}
+                        onChange={e => setState(prev => ({ ...prev, diffRunBId: e.currentTarget.value }))}
+                        disabled={runs.length === 0 || isDiffing}
+                    >
+                        {runs.map(run => (
+                            <option key={run.id} value={run.id}>{truncateId(run.id)} ({run.status})</option>
+                        ))}
+                    </select>
+                    <button
+                        className='theia-button secondary arc-studio-runs__diff-compare'
+                        onClick={compareRuns}
+                        disabled={!diffRunAId || !diffRunBId || isDiffing}
+                        aria-label='Compare selected runs'
+                    >
+                        {isDiffing ? 'Comparing…' : 'Compare'}
+                    </button>
+                </div>
+                {diffError && <div className='arc-studio-runs__error' role='alert'>Diff error: {diffError}</div>}
+                {diffResult && (
+                    <div className='arc-studio-runs__diff-result'>
+                        <p>
+                            <strong>Status:</strong> {diffResult.statusA} {'->'} {diffResult.statusB};{' '}
+                            <strong>Events:</strong> {diffResult.eventCountA} {'->'} {diffResult.eventCountB};{' '}
+                            <strong>Tool calls:</strong> {diffResult.toolCallsA} {'->'} {diffResult.toolCallsB}
+                        </p>
+                        <pre className='arc-studio-runs__diff-json'>{JSON.stringify(diffResult, null, 2)}</pre>
+                    </div>
+                )}
+            </div>
 
             <div className='arc-studio-runs__layout'>
                 <div className='arc-studio-runs__list'>

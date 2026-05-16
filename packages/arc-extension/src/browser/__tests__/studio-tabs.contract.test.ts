@@ -87,6 +87,40 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/arc-studio-chat__placeholder/);
         });
 
+        it('should load runtime capabilities for disabled selector states', () => {
+            expect(source).toMatch(/listRuntimeCapabilities/);
+            expect(source).toMatch(/FALLBACK_RUNTIMES/);
+            expect(source).toMatch(/runtimeOptions/);
+        });
+
+        it('should disable runtime select option when can_run is false and show reason', () => {
+            expect(source).toMatch(/disabled=\{disabled\}/);
+            expect(source).toMatch(/\.reason/);
+        });
+
+        it('should expose runtime/profile selectors and dry-run preflight', () => {
+            expect(source).toMatch(/arc-studio-chat__runtime-selector/);
+            expect(source).toMatch(/arc-studio-chat__profile-selector/);
+            expect(source).toMatch(/arc-studio-chat__paid-calls/);
+            expect(source).toMatch(/allowPaidCalls/);
+            expect(source).toMatch(/arc-studio-chat__dry-run/);
+            expect(source).toMatch(/preflightRun/);
+            expect(source).toMatch(/arc-studio-chat__run/);
+            expect(source).toMatch(/startRun/);
+        });
+
+        it('should show runtime readiness and keep local transcript', () => {
+            expect(source).toMatch(/arc-studio-chat__runtime-readiness/);
+            expect(source).toMatch(/selectedCapability/);
+            expect(source).toMatch(/arc-studio-chat__transcript/);
+            expect(source).toMatch(/setTranscript/);
+        });
+
+        it('should include CrewAI plus SwarmGraph fake offline option', () => {
+            expect(source).toMatch(/crewai\+swarmgraph/);
+            expect(source).toMatch(/CrewAI \+ SwarmGraph \(fake\/offline\)/);
+        });
+
         it('should NOT import TraceViewerSection', () => {
             expect(source).not.toMatch(/TraceViewerSection/);
         });
@@ -154,6 +188,17 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/arcService\.getRunReceipt/);
             expect(source).toMatch(/arcService\.getRunAutopsy/);
             expect(source).toMatch(/arcService\.getRunContract/);
+        });
+
+        it('should expose run diff controls backed by ArcService.diffRuns', () => {
+            expect(source).toMatch(/RunDiffResult/);
+            expect(source).toMatch(/diffRunAId/);
+            expect(source).toMatch(/diffRunBId/);
+            expect(source).toMatch(/arcService\.diffRuns\(state\.diffRunAId, state\.diffRunBId\)/);
+            expect(source).toMatch(/arc-studio-runs__diff-compare/);
+            expect(source).toMatch(/JSON\.stringify\(diffResult, null, 2\)/);
+            expect(source).not.toMatch(/fetch\(/);
+            expect(source).not.toMatch(/arc-core/);
         });
 
         it('should render receipt card conditionally', () => {
@@ -257,25 +302,29 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/name='runtime'/);
         });
 
-        it('should have SwarmGraph runtime option', () => {
+        it('should have runtime display metadata for known runtimes', () => {
+            expect(source).toMatch(/RUNTIME_DISPLAY/);
             expect(source).toMatch(/swarmgraph/);
-            expect(source).toMatch(/SwarmGraph/);
-        });
-
-        it('should have LangGraph runtime option', () => {
             expect(source).toMatch(/langgraph/);
-        });
-
-        it('should have CrewAI runtime option', () => {
             expect(source).toMatch(/crewai/);
-        });
-
-        it('should have OpenAI Agents runtime option', () => {
+            expect(source).toMatch(/crewai\+swarmgraph/);
             expect(source).toMatch(/openai-agents/);
+            expect(source).toMatch(/ag2/);
         });
 
-        it('should have AG2 runtime option', () => {
-            expect(source).toMatch(/ag2/);
+        it('should load runtime capabilities from backend for disabled state', () => {
+            expect(source).toMatch(/listRuntimeCapabilities/);
+            expect(source).toMatch(/caps\.runtimes/);
+        });
+
+        it('should disable runtime radio when can_run is false', () => {
+            expect(source).toMatch(/!opt\.canRun/);
+            expect(source).toMatch(/disabled=\{disabled\}/);
+        });
+
+        it('should show capability-driven reason for disabled runtime', () => {
+            expect(source).toMatch(/⛔/);
+            expect(source).toMatch(/opt\.description/);
         });
 
         it('should have mode radio group', () => {
@@ -304,6 +353,22 @@ describe('Studio Tabs Contracts', () => {
 
         it('should have providers section', () => {
             expect(source).toMatch(/Providers/);
+        });
+
+        it('should have provider dropdown and env var input', () => {
+            expect(source).toMatch(/arc-studio-config__provider-dropdown/);
+            expect(source).toMatch(/arc-studio-config__provider-env-input/);
+            expect(source).toMatch(/OPENAI_API_KEY/);
+        });
+
+        it('should have save key reference button', () => {
+            expect(source).toMatch(/Save key reference/);
+            expect(source).toMatch(/setProviderKeyRef/);
+        });
+
+        it('should show web auth warning', () => {
+            expect(source).toMatch(/Web session auth is research-only/);
+            expect(source).toMatch(/does not capture browser cookies/);
         });
 
         it('should show provider source badges', () => {
