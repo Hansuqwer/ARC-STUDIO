@@ -75,7 +75,7 @@ After all useful code is ported:
 | C.7 | `arc-context` | Remove from `applications/browser` deps, archive |
 | C.8 | `arc-settings` | Remove from `applications/browser` deps, archive |
 | C.9 | `arc-health` | Remove from `applications/browser` deps, archive |
-| C.10 | `arc-audit` | Archive directory; document concept for future rewrite |
+| C.10 | `arc-audit` | ✅ Removed static stub from `applications/browser` deps; archive source after browser smoke |
 | C.11 | `arc-arena` | Already excluded; ensure no import paths remain |
 | C.12 | `arc-product` | Archive directory; branding merged into canonical extension |
 
@@ -114,7 +114,7 @@ service types are properly represented in `packages/arc-extension` and the Pytho
 | Extension | Status |
 |-----------|--------|
 | `arc-adapters` | ✅ Ported into arc-extension and removed from browser app deps; source still present for rollback until browser smoke |
-| `arc-audit` | 📁 Archive candidate (Phase C) |
+| `arc-audit` | ✅ Static stub removed from browser app deps; per-run audit verification lives in canonical Runs tab |
 | `arc-arena` | 🗑️ ARCHIVE CANDIDATE — out of v0.1 scope; still present in workspace |
 | `arc-context` | ⏳ Awaiting port decision (Phase B) |
 | `arc-core` | 🗑️ DEPRECATED — duplicate of canonical extension, still wired in browser app |
