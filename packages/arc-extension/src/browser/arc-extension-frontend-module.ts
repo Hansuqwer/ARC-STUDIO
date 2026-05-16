@@ -10,6 +10,8 @@ import { ArcRunTimelineWidget } from './arc-run-timeline-widget';
 import { ArcRunsContribution } from './arc-runs-contribution';
 import { ArcEventStreamWidget } from './arc-event-stream-widget';
 import { ArcEventStreamContribution } from './arc-event-stream-contribution';
+import { ArcHealthWidget } from './arc-health-widget';
+import { ArcHealthContribution } from './arc-health-contribution';
 import { ArcStudioWidget } from './arc-studio-widget';
 import { ArcStudioWidgetContribution } from './arc-studio-widget-contribution';
 import { ArcServicePath, ArcService } from '../common/arc-protocol';
@@ -76,4 +78,13 @@ export default new ContainerModule(bind => {
         createWidget: () => ctx.container.get<ArcEventStreamWidget>(ArcEventStreamWidget),
     })).inSingletonScope();
     bindViewContribution(bind, ArcEventStreamContribution);
+
+    // Bind the ARC Health Monitor widget
+    bind(ArcHealthWidget).toSelf();
+    bind(WidgetFactory).toDynamicValue(ctx => ({
+        id: ArcHealthWidget.ID,
+        createWidget: () => ctx.container.get<ArcHealthWidget>(ArcHealthWidget),
+    })).inSingletonScope();
+    bindViewContribution(bind, ArcHealthContribution);
+    bind(FrontendApplicationContribution).toService(ArcHealthContribution);
 });

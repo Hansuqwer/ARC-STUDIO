@@ -35,7 +35,6 @@
     "arc-extension": "workspace:*",
     "arc-core": "workspace:*",
     "arc-runs": "workspace:*",
-    "arc-health": "workspace:*",
     "arc-settings": "workspace:*"
   },
   "devDependencies": {

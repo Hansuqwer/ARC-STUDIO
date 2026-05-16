@@ -324,6 +324,50 @@ describe('ArcAdaptersContribution', () => {
     });
 });
 
+describe('ArcHealthWidget', () => {
+    let source: string;
+
+    beforeAll(async () => {
+        source = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'browser', 'arc-health-widget.tsx'), 'utf-8');
+    });
+
+    it('should be an injectable ReactWidget', () => {
+        expect(source).toMatch(/@injectable/);
+        expect(source).toMatch(/extends ReactWidget/);
+    });
+
+    it('should inject ArcService', () => {
+        expect(source).toMatch(/@inject\(ArcService\)/);
+    });
+
+    it('should use canonical ARC service health signals', () => {
+        expect(source).toMatch(/getConfigStatus/);
+        expect(source).toMatch(/listRuntimeCapabilities/);
+    });
+
+    it('should poll and clear health refresh timer', () => {
+        expect(source).toMatch(/setInterval/);
+        expect(source).toMatch(/clearInterval/);
+    });
+});
+
+describe('ArcHealthContribution', () => {
+    let source: string;
+
+    beforeAll(async () => {
+        source = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'browser', 'arc-health-contribution.ts'), 'utf-8');
+    });
+
+    it('should register health monitor command', () => {
+        expect(source).toMatch(/arc:open-health-monitor/);
+        expect(source).toMatch(/ARC: Show Health Monitor/);
+    });
+
+    it('should support arc-view deep link', () => {
+        expect(source).toMatch(/health-monitor/);
+    });
+});
+
 describe('ArcWorkflowGraphWidget', () => {
     let source: string;
 

@@ -71,9 +71,6 @@ importers:
       arc-extension:
         specifier: workspace:*
         version: link:../../packages/arc-extension
-      arc-health:
-        specifier: workspace:*
-        version: link:../../theia-extensions/arc-health
       arc-runs:
         specifier: workspace:*
         version: link:../../theia-extensions/arc-runs
