@@ -2,7 +2,7 @@
 
 Generated: 2026-05-14
 
-Source of truth: `docs/REALITY_AUDIT.md`, `docs/CLI_IDE_GAP_ANALYSIS.md`, current `README.md`, current code. `packages/arc-extension` is canonical. `theia-extensions/arc-core` is duplicate/secondary unless explicitly salvaged. Approved migration policy: selectively port useful UI from `theia-extensions/*` into `packages/arc-extension`, then archive or delete the duplicate extension packages.
+Source of truth: `docs/REALITY_AUDIT.md`, `docs/CLI_IDE_GAP_ANALYSIS.md`, current `README.md`, current code. `packages/arc-extension` is canonical. Legacy `theia-extensions/*` sources have been archived under `docs/archive/theia-extensions/` after useful release-scope UI was ported into `packages/arc-extension`.
 
 ## Executive Summary
 
@@ -24,7 +24,7 @@ The practical path is:
 
 | Area | Current state | Main gap |
 |---|---|---|
-| Theia extension | `packages/arc-extension` is canonical and tested, but not yet wired into `applications/browser`/`applications/electron` app deps | Duplicate `theia-extensions/*` still drive the current app surface |
+| Theia extension | `packages/arc-extension` is canonical, tested, and wired into `applications/browser`/`applications/electron` app deps | Legacy `theia-extensions/*` source is archived for rollback/history |
 | Python CLI/daemon | Real CLI, aiohttp daemon, REST endpoints, JSONL trace store | SSE is replay-only; no live run stream |
 | SwarmGraph runtime | Vendored, real queen/worker/consensus/HITL/HMAC audit/gateway/quota | ARC mostly calls it as CLI subprocess, not as shared adoption layer |
 | SwarmGraph adoption | Not implemented | No external runtime is wrapped by SwarmGraph |
@@ -89,7 +89,7 @@ This addendum folds in `docs/CLI_IDE_GAP_ANALYSIS.md`. It is a target surface, n
 
 | Phase | Views/panels | Source / backend need |
 |---|---|---|
-| P0 canonical shell | ARC dashboard, runtime readiness, runs panel, run launcher, status bar indicators, command palette contributions | Port from `theia-extensions/arc-core`, `arc-adapters`, `arc-runs`, `arc-product`, `arc-settings` into `packages/arc-extension`. |
+| P0 canonical shell | ARC dashboard, runtime readiness, runs panel, run launcher, status bar indicators, command palette contributions | Release-scope UI has been ported into `packages/arc-extension`; legacy sources are archived. |
 | P1 run visualization | workflows graph, live event stream, trace timeline, schema inspector, run diff viewer, health monitor | Port from `arc-workflows`, `arc-event-stream`, `arc-runs`, `arc-schemas`, `arc-health`; requires live SSE architecture for true live mode. |
 | P2 high-assurance UX | audit chain viewer, HITL approval inbox, replay stepper | Needs daemon endpoints for audit/HITL/replay; do not present as complete before backend exists. |
 | P3 product setup | provider manager, profile selector, adapter setup wizard, workspace trust UI, context pack view, arena view | Port/adapt from `arc-adapters`, `arc-context`, `arc-arena`; arena remains stub/offline until backend changes. |
@@ -196,8 +196,8 @@ Goal: remove contradictions, stabilize visible product behavior, and make every 
 
 | Item | Outcome | Files/modules | Dependencies | Implementation notes | Verification tests | Risks/unknowns |
 |---|---|---|---|---|---|---|
-| Confirm canonical extension wiring | `packages/arc-extension` is documented, included in browser app deps, and smoke-loadable | `README.md`, `applications/browser/package.json`, `applications/electron/package.json`, `packages/arc-extension/` | User decision done | Align Theia dependency versions first (`applications/browser` uses `1.71.0`; `packages/arc-extension` currently declares `^1.45.0`), then add `arc-extension` to app deps before UI feature porting; keep duplicate extensions during transition only | `pnpm --filter arc-extension build`; `pnpm --filter @arc-studio/browser build`; browser app smoke | Some current app features still come from `theia-extensions/*`; Theia API skew may block wiring |
-| Inventory secondary Theia extensions | Decide port/archive/delete per extension | `theia-extensions/*` | Canonical extension decision | Port useful UI-only widgets into `packages/arc-extension`; archive or delete duplicate backend/protocol/stub packages | Static docs review; no build change yet | Deleting too early may lose useful widgets |
+| Confirm canonical extension wiring | `packages/arc-extension` is documented, included in browser/electron app deps, and smoke-loadable | `README.md`, `applications/browser/package.json`, `applications/electron/package.json`, `packages/arc-extension/` | User decision done | Completed: canonical app deps use `arc-extension`; legacy duplicates archived for rollback/history | `pnpm --filter arc-extension build`; `pnpm --filter @arc-studio/browser build`; browser/e2e smoke | Keep archived legacy sources honest as rollback/history only |
+| Inventory secondary Theia extensions | Decide port/archive/delete per extension | `docs/archive/theia-extensions/*` | Canonical extension decision | Completed for release scope: useful UI-only widgets ported; legacy source archived | Static docs review; browser/e2e smoke | Future salvage should happen from archive into canonical extension only |
 | Register or explicitly hide AG2 | AG2 is either visible and tested or removed from claims | `python/src/agent_runtime_cockpit/adapters/registry.py`, `runtime_router.py`, `README.md` | Existing AG2 runner | Prefer register behind honest capability report if detect/run path works | `uv run pytest python/tests/adapters/ag2` plus CLI capabilities test | AG2 deps/API drift |
 | Fix OpenAI Agents export target | No hardcoded internal TestAgent in product run path | `adapters/openai_agents.py`, `adapters/openai_agents/` | Env var design | Add `ARC_OPENAI_AGENTS_EXPORT=module:attr`, validate target inside workspace | Fake SDK/workspace test; CLI run test | SDK API volatility |
 | Document LM Arena honestly | No stub/live-mode fiction; Arena excluded from v0.1 scope | `arena/service.py`, `adapters/lmarena.py`, docs | None | State stub-default behavior and gated live path; do not productize Arena CLI/UI until backend/tests are release-ready | Grep/docs truth check; arena tests | Arena may distract from core ARC/SwarmGraph flows |
@@ -205,15 +205,15 @@ Goal: remove contradictions, stabilize visible product behavior, and make every 
 | Update docs index | Docs match current architecture | `README.md`, `docs/RUNTIMES.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md` | Audit complete | Separate standalone vs adoption in all docs | Manual grep for banned claims | Historical docs may intentionally contradict |
 | Add CLI truth/discoverability commands | Users can inspect ARC itself before running agents | `cli.py`, `web/routes.py`, docs | Existing daemon health + capability reports | Add `arc version`, `arc health`, `arc status`, `arc doctor all`, `arc env check`, `arc adapter info`, `arc adapter detect` | CLI tests for JSON envelopes and error cases | Command naming churn |
 | Add CLI daemon-parity commands | CLI exposes helper/daemon functionality already present | `cli.py`, `providers.py`, `evals/diff.py`, `web/routes.py` | Existing helper functions/routes | Add `arc runs diff`, `arc providers diagnostics`, `arc providers proxy`, `arc providers accounts enable` | CLI tests against temp traces/env | Keep provider proxy dry-run by default |
-| Add canonical shell migration spec | Shell porting is scoped and sequenced before code moves | `docs/EXTENSION_MIGRATION.md`, `packages/arc-extension`, `theia-extensions/*` | Canonical app wiring | Define exact service/protocol/widget port order and protocol conflicts; do not port complex UI in P0 | Docs review; browser app still builds | Porting in P0 would make truth/coherence phase too large |
+| Add canonical shell migration spec | Shell porting is scoped and sequenced before code moves | `docs/EXTENSION_MIGRATION.md`, `packages/arc-extension`, `docs/archive/theia-extensions/*` | Canonical app wiring | Completed: release-scope port/archive sequence documented; archived sources retained for rollback/history | Docs review; browser app still builds | Future product work must target canonical extension |
 | Document current isolation honestly | Users understand current subprocess trust boundary | `README.md`, security docs, `docs/IMPLEMENTATION_PLAN.md` | Current subprocess model | Mark subprocess as trusted-local only; inspect-only for untrusted workspaces | Docs review | Users may expect stronger isolation than exists |
 
 ### P0 Definition Of Done
 
 - README and roadmap do not claim implemented adoption.
 - `packages/arc-extension` is documented as canonical.
-- `theia-extensions/*` has a migration inventory: port, archive, or delete.
-- `theia-extensions/arc-core` is marked secondary/duplicate and no new product work lands there.
+- Legacy `theia-extensions/*` has a migration inventory and is archived for rollback/history.
+- No new product work lands in archived `theia-extensions/*`; future salvage must target `packages/arc-extension`.
 - `arc runtimes --capabilities --json` reports honest support levels.
 - AG2 status is no longer ambiguous.
 - OpenAI Agents no longer runs only a hardcoded test agent in product path.
@@ -221,7 +221,7 @@ Goal: remove contradictions, stabilize visible product behavior, and make every 
 - CLI exposes existing diff/provider diagnostic/provider proxy functionality.
 - Canonical extension is wired into the app and has a documented migration spec for shell/service/readiness/run UX.
 - Current isolation posture is documented as subprocess/trusted-local, not container or microVM isolation.
-- `applications/browser` includes `arc-extension` directly; duplicate `theia-extensions/*` are transitional.
+- `applications/browser` includes `arc-extension` directly; duplicate `theia-extensions/*` sources are archived.
 - `docs/RELEASE_CHECKLIST.md` exists and targets v0.1.0-alpha.
 - v0.1 scope is explicit: browser app + Python CLI/wheel; Electron packaging is post-v0.1.
 
@@ -283,7 +283,7 @@ Goal: add the smallest reusable adoption interface and low-risk helper UX after 
 | Define adoption runtime ID syntax | CLI/API/UI can refer to adoption modes consistently | adoption protocol, router, docs | Adoption protocol | Use `<runtime>+swarmgraph` syntax, e.g. `langgraph+swarmgraph`; standalone IDs remain unchanged | Router/protocol tests | Syntax bikeshed |
 | Add adoption runner skeleton | Runtime router can resolve adoption modes honestly | `orchestration/runtime_router.py`, new adoption registry | Adoption protocol | Return not-runnable with doctor actions until each runtime is implemented | Router tests | Mode discoverability before runtime support |
 | SwarmGraph import path spike | Determine whether ARC can import vendored SwarmGraph as a library for adoption | `runtimes/swarmgraph/`, adapter packaging | Adoption skeleton | Prefer library API for adoption where feasible; keep CLI fallback for standalone | Import/smoke test | Vendored package path complexity |
-| Port run visualization shell pieces | Canonical extension can inspect workflows/runs/traces at basic level | `packages/arc-extension`, selected `theia-extensions/*` | P0 shell basics; P1a live broker for true live stream | Port in priority order: `arc-adapters`, `arc-runs`, `arc-workflows`, `arc-event-stream`; archive stubs | UI contract tests; browser smoke | Protocol adaptation between duplicate widgets |
+| Port run visualization shell pieces | Canonical extension can inspect workflows/runs/traces at basic level | `packages/arc-extension`, archived `docs/archive/theia-extensions/*` for provenance | P0 shell basics; P1a live broker for true live stream | Release-scope widgets ported in priority order; legacy stubs archived | UI contract tests; browser smoke | Future protocol work should stay canonical |
 | Add local prompt optimizer foundation | Vague prompts can be structured without provider calls | `python/src/agent_runtime_cockpit/prompt_optimizer/`, `cli.py`, protocol | Run input model; event/trace metadata fields for `prompt_original`, `prompt_optimized`, `optimizer_mode` | Add `arc prompt optimize`, `arc prompt optimize --file`, `arc prompt diff`; local mode only; preserve original/optimized prompt metadata | Unit tests with vague/broken-English prompts; no network tests | Must not change user intent |
 
 ### P1b Definition Of Done

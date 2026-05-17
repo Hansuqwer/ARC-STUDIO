@@ -2,7 +2,7 @@
 
 Generated: 2026-05-14; truth notes refreshed 2026-05-17 for release-facing stale claims.
 
-> **Prerequisite decision confirmed**: `packages/arc-extension` is the true/canonical Theia extension. It is wired into the browser app, has 563 tests in the canonical extension suite, recent commits, and active DI bindings. Legacy `theia-extensions/*` source directories remain on disk for rollback/history only; they are unwired from browser/electron apps, root typecheck, and the pnpm workspace. This audit is historical unless a row is explicitly refreshed below.
+> **Prerequisite decision confirmed**: `packages/arc-extension` is the true/canonical Theia extension. It is wired into the browser app, has 581 tests in the canonical extension suite, recent commits, and active DI bindings. Legacy `theia-extensions/*` source directories are archived under `docs/archive/theia-extensions/`; they are unwired from browser/electron apps, root typecheck, and the pnpm workspace. This audit is historical unless a row is explicitly refreshed below.
 
 ---
 
@@ -10,7 +10,7 @@ Generated: 2026-05-14; truth notes refreshed 2026-05-17 for release-facing stale
 
 1. **ARC Studio is a Python CLI + local aiohttp daemon, NOT a real IDE.** The Theia shell exists (12 extensions, meaningful widget code) but talks to the Python daemon via JSON-RPC or CLI subprocess. There is no embedded Python runtime in the Theia process.
 
-2. **There is one live Theia extension path for release scope.** `packages/arc-extension` is canonical. Legacy `theia-extensions/*` source dirs are retained for rollback/history but are not workspace-active or app-wired.
+2. **There is one live Theia extension path for release scope.** `packages/arc-extension` is canonical. Legacy `theia-extensions/*` source dirs are archived for rollback/history but are not workspace-active or app-wired.
 
 3. **SwarmGraph (vendored in `runtimes/swarmgraph/`) is a real, working runtime.** It has queen/worker graph, 3-protocol consensus, HITL/interrupt, HMAC-SHA256 audit chain, multi-provider gateway (12 providers), quota, replay safety, deterministic orchestration. But ARC does NOT use it as a shared "adoption layer" for other runtimes. ARC calls it only as a CLI subprocess (`swarmgraph swarm --json`).
 
@@ -35,7 +35,7 @@ Generated: 2026-05-14; truth notes refreshed 2026-05-17 for release-facing stale
 | Area | Intended | Actual | Status | Evidence | Gap |
 |---|---|---|---|---|---|
 | **Product identity** | Eclipse Theia IDE + Python backend | Python CLI/daemon with Theia shell frontend | Partial | README L3; `web/server.py` L1-5; 12 theia-extensions | Theia is a thin UI overlay, not the primary product |
-| **Extension split** | Single extension path | `packages/arc-extension` is the only release-wired extension path; legacy `theia-extensions/*` source retained outside workspace | Mostly resolved | `applications/browser/package.json` and `applications/electron/package.json` depend on `arc-extension`; `pnpm-workspace.yaml` excludes legacy extensions | Archive/delete legacy source after rollback window |
+| **Extension split** | Single extension path | `packages/arc-extension` is the only release-wired extension path; legacy `theia-extensions/*` source archived outside workspace | Resolved for v0.1 | `applications/browser/package.json` and `applications/electron/package.json` depend on `arc-extension`; `pnpm-workspace.yaml` excludes legacy extensions | Delete archive later only if rollback/history no longer needed |
 | **SwarmGraph vendored** | In-repo canonical runtime | 3-package monorepo with full queen/worker/consensus/HITL/audit | Implemented | `runtimes/swarmgraph/packages/`; `hive-swarm/swarm/nodes/consensus.py`; `swarm_shared/audit.py` | Full, not partial |
 | **SwarmGraph as adoption layer** | All runtimes run through SwarmGraph | Fake-tested/gated adoption runners exist; CLI routing is currently limited to `crewai+swarmgraph` fake/offline path | Partial/scaffolded | `adoption/`; `runtime_router.py` | Broad live/provider-backed adoption remains not a v0.1 product claim |
 | **SwarmGraph audit in ARC** | HMAC-SHA256 signed audit chain | ARC adapter paths generally use SHA-256 chains; HMAC audit/key CLI path exists separately | Partial | `audit/chain.py`; `audit/hmac_chain.py`; `audit/key_manager.py`; `arc audit verify/export/key` | Adapter-wide HMAC audit population still needs verification |
@@ -92,7 +92,7 @@ Generated: 2026-05-14; truth notes refreshed 2026-05-17 for release-facing stale
 - **WorkflowDetectionSection**: Workflow detection UI section
 
 ### Legacy Views (source retained, not wired)
-- Legacy `theia-extensions/*` source dirs remain on disk for rollback/history only and are not active in browser/electron apps, root typecheck, or the pnpm workspace.
+- Legacy `theia-extensions/*` source dirs are archived under `docs/archive/theia-extensions/` for rollback/history only and are not active in browser/electron apps, root typecheck, or the pnpm workspace.
 - Release-scope views ported into `packages/arc-extension` include adapters, workflow graph, run timeline, event stream, health, status/welcome, chat launch UI, and run diff UI/service.
 - `arc-context`, `arc-schemas`, and `arc-arena` remain legacy/out-of-scope source references unless intentionally ported later.
 

@@ -15,7 +15,7 @@ arc-theia-studio/
 │   ├── arc-extension/       # Main ARC extension (backend + frontend)
 │   ├── arc-protocol-ts/     # TypeScript protocol types
 │   └── arc-test-fixtures/   # Test fixtures and sample projects
-├── theia-extensions/
+├── docs/archive/theia-extensions/  # Archived legacy Theia extension sources (rollback/history)
 │   ├── arc-adapters/        # Runtime adapters
 │   ├── arc-audit/           # Audit logging
 │   ├── arc-context/         # Context management
@@ -167,7 +167,7 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - Note: `pnpm lint` delegates to per-package scripts; root eslint config not yet wired into workspace lint command. Prettier not installed as a root dependency — `format`/`format:check` scripts need proper wiring as a separate task.
 
 ### P1-7: Test Coverage
-- arc-extension grew from 239 to 563 tests; Python now has 782 passed, 14 skipped
+- arc-extension grew from 239 to 581 tests; Python now has 782 passed, 14 skipped
 - UI components tested via source-pattern contract tests (NOT runtime jsdom tests)
 - Backend services tested with Jest unit tests
 - Branch coverage improved from 57.51% → 67.34%
@@ -322,7 +322,7 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 ### Test Metrics
 - Python: 782 passed, 14 skipped (was 435 before P2/P3/P4/P5 work)
 - TypeScript protocol build: clean
-- arc-extension build/test: clean (563 tests, 9 suites)
+- arc-extension build/test: clean (581 tests, 9 suites)
 
 ### Slice 7 — HITL/Audit/Replay UX Hardening (Completed)
 - ✅ **Protocol types**: Added `HitlPromptInfo`, `HitlRespondRequest`, `AuditChainInfo`, `ReplayResult`, `ReplayEvent` to `arc-protocol.ts`
@@ -334,13 +334,13 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 ### Remaining Issues
 Historical details are archived at `docs/archive/handover/REMAINING_ISSUES_PLAN.md`. Current summary:
 
-- **R-1 (Node CI: arc-ag-ui test exits 1)**: Fixed in repo by using `node --test`; confirm on GitHub.
-- **R-2 (ARC Roadmap Gate: native-keymap gyp crash)**: Fixed in repo by adding native deps; confirm on GitHub.
-- **R-3 (Python CI: 2 AG2 adapter test errors)**: Fixed in repo by removing the stale event-loop fixture; confirm on GitHub.
+- **R-1 (Node CI: arc-ag-ui test exits 1)**: Fixed and confirmed on GitHub before follow-up archive work.
+- **R-2 (ARC Roadmap Gate: native-keymap gyp crash)**: Fixed and confirmed on GitHub before follow-up archive work.
+- **R-3 (Python CI: 2 AG2 adapter test errors)**: Fixed and confirmed on GitHub before follow-up archive work.
 - **R-4 (10 unmerged remote branches)**: 3 may have salvageable work; 7 intentionally parked.
 - **R-5 (.env history scrub)**: Plan documented in `docs/ENV_HISTORY_SCRUB_PLAN.md`; execute only after release date approval.
-- **e2e workflow**: Local browser/e2e verification passes; latest GitHub e2e still needs confirmation after the local e2e fix is committed and pushed.
-- **theia-extensions migration**: Phase C cleanup in progress — release-scope widgets are canonical in `packages/arc-extension`; legacy `theia-extensions/*` packages are unwired from browser/electron apps, root typecheck, and pnpm workspace. Source dirs remain on disk for rollback/history until archive.
+- **e2e workflow**: Local browser/e2e verification passes; GitHub e2e passed on `ec127a1`.
+- **theia-extensions migration**: Phase C cleanup complete — release-scope widgets are canonical in `packages/arc-extension`; legacy `theia-extensions/*` packages are unwired from browser/electron apps, root typecheck, and pnpm workspace. Source dirs are archived under `docs/archive/theia-extensions/` for rollback/history.
 
 ## Related Documentation
 

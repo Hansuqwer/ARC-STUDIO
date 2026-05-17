@@ -2,7 +2,7 @@
 
 **Generated:** 2026-05-15; release-truth refresh 2026-05-17
 **Previous commits:** historical value omitted; check `git status`/`git log` before work.
-**Test count:** Python 782 passed / 14 skipped; TS protocol + arc-extension builds clean; arc-extension test suite 563 tests / 9 suites.
+**Test count:** Python 782 passed / 14 skipped; TS protocol + arc-extension builds clean; arc-extension test suite 581 tests / 9 suites.
 
 ## Goal
 Continue release-readiness work beyond the first 23 recommended PRs from `docs/IMPLEMENTATION_PLAN.md` with green tests and builds. P1a through P5 release-readiness scaffolds and HITL/Audit/Replay UX hardening are implemented; current work is release verification, doc truth cleanup, e2e stabilization, CI confirmation, and migration cleanup. Commit only if explicitly requested.
@@ -65,7 +65,7 @@ Continue release-readiness work beyond the first 23 recommended PRs from `docs/I
 
 **Verification:** Banned-claim checker plus targeted grep for stale “not implemented”/“still open” claims.
 
-### Slice B: e2e workflow stabilization ✅ Done locally; GitHub confirmation pending push
+### Slice B: e2e workflow stabilization ✅ Done locally; GitHub e2e passed on `ec127a1`
 **Why second:** Remaining release-work item; Python/node/roadmap fixes are in-repo, while e2e remains unstable.
 
 **Key constraint:** Do not weaken tests to make CI green. Document Theia/browser infra gaps honestly.
@@ -76,7 +76,7 @@ Continue release-readiness work beyond the first 23 recommended PRs from `docs/I
 **Key constraint:** No release/tag/history rewrite without explicit approval.
 
 ### Slice D: Theia extension migration Phase C ✅ Wiring cleanup done locally
-**Status:** Release-scope widgets are canonical in `packages/arc-extension`; legacy `theia-extensions/*` packages are unwired from browser/electron apps, root typecheck, and pnpm workspace. Source dirs remain on disk for rollback/history until archive/delete is explicitly approved.
+**Status:** Release-scope widgets are canonical in `packages/arc-extension`; legacy `theia-extensions/*` packages are unwired from browser/electron apps, root typecheck, and pnpm workspace. Source dirs are archived under `docs/archive/theia-extensions/` for rollback/history.
 
 ### Slice E: `.env` history scrub planning only
 **Why gated:** Requires coordinated history rewrite/force-push. Execute only after release date approval.

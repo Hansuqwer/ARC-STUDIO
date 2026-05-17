@@ -7,12 +7,12 @@ Canonical extension: `packages/arc-extension`
 Status: Wired into `applications/browser` since PR 5 (commit 765beb4), replacing
 duplicate `theia-extensions/*` browser dependencies during transition.
 
-**Migration status (2026-05-17):** Phase C cleanup in progress — critical release-scope
+**Migration status (2026-05-17):** Phase C cleanup complete — critical release-scope
 widgets/services are canonical in `packages/arc-extension` (adapters, workflow graph,
 run timeline, event stream, safe settings prefs, health, status bar, welcome widget,
 chat launch UI, and run diff UI/service). Legacy `theia-extensions/*` packages are no
 longer wired into `applications/browser`, `applications/electron`, root typecheck, or
-the pnpm workspace; source dirs remain on disk only for rollback/history until archive.
+the pnpm workspace; source dirs are archived under `docs/archive/theia-extensions/`.
 
 ---
 
@@ -20,7 +20,7 @@ the pnpm workspace; source dirs remain on disk only for rollback/history until a
 
 | # | Extension | Type | Files / Lines | Tests | Overlap w/ canonical | Action | Priority | Notes |
 |---|---|---|---|---|---|---|---|---|
-| 1 | `arc-core` | Both | 14 / 694 | 4 | Ported for release scope — protocol/service/main widget/status bar/welcome/prefs now canonical | Archive after smoke | P0 | Removed from browser app deps; legacy source retained for rollback/history until archive. |
+| 1 | `arc-core` | Both | 14 / 694 | 4 | Ported for release scope — protocol/service/main widget/status bar/welcome/prefs now canonical | Archived | P0 | Source archived under `docs/archive/theia-extensions/`. |
 | 2 | `arc-runs` | FE | 5 / 1181 | 2 | Ported for release scope — timeline, chat launch controls, and run diff now canonical | Archive after smoke | P0 | Removed from browser app deps; legacy source retained for rollback/history until archive. |
 | 3 | `arc-adapters` | FE | 3 / 240 | 0 | None | Port | P0 | Runtime readiness cards and doctor actions are product-critical. No equivalent in canonical extension. |
 | 4 | `arc-workflows` | FE | 3 / 238 | 0 | None | Port | P0 | Workflow graph SVG visualization. No equivalent in canonical extension. |
@@ -116,7 +116,7 @@ service types are properly represented in `packages/arc-extension` and the Pytho
 |-----------|--------|
 | `arc-adapters` | ✅ Ported into arc-extension and removed from browser app deps; source still present for rollback until browser smoke |
 | `arc-audit` | ✅ Static stub removed from browser app deps; per-run audit verification lives in canonical Runs tab |
-| `arc-arena` | 🗑️ ARCHIVE CANDIDATE — out of v0.1 scope; source retained outside workspace |
+| `arc-arena` | 🗄️ Archived — out of v0.1 scope; source retained under `docs/archive/theia-extensions/` |
 | `arc-context` | ✅ Old-core context-pack viewer removed from browser app deps; port later only if context-pack UX returns to release scope |
 | `arc-core` | ✅ Removed from browser app deps; canonical extension owns service/protocol/status/welcome/prefs |
 | `arc-event-stream` | ✅ Ported into arc-extension and removed from browser app deps; source still present for rollback until browser smoke |

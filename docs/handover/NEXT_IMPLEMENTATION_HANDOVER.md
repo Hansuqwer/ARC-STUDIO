@@ -95,14 +95,14 @@ Likely CI areas:
 
 ### 3. Theia extension migration Phase C — wiring cleanup done locally
 
-Goal: finish cleanup of duplicate `theia-extensions/*` after confirming canonical `packages/arc-extension` contains needed UI. Current local state: legacy packages are unwired from browser/electron apps, root typecheck, and pnpm workspace; source dirs remain on disk for rollback/history until archive/delete is explicitly approved.
+Goal: finish cleanup of duplicate `theia-extensions/*` after confirming canonical `packages/arc-extension` contains needed UI. Current state: legacy packages are unwired from browser/electron apps, root typecheck, and pnpm workspace; source dirs are archived under `docs/archive/theia-extensions/` for rollback/history.
 
 Start by reading:
 
 - `docs/EXTENSION_MIGRATION.md`
 - `applications/browser/package.json`
 - `packages/arc-extension/src/browser/`
-- remaining `theia-extensions/*`
+- archived `theia-extensions/*`
 
 Constraints:
 
@@ -113,7 +113,7 @@ Constraints:
 
 Suggested sub-slices:
 
-1. Inventory remaining `theia-extensions/*` and browser deps.
+1. Inventory archived `theia-extensions/*` and browser deps.
 2. Identify any still-wired duplicates.
 3. Port small missing UI-only pieces if needed.
 4. Archive/remove stale packages only when tests/builds prove canonical app still works.
