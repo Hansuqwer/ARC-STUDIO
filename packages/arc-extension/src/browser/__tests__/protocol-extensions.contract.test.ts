@@ -79,6 +79,15 @@ describe('Protocol Extensions (Session B + B7)', () => {
             expect(source).toMatch(/saveConfig\(update:\s*SafeConfigUpdate\)/);
         });
 
+        it('should expose profile and isolation service methods', () => {
+            expect(source).toMatch(/export interface ArcProfileInfo/);
+            expect(source).toMatch(/export interface IsolationStatus/);
+            expect(source).toMatch(/export interface IsolationProviderInfo/);
+            expect(source).toMatch(/listProfiles\(\):\s*Promise<ArcProfileInfo\[\]>/);
+            expect(source).toMatch(/getIsolationStatus\(\):\s*Promise<IsolationStatus>/);
+            expect(source).toMatch(/listIsolationProviders\(\):\s*Promise<IsolationProviderInfo\[\]>/);
+        });
+
         it('should export provider catalog and key-ref protocol types', () => {
             expect(source).toMatch(/export interface ProviderCatalogEntry/);
             expect(source).toMatch(/export interface ProviderKeyRefRequest/);
@@ -199,6 +208,20 @@ describe('Protocol Extensions (Session B + B7)', () => {
             expect(source).toMatch(/toolCallsA:\s*number/);
             expect(source).toMatch(/diffRuns\(runAId:\s*string,\s*runBId:\s*string\):\s*Promise<RunDiffResult>/);
         });
+
+        it('should expose active stream protocol types and methods', () => {
+            expect(source).toMatch(/export type ActiveTraceStreamMode\s*=\s*'live'\s*\|\s*'replay'/);
+            expect(source).toMatch(/export interface ActiveTraceStreamRequest/);
+            expect(source).toMatch(/export interface ActiveTraceStreamStatus/);
+            expect(source).toMatch(/export interface ActiveTraceEventChunk/);
+            expect(source).toMatch(/RUN_COMPLETED/);
+            expect(source).toMatch(/RUN_FAILED/);
+            expect(source).toMatch(/RUN_CANCELLED/);
+            expect(source).toMatch(/STREAM_END/);
+            expect(source).toMatch(/state:\s*ActiveTraceStreamState/);
+            expect(source).toMatch(/streamActiveTrace\(request:\s*ActiveTraceStreamRequest\)/);
+            expect(source).toMatch(/cancelActiveTraceStream\(runId:\s*string\)/);
+        });
     });
 
     describe('ProviderStatus safety', () => {
@@ -240,7 +263,22 @@ describe('Backend Service Extensions (Session B + B7)', () => {
 
         it('should validate safe keys before saving', () => {
             expect(source).toMatch(/safeKeys/);
+            expect(source).toMatch(/SAFE_CONFIG_KEYS/);
+            expect(source).toMatch(/UNSAFE_CONFIG_KEY_PATTERN/);
             expect(source).toMatch(/Rejected unsafe config field/);
+        });
+
+        it('should allow only non-secret config fields including isolation dryRun paid routing', () => {
+            expect(source).toMatch(/'defaultRuntime'/);
+            expect(source).toMatch(/'mode'/);
+            expect(source).toMatch(/'isolation'/);
+            expect(source).toMatch(/'allowPaidCalls'/);
+            expect(source).toMatch(/'dryRun'/);
+            expect(source).toMatch(/'routingMode'/);
+            expect(source).toMatch(/execution\.isolation/);
+            expect(source).toMatch(/execution\.allow_paid_calls/);
+            expect(source).toMatch(/providers\.dry_run/);
+            expect(source).toMatch(/providers\.routing_mode/);
         });
 
         it('should NOT pass raw secret values to CLI', () => {
@@ -261,6 +299,17 @@ describe('Backend Service Extensions (Session B + B7)', () => {
             expect(source).toMatch(/async preflightRun\(request:\s*RunPreflightRequest\)/);
             expect(source).toMatch(/--dry-run/);
             expect(source).toMatch(/providerCall:\s*false/);
+        });
+
+        it('should implement profile and isolation CLI JSON methods with safe fallback', () => {
+            expect(source).toMatch(/async listProfiles\(\)/);
+            expect(source).toMatch(/profiles.*list.*--json/);
+            expect(source).toMatch(/local-safe/);
+            expect(source).toMatch(/async getIsolationStatus\(\)/);
+            expect(source).toMatch(/isolation.*status.*--json/);
+            expect(source).toMatch(/async listIsolationProviders\(\)/);
+            expect(source).toMatch(/isolation.*list.*--json/);
+            expect(source).toMatch(/mapIsolationProviders/);
         });
 
         it('should implement startRun via CLI JSON output', () => {
@@ -310,6 +359,8 @@ describe('Backend Service Extensions (Session B + B7)', () => {
             expect(source).toMatch(/AuditChainInfo/);
             expect(source).toMatch(/ReplayResult/);
             expect(source).toMatch(/ReplayEvent/);
+            expect(source).toMatch(/ActiveTraceStreamRequest/);
+            expect(source).toMatch(/ActiveTraceEventChunk/);
         });
     });
 
@@ -367,6 +418,16 @@ describe('Backend Service Extensions (Session B + B7)', () => {
             expect(source).toMatch(/run_a_id/);
             expect(source).toMatch(/types_only_in_a/);
             expect(source).toMatch(/typesOnlyInA/);
+        });
+
+        it('should implement active trace stream with replay and disconnected live semantics', () => {
+            expect(source).toMatch(/async streamActiveTrace\(request:\s*ActiveTraceStreamRequest\)/);
+            expect(source).toMatch(/async cancelActiveTraceStream\(runId:\s*string\)/);
+            expect(source).toMatch(/createActiveTraceIterable/);
+            expect(source).toMatch(/this\.replayRun\(request\.runId\)/);
+            expect(source).toMatch(/Live SSE proxy is disconnected/);
+            expect(source).toMatch(/RUN_CANCELLED/);
+            expect(source).toMatch(/Stream timed out/);
         });
     });
 });

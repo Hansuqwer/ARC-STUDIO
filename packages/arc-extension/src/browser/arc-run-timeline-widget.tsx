@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
-import { ArcService, TraceData, TraceEvent, TraceFile } from '../common/arc-protocol';
+import { ActiveTraceEventChunk, ArcService, TraceData, TraceEvent, TraceFile } from '../common/arc-protocol';
 
 const EVENT_ICONS: Record<string, string> = {
     RUN_STARTED: '>',
@@ -13,6 +13,14 @@ const EVENT_ICONS: Record<string, string> = {
     HITL_TIMEOUT: 'TIMEOUT',
     MESSAGE: 'MSG',
     TOOL_CALL: 'TOOL',
+};
+
+const TERMINAL_EVENT_TYPES = new Set(['RUN_COMPLETED', 'RUN_FAILED', 'RUN_CANCELLED', 'STREAM_END']);
+
+type StreamMode = 'replay' | 'live';
+type StreamStatus = 'replay' | 'live-connecting' | 'live-active' | 'live-disconnected' | 'live-terminal' | 'live-error';
+type LiveArcService = ArcService & {
+    streamActiveTrace?: (request: { runId: string; mode: 'live' }) => Promise<AsyncIterable<ActiveTraceEventChunk>>;
 };
 
 @injectable()
@@ -27,6 +35,9 @@ export class ArcRunTimelineWidget extends ReactWidget {
     protected selectedTrace: TraceData | null = null;
     protected selectedEvent: TraceEvent | null = null;
     protected eventFilter = '';
+    protected sourceMode: StreamMode = 'replay';
+    protected streamStatus: StreamStatus = 'replay';
+    protected liveEvents: TraceEvent[] = [];
     protected loading = false;
     protected error = '';
 
@@ -47,6 +58,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
             this.traces = await this.arcService.getTraces();
             if (this.traces[0]) {
                 this.selectedTrace = await this.arcService.readTrace(this.traces[0].id);
+                this.resetReplayMode();
             }
         } catch (error) {
             this.error = error instanceof Error ? error.message : String(error);
@@ -59,6 +71,8 @@ export class ArcRunTimelineWidget extends ReactWidget {
     protected async selectTrace(trace: TraceFile): Promise<void> {
         this.loading = true;
         this.selectedEvent = null;
+        this.liveEvents = [];
+        this.resetReplayMode();
         this.update();
         try {
             this.selectedTrace = await this.arcService.readTrace(trace.id);
@@ -66,6 +80,50 @@ export class ArcRunTimelineWidget extends ReactWidget {
             this.error = error instanceof Error ? error.message : String(error);
         } finally {
             this.loading = false;
+            this.update();
+        }
+    }
+
+    protected resetReplayMode(): void {
+        this.sourceMode = 'replay';
+        this.streamStatus = 'replay';
+    }
+
+    protected hasLiveStream(): boolean {
+        return typeof (this.arcService as LiveArcService).streamActiveTrace === 'function';
+    }
+
+    protected async connectLiveStream(): Promise<void> {
+        if (!this.selectedTrace || !this.hasLiveStream()) {
+            return;
+        }
+        this.sourceMode = 'live';
+        this.streamStatus = 'live-connecting';
+        this.liveEvents = [];
+        this.update();
+        try {
+            const stream = await (this.arcService as LiveArcService).streamActiveTrace!({ runId: this.selectedTrace.id, mode: 'live' });
+            this.streamStatus = 'live-active';
+            this.update();
+            for await (const chunk of stream) {
+                const event = chunk.event as TraceEvent | undefined;
+                if (!event) {
+                    continue;
+                }
+                this.liveEvents = [...this.liveEvents, event];
+                this.streamStatus = TERMINAL_EVENT_TYPES.has(event.type) ? 'live-terminal' : 'live-active';
+                this.update();
+                if (TERMINAL_EVENT_TYPES.has(event.type)) {
+                    break;
+                }
+            }
+            if (this.streamStatus === 'live-active') {
+                this.streamStatus = 'live-disconnected';
+                this.update();
+            }
+        } catch (error) {
+            this.streamStatus = 'live-error';
+            this.error = error instanceof Error ? error.message : String(error);
             this.update();
         }
     }
@@ -104,8 +162,9 @@ export class ArcRunTimelineWidget extends ReactWidget {
     }
 
     protected renderTimeline(trace: TraceData): React.ReactNode {
-        const events = this.filteredEvents(trace.events);
-        const types = Array.from(new Set(trace.events.map(event => event.type))).sort();
+        const allEvents = this.sourceMode === 'live' ? [...trace.events, ...this.liveEvents] : trace.events;
+        const events = this.filteredEvents(allEvents);
+        const types = Array.from(new Set(allEvents.map(event => event.type))).sort();
         return (
             <div>
                 <div style={{ marginBottom: '16px' }}>
@@ -113,8 +172,13 @@ export class ArcRunTimelineWidget extends ReactWidget {
                     <div style={{ fontSize: '12px', color: 'var(--theia-descriptionForeground)' }}>
                         Workflow: <strong>{trace.workflowId}</strong> / Runtime: <strong>{trace.runtime}</strong> / Status: <strong>{trace.status}</strong>
                     </div>
+                    <div style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={badgeStyle}>Source: {this.sourceMode === 'live' ? 'Live stream' : 'Replay trace'}</span>
+                        <span style={badgeStyle}>State: {this.streamStatusLabel()}</span>
+                        {this.hasLiveStream() && <button style={buttonStyle} onClick={() => this.connectLiveStream()}>Connect Live Stream</button>}
+                    </div>
                     <div style={{ marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <span>{events.length}/{trace.events.length} events</span>
+                        <span>{events.length}/{allEvents.length} events</span>
                         <select style={selectStyle} value={this.eventFilter} onChange={event => { this.eventFilter = event.currentTarget.value; this.update(); }}>
                             <option value="">All events</option>
                             {types.map(type => <option key={type} value={type}>{type}</option>)}
@@ -128,6 +192,15 @@ export class ArcRunTimelineWidget extends ReactWidget {
                 {this.selectedEvent && <pre style={preStyle}>{JSON.stringify(this.selectedEvent, null, 2)}</pre>}
             </div>
         );
+    }
+
+    protected streamStatusLabel(): string {
+        if (this.streamStatus === 'live-connecting') return 'Live stream connecting';
+        if (this.streamStatus === 'live-active') return 'Live stream active';
+        if (this.streamStatus === 'live-disconnected') return 'Live stream disconnected';
+        if (this.streamStatus === 'live-terminal') return 'Live stream terminal';
+        if (this.streamStatus === 'live-error') return 'Live stream error';
+        return 'Replay trace mode';
     }
 
     protected renderEvent(event: TraceEvent, index: number, startedAt: string): React.ReactNode {
@@ -163,6 +236,7 @@ export class ArcRunTimelineWidget extends ReactWidget {
 
 const centerStyle: React.CSSProperties = { alignItems: 'center', color: 'var(--theia-descriptionForeground)', display: 'flex', flexDirection: 'column', gap: '8px', height: '100%', justifyContent: 'center', padding: '24px', textAlign: 'center' };
 const buttonStyle: React.CSSProperties = { background: 'none', border: '1px solid var(--theia-widget-border)', borderRadius: '4px', color: 'var(--theia-foreground)', cursor: 'pointer', padding: '2px 6px' };
+const badgeStyle: React.CSSProperties = { border: '1px solid var(--theia-widget-border)', borderRadius: '999px', color: 'var(--theia-descriptionForeground)', fontSize: '11px', padding: '2px 8px' };
 const selectStyle: React.CSSProperties = { backgroundColor: 'var(--theia-input-background)', border: '1px solid var(--theia-input-border)', color: 'var(--theia-input-foreground)', padding: '4px' };
 const errorStyle: React.CSSProperties = { backgroundColor: 'var(--theia-inputValidation-errorBackground)', border: '1px solid var(--theia-inputValidation-errorBorder)', color: 'var(--theia-errorForeground)', marginBottom: '12px', padding: '8px' };
 const preStyle: React.CSSProperties = { backgroundColor: 'var(--theia-textCodeBlock-background)', fontSize: '11px', maxHeight: '240px', overflow: 'auto', padding: '8px', whiteSpace: 'pre-wrap' };

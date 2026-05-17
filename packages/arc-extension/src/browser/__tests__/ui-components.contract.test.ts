@@ -302,6 +302,32 @@ describe('UI Components Contracts', () => {
         expect(source).toMatch(/confirmAction/);
         expect(source).toMatch(/renderConfirmDialog/);
     });
+
+    it('should render safe readiness setup action cards', () => {
+        expect(source).toMatch(/renderReadinessActions/);
+        expect(source).toMatch(/Missing dependencies/);
+        expect(source).toMatch(/Copy doctor command/);
+        expect(source).toMatch(/Copy only; ARC never executes setup commands/);
+    });
+
+    it('should surface export target env names for supported adapters', () => {
+        expect(source).toMatch(/CREWAI_EXPORT_PATH/);
+        expect(source).toMatch(/OPENAI_AGENTS_EXPORT_PATH/);
+        expect(source).toMatch(/LLAMAINDEX_EXPORT_PATH/);
+    });
+
+    it('should surface provider gates and env refs without raw secrets', () => {
+        expect(source).toMatch(/Provider gate \/ env refs/);
+        expect(source).toMatch(/ARC_CONFIRM_PROVIDER_CALLS=1/);
+        expect(source).toMatch(/Copy env var names/);
+        expect(source).toMatch(/Do not paste secret values/);
+    });
+
+    it('should not auto-execute setup commands from readiness cards', () => {
+        expect(source).not.toMatch(/execFile|execSync|spawn\(|child_process/);
+        expect(source).toMatch(/navigator\.clipboard\.writeText/);
+        expect(source).toMatch(/Requires explicit confirmation/);
+    });
 });
 
 describe('ArcAdaptersContribution', () => {
@@ -556,6 +582,42 @@ describe('ArcRunTimelineWidget', () => {
         expect(source).toMatch(/selectedEvent/);
         expect(source).toMatch(/filteredEvents/);
     });
+
+    it('should label stored timeline traces as replay mode', () => {
+        expect(source).toMatch(/sourceMode: StreamMode = 'replay'/);
+        expect(source).toMatch(/streamStatus: StreamStatus = 'replay'/);
+        expect(source).toMatch(/Source: \{this\.sourceMode === 'live' \? 'Live stream' : 'Replay trace'\}/);
+        expect(source).toMatch(/Replay trace mode/);
+    });
+
+    it('should feature-detect optional active trace live stream', () => {
+        expect(source).toMatch(/streamActiveTrace\?:/);
+        expect(source).toMatch(/hasLiveStream/);
+        expect(source).toMatch(/typeof \(this\.arcService as LiveArcService\)\.streamActiveTrace === 'function'/);
+        expect(source).toMatch(/Connect Live Stream/);
+        expect(source).toMatch(/mode: 'live'/);
+    });
+
+    it('should append live events separately from selected replay trace', () => {
+        expect(source).toMatch(/protected liveEvents: TraceEvent\[\] = \[\]/);
+        expect(source).toMatch(/this\.liveEvents = \[\.\.\.this\.liveEvents, event\]/);
+        expect(source).toMatch(/\[\.\.\.trace\.events, \.\.\.this\.liveEvents\]/);
+    });
+
+    it('should expose disconnected and terminal stream states', () => {
+        expect(source).toMatch(/live-disconnected/);
+        expect(source).toMatch(/live-terminal/);
+        expect(source).toMatch(/Live stream disconnected/);
+        expect(source).toMatch(/Live stream terminal/);
+    });
+
+    it('should treat terminal active stream events as final states', () => {
+        expect(source).toMatch(/RUN_COMPLETED/);
+        expect(source).toMatch(/RUN_FAILED/);
+        expect(source).toMatch(/RUN_CANCELLED/);
+        expect(source).toMatch(/STREAM_END/);
+        expect(source).toMatch(/TERMINAL_EVENT_TYPES\.has\(event\.type\)/);
+    });
 });
 
 describe('ArcRunsContribution', () => {
@@ -583,10 +645,42 @@ describe('ArcEventStreamWidget', () => {
         expect(source).toMatch(/extends ReactWidget/);
     });
 
-    it('should render trace-backed events without claiming live SSE', () => {
+    it('should render trace-backed events as replay mode without claiming live SSE', () => {
         expect(source).toMatch(/getTraces/);
         expect(source).toMatch(/readTrace/);
         expect(source).toMatch(/Advanced Trace/);
+        expect(source).toMatch(/Replay trace mode/);
+        expect(source).toMatch(/Replay trace loaded; live stream available/);
+    });
+
+    it('should feature-detect optional live stream support', () => {
+        expect(source).toMatch(/streamActiveTrace\?:/);
+        expect(source).toMatch(/hasLiveStream/);
+        expect(source).toMatch(/typeof \(this\.arcService as LiveArcService\)\.streamActiveTrace === 'function'/);
+        expect(source).toMatch(/Connect Live Stream/);
+    });
+
+    it('should expose live lifecycle labels', () => {
+        expect(source).toMatch(/live-connecting/);
+        expect(source).toMatch(/Live stream connecting/);
+        expect(source).toMatch(/Live stream active/);
+        expect(source).toMatch(/Live stream disconnected/);
+        expect(source).toMatch(/Live stream error/);
+        expect(source).toMatch(/Live stream terminal/);
+    });
+
+    it('should treat terminal live event types as stream terminal', () => {
+        expect(source).toMatch(/RUN_COMPLETED/);
+        expect(source).toMatch(/RUN_FAILED/);
+        expect(source).toMatch(/RUN_CANCELLED/);
+        expect(source).toMatch(/STREAM_END/);
+        expect(source).toMatch(/TERMINAL_EVENT_TYPES\.has\(event\.type\)/);
+    });
+
+    it('should append live events separately from selected replay trace', () => {
+        expect(source).toMatch(/protected liveEvents: TraceEvent\[\] = \[\]/);
+        expect(source).toMatch(/this\.liveEvents = \[\.\.\.this\.liveEvents, event\]/);
+        expect(source).toMatch(/return \[\.\.\.\(this\.selectedTrace\?\.events \?\? \[\]\), \.\.\.this\.liveEvents\]/);
     });
 
     it('should support event type chips and text filtering', () => {

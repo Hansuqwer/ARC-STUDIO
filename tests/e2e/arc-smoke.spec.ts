@@ -12,12 +12,20 @@ import { join } from 'path';
 const APP_URL = process.env.ARC_E2E_URL || `http://127.0.0.1:${process.env.ARC_E2E_PORT || '3010'}`;
 const TIMEOUT = 60_000;
 const REPO_ROOT = join(__dirname, '..', '..');
+const TERMINAL_EVENTS = new Set(['RUN_COMPLETED', 'RUN_FAILED', 'RUN_CANCELLED', 'STREAM_END']);
 
 async function acceptWorkspaceTrustIfShown(page: import('@playwright/test').Page): Promise<void> {
   const trustButton = page.getByRole('button', { name: /^yes,? i trust the authors$/i });
   if (await trustButton.isVisible({ timeout: 1000 }).catch(() => false)) {
     await trustButton.click();
   }
+}
+
+function parseServerSentEventTypes(body: string): string[] {
+  return body
+    .split('\n')
+    .filter((line) => line.startsWith('data: '))
+    .map((line) => JSON.parse(line.slice('data: '.length)).type);
 }
 
 test.describe('ARC Studio — Smoke Tests', () => {
@@ -116,5 +124,27 @@ test.describe('ARC Python CLI — Integration', () => {
     } catch (e) {
       test.skip(true, `Python CLI not available: ${e}`);
     }
+  });
+
+  test('SSE proof stream emits live RUN_STARTED and terminal event', async ({ request }) => {
+    const response = await request
+      .get(`${APP_URL}/api/sse-proof?event_delay=0&heartbeat_interval=0&heartbeat_count=0`, {
+        timeout: 15000,
+      })
+      .catch((e) => {
+        test.skip(true, `Python server not available: ${e}`);
+        throw e;
+      });
+
+    if (response.status() === 404) {
+      test.skip(true, 'Python SSE proof endpoint not available');
+    }
+
+    expect(response.ok()).toBe(true);
+    expect(response.headers()['content-type']).toContain('text/event-stream');
+
+    const eventTypes = parseServerSentEventTypes(await response.text());
+    expect(eventTypes).toContain('RUN_STARTED');
+    expect(eventTypes.some((type) => TERMINAL_EVENTS.has(type))).toBe(true);
   });
 });

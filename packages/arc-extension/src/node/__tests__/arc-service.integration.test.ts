@@ -465,6 +465,86 @@ describe('ArcBackendService Integration Tests', () => {
         });
     });
 
+    describe('streamActiveTrace', () => {
+        it('should stream replay chunks with explicit terminal end', async () => {
+            jest.spyOn(service, 'replayRun').mockResolvedValue({
+                runId: 'run-sg-ac01',
+                events: [
+                    {
+                        type: 'RUN_STARTED',
+                        timestamp: '2024-01-01T10:00:00.000Z',
+                        runId: 'run-sg-ac01',
+                        sequence: 0,
+                        data: {}
+                    },
+                    {
+                        type: 'RUN_COMPLETED',
+                        timestamp: '2024-01-01T10:00:01.000Z',
+                        runId: 'run-sg-ac01',
+                        sequence: 1,
+                        data: {}
+                    }
+                ],
+                totalEvents: 2
+            });
+
+            const iterable = await service.streamActiveTrace({ runId: 'run-sg-ac01', mode: 'replay' });
+            const chunks: any[] = [];
+            for await (const chunk of iterable) {
+                chunks.push(chunk);
+            }
+
+            expect(chunks[0].status.state).toBe('replaying');
+            expect(chunks[1].event.type).toBe('RUN_STARTED');
+            expect(chunks[2].terminal).toBe('RUN_COMPLETED');
+            expect(chunks[3].terminal).toBe('STREAM_END');
+            expect(chunks[3].done).toBe(true);
+        });
+
+        it('should expose live disconnected terminal without provider calls', async () => {
+            const replaySpy = jest.spyOn(service, 'replayRun');
+
+            const iterable = await service.streamActiveTrace({ runId: 'run-sg-ac02', mode: 'live' });
+            const chunks: any[] = [];
+            for await (const chunk of iterable) {
+                chunks.push(chunk);
+            }
+
+            expect(replaySpy).not.toHaveBeenCalled();
+            expect(chunks[0].status.state).toBe('connecting');
+            expect(chunks[1].status.state).toBe('disconnected');
+            expect(chunks[1].terminal).toBe('STREAM_END');
+            expect(chunks[1].done).toBe(true);
+        });
+
+        it('should cancel an active stream proxy before replay emits events', async () => {
+            jest.spyOn(service, 'replayRun').mockResolvedValue({
+                runId: 'run-sg-ac03',
+                events: [],
+                totalEvents: 0
+            });
+
+            const iterable = await service.streamActiveTrace({ runId: 'run-sg-ac03', mode: 'replay' });
+            const cancelResult = await service.cancelActiveTraceStream('run-sg-ac03');
+            const chunks: any[] = [];
+            for await (const chunk of iterable) {
+                chunks.push(chunk);
+            }
+
+            expect(cancelResult.success).toBe(true);
+            expect(chunks[0].status.state).toBe('replaying');
+            expect(chunks[1].terminal).toBe('RUN_CANCELLED');
+            expect(chunks[1].status.state).toBe('cancelled');
+        });
+
+        it('should reject invalid active stream run IDs and modes', async () => {
+            await expect(service.streamActiveTrace({ runId: '../bad', mode: 'replay' })).rejects.toThrow(Error);
+            await expect(service.streamActiveTrace({ runId: 'run-sg-ac04', mode: 'bad' as any })).rejects.toMatchObject({
+                code: ArcErrorCode.INVALID_INPUT
+            });
+        });
+    });
+
     describe('parseJsonlTrace (via readTrace)', () => {
         it('should parse single-line JSON trace', async () => {
             const tracesDir = path.join(tempDir, '.arc', 'traces');

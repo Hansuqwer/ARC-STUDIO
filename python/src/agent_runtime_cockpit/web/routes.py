@@ -20,6 +20,7 @@ from ..adapters.registry import default_registry
 from ..context.pack import ContextPackGenerator
 from ..orchestration import runtime_router
 from ..orchestration.cross_linker import CrossLinker
+from ..orchestration.event_broker import EventBroker
 from ..protocol.envelope import ok, err
 from ..protocol.errors import ArcErrorCode
 from ..protocol.schemas import WorkspaceInfo
@@ -397,7 +398,17 @@ async def sse_proof(request: web.Request) -> web.StreamResponse:
 
 
 async def run_events_sse(request: web.Request) -> web.StreamResponse:
-    """AG-UI-compatible SSE stream for run events."""
+    """AG-UI-compatible SSE stream for run events.
+
+    ``mode=live`` subscribes to the active in-memory stream and closes on
+    RUN_COMPLETED/RUN_FAILED/RUN_CANCELLED with STREAM_END. Default replay
+    streams the stored trace and marks STREAM_END as replay.
+    """
+    mode = request.query.get("mode", "replay")
+    if mode == "live":
+        broker = request.app.setdefault("event_broker", EventBroker(_trace_store(request)))
+        return await broker.sse_handler(request)
+
     run_id = request.match_info["run_id"]
     response = web.StreamResponse(headers={
         "Content-Type": "text/event-stream",
@@ -424,7 +435,7 @@ async def run_events_sse(request: web.Request) -> web.StreamResponse:
             data = json.dumps(event.model_dump(), default=str)
             await response.write(f"data: {data}\n\n".encode())
 
-    await response.write(b"data: {\"type\": \"STREAM_END\"}\n\n")
+    await response.write(b"data: {\"type\": \"STREAM_END\", \"mode\": \"replay\"}\n\n")
     return response
 
 

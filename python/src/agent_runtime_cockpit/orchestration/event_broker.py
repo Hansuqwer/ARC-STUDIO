@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 
 HEARTBEAT_INTERVAL = 15.0
 QUEUE_MAX_SIZE = 1000
+TERMINAL_EVENT_TYPES = {"RUN_COMPLETED", "RUN_FAILED", "RUN_CANCELLED"}
 
 
 class EventBroker:
@@ -133,7 +134,9 @@ class EventBroker:
         """
         run_id = request.match_info["run_id"]
         mode = request.query.get("mode", "replay")
-        last_event_id = int(request.headers.get("Last-Event-ID", "0"))
+        last_event_id = int(
+            request.query.get("last_event_id") or request.headers.get("Last-Event-ID", "0"),
+        )
 
         response = web.StreamResponse(headers={
             "Content-Type": "text/event-stream",
@@ -162,10 +165,13 @@ class EventBroker:
                         lines.append(f"id: {event_id}")
                     lines.append(f"data: {payload}")
                     await response.write(("\n".join(lines) + "\n\n").encode())
+                    if mode == "live" and event_type in TERMINAL_EVENT_TYPES:
+                        break
 
                 await response.write(
-                    b"event: stream_end\ndata: "
-                    b'{"type": "STREAM_END"}\n\n'
+                    f"event: stream_end\ndata: "
+                    f'{json.dumps({"type": "STREAM_END", "mode": mode})}\n\n'
+                    .encode()
                 )
             finally:
                 heartbeat_task.cancel()
@@ -176,13 +182,18 @@ class EventBroker:
         except asyncio.CancelledError:
             log.info("SSE stream cancelled for run %s", run_id)
             raise
+        except ConnectionResetError:
+            log.info("SSE client disconnected for run %s", run_id)
         except Exception as e:
             log.error("SSE stream error for run %s: %s", run_id, e)
-            await response.write(
-                f"event: stream_error\ndata: "
-                f'{json.dumps({"type": "STREAM_ERROR", "error": str(e)})}\n\n'
-                .encode()
-            )
+            try:
+                await response.write(
+                    f"event: stream_error\ndata: "
+                    f'{json.dumps({"type": "STREAM_ERROR", "error": str(e)})}\n\n'
+                    .encode()
+                )
+            except ConnectionResetError:
+                log.info("SSE client disconnected while reporting error for run %s", run_id)
         return response
 
     @staticmethod

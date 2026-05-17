@@ -29,6 +29,9 @@ import {
     RuntimeCapabilitiesResponse,
     ProviderStatus,
     ConfigStatus,
+    ArcProfileInfo,
+    IsolationProviderInfo,
+    IsolationStatus,
     SafeConfigUpdate,
     SafeProviderKeyStatus,
     SafeRuntimeConfig,
@@ -51,6 +54,8 @@ import {
     ReplayResult,
     ReplayEvent,
     RunDiffResult,
+    ActiveTraceStreamRequest,
+    ActiveTraceEventChunk,
 } from '../common/arc-protocol';
 import { validateWorkspaceRoot, validateTraceId, validateRunId } from './security-utils';
 import { WorkflowExecutor } from './services/workflow-executor';
@@ -67,6 +72,9 @@ const TRUST_SENSITIVE_FLAGS = [
     'requires_secrets',
     'requires_network',
 ];
+
+const SAFE_CONFIG_KEYS = ['defaultRuntime', 'mode', 'isolation', 'allowPaidCalls', 'dryRun', 'routingMode'];
+const UNSAFE_CONFIG_KEY_PATTERN = /(secret|token|password|api[_-]?key|raw.*key|credential)/i;
 
 function buildArcCliEnv(): NodeJS.ProcessEnv {
     const env: NodeJS.ProcessEnv = {};
@@ -85,6 +93,7 @@ export class ArcBackendService implements ArcService {
     private readonly parser: TraceParser;
     private readonly detector: WorkflowDetector;
     private readonly fileManager: FileManager;
+    private readonly activeStreamCancels = new Map<string, { cancelled: boolean }>();
     private workspaceRoot: string;
 
     constructor(
@@ -198,6 +207,27 @@ export class ArcBackendService implements ArcService {
                 { error: error instanceof Error ? error.message : 'Unknown error' }
             );
         }
+    }
+
+    async streamActiveTrace(request: ActiveTraceStreamRequest): Promise<AsyncIterable<ActiveTraceEventChunk>> {
+        validateRunId(request.runId);
+        if (request.mode !== 'live' && request.mode !== 'replay') {
+            throw new ArcError(ArcErrorCode.INVALID_INPUT, `Unsupported stream mode: ${request.mode}`);
+        }
+        const cancelToken = { cancelled: false };
+        this.activeStreamCancels.set(request.runId, cancelToken);
+        return this.createActiveTraceIterable(request, cancelToken);
+    }
+
+    async cancelActiveTraceStream(runId: string): Promise<{ success: boolean; message: string }> {
+        validateRunId(runId);
+        const token = this.activeStreamCancels.get(runId);
+        if (!token) {
+            return { success: false, message: `No active stream proxy for run: ${runId}` };
+        }
+        token.cancelled = true;
+        this.activeStreamCancels.delete(runId);
+        return { success: true, message: `Cancelled active stream proxy for run: ${runId}` };
     }
 
     /**
@@ -593,11 +623,11 @@ export class ArcBackendService implements ArcService {
      * Validates that no secret values are included before writing.
      */
     async saveConfig(update: SafeConfigUpdate): Promise<{ success: boolean; message: string }> {
-        const safeKeys = ['defaultRuntime', 'mode', 'isolation', 'allowPaidCalls', 'dryRun', 'routingMode'];
+        const safeKeys = SAFE_CONFIG_KEYS;
         const updateKeys = Object.keys(update);
 
         for (const key of updateKeys) {
-            if (!safeKeys.includes(key)) {
+            if (!safeKeys.includes(key) || UNSAFE_CONFIG_KEY_PATTERN.test(key)) {
                 return {
                     success: false,
                     message: `Rejected unsafe config field: ${key}. Only non-secret fields are allowed.`,
@@ -613,6 +643,9 @@ export class ArcBackendService implements ArcService {
             const args = ['config', 'set'];
             if (update.defaultRuntime) {
                 args.push(`runtime.default=${update.defaultRuntime}`);
+            }
+            if (update.mode) {
+                args.push(`execution.mode=${update.mode}`);
             }
             if (update.isolation) {
                 args.push(`execution.isolation=${update.isolation}`);
@@ -641,6 +674,86 @@ export class ArcBackendService implements ArcService {
                 message: `Failed to save config: ${error instanceof Error ? error.message : 'Unknown error'}`,
             };
         }
+    }
+
+    async listProfiles(): Promise<ArcProfileInfo[]> {
+        try {
+            const output = execFileSync('arc', ['profiles', 'list', '--json'], {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            const profiles = Array.isArray(parsed?.data) ? parsed.data : Array.isArray(parsed?.profiles) ? parsed.profiles : [];
+            return profiles.map((profile: any) => ({
+                id: String(profile.id || profile.profile_id || profile.name || 'unknown'),
+                name: String(profile.name || profile.id || profile.profile_id || 'Unknown'),
+                mode: profile.mode,
+                description: profile.description,
+                allowPaidCalls: profile.allow_paid_calls ?? profile.allowPaidCalls,
+                dryRun: profile.dry_run ?? profile.dryRun,
+                provider: profile.provider,
+                runtime: profile.runtime,
+            }));
+        } catch {
+            return [
+                { id: 'local-safe', name: 'local-safe', allowPaidCalls: false, dryRun: true },
+                { id: 'local-paid', name: 'local-paid', allowPaidCalls: true, dryRun: false },
+            ];
+        }
+    }
+
+    async getIsolationStatus(): Promise<IsolationStatus> {
+        try {
+            const output = execFileSync('arc', ['isolation', 'status', '--json'], {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            const data = parsed?.data || parsed || {};
+            return {
+                current: String(data.current || data.provider || data.isolation || 'none'),
+                available: data.available !== false,
+                providers: this.mapIsolationProviders(data.providers || []),
+                message: data.message,
+            };
+        } catch (error) {
+            return {
+                current: 'none',
+                available: true,
+                providers: [{ id: 'none', name: 'None', available: true, active: true }],
+                message: `Isolation status unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            };
+        }
+    }
+
+    async listIsolationProviders(): Promise<IsolationProviderInfo[]> {
+        try {
+            const output = execFileSync('arc', ['isolation', 'list', '--json'], {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            const providers = Array.isArray(parsed?.data) ? parsed.data : Array.isArray(parsed?.providers) ? parsed.providers : [];
+            return this.mapIsolationProviders(providers);
+        } catch {
+            return [{ id: 'none', name: 'None', available: true, active: true }];
+        }
+    }
+
+    private mapIsolationProviders(providers: any[]): IsolationProviderInfo[] {
+        return providers.map((provider: any) => ({
+            id: String(provider.id || provider.name || 'unknown'),
+            name: String(provider.display_name || provider.name || provider.id || 'Unknown'),
+            available: provider.available !== false,
+            active: !!provider.active,
+            reason: provider.reason || provider.message,
+        }));
     }
 
     async getProviderCatalog(): Promise<ProviderCatalogEntry[]> {
@@ -1113,6 +1226,108 @@ export class ArcBackendService implements ArcService {
     private async readFileContent(filePath: string): Promise<string> {
         const fs = await import('fs-extra');
         return fs.readFile(filePath, 'utf-8');
+    }
+
+    private async *createActiveTraceIterable(
+        request: ActiveTraceStreamRequest,
+        cancelToken: { cancelled: boolean }
+    ): AsyncIterable<ActiveTraceEventChunk> {
+        const timeoutMs = Math.min(Math.max(request.timeoutMs ?? 30000, 1), 300000);
+        const startedAt = Date.now();
+        const now = (): string => new Date().toISOString();
+        try {
+            yield {
+                runId: request.runId,
+                mode: request.mode,
+                sequence: 0,
+                status: {
+                    runId: request.runId,
+                    mode: request.mode,
+                    state: request.mode === 'replay' ? 'replaying' : 'connecting',
+                    timestamp: now(),
+                },
+                done: false,
+            };
+
+            if (cancelToken.cancelled) {
+                yield this.activeTraceTerminalChunk(request, 1, 'RUN_CANCELLED', 'cancelled', 'Stream cancelled.');
+                return;
+            }
+
+            if (request.mode === 'live') {
+                yield this.activeTraceTerminalChunk(
+                    request,
+                    1,
+                    'STREAM_END',
+                    'disconnected',
+                    'Live SSE proxy is disconnected; use replay until Python web URL wiring is configured.'
+                );
+                return;
+            }
+
+            const replay = await this.replayRun(request.runId);
+            let sequence = 1;
+            for (const event of replay.events) {
+                if (cancelToken.cancelled) {
+                    yield this.activeTraceTerminalChunk(request, sequence, 'RUN_CANCELLED', 'cancelled', 'Stream cancelled.');
+                    return;
+                }
+                if (Date.now() - startedAt > timeoutMs) {
+                    yield this.activeTraceTerminalChunk(request, sequence, 'STREAM_END', 'error', 'Stream timed out.');
+                    return;
+                }
+                yield {
+                    runId: request.runId,
+                    mode: 'replay',
+                    sequence,
+                    event,
+                    terminal: this.activeTraceTerminalFromEventType(event.type),
+                    done: false,
+                };
+                sequence += 1;
+            }
+            yield this.activeTraceTerminalChunk(request, sequence, 'STREAM_END', 'ended', 'Replay stream ended.');
+        } catch (error) {
+            yield this.activeTraceTerminalChunk(
+                request,
+                1,
+                'STREAM_END',
+                'error',
+                error instanceof Error ? error.message : 'Unknown stream error'
+            );
+        } finally {
+            this.activeStreamCancels.delete(request.runId);
+        }
+    }
+
+    private activeTraceTerminalChunk(
+        request: ActiveTraceStreamRequest,
+        sequence: number,
+        terminal: ActiveTraceEventChunk['terminal'],
+        state: NonNullable<ActiveTraceEventChunk['status']>['state'],
+        message: string
+    ): ActiveTraceEventChunk {
+        return {
+            runId: request.runId,
+            mode: request.mode,
+            sequence,
+            status: {
+                runId: request.runId,
+                mode: request.mode,
+                state,
+                message,
+                timestamp: new Date().toISOString(),
+            },
+            terminal,
+            done: true,
+        };
+    }
+
+    private activeTraceTerminalFromEventType(type: string): ActiveTraceEventChunk['terminal'] | undefined {
+        if (type === 'RUN_COMPLETED' || type === 'RUN_FAILED' || type === 'RUN_CANCELLED') {
+            return type;
+        }
+        return undefined;
     }
 
     private extractAuditRecordCount(reason?: string): number {

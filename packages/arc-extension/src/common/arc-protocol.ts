@@ -465,6 +465,32 @@ export interface SafeConfigUpdate {
     routingMode?: string;
 }
 
+export interface ArcProfileInfo {
+    id: string;
+    name: string;
+    mode?: 'plan' | 'build' | 'auto' | string;
+    description?: string;
+    allowPaidCalls?: boolean;
+    dryRun?: boolean;
+    provider?: string;
+    runtime?: string;
+}
+
+export interface IsolationProviderInfo {
+    id: string;
+    name: string;
+    available: boolean;
+    active?: boolean;
+    reason?: string;
+}
+
+export interface IsolationStatus {
+    current: string;
+    available: boolean;
+    providers: IsolationProviderInfo[];
+    message?: string;
+}
+
 // ========== Run Links Types (Session B7) ==========
 
 /**
@@ -879,6 +905,49 @@ export interface TraceEventChunk {
     done: boolean;
 }
 
+export type ActiveTraceStreamMode = 'live' | 'replay';
+
+export type ActiveTraceTerminalType =
+    | 'RUN_COMPLETED'
+    | 'RUN_FAILED'
+    | 'RUN_CANCELLED'
+    | 'STREAM_END';
+
+export type ActiveTraceStreamState =
+    | 'connecting'
+    | 'connected'
+    | 'replaying'
+    | 'disconnected'
+    | 'error'
+    | 'ended'
+    | 'cancelled';
+
+export interface ActiveTraceStreamRequest {
+    runId: string;
+    mode: ActiveTraceStreamMode;
+    /** Max stream lifetime in milliseconds. Defaults to backend-safe timeout. */
+    timeoutMs?: number;
+}
+
+export interface ActiveTraceStreamStatus {
+    runId: string;
+    mode: ActiveTraceStreamMode;
+    state: ActiveTraceStreamState;
+    message?: string;
+    timestamp: string;
+}
+
+/** Live/replay stream chunk compatible with Python SSE JSON event payloads. */
+export interface ActiveTraceEventChunk {
+    runId: string;
+    mode: ActiveTraceStreamMode;
+    sequence: number;
+    event?: TraceEvent | ReplayEvent | Record<string, unknown>;
+    status?: ActiveTraceStreamStatus;
+    terminal?: ActiveTraceTerminalType;
+    done: boolean;
+}
+
 // ========== Run Preflight ==========
 
 export interface RunBlocker {
@@ -1029,6 +1098,12 @@ export interface ArcService {
      */
     streamTrace(traceId: string): Promise<AsyncIterable<TraceEvent>>;
 
+    /** Stream active run events with explicit live vs replay and terminal semantics. */
+    streamActiveTrace(request: ActiveTraceStreamRequest): Promise<AsyncIterable<ActiveTraceEventChunk>>;
+
+    /** Cancel a backend active stream proxy for a run. Does not cancel the run itself. */
+    cancelActiveTraceStream(runId: string): Promise<{ success: boolean; message: string }>;
+
     /**
      * Validate the format and content of a trace file.
      *
@@ -1100,6 +1175,15 @@ export interface ArcService {
      * Only non-secret fields from SafeConfigUpdate are accepted.
      */
     saveConfig(update: SafeConfigUpdate): Promise<{ success: boolean; message: string }>;
+
+    /** List non-secret run profiles from Python CLI. */
+    listProfiles(): Promise<ArcProfileInfo[]>;
+
+    /** Get active isolation status. Falls back safely if CLI unavailable. */
+    getIsolationStatus(): Promise<IsolationStatus>;
+
+    /** List isolation providers. No secrets or host env values are returned. */
+    listIsolationProviders(): Promise<IsolationProviderInfo[]>;
 
     /** List provider catalog entries. No raw credentials are returned. */
     getProviderCatalog(): Promise<ProviderCatalogEntry[]>;
