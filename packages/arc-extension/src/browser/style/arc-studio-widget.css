@@ -684,6 +684,134 @@
     color: var(--arc-error-color, #c93c37);
 }
 
+/* SwarmGraph Insight Tab */
+.arc-studio-swarmgraph {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.arc-studio-swarmgraph__header,
+.arc-studio-swarmgraph__controls,
+.arc-studio-swarmgraph__panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.arc-studio-swarmgraph__header h2,
+.arc-studio-swarmgraph__panel-header h3,
+.arc-studio-swarmgraph__topology h4 {
+    margin: 0;
+}
+
+.arc-studio-swarmgraph__header p,
+.arc-studio-swarmgraph__note,
+.arc-studio-swarmgraph__empty,
+.arc-studio-swarmgraph__loading,
+.arc-studio-swarmgraph__reasons {
+    color: var(--theia-descriptionForeground, var(--theia-ui-font-color2, #777));
+    font-size: 12px;
+}
+
+.arc-studio-swarmgraph__button,
+.arc-studio-swarmgraph__select {
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: 4px;
+    background: var(--theia-input-background, #fff);
+    color: var(--theia-ui-font-color, #333);
+    font-size: 12px;
+    padding: 6px 10px;
+}
+
+.arc-studio-swarmgraph__button:disabled,
+.arc-studio-swarmgraph__select:disabled {
+    opacity: 0.6;
+}
+
+.arc-studio-swarmgraph__select {
+    flex: 1;
+}
+
+.arc-studio-swarmgraph__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.arc-studio-swarmgraph__panel,
+.arc-studio-swarmgraph__error,
+.arc-studio-swarmgraph__loading,
+.arc-studio-swarmgraph__empty,
+.arc-studio-swarmgraph__reasons {
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: 6px;
+    padding: 12px;
+    background: var(--theia-editorWidget-background, var(--theia-ui-background, #fff));
+}
+
+.arc-studio-swarmgraph__badge {
+    border-radius: 999px;
+    font-size: 11px;
+    padding: 2px 8px;
+    text-transform: uppercase;
+}
+
+.arc-studio-swarmgraph__badge--present {
+    background: rgba(45, 125, 70, 0.16);
+    color: var(--theia-testing-iconPassed, #2d7d46);
+}
+
+.arc-studio-swarmgraph__badge--degraded {
+    background: rgba(169, 112, 0, 0.16);
+    color: var(--theia-testing-iconQueued, #a97000);
+}
+
+.arc-studio-swarmgraph__badge--empty {
+    background: rgba(128, 128, 128, 0.16);
+    color: var(--theia-descriptionForeground, #777);
+}
+
+.arc-studio-swarmgraph__topology {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.arc-studio-swarmgraph__item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--theia-border-color, #eee);
+}
+
+.arc-studio-swarmgraph__item span {
+    color: var(--theia-descriptionForeground, #777);
+    font-size: 12px;
+}
+
+.arc-studio-swarmgraph__details {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 10px;
+    margin: 0;
+}
+
+.arc-studio-swarmgraph__details dt {
+    color: var(--theia-descriptionForeground, #777);
+}
+
+.arc-studio-swarmgraph__details dd {
+    margin: 0;
+}
+
+.arc-studio-swarmgraph__error {
+    color: var(--arc-error-color, #c93c37);
+    border-color: var(--arc-error-color, #c93c37);
+}
+
 /* Scrollbar */
 .arc-studio-content::-webkit-scrollbar {
     width: 10px;

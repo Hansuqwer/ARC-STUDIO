@@ -140,17 +140,20 @@ git status --short
 ## Phase 5 — SwarmGraph Insight Baseline
 
 **Roadmap:** R5  
-**Status:** Deferred
+**Status:** Complete baseline
 
 ### Chunk 5.1 — Event Contract Inventory
 - Identify current trace/adoption events that can support topology/consensus/cost.
 - Add missing event types only if producer exists or tests define empty state.
+- Status: Complete baseline — no producer-backed rich schema exists yet; protocol now accepts runtime-specific trace event names without inventing a fixed SG schema.
 
 ### Chunk 5.2 — Empty-State Panels
 - Add topology/consensus/cost panels that honestly show “no event-backed data”.
+- Status: Complete — SwarmGraph Insight tab includes trace selector plus empty/degraded topology, consensus, and cost panels.
 
 ### Chunk 5.3 — Event-Backed Rendering
 - Render topology/votes/cost only from real trace events.
+- Status: Complete baseline — pure extractors render only explicit SwarmGraph topology/consensus/cost trace events; fake/offline metadata is ignored.
 
 ## Phase 6 — Narrow Real Adoption Path
 
@@ -193,6 +196,6 @@ git status --short
 | 2 Runtime Setup UI | Partial | config/profile CLI | Safe ConfigTab baseline in place; remediation wizard/helpers remain |
 | 3 Provider/Quota UI | Not started | provider CLI | Must remain gated/offline by default |
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
-| 5 SwarmGraph Insight | Deferred | event-backed adoption data | Empty states first |
+| 5 SwarmGraph Insight | Complete baseline | event-backed adoption data | Empty/degraded panels and explicit-event rendering only |
 | 6 Real Adoption | Deferred | adoption protocol | Narrow first target only |
 | 7 Release Ops | Partial | green CI | `.env` scrub gated |

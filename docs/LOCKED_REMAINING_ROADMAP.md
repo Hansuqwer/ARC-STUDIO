@@ -91,7 +91,7 @@
 
 **Goal:** Expose real SwarmGraph concepts only when backed by real events/data.
 
-**Current:** Vendored SwarmGraph has queen/worker/consensus/HITL/audit; ARC adoption runners are mostly fake-tested/gated.
+**Current:** Baseline IDE SwarmGraph Insight tab exists. It reads stored traces, shows empty/degraded topology/consensus/cost panels, and renders present sections only from explicit SwarmGraph insight trace events. It does not promote fake/offline metadata to real topology/consensus/cost.
 
 **Deliverables:**
 - Trace-derived topology view for runs with topology events.
@@ -144,6 +144,6 @@
 | R2 IDE Runtime Setup | Partial | Adapter readiness actions + export-target helpers |
 | R3 Provider/Quota UI | Not started | Provider diagnostics panel scaffold |
 | R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
-| R5 SwarmGraph Insight | Deferred | Define event-backed empty-state contracts |
+| R5 SwarmGraph Insight | Complete baseline | Future real-runtime emitters for richer topology/votes/cost events |
 | R6 Real Adoption | Deferred | LangGraph + SwarmGraph narrow real path spike |
 | R7 Release Ops | Partial | Refresh checklist evidence; `.env` scrub remains gated |

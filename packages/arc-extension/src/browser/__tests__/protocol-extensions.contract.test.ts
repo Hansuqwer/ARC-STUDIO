@@ -164,6 +164,11 @@ describe('Protocol Extensions (Session B + B7)', () => {
     });
 
     describe('HITL/Audit/Replay Types (Slice 7)', () => {
+        it('should allow known and runtime-specific trace event type strings', () => {
+            expect(source).toMatch(/export type KnownTraceEventType/);
+            expect(source).toMatch(/type:\s*KnownTraceEventType \| \(string & \{\}\)/);
+        });
+
         it('should export HitlPromptInfo', () => {
             expect(source).toMatch(/export interface HitlPromptInfo/);
         });

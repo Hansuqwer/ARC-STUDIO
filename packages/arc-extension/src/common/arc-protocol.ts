@@ -169,6 +169,14 @@ export interface TraceFile {
  * Each event represents a discrete action during workflow execution.
  * Trace files are JSONL: one TraceEvent JSON object per line.
  */
+export type KnownTraceEventType =
+    | 'RUN_STARTED'
+    | 'NODE_COMPLETED'
+    | 'MESSAGE'
+    | 'RUN_COMPLETED'
+    | 'RUN_FAILED'
+    | 'ERROR';
+
 export interface TraceEvent {
     /**
      * Type of event.
@@ -178,8 +186,9 @@ export interface TraceEvent {
      * - RUN_COMPLETED:  Workflow execution succeeded
      * - RUN_FAILED:     Workflow execution failed
      * - ERROR:          An error occurred during execution
+     * Runtime-specific trace event strings are allowed for real adapter events.
      */
-    type: 'RUN_STARTED' | 'NODE_COMPLETED' | 'MESSAGE' | 'RUN_COMPLETED' | 'RUN_FAILED' | 'ERROR';
+    type: KnownTraceEventType | (string & {});
 
     /**
      * ISO 8601 timestamp when the event occurred.

@@ -10,9 +10,9 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common/message-service';
 import * as React from '@theia/core/shared/react';
 import { ArcService, ConfigStatus, WorkflowInfo } from '../common/arc-protocol';
-import { AssuranceTab, ChatTab, ConfigTab, RunsTab, WorkflowsTab } from './tabs';
+import { AssuranceTab, ChatTab, ConfigTab, RunsTab, SwarmGraphInsightTab, WorkflowsTab } from './tabs';
 
-type StudioTabId = 'chat' | 'runs' | 'workflows' | 'assurance' | 'config';
+type StudioTabId = 'chat' | 'runs' | 'workflows' | 'assurance' | 'swarmgraph-insight' | 'config';
 
 interface ArcStudioWidgetState {
     activeTab: StudioTabId;
@@ -96,6 +96,7 @@ export class ArcStudioWidget extends ReactWidget {
             { id: 'runs', label: 'Runs' },
             { id: 'workflows', label: 'Workflows' },
             { id: 'assurance', label: 'Assurance' },
+            { id: 'swarmgraph-insight', label: 'SwarmGraph Insight' },
             { id: 'config', label: 'Config' }
         ];
 
@@ -186,6 +187,14 @@ export class ArcStudioWidget extends ReactWidget {
                         hidden={activeTab !== 'config'}
                     >
                         {activeTab === 'config' && <ConfigTab arcService={this.arcService} />}
+                    </div>
+                    <div
+                        id={`arc-studio-panel-swarmgraph-insight`}
+                        role='tabpanel'
+                        aria-labelledby='arc-studio-tab-swarmgraph-insight'
+                        hidden={activeTab !== 'swarmgraph-insight'}
+                    >
+                        {activeTab === 'swarmgraph-insight' && <SwarmGraphInsightTab arcService={this.arcService} />}
                     </div>
                 </div>
 

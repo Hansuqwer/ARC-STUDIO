@@ -8,6 +8,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 
 describe('Studio Tabs Contracts', () => {
+    const browserDir = path.join(__dirname, '..', '..', '..', 'src', 'browser');
     const tabsDir = path.join(__dirname, '..', '..', '..', 'src', 'browser', 'tabs');
 
     describe('tabs/index.ts exports', () => {
@@ -617,6 +618,46 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/arc-studio-assurance__annotations/);
             expect(source).toMatch(/arc-studio-assurance__annotation/);
             expect(source).toMatch(/JSON\.stringify\(activeEvent\.data, null, 2\)/);
+        });
+    });
+
+    describe('SwarmGraph Insight Tab', () => {
+        let studioSource: string;
+        let tabsIndexSource: string;
+        let insightSource: string;
+
+        beforeAll(async () => {
+            studioSource = await fs.readFile(path.join(browserDir, 'arc-studio-widget.tsx'), 'utf-8');
+            tabsIndexSource = await fs.readFile(path.join(tabsDir, 'index.ts'), 'utf-8');
+            insightSource = await fs.readFile(path.join(tabsDir, 'SwarmGraphInsightTab.tsx'), 'utf-8');
+        });
+
+        it('should export and wire SwarmGraph Insight tab from the main studio host', () => {
+            expect(tabsIndexSource).toMatch(/export.*SwarmGraphInsightTab/);
+            expect(tabsIndexSource).toMatch(/export.*SwarmGraphInsightTabProps/);
+            expect(studioSource).toMatch(/SwarmGraphInsightTab/);
+            expect(studioSource).toMatch(/swarmgraph-insight/);
+            expect(studioSource).toMatch(/SwarmGraph Insight/);
+        });
+
+        it('should render honest empty and degraded topology consensus cost panels', () => {
+            expect(insightSource).toMatch(/Topology/);
+            expect(insightSource).toMatch(/Consensus/);
+            expect(insightSource).toMatch(/Cost/);
+            expect(insightSource).toMatch(/No SwarmGraph topology events found/);
+            expect(insightSource).toMatch(/No SwarmGraph consensus events found/);
+            expect(insightSource).toMatch(/No SwarmGraph cost events found/);
+            expect(insightSource).toMatch(/degraded/i);
+            expect(insightSource).toMatch(/trace events/i);
+        });
+
+        it('should source insight only from trace reads, not fake offline metadata', () => {
+            expect(insightSource).toMatch(/arcService\.getTraces/);
+            expect(insightSource).toMatch(/arcService\.readTrace/);
+            expect(insightSource).toMatch(/event\.type/);
+            expect(insightSource).not.toMatch(/metadata\.consensus/);
+            expect(insightSource).not.toMatch(/fake\/offline/i);
+            expect(insightSource).not.toMatch(/crewai\+swarmgraph/);
         });
     });
 });

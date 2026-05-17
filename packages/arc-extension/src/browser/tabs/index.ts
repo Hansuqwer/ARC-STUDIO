@@ -16,3 +16,6 @@ export type { ConfigTabProps } from './ConfigTab';
 
 export { AssuranceTab } from './AssuranceTab';
 export type { AssuranceTabProps } from './AssuranceTab';
+
+export { SwarmGraphInsightTab } from './SwarmGraphInsightTab';
+export type { SwarmGraphInsightTabProps } from './SwarmGraphInsightTab';
