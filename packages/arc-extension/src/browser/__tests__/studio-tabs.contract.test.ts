@@ -114,6 +114,18 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/startRun/);
         });
 
+        it('should show paid-call gate warning from capability, preflight, or opt-in', () => {
+            expect(source).toMatch(/arc-studio-chat__paid-call-warning/);
+            expect(source).toMatch(/showPaidCallWarning/);
+            expect(source).toMatch(/selectedCapability\?\.requires_paid_calls/);
+            expect(source).toMatch(/preflight\?\.paidCallRequired/);
+            expect(source).toMatch(/allowPaidCalls/);
+            expect(source).toMatch(/Paid provider calls require explicit opt-in/);
+            expect(source).toMatch(/Dry-run preflight makes no provider calls \(providerCall:false\)/);
+            expect(source).not.toMatch(/api[_-]?key/i);
+            expect(source).not.toMatch(/secret/i);
+        });
+
         it('should show runtime readiness and keep local transcript', () => {
             expect(source).toMatch(/arc-studio-chat__runtime-readiness/);
             expect(source).toMatch(/selectedCapability/);
@@ -434,6 +446,69 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/providerCall:false/);
             expect(source).toMatch(/if \(next\) setAllowPaidCalls\(false\)/);
             expect(source).toMatch(/disabled=\{dryRun\}/);
+        });
+
+        it('should expose provider diagnostics quota and cost warning cards', () => {
+            expect(source).toMatch(/arc-studio-config__provider-diagnostics/);
+            expect(source).toMatch(/arc-studio-config__provider-quota/);
+            expect(source).toMatch(/arc-studio-config__provider-cost/);
+            expect(source).toMatch(/arc-studio-config__paid-call-warning/);
+            expect(source).toMatch(/arc-studio-config__provider-refresh/);
+            expect(source).toMatch(/Provider Diagnostics & Quota/);
+            expect(source).toMatch(/Paid provider calls require explicit opt-in/);
+            expect(source).toMatch(/dry-run stays providerCall:false/);
+        });
+
+        it('should load optional provider diagnostics and quota without hard protocol dependency', () => {
+            expect(source).toMatch(/OptionalProviderTelemetryService/);
+            expect(source).toMatch(/getProviderDiagnostics\?: \(\) => Promise<unknown>/);
+            expect(source).toMatch(/getProviderQuota\?: \(provider\?: string\) => Promise<unknown>/);
+            expect(source).toMatch(/providerTelemetryService\.getProviderDiagnostics/);
+            expect(source).toMatch(/providerTelemetryService\.getProviderQuota/);
+            expect(source).toMatch(/quotaProviderFilter === 'all' \? undefined : quotaProviderFilter/);
+            expect(source).toMatch(/getProviderQuota\(quotaProvider\)/);
+            expect(source).toMatch(/catch\(\(\) => null\)/);
+        });
+
+        it('should expose provider quota filter with catalog fallback copy', () => {
+            expect(source).toMatch(/quotaProviderFilter/);
+            expect(source).toMatch(/setQuotaProviderFilter/);
+            expect(source).toMatch(/arc-studio-config__quota-provider-filter/);
+            expect(source).toMatch(/Quota provider filter/);
+            expect(source).toMatch(/All providers/);
+            expect(source).toMatch(/providerQuotaOptions/);
+            expect(source).toMatch(/providerCatalog\.length \? providerCatalog/);
+        });
+
+        it('should parse provider quota counters into safe rows', () => {
+            expect(source).toMatch(/type QuotaCounterRow/);
+            expect(source).toMatch(/function quotaCounterRows/);
+            expect(source).toMatch(/\^\(dry_run\|live\):\(provider\|account\):/);
+            expect(source).toMatch(/bucket: match\[1\] as 'dry_run' \| 'live'/);
+            expect(source).toMatch(/scope: match\[2\] as 'provider' \| 'account'/);
+            expect(source).toMatch(/id: match\[3\]/);
+            expect(source).toMatch(/count: value/);
+        });
+
+        it('should render richer quota rows without raw quota JSON dump', () => {
+            expect(source).toMatch(/arc-studio-config__quota-row/);
+            expect(source).toMatch(/arc-studio-config__quota-bucket/);
+            expect(source).toMatch(/arc-studio-config__quota-scope/);
+            expect(source).toMatch(/row\.bucket/);
+            expect(source).toMatch(/row\.scope/);
+            expect(source).toMatch(/row\.id/);
+            expect(source).toMatch(/row\.count/);
+            expect(source).not.toMatch(/JSON\.stringify\(providerQuota/);
+        });
+
+        it('should summarize redacted provider telemetry only', () => {
+            expect(source).toMatch(/liveTestsEnabled/);
+            expect(source).toMatch(/routingDefault/);
+            expect(source).toMatch(/configuredProvidersCount/);
+            expect(source).toMatch(/configuredAccountsCount/);
+            expect(source).toMatch(/quotaCounters/);
+            expect(source).not.toMatch(/JSON\.stringify\(providerDiagnostics/);
+            expect(source).not.toMatch(/JSON\.stringify\(providerQuota/);
         });
 
         it('should handle unavailable backend gracefully', () => {

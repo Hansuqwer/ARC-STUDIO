@@ -100,6 +100,21 @@ describe('Protocol Extensions (Session B + B7)', () => {
             expect(source).toMatch(/unsetProviderKeyRef\(providerOrAccountId:\s*string\)/);
         });
 
+        it('should export provider diagnostics and quota protocol types', () => {
+            expect(source).toMatch(/export interface ProviderDiagnosticsInfo/);
+            expect(source).toMatch(/export interface ProviderQuotaInfo/);
+            expect(source).toMatch(/providers\?:\s*Record<string, unknown>\[\]/);
+            expect(source).toMatch(/routing\?:\s*Record<string, unknown>/);
+            expect(source).toMatch(/accounts\?:\s*Record<string, unknown>\[\]/);
+            expect(source).toMatch(/quota\?:\s*Record<string, unknown>/);
+            expect(source).toMatch(/counters\?:\s*Record<string, unknown>/);
+        });
+
+        it('should expose provider diagnostics and quota service methods', () => {
+            expect(source).toMatch(/getProviderDiagnostics\(\):\s*Promise<ProviderDiagnosticsInfo>/);
+            expect(source).toMatch(/getProviderQuota\(provider\?:\s*string\):\s*Promise<ProviderQuotaInfo>/);
+        });
+
         it('should export run preflight protocol types', () => {
             expect(source).toMatch(/export interface RunPreflightRequest/);
             expect(source).toMatch(/export interface RunPreflightResponse/);
@@ -313,6 +328,16 @@ describe('Backend Service Extensions (Session B + B7)', () => {
             expect(source).toMatch(/providers.*key.*unset/);
         });
 
+        it('should implement provider diagnostics and quota CLI methods', () => {
+            expect(source).toMatch(/async getProviderDiagnostics\(\)/);
+            expect(source).toMatch(/providers.*diagnostics.*--json/);
+            expect(source).toMatch(/async getProviderQuota\(provider\?:\s*string\)/);
+            expect(source).toMatch(/providers.*quota.*show/);
+            expect(source).toMatch(/--provider/);
+            expect(source).toMatch(/Provider diagnostics unavailable/);
+            expect(source).toMatch(/Provider quota unavailable/);
+        });
+
         it('should implement dry-run preflight via CLI without provider calls', () => {
             expect(source).toMatch(/async preflightRun\(request:\s*RunPreflightRequest\)/);
             expect(source).toMatch(/--dry-run/);
@@ -361,6 +386,11 @@ describe('Backend Service Extensions (Session B + B7)', () => {
     describe('Import types', () => {
         it('should import ConfigStatus', () => {
             expect(source).toMatch(/ConfigStatus/);
+        });
+
+        it('should import provider diagnostics and quota types', () => {
+            expect(source).toMatch(/ProviderDiagnosticsInfo/);
+            expect(source).toMatch(/ProviderQuotaInfo/);
         });
 
         it('should import SafeConfigUpdate', () => {

@@ -62,6 +62,52 @@ const PROVIDER_DISPLAY: Record<string, string> = {
     ollama: 'Ollama',
 };
 
+type JsonObject = Record<string, unknown>;
+type OptionalProviderTelemetryService = {
+    getProviderDiagnostics?: () => Promise<unknown>;
+    getProviderQuota?: (provider?: string) => Promise<unknown>;
+};
+
+type QuotaCounterRow = {
+    key: string;
+    bucket: 'dry_run' | 'live';
+    scope: 'provider' | 'account';
+    id: string;
+    count: number;
+};
+
+function asObject(value: unknown): JsonObject | null {
+    return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : null;
+}
+
+function numberField(value: JsonObject | null, keys: string[]): number | null {
+    for (const key of keys) {
+        const candidate = value?.[key];
+        if (typeof candidate === 'number') return candidate;
+    }
+    return null;
+}
+
+function stringField(value: JsonObject | null, keys: string[]): string | null {
+    for (const key of keys) {
+        const candidate = value?.[key];
+        if (typeof candidate === 'string') return candidate;
+    }
+    return null;
+}
+
+function booleanField(value: JsonObject | null, keys: string[]): boolean | null {
+    for (const key of keys) {
+        const candidate = value?.[key];
+        if (typeof candidate === 'boolean') return candidate;
+    }
+    return null;
+}
+
+function objectArray(value: unknown): JsonObject[] {
+    return Array.isArray(value) ? value.map(asObject).filter((item): item is JsonObject => Boolean(item)) : [];
+}
+
 function providerSourceBadge(source: string): string {
     switch (source) {
         case 'keyring': return 'keyring';
@@ -78,6 +124,14 @@ function providerSourceColor(source: string): string {
         case 'file': return '#ffb74d';
         default: return '#999';
     }
+}
+
+function quotaCounterRows(counters: JsonObject | null): QuotaCounterRow[] {
+    return Object.entries(counters || {}).flatMap(([key, value]) => {
+        const match = /^(dry_run|live):(provider|account):([A-Za-z0-9_.:-]+)$/.exec(key);
+        if (!match || typeof value !== 'number') return [];
+        return [{ key, bucket: match[1] as 'dry_run' | 'live', scope: match[2] as 'provider' | 'account', id: match[3], count: value }];
+    });
 }
 
 export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
@@ -100,6 +154,9 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
     const [isolationStatus, setIsolationStatus] = useState<IsolationStatus | null>(null);
     const [isolationProviders, setIsolationProviders] = useState<IsolationProviderInfo[]>(FALLBACK_ISOLATION_OPTIONS);
     const [exportText, setExportText] = useState<string | null>(null);
+    const [providerDiagnostics, setProviderDiagnostics] = useState<unknown>(null);
+    const [providerQuota, setProviderQuota] = useState<unknown>(null);
+    const [quotaProviderFilter, setQuotaProviderFilter] = useState('all');
 
     const loadConfig = useCallback(async () => {
         if (!arcService) {
@@ -143,6 +200,14 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     setIsolationProviders(providers);
                 }
             }
+            const providerTelemetryService = arcService as ArcService & OptionalProviderTelemetryService;
+            if (providerTelemetryService.getProviderDiagnostics) {
+                setProviderDiagnostics(await providerTelemetryService.getProviderDiagnostics().catch(() => null));
+            }
+            if (providerTelemetryService.getProviderQuota) {
+                const quotaProvider = quotaProviderFilter === 'all' ? undefined : quotaProviderFilter;
+                setProviderQuota(await providerTelemetryService.getProviderQuota(quotaProvider).catch(() => null));
+            }
             // Load runtime capabilities for disabled states
             setCapabilitiesLoading(true);
             if (arcService.listRuntimeCapabilities) {
@@ -159,7 +224,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
         } finally {
             setLoading(false);
         }
-    }, [arcService, selectedProfile]);
+    }, [arcService, quotaProviderFilter, selectedProfile]);
 
     const buildSafeExport = useCallback((): string => {
         const safeSnapshot = {
@@ -236,6 +301,21 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
         }
         return { value, ...meta, canRun, reason, availability, paid, description };
     });
+
+    const diagnosticsObject = asObject(providerDiagnostics);
+    const diagnosticsProviders = objectArray(diagnosticsObject?.providers);
+    const diagnosticsAccounts = objectArray(diagnosticsObject?.accounts);
+    const liveTestsEnabled = booleanField(diagnosticsObject, ['live_tests_enabled', 'liveTestsEnabled', 'liveTests']);
+    const routingObject = asObject(diagnosticsObject?.routing);
+    const routingDefault = stringField(diagnosticsObject, ['routing_default', 'routingDefault', 'default_provider', 'defaultProvider'])
+        || stringField(routingObject, ['default_provider', 'defaultProvider'])
+        || 'unknown';
+    const configuredProvidersCount = numberField(diagnosticsObject, ['configured_providers_count', 'configuredProvidersCount']) ?? diagnosticsProviders.length;
+    const configuredAccountsCount = numberField(diagnosticsObject, ['configured_accounts_count', 'configuredAccountsCount']) ?? diagnosticsAccounts.length;
+    const quotaObject = asObject(providerQuota);
+    const quotaCountersObject = asObject(quotaObject?.counters) || quotaObject;
+    const quotaCounters = quotaCounterRows(quotaCountersObject);
+    const providerQuotaOptions = providerCatalog.length ? providerCatalog : [{ id: 'openai', displayName: 'OpenAI', display_name: 'OpenAI' } as ProviderCatalogEntry];
 
     const handleSaveKeyRef = async () => {
         if (!arcService?.setProviderKeyRef || !providerEnvVar.trim()) return;
@@ -469,6 +549,51 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                         Isolation status: {isolationStatus.message}
                     </p>
                 )}
+            </div>
+
+            <div className='arc-studio-config__section arc-studio-config__provider-cost' style={{ padding: '12px 16px', borderBottom: '1px solid var(--theia-widgetBorder)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                    <h4 style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: 'var(--theia-descriptionForeground)', textTransform: 'uppercase' }}>Provider Diagnostics & Quota</h4>
+                    <button
+                        className='arc-studio-config__provider-refresh'
+                        onClick={loadConfig}
+                        disabled={loading}
+                    >
+                        Refresh provider status
+                    </button>
+                </div>
+                <p className='arc-studio-config__paid-call-warning' style={{ margin: '8px 0', fontSize: '11px', color: 'var(--theia-editorWarning-foreground)' }}>
+                    Paid provider calls require explicit opt-in; dry-run stays providerCall:false.
+                </p>
+                <div className='arc-studio-config__provider-diagnostics' style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', fontSize: '12px' }}>
+                    <span>Live tests: <span style={{ fontFamily: 'monospace' }}>{liveTestsEnabled === null ? 'unknown' : liveTestsEnabled ? 'enabled' : 'disabled'}</span></span>
+                    <span>Routing default: <span style={{ fontFamily: 'monospace' }}>{routingDefault}</span></span>
+                    <span>Configured providers: <span style={{ fontFamily: 'monospace' }}>{configuredProvidersCount}</span></span>
+                    <span>Configured accounts: <span style={{ fontFamily: 'monospace' }}>{configuredAccountsCount}</span></span>
+                </div>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px', fontSize: '12px', maxWidth: '260px' }}>
+                    Quota provider filter
+                    <select
+                        className='arc-studio-config__quota-provider-filter'
+                        value={quotaProviderFilter}
+                        onChange={e => setQuotaProviderFilter(e.currentTarget.value)}
+                    >
+                        <option value='all'>All providers</option>
+                        {providerQuotaOptions.map(p => (
+                            <option key={p.id} value={p.id}>{p.displayName || p.display_name || p.id}</option>
+                        ))}
+                    </select>
+                </label>
+                <div className='arc-studio-config__provider-quota' style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px', fontSize: '11px' }}>
+                    {quotaCounters.length > 0 ? quotaCounters.map(row => (
+                        <span key={row.key} className='arc-studio-config__quota-row' style={{ display: 'inline-flex', gap: '6px', padding: '2px 6px', border: '1px solid var(--theia-widgetBorder)', borderRadius: '3px', fontFamily: 'monospace' }}>
+                            <span className='arc-studio-config__quota-bucket'>{row.bucket}</span>
+                            <span className='arc-studio-config__quota-scope'>{row.scope}</span>
+                            <span>{row.id}</span>
+                            <strong>{row.count}</strong>
+                        </span>
+                    )) : <span style={{ color: 'var(--theia-descriptionForeground)' }}>Quota counters unavailable.</span>}
+                </div>
             </div>
 
             {exportText && (

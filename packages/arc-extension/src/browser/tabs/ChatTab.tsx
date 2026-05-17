@@ -143,6 +143,9 @@ export const ChatTab: React.FC<ChatTabProps> = ({ arcService, onSendMessage, onN
         configStatus?.runtime.isolation,
         ...FALLBACK_ISOLATION,
     ].filter(Boolean) as string[]));
+    const showPaidCallWarning = Boolean(
+        selectedCapability?.requires_paid_calls || preflight?.paidCallRequired || allowPaidCalls,
+    );
 
     return (
         <div className='arc-studio-chat' role='region' aria-label='Chat panel'>
@@ -195,6 +198,14 @@ export const ChatTab: React.FC<ChatTabProps> = ({ arcService, onSendMessage, onN
                     <div className='arc-studio-chat__runtime-policy' aria-live='polite'>
                         Profile: {profileId} | Isolation: {isolationId} | Dry-run providerCall:false
                     </div>
+                    {showPaidCallWarning && (
+                        <div className='arc-studio-chat__paid-call-warning' role='alert'>
+                            Paid provider calls require explicit opt-in. Dry-run preflight makes no provider calls (providerCall:false).
+                            {selectedCapability?.requires_paid_calls && ' Selected runtime capability requires paid calls.'}
+                            {preflight?.paidCallRequired && ' Preflight says paid calls are required.'}
+                            {allowPaidCalls && ' Paid calls are currently enabled for the next explicit run action.'}
+                        </div>
+                    )}
                     <label className='arc-studio-chat__paid-calls'>
                         <input
                             type='checkbox'

@@ -404,6 +404,24 @@ export interface ProviderCatalogEntry {
     warnings: string[];
 }
 
+export interface ProviderDiagnosticsInfo {
+    providers?: Record<string, unknown>[];
+    routing?: Record<string, unknown>;
+    accounts?: Record<string, unknown>[];
+    status?: Record<string, unknown>;
+    warnings?: string[];
+    metadata?: Record<string, unknown>;
+}
+
+export interface ProviderQuotaInfo {
+    provider?: string;
+    accounts?: Record<string, unknown>[];
+    quota?: Record<string, unknown>;
+    counters?: Record<string, unknown>;
+    warnings?: string[];
+    metadata?: Record<string, unknown>;
+}
+
 /**
  * Request to save a provider key reference. envVar is a variable name only.
  */
@@ -1198,6 +1216,12 @@ export interface ArcService {
 
     /** List provider catalog entries. No raw credentials are returned. */
     getProviderCatalog(): Promise<ProviderCatalogEntry[]>;
+
+    /** Get provider diagnostics metadata. No credential values are returned. */
+    getProviderDiagnostics(): Promise<ProviderDiagnosticsInfo>;
+
+    /** Get provider quota/counter metadata. No credential values are returned. */
+    getProviderQuota(provider?: string): Promise<ProviderQuotaInfo>;
 
     /** Save an env-var provider key reference. Rejects raw key material. */
     setProviderKeyRef(request: ProviderKeyRefRequest): Promise<{ success: boolean; message: string }>;

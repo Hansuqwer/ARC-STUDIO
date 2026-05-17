@@ -37,6 +37,8 @@ import {
     SafeRuntimeConfig,
     TrustStatus,
     ProviderCatalogEntry,
+    ProviderDiagnosticsInfo,
+    ProviderQuotaInfo,
     ProviderKeyRefRequest,
     RunPreflightRequest,
     RunPreflightResponse,
@@ -776,6 +778,63 @@ export class ArcBackendService implements ArcService {
             })) as ProviderCatalogEntry[];
         }
         return [];
+    }
+
+    async getProviderDiagnostics(): Promise<ProviderDiagnosticsInfo> {
+        try {
+            const output = execFileSync('arc', ['providers', 'diagnostics', '--json'], {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            if (!parsed.ok) {
+                throw new ArcError(
+                    ArcErrorCode.EXECUTION_FAILED,
+                    parsed?.error?.message || 'Provider diagnostics failed',
+                    { error: parsed?.error }
+                );
+            }
+            return (parsed.data || {}) as ProviderDiagnosticsInfo;
+        } catch (error) {
+            if (error instanceof ArcError) throw error;
+            throw new ArcError(
+                ArcErrorCode.EXECUTION_FAILED,
+                `Provider diagnostics unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+        }
+    }
+
+    async getProviderQuota(provider?: string): Promise<ProviderQuotaInfo> {
+        try {
+            const args = ['providers', 'quota', 'show'];
+            if (provider) {
+                args.push('--provider', provider);
+            }
+            args.push('--json');
+            const output = execFileSync('arc', args, {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            if (!parsed.ok) {
+                throw new ArcError(
+                    ArcErrorCode.EXECUTION_FAILED,
+                    parsed?.error?.message || 'Provider quota failed',
+                    { error: parsed?.error }
+                );
+            }
+            return (parsed.data || {}) as ProviderQuotaInfo;
+        } catch (error) {
+            if (error instanceof ArcError) throw error;
+            throw new ArcError(
+                ArcErrorCode.EXECUTION_FAILED,
+                `Provider quota unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+        }
     }
 
     async setProviderKeyRef(request: ProviderKeyRefRequest): Promise<{ success: boolean; message: string }> {
