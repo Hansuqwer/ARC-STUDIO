@@ -693,6 +693,7 @@
 
 .arc-studio-swarmgraph__header,
 .arc-studio-swarmgraph__controls,
+.arc-studio-swarmgraph__live-controls,
 .arc-studio-swarmgraph__panel-header {
     display: flex;
     align-items: center;
@@ -716,6 +717,7 @@
 }
 
 .arc-studio-swarmgraph__button,
+.arc-studio-swarmgraph__input,
 .arc-studio-swarmgraph__select {
     border: 1px solid var(--theia-border-color, #ddd);
     border-radius: 4px;
@@ -726,12 +728,36 @@
 }
 
 .arc-studio-swarmgraph__button:disabled,
+.arc-studio-swarmgraph__input:disabled,
 .arc-studio-swarmgraph__select:disabled {
     opacity: 0.6;
 }
 
 .arc-studio-swarmgraph__select {
     flex: 1;
+}
+
+.arc-studio-swarmgraph__input {
+    flex: 1;
+    min-width: 180px;
+}
+
+.arc-studio-swarmgraph__live-status {
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--theia-descriptionForeground, var(--theia-ui-font-color2, #777));
+    font-size: 12px;
+}
+
+.arc-studio-swarmgraph__live-status--live {
+    border-color: var(--theia-testing-iconPassed, #2d7d46);
+}
+
+.arc-studio-swarmgraph__live-status--disconnected,
+.arc-studio-swarmgraph__live-status--degraded,
+.arc-studio-swarmgraph__live-status--error {
+    border-color: var(--theia-testing-iconQueued, #a97000);
 }
 
 .arc-studio-swarmgraph__grid {

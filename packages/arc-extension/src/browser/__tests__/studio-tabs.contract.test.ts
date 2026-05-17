@@ -659,5 +659,13 @@ describe('Studio Tabs Contracts', () => {
             expect(insightSource).not.toMatch(/fake\/offline/i);
             expect(insightSource).not.toMatch(/crewai\+swarmgraph/);
         });
+
+        it('should expose honest live-aware controls backed by streamActiveTrace', () => {
+            expect(insightSource).toMatch(/arcService\.streamActiveTrace\(\{ runId, mode: 'live' \}\)/);
+            expect(insightSource).toMatch(/buildActiveTrace/);
+            expect(insightSource).toMatch(/Live insight:/);
+            expect(insightSource).toMatch(/disconnected\/degraded/);
+            expect(insightSource).toMatch(/No real-live backend claim/);
+        });
     });
 });

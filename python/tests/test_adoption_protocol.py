@@ -321,6 +321,86 @@ class TestLangGraphRunner:
         result = await runner.run(spec, "run-custom", lambda *a: None)
         assert "echo: test-input" in result.winning_proposal.output
 
+    @pytest.mark.asyncio
+    async def test_runner_emits_swarmgraph_topology_consensus_without_cost(self, monkeypatch):
+        from agent_runtime_cockpit.adoption.langgraph_runner import (
+            LangGraphAdoptionRunner,
+        )
+
+        class _Graph:
+            ainvoke = None
+
+            def invoke(self, input_data):
+                return {"answer": input_data["swarmgraph_task"]}
+
+        runner = LangGraphAdoptionRunner()
+
+        def fake_decompose(objective, graph_input, max_workers, run_id):
+            return ([
+                {
+                    "task_id": "task-1",
+                    "worker_id": "worker-1",
+                    "role": "analyst",
+                    "input": {**graph_input, "swarmgraph_task": "analyze"},
+                },
+                {
+                    "task_id": "task-2",
+                    "worker_id": "worker-2",
+                    "role": "reviewer",
+                    "input": {**graph_input, "swarmgraph_task": "review"},
+                },
+            ], object())
+
+        monkeypatch.setattr(runner, "_queen_decompose", fake_decompose)
+
+        def fake_consensus(swarm_state, proposals):
+            return ConsensusResult(
+                task_id=proposals[0].task_id,
+                winning_proposal=proposals[0],
+                votes=[
+                    Vote(
+                        task_id=proposal.task_id,
+                        voter_id=proposal.worker_id,
+                        proposal_id=f"{proposal.task_id}-{proposal.worker_id}",
+                        score=proposal.confidence,
+                        reason="test vote",
+                    )
+                    for proposal in proposals
+                ],
+                consensus_reached=True,
+                confidence=1.0,
+            )
+
+        monkeypatch.setattr(runner, "_swarmgraph_consensus", fake_consensus)
+
+        events: list[tuple[str, dict]] = []
+        result = await runner.run(
+            AdoptionSpec(
+                mode=AdoptionMode.LANGGRAPH,
+                runtime_config={"graph": _Graph(), "input": {"topic": "x"}},
+                max_workers=2,
+            ),
+            "lg-sg-run",
+            lambda run_id, event_type, data: events.append((event_type, data)),
+        )
+
+        topology = [data for event_type, data in events if event_type == "SWARMGRAPH_TOPOLOGY"]
+        consensus = [data for event_type, data in events if event_type == "SWARMGRAPH_CONSENSUS"]
+
+        assert result.consensus_reached is True
+        assert len(topology) == 1
+        assert len(topology[0]["nodes"]) == 3
+        assert {node["id"] for node in topology[0]["nodes"]} == {"queen", "worker-1", "worker-2"}
+        assert topology[0]["edges"] == [
+            {"source": "queen", "target": "worker-1", "type": "assignment"},
+            {"source": "queen", "target": "worker-2", "type": "assignment"},
+        ]
+        assert len(consensus) == 1
+        assert len(consensus[0]["votes"]) == 2
+        assert {vote["voter_id"] for vote in consensus[0]["votes"]} == {"worker-1", "worker-2"}
+        assert consensus[0]["consensus_reached"] is True
+        assert "SWARMGRAPH_COST" not in [event_type for event_type, data in events]
+
 
 class TestAG2Runner:
     @pytest.mark.asyncio

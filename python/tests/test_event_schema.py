@@ -40,6 +40,10 @@ class TestEventTypeRegistry:
         for ev in ("STATE_SNAPSHOT", "RAW", "CUSTOM"):
             assert ev in EVENT_TYPES
 
+    def test_registry_contains_swarmgraph_insight_events(self):
+        for ev in ("SWARMGRAPH_TOPOLOGY", "SWARMGRAPH_CONSENSUS", "SWARMGRAPH_COST"):
+            assert ev in EVENT_TYPES
+
     def test_registry_contains_hitl_events(self):
         for ev in ("HITL_PROMPT", "HITL_RESPONSE", "HITL_TIMEOUT"):
             assert ev in EVENT_TYPES
@@ -95,6 +99,16 @@ class TestValidateEventData:
         errors = validate_event_data("HANDOFF", {"from_agent": "a"})
         assert len(errors) >= 1
         assert "to_agent" in errors[0]
+
+    def test_swarmgraph_topology_requires_nodes_and_edges(self):
+        errors = validate_event_data("SWARMGRAPH_TOPOLOGY", {"nodes": []})
+        assert len(errors) >= 1
+        assert "edges" in errors[0]
+
+    def test_swarmgraph_consensus_requires_votes(self):
+        errors = validate_event_data("SWARMGRAPH_CONSENSUS", {"decision": "approve"})
+        assert len(errors) >= 1
+        assert "votes" in errors[0]
 
 
 class TestCreateEvent:
@@ -186,6 +200,57 @@ class TestCreateEvent:
         assert ev.data["node_id"] == "n1"
         assert ev.data["message_id"] == "m1"
         assert ev.data["tool_call_id"] == "t1"
+
+    def test_swarmgraph_topology_event_accepts_nodes_and_edges(self):
+        ev = create_event("run-1", 11, "SWARMGRAPH_TOPOLOGY", {
+            "nodes": [{"id": "queen", "label": "Queen"}],
+            "edges": [{"source": "queen", "target": "worker-1"}],
+        })
+        assert ev.type == "SWARMGRAPH_TOPOLOGY"
+        assert ev.data["nodes"][0]["id"] == "queen"
+        assert ev.data["edges"][0]["target"] == "worker-1"
+
+    def test_swarmgraph_consensus_event_accepts_votes_and_metadata(self):
+        ev = create_event("run-1", 12, "SWARMGRAPH_CONSENSUS", {
+            "votes": [{"voter": "worker-1", "vote": "approve"}],
+            "decision": "approve",
+            "strategy": "majority",
+            "voters": ["worker-1"],
+            "confidence": 0.9,
+            "consensus_reached": True,
+            "task_id": "task-1",
+        })
+        assert ev.type == "SWARMGRAPH_CONSENSUS"
+        assert ev.data["votes"][0]["vote"] == "approve"
+        assert ev.data["consensus_reached"] is True
+
+    def test_swarmgraph_cost_event_accepts_measured_optional_fields(self):
+        ev = create_event("run-1", 13, "SWARMGRAPH_COST", {
+            "totalCost": 0.012,
+            "totalTokens": 1200,
+            "currency": "USD",
+            "items": [{"provider": "openai", "tokens": 1200, "cost": 0.012}],
+            "provider": "openai",
+            "runtime": "swarmgraph",
+        })
+        assert ev.type == "SWARMGRAPH_COST"
+        assert ev.data["totalCost"] == 0.012
+        assert ev.data["totalTokens"] == 1200
+
+    def test_swarmgraph_cost_event_allows_empty_payload(self):
+        ev = create_event("run-1", 14, "SWARMGRAPH_COST", {})
+        assert ev.type == "SWARMGRAPH_COST"
+        assert ev.data == {}
+
+    def test_swarmgraph_topology_event_rejects_missing_edges(self):
+        import pytest
+        with pytest.raises(ValueError, match="required"):
+            create_event("run-1", 15, "SWARMGRAPH_TOPOLOGY", {"nodes": []})
+
+    def test_swarmgraph_consensus_event_rejects_missing_votes(self):
+        import pytest
+        with pytest.raises(ValueError, match="required"):
+            create_event("run-1", 16, "SWARMGRAPH_CONSENSUS", {"decision": "approve"})
 
 
 class TestRunEventSchemaVersion:

@@ -148,6 +148,7 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             max_workers=max_workers,
             run_id=run_id,
         )
+        emit_event(run_id, "SWARMGRAPH_TOPOLOGY", self._topology_payload(tasks))
         emit_event(run_id, "STEP_COMPLETED", {
             "step": "queen_plan",
             "num_tasks": len(tasks),
@@ -187,6 +188,7 @@ class LangGraphAdoptionRunner(AdoptionRunner):
         })
 
         result = self._swarmgraph_consensus(swarm_state, worker_proposals)
+        emit_event(run_id, "SWARMGRAPH_CONSENSUS", self._consensus_payload(result))
 
         emit_event(run_id, "STEP_COMPLETED", {
             "step": "consensus",
@@ -203,6 +205,34 @@ class LangGraphAdoptionRunner(AdoptionRunner):
         })
 
         return result
+
+    def _topology_payload(self, tasks: list[dict[str, Any]]) -> dict[str, Any]:
+        nodes = [{"id": "queen", "role": "queen", "label": "SwarmGraph Queen"}]
+        edges: list[dict[str, str]] = []
+        seen_workers: set[str] = set()
+        for task in tasks:
+            worker_id = str(task["worker_id"])
+            if worker_id not in seen_workers:
+                seen_workers.add(worker_id)
+                nodes.append({
+                    "id": worker_id,
+                    "role": str(task.get("role") or "worker"),
+                    "label": worker_id,
+                })
+                edges.append({"source": "queen", "target": worker_id, "type": "assignment"})
+        return {"nodes": nodes, "edges": edges, "source": "langgraph+swarmgraph"}
+
+    def _consensus_payload(self, result: ConsensusResult) -> dict[str, Any]:
+        return {
+            "task_id": result.task_id,
+            "consensus_reached": result.consensus_reached,
+            "confidence": result.confidence,
+            "winning_proposal_id": (
+                f"{result.winning_proposal.task_id}-{result.winning_proposal.worker_id}"
+            ),
+            "votes": [vote.model_dump() for vote in result.votes],
+            "source": "langgraph+swarmgraph",
+        }
 
     def _queen_decompose(
         self,

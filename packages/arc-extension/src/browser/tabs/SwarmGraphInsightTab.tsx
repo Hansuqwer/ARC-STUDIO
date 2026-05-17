@@ -5,7 +5,7 @@
  */
 
 import * as React from '@theia/core/shared/react';
-import type { ArcService, TraceFile } from '../../common/arc-protocol';
+import type { ActiveTraceEventChunk, ArcService, TraceData, TraceEvent, TraceFile } from '../../common/arc-protocol';
 import {
     buildSwarmGraphInsight,
     type SwarmGraphConsensusInsight,
@@ -50,6 +50,43 @@ const Panel: React.FC<React.PropsWithChildren<{ title: string; status: SwarmGrap
         {children}
     </section>
 );
+
+type LiveInsightState = 'idle' | 'connecting' | 'live' | 'disconnected' | 'degraded' | 'error';
+
+function isTraceEvent(value: ActiveTraceEventChunk['event']): value is TraceEvent {
+    return Boolean(value && typeof value === 'object' && 'type' in value && 'timestamp' in value);
+}
+
+function liveStateCopy(state: LiveInsightState, count: number): string {
+    if (state === 'connecting') {
+        return 'connecting to active trace stream';
+    }
+    if (state === 'live') {
+        return `live stream connected; ${count} active event${count === 1 ? '' : 's'} appended in memory`;
+    }
+    if (state === 'disconnected') {
+        return `live stream disconnected; showing ${count} captured active event${count === 1 ? '' : 's'}`;
+    }
+    if (state === 'degraded') {
+        return 'live stream unavailable/degraded; stored trace flow still works';
+    }
+    if (state === 'error') {
+        return 'live stream error; stored trace flow still works';
+    }
+    return 'stored trace mode';
+}
+
+function buildActiveTrace(runId: string, events: TraceEvent[]): TraceData {
+    return {
+        id: runId,
+        workflowId: runId,
+        runtime: 'active',
+        status: 'running',
+        startedAt: events[0]?.timestamp ?? new Date(0).toISOString(),
+        events,
+        metadata: {},
+    };
+}
 
 const TopologyPanel: React.FC<{ topology: SwarmGraphTopologyInsight }> = ({ topology }) => (
     <Panel title='Topology' status={topology.status}>
@@ -117,6 +154,10 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
     const [loadingTrace, setLoadingTrace] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const [insight, setInsight] = React.useState(buildSwarmGraphInsight(null));
+    const [liveRunId, setLiveRunId] = React.useState('');
+    const [liveState, setLiveState] = React.useState<LiveInsightState>('idle');
+    const [liveEvents, setLiveEvents] = React.useState<TraceEvent[]>([]);
+    const streamCancelled = React.useRef(false);
 
     const loadTraces = React.useCallback(async () => {
         setLoadingTraces(true);
@@ -166,6 +207,49 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
         };
     }, [arcService, selectedTraceId]);
 
+    const connectLiveStream = React.useCallback(async () => {
+        const runId = liveRunId.trim();
+        if (!runId) {
+            setLiveState('degraded');
+            return;
+        }
+        streamCancelled.current = false;
+        setLiveEvents([]);
+        setLiveState('connecting');
+        setError(null);
+        try {
+            const stream = await arcService.streamActiveTrace({ runId, mode: 'live' });
+            setLiveState('live');
+            for await (const chunk of stream) {
+                if (streamCancelled.current) {
+                    return;
+                }
+                if (isTraceEvent(chunk.event)) {
+                    setLiveEvents(current => {
+                        const next = [...current, chunk.event as TraceEvent];
+                        setInsight(buildSwarmGraphInsight(buildActiveTrace(runId, next)));
+                        return next;
+                    });
+                }
+                if (chunk.done) {
+                    setLiveState('disconnected');
+                    return;
+                }
+            }
+            setLiveState('disconnected');
+        } catch (streamError) {
+            if (!streamCancelled.current) {
+                setLiveState('error');
+                setError(errorMessage(streamError));
+            }
+        }
+    }, [arcService, liveRunId]);
+
+    const disconnectLiveStream = React.useCallback(() => {
+        streamCancelled.current = true;
+        setLiveState(current => current === 'live' || current === 'connecting' ? 'disconnected' : current);
+    }, []);
+
     return (
         <div className='arc-studio-swarmgraph' role='region' aria-label='SwarmGraph insight panel'>
             <div className='arc-studio-swarmgraph__header'>
@@ -184,6 +268,15 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
                         <option value={trace.id} key={trace.id}>{trace.id} - {trace.status} - {formatTime(trace.timestamp)}</option>
                     ))}
                 </select>
+            </div>
+            <div className='arc-studio-swarmgraph__live-controls'>
+                <label htmlFor='arc-swarmgraph-live-run'>Optional active run ID</label>
+                <input id='arc-swarmgraph-live-run' className='arc-studio-swarmgraph__input' value={liveRunId} onChange={event => setLiveRunId(event.currentTarget.value)} placeholder='run id for live/degraded stream probe' />
+                <button className='arc-studio-swarmgraph__button' onClick={connectLiveStream} disabled={liveState === 'connecting' || liveState === 'live'}>Connect live</button>
+                <button className='arc-studio-swarmgraph__button' onClick={disconnectLiveStream} disabled={liveState !== 'connecting' && liveState !== 'live'}>Disconnect</button>
+            </div>
+            <div className={`arc-studio-swarmgraph__live-status arc-studio-swarmgraph__live-status--${liveState}`}>
+                Live insight: {liveStateCopy(liveState, liveEvents.length)}. No real-live backend claim; disconnected/degraded states are expected when active stream wiring is unavailable.
             </div>
             {error && <div className='arc-studio-swarmgraph__error' role='alert'>{error}</div>}
             {loadingTrace && <div className='arc-studio-swarmgraph__loading'>Loading trace...</div>}

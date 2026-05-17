@@ -158,6 +158,25 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         optional_fields={"redacted", "node_id"},
     ),
 
+    # ── SwarmGraph insight ───────────────────────────────────────────────
+    "SWARMGRAPH_TOPOLOGY": EventTypeDef(
+        required_fields={"nodes", "edges"},
+        optional_fields={"task_id", "strategy", "node_id", "message_id", "evidence_refs"},
+    ),
+    "SWARMGRAPH_CONSENSUS": EventTypeDef(
+        required_fields={"votes"},
+        optional_fields={
+            "decision", "strategy", "voters", "confidence", "consensus_reached", "task_id",
+            "node_id", "message_id", "evidence_refs",
+        },
+    ),
+    "SWARMGRAPH_COST": EventTypeDef(
+        optional_fields={
+            "totalCost", "totalTokens", "currency", "items", "provider", "runtime",
+            "node_id", "message_id", "evidence_refs",
+        },
+    ),
+
     # ── Human-in-the-loop ────────────────────────────────────────────────
     "HITL_PROMPT": EventTypeDef(
         required_fields={"hitl_id", "step_id", "prompt_text", "options", "timeout_seconds"},

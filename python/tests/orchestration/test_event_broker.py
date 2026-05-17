@@ -63,6 +63,45 @@ class TestPublishSubscribe:
         assert q1.get_nowait()["type"] == "EVENT"
         assert q2.get_nowait()["type"] == "EVENT"
 
+    def test_publish_accepts_sg_event_types(self, broker: EventBroker):
+        queue = broker.subscribe("run-sg")
+        broker.publish("run-sg", {
+            "type": "SWARMGRAPH_TOPOLOGY",
+            "data": {
+                "nodes": [{"id": "queen", "label": "Queen"}],
+                "edges": [{"source": "queen", "target": "worker-1"}],
+            },
+        })
+        broker.publish("run-sg", {
+            "type": "SWARMGRAPH_CONSENSUS",
+            "data": {
+                "votes": [{"voter": "worker-1", "vote": "approve"}],
+                "decision": "approve",
+                "strategy": "majority",
+                "voters": ["worker-1"],
+                "confidence": 0.9,
+                "consensus_reached": True,
+                "task_id": "task-1",
+            },
+        })
+        broker.publish("run-sg", {
+            "type": "SWARMGRAPH_COST",
+            "data": {
+                "totalCost": 0.012,
+                "totalTokens": 1200,
+                "currency": "USD",
+                "items": [{"provider": "stub", "tokens": 1200, "cost": 0.012}],
+                "provider": "stub",
+                "runtime": "swarmgraph",
+            },
+        })
+
+        assert [queue.get_nowait()["type"] for _ in range(3)] == [
+            "SWARMGRAPH_TOPOLOGY",
+            "SWARMGRAPH_CONSENSUS",
+            "SWARMGRAPH_COST",
+        ]
+
     def test_end_run_clears_subscribers(self, broker: EventBroker):
         broker.subscribe("run-001")
         broker.end_run("run-001")
@@ -180,6 +219,61 @@ class TestReplay:
 
         assert [event["type"] for event in replayed] == ["RUN_STARTED", "RUN_COMPLETED"]
         assert [event["event_id"] for event in replayed] == [1, 2]
+
+    @pytest.mark.asyncio
+    async def test_replay_stored_run_record_sg_events(self, tmp_path: Path):
+        from datetime import datetime, timezone
+        from agent_runtime_cockpit.protocol.events import create_event
+        from agent_runtime_cockpit.protocol.schemas import RunRecord, RunStatus
+
+        store = JsonlTraceStore(base_dir=tmp_path / "traces")
+        now = datetime.now(timezone.utc).isoformat()
+        run = RunRecord(
+            id="sg-record-run",
+            workflow_id="wf",
+            runtime="swarmgraph",
+            status=RunStatus.COMPLETED,
+            started_at=now,
+            ended_at=now,
+            events=[
+                create_event("sg-record-run", 0, "SWARMGRAPH_TOPOLOGY", {
+                    "nodes": [{"id": "queen", "label": "Queen"}],
+                    "edges": [{"source": "queen", "target": "worker-1"}],
+                }),
+                create_event("sg-record-run", 1, "SWARMGRAPH_CONSENSUS", {
+                    "votes": [{"voter": "worker-1", "vote": "approve"}],
+                    "decision": "approve",
+                    "strategy": "majority",
+                    "voters": ["worker-1"],
+                    "confidence": 0.9,
+                    "consensus_reached": True,
+                    "task_id": "task-1",
+                }),
+                create_event("sg-record-run", 2, "SWARMGRAPH_COST", {
+                    "totalCost": 0.012,
+                    "totalTokens": 1200,
+                    "currency": "USD",
+                    "items": [{"provider": "stub", "tokens": 1200, "cost": 0.012}],
+                    "provider": "stub",
+                    "runtime": "swarmgraph",
+                }),
+            ],
+        )
+        store.save(run)
+
+        broker = EventBroker(store=store)
+        replayed: list[dict] = []
+        async for event in broker._replay_stored("sg-record-run"):
+            replayed.append(event)
+
+        assert [event["type"] for event in replayed] == [
+            "SWARMGRAPH_TOPOLOGY",
+            "SWARMGRAPH_CONSENSUS",
+            "SWARMGRAPH_COST",
+        ]
+        assert replayed[0]["data"]["nodes"][0]["id"] == "queen"
+        assert replayed[1]["data"]["votes"][0]["vote"] == "approve"
+        assert replayed[2]["data"]["totalCost"] == 0.012
 
     @pytest.mark.asyncio
     async def test_replay_from_event_id(self, tmp_path: Path):

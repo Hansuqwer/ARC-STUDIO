@@ -91,7 +91,7 @@
 
 **Goal:** Expose real SwarmGraph concepts only when backed by real events/data.
 
-**Current:** Baseline IDE SwarmGraph Insight tab exists. It reads stored traces, shows empty/degraded topology/consensus/cost panels, and renders present sections only from explicit SwarmGraph insight trace events. It does not promote fake/offline metadata to real topology/consensus/cost.
+**Current:** Baseline IDE SwarmGraph Insight tab exists. Python has SwarmGraph topology/consensus/cost event schemas, and the LangGraph + SwarmGraph path now emits topology and consensus/vote events when that path runs. No cost producer exists yet, so cost panels remain empty/degraded unless measured cost events are present. The UI is live-aware through `streamActiveTrace()` and can consume explicit SwarmGraph insight events, but backend live SSE remains limited/degraded until the future Python web-base-url wiring is completed.
 
 **Deliverables:**
 - Trace-derived topology view for runs with topology events.
@@ -144,6 +144,6 @@
 | R2 IDE Runtime Setup | Partial | Adapter readiness actions + export-target helpers |
 | R3 Provider/Quota UI | Not started | Provider diagnostics panel scaffold |
 | R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
-| R5 SwarmGraph Insight | Complete baseline | Future real-runtime emitters for richer topology/votes/cost events |
+| R5 SwarmGraph Insight | Complete baseline + first producer events | Add measured cost producer and complete backend live SSE wiring before live-runtime claims |
 | R6 Real Adoption | Deferred | LangGraph + SwarmGraph narrow real path spike |
 | R7 Release Ops | Partial | Refresh checklist evidence; `.env` scrub remains gated |

@@ -103,6 +103,22 @@ describe('buildSwarmGraphInsight', () => {
         expect(insight.cost.items).toEqual([{ node: 'queen', cost: 0.2 }]);
     });
 
+    it('extracts insight from appended active stream events in a synthetic trace', () => {
+        const insight = buildSwarmGraphInsight(trace({
+            id: 'run-live-1',
+            status: 'running',
+            events: [
+                event('SWARMGRAPH_TOPOLOGY', { nodes: [{ id: 'queen' }] }),
+                event('SWARMGRAPH_CONSENSUS', { decision: 'accept', voters: ['queen'] }),
+            ],
+        }));
+
+        expect(insight.status).toBe('present');
+        expect(insight.topology.nodes).toEqual([{ id: 'queen', label: undefined, role: undefined }]);
+        expect(insight.consensus.decision).toBe('accept');
+        expect(insight.cost.status).toBe('empty');
+    });
+
     it('ignores fake/offline consensus metadata', () => {
         const insight = buildSwarmGraphInsight(trace({
             runtime: 'crewai+swarmgraph',

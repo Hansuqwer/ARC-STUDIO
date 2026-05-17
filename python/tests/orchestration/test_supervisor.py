@@ -20,6 +20,7 @@ from agent_runtime_cockpit.orchestration.event_broker import EventBroker
 from agent_runtime_cockpit.audit.hitl import HitlDecision, HitlPrompt, HitlResponse
 from agent_runtime_cockpit.security.trust import WorkspaceUntrusted, trust_workspace
 from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
+from agent_runtime_cockpit.protocol.events import create_event
 from agent_runtime_cockpit.protocol.schemas import RunStatus
 from agent_runtime_cockpit.protocol.evidence_refs import EvidenceKind, EvidenceRef
 
@@ -292,6 +293,77 @@ class TestBrokerIntegration:
         assert "RUN_STARTED" in types, f"Got types: {types}"
         assert "STEP_STARTED" in types, f"Got types: {types}"
         assert "RUN_COMPLETED" in types, f"Got types: {types}"
+
+    @pytest.mark.asyncio
+    async def test_sg_events_are_created_stored_and_published(self, supervisor: JobSupervisor):
+        queue_by_run: dict[str, asyncio.Queue] = {}
+
+        async def fake_executor(run_id, req, emit_event):
+            queue_by_run[run_id] = supervisor.broker.subscribe(run_id)
+            for sequence, event_type, data in [
+                (
+                    2,
+                    "SWARMGRAPH_TOPOLOGY",
+                    {
+                        "nodes": [{"id": "queen", "label": "Queen"}],
+                        "edges": [{"source": "queen", "target": "worker-1"}],
+                    },
+                ),
+                (
+                    3,
+                    "SWARMGRAPH_CONSENSUS",
+                    {
+                        "votes": [{"voter": "worker-1", "vote": "approve"}],
+                        "decision": "approve",
+                        "strategy": "majority",
+                        "voters": ["worker-1"],
+                        "confidence": 0.9,
+                        "consensus_reached": True,
+                        "task_id": "task-1",
+                    },
+                ),
+                (
+                    4,
+                    "SWARMGRAPH_COST",
+                    {
+                        "totalCost": 0.012,
+                        "totalTokens": 1200,
+                        "currency": "USD",
+                        "items": [{"provider": "stub", "tokens": 1200, "cost": 0.012}],
+                        "provider": "stub",
+                        "runtime": "swarmgraph",
+                    },
+                ),
+            ]:
+                create_event(run_id, sequence, event_type, data)
+                emit_event(run_id, event_type, data)
+
+        run = await supervisor.start_run(_make_request(), fake_executor)
+        await asyncio.sleep(0.2)
+
+        loaded = supervisor.store.load(run.id)
+        assert loaded is not None
+        sg_events = [event for event in loaded.events if event.type.startswith("SWARMGRAPH_")]
+        assert [event.type for event in sg_events] == [
+            "SWARMGRAPH_TOPOLOGY",
+            "SWARMGRAPH_CONSENSUS",
+            "SWARMGRAPH_COST",
+        ]
+        assert sg_events[0].data["nodes"][0]["id"] == "queen"
+        assert sg_events[1].data["votes"][0]["vote"] == "approve"
+        assert sg_events[2].data["totalCost"] == 0.012
+
+        queue = queue_by_run[run.id]
+        published = []
+        while not queue.empty():
+            event = queue.get_nowait()
+            if event is not None and event["type"].startswith("SWARMGRAPH_"):
+                published.append(event)
+        assert [event["type"] for event in published] == [
+            "SWARMGRAPH_TOPOLOGY",
+            "SWARMGRAPH_CONSENSUS",
+            "SWARMGRAPH_COST",
+        ]
 
 
 class TestHitlFlow:

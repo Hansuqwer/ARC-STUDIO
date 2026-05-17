@@ -140,20 +140,20 @@ git status --short
 ## Phase 5 — SwarmGraph Insight Baseline
 
 **Roadmap:** R5  
-**Status:** Complete baseline
+**Status:** Complete baseline + first producer-backed topology/consensus events
 
 ### Chunk 5.1 — Event Contract Inventory
 - Identify current trace/adoption events that can support topology/consensus/cost.
 - Add missing event types only if producer exists or tests define empty state.
-- Status: Complete baseline — no producer-backed rich schema exists yet; protocol now accepts runtime-specific trace event names without inventing a fixed SG schema.
+- Status: Complete — Python SwarmGraph topology/consensus/cost event schemas exist. LangGraph + SwarmGraph emits topology and consensus/vote events; no fabricated cost producer exists.
 
 ### Chunk 5.2 — Empty-State Panels
 - Add topology/consensus/cost panels that honestly show “no event-backed data”.
-- Status: Complete — SwarmGraph Insight tab includes trace selector plus empty/degraded topology, consensus, and cost panels.
+- Status: Complete — SwarmGraph Insight tab includes trace selector plus empty/degraded topology, consensus, and cost panels, and is live-aware through `streamActiveTrace()`.
 
 ### Chunk 5.3 — Event-Backed Rendering
 - Render topology/votes/cost only from real trace events.
-- Status: Complete baseline — pure extractors render only explicit SwarmGraph topology/consensus/cost trace events; fake/offline metadata is ignored.
+- Status: Complete baseline — pure extractors render only explicit SwarmGraph topology/consensus/cost trace events; fake/offline metadata is ignored. LangGraph + SwarmGraph can now supply topology and consensus/vote events, while cost remains absent unless a measured cost event is produced. Backend live SSE is still not complete beyond the existing degraded/disconnected behavior.
 
 ## Phase 6 — Narrow Real Adoption Path
 
@@ -196,6 +196,6 @@ git status --short
 | 2 Runtime Setup UI | Partial | config/profile CLI | Safe ConfigTab baseline in place; remediation wizard/helpers remain |
 | 3 Provider/Quota UI | Not started | provider CLI | Must remain gated/offline by default |
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
-| 5 SwarmGraph Insight | Complete baseline | event-backed adoption data | Empty/degraded panels and explicit-event rendering only |
+| 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; live-aware UI with backend live SSE still degraded/disconnected |
 | 6 Real Adoption | Deferred | adoption protocol | Narrow first target only |
 | 7 Release Ops | Partial | green CI | `.env` scrub gated |
