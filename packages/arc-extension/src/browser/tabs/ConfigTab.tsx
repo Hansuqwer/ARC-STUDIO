@@ -10,7 +10,16 @@ import * as React from '@theia/core/shared/react';
 import { useState, useEffect, useCallback } from '@theia/core/shared/react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
-import { ArcService, ConfigStatus, ProviderCatalogEntry, SafeConfigUpdate, SafeProviderKeyStatus, RuntimeCapabilityReport, RuntimeCapabilitiesResponse } from '../../common/arc-protocol';
+import {
+    ArcProfileInfo,
+    ArcService,
+    ConfigStatus,
+    IsolationProviderInfo,
+    IsolationStatus,
+    ProviderCatalogEntry,
+    SafeConfigUpdate,
+    RuntimeCapabilityReport,
+} from '../../common/arc-protocol';
 
 export interface ConfigTabProps {
     arcService?: ArcService;
@@ -32,9 +41,16 @@ const MODE_OPTIONS = [
     { value: 'auto' as const, label: 'Auto', description: 'policy-driven' },
 ];
 
-const ISOLATION_OPTIONS = ['none', 'subprocess', 'docker'];
+const FALLBACK_ISOLATION_OPTIONS: IsolationProviderInfo[] = [
+    { id: 'none', name: 'None', available: true },
+    { id: 'subprocess', name: 'Subprocess', available: true },
+    { id: 'docker', name: 'Docker', available: false, reason: 'status unknown' },
+];
 
-const PROFILE_OPTIONS = ['local-safe', 'local-paid'];
+const FALLBACK_PROFILE_OPTIONS: ArcProfileInfo[] = [
+    { id: 'local-safe', name: 'local-safe', allowPaidCalls: false, dryRun: true },
+    { id: 'local-paid', name: 'local-paid', allowPaidCalls: true, dryRun: false },
+];
 
 const PROVIDER_DISPLAY: Record<string, string> = {
     openai: 'OpenAI',
@@ -80,6 +96,10 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
     const [allowPaidCalls, setAllowPaidCalls] = useState(false);
     const [capabilities, setCapabilities] = useState<RuntimeCapabilityReport[] | null>(null);
     const [capabilitiesLoading, setCapabilitiesLoading] = useState(false);
+    const [profiles, setProfiles] = useState<ArcProfileInfo[]>(FALLBACK_PROFILE_OPTIONS);
+    const [isolationStatus, setIsolationStatus] = useState<IsolationStatus | null>(null);
+    const [isolationProviders, setIsolationProviders] = useState<IsolationProviderInfo[]>(FALLBACK_ISOLATION_OPTIONS);
+    const [exportText, setExportText] = useState<string | null>(null);
 
     const loadConfig = useCallback(async () => {
         if (!arcService) {
@@ -104,6 +124,25 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     setProviderEnvVar(catalog[0].envKeyNames?.[0] || catalog[0].env_key_names?.[0] || '');
                 }
             }
+            if (arcService.listProfiles) {
+                const loadedProfiles = await arcService.listProfiles();
+                if (loadedProfiles.length > 0) {
+                    setProfiles(loadedProfiles);
+                    const current = loadedProfiles.find(profile => profile.id === selectedProfile) || loadedProfiles[0];
+                    setSelectedProfile(current.id);
+                }
+            }
+            if (arcService.getIsolationStatus) {
+                const status = await arcService.getIsolationStatus();
+                setIsolationStatus(status);
+                setSelectedIsolation(status.current || status.providers?.find(provider => provider.active)?.id || status.providers?.[0]?.id || 'none');
+            }
+            if (arcService.listIsolationProviders) {
+                const providers = await arcService.listIsolationProviders();
+                if (providers.length > 0) {
+                    setIsolationProviders(providers);
+                }
+            }
             // Load runtime capabilities for disabled states
             setCapabilitiesLoading(true);
             if (arcService.listRuntimeCapabilities) {
@@ -120,7 +159,38 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
         } finally {
             setLoading(false);
         }
-    }, [arcService]);
+    }, [arcService, selectedProfile]);
+
+    const buildSafeExport = useCallback((): string => {
+        const safeSnapshot = {
+            runtime: {
+                defaultRuntime: selectedRuntime,
+                mode: selectedMode,
+                isolation: selectedIsolation,
+                dryRun,
+                allowPaidCalls: dryRun ? false : allowPaidCalls,
+            },
+            selectedProfile,
+            providers: config?.providers.map(provider => ({
+                provider: provider.provider,
+                configured: provider.configured,
+                source: provider.source,
+                defaultModel: provider.defaultModel,
+                envOverride: provider.envOverride,
+            })) ?? [],
+            isolation: isolationStatus ? {
+                current: isolationStatus.current,
+                available: isolationStatus.available,
+                providers: isolationProviders.map(provider => ({
+                    id: provider.id,
+                    available: provider.available,
+                    active: provider.active,
+                    reason: provider.reason,
+                })),
+            } : null,
+        };
+        return JSON.stringify(safeSnapshot, null, 2);
+    }, [allowPaidCalls, config?.providers, dryRun, isolationProviders, isolationStatus, selectedIsolation, selectedMode, selectedProfile, selectedRuntime]);
 
     useEffect(() => {
         loadConfig();
@@ -231,6 +301,14 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                 >
                     {saving ? 'Saving...' : 'Save'}
                 </button>
+                <button
+                    className='arc-studio-config__export-safe'
+                    onClick={() => setExportText(buildSafeExport())}
+                    aria-label='Export safe configuration snapshot'
+                    style={{ padding: '4px 12px', fontSize: '12px', marginLeft: '8px' }}
+                >
+                    Export safe snapshot
+                </button>
             </div>
 
             {saveMessage && (
@@ -340,7 +418,11 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                             value={selectedIsolation}
                             onChange={e => setSelectedIsolation(e.currentTarget.value)}
                         >
-                            {ISOLATION_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                            {isolationProviders.map(provider => (
+                                <option key={provider.id} value={provider.id} disabled={!provider.available}>
+                                    {provider.name || provider.id}{provider.available ? '' : ` — ${provider.reason || 'unavailable'}`}
+                                </option>
+                            ))}
                         </select>
                     </label>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -350,7 +432,11 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                             value={selectedProfile}
                             onChange={e => setSelectedProfile(e.currentTarget.value)}
                         >
-                            {PROFILE_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                            {profiles.map(profile => (
+                                <option key={profile.id} value={profile.id}>
+                                    {profile.name || profile.id}{profile.dryRun ? ' — dry-run' : ''}{profile.allowPaidCalls ? ' — paid allowed' : ''}
+                                </option>
+                            ))}
                         </select>
                     </label>
                     <label className='arc-studio-config__dry-run-toggle' style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -376,9 +462,24 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     </label>
                 </div>
                 <p className='arc-studio-config__run-policy-note' style={{ margin: '8px 0 0', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
-                    Dry-run saves force paid calls off; profile is a local selector until protocol persistence exists; provider auth remains env-var references only.
+                    Dry-run saves force paid calls off; profile selection follows backend profile inventory but is not persisted by this safe config update; provider auth remains env-var references only.
                 </p>
+                {isolationStatus?.message && (
+                    <p className='arc-studio-config__isolation-message' style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
+                        Isolation status: {isolationStatus.message}
+                    </p>
+                )}
             </div>
+
+            {exportText && (
+                <div className='arc-studio-config__section arc-studio-config__safe-export' style={{ padding: '12px 16px', borderBottom: '1px solid var(--theia-widgetBorder)' }}>
+                    <h4 style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 600, color: 'var(--theia-descriptionForeground)', textTransform: 'uppercase' }}>Safe Config Snapshot</h4>
+                    <p style={{ margin: '0 0 8px', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
+                        Copy-safe JSON. Contains status/source metadata only; no raw credentials.
+                    </p>
+                    <pre className='arc-studio-config__safe-export-json' style={{ maxHeight: '220px', overflow: 'auto', fontSize: '11px' }}>{exportText}</pre>
+                </div>
+            )}
 
             <div className='arc-studio-config__section' style={{ padding: '12px 16px', borderBottom: '1px solid var(--theia-widgetBorder)' }}>
                 <h4 style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 600, color: 'var(--theia-descriptionForeground)', textTransform: 'uppercase' }}>Provider Key Reference</h4>

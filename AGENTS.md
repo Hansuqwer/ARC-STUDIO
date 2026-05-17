@@ -181,15 +181,21 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 
 ## Workflow
 
-### Before Each PR Implementation
-**ALWAYS read the research document first:**
-1. Search `docs/research/IMPLEMENTATION_RESEARCH.md` for the relevant PR section
-2. Read any code scaffolds provided there
-3. Check `docs/adr/` for relevant ADRs
-4. Then implement following the research doc guidance
+### Locked Planning Documents
+The only active roadmap/implementation plan documents are:
+- `docs/LOCKED_REMAINING_ROADMAP.md` — remaining product roadmap/status
+- `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` — ordered phase/slice execution plan
+
+Do not create new roadmap, implementation-plan, phase-plan, status, next-steps, or handover markdown files. Update the two locked docs above after every commit that changes implementation status. Historical plans belong under `docs/archive/stale-roadmaps/` and are not sources of truth.
+
+### Before Each Implementation Slice
+1. Read `docs/LOCKED_REMAINING_ROADMAP.md` and `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`.
+2. Search `docs/research/IMPLEMENTATION_RESEARCH.md` only for supporting scaffolds/guidance.
+3. Check relevant `docs/adr/` records.
+4. Then implement the largest coherent phase chunk that can be completed safely with tests green in the current session. Avoid tiny micro-slices unless risk/ambiguity requires them.
 
 ### Implementation Flow
-1. Understand the PR spec from `docs/IMPLEMENTATION_PLAN.md` (table rows)
+1. Understand the next phase/chunk from `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`
 2. Research the existing codebase for relevant code
 3. Read `docs/research/IMPLEMENTATION_RESEARCH.md` for scaffolds/guidance
 4. Check `docs/adr/` for architecture decisions
@@ -199,10 +205,10 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 8. Verify TypeScript builds: `pnpm --filter @arc-studio/protocol build && pnpm --filter arc-extension build`
 9. Commit with descriptive message
 
-After every commit, update the current roadmap/plan/status docs affected by the change before continuing. If a commit changes implementation status, the plan/roadmap must be kept in sync in the same commit or in an immediate follow-up docs commit.
+After every commit, update `docs/LOCKED_REMAINING_ROADMAP.md` and `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` if implementation status changed. These updates must be in the same commit or an immediate follow-up docs commit.
 
 ### Green-Test Continuation Rule
-When a slice is implemented and verification is green, continue directly to the next ordered item in `docs/handover/HANDOVER.md`, `docs/IMPLEMENTATION_PLAN.md`, or the active todo list. Do not stop to ask for permission unless:
+When a phase chunk is implemented and verification is green, continue directly to the next ordered item in `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` or the active todo list. Prefer bundling related slices into one larger implementation when they share files/tests and can be verified together. Do not stop to ask for permission unless:
 - tests/builds fail and the failure is not quickly fixable
 - the next item requires destructive action, secrets, paid/live provider calls, external publishing, or force-push/reset
 - requirements conflict or are ambiguous enough that implementation would be guesswork
@@ -211,7 +217,7 @@ When a slice is implemented and verification is green, continue directly to the 
 Use this prompt when resuming continuation work:
 
 ```text
-Continue implementing the next ordered ARC Studio plan item. First read `docs/handover/HANDOVER.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/research/IMPLEMENTATION_RESEARCH.md`, and relevant ADRs. Pick the smallest correct vertical slice, implement it, add/update tests, run `cd python && uv run pytest -q` plus `pnpm --filter @arc-studio/protocol build && pnpm --filter arc-extension build`, fix issues, then continue to the next slice if all verification is green. Preserve unrelated worktree changes. Do not overclaim features; document scaffolds and not-wired behavior honestly.
+Continue implementing the next ordered ARC Studio plan item. First read `docs/LOCKED_REMAINING_ROADMAP.md`, `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`, `docs/research/IMPLEMENTATION_RESEARCH.md`, and relevant ADRs. Pick the largest coherent phase chunk that can be safely completed and verified in this session, implement it, add/update tests, run `cd python && uv run pytest -q` plus `pnpm --filter @arc-studio/protocol build && pnpm --filter arc-extension build`, fix issues, update the locked docs if status changed, then continue to the next phase/chunk if all verification is green. Preserve unrelated worktree changes. Do not overclaim features; document scaffolds and not-wired behavior honestly.
 ```
 
 ## Current Status
@@ -345,8 +351,9 @@ Historical details are archived at `docs/archive/handover/REMAINING_ISSUES_PLAN.
 ## Related Documentation
 
 ### Source of Truth
-- `docs/IMPLEMENTATION_PLAN.md` — Canonical PR list "Recommended First 23 PRs"
-- `docs/research/IMPLEMENTATION_RESEARCH.md` — Detailed scaffolds and guidance (MUST READ before each PR)
+- `docs/LOCKED_REMAINING_ROADMAP.md` — Locked remaining roadmap/status
+- `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` — Locked ordered phase/slice plan
+- `docs/research/IMPLEMENTATION_RESEARCH.md` — Supporting scaffolds/guidance only, not a roadmap
 - `docs/adr/` — Architecture Decision Records (000-008)
 - `docs/RELEASE_CHECKLIST.md` — v0.1.0-alpha release checklist
 

@@ -400,8 +400,11 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/arc-studio-config__profile-select/);
             expect(source).toMatch(/arc-studio-config__dry-run-toggle/);
             expect(source).toMatch(/arc-studio-config__paid-calls-toggle/);
-            expect(source).toMatch(/ISOLATION_OPTIONS/);
-            expect(source).toMatch(/PROFILE_OPTIONS/);
+            expect(source).toMatch(/FALLBACK_ISOLATION_OPTIONS/);
+            expect(source).toMatch(/FALLBACK_PROFILE_OPTIONS/);
+            expect(source).toMatch(/listProfiles/);
+            expect(source).toMatch(/getIsolationStatus/);
+            expect(source).toMatch(/listIsolationProviders/);
         });
 
         it('should save only safe config fields', () => {
@@ -414,8 +417,17 @@ describe('Studio Tabs Contracts', () => {
         });
 
         it('should keep profile selector as local fallback until protocol persistence exists', () => {
-            expect(source).toMatch(/profile is a local selector until protocol persistence exists/);
+            expect(source).toMatch(/profile selection follows backend profile inventory/);
+            expect(source).toMatch(/not persisted by this safe config update/);
             expect(source).toMatch(/value=\{selectedProfile\}/);
+        });
+
+        it('should export safe config snapshot without raw credentials', () => {
+            expect(source).toMatch(/arc-studio-config__export-safe/);
+            expect(source).toMatch(/buildSafeExport/);
+            expect(source).toMatch(/arc-studio-config__safe-export-json/);
+            expect(source).toMatch(/no raw credentials/);
+            expect(source).toMatch(/source metadata only/);
         });
 
         it('should force paid calls off for dry-run config', () => {

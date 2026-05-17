@@ -163,7 +163,8 @@ Always read first:
 AGENTS.md
 docs/handover/HANDOVER.md
 docs/handover/NEXT_IMPLEMENTATION_HANDOVER.md
-docs/IMPLEMENTATION_PLAN.md
+docs/LOCKED_REMAINING_ROADMAP.md
+docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md
 docs/research/IMPLEMENTATION_RESEARCH.md
 relevant docs/adr/*.md
 ```
@@ -203,7 +204,7 @@ Use max parallel subagents:
 ```text
 Continue ARC Studio from current repo state using docs/handover/NEXT_IMPLEMENTATION_HANDOVER.md.
 
-First read AGENTS.md, docs/handover/HANDOVER.md, docs/handover/NEXT_IMPLEMENTATION_HANDOVER.md, docs/IMPLEMENTATION_PLAN.md, docs/research/IMPLEMENTATION_RESEARCH.md, and relevant ADRs.
+First read AGENTS.md, docs/LOCKED_REMAINING_ROADMAP.md, docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md, docs/research/IMPLEMENTATION_RESEARCH.md, docs/wiki/research-context/README.md, and relevant ADRs.
 
 Identify the next ordered unfinished item. Use max parallel subagents:
 - explore/kimi for repo + CI log discovery
@@ -239,7 +240,7 @@ pnpm --filter arc-extension build
 When release docs touched:
 
 ```bash
-bash scripts/check-banned-claims.sh AGENTS.md README.md docs/IMPLEMENTATION_PLAN.md docs/REALITY_AUDIT.md docs/RELEASE_CHECKLIST.md docs/EXTENSION_MIGRATION.md docs/handover/HANDOVER.md
+bash scripts/check-banned-claims.sh AGENTS.md README.md docs/LOCKED_REMAINING_ROADMAP.md docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md docs/REALITY_AUDIT.md docs/RELEASE_CHECKLIST.md docs/EXTENSION_MIGRATION.md docs/handover/HANDOVER.md
 ```
 
 When browser/e2e touched:

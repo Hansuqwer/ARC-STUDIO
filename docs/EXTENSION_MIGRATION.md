@@ -1,7 +1,7 @@
 # Extension Migration Inventory
 
 **Date:** 2026-05-14
-**Source:** `docs/IMPLEMENTATION_PLAN.md` (migration policy), code audit of `theia-extensions/*`
+**Source:** archived migration policy, code audit of `theia-extensions/*`, and locked plan status in `docs/LOCKED_REMAINING_ROADMAP.md`
 
 Canonical extension: `packages/arc-extension`
 Status: Wired into `applications/browser` since PR 5 (commit 765beb4), replacing

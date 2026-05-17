@@ -5,18 +5,19 @@
 **Test count:** Python 782 passed / 14 skipped; TS protocol + arc-extension builds clean; arc-extension test suite 581 tests / 9 suites.
 
 ## Goal
-Continue release-readiness work beyond the first 23 recommended PRs from `docs/IMPLEMENTATION_PLAN.md` with green tests and builds. P1a through P5 release-readiness scaffolds and HITL/Audit/Replay UX hardening are implemented; current work is release verification, doc truth cleanup, e2e stabilization, CI confirmation, and migration cleanup. Commit only if explicitly requested.
+Continue remaining ARC Studio product work from `docs/LOCKED_REMAINING_ROADMAP.md` and `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` with green tests and builds. Earlier P1a through P5 release-readiness scaffolds and HITL/Audit/Replay UX hardening are implemented; current focus is product-depth work such as active run event delivery, setup/config UX, provider controls, HITL/audit UX, SwarmGraph insight, and narrow real adoption. Commit only if explicitly requested.
 
 ## Constraints & Preferences
-- Work in small vertical slices; after each slice run tests/lint/build, fix failures, commit only when green.
+- Work in larger coherent phase chunks when safe; after each chunk run tests/lint/build, fix failures, commit only when green.
 - No destructive git commands, no secret commits, preserve unrelated changes.
 - Keep docs honest – never overclaim implemented features.
 - Adoption scaffolds must fail closed: `NOT_RUNNABLE`, `RUN_FAILED`, `NotImplementedError`.
 - LM Arena = stub-default with gated live path, excluded from v0.1 product claims.
 - v0.1 scope = browser app + Python CLI/wheel only; Electron is post-v0.1.
 - JSONL canonical, SQLite rebuildable index; event streams use bounded queues.
-- Always read `docs/research/IMPLEMENTATION_RESEARCH.md` for scaffolds/guidance before each PR implementation.
-- Before every new PR/slice, read: `docs/IMPLEMENTATION_PLAN.md`, `docs/research/IMPLEMENTATION_RESEARCH.md`, and relevant `docs/adr/*`.
+- Always read `docs/LOCKED_REMAINING_ROADMAP.md` and `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` before each implementation chunk.
+- Use `docs/research/IMPLEMENTATION_RESEARCH.md` and `docs/wiki/research-context/` for supporting context only; they are not status sources.
+- Before every new slice, read relevant `docs/adr/*`.
 
 ## Progress
 
@@ -61,7 +62,8 @@ Continue release-readiness work beyond the first 23 recommended PRs from `docs/I
 - `AGENTS.md`
 - `docs/handover/HANDOVER.md`
 - `docs/RELEASE_CHECKLIST.md`
-- `docs/IMPLEMENTATION_PLAN.md`
+- `docs/LOCKED_REMAINING_ROADMAP.md`
+- `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`
 
 **Verification:** Banned-claim checker plus targeted grep for stale “not implemented”/“still open” claims.
 
@@ -70,8 +72,8 @@ Continue release-readiness work beyond the first 23 recommended PRs from `docs/I
 
 **Key constraint:** Do not weaken tests to make CI green. Document Theia/browser infra gaps honestly.
 
-### Slice C: CI confirmation + release checklist refresh
-**Why third:** Release requires green confirmation on GitHub plus local dry-run evidence.
+### Slice C: CI confirmation + release checklist refresh ✅ Done for `073238d`
+**Status:** GitHub `python`, `node`, `ARC Roadmap Gate`, `signing-preflight`, and `e2e` passed on `073238d`.
 
 **Key constraint:** No release/tag/history rewrite without explicit approval.
 
@@ -175,7 +177,8 @@ Safe language:
 | 008-daemon-bundling | P5/post-v0.1 | Smoke workflow/scaffold exists; Electron bundling remains post-v0.1 |
 
 ## Relevant Files
-- `docs/IMPLEMENTATION_PLAN.md` — Canonical PR list (23+ beyond)
+- `docs/LOCKED_REMAINING_ROADMAP.md` — Locked remaining roadmap/status
+- `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` — Locked ordered phase/slice plan
 - `docs/research/IMPLEMENTATION_RESEARCH.md` — Scaffolds and guidance (MUST READ before each PR)
 - `docs/adr/` — ADR-000 through ADR-008
 - `docs/SPIKE_KEYCHAIN_STORAGE.md` — Keychain platform validation report

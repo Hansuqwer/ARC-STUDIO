@@ -44,7 +44,7 @@
 
 **Goal:** Users can configure runnable adapters/profiles from IDE without editing shell env manually.
 
-**Current:** CLI config/profiles/workspace commands exist; ChatTab exposes runtime/profile selectors; no full setup wizard.
+**Current:** CLI config/profiles/workspace commands exist; ChatTab exposes runtime/profile selectors; ConfigTab now loads backend runtime capabilities, profiles, isolation providers/status, safe config save fields, provider key env-var references, and copy-safe config snapshots. No full multi-step setup wizard yet.
 
 **Deliverables:**
 - Adapter readiness details with concrete missing env/dependency actions.
@@ -141,7 +141,7 @@
 | Roadmap ID | Status | Next Slice |
 |---|---|---|
 | R1 Live Run Streaming | Complete | Phase 2 IDE Runtime Setup + Config |
-| R2 IDE Runtime Setup | Not started | Config read/write backend + static UI contract |
+| R2 IDE Runtime Setup | Partial | Adapter readiness actions + export-target helpers |
 | R3 Provider/Quota UI | Not started | Provider diagnostics panel scaffold |
 | R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
 | R5 SwarmGraph Insight | Deferred | Define event-backed empty-state contracts |

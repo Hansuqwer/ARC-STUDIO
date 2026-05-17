@@ -78,23 +78,27 @@ git status --short
 ## Phase 2 — IDE Runtime Setup + Config
 
 **Roadmap:** R2  
-**Status:** Not started
+**Status:** Partial — ConfigTab safe runtime/profile/isolation baseline implemented
 
 ### Chunk 2.1 — Config Backend Methods
 - Expose read/write/dry-run config methods needed by UI.
 - Tests verify no raw secret persistence.
+- Status: Complete baseline — backend service already exposes safe config read/write, profile list, isolation status/provider list, provider catalog, and env-var provider key references.
 
 ### Chunk 2.2 — Adapter Readiness Actions
 - UI displays missing deps/env/profile actions from capability reports.
 - Tests for gated/unavailable/runnable states.
+- Status: Partial — ConfigTab displays capability-driven disabled runtime states; concrete remediation actions remain.
 
 ### Chunk 2.3 — Profile + Isolation UI
 - Show current profile, workspace trust, isolation provider.
 - Allow safe profile selection/update.
+- Status: Partial — ConfigTab loads backend profile inventory and isolation providers/status, displays trust/isolation, and keeps profile choice UI-local for now.
 
 ### Chunk 2.4 — Export Target Helpers
 - UI for CrewAI/OpenAI/LlamaIndex export target references.
 - Store references only; do not store provider secrets.
+- Status: Partial — ConfigTab exports a copy-safe config snapshot and stores provider env-var references only; dedicated target helpers remain.
 
 ## Phase 3 — Provider/Quota/Cost UI
 
@@ -186,7 +190,7 @@ git status --short
 | Phase | Status | Depends On | Notes |
 |---|---|---|---|
 | 1 Active Live Streaming | Complete | current CLI/IDE run basics | Full vertical baseline: Python SSE, Theia proxy contract, UI live/replay/disconnected states, stub e2e |
-| 2 Runtime Setup UI | Not started | config/profile CLI | Enables real user setup |
+| 2 Runtime Setup UI | Partial | config/profile CLI | Safe ConfigTab baseline in place; remediation wizard/helpers remain |
 | 3 Provider/Quota UI | Not started | provider CLI | Must remain gated/offline by default |
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Deferred | event-backed adoption data | Empty states first |
