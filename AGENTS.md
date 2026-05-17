@@ -200,6 +200,8 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 8. Verify TypeScript builds: `pnpm --filter @arc-studio/protocol build && pnpm --filter arc-extension build`
 9. Commit with descriptive message
 
+After every commit, update the current roadmap/plan/status docs affected by the change before continuing. If a commit changes implementation status, the plan/roadmap must be kept in sync in the same commit or in an immediate follow-up docs commit.
+
 ### Green-Test Continuation Rule
 When a slice is implemented and verification is green, continue directly to the next ordered item in `docs/handover/HANDOVER.md`, `docs/IMPLEMENTATION_PLAN.md`, or the active todo list. Do not stop to ask for permission unless:
 - tests/builds fail and the failure is not quickly fixable
