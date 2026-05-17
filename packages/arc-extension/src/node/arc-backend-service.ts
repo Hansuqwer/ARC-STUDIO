@@ -949,6 +949,10 @@ export class ArcBackendService implements ArcService {
                     expiresAt: p.expires_at || p.expiresAt,
                     promptType: p.prompt_type || p.promptType,
                     token: p.token,
+                    status: p.status || p.state,
+                    expired: p.expired ?? p.is_expired ?? p.isExpired,
+                    singleUse: p.single_use ?? p.singleUse,
+                    usedAt: p.used_at || p.usedAt,
                 })) as HitlPromptInfo[];
             }
             return [];
@@ -1021,28 +1025,55 @@ export class ArcBackendService implements ArcService {
             const auditPath = traceParsed?.data?.audit_path || traceParsed?.data?.auditPath;
 
             if (!auditPath) {
-                return null;
+                return {
+                    runId,
+                    chainVerified: false,
+                    recordCount: 0,
+                    state: 'missing',
+                    reason: 'No audit path recorded for this run.',
+                };
             }
 
-            const output = execFileSync('arc', ['audit', 'verify', runId, '--chain', auditPath, '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-            const parsed = JSON.parse(output);
-            if (parsed.ok && parsed.data) {
-                const data = parsed.data;
+            try {
+                const output = execFileSync('arc', ['audit', 'verify', runId, '--chain', auditPath, '--json'], {
+                    timeout: 10000,
+                    encoding: 'utf-8',
+                    windowsHide: true,
+                    env: buildArcCliEnv(),
+                });
+                const parsed = JSON.parse(output);
+                if (parsed.ok && parsed.data) {
+                    const data = parsed.data;
+                    const chainVerified = Boolean(data.chain_verified ?? data.chainVerified ?? data.verified);
+                    return {
+                        runId,
+                        auditPath,
+                        chainVerified,
+                        recordCount: data.record_count ?? data.recordCount ?? this.extractAuditRecordCount(data.reason),
+                        state: data.state || (chainVerified ? 'present' : 'degraded'),
+                        reason: data.reason || data.message,
+                        signature: data.signature || undefined,
+                        hmacAlgo: data.hmac_algo || data.hmacAlgo,
+                    } as AuditChainInfo;
+                }
                 return {
                     runId,
                     auditPath,
-                    chainVerified: Boolean(data.chain_verified ?? data.verified),
-                    recordCount: data.record_count ?? data.recordCount ?? this.extractAuditRecordCount(data.reason),
-                    signature: data.signature || undefined,
-                    hmacAlgo: data.hmac_algo || data.hmacAlgo || 'sha256',
-                } as AuditChainInfo;
+                    chainVerified: false,
+                    recordCount: 0,
+                    state: 'degraded',
+                    reason: parsed?.error?.message || 'Audit verification returned no data.',
+                };
+            } catch (verifyError) {
+                return {
+                    runId,
+                    auditPath,
+                    chainVerified: false,
+                    recordCount: 0,
+                    state: 'degraded',
+                    reason: `Audit verification unavailable: ${verifyError instanceof Error ? verifyError.message : 'Unknown error'}`,
+                };
             }
-            return null;
         } catch (error) {
             if (error instanceof ArcError) throw error;
             throw new ArcError(
@@ -1074,11 +1105,16 @@ export class ArcBackendService implements ArcService {
                     runId: ev.run_id || ev.runId || runId,
                     sequence: ev.sequence ?? 0,
                     data: ev.data || {},
+                    category: ev.category || ev.event_category || ev.eventCategory || this.replayCategoryForType(ev.type),
+                    annotations: ev.annotations || ev.notes,
+                    metadata: ev.metadata || ev.meta,
                 }));
                 return {
                     runId,
                     events,
                     totalEvents: events.length,
+                    annotations: data.annotations || data.notes,
+                    metadata: data.metadata || data.meta,
                 };
             }
             throw new ArcError(
@@ -1328,6 +1364,17 @@ export class ArcBackendService implements ArcService {
             return type;
         }
         return undefined;
+    }
+
+    private replayCategoryForType(type?: string): ReplayEvent['category'] {
+        const normalized = (type || '').toUpperCase();
+        if (normalized.includes('ERROR') || normalized.includes('FAILED')) return 'error';
+        if (normalized.includes('MESSAGE')) return 'message';
+        if (normalized.includes('TOOL')) return 'tool';
+        if (normalized.includes('HITL')) return 'hitl';
+        if (normalized.includes('AUDIT')) return 'audit';
+        if (normalized.includes('RUN_') || normalized.includes('NODE_')) return 'lifecycle';
+        return 'unknown';
     }
 
     private extractAuditRecordCount(reason?: string): number {

@@ -1,7 +1,7 @@
 /**
  * Studio Tabs Contract Tests
  *
- * Static source-pattern tests for ChatTab, RunsTab, WorkflowsTab, ConfigTab.
+ * Static source-pattern tests for ChatTab, RunsTab, WorkflowsTab, AssuranceTab, ConfigTab.
  */
 
 import * as fs from 'fs-extra';
@@ -47,6 +47,11 @@ describe('Studio Tabs Contracts', () => {
 
         it('should export ConfigTabProps', () => {
             expect(source).toMatch(/export.*ConfigTabProps/);
+        });
+
+        it('should export AssuranceTab and AssuranceTabProps', () => {
+            expect(source).toMatch(/export.*AssuranceTab/);
+            expect(source).toMatch(/export.*AssuranceTabProps/);
         });
     });
 
@@ -457,6 +462,74 @@ describe('Studio Tabs Contracts', () => {
 
         it('should NOT import TraceViewerSection', () => {
             expect(source).not.toMatch(/TraceViewerSection/);
+        });
+    });
+
+    describe('AssuranceTab', () => {
+        let source: string;
+
+        beforeAll(async () => {
+            source = await fs.readFile(path.join(tabsDir, 'AssuranceTab.tsx'), 'utf-8');
+        });
+
+        it('should export AssuranceTabProps interface and accept ArcService', () => {
+            expect(source).toMatch(/export interface AssuranceTabProps/);
+            expect(source).toMatch(/arcService:\s*ArcService/);
+        });
+
+        it('should render root assurance class', () => {
+            expect(source).toMatch(/className='arc-studio-assurance'/);
+            expect(source).toMatch(/aria-label='Assurance panel'/);
+        });
+
+        it('should expose HITL inbox backed by ArcService only', () => {
+            expect(source).toMatch(/HITL Inbox/);
+            expect(source).toMatch(/listPendingHitlPrompts/);
+            expect(source).toMatch(/respondHitlPrompt/);
+            expect(source).not.toMatch(/fetch\(/);
+        });
+
+        it('should support approve reject and modify HITL decisions', () => {
+            expect(source).toMatch(/type HitlDecision = 'approve' \| 'reject' \| 'modify'/);
+            expect(source).toMatch(/respondHitl\(prompt, 'approve'\)/);
+            expect(source).toMatch(/respondHitl\(prompt, 'reject'\)/);
+            expect(source).toMatch(/respondHitl\(prompt, 'modify'\)/);
+            expect(source).toMatch(/Optional modified response/);
+        });
+
+        it('should disable HITL actions for missing or expired tokens', () => {
+            expect(source).toMatch(/function isExpired/);
+            expect(source).toMatch(/function hitlBlocked/);
+            expect(source).toMatch(/!prompt\.token \|\| isExpired\(prompt\.expiresAt\)/);
+            expect(source).toMatch(/disabled=\{blocked \|\| responding\}/);
+            expect(source).toMatch(/token missing/);
+            expect(source).toMatch(/token expired/);
+        });
+
+        it('should render audit present missing degraded states honestly', () => {
+            expect(source).toMatch(/type AuditState = 'present' \| 'missing' \| 'degraded'/);
+            expect(source).toMatch(/return 'missing'/);
+            expect(source).toMatch(/return info\.chainVerified \? 'present' : 'degraded'/);
+            expect(source).toMatch(/state:\s*\{state\}/);
+            expect(source).toMatch(/No adapter-wide keyed audit\/HMAC claim/);
+            expect(source).not.toMatch(/adapter-wide keyed audit\/HMAC verified/);
+        });
+
+        it('should expose replay stepper with prev next controls', () => {
+            expect(source).toMatch(/Replay Stepper/);
+            expect(source).toMatch(/replayRun/);
+            expect(source).toMatch(/setActiveStep\(step => Math\.max\(0, step - 1\)\)/);
+            expect(source).toMatch(/setActiveStep\(step => Math\.min\(replayEvents\.length - 1, step \+ 1\)\)/);
+            expect(source).toMatch(/Prev/);
+            expect(source).toMatch(/Next/);
+        });
+
+        it('should show replay annotations and event data', () => {
+            expect(source).toMatch(/eventAnnotations/);
+            expect(source).toMatch(/activeAnnotations/);
+            expect(source).toMatch(/arc-studio-assurance__annotations/);
+            expect(source).toMatch(/arc-studio-assurance__annotation/);
+            expect(source).toMatch(/JSON\.stringify\(activeEvent\.data, null, 2\)/);
         });
     });
 });

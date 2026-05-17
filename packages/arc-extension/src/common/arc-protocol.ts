@@ -769,6 +769,10 @@ export interface HitlPromptInfo {
     expiresAt?: string;
     promptType?: string;
     token?: string;
+    status?: 'pending' | 'approved' | 'rejected' | 'modified' | 'expired' | 'used' | 'unknown';
+    expired?: boolean;
+    singleUse?: boolean;
+    usedAt?: string;
 }
 
 /**
@@ -788,9 +792,11 @@ export interface HitlRespondRequest {
  */
 export interface AuditChainInfo {
     runId: string;
-    auditPath: string;
+    auditPath?: string;
     chainVerified: boolean;
     recordCount: number;
+    state?: 'present' | 'missing' | 'degraded';
+    reason?: string;
     signature?: string;
     hmacAlgo?: string;
 }
@@ -806,6 +812,9 @@ export interface ReplayEvent {
     runId: string;
     sequence: number;
     data: Record<string, unknown>;
+    category?: 'lifecycle' | 'message' | 'tool' | 'error' | 'hitl' | 'audit' | 'unknown';
+    annotations?: string[];
+    metadata?: Record<string, unknown>;
 }
 
 /**
@@ -815,6 +824,8 @@ export interface ReplayResult {
     runId: string;
     events: ReplayEvent[];
     totalEvents: number;
+    annotations?: string[];
+    metadata?: Record<string, unknown>;
 }
 
 // ========== Run Diff ==========

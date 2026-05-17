@@ -66,6 +66,10 @@ describe('ArcStudioWidget Contracts', () => {
             expect(widgetSource).toMatch(/import.*ConfigTab.*from.*tabs/);
         });
 
+        it('should import AssuranceTab', () => {
+            expect(widgetSource).toMatch(/import.*AssuranceTab.*from.*tabs/);
+        });
+
         it('should render ChatTab in render', () => {
             expect(widgetSource).toMatch(/<ChatTab/);
         });
@@ -82,12 +86,21 @@ describe('ArcStudioWidget Contracts', () => {
             expect(widgetSource).toMatch(/<ConfigTab/);
         });
 
+        it('should render AssuranceTab in render', () => {
+            expect(widgetSource).toMatch(/<AssuranceTab/);
+            expect(widgetSource).toMatch(/arc-studio-panel-assurance/);
+        });
+
         it('should pass arcService prop to ConfigTab', () => {
             expect(widgetSource).toMatch(/<ConfigTab\s+arcService=\{this\.arcService\}/);
         });
 
         it('should pass arcService prop to RunsTab', () => {
             expect(widgetSource).toMatch(/<RunsTab\s+arcService=\{this\.arcService\}/);
+        });
+
+        it('should pass arcService prop to AssuranceTab', () => {
+            expect(widgetSource).toMatch(/<AssuranceTab\s+arcService=\{this\.arcService\}/);
         });
     });
 
@@ -114,11 +127,13 @@ describe('ArcStudioWidget Contracts', () => {
             expect(widgetSource).toMatch(/role='tabpanel'/);
         });
 
-        it('should have 4 tabs: Chat, Runs, Workflows, Config', () => {
+        it('should have 5 tabs: Chat, Runs, Workflows, Assurance, Config', () => {
             expect(widgetSource).toMatch(/Chat/);
             expect(widgetSource).toMatch(/Runs/);
             expect(widgetSource).toMatch(/Workflows/);
+            expect(widgetSource).toMatch(/Assurance/);
             expect(widgetSource).toMatch(/Config/);
+            expect(widgetSource).toMatch(/type StudioTabId = 'chat' \| 'runs' \| 'workflows' \| 'assurance' \| 'config'/);
         });
     });
 

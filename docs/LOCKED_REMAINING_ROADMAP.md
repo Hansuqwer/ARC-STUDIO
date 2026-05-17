@@ -77,7 +77,7 @@
 
 **Goal:** Move beyond RunsTab basics into dedicated high-assurance workflows.
 
-**Current:** HITL pending/respond CLI and RunsTab basics exist; audit verify/export/key CLI exists; adapter-wide HMAC is not guaranteed.
+**Current:** Dedicated IDE Assurance tab exists with HITL inbox, run-scoped audit chain states, and replay stepper annotations. HITL pending/respond CLI and RunsTab basics still exist; audit verify/export/key CLI exists; adapter-wide HMAC is not guaranteed.
 
 **Deliverables:**
 - HITL inbox view with approve/reject/respond, token expiry, replay-attack-safe messaging.
@@ -85,9 +85,7 @@
 - Clear degraded/absent audit states.
 - Replay stepper integrated with audit/HITL events.
 
-**Acceptance:**
-- Backend and UI tests for pending/respond/audit/replay states.
-- Docs avoid adapter-wide HMAC claims unless implemented.
+**Acceptance:** Complete for dedicated UX baseline. Backend/static UI contracts cover pending/respond/audit/replay states and the UI explicitly avoids adapter-wide HMAC claims.
 
 ## R5 — SwarmGraph Insight Baseline
 
@@ -145,7 +143,7 @@
 | R1 Live Run Streaming | Complete | Phase 2 IDE Runtime Setup + Config |
 | R2 IDE Runtime Setup | Not started | Config read/write backend + static UI contract |
 | R3 Provider/Quota UI | Not started | Provider diagnostics panel scaffold |
-| R4 HITL/Audit UX | Partial | Dedicated HITL inbox view |
+| R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
 | R5 SwarmGraph Insight | Deferred | Define event-backed empty-state contracts |
 | R6 Real Adoption | Deferred | LangGraph + SwarmGraph narrow real path spike |
 | R7 Release Ops | Partial | Refresh checklist evidence; `.env` scrub remains gated |

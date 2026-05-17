@@ -10,12 +10,9 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common/message-service';
 import * as React from '@theia/core/shared/react';
 import { ArcService, ConfigStatus, WorkflowInfo } from '../common/arc-protocol';
-import { ChatTab } from './tabs/ChatTab';
-import { RunsTab } from './tabs/RunsTab';
-import { WorkflowsTab } from './tabs/WorkflowsTab';
-import { ConfigTab } from './tabs/ConfigTab';
+import { AssuranceTab, ChatTab, ConfigTab, RunsTab, WorkflowsTab } from './tabs';
 
-type StudioTabId = 'chat' | 'runs' | 'workflows' | 'config';
+type StudioTabId = 'chat' | 'runs' | 'workflows' | 'assurance' | 'config';
 
 interface ArcStudioWidgetState {
     activeTab: StudioTabId;
@@ -65,7 +62,7 @@ export class ArcStudioWidget extends ReactWidget {
     }
 
     private setActiveTab(tab: StudioTabId): void {
-        this.state = { ...this.state, activeTab: tab, selectedRunId: tab === 'runs' ? this.state.selectedRunId : null };
+        this.state = { ...this.state, activeTab: tab, selectedRunId: tab === 'runs' || tab === 'assurance' ? this.state.selectedRunId : null };
         this.update();
     }
 
@@ -98,6 +95,7 @@ export class ArcStudioWidget extends ReactWidget {
             { id: 'chat', label: 'Chat' },
             { id: 'runs', label: 'Runs' },
             { id: 'workflows', label: 'Workflows' },
+            { id: 'assurance', label: 'Assurance' },
             { id: 'config', label: 'Config' }
         ];
 
@@ -165,6 +163,19 @@ export class ArcStudioWidget extends ReactWidget {
                                 workflows={workflows}
                                 isScanning={isScanning}
                                 onScanWorkspace={() => this.handleScanWorkspace()}
+                            />
+                        )}
+                    </div>
+                    <div
+                        id={`arc-studio-panel-assurance`}
+                        role='tabpanel'
+                        aria-labelledby='arc-studio-tab-assurance'
+                        hidden={activeTab !== 'assurance'}
+                    >
+                        {activeTab === 'assurance' && (
+                            <AssuranceTab
+                                arcService={this.arcService}
+                                initialRunId={this.state.selectedRunId}
                             />
                         )}
                     </div>

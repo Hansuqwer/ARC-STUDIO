@@ -116,19 +116,22 @@ git status --short
 ## Phase 4 — HITL + Audit Dedicated UX
 
 **Roadmap:** R4  
-**Status:** Partial baseline exists in RunsTab
+**Status:** Complete dedicated UX baseline
 
 ### Chunk 4.1 — HITL Inbox View
 - Dedicated pending prompt list.
 - Approve/reject/respond with expiry/single-use token status.
+- Status: Complete — dedicated Assurance tab implements pending inbox and token/expiry-aware actions.
 
 ### Chunk 4.2 — Audit Chain Viewer
 - Show present/missing/degraded audit material.
 - Verify/export actions for runs with audit chain.
+- Status: Complete for verify/view baseline — run-scoped audit viewer shows present/missing/degraded states without adapter-wide keyed audit claims. Export affordance remains CLI-only polish.
 
 ### Chunk 4.3 — Replay Stepper
 - Step through events with HITL/audit annotations.
 - No deterministic replay claim beyond supported trace replay.
+- Status: Complete — replay stepper annotates HITL/audit/approval/replay events from stored trace replay only.
 
 ## Phase 5 — SwarmGraph Insight Baseline
 
@@ -185,7 +188,7 @@ git status --short
 | 1 Active Live Streaming | Complete | current CLI/IDE run basics | Full vertical baseline: Python SSE, Theia proxy contract, UI live/replay/disconnected states, stub e2e |
 | 2 Runtime Setup UI | Not started | config/profile CLI | Enables real user setup |
 | 3 Provider/Quota UI | Not started | provider CLI | Must remain gated/offline by default |
-| 4 HITL/Audit UX | Partial | existing CLI/RunsTab basics | Avoid adapter-wide HMAC claim |
+| 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Deferred | event-backed adoption data | Empty states first |
 | 6 Real Adoption | Deferred | adoption protocol | Narrow first target only |
 | 7 Release Ops | Partial | green CI | `.env` scrub gated |

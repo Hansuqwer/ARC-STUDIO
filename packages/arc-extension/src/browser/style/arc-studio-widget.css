@@ -395,6 +395,295 @@
     font-style: italic;
 }
 
+/* Assurance UX */
+.arc-studio-assurance {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    color: var(--theia-ui-font-color, #333);
+}
+
+.arc-studio-assurance__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--theia-border-color, #eee);
+}
+
+.arc-studio-assurance__header h3,
+.arc-studio-assurance__title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--theia-ui-font-color1, #333);
+}
+
+.arc-studio-assurance__subtitle,
+.arc-studio-assurance__description,
+.arc-studio-assurance__meta {
+    margin: 4px 0 0 0;
+    font-size: 11px;
+    color: var(--theia-ui-font-color2, #777);
+}
+
+.arc-studio-assurance__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+}
+
+.arc-studio-assurance__section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.arc-studio-assurance__section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.arc-studio-assurance__section-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--theia-ui-font-color1, #333);
+}
+
+.arc-studio-assurance__card,
+.arc-studio-assurance__prompt-card,
+.arc-studio-assurance__event-card {
+    padding: 12px;
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: 5px;
+    background: var(--theia-editor-background, var(--theia-ui-background, #fff));
+}
+
+.arc-studio-assurance__card--muted {
+    background: var(--theia-sideBar-background, var(--theia-ui-background, #f8f9fa));
+}
+
+.arc-studio-assurance__button-row,
+.arc-studio-assurance__controls,
+.arc-studio-assurance__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.arc-studio-assurance__button {
+    padding: 6px 12px;
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: 4px;
+    background: var(--theia-button-secondaryBackground, var(--theia-ui-button-background, #fff));
+    color: var(--theia-button-secondaryForeground, var(--theia-ui-font-color, #333));
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.arc-studio-assurance__button:hover:not(:disabled) {
+    background: var(--theia-button-secondaryHoverBackground, var(--theia-ui-button-hover-background, #e9ecef));
+}
+
+.arc-studio-assurance__button:disabled,
+.arc-studio-assurance__button--disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.arc-studio-assurance__button--primary {
+    border-color: transparent;
+    background: var(--theia-button-background, var(--arc-accent-color, #2e59d9));
+    color: var(--theia-button-foreground, #fff);
+}
+
+.arc-studio-assurance__button--primary:hover:not(:disabled) {
+    background: var(--theia-button-hoverBackground, #0052a3);
+}
+
+.arc-studio-assurance__button--danger {
+    border-color: var(--arc-error-color, #c93c37);
+    color: var(--arc-error-color, #c93c37);
+}
+
+.arc-studio-assurance__button--danger:hover:not(:disabled) {
+    background: rgba(201, 60, 55, 0.12);
+}
+
+.arc-studio-assurance__inbox {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.arc-studio-assurance__prompt-card {
+    border-left: 3px solid var(--theia-charts-yellow, #cca700);
+}
+
+.arc-studio-assurance__prompt-card--expired {
+    border-left-color: var(--arc-error-color, #c93c37);
+    opacity: 0.78;
+}
+
+.arc-studio-assurance__prompt-header,
+.arc-studio-assurance__event-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.arc-studio-assurance__prompt-title,
+.arc-studio-assurance__event-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--theia-ui-font-color1, #333);
+}
+
+.arc-studio-assurance__prompt-body,
+.arc-studio-assurance__event-body,
+.arc-studio-assurance__details {
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--theia-ui-font-color, #333);
+}
+
+.arc-studio-assurance__details {
+    padding: 8px;
+    border-radius: 4px;
+    background: var(--theia-textCodeBlock-background, var(--theia-input-background, #f5f5f5));
+    font-family: var(--theia-code-font-family, monospace);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.arc-studio-assurance__badge,
+.arc-studio-assurance__chip,
+.arc-studio-assurance__token-status,
+.arc-studio-assurance__expiry-status,
+.arc-studio-assurance__event-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: 999px;
+    background: var(--theia-badge-background, var(--theia-ui-background, #e9ecef));
+    color: var(--theia-badge-foreground, var(--theia-ui-font-color, #333));
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.4;
+    text-transform: uppercase;
+}
+
+.arc-studio-assurance__token-status--valid,
+.arc-studio-assurance__expiry-status--active {
+    border-color: var(--arc-success-color, #2f8f46);
+    color: var(--arc-success-color, #2f8f46);
+}
+
+.arc-studio-assurance__token-status--used,
+.arc-studio-assurance__expiry-status--expired {
+    border-color: var(--arc-error-color, #c93c37);
+    color: var(--arc-error-color, #c93c37);
+}
+
+.arc-studio-assurance__token-status--unknown,
+.arc-studio-assurance__expiry-status--unknown {
+    border-color: var(--theia-descriptionForeground, #888);
+    color: var(--theia-descriptionForeground, #888);
+}
+
+.arc-studio-assurance__audit-chip--present,
+.arc-studio-assurance__chip--present {
+    border-color: var(--arc-success-color, #2f8f46);
+    background: rgba(47, 143, 70, 0.12);
+    color: var(--arc-success-color, #2f8f46);
+}
+
+.arc-studio-assurance__audit-chip--missing,
+.arc-studio-assurance__chip--missing {
+    border-color: var(--theia-descriptionForeground, #888);
+    background: rgba(128, 128, 128, 0.12);
+    color: var(--theia-descriptionForeground, #888);
+}
+
+.arc-studio-assurance__audit-chip--degraded,
+.arc-studio-assurance__chip--degraded {
+    border-color: var(--theia-charts-yellow, #cca700);
+    background: rgba(204, 167, 0, 0.14);
+    color: var(--theia-charts-yellow, #9a7b00);
+}
+
+.arc-studio-assurance__replay-stepper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.arc-studio-assurance__stepper-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.arc-studio-assurance__stepper-progress {
+    min-width: 72px;
+    font-size: 11px;
+    color: var(--theia-ui-font-color2, #777);
+    text-align: center;
+}
+
+.arc-studio-assurance__event-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.arc-studio-assurance__event-card--active {
+    border-color: var(--theia-focusBorder, #0066cc);
+    box-shadow: 0 0 0 1px var(--theia-focusBorder, #0066cc) inset;
+}
+
+.arc-studio-assurance__event-card--error,
+.arc-studio-assurance__event-badge--error {
+    border-color: var(--arc-error-color, #c93c37);
+    color: var(--arc-error-color, #c93c37);
+}
+
+.arc-studio-assurance__event-badge--hitl {
+    border-color: var(--theia-charts-yellow, #cca700);
+    color: var(--theia-charts-yellow, #9a7b00);
+}
+
+.arc-studio-assurance__event-badge--audit {
+    border-color: var(--theia-charts-blue, var(--arc-accent-color, #2e59d9));
+    color: var(--theia-charts-blue, var(--arc-accent-color, #2e59d9));
+}
+
+.arc-studio-assurance__empty,
+.arc-studio-assurance__loading,
+.arc-studio-assurance__error {
+    padding: 12px;
+    border: 1px dashed var(--theia-border-color, #ddd);
+    border-radius: 5px;
+    font-size: 12px;
+    color: var(--theia-ui-font-color2, #777);
+}
+
+.arc-studio-assurance__error {
+    border-color: var(--arc-error-color, #c93c37);
+    color: var(--arc-error-color, #c93c37);
+}
+
 /* Scrollbar */
 .arc-studio-content::-webkit-scrollbar {
     width: 10px;

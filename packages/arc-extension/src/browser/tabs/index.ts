@@ -13,3 +13,6 @@ export type { WorkflowsTabProps } from './WorkflowsTab';
 
 export { ConfigTab, ConfigTabWidget } from './ConfigTab';
 export type { ConfigTabProps } from './ConfigTab';
+
+export { AssuranceTab } from './AssuranceTab';
+export type { AssuranceTabProps } from './AssuranceTab';

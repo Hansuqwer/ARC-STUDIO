@@ -160,6 +160,13 @@ describe('Protocol Extensions (Session B + B7)', () => {
             expect(source).toMatch(/prompt:\s*string/);
         });
 
+        it('should have optional HITL status expiry and single-use fields', () => {
+            expect(source).toMatch(/status\?:\s*'pending' \| 'approved' \| 'rejected' \| 'modified' \| 'expired' \| 'used' \| 'unknown'/);
+            expect(source).toMatch(/expired\?:\s*boolean/);
+            expect(source).toMatch(/singleUse\?:\s*boolean/);
+            expect(source).toMatch(/usedAt\?:\s*string/);
+        });
+
         it('should export HitlRespondRequest', () => {
             expect(source).toMatch(/export interface HitlRespondRequest/);
         });
@@ -182,6 +189,11 @@ describe('Protocol Extensions (Session B + B7)', () => {
             expect(source).toMatch(/signature/);
         });
 
+        it('should have optional audit state and reason fields', () => {
+            expect(source).toMatch(/state\?:\s*'present' \| 'missing' \| 'degraded'/);
+            expect(source).toMatch(/reason\?:\s*string/);
+        });
+
         it('should export ReplayResult', () => {
             expect(source).toMatch(/export interface ReplayResult/);
         });
@@ -191,6 +203,12 @@ describe('Protocol Extensions (Session B + B7)', () => {
             expect(source).toMatch(/runId:\s*string/);
             expect(source).toMatch(/events:\s*ReplayEvent\[\]/);
             expect(source).toMatch(/totalEvents:\s*number/);
+        });
+
+        it('should have optional replay category annotations and metadata fields', () => {
+            expect(source).toMatch(/category\?:\s*'lifecycle' \| 'message' \| 'tool' \| 'error' \| 'hitl' \| 'audit' \| 'unknown'/);
+            expect(source).toMatch(/annotations\?:\s*string\[\]/);
+            expect(source).toMatch(/metadata\?:\s*Record<string, unknown>/);
         });
 
         it('should have ArcService HITL/audit/replay methods', () => {
@@ -408,6 +426,22 @@ describe('Backend Service Extensions (Session B + B7)', () => {
         it('should map Python snake_case to camelCase for replay events', () => {
             expect(source).toMatch(/run_id/);
             expect(source).toMatch(/runId/);
+        });
+
+        it('should map missing and degraded audit states with reason', () => {
+            expect(source).toMatch(/state:\s*'missing'/);
+            expect(source).toMatch(/reason:\s*'No audit path recorded for this run\.'/);
+            expect(source).toMatch(/state:\s*data\.state \|\| \(chainVerified \? 'present' : 'degraded'\)/);
+            expect(source).toMatch(/state:\s*'degraded'/);
+            expect(source).toMatch(/reason:\s*parsed\?\.error\?\.message \|\| 'Audit verification returned no data\.'/);
+        });
+
+        it('should map replay category annotations and metadata', () => {
+            expect(source).toMatch(/category:\s*ev\.category \|\| ev\.event_category \|\| ev\.eventCategory \|\| this\.replayCategoryForType\(ev\.type\)/);
+            expect(source).toMatch(/annotations:\s*ev\.annotations \|\| ev\.notes/);
+            expect(source).toMatch(/metadata:\s*ev\.metadata \|\| ev\.meta/);
+            expect(source).toMatch(/annotations:\s*data\.annotations \|\| data\.notes/);
+            expect(source).toMatch(/metadata:\s*data\.metadata \|\| data\.meta/);
         });
 
         it('should implement run diff via CLI with validation and snake-case mapping', () => {
