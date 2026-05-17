@@ -22,6 +22,15 @@ interface AdaptersWidgetState {
     diffError?: string;
 }
 
+interface ReadinessAction {
+    id: string;
+    title: string;
+    help: string;
+    copyLabel: string;
+    copyText?: string;
+    confirmText?: string;
+}
+
 @injectable()
 export class ArcAdaptersWidget extends ReactWidget {
     static readonly ID = 'arc:adapters-status';
@@ -170,6 +179,7 @@ export class ArcAdaptersWidget extends ReactWidget {
                         Evidence: {cap.detected_artifacts.join(' \u00B7 ')}
                     </div>
                 )}
+                {this.renderReadinessActions(cap)}
                 {cap.doctor_actions.length > 0 && (
                     <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {cap.doctor_actions.map(action => (
@@ -186,11 +196,92 @@ export class ArcAdaptersWidget extends ReactWidget {
                 )}
                 {cap.requires_paid_calls && (
                     <div style={{ marginTop: 4, fontSize: 10, color: 'var(--theia-editorWarning-foreground)' }}>
-                        This runtime requires paid/provider calls.
+                        Provider gate: this runtime requires explicit paid/provider opt-in. Use env-var refs only; raw secret values are never shown.
                     </div>
                 )}
             </div>
         );
+    }
+
+    protected renderReadinessActions(cap: RuntimeCapabilityReport): React.ReactNode {
+        const actions = this.getReadinessActions(cap);
+        if (actions.length === 0) return null;
+        return (
+            <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+                {actions.map(action => (
+                    <div key={action.id} style={readinessCardStyle}>
+                        <div style={{ fontWeight: 600 }}>{action.title}</div>
+                        <div style={{ marginTop: 2, color: 'var(--theia-descriptionForeground)' }}>
+                            {action.help}
+                        </div>
+                        <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {action.copyText && (
+                                <button
+                                    style={doctorBtnStyle}
+                                    title="Copy only; ARC never executes setup commands from this card."
+                                    onClick={() => navigator.clipboard.writeText(action.copyText!).catch(() => {})}
+                                >
+                                    {action.copyLabel}
+                                </button>
+                            )}
+                            {action.confirmText && (
+                                <button
+                                    style={doctorBtnStyle}
+                                    title="Requires explicit confirmation before using provider-backed runtime."
+                                    onClick={() => navigator.clipboard.writeText(action.confirmText!).catch(() => {})}
+                                >
+                                    Copy confirm flag
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    protected getReadinessActions(cap: RuntimeCapabilityReport): ReadinessAction[] {
+        const actions: ReadinessAction[] = [];
+        const runtimeId = cap.runtime_id.toLowerCase();
+        if (!cap.can_run && cap.doctor_actions.length === 0) {
+            actions.push({
+                id: 'missing-dependencies',
+                title: 'Missing dependencies',
+                help: 'Install the adapter package/CLI, then refresh readiness. This card is copy-only and never runs commands.',
+                copyLabel: 'Copy doctor command',
+                copyText: `arc doctor runtime ${cap.runtime_id}`,
+            });
+        }
+        if (runtimeId.includes('crewai')) {
+            actions.push(this.exportTargetAction('crewai', 'CrewAI export target', 'CREWAI_EXPORT_PATH'));
+        }
+        if (runtimeId.includes('openai')) {
+            actions.push(this.exportTargetAction('openai', 'OpenAI Agents export target', 'OPENAI_AGENTS_EXPORT_PATH'));
+        }
+        if (runtimeId.includes('llama')) {
+            actions.push(this.exportTargetAction('llamaindex', 'LlamaIndex export target', 'LLAMAINDEX_EXPORT_PATH'));
+        }
+        if (cap.required_env.length > 0 || cap.requires_paid_calls) {
+            actions.push({
+                id: 'provider-gate-env-refs',
+                title: 'Provider gate / env refs',
+                help: `Set env-var references only: ${cap.required_env.join(', ') || 'provider-specific env refs'}. Do not paste secret values into ARC config.`,
+                copyLabel: 'Copy env var names',
+                copyText: cap.required_env.join('\n'),
+                confirmText: 'ARC_CONFIRM_PROVIDER_CALLS=1',
+            });
+        }
+        return actions;
+    }
+
+    protected exportTargetAction(id: string, title: string, envName: string): ReadinessAction {
+        return {
+            id: `${id}-export-target`,
+            title,
+            help: `Configure ${envName} as an env-var reference for generated export output. Raw values are not displayed.`,
+            copyLabel: 'Copy export env name',
+            copyText: envName,
+        };
     }
 
     protected runDoctorAction(action: DoctorAction): void {
@@ -279,5 +370,12 @@ const doctorBtnStyle: React.CSSProperties = {
     borderRadius: 4,
     padding: '4px 10px',
     cursor: 'pointer',
+    fontSize: 11,
+};
+
+const readinessCardStyle: React.CSSProperties = {
+    padding: 8,
+    border: '1px solid var(--theia-widget-border)',
+    borderRadius: 4,
     fontSize: 11,
 };

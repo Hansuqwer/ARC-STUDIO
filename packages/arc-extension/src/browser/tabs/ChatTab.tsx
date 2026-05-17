@@ -6,13 +6,16 @@
 
 import * as React from '@theia/core/shared/react';
 import { useState, useEffect } from '@theia/core/shared/react';
-import { ArcService, RunPreflightResponse, RuntimeCapabilityReport } from '../../common/arc-protocol';
+import { ArcService, ConfigStatus, RunPreflightResponse, RuntimeCapabilityReport } from '../../common/arc-protocol';
 
 const FALLBACK_RUNTIMES: Record<string, { label: string }> = {
     'swarmgraph': { label: 'SwarmGraph standalone' },
     'crewai': { label: 'CrewAI standalone' },
     'crewai+swarmgraph': { label: 'CrewAI + SwarmGraph (fake/offline)' },
 };
+
+const FALLBACK_PROFILES = ['local-safe', 'local-paid'];
+const FALLBACK_ISOLATION = ['subprocess', 'none'];
 
 interface TranscriptMessage {
     id: number;
@@ -37,6 +40,8 @@ export const ChatTab: React.FC<ChatTabProps> = ({ arcService, onSendMessage, onN
     const [lastRunId, setLastRunId] = useState<string | null>(null);
     const [lastTracePath, setLastTracePath] = useState<string | null>(null);
     const [capabilities, setCapabilities] = useState<RuntimeCapabilityReport[] | null>(null);
+    const [configStatus, setConfigStatus] = useState<ConfigStatus | null>(null);
+    const [isolationId, setIsolationId] = useState('subprocess');
     const [allowPaidCalls, setAllowPaidCalls] = useState(false);
     const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
 
@@ -82,10 +87,21 @@ export const ChatTab: React.FC<ChatTabProps> = ({ arcService, onSendMessage, onN
     };
 
     useEffect(() => {
-        if (!arcService?.listRuntimeCapabilities) return;
-        arcService.listRuntimeCapabilities()
-            .then(resp => setCapabilities(resp.runtimes || []))
-            .catch(() => setCapabilities(null));
+        if (arcService?.listRuntimeCapabilities) {
+            arcService.listRuntimeCapabilities()
+                .then(resp => setCapabilities(resp.runtimes || []))
+                .catch(() => setCapabilities(null));
+        }
+        if (arcService?.getConfigStatus) {
+            arcService.getConfigStatus()
+                .then(status => {
+                    setConfigStatus(status);
+                    setRuntimeId(status.runtime.defaultRuntime || runtimeId);
+                    setIsolationId(status.runtime.isolation || isolationId);
+                    setAllowPaidCalls(status.runtime.allowPaidCalls);
+                })
+                .catch(() => setConfigStatus(null));
+        }
     }, [arcService]);
 
     const handleStartRun = async () => {
@@ -117,6 +133,16 @@ export const ChatTab: React.FC<ChatTabProps> = ({ arcService, onSendMessage, onN
         ? capabilities.map(cap => ({ value: cap.runtime_id, label: FALLBACK_RUNTIMES[cap.runtime_id]?.label || cap.runtime_id, cap }))
         : Object.entries(FALLBACK_RUNTIMES).map(([value, meta]) => ({ value, label: meta.label, cap: undefined }));
     const selectedCapability = capabilities?.find(cap => cap.runtime_id === runtimeId);
+    const profileOptions = Array.from(new Set([
+        ...(Array.isArray((configStatus as unknown as { profiles?: string[] } | null)?.profiles)
+            ? (configStatus as unknown as { profiles: string[] }).profiles
+            : []),
+        ...FALLBACK_PROFILES,
+    ]));
+    const isolationOptions = Array.from(new Set([
+        configStatus?.runtime.isolation,
+        ...FALLBACK_ISOLATION,
+    ].filter(Boolean) as string[]));
 
     return (
         <div className='arc-studio-chat' role='region' aria-label='Chat panel'>
@@ -157,10 +183,18 @@ export const ChatTab: React.FC<ChatTabProps> = ({ arcService, onSendMessage, onN
                     <label>
                         Profile
                         <select className='arc-studio-chat__profile-selector' value={profileId} onChange={e => setProfileId(e.currentTarget.value)}>
-                            <option value='local-safe'>local-safe</option>
-                            <option value='local-paid'>local-paid</option>
+                            {profileOptions.map(profile => <option key={profile} value={profile}>{profile}</option>)}
                         </select>
                     </label>
+                    <label>
+                        Isolation
+                        <select className='arc-studio-chat__isolation-selector' value={isolationId} onChange={e => setIsolationId(e.currentTarget.value)}>
+                            {isolationOptions.map(isolation => <option key={isolation} value={isolation}>{isolation}</option>)}
+                        </select>
+                    </label>
+                    <div className='arc-studio-chat__runtime-policy' aria-live='polite'>
+                        Profile: {profileId} | Isolation: {isolationId} | Dry-run providerCall:false
+                    </div>
                     <label className='arc-studio-chat__paid-calls'>
                         <input
                             type='checkbox'

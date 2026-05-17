@@ -32,6 +32,10 @@ const MODE_OPTIONS = [
     { value: 'auto' as const, label: 'Auto', description: 'policy-driven' },
 ];
 
+const ISOLATION_OPTIONS = ['none', 'subprocess', 'docker'];
+
+const PROFILE_OPTIONS = ['local-safe', 'local-paid'];
+
 const PROVIDER_DISPLAY: Record<string, string> = {
     openai: 'OpenAI',
     anthropic: 'Anthropic',
@@ -70,6 +74,10 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
     const [providerCatalog, setProviderCatalog] = useState<ProviderCatalogEntry[]>([]);
     const [selectedProvider, setSelectedProvider] = useState('openai');
     const [providerEnvVar, setProviderEnvVar] = useState('OPENAI_API_KEY');
+    const [selectedIsolation, setSelectedIsolation] = useState('subprocess');
+    const [selectedProfile, setSelectedProfile] = useState('local-safe');
+    const [dryRun, setDryRun] = useState(true);
+    const [allowPaidCalls, setAllowPaidCalls] = useState(false);
     const [capabilities, setCapabilities] = useState<RuntimeCapabilityReport[] | null>(null);
     const [capabilitiesLoading, setCapabilitiesLoading] = useState(false);
 
@@ -84,6 +92,10 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
             setConfig(status);
             setSelectedRuntime(status.runtime.defaultRuntime);
             setSelectedMode(status.mode);
+            setSelectedIsolation(status.runtime.isolation || 'subprocess');
+            setSelectedProfile('local-safe');
+            setDryRun(Boolean(status.runtime.dryRun));
+            setAllowPaidCalls(Boolean(status.runtime.allowPaidCalls));
             if (arcService.getProviderCatalog) {
                 const catalog = await arcService.getProviderCatalog();
                 setProviderCatalog(catalog);
@@ -122,6 +134,9 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
             const update: SafeConfigUpdate = {
                 defaultRuntime: selectedRuntime,
                 mode: selectedMode,
+                isolation: selectedIsolation,
+                dryRun,
+                allowPaidCalls: dryRun ? false : allowPaidCalls,
             };
             const result = await arcService.saveConfig(update);
             setSaveMessage(result.message);
@@ -316,6 +331,56 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
             </div>
 
             <div className='arc-studio-config__section' style={{ padding: '12px 16px', borderBottom: '1px solid var(--theia-widgetBorder)' }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 600, color: 'var(--theia-descriptionForeground)', textTransform: 'uppercase' }}>Run Policy</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', fontSize: '12px' }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        Isolation
+                        <select
+                            className='arc-studio-config__isolation-select'
+                            value={selectedIsolation}
+                            onChange={e => setSelectedIsolation(e.currentTarget.value)}
+                        >
+                            {ISOLATION_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        Profile
+                        <select
+                            className='arc-studio-config__profile-select'
+                            value={selectedProfile}
+                            onChange={e => setSelectedProfile(e.currentTarget.value)}
+                        >
+                            {PROFILE_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                    </label>
+                    <label className='arc-studio-config__dry-run-toggle' style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <input
+                            type='checkbox'
+                            checked={dryRun}
+                            onChange={e => {
+                                const next = e.currentTarget.checked;
+                                setDryRun(next);
+                                if (next) setAllowPaidCalls(false);
+                            }}
+                        />
+                        Dry run (providerCall:false)
+                    </label>
+                    <label className='arc-studio-config__paid-calls-toggle' style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: dryRun ? 0.6 : 1 }}>
+                        <input
+                            type='checkbox'
+                            checked={!dryRun && allowPaidCalls}
+                            disabled={dryRun}
+                            onChange={e => setAllowPaidCalls(e.currentTarget.checked)}
+                        />
+                        Allow paid provider calls
+                    </label>
+                </div>
+                <p className='arc-studio-config__run-policy-note' style={{ margin: '8px 0 0', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
+                    Dry-run saves force paid calls off; profile is a local selector until protocol persistence exists; provider auth remains env-var references only.
+                </p>
+            </div>
+
+            <div className='arc-studio-config__section' style={{ padding: '12px 16px', borderBottom: '1px solid var(--theia-widgetBorder)' }}>
                 <h4 style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 600, color: 'var(--theia-descriptionForeground)', textTransform: 'uppercase' }}>Provider Key Reference</h4>
                 <p style={{ margin: '0 0 8px', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
                     Save an environment variable name only. ARC does not capture raw key material.
@@ -407,6 +472,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     <span>Mode: <span style={{ fontFamily: 'monospace' }}>{config.runtime.routingMode}</span></span>
                     <span>Dry run: <span style={{ fontFamily: 'monospace' }}>{config.runtime.dryRun ? 'yes' : 'no'}</span></span>
                     <span>Isolation: <span style={{ fontFamily: 'monospace' }}>{config.runtime.isolation}</span></span>
+                    <span>Profile: <span style={{ fontFamily: 'monospace' }}>{selectedProfile}</span></span>
                     <span>Paid calls: <span style={{ fontFamily: 'monospace', color: config.runtime.allowPaidCalls ? 'var(--theia-terminal-ansiYellow)' : 'var(--theia-descriptionForeground)' }}>{config.runtime.allowPaidCalls ? 'allowed' : 'blocked'}</span></span>
                 </div>
             </div>

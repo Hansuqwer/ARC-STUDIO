@@ -389,6 +389,36 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/isolation/);
         });
 
+        it('should expose editable safe run policy controls', () => {
+            expect(source).toMatch(/Run Policy/);
+            expect(source).toMatch(/arc-studio-config__isolation-select/);
+            expect(source).toMatch(/arc-studio-config__profile-select/);
+            expect(source).toMatch(/arc-studio-config__dry-run-toggle/);
+            expect(source).toMatch(/arc-studio-config__paid-calls-toggle/);
+            expect(source).toMatch(/ISOLATION_OPTIONS/);
+            expect(source).toMatch(/PROFILE_OPTIONS/);
+        });
+
+        it('should save only safe config fields', () => {
+            expect(source).toMatch(/defaultRuntime: selectedRuntime/);
+            expect(source).toMatch(/mode: selectedMode/);
+            expect(source).toMatch(/isolation: selectedIsolation/);
+            expect(source).toMatch(/dryRun,/);
+            expect(source).toMatch(/allowPaidCalls: dryRun \? false : allowPaidCalls/);
+            expect(source).not.toMatch(/profile: selectedProfile/);
+        });
+
+        it('should keep profile selector as local fallback until protocol persistence exists', () => {
+            expect(source).toMatch(/profile is a local selector until protocol persistence exists/);
+            expect(source).toMatch(/value=\{selectedProfile\}/);
+        });
+
+        it('should force paid calls off for dry-run config', () => {
+            expect(source).toMatch(/providerCall:false/);
+            expect(source).toMatch(/if \(next\) setAllowPaidCalls\(false\)/);
+            expect(source).toMatch(/disabled=\{dryRun\}/);
+        });
+
         it('should handle unavailable backend gracefully', () => {
             expect(source).toMatch(/arc-studio-config__unavailable/);
             expect(source).toMatch(/Backend unavailable/);
@@ -403,8 +433,16 @@ describe('Studio Tabs Contracts', () => {
         it('should NOT render raw api_key values', () => {
             expect(source).not.toMatch(/api_key[^_]/);
             expect(source).not.toMatch(/apiKey[^C]/);
-            expect(source).not.toMatch(/secret/);
             expect(source).not.toMatch(/password/);
+            expect(source).not.toMatch(/type='password'/);
+            expect(source).not.toMatch(/type="password"/);
+        });
+
+        it('should persist provider key refs only, not raw secrets', () => {
+            expect(source).toMatch(/envVar: providerEnvVar\.trim\(\)/);
+            expect(source).toMatch(/Save key reference/);
+            expect(source).not.toMatch(/setProviderKey\(/);
+            expect(source).not.toMatch(/rawKey/);
         });
 
         it('should show keys as source/status only', () => {

@@ -19,6 +19,9 @@ import {
     RunContract,
     ConfigStatus,
     SafeConfigUpdate,
+    ArcProfileInfo,
+    IsolationStatus,
+    IsolationProviderInfo,
     RunLinksResponse,
     HitlPromptInfo,
     HitlRespondRequest,
@@ -74,6 +77,9 @@ describe('ArcService Proxy Tests', () => {
                 'getRunContract',
                 'getConfigStatus',
                 'saveConfig',
+                'listProfiles',
+                'getIsolationStatus',
+                'listIsolationProviders',
                 'getRunLinks',
                 'listPendingHitlPrompts',
                 'respondHitlPrompt',
@@ -100,6 +106,9 @@ describe('ArcService Proxy Tests', () => {
                 getRunContract: async () => ({}),
                 getConfigStatus: async () => ({}),
                 saveConfig: async () => ({}),
+                listProfiles: async () => [],
+                getIsolationStatus: async () => ({}),
+                listIsolationProviders: async () => [],
                 getRunLinks: async () => ({}),
                 listPendingHitlPrompts: async () => [],
                 respondHitlPrompt: async () => ({}),
@@ -288,6 +297,28 @@ describe('ArcService Proxy Tests', () => {
             };
             expect(report.doctor_actions.length).toBe(1);
             expect(report.doctor_actions[0].id).toBe('install-deps');
+        });
+
+        it('profile and isolation DTOs should contain no raw secrets', async () => {
+            const mockService = {
+                listProfiles: async (): Promise<ArcProfileInfo[]> => [
+                    { id: 'local-safe', name: 'Local Safe', allowPaidCalls: false, dryRun: true, provider: 'ollama' },
+                ],
+                getIsolationStatus: async (): Promise<IsolationStatus> => ({
+                    current: 'none',
+                    available: true,
+                    providers: [{ id: 'none', name: 'None', available: true, active: true }],
+                }),
+                listIsolationProviders: async (): Promise<IsolationProviderInfo[]> => [
+                    { id: 'none', name: 'None', available: true, active: true },
+                ],
+            };
+
+            expect(await mockService.listProfiles()).toEqual([
+                { id: 'local-safe', name: 'Local Safe', allowPaidCalls: false, dryRun: true, provider: 'ollama' },
+            ]);
+            expect((await mockService.getIsolationStatus()).current).toBe('none');
+            expect((await mockService.listIsolationProviders())[0].available).toBe(true);
         });
     });
 
