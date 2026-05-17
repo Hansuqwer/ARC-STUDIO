@@ -49,12 +49,40 @@ def test_profiles_show_paid():
     assert data["allow_network"] is True
 
 
-def test_profiles_show_unknown_falls_back_to_stub():
-    """arc profiles show unknown-id falls back to stub."""
+def test_profiles_show_unknown_fails_closed():
+    """arc profiles show unknown-id fails closed."""
     result = CliRunner().invoke(app, ["profiles", "show", "nonexistent", "--json"])
+    assert result.exit_code == 2
+    data = json.loads(result.output)
+    assert data["ok"] is False
+    assert data["error"]["details"]["code"] == "UNKNOWN_PROFILE"
+
+
+def test_profiles_create_persists_outside_workspace(monkeypatch, tmp_path: Path):
+    """arc profiles create writes env-ref metadata outside the workspace."""
+    store = tmp_path / "home" / "profiles.json"
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    monkeypatch.setenv("ARC_PROFILE_CONFIG", str(store))
+    result = CliRunner().invoke(app, [
+        "profiles", "create", "ci-paid",
+        "--allow-paid-calls",
+        "--provider", "openai",
+        "--default-model", "gpt-test",
+        "--json",
+    ])
     assert result.exit_code == 0, result.output
-    data = json.loads(result.output)["data"]
-    assert data["id"] == "stub"
+    assert store.exists()
+    assert not (workspace / ".arc" / "profiles.json").exists()
+    payload = json.loads(store.read_text())
+    serialized = json.dumps(payload)
+    assert "ci-paid" in serialized
+    assert "sk-" not in serialized
+    assert "OPENAI_API_KEY" not in serialized
+
+    shown = CliRunner().invoke(app, ["profiles", "show", "ci-paid", "--json"])
+    assert shown.exit_code == 0, shown.output
+    assert json.loads(shown.output)["data"]["allow_paid_calls"] is True
 
 
 def test_workspace_init_creates_config(tmp_path: Path):

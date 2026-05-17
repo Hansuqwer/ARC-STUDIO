@@ -22,6 +22,7 @@ interface ArcStudioWidgetState {
     workflows: WorkflowInfo[];
     isScanning: boolean;
     configStatus?: ConfigStatus;
+    selectedRunId?: string | null;
 }
 
 @injectable()
@@ -64,7 +65,7 @@ export class ArcStudioWidget extends ReactWidget {
     }
 
     private setActiveTab(tab: StudioTabId): void {
-        this.state = { ...this.state, activeTab: tab };
+        this.state = { ...this.state, activeTab: tab, selectedRunId: tab === 'runs' ? this.state.selectedRunId : null };
         this.update();
     }
 
@@ -130,7 +131,15 @@ export class ArcStudioWidget extends ReactWidget {
                         aria-labelledby='arc-studio-tab-chat'
                         hidden={activeTab !== 'chat'}
                     >
-                        {activeTab === 'chat' && <ChatTab />}
+                        {activeTab === 'chat' && (
+                            <ChatTab
+                                arcService={this.arcService}
+                                onNavigateToRuns={(runId) => {
+                                    this.state = { ...this.state, selectedRunId: runId ?? null };
+                                    this.setActiveTab('runs');
+                                }}
+                            />
+                        )}
                     </div>
                     <div
                         id={`arc-studio-panel-runs`}
@@ -138,7 +147,12 @@ export class ArcStudioWidget extends ReactWidget {
                         aria-labelledby='arc-studio-tab-runs'
                         hidden={activeTab !== 'runs'}
                     >
-                        {activeTab === 'runs' && <RunsTab arcService={this.arcService} />}
+                        {activeTab === 'runs' && (
+                            <RunsTab
+                                arcService={this.arcService}
+                                initialRunId={this.state.selectedRunId}
+                            />
+                        )}
                     </div>
                     <div
                         id={`arc-studio-panel-workflows`}

@@ -48,6 +48,94 @@ def test_run_command_reports_crewai_missing_target(tmp_path):
     assert envelope["error"]["details"]["code"] == "RUNTIME_NOT_RUNNABLE"
 
 
+def test_run_unknown_profile_fails_closed(tmp_path):
+    result = CliRunner().invoke(app, [
+        "run", "wf-test", "--workspace", str(tmp_path), "--profile-id", "missing", "--json",
+    ])
+    assert result.exit_code == 2
+    envelope = json.loads(result.output)
+    assert envelope["ok"] is False
+    assert envelope["error"]["details"]["code"] == "UNKNOWN_PROFILE"
+
+
+def test_run_dry_run_crewai_swarmgraph_returns_blockers_no_trace(tmp_path):
+    result = CliRunner().invoke(app, [
+        "run", "crew.py",
+        "--workspace", str(tmp_path),
+        "--runtime", "crewai+swarmgraph",
+        "--dry-run",
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)["data"]
+    assert payload["runtime"] == "crewai+swarmgraph"
+    assert payload["dry_run"] is True
+    assert payload["provider_call"] is False
+    assert payload["runnable"] is False
+    codes = {blocker["code"] for blocker in payload["blockers"]}
+    assert "MISSING_CREWAI_EXPORT" in codes
+    assert payload["dependency_status"]["runtime_mode"] == "fake/offline"
+    assert not (tmp_path / ".arc" / "traces").exists()
+
+
+def test_run_dry_run_crewai_swarmgraph_fake_ready_no_execution(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_CREWAI_EXPORT", "crew_module:crew")
+    result = CliRunner().invoke(app, [
+        "run", "crew.py",
+        "--workspace", str(tmp_path),
+        "--runtime", "crewai+swarmgraph",
+        "--dry-run",
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)["data"]
+    assert payload["runnable"] is True
+    assert payload["provider_call"] is False
+    assert payload["export_target_status"]["present"] is True
+    assert not (tmp_path / ".arc" / "traces").exists()
+
+
+def test_run_crewai_swarmgraph_fake_offline_completes(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_CREWAI_EXPORT", "crew_module:crew")
+    result = CliRunner().invoke(app, [
+        "run", "crew.py",
+        "--workspace", str(tmp_path),
+        "--runtime", "crewai+swarmgraph",
+        "--prompt", "offline prompt",
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert data["runtime"] == "crewai+swarmgraph"
+    assert data["status"] == "completed"
+    assert data["metadata"]["runtime_mode"] == "fake/offline"
+    assert data["metadata"]["adoption"] is True
+    assert data["metadata"]["real_provider_call"] is False
+    assert data["metadata"]["audit_absent_reason"]
+    event_types = [event["type"] for event in data["events"]]
+    assert event_types[0] == "RUN_STARTED"
+    assert "STEP_STARTED" in event_types
+    assert "STEP_COMPLETED" in event_types
+    assert event_types[-1] == "RUN_COMPLETED"
+    traces = list((tmp_path / ".arc" / "traces").glob("run-crewai-sg-*.jsonl"))
+    assert len(traces) == 1
+
+
+def test_run_dry_run_unknown_profile_fails_closed(tmp_path):
+    result = CliRunner().invoke(app, [
+        "run", "crew.py",
+        "--workspace", str(tmp_path),
+        "--runtime", "crewai+swarmgraph",
+        "--profile-id", "missing",
+        "--dry-run",
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)["data"]
+    codes = {blocker["code"] for blocker in payload["blockers"]}
+    assert "UNKNOWN_PROFILE" in codes
+
+
 def test_runtimes_capabilities_json(tmp_path):
     result = CliRunner().invoke(app, ["runtimes", "--workspace", str(tmp_path), "--capabilities", "--json"])
 

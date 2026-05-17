@@ -1,7 +1,7 @@
 {
   "name": "arc-arena",
   "version": "0.1.0-alpha",
-  "description": "ARCHIVED — out of v0.1 scope (stub-default with gated live path). ARC Arena — LM Arena model battle, direct chat, code generation, and agent preview for ARC Studio",
+  "description": "ARCHIVE CANDIDATE — out of v0.1 scope; still present in workspace. Stub-default with gated live path. ARC Arena — LM Arena model battle, direct chat, code generation, and agent preview for ARC Studio",
   "keywords": ["theia-extension"],
   "license": "Apache-2.0",
   "files": ["lib", "src"],

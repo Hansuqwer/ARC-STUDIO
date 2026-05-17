@@ -1,7 +1,7 @@
 {
   "name": "arc-product",
   "version": "0.1.0-alpha",
-  "description": "DEPRECATED — branding merged into canonical packages/arc-extension. ARC Studio product branding — welcome page, about dialog, icons, product name",
+  "description": "DEPRECATED — branding should move to canonical packages/arc-extension; still wired during transition. ARC Studio product branding — welcome page, about dialog, icons, product name",
   "keywords": ["theia-extension"],
   "license": "Apache-2.0",
   "files": ["lib", "src", "*.d.ts"],

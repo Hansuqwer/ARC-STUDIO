@@ -8,6 +8,7 @@ import uuid
 
 from ..adapters.base import CapabilityReport, RuntimeAdapter
 from ..adapters.registry import default_registry
+from ..adoption.protocol import AdoptionMode, AdoptionSpec
 from ..adoption.registry import AdoptionRegistry
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import RunEvent, RunRecord, RunStatus
@@ -106,9 +107,95 @@ class ComboRuntimeAdapter(RuntimeAdapter):
         return RunEvent(type=event_type, timestamp=datetime.now(timezone.utc).isoformat(), run_id=run_id, sequence=sequence, data=data)
 
 
+class CrewAISwarmGraphFakeAdapter(RuntimeAdapter):
+    @property
+    def adapter_id(self) -> str:
+        return "crewai+swarmgraph"
+
+    @property
+    def adapter_name(self) -> str:
+        return "CrewAI + SwarmGraph (fake/offline)"
+
+    def capabilities(self) -> RuntimeCapabilities:
+        return RuntimeCapabilities(can_run=True, can_trace=True)
+
+    def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
+        return True, 1.0, ["fake/offline adoption adapter"]
+
+    def capability_report(self, workspace: Path) -> CapabilityReport:
+        return CapabilityReport(
+            runtime_id=self.adapter_id,
+            detected=True,
+            can_run=True,
+            availability="runnable",
+            reason="Fake/offline CrewAI + SwarmGraph path; no provider calls",
+            detected_artifacts=["fake/offline adoption adapter"],
+            requires_paid_calls=False,
+        )
+
+    async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
+        inputs = inputs or {}
+        mode = inputs.get("runtime_mode", "fake/offline")
+        if mode != "fake/offline":
+            raise RuntimeNotRunnable("CrewAI + SwarmGraph real mode is gated behind opt-in smoke tests")
+        runner = AdoptionRegistry.get(AdoptionMode.CREWAI)
+        if runner is None:
+            raise RuntimeNotRunnable("CrewAI adoption runner is not registered")
+        run_id = f"run-crewai-sg-{uuid.uuid4().hex[:8]}"
+        started = datetime.now(timezone.utc)
+        events: list[RunEvent] = []
+
+        def emit_event(event_run_id: str, event_type: str, data: dict[str, Any]) -> None:
+            events.append(RunEvent(
+                type=event_type,
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                run_id=event_run_id,
+                sequence=len(events),
+                data=data,
+            ))
+
+        emit_event(run_id, "RUN_STARTED", {"workflow_id": workflow_id, "runtime": self.adapter_id, "runtime_mode": mode})
+        spec = AdoptionSpec(
+            mode=AdoptionMode.CREWAI,
+            runtime_config={"crew": _FakeCrew(workflow_id), "inputs": inputs},
+            swarmgraph_config={"mode": mode, "real_provider_call": False},
+        )
+        consensus = await runner.run(spec, run_id, emit_event)
+        ended = datetime.now(timezone.utc)
+        emit_event(run_id, "RUN_COMPLETED", {"confidence": consensus.confidence, "consensus_reached": consensus.consensus_reached})
+        return RunRecord(
+            id=run_id,
+            workflow_id=workflow_id,
+            runtime=self.adapter_id,
+            status=RunStatus.COMPLETED,
+            started_at=started.isoformat(),
+            ended_at=ended.isoformat(),
+            events=events,
+            metadata={
+                "runtime_mode": mode,
+                "adoption": True,
+                "real_provider_call": False,
+                "audit_path": None,
+                "audit_absent_reason": "fake/offline adoption run does not create SwarmGraph HMAC audit records",
+                "consensus": consensus.model_dump(),
+            },
+        )
+
+
+class _FakeCrew:
+    def __init__(self, workflow_id: str) -> None:
+        self.workflow_id = workflow_id
+
+    def kickoff(self, inputs: dict[str, Any]) -> object:
+        prompt = inputs.get("prompt") or self.workflow_id
+        return type("FakeCrewResult", (), {"raw": f"fake/offline CrewAI result for {prompt}"})()
+
 def list_runtimes(workspace: Path) -> list[CapabilityReport]:
     reports = [adapter.capability_report(workspace) for adapter in default_registry().all()]
     for capability in AdoptionRegistry.list_capabilities(workspace):
+        if capability.mode == AdoptionMode.CREWAI:
+            reports.append(CrewAISwarmGraphFakeAdapter().capability_report(workspace))
+            continue
         reason = capability.reason
         if capability.status.value == "runnable":
             reason = f"{capability.reason}; adoption runner ready but runtime router is not wired"
@@ -129,6 +216,10 @@ def resolve(workspace: Path, runtime: str | Sequence[str] | None = "auto", allow
     if isinstance(runtime, str):
         base_runtime, adoption_mode = AdoptionRegistry.parse_runtime_id(runtime)
         if adoption_mode is not None:
+            if adoption_mode == AdoptionMode.CREWAI:
+                adapter = CrewAISwarmGraphFakeAdapter()
+                report = adapter.capability_report(workspace)
+                return RoutedRuntime(adapter=adapter, report=report, chosen_by="explicit")
             capability = next(
                 cap for cap in AdoptionRegistry.list_capabilities(workspace)
                 if cap.mode == adoption_mode

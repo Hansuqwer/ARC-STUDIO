@@ -9,12 +9,13 @@ from agent_runtime_cockpit.cli import app
 
 
 def test_providers_list_json():
-    """arc providers list returns five built-in providers."""
+    """arc providers list returns the provider auth catalog."""
     result = CliRunner().invoke(app, ["providers", "list", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
     ids = {p["id"] for p in data}
-    assert ids == {"openai", "anthropic", "openrouter", "qwen", "kimi"}
+    assert len(ids) >= 50
+    assert {"openai", "anthropic", "openrouter", "qwen", "kimi"}.issubset(ids)
 
 
 def test_providers_status_json():
@@ -22,11 +23,76 @@ def test_providers_status_json():
     result = CliRunner().invoke(app, ["providers", "status", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
-    assert len(data) == 5
+    assert len(data) >= 50
     for status in data:
         assert "provider" in status
         assert "api_key_configured" in status
         assert "dry_run" in status or True  # StatusBase always dry-run
+
+
+def test_providers_catalog_required_entries():
+    """arc providers catalog includes core API and research-only web providers."""
+    result = CliRunner().invoke(app, ["providers", "catalog", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    by_id = {p["id"]: p for p in data}
+    required = {
+        "openai", "anthropic", "google-ai", "xai-grok", "perplexity",
+        "openrouter", "qwen", "kimi", "github", "chatgpt-web",
+        "claude-web", "grok-web", "perplexity-web", "antigravity", "omniroute",
+    }
+    assert required.issubset(by_id)
+    assert by_id["chatgpt-web"]["status"] == "research_only"
+    assert by_id["claude-web"]["supports_web_auth"] is True
+    assert by_id["ollama"]["auth_kind"] == "local"
+
+
+def test_providers_key_set_env_ref_only(tmp_path, monkeypatch):
+    """arc providers key set stores env var refs, not raw keys."""
+    config_path = tmp_path / "providers.json"
+    monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(config_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-should-not-persist")
+    result = CliRunner().invoke(app, [
+        "providers", "key", "set", "openai",
+        "--env", "OPENAI_API_KEY",
+        "--label", "test",
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    saved = config_path.read_text()
+    assert "OPENAI_API_KEY" in saved
+    assert "sk-test-should-not-persist" not in saved
+
+
+def test_providers_key_set_rejects_raw_key(tmp_path, monkeypatch):
+    """arc providers key set rejects raw key-looking values passed to --env."""
+    monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(tmp_path / "providers.json"))
+    result = CliRunner().invoke(app, [
+        "providers", "key", "set", "openai",
+        "--env", "sk-test-raw-key-material",
+        "--json",
+    ])
+    assert result.exit_code == 2
+    assert "Expected an environment variable name" in result.output
+
+
+def test_providers_key_status_json(tmp_path, monkeypatch):
+    """arc providers key status emits key-ref status without raw values."""
+    config_path = tmp_path / "providers.json"
+    monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(config_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-should-not-emit")
+    set_result = CliRunner().invoke(app, [
+        "providers", "key", "set", "openai",
+        "--env", "OPENAI_API_KEY",
+        "--json",
+    ])
+    assert set_result.exit_code == 0, set_result.output
+    result = CliRunner().invoke(app, ["providers", "key", "status", "openai", "--json"])
+    assert result.exit_code == 0, result.output
+    assert "sk-test-should-not-emit" not in result.output
+    data = json.loads(result.output)["data"]
+    assert data[0]["provider"] == "openai"
+    assert data[0]["configured"] is True
 
 
 def test_providers_diagnostics_json():

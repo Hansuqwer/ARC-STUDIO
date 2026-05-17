@@ -10,20 +10,21 @@ import * as React from '@theia/core/shared/react';
 import { useState, useEffect, useCallback } from '@theia/core/shared/react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
-import { ArcService, ConfigStatus, SafeConfigUpdate, SafeProviderKeyStatus } from '../../common/arc-protocol';
+import { ArcService, ConfigStatus, ProviderCatalogEntry, SafeConfigUpdate, SafeProviderKeyStatus, RuntimeCapabilityReport, RuntimeCapabilitiesResponse } from '../../common/arc-protocol';
 
 export interface ConfigTabProps {
     arcService?: ArcService;
     onSave?: (update: SafeConfigUpdate) => void;
 }
 
-const RUNTIME_OPTIONS = [
-    { value: 'swarmgraph', label: 'SwarmGraph', badge: 'SG', description: 'bundled, ready' },
-    { value: 'langgraph', label: 'LangGraph', badge: 'LG', description: 'requires export target' },
-    { value: 'crewai', label: 'CrewAI', badge: 'CR', description: 'not installed' },
-    { value: 'openai-agents', label: 'OpenAI Agents', badge: 'OA', description: 'partial SDK' },
-    { value: 'ag2', label: 'AG2', badge: 'A2', description: 'detection/export only' },
-];
+const RUNTIME_DISPLAY: Record<string, { label: string; badge: string }> = {
+    'swarmgraph': { label: 'SwarmGraph', badge: 'SG' },
+    'langgraph': { label: 'LangGraph', badge: 'LG' },
+    'crewai': { label: 'CrewAI', badge: 'CR' },
+    'crewai+swarmgraph': { label: 'CrewAI + SwarmGraph', badge: 'CS' },
+    'openai-agents': { label: 'OpenAI Agents', badge: 'OA' },
+    'ag2': { label: 'AG2', badge: 'A2' },
+};
 
 const MODE_OPTIONS = [
     { value: 'plan' as const, label: 'Plan', description: 'read-only' },
@@ -66,6 +67,11 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
     const [selectedRuntime, setSelectedRuntime] = useState('swarmgraph');
     const [selectedMode, setSelectedMode] = useState<'plan' | 'build' | 'auto'>('build');
+    const [providerCatalog, setProviderCatalog] = useState<ProviderCatalogEntry[]>([]);
+    const [selectedProvider, setSelectedProvider] = useState('openai');
+    const [providerEnvVar, setProviderEnvVar] = useState('OPENAI_API_KEY');
+    const [capabilities, setCapabilities] = useState<RuntimeCapabilityReport[] | null>(null);
+    const [capabilitiesLoading, setCapabilitiesLoading] = useState(false);
 
     const loadConfig = useCallback(async () => {
         if (!arcService) {
@@ -78,6 +84,25 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
             setConfig(status);
             setSelectedRuntime(status.runtime.defaultRuntime);
             setSelectedMode(status.mode);
+            if (arcService.getProviderCatalog) {
+                const catalog = await arcService.getProviderCatalog();
+                setProviderCatalog(catalog);
+                if (catalog.length > 0) {
+                    setSelectedProvider(catalog[0].id);
+                    setProviderEnvVar(catalog[0].envKeyNames?.[0] || catalog[0].env_key_names?.[0] || '');
+                }
+            }
+            // Load runtime capabilities for disabled states
+            setCapabilitiesLoading(true);
+            if (arcService.listRuntimeCapabilities) {
+                try {
+                    const caps = await arcService.listRuntimeCapabilities();
+                    setCapabilities(caps.runtimes || []);
+                } catch {
+                    setCapabilities(null);
+                }
+            }
+            setCapabilitiesLoading(false);
         } catch {
             setConfig(null);
         } finally {
@@ -105,6 +130,44 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
             }
         } catch (error) {
             setSaveMessage(`Save failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const runtimeOptionsWithCaps = Object.entries(RUNTIME_DISPLAY).map(([value, meta]) => {
+        const cap = capabilities?.find(c => c.runtime_id === value) || null;
+        const canRun = cap ? cap.can_run : (value === 'crewai+swarmgraph' ? true : false);
+        const reason = cap?.reason || null;
+        const availability = cap?.availability || (value === 'crewai+swarmgraph' ? 'runnable' : 'unknown');
+        const paid = cap?.requires_paid_calls || false;
+        let description: string;
+        if (cap && !cap.can_run) {
+            description = reason || availability.replace(/_/g, ' ');
+        } else if (value === 'crewai+swarmgraph') {
+            description = 'fake/offline; real provider mode gated';
+        } else {
+            description = meta.label.toLowerCase().includes('swarm') ? 'bundled, ready' : availability;
+        }
+        return { value, ...meta, canRun, reason, availability, paid, description };
+    });
+
+    const handleSaveKeyRef = async () => {
+        if (!arcService?.setProviderKeyRef || !providerEnvVar.trim()) return;
+        setSaving(true);
+        setSaveMessage(null);
+        try {
+            const result = await arcService.setProviderKeyRef({
+                provider: selectedProvider,
+                envVar: providerEnvVar.trim(),
+                label: 'ide',
+            });
+            setSaveMessage(result.message);
+            if (result.success) {
+                await loadConfig();
+            }
+        } catch (error) {
+            setSaveMessage(`Save key reference failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
             setSaving(false);
         }
@@ -164,30 +227,45 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
             <div className='arc-studio-config__section' style={{ padding: '12px 16px', borderBottom: '1px solid var(--theia-widgetBorder)' }}>
                 <h4 style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 600, color: 'var(--theia-descriptionForeground)', textTransform: 'uppercase' }}>Runtime</h4>
                 <div className='arc-studio-config__radio-group' style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {RUNTIME_OPTIONS.map(opt => (
-                        <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
-                            <input
-                                type='radio'
-                                name='runtime'
-                                value={opt.value}
-                                checked={selectedRuntime === opt.value}
-                                onChange={() => setSelectedRuntime(opt.value)}
-                            />
-                            <span style={{
-                                display: 'inline-block',
-                                padding: '1px 6px',
-                                borderRadius: '3px',
-                                fontSize: '10px',
-                                fontFamily: 'monospace',
-                                backgroundColor: 'var(--theia-badge-background)',
-                                color: 'var(--theia-badge-foreground)',
-                                minWidth: '20px',
-                                textAlign: 'center',
-                            }}>{opt.badge}</span>
-                            <span>{opt.label}</span>
-                            <span style={{ fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>{opt.description}</span>
-                        </label>
-                    ))}
+                    {runtimeOptionsWithCaps.map(opt => {
+                        const disabled = !opt.canRun;
+                        return (
+                            <label key={opt.value} style={{
+                                display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px',
+                                cursor: disabled ? 'not-allowed' : 'pointer',
+                                opacity: disabled ? 0.55 : 1,
+                            }}
+                            title={disabled ? opt.description : ''}
+                            >
+                                <input
+                                    type='radio'
+                                    name='runtime'
+                                    value={opt.value}
+                                    checked={selectedRuntime === opt.value}
+                                    onChange={() => !disabled && setSelectedRuntime(opt.value)}
+                                    disabled={disabled}
+                                />
+                                <span style={{
+                                    display: 'inline-block',
+                                    padding: '1px 6px',
+                                    borderRadius: '3px',
+                                    fontSize: '10px',
+                                    fontFamily: 'monospace',
+                                    backgroundColor: disabled ? 'var(--theia-badge-background)' : 'var(--theia-badge-background)',
+                                    color: disabled ? 'var(--theia-descriptionForeground)' : 'var(--theia-badge-foreground)',
+                                    minWidth: '20px',
+                                    textAlign: 'center',
+                                }}>{opt.badge}</span>
+                                <span>{opt.label}</span>
+                                <span style={{
+                                    fontSize: '11px',
+                                    color: disabled ? 'var(--theia-editorWarning-foreground)' : 'var(--theia-descriptionForeground)',
+                                }}>
+                                    {disabled ? `⛔ ${opt.description}` : opt.description}
+                                </span>
+                            </label>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -234,6 +312,49 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                 </p>
                 <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
                     Trust level: {config.workspace.trustLevel}
+                </p>
+            </div>
+
+            <div className='arc-studio-config__section' style={{ padding: '12px 16px', borderBottom: '1px solid var(--theia-widgetBorder)' }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 600, color: 'var(--theia-descriptionForeground)', textTransform: 'uppercase' }}>Provider Key Reference</h4>
+                <p style={{ margin: '0 0 8px', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
+                    Save an environment variable name only. ARC does not capture raw key material.
+                </p>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', marginBottom: '8px' }}>
+                    Provider
+                    <select
+                        className='arc-studio-config__provider-dropdown'
+                        value={selectedProvider}
+                        onChange={e => {
+                            const next = e.currentTarget.value;
+                            const entry = providerCatalog.find(p => p.id === next);
+                            setSelectedProvider(next);
+                            setProviderEnvVar(entry?.envKeyNames?.[0] || entry?.env_key_names?.[0] || '');
+                        }}
+                    >
+                        {(providerCatalog.length ? providerCatalog : [{ id: 'openai', displayName: 'OpenAI', display_name: 'OpenAI' } as ProviderCatalogEntry]).map(p => (
+                            <option key={p.id} value={p.id}>{p.displayName || p.display_name || p.id}</option>
+                        ))}
+                    </select>
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', marginBottom: '8px' }}>
+                    API key via env var
+                    <input
+                        className='arc-studio-config__provider-env-input'
+                        value={providerEnvVar}
+                        onChange={e => setProviderEnvVar(e.currentTarget.value)}
+                        placeholder='OPENAI_API_KEY'
+                    />
+                </label>
+                <button
+                    className='arc-studio-config__save-key-ref'
+                    onClick={handleSaveKeyRef}
+                    disabled={saving || !providerEnvVar.trim()}
+                >
+                    Save key reference
+                </button>
+                <p className='arc-studio-config__web-auth-warning' style={{ margin: '8px 0 0', fontSize: '11px', color: 'var(--theia-editorWarning-foreground)' }}>
+                    Web session auth is research-only. ARC does not capture browser cookies or passphrases. Use official API/OAuth where available.
                 </p>
             </div>
 
