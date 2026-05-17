@@ -4,7 +4,7 @@ This is a gated release task. Do not run it during normal development.
 
 ## Trigger
 
-Run only after a v0.1.0-alpha release date is set and at least 7 days before the tag.
+Run only after ARC Studio is working as intended, a v0.1.0-alpha release date is re-set, and the scrub is at least 7 days before the tag.
 
 ## Why
 

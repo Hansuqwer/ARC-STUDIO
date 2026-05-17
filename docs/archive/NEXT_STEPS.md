@@ -53,8 +53,8 @@ uv run arc context pack --task "build theia extension"
 
 ## Medium Term
 
-- [ ] Add CrewAI adapter
-- [ ] Add OpenAI Agents SDK adapter
+- [ ] Expand CrewAI adapter graph extraction and runtime diagnostics
+- [ ] Add OpenAI Agents SDK project entrypoint/export support and streaming
 - [ ] Add AG2 adapter
 - [ ] Implement A2UI v1.0 renderer (when spec stable)
 - [ ] Add Flutter project extension (enable via settings)

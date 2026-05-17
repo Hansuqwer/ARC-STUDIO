@@ -14,5 +14,5 @@ Current summary:
 - Python tests and CLI smoke commands are verified.
 - Node fixture/protocol tests are verified.
 - Theia build, Electron packaging, and E2E are not verified in this environment.
-- Real SwarmGraph/LangGraph execution is not implemented.
+- SwarmGraph and LangGraph have explicit run paths; streaming, audit/replay depth, and end-to-end Theia/E2E verification remain incomplete.
 - Normal product paths must not silently return mock success.

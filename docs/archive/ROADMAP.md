@@ -9,16 +9,16 @@
 
 ## P1
 
-- Implement real SwarmGraph adapter execution, trace, audit, and replay support.
-- Implement real LangGraph graph loading/export.
+- Finish SwarmGraph live streaming, trace persistence, audit, and replay integration.
+- Finish LangGraph streaming/event persistence beyond the explicit export/run path.
 - Extend daemon integration tests beyond run listing and SSE replay.
 - Expand replay viewer beyond JSONL event detail/export.
 - Expand SSE coverage for reconnect/error paths.
 
 ## P2
 
-- Add CrewAI adapter.
-- Add OpenAI Agents SDK adapter.
+- Expand CrewAI adapter graph extraction and runtime diagnostics.
+- Add OpenAI Agents SDK project entrypoint/export support and streaming.
 - Add AG2 adapter.
 - Add signed Electron packaging.
 - Define Open VSX/plugin bundling and license policy.
