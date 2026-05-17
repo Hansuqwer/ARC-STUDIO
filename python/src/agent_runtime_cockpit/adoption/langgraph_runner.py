@@ -110,13 +110,24 @@ class LangGraphAdoptionRunner(AdoptionRunner):
         4. Invoke the LangGraph graph once per assigned task.
         5. Use vendored SwarmGraph consensus over worker votes.
         """
-        _setup_swarmgraph_paths()
+        offline_deterministic = (
+            spec.runtime_config.get("offline_deterministic") is True
+            or (spec.runtime_config.get("offline") is True and spec.runtime_config.get("fake") is True)
+        )
+        if not offline_deterministic:
+            _setup_swarmgraph_paths()
         emit_event(run_id, "STEP_STARTED", {
             "step": "load_graph",
             "mode": self.mode.value,
         })
 
         graph = spec.runtime_config.get("graph")
+        if graph is None and offline_deterministic:
+            graph = _OfflineDeterministicLangGraph(
+                spec.runtime_config.get("objective")
+                or spec.runtime_config.get("prompt")
+                or self.mode.value
+            )
         if graph is None:
             emit_event(run_id, "RUN_FAILED", {
                 "error": "No LangGraph graph provided. "
@@ -142,12 +153,16 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             "description": "Using vendored SwarmGraph queen decomposition",
         })
 
-        tasks, swarm_state = self._queen_decompose(
-            objective=str(spec.runtime_config.get("objective") or graph_input or spec.mode.value),
-            graph_input=graph_input,
-            max_workers=max_workers,
-            run_id=run_id,
-        )
+        objective = str(spec.runtime_config.get("objective") or graph_input or spec.mode.value)
+        if offline_deterministic:
+            tasks, swarm_state = self._offline_queen_decompose(objective, graph_input, max_workers)
+        else:
+            tasks, swarm_state = self._queen_decompose(
+                objective=objective,
+                graph_input=graph_input,
+                max_workers=max_workers,
+                run_id=run_id,
+            )
         emit_event(run_id, "SWARMGRAPH_TOPOLOGY", self._topology_payload(tasks))
         emit_event(run_id, "STEP_COMPLETED", {
             "step": "queen_plan",
@@ -187,7 +202,11 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             "swarmgraph": True,
         })
 
-        result = self._swarmgraph_consensus(swarm_state, worker_proposals)
+        result = (
+            self._offline_consensus(worker_proposals)
+            if offline_deterministic
+            else self._swarmgraph_consensus(swarm_state, worker_proposals)
+        )
         emit_event(run_id, "SWARMGRAPH_CONSENSUS", self._consensus_payload(result))
 
         emit_event(run_id, "STEP_COMPLETED", {
@@ -205,6 +224,46 @@ class LangGraphAdoptionRunner(AdoptionRunner):
         })
 
         return result
+    def _offline_queen_decompose(
+        self,
+        objective: str,
+        graph_input: dict[str, Any],
+        max_workers: int,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        tasks = []
+        for index in range(max(1, max_workers)):
+            worker_id = f"worker-{index + 1}"
+            tasks.append({
+                "task_id": f"task-{index + 1}",
+                "worker_id": worker_id,
+                "role": "worker",
+                "input": {
+                    **graph_input,
+                    "swarmgraph_task": f"fake/offline deterministic task {index + 1}: {objective}",
+                },
+            })
+        return tasks, {"objective": objective, "offline_deterministic": True}
+
+    def _offline_consensus(self, proposals: list[WorkerProposal]) -> ConsensusResult:
+        winning = proposals[0]
+        votes = [
+            Vote(
+                task_id=proposal.task_id,
+                voter_id=proposal.worker_id,
+                proposal_id=f"{proposal.task_id}-{proposal.worker_id}",
+                score=proposal.confidence,
+                reason="Fake/offline deterministic SwarmGraph consensus vote",
+            )
+            for proposal in proposals
+        ]
+        return ConsensusResult(
+            task_id=winning.task_id,
+            winning_proposal=winning,
+            votes=votes,
+            consensus_reached=True,
+            confidence=1.0,
+            metadata={"runtime_mode": "fake/offline", "real_provider_call": False},
+        )
 
     def _topology_payload(self, tasks: list[dict[str, Any]]) -> dict[str, Any]:
         nodes = [{"id": "queen", "role": "queen", "label": "SwarmGraph Queen"}]
@@ -232,6 +291,7 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             ),
             "votes": [vote.model_dump() for vote in result.votes],
             "source": "langgraph+swarmgraph",
+            "real_provider_call": result.metadata.get("real_provider_call"),
         }
 
     def _queen_decompose(
@@ -334,7 +394,7 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             import inspect
             if inspect.isasyncgenfunction(getattr(graph, "astream_events", None)):
                 output = await self._run_async_stream(graph, input_data, run_id, emit_event)
-            elif inspect.iscoroutinefunction(graph.ainvoke):
+            elif inspect.iscoroutinefunction(getattr(graph, "ainvoke", None)):
                 result = await graph.ainvoke(input_data)
                 output = str(result) if result is not None else ""
             else:
@@ -397,3 +457,16 @@ class LangGraphAdoptionRunner(AdoptionRunner):
         raise NotImplementedError(
             "Worker event streaming not yet implemented for LangGraph adoption"
         )
+
+
+class _OfflineDeterministicLangGraph:
+    def __init__(self, objective: Any) -> None:
+        self.objective = str(objective)
+
+    def invoke(self, input_data: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "mode": "fake/offline",
+            "objective": self.objective,
+            "swarmgraph_task": input_data.get("swarmgraph_task"),
+            "real_provider_call": False,
+        }

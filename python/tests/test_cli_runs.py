@@ -95,6 +95,27 @@ def test_run_dry_run_crewai_swarmgraph_fake_ready_no_execution(monkeypatch, tmp_
     assert not (tmp_path / ".arc" / "traces").exists()
 
 
+def test_run_dry_run_langgraph_swarmgraph_fake_offline_ready(tmp_path):
+    result = CliRunner().invoke(app, [
+        "run", "graph.py",
+        "--workspace", str(tmp_path),
+        "--runtime", "langgraph+swarmgraph",
+        "--dry-run",
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)["data"]
+    assert payload["runtime"] == "langgraph+swarmgraph"
+    assert payload["dry_run"] is True
+    assert payload["runnable"] is True
+    assert payload["provider_call"] is False
+    assert payload["dependency_status"]["runtime_mode"] == "fake/offline"
+    assert payload["dependency_status"]["real_provider_call"] is False
+    assert payload["dependency_status"]["real_runtime_gated"] is True
+    assert not payload["blockers"]
+    assert not (tmp_path / ".arc" / "traces").exists()
+
+
 def test_run_crewai_swarmgraph_fake_offline_completes(monkeypatch, tmp_path):
     monkeypatch.setenv("ARC_CREWAI_EXPORT", "crew_module:crew")
     result = CliRunner().invoke(app, [
@@ -121,6 +142,44 @@ def test_run_crewai_swarmgraph_fake_offline_completes(monkeypatch, tmp_path):
     assert len(traces) == 1
 
 
+def test_run_langgraph_swarmgraph_fake_offline_deterministic_trace(tmp_path):
+    args = [
+        "run", "graph.py",
+        "--workspace", str(tmp_path),
+        "--runtime", "langgraph+swarmgraph",
+        "--prompt", "offline prompt",
+        "--json",
+    ]
+
+    first = CliRunner().invoke(app, args)
+    second = CliRunner().invoke(app, args)
+    assert first.exit_code == 0, first.output
+    assert second.exit_code == 0, second.output
+
+    first_data = json.loads(first.output)["data"]
+    second_data = json.loads(second.output)["data"]
+    assert first_data["runtime"] == "langgraph+swarmgraph"
+    assert first_data["status"] == "completed"
+    assert first_data["metadata"]["runtime_mode"] == "fake/offline"
+    assert first_data["metadata"]["real_provider_call"] is False
+    assert first_data["metadata"]["real_runtime_gated"] is True
+
+    first_events = [event["type"] for event in first_data["events"]]
+    second_events = [event["type"] for event in second_data["events"]]
+    assert first_events == second_events
+    assert "SWARMGRAPH_TOPOLOGY" in first_events
+    assert "SWARMGRAPH_CONSENSUS" in first_events
+
+    topology = next(event for event in first_data["events"] if event["type"] == "SWARMGRAPH_TOPOLOGY")
+    consensus = next(event for event in first_data["events"] if event["type"] == "SWARMGRAPH_CONSENSUS")
+    assert {node["id"] for node in topology["data"]["nodes"]} >= {"queen", "worker-1", "worker-2"}
+    assert consensus["data"]["consensus_reached"] is True
+    assert consensus["data"]["real_provider_call"] is False
+
+    traces = list((tmp_path / ".arc" / "traces").glob("run-langgraph-sg-*.jsonl"))
+    assert len(traces) == 2
+
+
 def test_run_dry_run_unknown_profile_fails_closed(tmp_path):
     result = CliRunner().invoke(app, [
         "run", "crew.py",
@@ -145,6 +204,13 @@ def test_runtimes_capabilities_json(tmp_path):
     ids = {runtime["runtime_id"] for runtime in payload["runtimes"]}
     assert ids >= {"swarmgraph", "langgraph", "crewai", "lmarena"}
     assert all("requires_paid_calls" in runtime for runtime in payload["runtimes"])
+    langgraph_sg = next(runtime for runtime in payload["runtimes"] if runtime["runtime_id"] == "langgraph+swarmgraph")
+    assert langgraph_sg["can_run"] is True
+    assert langgraph_sg["availability"] == "runnable"
+    assert langgraph_sg["requires_paid_calls"] is False
+    assert "fake/offline" in langgraph_sg["reason"]
+    assert "real" in langgraph_sg["reason"]
+    assert "gated" in langgraph_sg["reason"]
 
 
 def test_runtimes_capabilities_table(tmp_path):

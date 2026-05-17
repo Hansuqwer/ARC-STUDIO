@@ -107,7 +107,7 @@
 
 **Goal:** Turn fake-tested/gated adoption runners into narrow, honest, real product paths.
 
-**Current:** Adoption protocol/runners exist; only `crewai+swarmgraph` fake/offline CLI path is routed for product use.
+**Current:** Adoption protocol/runners exist. `crewai+swarmgraph` and `langgraph+swarmgraph` fake/offline CLI paths are routed for deterministic product use. Real/provider-backed LangGraph + SwarmGraph adoption remains gated, opt-in-smoke-only, and is not claimed as product-ready.
 
 **Deliverables:**
 - Pick one first real target (`LangGraph + SwarmGraph` recommended).
@@ -145,5 +145,5 @@
 | R3 Provider/Quota UI | Not started | Provider diagnostics panel scaffold |
 | R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
 | R5 SwarmGraph Insight | Complete baseline + first producer events | Add measured cost producer and complete backend live SSE wiring before live-runtime claims |
-| R6 Real Adoption | Deferred | LangGraph + SwarmGraph narrow real path spike |
+| R6 Real Adoption | Partial | Harden LangGraph + SwarmGraph real/provider-backed path behind explicit gates; keep opt-in smoke only |
 | R7 Release Ops | Partial | Refresh checklist evidence; `.env` scrub remains gated |

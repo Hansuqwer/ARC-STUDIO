@@ -182,6 +182,97 @@ class CrewAISwarmGraphFakeAdapter(RuntimeAdapter):
         )
 
 
+class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
+    @property
+    def adapter_id(self) -> str:
+        return "langgraph+swarmgraph"
+
+    @property
+    def adapter_name(self) -> str:
+        return "LangGraph + SwarmGraph (fake/offline)"
+
+    def capabilities(self) -> RuntimeCapabilities:
+        return RuntimeCapabilities(can_run=True, can_trace=True)
+
+    def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
+        return True, 1.0, ["fake/offline deterministic adoption adapter"]
+
+    def capability_report(self, workspace: Path) -> CapabilityReport:
+        return CapabilityReport(
+            runtime_id=self.adapter_id,
+            detected=True,
+            can_run=True,
+            availability="runnable",
+            reason="fake/offline deterministic LangGraph + SwarmGraph path; no provider calls; real path gated",
+            detected_artifacts=["fake/offline deterministic adoption adapter"],
+            requires_paid_calls=False,
+        )
+
+    async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
+        inputs = inputs or {}
+        mode = inputs.get("runtime_mode", "fake/offline")
+        if mode != "fake/offline":
+            raise RuntimeNotRunnable("LangGraph + SwarmGraph real mode is gated behind opt-in smoke tests")
+        runner = AdoptionRegistry.get(AdoptionMode.LANGGRAPH)
+        if runner is None:
+            raise RuntimeNotRunnable("LangGraph adoption runner is not registered")
+        run_id = f"run-langgraph-sg-{uuid.uuid4().hex[:8]}"
+        started = datetime.now(timezone.utc)
+        events: list[RunEvent] = []
+
+        def emit_event(event_run_id: str, event_type: str, data: dict[str, Any]) -> None:
+            events.append(RunEvent(
+                type=event_type,
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                run_id=event_run_id,
+                sequence=len(events),
+                data=data,
+            ))
+
+        emit_event(run_id, "RUN_STARTED", {"workflow_id": workflow_id, "runtime": self.adapter_id, "runtime_mode": mode})
+        spec = AdoptionSpec(
+            mode=AdoptionMode.LANGGRAPH,
+            runtime_config={
+                "graph": _FakeLangGraph(workflow_id),
+                "input": inputs,
+                "objective": inputs.get("prompt") or workflow_id,
+                "offline_deterministic": True,
+            },
+            swarmgraph_config={"mode": mode, "real_provider_call": False},
+        )
+        consensus = await runner.run(spec, run_id, emit_event)
+        ended = datetime.now(timezone.utc)
+        emit_event(run_id, "RUN_COMPLETED", {"confidence": consensus.confidence, "consensus_reached": consensus.consensus_reached})
+        return RunRecord(
+            id=run_id,
+            workflow_id=workflow_id,
+            runtime=self.adapter_id,
+            status=RunStatus.COMPLETED,
+            started_at=started.isoformat(),
+            ended_at=ended.isoformat(),
+            events=events,
+            metadata={
+                "runtime_mode": mode,
+                "adoption": True,
+                "real_provider_call": False,
+                "real_runtime_gated": True,
+                "real_path_absent_reason": "fake/offline deterministic; real provider-backed path gated",
+                "audit_path": None,
+                "audit_absent_reason": "fake/offline adoption run does not create SwarmGraph HMAC audit records",
+                "consensus": consensus.model_dump(),
+            },
+        )
+
+
+class _FakeLangGraph:
+    def __init__(self, workflow_id: str) -> None:
+        self.workflow_id = workflow_id
+
+    def invoke(self, input_data: dict[str, Any]) -> dict[str, str]:
+        prompt = input_data.get("prompt") or input_data.get("swarmgraph_task") or self.workflow_id
+        return {"result": f"fake/offline LangGraph result for {prompt}"}
+
+
 class _FakeCrew:
     def __init__(self, workflow_id: str) -> None:
         self.workflow_id = workflow_id
@@ -193,6 +284,9 @@ class _FakeCrew:
 def list_runtimes(workspace: Path) -> list[CapabilityReport]:
     reports = [adapter.capability_report(workspace) for adapter in default_registry().all()]
     for capability in AdoptionRegistry.list_capabilities(workspace):
+        if capability.mode == AdoptionMode.LANGGRAPH:
+            reports.append(LangGraphSwarmGraphFakeAdapter().capability_report(workspace))
+            continue
         if capability.mode == AdoptionMode.CREWAI:
             reports.append(CrewAISwarmGraphFakeAdapter().capability_report(workspace))
             continue
@@ -216,6 +310,10 @@ def resolve(workspace: Path, runtime: str | Sequence[str] | None = "auto", allow
     if isinstance(runtime, str):
         base_runtime, adoption_mode = AdoptionRegistry.parse_runtime_id(runtime)
         if adoption_mode is not None:
+            if adoption_mode == AdoptionMode.LANGGRAPH:
+                adapter = LangGraphSwarmGraphFakeAdapter()
+                report = adapter.capability_report(workspace)
+                return RoutedRuntime(adapter=adapter, report=report, chosen_by="explicit")
             if adoption_mode == AdoptionMode.CREWAI:
                 adapter = CrewAISwarmGraphFakeAdapter()
                 report = adapter.capability_report(workspace)

@@ -141,23 +141,28 @@ def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str
     dependency_status: dict[str, object] = {}
     export_target_status: dict[str, object] = {}
 
-    if runtime == "crewai+swarmgraph":
+    if runtime in {"crewai+swarmgraph", "langgraph+swarmgraph"}:
         base_runtime, adoption_mode = AdoptionRegistry.parse_runtime_id(runtime)
         capability = next((cap for cap in AdoptionRegistry.list_capabilities(workspace) if cap.mode == adoption_mode), None)
         dependency_status = {
-            "crewai": capability.status.value if capability else "unknown",
+            base_runtime: capability.status.value if capability else "unknown",
             "adoption_runner": bool(capability),
         }
-        if capability:
+        if runtime == "crewai+swarmgraph" and capability:
             warnings.append("CrewAI + SwarmGraph is fake/offline only; no real provider calls or HMAC audit claims.")
             doctor_actions.extend(capability.doctor_actions)
-        export_target = os.environ.get("ARC_CREWAI_EXPORT")
-        export_target_status = {"env": "ARC_CREWAI_EXPORT", "present": bool(export_target), "format": "module:attr"}
-        if not export_target:
-            blockers.append({"code": "MISSING_CREWAI_EXPORT", "message": "Set ARC_CREWAI_EXPORT=module:attr for CrewAI export discovery"})
-        elif ":" not in export_target:
-            blockers.append({"code": "INVALID_CREWAI_EXPORT", "message": "ARC_CREWAI_EXPORT must use module:attr format"})
+            export_target = os.environ.get("ARC_CREWAI_EXPORT")
+            export_target_status = {"env": "ARC_CREWAI_EXPORT", "present": bool(export_target), "format": "module:attr"}
+            if not export_target:
+                blockers.append({"code": "MISSING_CREWAI_EXPORT", "message": "Set ARC_CREWAI_EXPORT=module:attr for CrewAI export discovery"})
+            elif ":" not in export_target:
+                blockers.append({"code": "INVALID_CREWAI_EXPORT", "message": "ARC_CREWAI_EXPORT must use module:attr format"})
+        elif capability:
+            warnings.append("LangGraph + SwarmGraph is fake/offline deterministic; no real provider calls or HMAC audit claims; real path gated.")
+            export_target_status = {"required": False, "reason": "fake/offline deterministic path uses an in-process fixture graph"}
         dependency_status["runtime_mode"] = "fake/offline"
+        dependency_status["real_provider_call"] = False
+        dependency_status["real_runtime_gated"] = True
     else:
         try:
             requested_runtime = [part.strip().lower() for part in runtime.split(",") if part.strip()] if "," in runtime else runtime.lower()

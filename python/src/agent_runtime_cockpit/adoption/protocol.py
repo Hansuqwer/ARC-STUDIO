@@ -66,6 +66,7 @@ class ConsensusResult(BaseModel):
     votes: list[Vote] = Field(default_factory=list)
     consensus_reached: bool
     confidence: float
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class AdoptionStatus(str, Enum):

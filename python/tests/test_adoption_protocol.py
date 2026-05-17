@@ -401,6 +401,50 @@ class TestLangGraphRunner:
         assert consensus[0]["consensus_reached"] is True
         assert "SWARMGRAPH_COST" not in [event_type for event_type, data in events]
 
+    @pytest.mark.asyncio
+    async def test_runner_offline_fake_branch_is_deterministic(self):
+        from agent_runtime_cockpit.adoption.langgraph_runner import (
+            LangGraphAdoptionRunner,
+        )
+
+        async def run_once():
+            events: list[tuple[str, dict]] = []
+            result = await LangGraphAdoptionRunner().run(
+                AdoptionSpec(
+                    mode=AdoptionMode.LANGGRAPH,
+                    runtime_config={
+                        "offline": True,
+                        "fake": True,
+                        "prompt": "deterministic prompt",
+                    },
+                    max_workers=2,
+                ),
+                "lg-sg-offline",
+                lambda run_id, event_type, data: events.append((event_type, data)),
+            )
+            comparable_events = [
+                (event_type, data)
+                for event_type, data in events
+                if event_type in {"SWARMGRAPH_TOPOLOGY", "SWARMGRAPH_CONSENSUS"}
+            ]
+            return result, comparable_events
+
+        first_result, first_events = await run_once()
+        second_result, second_events = await run_once()
+
+        assert first_result.model_dump() == second_result.model_dump()
+        assert first_events == second_events
+        assert first_result.consensus_reached is True
+        assert first_result.metadata["runtime_mode"] == "fake/offline"
+        assert first_result.metadata["real_provider_call"] is False
+        assert [event_type for event_type, data in first_events] == [
+            "SWARMGRAPH_TOPOLOGY",
+            "SWARMGRAPH_CONSENSUS",
+        ]
+        consensus = first_events[-1][1]
+        assert consensus["consensus_reached"] is True
+        assert consensus["real_provider_call"] is False
+
 
 class TestAG2Runner:
     @pytest.mark.asyncio

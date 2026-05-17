@@ -107,10 +107,15 @@ def test_explicit_crewai_not_runnable_without_target(tmp_path):
         runtime_router.resolve(tmp_path, "crewai")
 
 
-def test_adoption_runtime_resolves_as_not_runnable(tmp_path):
-    """Adoption runtime resolves as not runnable (not yet wired into resolve)."""
-    with pytest.raises(runtime_router.RuntimeNotRunnable):
-        runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
+def test_langgraph_swarmgraph_resolves_as_fake_offline_runnable(tmp_path):
+    routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
+
+    assert routed.adapter.adapter_id == "langgraph+swarmgraph"
+    assert routed.chosen_by == "explicit"
+    assert routed.report.can_run is True
+    assert routed.report.availability == "runnable"
+    assert routed.report.requires_paid_calls is False
+    assert "fake/offline" in (routed.report.reason or "")
 
 
 def test_list_runtimes_includes_adoption_modes(monkeypatch, tmp_path):
@@ -121,9 +126,12 @@ def test_list_runtimes_includes_adoption_modes(monkeypatch, tmp_path):
 
     assert "langgraph+swarmgraph" in ids
     adoption = next(report for report in reports if report.runtime_id == "langgraph+swarmgraph")
-    assert adoption.can_run is False
-    assert adoption.availability == "detected_not_runnable"
-    assert "not wired" in (adoption.reason or "")
+    assert adoption.can_run is True
+    assert adoption.availability == "runnable"
+    assert adoption.requires_paid_calls is False
+    assert "fake/offline" in (adoption.reason or "")
+    assert "real" in (adoption.reason or "")
+    assert "gated" in (adoption.reason or "")
 
 
 def test_auto_skips_paid_when_flag_off(monkeypatch, tmp_path):
