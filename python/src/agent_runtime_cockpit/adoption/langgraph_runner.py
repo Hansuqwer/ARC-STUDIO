@@ -66,11 +66,17 @@ class LangGraphAdoptionRunner(AdoptionRunner):
                 if importlib.util.find_spec("langgraph") is None:
                     raise ImportError("langgraph")
                 _setup_swarmgraph_paths()
+                has_vendored_swarmgraph = _SWARM_SHARED_PATH.exists() and _HIVE_SWARM_PATH.exists()
 
             return AdoptionCapability(
                 mode=self.mode,
                 status=AdoptionStatus.RUNNABLE,
-                reason="LangGraph package detected; SwarmGraph adoption path is fake-tested/gated",
+                reason=(
+                    "LangGraph package detected; vendored SwarmGraph paths available; "
+                    "adoption path is fake-tested/gated"
+                    if has_vendored_swarmgraph
+                    else "LangGraph package detected; SwarmGraph adoption path is fake-tested/gated"
+                ),
                 doctor_actions=[],
             )
         except ImportError:

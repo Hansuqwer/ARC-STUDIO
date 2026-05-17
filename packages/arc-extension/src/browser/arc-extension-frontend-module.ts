@@ -78,6 +78,7 @@ export default new ContainerModule(bind => {
         createWidget: () => ctx.container.get<ArcRunTimelineWidget>(ArcRunTimelineWidget),
     })).inSingletonScope();
     bindViewContribution(bind, ArcRunsContribution);
+    bind(FrontendApplicationContribution).toService(ArcRunsContribution);
 
     // Bind the ARC Event Stream widget (advanced trace — available via command, not default-opened)
     bind(ArcEventStreamWidget).toSelf();
@@ -86,6 +87,7 @@ export default new ContainerModule(bind => {
         createWidget: () => ctx.container.get<ArcEventStreamWidget>(ArcEventStreamWidget),
     })).inSingletonScope();
     bindViewContribution(bind, ArcEventStreamContribution);
+    bind(FrontendApplicationContribution).toService(ArcEventStreamContribution);
 
     // Bind the ARC Health Monitor widget
     bind(ArcHealthWidget).toSelf();

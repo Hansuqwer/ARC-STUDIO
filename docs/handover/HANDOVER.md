@@ -1,11 +1,11 @@
 # ARC Studio — Handover for Continued Implementation
 
-**Generated:** 2026-05-15
-**Previous commits:** 34 on main, latest `21e1061 fix: declare config YAML dependency and update status docs`
-**Test count:** 435 passed, 6 skipped (Python), TS protocol + arc-extension builds clean
+**Generated:** 2026-05-15; release-truth refresh 2026-05-17
+**Previous commits:** historical value omitted; check `git status`/`git log` before work.
+**Test count:** Python 782 passed / 14 skipped; TS protocol + arc-extension builds clean; arc-extension test suite 563 tests / 9 suites.
 
 ## Goal
-Continue release-readiness work beyond the first 23 recommended PRs from `docs/IMPLEMENTATION_PLAN.md` with green tests and builds, committing each green slice. P1a through most P5 scaffolding are implemented; current work is release verification, doc truth cleanup, and deferred UX hardening.
+Continue release-readiness work beyond the first 23 recommended PRs from `docs/IMPLEMENTATION_PLAN.md` with green tests and builds. P1a through P5 release-readiness scaffolds and HITL/Audit/Replay UX hardening are implemented; current work is release verification, doc truth cleanup, e2e stabilization, CI confirmation, and migration cleanup. Commit only if explicitly requested.
 
 ## Constraints & Preferences
 - Work in small vertical slices; after each slice run tests/lint/build, fix failures, commit only when green.
@@ -43,8 +43,8 @@ Continue release-readiness work beyond the first 23 recommended PRs from `docs/I
 - ✅ Config model + loader (ADR-001)
 - ✅ Subprocess env allowlists (SwarmGraph adapter only; other adapters are in-process)
 
-### P1b Items Still Open
-- (none; see AGENTS.md current status for completed prompt optimizer, adoption skeleton, and Theia port notes)
+### P1b–P5 Items Still Open
+- (none as a broad implementation phase; see `AGENTS.md` current status for completed prompt optimizer, adoption skeleton/runners, Theia port notes, and release caveats.)
 
 ### In Progress
 - (none)
@@ -54,7 +54,7 @@ Continue release-readiness work beyond the first 23 recommended PRs from `docs/I
 
 ## Next Slices (ordered by impact + dependency)
 
-### Slice A: Release Truth Cleanup
+### Slice A: Release Truth Cleanup ✅ Done locally
 **Why first:** Several handover/release docs are stale after rapid implementation. Bring release-facing docs back in sync before tagging or more feature work.
 
 **Files to review:**
@@ -65,34 +65,21 @@ Continue release-readiness work beyond the first 23 recommended PRs from `docs/I
 
 **Verification:** Banned-claim checker plus targeted grep for stale “not implemented”/“still open” claims.
 
-### Slice B: Port Run Visualization Shell Pieces (Theia UI)
-**Why second:** The most valuable UI work but depends on P1a backends being stable.
+### Slice B: e2e workflow stabilization ✅ Done locally; GitHub confirmation pending push
+**Why second:** Remaining release-work item; Python/node/roadmap fixes are in-repo, while e2e remains unstable.
 
-**Priority order:** `arc-adapters` > `arc-runs` > `arc-workflows` > `arc-event-stream`. Follow `docs/EXTENSION_MIGRATION.md`.
+**Key constraint:** Do not weaken tests to make CI green. Document Theia/browser infra gaps honestly.
 
-**Key constraint:** Protocol adaptation between duplicate widgets; static contract tests only (no jsdom/runtime).
+### Slice C: CI confirmation + release checklist refresh
+**Why third:** Release requires green confirmation on GitHub plus local dry-run evidence.
 
-### Slice C: LangGraph + SwarmGraph Adoption (First P2 Item)
-**Why third:** Builds on P1b adoption skeleton + SwarmGraph import spike.
+**Key constraint:** No release/tag/history rewrite without explicit approval.
 
-**Files to create/modify:**
-- `python/src/agent_runtime_cockpit/adoption/langgraph.py` — adoption runner
-- Tests with fake LangGraph graph
+### Slice D: Theia extension migration Phase C ✅ Wiring cleanup done locally
+**Status:** Release-scope widgets are canonical in `packages/arc-extension`; legacy `theia-extensions/*` packages are unwired from browser/electron apps, root typecheck, and pnpm workspace. Source dirs remain on disk for rollback/history until archive/delete is explicitly approved.
 
-**Implementation notes:** "Convert LangGraph export into worker callable; SG queen assigns deliberation tasks; consensus signs result."
-
-### Slice D: Wire SwarmGraph HMAC Audit Verify Path
-**Dependencies:** SwarmGraph import spike (done), audit refs (partially done).
-
-**Files to modify:**
-- `audit/` — add audit service, verify endpoint
-- `cli.py` — `arc audit verify/export` commands
-- `web/routes.py` — verify endpoint
-
-### Slice E: Enforce Workspace Trust Before Execution
-**Dependencies:** P1a trust resolver (done), isolation provider interface (done).
-
-**Change:** Flip P1a advisory mode → explicit approval/blocking mode in run/profile resolution.
+### Slice E: `.env` history scrub planning only
+**Why gated:** Requires coordinated history rewrite/force-push. Execute only after release date approval.
 
 ## Critical Context
 
@@ -132,9 +119,9 @@ The Python venv is at `python/.venv`. Always use `uv run` to activate it, NOT `.
 | `protocol/events.py` | Event registry (33 types), `create_event()` | — |
 | `storage/indexed_store.py` | Dual-write JSONL + SQLite | 143 |
 | `storage/sqlite.py` | SQLite index (ADR-003 schema) | 232 |
-| `isolating/base.py` | IsolationProvider ABC | 64 |
-| `isolating/none.py` | Direct subprocess provider | 70 |
-| `isolating/subprocess.py` | Env-filtered subprocess provider | 100 |
+| `isolation/base.py` | IsolationProvider ABC | approx |
+| `isolation/none.py` | Direct subprocess provider | approx |
+| `isolation/subprocess.py` | Env-filtered subprocess provider | approx |
 | `config/model.py` | ArcConfig Pydantic model | 122 |
 | `config/loader.py` | YAML config loader | 238 |
 | `adoption/protocol.py` | Adoption Pydantic models | — |
@@ -154,10 +141,10 @@ Tests mirror the source structure but are flat under `python/tests/`:
 
 ### Do Not Overclaim
 Avoid these claims unless tests prove them:
-- "ARC supports SwarmGraph adoption for CrewAI/LangGraph/OpenAI Agents/AG2/LlamaIndex"
+- "ARC supports broad live/provider-backed SwarmGraph adoption for CrewAI/LangGraph/OpenAI Agents/AG2/LlamaIndex"
 - "ARC has live streaming" if the endpoint only replays stored trace events
-- "ARC has signed audit trails" unless using SwarmGraph HMAC audit
-- "AG2 support" until registered and visible in `arc runtimes`
+- "ARC has adapter-wide keyed audit trails" unless the specific run writes keyed audit material
+- "Ungated/live AG2 support"; AG2 is registered/gated, real dependency/runtime path remains gated
 - "LM Arena live mode" as a v0.1 product feature
 - "Production ready," "multi-user," or "tenant-isolated"
 
@@ -165,12 +152,12 @@ Safe language:
 - "Standalone adapter exists"
 - "Detection/static export only"
 - "Stub-default with gated live path (not v0.1 scope)"
-- "Planned SwarmGraph adoption mode"
+- "Fake-tested/gated adoption runners exist; only `crewai+swarmgraph` is currently routed through CLI fake/offline path"
 - "Vendored SwarmGraph runtime includes HMAC audit, HITL, quota, and consensus"
 
 ### Git
-- 34 commits ahead of `origin/main`
-- Working tree has many deleted/untracked docs from historical cleanup — do not revert or stage them
+- Check current branch/status before each slice; preserve unrelated changes.
+- Do not revert or stage user/unrelated worktree changes.
 - Only touch files needed for current slice
 - Commit messages: `type: description` (e.g. `feat:`, `fix:`, `spike:`, `docs:`)
 
@@ -182,10 +169,10 @@ Safe language:
 | 002-run-lifecycle-state-machine | **Done** | ✅ JobSupervisor + cancel + orphan recovery |
 | 003-storage-strategy | **Done** | ✅ IndexedTraceStore + backfill |
 | 004-event-schema-versioning | **Done** | ✅ Event registry + create_event + validate |
-| 005-audit-key-management | P2 target | Spike done, not wired |
+| 005-audit-key-management | Partial | ✅ key manager + hmac_chain + audit verify/export/key; adapter-wide keyed audit population still needs verification |
 | 006-workspace-trust-isolation | **Done** | ✅ Trust resolver + isolation providers |
 | 007-provider-routing-unification | P1-P3 target | Partial |
-| 008-daemon-bundling | P5 target | Not started |
+| 008-daemon-bundling | P5/post-v0.1 | Smoke workflow/scaffold exists; Electron bundling remains post-v0.1 |
 
 ## Relevant Files
 - `docs/IMPLEMENTATION_PLAN.md` — Canonical PR list (23+ beyond)

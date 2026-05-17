@@ -1,8 +1,8 @@
 # ARC Studio — Full Repo Reality Audit
 
-Generated: 2026-05-14
+Generated: 2026-05-14; truth notes refreshed 2026-05-17 for release-facing stale claims.
 
-> **Prerequisite decision confirmed**: `packages/arc-extension` is the true/canonical Theia extension. It is wired into the browser app, has 563 tests in the canonical extension suite, recent commits, and active DI bindings. `theia-extensions/arc-core` is a duplicate/alternative that should be reconciled or removed.
+> **Prerequisite decision confirmed**: `packages/arc-extension` is the true/canonical Theia extension. It is wired into the browser app, has 563 tests in the canonical extension suite, recent commits, and active DI bindings. Legacy `theia-extensions/*` source directories remain on disk for rollback/history only; they are unwired from browser/electron apps, root typecheck, and the pnpm workspace. This audit is historical unless a row is explicitly refreshed below.
 
 ---
 
@@ -10,15 +10,15 @@ Generated: 2026-05-14
 
 1. **ARC Studio is a Python CLI + local aiohttp daemon, NOT a real IDE.** The Theia shell exists (12 extensions, meaningful widget code) but talks to the Python daemon via JSON-RPC or CLI subprocess. There is no embedded Python runtime in the Theia process.
 
-2. **There are TWO live Theia extension packages, which is contradictory.** `packages/arc-extension` is the canonical one (per user confirmation). `theia-extensions/arc-core` is a parallel implementation. The README says `arc-extension` is dead — this is false. Both are live. This must be reconciled.
+2. **There is one live Theia extension path for release scope.** `packages/arc-extension` is canonical. Legacy `theia-extensions/*` source dirs are retained for rollback/history but are not workspace-active or app-wired.
 
 3. **SwarmGraph (vendored in `runtimes/swarmgraph/`) is a real, working runtime.** It has queen/worker graph, 3-protocol consensus, HITL/interrupt, HMAC-SHA256 audit chain, multi-provider gateway (12 providers), quota, replay safety, deterministic orchestration. But ARC does NOT use it as a shared "adoption layer" for other runtimes. ARC calls it only as a CLI subprocess (`swarmgraph swarm --json`).
 
-4. **No runtime adapter uses SwarmGraph as its execution engine.** Every adapter runs standalone: SwarmGraph CLI, LangGraph via `importlib`, CrewAI via `importlib`, OpenAI Agents via in-process SDK, AG2 via `a_run_group_chat`. There is zero shared SwarmGraph orchestration wrapping other runtimes — no other runtime goes through queen/worker/consensus/HITL/audit.
+4. **Refresh 2026-05-17:** fake-tested/gated SwarmGraph adoption runners now exist for LangGraph, AG2, CrewAI, OpenAI Agents, and LlamaIndex. Only `crewai+swarmgraph` is currently exposed as a CLI fake/offline path; do not claim broad live/provider-backed adoption.
 
 5. **CrewAI and OpenAI Agents adapters have real runtime execution code** (not just mocks). Both can import the real library, resolve workspace exports, run workflows, and return RunRecords. However `export_workflow()` returns only a single static node (`_static.py:static_workflow`). No graph extraction.
 
-6. **AG2 adapter code exists but is NOT registered in the adapter registry.** It has a runner, detections, and mapping but is absent from `adapters/registry.py:build_default()`. It is invisible to `arc runtimes` and `arc run`.
+6. **Refresh 2026-05-17:** AG2 is registered/gated in current runtime capability reporting; real dependency/runtime paths remain gated.
 
 7. **The LM Arena adapter and service are stub-default with a gated live path.** All four modes (battle/direct/code/agent-arena-preview) return canned stub text. There is zero live LLM integration. `ARC_ALLOW_LIVE_ARENA=true` gates nothing real in the current v0.1 code.
 
@@ -26,7 +26,7 @@ Generated: 2026-05-14
 
 9. **Test coverage is entirely unit/contract/mock.** No end-to-end test proves any real runtime executes a real workflow. Tests prove ARC plumbing, schema compatibility, trace persistence, and SSE endpoints — but not runtime execution against real SwarmGraph/LangGraph/CrewAI/OpenAI Agents.
 
-10. **Security: no auth by default** (optional bearer token via `ARC_DAEMON_TOKEN`), subprocess env redaction implemented but not comprehensive, audit chain is SHA-256 only (no HMAC), no concurrent-user readiness, no release packaging.
+10. **Security:** no auth by default (optional bearer token via `ARC_DAEMON_TOKEN`), subprocess env redaction exists, ARC adapter run paths generally use SHA-256 audit chains, and a separate keyed-audit CLI/key-management path exists. Do not claim concurrent-user readiness or adapter-wide keyed audit without run-specific evidence.
 
 ---
 
@@ -35,15 +35,15 @@ Generated: 2026-05-14
 | Area | Intended | Actual | Status | Evidence | Gap |
 |---|---|---|---|---|---|
 | **Product identity** | Eclipse Theia IDE + Python backend | Python CLI/daemon with Theia shell frontend | Partial | README L3; `web/server.py` L1-5; 12 theia-extensions | Theia is a thin UI overlay, not the primary product |
-| **Extension split** | Single extension path | TWO live extensions: `packages/arc-extension` (canonical) + `theia-extensions/arc-core` (duplicate) | Contradictory | `applications/browser/package.json` depends on `arc-extension`; `arc-core` has parallel impl; README L208 claims arc-extension is dead (false) | Must reconcile: keep arc-extension, deprecate/remove arc-core |
+| **Extension split** | Single extension path | `packages/arc-extension` is the only release-wired extension path; legacy `theia-extensions/*` source retained outside workspace | Mostly resolved | `applications/browser/package.json` and `applications/electron/package.json` depend on `arc-extension`; `pnpm-workspace.yaml` excludes legacy extensions | Archive/delete legacy source after rollback window |
 | **SwarmGraph vendored** | In-repo canonical runtime | 3-package monorepo with full queen/worker/consensus/HITL/audit | Implemented | `runtimes/swarmgraph/packages/`; `hive-swarm/swarm/nodes/consensus.py`; `swarm_shared/audit.py` | Full, not partial |
-| **SwarmGraph as adoption layer** | All runtimes run through SwarmGraph | No adapter uses SwarmGraph engine | Fiction | `swarmgraph/runner.py` calls CLI subprocess; all other adapters import runtimes directly | **Core gap: no adoption layer exists** |
-| **SwarmGraph audit in ARC** | HMAC-SHA256 signed audit chain | SHA-256 hash chain (no HMAC secret) | Partial | `audit/chain.py` L1-5 SHA256 only; `swarm_shared/audit.py` has real HMAC | ARC audit is simplified; SwarmGraph audit not exposed |
+| **SwarmGraph as adoption layer** | All runtimes run through SwarmGraph | Fake-tested/gated adoption runners exist; CLI routing is currently limited to `crewai+swarmgraph` fake/offline path | Partial/scaffolded | `adoption/`; `runtime_router.py` | Broad live/provider-backed adoption remains not a v0.1 product claim |
+| **SwarmGraph audit in ARC** | HMAC-SHA256 signed audit chain | ARC adapter paths generally use SHA-256 chains; HMAC audit/key CLI path exists separately | Partial | `audit/chain.py`; `audit/hmac_chain.py`; `audit/key_manager.py`; `arc audit verify/export/key` | Adapter-wide HMAC audit population still needs verification |
 | **LangGraph adapter** | Full detection + run + stream | Real `importlib` run, AST fallback, streaming fallback | Implemented | `langgraph.py` L159-198 real run; L200-224 stream impl | No live streaming into ARC traces |
 | **CrewAI adapter** | Full detection + run + graph | Real `importlib` run, static workflow export, paid-call gating | Partial | `crewai.py` L119-154 real run; L113-117 static export | Graph extraction missing; static export only |
-| **OpenAI Agents adapter** | Detection + run + stream | Inline hardcoded TestAgent, static export, RunHooks | Partial | `openai_agents.py` L268-281 hardcoded `Agent(name="TestAgent")` | No workspace export target; hardcoded agent |
-| **AG2 adapter** | Registered + runnable | Code exists but NOT registered | Stub-only | `adapters/ag2/runner.py` exists; NOT in `registry.py:build_default()` | Not wired; invisible to CLI/daemon |
-| **LlamaIndex adapter** | Detection + export | Static detection only; no run | Partial | `llamaindex.py` 38 lines, detect only, no run_workflow | No execution capability |
+| **OpenAI Agents adapter** | Detection + run + stream | Workspace export target/fake-tested gated path; static export remains limited | Partial | `adapters/openai_agents.py` | No broad live provider claim |
+| **AG2 adapter** | Registered + runnable | Registered/gated path exists | Partial | `adapters/ag2/` | Real dependency/runtime path gated |
+| **LlamaIndex adapter** | Detection + export/run/adoption scaffold | Fake-tested/gated adapter/adoption path exists | Partial | `adapters/llamaindex.py`; `adoption/` | No broad live provider claim |
 | **LM Arena adapter** | Live provider comparison | 100% stub responses | Static | `arena/service.py` L78-150 `_stub_battle/direct/code/agent_preview` | No real LLM calls |
 | **Combo adapter** | SwarmGraph composition | Sequential for-loop, no composition | Static | `runtime_router.py:ComboRuntimeAdapter` L42-101 | Not adoption; not SwarmGraph |
 | **Theia UI** | Full runtime cockpit | Status cards + basic actions | Partial | `arc-main-widget.tsx` runtime readiness, recent runs | No runtime config, HITL, audit viewer, event stream |
@@ -60,21 +60,21 @@ Generated: 2026-05-14
 | SwarmGraph | YES (heuristic) | YES (AST + fixture fallback) | YES (CLI subprocess) | NO | NO (ARC audit, not SG HMAC) | Implemented | `swarmgraph.py` L187-227 detect; L229-290 export; L292-404 run |
 | LangGraph | YES (dep check) | YES (real import, AST, fixture) | YES (importlib) | YES (fallback) | NO | Implemented | `langgraph.py` L246-280 detect; L282-498 export; L159-198 run; L200-224 stream |
 | CrewAI | YES (dep check) | Static only (1 node) | YES (importlib) | NO | NO | Partial | `crewai.py` L103-111 detect; L113-117 static export; L119-154 run |
-| OpenAI Agents | YES (dep check) | Static only (1 node) | YES (importlib, hardcoded agent) | NO | NO | Partial | `openai_agents.py` L132-148 detect; L150-154 static export; L156-323 run |
-| AG2 | YES (modular code) | Static only | YES if registered | NO | NO | Stub (not registered) | `adapters/ag2/` code exists; NOT in `registry.py:build_default()` |
-| LlamaIndex | YES (dep check) | Static only (1 node) | NO | NO | NO | Partial | `llamaindex.py` 38 lines, no run_workflow |
+| OpenAI Agents | YES (dep check) | Static only (1 node) | YES via workspace export target/fake-tested gated path | NO | ARC trace/audit only unless HMAC material exists | Partial | `adapters/openai_agents.py` |
+| AG2 | YES (modular code) | Static only | Gated/fake-tested path | NO | ARC trace/audit only unless HMAC material exists | Partial | `adapters/ag2/` |
+| LlamaIndex | YES (dep check) | Static only (1 node) | Gated/fake-tested path | NO | ARC trace/audit only unless HMAC material exists | Partial | `adapters/llamaindex.py` |
 
 ### "+ SwarmGraph Adoption Layer" Runtimes
 
 | Runtime + SG | Current status | Evidence | Gap to vision |
 |---|---|---|---|
-| CrewAI + SwarmGraph | **Does not exist** | No code references SG adoption | Need SwarmGraph runner wrapping CrewAI kickoff through queen/workers/consensus |
-| LangGraph + SwarmGraph | **Does not exist** | No code references SG adoption | Need SG wrapper around LangGraph graphs |
-| OpenAI Agents + SwarmGraph | **Does not exist** | No code references SG adoption | Need SG runner wrapping Agents SDK Runner.run() |
-| AG2 + SwarmGraph | **Does not exist** | No code references SG adoption | Need SG runner wrapping AG2 group chat |
-| LlamaIndex + SwarmGraph | **Does not exist** | No code references SG adoption | Need SG runner wrapping LI workflows |
+| CrewAI + SwarmGraph | Fake/offline CLI path exists | `crewai+swarmgraph` route; fake adapter emits trace events with `real_provider_call=false` | Real provider-backed adoption remains gated/not claimed |
+| LangGraph + SwarmGraph | Runner exists; not broadly productized | `adoption/` | CLI/router product path needs explicit wiring/verification before release claim |
+| OpenAI Agents + SwarmGraph | Runner exists; fake-tested/gated | `adoption/` | No broad live provider claim |
+| AG2 + SwarmGraph | Runner exists; fake-tested/gated | `adoption/` | Real dependency/runtime path gated |
+| LlamaIndex + SwarmGraph | Runner exists; fake-tested/gated | `adoption/` | No broad live provider claim |
 
-**None of the "+ SwarmGraph" modes exist.** The concept is pure fiction in code. The `ComboRuntimeAdapter` is a sequential for-loop — it does not use queen/worker decomposition, voting, consensus, HITL, or audit.
+**Refresh 2026-05-17:** `+swarmgraph` adoption scaffolds/runners exist, with `crewai+swarmgraph` exposed as a fake/offline CLI path. `ComboRuntimeAdapter` remains sequential and is not SwarmGraph adoption.
 
 ---
 
@@ -91,27 +91,19 @@ Generated: 2026-05-14
 - **TraceViewerSection**: Trace viewer UI section with filtering
 - **WorkflowDetectionSection**: Workflow detection UI section
 
-### Partially Wired Views (in `theia-extensions/`)
-- **Runtime/Provider Readiness** (`arc-adapters`): Shows adapter detect/run/gate status with DoctorAction suggestions
-- **Workflow Graph** (`arc-workflows`): SVG graph layout for exported workflow nodes/edges
-- **Schema Inspector** (`arc-schemas`): JSON schema viewer with detail/raw toggle
-- **Event Stream** (`arc-event-stream`): SSE event stream viewer with filtering
-- **Run Timeline** (`arc-runs`): Chat launcher, timeline, run diff
-- **Health** (`arc-health`): Daemon status poller
-- **Welcome Widget** (`arc-welcome-widget.tsx`): Getting-started landing page
-- **Context Pack** (`arc-context`): Trigger context pack generation
-- **Provider Accounts** (`arc-service-impl.ts`): REST endpoints exist but `listProviders()` returns hardcoded data (no daemon routing)
-- **Cost Warning** (`cost-warning/`): directory exists
-- **Arena** (`arc-arena`): Theia extension with node service impl but backend not wired in `package.json`
+### Legacy Views (source retained, not wired)
+- Legacy `theia-extensions/*` source dirs remain on disk for rollback/history only and are not active in browser/electron apps, root typecheck, or the pnpm workspace.
+- Release-scope views ported into `packages/arc-extension` include adapters, workflow graph, run timeline, event stream, health, status/welcome, chat launch UI, and run diff UI/service.
+- `arc-context`, `arc-schemas`, and `arc-arena` remain legacy/out-of-scope source references unless intentionally ported later.
 
 ### Missing Core UX
-- Runtime selection/comparison dropdown (none exists)
+- Runtime/profile selection exists in the modern Chat tab; richer comparison/setup UX remains deferred.
 - Adapter config UI (set `ARC_CREWAI_EXPORT`, etc.)
 - SwarmGraph adoption mode toggle (fiction)
 - Live run launch with streaming events (only post-hoc replay via SSE)
 - Live event stream during run (SSE is replay-only from stored JSONL)
-- Audit viewer (no endpoint exposes audit chain data)
-- HITL approval UI (no Theia view for `interrupt` payloads)
+- Dedicated audit viewer remains deferred; Runs tab exposes audit verification info for selected runs.
+- Dedicated HITL inbox remains deferred; Runs tab exposes pending prompt approval/rejection basics.
 - Provider/cost controls (daemon routes exist, no Theia view)
 - Workspace/project setup wizard
 - Run comparison side-by-side
@@ -123,16 +115,16 @@ Generated: 2026-05-14
 
 | Claim | Location | Reality |
 |---|---|---|
-| "Support for OpenAI Agents SDK" | README L3, L14 | Implementation exists but `run_workflow()` creates a hardcoded `Agent(name="TestAgent")` — it does NOT load actual user workspace agents |
-| "Support for LlamaIndex" | README L3 | 38-line detect-only adapter. No `run_workflow()`. Cannot execute any LlamaIndex workflow |
+| "Support for OpenAI Agents SDK" | README L3, L14 | Current support is workspace-export/fake-tested/gated; no broad live provider claim |
+| "Support for LlamaIndex" | README L3 | Current support is fake-tested/gated; no broad live provider claim |
 | "ARC Studio uses SwarmGraph as canonical runtime/adoption layer" | README L12-13 | ARC calls SwarmGraph CLI as subprocess; no adapter adopts SwarmGraph engine. "Adoption layer" is a marketing term |
-| "$ runtime + SwarmGraph adoption layer" | Product vision | Zero code. ComboRuntimeAdapter is sequential, not SwarmGraph |
+| "$ runtime + SwarmGraph adoption layer" | Product vision | Scaffolds/runners exist, but broad live/provider-backed adoption is not a v0.1 product claim. ComboRuntimeAdapter is sequential, not SwarmGraph |
 | "packages/arc-extension is not used" | Historical README wording | **FALSE** — confirmed as the true extension. Actively maintained, wired into browser app, 563 canonical extension tests, recent commits |
 | "LM Arena with live modes" | `lmarena.py` docstring | All 4 arena modes are 100% stub responses. `ARC_ALLOW_LIVE_ARENA=true` is a fiction — no live provider integration |
 | "CLI has 15 commands" | README L142-155 | Commands exist but `eval`, `context` are thin wrappers; `adapter test` runs conformance only; `run` defaults to fixture ID |
-| "HMAC-SHA256 audit chain in ARC" | `docs/SECURITY_AUDIT_REPORT.md` | ARC's `audit/chain.py` uses SHA-256 hash chaining (no HMAC secret). HMAC exists only in the vendored SwarmGraph package |
+| "HMAC-SHA256 audit chain in ARC" | `docs/SECURITY_AUDIT_REPORT.md` | ARC has `audit/hmac_chain.py` + key manager + CLI verify/export/key path, but adapter-wide run paths generally still use SHA-256 chains unless HMAC material is explicitly written |
 | "ARC can stream live events" | `RUNTIMES.md` streaming section | SSE endpoint (`run_events_sse`) reads stored JSONL traces — replay only. No live streaming channel |
-| "AG2 support" | README L163-164 | Code exists but is NOT registered. `arc runtimes` will never show AG2 |
+| "AG2 support" | README L163-164 | AG2 is registered/gated; real dependency/runtime execution remains gated |
 | "Combo runtime = SwarmGraph composition" | `runtime_router.py:ComboRuntimeAdapter` | Sequential for-loop adapter execution. No SwarmGraph concepts |
 
 ---
@@ -154,7 +146,9 @@ Generated: 2026-05-14
 
 ---
 
-## 7. Recommended Roadmap
+## 7. Historical Roadmap Snapshot
+
+This section is retained as historical audit context from 2026-05-14. Many items below are now complete, scaffolded, or explicitly deferred; use `docs/handover/HANDOVER.md` and `docs/handover/NEXT_IMPLEMENTATION_HANDOVER.md` for current ordered work.
 
 ### P0: Make Truth Coherent and Runnable (1-2 weeks)
 
@@ -232,9 +226,9 @@ Generated: 2026-05-14
 
 ### Claims Safe to Make
 - "ARC Studio is a Python CLI and daemon for inspecting, running, and debugging agent workflows"
-- "Supports standalone execution via adapters for: SwarmGraph, LangGraph, CrewAI, OpenAI Agents SDK (partial), AG2 (pending registry)"
+- "Supports standalone execution via adapters for: SwarmGraph, LangGraph, CrewAI, OpenAI Agents SDK (workspace export/gated), AG2 (registered/gated), LlamaIndex (gated)"
 - "SwarmGraph is vendored as an in-repo runtime with queen/worker orchestration, consensus, HITL, HMAC audit chain, and provider gateway"
-- "LlamaIndex: detection only"
+- "LlamaIndex: gated/fake-tested path; no broad live provider claim"
 - "LM Arena: stub/test mode only"
 - "Trace visualization via Theia shell (optional); `packages/arc-extension` is the primary Theia extension"
 - "All runtime execution is gated behind environment variables and paid-call flags"
@@ -242,11 +236,11 @@ Generated: 2026-05-14
 - "No telemetry. Loopback-only by default."
 
 ### Claims to Remove/Change
-- "Adoption layer for all runtimes" → not implemented
-- "OpenAI Agents SDK full support" → partial, hardcoded agent
-- "LlamaIndex support" → detection only
-- "AG2 support" → not registered
+- "Adoption layer for all runtimes" → fake-tested/gated runners exist; broad live/provider-backed support is not a v0.1 claim
+- "OpenAI Agents SDK full support" → workspace-export/gated path only; no broad live provider claim
+- "LlamaIndex support" → gated/fake-tested path only; no broad live provider claim
+- "AG2 support" → registered/gated; real dependency/runtime path gated
 - "`packages/arc-extension` not used" → **FALSE** — it IS the canonical extension
-- "HMAC-SHA256 audit" → ARC hash chain only, HMAC in SG package
+- "HMAC-SHA256 audit" → adapter paths generally use ARC SHA-256 chains; keyed CLI audit path exists separately
 - "Live streaming" → replay only
 - "15 CLI commands" → 9-10 are real, rest are thin

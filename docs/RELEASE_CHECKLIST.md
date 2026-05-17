@@ -85,7 +85,7 @@ cd python && uv run arc runtimes --capabilities --json | python -m json.tool
 
 **Check:**
 ```bash
-bash scripts/check-banned-claims.sh README.md docs/IMPLEMENTATION_PLAN.md docs/REALITY_AUDIT.md docs/RELEASE_CHECKLIST.md
+bash scripts/check-banned-claims.sh AGENTS.md README.md docs/IMPLEMENTATION_PLAN.md docs/REALITY_AUDIT.md docs/RELEASE_CHECKLIST.md docs/EXTENSION_MIGRATION.md docs/handover/HANDOVER.md
 # Expect: "OK: No banned claims found."
 ```
 
@@ -123,11 +123,11 @@ pnpm --filter arc-extension test
 
 **Status:** ✅ Passing scoped release-doc check locally (2026-05-15)
 
-`README.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/REALITY_AUDIT.md`, and this checklist pass the banned-claims checker. The checker intentionally excludes archived, ADR, spike, and audit/planning files from release-facing claim checks because they preserve historical context rather than current product claims.
+`AGENTS.md`, `README.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/REALITY_AUDIT.md`, `docs/RELEASE_CHECKLIST.md`, `docs/EXTENSION_MIGRATION.md`, and `docs/handover/HANDOVER.md` pass the banned-claims checker. The checker intentionally excludes archived, ADR, spike, and audit/planning files from release-facing claim checks because they preserve historical context rather than current product claims.
 
 **Check:**
 ```bash
-bash scripts/check-banned-claims.sh README.md docs/IMPLEMENTATION_PLAN.md docs/REALITY_AUDIT.md docs/RELEASE_CHECKLIST.md
+bash scripts/check-banned-claims.sh AGENTS.md README.md docs/IMPLEMENTATION_PLAN.md docs/REALITY_AUDIT.md docs/RELEASE_CHECKLIST.md docs/EXTENSION_MIGRATION.md docs/handover/HANDOVER.md
 # Exit 0 means no banned claims in current public release docs.
 # Manual review confirming no "adoption layer" language in README describing current behavior.
 ```
@@ -202,17 +202,17 @@ gh issue list --state open --label security
 
 **Status:** ✅ Passing locally (2026-05-15)
 
-README reviewed during docs freeze pass. Electron is post-v0.1, AG2 is described as a registered/gated standalone adapter, and SwarmGraph adoption is described as planned rather than implemented.
+README reviewed during docs freeze pass. Electron is post-v0.1, AG2 is described as a registered/gated standalone adapter, and SwarmGraph adoption is described as fake-tested/gated rather than broad live/provider-backed product support.
 
 **Check:** Manual review of README.md:
-- Does not claim SwarmGraph adoption as implemented
+- Does not claim broad live/provider-backed SwarmGraph adoption as implemented
 - Does not claim active-run event delivery (says "SSE trace replay" if applicable)
-- Does not claim HMAC-keyed audit trails
+- Does not claim adapter-wide HMAC-keyed audit trails
 - LM Arena described as "stub-default with gated live path"
 - No mention of Electron as current release path
 - AG2 described honestly (registered standalone adapter; real dependency/runtime path gated)
-- OpenAI Agents described honestly ("partial, hardcoded agent")
-- LlamaIndex described honestly ("detection only")
+- OpenAI Agents described honestly (workspace export target/fake-tested gated path; no broad live provider claim)
+- LlamaIndex described honestly (fake-tested/gated adapter/adoption path; no broad live provider claim)
 
 ---
 

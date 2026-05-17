@@ -9,6 +9,7 @@ No provider calls are made — only import and availability checks.
 from __future__ import annotations
 
 import os
+import importlib.util
 
 import pytest
 
@@ -25,33 +26,36 @@ def _requires_real_runtime_smoke() -> None:
         pytest.skip("set ARC_REAL_RUNTIME_SMOKE=1 to run real-runtime smoke tests")
 
 
+def _requires_crewai_runtime() -> None:
+    _requires_real_runtime_smoke()
+    if importlib.util.find_spec("crewai") is None:
+        pytest.skip("crewai package is not installed; skipping optional real-runtime CrewAI smoke")
+
+
+def _requires_crewai_export() -> str:
+    _requires_crewai_runtime()
+    export_env = "ARC_CREWAI_EXPORT"
+    value = os.environ.get(export_env)
+    if value is None:
+        pytest.skip(f"set {export_env}=module:attr to run optional real-runtime CrewAI smoke")
+    if ":" not in value:
+        pytest.fail(f"{export_env} must use module:attr format (e.g. my_crew:crew)")
+    return value
+
+
 def test_crewai_package_importable() -> None:
     """Verify CrewAI can be imported when available."""
-    _requires_real_runtime_smoke()
-
-    import importlib.util
-    assert importlib.util.find_spec("crewai") is not None, (
-        "crewai package is not installed. Run: pip install crewai"
-    )
+    _requires_crewai_runtime()
 
 
 def test_crewai_export_env_is_set() -> None:
     """Verify ARC_CREWAI_EXPORT is set for real-runtime smoke."""
-    _requires_real_runtime_smoke()
-
-    export_env = "ARC_CREWAI_EXPORT"
-    value = os.environ.get(export_env)
-    assert value is not None, (
-        f"Set {export_env}=module:attr to your Crew entry point"
-    )
-    assert ":" in value, (
-        f"{export_env} must use module:attr format (e.g. my_crew:crew)"
-    )
+    _requires_crewai_export()
 
 
 def test_crewai_adoption_runner_availability_reports_real_status(tmp_path) -> None:
     """Verify CrewAI adoption runner detects real availability."""
-    _requires_real_runtime_smoke()
+    _requires_crewai_runtime()
 
     _setup_swarmgraph_paths()
 
@@ -66,7 +70,7 @@ def test_crewai_adoption_runner_availability_reports_real_status(tmp_path) -> No
 
 def test_crewai_standalone_adapter_detects_export(tmp_path) -> None:
     """Verify standalone CrewAI adapter can detect export target."""
-    _requires_real_runtime_smoke()
+    _requires_crewai_export()
 
     from agent_runtime_cockpit.adapters.crewai import CrewAIAdapter
 

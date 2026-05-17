@@ -78,28 +78,26 @@ test('Fixture is clearly marked as mock', () => {
   assert.ok(FIXTURE_RUN.metadata._mock === true);
 });
 
-test('Theia startRun uses positional workflow CLI argument', () => {
-  const servicePath = path.join(__dirname, '../../theia-extensions/arc-core/src/node/arc-service-impl.ts');
+test('Canonical workflow executor uses positional prompt CLI argument', () => {
+  const servicePath = path.join(__dirname, '../../packages/arc-extension/src/node/services/workflow-executor.ts');
   const source = fs.readFileSync(servicePath, 'utf8');
-  assert.ok(source.includes("const args = ['run', request.workflow_id,"));
-  assert.ok(!source.includes("['run', '--workflow',"));
+  assert.ok(source.includes("'swarm',"));
+  assert.ok(source.includes("'--json',"));
+  assert.ok(source.includes('prompt,'));
+  assert.ok(!source.includes("'--workflow',"));
 });
 
-test('Theia backend error envelope preserves sanitized details', () => {
-  const servicePath = path.join(__dirname, '../../theia-extensions/arc-core/src/node/arc-service-impl.ts');
+test('Canonical workflow executor sanitizes execution errors', () => {
+  const servicePath = path.join(__dirname, '../../packages/arc-extension/src/node/services/workflow-executor.ts');
   const source = fs.readFileSync(servicePath, 'utf8');
-  assert.ok(source.includes('details: {'));
-  assert.ok(source.includes('command,'));
   assert.ok(source.includes('stderr'));
   assert.ok(source.includes('stdout'));
-  assert.ok(source.includes('sanitize'));
-  assert.ok(source.includes('REDACTED'));
+  assert.ok(source.includes('strictSanitizeErrorMessage'));
 });
 
-test('Theia backend does not expose normal mock fallback', () => {
-  const servicePath = path.join(__dirname, '../../theia-extensions/arc-core/src/node/arc-service-impl.ts');
+test('Canonical workflow executor does not expose normal mock fallback', () => {
+  const servicePath = path.join(__dirname, '../../packages/arc-extension/src/node/services/workflow-executor.ts');
   const source = fs.readFileSync(servicePath, 'utf8');
-  assert.ok(source.includes('errorEnvelope'));
   assert.ok(!source.includes('mockFallback'));
   assert.ok(!source.includes('MOCK_DATA'));
 });

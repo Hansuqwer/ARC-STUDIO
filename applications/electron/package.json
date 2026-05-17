@@ -39,17 +39,7 @@
     "@theia/search-in-workspace": "1.71.0",
     "@theia/getting-started": "1.71.0",
     "@theia/keymaps": "1.71.0",
-    "arc-core": "workspace:*",
-    "arc-workflows": "workspace:*",
-    "arc-runs": "workspace:*",
-    "arc-schemas": "workspace:*",
-    "arc-context": "workspace:*",
-    "arc-adapters": "workspace:*",
-    "arc-audit": "workspace:*",
-    "arc-health": "workspace:*",
-    "arc-event-stream": "workspace:*",
-    "arc-product": "workspace:*",
-    "arc-settings": "workspace:*"
+    "arc-extension": "workspace:*"
   },
   "devDependencies": {
     "@theia/cli": "1.71.0",

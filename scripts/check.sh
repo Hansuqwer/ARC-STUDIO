@@ -11,9 +11,9 @@ run_check() {
   local name="$1"; shift
   echo -n "  $name... "
   if "$@" &>/dev/null; then
-    echo "✓"; ((PASS++))
+    echo "✓"; ((++PASS))
   else
-    echo "✗ FAILED"; ((FAIL++))
+    echo "✗ FAILED"; ((++FAIL))
   fi
 }
 
@@ -38,8 +38,8 @@ echo "Files:"
 run_check "python/pyproject.toml" test -f python/pyproject.toml
 run_check "applications/browser"  test -f applications/browser/package.json
 run_check "applications/electron" test -f applications/electron/package.json
-run_check "arc-core extension"    test -f theia-extensions/arc-core/src/common/arc-protocol.ts
-run_check "docs/ARCHITECTURE.md" test -f docs/ARCHITECTURE.md
+run_check "arc-extension protocol" test -f packages/arc-extension/src/common/arc-protocol.ts
+run_check "docs/IMPLEMENTATION_PLAN.md" test -f docs/IMPLEMENTATION_PLAN.md
 
 echo ""
 if [[ $FAIL -eq 0 ]]; then

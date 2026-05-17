@@ -12,7 +12,6 @@ ARC Studio is an Agent Runtime Cockpit IDE built on Eclipse Theia. It provides a
 arc-theia-studio/
 ├── packages/
 │   ├── arc-ag-ui/           # Agent UI components (React)
-│   ├── arc-browser-app/     # DEPRECATED — use applications/browser/ instead (Theia ^1.45.0, stale)
 │   ├── arc-extension/       # Main ARC extension (backend + frontend)
 │   ├── arc-protocol-ts/     # TypeScript protocol types
 │   └── arc-test-fixtures/   # Test fixtures and sample projects
@@ -66,7 +65,7 @@ arc-theia-studio/
 The primary extension package. Contains backend services and frontend widgets.
 
 **Backend (`src/node/`):**
-- `arc-backend-service.ts` - Orchestration layer (276 lines). Coordinates services via DI.
+- `arc-backend-service.ts` - Orchestration layer (1125 lines). Coordinates services via DI; needs follow-up split.
 - `services/workflow-executor.ts` - SwarmGraph workflow execution with process management
 - `services/trace-parser.ts` - JSONL trace parsing, streaming, validation
 - `services/workflow-detector.ts` - SwarmGraph/LangGraph detection via safe spawn
@@ -146,7 +145,7 @@ cd python && uv run pytest tests/web/ --log-cli-level=DEBUG -s  # Web tests with
 
 ### P0-3: Backend Modularization
 Split the monolithic `arc-backend-service.ts` (1,329 lines) into:
-- Orchestration layer (now 733 lines — grew post-refactor with config/CLI/receipt/autopsy methods; needs re-split into config-service + run-lifecycle-service)
+- Orchestration layer (now 1125 lines — grew post-refactor with config/CLI/receipt/autopsy/HITL/audit/replay methods; needs re-split into config-service + run-lifecycle-service)
 - 4 specialized service modules (each < 500 lines)
 - Explicit DI bindings for testability
 - Replaced `execSync` with safe `spawn('which', [name], {shell:false})`
@@ -178,7 +177,7 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - Webpack split chunks configured
 - Main bundle reduced from 27 MiB → 50 KiB (our code)
 - Monaco editor, Theia core, React, and vendors cached separately
-- Custom `webpack.config.js` in `packages/arc-browser-app/` (legacy; port to `applications/browser/` for canonical app)
+- Custom webpack split chunks live in the canonical `applications/browser/` app path.
 
 ## Workflow
 
@@ -277,9 +276,9 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 
 ### Completed (P2 — Runtime + SwarmGraph Integrations)
 - ✅ **Prompt optimizer foundation**: `optimizer/local.py` with rule-based prompt structuring, `arc prompt optimize/diff` CLI; optional `tiktoken>=0.12`
-- ✅ **Adoption runners**: LangGraph (SwarmGraph queen/consensus), AG2, CrewAI, OpenAI Agents, LlamaIndex — all with fake-tested paths, real deps gated
+- ✅ **Adoption runners**: LangGraph (SwarmGraph queen/consensus), AG2, CrewAI, OpenAI Agents, LlamaIndex — fake-tested/gated runner paths exist; only `crewai+swarmgraph` is currently routed through the CLI fake/offline path
 - ✅ **CrewAI + SwarmGraph fake/offline CLI path**: `arc run --runtime crewai+swarmgraph` uses fake CrewAI adoption with trace events and `real_provider_call=false`; real provider-backed adoption remains gated/not claimed
-- ✅ **HMAC audit**: `audit/key_manager.py`, `audit/hmac_chain.py`, `audit/hitl.py`, CLI `arc audit verify/export/key *`
+- ✅ **Keyed audit CLI path**: `audit/key_manager.py`, `audit/hmac_chain.py`, `audit/hitl.py`, CLI `arc audit verify/export/key *`; adapter run paths still use ARC SHA-256 audit chains unless a specific run writes keyed audit material
 - ✅ **Trust enforcement**: `ensure_trusted()` blocks untrusted workspaces before run record creation
 - ✅ **HITL supervisor flow**: event types `HITL_PROMPT`, `HITL_RESPONSE`, `HITL_TIMEOUT`; `JobSupervisor.request_hitl()`, `respond_hitl()`, `pending_hitl()`
 - ✅ **Eval CLI basics**: `arc eval save/delete/report/list`, `arc eval run --batch`; 9 eval tests
@@ -303,7 +302,7 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/ha
 - ✅ **Trace retention + storage management**: `arc runs prune --older-than N`, `arc storage vacuum`, `arc storage status`; 5 new tests
 - ✅ **Opt-in real-runtime smoke scaffold**: `python/tests/integration/real_runtime/` with `ARC_REAL_RUNTIME_SMOKE=1` gated SwarmGraph/LangGraph smoke tests
 - ✅ **Nightly/manual real-runtime smoke workflow**: `.github/workflows/real-runtime-smoke.yml` keeps PR/push CI offline and runs opt-in smoke tests on schedule/manual dispatch
-- ⚠️ **Release checklist dry-run started**: frozen install, full build, Python tests, extension tests, CLI help, runtime capabilities JSON, and scoped release-doc banned-claim checks pass locally; GitHub main CI is currently red for python/node/roadmap gate
+- ⚠️ **Release checklist dry-run started**: frozen install, full build, Python tests, extension tests, CLI help, runtime capabilities JSON, and scoped release-doc banned-claim checks pass locally; python/node/roadmap gate fixes are in-repo, but GitHub confirmation and e2e stabilization remain release work
 
 ### P4 Items Explicitly Deferred
 - **Consensus/voting, queen/worker topology IDE dashboards**: requires stable adoption events and Theia UI work; deferred until adoption protocol matures
@@ -340,8 +339,8 @@ Historical details are archived at `docs/archive/handover/REMAINING_ISSUES_PLAN.
 - **R-3 (Python CI: 2 AG2 adapter test errors)**: Fixed in repo by removing the stale event-loop fixture; confirm on GitHub.
 - **R-4 (10 unmerged remote branches)**: 3 may have salvageable work; 7 intentionally parked.
 - **R-5 (.env history scrub)**: Plan documented in `docs/ENV_HISTORY_SCRUB_PLAN.md`; execute only after release date approval.
-- **e2e workflow**: Still in progress.
-- **theia-extensions migration**: PARTIAL — ported widgets exist in arc-extension (arc-adapters-widget, arc-workflow-graph, arc-run-timeline, arc-event-stream); `arc-adapters`, `arc-workflows`, `arc-event-stream`, static stub `arc-audit`, old-core `arc-schemas`, and old-core `arc-context` have been removed from `applications/browser/package.json`, while remaining duplicate theia-extensions are still wired. Full migration Phase C continues.
+- **e2e workflow**: Local browser/e2e verification passes; latest GitHub e2e still needs confirmation after the local e2e fix is committed and pushed.
+- **theia-extensions migration**: Phase C cleanup in progress — release-scope widgets are canonical in `packages/arc-extension`; legacy `theia-extensions/*` packages are unwired from browser/electron apps, root typecheck, and pnpm workspace. Source dirs remain on disk for rollback/history until archive.
 
 ## Related Documentation
 

@@ -1,6 +1,4 @@
 packages:
   - 'applications/*'
-  - 'theia-extensions/*'
-  - '!theia-extensions/arc-arena'   # excluded: TS build broken, see F-2 in 2026-05-14 audit
   - 'packages/*'
   - 'tests/*'

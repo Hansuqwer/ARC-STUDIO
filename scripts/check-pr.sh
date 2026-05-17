@@ -38,6 +38,7 @@ if git grep -nE 'forceCodeSigning:[[:space:]]*false' -- \
 fi
 
 if git grep -n 'swarmgraph-stub.sh' -- \
+  ':(exclude).github/workflows/e2e.yml' \
   ':(exclude)tests/e2e/**' \
   ':(exclude)scripts/start-browser-stub.mjs' \
   ':(exclude)scripts/check-pr.sh'; then
@@ -52,7 +53,7 @@ if git grep -nE '(sk-(ant-|or-)?[A-Za-z0-9_-]{20,}|Authorization:[[:space:]]*Bea
   ':(exclude)python/tests/**' \
   ':(exclude)python/test_security_manual.py' \
   ':(exclude)python/src/agent_runtime_cockpit/web/server.py' \
-  ':(exclude)theia-extensions/arc-core/test/**' \
+  ':(exclude)theia-extensions/**' \
   ':(exclude)examples/**' \
   ':(exclude)runtimes/swarmgraph/**' \
   ':(exclude)scripts/check-pr.sh'; then
@@ -62,7 +63,6 @@ fi
 
 if git grep -nE '"arc-[^"]+"[[:space:]]*:[[:space:]]*"(file:|link:|[0-9^~])' -- \
   'applications/**/package.json' \
-  'theia-extensions/**/package.json' \
   'packages/**/package.json'; then
   echo "ERROR: ARC local package dependencies must use workspace:* references."
   exit 1
@@ -77,7 +77,7 @@ SECRET_PATTERNS=(
   'ghp_[A-Za-z0-9]{36,}'                 # GitHub PAT
   'sk-[A-Za-z0-9]{20,}'                  # OpenAI / Anthropic style
 )
-EXCLUDE_FILES='\.env\.example|\.env\.sample|docs/history/|python/test_security_manual\.py|python/tests/|theia-extensions/arc-core/test/|python/src/agent_runtime_cockpit/web/server\.py|runtimes/swarmgraph/'
+EXCLUDE_FILES='\.env\.example|\.env\.sample|docs/history/|python/test_security_manual\.py|python/tests/|python/src/agent_runtime_cockpit/web/server\.py|theia-extensions/|runtimes/swarmgraph/'
 
 for pat in "${SECRET_PATTERNS[@]}"; do
   hits=$(git ls-files | grep -vE "$EXCLUDE_FILES" | xargs grep -EnH "$pat" 2>/dev/null || true)

@@ -29,6 +29,8 @@ jobs:
         run: uv sync --all-extras --dev
       - name: Add ARC Python CLI to PATH
         run: echo "${{ github.workspace }}/python/.venv/bin" >> "$GITHUB_PATH"
+      - name: Ensure e2e stub is executable
+        run: chmod +x tests/e2e/fixtures/swarmgraph-stub.sh
       - run: pnpm --filter @arc-studio/e2e-tests exec playwright install chromium
       - run: pnpm build
       - run: pnpm test:e2e

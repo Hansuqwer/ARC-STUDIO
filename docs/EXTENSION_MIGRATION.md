@@ -7,11 +7,12 @@ Canonical extension: `packages/arc-extension`
 Status: Wired into `applications/browser` since PR 5 (commit 765beb4), replacing
 duplicate `theia-extensions/*` browser dependencies during transition.
 
-**Migration status (2026-05-17):** Phase C nearly complete — critical widgets/services
-are canonical in `packages/arc-extension` (adapters, workflow graph, run timeline,
-event stream, safe settings prefs, health, status bar, welcome widget, chat launch UI,
-and run diff UI/service). `arc-runs` and `arc-core` have been removed from
-`applications/browser/package.json`; legacy source dirs remain for rollback/history until archive.
+**Migration status (2026-05-17):** Phase C cleanup in progress — critical release-scope
+widgets/services are canonical in `packages/arc-extension` (adapters, workflow graph,
+run timeline, event stream, safe settings prefs, health, status bar, welcome widget,
+chat launch UI, and run diff UI/service). Legacy `theia-extensions/*` packages are no
+longer wired into `applications/browser`, `applications/electron`, root typecheck, or
+the pnpm workspace; source dirs remain on disk only for rollback/history until archive.
 
 ---
 
@@ -115,7 +116,7 @@ service types are properly represented in `packages/arc-extension` and the Pytho
 |-----------|--------|
 | `arc-adapters` | ✅ Ported into arc-extension and removed from browser app deps; source still present for rollback until browser smoke |
 | `arc-audit` | ✅ Static stub removed from browser app deps; per-run audit verification lives in canonical Runs tab |
-| `arc-arena` | 🗑️ ARCHIVE CANDIDATE — out of v0.1 scope; still present in workspace |
+| `arc-arena` | 🗑️ ARCHIVE CANDIDATE — out of v0.1 scope; source retained outside workspace |
 | `arc-context` | ✅ Old-core context-pack viewer removed from browser app deps; port later only if context-pack UX returns to release scope |
 | `arc-core` | ✅ Removed from browser app deps; canonical extension owns service/protocol/status/welcome/prefs |
 | `arc-event-stream` | ✅ Ported into arc-extension and removed from browser app deps; source still present for rollback until browser smoke |

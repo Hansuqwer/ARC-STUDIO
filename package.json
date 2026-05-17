@@ -12,7 +12,6 @@
   "workspaces": [
     "applications/browser",
     "applications/electron",
-    "theia-extensions/*",
     "packages/*"
   ],
   "scripts": {
