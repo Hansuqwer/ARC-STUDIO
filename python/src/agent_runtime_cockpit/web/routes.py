@@ -51,7 +51,7 @@ from ..providers import (
     provider_statuses,
     redacted_diagnostics,
 )
-from .keys import WORKSPACE_KEY
+from .keys import EVENT_BROKER_KEY, WORKSPACE_KEY
 
 log = logging.getLogger(__name__)
 redactor = Redactor()
@@ -406,7 +406,7 @@ async def run_events_sse(request: web.Request) -> web.StreamResponse:
     """
     mode = request.query.get("mode", "replay")
     if mode == "live":
-        broker = request.app.setdefault("event_broker", EventBroker(_trace_store(request)))
+        broker = request.app.setdefault(EVENT_BROKER_KEY, EventBroker(_trace_store(request)))
         return await broker.sse_handler(request)
 
     run_id = request.match_info["run_id"]

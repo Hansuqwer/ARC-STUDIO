@@ -7,6 +7,7 @@ from aiohttp.web import AppRunner, TCPSite
 from agent_runtime_cockpit.orchestration.event_broker import EventBroker
 from agent_runtime_cockpit.protocol.schemas import RunEvent, RunRecord, RunStatus
 from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
+from agent_runtime_cockpit.web.keys import EVENT_BROKER_KEY
 from agent_runtime_cockpit.web.server import create_app
 
 
@@ -27,7 +28,7 @@ async def test_active_run_sse_live_closes_on_terminal_event(tmp_path, unused_tcp
     store = JsonlTraceStore(tmp_path / ".arc" / "traces")
     app = await create_app(tmp_path)
     broker = EventBroker(store)
-    app["event_broker"] = broker
+    app[EVENT_BROKER_KEY] = broker
     runner = AppRunner(app)
     await runner.setup()
     site = TCPSite(runner, "127.0.0.1", unused_tcp_port)
@@ -118,7 +119,7 @@ async def test_active_run_sse_client_disconnect_is_safe(tmp_path, unused_tcp_por
     store = JsonlTraceStore(tmp_path / ".arc" / "traces")
     app = await create_app(tmp_path)
     broker = EventBroker(store)
-    app["event_broker"] = broker
+    app[EVENT_BROKER_KEY] = broker
     runner = AppRunner(app)
     await runner.setup()
     site = TCPSite(runner, "127.0.0.1", unused_tcp_port)
