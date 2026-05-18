@@ -55,6 +55,76 @@ describe('ArcBackendService Integration Tests', () => {
         });
     });
 
+    describe('run cost metadata bridge', () => {
+        let originalPath: string | undefined;
+
+        afterEach(() => {
+            process.env.PATH = originalPath;
+        });
+
+        async function installArcFixture(script: string): Promise<void> {
+            originalPath = process.env.PATH;
+            const binDir = path.join(tempDir, 'bin');
+            await fs.ensureDir(binDir);
+            const arcPath = path.join(binDir, 'arc');
+            await fs.writeFile(arcPath, script, 'utf-8');
+            await fs.chmod(arcPath, 0o755);
+            process.env.PATH = `${binDir}${path.delimiter}${originalPath || ''}`;
+        }
+
+        it('should preserve dry-run preflight and map cost metadata without implicit paid opt-in', async () => {
+            const argsPath = path.join(tempDir, 'arc-args.txt');
+            await installArcFixture(`#!/bin/sh
+printf '%s\n' "$@" > "${argsPath}"
+printf '%s' '{"ok":true,"data":{"workflow":"crew.py","runtime":"crewai+swarmgraph","runnable":false,"blockers":[],"warnings":[],"doctor_actions":[],"paid_call_required":true,"provider":"openai","quota":{"remaining":3},"estimated_cost":{"currency":"USD"},"key_ref_status":{},"export_target_status":{},"dependency_status":{}}}'
+`);
+
+            const result = await service.preflightRun({
+                workflow: 'crew.py',
+                runtimeId: 'crewai+swarmgraph',
+                dryRun: true
+            });
+
+            const args = (await fs.readFile(argsPath, 'utf-8')).trim().split('\n');
+            expect(args).toContain('--dry-run');
+            expect(args).not.toContain('--allow-paid-calls');
+            expect(result.providerCall).toBe(false);
+            expect(result.costMetadata).toEqual({
+                paidCallRequired: true,
+                paidCallAllowed: false,
+                providerCall: false,
+                dryRun: true,
+                quota: { remaining: 3 },
+                provider: 'openai',
+                estimatedCost: { currency: 'USD' }
+            });
+        });
+
+        it('should pass paid opt-in to startRun only when request explicitly permits it', async () => {
+            const argsPath = path.join(tempDir, 'arc-args.txt');
+            await installArcFixture(`#!/bin/sh
+printf '%s\n' "$@" > "${argsPath}"
+printf '%s' '{"ok":true,"data":{"id":"run-1","status":"completed","runtime":"crewai+swarmgraph","paid_call_required":true,"metadata":{"trace_path":"trace.jsonl","provider":"openai"}}}'
+`);
+
+            const result = await service.startRun({
+                workflow: 'crew.py',
+                runtimeId: 'crewai+swarmgraph',
+                allowPaidCalls: true
+            });
+
+            const args = (await fs.readFile(argsPath, 'utf-8')).trim().split('\n');
+            expect(args).toContain('--allow-paid-calls');
+            expect(result.costMetadata).toMatchObject({
+                paidCallRequired: true,
+                paidCallAllowed: true,
+                providerCall: false,
+                dryRun: false,
+                provider: 'openai'
+            });
+        });
+    });
+
     describe('executeWorkflow', () => {
         it('should throw ArcError for empty prompt', async () => {
             await expect(service.executeWorkflow('')).rejects.toThrow(ArcError);

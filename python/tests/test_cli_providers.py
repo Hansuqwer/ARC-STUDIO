@@ -124,6 +124,47 @@ def test_providers_proxy_dry_run():
     assert resp["model"] == "gpt-4.1-mini"
 
 
+def test_providers_proxy_live_requires_env_gate(monkeypatch):
+    """arc providers proxy --live is blocked unless env and paid opt-in are explicit."""
+    monkeypatch.delenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", raising=False)
+    result = CliRunner().invoke(app, [
+        "providers", "proxy",
+        "--provider", "openai",
+        "--live",
+        "--allow-paid-calls",
+        "--json",
+    ])
+    assert result.exit_code == 1
+    assert "ARC_ALLOW_LIVE_PROVIDER_TESTS=true" in result.output
+
+
+def test_providers_proxy_live_requires_paid_flag(monkeypatch):
+    """arc providers proxy --live also requires --allow-paid-calls."""
+    monkeypatch.setenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", "true")
+    result = CliRunner().invoke(app, [
+        "providers", "proxy",
+        "--provider", "openai",
+        "--live",
+        "--json",
+    ])
+    assert result.exit_code == 1
+    assert "--allow-paid-calls" in result.output
+
+
+def test_providers_proxy_live_explicit_gate_still_no_network(monkeypatch):
+    """Explicit live opt-in reaches CLI stub, not network provider execution."""
+    monkeypatch.setenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", "true")
+    result = CliRunner().invoke(app, [
+        "providers", "proxy",
+        "--provider", "openai",
+        "--live",
+        "--allow-paid-calls",
+        "--json",
+    ])
+    assert result.exit_code == 1
+    assert "no network call was made" in result.output
+
+
 def test_providers_quota_show(tmp_path, monkeypatch):
     """arc providers quota show returns today's usage."""
     monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
@@ -147,6 +188,7 @@ def test_providers_quota_reset(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
     assert data["reset"] is True
+    assert data["scope"] == "local_quota_counters_only"
     usage_after = store.usage()
     assert usage_after["counters"] == {}
 

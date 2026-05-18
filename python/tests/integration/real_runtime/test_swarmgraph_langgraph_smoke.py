@@ -94,8 +94,9 @@ def test_langgraph_swarmgraph_route_availability_smoke(tmp_path) -> None:
     assert "SwarmGraph" in capability.reason
 
 
-def test_langgraph_swarmgraph_local_real_requires_second_gate(tmp_path, monkeypatch) -> None:
+def test_langgraph_swarmgraph_local_real_requires_dual_gate(tmp_path, monkeypatch) -> None:
     _requires_langgraph_runtime()
+    monkeypatch.delenv("ARC_REAL_RUNTIME_SMOKE", raising=False)
     monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
 
     events: list[tuple[str, dict[str, object]]] = []
@@ -113,7 +114,7 @@ def test_langgraph_swarmgraph_local_real_requires_second_gate(tmp_path, monkeypa
         max_workers=1,
     )
 
-    with pytest.raises(PermissionError, match="ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
+    with pytest.raises(PermissionError, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
         asyncio.run(LangGraphAdoptionRunner().run(spec, "local-real-gated", emit_event))
 
     assert events == [(
@@ -121,7 +122,8 @@ def test_langgraph_swarmgraph_local_real_requires_second_gate(tmp_path, monkeypa
         {
             "error": (
                 "LangGraph+SwarmGraph local-real mode requires "
-                "ARC_LANGGRAPH_SWARMGRAPH_REAL=1; no provider calls were made."
+                "ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1; "
+                "no provider calls were made."
             ),
             "mode": "langgraph+swarmgraph",
             "runtime_mode": "local-real",

@@ -675,7 +675,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     Safe fields only: defaultRuntime={selectedRuntime}, mode={selectedMode}, isolation={selectedIsolation}, selectedProfile={selectedProfile}; no raw secrets or provider calls.
                 </p>
                 <p className='arc-studio-config__cost-policy-summary' style={{ margin: '4px 0 0', fontSize: '11px', color: dryRun || !allowPaidCalls ? 'var(--theia-descriptionForeground)' : 'var(--theia-editorWarning-foreground)' }}>
-                    Local cost preview: {costPolicySummary.label}. Dry-run blocks paid calls; current profile dryRun={String(Boolean(currentProfile?.dryRun))}, allowPaidCalls={String(Boolean(currentProfile?.allowPaidCalls))}; effective allowPaidCalls={String(costPolicySummary.paidCallsAllowed)}. Backend quota/cost enforcement is future/offline-gated; this UI does not enable provider execution.
+                    Local cost preview: {costPolicySummary.label}. Dry-run blocks paid calls; current profile dryRun={String(Boolean(currentProfile?.dryRun))}, allowPaidCalls={String(Boolean(currentProfile?.allowPaidCalls))}; effective allowPaidCalls={String(costPolicySummary.paidCallsAllowed)}. Backend enforces opt-in gates; this UI does not enable provider execution.
                 </p>
                 {isolationStatus?.message && (
                     <p className='arc-studio-config__isolation-message' style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
@@ -696,15 +696,15 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     </button>
                 </div>
                 <p className='arc-studio-config__paid-call-warning' style={{ margin: '8px 0', fontSize: '11px', color: 'var(--theia-editorWarning-foreground)' }}>
-                    Paid/live provider calls require explicit future backend gates; dry-run/offline stays providerCall:false. Quota/cost display and reset use local counters only.
+                    Paid/live provider calls require explicit backend-enforced opt-in gates; dry-run/offline stays providerCall:false. Quota/cost display and reset use local counters only.
                 </p>
                 <div className='arc-studio-config__live-provider-gate' style={{ margin: '8px 0', padding: '8px', border: '1px solid var(--theia-widgetBorder)', borderRadius: '4px', fontSize: '11px', backgroundColor: 'var(--theia-editor-background)' }}>
                     <strong>Local provider readiness gate: {liveProviderGate.label || liveProviderGate.state || liveProviderGate.status || (dryRun || !allowPaidCalls ? 'blocked/gated' : 'ready')}</strong>
                     <p style={{ margin: '4px 0 0', color: 'var(--theia-descriptionForeground)' }}>
-                        Preview-only/no network: providerCall:false. This panel never calls provider API, provider proxy, live API, or billing endpoints, and never enables real provider execution.
+                        No network by default: providerCall:false. This panel never calls provider API, provider proxy, live API, or billing endpoints, and never enables real provider execution.
                     </p>
                     <p style={{ margin: '4px 0 0', color: 'var(--theia-descriptionForeground)' }}>
-                        {liveProviderGate.message || 'State derives from dry-run, paid-call opt-in, diagnostics, and local cost policy only.'} Enforcement: {liveProviderGate.enforcement || 'future backend enforcement; UI is preview/offline scaffold only.'}
+                        {liveProviderGate.message || 'State derives from dry-run, paid-call opt-in, diagnostics, and local cost policy only.'} Enforcement: {liveProviderGate.enforcement || 'backend-enforced opt-in; UI remains preview/offline and never enables provider execution.'}
                     </p>
                 </div>
                 <div className='arc-studio-config__provider-diagnostics' style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', fontSize: '12px' }}>

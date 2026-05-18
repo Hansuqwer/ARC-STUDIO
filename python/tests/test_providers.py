@@ -6,6 +6,7 @@ from agent_runtime_cockpit.providers import (
     ProviderRequest,
     ProviderRoutingPolicy,
     ProviderRoutingStore,
+    check_provider_cost_gate,
     dry_run_proxy,
     mask_secret,
     provider_statuses,
@@ -75,6 +76,49 @@ def test_proxy_dry_run_no_network(monkeypatch, tmp_path):
     response = dry_run_proxy(ProviderRequest(provider="openai", model="gpt-4.1-mini", prompt="hello"))
     assert response.dry_run is True
     assert "No network call" in response.message
+
+
+def test_cost_gate_allows_default_dry_run_without_live_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_PROVIDER_ROUTING", str(tmp_path / "routing.json"))
+    monkeypatch.delenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", raising=False)
+    gate = check_provider_cost_gate(ProviderRequest(provider="openai", model="gpt-4.1-mini"), env={})
+    assert gate.allowed is True
+    assert gate.dry_run is True
+    assert gate.live_enabled is False
+
+
+def test_cost_gate_blocks_live_without_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_PROVIDER_ROUTING", str(tmp_path / "routing.json"))
+    gate = check_provider_cost_gate(
+        ProviderRequest(provider="openai", model="gpt-4.1-mini", dry_run=False, allow_paid_calls=True),
+        env={},
+    )
+    assert gate.allowed is False
+    assert gate.reason == "live_provider_calls_disabled"
+
+
+def test_cost_gate_blocks_paid_without_request_or_policy_opt_in(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_PROVIDER_ROUTING", str(tmp_path / "routing.json"))
+    gate = check_provider_cost_gate(
+        ProviderRequest(provider="openai", model="gpt-4.1-mini", dry_run=False),
+        env={"ARC_ALLOW_LIVE_PROVIDER_TESTS": "true"},
+    )
+    assert gate.allowed is False
+    assert gate.reason == "paid_provider_calls_disabled"
+
+
+def test_proxy_blocked_live_does_not_reserve_quota(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_PROVIDER_ROUTING", str(tmp_path / "routing.json"))
+    quota_path = tmp_path / "quota.json"
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(quota_path))
+    monkeypatch.delenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", raising=False)
+    try:
+        dry_run_proxy(ProviderRequest(provider="openai", model="gpt-4.1-mini", dry_run=False, allow_paid_calls=True))
+    except RuntimeError as exc:
+        assert "Live provider calls disabled" in str(exc)
+    else:
+        raise AssertionError("live calls should fail before quota reservation")
+    assert ProviderQuotaStore(quota_path).usage()["counters"] == {}
 
 
 def test_proxy_live_requires_gate(monkeypatch, tmp_path):

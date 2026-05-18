@@ -61,13 +61,13 @@
 
 **Goal:** Existing CLI/provider diagnostics and quota controls are visible and actionable in IDE.
 
-**Current:** CLI provider diagnostics/quota commands exist; IDE has a provider diagnostics/quota scaffold with typed telemetry parsing/tests, targeted confirmation before local quota-counter reset, an informational profile-linked cost policy summary, and hardened explicit paid/live preview gate wording. Reset is backed only by existing `arc providers quota reset --json` local quota-counter semantics. Live/provider UX remains gated/offline by default and performs no network/provider calls; backend cost enforcement and real provider execution remain future work.
+**Current:** CLI provider diagnostics/quota commands exist; IDE has a provider diagnostics/quota scaffold with typed telemetry parsing/tests, targeted confirmation before local quota-counter reset, a profile-linked cost policy summary, backend cost-gate metadata/enforcement, and hardened explicit paid/live opt-in gate wording. Reset is backed only by existing `arc providers quota reset --json` local quota-counter semantics. Live/provider UX remains gated/offline by default and performs no network/provider calls; real provider execution remains future work.
 
 **Deliverables:**
 - Provider diagnostics panel.
 - Quota status/reset UI where safe; confirmation required before reset. Reset is local quota-counter reset only, not a provider/network reset.
 - Paid-call gate warnings before any provider-backed action; current live-provider UX is preview/gate only and performs no network/provider calls.
-- Profile-linked provider/cost summary; informational only unless future backend policy enforcement exists.
+- Profile-linked provider/cost summary backed by backend cost-gate metadata; UI does not enable provider execution.
 
 **Acceptance:**
 - Tests prove no live provider call without explicit gate.
@@ -108,7 +108,7 @@
 
 **Goal:** Turn fake-tested/gated adoption runners into narrow, honest, real product paths.
 
-**Current:** Adoption protocol/runners exist. `crewai+swarmgraph` and `langgraph+swarmgraph` fake/offline CLI paths are routed for deterministic product use. `langgraph+swarmgraph` also has a narrow local-real path behind explicit `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` opt-in and `ARC_REAL_RUNTIME_SMOKE=1` smoke validation. It is non-provider-backed, performs no paid/live provider calls, and is not claimed as product-ready. Provider-backed LangGraph + SwarmGraph adoption remains gated and not claimed.
+**Current:** Adoption protocol/runners exist. `crewai+swarmgraph` and `langgraph+swarmgraph` fake/offline CLI paths are routed for deterministic product use. `langgraph+swarmgraph` also has a narrow local-real path that now requires both explicit `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` gates. It is non-provider-backed, performs no paid/live provider calls, and is not claimed as product-ready. Provider-backed LangGraph + SwarmGraph adoption remains gated and not claimed.
 
 **Deliverables:**
 - Pick one first real target (`LangGraph + SwarmGraph` recommended).
@@ -144,8 +144,8 @@
 |---|---|---|
 | R1 Live Run Streaming | Complete | Phase 2 IDE Runtime Setup + Config |
 | R2 IDE Runtime Setup | Complete polished UI baseline | Backend protocol/service expansion only if future config fields require it; continue env-ref-only secret posture |
-| R3 Provider/Quota UI | Partial | Keep provider calls gated/offline by default; future work is backend cost enforcement and any real provider execution path behind explicit opt-in |
+| R3 Provider/Quota UI | Partial | Keep provider calls gated/offline by default; backend cost enforcement is in place; future work is any real provider execution path behind explicit opt-in |
 | R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
 | R5 SwarmGraph Insight | Complete baseline + first producer events | Add measured cost producer and complete backend live SSE wiring before live-runtime claims |
-| R6 Real Adoption | Partial | Harden LangGraph + SwarmGraph local-real path behind explicit gates; keep fake/offline default and provider-backed execution unclaimed |
+| R6 Real Adoption | Partial | LangGraph + SwarmGraph local-real path now requires dual explicit gates; keep fake/offline default and provider-backed execution unclaimed |
 | R7 Release Ops | Partial | Checklist wording refreshed with local commit evidence; GitHub run IDs TBD/not yet refreshed; 3-day green window and `.env` scrub remain gated |

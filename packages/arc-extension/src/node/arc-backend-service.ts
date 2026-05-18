@@ -390,7 +390,8 @@ export class ArcBackendService implements ArcService {
             if (request.prompt) {
                 args.push('--prompt', request.prompt);
             }
-            if (request.allowPaidCalls) {
+            const paidCallAllowed = request.allowPaidCalls === true;
+            if (paidCallAllowed) {
                 args.push('--allow-paid-calls');
             }
             const output = execFileSync('arc', args, {
@@ -404,6 +405,15 @@ export class ArcBackendService implements ArcService {
                 throw new ArcError(ArcErrorCode.EXECUTION_FAILED, parsed?.error?.message || 'Preflight failed');
             }
             const data = parsed.data;
+            const costMetadata = {
+                paidCallRequired: Boolean(data.paid_call_required),
+                paidCallAllowed,
+                providerCall: false as const,
+                dryRun: true,
+                quota: data.quota || data.provider_quota,
+                provider: data.provider,
+                estimatedCost: data.estimated_cost || null,
+            };
             return {
                 workflow: data.workflow,
                 runtime: data.runtime,
@@ -412,12 +422,13 @@ export class ArcBackendService implements ArcService {
                 blockers: data.blockers || [],
                 warnings: data.warnings || [],
                 doctorActions: data.doctor_actions || data.doctorActions || [],
-                paidCallRequired: Boolean(data.paid_call_required),
+                paidCallRequired: costMetadata.paidCallRequired,
                 keyRefStatus: data.key_ref_status || {},
                 exportTargetStatus: data.export_target_status || {},
                 dependencyStatus: data.dependency_status || {},
                 dryRun: true,
                 providerCall: false,
+                costMetadata,
             };
         } catch (error) {
             if (error instanceof ArcError) throw error;
@@ -444,7 +455,8 @@ export class ArcBackendService implements ArcService {
             if (request.prompt) {
                 args.push('--prompt', request.prompt);
             }
-            if (request.allowPaidCalls) {
+            const paidCallAllowed = request.allowPaidCalls === true;
+            if (paidCallAllowed) {
                 args.push('--allow-paid-calls');
             }
             const output = execFileSync('arc', args, {
@@ -464,6 +476,15 @@ export class ArcBackendService implements ArcService {
                 runtime: data.runtime,
                 tracePath: data.metadata?.trace_path,
                 metadata: data.metadata || {},
+                costMetadata: {
+                    paidCallRequired: Boolean(data.paid_call_required || data.metadata?.paid_call_required),
+                    paidCallAllowed,
+                    providerCall: false,
+                    dryRun: false,
+                    quota: data.quota || data.provider_quota || data.metadata?.quota,
+                    provider: data.provider || data.metadata?.provider,
+                    estimatedCost: data.estimated_cost || data.metadata?.estimated_cost || null,
+                },
             };
         } catch (error) {
             if (error instanceof ArcError) throw error;

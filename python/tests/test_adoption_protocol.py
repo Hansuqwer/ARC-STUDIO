@@ -513,10 +513,11 @@ class TestLangGraphRunner:
             LangGraphAdoptionRunner,
         )
 
+        monkeypatch.delenv("ARC_REAL_RUNTIME_SMOKE", raising=False)
         monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
         events: list[tuple[str, dict]] = []
 
-        with pytest.raises(PermissionError, match="ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
+        with pytest.raises(PermissionError, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
             await LangGraphAdoptionRunner().run(
                 AdoptionSpec(
                     mode=AdoptionMode.LANGGRAPH,
@@ -531,7 +532,8 @@ class TestLangGraphRunner:
             {
                 "error": (
                     "LangGraph+SwarmGraph local-real mode requires "
-                    "ARC_LANGGRAPH_SWARMGRAPH_REAL=1; no provider calls were made."
+                    "ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1; "
+                    "no provider calls were made."
                 ),
                 "mode": "langgraph+swarmgraph",
                 "runtime_mode": "local-real",
@@ -553,6 +555,7 @@ class TestLangGraphRunner:
                 return {"answer": input_data["swarmgraph_task"]}
 
         runner = LangGraphAdoptionRunner()
+        monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
         monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
         monkeypatch.setattr(
             runner,
@@ -627,6 +630,7 @@ class TestLangGraphRunner:
                 return {"answer": input_data["swarmgraph_task"]}
 
         runner = LangGraphAdoptionRunner()
+        monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
         monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
         monkeypatch.setattr(
             runner,

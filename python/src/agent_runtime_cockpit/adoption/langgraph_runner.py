@@ -30,6 +30,7 @@ from .protocol import (
 log = logging.getLogger(__name__)
 
 _LOCAL_REAL_MODE = "local-real"
+_REAL_RUNTIME_SMOKE_ENV = "ARC_REAL_RUNTIME_SMOKE"
 _LOCAL_REAL_GATE_ENV = "ARC_LANGGRAPH_SWARMGRAPH_REAL"
 
 # SwarmGraph vendored packages path
@@ -121,11 +122,12 @@ class LangGraphAdoptionRunner(AdoptionRunner):
         local_real = self._is_local_real(spec)
         if local_real:
             emit_event = self._local_no_provider_emit(emit_event)
-        if local_real and os.environ.get(_LOCAL_REAL_GATE_ENV) != "1":
+        if local_real and not self._local_real_gate_open():
             emit_event(run_id, "RUN_FAILED", {
                 "error": (
                     "LangGraph+SwarmGraph local-real mode requires "
-                    f"{_LOCAL_REAL_GATE_ENV}=1; no provider calls were made."
+                    f"{_REAL_RUNTIME_SMOKE_ENV}=1 and {_LOCAL_REAL_GATE_ENV}=1; "
+                    "no provider calls were made."
                 ),
                 "mode": self.mode.value,
                 "runtime_mode": _LOCAL_REAL_MODE,
@@ -134,7 +136,8 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             })
             raise PermissionError(
                 "LangGraph+SwarmGraph local-real mode requires "
-                f"{_LOCAL_REAL_GATE_ENV}=1; no provider calls were made."
+                f"{_REAL_RUNTIME_SMOKE_ENV}=1 and {_LOCAL_REAL_GATE_ENV}=1; "
+                "no provider calls were made."
             )
         if not offline_deterministic:
             _setup_swarmgraph_paths()
@@ -279,6 +282,12 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             spec.runtime_config.get("mode") == _LOCAL_REAL_MODE
             or spec.runtime_config.get("runtime_mode") == _LOCAL_REAL_MODE
             or spec.runtime_config.get("adoption_mode") == _LOCAL_REAL_MODE
+        )
+
+    def _local_real_gate_open(self) -> bool:
+        return (
+            os.environ.get(_REAL_RUNTIME_SMOKE_ENV) == "1"
+            and os.environ.get(_LOCAL_REAL_GATE_ENV) == "1"
         )
 
     def _local_no_provider_emit(self, emit_event):

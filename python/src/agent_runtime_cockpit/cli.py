@@ -111,6 +111,7 @@ def _profile_payload(profile) -> dict[str, object]:
 
 
 RUNTIME_MODES = {"fake/offline", "local-real"}
+LOCAL_REAL_GATE_ENVS = ("ARC_REAL_RUNTIME_SMOKE", "ARC_LANGGRAPH_SWARMGRAPH_REAL")
 
 
 def _validate_runtime_mode(runtime_mode: str) -> str:
@@ -120,7 +121,7 @@ def _validate_runtime_mode(runtime_mode: str) -> str:
 
 
 def _local_real_gate_open() -> bool:
-    return os.environ.get("ARC_LANGGRAPH_SWARMGRAPH_REAL") == "1"
+    return all(os.environ.get(env) == "1" for env in LOCAL_REAL_GATE_ENVS)
 
 
 def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str, allow_paid_calls: bool, runtime_mode: str) -> dict[str, object]:
@@ -178,7 +179,10 @@ def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str
                 if not _local_real_gate_open():
                     blockers.append({
                         "code": "LOCAL_REAL_GATE_REQUIRED",
-                        "message": "Set ARC_LANGGRAPH_SWARMGRAPH_REAL=1 to request langgraph+swarmgraph local-real",
+                        "message": (
+                            "Set ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1 "
+                            "to request langgraph+swarmgraph local-real"
+                        ),
                     })
             else:
                 warnings.append("LangGraph + SwarmGraph is fake/offline deterministic; no real provider calls or HMAC audit claims; real path gated.")
@@ -1014,6 +1018,8 @@ def providers_proxy(
     provider: Optional[str] = typer.Option(None, "--provider", help="Provider id (default: routing default)"),
     model: Optional[str] = typer.Option(None, "--model", help="Model name (default: routing default)"),
     prompt: str = typer.Option("Hello", "--prompt", help="Prompt text for dry-run proxy"),
+    live: bool = typer.Option(False, "--live", help="Request live provider mode; still requires env gate and --allow-paid-calls"),
+    allow_paid_calls: bool = typer.Option(False, "--allow-paid-calls", help="Allow paid provider calls when --live is set"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
@@ -1024,17 +1030,29 @@ def providers_proxy(
     and --allow-paid-calls for a live proxy call.
     """
     _setup_logging(debug)
-    from .providers import ProviderRequest, dry_run_proxy
+    import os
+    from .providers import ProviderRequest, check_provider_cost_gate, dry_run_proxy
     from .providers import ProviderRoutingStore
     routing = ProviderRoutingStore().get()
     req = ProviderRequest(
         provider=provider or routing.default_provider,
         model=model or routing.default_model,
         prompt=prompt,
-        dry_run=True,
-        allow_paid_calls=False,
+        dry_run=not live,
+        allow_paid_calls=allow_paid_calls,
     )
     try:
+        gate = check_provider_cost_gate(req, os.environ)
+        if not gate.allowed:
+            messages = {
+                "live_provider_calls_disabled": "Live provider calls disabled. Set ARC_ALLOW_LIVE_PROVIDER_TESTS=true and pass --live --allow-paid-calls.",
+                "paid_provider_calls_disabled": "Paid provider calls disabled. Pass --allow-paid-calls with --live.",
+            }
+            _out(err(ArcErrorCode.INVALID_INPUT, messages.get(gate.reason or "", gate.reason or "Provider cost gate blocked request")), json_output)
+            raise typer.Exit(1)
+        if live:
+            _out(err(ArcErrorCode.INVALID_INPUT, "Live provider proxy is gated but not implemented in this CLI path; no network call was made."), json_output)
+            raise typer.Exit(1)
         resp = dry_run_proxy(req)
         _out(ok(resp.model_dump()), json_output)
     except RuntimeError as exc:
@@ -1208,12 +1226,12 @@ def providers_quota_reset(
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
-    """Reset today's provider quota counters."""
+    """Reset today's local provider quota counters only."""
     _setup_logging(debug)
     from .providers import ProviderQuotaStore
     store = ProviderQuotaStore()
     store.reset()
-    _out(ok({"reset": True}), json_output)
+    _out(ok({"reset": True, "scope": "local_quota_counters_only"}), json_output)
 
 
 routing_app = typer.Typer(name="routing", help="Provider routing policy")

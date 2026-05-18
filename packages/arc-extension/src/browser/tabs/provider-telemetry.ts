@@ -117,7 +117,7 @@ export function summarizeProfileCostPolicy(
     const paidCallsBlocked = dryRun || !allowPaidCalls;
     const liveCallsGated = dryRun || !allowPaidCalls;
     const enforcement = enforced ? 'enforced' : 'informational';
-    const enforcementLabel = enforced ? 'enforced by current UI policy' : 'future backend enforcement only';
+    const enforcementLabel = enforced ? 'backend-enforced opt-in' : 'backend-enforced opt-in; UI preview only';
     const label = dryRun
         ? `${name}: dry-run/offline hard-blocks paid/live provider calls (${enforcementLabel})`
         : paidCallsAllowed
@@ -174,7 +174,7 @@ export function buildLiveProviderGate(input: LiveProviderGateInput): LiveProvide
     const message = reasons.length > 0
         ? `Local/offline quota/cost preview only; blocked by ${reasons.join('; ')}.`
         : 'Local/offline quota/cost preview only; no provider execution is enabled by this state.';
-    const enforcement = 'future backend enforcement; UI is preview/offline scaffold only';
+    const enforcement = 'backend-enforced opt-in; UI remains preview/offline and never enables provider execution';
 
     return { state, reasons, cta, enforcement, message, providerCall: false };
 }

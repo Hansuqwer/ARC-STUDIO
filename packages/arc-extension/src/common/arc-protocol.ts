@@ -1003,6 +1003,16 @@ export interface RunBlocker {
     message: string;
 }
 
+export interface RunCostMetadata {
+    paidCallRequired: boolean;
+    paidCallAllowed: boolean;
+    providerCall: false;
+    dryRun?: boolean;
+    quota?: Record<string, unknown>;
+    provider?: string;
+    estimatedCost?: Record<string, unknown> | null;
+}
+
 export interface RunPreflightRequest {
     workflow: string;
     prompt?: string;
@@ -1026,6 +1036,7 @@ export interface RunPreflightResponse {
     dependencyStatus: Record<string, unknown>;
     dryRun: true;
     providerCall: false;
+    costMetadata: RunCostMetadata;
 }
 
 export interface StartRunRequest {
@@ -1042,6 +1053,7 @@ export interface StartRunResponse {
     runtime: string;
     tracePath?: string;
     metadata: Record<string, unknown>;
+    costMetadata: RunCostMetadata;
 }
 
 // ========== Service Interface ==========

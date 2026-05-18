@@ -253,6 +253,12 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/arc-studio-runs__layout/);
         });
 
+        it('should not claim future provider enforcement copy in ConfigTab contracts', async () => {
+            const configSource = await fs.readFile(path.join(tabsDir, 'ConfigTab.tsx'), 'utf-8');
+            expect(configSource).toMatch(/backend-enforced opt-in gates/);
+            expect(configSource).not.toMatch(/future backend gates/);
+        });
+
         it('should NOT import TraceViewerSection', () => {
             expect(source).not.toMatch(/TraceViewerSection/);
         });
@@ -468,7 +474,7 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/arc-studio-config__paid-call-warning/);
             expect(source).toMatch(/arc-studio-config__provider-refresh/);
             expect(source).toMatch(/Provider Diagnostics & Local Quota Preview/);
-            expect(source).toMatch(/Paid\/live provider calls require explicit future backend gates/);
+            expect(source).toMatch(/Paid\/live provider calls require explicit backend-enforced opt-in gates/);
             expect(source).toMatch(/dry-run\/offline stays providerCall:false/);
             expect(source).toMatch(/Quota\/cost display and reset use local counters only/);
             expect(source).not.toMatch(/provider execution is enabled/);
@@ -526,10 +532,10 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/allowPaidCalls=\{String\(Boolean\(currentProfile\?\.allowPaidCalls\)\)\}/);
             expect(source).toMatch(/effective allowPaidCalls=\{String\(costPolicySummary\.paidCallsAllowed\)\}/);
             expect(source).toMatch(/Dry-run blocks paid calls/);
-            expect(source).toMatch(/future\/offline-gated/);
+            expect(source).toMatch(/Backend enforces opt-in gates/);
             expect(source).toMatch(/buildLiveProviderGate/);
             expect(source).toMatch(/arc-studio-config__live-provider-gate/);
-            expect(source).toMatch(/Preview-only\/no network: providerCall:false/);
+            expect(source).toMatch(/No network by default: providerCall:false/);
             expect(source).toMatch(/never calls provider API, provider proxy, live API, or billing endpoints/);
         });
 

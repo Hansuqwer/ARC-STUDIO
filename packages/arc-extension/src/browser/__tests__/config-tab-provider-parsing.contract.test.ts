@@ -70,7 +70,7 @@ describe('ConfigTab provider telemetry parsing contract', () => {
         expect(source).toMatch(/no provider network calls/);
         expect(source).toMatch(/No provider network, no live API, no billing action/);
         expect(source).toMatch(/arc-studio-config__cost-policy-summary/);
-        expect(source).toMatch(/Paid\/live provider calls require explicit future backend gates/);
+        expect(source).toMatch(/Paid\/live provider calls require explicit backend-enforced opt-in gates/);
     });
 
     it('requires exact confirmation phrase before local quota reset can run', () => {
@@ -84,11 +84,11 @@ describe('ConfigTab provider telemetry parsing contract', () => {
 
     it('shows preview-only live provider gate without provider/proxy calls', () => {
         expect(source).toMatch(/arc-studio-config__live-provider-gate/);
-        expect(source).toMatch(/Preview-only\/no network: providerCall:false/);
+        expect(source).toMatch(/No network by default: providerCall:false/);
         expect(source).toMatch(/never calls provider API, provider proxy, live API, or billing endpoints/);
         expect(source).toMatch(/providerCall: false/);
         expect(helperSource).toMatch(/providerCall: false/);
-        expect(helperSource).toMatch(/future backend enforcement; UI is preview\/offline scaffold only/);
+        expect(helperSource).toMatch(/backend-enforced opt-in; UI remains preview\/offline and never enables provider execution/);
         expect(helperSource).toMatch(/Local\/offline quota\/cost preview only/);
         expect(source).not.toMatch(/providerTelemetryService\.(?!getProviderDiagnostics|getProviderQuota|resetProviderQuota)/);
     });

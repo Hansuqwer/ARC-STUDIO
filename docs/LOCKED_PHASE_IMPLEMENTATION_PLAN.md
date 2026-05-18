@@ -103,7 +103,7 @@ git status --short
 ## Phase 3 — Provider/Quota/Cost UI
 
 **Roadmap:** R3  
-**Status:** Partial — provider diagnostics/quota scaffold exists with typed parsing/tests, targeted confirmation before local quota-counter reset, informational profile-linked cost policy summary, and explicit paid/live preview gates. Reset remains local quota-counter reset only; live/provider UX performs no network/provider calls.
+**Status:** Partial — provider diagnostics/quota scaffold exists with typed parsing/tests, targeted confirmation before local quota-counter reset, profile-linked cost policy summary, backend cost-gate enforcement, and explicit paid/live opt-in gates. Reset remains local quota-counter reset only; live/provider UX performs no network/provider calls by default, and real provider execution is still not implemented.
 
 ### Chunk 3.1 — Provider Diagnostics Panel
 - Surface existing CLI/provider diagnostics.
@@ -113,12 +113,12 @@ git status --short
 ### Chunk 3.2 — Quota + Profile Summary
 - Display quota status and profile-linked cost policy.
 - Reset only where existing CLI supports safe reset.
-- Status: Partial — quota visibility scaffold exists with targeted confirmation before reset. Reset may call only existing `arc providers quota reset --json` semantics and is a local quota-counter reset, not a provider/network reset. Profile-linked cost policy summary is informational only unless future backend policy enforcement exists.
+- Status: Partial — quota visibility scaffold exists with targeted confirmation before reset. Reset may call only existing `arc providers quota reset --json` semantics and is a local quota-counter reset, not a provider/network reset. Profile-linked cost policy summary is backed by backend opt-in cost-gate metadata; no provider execution is enabled by the UI.
 
 ### Chunk 3.3 — Paid-Call Gate UX
 - Add explicit warnings/confirmations before provider-backed paths.
 - Tests prove no live call without explicit opt-in.
-- Status: Partial — provider-backed/live actions remain gated/offline by default. Current live-provider UX is preview/gate only and performs no network/provider calls; hardened UI copy/actions distinguish dry-run/offline, local quota reset, and any future live/provider path. Backend cost enforcement and real provider execution remain future work behind explicit opt-in.
+- Status: Partial — provider-backed/live actions remain gated/offline by default. Current live-provider UX is preview/gate only and performs no network/provider calls; hardened UI copy/actions distinguish dry-run/offline, local quota reset, backend cost-gate enforcement, and any future live/provider path. Real provider execution remains future work behind explicit opt-in.
 
 ## Phase 4 — HITL + Audit Dedicated UX
 
@@ -161,7 +161,7 @@ git status --short
 ## Phase 6 — Narrow Real Adoption Path
 
 **Roadmap:** R6  
-**Status:** Partial — `langgraph+swarmgraph` fake/offline CLI route baseline remains default; narrow local-real path is explicit `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` opt-in, smoke-scoped under `ARC_REAL_RUNTIME_SMOKE=1`, and performs no provider calls
+**Status:** Partial — `langgraph+swarmgraph` fake/offline CLI route baseline remains default; narrow local-real path now requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`, and performs no provider calls
 
 ### Chunk 6.1 — Select First Real Target
 - Default recommendation: `langgraph+swarmgraph`.
@@ -171,7 +171,7 @@ git status --short
 ### Chunk 6.2 — Real Runner Spike
 - Implement narrow real invocation path.
 - Preserve fake/offline tests.
-- Status: Partial — `langgraph+swarmgraph` keeps deterministic fake/offline routing as the default. A narrow local-real runner path exists only behind explicit `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` opt-in and smoke gating, is not provider-backed, performs no paid/live provider calls, and is not claimed as product-ready.
+- Status: Partial — `langgraph+swarmgraph` keeps deterministic fake/offline routing as the default. A narrow local-real runner path exists only behind dual explicit `ARC_REAL_RUNTIME_SMOKE=1` plus `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` gates, is not provider-backed, performs no paid/live provider calls, and is not claimed as product-ready.
 
 ### Chunk 6.3 — Capability + Smoke
 - Capability reports distinguish fake-tested/gated/real.
@@ -203,8 +203,8 @@ git status --short
 |---|---|---|---|
 | 1 Active Live Streaming | Complete | current CLI/IDE run basics | Full vertical baseline: Python SSE, Theia proxy contract, UI live/replay/disconnected states, stub e2e |
 | 2 Runtime Setup UI | Complete polished UI baseline | config/profile CLI | Safe ConfigTab baseline plus YAML-backed safe fields summary, persisted profile copy, remediation wizard, and dedicated export-target env-ref helpers in place |
-| 3 Provider/Quota UI | Partial | provider CLI | Typed parser/tests, confirmed local quota-counter reset affordance, informational profile-linked cost summary, hardened paid/live preview gates; no provider network calls by default; backend cost enforcement/live provider execution remain future work |
+| 3 Provider/Quota UI | Partial | provider CLI | Typed parser/tests, confirmed local quota-counter reset affordance, profile-linked cost summary, backend cost-gate enforcement, hardened paid/live opt-in gates; no provider network calls by default; real provider execution remains future work |
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; live-aware UI with backend live SSE still degraded/disconnected |
-| 6 Real Adoption | Partial | adoption protocol | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path is explicit `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` opt-in/smoke-scoped with no provider calls; provider-backed path gated/not claimed |
+| 6 Real Adoption | Partial | adoption protocol | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` with no provider calls; provider-backed path gated/not claimed |
 | 7 Release Ops | Partial | green CI | 7.1 local evidence wording refreshed; GitHub run IDs TBD/not yet refreshed; 7.2 waits for release date; 7.3 `.env` scrub blocked pending explicit destructive-action approval |

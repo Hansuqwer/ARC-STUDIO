@@ -102,6 +102,16 @@ class ProviderResponse(BaseModel):
     message: str
 
 
+class ProviderCostGateResult(BaseModel):
+    provider: str
+    model: str
+    dry_run: bool
+    live_enabled: bool
+    paid_allowed: bool
+    allowed: bool
+    reason: str | None = None
+
+
 class ProviderAccountStore:
     """JSON account metadata store. Secrets are env refs only in this beta foundation."""
 
@@ -444,15 +454,50 @@ def redacted_diagnostics(env: dict[str, str]) -> dict[str, object]:
     return redact({"live_tests_enabled": env.get("ARC_ALLOW_LIVE_PROVIDER_TESTS") == "true", "providers": [status.model_dump() for status in provider_statuses(env)], "routing": ProviderRoutingStore().get().model_dump(), "accounts": [account.model_dump() for account in ProviderAccountStore().list_accounts()], "quota": ProviderQuotaStore().usage()})
 
 
-def dry_run_proxy(request: ProviderRequest) -> ProviderResponse:
+def check_provider_cost_gate(request: ProviderRequest, env: dict[str, str] | None = None) -> ProviderCostGateResult:
     routing = ProviderRoutingStore().get()
     provider = request.provider or routing.default_provider
     model = request.model or routing.default_model
-    if not request.dry_run and os.environ.get("ARC_ALLOW_LIVE_PROVIDER_TESTS") != "true":
+    dry_run = request.dry_run
+    live_enabled = (env or os.environ).get("ARC_ALLOW_LIVE_PROVIDER_TESTS") == "true"
+    paid_allowed = request.allow_paid_calls or routing.allow_paid_calls
+    if not dry_run and not live_enabled:
+        return ProviderCostGateResult(
+            provider=provider,
+            model=model,
+            dry_run=dry_run,
+            live_enabled=live_enabled,
+            paid_allowed=paid_allowed,
+            allowed=False,
+            reason="live_provider_calls_disabled",
+        )
+    if not dry_run and not paid_allowed:
+        return ProviderCostGateResult(
+            provider=provider,
+            model=model,
+            dry_run=dry_run,
+            live_enabled=live_enabled,
+            paid_allowed=paid_allowed,
+            allowed=False,
+            reason="paid_provider_calls_disabled",
+        )
+    return ProviderCostGateResult(
+        provider=provider,
+        model=model,
+        dry_run=dry_run,
+        live_enabled=live_enabled,
+        paid_allowed=paid_allowed,
+        allowed=True,
+    )
+
+
+def dry_run_proxy(request: ProviderRequest) -> ProviderResponse:
+    gate = check_provider_cost_gate(request)
+    if not gate.allowed and gate.reason == "live_provider_calls_disabled":
         raise RuntimeError("Live provider calls disabled. Set ARC_ALLOW_LIVE_PROVIDER_TESTS=true.")
-    if not request.dry_run and not request.allow_paid_calls:
+    if not gate.allowed and gate.reason == "paid_provider_calls_disabled":
         raise RuntimeError("Paid provider calls disabled. Set allow_paid_calls=true.")
-    quota = ProviderQuotaStore().reserve(provider, dry_run=request.dry_run)
+    quota = ProviderQuotaStore().reserve(gate.provider, dry_run=gate.dry_run)
     if not quota["allowed"]:
         raise RuntimeError(str(quota["reason"]))
-    return ProviderResponse(provider=provider, model=model, dry_run=True, message="Dry-run provider proxy response. No network call was made.")
+    return ProviderResponse(provider=gate.provider, model=gate.model, dry_run=True, message="Dry-run provider proxy response. No network call was made.")
