@@ -8,7 +8,7 @@
 
 - Canonical app: `applications/browser` + `packages/arc-extension`.
 - Legacy `theia-extensions/*` and `packages/arc-browser-app` are archived under `docs/archive/`.
-- GitHub CI green on `073238d`: `python`, `node`, `ARC Roadmap Gate`, `signing-preflight`, `e2e`.
+- GitHub CI green on `bbabc5e`: `python`, `node`, `ARC Roadmap Gate`, `signing-preflight`, `e2e`.
 - Release-scope CLI/IDE basics are implemented and tested.
 - Remaining work is product depth, not repo stabilization.
 
@@ -125,7 +125,7 @@
 
 **Goal:** Prepare v0.1 release without rewriting history prematurely.
 
-**Current:** Release ops evidence is not yet release-ready. Local `main` is currently `c0717749`. Latest GitHub `main` runs checked on `ba7b1d32` show `python` green (`26023575411`), `e2e` green (`26023575414`), and `signing-preflight` green (`26023575408`), but `node` failed (`26023575413`) and `ARC Roadmap Gate` failed (`26023575410`). Last all-green required-ish set found is `073238d`: `python` (`25997787492`), `node` (`25997787491`), `ARC Roadmap Gate` (`25997787490`), `e2e` (`25997787483`), and `signing-preflight` (`25997787503`). No release date is set, no 3-day green window has started, and `.env` history scrub remains blocked until explicit release-date plus history-rewrite/force-push approval. The scrub plan now includes a non-destructive preparation checklist only; no scrub/rewrite/force-push was performed.
+**Current:** Release ops evidence is improved but not release-ready. Pushed `main` commit `bbabc5e` is green for the required-ish GitHub workflows checked on 2026-05-18: `python` (`26028632673`), `node` (`26028632696`), `ARC Roadmap Gate` (`26028632674`), `e2e` (`26028632698`), and `signing-preflight` (`26028632723`). No release date is set, no 3-day green window has started, and `.env` history scrub remains blocked until explicit release-date plus history-rewrite/force-push approval. The scrub plan includes a non-destructive preparation checklist only; no scrub/rewrite/force-push was performed.
 
 **Deliverables:**
 - Final release checklist evidence with commit/run IDs.
@@ -148,4 +148,4 @@
 | R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
 | R5 SwarmGraph Insight | Complete baseline + first producer events | Add measured cost producer and complete backend live SSE wiring before live-runtime claims |
 | R6 Real Adoption | Partial | LangGraph + SwarmGraph local-real path now requires dual explicit gates consistently; keep fake/offline default and provider-backed execution unclaimed |
-| R7 Release Ops | Partial | Evidence refreshed in roadmap only: local `main` is `c0717749`; latest `ba7b1d32` GitHub runs have `node` + `ARC Roadmap Gate` failures; last all-green required-ish set is `073238d`; no release date, green window, or `.env` scrub |
+| R7 Release Ops | Partial | Evidence refreshed: pushed `main` `bbabc5e` is green for `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`; no release date, green window, or `.env` scrub |
