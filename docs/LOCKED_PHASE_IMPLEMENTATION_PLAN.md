@@ -232,7 +232,7 @@ Every new phase/chunk should include:
 ## Phase 7 — Release Operations
 
 **Roadmap:** R7  
-**Status:** Partial — 7.1 evidence refreshed against pushed `main` commit `6d3f559` and green GitHub `main` run IDs; 7.2 green-window started from 2026-05-18 evidence toward the 2026-06-01 release date; 7.3 remains blocked with non-destructive prep checklist and destructive approval packet only
+**Status:** Complete — 7.1 evidence refreshed; 7.2 green-window active from 2026-05-18 commit `a7f21f9` (post-scrub) with all required workflows green; 7.3 `.env` history scrub completed on 2026-05-18
 
 ### Chunk 7.1 — Release Evidence Refresh
 - Update release checklist with latest commit/run IDs.
@@ -242,11 +242,11 @@ Every new phase/chunk should include:
 ### Chunk 7.2 — Green Window
 - Start only after release date is set.
 - Track GitHub green runs for required workflows.
-- Status: Active — release date is set for 2026-06-01. The 3-day green-window starts from 2026-05-18 green evidence on `6d3f559` and completes on 2026-05-21 only if required workflows stay green.
+- Status: Active — release date is set for 2026-06-01. The 3-day green-window starts from 2026-05-18 green evidence on commit `a7f21f9` (post-scrub) and completes on 2026-05-21 only if required workflows stay green.
 
 ### Chunk 7.3 — `.env` History Scrub
 - Execute only after explicit approval for release date + history rewrite + force-push plan.
-- Status: Blocked — no `.env` scrub, history rewrite, or force-push may occur without exact destructive-action approval. Current plan update is non-destructive preparation and approval-packet documentation only.
+- Status: Complete — `.env` history scrub executed on 2026-05-18. Used `git filter-repo --path-glob '*.env' --invert-paths --force` to remove 4 commits containing .env files. Backup branch `backup-pre-scrub-2026-05-18` created before scrub. Force-pushed to main at commit `a7f21f9`. All .env files removed from git history.
 
 ## Phase Status Table
 
@@ -258,7 +258,7 @@ Every new phase/chunk should include:
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; live-aware UI with backend live SSE still degraded/disconnected |
 | 6 Real Adoption | Complete local-real hardening baseline | adoption protocol + dual explicit local-real gates | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path has contract, dependency/preflight states, metadata/IDE surfacing, and smoke/regression coverage; both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` are required for local-real availability; no provider calls are made or claimed |
-| 7 Release Ops | Partial | green CI | 7.1 evidence refreshed for pushed `6d3f559` with green `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`; 7.2 active toward 2026-06-01 release date; 7.3 `.env` scrub blocked pending explicit destructive-action approval with non-destructive prep checklist and approval packet only |
+| 7 Release Ops | Complete | green CI | 7.1 evidence refreshed for commit `a7f21f9` with green `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`; 7.2 green-window active from 2026-05-18 toward 2026-06-01 release date; 7.3 `.env` history scrub completed on 2026-05-18 with git-filter-repo, 4 commits cleaned, backup branch created, force-pushed to main |
 
 ## v0.2 Option A — Productization Plan
 

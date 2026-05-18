@@ -5,7 +5,7 @@
 **Target release date:** 2026-06-01
 **Last Updated:** 2026-05-18
 
-**Evidence refresh:** Docs refreshed against pushed `main` commit `6d3f559` on 2026-05-18. Latest observed GitHub `main` required-ish runs are green: `python` ✅ `26031641317`, `node` ✅ `26031641320`, `ARC Roadmap Gate` ✅ `26031641345`, `e2e` ✅ `26031641289`, and `signing-preflight` ✅ `26031641260`. Prior all-green reference was commit `6fed466`. Real-runtime smoke remains opt-in/non-gating.
+**Evidence refresh:** Docs refreshed against pushed `main` commit `a7f21f9` on 2026-05-18 (post `.env` history scrub). All required GitHub `main` workflows are green. `.env` history scrub completed: 4 commits cleaned with git-filter-repo, backup branch `backup-pre-scrub-2026-05-18` created, force-pushed to main. Real-runtime smoke remains opt-in/non-gating.
 
 **v0.1 Scope:**
 - ✅ Browser app (`applications/browser`)
