@@ -1,7 +1,6 @@
 """SSE streaming coverage. We verify the framing, the Last-Event-ID resume
 contract, and the [DONE] terminator without sleeping — the daemon's emitter
 is mocked for determinism."""
-import json
 import asyncio
 import json
 import warnings
