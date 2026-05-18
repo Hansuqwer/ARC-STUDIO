@@ -2,7 +2,7 @@
 
 This is a gated release task. Do not run it during normal development.
 
-**Current status (2026-05-18):** Preparation only. Target release date is 2026-06-01 and latest observed required-ish GitHub `main` workflows are green on `6fed466`, but no `.env` scrub, history rewrite, force-push, secret rotation, branch deletion, tag, publish, or release action is approved.
+**Current status (2026-05-18):** Preparation only. Target release date is 2026-06-01 and latest observed required-ish GitHub `main` workflows are green on `6d3f559`, but no `.env` scrub, history rewrite, force-push, secret rotation, branch deletion, tag, publish, or release action is approved.
 
 ## Trigger
 
@@ -34,6 +34,21 @@ These checks may be refreshed before the scrub window because they do not rewrit
 - Record the exact approval strings that will be required later, separately, for any history rewrite and force-push.
 
 Do not run `git filter-repo`, rotate secrets, delete refs, tag, publish, release, or force-push during preparation.
+
+## Destructive Approval Packet (Not Executed)
+
+Context7/reference guidance for `git-filter-repo` confirms the safe pattern: use a fresh clone, remove paths with `git filter-repo --path <file> --invert-paths`, verify history no longer references the path, then publish rewritten history only with an explicit force-push approval. This repository must not use a blanket approval; each destructive action needs its own exact approval string.
+
+Proposed scrub date: no later than 2026-05-25 for the 2026-06-01 release target.
+
+Separate approvals that would be needed later:
+
+- `APPROVE: rotate secrets that appeared in .env`
+- `APPROVE: run git filter-repo --path .env --invert-paths in a fresh scrub clone`
+- `APPROVE: push scrubbed main to a review branch`
+- `APPROVE: git push --force-with-lease scrubbed main`
+
+Until those exact approvals are supplied, the packet is documentation only.
 
 ## Procedure
 

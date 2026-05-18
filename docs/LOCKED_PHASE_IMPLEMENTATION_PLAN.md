@@ -181,21 +181,21 @@ git status --short
 ## Phase 7 — Release Operations
 
 **Roadmap:** R7  
-**Status:** Partial — 7.1 evidence refreshed against pushed `main` commit `6fed466` and green GitHub `main` run IDs; 7.2 green-window started from 2026-05-18 evidence toward the 2026-06-01 release date; 7.3 remains blocked with non-destructive prep checklist only
+**Status:** Partial — 7.1 evidence refreshed against pushed `main` commit `6d3f559` and green GitHub `main` run IDs; 7.2 green-window started from 2026-05-18 evidence toward the 2026-06-01 release date; 7.3 remains blocked with non-destructive prep checklist and destructive approval packet only
 
 ### Chunk 7.1 — Release Evidence Refresh
 - Update release checklist with latest commit/run IDs.
 - Do not overclaim deferred features.
-- Status: Partial — evidence refreshed for pushed `main` commit `6fed466`. Latest GitHub `main` evidence: python ✅ `26030398787`, node ✅ `26030398743`, ARC Roadmap Gate ✅ `26030398758`, e2e ✅ `26030398786`, signing-preflight ✅ `26030398785`. Banned-claims verification remains the docs-touch check for this phase.
+- Status: Partial — evidence refreshed for pushed `main` commit `6d3f559`. Latest GitHub `main` evidence: python ✅ `26031641317`, node ✅ `26031641320`, ARC Roadmap Gate ✅ `26031641345`, e2e ✅ `26031641289`, signing-preflight ✅ `26031641260`. Banned-claims verification remains the docs-touch check for this phase.
 
 ### Chunk 7.2 — Green Window
 - Start only after release date is set.
 - Track GitHub green runs for required workflows.
-- Status: Active — release date is set for 2026-06-01. The 3-day green-window starts from 2026-05-18 green evidence on `6fed466` and completes on 2026-05-21 only if required workflows stay green.
+- Status: Active — release date is set for 2026-06-01. The 3-day green-window starts from 2026-05-18 green evidence on `6d3f559` and completes on 2026-05-21 only if required workflows stay green.
 
 ### Chunk 7.3 — `.env` History Scrub
 - Execute only after explicit approval for release date + history rewrite + force-push plan.
-- Status: Blocked — no `.env` scrub, history rewrite, or force-push may occur without explicit release-date and destructive-action approval. Current plan update is non-destructive preparation only.
+- Status: Blocked — no `.env` scrub, history rewrite, or force-push may occur without exact destructive-action approval. Current plan update is non-destructive preparation and approval-packet documentation only.
 
 ## Phase Status Table
 
@@ -207,4 +207,4 @@ git status --short
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; live-aware UI with backend live SSE still degraded/disconnected |
 | 6 Real Adoption | Partial | adoption protocol | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` across router/capability/preflight/runner surfaces with no provider calls; provider-backed path gated/not claimed |
-| 7 Release Ops | Partial | green CI | 7.1 evidence refreshed for pushed `6fed466` with green `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`; 7.2 active toward 2026-06-01 release date; 7.3 `.env` scrub blocked pending explicit destructive-action approval with non-destructive prep checklist only |
+| 7 Release Ops | Partial | green CI | 7.1 evidence refreshed for pushed `6d3f559` with green `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`; 7.2 active toward 2026-06-01 release date; 7.3 `.env` scrub blocked pending explicit destructive-action approval with non-destructive prep checklist and approval packet only |
