@@ -112,7 +112,7 @@ describe('provider telemetry helpers', () => {
     it('summarizes profile cost policy with dry-run paid-call blocking', () => {
         expect(summarizeProfileCostPolicy({ name: 'safe' }, true, true)).toEqual({
             label:
-                'safe: dry-run/offline hard-blocks paid/live provider calls (future backend enforcement only)',
+                'safe: dry-run/offline hard-blocks paid/live provider calls (backend-enforced opt-in; UI preview only)',
             dryRun: true,
             paidCallsAllowed: false,
             paidCallsBlocked: true,
@@ -123,7 +123,7 @@ describe('provider telemetry helpers', () => {
         });
 
         expect(summarizeProfileCostPolicy({ id: 'prod' }, false, false)).toMatchObject({
-            label: 'prod: paid/live provider calls gated (future backend enforcement only)',
+            label: 'prod: paid/live provider calls gated (backend-enforced opt-in; UI preview only)',
             paidCallsAllowed: false,
             paidCallsBlocked: true,
             enforcement: 'informational',
@@ -133,7 +133,7 @@ describe('provider telemetry helpers', () => {
 
     it('marks cost policy as enforced only when explicit flag is provided', () => {
         expect(summarizeProfileCostPolicy({ name: 'prod' }, false, true, true)).toMatchObject({
-            label: 'prod: paid/live provider calls explicitly allowed (enforced by current UI policy)',
+            label: 'prod: paid/live provider calls explicitly allowed (backend-enforced opt-in)',
             enforcement: 'enforced',
             enforced: true,
             dryRunHardBlock: false,
@@ -175,7 +175,7 @@ describe('provider telemetry helpers', () => {
             state: 'blocked',
             reasons: ['dry-run is enabled; live provider calls are hard-blocked'],
             cta: 'safe: disable dry-run before local live-readiness preview can proceed',
-            enforcement: 'future backend enforcement; UI is preview/offline scaffold only',
+            enforcement: 'backend-enforced opt-in; UI remains preview/offline and never enables provider execution',
             message:
                 'Local/offline quota/cost preview only; blocked by dry-run is enabled; live provider calls are hard-blocked.',
             providerCall: false,
@@ -209,7 +209,7 @@ describe('provider telemetry helpers', () => {
             state: 'ready',
             reasons: [],
             cta: 'current profile: local/offline preview ready; provider execution remains disabled here',
-            enforcement: 'future backend enforcement; UI is preview/offline scaffold only',
+            enforcement: 'backend-enforced opt-in; UI remains preview/offline and never enables provider execution',
             message: 'Local/offline quota/cost preview only; no provider execution is enabled by this state.',
             providerCall: false,
         });
@@ -232,6 +232,24 @@ describe('provider telemetry helpers', () => {
         expect(gate.providerCall).toBe(false);
         expect(gate.cta).toContain('provider execution remains disabled');
         expect(gate.message).toContain('no provider execution is enabled');
-        expect(gate.enforcement).toContain('future backend enforcement');
+        expect(gate.enforcement).toContain('backend-enforced opt-in');
+        expect(gate.enforcement).toContain('preview/offline');
+        expect(gate.enforcement).toContain('never enables provider execution');
+        expect(gate.enforcement).not.toContain('network');
+        expect(gate.enforcement).not.toContain('API');
+    });
+
+    it('does not expose live execution enablement in any gate state', () => {
+        const cases = [
+            buildLiveProviderGate({ dryRun: true, allowPaidCalls: false, liveTestsEnabled: false }),
+            buildLiveProviderGate({ dryRun: false, allowPaidCalls: false, liveTestsEnabled: false }),
+            buildLiveProviderGate({ dryRun: false, allowPaidCalls: true, liveTestsEnabled: true }),
+        ];
+
+        for (const gate of cases) {
+            expect(gate.providerCall).toBe(false);
+            expect(`${gate.cta} ${gate.message} ${gate.enforcement}`).toContain('Local/offline');
+            expect(`${gate.cta} ${gate.message} ${gate.enforcement}`).not.toMatch(/enable(s|d)? live provider execution/i);
+        }
     });
 });

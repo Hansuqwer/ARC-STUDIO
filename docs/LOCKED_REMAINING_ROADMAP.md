@@ -61,7 +61,7 @@
 
 **Goal:** Existing CLI/provider diagnostics and quota controls are visible and actionable in IDE.
 
-**Current:** CLI provider diagnostics/quota commands exist; IDE has a provider diagnostics/quota scaffold with typed telemetry parsing/tests, targeted confirmation before local quota-counter reset, a profile-linked cost policy summary, backend cost-gate metadata/enforcement, and hardened explicit paid/live opt-in gate wording. Reset is backed only by existing `arc providers quota reset --json` local quota-counter semantics. Live/provider UX remains gated/offline by default and performs no network/provider calls; real provider execution remains future work.
+**Current:** CLI provider diagnostics/quota commands exist; IDE has a provider diagnostics/quota scaffold with typed telemetry parsing/tests, targeted confirmation before local quota-counter reset, a profile-linked cost policy summary, backend cost-gate metadata/enforcement, and hardened explicit paid/live opt-in gate wording. Reset is backed only by existing `arc providers quota reset --json` local quota-counter semantics. Live/provider UX remains offline/gated by default and performs no provider network calls without explicit opt-in; real provider execution remains future work and is not implemented unless explicitly reprioritized.
 
 **Deliverables:**
 - Provider diagnostics panel.
@@ -144,7 +144,7 @@
 |---|---|---|
 | R1 Live Run Streaming | Complete | Phase 2 IDE Runtime Setup + Config |
 | R2 IDE Runtime Setup | Complete polished UI baseline | Backend protocol/service expansion only if future config fields require it; continue env-ref-only secret posture |
-| R3 Provider/Quota UI | Partial | Keep provider calls gated/offline by default; backend cost enforcement is in place; future work is any real provider execution path behind explicit opt-in |
+| R3 Provider/Quota UI | Partial | Keep provider calls offline/gated by default; backend cost enforcement is in place; future work is any real provider execution path, not implemented unless explicitly reprioritized and protected by opt-in |
 | R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
 | R5 SwarmGraph Insight | Complete baseline + first producer events | Add measured cost producer and complete backend live SSE wiring before live-runtime claims |
 | R6 Real Adoption | Partial | LangGraph + SwarmGraph local-real path now requires dual explicit gates; keep fake/offline default and provider-backed execution unclaimed |

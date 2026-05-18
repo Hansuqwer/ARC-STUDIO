@@ -103,7 +103,7 @@ git status --short
 ## Phase 3 — Provider/Quota/Cost UI
 
 **Roadmap:** R3  
-**Status:** Partial — provider diagnostics/quota scaffold exists with typed parsing/tests, targeted confirmation before local quota-counter reset, profile-linked cost policy summary, backend cost-gate enforcement, and explicit paid/live opt-in gates. Reset remains local quota-counter reset only; live/provider UX performs no network/provider calls by default, and real provider execution is still not implemented.
+**Status:** Partial — provider diagnostics/quota scaffold exists with typed parsing/tests, targeted confirmation before local quota-counter reset, profile-linked cost policy summary, backend cost-gate enforcement, and explicit paid/live opt-in gates. Reset remains local quota-counter reset only; default UX is offline/gated and performs no provider network calls without explicit opt-in. Real provider execution is future work and not implemented unless explicitly reprioritized.
 
 ### Chunk 3.1 — Provider Diagnostics Panel
 - Surface existing CLI/provider diagnostics.
@@ -118,7 +118,7 @@ git status --short
 ### Chunk 3.3 — Paid-Call Gate UX
 - Add explicit warnings/confirmations before provider-backed paths.
 - Tests prove no live call without explicit opt-in.
-- Status: Partial — provider-backed/live actions remain gated/offline by default. Current live-provider UX is preview/gate only and performs no network/provider calls; hardened UI copy/actions distinguish dry-run/offline, local quota reset, backend cost-gate enforcement, and any future live/provider path. Real provider execution remains future work behind explicit opt-in.
+- Status: Partial — provider-backed/live actions remain gated/offline by default. Current live-provider UX is preview/gate only and performs no network/provider calls without explicit opt-in; hardened UI copy/actions distinguish dry-run/offline, local quota reset, backend cost-gate enforcement, and any future live/provider path. Real provider execution remains future work and is not implemented unless explicitly reprioritized.
 
 ## Phase 4 — HITL + Audit Dedicated UX
 
@@ -203,7 +203,7 @@ git status --short
 |---|---|---|---|
 | 1 Active Live Streaming | Complete | current CLI/IDE run basics | Full vertical baseline: Python SSE, Theia proxy contract, UI live/replay/disconnected states, stub e2e |
 | 2 Runtime Setup UI | Complete polished UI baseline | config/profile CLI | Safe ConfigTab baseline plus YAML-backed safe fields summary, persisted profile copy, remediation wizard, and dedicated export-target env-ref helpers in place |
-| 3 Provider/Quota UI | Partial | provider CLI | Typed parser/tests, confirmed local quota-counter reset affordance, profile-linked cost summary, backend cost-gate enforcement, hardened paid/live opt-in gates; no provider network calls by default; real provider execution remains future work |
+| 3 Provider/Quota UI | Partial | provider CLI | Typed parser/tests, confirmed local quota-counter reset affordance, profile-linked cost summary, backend cost-gate enforcement, hardened paid/live opt-in gates; offline/gated by default with no provider network calls without explicit opt-in; real provider execution remains future work/not implemented |
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; live-aware UI with backend live SSE still degraded/disconnected |
 | 6 Real Adoption | Partial | adoption protocol | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` with no provider calls; provider-backed path gated/not claimed |

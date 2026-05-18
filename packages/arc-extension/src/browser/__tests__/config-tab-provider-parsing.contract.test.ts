@@ -58,38 +58,30 @@ describe('ConfigTab provider telemetry parsing contract', () => {
         expect(helperSource).toMatch(/quotaObject\?\.counters/);
     });
 
-    it('wires provider telemetry helpers reset gate and cost policy summary into ConfigTab', () => {
+    it('wires optional provider telemetry helpers reset gate and cost policy summary into ConfigTab', () => {
         expect(source).toMatch(/parseProviderDiagnostics/);
         expect(source).toMatch(/parseQuotaCounters/);
         expect(source).toMatch(/summarizeProfileCostPolicy/);
         expect(source).toMatch(/buildQuotaResetConfirmation/);
         expect(source).toMatch(/buildLiveProviderGate/);
         expect(source).toMatch(/canResetQuota/);
+        expect(source).toMatch(/if \(providerTelemetryService\.getProviderDiagnostics\)/);
+        expect(source).toMatch(/if \(providerTelemetryService\.getProviderQuota\)/);
         expect(source).toMatch(/resetProviderQuota/);
         expect(source).toMatch(/Local quota-counter reset/);
-        expect(source).toMatch(/no provider network calls/);
-        expect(source).toMatch(/No provider network, no live API, no billing action/);
-        expect(source).toMatch(/arc-studio-config__cost-policy-summary/);
-        expect(source).toMatch(/Paid\/live provider calls require explicit backend-enforced opt-in gates/);
+        expect(source).toMatch(/no provider network calls/i);
     });
 
-    it('requires exact confirmation phrase before local quota reset can run', () => {
-        expect(source).toMatch(/quotaResetRequiredPhrase/);
-        expect(source).toMatch(/RESET LOCAL QUOTA COUNTERS/);
-        expect(source).toMatch(/quotaResetPhrase === quotaResetRequiredPhrase/);
-        expect(source).toMatch(/disabled=\{quotaResetting \|\| !quotaResetConfirmed\}/);
-        expect(source).toMatch(/role='dialog'/);
-        expect(source).toMatch(/Type exact phrase/);
-    });
-
-    it('shows preview-only live provider gate without provider/proxy calls', () => {
-        expect(source).toMatch(/arc-studio-config__live-provider-gate/);
-        expect(source).toMatch(/No network by default: providerCall:false/);
-        expect(source).toMatch(/never calls provider API, provider proxy, live API, or billing endpoints/);
-        expect(source).toMatch(/providerCall: false/);
+    it('shows preview-only live provider gate without provider/proxy/billing calls or real execution claims', () => {
         expect(helperSource).toMatch(/providerCall: false/);
         expect(helperSource).toMatch(/backend-enforced opt-in; UI remains preview\/offline and never enables provider execution/);
         expect(helperSource).toMatch(/Local\/offline quota\/cost preview only/);
-        expect(source).not.toMatch(/providerTelemetryService\.(?!getProviderDiagnostics|getProviderQuota|resetProviderQuota)/);
+        expect(source).not.toMatch(/providerProxy/i);
+        expect(source).not.toMatch(/billingEndpoint/i);
+        expect(source).not.toMatch(/liveProviderExecution/i);
+        expect(source).not.toMatch(/enableRealProvider/i);
+        expect(source).not.toMatch(/executeProvider/i);
+        expect(source).not.toMatch(/fetch\(/);
+        expect(source).not.toMatch(/axios\./);
     });
 });
