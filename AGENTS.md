@@ -1,5 +1,9 @@
 # ARC Studio - Agent Context
 
+**Last reality refresh:** 2026-05-18. This file is agent onboarding/context, not a status source of truth.
+
+When in doubt, `docs/LOCKED_REMAINING_ROADMAP.md` and `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` override this file. Do not resolve conflicts by creating a new roadmap/status/handover doc; update the locked docs instead.
+
 ## Project Overview
 
 ARC Studio is an Agent Runtime Cockpit IDE built on Eclipse Theia. It provides a graphical interface for developing, executing, and monitoring AI agent workflows using SwarmGraph and LangGraph.
@@ -15,18 +19,7 @@ arc-theia-studio/
 │   ├── arc-extension/       # Main ARC extension (backend + frontend)
 │   ├── arc-protocol-ts/     # TypeScript protocol types
 │   └── arc-test-fixtures/   # Test fixtures and sample projects
-├── docs/archive/theia-extensions/  # Archived legacy Theia extension sources (rollback/history)
-│   ├── arc-adapters/        # Runtime adapters
-│   ├── arc-audit/           # Audit logging
-│   ├── arc-context/         # Context management
-│   ├── arc-core/            # Core ARC services
-│   ├── arc-event-stream/    # Event stream visualization
-│   ├── arc-health/          # Health monitoring
-│   ├── arc-product/         # Product-specific UI
-│   ├── arc-runs/            # Run timeline visualization
-│   ├── arc-schemas/         # Schema inspector
-│   ├── arc-settings/        # Settings/preferences
-│   └── arc-workflows/       # Workflow graph visualization
+├── docs/archive/theia-extensions/  # Archived legacy sources only; not workspace-active
 ├── applications/
 │   └── browser/             # Canonical browser app (Theia 1.71.0) — primary release target
 ├── python/
@@ -137,11 +130,12 @@ cd python && uv run pytest tests/web/ --log-cli-level=DEBUG -s  # Web tests with
 ### Test Configuration
 - Framework: Jest with ts-jest
 - Environment: Node (for backend), source-pattern matching (for UI components)
-- Coverage: 61.84% statements, 67.34% branches, 53.78% functions, 63.18% lines
-- Total tests: 563 arc-extension (9 suites) + 782 passed / 14 skipped Python + 11 arc-ag-ui
+- Current test counts and release evidence live in `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` and `docs/RELEASE_CHECKLIST.md`; do not duplicate volatile counts here.
 - Location: `packages/arc-extension/jest.config.js`
 
-## Architecture Decisions
+## Refactoring History
+
+Historical sprint labels below are orientation notes, not current roadmap status. ADRs under `docs/adr/` are the architecture-decision source of truth.
 
 ### P0-3: Backend Modularization
 Split the monolithic `arc-backend-service.ts` (1,329 lines) into:
@@ -188,6 +182,12 @@ The only active roadmap/implementation plan documents are:
 
 Do not create new roadmap, implementation-plan, phase-plan, status, next-steps, or handover markdown files. Update the two locked docs above after every commit that changes implementation status. Historical plans belong under `docs/archive/stale-roadmaps/` and are not sources of truth.
 
+### Gated Paths + Claim Safety
+- Gated execution path details live in `docs/LOCKED_REMAINING_ROADMAP.md` under `Gated Execution Paths`.
+- Event/data producer status lives in `docs/LOCKED_REMAINING_ROADMAP.md` under `Producer Inventory`.
+- UI panels that depend on topology, consensus, cost, HITL, or audit events must render honest empty/degraded states when producers/material are absent; never fabricate data.
+- Release-facing docs must pass `scripts/check-banned-claims.sh`. Do not claim broad provider-backed adoption, live Arena product behavior, adapter-wide keyed audit, production readiness, shared-server readiness, or tenant isolation unless the locked docs and tests explicitly support it.
+
 ### Before Each Implementation Slice
 1. Read `docs/LOCKED_REMAINING_ROADMAP.md` and `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`.
 2. Search `docs/research/IMPLEMENTATION_RESEARCH.md` only for supporting scaffolds/guidance.
@@ -222,131 +222,19 @@ Continue implementing the next ordered ARC Studio plan item. First read `docs/LO
 
 ## Current Status
 
-### Completed (P0 - Critical)
-- ✅ P0-1: Python build fixed (hatch wheel config)
-- ✅ P0-2: Backup artifacts cleaned + .gitignore
-- ✅ P0-3: Backend refactored (1,329→276 lines + 4 services)
-- ✅ P0-4: Frontend refactored (974→~450 lines + 8 components)
-- ✅ P0-5: TypeScript strict mode verified
+Do not maintain detailed implementation status in this agent-context file. Current status, evidence anchors, gated paths, producer inventory, deferred items, and v0.2 Option A scope live in:
 
-### Completed (P1 - High)
-- ✅ P1-6: ESLint + Prettier configured
-- ✅ P1-7: Test coverage improved (239 tests, 67.34% branches)
-- ✅ P1-8: Build optimization (split chunks)
-- ✅ P1-9: Documentation consolidated
+- `docs/LOCKED_REMAINING_ROADMAP.md`
+- `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`
+- `docs/RELEASE_CHECKLIST.md`
 
-### Completed (P2 - Critical Review Fixes)
-- ✅ P2-1: Historical docs archived under docs/archive/
-- ✅ P2-2: workflow-executor.ts uses discovered cliPath (not literal 'swarmgraph')
-- ✅ P2-3: findExecutable accepts workspaceRoot (not process.cwd())
-- ✅ P2-4: replaced `null as any` with `null!` for running-process preinsert
-- ✅ P2-5: Spawn-mocked WorkflowExecutor tests added (6 new test cases)
+Historical P0/P1/P2/P3/P4/P5 milestone labels, the 23-PR sequence, Slice 7 details, and old remaining-issue summaries are archive context only. Use `docs/archive/` for historical reconstruction, not execution planning.
 
-### Completed (P3 - Audit Fixes)
-- ✅ F-0 through F-13, G4F, #19, #20 — all resolved
+Stable constraints to remember:
 
-### Completed (Recommended First 23 PRs)
-- ✅ PR 1: Docs truth cleanup
-- ✅ PR 2: Release checklist
-- ✅ PR 3: Theia version-skew audit
-- ✅ PR 4: Extension build on Theia 1.71
-- ✅ PR 5: Browser app canonical wiring
-- ✅ PR 6: Extension migration inventory
-- ✅ PR 7: CLI discoverability A (version, health)
-- ✅ PR 8: CLI discoverability B (status, doctor all)
-- ✅ PR 9: Register/hide AG2
-- ✅ PR 10: Capability schema v1
-- ✅ PR 11: OpenAI Agents export target
-- ✅ PR 12: CLI daemon parity A (arc runs diff)
-- ✅ PR 13: CLI daemon parity B (provider diagnostics/proxy)
-- ✅ PR 14: Event schema registry (ADR-004)
-- ✅ PR 15-16: Adoption protocol + registry skeleton
-- ✅ PR 17: Delete stale deploy script
-- ✅ PR 18: Manual SSE proof endpoint
-- ✅ PR 19: Event broker core
-- ✅ PR 20: Supervisor wiring
-- ✅ PR 21: Keychain storage spike
-- ✅ PR 22: Trust resolver external store
-- ✅ PR 23: Dossier scaffold hardening
-
-### Completed (P1a — Execution Core Infrastructure)
-- ✅ **SQLite index beside JSONL (ADR-003)**: `IndexedTraceStore` wraps JSONL + SQLite with dual-write; `backfill_index()` for idempotent rebuild; 20 storage tests
-- ✅ **Isolation provider interface (ADR-006)**: `isolation/` package with `IsolationProvider` base, `NoneIsolationProvider` (direct subprocess), `SubprocessIsolationProvider` (env-filtered); `arc isolation status/doctor/list` CLI; 16 tests
-- ✅ **Run lifecycle CLI**: `arc runs status/delete/export/backfill` commands added (15 CLI run tests)
-- ✅ **Audit path on RunRecord**: `audit_path` field added to `RunRecord` schema for trace-to-audit-chain linkage
-- ✅ **Combo semantics**: Already implemented via `ComboRuntimeAdapter` (sequential multi-runtime)
-- ✅ **Config model (ADR-001)**: `ArcConfig` Pydantic model, YAML loader, env/workspace/user/default precedence, `arc config init/show`; 14 tests
-
-### Completed (P1b — Adoption Foundation)
-- ✅ **SwarmGraph import path spike**: vendored `swarm_shared` and `hive-swarm` modules import from ARC Python venv; documented in `docs/SPIKE_SWARMGRAPH_IMPORT.md`
-
-### Completed (P2 — Runtime + SwarmGraph Integrations)
-- ✅ **Prompt optimizer foundation**: `optimizer/local.py` with rule-based prompt structuring, `arc prompt optimize/diff` CLI; optional `tiktoken>=0.12`
-- ✅ **Adoption runners**: LangGraph (SwarmGraph queen/consensus), AG2, CrewAI, OpenAI Agents, LlamaIndex — fake-tested/gated runner paths exist; only `crewai+swarmgraph` is currently routed through the CLI fake/offline path
-- ✅ **CrewAI + SwarmGraph fake/offline CLI path**: `arc run --runtime crewai+swarmgraph` uses fake CrewAI adoption with trace events and `real_provider_call=false`; real provider-backed adoption remains gated/not claimed
-- ✅ **Keyed audit CLI path**: `audit/key_manager.py`, `audit/hmac_chain.py`, `audit/hitl.py`, CLI `arc audit verify/export/key *`; adapter run paths still use ARC SHA-256 audit chains unless a specific run writes keyed audit material
-- ✅ **Trust enforcement**: `ensure_trusted()` blocks untrusted workspaces before run record creation
-- ✅ **HITL supervisor flow**: event types `HITL_PROMPT`, `HITL_RESPONSE`, `HITL_TIMEOUT`; `JobSupervisor.request_hitl()`, `respond_hitl()`, `pending_hitl()`
-- ✅ **Eval CLI basics**: `arc eval save/delete/report/list`, `arc eval run --batch`; 9 eval tests
-- ✅ **Trace replay + HITL CLI**: `arc runs import/replay`, `arc hitl pending/respond/approve/reject`
-
-### Completed (P3 — Theia UX Productization)
-- ✅ **Theia UI ports**: workflow graph, run timeline, event stream, adapters widgets into canonical `packages/arc-extension`
-- ✅ **Product config CLI**: `arc profiles list/show/create`, `arc run --dry-run`, `arc workspace init/info/config`, `arc providers quota show/reset`
-- ✅ **IDE run preflight/launch basics**: modern ChatTab exposes runtime/profile selectors, `crewai+swarmgraph` fake/offline preflight, and explicit fake/offline run launch via backend CLI bridge
-- ✅ **Eval/observability CLI**: `arc runs search` (SQLite index), `arc doctor env/network/storage`, `arc bug-report`
-- ✅ **Docker-compatible isolation**: `DockerIsolationProvider` with OrbStack/Podman/Colima detection; `arc isolation setup/test`; optional `docker>=7.1`; 13 Docker tests
-
-### Completed (P4 — Audit, Replay, HITL, Security Hardening)
-- ✅ **Eval batch mode**: `arc eval run --batch` evaluates against all saved golden traces
-- ✅ **HITL persistence hardening**: single-use tokens, expiry/TTL, replay-attack protection, `prune_expired`; 6 new HITL tests
-- ✅ **Advanced subprocess isolation hardening**: blocked env patterns (`*_API_KEY`, `*_TOKEN`, `*_SECRET`, `AWS_*`), output redaction (OpenAI/Anthropic keys, bearer tokens, passwords); 11 new tests
-- ✅ **Gated prompt optimizer providers**: `OptimizerMode` enum with `off`/`local`/`local-model`/`provider`/`swarmgraph`; provider modes gated with `NotImplementedError` until privacy/paid-call gates exist; 5 new tests
-- ✅ **Deterministic replay**: explicitly scoped behind SwarmGraph runtime support; trace replay (`arc runs replay`) covers P2 baseline
-
-### Completed (P5 — Release Readiness)
-- ✅ **Trace retention + storage management**: `arc runs prune --older-than N`, `arc storage vacuum`, `arc storage status`; 5 new tests
-- ✅ **Opt-in real-runtime smoke scaffold**: `python/tests/integration/real_runtime/` with `ARC_REAL_RUNTIME_SMOKE=1` gated SwarmGraph/LangGraph smoke tests
-- ✅ **Nightly/manual real-runtime smoke workflow**: `.github/workflows/real-runtime-smoke.yml` keeps PR/push CI offline and runs opt-in smoke tests on schedule/manual dispatch
-- ⚠️ **Release checklist dry-run started**: frozen install, full build, Python tests, extension tests, CLI help, runtime capabilities JSON, and scoped release-doc banned-claim checks pass locally; python/node/roadmap gate fixes are in-repo, but GitHub confirmation and e2e stabilization remain release work
-
-### P4 Items Explicitly Deferred
-- **Consensus/voting, queen/worker topology IDE dashboards**: requires stable adoption events and Theia UI work; deferred until adoption protocol matures
-- **SwarmGraph insight IDE**: requires adoption/audit events backing real run data
-
-### P1a Follow-up Notes
-- `audit_path` exists on `RunRecord` and SQLite index; adapter-wide audit-path population still needs targeted verification before public audit claims
-- Hard subprocess env allowlists are covered by `SwarmGraphAdapter._filtered_env()` and `SubprocessIsolationProvider`; other adapters are in-process unless explicitly routed through isolation
-
-### Known Issues
-- ESLint has 247 problems (113 errors, 134 warnings) — all pre-existing in other packages; our files have 0 errors
-- Browser files (arc-widget.tsx, etc.) show 0% coverage due to Theia runtime dependency — UI tests are static contract tests only
-- Coverage targets: 70% not reached for statements (61.84%), functions (53.78%), lines (63.18%). Only branches (67.34%) close. Target lowered to 60% for v0.1.0-alpha.
-- Monaco editor bundle is 15.9 MiB (expected, not reducible)
-- Total frontend entrypoint ~28.8 MiB (Monaco + Theia core + React + vendors); ARC Studio code chunk is 50 KiB
-
-### Test Metrics
-- Python: 782 passed, 14 skipped (was 435 before P2/P3/P4/P5 work)
-- TypeScript protocol build: clean
-- arc-extension build/test: clean (581 tests, 9 suites)
-
-### Slice 7 — HITL/Audit/Replay UX Hardening (Completed)
-- ✅ **Protocol types**: Added `HitlPromptInfo`, `HitlRespondRequest`, `AuditChainInfo`, `ReplayResult`, `ReplayEvent` to `arc-protocol.ts`
-- ✅ **Service methods**: Added `listPendingHitlPrompts()`, `respondHitlPrompt()`, `getAuditChainInfo()`, `replayRun()` to `ArcService` interface and `ArcBackendService` implementation
-- ✅ **RunsTab enhancements**: Added audit chain verification button + info display, replay events button + event list view, HITL pending prompts listing with approve/reject buttons in header
-- ✅ **Tests**: 11+ new proxy/contract tests covering HITL, audit, and replay protocol types and backend methods
-- ✅ **Backend wiring**: All new methods call Python CLI (`arc hitl pending/respond`, `arc runs status`, `arc audit verify`, `arc runs replay`) following existing `execFileSync` pattern with env filtering
-
-### Remaining Issues
-Historical details are archived at `docs/archive/handover/REMAINING_ISSUES_PLAN.md`. Current summary:
-
-- **R-1 (Node CI: arc-ag-ui test exits 1)**: Fixed and confirmed on GitHub before follow-up archive work.
-- **R-2 (ARC Roadmap Gate: native-keymap gyp crash)**: Fixed and confirmed on GitHub before follow-up archive work.
-- **R-3 (Python CI: 2 AG2 adapter test errors)**: Fixed and confirmed on GitHub before follow-up archive work.
-- **R-4 (10 unmerged remote branches)**: 3 may have salvageable work; 7 intentionally parked.
-- **R-5 (.env history scrub)**: Plan documented in `docs/ENV_HISTORY_SCRUB_PLAN.md`; execute only after release date approval.
-- **e2e workflow**: Local browser/e2e verification passes; GitHub e2e passed on `ec127a1`.
-- **theia-extensions migration**: Phase C cleanup complete — release-scope widgets are canonical in `packages/arc-extension`; legacy `theia-extensions/*` packages are unwired from browser/electron apps, root typecheck, and pnpm workspace. Source dirs are archived under `docs/archive/theia-extensions/` for rollback/history.
+- Browser/Theia UI tests are mostly static/source-contract tests because runtime jsdom coverage is limited.
+- Monaco/Theia bundle size is expected to be large; optimize ARC-owned chunks, not Monaco itself.
+- Adapter-wide keyed audit, broad provider-backed adoption, live Arena, production readiness, shared-server readiness, and tenant isolation remain unclaimed unless the locked docs and tests say otherwise.
 
 ## Related Documentation
 

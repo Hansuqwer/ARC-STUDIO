@@ -2,7 +2,23 @@
 
 **Status:** Locked source of truth for remaining product work.  
 **Created:** 2026-05-17  
+**Last reality refresh:** 2026-05-18 against current locked phase status and release evidence.  
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
+
+## Status Vocabulary
+
+Use only these values in roadmap status lines:
+
+| Status | Meaning |
+|---|---|
+| Not Started | Planned but no implementation slice has begun. |
+| In Progress | Implementation is active and not yet accepted. |
+| Baseline Complete | Minimum accepted behavior exists with tests/evidence; polish may remain. |
+| Polished Complete | Baseline plus user-facing polish is accepted. |
+| Blocked | Cannot proceed without an external decision, approval, secret, destructive action, or unavailable dependency. |
+| Deferred | Intentionally out of current scope; requires explicit roadmap change to resume. |
+
+Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test anchor> | Notes: <one sentence>`.
 
 ## Current Baseline
 
@@ -20,6 +36,42 @@
 - LM Arena remains stub-default/gated and out of v0.1 product scope.
 - Electron packaging/signing remains post-v0.1 unless explicitly reprioritized.
 - `.env` history scrub requires explicit release date + force-push/history-rewrite approval.
+
+## Gated Execution Paths
+
+| Path | Required Gates | Exact Confirmation | What It Proves | What It Does Not Prove | Evidence |
+|---|---|---|---|---|---|
+| `langgraph+swarmgraph` local-real smoke | `ARC_REAL_RUNTIME_SMOKE=1`, `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`, installed local deps | None beyond smoke invocation | Narrow local, non-provider-backed LangGraph + SwarmGraph execution path can run when dependencies and both gates are present | No provider-backed execution; no broad adoption readiness; no paid calls | Locked R6 baseline; opt-in smoke/manual path |
+| `arc providers action` via 9router | Live-provider test env gate, paid-call opt-in, env/key references only | `RUN_PROVIDER_ACTION:<provider>:<model>` | One narrow gated provider action path and ARC local accounting | No remote quota reset; no provider-backed adoption; no SwarmGraph runtime execution | `9184f9b` with `9router` / `nvidia/minimaxai/minimax-m2.7` |
+| LM Arena | None accepted for product use | N/A | Stub/default arena behavior only | No live arena product feature | Fiction list / release scope |
+
+## Producer Inventory
+
+Only render rich UI data from event producers listed here. Missing producers must yield absent/degraded UI states, not fabricated data.
+
+| Event/Data Type | Producer Path | Status | UI Consumers |
+|---|---|---|---|
+| Active run SSE transport events | `EventBroker`/`JobSupervisor`, `/api/runs/{id}/events`, `/api/sse-proof` stub | Baseline Complete | Event Stream, Run Timeline |
+| `RUN_STARTED` / terminal events | SSE proof stub and supported run paths | Baseline Complete | Event Stream, Run Timeline |
+| SwarmGraph topology | `langgraph+swarmgraph` event path | Baseline Complete for first producer; absent elsewhere | SwarmGraph Insight |
+| Consensus/vote events | `langgraph+swarmgraph` event path | Baseline Complete for first producer; absent elsewhere | SwarmGraph Insight |
+| Measured cost/token events | None broadly wired | Not Started | Budget/Cost panels show absent/degraded |
+| HITL prompt/response/timeout | `JobSupervisor` HITL flow + CLI/IDE response paths | Baseline Complete | Assurance tab, Runs tab basics |
+| Audit chain material | ARC audit paths and keyed audit CLI path where specific run writes material | Conditional | Assurance tab, audit verify/export |
+| Effect-boundary journal entries | None | Deferred | Future replay/fork UX |
+
+## Documentation Inventory
+
+| Location | Purpose |
+|---|---|
+| `docs/LOCKED_REMAINING_ROADMAP.md` | Authoritative roadmap/status. |
+| `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` | Authoritative ordered execution plan. |
+| `docs/adr/` | Architecture decisions. |
+| `docs/research/` and `docs/wiki/research-context/` | Supporting research/scaffolds only, not status. |
+| `docs/RELEASE_CHECKLIST.md` | Release evidence and gates. |
+| `docs/archive/` | Historical context only. |
+| `docs/handover/` | Thin pointers/context; must defer to locked docs. |
+| `scripts/check-banned-claims.sh` | Enforced release-claim guard. |
 
 ## R1 — Live Run Streaming Product Path
 
@@ -149,3 +201,34 @@
 | R5 SwarmGraph Insight | Complete baseline + first producer events | Add measured cost producer and complete backend live SSE wiring before live-runtime claims |
 | R6 Real Adoption | Complete local-real hardening baseline | Keep fake/offline deterministic/default; local-real availability requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; no paid/live provider calls; provider-backed execution remains blocked/unclaimed |
 | R7 Release Ops | Partial | Release date set for 2026-06-01; green-window started from 2026-05-18 `6d3f559` green evidence; `.env` scrub still blocked pending explicit destructive-action approval |
+
+## v0.2 Planning Decision — Option A
+
+**Status:** Accepted planning input, subordinate to this locked roadmap and `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`.
+
+v0.2 product work is scoped to IDE productization of existing/gated capabilities, not a replay-architecture cycle. Effect-boundary deterministic replay, journal-backed fork/resume, adapter-wide real-time budget interrupts, and standalone SwarmGraph internal event capture are deferred unless explicitly reprioritized in this locked roadmap.
+
+### v0.2 Scope
+
+- Complete live-stream productization by wiring Theia live mode to a configured Python daemon/local runtime stream beyond the deterministic SSE proof stub. Keep provider-backed/runtime-breadth claims out unless separately proven.
+- Add BudgetVector post-hoc accounting/reporting and IDE gauges from trace/metadata where data exists. Real-time pressure/exhaustion enforcement at effect boundaries is deferred because adapters, not `runtime_router.py`, observe most effect boundaries.
+- Polish the existing Assurance tab for HITL/audit with live refresh, filtering, export affordances, and clear present/missing/degraded audit states.
+- Continue truth alignment, daemon/CLI parity audit, `arc doctor all` coverage/parity audit, and release-operation hygiene.
+
+### Deferred From v0.2
+
+- Effect-boundary replay and `arc runs fork` over journaled adapter responses.
+- Adapter-wide BudgetVector interrupts and hard enforcement at model/tool-call boundaries.
+- New adapters or adapter status upgrades without corresponding IDE views.
+- Live LM Arena and Electron release packaging.
+
+## Deferred Ledger
+
+| Item | Deferred Until | Unblock Gate |
+|---|---|---|
+| Effect-boundary replay / journal-backed fork | v0.3+ | Adapter/effect instrumentation is explicitly in scope. |
+| Real-time BudgetVector pressure/exhaustion interrupts | v0.3+ | Effect-boundary data is observable for the target runtime path. |
+| Standalone SwarmGraph internal topology/consensus capture | Later productization | ARC can consume real emitted events from standalone SwarmGraph, not fabricated summaries. |
+| Broad provider-backed adoption | Later productization | Provider gates, privacy gates, tests, and IDE views are all present. |
+| New adapters | Later roadmap | IDE views and support burden are explicitly accepted. |
+| Electron release packaging | Post-browser release | Browser release gates are stable and packaging/signing is reprioritized. |

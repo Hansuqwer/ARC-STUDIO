@@ -1,11 +1,11 @@
 # ARC Studio — Handover for Continued Implementation
 
-**Generated:** 2026-05-15; release-truth refresh 2026-05-17
+**Generated:** 2026-05-15; release-truth refresh 2026-05-18
 **Previous commits:** historical value omitted; check `git status`/`git log` before work.
 **Test count:** Python 782 passed / 14 skipped; TS protocol + arc-extension builds clean; arc-extension test suite 581 tests / 9 suites.
 
 ## Goal
-Continue remaining ARC Studio product work from `docs/LOCKED_REMAINING_ROADMAP.md` and `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` with green tests and builds. Earlier P1a through P5 release-readiness scaffolds and HITL/Audit/Replay UX hardening are implemented; current focus is product-depth work such as active run event delivery, setup/config UX, provider controls, HITL/audit UX, SwarmGraph insight, and narrow real adoption. Commit only if explicitly requested.
+Continue remaining ARC Studio product work from `docs/LOCKED_REMAINING_ROADMAP.md` and `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` with green tests and builds. Those two locked docs are authoritative. Current v0.2 planning selects Option A: IDE productization of existing/gated capabilities, while effect-boundary replay/fork and adapter-wide real-time budget interrupts are deferred. Commit only if explicitly requested.
 
 ## Constraints & Preferences
 - Work in larger coherent phase chunks when safe; after each chunk run tests/lint/build, fix failures, commit only when green.
@@ -53,35 +53,16 @@ Continue remaining ARC Studio product work from `docs/LOCKED_REMAINING_ROADMAP.m
 ### Blocked
 - (none)
 
-## Next Slices (ordered by impact + dependency)
+## Next Slices
 
-### Slice A: Release Truth Cleanup ✅ Done locally
-**Why first:** Several handover/release docs are stale after rapid implementation. Bring release-facing docs back in sync before tagging or more feature work.
+Use `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` as the ordered execution plan. Current planned v0.2 Option A slices are:
 
-**Files to review:**
-- `AGENTS.md`
-- `docs/handover/HANDOVER.md`
-- `docs/RELEASE_CHECKLIST.md`
-- `docs/LOCKED_REMAINING_ROADMAP.md`
-- `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`
+- Phase 8: live stream productization to a configured Python daemon/local runtime stream.
+- Phase 9: BudgetVector post-hoc accounting/reporting and IDE gauges.
+- Phase 10: Assurance tab HITL/audit polish.
+- Phase 11: daemon/CLI parity, `arc doctor all` coverage, and truth-alignment audits.
 
-**Verification:** Banned-claim checker plus targeted grep for stale “not implemented”/“still open” claims.
-
-### Slice B: e2e workflow stabilization ✅ Done locally; GitHub e2e passed on `ec127a1`
-**Why second:** Remaining release-work item; Python/node/roadmap fixes are in-repo, while e2e remains unstable.
-
-**Key constraint:** Do not weaken tests to make CI green. Document Theia/browser infra gaps honestly.
-
-### Slice C: CI confirmation + release checklist refresh ✅ Done for `073238d`
-**Status:** GitHub `python`, `node`, `ARC Roadmap Gate`, `signing-preflight`, and `e2e` passed on `073238d`.
-
-**Key constraint:** No release/tag/history rewrite without explicit approval.
-
-### Slice D: Theia extension migration Phase C ✅ Wiring cleanup done locally
-**Status:** Release-scope widgets are canonical in `packages/arc-extension`; legacy `theia-extensions/*` packages are unwired from browser/electron apps, root typecheck, and pnpm workspace. Source dirs are archived under `docs/archive/theia-extensions/` for rollback/history.
-
-### Slice E: `.env` history scrub planning only
-**Why gated:** Requires coordinated history rewrite/force-push. Execute only after release date approval.
+Release operations and `.env` history scrub remain governed by R7/Phase 7. Do not run destructive history rewrite or force-push without explicit approval.
 
 ## Critical Context
 

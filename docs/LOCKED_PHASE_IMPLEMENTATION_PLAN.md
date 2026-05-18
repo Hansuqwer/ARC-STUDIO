@@ -2,6 +2,7 @@
 
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
+**Last reality refresh:** 2026-05-18 against locked roadmap and release evidence.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -33,6 +34,16 @@ Before commit:
 ```bash
 git status --short
 ```
+
+## Acceptance Ledger Format
+
+Every new phase/chunk should include:
+
+- `Status: <Not Started | In Progress | Baseline Complete | Polished Complete | Blocked | Deferred>`.
+- `Evidence: <commit SHA, CI run ID, test count, or local command result>`.
+- `Acceptance:` numbered, testable conditions.
+- `Verification:` exact commands required for that phase.
+- `Known risks:` residual risk even after acceptance.
 
 ## Phase 1 — Active Live Streaming
 
@@ -248,3 +259,55 @@ git status --short
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; live-aware UI with backend live SSE still degraded/disconnected |
 | 6 Real Adoption | Complete local-real hardening baseline | adoption protocol + dual explicit local-real gates | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path has contract, dependency/preflight states, metadata/IDE surfacing, and smoke/regression coverage; both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` are required for local-real availability; no provider calls are made or claimed |
 | 7 Release Ops | Partial | green CI | 7.1 evidence refreshed for pushed `6d3f559` with green `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`; 7.2 active toward 2026-06-01 release date; 7.3 `.env` scrub blocked pending explicit destructive-action approval with non-destructive prep checklist and approval packet only |
+
+## v0.2 Option A — Productization Plan
+
+**Roadmap:** v0.2 planning decision in `docs/LOCKED_REMAINING_ROADMAP.md`  
+**Status:** Planned; execute after release-operation blockers are resolved or explicitly paused.  
+**Scope:** Existing-capability IDE productization. Effect-boundary replay/fork and real-time adapter-wide budget interrupts are deferred.
+
+### Phase 8 — Live Stream Productization
+
+- Wire Theia live mode to configured Python daemon/local runtime stream beyond deterministic `/api/sse-proof`.
+- Preserve live/replay/disconnected distinctions; do not label replay as live.
+- Add/refresh tests proving configured local stream behavior without provider calls.
+- Acceptance:
+  1. Local daemon stream can be opened from IDE for an in-flight or stub/local-runtime run.
+  2. Stream reaches a terminal state or explicit disconnected/degraded state.
+  3. UI never labels replay-only data as live.
+- Verification: Python web/event tests, arc-extension build/tests, browser/e2e if UI behavior changes.
+- Known risks: configured daemon URL drift, local-runtime dependency shape, and temptation to treat SSE proof stub as broad live runtime evidence.
+
+### Phase 9 — BudgetVector Post-Hoc Accounting
+
+- Add a `BudgetVector` model and workflow/default-budget config shape where appropriate.
+- Compute post-hoc usage from trace/metadata where data exists; mark missing dimensions as absent/degraded.
+- Add `arc runs budget <id>` or equivalent CLI report.
+- Add IDE gauges/readout for final consumption against configured limits.
+- Deferred: real-time pressure/exhaustion interrupts at adapter effect boundaries.
+- Acceptance:
+  1. CLI reports available dimensions and marks unavailable dimensions as absent/degraded.
+  2. IDE gauges/readout do not fabricate missing cost/token/latency data.
+  3. Tests cover complete, partial, malformed, and missing budget metadata.
+- Verification: Python budget/CLI tests, arc-extension static/helper tests, builds.
+- Known risks: producer gaps for measured cost/token data and confusion between post-hoc accounting and hard enforcement.
+
+### Phase 10 — Assurance Polish
+
+- Improve existing Assurance tab HITL inbox/audit viewer with live refresh, filtering, export affordances, and clearer missing/degraded states.
+- Preserve adapter-wide HMAC caution: verify/export only where audit material exists.
+- Acceptance: HITL/audit UI tests cover present, absent, degraded, expired, and replay-safe states.
+- Verification: arc-extension tests/build, backend method tests if protocol/service methods change, browser/e2e if user interaction changes.
+- Known risks: audit material is conditional per run path; UI must not imply adapter-wide keyed audit.
+
+### Phase 11 — Discipline Audits
+
+- Run daemon/CLI parity audit and decide command vs endpoint fate for remaining orphan surfaces.
+- Audit `arc doctor all` coverage rather than reimplementing it.
+- Keep release-facing docs aligned with reality; no broad provider-backed adoption, live Arena, adapter-wide keyed audit, production, shared-server, or tenant-isolation claims.
+- Acceptance:
+  1. Remaining orphan daemon endpoints each have an explicit CLI command, UI consumer, or deferral note.
+  2. `arc doctor all` coverage is documented against runtime/provider/storage checks.
+  3. Banned-claims check passes on release-facing docs.
+- Verification: relevant CLI tests, `bash scripts/check-banned-claims.sh ...`, `bash scripts/check-pr.sh`.
+- Known risks: endpoint/CLI drift and stale release evidence.
