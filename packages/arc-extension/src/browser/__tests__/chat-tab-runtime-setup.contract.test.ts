@@ -54,6 +54,14 @@ describe('ChatTab runtime setup UX contract', () => {
         expect(source).toMatch(/providerCall:false/);
     });
 
+    it('surfaces capability metadata as keys only without provider readiness claim', () => {
+        expect(source).toMatch(/arc-studio-chat__runtime-metadata/);
+        expect(source).toMatch(/Capability metadata keys/);
+        expect(source).toMatch(/Trace metadata keys/);
+        expect(source).toMatch(/safeMetadataKeys/);
+        expect(source).not.toMatch(/provider ready/i);
+    });
+
     it('does not expose raw key or secret inputs', () => {
         expect(source).not.toMatch(/apiKey|secret|password/i);
         expect(source).not.toMatch(/type=['"]password['"]/);

@@ -3,7 +3,15 @@ Tests: RuntimeCapabilities and CapabilityReport cockpit primitive flags.
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+from typer.testing import CliRunner
+
 from agent_runtime_cockpit.adapters.base import CapabilityReport
+from agent_runtime_cockpit.adoption.langgraph_runner import LangGraphAdoptionRunner
+from agent_runtime_cockpit.adoption.protocol import AdoptionStatus
+from agent_runtime_cockpit.cli import app
 from agent_runtime_cockpit.orchestration.runtime_router import LangGraphSwarmGraphFakeAdapter
 from agent_runtime_cockpit.protocol.capabilities import RuntimeCapabilities
 
@@ -163,3 +171,74 @@ class TestCapabilityReportCockpitPrimitives:
         assert "local-real" in data["reason"]
         assert "no provider-backed claim" in data["reason"]
         assert "local-real gates ARC_REAL_RUNTIME_SMOKE=1 + ARC_LANGGRAPH_SWARMGRAPH_REAL=1" in data["detected_artifacts"]
+
+    def test_runtimes_cli_default_keeps_langgraph_swarmgraph_fake_offline(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("ARC_REAL_RUNTIME_SMOKE", raising=False)
+        monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
+
+        result = CliRunner().invoke(app, [
+            "runtimes", "--workspace", str(tmp_path), "--capabilities", "--json",
+        ])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)["data"]
+        langgraph_sg = next(
+            runtime for runtime in payload["runtimes"]
+            if runtime["runtime_id"] == "langgraph+swarmgraph"
+        )
+        assert langgraph_sg["test_level"] == "fake_offline"
+        assert langgraph_sg["fake_offline_supported"] is True
+        assert langgraph_sg["local_real_gated"] is True
+        assert langgraph_sg["local_real_available"] is False
+        assert langgraph_sg["provider_backed"] is False
+        assert langgraph_sg["requires_paid_calls"] is False
+        assert langgraph_sg["required_env"] == [
+            "ARC_REAL_RUNTIME_SMOKE",
+            "ARC_LANGGRAPH_SWARMGRAPH_REAL",
+        ]
+
+    def test_runtimes_cli_requires_both_local_real_gates(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
+        monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
+
+        result = CliRunner().invoke(app, [
+            "runtimes", "--workspace", str(tmp_path), "--capabilities", "--json",
+        ])
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)["data"]
+        langgraph_sg = next(
+            runtime for runtime in payload["runtimes"]
+            if runtime["runtime_id"] == "langgraph+swarmgraph"
+        )
+        assert langgraph_sg["test_level"] == "fake_offline"
+        assert langgraph_sg["local_real_gated"] is True
+        assert langgraph_sg["local_real_available"] is False
+        assert langgraph_sg["provider_backed"] is False
+        assert langgraph_sg["requires_paid_calls"] is False
+        assert langgraph_sg["required_env"] == ["ARC_LANGGRAPH_SWARMGRAPH_REAL"]
+
+    def test_langgraph_runner_reports_missing_dependency(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.adoption.langgraph_runner.importlib.util.find_spec",
+            lambda name: None if name == "langgraph" else object(),
+        )
+
+        capability = LangGraphAdoptionRunner().check_availability(tmp_path)
+
+        assert capability.status is AdoptionStatus.NOT_RUNNABLE
+        assert capability.reason == "LangGraph package not installed."
+        assert capability.doctor_actions[0]["id"] == "install-langgraph"
+
+
+def test_real_runtime_smoke_workflow_is_dual_gated_and_provider_env_free():
+    workflow = Path(__file__).parents[2] / ".github" / "workflows" / "real-runtime-smoke.yml"
+    text = workflow.read_text(encoding="utf-8")
+
+    assert "ARC_REAL_RUNTIME_SMOKE: '1'" in text
+    assert "ARC_LANGGRAPH_SWARMGRAPH_REAL: '1'" in text
+    assert "ARC_SWARMGRAPH_RUN_BACKEND: ''" in text
+    assert "ARC_SWARMGRAPH_ALLOW_COSTS: ''" in text
+    assert "OPENAI_API_KEY" not in text
+    assert "ANTHROPIC_API_KEY" not in text
+    assert "ARC_SWARMGRAPH_ALLOW_COSTS: '1'" not in text

@@ -115,6 +115,9 @@ def test_run_dry_run_langgraph_swarmgraph_fake_offline_ready(monkeypatch, tmp_pa
     assert payload["dependency_status"]["runtime_mode"] == "fake/offline"
     assert payload["dependency_status"]["real_provider_call"] is False
     assert payload["dependency_status"]["real_runtime_gated"] is True
+    assert payload["contract_status"]["state"] == "fake_offline"
+    assert payload["contract_status"]["provider_backed_claim"] is False
+    assert payload["gate_status"]["required"] is False
     assert not payload["blockers"]
     assert not (tmp_path / ".arc" / "traces").exists()
 
@@ -137,6 +140,10 @@ def test_run_dry_run_langgraph_swarmgraph_local_real_blocked_without_gate(monkey
     assert payload["provider_call"] is False
     assert payload["dependency_status"]["runtime_mode"] == "local-real"
     assert payload["dependency_status"]["real_provider_call"] is False
+    assert payload["contract_status"]["state"] == "local_real_gated"
+    assert payload["gate_status"]["required"] is True
+    assert payload["gate_status"]["open"] is False
+    assert payload["provider_backed_claim"] is False
     assert payload["runnable"] is False
     codes = {blocker["code"] for blocker in payload["blockers"]}
     assert "LOCAL_REAL_GATE_REQUIRED" in codes
@@ -182,6 +189,9 @@ def test_run_dry_run_langgraph_swarmgraph_local_real_ready_with_gate(monkeypatch
     assert payload["provider_call"] is False
     assert payload["dependency_status"]["real_provider_call"] is False
     assert payload["dependency_status"]["real_runtime_gated"] is False
+    assert payload["contract_status"]["state"] == "local_real_available"
+    assert payload["gate_status"]["open"] is True
+    assert payload["provider_backed_claim"] is False
     assert not payload["blockers"]
     assert not (tmp_path / ".arc" / "traces").exists()
 

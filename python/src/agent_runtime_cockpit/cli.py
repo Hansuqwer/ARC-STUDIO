@@ -124,6 +124,16 @@ def _local_real_gate_open() -> bool:
     return all(os.environ.get(env) == "1" for env in LOCAL_REAL_GATE_ENVS)
 
 
+def _local_real_gate_state(runtime_mode: str) -> dict[str, object]:
+    missing = [env for env in LOCAL_REAL_GATE_ENVS if os.environ.get(env) != "1"]
+    return {
+        "required": runtime_mode == "local-real",
+        "open": not missing,
+        "required_env": list(LOCAL_REAL_GATE_ENVS),
+        "missing_env": missing,
+    }
+
+
 def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str, allow_paid_calls: bool, runtime_mode: str) -> dict[str, object]:
     from .adoption.registry import AdoptionRegistry
     from .security.profiles import ProfileNotFound, enforce_profile, resolve_profile_strict
@@ -155,6 +165,13 @@ def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str
     key_ref_status = {"provider": "openai", "env": "OPENAI_API_KEY", "present": bool(os.environ.get("OPENAI_API_KEY"))}
     dependency_status: dict[str, object] = {}
     export_target_status: dict[str, object] = {}
+    contract_status: dict[str, object] = {
+        "runtime_mode": runtime_mode,
+        "state": runtime_mode,
+        "supported_runtime": runtime == "langgraph+swarmgraph" or runtime_mode == "fake/offline",
+        "provider_backed_claim": False,
+        "real_provider_call": False,
+    }
 
     if runtime in {"crewai+swarmgraph", "langgraph+swarmgraph"}:
         base_runtime, adoption_mode = AdoptionRegistry.parse_runtime_id(runtime)
@@ -173,6 +190,7 @@ def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str
             elif ":" not in export_target:
                 blockers.append({"code": "INVALID_CREWAI_EXPORT", "message": "ARC_CREWAI_EXPORT must use module:attr format"})
         elif capability:
+            report = runtime_router.LangGraphSwarmGraphFakeAdapter().capability_report(workspace)
             if runtime_mode == "local-real":
                 warnings.append("LangGraph + SwarmGraph local-real is explicit opt-in smoke scope only; no network/provider/paid calls.")
                 export_target_status = {"required": False, "reason": "local-real smoke path uses local runtime only"}
@@ -184,11 +202,28 @@ def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str
                             "to request langgraph+swarmgraph local-real"
                         ),
                     })
+                elif not report.can_run:
+                    blockers.append({"code": "MISSING_LANGGRAPH_DEPENDENCY", "message": report.reason or "LangGraph + SwarmGraph local-real dependency missing"})
+                contract_status["state"] = "local_real_available" if report.can_run and _local_real_gate_open() else "local_real_gated"
             else:
                 warnings.append("LangGraph + SwarmGraph is fake/offline deterministic; no real provider calls or HMAC audit claims; real path gated.")
                 export_target_status = {"required": False, "reason": "fake/offline deterministic path uses an in-process fixture graph"}
+                contract_status["state"] = "fake_offline"
+            dependency_status.update({
+                "availability": report.availability,
+                "detected": report.detected,
+                "can_run": report.can_run,
+                "reason": report.reason,
+                "test_level": report.test_level,
+                "fake_offline_supported": report.fake_offline_supported,
+                "local_real_gated": report.local_real_gated,
+                "local_real_available": report.local_real_available,
+                "provider_backed": report.provider_backed,
+                "required_env": report.required_env,
+            })
         elif runtime_mode == "local-real":
             blockers.append({"code": "LOCAL_REAL_UNSUPPORTED", "message": f"Runtime '{runtime}' does not support local-real mode"})
+            contract_status["state"] = "unsupported"
         dependency_status["runtime_mode"] = runtime_mode
         dependency_status["real_provider_call"] = False
         dependency_status["real_runtime_gated"] = runtime_mode == "fake/offline" or not _local_real_gate_open()
@@ -216,6 +251,9 @@ def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str
         "key_ref_status": key_ref_status,
         "export_target_status": export_target_status,
         "dependency_status": dependency_status,
+        "contract_status": contract_status,
+        "gate_status": _local_real_gate_state(runtime_mode),
+        "provider_backed_claim": False,
         "dry_run": True,
         "provider_call": False,
     }

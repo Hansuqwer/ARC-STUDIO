@@ -108,6 +108,11 @@ function providerSourceColor(source: string): string {
     }
 }
 
+function formatMetadataKeys(metadata?: Record<string, unknown>): string {
+    const keys = Object.keys(metadata || {}).filter(key => !/secret|token|password|api[_-]?key|credential/i.test(key));
+    return keys.length > 0 ? keys.slice(0, 6).join(', ') : 'none';
+}
+
 export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
     const [config, setConfig] = useState<ConfigStatus | null>(null);
     const [loading, setLoading] = useState(true);
@@ -501,9 +506,27 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                 {selectedRuntimeCapability && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', marginBottom: '8px', fontSize: '11px' }}>
                         <div>
+                            <strong>Metadata keys</strong>
+                            <div style={{ marginTop: '4px', fontFamily: 'monospace', color: 'var(--theia-descriptionForeground)' }}>
+                                {formatMetadataKeys(selectedRuntimeCapability.metadata)}
+                            </div>
+                        </div>
+                        <div>
+                            <strong>Trace metadata keys</strong>
+                            <div style={{ marginTop: '4px', fontFamily: 'monospace', color: 'var(--theia-descriptionForeground)' }}>
+                                {formatMetadataKeys(selectedRuntimeCapability.traceMetadata)}
+                            </div>
+                        </div>
+                        <div>
+                            <strong>Runtime gates</strong>
+                            <div style={{ marginTop: '4px', fontFamily: 'monospace', color: 'var(--theia-descriptionForeground)' }}>
+                                realRuntime={String(Boolean(selectedRuntimeCapability.realRuntimeGate))}; providerBacked={String(Boolean(selectedRuntimeCapability.providerBacked))}
+                            </div>
+                        </div>
+                        <div>
                             <strong>Required env names</strong>
                             <div style={{ marginTop: '4px', fontFamily: 'monospace', color: 'var(--theia-descriptionForeground)' }}>
-                                {selectedRuntimeCapability.required_env.length > 0 ? selectedRuntimeCapability.required_env.join(', ') : 'none'}
+                                {(selectedRuntimeCapability.requiredEnv || selectedRuntimeCapability.required_env).length > 0 ? (selectedRuntimeCapability.requiredEnv || selectedRuntimeCapability.required_env).join(', ') : 'none'}
                             </div>
                         </div>
                         <div>
@@ -515,7 +538,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                         <div>
                             <strong>Doctor actions</strong>
                             <div style={{ marginTop: '4px', fontFamily: 'monospace', color: 'var(--theia-descriptionForeground)' }}>
-                                {selectedRuntimeCapability.doctor_actions.length > 0 ? `${selectedRuntimeCapability.doctor_actions.length} available` : 'none'}
+                                {(selectedRuntimeCapability.doctorActions || selectedRuntimeCapability.doctor_actions).length > 0 ? `${(selectedRuntimeCapability.doctorActions || selectedRuntimeCapability.doctor_actions).length} available` : 'none'}
                             </div>
                         </div>
                     </div>

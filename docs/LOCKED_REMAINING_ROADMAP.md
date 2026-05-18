@@ -110,18 +110,16 @@
 
 **Goal:** Turn fake-tested/gated adoption runners into narrow, honest, real product paths.
 
-**Current:** Adoption protocol/runners exist. `crewai+swarmgraph` and `langgraph+swarmgraph` fake/offline CLI paths are routed for deterministic product use. `langgraph+swarmgraph` also has a narrow local-real path that now requires both explicit `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` gates across router/capability/preflight/runner surfaces. It is non-provider-backed, performs no paid/live provider calls, and is not claimed as product-ready. Provider-backed LangGraph + SwarmGraph adoption remains gated and not claimed.
+**Current:** Adoption protocol/runners exist. `crewai+swarmgraph` and `langgraph+swarmgraph` fake/offline CLI paths are routed for deterministic product use, and fake/offline remains the default. `langgraph+swarmgraph` also has a narrow local-real path with an explicit execution contract, dependency/preflight states, trace/IDE metadata, and regression/smoke coverage. Local-real availability requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`. It is non-provider-backed, performs no paid/live provider calls, and is not evidence for provider-backed adoption.
 
 **Deliverables:**
 - Pick one first real target (`LangGraph + SwarmGraph` recommended).
 - Implement and harden the narrow local-real runtime invocation through the LangGraph + SwarmGraph path without provider calls.
 - Paid/provider/privacy gates before any future external/provider calls; no such calls are part of the current local-real smoke scope.
-- Trace/audit metadata identifies fake/offline vs real provider-backed execution.
+- Trace/audit metadata identifies fake/offline vs gated local-real execution; provider-backed execution remains blocked/not claimed.
+- Capability/preflight/IDE surfaces distinguish fake/offline, gated local-real, and provider-backed-not-claimed states without enabling default external/provider calls.
 
-**Acceptance:**
-- Offline fake tests remain deterministic.
-- Opt-in real-runtime smoke covers the local-real path where deps are installed by setting both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; it is not evidence for provider-backed execution.
-- Capability reports distinguish fake-tested/gated/real clearly.
+**Acceptance:** Complete for the local-real hardening baseline. Offline fake tests remain deterministic/default. Opt-in real-runtime smoke covers only the local-real path where deps are installed and both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` are set. Capability/preflight/IDE surfaces distinguish fake/offline, gated/missing-dependency/available local-real states, and provider-backed-not-claimed posture. This is not evidence for provider-backed execution.
 
 ## R7 — Release Operations + History Hygiene
 
@@ -149,5 +147,5 @@
 | R3 Provider/Quota UI | Active narrow real-provider scaffold | Keep provider calls offline/gated by default; backend cost enforcement is in place; narrow gated provider-action track requires explicit opt-in, paid-call gates, confirmation UX, env/keychain refs only, local accounting, and opt-in smoke/manual verification. Contract/scaffold only unless those gates/evidence are present; not a provider-backed adoption claim |
 | R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
 | R5 SwarmGraph Insight | Complete baseline + first producer events | Add measured cost producer and complete backend live SSE wiring before live-runtime claims |
-| R6 Real Adoption | Partial | LangGraph + SwarmGraph local-real path now requires dual explicit gates consistently; keep fake/offline default and provider-backed execution unclaimed |
+| R6 Real Adoption | Complete local-real hardening baseline | Keep fake/offline deterministic/default; local-real availability requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; no paid/live provider calls; provider-backed execution remains blocked/unclaimed |
 | R7 Release Ops | Partial | Release date set for 2026-06-01; green-window started from 2026-05-18 `6d3f559` green evidence; `.env` scrub still blocked pending explicit destructive-action approval |

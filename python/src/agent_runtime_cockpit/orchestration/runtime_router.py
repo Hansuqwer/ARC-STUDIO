@@ -210,8 +210,15 @@ class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
         return True, 1.0, ["fake/offline deterministic adoption adapter"]
 
     def capability_report(self, workspace: Path) -> CapabilityReport:
+        runner_capability = next(
+            (cap for cap in AdoptionRegistry.list_capabilities(workspace) if cap.mode == AdoptionMode.LANGGRAPH),
+            None,
+        )
+        runner_ready = runner_capability is not None and runner_capability.status.value == "runnable"
         missing_local_real_env = [env for env in self.LOCAL_REAL_GATE_ENVS if os.environ.get(env) != "1"]
         local_real_enabled = not missing_local_real_env
+        availability = "runnable" if runner_ready else "missing_dependency"
+        can_run = runner_ready
         reason = (
             "fake/offline deterministic path plus gated local-real LangGraph + vendored SwarmGraph path; "
             "no provider-backed claim; no paid calls"
@@ -219,22 +226,25 @@ class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
             else "fake/offline deterministic LangGraph + SwarmGraph path; no provider calls; "
             "gated local-real path requires ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1"
         )
+        if not runner_ready and runner_capability is not None:
+            reason = runner_capability.reason
         return CapabilityReport(
             runtime_id=self.adapter_id,
-            detected=True,
-            can_run=True,
-            availability="runnable",
+            detected=runner_capability is not None,
+            can_run=can_run,
+            availability=availability,
             reason=reason,
             detected_artifacts=[
                 "fake/offline deterministic adoption adapter",
                 *(["local-real gates ARC_REAL_RUNTIME_SMOKE=1 + ARC_LANGGRAPH_SWARMGRAPH_REAL=1"] if local_real_enabled else []),
             ],
             required_env=missing_local_real_env,
+            doctor_actions=[_doctor_action_from_dict(action) for action in (runner_capability.doctor_actions if runner_capability else [])],
             requires_paid_calls=False,
             test_level="gated_local_real" if local_real_enabled else "fake_offline",
             fake_offline_supported=True,
-            local_real_gated=not local_real_enabled,
-            local_real_available=local_real_enabled,
+            local_real_gated=not local_real_enabled or not runner_ready,
+            local_real_available=local_real_enabled and runner_ready,
             provider_backed=False,
         )
 
@@ -305,6 +315,9 @@ class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
                 "adoption": True,
                 "real_provider_call": False,
                 "real_runtime_gated": not local_real,
+                "contract_state": "local_real_available" if local_real else "fake_offline",
+                "dependency_state": "available",
+                "provider_backed_claim": False,
                 "real_path_absent_reason": (
                     "local-real uses local LangGraph plus vendored SwarmGraph only; no provider-backed claim"
                     if local_real

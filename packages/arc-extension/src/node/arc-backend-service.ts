@@ -360,7 +360,10 @@ export class ArcBackendService implements ArcService {
             });
             const parsed = JSON.parse(output);
             if (parsed.ok && parsed.data) {
-                return parsed.data as RuntimeCapabilitiesResponse;
+                return {
+                    ...parsed.data,
+                    runtimes: (parsed.data.runtimes || []).map((runtime: any) => this.mapRuntimeCapability(runtime)),
+                } as RuntimeCapabilitiesResponse;
             }
             throw new ArcError(
                 ArcErrorCode.UNKNOWN,
@@ -1688,6 +1691,26 @@ export class ArcBackendService implements ArcService {
         if (normalized.includes('AUDIT')) return 'audit';
         if (normalized.includes('RUN_') || normalized.includes('NODE_')) return 'lifecycle';
         return 'unknown';
+    }
+
+    private mapRuntimeCapability(runtime: any): RuntimeCapabilitiesResponse['runtimes'][number] {
+        const metadata = runtime.metadata || runtime.meta || {};
+        const traceMetadata = runtime.trace_metadata || runtime.traceMetadata || metadata.trace_metadata || metadata.traceMetadata || {};
+        const gates = runtime.gates || metadata.gates || {};
+        return {
+            ...runtime,
+            runtimeId: runtime.runtime_id || runtime.runtimeId,
+            canRun: runtime.can_run ?? runtime.canRun,
+            detectedArtifacts: runtime.detected_artifacts || runtime.detectedArtifacts || [],
+            requiredEnv: runtime.required_env || runtime.requiredEnv || [],
+            requiresPaidCalls: runtime.requires_paid_calls ?? runtime.requiresPaidCalls ?? false,
+            doctorActions: runtime.doctor_actions || runtime.doctorActions || [],
+            metadata,
+            traceMetadata,
+            gates,
+            realRuntimeGate: runtime.real_runtime_gate ?? runtime.realRuntimeGate ?? gates.real_runtime ?? gates.realRuntime,
+            providerBacked: runtime.provider_backed ?? runtime.providerBacked ?? metadata.provider_backed ?? metadata.providerBacked,
+        };
     }
 
     private extractAuditRecordCount(reason?: string): number {

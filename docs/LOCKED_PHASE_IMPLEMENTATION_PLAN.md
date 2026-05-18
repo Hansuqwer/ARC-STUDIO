@@ -181,7 +181,7 @@ git status --short
 ## Phase 6 — Narrow Real Adoption Path
 
 **Roadmap:** R6  
-**Status:** Partial — `langgraph+swarmgraph` fake/offline CLI route baseline remains default; narrow local-real path now has router, capability, CLI preflight, runner, and smoke-test coverage for the dual `ARC_REAL_RUNTIME_SMOKE=1` plus `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` gates, and performs no provider calls
+**Status:** Complete local-real hardening baseline — `langgraph+swarmgraph` fake/offline CLI route remains the default. The narrow local-real path has an explicit execution contract, dependency/preflight states, trace/IDE metadata, and regression/smoke coverage. Local-real availability still requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`, and no provider calls are made or claimed.
 
 ### Chunk 6.1 — Select First Real Target
 - Default recommendation: `langgraph+swarmgraph`.
@@ -197,6 +197,26 @@ git status --short
 - Capability reports distinguish fake-tested/gated/real.
 - Opt-in real-runtime smoke covers installed deps.
 - Status: Partial — capability/smoke posture distinguishes fake/offline routed baseline from the gated local-real path. Capability reports now require both `ARC_REAL_RUNTIME_SMOKE=1` plus `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` before marking local-real available. Opt-in real-runtime smoke with both gates is the only real-path validation scope; provider-backed execution remains gated/not claimed.
+
+### Chunk 6.4 — Local-Real Execution Contract
+- Define supported inputs, outputs, trace events, failure modes, and dependency boundaries for the non-provider-backed `langgraph+swarmgraph` local-real path.
+- Preserve fake/offline as the default and require both `ARC_REAL_RUNTIME_SMOKE=1` plus `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` for local-real availability.
+- Status: Complete — contract is scoped to local LangGraph + SwarmGraph execution only, with supported input/output boundaries, trace events, failure modes, dependency limits, fake/offline default behavior, dual-gate availability, and no provider-call behavior.
+
+### Chunk 6.5 — Dependency + Preflight Hardening
+- Harden installed-dependency checks and preflight errors for LangGraph/SwarmGraph local-real execution.
+- Capability/preflight output must distinguish fake/offline available, local-real gated/missing-deps/available, and provider-backed-not-claimed states.
+- Status: Complete — capability and preflight output distinguish fake/offline availability, local-real gated/missing-dependency/available states, and provider-backed-not-claimed posture. Defaults remain offline and do not make external/provider/network calls.
+
+### Chunk 6.6 — Trace Metadata + IDE Surfacing
+- Ensure trace/audit metadata clearly identifies fake/offline vs gated local-real execution.
+- Surface local-real availability in CLI/IDE capability views without claiming provider-backed adoption or readiness.
+- Status: Complete — trace/metadata and CLI/IDE capability surfaces identify fake/offline versus gated local-real execution, preserve provider-backed-not-claimed copy, and have metadata/copy-guard coverage.
+
+### Chunk 6.7 — Deterministic Regression + Opt-In Smoke
+- Keep fake/offline regression tests deterministic and default in CI.
+- Add/maintain opt-in local-real smoke/manual verification requiring both gates and installed deps.
+- Status: Complete — fake/offline regression coverage remains deterministic/default. Opt-in local-real smoke/manual verification requires both gates plus installed deps and proves only the local-real path, not provider-backed execution.
 
 ## Phase 7 — Release Operations
 
@@ -226,5 +246,5 @@ git status --short
 | 3 Provider/Quota UI | Active narrow real-provider scaffold | provider CLI + explicit paid/provider gates | Typed parser/tests, confirmed local quota-counter reset affordance, profile-linked cost summary, backend cost-gate enforcement, hardened paid/live opt-in gates; offline/gated by default with no provider network calls without explicit opt-in; narrow gated provider-action track is contract/scaffold only unless all gates, confirmation, local accounting, and opt-in smoke/manual evidence are present |
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; live-aware UI with backend live SSE still degraded/disconnected |
-| 6 Real Adoption | Partial | adoption protocol | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` across router/capability/preflight/runner surfaces with no provider calls; provider-backed path gated/not claimed |
+| 6 Real Adoption | Complete local-real hardening baseline | adoption protocol + dual explicit local-real gates | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path has contract, dependency/preflight states, metadata/IDE surfacing, and smoke/regression coverage; both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` are required for local-real availability; no provider calls are made or claimed |
 | 7 Release Ops | Partial | green CI | 7.1 evidence refreshed for pushed `6d3f559` with green `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`; 7.2 active toward 2026-06-01 release date; 7.3 `.env` scrub blocked pending explicit destructive-action approval with non-destructive prep checklist and approval packet only |

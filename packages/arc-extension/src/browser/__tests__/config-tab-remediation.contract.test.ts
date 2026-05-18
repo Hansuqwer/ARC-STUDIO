@@ -62,6 +62,14 @@ describe('ConfigTab runtime remediation contract', () => {
         expect(wizardSource).not.toMatch(/store(?:s|d|ing)? raw (?:secret|credential|key|token|password)s?/i);
     });
 
+    it('surfaces capability and trace metadata keys only', () => {
+        expect(source).toMatch(/formatMetadataKeys/);
+        expect(source).toMatch(/Metadata keys/);
+        expect(source).toMatch(/Trace metadata keys/);
+        expect(source).toMatch(/Runtime gates/);
+        expect(source).not.toMatch(/provider ready/i);
+    });
+
     it('exports runtime remediation helper contracts', () => {
         expect(helperSource).toMatch(/export interface RuntimeRemediationStep/);
         expect(helperSource).toMatch(/export interface RuntimeRemediationPlan/);

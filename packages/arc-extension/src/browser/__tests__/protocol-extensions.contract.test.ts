@@ -274,6 +274,15 @@ describe('Protocol Extensions (Session B + B7)', () => {
             expect(source).toMatch(/streamActiveTrace\(request:\s*ActiveTraceStreamRequest\)/);
             expect(source).toMatch(/cancelActiveTraceStream\(runId:\s*string\)/);
         });
+
+        it('should expose optional capability metadata without provider readiness claims', () => {
+            expect(source).toMatch(/metadata\?:\s*Record<string, unknown>/);
+            expect(source).toMatch(/traceMetadata\?:\s*Record<string, unknown>/);
+            expect(source).toMatch(/gates\?:\s*Record<string, unknown>/);
+            expect(source).toMatch(/realRuntimeGate\?:\s*boolean/);
+            expect(source).toMatch(/providerBacked\?:\s*boolean/);
+            expect(source).not.toMatch(/providerReady\?:\s*true/);
+        });
     });
 
     describe('ProviderStatus safety', () => {
@@ -516,6 +525,16 @@ describe('Backend Service Extensions (Session B + B7)', () => {
             expect(source).toMatch(/Live SSE proxy disconnected; no Python web\/SSE base URL configured/);
             expect(source).toMatch(/RUN_CANCELLED/);
             expect(source).toMatch(/Stream timed out/);
+        });
+
+        it('should map runtime capability snake_case metadata to camelCase', () => {
+            expect(source).toMatch(/mapRuntimeCapability/);
+            expect(source).toMatch(/trace_metadata/);
+            expect(source).toMatch(/traceMetadata/);
+            expect(source).toMatch(/real_runtime_gate/);
+            expect(source).toMatch(/realRuntimeGate/);
+            expect(source).toMatch(/provider_backed/);
+            expect(source).toMatch(/providerBacked/);
         });
     });
 });

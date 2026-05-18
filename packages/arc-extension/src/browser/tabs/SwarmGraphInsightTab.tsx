@@ -69,6 +69,11 @@ function buildActiveTrace(runId: string, events: TraceEvent[]): TraceData {
     };
 }
 
+function safeMetadataSummary(metadata?: Record<string, unknown>): string {
+    const keys = Object.keys(metadata || {}).filter(key => !/secret|token|password|api[_-]?key|credential/i.test(key));
+    return keys.length ? keys.slice(0, 6).join(', ') : 'none';
+}
+
 const TopologyPanel: React.FC<{ topology: SwarmGraphTopologyInsight }> = ({ topology }) => (
     <Panel title='Topology' status={topology.status}>
         {topology.status === 'present' ? (
@@ -306,6 +311,9 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
                 <input id='arc-swarmgraph-live-base-url' className='arc-studio-swarmgraph__input' value={liveBaseUrl} onChange={event => setLiveBaseUrl(event.currentTarget.value)} placeholder='required for degraded live attempt, e.g. http://127.0.0.1:8000' />
                 <button className='arc-studio-swarmgraph__button' onClick={connectLiveStream} disabled={liveState === 'connecting' || liveState === 'live'}>Connect live</button>
                 <button className='arc-studio-swarmgraph__button' onClick={disconnectLiveStream} disabled={liveState !== 'connecting' && liveState !== 'live'}>Disconnect</button>
+            </div>
+            <div className='arc-studio-swarmgraph__trace-metadata'>
+                Trace metadata keys: {safeMetadataSummary(insight.runtimeMetadata as unknown as Record<string, unknown>)}. Display is provenance-only; absent event data stays degraded.
             </div>
             <div className={`arc-studio-swarmgraph__live-status arc-studio-swarmgraph__live-status--${liveState}`}>
                 Live insight: {liveStatus.text}. Base URL: {liveStatus.baseUrlConfigured ? 'configured' : 'not configured'}. Live mode is a limited Python SSE probe; disconnected/degraded states mean no active stream is reachable.

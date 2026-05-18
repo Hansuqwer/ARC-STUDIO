@@ -317,15 +317,26 @@ export interface DoctorAction {
  */
 export interface RuntimeCapabilityReport {
     runtime_id: string;
+    runtimeId?: string;
     detected: boolean;
     can_run: boolean;
+    canRun?: boolean;
     availability: string;
     reason?: string | null;
     detected_artifacts: string[];
+    detectedArtifacts?: string[];
     required_env: string[];
+    requiredEnv?: string[];
     version?: string | null;
     requires_paid_calls: boolean;
+    requiresPaidCalls?: boolean;
     doctor_actions: DoctorAction[];
+    doctorActions?: DoctorAction[];
+    metadata?: Record<string, unknown>;
+    traceMetadata?: Record<string, unknown>;
+    gates?: Record<string, unknown>;
+    realRuntimeGate?: boolean;
+    providerBacked?: boolean;
 }
 
 /**

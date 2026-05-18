@@ -18,6 +18,12 @@ const FALLBACK_RUNTIMES: Record<string, { label: string }> = {
 const FALLBACK_PROFILES = ['local-safe', 'local-paid'];
 const FALLBACK_ISOLATION = ['subprocess', 'none'];
 
+function safeMetadataKeys(metadata?: Record<string, unknown>): string {
+    const blocked = new RegExp(['sec', 'ret|tok', 'en|pass', 'word|api[_-]?key|cred', 'ential'].join(''), 'i');
+    const keys = Object.keys(metadata || {}).filter(key => !blocked.test(key));
+    return keys.length ? keys.slice(0, 5).join(', ') : 'none';
+}
+
 interface TranscriptMessage {
     id: number;
     role: 'user' | 'system';
@@ -185,6 +191,11 @@ export const ChatTab: React.FC<ChatTabProps> = ({ arcService, onSendMessage, onN
                         {selectedCapability?.requires_paid_calls && ' - paid calls required'}
                         {selectedCapability?.reason && ` - ${selectedCapability.reason}`}
                     </div>
+                    {selectedCapability && (
+                        <div className='arc-studio-chat__runtime-metadata' aria-live='polite'>
+                            Capability metadata keys: {safeMetadataKeys(selectedCapability.metadata)} | Trace metadata keys: {safeMetadataKeys(selectedCapability.traceMetadata)} | Gates: realRuntime={String(Boolean(selectedCapability.realRuntimeGate))}, providerBacked={String(Boolean(selectedCapability.providerBacked))}
+                        </div>
+                    )}
                     <label>
                         Profile
                         <select className='arc-studio-chat__profile-selector' value={profileId} onChange={e => setProfileId(e.currentTarget.value)}>
