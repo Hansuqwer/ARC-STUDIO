@@ -103,7 +103,7 @@ git status --short
 ## Phase 3 — Provider/Quota/Cost UI
 
 **Roadmap:** R3  
-**Status:** Active narrow real-provider action baseline — provider diagnostics/quota scaffold exists with typed parsing/tests, targeted confirmation before local quota-counter reset, profile-linked cost policy summary, backend cost-gate enforcement, and explicit paid/live opt-in gates. Reset remains local quota-counter reset only; default UX is offline/gated and performs no provider network calls. R3 now includes one narrow gated provider action baseline for 9router/Qwen via `arc providers action`, requiring live env gate, paid-call opt-in, exact confirmation, and env/key references only. Successful live actions may update ARC local accounting only; there is no remote quota reset, provider-backed adoption, SwarmGraph/provider adoption wiring, or broad real-runtime completion claim.
+**Status:** Active narrow real-provider action baseline — provider diagnostics/quota scaffold exists with typed parsing/tests, targeted confirmation before local quota-counter reset, profile-linked cost policy summary, backend cost-gate enforcement, and explicit paid/live opt-in gates. Reset remains local quota-counter reset only; default UX is offline/gated and performs no provider network calls. R3 now includes one narrow gated provider action baseline for 9router-routed model calls via `arc providers action`, requiring live env gate, paid-call opt-in, exact confirmation, and env/key references only. Opt-in smoke evidence passed on `9184f9b` for `9router` with `nvidia/minimaxai/minimax-m2.7`; successful live actions may update ARC local accounting only. There is no remote quota reset, provider-backed adoption, SwarmGraph/provider adoption wiring, or broad real-runtime completion claim.
 
 ### Chunk 3.1 — Provider Diagnostics Panel
 - Surface existing CLI/provider diagnostics.
@@ -118,12 +118,12 @@ git status --short
 ### Chunk 3.3 — Paid-Call Gate UX
 - Add explicit warnings/confirmations before provider-backed paths.
 - Tests prove no live call without explicit opt-in.
-- Status: Partial — provider-backed/live actions remain gated/offline by default. Current live-provider UX is preview/gate only unless every explicit gate is supplied; hardened UI copy/actions distinguish dry-run/offline, local quota reset, backend cost-gate enforcement, and the narrow 9router/Qwen provider-action baseline. This proves only one gated action path, not provider-backed adoption or broad real-runtime support.
+- Status: Partial — provider-backed/live actions remain gated/offline by default. Current live-provider UX is preview/gate only unless every explicit gate is supplied; hardened UI copy/actions distinguish dry-run/offline, local quota reset, backend cost-gate enforcement, and the narrow 9router provider-action baseline. This proves only one gated action path, not provider-backed adoption or broad real-runtime support.
 
 ### Chunk 3.4 — Real Provider Execution Contract
 - Define the narrow real provider-backed action contract before implementation.
 - Preserve dry-run default, explicit `allowPaidCalls`/provider-live gates, env/keychain references only, no raw secret persistence/display, and no broad provider-backed adoption claim.
-- Status: Complete baseline — contract stays narrow: one explicit 9router/Qwen provider-backed action path, dry-run default, no default network, explicit paid/provider gates, env/key refs only, no raw secrets, local accounting only, no remote quota reset, and no broad adoption claim.
+- Status: Complete baseline — contract stays narrow: one explicit 9router provider-backed action path, dry-run default, no default network, explicit paid/provider gates, env/key refs only, no raw secrets, local accounting only, no remote quota reset, and no broad adoption claim.
 
 ### Chunk 3.5 — Gated Backend Provider Action Path
 - Implement a backend action path that can make a provider-backed request only when all explicit gates pass.
@@ -138,7 +138,7 @@ git status --short
 ### Chunk 3.7 — Opt-In Smoke + Manual Verification
 - Add an opt-in smoke/manual verification path for real provider-backed behavior with required env/keychain setup and paid-call gates.
 - Keep CI offline by default and avoid real provider calls in normal tests.
-- Status: Partial — smoke/manual verification is opt-in and narrow. Evidence may prove only the gated 9router/Qwen provider action path with `ARC_ALLOW_LIVE_PROVIDER_TESTS=true`, `--live`, `--allow-paid-calls`, and exact `RUN_PROVIDER_ACTION:<provider>:<model>` confirmation; it does not prove provider-backed adoption, SwarmGraph runtime execution, or broad real-runtime completion.
+- Status: Complete for narrow smoke evidence — opt-in smoke/manual verification is narrow and passed on `9184f9b` with `9router` / `nvidia/minimaxai/minimax-m2.7`, `ARC_ALLOW_LIVE_PROVIDER_TESTS=true`, `--live`, `--allow-paid-calls`, and exact `RUN_PROVIDER_ACTION:<provider>:<model>` confirmation. Evidence proves only the gated provider action path; it does not prove provider-backed adoption, SwarmGraph runtime execution, or broad real-runtime completion.
 
 ## Phase 4 — HITL + Audit Dedicated UX
 
@@ -243,7 +243,7 @@ git status --short
 |---|---|---|---|
 | 1 Active Live Streaming | Complete | current CLI/IDE run basics | Full vertical baseline: Python SSE, Theia proxy contract, UI live/replay/disconnected states, stub e2e |
 | 2 Runtime Setup UI | Complete polished UI baseline | config/profile CLI | Safe ConfigTab baseline plus YAML-backed safe fields summary, persisted profile copy, remediation wizard, and dedicated export-target env-ref helpers in place |
-| 3 Provider/Quota UI | Active narrow real-provider action baseline | provider CLI + explicit paid/provider gates | Typed parser/tests, confirmed local quota-counter reset affordance, profile-linked cost summary, backend cost-gate enforcement, hardened paid/live opt-in gates; offline/gated by default with no provider network calls; one narrow 9router/Qwen provider action exists behind live env gate, paid opt-in, exact confirmation, env/key refs only, and ARC local accounting only; no remote quota reset or provider-backed adoption claim |
+| 3 Provider/Quota UI | Active narrow real-provider action baseline | provider CLI + explicit paid/provider gates | Typed parser/tests, confirmed local quota-counter reset affordance, profile-linked cost summary, backend cost-gate enforcement, hardened paid/live opt-in gates; offline/gated by default with no provider network calls; one narrow 9router provider action exists behind live env gate, paid opt-in, exact confirmation, env/key refs only, and ARC local accounting only; opt-in smoke passed on `9184f9b` with `nvidia/minimaxai/minimax-m2.7`; no remote quota reset or provider-backed adoption claim |
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; live-aware UI with backend live SSE still degraded/disconnected |
 | 6 Real Adoption | Complete local-real hardening baseline | adoption protocol + dual explicit local-real gates | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path has contract, dependency/preflight states, metadata/IDE surfacing, and smoke/regression coverage; both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` are required for local-real availability; no provider calls are made or claimed |
