@@ -161,7 +161,7 @@ git status --short
 ## Phase 6 — Narrow Real Adoption Path
 
 **Roadmap:** R6  
-**Status:** Partial — `langgraph+swarmgraph` fake/offline CLI route baseline remains default; narrow local-real path is explicit opt-in, smoke-scoped, and performs no provider calls
+**Status:** Partial — `langgraph+swarmgraph` fake/offline CLI route baseline remains default; narrow local-real path is explicit `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` opt-in, smoke-scoped under `ARC_REAL_RUNTIME_SMOKE=1`, and performs no provider calls
 
 ### Chunk 6.1 — Select First Real Target
 - Default recommendation: `langgraph+swarmgraph`.
@@ -171,12 +171,12 @@ git status --short
 ### Chunk 6.2 — Real Runner Spike
 - Implement narrow real invocation path.
 - Preserve fake/offline tests.
-- Status: Partial — `langgraph+swarmgraph` keeps deterministic fake/offline routing as the default. A narrow local-real runner path exists only behind explicit opt-in/smoke gating, is not provider-backed, performs no paid/live provider calls, and is not claimed as product-ready.
+- Status: Partial — `langgraph+swarmgraph` keeps deterministic fake/offline routing as the default. A narrow local-real runner path exists only behind explicit `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` opt-in and smoke gating, is not provider-backed, performs no paid/live provider calls, and is not claimed as product-ready.
 
 ### Chunk 6.3 — Capability + Smoke
 - Capability reports distinguish fake-tested/gated/real.
 - Opt-in real-runtime smoke covers installed deps.
-- Status: Partial — capability/smoke posture distinguishes fake/offline routed baseline from the gated local-real path. Opt-in real-runtime smoke is the only real-path validation scope; provider-backed execution remains gated/not claimed.
+- Status: Partial — capability/smoke posture distinguishes fake/offline routed baseline from the gated local-real path. Opt-in real-runtime smoke sets `ARC_REAL_RUNTIME_SMOKE=1` plus `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` and is the only real-path validation scope; provider-backed execution remains gated/not claimed.
 
 ## Phase 7 — Release Operations
 
@@ -203,5 +203,5 @@ git status --short
 | 3 Provider/Quota UI | Partial | provider CLI | Typed parser/tests, confirmed local quota-counter reset affordance, informational profile-linked cost summary, and explicit paid/live preview gates; no provider network calls by default |
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; live-aware UI with backend live SSE still degraded/disconnected |
-| 6 Real Adoption | Partial | adoption protocol | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path is explicit opt-in/smoke-scoped with no provider calls; provider-backed path gated/not claimed |
+| 6 Real Adoption | Partial | adoption protocol | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path is explicit `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` opt-in/smoke-scoped with no provider calls; provider-backed path gated/not claimed |
 | 7 Release Ops | Partial | green CI | `.env` scrub gated |

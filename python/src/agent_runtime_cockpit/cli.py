@@ -110,7 +110,20 @@ def _profile_payload(profile) -> dict[str, object]:
     }
 
 
-def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str, allow_paid_calls: bool) -> dict[str, object]:
+RUNTIME_MODES = {"fake/offline", "local-real"}
+
+
+def _validate_runtime_mode(runtime_mode: str) -> str:
+    if runtime_mode not in RUNTIME_MODES:
+        raise typer.BadParameter("runtime-mode must be one of: fake/offline, local-real")
+    return runtime_mode
+
+
+def _local_real_gate_open() -> bool:
+    return os.environ.get("ARC_LANGGRAPH_SWARMGRAPH_REAL") == "1"
+
+
+def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str, allow_paid_calls: bool, runtime_mode: str) -> dict[str, object]:
     from .adoption.registry import AdoptionRegistry
     from .security.profiles import ProfileNotFound, enforce_profile, resolve_profile_strict
 
@@ -118,6 +131,7 @@ def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str
     warnings: list[str] = []
     doctor_actions: list[dict[str, str]] = []
     profile_payload: dict[str, object] | None = None
+    runtime_mode = _validate_runtime_mode(runtime_mode)
     paid_required = runtime == "crewai"
 
     try:
@@ -158,11 +172,22 @@ def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str
             elif ":" not in export_target:
                 blockers.append({"code": "INVALID_CREWAI_EXPORT", "message": "ARC_CREWAI_EXPORT must use module:attr format"})
         elif capability:
-            warnings.append("LangGraph + SwarmGraph is fake/offline deterministic; no real provider calls or HMAC audit claims; real path gated.")
-            export_target_status = {"required": False, "reason": "fake/offline deterministic path uses an in-process fixture graph"}
-        dependency_status["runtime_mode"] = "fake/offline"
+            if runtime_mode == "local-real":
+                warnings.append("LangGraph + SwarmGraph local-real is explicit opt-in smoke scope only; no network/provider/paid calls.")
+                export_target_status = {"required": False, "reason": "local-real smoke path uses local runtime only"}
+                if not _local_real_gate_open():
+                    blockers.append({
+                        "code": "LOCAL_REAL_GATE_REQUIRED",
+                        "message": "Set ARC_LANGGRAPH_SWARMGRAPH_REAL=1 to request langgraph+swarmgraph local-real",
+                    })
+            else:
+                warnings.append("LangGraph + SwarmGraph is fake/offline deterministic; no real provider calls or HMAC audit claims; real path gated.")
+                export_target_status = {"required": False, "reason": "fake/offline deterministic path uses an in-process fixture graph"}
+        elif runtime_mode == "local-real":
+            blockers.append({"code": "LOCAL_REAL_UNSUPPORTED", "message": f"Runtime '{runtime}' does not support local-real mode"})
+        dependency_status["runtime_mode"] = runtime_mode
         dependency_status["real_provider_call"] = False
-        dependency_status["real_runtime_gated"] = True
+        dependency_status["real_runtime_gated"] = runtime_mode == "fake/offline" or not _local_real_gate_open()
     else:
         try:
             requested_runtime = [part.strip().lower() for part in runtime.split(",") if part.strip()] if "," in runtime else runtime.lower()
@@ -177,6 +202,7 @@ def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str
     return {
         "workflow": workflow,
         "runtime": runtime,
+        "runtime_mode": runtime_mode,
         "profile": profile_payload,
         "runnable": not blockers,
         "blockers": blockers,
@@ -558,6 +584,7 @@ def run_workflow(
     workflow: str = typer.Argument("wf-swarmgraph-fixture", help="Workflow ID"),
     workspace: Optional[str] = WORKSPACE_FLAG,
     runtime: str = typer.Option("auto", "--runtime", "-r", help="Runtime: auto, swarmgraph, langgraph, crewai, lmarena"),
+    runtime_mode: str = typer.Option("fake/offline", "--runtime-mode", help="Runtime mode: fake/offline or local-real"),
     prompt: Optional[str] = typer.Option(None, "--prompt", help="Prompt passed to runnable adapters"),
     allow_paid_calls: bool = typer.Option(False, "--allow-paid-calls", help="Allow runtimes to make provider calls"),
     profile_id: str = typer.Option("local-safe", "--profile-id", help="Run profile ID"),
@@ -570,10 +597,22 @@ def run_workflow(
     from .security.profiles import ProfileNotFound, enforce_profile, resolve_profile_strict
     _setup_logging(debug)
     ws = _workspace(workspace)
+    try:
+        runtime_mode = _validate_runtime_mode(runtime_mode)
+    except typer.BadParameter as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "INVALID_RUNTIME_MODE"}), json_output)
+        raise typer.Exit(2)
     if dry_run:
-        payload = _run_preflight(ws, workflow, runtime.lower(), profile_id, allow_paid_calls)
+        payload = _run_preflight(ws, workflow, runtime.lower(), profile_id, allow_paid_calls, runtime_mode)
         _out(ok(payload), json_output)
         return
+    if runtime.lower() == "langgraph+swarmgraph" and runtime_mode == "local-real" and not _local_real_gate_open():
+        _out(err(
+            ArcErrorCode.INVALID_INPUT,
+            "Set ARC_LANGGRAPH_SWARMGRAPH_REAL=1 to request langgraph+swarmgraph local-real",
+            details={"code": "LOCAL_REAL_GATE_REQUIRED"},
+        ), json_output)
+        raise typer.Exit(2)
     try:
         profile = resolve_profile_strict(profile_id)
         enforce_profile(profile, runtime.lower())
@@ -596,7 +635,7 @@ def run_workflow(
     if not json_output:
         console.print(f"[dim]Runtime:[/dim] {routed.adapter.adapter_id} ({routed.chosen_by})")
 
-    inputs = {"workspace": str(ws), "allow_paid_calls": allow_paid_calls, "profile_id": profile_id}
+    inputs = {"workspace": str(ws), "allow_paid_calls": allow_paid_calls, "profile_id": profile_id, "runtime_mode": runtime_mode}
     if prompt:
         inputs["prompt"] = prompt
     try:

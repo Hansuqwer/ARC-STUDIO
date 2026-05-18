@@ -112,8 +112,14 @@ def test_langgraph_swarmgraph_local_real_fixture_runs_without_provider_calls(tmp
 
     assert result.consensus_reached is True
     assert result.winning_proposal.metadata["runtime"] == "langgraph"
+    assert result.metadata["runtime_mode"] == "local-real"
+    assert result.metadata["real_provider_call"] is False
+    assert result.metadata["provider_backed"] is False
+    assert result.winning_proposal.metadata["real_provider_call"] is False
+    assert result.winning_proposal.metadata["provider_backed"] is False
     assert result.winning_proposal.confidence == 1.0
     assert result.winning_proposal.output
     assert any(event_type == "SWARMGRAPH_TOPOLOGY" for event_type, _ in events)
     assert any(event_type == "SWARMGRAPH_CONSENSUS" for event_type, _ in events)
     assert all(payload.get("real_provider_call") is not True for _, payload in events)
+    assert all(payload.get("provider_backed") is not True for _, payload in events)

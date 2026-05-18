@@ -119,6 +119,8 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             or (spec.runtime_config.get("offline") is True and spec.runtime_config.get("fake") is True)
         )
         local_real = self._is_local_real(spec)
+        if local_real:
+            emit_event = self._local_no_provider_emit(emit_event)
         if local_real and os.environ.get(_LOCAL_REAL_GATE_ENV) != "1":
             emit_event(run_id, "RUN_FAILED", {
                 "error": (
@@ -236,6 +238,13 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             if offline_deterministic
             else self._swarmgraph_consensus(swarm_state, worker_proposals)
         )
+        if local_real and (
+            result.metadata.get("real_provider_call") is True
+            or result.metadata.get("provider_backed") is True
+        ):
+            raise RuntimeError(
+                "LangGraph+SwarmGraph local-real path cannot claim provider-backed calls"
+            )
         result.metadata.update({
             "runtime_mode": _LOCAL_REAL_MODE if local_real else result.metadata.get("runtime_mode", "gated"),
             "real_provider_call": False,
@@ -268,6 +277,17 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             or spec.runtime_config.get("runtime_mode") == _LOCAL_REAL_MODE
             or spec.runtime_config.get("adoption_mode") == _LOCAL_REAL_MODE
         )
+
+    def _local_no_provider_emit(self, emit_event):
+        def guarded_emit(run_id: str, event_type: str, payload: dict[str, Any]) -> None:
+            if payload.get("real_provider_call") is True or payload.get("provider_backed") is True:
+                raise RuntimeError(
+                    "LangGraph+SwarmGraph local-real path cannot claim provider-backed calls"
+                )
+            emit_event(run_id, event_type, payload)
+
+        return guarded_emit
+
     def _offline_queen_decompose(
         self,
         objective: str,

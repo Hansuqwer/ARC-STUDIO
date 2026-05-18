@@ -548,6 +548,60 @@ class TestLangGraphRunner:
         assert completed["runtime_mode"] == "local-real"
         assert completed["real_provider_call"] is False
         assert completed["provider_backed"] is False
+        for event_type, payload in events:
+            assert payload.get("real_provider_call") is not True, event_type
+            assert payload.get("provider_backed") is not True, event_type
+
+    @pytest.mark.asyncio
+    async def test_runner_local_real_rejects_provider_backed_event_claims(self, monkeypatch):
+        from agent_runtime_cockpit.adoption.langgraph_runner import (
+            LangGraphAdoptionRunner,
+        )
+
+        class _Graph:
+            ainvoke = None
+
+            def invoke(self, input_data):
+                return {"answer": input_data["swarmgraph_task"]}
+
+        runner = LangGraphAdoptionRunner()
+        monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
+        monkeypatch.setattr(
+            runner,
+            "_queen_decompose",
+            lambda objective, graph_input, max_workers, run_id: ([{
+                "task_id": "task-1",
+                "worker_id": "worker-1",
+                "role": "worker",
+                "input": {**graph_input, "swarmgraph_task": "local task"},
+            }], object()),
+        )
+
+        def provider_backed_consensus(swarm_state, proposals):
+            return ConsensusResult(
+                task_id=proposals[0].task_id,
+                winning_proposal=proposals[0],
+                votes=[],
+                consensus_reached=True,
+                confidence=1.0,
+                metadata={"provider_backed": True},
+            )
+
+        monkeypatch.setattr(runner, "_swarmgraph_consensus", provider_backed_consensus)
+
+        with pytest.raises(RuntimeError, match="cannot claim provider-backed calls"):
+            await runner.run(
+                AdoptionSpec(
+                    mode=AdoptionMode.LANGGRAPH,
+                    runtime_config={
+                        "runtime_mode": "local-real",
+                        "graph": _Graph(),
+                        "input": {"topic": "local"},
+                    },
+                ),
+                "lg-sg-local-real-provider-claim",
+                lambda *args: None,
+            )
 
 
 class TestAG2Runner:

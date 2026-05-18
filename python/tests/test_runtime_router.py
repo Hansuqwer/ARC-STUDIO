@@ -140,7 +140,6 @@ async def test_langgraph_swarmgraph_local_real_routes_when_env_set(monkeypatch, 
 
     run = await routed.adapter.run_workflow("wf-local", {
         "runtime_mode": "local-real",
-        "graph": _FakeGraph(),
         "prompt": "local prompt",
     })
 
@@ -149,6 +148,34 @@ async def test_langgraph_swarmgraph_local_real_routes_when_env_set(monkeypatch, 
     assert run.metadata["real_provider_call"] is False
     assert run.metadata["real_runtime_gated"] is False
     assert "no provider-backed claim" in run.metadata["real_path_absent_reason"]
+    assert run.metadata["consensus"]["metadata"]["runtime_mode"] == "local-real"
+    assert run.metadata["consensus"]["metadata"]["real_provider_call"] is False
+
+
+
+@pytest.mark.asyncio
+async def test_langgraph_swarmgraph_fake_path_ignores_input_graph(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
+    routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
+
+    run = await routed.adapter.run_workflow("wf-fake", {
+        "runtime_mode": "fake/offline",
+        "graph": _FakeGraph(),
+        "prompt": "offline prompt",
+    })
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.metadata["runtime_mode"] == "fake/offline"
+    assert run.metadata["real_provider_call"] is False
+    assert run.metadata["consensus"]["metadata"]["runtime_mode"] == "fake/offline"
+
+
+@pytest.mark.asyncio
+async def test_langgraph_swarmgraph_rejects_unknown_runtime_mode(tmp_path):
+    routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
+
+    with pytest.raises(runtime_router.RuntimeNotRunnable, match="fake/offline or local-real only"):
+        await routed.adapter.run_workflow("wf-invalid", {"runtime_mode": "provider"})
 
 
 def test_langgraph_swarmgraph_capability_marks_local_real_gate(monkeypatch, tmp_path):

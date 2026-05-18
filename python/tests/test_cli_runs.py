@@ -106,6 +106,7 @@ def test_run_dry_run_langgraph_swarmgraph_fake_offline_ready(tmp_path):
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)["data"]
     assert payload["runtime"] == "langgraph+swarmgraph"
+    assert payload["runtime_mode"] == "fake/offline"
     assert payload["dry_run"] is True
     assert payload["runnable"] is True
     assert payload["provider_call"] is False
@@ -114,6 +115,79 @@ def test_run_dry_run_langgraph_swarmgraph_fake_offline_ready(tmp_path):
     assert payload["dependency_status"]["real_runtime_gated"] is True
     assert not payload["blockers"]
     assert not (tmp_path / ".arc" / "traces").exists()
+
+
+def test_run_dry_run_langgraph_swarmgraph_local_real_blocked_without_gate(tmp_path):
+    result = CliRunner().invoke(app, [
+        "run", "graph.py",
+        "--workspace", str(tmp_path),
+        "--runtime", "langgraph+swarmgraph",
+        "--runtime-mode", "local-real",
+        "--allow-paid-calls",
+        "--dry-run",
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)["data"]
+    assert payload["runtime_mode"] == "local-real"
+    assert payload["provider_call"] is False
+    assert payload["dependency_status"]["runtime_mode"] == "local-real"
+    assert payload["dependency_status"]["real_provider_call"] is False
+    assert payload["runnable"] is False
+    codes = {blocker["code"] for blocker in payload["blockers"]}
+    assert "LOCAL_REAL_GATE_REQUIRED" in codes
+    assert not (tmp_path / ".arc" / "traces").exists()
+
+
+def test_run_dry_run_langgraph_swarmgraph_local_real_ready_with_gate(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
+    result = CliRunner().invoke(app, [
+        "run", "graph.py",
+        "--workspace", str(tmp_path),
+        "--runtime", "langgraph+swarmgraph",
+        "--runtime-mode", "local-real",
+        "--dry-run",
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)["data"]
+    assert payload["runtime_mode"] == "local-real"
+    assert payload["runnable"] is True
+    assert payload["provider_call"] is False
+    assert payload["dependency_status"]["real_provider_call"] is False
+    assert payload["dependency_status"]["real_runtime_gated"] is False
+    assert not payload["blockers"]
+    assert not (tmp_path / ".arc" / "traces").exists()
+
+
+def test_run_langgraph_swarmgraph_local_real_blocked_without_gate(tmp_path):
+    result = CliRunner().invoke(app, [
+        "run", "graph.py",
+        "--workspace", str(tmp_path),
+        "--runtime", "langgraph+swarmgraph",
+        "--runtime-mode", "local-real",
+        "--allow-paid-calls",
+        "--json",
+    ])
+    assert result.exit_code == 2
+    envelope = json.loads(result.output)
+    assert envelope["ok"] is False
+    assert envelope["error"]["details"]["code"] == "LOCAL_REAL_GATE_REQUIRED"
+    assert not (tmp_path / ".arc" / "traces").exists()
+
+
+def test_run_rejects_invalid_runtime_mode(tmp_path):
+    result = CliRunner().invoke(app, [
+        "run", "graph.py",
+        "--workspace", str(tmp_path),
+        "--runtime", "langgraph+swarmgraph",
+        "--runtime-mode", "real",
+        "--json",
+    ])
+    assert result.exit_code == 2
+    envelope = json.loads(result.output)
+    assert envelope["ok"] is False
+    assert envelope["error"]["details"]["code"] == "INVALID_RUNTIME_MODE"
 
 
 def test_run_crewai_swarmgraph_fake_offline_completes(monkeypatch, tmp_path):

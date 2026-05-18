@@ -108,7 +108,7 @@
 
 **Goal:** Turn fake-tested/gated adoption runners into narrow, honest, real product paths.
 
-**Current:** Adoption protocol/runners exist. `crewai+swarmgraph` and `langgraph+swarmgraph` fake/offline CLI paths are routed for deterministic product use. `langgraph+swarmgraph` also has a narrow local-real path that is explicit opt-in, smoke-scoped, and non-provider-backed. It performs no paid/live provider calls and is not claimed as product-ready. Provider-backed LangGraph + SwarmGraph adoption remains gated and not claimed.
+**Current:** Adoption protocol/runners exist. `crewai+swarmgraph` and `langgraph+swarmgraph` fake/offline CLI paths are routed for deterministic product use. `langgraph+swarmgraph` also has a narrow local-real path behind explicit `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` opt-in and `ARC_REAL_RUNTIME_SMOKE=1` smoke validation. It is non-provider-backed, performs no paid/live provider calls, and is not claimed as product-ready. Provider-backed LangGraph + SwarmGraph adoption remains gated and not claimed.
 
 **Deliverables:**
 - Pick one first real target (`LangGraph + SwarmGraph` recommended).
@@ -118,7 +118,7 @@
 
 **Acceptance:**
 - Offline fake tests remain deterministic.
-- Opt-in real-runtime smoke covers the local-real path where deps are installed; it is not evidence for provider-backed execution.
+- Opt-in real-runtime smoke covers the local-real path where deps are installed by setting both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; it is not evidence for provider-backed execution.
 - Capability reports distinguish fake-tested/gated/real clearly.
 
 ## R7 — Release Operations + History Hygiene

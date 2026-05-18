@@ -249,13 +249,15 @@ class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
             ))
 
         emit_event(run_id, "RUN_STARTED", {"workflow_id": workflow_id, "runtime": self.adapter_id, "runtime_mode": mode})
+        graph = _LocalNoProviderLangGraph(workflow_id) if local_real else _FakeLangGraph(workflow_id)
         spec = AdoptionSpec(
             mode=AdoptionMode.LANGGRAPH,
             runtime_config={
-                "graph": _FakeLangGraph(workflow_id),
+                "graph": graph,
                 "input": inputs,
                 "objective": inputs.get("prompt") or workflow_id,
                 "offline_deterministic": not local_real,
+                "runtime_mode": mode,
             },
             swarmgraph_config={"mode": mode, "real_provider_call": False},
         )
@@ -294,6 +296,19 @@ class _FakeLangGraph:
     def invoke(self, input_data: dict[str, Any]) -> dict[str, str]:
         prompt = input_data.get("prompt") or input_data.get("swarmgraph_task") or self.workflow_id
         return {"result": f"fake/offline LangGraph result for {prompt}"}
+
+
+class _LocalNoProviderLangGraph:
+    def __init__(self, workflow_id: str) -> None:
+        self.workflow_id = workflow_id
+
+    def invoke(self, input_data: dict[str, Any]) -> dict[str, Any]:
+        prompt = input_data.get("prompt") or input_data.get("swarmgraph_task") or self.workflow_id
+        return {
+            "result": f"local-real LangGraph no-provider result for {prompt}",
+            "runtime_mode": "local-real",
+            "real_provider_call": False,
+        }
 
 
 class _FakeCrew:

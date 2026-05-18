@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ARC_REAL_RUNTIME_SMOKE: '1'
+      ARC_LANGGRAPH_SWARMGRAPH_REAL: '1'
       ARC_SWARMGRAPH_RUN_BACKEND: ''
       ARC_SWARMGRAPH_ALLOW_COSTS: ''
     steps:
