@@ -150,9 +150,8 @@ test.describe('ARC Studio — Smoke Tests', () => {
     const liveInsight = page.getByText(/^Live insight:/).first();
     await expect(liveInsight).toBeVisible({ timeout: TIMEOUT });
 
-    await expect(page.getByText(/active event|live stream disconnected; showing/i).first()).toBeVisible({
-      timeout: TIMEOUT,
-    });
+    await expect(page.getByText(/Live Event Log/i).first()).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('RUN_STARTED').first()).toBeVisible({ timeout: TIMEOUT });
   });
 });
 

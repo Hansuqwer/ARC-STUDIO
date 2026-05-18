@@ -76,6 +76,15 @@ function safeMetadataSummary(metadata?: Record<string, unknown>): string {
     return keys.length ? keys.slice(0, 6).join(', ') : 'none';
 }
 
+function eventStatus(event: Record<string, unknown>): string {
+    const status = (event as unknown as Record<string, unknown>).status;
+    return typeof status === 'string' && status.trim().length > 0 ? status : 'not reported';
+}
+
+function eventType(value: ActiveTraceEventChunk['event']): string | undefined {
+    return value && typeof value === 'object' && 'type' in value ? String(value.type) : undefined;
+}
+
 const TopologyPanel: React.FC<{ topology: SwarmGraphTopologyInsight }> = ({ topology }) => (
     <Panel title='Topology' status={topology.status}>
         {topology.status === 'present' ? (
@@ -161,6 +170,32 @@ const RuntimeMetadataPanel: React.FC<{ metadata: SwarmGraphRuntimeMetadata }> = 
     );
 };
 
+const LiveEventLog: React.FC<{ chunks: ActiveTraceEventChunk[]; source: InsightSource; state: string }> = ({ chunks, source, state }) => (
+    <section className='arc-studio-swarmgraph__panel arc-studio-swarmgraph__panel--metadata'>
+        <div className='arc-studio-swarmgraph__panel-header'>
+            <h3>Live Event Log</h3>
+            <span className='arc-studio-swarmgraph__badge arc-studio-swarmgraph__badge--metadata'>{state}</span>
+        </div>
+        <p className='arc-studio-swarmgraph__note'>Limited Python SSE active stream attempt; displays captured live event type plus sequence/status only.</p>
+        {chunks.length === 0 ? (
+            <p className='arc-studio-swarmgraph__empty'>No live events captured for this active stream attempt. Stored trace replay remains separate.</p>
+        ) : (
+            <dl className='arc-studio-swarmgraph__details'>
+                <dt>source</dt><dd>{source === 'live-stream' ? 'live active stream attempt' : 'stored trace replay/read selected'}</dd>
+                <dt>captured types</dt><dd>{chunks.map(chunk => eventType(chunk.event) ?? chunk.terminal ?? chunk.status?.state ?? 'STREAM_STATUS').join(', ')}</dd>
+                {chunks.map((chunk, index) => {
+                    const type = eventType(chunk.event) ?? chunk.terminal ?? chunk.status?.state ?? 'STREAM_STATUS';
+                    const status = chunk.terminal ?? chunk.status?.state ?? eventStatus(chunk.event as Record<string, unknown> | undefined ?? {});
+                    return <React.Fragment key={`${type}-${chunk.sequence}-${index}`}>
+                        <dt>{type}</dt>
+                        <dd>{`seq ${chunk.sequence}; status ${status}`}</dd>
+                    </React.Fragment>
+                })}
+            </dl>
+        )}
+    </section>
+);
+
 export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcService }) => {
     const [traces, setTraces] = React.useState<TraceFile[]>([]);
     const [selectedTraceId, setSelectedTraceId] = React.useState('');
@@ -173,6 +208,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
     const [liveReason, setLiveReason] = React.useState<string | undefined>();
     const [liveState, setLiveState] = React.useState<'idle' | 'connecting' | 'live' | 'disconnected' | 'degraded' | 'error'>('idle');
     const [liveEvents, setLiveEvents] = React.useState<TraceEvent[]>([]);
+    const [liveChunks, setLiveChunks] = React.useState<ActiveTraceEventChunk[]>([]);
     const [insightSource, setInsightSource] = React.useState<InsightSource>('stored-trace');
     const streamCancelled = React.useRef(false);
 
@@ -241,6 +277,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
         }
         streamCancelled.current = false;
         setLiveEvents([]);
+        setLiveChunks([]);
         setInsightSource('live-stream');
         setLiveState('connecting');
         setLiveReason(undefined);
@@ -251,6 +288,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
                 if (streamCancelled.current) {
                     return;
                 }
+                setLiveChunks(current => [...current, chunk]);
                 if (chunk.status?.message) {
                     setLiveReason(chunk.status.message);
                 }
@@ -336,6 +374,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
             {insight.reasons.length > 0 && <div className='arc-studio-swarmgraph__reasons'>{insight.reasons.map(reason => <div key={reason}>{reason}</div>)}</div>}
             <div className='arc-studio-swarmgraph__grid'>
                 {/* Insight derives from trace event.type via buildSwarmGraphInsight; metadata is informational only. */}
+                <LiveEventLog chunks={liveChunks} source={insightSource} state={liveState} />
                 <TopologyPanel topology={insight.topology} />
                 <ConsensusPanel consensus={insight.consensus} />
                 <CostPanel cost={insight.cost} />

@@ -29,12 +29,12 @@ const server = http.createServer((req, res) => {
   });
 
   res.write(`event: arc\n`);
-  res.write(`data: ${JSON.stringify({ type: 'RUN_STARTED', run_id: runId, source: 'e2e-fixture' })}\n\n`);
+  res.write(`data: ${JSON.stringify({ type: 'RUN_STARTED', run_id: runId, timestamp: '2026-01-01T00:00:00.000Z', sequence: 0, source: 'e2e-fixture' })}\n\n`);
 
   setTimeout(() => {
     res.write(`event: arc\n`);
     res.write(
-      `data: ${JSON.stringify({ type: 'RUN_COMPLETED', run_id: runId, status: 'completed', source: 'e2e-fixture' })}\n\n`,
+      `data: ${JSON.stringify({ type: 'RUN_COMPLETED', run_id: runId, timestamp: '2026-01-01T00:00:01.000Z', sequence: 1, status: 'completed', source: 'e2e-fixture' })}\n\n`,
     );
     res.end();
   }, 25);
