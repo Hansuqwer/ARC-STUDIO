@@ -4,6 +4,7 @@ from agent_runtime_cockpit.providers import (
     ProviderAccountStore,
     ProviderQuotaStore,
     ProviderRequest,
+    ProviderActionRequest,
     ProviderRoutingPolicy,
     ProviderRoutingStore,
     check_provider_cost_gate,
@@ -11,12 +12,19 @@ from agent_runtime_cockpit.providers import (
     mask_secret,
     provider_statuses,
     redact,
+    run_provider_action,
 )
 
 
 def test_provider_definitions_include_first_class_providers():
     ids = {provider.id for provider in PROVIDERS}
-    assert {"openai", "anthropic", "openrouter", "qwen", "kimi"}.issubset(ids)
+    assert {"openai", "anthropic", "openrouter", "9router", "qwen", "kimi"}.issubset(ids)
+
+
+def test_9router_primary_env_name_is_shell_safe():
+    provider = next(provider for provider in PROVIDERS if provider.id == "9router")
+    assert provider.env_key_names[0] == "NINEROUTER_API_KEY"
+    assert "9ROUTER_API_KEY" not in provider.env_key_names
 
 
 def test_provider_statuses_are_dry_run_and_do_not_expose_keys():
@@ -153,3 +161,72 @@ def test_quota_store_reset_clears_counters(tmp_path):
     store.reserve("openai", account_id="acct", provider_cap=2, account_cap=2)
     store.reset()
     assert store.remaining("openai", "acct", provider_cap=2, account_cap=2) == {"provider": 2, "account": 2}
+
+
+def test_9router_live_action_blocks_before_network_without_gates(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
+    monkeypatch.delenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", raising=False)
+
+    def fail_urlopen(*_args, **_kwargs):
+        raise AssertionError("network must not be attempted")
+
+    monkeypatch.setattr("urllib.request.urlopen", fail_urlopen)
+    try:
+        run_provider_action(
+            ProviderActionRequest(
+                provider="9router",
+                model="qwen/qwen-plus",
+                dry_run=False,
+                allow_paid_calls=True,
+                confirmation="RUN_PROVIDER_ACTION:9router:qwen/qwen-plus",
+            ),
+            {"NINEROUTER_API_KEY": "sk-test-should-not-emit"},
+        )
+    except RuntimeError as exc:
+        assert str(exc) == "live_provider_calls_disabled"
+    else:
+        raise AssertionError("live action should require env gate")
+
+
+def test_9router_mocked_live_action_succeeds_with_all_gates(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
+    monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(tmp_path / "providers.json"))
+    seen = {}
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return b'{"choices":[{"message":{"content":"ok"}}],"usage":{"total_tokens":3}}'
+
+    def fake_urlopen(req, timeout):
+        seen["url"] = req.full_url
+        seen["auth"] = req.headers["Authorization"]
+        seen["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    result = run_provider_action(
+        ProviderActionRequest(
+            provider="9router",
+            model="qwen/qwen-plus",
+            dry_run=False,
+            allow_paid_calls=True,
+            confirmation="RUN_PROVIDER_ACTION:9router:qwen/qwen-plus",
+        ),
+        {"ARC_ALLOW_LIVE_PROVIDER_TESTS": "true", "NINEROUTER_API_KEY": "sk-test-should-not-emit"},
+    )
+    dumped = result.model_dump_json()
+    assert result.real_provider_call is True
+    assert result.network_call_attempted is True
+    assert result.accounting["usage"] == {"total_tokens": 3}
+    assert result.metadata["key_ref_source"] == "NINEROUTER_API_KEY"
+    assert seen["url"] == "https://api.9router.com/v1/chat/completions"
+    assert seen["auth"] == "Bearer sk-test-should-not-emit"
+    assert "sk-test-should-not-emit" not in dumped

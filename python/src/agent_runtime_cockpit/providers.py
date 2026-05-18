@@ -5,6 +5,8 @@ import json
 import os
 import re
 import tempfile
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -356,6 +358,7 @@ PROVIDERS: list[ProviderDefinition] = [
     _p("xai-grok", "xAI / Grok API", ["XAI_API_KEY"], "https://api.x.ai/v1", docs_url="https://docs.x.ai/", default_models=["grok-4", "grok-3"], supports_tools=True),
     _p("perplexity", "Perplexity API", ["PERPLEXITY_API_KEY", "PPLX_API_KEY"], "https://api.perplexity.ai", docs_url="https://docs.perplexity.ai/", default_models=["sonar", "sonar-pro"]),
     _p("openrouter", "OpenRouter", ["OPENROUTER_API_KEY"], "https://openrouter.ai/api/v1", docs_url="https://openrouter.ai/docs", default_models=["openai/gpt-4.1-mini", "anthropic/claude-sonnet-4"], supports_tools=True),
+    _p("9router", "9router / Qwen", ["NINEROUTER_API_KEY", "ROUTER9_API_KEY"], "https://api.9router.com/v1", docs_url="https://9router.com/", default_models=["qwen/qwen3-coder", "qwen/qwen-plus", "qwen/qwen-max"], supports_tools=True),
     _p("azure-openai", "Azure OpenAI", ["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT"], "", docs_url="https://learn.microsoft.com/azure/ai-services/openai/", default_models=["deployment-name"], supports_tools=True, supports_embeddings=True, supports_images=True),
     _p("aws-bedrock", "AWS Bedrock", ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_REGION"], "", credential_label="AWS credentials", docs_url="https://docs.aws.amazon.com/bedrock/", default_models=["anthropic.claude", "amazon.nova"], supports_tools=True),
     _p("mistral", "Mistral AI", ["MISTRAL_API_KEY"], "https://api.mistral.ai/v1", docs_url="https://docs.mistral.ai/", supports_tools=True, supports_embeddings=True),
@@ -558,6 +561,9 @@ def run_provider_action(request: ProviderActionRequest, env: dict[str, str] | No
             metadata={"key_ref_source": source, "provider_status": definition.status},
         )
 
+    if provider == "9router":
+        return _run_openai_compatible_chat_completion(request, definition, model, source or "", env, quota)
+
     return ProviderActionResult(
         provider=provider,
         model=model,
@@ -568,6 +574,63 @@ def run_provider_action(request: ProviderActionRequest, env: dict[str, str] | No
         message="All gates passed; live provider execution remains a closed smoke scaffold. No network call was made.",
         accounting={"scope": "local_quota_counters_only", **quota},
         metadata={"key_ref_source": source, "provider_status": definition.status, "confirmation": "accepted"},
+    )
+
+
+def _run_openai_compatible_chat_completion(
+    request: ProviderActionRequest,
+    definition: ProviderDefinition,
+    model: str,
+    key_source: str,
+    env: dict[str, str],
+    quota: dict[str, Any],
+) -> ProviderActionResult:
+    account = next((item for item in ProviderAccountStore().list_accounts() if item.provider == definition.id and item.enabled), None)
+    base_url = (account.base_url if account and account.base_url else definition.default_base_url).rstrip("/")
+    timeout_s = max(1, ProviderRoutingStore().get().timeout_ms / 1000)
+    payload = json.dumps(
+        {
+            "model": model,
+            "messages": [{"role": "user", "content": request.prompt}],
+            "max_tokens": 32,
+            "stream": False,
+        }
+    ).encode()
+    http_request = urllib.request.Request(
+        f"{base_url}/chat/completions",
+        data=payload,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {env[key_source]}",
+            "Content-Type": "application/json",
+            "User-Agent": "arc-provider-smoke/1",
+        },
+    )
+    try:
+        with urllib.request.urlopen(http_request, timeout=timeout_s) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+            status = response.status
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"provider_http_error:{exc.code}:{redact(raw)}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"provider_network_error:{redact(str(exc.reason))}") from exc
+    except TimeoutError as exc:
+        raise RuntimeError("provider_network_timeout") from exc
+
+    data = redact(json.loads(raw)) if raw else {}
+    usage = data.get("usage", {}) if isinstance(data, dict) else {}
+    choice_count = len(data.get("choices", [])) if isinstance(data, dict) and isinstance(data.get("choices"), list) else 0
+    return ProviderActionResult(
+        provider=definition.id,
+        model=model,
+        action=request.action,
+        dry_run=False,
+        real_provider_call=True,
+        network_call_attempted=True,
+        message="Gated 9router chat completion smoke succeeded.",
+        accounting={"scope": "provider_reported_usage", "usage": usage, **quota},
+        metadata={"key_ref_source": key_source, "provider_status": definition.status, "confirmation": "accepted", "http_status": status, "choice_count": choice_count},
     )
 
 

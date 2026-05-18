@@ -19,6 +19,7 @@ import {
     ProviderCatalogEntry,
     SafeConfigUpdate,
     RuntimeCapabilityReport,
+    GatedProviderActionResult,
 } from '../../common/arc-protocol';
 import {
     buildLiveProviderGate,
@@ -70,7 +71,13 @@ const PROVIDER_DISPLAY: Record<string, string> = {
     bedrock: 'Bedrock',
     vertex: 'Vertex',
     ollama: 'Ollama',
+    qwen: 'Qwen',
+    '9router': '9router',
 };
+
+const DEFAULT_PROVIDER_ACTION_PROVIDER = '9router';
+const DEFAULT_PROVIDER_ACTION_MODEL = 'qwen/qwen3-coder';
+const DEFAULT_PROVIDER_ACTION_PROMPT = 'Return one short ARC Studio provider-action smoke sentence.';
 
 type JsonObject = Record<string, unknown>;
 type OptionalProviderTelemetryService = {
@@ -80,9 +87,10 @@ type OptionalProviderTelemetryService = {
     confirmProviderAction?: (request: {
         provider: string;
         model?: string;
+        prompt: string;
         dryRun: boolean;
         allowPaidCalls: boolean;
-        confirmationText: string;
+        confirmProviderCall: boolean;
     }) => Promise<unknown>;
 };
 
@@ -109,7 +117,7 @@ function providerSourceColor(source: string): string {
 }
 
 function formatMetadataKeys(metadata?: Record<string, unknown>): string {
-    const keys = Object.keys(metadata || {}).filter(key => !/secret|token|password|api[_-]?key|credential/i.test(key));
+    const keys = Object.keys(metadata || {}).filter(key => !/secret|token|pass(?:word)?|api[_-]?key|credential/i.test(key));
     return keys.length > 0 ? keys.slice(0, 6).join(', ') : 'none';
 }
 
@@ -140,6 +148,8 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
     const [quotaResetConfirmOpen, setQuotaResetConfirmOpen] = useState(false);
     const [quotaResetPhrase, setQuotaResetPhrase] = useState('');
     const [liveProviderConfirmPhrase, setLiveProviderConfirmPhrase] = useState('');
+    const [providerActionLaunching, setProviderActionLaunching] = useState(false);
+    const [providerActionResult, setProviderActionResult] = useState<GatedProviderActionResult | null>(null);
 
     const loadConfig = useCallback(async () => {
         if (!arcService) {
@@ -298,7 +308,8 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
     const providerTelemetryService = arcService as ArcService & OptionalProviderTelemetryService | undefined;
     const providerDiagnosticsAvailable = Boolean(providerTelemetryService?.getProviderDiagnostics);
     const providerQuotaAvailable = Boolean(providerTelemetryService?.getProviderQuota);
-    const providerActionAvailable = Boolean(providerTelemetryService?.confirmProviderAction);
+    const providerActionLaunch = providerTelemetryService?.runGatedProviderAction || providerTelemetryService?.confirmProviderAction;
+    const providerActionAvailable = Boolean(providerActionLaunch);
     const providerTelemetryUnavailable = !providerDiagnosticsAvailable && !providerQuotaAvailable;
     const providerTelemetryError = !providerTelemetryUnavailable && (providerDiagnostics === null || providerQuota === null);
     const providerTelemetryEmpty = providerQuotaAvailable && providerQuota !== null && quotaCounters.length === 0;
@@ -335,14 +346,47 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
         providerCall: false,
         diagnostics,
         costPolicySummary,
-        provider: quotaProviderFilter === 'all' ? diagnostics.routingDefault : quotaProviderFilter,
-        model: (currentProfile as { defaultModel?: string } | null)?.defaultModel || (config?.runtime as { defaultModel?: string } | undefined)?.defaultModel,
+        provider: quotaProviderFilter === 'all' ? DEFAULT_PROVIDER_ACTION_PROVIDER : quotaProviderFilter,
+        model: (currentProfile as { defaultModel?: string } | null)?.defaultModel || (config?.runtime as { defaultModel?: string } | undefined)?.defaultModel || DEFAULT_PROVIDER_ACTION_MODEL,
         liveTestsEnabled: diagnostics.liveTestsEnabled,
         backendActionAvailable: providerActionAvailable,
         confirmationText: liveProviderConfirmPhrase,
     });
     const liveProviderActionConfirmed = liveProviderGate.confirmed === true;
-    const liveProviderActionDisabled = !liveProviderActionConfirmed || liveProviderGate.providerCall !== false;
+    const providerActionProvider = quotaProviderFilter === 'all' ? DEFAULT_PROVIDER_ACTION_PROVIDER : quotaProviderFilter;
+    const providerActionModel = (currentProfile as { defaultModel?: string } | null)?.defaultModel || (config?.runtime as { defaultModel?: string } | undefined)?.defaultModel || DEFAULT_PROVIDER_ACTION_MODEL;
+    const liveProviderActionDisabled = providerActionLaunching || !providerActionAvailable || !liveProviderActionConfirmed || liveProviderGate.providerCall !== false;
+
+    const handleProviderAction = async () => {
+        if (!providerActionLaunch || liveProviderActionDisabled) return;
+        setProviderActionLaunching(true);
+        setProviderActionResult(null);
+        setSaveMessage(null);
+        try {
+            const result = await providerActionLaunch({
+                provider: providerActionProvider,
+                model: providerActionModel,
+                prompt: DEFAULT_PROVIDER_ACTION_PROMPT,
+                dryRun,
+                allowPaidCalls: !dryRun && allowPaidCalls,
+                confirmProviderCall: liveProviderActionConfirmed,
+            }) as GatedProviderActionResult;
+            setProviderActionResult(result);
+            setSaveMessage(result.message || (result.success ? 'Narrow provider action completed.' : 'Narrow provider action blocked.'));
+        } catch (error) {
+            setProviderActionResult({
+                success: false,
+                blocked: true,
+                dryRun,
+                providerCall: false,
+                provider: providerActionProvider,
+                model: providerActionModel,
+                message: `Narrow provider action failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            });
+        } finally {
+            setProviderActionLaunching(false);
+        }
+    };
 
     const handleResetQuota = async () => {
         if (!providerTelemetryService?.resetProviderQuota || !quotaResetConfirmed) return;
@@ -749,9 +793,9 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     Provider telemetry state: {providerTelemetryUnavailable ? 'unavailable/degraded - backend method not wired; no provider call attempted' : providerTelemetryError ? 'error/degraded - local telemetry read failed; provider execution still disabled' : loading ? 'loading local telemetry...' : 'loaded from local ARC telemetry only'}.
                 </p>
                 <div className='arc-studio-config__live-provider-gate' style={{ margin: '8px 0', padding: '8px', border: '1px solid var(--theia-widgetBorder)', borderRadius: '4px', fontSize: '11px', backgroundColor: 'var(--theia-editor-background)' }}>
-                    <strong>Provider gate preview only: {liveProviderGate.label || liveProviderGate.state || liveProviderGate.status || (dryRun || !allowPaidCalls ? 'blocked/gated' : 'preview-only')}</strong>
+                    <strong>Narrow provider action gate: {liveProviderGate.label || liveProviderGate.state || liveProviderGate.status || (dryRun || !allowPaidCalls ? 'blocked/gated' : 'preview-only')}</strong>
                     <p style={{ margin: '4px 0 0', color: 'var(--theia-descriptionForeground)' }}>
-                        No provider network calls from UI: providerCall:false. This panel never calls provider API, provider proxy, live API, quota, or billing endpoints, and never enables real provider execution.
+                        Default remains dry-run/offline. Live calls require backend gates: ARC_ALLOW_LIVE_PROVIDER_TESTS=true, paid-call opt-in, exact confirmation, env-ref key only. This is one narrow provider action, not provider-backed adoption or runtime support. Future live provider paths remain backend-gated and not launched from this panel.
                     </p>
                     <p style={{ margin: '4px 0 0', color: 'var(--theia-descriptionForeground)' }}>
                         {liveProviderGate.message || 'State derives from dry-run, paid-call opt-in, diagnostics metadata, and local cost policy only.'} Enforcement: {liveProviderGate.enforcement || 'backend-enforced opt-in; UI remains preview/offline and never enables provider execution.'}
@@ -762,6 +806,9 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     <p className='arc-studio-config__provider-accounting-label' style={{ margin: '4px 0 0', color: 'var(--theia-descriptionForeground)' }}>
                         {liveProviderGate.accountingLabel || 'Local accounting display uses ARC local counters only; no raw secrets, no remote quota, no billing read.'}
                     </p>
+                    <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
+                            Action target: <span style={{ fontFamily: 'monospace' }}>{providerActionProvider}</span> / <span style={{ fontFamily: 'monospace' }}>{providerActionModel}</span>; prompt is fixed smoke text; raw keys are never displayed. Local accounting only; no provider call attempted unless all backend gates pass.
+                    </div>
                     <label className='arc-studio-config__provider-action-confirm' style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
                         Paid-call confirmation phrase
                         <input
@@ -775,11 +822,16 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     <button
                         className='arc-studio-config__provider-action-guarded'
                         disabled={liveProviderActionDisabled}
-                        onClick={() => setSaveMessage('Provider-backed action is backend-gated and not launched by this UI panel. Local accounting only; no provider call attempted.')}
+                        onClick={handleProviderAction}
                         style={{ marginTop: '6px', fontSize: '12px' }}
                     >
-                        {providerActionAvailable ? 'Backend-gated paid action requires confirmation' : 'Backend action unavailable - fail closed'}
+                        {providerActionLaunching ? 'Running gated provider action...' : providerActionAvailable ? 'Run one backend-gated provider action' : 'Backend action unavailable - fail closed'}
                     </button>
+                    {providerActionResult && (
+                        <div className='arc-studio-config__provider-action-result' style={{ marginTop: '6px', fontSize: '11px', color: providerActionResult.success ? 'var(--theia-descriptionForeground)' : 'var(--theia-editorWarning-foreground)' }}>
+                            Result: success={String(providerActionResult.success)} blocked={String(providerActionResult.blocked)} dryRun={String(providerActionResult.dryRun)} providerCall={String(providerActionResult.providerCall)} provider={providerActionResult.provider || providerActionProvider} model={providerActionResult.model || providerActionModel}. {providerActionResult.message}
+                        </div>
+                    )}
                 </div>
                 <div className='arc-studio-config__provider-diagnostics' style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', fontSize: '12px' }}>
                     <span>Backend live-test config (UI makes no calls): <span style={{ fontFamily: 'monospace' }}>{diagnostics.liveTestsEnabled ? 'configured for separate gated backend use' : 'disabled/gated'}</span></span>
@@ -788,7 +840,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     <span>Configured accounts: <span style={{ fontFamily: 'monospace' }}>{diagnostics.configuredAccountsCount}</span></span>
                 </div>
                 <p className='arc-studio-config__provider-paths-note' style={{ margin: '6px 0 0', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
-                    Path legend: dry-run/offline = local preview only; local quota reset = ARC storage counters only; provider remote quota is not read or reset; any future live provider paths are separate backend-gated flows, not launched from this panel.
+                    Path legend: dry-run/offline = local preview only; local quota reset = ARC storage counters only; provider remote quota is not read or reset; narrow provider action = explicit backend-gated one-shot only.
                 </p>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px', fontSize: '12px', maxWidth: '260px' }}>
                     Quota provider filter

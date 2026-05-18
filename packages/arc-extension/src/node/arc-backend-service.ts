@@ -906,9 +906,10 @@ export class ArcBackendService implements ArcService {
 
     async runGatedProviderAction(request: GatedProviderActionRequest): Promise<GatedProviderActionResult> {
         const dryRun = request.dryRun !== false;
+        const model = request.model || 'gpt-4o-mini';
         const args = ['providers', 'action', '--provider', request.provider, '--prompt', request.prompt, '--json'];
-        if (request.model) {
-            args.push('--model', request.model);
+        if (model) {
+            args.push('--model', model);
         }
         if (!dryRun) {
             args.push('--live');
@@ -916,8 +917,8 @@ export class ArcBackendService implements ArcService {
         if (request.allowPaidCalls) {
             args.push('--allow-paid-calls');
         }
-        if (request.confirmProviderCall && request.model) {
-            args.push('--confirm', `RUN_PROVIDER_ACTION:${request.provider}:${request.model}`);
+        if (request.confirmProviderCall) {
+            args.push('--confirm', `RUN_PROVIDER_ACTION:${request.provider}:${model}`);
         }
 
         try {
@@ -927,11 +928,11 @@ export class ArcBackendService implements ArcService {
                 windowsHide: true,
                 env: buildArcCliEnv(),
             });
-            return this.mapGatedProviderActionOutput(output, dryRun, request);
+            return this.mapGatedProviderActionOutput(output, dryRun, { ...request, model });
         } catch (error: any) {
             const output = String(error?.stdout || error?.stderr || '');
             if (output.trim()) {
-                return this.mapGatedProviderActionOutput(output, dryRun, request, true);
+                return this.mapGatedProviderActionOutput(output, dryRun, { ...request, model }, true);
             }
             return {
                 success: false,
@@ -939,7 +940,7 @@ export class ArcBackendService implements ArcService {
                 dryRun,
                 providerCall: false,
                 provider: request.provider,
-                model: request.model,
+                model,
                 message: `Provider action unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`,
             };
         }

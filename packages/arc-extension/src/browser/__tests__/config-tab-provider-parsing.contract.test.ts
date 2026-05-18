@@ -133,4 +133,29 @@ describe('ConfigTab provider telemetry parsing contract', () => {
         expect(source).toMatch(/Local accounting only; no provider call attempted/);
         expect(source).toMatch(/no raw secrets/i);
     });
+
+    it('launches only one backend-gated provider action after confirmation', () => {
+        expect(source).toMatch(/runGatedProviderAction/);
+        expect(source).toMatch(/DEFAULT_PROVIDER_ACTION_PROVIDER = '9router'/);
+        expect(source).toMatch(/DEFAULT_PROVIDER_ACTION_MODEL = 'qwen\/qwen3-coder'/);
+        expect(source).toMatch(/DEFAULT_PROVIDER_ACTION_PROMPT/);
+        expect(source).toMatch(/confirmProviderCall: liveProviderActionConfirmed/);
+        expect(source).toMatch(/allowPaidCalls: !dryRun && allowPaidCalls/);
+        expect(source).toMatch(/disabled=\{liveProviderActionDisabled\}/);
+        expect(source).toMatch(/!providerActionAvailable/);
+        expect(source).toMatch(/Run one backend-gated provider action/);
+        expect(source).toMatch(/Narrow provider action gate/);
+        expect(source).toMatch(/one narrow provider action, not provider-backed adoption or runtime support/i);
+    });
+
+    it('surfaces gated action result and accounting without raw secret display', () => {
+        expect(source).toMatch(/arc-studio-config__provider-action-result/);
+        expect(source).toMatch(/success=\{String\(providerActionResult\.success\)\}/);
+        expect(source).toMatch(/blocked=\{String\(providerActionResult\.blocked\)\}/);
+        expect(source).toMatch(/dryRun=\{String\(providerActionResult\.dryRun\)\}/);
+        expect(source).toMatch(/providerCall=\{String\(providerActionResult\.providerCall\)\}/);
+        expect(source).toMatch(/raw keys are never displayed/i);
+        expect(source).not.toMatch(/apiKey|secretKey|rawKey/);
+        expect(source).not.toMatch(/provider-backed adoption (ready|enabled|supported)/i);
+    });
 });
