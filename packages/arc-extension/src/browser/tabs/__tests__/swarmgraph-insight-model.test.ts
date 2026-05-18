@@ -1,5 +1,5 @@
 import type { TraceData, TraceEvent } from '../../../common/arc-protocol';
-import { buildSwarmGraphInsight } from '../swarmgraph-insight-model';
+import { buildLiveInsightStatus, buildSwarmGraphInsight } from '../swarmgraph-insight-model';
 
 function event(type: string, data: Record<string, unknown>): TraceEvent {
     return {
@@ -174,5 +174,21 @@ describe('buildSwarmGraphInsight', () => {
     it('returns empty for missing trace', () => {
         expect(buildSwarmGraphInsight(null).status).toBe('empty');
         expect(buildSwarmGraphInsight(undefined).status).toBe('empty');
+    });
+});
+
+describe('buildLiveInsightStatus', () => {
+    it('reports disconnected when live has no base URL', () => {
+        expect(buildLiveInsightStatus({ state: 'connecting', eventCount: 0 })).toMatchObject({
+            baseUrlConfigured: false,
+            text: 'live stream disconnected; no Python web/SSE base URL configured',
+        });
+    });
+
+    it('does not claim connected until state is live and base URL is configured', () => {
+        expect(buildLiveInsightStatus({ state: 'connecting', eventCount: 0, baseUrl: 'http://127.0.0.1:8000' }).text)
+            .toBe('connecting to configured active trace stream');
+        expect(buildLiveInsightStatus({ state: 'live', eventCount: 1, baseUrl: 'http://127.0.0.1:8000' }).text)
+            .toBe('live stream connected; 1 active event appended in memory');
     });
 });

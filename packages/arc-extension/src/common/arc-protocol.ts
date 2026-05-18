@@ -480,6 +480,7 @@ export interface ConfigStatus {
     runtime: SafeRuntimeConfig;
     providers: SafeProviderKeyStatus[];
     mode: 'plan' | 'build' | 'auto';
+    selectedProfile?: string;
     backendAvailable: boolean;
     backendMessage?: string;
 }
@@ -495,6 +496,7 @@ export interface SafeConfigUpdate {
     allowPaidCalls?: boolean;
     dryRun?: boolean;
     routingMode?: string;
+    selectedProfile?: string;
 }
 
 export interface ArcProfileInfo {
@@ -968,6 +970,8 @@ export type ActiveTraceStreamState =
 export interface ActiveTraceStreamRequest {
     runId: string;
     mode: ActiveTraceStreamMode;
+    /** Python web/SSE base URL. Live mode does not attempt without this. */
+    baseUrl?: string;
     /** Max stream lifetime in milliseconds. Defaults to backend-safe timeout. */
     timeoutMs?: number;
 }
@@ -977,6 +981,7 @@ export interface ActiveTraceStreamStatus {
     mode: ActiveTraceStreamMode;
     state: ActiveTraceStreamState;
     message?: string;
+    baseUrlConfigured?: boolean;
     timestamp: string;
 }
 

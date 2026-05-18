@@ -69,6 +69,7 @@ describe('Protocol Extensions (Session B + B7)', () => {
             expect(source).toMatch(/isolation\?/);
             expect(source).toMatch(/allowPaidCalls\?/);
             expect(source).toMatch(/routingMode\?/);
+            expect(source).toMatch(/selectedProfile\?/);
         });
 
         it('should have getConfigStatus method on ArcService', () => {
@@ -317,10 +318,12 @@ describe('Backend Service Extensions (Session B + B7)', () => {
             expect(source).toMatch(/'allowPaidCalls'/);
             expect(source).toMatch(/'dryRun'/);
             expect(source).toMatch(/'routingMode'/);
+            expect(source).toMatch(/'selectedProfile'/);
             expect(source).toMatch(/execution\.isolation/);
             expect(source).toMatch(/execution\.allow_paid_calls/);
             expect(source).toMatch(/providers\.dry_run/);
             expect(source).toMatch(/providers\.routing_mode/);
+            expect(source).toMatch(/profiles\.selected_profile/);
         });
 
         it('should NOT pass raw secret values to CLI', () => {
@@ -501,7 +504,7 @@ describe('Backend Service Extensions (Session B + B7)', () => {
             expect(source).toMatch(/async cancelActiveTraceStream\(runId:\s*string\)/);
             expect(source).toMatch(/createActiveTraceIterable/);
             expect(source).toMatch(/this\.replayRun\(request\.runId\)/);
-            expect(source).toMatch(/Live SSE proxy is disconnected/);
+            expect(source).toMatch(/Live SSE proxy disconnected; no Python web\/SSE base URL configured/);
             expect(source).toMatch(/RUN_CANCELLED/);
             expect(source).toMatch(/Stream timed out/);
         });

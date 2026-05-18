@@ -251,6 +251,9 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             "provider_backed": False,
         })
         emit_event(run_id, "SWARMGRAPH_CONSENSUS", self._consensus_payload(result))
+        cost_payload = self._measured_cost_payload(spec.runtime_config)
+        if cost_payload is not None:
+            emit_event(run_id, "SWARMGRAPH_COST", cost_payload)
 
         emit_event(run_id, "STEP_COMPLETED", {
             "step": "consensus",
@@ -365,6 +368,28 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             "provider_backed": result.metadata.get("provider_backed"),
             "runtime_mode": result.metadata.get("runtime_mode"),
         }
+
+    def _measured_cost_payload(self, runtime_config: dict[str, Any]) -> dict[str, Any] | None:
+        raw = runtime_config.get("measured_cost") or runtime_config.get("cost")
+        if not isinstance(raw, dict) or raw.get("measured") is not True:
+            return None
+
+        payload: dict[str, Any] = {"runtime": "langgraph+swarmgraph", "measured": True}
+        for source, target in (
+            ("totalCost", "totalCost"),
+            ("total_cost", "totalCost"),
+            ("totalTokens", "totalTokens"),
+            ("total_tokens", "totalTokens"),
+            ("currency", "currency"),
+            ("items", "items"),
+            ("provider", "provider"),
+        ):
+            if source in raw and raw[source] is not None:
+                payload[target] = raw[source]
+
+        if "totalCost" not in payload and "totalTokens" not in payload and "items" not in payload:
+            return None
+        return payload
 
     def _queen_decompose(
         self,

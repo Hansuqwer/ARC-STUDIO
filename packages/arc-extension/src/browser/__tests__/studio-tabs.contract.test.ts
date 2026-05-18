@@ -426,12 +426,12 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/isolation: selectedIsolation/);
             expect(source).toMatch(/dryRun,/);
             expect(source).toMatch(/allowPaidCalls: dryRun \? false : allowPaidCalls/);
-            expect(source).not.toMatch(/profile: selectedProfile/);
+            expect(source).toMatch(/selectedProfile,/);
         });
 
-        it('should keep profile selector as local fallback until protocol persistence exists', () => {
-            expect(source).toMatch(/profile selection follows backend profile inventory/);
-            expect(source).toMatch(/not persisted by this safe config update/);
+        it('should load and persist selected profile through safe config', () => {
+            expect(source).toMatch(/status\.selectedProfile/);
+            expect(source).toMatch(/setSelectedProfile\(status\.selectedProfile\)/);
             expect(source).toMatch(/value=\{selectedProfile\}/);
         });
 
@@ -455,10 +455,10 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/arc-studio-config__provider-cost/);
             expect(source).toMatch(/arc-studio-config__paid-call-warning/);
             expect(source).toMatch(/arc-studio-config__provider-refresh/);
-            expect(source).toMatch(/Provider Diagnostics & Quota/);
-            expect(source).toMatch(/Paid\/live provider calls require explicit opt-in/);
+            expect(source).toMatch(/Provider Diagnostics & Local Quota Preview/);
+            expect(source).toMatch(/Paid\/live provider calls require explicit future backend gates/);
             expect(source).toMatch(/dry-run\/offline stays providerCall:false/);
-            expect(source).toMatch(/Quota display and reset use local counters only/);
+            expect(source).toMatch(/Quota\/cost display and reset use local counters only/);
         });
 
         it('should load optional provider diagnostics and quota without hard protocol dependency', () => {
@@ -513,7 +513,7 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/allowPaidCalls=\{String\(Boolean\(currentProfile\?\.allowPaidCalls\)\)\}/);
             expect(source).toMatch(/effective allowPaidCalls=\{String\(costPolicySummary\.paidCallsAllowed\)\}/);
             expect(source).toMatch(/Dry-run blocks paid calls/);
-            expect(source).toMatch(/not full provider-side cost enforcement/);
+            expect(source).toMatch(/future\/offline-gated/);
             expect(source).toMatch(/buildLiveProviderGate/);
             expect(source).toMatch(/arc-studio-config__live-provider-gate/);
             expect(source).toMatch(/Preview-only\/no network: providerCall:false/);
@@ -696,7 +696,7 @@ describe('Studio Tabs Contracts', () => {
         });
 
         it('should expose honest live-aware controls backed by streamActiveTrace', () => {
-            expect(insightSource).toMatch(/arcService\.streamActiveTrace\(\{ runId, mode: 'live' \}\)/);
+            expect(insightSource).toMatch(/arcService\.streamActiveTrace\(\{ runId, mode: 'live', baseUrl \}\)/);
             expect(insightSource).toMatch(/buildActiveTrace/);
             expect(insightSource).toMatch(/Live insight:/);
             expect(insightSource).toMatch(/disconnected\/degraded/);

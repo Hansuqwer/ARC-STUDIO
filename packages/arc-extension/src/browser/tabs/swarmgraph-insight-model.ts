@@ -52,11 +52,48 @@ export interface SwarmGraphInsight {
     reasons: string[];
 }
 
+export type LiveInsightUiState = 'idle' | 'connecting' | 'live' | 'disconnected' | 'degraded' | 'error';
+
+export interface LiveInsightStatusInput {
+    state: LiveInsightUiState;
+    eventCount: number;
+    baseUrl?: string;
+    reason?: string;
+}
+
+export interface LiveInsightStatusView {
+    state: LiveInsightUiState;
+    baseUrlConfigured: boolean;
+    text: string;
+}
+
 type UnknownRecord = Record<string, unknown>;
 
 const EMPTY_TOPOLOGY: SwarmGraphTopologyInsight = { status: 'empty', nodes: [], edges: [] };
 const EMPTY_CONSENSUS: SwarmGraphConsensusInsight = { status: 'empty', voters: [], votes: [] };
 const EMPTY_COST: SwarmGraphCostInsight = { status: 'empty', items: [] };
+
+export function buildLiveInsightStatus(input: LiveInsightStatusInput): LiveInsightStatusView {
+    const baseUrlConfigured = Boolean(input.baseUrl?.trim());
+    const count = input.eventCount;
+    let text: string;
+    if (!baseUrlConfigured && (input.state === 'connecting' || input.state === 'live')) {
+        text = 'live stream disconnected; no Python web/SSE base URL configured';
+    } else if (input.state === 'connecting') {
+        text = 'connecting to configured active trace stream';
+    } else if (input.state === 'live') {
+        text = `live stream connected; ${count} active event${count === 1 ? '' : 's'} appended in memory`;
+    } else if (input.state === 'disconnected') {
+        text = `live stream disconnected; showing ${count} captured active event${count === 1 ? '' : 's'}`;
+    } else if (input.state === 'degraded') {
+        text = 'live stream unavailable/degraded; stored trace flow still works';
+    } else if (input.state === 'error') {
+        text = 'live stream error; stored trace flow still works';
+    } else {
+        text = 'stored trace mode';
+    }
+    return { state: input.state, baseUrlConfigured, text: input.reason ? `${text}: ${input.reason}` : text };
+}
 
 function isRecord(value: unknown): value is UnknownRecord {
     return typeof value === 'object' && value !== null && !Array.isArray(value);

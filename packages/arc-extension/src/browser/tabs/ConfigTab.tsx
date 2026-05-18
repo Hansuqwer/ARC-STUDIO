@@ -141,6 +141,9 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
             setSelectedIsolation(status.runtime.isolation || 'subprocess');
             setDryRun(Boolean(status.runtime.dryRun));
             setAllowPaidCalls(Boolean(status.runtime.allowPaidCalls));
+            if (status.selectedProfile) {
+                setSelectedProfile(status.selectedProfile);
+            }
             if (arcService.getProviderCatalog) {
                 const catalog = await arcService.getProviderCatalog();
                 setProviderCatalog(catalog);
@@ -241,6 +244,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                 isolation: selectedIsolation,
                 dryRun,
                 allowPaidCalls: dryRun ? false : allowPaidCalls,
+                selectedProfile,
             };
             const result = await arcService.saveConfig(update);
             setSaveMessage(result.message);
@@ -634,7 +638,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     Dry-run saves force paid calls off; profile selection follows backend profile inventory but is not persisted by this safe config update; provider auth remains env-var references only.
                 </p>
                 <p className='arc-studio-config__cost-policy-summary' style={{ margin: '4px 0 0', fontSize: '11px', color: dryRun || !allowPaidCalls ? 'var(--theia-descriptionForeground)' : 'var(--theia-editorWarning-foreground)' }}>
-                    Cost policy: {costPolicySummary.label}. Dry-run blocks paid calls; current profile dryRun={String(Boolean(currentProfile?.dryRun))}, allowPaidCalls={String(Boolean(currentProfile?.allowPaidCalls))}; effective allowPaidCalls={String(costPolicySummary.paidCallsAllowed)}. IDE gating is a preview/enforcement posture, not full provider-side cost enforcement.
+                    Local cost preview: {costPolicySummary.label}. Dry-run blocks paid calls; current profile dryRun={String(Boolean(currentProfile?.dryRun))}, allowPaidCalls={String(Boolean(currentProfile?.allowPaidCalls))}; effective allowPaidCalls={String(costPolicySummary.paidCallsAllowed)}. Backend quota/cost enforcement is future/offline-gated; this UI does not enable provider execution.
                 </p>
                 {isolationStatus?.message && (
                     <p className='arc-studio-config__isolation-message' style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
@@ -645,7 +649,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
 
             <div className='arc-studio-config__section arc-studio-config__provider-cost' style={{ padding: '12px 16px', borderBottom: '1px solid var(--theia-widgetBorder)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                    <h4 style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: 'var(--theia-descriptionForeground)', textTransform: 'uppercase' }}>Provider Diagnostics & Quota</h4>
+                    <h4 style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: 'var(--theia-descriptionForeground)', textTransform: 'uppercase' }}>Provider Diagnostics & Local Quota Preview</h4>
                     <button
                         className='arc-studio-config__provider-refresh'
                         onClick={loadConfig}
@@ -655,15 +659,15 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     </button>
                 </div>
                 <p className='arc-studio-config__paid-call-warning' style={{ margin: '8px 0', fontSize: '11px', color: 'var(--theia-editorWarning-foreground)' }}>
-                    Paid/live provider calls require explicit opt-in; dry-run/offline stays providerCall:false. Quota display and reset use local counters only.
+                    Paid/live provider calls require explicit future backend gates; dry-run/offline stays providerCall:false. Quota/cost display and reset use local counters only.
                 </p>
                 <div className='arc-studio-config__live-provider-gate' style={{ margin: '8px 0', padding: '8px', border: '1px solid var(--theia-widgetBorder)', borderRadius: '4px', fontSize: '11px', backgroundColor: 'var(--theia-editor-background)' }}>
-                    <strong>Live provider preview gate: {liveProviderGate.label || liveProviderGate.state || liveProviderGate.status || (dryRun || !allowPaidCalls ? 'blocked/gated' : 'ready')}</strong>
+                    <strong>Local provider readiness gate: {liveProviderGate.label || liveProviderGate.state || liveProviderGate.status || (dryRun || !allowPaidCalls ? 'blocked/gated' : 'ready')}</strong>
                     <p style={{ margin: '4px 0 0', color: 'var(--theia-descriptionForeground)' }}>
-                        Preview-only/no network: providerCall:false. This panel never calls provider API, provider proxy, live API, or billing endpoints.
+                        Preview-only/no network: providerCall:false. This panel never calls provider API, provider proxy, live API, or billing endpoints, and never enables real provider execution.
                     </p>
                     <p style={{ margin: '4px 0 0', color: 'var(--theia-descriptionForeground)' }}>
-                        {liveProviderGate.message || 'State derives from dry-run, paid-call opt-in, diagnostics, and local cost policy only.'} Enforcement: {liveProviderGate.enforcement || 'IDE gate; provider-side quota/billing remains external.'}
+                        {liveProviderGate.message || 'State derives from dry-run, paid-call opt-in, diagnostics, and local cost policy only.'} Enforcement: {liveProviderGate.enforcement || 'future backend enforcement; UI is preview/offline scaffold only.'}
                     </p>
                 </div>
                 <div className='arc-studio-config__provider-diagnostics' style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', fontSize: '12px' }}>

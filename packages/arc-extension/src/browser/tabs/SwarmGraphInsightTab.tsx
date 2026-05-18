@@ -7,6 +7,7 @@
 import * as React from '@theia/core/shared/react';
 import type { ActiveTraceEventChunk, ArcService, TraceData, TraceEvent, TraceFile } from '../../common/arc-protocol';
 import {
+    buildLiveInsightStatus,
     buildSwarmGraphInsight,
     type SwarmGraphConsensusInsight,
     type SwarmGraphCostInsight,
@@ -52,29 +53,8 @@ const Panel: React.FC<React.PropsWithChildren<{ title: string; status: SwarmGrap
     </section>
 );
 
-type LiveInsightState = 'idle' | 'connecting' | 'live' | 'disconnected' | 'degraded' | 'error';
-
 function isTraceEvent(value: ActiveTraceEventChunk['event']): value is TraceEvent {
     return Boolean(value && typeof value === 'object' && 'type' in value && 'timestamp' in value);
-}
-
-function liveStateCopy(state: LiveInsightState, count: number): string {
-    if (state === 'connecting') {
-        return 'connecting to active trace stream';
-    }
-    if (state === 'live') {
-        return `live stream connected; ${count} active event${count === 1 ? '' : 's'} appended in memory`;
-    }
-    if (state === 'disconnected') {
-        return `live stream disconnected; showing ${count} captured active event${count === 1 ? '' : 's'}`;
-    }
-    if (state === 'degraded') {
-        return 'live stream unavailable/degraded; stored trace flow still works';
-    }
-    if (state === 'error') {
-        return 'live stream error; stored trace flow still works';
-    }
-    return 'stored trace mode';
 }
 
 function buildActiveTrace(runId: string, events: TraceEvent[]): TraceData {
@@ -182,7 +162,9 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
     const [error, setError] = React.useState<string | null>(null);
     const [insight, setInsight] = React.useState(buildSwarmGraphInsight(null));
     const [liveRunId, setLiveRunId] = React.useState('');
-    const [liveState, setLiveState] = React.useState<LiveInsightState>('idle');
+    const [liveBaseUrl, setLiveBaseUrl] = React.useState('');
+    const [liveReason, setLiveReason] = React.useState<string | undefined>();
+    const [liveState, setLiveState] = React.useState<'idle' | 'connecting' | 'live' | 'disconnected' | 'degraded' | 'error'>('idle');
     const [liveEvents, setLiveEvents] = React.useState<TraceEvent[]>([]);
     const streamCancelled = React.useRef(false);
 
@@ -236,20 +218,33 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
 
     const connectLiveStream = React.useCallback(async () => {
         const runId = liveRunId.trim();
+        const baseUrl = liveBaseUrl.trim();
         if (!runId) {
             setLiveState('degraded');
+            setLiveReason('run ID is required for live stream probe');
+            return;
+        }
+        if (!baseUrl) {
+            setLiveState('disconnected');
+            setLiveReason('no Python web/SSE base URL configured');
             return;
         }
         streamCancelled.current = false;
         setLiveEvents([]);
         setLiveState('connecting');
+        setLiveReason(undefined);
         setError(null);
         try {
-            const stream = await arcService.streamActiveTrace({ runId, mode: 'live' });
-            setLiveState('live');
+            const stream = await arcService.streamActiveTrace({ runId, mode: 'live', baseUrl });
             for await (const chunk of stream) {
                 if (streamCancelled.current) {
                     return;
+                }
+                if (chunk.status?.message) {
+                    setLiveReason(chunk.status.message);
+                }
+                if (chunk.status?.state === 'connected') {
+                    setLiveState('live');
                 }
                 if (isTraceEvent(chunk.event)) {
                     setLiveEvents(current => {
@@ -260,6 +255,9 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
                 }
                 if (chunk.done) {
                     setLiveState('disconnected');
+                    if (chunk.status?.message) {
+                        setLiveReason(chunk.status.message);
+                    }
                     return;
                 }
             }
@@ -267,15 +265,19 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
         } catch (streamError) {
             if (!streamCancelled.current) {
                 setLiveState('error');
-                setError(errorMessage(streamError));
+                const message = errorMessage(streamError);
+                setLiveReason(message);
+                setError(message);
             }
         }
-    }, [arcService, liveRunId]);
+    }, [arcService, liveBaseUrl, liveRunId]);
 
     const disconnectLiveStream = React.useCallback(() => {
         streamCancelled.current = true;
         setLiveState(current => current === 'live' || current === 'connecting' ? 'disconnected' : current);
     }, []);
+
+    const liveStatus = buildLiveInsightStatus({ state: liveState, eventCount: liveEvents.length, baseUrl: liveBaseUrl, reason: liveReason });
 
     return (
         <div className='arc-studio-swarmgraph' role='region' aria-label='SwarmGraph insight panel'>
@@ -299,11 +301,13 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
             <div className='arc-studio-swarmgraph__live-controls'>
                 <label htmlFor='arc-swarmgraph-live-run'>Optional active run ID</label>
                 <input id='arc-swarmgraph-live-run' className='arc-studio-swarmgraph__input' value={liveRunId} onChange={event => setLiveRunId(event.currentTarget.value)} placeholder='run id for live/degraded stream probe' />
+                <label htmlFor='arc-swarmgraph-live-base-url'>Python web/SSE base URL</label>
+                <input id='arc-swarmgraph-live-base-url' className='arc-studio-swarmgraph__input' value={liveBaseUrl} onChange={event => setLiveBaseUrl(event.currentTarget.value)} placeholder='required for live attempt, e.g. http://127.0.0.1:8000' />
                 <button className='arc-studio-swarmgraph__button' onClick={connectLiveStream} disabled={liveState === 'connecting' || liveState === 'live'}>Connect live</button>
                 <button className='arc-studio-swarmgraph__button' onClick={disconnectLiveStream} disabled={liveState !== 'connecting' && liveState !== 'live'}>Disconnect</button>
             </div>
             <div className={`arc-studio-swarmgraph__live-status arc-studio-swarmgraph__live-status--${liveState}`}>
-                Live insight: {liveStateCopy(liveState, liveEvents.length)}. No real-live backend claim; disconnected/degraded states are expected when active stream wiring is unavailable.
+                Live insight: {liveStatus.text}. Base URL: {liveStatus.baseUrlConfigured ? 'configured' : 'not configured'}. No real-live backend claim; disconnected/degraded states are expected when active stream wiring is unavailable.
             </div>
             {error && <div className='arc-studio-swarmgraph__error' role='alert'>{error}</div>}
             {loadingTrace && <div className='arc-studio-swarmgraph__loading'>Loading trace...</div>}

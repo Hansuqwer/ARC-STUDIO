@@ -76,7 +76,7 @@ const TRUST_SENSITIVE_FLAGS = [
     'requires_network',
 ];
 
-const SAFE_CONFIG_KEYS = ['defaultRuntime', 'mode', 'isolation', 'allowPaidCalls', 'dryRun', 'routingMode'];
+const SAFE_CONFIG_KEYS = ['defaultRuntime', 'mode', 'isolation', 'allowPaidCalls', 'dryRun', 'routingMode', 'selectedProfile'];
 const UNSAFE_CONFIG_KEY_PATTERN = /(secret|token|password|api[_-]?key|raw.*key|credential)/i;
 
 function buildArcCliEnv(): NodeJS.ProcessEnv {
@@ -549,6 +549,7 @@ export class ArcBackendService implements ArcService {
         let providers: SafeProviderKeyStatus[] = [];
         let backendAvailable = true;
         let backendMessage: string | undefined;
+        let selectedProfile: string | undefined;
 
         try {
             const output = execFileSync('arc', ['providers', 'status', '--json'], {
@@ -602,6 +603,9 @@ export class ArcBackendService implements ArcService {
                     runtimeConfig.dryRun = data.providers.dry_run ?? runtimeConfig.dryRun;
                     runtimeConfig.routingMode = data.providers.routing_mode || runtimeConfig.routingMode;
                 }
+                if (data.profiles) {
+                    selectedProfile = data.profiles.selected_profile || data.profiles.selected || data.profiles.default;
+                }
                 if (data.workspace) {
                     trustStatus.trustLevel = data.workspace.trust_level || trustStatus.trustLevel;
                     trustStatus.trusted = trustStatus.trustLevel === 'trusted';
@@ -616,6 +620,7 @@ export class ArcBackendService implements ArcService {
             runtime: runtimeConfig,
             providers,
             mode: 'build',
+            selectedProfile,
             backendAvailable,
             backendMessage,
         };
@@ -661,6 +666,9 @@ export class ArcBackendService implements ArcService {
             }
             if (update.routingMode) {
                 args.push(`providers.routing_mode=${update.routingMode}`);
+            }
+            if (update.selectedProfile) {
+                args.push(`profiles.selected_profile=${update.selectedProfile}`);
             }
 
             execFileSync('arc', args, {
@@ -1383,12 +1391,15 @@ export class ArcBackendService implements ArcService {
             }
 
             if (request.mode === 'live') {
+                const baseUrlConfigured = Boolean(request.baseUrl?.trim());
                 yield this.activeTraceTerminalChunk(
                     request,
                     1,
                     'STREAM_END',
                     'disconnected',
-                    'Live SSE proxy is disconnected; use replay until Python web URL wiring is configured.'
+                    baseUrlConfigured
+                        ? 'Live SSE base URL configured, but Theia SSE proxy is not wired; use replay until web URL streaming is implemented.'
+                        : 'Live SSE proxy disconnected; no Python web/SSE base URL configured.'
                 );
                 return;
             }
@@ -1444,6 +1455,7 @@ export class ArcBackendService implements ArcService {
                 mode: request.mode,
                 state,
                 message,
+                baseUrlConfigured: Boolean(request.baseUrl?.trim()),
                 timestamp: new Date().toISOString(),
             },
             terminal,

@@ -7,6 +7,7 @@
 import * as React from '@theia/core/shared/react';
 import { useState, useEffect } from '@theia/core/shared/react';
 import { ArcService, ConfigStatus, RunPreflightResponse, RuntimeCapabilityReport } from '../../common/arc-protocol';
+import { validateExportTarget } from './export-target';
 
 const FALLBACK_RUNTIMES: Record<string, { label: string }> = {
     'swarmgraph': { label: 'SwarmGraph standalone' },
@@ -146,6 +147,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ arcService, onSendMessage, onN
     const showPaidCallWarning = Boolean(
         selectedCapability?.requires_paid_calls || preflight?.paidCallRequired || allowPaidCalls,
     );
+    const exportTarget = validateExportTarget(runtimeId);
 
     return (
         <div className='arc-studio-chat' role='region' aria-label='Chat panel'>
@@ -198,6 +200,11 @@ export const ChatTab: React.FC<ChatTabProps> = ({ arcService, onSendMessage, onN
                     <div className='arc-studio-chat__runtime-policy' aria-live='polite'>
                         Profile: {profileId} | Isolation: {isolationId} | Dry-run providerCall:false
                     </div>
+                    {exportTarget.envName && (
+                        <div className={`arc-studio-chat__export-target arc-studio-chat__export-target--${exportTarget.status}`} aria-live='polite'>
+                            Export target: {exportTarget.message} {exportTarget.valid ? '' : exportTarget.remediation}
+                        </div>
+                    )}
                     {showPaidCallWarning && (
                         <div className='arc-studio-chat__paid-call-warning' role='alert'>
                             Paid provider calls require explicit opt-in. Dry-run preflight makes no provider calls (providerCall:false).

@@ -402,6 +402,68 @@ class TestLangGraphRunner:
         assert "SWARMGRAPH_COST" not in [event_type for event_type, data in events]
 
     @pytest.mark.asyncio
+    async def test_runner_emits_swarmgraph_cost_from_measured_metadata_only(self):
+        from agent_runtime_cockpit.adoption.langgraph_runner import (
+            LangGraphAdoptionRunner,
+        )
+
+        events: list[tuple[str, dict]] = []
+        await LangGraphAdoptionRunner().run(
+            AdoptionSpec(
+                mode=AdoptionMode.LANGGRAPH,
+                runtime_config={
+                    "offline": True,
+                    "fake": True,
+                    "prompt": "cost metadata",
+                    "measured_cost": {
+                        "measured": True,
+                        "total_cost": 0.025,
+                        "total_tokens": 2500,
+                        "currency": "USD",
+                        "provider": "test-provider",
+                        "items": [{"tokens": 2500, "cost": 0.025}],
+                    },
+                },
+            ),
+            "lg-sg-measured-cost",
+            lambda run_id, event_type, data: events.append((event_type, data)),
+        )
+
+        cost_events = [data for event_type, data in events if event_type == "SWARMGRAPH_COST"]
+        assert cost_events == [{
+            "runtime": "langgraph+swarmgraph",
+            "measured": True,
+            "totalCost": 0.025,
+            "totalTokens": 2500,
+            "currency": "USD",
+            "provider": "test-provider",
+            "items": [{"tokens": 2500, "cost": 0.025}],
+        }]
+
+    @pytest.mark.asyncio
+    async def test_runner_ignores_unmeasured_swarmgraph_cost_metadata(self):
+        from agent_runtime_cockpit.adoption.langgraph_runner import (
+            LangGraphAdoptionRunner,
+        )
+
+        events: list[tuple[str, dict]] = []
+        await LangGraphAdoptionRunner().run(
+            AdoptionSpec(
+                mode=AdoptionMode.LANGGRAPH,
+                runtime_config={
+                    "offline": True,
+                    "fake": True,
+                    "prompt": "cost metadata",
+                    "measured_cost": {"total_cost": 0.025, "total_tokens": 2500},
+                },
+            ),
+            "lg-sg-unmeasured-cost",
+            lambda run_id, event_type, data: events.append((event_type, data)),
+        )
+
+        assert "SWARMGRAPH_COST" not in [event_type for event_type, data in events]
+
+    @pytest.mark.asyncio
     async def test_runner_offline_fake_branch_is_deterministic(self):
         from agent_runtime_cockpit.adoption.langgraph_runner import (
             LangGraphAdoptionRunner,

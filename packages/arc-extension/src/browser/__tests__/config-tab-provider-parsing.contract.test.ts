@@ -70,7 +70,7 @@ describe('ConfigTab provider telemetry parsing contract', () => {
         expect(source).toMatch(/no provider network calls/);
         expect(source).toMatch(/No provider network, no live API, no billing action/);
         expect(source).toMatch(/arc-studio-config__cost-policy-summary/);
-        expect(source).toMatch(/Paid\/live provider calls require explicit opt-in/);
+        expect(source).toMatch(/Paid\/live provider calls require explicit future backend gates/);
     });
 
     it('requires exact confirmation phrase before local quota reset can run', () => {

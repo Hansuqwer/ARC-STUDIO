@@ -152,7 +152,10 @@ describe('provider telemetry helpers', () => {
         ).toEqual({
             state: 'blocked',
             reasons: ['dry-run is enabled; live provider calls are hard-blocked'],
-            cta: 'safe: disable dry-run before live provider preview can proceed',
+            cta: 'safe: disable dry-run before local live-readiness preview can proceed',
+            enforcement: 'future backend enforcement; UI is preview/offline scaffold only',
+            message:
+                'Local quota/cost preview only; blocked by dry-run is enabled; live provider calls are hard-blocked.',
             providerCall: false,
         });
     });
@@ -183,8 +186,19 @@ describe('provider telemetry helpers', () => {
         ).toEqual({
             state: 'ready',
             reasons: [],
-            cta: 'current profile: preview ready; provider call remains disabled here',
+            cta: 'current profile: local preview ready; provider execution remains disabled here',
+            enforcement: 'future backend enforcement; UI is preview/offline scaffold only',
+            message: 'Local quota/cost preview only; no provider execution is enabled by this state.',
             providerCall: false,
         });
+    });
+
+    it('keeps ready-state text explicitly local and non-enabling', () => {
+        const gate = buildLiveProviderGate({ dryRun: false, allowPaidCalls: true, liveTestsEnabled: true });
+
+        expect(gate.providerCall).toBe(false);
+        expect(gate.cta).toContain('provider execution remains disabled');
+        expect(gate.message).toContain('no provider execution is enabled');
+        expect(gate.enforcement).toContain('future backend enforcement');
     });
 });

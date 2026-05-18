@@ -48,6 +48,8 @@ export interface LiveProviderGateState {
     state: 'blocked' | 'gated' | 'ready';
     reasons: string[];
     cta: string;
+    enforcement: string;
+    message: string;
     providerCall: false;
 }
 
@@ -165,12 +167,16 @@ export function buildLiveProviderGate(input: LiveProviderGateInput): LiveProvide
     const state = input.dryRun ? 'blocked' : reasons.length > 0 ? 'gated' : 'ready';
     const cta =
         state === 'ready'
-            ? `${name}: preview ready; provider call remains disabled here`
+            ? `${name}: local preview ready; provider execution remains disabled here`
             : state === 'blocked'
-              ? `${name}: disable dry-run before live provider preview can proceed`
-              : `${name}: satisfy all gates before live provider preview can proceed`;
+              ? `${name}: disable dry-run before local live-readiness preview can proceed`
+              : `${name}: satisfy all gates before local live-readiness preview can proceed`;
+    const message = reasons.length > 0
+        ? `Local quota/cost preview only; blocked by ${reasons.join('; ')}.`
+        : 'Local quota/cost preview only; no provider execution is enabled by this state.';
+    const enforcement = 'future backend enforcement; UI is preview/offline scaffold only';
 
-    return { state, reasons, cta, providerCall: false };
+    return { state, reasons, cta, enforcement, message, providerCall: false };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
