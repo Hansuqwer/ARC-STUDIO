@@ -219,6 +219,14 @@ describe('Studio Tabs Contracts', () => {
             expect(source).not.toMatch(/arc-core/);
         });
 
+        it('should label replay results as replay only, not live', () => {
+            expect(source).toMatch(/arc-studio-runs__replay/);
+            expect(source).toMatch(/Replay Events/);
+            expect(source).toMatch(/events replayed/);
+            expect(source).not.toMatch(/streamActiveTrace/);
+            expect(source).not.toMatch(/live events replayed|replayed live events/i);
+        });
+
         it('should render receipt card conditionally', () => {
             expect(source).toMatch(/receipt\s*&&\s*\(/);
             expect(source).toMatch(/<RunReceiptCard/);
@@ -802,6 +810,20 @@ describe('Studio Tabs Contracts', () => {
             expect(insightSource).toMatch(/Live insight:/);
             expect(insightSource).toMatch(/disconnected\/degraded/);
             expect(insightSource).toMatch(/Live mode is a limited Python SSE probe/);
+        });
+
+        it('should keep replay trace insight distinct from active live stream insight', () => {
+            expect(insightSource).toMatch(/type InsightSource = 'stored-trace' \| 'live-stream'/);
+            expect(insightSource).toMatch(/arcService\.readTrace\(selectedTraceId\)/);
+            expect(insightSource).toMatch(/setInsight\(buildSwarmGraphInsight\(trace\)\)/);
+            expect(insightSource).toMatch(/setInsightSource\('stored-trace'\)/);
+            expect(insightSource).toMatch(/setLiveEvents\(\[\]\)/);
+            expect(insightSource).toMatch(/setInsightSource\('live-stream'\)/);
+            expect(insightSource).toMatch(/setInsight\(buildSwarmGraphInsight\(buildActiveTrace\(runId, next\)\)\)/);
+            expect(insightSource).toMatch(/Insight source: stored trace replay\/read; not live\./);
+            expect(insightSource).toMatch(/Insight source: live Python SSE events captured in memory/);
+            expect(insightSource).toMatch(/setLiveState\('disconnected'\)/);
+            expect(insightSource).not.toMatch(/stored[- ]trace replay as live/i);
         });
     });
 });

@@ -981,7 +981,7 @@ export type ActiveTraceStreamState =
 export interface ActiveTraceStreamRequest {
     runId: string;
     mode: ActiveTraceStreamMode;
-    /** Python web/SSE base URL. Live mode streams /api/runs/{runId}/events when supplied. */
+    /** Python web/SSE base URL. Live mode streams /api/runs/{runId}/events; backend may use configured daemon URL when omitted. */
     baseUrl?: string;
     /** Max stream lifetime in milliseconds. Defaults to backend-safe timeout. */
     timeoutMs?: number;

@@ -21,6 +21,7 @@ log = logging.getLogger(__name__)
 HEARTBEAT_INTERVAL = 15.0
 QUEUE_MAX_SIZE = 1000
 TERMINAL_EVENT_TYPES = {"RUN_COMPLETED", "RUN_FAILED", "RUN_CANCELLED"}
+DEGRADED_EVENT_TYPE = "STREAM_DEGRADED"
 
 
 class EventBroker:
@@ -34,6 +35,19 @@ class EventBroker:
         self.store = store
         self._subscribers: dict[str, list[asyncio.Queue[Optional[dict[str, Any]]]]] = {}
         self._event_ids: dict[str, int] = {}
+        self._active_runs: set[str] = set()
+
+    def mark_active(self, run_id: str) -> None:
+        """Mark a run as actively publishing live events."""
+        self._active_runs.add(run_id)
+
+    def mark_inactive(self, run_id: str) -> None:
+        """Mark a run as no longer actively publishing live events."""
+        self._active_runs.discard(run_id)
+
+    def is_active(self, run_id: str) -> bool:
+        """Return whether this broker has a live producer for the run."""
+        return run_id in self._active_runs
 
     def publish(self, run_id: str, event: dict[str, Any]) -> int:
         """Publish an event to all subscribers of a run. Returns event ID."""
@@ -66,8 +80,20 @@ class EventBroker:
 
     def end_run(self, run_id: str) -> None:
         """Signal end of run to all subscribers."""
+        self.mark_inactive(run_id)
         for queue in self._subscribers.pop(run_id, []):
             queue.put_nowait(None)
+
+    def degraded_event(self, run_id: str, reason: str) -> dict[str, Any]:
+        """Create a structured degraded/disconnected live-stream event."""
+        return {
+            "type": DEGRADED_EVENT_TYPE,
+            "run_id": run_id,
+            "data": {
+                "state": "disconnected",
+                "reason": reason,
+            },
+        }
 
     async def stream_live(
         self, run_id: str, last_event_id: int = 0,

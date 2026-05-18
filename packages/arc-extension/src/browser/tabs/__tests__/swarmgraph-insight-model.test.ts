@@ -210,4 +210,11 @@ describe('buildLiveInsightStatus', () => {
         expect(buildLiveInsightStatus({ state: 'idle', eventCount: 0 }).text)
             .toBe('stored trace mode; live requires a configured Python web/SSE base URL');
     });
+
+    it('does not label disconnected captured events as currently live', () => {
+        expect(buildLiveInsightStatus({ state: 'disconnected', eventCount: 2, baseUrl: 'http://127.0.0.1:8000' }).text)
+            .toBe('live stream disconnected; showing 2 previously captured active events from the prior live stream attempt');
+        expect(buildLiveInsightStatus({ state: 'disconnected', eventCount: 0, baseUrl: 'http://127.0.0.1:8000' }).text)
+            .toBe('live stream disconnected; no active events captured');
+    });
 });

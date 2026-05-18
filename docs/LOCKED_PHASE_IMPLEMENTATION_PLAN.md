@@ -268,6 +268,7 @@ Every new phase/chunk should include:
 
 ### Phase 8 — Live Stream Productization
 
+- Status: Baseline Complete — configured Python daemon/local live stream wiring is implemented for IDE `streamActiveTrace()` via explicit/requested base URL or `ARC_PYTHON_DAEMON_URL`, with local live terminal/degraded handling and replay-not-live UI copy/tests. Evidence: local Phase 8 verification on `bec8d4b` worktree (`python` web SSE tests, arc-extension tests/build, browser build/e2e, `scripts/check-pr.sh`). This proves configured local daemon/stub runtime streaming only, not broad runtime/provider-backed live streaming.
 - Wire Theia live mode to configured Python daemon/local runtime stream beyond deterministic `/api/sse-proof`.
 - Preserve live/replay/disconnected distinctions; do not label replay as live.
 - Add/refresh tests proving configured local stream behavior without provider calls.

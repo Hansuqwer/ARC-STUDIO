@@ -23,7 +23,7 @@ from ..orchestration.cross_linker import CrossLinker
 from ..orchestration.event_broker import EventBroker
 from ..protocol.envelope import ok, err
 from ..protocol.errors import ArcErrorCode
-from ..protocol.schemas import WorkspaceInfo
+from ..protocol.schemas import RunStatus, WorkspaceInfo
 from ..security.validation import validate_workspace_path
 from ..security.redaction import Redactor
 from ..storage.jsonl import JsonlTraceStore
@@ -407,6 +407,35 @@ async def run_events_sse(request: web.Request) -> web.StreamResponse:
     mode = request.query.get("mode", "replay")
     if mode == "live":
         broker = request.app.setdefault(EVENT_BROKER_KEY, EventBroker(_trace_store(request)))
+        run_id = request.match_info["run_id"]
+        run = _trace_store(request).load(run_id)
+        if run and run.status not in {RunStatus.PENDING, RunStatus.RUNNING}:
+            response = web.StreamResponse(headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "Access-Control-Allow-Origin": _cors_origin(),
+            })
+            await response.prepare(request)
+            for event in run.events:
+                event_data = event.model_dump()
+                await response.write(
+                    f"event: {event_data.get('type', 'message')}\n"
+                    f"data: {json.dumps(event_data, default=str)}\n\n"
+                    .encode()
+                )
+            await response.write(b"event: stream_end\ndata: {\"type\": \"STREAM_END\", \"mode\": \"live\"}\n\n")
+            return response
+        if run and not broker.is_active(run_id):
+            response = web.StreamResponse(headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "Access-Control-Allow-Origin": _cors_origin(),
+            })
+            await response.prepare(request)
+            event = broker.degraded_event(run_id, "no_active_local_producer")
+            await response.write(f"event: {event['type']}\ndata: {json.dumps(event, default=str)}\n\n".encode())
+            await response.write(b"event: stream_end\ndata: {\"type\": \"STREAM_END\", \"mode\": \"live\", \"degraded\": true}\n\n")
+            return response
         return await broker.sse_handler(request)
 
     run_id = request.match_info["run_id"]

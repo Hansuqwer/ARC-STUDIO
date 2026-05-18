@@ -20,6 +20,8 @@ export interface SwarmGraphInsightTabProps {
     arcService: ArcService;
 }
 
+type InsightSource = 'stored-trace' | 'live-stream';
+
 function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
@@ -171,6 +173,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
     const [liveReason, setLiveReason] = React.useState<string | undefined>();
     const [liveState, setLiveState] = React.useState<'idle' | 'connecting' | 'live' | 'disconnected' | 'degraded' | 'error'>('idle');
     const [liveEvents, setLiveEvents] = React.useState<TraceEvent[]>([]);
+    const [insightSource, setInsightSource] = React.useState<InsightSource>('stored-trace');
     const streamCancelled = React.useRef(false);
 
     const loadTraces = React.useCallback(async () => {
@@ -203,6 +206,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
             .then(trace => {
                 if (!cancelled) {
                     setInsight(buildSwarmGraphInsight(trace));
+                    setInsightSource('stored-trace');
                 }
             })
             .catch(readError => {
@@ -237,6 +241,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
         }
         streamCancelled.current = false;
         setLiveEvents([]);
+        setInsightSource('live-stream');
         setLiveState('connecting');
         setLiveReason(undefined);
         setError(null);
@@ -256,6 +261,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
                     setLiveEvents(current => {
                         const next = [...current, chunk.event as TraceEvent];
                         setInsight(buildSwarmGraphInsight(buildActiveTrace(runId, next)));
+                        setInsightSource('live-stream');
                         return next;
                     });
                 }
@@ -284,6 +290,9 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
     }, []);
 
     const liveStatus = buildLiveInsightStatus({ state: liveState, eventCount: liveEvents.length, baseUrl: liveBaseUrl, reason: liveReason });
+    const insightSourceText = insightSource === 'live-stream'
+        ? 'Insight source: live Python SSE events captured in memory for this active stream attempt.'
+        : 'Insight source: stored trace replay/read; not live.';
 
     return (
         <div className='arc-studio-swarmgraph' role='region' aria-label='SwarmGraph insight panel'>
@@ -317,6 +326,9 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
             </div>
             <div className={`arc-studio-swarmgraph__live-status arc-studio-swarmgraph__live-status--${liveState}`}>
                 Live insight: {liveStatus.text}. Base URL: {liveStatus.baseUrlConfigured ? 'configured' : 'not configured'}. Live mode is a limited Python SSE probe; disconnected/degraded states mean no active stream is reachable.
+            </div>
+            <div className={`arc-studio-swarmgraph__source arc-studio-swarmgraph__source--${insightSource}`}>
+                {insightSourceText}
             </div>
             {error && <div className='arc-studio-swarmgraph__error' role='alert'>{error}</div>}
             {loadingTrace && <div className='arc-studio-swarmgraph__loading'>Loading trace...</div>}

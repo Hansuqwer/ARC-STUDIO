@@ -1399,4 +1399,79 @@ graph = builder.compile(checkpointer=MemorySaver())
             expect(result!.runtime).toBe('swarmgraph');
         });
     });
+
+    describe('streamActiveTrace live daemon proxy', () => {
+        const originalFetch = global.fetch;
+        const originalDaemonUrl = process.env.ARC_PYTHON_DAEMON_URL;
+
+        afterEach(() => {
+            global.fetch = originalFetch;
+            if (originalDaemonUrl === undefined) {
+                delete process.env.ARC_PYTHON_DAEMON_URL;
+            } else {
+                process.env.ARC_PYTHON_DAEMON_URL = originalDaemonUrl;
+            }
+        });
+
+        async function collectActiveTrace(runId = 'run_live_test') {
+            const iterable = await service.streamActiveTrace({ runId, mode: 'live', timeoutMs: 1000 });
+            const chunks = [];
+            for await (const chunk of iterable) {
+                chunks.push(chunk);
+                if (chunk.done) break;
+            }
+            return chunks;
+        }
+
+        it('should use configured Python daemon URL for live SSE', async () => {
+            process.env.ARC_PYTHON_DAEMON_URL = 'http://127.0.0.1:8765';
+            let requestedUrl = '';
+            global.fetch = jest.fn(async (url: Parameters<typeof fetch>[0]) => {
+                requestedUrl = url.toString();
+                const body = new ReadableStream({
+                    start(controller) {
+                        controller.enqueue(new TextEncoder().encode('data: {"type":"RUN_COMPLETED"}\n\n'));
+                        controller.close();
+                    },
+                });
+                return { ok: true, status: 200, body } as Response;
+            });
+
+            const chunks = await collectActiveTrace();
+
+            expect(requestedUrl).toBe('http://127.0.0.1:8765/api/runs/run_live_test/events?mode=live');
+            expect(chunks.some(chunk => chunk.status?.state === 'connected')).toBe(true);
+            expect(chunks[chunks.length - 1]).toMatchObject({ terminal: 'RUN_COMPLETED', done: true });
+        });
+
+        it('should reject unsafe configured daemon URL', async () => {
+            process.env.ARC_PYTHON_DAEMON_URL = 'file:///tmp/arc.sock';
+            global.fetch = jest.fn();
+
+            const chunks = await collectActiveTrace();
+
+            expect(global.fetch).not.toHaveBeenCalled();
+            expect(chunks[chunks.length - 1]).toMatchObject({
+                terminal: 'STREAM_END',
+                done: true,
+                status: { state: 'error', message: 'Invalid Python web/SSE base URL.' },
+            });
+        });
+
+        it('should emit disconnected degraded state when daemon fetch fails', async () => {
+            process.env.ARC_PYTHON_DAEMON_URL = 'http://127.0.0.1:8765';
+            global.fetch = jest.fn(async () => {
+                throw new Error('ECONNREFUSED');
+            });
+
+            const chunks = await collectActiveTrace();
+
+            expect(chunks[chunks.length - 1]).toMatchObject({
+                terminal: 'STREAM_END',
+                done: true,
+                status: { state: 'disconnected' },
+            });
+            expect(chunks[chunks.length - 1]?.status?.message).toContain('Live SSE proxy degraded; ECONNREFUSED');
+        });
+    });
 });

@@ -77,7 +77,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 
 **Goal:** Active runs stream events into IDE views while running, not only replay stored traces.
 
-**Current:** Complete Phase 1 vertical baseline. Python SSE supports active/replay modes and terminal/disconnected semantics; Theia exposes a typed `streamActiveTrace()` proxy; Event Stream and Run Timeline distinguish live/replay/disconnected states; `/api/sse-proof` has deterministic e2e coverage for live stub `RUN_STARTED` + terminal delivery.
+**Current:** Complete Phase 1 vertical baseline plus Phase 8 local daemon productization baseline. Python SSE supports active/replay modes and terminal/disconnected semantics; Theia exposes a typed `streamActiveTrace()` proxy that can use an explicit/requested Python web base URL or `ARC_PYTHON_DAEMON_URL`; Event Stream/SwarmGraph Insight surfaces distinguish live/replay/disconnected states; `/api/sse-proof` has deterministic limited-local coverage only and is not evidence of broad runtime live streaming.
 
 **Deliverables:**
 - Python active run stream endpoint or command path backed by `EventBroker`/`JobSupervisor`.
@@ -90,7 +90,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 - E2E launches or connects to a stub live stream and observes at least `RUN_STARTED` and terminal event live.
 - Docs distinguish broker-backed active stream, deterministic SSE proof stub, and stored-trace replay.
 
-**Status:** Complete for the v0.1 vertical baseline. Remaining enhancements belong to later runtime/productization work, especially wiring Theia live mode to a configured Python web base URL for real in-flight runtime streams beyond the deterministic stub path.
+**Status:** Baseline Complete for configured local daemon/stub runtime live streaming. Evidence: local Phase 8 verification on `bec8d4b` worktree (`python` web SSE tests, arc-extension tests/build, browser build/e2e, `scripts/check-pr.sh`). Notes: IDE live mode can connect to configured Python daemon/local runtime streams and handles terminal/degraded states while preserving replay-not-live copy; this is not a broad runtime/provider-backed live-streaming claim.
 
 ## R2 — IDE Runtime Setup + Config Wizard
 
@@ -210,7 +210,7 @@ v0.2 product work is scoped to IDE productization of existing/gated capabilities
 
 ### v0.2 Scope
 
-- Complete live-stream productization by wiring Theia live mode to a configured Python daemon/local runtime stream beyond the deterministic SSE proof stub. Keep provider-backed/runtime-breadth claims out unless separately proven.
+- Live-stream productization baseline is complete for configured Python daemon/local runtime streams beyond the deterministic SSE proof stub. Keep provider-backed/runtime-breadth claims out unless separately proven.
 - Add BudgetVector post-hoc accounting/reporting and IDE gauges from trace/metadata where data exists. Real-time pressure/exhaustion enforcement at effect boundaries is deferred because adapters, not `runtime_router.py`, observe most effect boundaries.
 - Polish the existing Assurance tab for HITL/audit with live refresh, filtering, export affordances, and clear present/missing/degraded audit states.
 - Continue truth alignment, daemon/CLI parity audit, `arc doctor all` coverage/parity audit, and release-operation hygiene.

@@ -522,7 +522,10 @@ describe('Backend Service Extensions (Session B + B7)', () => {
             expect(source).toMatch(/async cancelActiveTraceStream\(runId:\s*string\)/);
             expect(source).toMatch(/createActiveTraceIterable/);
             expect(source).toMatch(/this\.replayRun\(request\.runId\)/);
+            expect(source).toMatch(/ARC_PYTHON_DAEMON_URL/);
+            expect(source).toMatch(/resolvePythonDaemonBaseUrl/);
             expect(source).toMatch(/Live SSE proxy disconnected; no Python web\/SSE base URL configured/);
+            expect(source).toMatch(/Live SSE proxy degraded/);
             expect(source).toMatch(/RUN_CANCELLED/);
             expect(source).toMatch(/Stream timed out/);
         });

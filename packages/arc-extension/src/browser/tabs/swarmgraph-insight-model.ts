@@ -85,7 +85,9 @@ export function buildLiveInsightStatus(input: LiveInsightStatusInput): LiveInsig
     } else if (input.state === 'live') {
         text = `live stream connected to configured Python SSE endpoint; ${count} active event${count === 1 ? '' : 's'} appended in memory`;
     } else if (input.state === 'disconnected') {
-        text = `live stream disconnected; showing ${count} captured active event${count === 1 ? '' : 's'}`;
+        text = count > 0
+            ? `live stream disconnected; showing ${count} previously captured active event${count === 1 ? '' : 's'} from the prior live stream attempt`
+            : 'live stream disconnected; no active events captured';
     } else if (input.state === 'degraded') {
         text = 'live stream unavailable/degraded; stored trace flow still works';
     } else if (input.state === 'error') {

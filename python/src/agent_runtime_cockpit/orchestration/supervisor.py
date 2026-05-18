@@ -130,6 +130,7 @@ class JobSupervisor:
         self.store.save(run)
         active = ActiveRun(run_id=run_id)
         self._active_runs[run_id] = active
+        self.broker.mark_active(run_id)
         task = asyncio.create_task(
             self._execute_run(run_id, request, executor_fn),
             name=f"run-{run_id}",

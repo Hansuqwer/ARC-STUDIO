@@ -164,7 +164,7 @@ test.describe('ARC Python CLI — Integration', () => {
     }
   });
 
-  test('SSE proof stream emits live RUN_STARTED and terminal event', async ({ request }) => {
+  test('SSE proof stream emits limited local RUN_STARTED and terminal event', async ({ request }) => {
     const response = await request
       .get(`${APP_URL}/api/sse-proof?event_delay=0&heartbeat_interval=0&heartbeat_count=0`, {
         timeout: 15000,
@@ -184,5 +184,25 @@ test.describe('ARC Python CLI — Integration', () => {
     const eventTypes = parseServerSentEventTypes(await response.text());
     expect(eventTypes).toContain('RUN_STARTED');
     expect(eventTypes.some((type) => TERMINAL_EVENTS.has(type))).toBe(true);
+  });
+
+  test('SSE proof remains a local deterministic stream only', async ({ request }) => {
+    const response = await request
+      .get(`${APP_URL}/api/sse-proof?event_delay=0&heartbeat_interval=0&heartbeat_count=0`, {
+        timeout: 15000,
+      })
+      .catch((e) => {
+        test.skip(true, `Python server not available: ${e}`);
+        throw e;
+      });
+
+    if (response.status() === 404) {
+      test.skip(true, 'Python SSE proof endpoint not available');
+    }
+
+    expect(response.ok()).toBe(true);
+    const body = await response.text();
+    expect(body).toContain('RUN_STARTED');
+    expect(body).not.toMatch(/provider|paid|api[_-]?key|broad runtime/i);
   });
 });

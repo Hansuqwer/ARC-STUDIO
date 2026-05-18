@@ -69,6 +69,7 @@ import { WorkflowDetector } from './services/workflow-detector';
 import { FileManager } from './services/file-manager';
 
 const ARC_CLI_ENV_ALLOWLIST = ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR'];
+const ARC_PYTHON_DAEMON_URL_ENV = 'ARC_PYTHON_DAEMON_URL';
 
 const TRUST_SENSITIVE_FLAGS = [
     'can_run',
@@ -1541,7 +1542,7 @@ export class ArcBackendService implements ArcService {
         timeoutMs: number,
         startedAt: number
     ): AsyncIterable<ActiveTraceEventChunk> {
-        const baseUrl = request.baseUrl?.trim();
+        const baseUrl = this.resolvePythonDaemonBaseUrl(request);
         if (!baseUrl) {
             yield this.activeTraceTerminalChunk(
                 request,
@@ -1555,17 +1556,9 @@ export class ArcBackendService implements ArcService {
 
         let streamUrl: URL;
         try {
-            streamUrl = new URL(`/api/runs/${encodeURIComponent(request.runId)}/events`, baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`);
-        } catch {
+            streamUrl = this.buildPythonDaemonStreamUrl(baseUrl, request.runId);
+        } catch (error) {
             yield this.activeTraceTerminalChunk(request, 1, 'STREAM_END', 'error', 'Invalid Python web/SSE base URL.');
-            return;
-        }
-        if (streamUrl.protocol !== 'http:' && streamUrl.protocol !== 'https:') {
-            yield this.activeTraceTerminalChunk(request, 1, 'STREAM_END', 'error', 'Python web/SSE base URL must use http or https.');
-            return;
-        }
-        if (streamUrl.username || streamUrl.password) {
-            yield this.activeTraceTerminalChunk(request, 1, 'STREAM_END', 'error', 'Python web/SSE base URL must not include credentials.');
             return;
         }
         streamUrl.searchParams.set('mode', 'live');
@@ -1580,7 +1573,7 @@ export class ArcBackendService implements ArcService {
                 signal: controller.signal,
             });
             if (!response.ok || !response.body) {
-                yield this.activeTraceTerminalChunk(request, sequence, 'STREAM_END', 'error', `Live SSE request failed with HTTP ${response.status}.`);
+                yield this.activeTraceTerminalChunk(request, sequence, 'STREAM_END', 'disconnected', `Live SSE proxy degraded; Python daemon returned HTTP ${response.status}.`);
                 return;
             }
             yield {
@@ -1631,11 +1624,26 @@ export class ArcBackendService implements ArcService {
                 cancelToken.cancelled ? 'Stream cancelled.' : 'Live SSE stream disconnected.'
             );
         } catch (error) {
-            yield this.activeTraceTerminalChunk(request, sequence, 'STREAM_END', 'error', error instanceof Error ? error.message : 'Unknown live SSE error');
+            yield this.activeTraceTerminalChunk(request, sequence, 'STREAM_END', 'disconnected', `Live SSE proxy degraded; ${error instanceof Error ? error.message : 'Unknown live SSE error'}`);
         } finally {
             clearTimeout(timeout);
             controller.abort();
         }
+    }
+
+    private resolvePythonDaemonBaseUrl(request: ActiveTraceStreamRequest): string | undefined {
+        return request.baseUrl?.trim() || process.env[ARC_PYTHON_DAEMON_URL_ENV]?.trim() || undefined;
+    }
+
+    private buildPythonDaemonStreamUrl(baseUrl: string, runId: string): URL {
+        const parsedBaseUrl = new URL(baseUrl);
+        if (parsedBaseUrl.protocol !== 'http:' && parsedBaseUrl.protocol !== 'https:') {
+            throw new Error('Python web/SSE base URL must use http or https.');
+        }
+        if (parsedBaseUrl.username || parsedBaseUrl.password) {
+            throw new Error('Python web/SSE base URL must not include credentials.');
+        }
+        return new URL(`/api/runs/${encodeURIComponent(runId)}/events`, parsedBaseUrl.href.endsWith('/') ? parsedBaseUrl.href : `${parsedBaseUrl.href}/`);
     }
 
     private parseSseEvent(frame: string): Record<string, unknown> | undefined {
