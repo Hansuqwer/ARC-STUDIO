@@ -187,6 +187,8 @@ class CrewAISwarmGraphFakeAdapter(RuntimeAdapter):
 
 
 class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
+    LOCAL_REAL_GATE_ENVS = ("ARC_REAL_RUNTIME_SMOKE", "ARC_LANGGRAPH_SWARMGRAPH_REAL")
+
     @property
     def adapter_id(self) -> str:
         return "langgraph+swarmgraph"
@@ -202,13 +204,14 @@ class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
         return True, 1.0, ["fake/offline deterministic adoption adapter"]
 
     def capability_report(self, workspace: Path) -> CapabilityReport:
-        local_real_enabled = os.environ.get("ARC_LANGGRAPH_SWARMGRAPH_REAL") == "1"
+        missing_local_real_env = [env for env in self.LOCAL_REAL_GATE_ENVS if os.environ.get(env) != "1"]
+        local_real_enabled = not missing_local_real_env
         reason = (
             "fake/offline deterministic path plus gated local-real LangGraph + vendored SwarmGraph path; "
             "no provider-backed claim; no paid calls"
             if local_real_enabled
             else "fake/offline deterministic LangGraph + SwarmGraph path; no provider calls; "
-            "gated local-real path requires ARC_LANGGRAPH_SWARMGRAPH_REAL=1"
+            "gated local-real path requires ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1"
         )
         return CapabilityReport(
             runtime_id=self.adapter_id,
@@ -218,9 +221,9 @@ class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
             reason=reason,
             detected_artifacts=[
                 "fake/offline deterministic adoption adapter",
-                *(["local-real gate ARC_LANGGRAPH_SWARMGRAPH_REAL=1"] if local_real_enabled else []),
+                *(["local-real gates ARC_REAL_RUNTIME_SMOKE=1 + ARC_LANGGRAPH_SWARMGRAPH_REAL=1"] if local_real_enabled else []),
             ],
-            required_env=[] if local_real_enabled else ["ARC_LANGGRAPH_SWARMGRAPH_REAL"],
+            required_env=missing_local_real_env,
             requires_paid_calls=False,
             test_level="gated_local_real" if local_real_enabled else "fake_offline",
             fake_offline_supported=True,
@@ -238,8 +241,13 @@ class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
                 "provider-backed real mode is not claimed"
             )
         local_real = mode == "local-real"
-        if local_real and os.environ.get("ARC_LANGGRAPH_SWARMGRAPH_REAL") != "1":
-            raise RuntimeNotRunnable("LangGraph + SwarmGraph local-real mode requires ARC_LANGGRAPH_SWARMGRAPH_REAL=1")
+        missing_local_real_env = [env for env in self.LOCAL_REAL_GATE_ENVS if os.environ.get(env) != "1"]
+        if local_real and missing_local_real_env:
+            raise RuntimeNotRunnable(
+                "LangGraph + SwarmGraph local-real mode requires "
+                "ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1; "
+                "no provider calls were made"
+            )
         runner = AdoptionRegistry.get(AdoptionMode.LANGGRAPH)
         if runner is None:
             raise RuntimeNotRunnable("LangGraph adoption runner is not registered")
@@ -288,7 +296,7 @@ class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
                 "real_path_absent_reason": (
                     "local-real uses local LangGraph plus vendored SwarmGraph only; no provider-backed claim"
                     if local_real
-                    else "fake/offline deterministic; local-real requires ARC_LANGGRAPH_SWARMGRAPH_REAL=1"
+                    else "fake/offline deterministic; local-real requires ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1"
                 ),
                 "audit_path": None,
                 "audit_absent_reason": "fake/offline adoption run does not create SwarmGraph HMAC audit records",

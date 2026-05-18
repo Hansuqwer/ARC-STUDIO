@@ -108,7 +108,7 @@
 
 **Goal:** Turn fake-tested/gated adoption runners into narrow, honest, real product paths.
 
-**Current:** Adoption protocol/runners exist. `crewai+swarmgraph` and `langgraph+swarmgraph` fake/offline CLI paths are routed for deterministic product use. `langgraph+swarmgraph` also has a narrow local-real path that now requires both explicit `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` gates. It is non-provider-backed, performs no paid/live provider calls, and is not claimed as product-ready. Provider-backed LangGraph + SwarmGraph adoption remains gated and not claimed.
+**Current:** Adoption protocol/runners exist. `crewai+swarmgraph` and `langgraph+swarmgraph` fake/offline CLI paths are routed for deterministic product use. `langgraph+swarmgraph` also has a narrow local-real path that now requires both explicit `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` gates across router/capability/preflight/runner surfaces. It is non-provider-backed, performs no paid/live provider calls, and is not claimed as product-ready. Provider-backed LangGraph + SwarmGraph adoption remains gated and not claimed.
 
 **Deliverables:**
 - Pick one first real target (`LangGraph + SwarmGraph` recommended).
@@ -147,5 +147,5 @@
 | R3 Provider/Quota UI | Partial | Keep provider calls offline/gated by default; backend cost enforcement is in place; future work is any real provider execution path, not implemented unless explicitly reprioritized and protected by opt-in |
 | R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
 | R5 SwarmGraph Insight | Complete baseline + first producer events | Add measured cost producer and complete backend live SSE wiring before live-runtime claims |
-| R6 Real Adoption | Partial | LangGraph + SwarmGraph local-real path now requires dual explicit gates; keep fake/offline default and provider-backed execution unclaimed |
+| R6 Real Adoption | Partial | LangGraph + SwarmGraph local-real path now requires dual explicit gates consistently; keep fake/offline default and provider-backed execution unclaimed |
 | R7 Release Ops | Partial | Evidence refreshed in roadmap only: local `main` is `b68663b`; latest `ba7b1d32` GitHub runs have `node` + `ARC Roadmap Gate` failures; last all-green required-ish set is `073238d`; no release date, green window, or `.env` scrub |

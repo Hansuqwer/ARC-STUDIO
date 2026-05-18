@@ -121,7 +121,9 @@ def test_langgraph_swarmgraph_resolves_as_fake_offline_runnable(tmp_path):
     assert routed.report.availability == "runnable"
     assert routed.report.requires_paid_calls is False
     assert "fake/offline" in (routed.report.reason or "")
+    assert "ARC_REAL_RUNTIME_SMOKE=1" in (routed.report.reason or "")
     assert "ARC_LANGGRAPH_SWARMGRAPH_REAL=1" in (routed.report.reason or "")
+    assert "ARC_REAL_RUNTIME_SMOKE" in routed.report.required_env
     assert "ARC_LANGGRAPH_SWARMGRAPH_REAL" in routed.report.required_env
 
 
@@ -129,12 +131,27 @@ def test_langgraph_swarmgraph_resolves_as_fake_offline_runnable(tmp_path):
 async def test_langgraph_swarmgraph_local_real_requires_env(tmp_path):
     routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
 
-    with pytest.raises(runtime_router.RuntimeNotRunnable, match="ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
+    with pytest.raises(runtime_router.RuntimeNotRunnable, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
+        await routed.adapter.run_workflow("wf-local", {"runtime_mode": "local-real"})
+
+
+@pytest.mark.asyncio
+async def test_langgraph_swarmgraph_local_real_requires_both_envs(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
+    monkeypatch.delenv("ARC_REAL_RUNTIME_SMOKE", raising=False)
+    routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
+
+    assert "ARC_REAL_RUNTIME_SMOKE" in routed.report.required_env
+    assert routed.report.local_real_gated is True
+    assert routed.report.local_real_available is False
+
+    with pytest.raises(runtime_router.RuntimeNotRunnable, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
         await routed.adapter.run_workflow("wf-local", {"runtime_mode": "local-real"})
 
 
 @pytest.mark.asyncio
 async def test_langgraph_swarmgraph_local_real_routes_when_env_set(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
     monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
     routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
 
@@ -146,6 +163,7 @@ async def test_langgraph_swarmgraph_local_real_routes_when_env_set(monkeypatch, 
     assert run.status == RunStatus.COMPLETED
     assert run.metadata["runtime_mode"] == "local-real"
     assert run.metadata["real_provider_call"] is False
+    assert run.metadata["consensus"]["metadata"]["provider_backed"] is False
     assert run.metadata["real_runtime_gated"] is False
     assert "no provider-backed claim" in run.metadata["real_path_absent_reason"]
     assert run.metadata["consensus"]["metadata"]["runtime_mode"] == "local-real"
@@ -179,6 +197,7 @@ async def test_langgraph_swarmgraph_rejects_unknown_runtime_mode(tmp_path):
 
 
 def test_langgraph_swarmgraph_capability_marks_local_real_gate(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
     monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
 
     routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
@@ -187,7 +206,7 @@ def test_langgraph_swarmgraph_capability_marks_local_real_gate(monkeypatch, tmp_
     assert routed.report.required_env == []
     assert "local-real" in (routed.report.reason or "")
     assert "no provider-backed claim" in (routed.report.reason or "")
-    assert "local-real gate ARC_LANGGRAPH_SWARMGRAPH_REAL=1" in routed.report.detected_artifacts
+    assert "local-real gates ARC_REAL_RUNTIME_SMOKE=1 + ARC_LANGGRAPH_SWARMGRAPH_REAL=1" in routed.report.detected_artifacts
 
 
 def test_list_runtimes_includes_adoption_modes(monkeypatch, tmp_path):
@@ -203,6 +222,7 @@ def test_list_runtimes_includes_adoption_modes(monkeypatch, tmp_path):
     assert adoption.requires_paid_calls is False
     assert "fake/offline" in (adoption.reason or "")
     assert "real" in (adoption.reason or "")
+    assert "ARC_REAL_RUNTIME_SMOKE=1" in (adoption.reason or "")
     assert "ARC_LANGGRAPH_SWARMGRAPH_REAL=1" in (adoption.reason or "")
 
 

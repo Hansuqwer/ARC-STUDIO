@@ -140,6 +140,7 @@ def test_run_dry_run_langgraph_swarmgraph_local_real_blocked_without_gate(tmp_pa
 
 
 def test_run_dry_run_langgraph_swarmgraph_local_real_ready_with_gate(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
     monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
     result = CliRunner().invoke(app, [
         "run", "graph.py",

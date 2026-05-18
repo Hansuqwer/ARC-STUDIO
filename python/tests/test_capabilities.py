@@ -122,6 +122,7 @@ class TestCapabilityReportCockpitPrimitives:
         assert data["provider_backed"] is False
 
     def test_langgraph_swarmgraph_fake_offline_classification(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("ARC_REAL_RUNTIME_SMOKE", raising=False)
         monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
         data = LangGraphSwarmGraphFakeAdapter().capability_report(tmp_path).model_dump()
 
@@ -133,9 +134,22 @@ class TestCapabilityReportCockpitPrimitives:
         assert data["local_real_available"] is False
         assert data["provider_backed"] is False
         assert data["requires_paid_calls"] is False
-        assert data["required_env"] == ["ARC_LANGGRAPH_SWARMGRAPH_REAL"]
+        assert data["required_env"] == ["ARC_REAL_RUNTIME_SMOKE", "ARC_LANGGRAPH_SWARMGRAPH_REAL"]
+
+    def test_langgraph_swarmgraph_partial_gate_remains_gated(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
+        monkeypatch.delenv("ARC_REAL_RUNTIME_SMOKE", raising=False)
+        data = LangGraphSwarmGraphFakeAdapter().capability_report(tmp_path).model_dump()
+
+        assert data["test_level"] == "fake_offline"
+        assert data["local_real_gated"] is True
+        assert data["local_real_available"] is False
+        assert data["provider_backed"] is False
+        assert data["requires_paid_calls"] is False
+        assert data["required_env"] == ["ARC_REAL_RUNTIME_SMOKE"]
 
     def test_langgraph_swarmgraph_local_real_gate_classification(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
         monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
         data = LangGraphSwarmGraphFakeAdapter().capability_report(tmp_path).model_dump()
 
