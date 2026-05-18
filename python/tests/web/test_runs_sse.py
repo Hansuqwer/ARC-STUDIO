@@ -3,6 +3,8 @@ contract, and the [DONE] terminator without sleeping — the daemon's emitter
 is mocked for determinism."""
 import json
 import asyncio
+import json
+import warnings
 
 import pytest
 
@@ -113,7 +115,9 @@ async def test_live_sse_streams_active_local_run(client, app, workspace):
     _save_run(workspace, run_id)
     broker = EventBroker(_store(workspace))
     broker.mark_active(run_id)
-    app[EVENT_BROKER_KEY] = broker
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Changing state of started or joined application is deprecated", category=DeprecationWarning)
+        app[EVENT_BROKER_KEY] = broker
 
     request_task = asyncio.create_task(client.get(f"/api/runs/{run_id}/events?mode=live"))
     for _ in range(20):

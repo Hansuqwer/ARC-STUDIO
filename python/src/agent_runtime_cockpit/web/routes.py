@@ -406,7 +406,15 @@ async def run_events_sse(request: web.Request) -> web.StreamResponse:
     """
     mode = request.query.get("mode", "replay")
     if mode == "live":
-        broker = request.app.setdefault(EVENT_BROKER_KEY, EventBroker(_trace_store(request)))
+        # Get or create broker without triggering deprecation warning
+        try:
+            broker = request.app[EVENT_BROKER_KEY]
+        except KeyError:
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="Changing state of started or joined application is deprecated", category=DeprecationWarning)
+                broker = EventBroker(_trace_store(request))
+                request.app[EVENT_BROKER_KEY] = broker
         run_id = request.match_info["run_id"]
         run = _trace_store(request).load(run_id)
         if run and run.status not in {RunStatus.PENDING, RunStatus.RUNNING}:
