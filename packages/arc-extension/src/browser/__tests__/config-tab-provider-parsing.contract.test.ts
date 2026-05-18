@@ -76,6 +76,8 @@ describe('ConfigTab provider telemetry parsing contract', () => {
         expect(helperSource).toMatch(/providerCall: false/);
         expect(helperSource).toMatch(/backend-enforced opt-in; UI remains preview\/offline and never enables provider execution/);
         expect(helperSource).toMatch(/Local\/offline quota\/cost preview only/);
+        expect(helperSource).not.toMatch(/state:\s*'ready'/);
+        expect(helperSource).not.toMatch(/preview ready/i);
         expect(source).not.toMatch(/providerProxy/i);
         expect(source).not.toMatch(/billingEndpoint/i);
         expect(source).not.toMatch(/liveProviderExecution/i);
@@ -83,5 +85,24 @@ describe('ConfigTab provider telemetry parsing contract', () => {
         expect(source).not.toMatch(/executeProvider/i);
         expect(source).not.toMatch(/fetch\(/);
         expect(source).not.toMatch(/axios\./);
+    });
+
+    it('does not imply live provider readiness, configured live tests, or paid-call enablement', () => {
+        expect(source).not.toMatch(/Local provider readiness gate:[^`]*'ready'/s);
+        expect(source).not.toMatch(/\bLive tests:\s*[^`]*'configured'/s);
+        expect(source).not.toMatch(/Allow paid provider calls/);
+        expect(source).toMatch(/backend paid-call opt-in/i);
+        expect(source).toMatch(/disabled\/gated/);
+        expect(source).toMatch(/provider execution is not implemented here/);
+    });
+
+    it('keeps quota reset copy local-only and non-networked', () => {
+        expect(source).toMatch(/Local quota-counter reset/);
+        expect(source).toMatch(/resetProviderQuota/);
+        expect(source).toMatch(/no provider network calls/i);
+        expect(source).toMatch(/no live API/i);
+        expect(source).toMatch(/no billing action/i);
+        expect(source).not.toMatch(/remote quota reset/i);
+        expect(source).not.toMatch(/provider quota reset/i);
     });
 });

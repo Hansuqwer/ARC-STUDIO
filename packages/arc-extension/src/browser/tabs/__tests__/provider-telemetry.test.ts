@@ -174,7 +174,7 @@ describe('provider telemetry helpers', () => {
         ).toEqual({
             state: 'blocked',
             reasons: ['dry-run is enabled; live provider calls are hard-blocked'],
-            cta: 'safe: disable dry-run before local live-readiness preview can proceed',
+            cta: 'safe: disable dry-run before local backend-gated preview can proceed',
             enforcement: 'backend-enforced opt-in; UI remains preview/offline and never enables provider execution',
             message:
                 'Local/offline quota/cost preview only; blocked by dry-run is enabled; live provider calls are hard-blocked.',
@@ -206,9 +206,9 @@ describe('provider telemetry helpers', () => {
         expect(
             buildLiveProviderGate({ dryRun: false, allowPaidCalls: true, liveTestsEnabled: true })
         ).toEqual({
-            state: 'ready',
+            state: 'preview',
             reasons: [],
-            cta: 'current profile: local/offline preview ready; provider execution remains disabled here',
+            cta: 'current profile: local/offline preview gates satisfied; provider execution remains disabled here',
             enforcement: 'backend-enforced opt-in; UI remains preview/offline and never enables provider execution',
             message: 'Local/offline quota/cost preview only; no provider execution is enabled by this state.',
             providerCall: false,
@@ -226,10 +226,11 @@ describe('provider telemetry helpers', () => {
         }
     });
 
-    it('keeps ready-state text explicitly local and non-enabling', () => {
+    it('keeps preview-state text explicitly local and non-enabling', () => {
         const gate = buildLiveProviderGate({ dryRun: false, allowPaidCalls: true, liveTestsEnabled: true });
 
         expect(gate.providerCall).toBe(false);
+        expect(gate.state).not.toBe('ready');
         expect(gate.cta).toContain('provider execution remains disabled');
         expect(gate.message).toContain('no provider execution is enabled');
         expect(gate.enforcement).toContain('backend-enforced opt-in');
@@ -249,7 +250,18 @@ describe('provider telemetry helpers', () => {
         for (const gate of cases) {
             expect(gate.providerCall).toBe(false);
             expect(`${gate.cta} ${gate.message} ${gate.enforcement}`).toContain('Local/offline');
+            expect(gate.state).not.toBe('ready');
             expect(`${gate.cta} ${gate.message} ${gate.enforcement}`).not.toMatch(/enable(s|d)? live provider execution/i);
         }
+    });
+
+    it('does not use ready wording for local/offline provider gate', () => {
+        const gate = buildLiveProviderGate({ dryRun: false, allowPaidCalls: true, liveTestsEnabled: true });
+        const text = `${gate.state} ${gate.cta} ${gate.message} ${gate.enforcement}`;
+
+        expect(text).toContain('local/offline');
+        expect(text).not.toMatch(/\bready\b/i);
+        expect(text).not.toMatch(/\bconfigured\b/i);
+        expect(text).not.toMatch(/provider network|provider API|live API|billing/i);
     });
 });

@@ -271,7 +271,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
         } else if (value === 'crewai+swarmgraph') {
             description = 'fake/offline; real provider mode gated';
         } else {
-            description = meta.label.toLowerCase().includes('swarm') ? 'bundled, ready' : availability;
+            description = meta.label.toLowerCase().includes('swarm') ? 'bundled/offline-capable' : availability;
         }
         return { value, ...meta, canRun, reason, availability, paid, description };
     });
@@ -283,6 +283,11 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
     const currentProfile = profiles.find(profile => profile.id === selectedProfile) || null;
     const costPolicySummary = summarizeProfileCostPolicy(currentProfile, dryRun, allowPaidCalls);
     const providerTelemetryService = arcService as ArcService & OptionalProviderTelemetryService | undefined;
+    const providerDiagnosticsAvailable = Boolean(providerTelemetryService?.getProviderDiagnostics);
+    const providerQuotaAvailable = Boolean(providerTelemetryService?.getProviderQuota);
+    const providerTelemetryUnavailable = !providerDiagnosticsAvailable && !providerQuotaAvailable;
+    const providerTelemetryError = !providerTelemetryUnavailable && (providerDiagnostics === null || providerQuota === null);
+    const providerTelemetryEmpty = providerQuotaAvailable && providerQuota !== null && quotaCounters.length === 0;
     const quotaResetAvailable = Boolean(providerTelemetryService?.resetProviderQuota) && canResetQuota(quotaObject);
     const quotaResetConfirmation = (buildQuotaResetConfirmation as (...args: unknown[]) => {
         phrase?: string;
@@ -471,7 +476,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px', fontSize: '11px' }}>
                     <span style={{ fontFamily: 'monospace' }}>runtime: {selectedRuntime}</span>
                     <span style={{ fontFamily: 'monospace' }}>status: {runtimeRemediationPlan.status}</span>
-                    <span style={{ fontFamily: 'monospace' }}>readiness: {selectedRuntimeCapability?.can_run ? 'ready' : 'needs setup'}</span>
+                    <span style={{ fontFamily: 'monospace' }}>setup: {selectedRuntimeCapability?.can_run ? 'detected' : 'needs setup'}</span>
                     {capabilitiesLoading && <span>refreshing...</span>}
                 </div>
                 {selectedRuntimeCapability && (
@@ -665,7 +670,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                             disabled={dryRun}
                             onChange={e => setAllowPaidCalls(e.currentTarget.checked)}
                         />
-                        Allow paid provider calls
+                        Request backend paid-call opt-in (no provider call here)
                     </label>
                 </div>
                 <p className='arc-studio-config__run-policy-note' style={{ margin: '8px 0 0', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
@@ -696,10 +701,13 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     </button>
                 </div>
                 <p className='arc-studio-config__paid-call-warning' style={{ margin: '8px 0', fontSize: '11px', color: 'var(--theia-editorWarning-foreground)' }}>
-                    Paid/live provider calls require explicit backend-enforced opt-in gates; dry-run/offline stays providerCall:false. Quota/cost display and reset use local counters only.
+                    Paid/live provider calls require explicit backend-enforced opt-in gates. Offline/local panel only; provider execution is not implemented here. dry-run/offline stays providerCall:false. Quota/cost display and reset use local counters only; display is event-backed/local-counter only.
+                </p>
+                <p className='arc-studio-config__provider-telemetry-state' style={{ margin: '0 0 8px', fontSize: '11px', color: providerTelemetryError ? 'var(--theia-editorWarning-foreground)' : 'var(--theia-descriptionForeground)' }}>
+                    Provider telemetry state: {providerTelemetryUnavailable ? 'unavailable/degraded - backend method not wired; no provider call attempted' : providerTelemetryError ? 'error/degraded - local telemetry read failed; provider execution still disabled' : loading ? 'loading local telemetry...' : 'loaded from local ARC telemetry only'}.
                 </p>
                 <div className='arc-studio-config__live-provider-gate' style={{ margin: '8px 0', padding: '8px', border: '1px solid var(--theia-widgetBorder)', borderRadius: '4px', fontSize: '11px', backgroundColor: 'var(--theia-editor-background)' }}>
-                    <strong>Local provider readiness gate: {liveProviderGate.label || liveProviderGate.state || liveProviderGate.status || (dryRun || !allowPaidCalls ? 'blocked/gated' : 'ready')}</strong>
+                    <strong>Local provider backend-gated preview: {liveProviderGate.label || liveProviderGate.state || liveProviderGate.status || (dryRun || !allowPaidCalls ? 'blocked/gated' : 'preview-only')}</strong>
                     <p style={{ margin: '4px 0 0', color: 'var(--theia-descriptionForeground)' }}>
                         No network by default: providerCall:false. This panel never calls provider API, provider proxy, live API, or billing endpoints, and never enables real provider execution.
                     </p>
@@ -708,11 +716,14 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     </p>
                 </div>
                 <div className='arc-studio-config__provider-diagnostics' style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', fontSize: '12px' }}>
-                    <span>Live tests: <span style={{ fontFamily: 'monospace' }}>{diagnostics.liveTestsEnabled ? 'enabled' : 'disabled'}</span></span>
-                    <span>Routing default: <span style={{ fontFamily: 'monospace' }}>{diagnostics.routingDefault}</span></span>
+                    <span>Backend live-test flag (no calls here): <span style={{ fontFamily: 'monospace' }}>{diagnostics.liveTestsEnabled ? 'configured for gated backend use' : 'disabled/gated'}</span></span>
+                    <span>Routing default: <span style={{ fontFamily: 'monospace' }}>{diagnostics.routingDefault || 'unset'}</span></span>
                     <span>Configured providers: <span style={{ fontFamily: 'monospace' }}>{diagnostics.configuredProvidersCount}</span></span>
                     <span>Configured accounts: <span style={{ fontFamily: 'monospace' }}>{diagnostics.configuredAccountsCount}</span></span>
                 </div>
+                <p className='arc-studio-config__provider-paths-note' style={{ margin: '6px 0 0', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
+                    Path legend: dry-run/offline = local preview only; local quota reset = ARC storage counters only; future live provider paths = separate backend-gated flow, not launched from this panel.
+                </p>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px', fontSize: '12px', maxWidth: '260px' }}>
                     Quota provider filter
                     <select
@@ -734,8 +745,13 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                             <span>{row.id}</span>
                             <strong>{row.count}</strong>
                         </span>
-                    )) : <span style={{ color: 'var(--theia-descriptionForeground)' }}>Quota counters unavailable.</span>}
+                    )) : <span className='arc-studio-config__quota-empty' style={{ color: 'var(--theia-descriptionForeground)' }}>{providerTelemetryEmpty ? 'No local quota counters recorded yet. Run dry-run/offline flows to produce event-backed counters.' : 'Quota counters unavailable/degraded; no provider calls attempted.'}</span>}
                 </div>
+                {!quotaResetAvailable && (
+                    <p className='arc-studio-config__quota-reset-disabled' style={{ margin: '6px 0 0', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
+                        Local quota reset disabled until local counters exist and the reset method is available.
+                    </p>
+                )}
                 {quotaResetAvailable && (
                     <div className='arc-studio-config__quota-reset-confirm' style={{ marginTop: '8px', padding: '8px', border: '1px solid var(--theia-widgetBorder)', borderRadius: '4px', fontSize: '12px' }}>
                         <button

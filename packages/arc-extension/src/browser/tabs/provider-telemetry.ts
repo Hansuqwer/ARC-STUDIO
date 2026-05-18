@@ -45,7 +45,7 @@ export interface LiveProviderGateInput {
 }
 
 export interface LiveProviderGateState {
-    state: 'blocked' | 'gated' | 'ready';
+    state: 'blocked' | 'gated' | 'preview';
     reasons: string[];
     cta: string;
     enforcement: string;
@@ -164,13 +164,13 @@ export function buildLiveProviderGate(input: LiveProviderGateInput): LiveProvide
         reasons.push('live provider tests are disabled');
     }
 
-    const state = input.dryRun ? 'blocked' : reasons.length > 0 ? 'gated' : 'ready';
+    const state = input.dryRun ? 'blocked' : reasons.length > 0 ? 'gated' : 'preview';
     const cta =
-        state === 'ready'
-            ? `${name}: local/offline preview ready; provider execution remains disabled here`
+        state === 'preview'
+            ? `${name}: local/offline preview gates satisfied; provider execution remains disabled here`
             : state === 'blocked'
-              ? `${name}: disable dry-run before local live-readiness preview can proceed`
-              : `${name}: satisfy all gates before local live-readiness preview can proceed`;
+              ? `${name}: disable dry-run before local backend-gated preview can proceed`
+              : `${name}: satisfy all gates before local backend-gated preview can proceed`;
     const message = reasons.length > 0
         ? `Local/offline quota/cost preview only; blocked by ${reasons.join('; ')}.`
         : 'Local/offline quota/cost preview only; no provider execution is enabled by this state.';
