@@ -40,4 +40,11 @@ export class ArcStudioWidgetContribution extends AbstractViewContribution<ArcStu
     registerMenus(menus: MenuModelRegistry): void {
         super.registerMenus(menus);
     }
+
+    async initializeLayout(): Promise<void> {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('arc-view') === 'arc-studio') {
+            await this.openView({ activate: true, reveal: true });
+        }
+    }
 }

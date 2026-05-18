@@ -246,7 +246,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
         setLiveReason(undefined);
         setError(null);
         try {
-            const stream = await arcService.streamActiveTrace({ runId, mode: 'live', baseUrl });
+            const stream = await arcService.readActiveTraceStream({ runId, mode: 'live', baseUrl });
             for await (const chunk of stream) {
                 if (streamCancelled.current) {
                     return;

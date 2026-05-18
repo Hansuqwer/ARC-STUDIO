@@ -10,6 +10,8 @@ import { test, expect } from '@playwright/test';
 import { join } from 'path';
 
 const APP_URL = process.env.ARC_E2E_URL || `http://127.0.0.1:${process.env.ARC_E2E_PORT || '3010'}`;
+const DAEMON_URL = process.env.ARC_E2E_DAEMON_URL;
+const DAEMON_RUN_ID = process.env.ARC_E2E_DAEMON_RUN_ID;
 const TIMEOUT = 60_000;
 const REPO_ROOT = join(__dirname, '..', '..');
 const TERMINAL_EVENTS = new Set(['RUN_COMPLETED', 'RUN_FAILED', 'RUN_CANCELLED', 'STREAM_END']);
@@ -125,6 +127,30 @@ test.describe('ARC Studio — Smoke Tests', () => {
     await expect(page.getByRole('heading', { name: 'SwarmGraph Insight' })).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText(/Live insight:/)).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText(/disconnected|degraded|not configured|no active stream/i).first()).toBeVisible({
+      timeout: TIMEOUT,
+    });
+  });
+
+  test('SwarmGraph Insight renders configured daemon live frame or degraded state', async ({ page }) => {
+    if (!DAEMON_URL || !DAEMON_RUN_ID) {
+      test.skip(true, 'ARC_E2E_DAEMON_URL and ARC_E2E_DAEMON_RUN_ID not configured');
+    }
+
+    await page.goto(`${APP_URL}/?arc-view=arc-studio`, { waitUntil: 'networkidle', timeout: TIMEOUT });
+    await acceptWorkspaceTrustIfShown(page);
+
+    if (!(await openArcStudioTab(page, 'SwarmGraph Insight'))) {
+      test.skip(true, 'ARC Studio tab shell not routable in this app mode');
+    }
+
+    await page.locator('#arc-swarmgraph-live-run').fill(DAEMON_RUN_ID);
+    await page.locator('#arc-swarmgraph-live-base-url').fill(DAEMON_URL);
+    await page.getByRole('button', { name: 'Connect live' }).click();
+
+    const liveInsight = page.getByText(/^Live insight:/).first();
+    await expect(liveInsight).toBeVisible({ timeout: TIMEOUT });
+
+    await expect(page.getByText(/active event|live stream disconnected; showing/i).first()).toBeVisible({
       timeout: TIMEOUT,
     });
   });

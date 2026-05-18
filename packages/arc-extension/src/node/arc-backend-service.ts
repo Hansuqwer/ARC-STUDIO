@@ -225,6 +225,15 @@ export class ArcBackendService implements ArcService {
         return this.createActiveTraceIterable(request, cancelToken);
     }
 
+    async readActiveTraceStream(request: ActiveTraceStreamRequest): Promise<ActiveTraceEventChunk[]> {
+        const stream = await this.streamActiveTrace(request);
+        const chunks: ActiveTraceEventChunk[] = [];
+        for await (const chunk of stream) {
+            chunks.push(chunk);
+        }
+        return chunks;
+    }
+
     async cancelActiveTraceStream(runId: string): Promise<{ success: boolean; message: string }> {
         validateRunId(runId);
         const token = this.activeStreamCancels.get(runId);

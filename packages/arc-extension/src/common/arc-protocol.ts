@@ -1195,6 +1195,9 @@ export interface ArcService {
     /** Stream active run events with explicit live vs replay and terminal semantics. */
     streamActiveTrace(request: ActiveTraceStreamRequest): Promise<AsyncIterable<ActiveTraceEventChunk>>;
 
+    /** JSON-RPC-safe active run stream snapshot for browser clients. */
+    readActiveTraceStream(request: ActiveTraceStreamRequest): Promise<ActiveTraceEventChunk[]>;
+
     /** Cancel a backend active stream proxy for a run. Does not cancel the run itself. */
     cancelActiveTraceStream(runId: string): Promise<{ success: boolean; message: string }>;
 
