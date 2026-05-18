@@ -42,3 +42,6 @@ export type { RunReceiptCardProps } from './RunReceiptCard';
 
 export { CapabilityDiffViewer } from './CapabilityDiffViewer';
 export type { CapabilityDiffViewerProps } from './CapabilityDiffViewer';
+
+export { BudgetGauge } from './BudgetGauge';
+export type { BudgetGaugeProps } from './BudgetGauge';

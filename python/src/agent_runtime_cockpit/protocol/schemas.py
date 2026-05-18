@@ -115,6 +115,12 @@ class RunEvent(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
 
 
+class BudgetVector(BaseModel):
+    tokens: Optional[int] = None
+    cost_usd: Optional[float] = None
+    latency_ms: Optional[int] = None
+
+
 class RunRecord(BaseModel):
     id: str
     workflow_id: str
@@ -125,6 +131,7 @@ class RunRecord(BaseModel):
     events: list[RunEvent] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
     audit_path: Optional[str] = None  # Path to audit chain file (ADR-003)
+    budget: Optional[BudgetVector] = None
 
 
 # ─── Context ──────────────────────────────────────────────────────────────────

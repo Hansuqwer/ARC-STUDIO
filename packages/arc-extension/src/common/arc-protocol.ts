@@ -613,6 +613,12 @@ export interface FileChange {
     removed: number;
 }
 
+export interface BudgetVector {
+    tokens: number | null | undefined;
+    cost_usd: number | null | undefined;
+    latency_ms: number | null | undefined;
+}
+
 export interface RunReceipt {
     schema_version: number;
     receipt_id: string;
@@ -622,6 +628,8 @@ export interface RunReceipt {
     status: 'completed' | 'failed' | 'cancelled';
     summary: string;
     cost_usd: number | 'unknown';
+    usage?: BudgetVector;
+    limit?: BudgetVector;
     duration_ms: number;
     files_changed: FileChange[];
     approvals: string[];

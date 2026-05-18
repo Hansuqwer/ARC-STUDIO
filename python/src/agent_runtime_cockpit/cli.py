@@ -2589,6 +2589,83 @@ def runs_contract(
             console.print(f"  Fulfilled: {contract.fulfilled_at}")
 
 
+@runs_app.command("budget")
+def runs_budget(
+    run_id: str = typer.Argument(..., help="Run ID to show budget and usage for"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show budget and usage information for a run."""
+    _setup_logging(debug)
+    from .storage.jsonl import JsonlTraceStore
+
+    ws = _workspace(workspace)
+    store = JsonlTraceStore(ws / ".arc" / "traces")
+    run_record = store.load(run_id)
+
+    if run_record is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
+        raise typer.Exit(1)
+
+    budget = run_record.metadata.get("budget", {})
+    usage = run_record.metadata.get("usage", {})
+
+    def dimension(source: dict[str, object], key: str) -> dict[str, object]:
+        if key not in source:
+            return {"status": "absent"}
+        raw = source[key]
+        if not isinstance(raw, (int, float)) or isinstance(raw, bool):
+            return {"status": "degraded", "raw": raw, "reason": "non_numeric"}
+        if raw < 0:
+            return {"status": "degraded", "raw": raw, "reason": "negative_value"}
+        return {"status": "available", "value": raw}
+
+    usage_report = {
+        "tokens": dimension(usage, "total_tokens") if isinstance(usage, dict) else {"status": "degraded", "raw": usage, "reason": "malformed_usage"},
+        "cost_usd": dimension(usage, "total_cost") if isinstance(usage, dict) else {"status": "degraded", "raw": usage, "reason": "malformed_usage"},
+        "latency_ms": dimension(usage, "latency_ms") if isinstance(usage, dict) else {"status": "degraded", "raw": usage, "reason": "malformed_usage"},
+    }
+
+    payload = {
+        "run_id": run_id,
+        "budget": budget if isinstance(budget, dict) else {"status": "degraded", "raw": budget, "reason": "malformed_budget"},
+        "usage": usage_report,
+    }
+
+    _out(ok(payload, workspace=str(ws)), json_output)
+
+    if not json_output:
+        console.print(f"[bold]Budget & Usage:[/bold] {run_id}")
+        
+        console.print("\n[bold]Budget:[/bold]")
+        if not isinstance(budget, dict):
+            console.print(f"  [yellow]degraded: malformed_budget raw={budget!r}[/yellow]")
+        elif not budget:
+            console.print("  [dim]No budget constraints recorded[/dim]")
+        else:
+            if "max_tokens" in budget:
+                console.print(f"  Max Tokens: {budget['max_tokens']}")
+            if "max_cost" in budget:
+                console.print(f"  Max Cost:   ${budget['max_cost']:.4f}")
+                
+        console.print("\n[bold]Usage:[/bold]")
+        if not isinstance(usage, dict):
+            console.print(f"  [yellow]degraded: malformed_usage raw={usage!r}[/yellow]")
+        elif not usage:
+            console.print("  [dim]No usage data recorded[/dim]")
+        else:
+            for label, name, suffix in [("Total Tokens", "tokens", ""), ("Total Cost", "cost_usd", ""), ("Latency", "latency_ms", "ms")]:
+                entry = usage_report[name]
+                if entry["status"] == "available":
+                    value = entry["value"]
+                    rendered = f"${value:.4f}" if name == "cost_usd" else f"{value}{suffix}"
+                    console.print(f"  {label}: {rendered}")
+                elif entry["status"] == "degraded":
+                    console.print(f"  {label}: [yellow]degraded: {entry['reason']} raw={entry['raw']!r}[/yellow]")
+                else:
+                    console.print(f"  {label}: [dim]n/a[/dim]")
+
 # ─── autopsy show ─────────────────────────────────────────────────────────────
 
 

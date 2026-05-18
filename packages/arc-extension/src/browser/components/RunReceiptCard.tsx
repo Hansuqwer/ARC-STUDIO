@@ -9,6 +9,8 @@ import * as React from '@theia/core/shared/react';
 import type { RunReceipt, FileChange, EvidenceSelectionEvent } from '../../common/arc-protocol';
 import { EvidenceChip } from './EvidenceChip';
 import type { EvidenceChipProps } from './EvidenceChip';
+import { BudgetGauge } from './BudgetGauge';
+import { BudgetVector } from '../../common/arc-protocol';
 
 export interface RunReceiptCardProps {
     receipt: RunReceipt;
@@ -98,6 +100,14 @@ export const RunReceiptCard: React.FC<RunReceiptCardProps> = ({
                 <p className='arc-receipt-summary'>
                     <strong>Summary:</strong> {summary}
                 </p>
+
+                <div className='arc-receipt-section'>
+                    <strong>Budget Usage</strong>
+                    <BudgetGauge
+                        usage={{ tokens: null, cost_usd: cost_usd === 'unknown' ? undefined : cost_usd, latency_ms: duration_ms }}
+                        limit={(receipt as any).budget_limit}
+                    />
+                </div>
 
                 <dl className='arc-receipt-meta'>
                     <dt>Cost</dt>

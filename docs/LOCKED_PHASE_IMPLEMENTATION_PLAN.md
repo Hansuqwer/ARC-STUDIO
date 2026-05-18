@@ -300,6 +300,10 @@ Every new phase/chunk should include:
 
 ### Phase 9 — BudgetVector Post-Hoc Accounting
 
+**Status:** Complete in working tree pending commit. Implemented post-hoc accounting/reporting only; real-time pressure/exhaustion interrupts remain deferred.
+
+**Evidence:** `cd python && uv run pytest tests/web/test_cli_budget.py -q` (8 passed); `pnpm --filter @arc-studio/protocol build && pnpm --filter arc-extension build`.
+
 - Add a `BudgetVector` model and workflow/default-budget config shape where appropriate.
 - Compute post-hoc usage from trace/metadata where data exists; mark missing dimensions as absent/degraded.
 - Add `arc runs budget <id>` or equivalent CLI report.

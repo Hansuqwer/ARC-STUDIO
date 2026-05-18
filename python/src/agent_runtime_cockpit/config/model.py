@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
+from agent_runtime_cockpit.protocol.schemas import BudgetVector
 
 
 class WorkspaceConfig(BaseModel):
@@ -26,6 +27,7 @@ class ExecutionConfig(BaseModel):
     timeout_seconds: int = 300
     allow_paid_calls: bool = False
     background: bool = False
+    budget: Optional[BudgetVector] = None
 
 
 class ProviderConfig(BaseModel):
