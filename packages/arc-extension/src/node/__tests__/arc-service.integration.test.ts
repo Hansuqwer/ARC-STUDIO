@@ -16,6 +16,8 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
 
+const backendSource = fs.readFileSync(path.resolve(__dirname, '../../../src/node/arc-backend-service.ts'), 'utf-8');
+
 describe('ArcBackendService Integration Tests', () => {
     let service: ArcBackendService;
     let tempDir: string;
@@ -40,6 +42,16 @@ describe('ArcBackendService Integration Tests', () => {
         it('should instantiate ArcBackendService', () => {
             expect(service).toBeDefined();
             expect(service).toBeInstanceOf(ArcBackendService);
+        });
+    });
+
+    describe('provider quota reset bridge', () => {
+        it('should call quota reset CLI, not quota show', () => {
+            expect(backendSource).toMatch(/async resetProviderQuota\(\)/);
+            expect(backendSource).toMatch(/execFileSync\('arc', \['providers', 'quota', 'reset', '--json'\]/);
+            expect(backendSource).toMatch(/env:\s*buildArcCliEnv\(\)/);
+            expect(backendSource).toMatch(/Provider quota reset failed/);
+            expect(backendSource).not.toMatch(/execFileSync\('arc', \['providers', 'quota', 'show', '--json'\]/);
         });
     });
 

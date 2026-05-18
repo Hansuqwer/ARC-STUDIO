@@ -456,14 +456,16 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/arc-studio-config__paid-call-warning/);
             expect(source).toMatch(/arc-studio-config__provider-refresh/);
             expect(source).toMatch(/Provider Diagnostics & Quota/);
-            expect(source).toMatch(/Paid provider calls require explicit opt-in/);
-            expect(source).toMatch(/dry-run stays providerCall:false/);
+            expect(source).toMatch(/Paid\/live provider calls require explicit opt-in/);
+            expect(source).toMatch(/dry-run\/offline stays providerCall:false/);
+            expect(source).toMatch(/Quota display and reset use local counters only/);
         });
 
         it('should load optional provider diagnostics and quota without hard protocol dependency', () => {
             expect(source).toMatch(/OptionalProviderTelemetryService/);
             expect(source).toMatch(/getProviderDiagnostics\?: \(\) => Promise<unknown>/);
             expect(source).toMatch(/getProviderQuota\?: \(provider\?: string\) => Promise<unknown>/);
+            expect(source).toMatch(/resetProviderQuota\?: \(provider\?: string\) => Promise<unknown>/);
             expect(source).toMatch(/providerTelemetryService\.getProviderDiagnostics/);
             expect(source).toMatch(/providerTelemetryService\.getProviderQuota/);
             expect(source).toMatch(/quotaProviderFilter === 'all' \? undefined : quotaProviderFilter/);
@@ -482,13 +484,40 @@ describe('Studio Tabs Contracts', () => {
         });
 
         it('should parse provider quota counters into safe rows', () => {
-            expect(source).toMatch(/type QuotaCounterRow/);
-            expect(source).toMatch(/function quotaCounterRows/);
-            expect(source).toMatch(/\^\(dry_run\|live\):\(provider\|account\):/);
-            expect(source).toMatch(/bucket: match\[1\] as 'dry_run' \| 'live'/);
-            expect(source).toMatch(/scope: match\[2\] as 'provider' \| 'account'/);
-            expect(source).toMatch(/id: match\[3\]/);
-            expect(source).toMatch(/count: value/);
+            expect(source).toMatch(/parseQuotaCounters\(providerQuota\)/);
+            expect(source).toMatch(/parseProviderDiagnostics\(providerDiagnostics\)/);
+            expect(source).toMatch(/summarizeProfileCostPolicy/);
+            expect(source).toMatch(/canResetQuota/);
+            expect(source).not.toMatch(/function quotaCounterRows/);
+            expect(source).not.toMatch(/\^\(dry_run\|live\):\(provider\|account\):/);
+        });
+
+        it('should expose local quota reset only through optional reset bridge and local-copy guard', () => {
+            expect(source).toMatch(/resetProviderQuota/);
+            expect(source).toMatch(/quotaResetAvailable/);
+            expect(source).toMatch(/buildQuotaResetConfirmation/);
+            expect(source).toMatch(/canResetQuota\(quotaObject\)/);
+            expect(source).toMatch(/quotaResetPhrase === quotaResetRequiredPhrase/);
+            expect(source).toMatch(/disabled=\{quotaResetting \|\| !quotaResetConfirmed\}/);
+            expect(source).toMatch(/arc-studio-config__quota-reset-local/);
+            expect(source).toMatch(/Local quota-counter reset/);
+            expect(source).toMatch(/no provider network calls/);
+            expect(source).toMatch(/no live API calls/);
+            expect(source).toMatch(/no billing action/);
+        });
+
+        it('should show profile-linked cost policy summary and explicit gates', () => {
+            expect(source).toMatch(/arc-studio-config__cost-policy-summary/);
+            expect(source).toMatch(/costPolicySummary/);
+            expect(source).toMatch(/current profile dryRun=\{String\(Boolean\(currentProfile\?\.dryRun\)\)\}/);
+            expect(source).toMatch(/allowPaidCalls=\{String\(Boolean\(currentProfile\?\.allowPaidCalls\)\)\}/);
+            expect(source).toMatch(/effective allowPaidCalls=\{String\(costPolicySummary\.paidCallsAllowed\)\}/);
+            expect(source).toMatch(/Dry-run blocks paid calls/);
+            expect(source).toMatch(/not full provider-side cost enforcement/);
+            expect(source).toMatch(/buildLiveProviderGate/);
+            expect(source).toMatch(/arc-studio-config__live-provider-gate/);
+            expect(source).toMatch(/Preview-only\/no network: providerCall:false/);
+            expect(source).toMatch(/never calls provider API, provider proxy, live API, or billing endpoints/);
         });
 
         it('should render richer quota rows without raw quota JSON dump', () => {
@@ -649,14 +678,20 @@ describe('Studio Tabs Contracts', () => {
             expect(insightSource).toMatch(/No SwarmGraph cost events found/);
             expect(insightSource).toMatch(/degraded/i);
             expect(insightSource).toMatch(/trace events/i);
+            expect(insightSource).not.toContain(['real', 'trace events present'].join(' '));
         });
 
-        it('should source insight only from trace reads, not fake offline metadata', () => {
+        it('should source insight only from trace reads while showing runtime metadata separately', () => {
             expect(insightSource).toMatch(/arcService\.getTraces/);
             expect(insightSource).toMatch(/arcService\.readTrace/);
             expect(insightSource).toMatch(/event\.type/);
             expect(insightSource).not.toMatch(/metadata\.consensus/);
-            expect(insightSource).not.toMatch(/fake\/offline/i);
+            expect(insightSource).toMatch(/Runtime Metadata/);
+            expect(insightSource).toMatch(/runtimeMetadata/);
+            expect(insightSource).toMatch(/fake\/offline\/no provider call/i);
+            expect(insightSource).toMatch(/real runtime gated/i);
+            expect(insightSource).toMatch(/real path absent/i);
+            expect(insightSource).toMatch(/not promoted to topology, consensus, or cost insight/);
             expect(insightSource).not.toMatch(/crewai\+swarmgraph/);
         });
 

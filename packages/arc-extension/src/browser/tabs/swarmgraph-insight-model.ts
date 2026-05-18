@@ -36,11 +36,19 @@ export interface SwarmGraphCostInsight {
     items: Record<string, unknown>[];
 }
 
+export interface SwarmGraphRuntimeMetadata {
+    runtimeMode?: string;
+    realProviderCall?: boolean;
+    realRuntimeGated?: boolean;
+    realPathAbsentReason?: string;
+}
+
 export interface SwarmGraphInsight {
     status: SwarmGraphInsightStatus;
     topology: SwarmGraphTopologyInsight;
     consensus: SwarmGraphConsensusInsight;
     cost: SwarmGraphCostInsight;
+    runtimeMetadata: SwarmGraphRuntimeMetadata;
     reasons: string[];
 }
 
@@ -148,6 +156,22 @@ function extractCost(events: TraceEvent[], degraded: boolean): SwarmGraphCostIns
         : { ...EMPTY_COST, status: 'degraded' };
 }
 
+function asBoolean(value: unknown): boolean | undefined {
+    return typeof value === 'boolean' ? value : undefined;
+}
+
+function extractRuntimeMetadata(trace?: TraceData | null): SwarmGraphRuntimeMetadata {
+    const sources = [trace?.metadata, ...(trace?.events ?? []).map(event => event.data)].filter(isRecord);
+    const metadata: SwarmGraphRuntimeMetadata = {};
+    for (const source of sources) {
+        metadata.runtimeMode ??= asString(source.runtime_mode) ?? asString(source.runtimeMode);
+        metadata.realProviderCall ??= asBoolean(source.real_provider_call) ?? asBoolean(source.realProviderCall);
+        metadata.realRuntimeGated ??= asBoolean(source.real_runtime_gated) ?? asBoolean(source.realRuntimeGated);
+        metadata.realPathAbsentReason ??= asString(source.real_path_absent_reason) ?? asString(source.realPathAbsentReason);
+    }
+    return metadata;
+}
+
 export function buildSwarmGraphInsight(trace?: TraceData | null): SwarmGraphInsight {
     const events = trace?.events ?? [];
     const swarmGraphish = Boolean(trace?.runtime?.toLowerCase().includes('swarmgraph')) || events.some(isSwarmGraphEvent);
@@ -158,6 +182,7 @@ export function buildSwarmGraphInsight(trace?: TraceData | null): SwarmGraphInsi
     const topology = extractTopology(events, degradeMissingSections);
     const consensus = extractConsensus(events, degradeMissingSections);
     const cost = extractCost(events, degradeMissingSections);
+    const runtimeMetadata = extractRuntimeMetadata(trace);
     const sections = [topology.status, consensus.status, cost.status];
     const status: SwarmGraphInsightStatus = sections.includes('present')
         ? 'present'
@@ -170,5 +195,5 @@ export function buildSwarmGraphInsight(trace?: TraceData | null): SwarmGraphInsi
             ? ['SwarmGraph run detected, but one or more insight event types are missing or incomplete.']
             : [];
 
-    return { status, topology, consensus, cost, reasons };
+    return { status, topology, consensus, cost, runtimeMetadata, reasons };
 }

@@ -28,6 +28,7 @@ import {
     AuditChainInfo,
     ReplayResult,
     ReplayEvent,
+    ProviderQuotaResetResult,
 } from '../../common/arc-protocol';
 
 describe('ArcService Proxy Tests', () => {
@@ -86,6 +87,7 @@ describe('ArcService Proxy Tests', () => {
                 'getAuditChainInfo',
                 'replayRun',
                 'diffRuns',
+                'resetProviderQuota',
             ];
 
             const mockService: any = {
@@ -115,11 +117,26 @@ describe('ArcService Proxy Tests', () => {
                 getAuditChainInfo: async () => ({}),
                 replayRun: async () => ({}),
                 diffRuns: async () => ({}),
+                resetProviderQuota: async () => ({ success: true, message: 'Local provider quota counters reset' }),
             };
 
             for (const method of requiredMethods) {
                 expect(typeof mockService[method]).toBe('function');
             }
+        });
+
+        it('resetProviderQuota should return typed local reset result', async () => {
+            const mockService = {
+                resetProviderQuota: async (): Promise<ProviderQuotaResetResult> => ({
+                    success: true,
+                    message: 'Local provider quota counters reset',
+                }),
+            };
+
+            await expect(mockService.resetProviderQuota()).resolves.toEqual({
+                success: true,
+                message: 'Local provider quota counters reset',
+            });
         });
 
         it('executeWorkflow should accept prompt and optional options', async () => {

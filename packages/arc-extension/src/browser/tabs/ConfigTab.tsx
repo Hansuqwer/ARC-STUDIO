@@ -20,6 +20,14 @@ import {
     SafeConfigUpdate,
     RuntimeCapabilityReport,
 } from '../../common/arc-protocol';
+import {
+    buildLiveProviderGate,
+    buildQuotaResetConfirmation,
+    canResetQuota,
+    parseProviderDiagnostics,
+    parseQuotaCounters,
+    summarizeProfileCostPolicy,
+} from './provider-telemetry';
 
 export interface ConfigTabProps {
     arcService?: ArcService;
@@ -66,46 +74,11 @@ type JsonObject = Record<string, unknown>;
 type OptionalProviderTelemetryService = {
     getProviderDiagnostics?: () => Promise<unknown>;
     getProviderQuota?: (provider?: string) => Promise<unknown>;
-};
-
-type QuotaCounterRow = {
-    key: string;
-    bucket: 'dry_run' | 'live';
-    scope: 'provider' | 'account';
-    id: string;
-    count: number;
+    resetProviderQuota?: (provider?: string) => Promise<unknown>;
 };
 
 function asObject(value: unknown): JsonObject | null {
     return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonObject : null;
-}
-
-function numberField(value: JsonObject | null, keys: string[]): number | null {
-    for (const key of keys) {
-        const candidate = value?.[key];
-        if (typeof candidate === 'number') return candidate;
-    }
-    return null;
-}
-
-function stringField(value: JsonObject | null, keys: string[]): string | null {
-    for (const key of keys) {
-        const candidate = value?.[key];
-        if (typeof candidate === 'string') return candidate;
-    }
-    return null;
-}
-
-function booleanField(value: JsonObject | null, keys: string[]): boolean | null {
-    for (const key of keys) {
-        const candidate = value?.[key];
-        if (typeof candidate === 'boolean') return candidate;
-    }
-    return null;
-}
-
-function objectArray(value: unknown): JsonObject[] {
-    return Array.isArray(value) ? value.map(asObject).filter((item): item is JsonObject => Boolean(item)) : [];
 }
 
 function providerSourceBadge(source: string): string {
@@ -124,14 +97,6 @@ function providerSourceColor(source: string): string {
         case 'file': return '#ffb74d';
         default: return '#999';
     }
-}
-
-function quotaCounterRows(counters: JsonObject | null): QuotaCounterRow[] {
-    return Object.entries(counters || {}).flatMap(([key, value]) => {
-        const match = /^(dry_run|live):(provider|account):([A-Za-z0-9_.:-]+)$/.exec(key);
-        if (!match || typeof value !== 'number') return [];
-        return [{ key, bucket: match[1] as 'dry_run' | 'live', scope: match[2] as 'provider' | 'account', id: match[3], count: value }];
-    });
 }
 
 export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
@@ -157,6 +122,9 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
     const [providerDiagnostics, setProviderDiagnostics] = useState<unknown>(null);
     const [providerQuota, setProviderQuota] = useState<unknown>(null);
     const [quotaProviderFilter, setQuotaProviderFilter] = useState('all');
+    const [quotaResetting, setQuotaResetting] = useState(false);
+    const [quotaResetConfirmOpen, setQuotaResetConfirmOpen] = useState(false);
+    const [quotaResetPhrase, setQuotaResetPhrase] = useState('');
 
     const loadConfig = useCallback(async () => {
         if (!arcService) {
@@ -170,7 +138,6 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
             setSelectedRuntime(status.runtime.defaultRuntime);
             setSelectedMode(status.mode);
             setSelectedIsolation(status.runtime.isolation || 'subprocess');
-            setSelectedProfile('local-safe');
             setDryRun(Boolean(status.runtime.dryRun));
             setAllowPaidCalls(Boolean(status.runtime.allowPaidCalls));
             if (arcService.getProviderCatalog) {
@@ -185,8 +152,9 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                 const loadedProfiles = await arcService.listProfiles();
                 if (loadedProfiles.length > 0) {
                     setProfiles(loadedProfiles);
-                    const current = loadedProfiles.find(profile => profile.id === selectedProfile) || loadedProfiles[0];
-                    setSelectedProfile(current.id);
+                    setSelectedProfile(currentProfile => (
+                        loadedProfiles.some(profile => profile.id === currentProfile) ? currentProfile : loadedProfiles[0].id
+                    ));
                 }
             }
             if (arcService.getIsolationStatus) {
@@ -224,7 +192,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
         } finally {
             setLoading(false);
         }
-    }, [arcService, quotaProviderFilter, selectedProfile]);
+    }, [arcService, quotaProviderFilter]);
 
     const buildSafeExport = useCallback((): string => {
         const safeSnapshot = {
@@ -302,20 +270,60 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
         return { value, ...meta, canRun, reason, availability, paid, description };
     });
 
-    const diagnosticsObject = asObject(providerDiagnostics);
-    const diagnosticsProviders = objectArray(diagnosticsObject?.providers);
-    const diagnosticsAccounts = objectArray(diagnosticsObject?.accounts);
-    const liveTestsEnabled = booleanField(diagnosticsObject, ['live_tests_enabled', 'liveTestsEnabled', 'liveTests']);
-    const routingObject = asObject(diagnosticsObject?.routing);
-    const routingDefault = stringField(diagnosticsObject, ['routing_default', 'routingDefault', 'default_provider', 'defaultProvider'])
-        || stringField(routingObject, ['default_provider', 'defaultProvider'])
-        || 'unknown';
-    const configuredProvidersCount = numberField(diagnosticsObject, ['configured_providers_count', 'configuredProvidersCount']) ?? diagnosticsProviders.length;
-    const configuredAccountsCount = numberField(diagnosticsObject, ['configured_accounts_count', 'configuredAccountsCount']) ?? diagnosticsAccounts.length;
+    const diagnostics = parseProviderDiagnostics(providerDiagnostics);
     const quotaObject = asObject(providerQuota);
-    const quotaCountersObject = asObject(quotaObject?.counters) || quotaObject;
-    const quotaCounters = quotaCounterRows(quotaCountersObject);
+    const quotaCounters = parseQuotaCounters(providerQuota);
     const providerQuotaOptions = providerCatalog.length ? providerCatalog : [{ id: 'openai', displayName: 'OpenAI', display_name: 'OpenAI' } as ProviderCatalogEntry];
+    const currentProfile = profiles.find(profile => profile.id === selectedProfile) || null;
+    const costPolicySummary = summarizeProfileCostPolicy(currentProfile, dryRun, allowPaidCalls);
+    const providerTelemetryService = arcService as ArcService & OptionalProviderTelemetryService | undefined;
+    const quotaResetAvailable = Boolean(providerTelemetryService?.resetProviderQuota) && canResetQuota(quotaObject);
+    const quotaResetConfirmation = (buildQuotaResetConfirmation as (...args: unknown[]) => {
+        phrase?: string;
+        confirmationPhrase?: string;
+        requiredPhrase?: string;
+        confirmed?: boolean;
+        canReset?: boolean;
+        warning?: string;
+        description?: string;
+    })({ provider: quotaProviderFilter, typedPhrase: quotaResetPhrase, available: quotaResetAvailable });
+    const quotaResetRequiredPhrase = quotaResetConfirmation.phrase || quotaResetConfirmation.confirmationPhrase || quotaResetConfirmation.requiredPhrase || 'RESET LOCAL QUOTA COUNTERS';
+    const quotaResetConfirmed = quotaResetAvailable && (quotaResetConfirmation.confirmed || quotaResetConfirmation.canReset || quotaResetPhrase === quotaResetRequiredPhrase);
+    const liveProviderGate = (buildLiveProviderGate as (...args: unknown[]) => {
+        state?: string;
+        status?: string;
+        label?: string;
+        message?: string;
+        providerCall?: boolean;
+        enforcement?: string;
+    })({
+        dryRun,
+        allowPaidCalls,
+        providerCall: false,
+        diagnostics,
+        costPolicySummary,
+        provider: quotaProviderFilter === 'all' ? diagnostics.routingDefault : quotaProviderFilter,
+    });
+
+    const handleResetQuota = async () => {
+        if (!providerTelemetryService?.resetProviderQuota || !quotaResetConfirmed) return;
+        setQuotaResetting(true);
+        setSaveMessage(null);
+        try {
+            const quotaProvider = quotaProviderFilter === 'all' ? undefined : quotaProviderFilter;
+            await providerTelemetryService.resetProviderQuota(quotaProvider);
+            setSaveMessage('Local quota-counter reset complete. No provider network calls were made.');
+            setQuotaResetConfirmOpen(false);
+            setQuotaResetPhrase('');
+            if (providerTelemetryService.getProviderQuota) {
+                setProviderQuota(await providerTelemetryService.getProviderQuota(quotaProvider).catch(() => null));
+            }
+        } catch (error) {
+            setSaveMessage(`Local quota-counter reset failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setQuotaResetting(false);
+        }
+    };
 
     const handleSaveKeyRef = async () => {
         if (!arcService?.setProviderKeyRef || !providerEnvVar.trim()) return;
@@ -544,6 +552,9 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                 <p className='arc-studio-config__run-policy-note' style={{ margin: '8px 0 0', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
                     Dry-run saves force paid calls off; profile selection follows backend profile inventory but is not persisted by this safe config update; provider auth remains env-var references only.
                 </p>
+                <p className='arc-studio-config__cost-policy-summary' style={{ margin: '4px 0 0', fontSize: '11px', color: dryRun || !allowPaidCalls ? 'var(--theia-descriptionForeground)' : 'var(--theia-editorWarning-foreground)' }}>
+                    Cost policy: {costPolicySummary.label}. Dry-run blocks paid calls; current profile dryRun={String(Boolean(currentProfile?.dryRun))}, allowPaidCalls={String(Boolean(currentProfile?.allowPaidCalls))}; effective allowPaidCalls={String(costPolicySummary.paidCallsAllowed)}. IDE gating is a preview/enforcement posture, not full provider-side cost enforcement.
+                </p>
                 {isolationStatus?.message && (
                     <p className='arc-studio-config__isolation-message' style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
                         Isolation status: {isolationStatus.message}
@@ -563,13 +574,22 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     </button>
                 </div>
                 <p className='arc-studio-config__paid-call-warning' style={{ margin: '8px 0', fontSize: '11px', color: 'var(--theia-editorWarning-foreground)' }}>
-                    Paid provider calls require explicit opt-in; dry-run stays providerCall:false.
+                    Paid/live provider calls require explicit opt-in; dry-run/offline stays providerCall:false. Quota display and reset use local counters only.
                 </p>
+                <div className='arc-studio-config__live-provider-gate' style={{ margin: '8px 0', padding: '8px', border: '1px solid var(--theia-widgetBorder)', borderRadius: '4px', fontSize: '11px', backgroundColor: 'var(--theia-editor-background)' }}>
+                    <strong>Live provider preview gate: {liveProviderGate.label || liveProviderGate.state || liveProviderGate.status || (dryRun || !allowPaidCalls ? 'blocked/gated' : 'ready')}</strong>
+                    <p style={{ margin: '4px 0 0', color: 'var(--theia-descriptionForeground)' }}>
+                        Preview-only/no network: providerCall:false. This panel never calls provider API, provider proxy, live API, or billing endpoints.
+                    </p>
+                    <p style={{ margin: '4px 0 0', color: 'var(--theia-descriptionForeground)' }}>
+                        {liveProviderGate.message || 'State derives from dry-run, paid-call opt-in, diagnostics, and local cost policy only.'} Enforcement: {liveProviderGate.enforcement || 'IDE gate; provider-side quota/billing remains external.'}
+                    </p>
+                </div>
                 <div className='arc-studio-config__provider-diagnostics' style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', fontSize: '12px' }}>
-                    <span>Live tests: <span style={{ fontFamily: 'monospace' }}>{liveTestsEnabled === null ? 'unknown' : liveTestsEnabled ? 'enabled' : 'disabled'}</span></span>
-                    <span>Routing default: <span style={{ fontFamily: 'monospace' }}>{routingDefault}</span></span>
-                    <span>Configured providers: <span style={{ fontFamily: 'monospace' }}>{configuredProvidersCount}</span></span>
-                    <span>Configured accounts: <span style={{ fontFamily: 'monospace' }}>{configuredAccountsCount}</span></span>
+                    <span>Live tests: <span style={{ fontFamily: 'monospace' }}>{diagnostics.liveTestsEnabled ? 'enabled' : 'disabled'}</span></span>
+                    <span>Routing default: <span style={{ fontFamily: 'monospace' }}>{diagnostics.routingDefault}</span></span>
+                    <span>Configured providers: <span style={{ fontFamily: 'monospace' }}>{diagnostics.configuredProvidersCount}</span></span>
+                    <span>Configured accounts: <span style={{ fontFamily: 'monospace' }}>{diagnostics.configuredAccountsCount}</span></span>
                 </div>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px', fontSize: '12px', maxWidth: '260px' }}>
                     Quota provider filter
@@ -594,6 +614,53 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                         </span>
                     )) : <span style={{ color: 'var(--theia-descriptionForeground)' }}>Quota counters unavailable.</span>}
                 </div>
+                {quotaResetAvailable && (
+                    <div className='arc-studio-config__quota-reset-confirm' style={{ marginTop: '8px', padding: '8px', border: '1px solid var(--theia-widgetBorder)', borderRadius: '4px', fontSize: '12px' }}>
+                        <button
+                            className='arc-studio-config__quota-reset-open'
+                            onClick={() => setQuotaResetConfirmOpen(true)}
+                            disabled={quotaResetting}
+                        >
+                            Local quota-counter reset
+                        </button>
+                        {quotaResetConfirmOpen && (
+                            <div className='arc-studio-config__quota-reset-modal' role='dialog' aria-label='Confirm local quota-counter reset' style={{ marginTop: '8px' }}>
+                                <p style={{ margin: '0 0 6px', color: 'var(--theia-editorWarning-foreground)' }}>
+                                    Local quota-counter reset only. No provider network, no live API, no billing action.
+                                </p>
+                                <p style={{ margin: '0 0 6px', color: 'var(--theia-descriptionForeground)' }}>
+                                    Type exact phrase <code>{quotaResetRequiredPhrase}</code> to enable reset. {quotaResetConfirmation.warning || quotaResetConfirmation.description || ''}
+                                </p>
+                                <input
+                                    className='arc-studio-config__quota-reset-phrase'
+                                    value={quotaResetPhrase}
+                                    onChange={e => setQuotaResetPhrase(e.currentTarget.value)}
+                                    placeholder={quotaResetRequiredPhrase}
+                                    aria-label='Quota reset confirmation phrase'
+                                />
+                                <button
+                                    className='arc-studio-config__quota-reset-local'
+                                    onClick={handleResetQuota}
+                                    disabled={quotaResetting || !quotaResetConfirmed}
+                                    style={{ marginLeft: '8px', fontSize: '12px' }}
+                                >
+                                    {quotaResetting ? 'Resetting local quota counters...' : 'Confirm local reset'}
+                                </button>
+                                <button
+                                    className='arc-studio-config__quota-reset-cancel'
+                                    onClick={() => { setQuotaResetConfirmOpen(false); setQuotaResetPhrase(''); }}
+                                    disabled={quotaResetting}
+                                    style={{ marginLeft: '6px', fontSize: '12px' }}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+                <p className='arc-studio-config__quota-reset-note' style={{ margin: '6px 0 0', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
+                    Local quota-counter reset calls ARC CLI local storage only; no provider network calls, no live API calls, no billing action.
+                </p>
             </div>
 
             {exportText && (

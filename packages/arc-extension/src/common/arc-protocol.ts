@@ -431,6 +431,11 @@ export interface ProviderQuotaInfo {
     metadata?: Record<string, unknown>;
 }
 
+export interface ProviderQuotaResetResult {
+    success: boolean;
+    message: string;
+}
+
 /**
  * Request to save a provider key reference. envVar is a variable name only.
  */
@@ -1231,6 +1236,9 @@ export interface ArcService {
 
     /** Get provider quota/counter metadata. No credential values are returned. */
     getProviderQuota(provider?: string): Promise<ProviderQuotaInfo>;
+
+    /** Reset local provider quota counters only. No provider network calls are made. */
+    resetProviderQuota(): Promise<ProviderQuotaResetResult>;
 
     /** Save an env-var provider key reference. Rejects raw key material. */
     setProviderKeyRef(request: ProviderKeyRefRequest): Promise<{ success: boolean; message: string }>;

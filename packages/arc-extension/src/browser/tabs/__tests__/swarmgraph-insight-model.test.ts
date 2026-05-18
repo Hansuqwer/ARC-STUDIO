@@ -122,8 +122,14 @@ describe('buildSwarmGraphInsight', () => {
     it('ignores fake/offline consensus metadata', () => {
         const insight = buildSwarmGraphInsight(trace({
             runtime: 'crewai+swarmgraph',
-            events: [event('NODE_COMPLETED', { step: 'fake offline complete' })],
+            events: [event('NODE_COMPLETED', {
+                step: 'fake offline complete',
+                real_runtime_gated: true,
+                real_path_absent_reason: 'provider opt-in missing',
+            })],
             metadata: {
+                runtime_mode: 'fake/offline',
+                real_provider_call: false,
                 consensus: { strategy: 'fake-majority', decision: 'accept' },
                 cost: { totalCost: 999 },
                 topology: { nodes: [{ id: 'fake' }] },
@@ -134,6 +140,35 @@ describe('buildSwarmGraphInsight', () => {
         expect(insight.consensus.decision).toBeUndefined();
         expect(insight.cost.totalCost).toBeUndefined();
         expect(insight.topology.nodes).toEqual([]);
+        expect(insight.runtimeMetadata).toEqual({
+            runtimeMode: 'fake/offline',
+            realProviderCall: false,
+            realRuntimeGated: true,
+            realPathAbsentReason: 'provider opt-in missing',
+        });
+    });
+
+    it('extracts runtime metadata from event data without promoting it to insight', () => {
+        const insight = buildSwarmGraphInsight(trace({
+            runtime: 'crewai+swarmgraph',
+            events: [event('NODE_COMPLETED', {
+                runtime_mode: 'offline',
+                real_provider_call: false,
+                real_runtime_gated: true,
+                real_path_absent_reason: 'fake fixture selected',
+            })],
+        }));
+
+        expect(insight.status).toBe('degraded');
+        expect(insight.topology.nodes).toEqual([]);
+        expect(insight.consensus.decision).toBeUndefined();
+        expect(insight.cost.totalCost).toBeUndefined();
+        expect(insight.runtimeMetadata).toEqual({
+            runtimeMode: 'offline',
+            realProviderCall: false,
+            realRuntimeGated: true,
+            realPathAbsentReason: 'fake fixture selected',
+        });
     });
 
     it('returns empty for missing trace', () => {

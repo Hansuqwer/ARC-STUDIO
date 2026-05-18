@@ -39,6 +39,7 @@ import {
     ProviderCatalogEntry,
     ProviderDiagnosticsInfo,
     ProviderQuotaInfo,
+    ProviderQuotaResetResult,
     ProviderKeyRefRequest,
     RunPreflightRequest,
     RunPreflightResponse,
@@ -833,6 +834,38 @@ export class ArcBackendService implements ArcService {
             throw new ArcError(
                 ArcErrorCode.EXECUTION_FAILED,
                 `Provider quota unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+        }
+    }
+
+    async resetProviderQuota(): Promise<ProviderQuotaResetResult> {
+        try {
+            const output = execFileSync('arc', ['providers', 'quota', 'reset', '--json'], {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            if (!parsed.ok) {
+                throw new ArcError(
+                    ArcErrorCode.EXECUTION_FAILED,
+                    parsed?.error?.message || 'Provider quota reset failed',
+                    { error: parsed?.error }
+                );
+            }
+            return {
+                success: true,
+                message:
+                    typeof parsed?.data?.message === 'string'
+                        ? parsed.data.message
+                        : 'Local provider quota counters reset',
+            };
+        } catch (error) {
+            if (error instanceof ArcError) throw error;
+            throw new ArcError(
+                ArcErrorCode.EXECUTION_FAILED,
+                `Provider quota reset unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`
             );
         }
     }

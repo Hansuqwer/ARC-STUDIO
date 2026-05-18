@@ -11,6 +11,7 @@ import {
     type SwarmGraphConsensusInsight,
     type SwarmGraphCostInsight,
     type SwarmGraphInsightStatus,
+    type SwarmGraphRuntimeMetadata,
     type SwarmGraphTopologyInsight,
 } from './swarmgraph-insight-model';
 
@@ -32,7 +33,7 @@ function formatTime(value?: string): string {
 
 function stateCopy(status: SwarmGraphInsightStatus): string {
     if (status === 'present') {
-        return 'real trace events present';
+        return 'trace events present';
     }
     if (status === 'degraded') {
         return 'SwarmGraph run detected; required insight events missing or incomplete';
@@ -146,6 +147,32 @@ const CostPanel: React.FC<{ cost: SwarmGraphCostInsight }> = ({ cost }) => (
         )}
     </Panel>
 );
+
+const RuntimeMetadataPanel: React.FC<{ metadata: SwarmGraphRuntimeMetadata }> = ({ metadata }) => {
+    const rows = [
+        ['runtime mode', metadata.runtimeMode],
+        ['provider call', metadata.realProviderCall === undefined ? undefined : metadata.realProviderCall ? 'real provider call reported' : 'fake/offline/no provider call'],
+        ['runtime gate', metadata.realRuntimeGated === undefined ? undefined : metadata.realRuntimeGated ? 'real runtime gated' : 'real runtime not gated'],
+        ['real path absent', metadata.realPathAbsentReason],
+    ].filter((row): row is [string, string] => typeof row[1] === 'string' && row[1].trim().length > 0);
+
+    if (rows.length === 0) {
+        return null;
+    }
+
+    return (
+        <section className='arc-studio-swarmgraph__panel arc-studio-swarmgraph__panel--metadata'>
+            <div className='arc-studio-swarmgraph__panel-header'>
+                <h3>Runtime Metadata</h3>
+                <span className='arc-studio-swarmgraph__badge arc-studio-swarmgraph__badge--metadata'>informational</span>
+            </div>
+            <p className='arc-studio-swarmgraph__note'>Shown as gating/provenance metadata only; not promoted to topology, consensus, or cost insight.</p>
+            <dl className='arc-studio-swarmgraph__details'>
+                {rows.map(([label, value]) => <React.Fragment key={label}><dt>{label}</dt><dd>{value}</dd></React.Fragment>)}
+            </dl>
+        </section>
+    );
+};
 
 export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcService }) => {
     const [traces, setTraces] = React.useState<TraceFile[]>([]);
@@ -287,6 +314,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
                 <TopologyPanel topology={insight.topology} />
                 <ConsensusPanel consensus={insight.consensus} />
                 <CostPanel cost={insight.cost} />
+                <RuntimeMetadataPanel metadata={insight.runtimeMetadata} />
             </div>
         </div>
     );

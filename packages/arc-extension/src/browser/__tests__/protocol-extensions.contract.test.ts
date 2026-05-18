@@ -103,6 +103,9 @@ describe('Protocol Extensions (Session B + B7)', () => {
         it('should export provider diagnostics and quota protocol types', () => {
             expect(source).toMatch(/export interface ProviderDiagnosticsInfo/);
             expect(source).toMatch(/export interface ProviderQuotaInfo/);
+            expect(source).toMatch(/export interface ProviderQuotaResetResult/);
+            expect(source).toMatch(/success:\s*boolean/);
+            expect(source).toMatch(/message:\s*string/);
             expect(source).toMatch(/providers\?:\s*Record<string, unknown>\[\]/);
             expect(source).toMatch(/routing\?:\s*Record<string, unknown>/);
             expect(source).toMatch(/accounts\?:\s*Record<string, unknown>\[\]/);
@@ -113,6 +116,7 @@ describe('Protocol Extensions (Session B + B7)', () => {
         it('should expose provider diagnostics and quota service methods', () => {
             expect(source).toMatch(/getProviderDiagnostics\(\):\s*Promise<ProviderDiagnosticsInfo>/);
             expect(source).toMatch(/getProviderQuota\(provider\?:\s*string\):\s*Promise<ProviderQuotaInfo>/);
+            expect(source).toMatch(/resetProviderQuota\(\):\s*Promise<ProviderQuotaResetResult>/);
         });
 
         it('should export run preflight protocol types', () => {
@@ -338,9 +342,12 @@ describe('Backend Service Extensions (Session B + B7)', () => {
             expect(source).toMatch(/providers.*diagnostics.*--json/);
             expect(source).toMatch(/async getProviderQuota\(provider\?:\s*string\)/);
             expect(source).toMatch(/providers.*quota.*show/);
+            expect(source).toMatch(/async resetProviderQuota\(\)/);
+            expect(source).toMatch(/\['providers', 'quota', 'reset', '--json'\]/);
             expect(source).toMatch(/--provider/);
             expect(source).toMatch(/Provider diagnostics unavailable/);
             expect(source).toMatch(/Provider quota unavailable/);
+            expect(source).toMatch(/Provider quota reset unavailable/);
         });
 
         it('should implement dry-run preflight via CLI without provider calls', () => {
