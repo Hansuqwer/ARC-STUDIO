@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import importlib.util
+import os
 import sys
 import time
 import warnings
@@ -27,6 +28,9 @@ from .protocol import (
 )
 
 log = logging.getLogger(__name__)
+
+_LOCAL_REAL_MODE = "local-real"
+_LOCAL_REAL_GATE_ENV = "ARC_LANGGRAPH_SWARMGRAPH_REAL"
 
 # SwarmGraph vendored packages path
 _SWARM_SHARED_PATH = (
@@ -114,11 +118,30 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             spec.runtime_config.get("offline_deterministic") is True
             or (spec.runtime_config.get("offline") is True and spec.runtime_config.get("fake") is True)
         )
+        local_real = self._is_local_real(spec)
+        if local_real and os.environ.get(_LOCAL_REAL_GATE_ENV) != "1":
+            emit_event(run_id, "RUN_FAILED", {
+                "error": (
+                    "LangGraph+SwarmGraph local-real mode requires "
+                    f"{_LOCAL_REAL_GATE_ENV}=1; no provider calls were made."
+                ),
+                "mode": self.mode.value,
+                "runtime_mode": _LOCAL_REAL_MODE,
+                "real_provider_call": False,
+                "provider_backed": False,
+            })
+            raise PermissionError(
+                "LangGraph+SwarmGraph local-real mode requires "
+                f"{_LOCAL_REAL_GATE_ENV}=1; no provider calls were made."
+            )
         if not offline_deterministic:
             _setup_swarmgraph_paths()
         emit_event(run_id, "STEP_STARTED", {
             "step": "load_graph",
             "mode": self.mode.value,
+            "runtime_mode": _LOCAL_REAL_MODE if local_real else None,
+            "real_provider_call": False,
+            "provider_backed": False,
         })
 
         graph = spec.runtime_config.get("graph")
@@ -185,7 +208,13 @@ class LangGraphAdoptionRunner(AdoptionRunner):
                 worker_id=task["worker_id"],
                 output=worker_output,
                 confidence=1.0,
-                metadata={"runtime": "langgraph", "swarmgraph_role": task.get("role", "worker")},
+                metadata={
+                    "runtime": "langgraph",
+                    "swarmgraph_role": task.get("role", "worker"),
+                    "runtime_mode": _LOCAL_REAL_MODE if local_real else "fake/offline" if offline_deterministic else "gated",
+                    "real_provider_call": False,
+                    "provider_backed": False,
+                },
             )
             worker_proposals.append(proposal)
 
@@ -207,6 +236,11 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             if offline_deterministic
             else self._swarmgraph_consensus(swarm_state, worker_proposals)
         )
+        result.metadata.update({
+            "runtime_mode": _LOCAL_REAL_MODE if local_real else result.metadata.get("runtime_mode", "gated"),
+            "real_provider_call": False,
+            "provider_backed": False,
+        })
         emit_event(run_id, "SWARMGRAPH_CONSENSUS", self._consensus_payload(result))
 
         emit_event(run_id, "STEP_COMPLETED", {
@@ -221,9 +255,19 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             "task_id": result.task_id,
             "consensus_reached": result.consensus_reached,
             "confidence": result.confidence,
+            "runtime_mode": result.metadata.get("runtime_mode"),
+            "real_provider_call": False,
+            "provider_backed": False,
         })
 
         return result
+
+    def _is_local_real(self, spec: AdoptionSpec) -> bool:
+        return (
+            spec.runtime_config.get("mode") == _LOCAL_REAL_MODE
+            or spec.runtime_config.get("runtime_mode") == _LOCAL_REAL_MODE
+            or spec.runtime_config.get("adoption_mode") == _LOCAL_REAL_MODE
+        )
     def _offline_queen_decompose(
         self,
         objective: str,
@@ -292,6 +336,8 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             "votes": [vote.model_dump() for vote in result.votes],
             "source": "langgraph+swarmgraph",
             "real_provider_call": result.metadata.get("real_provider_call"),
+            "provider_backed": result.metadata.get("provider_backed"),
+            "runtime_mode": result.metadata.get("runtime_mode"),
         }
 
     def _queen_decompose(

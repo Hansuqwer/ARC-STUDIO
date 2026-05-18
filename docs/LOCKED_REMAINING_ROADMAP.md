@@ -108,17 +108,17 @@
 
 **Goal:** Turn fake-tested/gated adoption runners into narrow, honest, real product paths.
 
-**Current:** Adoption protocol/runners exist. `crewai+swarmgraph` and `langgraph+swarmgraph` fake/offline CLI paths are routed for deterministic product use. Real/provider-backed LangGraph + SwarmGraph adoption remains gated, opt-in-smoke-only, and is not claimed as product-ready.
+**Current:** Adoption protocol/runners exist. `crewai+swarmgraph` and `langgraph+swarmgraph` fake/offline CLI paths are routed for deterministic product use. `langgraph+swarmgraph` also has a narrow local-real path that is explicit opt-in, smoke-scoped, and non-provider-backed. It performs no paid/live provider calls and is not claimed as product-ready. Provider-backed LangGraph + SwarmGraph adoption remains gated and not claimed.
 
 **Deliverables:**
 - Pick one first real target (`LangGraph + SwarmGraph` recommended).
-- Implement real runtime invocation through SwarmGraph worker/consensus path.
-- Paid/provider/privacy gates if any external calls occur.
+- Implement and harden the narrow local-real runtime invocation through the LangGraph + SwarmGraph path without provider calls.
+- Paid/provider/privacy gates before any future external/provider calls; no such calls are part of the current local-real smoke scope.
 - Trace/audit metadata identifies fake/offline vs real provider-backed execution.
 
 **Acceptance:**
 - Offline fake tests remain deterministic.
-- Opt-in real-runtime smoke proves the real path where deps are installed.
+- Opt-in real-runtime smoke covers the local-real path where deps are installed; it is not evidence for provider-backed execution.
 - Capability reports distinguish fake-tested/gated/real clearly.
 
 ## R7 — Release Operations + History Hygiene
@@ -146,5 +146,5 @@
 | R3 Provider/Quota UI | Partial | Keep provider calls gated/offline by default; future work is backend cost enforcement and any real provider execution path behind explicit opt-in |
 | R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
 | R5 SwarmGraph Insight | Complete baseline + first producer events | Add measured cost producer and complete backend live SSE wiring before live-runtime claims |
-| R6 Real Adoption | Partial | Harden LangGraph + SwarmGraph real/provider-backed path behind explicit gates; keep opt-in smoke only |
+| R6 Real Adoption | Partial | Harden LangGraph + SwarmGraph local-real path behind explicit gates; keep fake/offline default and provider-backed execution unclaimed |
 | R7 Release Ops | Partial | Refresh checklist evidence; `.env` scrub remains gated |

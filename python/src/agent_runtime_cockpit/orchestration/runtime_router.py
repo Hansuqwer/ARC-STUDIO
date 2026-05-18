@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 from typing import Any, Literal, Sequence
 import uuid
@@ -198,21 +199,39 @@ class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
         return True, 1.0, ["fake/offline deterministic adoption adapter"]
 
     def capability_report(self, workspace: Path) -> CapabilityReport:
+        local_real_enabled = os.environ.get("ARC_LANGGRAPH_SWARMGRAPH_REAL") == "1"
+        reason = (
+            "fake/offline deterministic path plus gated local-real LangGraph + vendored SwarmGraph path; "
+            "no provider-backed claim; no paid calls"
+            if local_real_enabled
+            else "fake/offline deterministic LangGraph + SwarmGraph path; no provider calls; "
+            "gated local-real path requires ARC_LANGGRAPH_SWARMGRAPH_REAL=1"
+        )
         return CapabilityReport(
             runtime_id=self.adapter_id,
             detected=True,
             can_run=True,
             availability="runnable",
-            reason="fake/offline deterministic LangGraph + SwarmGraph path; no provider calls; real path gated",
-            detected_artifacts=["fake/offline deterministic adoption adapter"],
+            reason=reason,
+            detected_artifacts=[
+                "fake/offline deterministic adoption adapter",
+                *(["local-real gate ARC_LANGGRAPH_SWARMGRAPH_REAL=1"] if local_real_enabled else []),
+            ],
+            required_env=[] if local_real_enabled else ["ARC_LANGGRAPH_SWARMGRAPH_REAL"],
             requires_paid_calls=False,
         )
 
     async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
         inputs = inputs or {}
         mode = inputs.get("runtime_mode", "fake/offline")
-        if mode != "fake/offline":
-            raise RuntimeNotRunnable("LangGraph + SwarmGraph real mode is gated behind opt-in smoke tests")
+        if mode not in {"fake/offline", "local-real"}:
+            raise RuntimeNotRunnable(
+                "LangGraph + SwarmGraph supports runtime_mode fake/offline or local-real only; "
+                "provider-backed real mode is not claimed"
+            )
+        local_real = mode == "local-real"
+        if local_real and os.environ.get("ARC_LANGGRAPH_SWARMGRAPH_REAL") != "1":
+            raise RuntimeNotRunnable("LangGraph + SwarmGraph local-real mode requires ARC_LANGGRAPH_SWARMGRAPH_REAL=1")
         runner = AdoptionRegistry.get(AdoptionMode.LANGGRAPH)
         if runner is None:
             raise RuntimeNotRunnable("LangGraph adoption runner is not registered")
@@ -236,7 +255,7 @@ class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
                 "graph": _FakeLangGraph(workflow_id),
                 "input": inputs,
                 "objective": inputs.get("prompt") or workflow_id,
-                "offline_deterministic": True,
+                "offline_deterministic": not local_real,
             },
             swarmgraph_config={"mode": mode, "real_provider_call": False},
         )
@@ -255,8 +274,12 @@ class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
                 "runtime_mode": mode,
                 "adoption": True,
                 "real_provider_call": False,
-                "real_runtime_gated": True,
-                "real_path_absent_reason": "fake/offline deterministic; real provider-backed path gated",
+                "real_runtime_gated": not local_real,
+                "real_path_absent_reason": (
+                    "local-real uses local LangGraph plus vendored SwarmGraph only; no provider-backed claim"
+                    if local_real
+                    else "fake/offline deterministic; local-real requires ARC_LANGGRAPH_SWARMGRAPH_REAL=1"
+                ),
                 "audit_path": None,
                 "audit_absent_reason": "fake/offline adoption run does not create SwarmGraph HMAC audit records",
                 "consensus": consensus.model_dump(),

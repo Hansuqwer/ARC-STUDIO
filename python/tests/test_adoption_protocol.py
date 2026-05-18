@@ -445,6 +445,110 @@ class TestLangGraphRunner:
         assert consensus["consensus_reached"] is True
         assert consensus["real_provider_call"] is False
 
+    @pytest.mark.asyncio
+    async def test_runner_local_real_blocked_without_gate(self, monkeypatch):
+        from agent_runtime_cockpit.adoption.langgraph_runner import (
+            LangGraphAdoptionRunner,
+        )
+
+        monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
+        events: list[tuple[str, dict]] = []
+
+        with pytest.raises(PermissionError, match="ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
+            await LangGraphAdoptionRunner().run(
+                AdoptionSpec(
+                    mode=AdoptionMode.LANGGRAPH,
+                    runtime_config={"mode": "local-real", "graph": object()},
+                ),
+                "lg-sg-local-real-blocked",
+                lambda run_id, event_type, data: events.append((event_type, data)),
+            )
+
+        assert events == [(
+            "RUN_FAILED",
+            {
+                "error": (
+                    "LangGraph+SwarmGraph local-real mode requires "
+                    "ARC_LANGGRAPH_SWARMGRAPH_REAL=1; no provider calls were made."
+                ),
+                "mode": "langgraph+swarmgraph",
+                "runtime_mode": "local-real",
+                "real_provider_call": False,
+                "provider_backed": False,
+            },
+        )]
+
+    @pytest.mark.asyncio
+    async def test_runner_local_real_gate_metadata_no_provider_calls(self, monkeypatch):
+        from agent_runtime_cockpit.adoption.langgraph_runner import (
+            LangGraphAdoptionRunner,
+        )
+
+        class _Graph:
+            ainvoke = None
+
+            def invoke(self, input_data):
+                return {"answer": input_data["swarmgraph_task"]}
+
+        runner = LangGraphAdoptionRunner()
+        monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
+        monkeypatch.setattr(
+            runner,
+            "_queen_decompose",
+            lambda objective, graph_input, max_workers, run_id: ([{
+                "task_id": "task-1",
+                "worker_id": "worker-1",
+                "role": "worker",
+                "input": {**graph_input, "swarmgraph_task": "local task"},
+            }], object()),
+        )
+        monkeypatch.setattr(
+            runner,
+            "_swarmgraph_consensus",
+            lambda swarm_state, proposals: ConsensusResult(
+                task_id=proposals[0].task_id,
+                winning_proposal=proposals[0],
+                votes=[Vote(
+                    task_id=proposals[0].task_id,
+                    voter_id=proposals[0].worker_id,
+                    proposal_id="task-1-worker-1",
+                    score=1.0,
+                    reason="local test vote",
+                )],
+                consensus_reached=True,
+                confidence=1.0,
+            ),
+        )
+
+        events: list[tuple[str, dict]] = []
+        result = await runner.run(
+            AdoptionSpec(
+                mode=AdoptionMode.LANGGRAPH,
+                runtime_config={
+                    "mode": "local-real",
+                    "graph": _Graph(),
+                    "input": {"topic": "local"},
+                },
+            ),
+            "lg-sg-local-real",
+            lambda run_id, event_type, data: events.append((event_type, data)),
+        )
+
+        assert result.metadata["runtime_mode"] == "local-real"
+        assert result.metadata["real_provider_call"] is False
+        assert result.metadata["provider_backed"] is False
+        assert result.winning_proposal.metadata["runtime_mode"] == "local-real"
+        assert result.winning_proposal.metadata["real_provider_call"] is False
+        assert result.winning_proposal.metadata["provider_backed"] is False
+        consensus = [data for event_type, data in events if event_type == "SWARMGRAPH_CONSENSUS"][-1]
+        completed = [data for event_type, data in events if event_type == "RUN_COMPLETED"][-1]
+        assert consensus["runtime_mode"] == "local-real"
+        assert consensus["real_provider_call"] is False
+        assert consensus["provider_backed"] is False
+        assert completed["runtime_mode"] == "local-real"
+        assert completed["real_provider_call"] is False
+        assert completed["provider_backed"] is False
+
 
 class TestAG2Runner:
     @pytest.mark.asyncio

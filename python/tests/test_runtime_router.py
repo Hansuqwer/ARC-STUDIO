@@ -46,6 +46,11 @@ class _FakeAdapter:
         )
 
 
+class _FakeGraph:
+    def invoke(self, input_data):
+        return {"result": input_data.get("swarmgraph_task") or "ok", "real_provider_call": False}
+
+
 def _install_fake_registry(monkeypatch, specs):
     adapters = {key: _FakeAdapter(key, **value) for key, value in specs.items()}
     monkeypatch.setattr(runtime_router, "default_registry", lambda: _FakeRegistry(adapters))
@@ -116,6 +121,46 @@ def test_langgraph_swarmgraph_resolves_as_fake_offline_runnable(tmp_path):
     assert routed.report.availability == "runnable"
     assert routed.report.requires_paid_calls is False
     assert "fake/offline" in (routed.report.reason or "")
+    assert "ARC_LANGGRAPH_SWARMGRAPH_REAL=1" in (routed.report.reason or "")
+    assert "ARC_LANGGRAPH_SWARMGRAPH_REAL" in routed.report.required_env
+
+
+@pytest.mark.asyncio
+async def test_langgraph_swarmgraph_local_real_requires_env(tmp_path):
+    routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
+
+    with pytest.raises(runtime_router.RuntimeNotRunnable, match="ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
+        await routed.adapter.run_workflow("wf-local", {"runtime_mode": "local-real"})
+
+
+@pytest.mark.asyncio
+async def test_langgraph_swarmgraph_local_real_routes_when_env_set(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
+    routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
+
+    run = await routed.adapter.run_workflow("wf-local", {
+        "runtime_mode": "local-real",
+        "graph": _FakeGraph(),
+        "prompt": "local prompt",
+    })
+
+    assert run.status == RunStatus.COMPLETED
+    assert run.metadata["runtime_mode"] == "local-real"
+    assert run.metadata["real_provider_call"] is False
+    assert run.metadata["real_runtime_gated"] is False
+    assert "no provider-backed claim" in run.metadata["real_path_absent_reason"]
+
+
+def test_langgraph_swarmgraph_capability_marks_local_real_gate(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
+
+    routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
+
+    assert routed.report.requires_paid_calls is False
+    assert routed.report.required_env == []
+    assert "local-real" in (routed.report.reason or "")
+    assert "no provider-backed claim" in (routed.report.reason or "")
+    assert "local-real gate ARC_LANGGRAPH_SWARMGRAPH_REAL=1" in routed.report.detected_artifacts
 
 
 def test_list_runtimes_includes_adoption_modes(monkeypatch, tmp_path):
@@ -131,7 +176,7 @@ def test_list_runtimes_includes_adoption_modes(monkeypatch, tmp_path):
     assert adoption.requires_paid_calls is False
     assert "fake/offline" in (adoption.reason or "")
     assert "real" in (adoption.reason or "")
-    assert "gated" in (adoption.reason or "")
+    assert "ARC_LANGGRAPH_SWARMGRAPH_REAL=1" in (adoption.reason or "")
 
 
 def test_auto_skips_paid_when_flag_off(monkeypatch, tmp_path):

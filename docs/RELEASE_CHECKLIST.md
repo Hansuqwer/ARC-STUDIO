@@ -9,7 +9,7 @@
 - ✅ Python CLI/wheel (`python/`)
 - ❌ Electron packaging — post-v0.1 spike only
 - ❌ LM Arena product feature — stub-default with gated live path, not v0.1 scope
-- ❌ SwarmGraph adoption product claim — fake-tested/gated adoption runners exist, but v0.1 release docs must not claim broad live adoption support
+- ❌ SwarmGraph adoption product claim — fake-tested/gated adoption runners exist; `langgraph+swarmgraph` has only a narrow opt-in local-real smoke path with no provider calls. v0.1 release docs must not claim broad live/provider-backed adoption support.
 
 ---
 
@@ -68,7 +68,7 @@ cd python && uv run arc --help
 
 **Status:** ✅ Passing locally (2026-05-15)
 
-Local run emits a LangGraph dependency warning on stderr, but stdout remains valid JSON and pipes through `python -m json.tool`.
+Local run emits a LangGraph dependency warning on stderr, but stdout remains valid JSON and pipes through `python -m json.tool`. Capability wording must keep fake/offline deterministic defaults separate from any opt-in local-real smoke path and must not imply provider-backed execution.
 
 **Check:**
 ```bash
@@ -179,7 +179,7 @@ curl -s http://localhost:3000 | grep -q 'arc-widget'
 
 **Status:** ⏸️ Deferred until release date is re-set
 
-Offline PR/push gates exist (`python`, `node`, `ARC Roadmap Gate`). A separate `real-runtime-smoke` workflow runs manually and nightly with `ARC_REAL_RUNTIME_SMOKE=1`. The 3-day green-window clock should start only after a release date is re-set.
+Offline PR/push gates exist (`python`, `node`, `ARC Roadmap Gate`). A separate `real-runtime-smoke` workflow runs manually and nightly with `ARC_REAL_RUNTIME_SMOKE=1`; that smoke scope is opt-in local-real validation only and must not perform or imply paid/live provider calls. The 3-day green-window clock should start only after a release date is re-set.
 
 **Check:** Visit CI dashboard and confirm workflows (python, node, lint)
 have green checkmarks on main for the past 3 days.
