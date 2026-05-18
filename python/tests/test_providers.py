@@ -227,6 +227,6 @@ def test_9router_mocked_live_action_succeeds_with_all_gates(monkeypatch, tmp_pat
     assert result.network_call_attempted is True
     assert result.accounting["usage"] == {"total_tokens": 3}
     assert result.metadata["key_ref_source"] == "NINEROUTER_API_KEY"
-    assert seen["url"] == "https://api.9router.com/v1/chat/completions"
+    assert seen["url"] == "http://localhost:20128/v1/chat/completions"
     assert seen["auth"] == "Bearer sk-test-should-not-emit"
     assert "sk-test-should-not-emit" not in dumped

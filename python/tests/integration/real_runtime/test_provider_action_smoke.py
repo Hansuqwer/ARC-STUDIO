@@ -1,4 +1,4 @@
-"""Opt-in live provider-action smoke for one narrow 9router/Qwen action.
+"""Opt-in live provider-action smoke for one narrow 9router MiniMax action.
 
 Skipped by default. This file must not run in normal CI/offline gates.
 
@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import json
 
 import pytest
 
@@ -23,7 +24,7 @@ pytestmark = pytest.mark.real_runtime
 
 
 PROVIDER = "9router"
-MODEL = "qwen/qwen3-235b-a22b-thinking-2507"
+MODEL = "nvidia/minimaxai/minimax-m2.7"
 CONFIRMATION = f"RUN_PROVIDER_ACTION:{PROVIDER}:{MODEL}"
 
 
@@ -36,9 +37,29 @@ def _requires_provider_action_smoke() -> None:
         pytest.skip("set NINEROUTER_API_KEY env ref; raw key is never logged/stored")
 
 
-def test_9router_qwen_provider_action_smoke_requires_explicit_gates(tmp_path) -> None:
+def test_9router_minimax_provider_action_smoke_requires_explicit_gates(tmp_path) -> None:
     """Manual-only live smoke: one paid-gated provider action, no adoption wiring."""
     _requires_provider_action_smoke()
+    routing_path = tmp_path / "provider-routing.json"
+    routing_path.write_text(
+        json.dumps(
+            {
+                "mode": "manual",
+                "default_provider": "9router",
+                "default_model": MODEL,
+                "dry_run": False,
+                "allow_paid_calls": True,
+                "max_retries": 1,
+                "timeout_ms": 900000,
+            }
+        ),
+        encoding="utf-8",
+    )
+    env = {
+        **os.environ,
+        "ARC_PROVIDER_ROUTING": str(routing_path),
+        "ARC_PROVIDER_QUOTA": str(tmp_path / "provider-quota.json"),
+    }
 
     result = subprocess.run(
         [
@@ -57,11 +78,18 @@ def test_9router_qwen_provider_action_smoke_requires_explicit_gates(tmp_path) ->
             CONFIRMATION,
         ],
         cwd=tmp_path,
+        env=env,
         check=False,
         capture_output=True,
         text=True,
-        timeout=60,
+        timeout=950,
     )
 
     assert result.returncode == 0, result.stderr
-    assert "ARC_PROVIDER_ACTION_SMOKE_OK" in result.stdout
+    payload = json.loads(result.stdout)
+    data = payload["data"]
+    assert data["real_provider_call"] is True
+    assert data["network_call_attempted"] is True
+    assert data["provider"] == PROVIDER
+    assert data["model"] == MODEL
+    assert data["metadata"]["choice_count"] >= 1
