@@ -2,7 +2,7 @@
 
 This is a gated release task. Do not run it during normal development.
 
-**Current status (2026-05-18):** Preparation only. No release date is set, the 3-day green window has not started, latest observed GitHub `main` is not fully green, and no `.env` scrub, history rewrite, force-push, secret rotation, branch deletion, tag, publish, or release action is approved.
+**Current status (2026-05-18):** Preparation only. Target release date is 2026-06-01 and latest observed required-ish GitHub `main` workflows are green on `6fed466`, but no `.env` scrub, history rewrite, force-push, secret rotation, branch deletion, tag, publish, or release action is approved.
 
 ## Trigger
 

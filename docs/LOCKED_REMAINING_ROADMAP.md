@@ -8,7 +8,7 @@
 
 - Canonical app: `applications/browser` + `packages/arc-extension`.
 - Legacy `theia-extensions/*` and `packages/arc-browser-app` are archived under `docs/archive/`.
-- GitHub CI green on `bbabc5e`: `python`, `node`, `ARC Roadmap Gate`, `signing-preflight`, `e2e`.
+- GitHub CI green on `6fed466`: `python`, `node`, `ARC Roadmap Gate`, `signing-preflight`, `e2e`.
 - Release-scope CLI/IDE basics are implemented and tested.
 - Remaining work is product depth, not repo stabilization.
 
@@ -125,7 +125,7 @@
 
 **Goal:** Prepare v0.1 release without rewriting history prematurely.
 
-**Current:** Release ops evidence is improved but not release-ready. Pushed `main` commit `bbabc5e` is green for the required-ish GitHub workflows checked on 2026-05-18: `python` (`26028632673`), `node` (`26028632696`), `ARC Roadmap Gate` (`26028632674`), `e2e` (`26028632698`), and `signing-preflight` (`26028632723`). No release date is set, no 3-day green window has started, and `.env` history scrub remains blocked until explicit release-date plus history-rewrite/force-push approval. The scrub plan includes a non-destructive preparation checklist only; no scrub/rewrite/force-push was performed.
+**Current:** Release ops evidence is improved but not release-ready. Target release date is 2026-06-01. Pushed `main` commit `6fed466` is green for the required-ish GitHub workflows checked on 2026-05-18: `python` (`26030398787`), `node` (`26030398743`), `ARC Roadmap Gate` (`26030398758`), `e2e` (`26030398786`), and `signing-preflight` (`26030398785`). The 3-day green-window starts from this 2026-05-18 green evidence and completes on 2026-05-21 only if required workflows stay green. `.env` history scrub remains blocked until explicit history-rewrite/force-push approval. The scrub plan includes a non-destructive preparation checklist only; no scrub/rewrite/force-push was performed.
 
 **Deliverables:**
 - Final release checklist evidence with commit/run IDs.
@@ -148,4 +148,4 @@
 | R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
 | R5 SwarmGraph Insight | Complete baseline + first producer events | Add measured cost producer and complete backend live SSE wiring before live-runtime claims |
 | R6 Real Adoption | Partial | LangGraph + SwarmGraph local-real path now requires dual explicit gates consistently; keep fake/offline default and provider-backed execution unclaimed |
-| R7 Release Ops | Partial | Evidence refreshed: pushed `main` `bbabc5e` is green for `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`; no release date, green window, or `.env` scrub |
+| R7 Release Ops | Partial | Release date set for 2026-06-01; green-window started from 2026-05-18 `6fed466` green evidence; `.env` scrub still blocked pending explicit destructive-action approval |
