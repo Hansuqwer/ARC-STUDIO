@@ -263,7 +263,21 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
 
     const connectLiveStream = React.useCallback(async () => {
         const runId = liveRunId.trim();
-        const baseUrl = liveBaseUrl.trim();
+        let baseUrl = liveBaseUrl.trim();
+        
+        // Auto-resolve from backend env if not provided
+        if (!baseUrl) {
+            try {
+                const envBaseUrl = await arcService.getPythonDaemonUrl();
+                if (envBaseUrl) {
+                    baseUrl = envBaseUrl;
+                    setLiveBaseUrl(envBaseUrl);
+                }
+            } catch {
+                // Ignore env resolution errors, fall through to manual requirement
+            }
+        }
+        
         if (!runId) {
             setLiveState('degraded');
             setLiveReason('run ID is required for live stream probe');
@@ -271,7 +285,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
         }
         if (!baseUrl) {
             setLiveState('disconnected');
-            setLiveReason('no Python web/SSE base URL configured');
+            setLiveReason('no Python web/SSE base URL configured (set ARC_PYTHON_DAEMON_URL or enter manually)');
             setError(null);
             return;
         }
@@ -283,7 +297,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
         setLiveReason(undefined);
         setError(null);
         try {
-            const stream = await arcService.readActiveTraceStream({ runId, mode: 'live', baseUrl });
+            const stream = await arcService.streamActiveTrace({ runId, mode: 'live', baseUrl });
             for await (const chunk of stream) {
                 if (streamCancelled.current) {
                     return;

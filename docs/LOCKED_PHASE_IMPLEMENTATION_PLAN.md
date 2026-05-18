@@ -52,8 +52,8 @@ Every new phase/chunk should include:
 
 ### Design Note — Current Launch/Event Flow
 - IDE launch path today is ChatTab/runtime selectors → Theia backend CLI bridge → Python `arc run`/related commands. The Theia service contract now exposes `streamActiveTrace()` for live/replay event consumption.
-- Python live infrastructure exists in `EventBroker.stream_live()`/`sse_handler()` and supervisor event emission, while `/api/runs/{id}/events` supports explicit live/replay SSE modes for an existing run id.
-- `/api/sse-proof` is a deterministic stub live SSE endpoint. It emits `RUN_STARTED`, step data, terminal `RUN_COMPLETED`, then `STREAM_END`; it proves streaming transport semantics but is not a provider-backed runtime stream.
+- Python live infrastructure exists in `EventBroker.stream_live()`/`sse_handler()` (in-memory same-process only) and supervisor event emission, while `/api/runs/{id}/events` supports explicit live/replay SSE modes for an existing run id.
+- `/api/sse/proof` is a deterministic stub live SSE endpoint. It emits `RUN_STARTED`, step data, terminal `RUN_COMPLETED`, then `STREAM_END`; it proves streaming transport semantics but is not a provider-backed runtime stream.
 - Product semantics target: active stream = connected to an in-flight run via broker/supervisor; replay = finite stored trace read; disconnected = stream lost before a terminal run event or `STREAM_END`.
 
 ### Chunk 1.1 — Trace Current Run Launch/Event Flow
@@ -83,7 +83,7 @@ Every new phase/chunk should include:
 
 ### Chunk 1.5 — Stub E2E Live Run
 - Status: Complete for deterministic SSE proof stub only.
-- Stub run emits deterministic events through `/api/sse-proof`.
+- Stub run emits deterministic events through `/api/sse/proof`.
 - E2E verifies live `RUN_STARTED` + terminal event without reading stored replay.
 
 ## Phase 2 — IDE Runtime Setup + Config
@@ -269,7 +269,7 @@ Every new phase/chunk should include:
 ### Phase 8 — Live Stream Productization
 
 - Status: Baseline Complete — configured Python daemon/local live stream wiring is implemented for IDE `streamActiveTrace()` via explicit/requested base URL or `ARC_PYTHON_DAEMON_URL`, with local live terminal/degraded handling and replay-not-live UI copy/tests. Evidence: local Phase 8 verification on `bec8d4b` worktree (`python` web SSE tests, arc-extension tests/build, browser build/e2e, `scripts/check-pr.sh`). This proves configured local daemon/stub runtime event streams only, not broad runtime/provider-backed live event support.
-- Wire Theia live mode to configured Python daemon/local runtime stream beyond deterministic `/api/sse-proof`.
+- Wire Theia live mode to configured Python daemon/local runtime stream beyond deterministic `/api/sse/proof`.
 - Preserve live/replay/disconnected distinctions; do not label replay as live.
 - Add/refresh tests proving configured local stream behavior without provider calls.
 - Acceptance:
@@ -286,10 +286,10 @@ Every new phase/chunk should include:
 - Do:
   1. Add a deterministic local daemon route/hook or fixture to the e2e harness for `/api/runs/{id}/events?mode=live` without provider calls.
   2. Add one smoke test that opens the relevant IDE surface, connects to the configured daemon URL, and observes a live `RUN_STARTED` plus terminal or explicit degraded/disconnected state.
-  3. Keep existing `/api/sse-proof` assertions labeled limited-local only.
+  3. Keep existing `/api/sse/proof` assertions labeled limited-local only.
 - Do not:
   1. Do not claim broad runtime/provider-backed live event support.
-  2. Do not treat stored replay or `/api/sse-proof` as proof of UI-rendered daemon live frames.
+  2. Do not treat stored replay or `/api/sse/proof` as proof of UI-rendered daemon live frames.
   3. Do not expand scope into unrelated Theia warning cleanup unless the warning blocks this e2e path.
 - Acceptance:
   1. Browser e2e proves one IDE-to-local-daemon SSE live frame path.
@@ -300,9 +300,9 @@ Every new phase/chunk should include:
 
 ### Phase 9 — BudgetVector Post-Hoc Accounting
 
-**Status:** Complete in working tree pending commit. Implemented post-hoc accounting/reporting only; real-time pressure/exhaustion interrupts remain deferred.
+**Status:** Complete. Implemented post-hoc accounting/reporting only; real-time pressure/exhaustion interrupts remain deferred.
 
-**Evidence:** `cd python && uv run pytest tests/web/test_cli_budget.py -q` (8 passed); `pnpm --filter @arc-studio/protocol build && pnpm --filter arc-extension build`.
+**Evidence:** Committed at `cc9cac4`. `cd python && uv run pytest tests/web/test_cli_budget.py -q` (8 passed); `pnpm --filter @arc-studio/protocol build && pnpm --filter arc-extension build`.
 
 - Add a `BudgetVector` model and workflow/default-budget config shape where appropriate.
 - Compute post-hoc usage from trace/metadata where data exists; mark missing dimensions as absent/degraded.

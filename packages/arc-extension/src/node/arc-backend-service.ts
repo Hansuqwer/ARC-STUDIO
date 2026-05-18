@@ -1738,4 +1738,8 @@ export class ArcBackendService implements ArcService {
         const match = reason.match(/verified\s+(\d+)\s+records?/i);
         return match ? Number(match[1]) : 0;
     }
+
+    async getPythonDaemonUrl(): Promise<string | undefined> {
+        return process.env[ARC_PYTHON_DAEMON_URL_ENV]?.trim() || undefined;
+    }
 }

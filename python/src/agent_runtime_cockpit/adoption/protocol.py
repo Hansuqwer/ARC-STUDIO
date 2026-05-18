@@ -2,8 +2,8 @@
 Adoption protocol — shared interface for all runtime + SwarmGraph modes (P1b).
 
 Defines the Pydantic models and abstract runner that every adoption adapter
-must implement. No executable adoption mode is provided — all runners default
-to NOT_IMPLEMENTED or NOT_RUNNABLE.
+must implement. Runners may return RUNNABLE status when dependencies and gates
+are satisfied; default behavior is NOT_IMPLEMENTED or NOT_RUNNABLE.
 """
 from __future__ import annotations
 

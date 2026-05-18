@@ -51,7 +51,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 
 | Event/Data Type | Producer Path | Status | UI Consumers |
 |---|---|---|---|
-| Active run SSE transport events | `EventBroker`/`JobSupervisor`, `/api/runs/{id}/events`, `/api/sse-proof` stub | Baseline Complete | Event Stream, Run Timeline |
+| Active run SSE transport events | `EventBroker`/`JobSupervisor`, `/api/runs/{id}/events`, `/api/sse/proof` stub | Baseline Complete | Event Stream, Run Timeline |
 | `RUN_STARTED` / terminal events | SSE proof stub and supported run paths | Baseline Complete | Event Stream, Run Timeline |
 | SwarmGraph topology | `langgraph+swarmgraph` event path | Baseline Complete for first producer; absent elsewhere | SwarmGraph Insight |
 | Consensus/vote events | `langgraph+swarmgraph` event path | Baseline Complete for first producer; absent elsewhere | SwarmGraph Insight |
@@ -77,7 +77,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 
 **Goal:** Active runs stream events into IDE views while running, not only replay stored traces.
 
-**Current:** Complete Phase 1 vertical baseline plus Phase 8 local daemon productization baseline. Python SSE supports active/replay modes and terminal/disconnected semantics; Theia exposes a typed `streamActiveTrace()` proxy that can use an explicit/requested Python web base URL or `ARC_PYTHON_DAEMON_URL`; Event Stream/SwarmGraph Insight surfaces distinguish live/replay/disconnected states; `/api/sse-proof` has deterministic limited-local coverage only and is not evidence of broad runtime live event support.
+**Current:** Complete Phase 1 vertical baseline plus Phase 8 local daemon productization baseline. Python SSE supports active/replay modes and terminal/disconnected semantics; Theia exposes a typed `streamActiveTrace()` proxy that can use an explicit/requested Python web base URL or `ARC_PYTHON_DAEMON_URL`; Event Stream/SwarmGraph Insight surfaces distinguish live/replay/disconnected states; `/api/sse/proof` has deterministic limited-local coverage only and is not evidence of broad runtime live event support.
 
 **Deliverables:**
 - Python active run stream endpoint or command path backed by `EventBroker`/`JobSupervisor`.

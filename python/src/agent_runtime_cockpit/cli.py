@@ -785,27 +785,58 @@ def doctor_all(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
         })
 
     # 4. Daemon connectivity (best-effort, non-blocking)
-    daemon_host = os.environ.get("ARC_DAEMON_HOST", "127.0.0.1")
-    daemon_port = os.environ.get("ARC_DAEMON_PORT", "7777")
-    try:
-        import urllib.request
-        req = urllib.request.Request(f"http://{daemon_host}:{daemon_port}/health")
-        with urllib.request.urlopen(req, timeout=2) as resp:
-            daemon_reachable = resp.status == 200
+    # Check both ARC_PYTHON_DAEMON_URL and legacy ARC_DAEMON_HOST/PORT
+    daemon_url = os.environ.get("ARC_PYTHON_DAEMON_URL")
+    if daemon_url:
+        try:
+            import urllib.request
+            health_url = f"{daemon_url.rstrip('/')}/health"
+            req = urllib.request.Request(health_url)
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                daemon_reachable = resp.status == 200
+                checks.append({
+                    "check": "daemon",
+                    "ok": daemon_reachable,
+                    "reachable": daemon_reachable,
+                    "url": daemon_url,
+                })
+                if not daemon_reachable:
+                    all_ok = False
+        except Exception:
             checks.append({
                 "check": "daemon",
-                "ok": daemon_reachable,
-                "reachable": daemon_reachable,
+                "ok": False,
+                "reachable": False,
+                "url": daemon_url,
+                "note": "daemon not running (offline-first is normal)",
             })
-            if not daemon_reachable:
-                all_ok = False
-    except Exception:
-        checks.append({
-            "check": "daemon",
-            "ok": False,
-            "reachable": False,
-            "note": "daemon not running (offline-first is normal)",
-        })
+    else:
+        # Fallback to legacy ARC_DAEMON_HOST/PORT
+        daemon_host = os.environ.get("ARC_DAEMON_HOST", "127.0.0.1")
+        daemon_port = os.environ.get("ARC_DAEMON_PORT", "7777")
+        try:
+            import urllib.request
+            req = urllib.request.Request(f"http://{daemon_host}:{daemon_port}/health")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                daemon_reachable = resp.status == 200
+                checks.append({
+                    "check": "daemon",
+                    "ok": daemon_reachable,
+                    "reachable": daemon_reachable,
+                    "host": daemon_host,
+                    "port": daemon_port,
+                })
+                if not daemon_reachable:
+                    all_ok = False
+        except Exception:
+            checks.append({
+                "check": "daemon",
+                "ok": False,
+                "reachable": False,
+                "host": daemon_host,
+                "port": daemon_port,
+                "note": "daemon not running (offline-first is normal)",
+            })
 
     # 5. SwarmGraph CLI availability
     try:

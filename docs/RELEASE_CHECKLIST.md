@@ -106,9 +106,9 @@ bash scripts/check-banned-claims.sh AGENTS.md README.md docs/LOCKED_REMAINING_RO
 
 ### 6. Python test suite passes
 
-**Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
+**Status:** ✅ Passing locally (2026-05-18)
 
-Latest local run: `782 passed, 14 skipped`. Real-runtime smoke paths are outside the default offline gate because dependency shape differs across platforms. The narrow `langgraph+swarmgraph` local-real smoke requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; it uses an in-process fixture graph, forces no-cost SwarmGraph env defaults, performs no provider/paid calls, and is not evidence for provider-backed adoption.
+Latest local run: `860 passed, 19 skipped`. Real-runtime smoke paths are outside the default offline gate because dependency shape differs across platforms. The narrow `langgraph+swarmgraph` local-real smoke requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; it uses an in-process fixture graph, forces no-cost SwarmGraph env defaults, performs no provider/paid calls, and is not evidence for provider-backed adoption.
 
 **Evidence:** Pushed `main` commit `6d3f559`; latest observed `python` on `main` is green: ✅ `26031641317`.
 

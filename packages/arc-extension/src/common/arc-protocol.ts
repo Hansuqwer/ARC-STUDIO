@@ -1370,6 +1370,9 @@ export interface ArcService {
     /** Diff two stored runs using the Python CLI. */
     diffRuns(runAId: string, runBId: string): Promise<RunDiffResult>;
 
+    /** Get configured Python daemon URL from ARC_PYTHON_DAEMON_URL env var. */
+    getPythonDaemonUrl(): Promise<string | undefined>;
+
     // ========== Capability Diff (Session B) ==========
 
     /**

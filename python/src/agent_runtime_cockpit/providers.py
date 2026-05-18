@@ -160,7 +160,7 @@ class ProviderAccountStore:
             label=label,
             key_env_var=api_key_env,
             key_fingerprint=None,
-            masked_key=mask_secret(os.environ.get(api_key_env)) or f"env:{api_key_env}",
+            masked_key=f"env:{api_key_env}",
             default_model=default_model,
             base_url=base_url,
         )

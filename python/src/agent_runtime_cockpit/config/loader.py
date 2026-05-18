@@ -29,7 +29,6 @@ USER_CONFIG_PATH = Path.home() / ".arc" / "config.yaml"
 
 # Environment variable -> config key mapping
 ENV_TO_CONFIG: dict[str, str] = {
-    "ARC_DAEMON_PORT": "daemon.port",
     "ARC_SWARMGRAPH_RUN_BACKEND": "swarmgraph.run_backend",
     "ARC_SWARMGRAPH_PROVIDER": "swarmgraph.provider",
     "ARC_OTEL_GENAI_EXPERIMENTAL": "telemetry.otel_genai_experimental",

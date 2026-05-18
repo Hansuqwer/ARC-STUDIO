@@ -57,7 +57,7 @@ def test_account_store_persists_env_ref_without_key(tmp_path, monkeypatch):
     store = ProviderAccountStore(tmp_path / "providers.json")
     account = store.add_env_account("qwen", "personal", "QWEN_API_KEY")
     raw = (tmp_path / "providers.json").read_text()
-    assert account.masked_key == "sk-...cted"
+    assert account.masked_key == "env:QWEN_API_KEY"
     assert "sk-test-qwen-redacted" not in raw
     assert store.list_accounts()[0].key_env_var == "QWEN_API_KEY"
 

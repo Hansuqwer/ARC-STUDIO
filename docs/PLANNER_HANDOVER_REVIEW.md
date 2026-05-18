@@ -66,7 +66,7 @@ All exclusions are appropriate:
 - ✅ Phase 1 (R1) is marked **Complete** in `LOCKED_PHASE_IMPLEMENTATION_PLAN.md`
 - ✅ `streamActiveTrace()` exists in Theia backend service contract
 - ✅ Event Stream and Run Timeline widgets distinguish live/replay/disconnected states
-- ✅ `/api/sse-proof` deterministic stub endpoint exists with e2e coverage
+- ✅ `/api/sse/proof` deterministic stub endpoint exists with e2e coverage
 
 **Gap:** The document says "the wiring between them is missing" but Phase 1 status says the transport/proxy/UI-state baseline is complete. The remaining work is **productization**: connecting Theia live mode to a configured Python web base URL for real in-flight runtime streams beyond the deterministic stub path.
 
