@@ -217,6 +217,14 @@ v0.2 product work is scoped to IDE productization of existing/gated capabilities
 - Polish the existing Assurance tab for HITL/audit with live refresh, filtering, export affordances, and clear present/missing/degraded audit states. **Complete** in Phase 10 assurance polish patch after `fa9a64f`.
 - Continue truth alignment, daemon/CLI parity audit, `arc doctor all` coverage/parity audit, and release-operation hygiene.
 
+### Phase 11 Discipline Audit Status
+
+**Status:** Baseline Complete | Evidence: local source audit against daemon routes in `python/src/agent_runtime_cockpit/web/routes.py:710-744`, doctor implementation in `python/src/agent_runtime_cockpit/cli.py:739-851`, storage subcheck at `:939-980`, and scoped CLI tests (`76 passed`) | Notes: remaining direct-daemon orphan/deferred surfaces are documented below; docs must not imply complete CLI/UI parity for every daemon route.
+
+`arc doctor all` currently covers Python, CLI version, runtime detection, daemon health, SwarmGraph CLI availability, and provider env-presence diagnostics. Storage diagnostics are implemented as `arc doctor storage`, but current source does not show storage included in `arc doctor all`; release docs should state that gap until tests or code change prove otherwise.
+
+Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/eval routes have CLI analogs or active UI consumers. Remaining deferred/orphan surfaces are `/api/runs/start` direct daemon start (current UI uses CLI `arc run`), `/api/runs/{run_id}/links` (daemon route exists while Theia expects missing CLI `arc runs links`), `/api/telemetry/export/{run_id}`, `/api/context/pack`, `/api/providers/accounts/{account_id}/test`, limited-local `/api/sse/proof`, and gated/stub `/api/arena/*` surfaces. These are not release claims.
+
 ### Deferred From v0.2
 
 - Effect-boundary replay and `arc runs fork` over journaled adapter responses.

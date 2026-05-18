@@ -153,6 +153,23 @@ bash scripts/check-banned-claims.sh AGENTS.md README.md docs/LOCKED_REMAINING_RO
 
 ---
 
+### 8a. Daemon/doctor parity docs are honest
+
+**Status:** ✅ Baseline audit documented; remaining orphan/deferred surfaces listed
+
+**Evidence:** Local source audit draft on 2026-05-18. Daemon routes are registered in `python/src/agent_runtime_cockpit/web/routes.py:710-744`. `arc doctor all` is implemented in `python/src/agent_runtime_cockpit/cli.py:739-851`; storage diagnostics are separate at `python/src/agent_runtime_cockpit/cli.py:939-980`.
+
+`arc doctor all` currently reports Python, CLI version, runtime detection, daemon health, SwarmGraph CLI availability, and provider env-presence diagnostics. It does not include the storage subcheck based on current source. Remaining direct-daemon orphan/deferred surfaces are `/api/runs/start`, `/api/runs/{run_id}/links`, `/api/telemetry/export/{run_id}`, `/api/context/pack`, `/api/providers/accounts/{account_id}/test`, limited-local `/api/sse/proof`, and gated/stub `/api/arena/*`. Release notes must not state complete daemon endpoint CLI/UI parity or complete doctor storage coverage until a later implementation closes those gaps.
+
+**Check:**
+```bash
+cd python && uv run pytest tests/test_cli_doctor.py tests/cli/test_cli_discoverability.py tests/test_cli_providers.py tests/test_cli_runs.py -q
+bash scripts/check-banned-claims.sh AGENTS.md README.md docs/LOCKED_REMAINING_ROADMAP.md docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md docs/REALITY_AUDIT.md docs/RELEASE_CHECKLIST.md docs/EXTENSION_MIGRATION.md docs/handover/HANDOVER.md
+# Expect: relevant CLI tests pass and no banned claims are reported.
+```
+
+---
+
 ### 9. `.env` history scrubbed (gated on release readiness)
 
 **Status:** ⚠️ Scheduled; destructive action still blocked

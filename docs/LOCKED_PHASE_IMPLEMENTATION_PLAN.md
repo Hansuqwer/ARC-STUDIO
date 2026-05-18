@@ -334,8 +334,15 @@ Every new phase/chunk should include:
 ### Phase 11 — Discipline Audits
 
 - Run daemon/CLI parity audit and decide command vs endpoint fate for remaining orphan surfaces.
-- Audit `arc doctor all` coverage rather than reimplementing it.
-- Keep release-facing docs aligned with reality; no broad provider-backed adoption, live Arena, adapter-wide keyed audit, production, shared-server, or tenant-isolation claims.
+- Audit `arc doctor all` coverage against existing subchecks without changing CLI behavior.
+- Keep release-facing docs aligned with reality; no release claims beyond proven gated/local/offline behavior.
+- Phase 11 audit ledger draft:
+  - Daemon route inventory source: `python/src/agent_runtime_cockpit/web/routes.py:710-744`.
+  - Endpoint parity status: audited against current CLI and Theia extension sources. Core daemon surfaces have explicit CLI analogs or active UI consumers for health, inspect, runtimes/capabilities, workflows, schemas, run list/get/events, providers/status/accounts/routing/proxy/diagnostics, run diff, and eval run. Remaining direct-daemon orphan/deferred surfaces are `/api/runs/start` (UI launches through CLI `arc run` instead), `/api/runs/{run_id}/links` (extension expects CLI `arc runs links`, but no matching CLI command was found), `/api/telemetry/export/{run_id}` (no active CLI/UI consumer found), `/api/context/pack` (no active CLI/UI consumer found), `/api/providers/accounts/{account_id}/test` (no active CLI/UI consumer found), `/api/sse/proof` (limited-local stub/proof only), and `/api/arena/*` (stub/gated Arena surfaces with no product live-Arena claim).
+  - `arc doctor all` source: `python/src/agent_runtime_cockpit/cli.py:739-851`.
+  - `arc doctor all` currently reports Python, CLI version, runtime detection, daemon health, SwarmGraph CLI availability, and provider env-presence diagnostics.
+  - Storage diagnostics exist separately in `arc doctor storage` at `python/src/agent_runtime_cockpit/cli.py:939-980`; they are not included in `arc doctor all` based on current source.
+  - Relevant CLI test evidence: `cd python && uv run pytest tests/test_cli_doctor.py tests/cli/test_cli_discoverability.py tests/test_cli_providers.py tests/test_cli_runs.py -q` passed locally with 76 tests.
 - Acceptance:
   1. Remaining orphan daemon endpoints each have an explicit CLI command, UI consumer, or deferral note.
   2. `arc doctor all` coverage is documented against runtime/provider/storage checks.
