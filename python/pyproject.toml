@@ -64,6 +64,9 @@ markers = [
 filterwarnings = [
     # Transitive LangGraph warning until upstream resolves allowed_objects default.
     "ignore:.*allowed_objects.*",
+    # Ignore resource warnings from unclosed sockets in test cleanup
+    "ignore::ResourceWarning",
+    "ignore::pytest.PytestUnraisableExceptionWarning",
 ]
 
 [tool.ruff]

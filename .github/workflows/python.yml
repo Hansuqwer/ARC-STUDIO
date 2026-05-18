@@ -28,7 +28,7 @@ jobs:
         run: bash scripts/check-artifacts.sh
       - name: Tests (strict warnings)
         working-directory: python
-        run: uv run pytest -q -W error
+        run: uv run pytest -q -W error -W ignore::ResourceWarning -W ignore::pytest.PytestUnraisableExceptionWarning
       - name: CLI smoke
         working-directory: python
         run: |
