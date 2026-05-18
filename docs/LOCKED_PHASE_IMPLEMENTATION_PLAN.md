@@ -181,12 +181,12 @@ git status --short
 ## Phase 7 — Release Operations
 
 **Roadmap:** R7  
-**Status:** Partial — 7.1 evidence refreshed against local `main` commit `b68663b` and latest/last-green GitHub `main` run IDs; 7.2 deferred because no release date is set and latest `main` is not fully green; 7.3 remains blocked
+**Status:** Partial — 7.1 evidence refreshed against local `main` commit `c0717749` and latest/last-green GitHub `main` run IDs; 7.2 deferred because no release date is set and latest `main` is not fully green; 7.3 remains blocked with non-destructive prep checklist only
 
 ### Chunk 7.1 — Release Evidence Refresh
 - Update release checklist with latest commit/run IDs.
 - Do not overclaim deferred features.
-- Status: Partial — evidence refreshed for local `main` commit `b68663b`. Latest GitHub `main` evidence: `ba7b1d32` python ✅ `26023575411`, e2e ✅ `26023575414`, signing-preflight ✅ `26023575408`, node ❌ `26023575413`, ARC Roadmap Gate ❌ `26023575410`. Last all-green required-ish set remains `073238d`: python ✅ `25997787492`, node ✅ `25997787491`, ARC Roadmap Gate ✅ `25997787490`, e2e ✅ `25997787483`, signing-preflight ✅ `25997787503`. Banned-claims verification remains the docs-touch check for this phase.
+- Status: Partial — evidence refreshed for local `main` commit `c0717749`. Latest GitHub `main` evidence: `ba7b1d32` python ✅ `26023575411`, e2e ✅ `26023575414`, signing-preflight ✅ `26023575408`, node ❌ `26023575413`, ARC Roadmap Gate ❌ `26023575410`. Last all-green required-ish set remains `073238d`: python ✅ `25997787492`, node ✅ `25997787491`, ARC Roadmap Gate ✅ `25997787490`, e2e ✅ `25997787483`, signing-preflight ✅ `25997787503`. Banned-claims verification remains the docs-touch check for this phase.
 
 ### Chunk 7.2 — Green Window
 - Start only after release date is set.
@@ -195,7 +195,7 @@ git status --short
 
 ### Chunk 7.3 — `.env` History Scrub
 - Execute only after explicit approval for release date + history rewrite + force-push plan.
-- Status: Blocked — no `.env` scrub, history rewrite, or force-push may occur without explicit release-date and destructive-action approval.
+- Status: Blocked — no `.env` scrub, history rewrite, or force-push may occur without explicit release-date and destructive-action approval. Current plan update is non-destructive preparation only.
 
 ## Phase Status Table
 
@@ -207,4 +207,4 @@ git status --short
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; live-aware UI with backend live SSE still degraded/disconnected |
 | 6 Real Adoption | Partial | adoption protocol | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` across router/capability/preflight/runner surfaces with no provider calls; provider-backed path gated/not claimed |
-| 7 Release Ops | Partial | green CI | 7.1 evidence refreshed for local `b68663b` plus latest `ba7b1d32`/last-green `073238d` GitHub run IDs; 7.2 deferred because no release date is set and latest `main` is not fully green; 7.3 `.env` scrub blocked pending explicit destructive-action approval |
+| 7 Release Ops | Partial | green CI | 7.1 evidence refreshed for local `c0717749` plus latest `ba7b1d32`/last-green `073238d` GitHub run IDs; 7.2 deferred because no release date is set and latest `main` is not fully green; 7.3 `.env` scrub blocked pending explicit destructive-action approval with non-destructive prep checklist only |
