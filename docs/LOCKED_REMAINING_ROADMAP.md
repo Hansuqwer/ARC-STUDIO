@@ -125,7 +125,7 @@
 
 **Goal:** Prepare v0.1 release without rewriting history prematurely.
 
-**Current:** Release checklist evidence was refreshed on 2026-05-18 against local commit `13b34b4`. Current GitHub run IDs are still TBD/not yet refreshed from local evidence. `.env` history scrub is planned but blocked until an explicit release date and history-rewrite/force-push approval.
+**Current:** Release ops evidence is not yet release-ready. Local `main` is currently `b68663b`. Latest GitHub `main` runs checked on `ba7b1d32` show `python` green (`26023575411`), `e2e` green (`26023575414`), and `signing-preflight` green (`26023575408`), but `node` failed (`26023575413`) and `ARC Roadmap Gate` failed (`26023575410`). Last all-green required-ish set found is `073238d`: `python` (`25997787492`), `node` (`25997787491`), `ARC Roadmap Gate` (`25997787490`), `e2e` (`25997787483`), and `signing-preflight` (`25997787503`). No release date is set, no 3-day green window has started, and `.env` history scrub remains blocked until explicit release-date plus history-rewrite/force-push approval.
 
 **Deliverables:**
 - Final release checklist evidence with commit/run IDs.
@@ -148,4 +148,4 @@
 | R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
 | R5 SwarmGraph Insight | Complete baseline + first producer events | Add measured cost producer and complete backend live SSE wiring before live-runtime claims |
 | R6 Real Adoption | Partial | LangGraph + SwarmGraph local-real path now requires dual explicit gates; keep fake/offline default and provider-backed execution unclaimed |
-| R7 Release Ops | Partial | Checklist wording refreshed with local commit evidence; GitHub run IDs TBD/not yet refreshed; 3-day green window and `.env` scrub remain gated |
+| R7 Release Ops | Partial | Evidence refreshed in roadmap only: local `main` is `b68663b`; latest `ba7b1d32` GitHub runs have `node` + `ARC Roadmap Gate` failures; last all-green required-ish set is `073238d`; no release date, green window, or `.env` scrub |

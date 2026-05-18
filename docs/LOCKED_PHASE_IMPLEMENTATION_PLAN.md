@@ -181,17 +181,17 @@ git status --short
 ## Phase 7 — Release Operations
 
 **Roadmap:** R7  
-**Status:** Partial — 7.1 docs evidence wording refreshed locally on 2026-05-18; GitHub run IDs remain TBD/not yet refreshed; 7.2 and 7.3 remain gated
+**Status:** Partial — 7.1 evidence refreshed against local `main` commit `b68663b` and latest/last-green GitHub `main` run IDs; 7.2 deferred because no release date is set and latest `main` is not fully green; 7.3 remains blocked
 
 ### Chunk 7.1 — Release Evidence Refresh
 - Update release checklist with latest commit/run IDs.
 - Do not overclaim deferred features.
-- Status: Partial — release checklist now records local commit `13b34b4` and honest TBD/not-yet-refreshed GitHub run ID slots. Banned-claims verification was refreshed locally on 2026-05-18; full build/test evidence was not re-run in this docs-only pass.
+- Status: Partial — evidence refreshed for local `main` commit `b68663b`. Latest GitHub `main` evidence: `ba7b1d32` python ✅ `26023575411`, e2e ✅ `26023575414`, signing-preflight ✅ `26023575408`, node ❌ `26023575413`, ARC Roadmap Gate ❌ `26023575410`. Last all-green required-ish set remains `073238d`: python ✅ `25997787492`, node ✅ `25997787491`, ARC Roadmap Gate ✅ `25997787490`, e2e ✅ `25997787483`, signing-preflight ✅ `25997787503`. Banned-claims verification remains the docs-touch check for this phase.
 
 ### Chunk 7.2 — Green Window
 - Start only after release date is set.
 - Track GitHub green runs for required workflows.
-- Status: Deferred — no release date is set, so the 3-day green-window clock has not started.
+- Status: Deferred — no release date is set and latest GitHub `main` is not fully green (`ba7b1d32` has node and ARC Roadmap Gate failures), so the 3-day green-window clock has not started.
 
 ### Chunk 7.3 — `.env` History Scrub
 - Execute only after explicit approval for release date + history rewrite + force-push plan.
@@ -207,4 +207,4 @@ git status --short
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; live-aware UI with backend live SSE still degraded/disconnected |
 | 6 Real Adoption | Partial | adoption protocol | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` with no provider calls; provider-backed path gated/not claimed |
-| 7 Release Ops | Partial | green CI | 7.1 local evidence wording refreshed; GitHub run IDs TBD/not yet refreshed; 7.2 waits for release date; 7.3 `.env` scrub blocked pending explicit destructive-action approval |
+| 7 Release Ops | Partial | green CI | 7.1 evidence refreshed for local `b68663b` plus latest `ba7b1d32`/last-green `073238d` GitHub run IDs; 7.2 deferred because no release date is set and latest `main` is not fully green; 7.3 `.env` scrub blocked pending explicit destructive-action approval |

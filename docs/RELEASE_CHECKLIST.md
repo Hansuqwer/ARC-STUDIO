@@ -4,7 +4,7 @@
 **Version:** v0.1.0-alpha
 **Last Updated:** 2026-05-18
 
-**Evidence refresh:** Docs refreshed against local commit `13b34b4` on 2026-05-18. Current GitHub run IDs are not available from this local evidence pass, so run-ID fields remain TBD/not yet refreshed rather than inferred. Real-runtime smoke wording below describes opt-in/local-only validation, not a default release gate.
+**Evidence refresh:** Docs refreshed against local commit `b68663b` on 2026-05-18. Latest observed GitHub `main` runs are mixed: commit `ba7b1d32` has `python` ✅ `26023575411`, `e2e` ✅ `26023575414`, `signing-preflight` ✅ `26023575408`, `node` ❌ `26023575413`, and `ARC Roadmap Gate` ❌ `26023575410`. Last observed all-green required-ish set is commit `073238d` with `python` ✅ `25997787492`, `node` ✅ `25997787491`, `ARC Roadmap Gate` ✅ `25997787490`, `e2e` ✅ `25997787483`, and `signing-preflight` ✅ `25997787503`. Real-runtime smoke remains opt-in/non-gating.
 
 **v0.1 Scope:**
 - ✅ Browser app (`applications/browser`)
@@ -33,7 +33,7 @@ Items in this section are gating. If any are unchecked, the release is blocked.
 
 **Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
 
-**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
+**Evidence:** Local commit `b68663b`; no current GitHub run ID for this local-only check. Latest observed `node` run on `main` is failing: `ba7b1d32` ❌ `26023575413`.
 
 **Check:**
 ```bash
@@ -47,7 +47,7 @@ pnpm install --frozen-lockfile
 
 **Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
 
-**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
+**Evidence:** Local commit `b68663b`; latest observed `node` build/test workflow on `main` is failing: `ba7b1d32` ❌ `26023575413`. Last observed green `node`: `073238d` ✅ `25997787491`.
 
 **Check:**
 ```bash
@@ -62,7 +62,7 @@ cd python && uv build
 
 **Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
 
-**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
+**Evidence:** Local commit `b68663b`; no current GitHub run ID for this CLI-help local check.
 
 **Check:**
 ```bash
@@ -76,7 +76,7 @@ cd python && uv run arc --help
 
 **Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
 
-**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
+**Evidence:** Local commit `b68663b`; no current GitHub run ID for this capability-report local check.
 
 Local run emits a LangGraph dependency warning on stderr, but stdout remains valid JSON and pipes through `python -m json.tool`. Capability wording must keep fake/offline deterministic defaults separate from any opt-in local-real smoke path and must not imply provider-backed execution.
 
@@ -93,7 +93,7 @@ cd python && uv run arc runtimes --capabilities --json | python -m json.tool
 
 **Status:** ✅ Passing locally (2026-05-15); refreshed by banned-claims check on 2026-05-18
 
-**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
+**Evidence:** Local commit `b68663b`; latest observed `ARC Roadmap Gate` on `main` is failing: `ba7b1d32` ❌ `26023575410`. Last observed green gate: `073238d` ✅ `25997787490`.
 
 **Check:**
 ```bash
@@ -109,7 +109,7 @@ bash scripts/check-banned-claims.sh AGENTS.md README.md docs/LOCKED_REMAINING_RO
 
 Latest local run: `782 passed, 14 skipped`. Real-runtime smoke paths are outside the default offline gate because dependency shape differs across platforms. The narrow `langgraph+swarmgraph` local-real smoke requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; it uses an in-process fixture graph, forces no-cost SwarmGraph env defaults, performs no provider/paid calls, and is not evidence for provider-backed adoption.
 
-**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
+**Evidence:** Local commit `b68663b`; latest observed `python` on `main` is passing: `ba7b1d32` ✅ `26023575411`. Last observed green required-ish set also includes `python` at `073238d` ✅ `25997787492`.
 
 **Check:**
 ```bash
@@ -125,7 +125,7 @@ cd python && uv run pytest -q -W error
 
 Latest local run: `563 passed, 9 suites`. Jest reports an open-handle notice after completion; tests still exit successfully.
 
-**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
+**Evidence:** Local commit `b68663b`; latest observed `node` on `main` is failing: `ba7b1d32` ❌ `26023575413`. Last observed green `node`: `073238d` ✅ `25997787491`.
 
 **Check:**
 ```bash
@@ -141,7 +141,7 @@ pnpm --filter arc-extension test
 
 `AGENTS.md`, `README.md`, `docs/LOCKED_REMAINING_ROADMAP.md`, `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`, `docs/REALITY_AUDIT.md`, `docs/RELEASE_CHECKLIST.md`, `docs/EXTENSION_MIGRATION.md`, and `docs/handover/HANDOVER.md` pass the banned-claims checker. The checker intentionally excludes archived, ADR, spike, and audit/planning files from release-facing claim checks because they preserve historical context rather than current product claims.
 
-**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
+**Evidence:** Local commit `b68663b`; latest observed `ARC Roadmap Gate` on `main` is failing: `ba7b1d32` ❌ `26023575410`. Last observed green gate: `073238d` ✅ `25997787490`.
 
 **Check:**
 ```bash
@@ -185,7 +185,7 @@ and documented in the release notes.
 
 Bounded local smoke confirmed `http://127.0.0.1:3000` is reachable after `pnpm start:browser`. This is a server reachability check, not a full UI interaction test.
 
-**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
+**Evidence:** Local commit `b68663b`; latest observed `e2e` on `main` is passing: `ba7b1d32` ✅ `26023575414`. Last observed green `e2e`: `073238d` ✅ `25997787483`.
 
 **Check:**
 ```bash
@@ -203,7 +203,7 @@ curl -s http://localhost:3000 | grep -q 'arc-widget'
 
 Offline PR/push gates exist (`python`, `node`, `ARC Roadmap Gate`). A separate `real-runtime-smoke` workflow runs manually and nightly with `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; that smoke scope is opt-in local-real validation only, explicitly clears SwarmGraph backend/cost env vars, and must not perform or imply paid/live provider calls. The 3-day green-window clock should start only after a release date is re-set.
 
-No release date is currently set in these source-of-truth docs. The 3-day green-window was not started during the 2026-05-18 evidence refresh. GitHub run IDs remain TBD/not yet refreshed.
+No release date is currently set in these source-of-truth docs. The 3-day green-window was not started during the 2026-05-18 evidence refresh. Latest observed `main` runs are not all green: `ba7b1d32` has `python` ✅ `26023575411`, `e2e` ✅ `26023575414`, `signing-preflight` ✅ `26023575408`, `node` ❌ `26023575413`, and `ARC Roadmap Gate` ❌ `26023575410`. Last observed all-green required-ish set: `073238d` with `python` ✅ `25997787492`, `node` ✅ `25997787491`, `ARC Roadmap Gate` ✅ `25997787490`, `e2e` ✅ `25997787483`, and `signing-preflight` ✅ `25997787503`. `real-runtime-smoke` remains opt-in/non-gating.
 
 **Check:** Visit CI dashboard and confirm workflows (python, node, lint)
 have green checkmarks on main for the past 3 days.
@@ -214,7 +214,7 @@ have green checkmarks on main for the past 3 days.
 
 **Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
 
-**Evidence:** Local commit `13b34b4`; GitHub issue query/run ID TBD/not yet refreshed.
+**Evidence:** Local commit `b68663b`; GitHub issue query not refreshed in this docs-only pass.
 
 **Check:**
 ```bash
@@ -228,7 +228,7 @@ gh issue list --state open --label security
 
 **Status:** ✅ Passing locally (2026-05-15); not re-reviewed in 2026-05-18 docs-only refresh beyond banned-claims scope
 
-**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
+**Evidence:** Local commit `b68663b`; latest observed release-doc-related gate is failing via `ARC Roadmap Gate` on `ba7b1d32` ❌ `26023575410`. Last observed green gate: `073238d` ✅ `25997787490`.
 
 README reviewed during docs freeze pass. Electron is post-v0.1, AG2 is described as a registered/gated standalone adapter, and SwarmGraph adoption is described as fake-tested/gated rather than broad live/provider-backed product support.
 
