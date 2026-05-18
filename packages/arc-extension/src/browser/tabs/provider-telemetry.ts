@@ -35,6 +35,7 @@ export interface QuotaResetConfirmationState {
     confirmed: boolean;
     disabledReason: string;
     warning: string;
+    localOnly: boolean;
 }
 
 export interface LiveProviderGateInput {
@@ -117,7 +118,7 @@ export function summarizeProfileCostPolicy(
     const paidCallsBlocked = dryRun || !allowPaidCalls;
     const liveCallsGated = dryRun || !allowPaidCalls;
     const enforcement = enforced ? 'enforced' : 'informational';
-    const enforcementLabel = enforced ? 'backend-enforced opt-in' : 'backend-enforced opt-in; UI preview only';
+    const enforcementLabel = enforced ? 'backend-enforced opt-in' : 'advisory UI preview; not enforcement';
     const label = dryRun
         ? `${name}: dry-run/offline hard-blocks paid/live provider calls (${enforcementLabel})`
         : paidCallsAllowed
@@ -139,13 +140,15 @@ export function summarizeProfileCostPolicy(
 export function buildQuotaResetConfirmation(
     input: QuotaResetConfirmationInput = {}
 ): QuotaResetConfirmationState {
-    const confirmed = input.confirmationText === QUOTA_RESET_CONFIRMATION_PHRASE;
+    const confirmationText = typeof input.confirmationText === 'string' ? input.confirmationText.trim() : '';
+    const confirmed = confirmationText === QUOTA_RESET_CONFIRMATION_PHRASE;
     return {
         requiredPhrase: QUOTA_RESET_CONFIRMATION_PHRASE,
         confirmed,
-        disabledReason: confirmed ? '' : `Type ${QUOTA_RESET_CONFIRMATION_PHRASE} to enable local reset`,
+        disabledReason: confirmed ? '' : `Type ${QUOTA_RESET_CONFIRMATION_PHRASE} to enable local-only reset`,
         warning:
-            'Resets local ARC provider quota counters only; no provider execution, billing action, or remote quota change occurs.',
+            'Resets local ARC provider quota counters only; no provider execution, billing action, remote quota change, or provider network call occurs.',
+        localOnly: true,
     };
 }
 
@@ -153,18 +156,21 @@ export function buildLiveProviderGate(input: LiveProviderGateInput): LiveProvide
     const profile = asRecord(input.profile);
     const name = stringValue(firstValue(profile, ['name', 'profile', 'id'])) || 'current profile';
     const reasons: string[] = [];
+    const dryRun = input.dryRun === true;
+    const allowPaidCalls = input.allowPaidCalls === true;
+    const liveTestsEnabled = input.liveTestsEnabled === true;
 
-    if (input.dryRun) {
+    if (dryRun) {
         reasons.push('dry-run is enabled; live provider calls are hard-blocked');
     }
-    if (!input.allowPaidCalls) {
+    if (!allowPaidCalls) {
         reasons.push('paid/live provider calls are not explicitly allowed');
     }
-    if (!input.liveTestsEnabled) {
+    if (!liveTestsEnabled) {
         reasons.push('live provider tests are disabled');
     }
 
-    const state = input.dryRun ? 'blocked' : reasons.length > 0 ? 'gated' : 'preview';
+    const state = dryRun ? 'blocked' : reasons.length > 0 ? 'gated' : 'preview';
     const cta =
         state === 'preview'
             ? `${name}: local/offline preview gates satisfied; provider execution remains disabled here`

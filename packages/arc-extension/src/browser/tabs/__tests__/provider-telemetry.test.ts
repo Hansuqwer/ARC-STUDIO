@@ -112,7 +112,7 @@ describe('provider telemetry helpers', () => {
     it('summarizes profile cost policy with dry-run paid-call blocking', () => {
         expect(summarizeProfileCostPolicy({ name: 'safe' }, true, true)).toEqual({
             label:
-                'safe: dry-run/offline hard-blocks paid/live provider calls (backend-enforced opt-in; UI preview only)',
+                'safe: dry-run/offline hard-blocks paid/live provider calls (advisory UI preview; not enforcement)',
             dryRun: true,
             paidCallsAllowed: false,
             paidCallsBlocked: true,
@@ -123,12 +123,25 @@ describe('provider telemetry helpers', () => {
         });
 
         expect(summarizeProfileCostPolicy({ id: 'prod' }, false, false)).toMatchObject({
-            label: 'prod: paid/live provider calls gated (backend-enforced opt-in; UI preview only)',
+            label: 'prod: paid/live provider calls gated (advisory UI preview; not enforcement)',
             paidCallsAllowed: false,
             paidCallsBlocked: true,
             enforcement: 'informational',
             enforced: false,
         });
+    });
+
+    it('keeps informational cost policy advisory and non-enforcing', () => {
+        const summary = summarizeProfileCostPolicy({ name: 'preview' }, false, true);
+
+        expect(summary).toMatchObject({
+            enforcement: 'informational',
+            enforced: false,
+            paidCallsAllowed: true,
+            paidCallsBlocked: false,
+        });
+        expect(summary.label).toContain('advisory UI preview; not enforcement');
+        expect(summary.label).not.toContain('backend-enforced opt-in');
     });
 
     it('marks cost policy as enforced only when explicit flag is provided', () => {
@@ -145,7 +158,8 @@ describe('provider telemetry helpers', () => {
         expect(empty).toMatchObject({
             requiredPhrase: 'RESET LOCAL PROVIDER QUOTA',
             confirmed: false,
-            disabledReason: 'Type RESET LOCAL PROVIDER QUOTA to enable local reset',
+            disabledReason: 'Type RESET LOCAL PROVIDER QUOTA to enable local-only reset',
+            localOnly: true,
         });
 
         expect(buildQuotaResetConfirmation({ confirmationText: 'reset local provider quota' })).toMatchObject({
@@ -154,13 +168,44 @@ describe('provider telemetry helpers', () => {
         expect(buildQuotaResetConfirmation({ confirmationText: 'RESET LOCAL PROVIDER QUOTA' })).toMatchObject({
             confirmed: true,
             disabledReason: '',
+            localOnly: true,
+        });
+        expect(buildQuotaResetConfirmation({ confirmationText: ' RESET LOCAL PROVIDER QUOTA ' })).toMatchObject({
+            confirmed: true,
+        });
+        expect(buildQuotaResetConfirmation({ confirmationText: 'RESET LOCAL PROVIDER QUOTA\nREMOTE' })).toMatchObject({
+            confirmed: false,
         });
     });
 
     it('warns quota reset is local only with no provider execution or billing action', () => {
         expect(buildQuotaResetConfirmation().warning).toBe(
-            'Resets local ARC provider quota counters only; no provider execution, billing action, or remote quota change occurs.'
+            'Resets local ARC provider quota counters only; no provider execution, billing action, remote quota change, or provider network call occurs.'
         );
+    });
+
+    it('handles malformed reset confirmation input safely', () => {
+        expect(buildQuotaResetConfirmation({ confirmationText: undefined })).toMatchObject({
+            confirmed: false,
+            localOnly: true,
+        });
+    });
+
+    it('treats malformed live gate booleans as disabled gates', () => {
+        const gate = buildLiveProviderGate({
+            dryRun: 'yes' as unknown as boolean,
+            allowPaidCalls: 'yes' as unknown as boolean,
+            liveTestsEnabled: 1 as unknown as boolean,
+        });
+
+        expect(gate).toMatchObject({
+            state: 'gated',
+            reasons: [
+                'paid/live provider calls are not explicitly allowed',
+                'live provider tests are disabled',
+            ],
+            providerCall: false,
+        });
     });
 
     it('blocks live provider preview when dry-run is enabled', () => {

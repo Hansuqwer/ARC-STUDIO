@@ -74,8 +74,10 @@ describe('ConfigTab provider telemetry parsing contract', () => {
 
     it('shows preview-only live provider gate without provider/proxy/billing calls or real execution claims', () => {
         expect(helperSource).toMatch(/providerCall: false/);
-        expect(helperSource).toMatch(/backend-enforced opt-in; UI remains preview\/offline and never enables provider execution/);
-        expect(helperSource).toMatch(/Local\/offline quota\/cost preview only/);
+        expect(helperSource).toMatch(/backend-enforced opt-in/i);
+        expect(helperSource).toMatch(/preview\/offline|offline\/local|local preview/i);
+        expect(helperSource).toMatch(/never enables provider execution|provider execution is not implemented/i);
+        expect(helperSource).toMatch(/local\/offline quota\/cost preview only|local counters only/i);
         expect(helperSource).not.toMatch(/state:\s*'ready'/);
         expect(helperSource).not.toMatch(/preview ready/i);
         expect(source).not.toMatch(/providerProxy/i);
@@ -91,18 +93,27 @@ describe('ConfigTab provider telemetry parsing contract', () => {
         expect(source).not.toMatch(/Local provider readiness gate:[^`]*'ready'/s);
         expect(source).not.toMatch(/\bLive tests:\s*[^`]*'configured'/s);
         expect(source).not.toMatch(/Allow paid provider calls/);
-        expect(source).toMatch(/backend paid-call opt-in/i);
+        expect(source).toMatch(/backend[- ](?:enforced )?paid-call opt-in|backend-enforced opt-in/i);
         expect(source).toMatch(/disabled\/gated/);
-        expect(source).toMatch(/provider execution is not implemented here/);
+        expect(source).toMatch(/does not enable real provider execution/i);
     });
 
     it('keeps quota reset copy local-only and non-networked', () => {
         expect(source).toMatch(/Local quota-counter reset/);
         expect(source).toMatch(/resetProviderQuota/);
-        expect(source).toMatch(/no provider network calls/i);
+        expect(source).toMatch(/no provider network calls|no provider call attempted/i);
         expect(source).toMatch(/no live API/i);
         expect(source).toMatch(/no billing action/i);
+        expect(source).toMatch(/local counters only|ARC storage counters only/i);
         expect(source).not.toMatch(/remote quota reset/i);
         expect(source).not.toMatch(/provider quota reset/i);
+    });
+
+    it('keeps R3 provider controls explicit copy/preview only, not execution controls', () => {
+        expect(source).toMatch(/copy|preview/i);
+        expect(source).toMatch(/dry-run\/offline|offline\/local|local preview/i);
+        expect(source).toMatch(/local quota|local counters|ARC storage counters/i);
+        expect(source).toMatch(/providerCall:false|providerCall: false/);
+        expect(source).not.toMatch(/runLiveProvider|startProviderRun|executeProvider|enableRealProvider/);
     });
 });

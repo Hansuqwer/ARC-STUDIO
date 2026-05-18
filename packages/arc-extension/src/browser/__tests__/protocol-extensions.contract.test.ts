@@ -114,6 +114,15 @@ describe('Protocol Extensions (Session B + B7)', () => {
             expect(source).toMatch(/counters\?:\s*Record<string, unknown>/);
         });
 
+        it('should keep provider telemetry protocol generic and non-secret', () => {
+            expect(source).toMatch(/ProviderDiagnosticsInfo/);
+            expect(source).toMatch(/ProviderQuotaInfo/);
+            expect(source).not.toMatch(/ProviderDiagnosticsInfo[\s\S]*?api[_-]?key/i);
+            expect(source).not.toMatch(/ProviderQuotaInfo[\s\S]*?api[_-]?key/i);
+            expect(source).not.toMatch(/ProviderQuotaInfo[\s\S]*?rawSecret/i);
+            expect(source).not.toMatch(/ProviderDiagnosticsInfo[\s\S]*?rawSecret/i);
+        });
+
         it('should expose provider diagnostics and quota service methods', () => {
             expect(source).toMatch(/getProviderDiagnostics\(\):\s*Promise<ProviderDiagnosticsInfo>/);
             expect(source).toMatch(/getProviderQuota\(provider\?:\s*string\):\s*Promise<ProviderQuotaInfo>/);
