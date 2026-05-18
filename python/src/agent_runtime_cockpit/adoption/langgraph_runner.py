@@ -284,6 +284,12 @@ class LangGraphAdoptionRunner(AdoptionRunner):
                 raise RuntimeError(
                     "LangGraph+SwarmGraph local-real path cannot claim provider-backed calls"
                 )
+            payload = {
+                **payload,
+                "runtime_mode": payload.get("runtime_mode", _LOCAL_REAL_MODE),
+                "real_provider_call": payload.get("real_provider_call", False),
+                "provider_backed": payload.get("provider_backed", False),
+            }
             emit_event(run_id, event_type, payload)
 
         return guarded_emit

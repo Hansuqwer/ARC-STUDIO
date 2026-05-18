@@ -132,6 +132,9 @@ class CrewAISwarmGraphFakeAdapter(RuntimeAdapter):
             reason="Fake/offline CrewAI + SwarmGraph path; no provider calls",
             detected_artifacts=["fake/offline adoption adapter"],
             requires_paid_calls=False,
+            test_level="fake_offline",
+            fake_offline_supported=True,
+            provider_backed=False,
         )
 
     async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
@@ -219,6 +222,11 @@ class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
             ],
             required_env=[] if local_real_enabled else ["ARC_LANGGRAPH_SWARMGRAPH_REAL"],
             requires_paid_calls=False,
+            test_level="gated_local_real" if local_real_enabled else "fake_offline",
+            fake_offline_supported=True,
+            local_real_gated=not local_real_enabled,
+            local_real_available=local_real_enabled,
+            provider_backed=False,
         )
 
     async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:

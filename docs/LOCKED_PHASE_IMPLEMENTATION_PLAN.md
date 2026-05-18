@@ -181,18 +181,21 @@ git status --short
 ## Phase 7 — Release Operations
 
 **Roadmap:** R7  
-**Status:** Partial
+**Status:** Partial — 7.1 docs evidence wording refreshed locally on 2026-05-18; GitHub run IDs remain TBD/not yet refreshed; 7.2 and 7.3 remain gated
 
 ### Chunk 7.1 — Release Evidence Refresh
 - Update release checklist with latest commit/run IDs.
 - Do not overclaim deferred features.
+- Status: Partial — release checklist now records local commit `13b34b4` and honest TBD/not-yet-refreshed GitHub run ID slots. Banned-claims verification was refreshed locally on 2026-05-18; full build/test evidence was not re-run in this docs-only pass.
 
 ### Chunk 7.2 — Green Window
 - Start only after release date is set.
 - Track GitHub green runs for required workflows.
+- Status: Deferred — no release date is set, so the 3-day green-window clock has not started.
 
 ### Chunk 7.3 — `.env` History Scrub
 - Execute only after explicit approval for release date + history rewrite + force-push plan.
+- Status: Blocked — no `.env` scrub, history rewrite, or force-push may occur without explicit release-date and destructive-action approval.
 
 ## Phase Status Table
 
@@ -204,4 +207,4 @@ git status --short
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; live-aware UI with backend live SSE still degraded/disconnected |
 | 6 Real Adoption | Partial | adoption protocol | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path is explicit `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` opt-in/smoke-scoped with no provider calls; provider-backed path gated/not claimed |
-| 7 Release Ops | Partial | green CI | `.env` scrub gated |
+| 7 Release Ops | Partial | green CI | 7.1 local evidence wording refreshed; GitHub run IDs TBD/not yet refreshed; 7.2 waits for release date; 7.3 `.env` scrub blocked pending explicit destructive-action approval |

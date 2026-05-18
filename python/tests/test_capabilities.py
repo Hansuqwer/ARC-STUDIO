@@ -4,6 +4,7 @@ Tests: RuntimeCapabilities and CapabilityReport cockpit primitive flags.
 from __future__ import annotations
 
 from agent_runtime_cockpit.adapters.base import CapabilityReport
+from agent_runtime_cockpit.orchestration.runtime_router import LangGraphSwarmGraphFakeAdapter
 from agent_runtime_cockpit.protocol.capabilities import RuntimeCapabilities
 
 
@@ -74,6 +75,11 @@ class TestCapabilityReportCockpitPrimitives:
         assert report.can_emit_autopsy is False
         assert report.can_emit_evidence is False
         assert report.has_stable_ids is False
+        assert report.test_level == "unknown"
+        assert report.fake_offline_supported is False
+        assert report.local_real_gated is False
+        assert report.local_real_available is False
+        assert report.provider_backed is False
 
     def test_set_cockpit_flags(self):
         report = CapabilityReport(
@@ -102,3 +108,41 @@ class TestCapabilityReportCockpitPrimitives:
         assert data["can_emit_contract"] is True
         assert "can_emit_receipt" in data
         assert data["can_emit_receipt"] is False
+
+    def test_serialization_includes_evidence_classification_defaults(self):
+        report = CapabilityReport(
+            runtime_id="test", detected=True, can_run=True,
+            availability="runnable",
+        )
+        data = report.model_dump()
+        assert data["test_level"] == "unknown"
+        assert data["fake_offline_supported"] is False
+        assert data["local_real_gated"] is False
+        assert data["local_real_available"] is False
+        assert data["provider_backed"] is False
+
+    def test_langgraph_swarmgraph_fake_offline_classification(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
+        data = LangGraphSwarmGraphFakeAdapter().capability_report(tmp_path).model_dump()
+
+        assert data["runtime_id"] == "langgraph+swarmgraph"
+        assert data["can_run"] is True
+        assert data["test_level"] == "fake_offline"
+        assert data["fake_offline_supported"] is True
+        assert data["local_real_gated"] is True
+        assert data["local_real_available"] is False
+        assert data["provider_backed"] is False
+        assert data["requires_paid_calls"] is False
+        assert data["required_env"] == ["ARC_LANGGRAPH_SWARMGRAPH_REAL"]
+
+    def test_langgraph_swarmgraph_local_real_gate_classification(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
+        data = LangGraphSwarmGraphFakeAdapter().capability_report(tmp_path).model_dump()
+
+        assert data["test_level"] == "gated_local_real"
+        assert data["fake_offline_supported"] is True
+        assert data["local_real_gated"] is False
+        assert data["local_real_available"] is True
+        assert data["provider_backed"] is False
+        assert data["requires_paid_calls"] is False
+        assert data["required_env"] == []

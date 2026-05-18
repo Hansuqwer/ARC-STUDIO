@@ -125,7 +125,7 @@
 
 **Goal:** Prepare v0.1 release without rewriting history prematurely.
 
-**Current:** Release checks are green; `.env` history scrub is planned but gated.
+**Current:** Release checklist evidence was refreshed on 2026-05-18 against local commit `13b34b4`. Current GitHub run IDs are still TBD/not yet refreshed from local evidence. `.env` history scrub is planned but blocked until an explicit release date and history-rewrite/force-push approval.
 
 **Deliverables:**
 - Final release checklist evidence with commit/run IDs.
@@ -136,6 +136,7 @@
 **Acceptance:**
 - `docs/RELEASE_CHECKLIST.md` has current evidence.
 - No force-push/history rewrite without explicit approval.
+- No 3-day green-window starts until a release date is set.
 
 ## Status Summary
 
@@ -147,4 +148,4 @@
 | R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
 | R5 SwarmGraph Insight | Complete baseline + first producer events | Add measured cost producer and complete backend live SSE wiring before live-runtime claims |
 | R6 Real Adoption | Partial | Harden LangGraph + SwarmGraph local-real path behind explicit gates; keep fake/offline default and provider-backed execution unclaimed |
-| R7 Release Ops | Partial | Refresh checklist evidence; `.env` scrub remains gated |
+| R7 Release Ops | Partial | Checklist wording refreshed with local commit evidence; GitHub run IDs TBD/not yet refreshed; 3-day green window and `.env` scrub remain gated |

@@ -2,7 +2,9 @@
 
 **Project:** ARC Studio
 **Version:** v0.1.0-alpha
-**Last Updated:** 2026-05-16
+**Last Updated:** 2026-05-18
+
+**Evidence refresh:** Docs refreshed against local commit `13b34b4` on 2026-05-18. Current GitHub run IDs are not available from this local evidence pass, so run-ID fields remain TBD/not yet refreshed rather than inferred.
 
 **v0.1 Scope:**
 - ✅ Browser app (`applications/browser`)
@@ -29,7 +31,9 @@ Items in this section are gating. If any are unchecked, the release is blocked.
 
 ### 1. `pnpm install --frozen-lockfile` passes
 
-**Status:** ✅ Passing locally (2026-05-15)
+**Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
+
+**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
 
 **Check:**
 ```bash
@@ -41,7 +45,9 @@ pnpm install --frozen-lockfile
 
 ### 2. All build targets succeed
 
-**Status:** ✅ Passing locally (2026-05-15)
+**Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
+
+**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
 
 **Check:**
 ```bash
@@ -54,7 +60,9 @@ cd python && uv build
 
 ### 3. `arc --help` prints and exits 0
 
-**Status:** ✅ Passing locally (2026-05-15)
+**Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
+
+**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
 
 **Check:**
 ```bash
@@ -66,7 +74,9 @@ cd python && uv run arc --help
 
 ### 4. `arc runtimes --capabilities --json` prints honest capability report
 
-**Status:** ✅ Passing locally (2026-05-15)
+**Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
+
+**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
 
 Local run emits a LangGraph dependency warning on stderr, but stdout remains valid JSON and pipes through `python -m json.tool`. Capability wording must keep fake/offline deterministic defaults separate from any opt-in local-real smoke path and must not imply provider-backed execution.
 
@@ -81,7 +91,9 @@ cd python && uv run arc runtimes --capabilities --json | python -m json.tool
 
 ### 5. Banned claims checker passes on key docs
 
-**Status:** ✅ Passing locally (2026-05-15)
+**Status:** ✅ Passing locally (2026-05-15); refreshed by banned-claims check on 2026-05-18
+
+**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
 
 **Check:**
 ```bash
@@ -93,9 +105,11 @@ bash scripts/check-banned-claims.sh AGENTS.md README.md docs/LOCKED_REMAINING_RO
 
 ### 6. Python test suite passes
 
-**Status:** ✅ Passing locally (2026-05-15)
+**Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
 
-Latest local run: `782 passed, 14 skipped`. Real-runtime smoke paths are opt-in because dependency shape and provider availability differ across platforms.
+Latest local run: `782 passed, 14 skipped`. Real-runtime smoke paths are opt-in because dependency shape and provider availability differ across platforms. The narrow `langgraph+swarmgraph` local-real smoke requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; it performs no provider/paid calls and is not evidence for provider-backed adoption.
+
+**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
 
 **Check:**
 ```bash
@@ -107,9 +121,11 @@ cd python && uv run pytest -q -W error
 
 ### 7. Canonical extension test suite passes
 
-**Status:** ✅ Passing locally (2026-05-15)
+**Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
 
 Latest local run: `563 passed, 9 suites`. Jest reports an open-handle notice after completion; tests still exit successfully.
+
+**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
 
 **Check:**
 ```bash
@@ -121,9 +137,11 @@ pnpm --filter arc-extension test
 
 ### 8. Public release docs do not imply implemented SwarmGraph adoption
 
-**Status:** ✅ Passing scoped release-doc check locally (2026-05-15)
+**Status:** ✅ Passing scoped release-doc check locally (2026-05-15); refreshed by banned-claims check on 2026-05-18
 
 `AGENTS.md`, `README.md`, `docs/LOCKED_REMAINING_ROADMAP.md`, `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`, `docs/REALITY_AUDIT.md`, `docs/RELEASE_CHECKLIST.md`, `docs/EXTENSION_MIGRATION.md`, and `docs/handover/HANDOVER.md` pass the banned-claims checker. The checker intentionally excludes archived, ADR, spike, and audit/planning files from release-facing claim checks because they preserve historical context rather than current product claims.
+
+**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
 
 **Check:**
 ```bash
@@ -143,6 +161,8 @@ Schedule `git filter-repo` scrub ≥7 days before that date.
 
 Plan: `docs/ENV_HISTORY_SCRUB_PLAN.md`. This remains blocked until release-readiness and explicit release-date approval because it requires coordinated history rewrite and force-push.
 
+No `.env` scrub, history rewrite, or force-push was executed during the 2026-05-18 docs-only evidence refresh.
+
 **What must happen:**
 1. Set a release date.
 2. Run `git filter-repo --path .env` on a clone.
@@ -161,9 +181,11 @@ and documented in the release notes.
 
 ### 10. Browser app starts and loads ARC widget
 
-**Status:** ✅ Reachability smoke passing locally (2026-05-15)
+**Status:** ✅ Reachability smoke passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
 
 Bounded local smoke confirmed `http://127.0.0.1:3000` is reachable after `pnpm start:browser`. This is a server reachability check, not a full UI interaction test.
+
+**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
 
 **Check:**
 ```bash
@@ -181,6 +203,8 @@ curl -s http://localhost:3000 | grep -q 'arc-widget'
 
 Offline PR/push gates exist (`python`, `node`, `ARC Roadmap Gate`). A separate `real-runtime-smoke` workflow runs manually and nightly with `ARC_REAL_RUNTIME_SMOKE=1`; that smoke scope is opt-in local-real validation only and must not perform or imply paid/live provider calls. The 3-day green-window clock should start only after a release date is re-set.
 
+No release date is currently set in these source-of-truth docs. The 3-day green-window was not started during the 2026-05-18 evidence refresh. GitHub run IDs remain TBD/not yet refreshed.
+
 **Check:** Visit CI dashboard and confirm workflows (python, node, lint)
 have green checkmarks on main for the past 3 days.
 
@@ -188,7 +212,9 @@ have green checkmarks on main for the past 3 days.
 
 ### 12. No P0/P1 security issues open
 
-**Status:** ✅ Passing locally (2026-05-15)
+**Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
+
+**Evidence:** Local commit `13b34b4`; GitHub issue query/run ID TBD/not yet refreshed.
 
 **Check:**
 ```bash
@@ -200,7 +226,9 @@ gh issue list --state open --label security
 
 ### 13. README advertises only honest claims
 
-**Status:** ✅ Passing locally (2026-05-15)
+**Status:** ✅ Passing locally (2026-05-15); not re-reviewed in 2026-05-18 docs-only refresh beyond banned-claims scope
+
+**Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
 
 README reviewed during docs freeze pass. Electron is post-v0.1, AG2 is described as a registered/gated standalone adapter, and SwarmGraph adoption is described as fake-tested/gated rather than broad live/provider-backed product support.
 

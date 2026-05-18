@@ -26,6 +26,8 @@ RuntimeAvailability = Literal[
     "not_detected",
 ]
 
+CapabilityTestLevel = Literal["unknown", "fake_offline", "gated_local_real", "provider_backed"]
+
 
 class DoctorAction(BaseModel):
     """A suggested action to make this runtime runnable."""
@@ -47,6 +49,14 @@ class CapabilityReport(BaseModel):
     version: str | None = None
     requires_paid_calls: bool = False
     doctor_actions: list[DoctorAction] = Field(default_factory=list)
+
+    # Evidence classification. Defaults preserve old reports while new runtimes can
+    # distinguish offline scaffolds, gated local-real paths, and provider-backed runs.
+    test_level: CapabilityTestLevel = "unknown"
+    fake_offline_supported: bool = False
+    local_real_gated: bool = False
+    local_real_available: bool = False
+    provider_backed: bool = False
 
     # Cockpit primitive flags (mirrors RuntimeCapabilities)
     can_emit_contract: bool = False

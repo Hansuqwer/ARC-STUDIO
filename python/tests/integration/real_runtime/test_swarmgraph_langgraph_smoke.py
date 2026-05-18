@@ -37,7 +37,8 @@ def _requires_langgraph_swarmgraph_local_real() -> None:
     _requires_langgraph_runtime()
     if os.environ.get("ARC_LANGGRAPH_SWARMGRAPH_REAL") != "1":
         pytest.skip(
-            "set ARC_LANGGRAPH_SWARMGRAPH_REAL=1 to run local-real langgraph+swarmgraph smoke"
+            "set ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1 "
+            "to run local-real langgraph+swarmgraph smoke"
         )
 
 
@@ -90,6 +91,43 @@ def test_langgraph_swarmgraph_route_availability_smoke(tmp_path) -> None:
     assert "SwarmGraph" in capability.reason
 
 
+def test_langgraph_swarmgraph_local_real_requires_second_gate(tmp_path, monkeypatch) -> None:
+    _requires_langgraph_runtime()
+    monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
+
+    events: list[tuple[str, dict[str, object]]] = []
+
+    def emit_event(_run_id: str, event_type: str, payload: dict[str, object]) -> None:
+        events.append((event_type, payload))
+
+    spec = AdoptionSpec(
+        mode=AdoptionMode.LANGGRAPH,
+        runtime_config={
+            "runtime_mode": "local-real",
+            "graph": _LocalRealNoProviderGraph(),
+            "input": {"prompt": "local smoke only"},
+        },
+        max_workers=1,
+    )
+
+    with pytest.raises(PermissionError, match="ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
+        asyncio.run(LangGraphAdoptionRunner().run(spec, "local-real-gated", emit_event))
+
+    assert events == [(
+        "RUN_FAILED",
+        {
+            "error": (
+                "LangGraph+SwarmGraph local-real mode requires "
+                "ARC_LANGGRAPH_SWARMGRAPH_REAL=1; no provider calls were made."
+            ),
+            "mode": "langgraph+swarmgraph",
+            "runtime_mode": "local-real",
+            "real_provider_call": False,
+            "provider_backed": False,
+        },
+    )]
+
+
 def test_langgraph_swarmgraph_local_real_fixture_runs_without_provider_calls(tmp_path) -> None:
     _requires_langgraph_swarmgraph_local_real()
 
@@ -101,6 +139,7 @@ def test_langgraph_swarmgraph_local_real_fixture_runs_without_provider_calls(tmp
     spec = AdoptionSpec(
         mode=AdoptionMode.LANGGRAPH,
         runtime_config={
+            "runtime_mode": "local-real",
             "graph": _LocalRealNoProviderGraph(),
             "input": {"prompt": "local smoke only"},
             "objective": "verify local langgraph+swarmgraph runner fixture without provider calls",
@@ -121,5 +160,6 @@ def test_langgraph_swarmgraph_local_real_fixture_runs_without_provider_calls(tmp
     assert result.winning_proposal.output
     assert any(event_type == "SWARMGRAPH_TOPOLOGY" for event_type, _ in events)
     assert any(event_type == "SWARMGRAPH_CONSENSUS" for event_type, _ in events)
-    assert all(payload.get("real_provider_call") is not True for _, payload in events)
-    assert all(payload.get("provider_backed") is not True for _, payload in events)
+    assert all(payload["runtime_mode"] == "local-real" for _, payload in events)
+    assert all(payload["real_provider_call"] is False for _, payload in events)
+    assert all(payload["provider_backed"] is False for _, payload in events)
