@@ -44,7 +44,7 @@
 
 **Goal:** Users can configure runnable adapters/profiles from IDE without editing shell env manually.
 
-**Current:** CLI config/profiles/workspace commands exist; ChatTab exposes runtime/profile selectors; ConfigTab now loads backend runtime capabilities, profiles, isolation providers/status, safe config save fields, provider key env-var references, and copy-safe config snapshots. No full multi-step setup wizard yet.
+**Current:** CLI config/profiles/workspace commands exist; ChatTab exposes runtime/profile selectors; ConfigTab now loads backend runtime capabilities, profiles, isolation providers/status, safe config save fields, provider key env-var references, copy-safe config snapshots, and a capability-derived Runtime Setup Wizard with missing env/dependency/manual remediation guidance. Profile persistence and dedicated export-target helpers remain incomplete.
 
 **Deliverables:**
 - Adapter readiness details with concrete missing env/dependency actions.
@@ -143,7 +143,7 @@
 | Roadmap ID | Status | Next Slice |
 |---|---|---|
 | R1 Live Run Streaming | Complete | Phase 2 IDE Runtime Setup + Config |
-| R2 IDE Runtime Setup | Partial | Adapter readiness actions + export-target helpers |
+| R2 IDE Runtime Setup | Partial | Profile persistence + dedicated export-target helpers |
 | R3 Provider/Quota UI | Partial | Keep provider calls gated/offline by default; future work is backend cost enforcement and any real provider execution path behind explicit opt-in |
 | R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
 | R5 SwarmGraph Insight | Complete baseline + first producer events | Add measured cost producer and complete backend live SSE wiring before live-runtime claims |

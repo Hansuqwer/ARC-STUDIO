@@ -78,7 +78,7 @@ git status --short
 ## Phase 2 — IDE Runtime Setup + Config
 
 **Roadmap:** R2  
-**Status:** Partial — ConfigTab safe runtime/profile/isolation baseline implemented
+**Status:** Partial — ConfigTab safe runtime/profile/isolation baseline plus remediation helper/wizard baseline implemented
 
 ### Chunk 2.1 — Config Backend Methods
 - Expose read/write/dry-run config methods needed by UI.
@@ -88,7 +88,7 @@ git status --short
 ### Chunk 2.2 — Adapter Readiness Actions
 - UI displays missing deps/env/profile actions from capability reports.
 - Tests for gated/unavailable/runnable states.
-- Status: Partial — ConfigTab displays capability-driven disabled runtime states; concrete remediation actions remain.
+- Status: Complete baseline — ConfigTab displays capability-driven runtime states plus a Runtime Setup Wizard that derives missing env names, detected artifacts, safe doctor actions, and manual remediation guidance from capability reports. Static/helper tests cover gated/unavailable/runnable states and secret redaction/copy guards.
 
 ### Chunk 2.3 — Profile + Isolation UI
 - Show current profile, workspace trust, isolation provider.
@@ -202,7 +202,7 @@ git status --short
 | Phase | Status | Depends On | Notes |
 |---|---|---|---|
 | 1 Active Live Streaming | Complete | current CLI/IDE run basics | Full vertical baseline: Python SSE, Theia proxy contract, UI live/replay/disconnected states, stub e2e |
-| 2 Runtime Setup UI | Partial | config/profile CLI | Safe ConfigTab baseline in place; remediation wizard/helpers remain |
+| 2 Runtime Setup UI | Partial | config/profile CLI | Safe ConfigTab baseline plus remediation wizard/helpers in place; profile persistence/export-target dedicated helpers remain |
 | 3 Provider/Quota UI | Partial | provider CLI | Typed parser/tests, confirmed local quota-counter reset affordance, informational profile-linked cost summary, and explicit paid/live preview gates; no provider network calls by default |
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; live-aware UI with backend live SSE still degraded/disconnected |

@@ -28,6 +28,7 @@ import {
     parseQuotaCounters,
     summarizeProfileCostPolicy,
 } from './provider-telemetry';
+import { buildRuntimeRemediationPlan } from './runtime-remediation';
 
 export interface ConfigTabProps {
     arcService?: ArcService;
@@ -289,6 +290,8 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
     })({ provider: quotaProviderFilter, typedPhrase: quotaResetPhrase, available: quotaResetAvailable });
     const quotaResetRequiredPhrase = quotaResetConfirmation.phrase || quotaResetConfirmation.confirmationPhrase || quotaResetConfirmation.requiredPhrase || 'RESET LOCAL QUOTA COUNTERS';
     const quotaResetConfirmed = quotaResetAvailable && (quotaResetConfirmation.confirmed || quotaResetConfirmation.canReset || quotaResetPhrase === quotaResetRequiredPhrase);
+    const selectedRuntimeCapability = capabilities?.find(c => c.runtime_id === selectedRuntime) || null;
+    const runtimeRemediationPlan = buildRuntimeRemediationPlan(selectedRuntimeCapability);
     const liveProviderGate = (buildLiveProviderGate as (...args: unknown[]) => {
         state?: string;
         status?: string;
@@ -447,6 +450,84 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                             </label>
                         );
                     })}
+                </div>
+            </div>
+
+            <div className='arc-studio-config__section arc-studio-config__runtime-setup-wizard' style={{ padding: '12px 16px', borderBottom: '1px solid var(--theia-widgetBorder)' }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 600, color: 'var(--theia-descriptionForeground)', textTransform: 'uppercase' }}>Runtime Setup Wizard</h4>
+                <p style={{ margin: '0 0 6px', fontSize: '12px', color: 'var(--theia-descriptionForeground)' }}>
+                    {runtimeRemediationPlan.summary}
+                </p>
+                <p style={{ margin: '0 0 6px', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
+                    No raw secrets are captured or displayed. Env var names only; values stay in your shell/keychain.
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px', fontSize: '11px' }}>
+                    <span style={{ fontFamily: 'monospace' }}>runtime: {selectedRuntime}</span>
+                    <span style={{ fontFamily: 'monospace' }}>status: {runtimeRemediationPlan.status}</span>
+                    <span style={{ fontFamily: 'monospace' }}>readiness: {selectedRuntimeCapability?.can_run ? 'ready' : 'needs setup'}</span>
+                    {capabilitiesLoading && <span>refreshing...</span>}
+                </div>
+                {selectedRuntimeCapability && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', marginBottom: '8px', fontSize: '11px' }}>
+                        <div>
+                            <strong>Required env names</strong>
+                            <div style={{ marginTop: '4px', fontFamily: 'monospace', color: 'var(--theia-descriptionForeground)' }}>
+                                {selectedRuntimeCapability.required_env.length > 0 ? selectedRuntimeCapability.required_env.join(', ') : 'none'}
+                            </div>
+                        </div>
+                        <div>
+                            <strong>Detected artifacts</strong>
+                            <div style={{ marginTop: '4px', fontFamily: 'monospace', color: 'var(--theia-descriptionForeground)' }}>
+                                {runtimeRemediationPlan.artifacts.length > 0 ? runtimeRemediationPlan.artifacts.join(', ') : 'none'}
+                            </div>
+                        </div>
+                        <div>
+                            <strong>Doctor actions</strong>
+                            <div style={{ marginTop: '4px', fontFamily: 'monospace', color: 'var(--theia-descriptionForeground)' }}>
+                                {selectedRuntimeCapability.doctor_actions.length > 0 ? `${selectedRuntimeCapability.doctor_actions.length} available` : 'none'}
+                            </div>
+                        </div>
+                    </div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {runtimeRemediationPlan.steps.length > 0 ? runtimeRemediationPlan.steps.map(step => {
+                        const copyText = step.copyText || step.command || '';
+                        const canCopy = Boolean(step.copyText || step.command);
+                        return (
+                            <div key={step.id} className='arc-studio-config__runtime-remediation-step' style={{ padding: '8px', border: '1px solid var(--theia-widgetBorder)', borderRadius: '4px', backgroundColor: 'var(--theia-editor-background)', fontSize: '12px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'flex-start' }}>
+                                    <div>
+                                        <strong>{step.title}</strong>
+                                        <span style={{ marginLeft: '6px', fontSize: '10px', color: 'var(--theia-descriptionForeground)', fontFamily: 'monospace' }}>{step.kind}</span>
+                                    </div>
+                                    {canCopy && (
+                                        <button
+                                            className='arc-studio-config__runtime-remediation-copy'
+                                            onClick={() => navigator.clipboard?.writeText(copyText)}
+                                            style={{ fontSize: '11px' }}
+                                        >
+                                            Copy
+                                        </button>
+                                    )}
+                                </div>
+                                <p style={{ margin: '4px 0 0', color: 'var(--theia-descriptionForeground)' }}>{step.description}</p>
+                                {step.envVars && step.envVars.length > 0 && (
+                                    <div style={{ marginTop: '4px', fontSize: '11px' }}>
+                                        Env refs: <span style={{ fontFamily: 'monospace' }}>{step.envVars.join(', ')}</span>
+                                    </div>
+                                )}
+                                {step.command && (
+                                    <code className='arc-studio-config__runtime-remediation-command' style={{ display: 'block', marginTop: '4px', padding: '4px 6px', fontSize: '11px', whiteSpace: 'pre-wrap', backgroundColor: 'var(--theia-input-background)' }}>
+                                        {step.command}
+                                    </code>
+                                )}
+                            </div>
+                        );
+                    }) : (
+                        <div className='arc-studio-config__runtime-remediation-step' style={{ fontSize: '12px', color: 'var(--theia-descriptionForeground)' }}>
+                            No remediation steps available. Refresh runtime capabilities after installing dependencies.
+                        </div>
+                    )}
                 </div>
             </div>
 
