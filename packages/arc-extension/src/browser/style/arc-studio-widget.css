@@ -684,6 +684,161 @@
     color: var(--arc-error-color, #c93c37);
 }
 
+/* Live refresh indicator (alias: live-badge for JSX) */
+.arc-studio-assurance__live-indicator,
+.arc-studio-assurance__live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(47, 143, 70, 0.12);
+    color: var(--arc-success-color, #2f8f46);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+.arc-studio-assurance__live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--arc-success-color, #2f8f46);
+    animation: arc-pulse 2s ease-in-out infinite;
+}
+@keyframes arc-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* Last refreshed / timestamp */
+.arc-studio-assurance__last-refresh,
+.arc-studio-assurance__timestamp {
+    font-size: 10px;
+    color: var(--theia-descriptionForeground, #888);
+    white-space: nowrap;
+}
+
+/* Filter bar */
+.arc-studio-assurance__filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 8px;
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: 4px;
+    background: var(--theia-input-background, #f5f5f5);
+    font-size: 11px;
+}
+.arc-studio-assurance__filter-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    user-select: none;
+}
+.arc-studio-assurance__filter-checkbox {
+    margin: 0;
+    cursor: pointer;
+}
+.arc-studio-assurance__filter-clear {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--theia-input-placeholder-foreground, #888);
+    cursor: pointer;
+    text-decoration: underline;
+    border: none;
+    background: none;
+    padding: 2px 4px;
+}
+.arc-studio-assurance__filter-clear:hover {
+    color: var(--theia-ui-font-color, #333);
+}
+
+/* Export button / secondary button */
+.arc-studio-assurance__export-btn,
+.arc-studio-assurance__button--secondary {
+    padding: 3px 8px;
+    border: 1px solid var(--theia-border-color, #ddd);
+    border-radius: 3px;
+    background: transparent;
+    color: var(--theia-ui-font-color2, #777);
+    font-size: 10px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+.arc-studio-assurance__export-btn:hover {
+    color: var(--theia-ui-font-color, #333);
+    border-color: var(--theia-focusBorder, #0066cc);
+}
+
+/* Enhanced empty/degraded state */
+.arc-studio-assurance__state-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 5px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+.arc-studio-assurance__state-banner--info {
+    border: 1px solid var(--theia-border-color, #ddd);
+    background: var(--theia-sideBar-background, #f8f9fa);
+    color: var(--theia-ui-font-color2, #777);
+}
+.arc-studio-assurance__state-banner--warning {
+    border: 1px solid var(--theia-charts-yellow, #cca700);
+    background: rgba(204, 167, 0, 0.08);
+    color: var(--theia-charts-yellow, #9a7b00);
+}
+.arc-studio-assurance__state-banner--error {
+    border: 1px solid var(--arc-error-color, #c93c37);
+    background: rgba(201, 60, 55, 0.08);
+    color: var(--arc-error-color, #c93c37);
+}
+.arc-studio-assurance__state-banner--success {
+    border: 1px solid var(--arc-success-color, #2f8f46);
+    background: rgba(47, 143, 70, 0.08);
+    color: var(--arc-success-color, #2f8f46);
+}
+.arc-studio-assurance__state-icon {
+    flex-shrink: 0;
+    font-size: 14px;
+    line-height: 1.4;
+}
+/* Note: icons are text-based, not font awesome — use simple ASCII/Unicode */
+.arc-studio-assurance__state-body {
+    flex: 1;
+    min-width: 0;
+}
+.arc-studio-assurance__state-title {
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+.arc-studio-assurance__state-detail {
+    color: var(--theia-ui-font-color2, #777);
+}
+
+/* Expired-token warning */
+.arc-studio-assurance__expired-banner {
+    padding: 8px 12px;
+    border: 1px solid var(--arc-error-color, #c93c37);
+    border-radius: 4px;
+    background: rgba(201, 60, 55, 0.06);
+    color: var(--arc-error-color, #c93c37);
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+/* Filter count badge in replay progress */
+.arc-studio-assurance__filtered-count {
+    font-size: 10px;
+    color: var(--theia-descriptionForeground, #888);
+    margin-left: 4px;
+}
+
 /* SwarmGraph Insight Tab */
 .arc-studio-swarmgraph {
     display: flex;

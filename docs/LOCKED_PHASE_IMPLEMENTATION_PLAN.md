@@ -318,10 +318,17 @@ Every new phase/chunk should include:
 
 ### Phase 10 — Assurance Polish
 
+**Status:** Baseline Complete | Evidence: Phase 10 assurance polish patch after `fa9a64f` — live refresh, filtering, export affordances, improved states, 9 new contract tests pass, and SwarmGraph Insight contract drift fixed.
+
 - Improve existing Assurance tab HITL inbox/audit viewer with live refresh, filtering, export affordances, and clearer missing/degraded states.
 - Preserve adapter-wide HMAC caution: verify/export only where audit material exists.
-- Acceptance: HITL/audit UI tests cover present, absent, degraded, expired, and replay-safe states.
-- Verification: arc-extension tests/build, backend method tests if protocol/service methods change, browser/e2e if user interaction changes.
+- Acceptance:
+  1. HITL inbox auto-refreshes every 10s with LIVE badge and last-refreshed timestamp.
+  2. Replay events filterable by category checkboxes (lifecycle/message/tool/error/hitl/audit/unknown) with "Clear filters" and filtered-count display.
+  3. Export buttons (JSON download) for HITL, run-scoped audit material, and replay events, visible only when data exists.
+  4. HITL/audit UI contract tests cover present, absent, degraded, expired, unknown-category, and replay-safe states (9 new tests).
+  5. Adapter-wide HMAC caution preserved: disclaimer unchanged, export conditional on data existence.
+- Verification: `pnpm --filter arc-extension build && pnpm --filter arc-extension test` — 751 passed, 1 pre-existing fail.
 - Known risks: audit material is conditional per run path; UI must not imply adapter-wide keyed audit.
 
 ### Phase 11 — Discipline Audits

@@ -134,7 +134,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 
 **Goal:** Move beyond RunsTab basics into dedicated high-assurance workflows.
 
-**Current:** Dedicated IDE Assurance tab exists with HITL inbox, run-scoped audit chain states, and replay stepper annotations. HITL pending/respond CLI and RunsTab basics still exist; audit verify/export/key CLI exists; adapter-wide HMAC is not guaranteed.
+**Current:** Dedicated IDE Assurance tab with polished HITL inbox (auto-refresh, LIVE badge, last-refreshed timestamp), run-scoped audit chain states, replay stepper with category filtering (lifecycle/message/tool/error/hitl/audit/unknown), JSON export for sections with data, audit export only where run audit material exists, and clear present/missing/degraded/expired states. HITL pending/respond CLI and RunsTab basics still exist; audit verify/export/key CLI exists; adapter-wide HMAC is not guaranteed.
 
 **Deliverables:**
 - HITL inbox view with approve/reject/respond, token expiry, replay-attack-safe messaging.
@@ -199,7 +199,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | R1 Live Run Streaming | Complete | Phase 2 IDE Runtime Setup + Config |
 | R2 IDE Runtime Setup | Complete polished UI baseline | Backend protocol/service expansion only if future config fields require it; continue env-ref-only secret posture |
 | R3 Provider/Quota UI | Active narrow real-provider action baseline | Keep provider calls offline/gated by default; backend cost enforcement is in place; one narrow 9router provider-action path requires explicit opt-in, paid-call gates, exact confirmation UX, env/key refs only, local accounting, and opt-in smoke/manual verification. Smoke evidence passed on `9184f9b` with `nvidia/minimaxai/minimax-m2.7`. No remote quota reset; not a provider-backed adoption claim |
-| R4 HITL/Audit UX | Complete baseline | Later polish only: live refresh/filtering/export affordances |
+| R4 HITL/Audit UX | Polished Complete | Live refresh, filtering, export, improved states in Phase 10 assurance polish patch after `fa9a64f` |
 | R5 SwarmGraph Insight | Complete baseline + first producer events | Add measured cost producer and complete backend live SSE wiring before live-runtime claims |
 | R6 Real Adoption | Complete local-real hardening baseline | Keep fake/offline deterministic/default; local-real availability requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; no paid/live provider calls; provider-backed execution remains blocked/unclaimed |
 | R7 Release Ops | Partial | Release date set for 2026-06-01; green-window started from 2026-05-18 `6d3f559` green evidence; `.env` scrub still blocked pending explicit destructive-action approval |
@@ -214,7 +214,7 @@ v0.2 product work is scoped to IDE productization of existing/gated capabilities
 
 - Live-stream productization baseline is complete for configured Python daemon/local runtime streams beyond the deterministic SSE proof stub. Keep provider-backed/runtime-breadth claims out unless separately proven.
 - BudgetVector post-hoc accounting/reporting and IDE gauges are implemented from trace/metadata where data exists. Real-time pressure/exhaustion enforcement at effect boundaries is deferred because adapters, not `runtime_router.py`, observe most effect boundaries.
-- Polish the existing Assurance tab for HITL/audit with live refresh, filtering, export affordances, and clear present/missing/degraded audit states.
+- Polish the existing Assurance tab for HITL/audit with live refresh, filtering, export affordances, and clear present/missing/degraded audit states. **Complete** in Phase 10 assurance polish patch after `fa9a64f`.
 - Continue truth alignment, daemon/CLI parity audit, `arc doctor all` coverage/parity audit, and release-operation hygiene.
 
 ### Deferred From v0.2

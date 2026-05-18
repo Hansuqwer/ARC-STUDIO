@@ -720,6 +720,8 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/return 'missing'/);
             expect(source).toMatch(/return info\.chainVerified \? 'present' : 'degraded'/);
             expect(source).toMatch(/state:\s*\{state\}/);
+            expect(source).toMatch(/auditStateCopy/);
+            expect(source).toMatch(/state-banner--\$\{auditCopy\.variant\}/);
             expect(source).toMatch(/No adapter-wide keyed audit\/HMAC claim/);
             expect(source).not.toMatch(/adapter-wide keyed audit\/HMAC verified/);
         });
@@ -756,6 +758,65 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/arc-studio-assurance__annotations/);
             expect(source).toMatch(/arc-studio-assurance__annotation/);
             expect(source).toMatch(/JSON\.stringify\(activeEvent\.data, null, 2\)/);
+        });
+
+        it('should have auto-refresh timer for HITL inbox', () => {
+            expect(source).toMatch(/setInterval[\s\S]*loadHitlPrompts/);
+            expect(source).toMatch(/clearInterval/);
+            expect(source).toMatch(/10_000/);  // 10 second interval
+            expect(source).toMatch(/LIVE/);   // live indicator
+            expect(source).not.toMatch(/streamActiveTrace/);  // no live-streaming claim
+        });
+
+        it('should provide category filter checkboxes for replay events', () => {
+            expect(source).toMatch(/Filter/);
+            expect(source).toMatch(/lifecycle/);
+            expect(source).toMatch(/message/);
+            expect(source).toMatch(/Clear filters/);
+            expect(source).toMatch(/filtered/);
+        });
+
+        it('should expose JSON export buttons for HITL, audit, and replay data', () => {
+            expect(source).toMatch(/Export.*JSON/);
+            expect(source).toMatch(/Blob/);
+            expect(source).toMatch(/createObjectURL/);
+            expect(source).toMatch(/application\/json/);
+        });
+
+        it('should render replay-safe degraded state without claiming live data', () => {
+            expect(source).toMatch(/No replay events loaded\./);
+            expect(source).not.toMatch(/real-time streaming/);
+            expect(source).not.toMatch(/live update/);
+            expect(source).not.toMatch(/connected/);
+        });
+
+        it('should render expired token state with appropriate visual warning', () => {
+            expect(source).toMatch(/token expired/);
+            expect(source).toMatch(/expired/);
+        });
+
+        it('should show filtered count in replay progress when filters are active', () => {
+            expect(source).toMatch(/filtered/);
+        });
+
+        it('should only show export buttons when data exists', () => {
+            expect(source).toMatch(/export.*json/i);
+            expect(source).toMatch(/hitlPrompts\.length/);
+            expect(source).toMatch(/function auditMaterialExists/);
+            expect(source).toMatch(/info\?\.auditPath && info\.recordCount > 0/);
+            expect(source).toMatch(/canExportAudit && auditInfo/);
+            expect(source).toMatch(/replayEvents\.length/);
+        });
+
+        it('should include unknown replay category rather than silently hiding uncategorized events', () => {
+            expect(source).toMatch(/'unknown'/);
+            expect(source).toMatch(/evt\.category \?\? 'unknown'/);
+        });
+
+        it('should wire visual state classes used by Assurance CSS', () => {
+            expect(source).toMatch(/arc-studio-assurance__live-dot/);
+            expect(source).toMatch(/arc-studio-assurance__filter-checkbox/);
+            expect(source).toMatch(/arc-studio-assurance__state-banner/);
         });
     });
 
@@ -804,8 +865,8 @@ describe('Studio Tabs Contracts', () => {
             expect(insightSource).not.toMatch(/crewai\+swarmgraph/);
         });
 
-        it('should expose honest live-aware controls backed by streamActiveTrace', () => {
-            expect(insightSource).toMatch(/arcService\.streamActiveTrace\(\{ runId, mode: 'live', baseUrl \}\)/);
+        it('should expose honest live-aware controls backed by readActiveTraceStream', () => {
+            expect(insightSource).toMatch(/readActiveTraceStream\(\{ runId, mode: 'live', baseUrl \}\)/);
             expect(insightSource).toMatch(/buildActiveTrace/);
             expect(insightSource).toMatch(/Live insight:/);
             expect(insightSource).toMatch(/disconnected\/degraded/);
