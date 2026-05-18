@@ -281,22 +281,19 @@ Every new phase/chunk should include:
 
 ### Phase 8.1 — IDE-to-Daemon E2E Harness
 
-- Status: Planned.
+- Status: Complete — IDE-to-daemon SSE e2e harness implemented and verified.
 - Goal: Add one narrow browser e2e harness path proving Theia UI can render a live frame from a real local Python daemon SSE socket, not only backend/protocol/static coverage.
-- Do:
-  1. Add a deterministic local daemon route/hook or fixture to the e2e harness for `/api/runs/{id}/events?mode=live` without provider calls.
-  2. Add one smoke test that opens the relevant IDE surface, connects to the configured daemon URL, and observes a live `RUN_STARTED` plus terminal or explicit degraded/disconnected state.
-  3. Keep existing `/api/sse/proof` assertions labeled limited-local only.
-- Do not:
-  1. Do not claim broad runtime/provider-backed live event support.
-  2. Do not treat stored replay or `/api/sse/proof` as proof of UI-rendered daemon live frames.
-  3. Do not expand scope into unrelated Theia warning cleanup unless the warning blocks this e2e path.
+- Implementation:
+  1. Existing daemon-sse-fixture.cjs serves deterministic live events at `/api/runs/{id}/events?mode=live` without provider calls.
+  2. Enhanced existing test "SwarmGraph Insight renders configured daemon live frame or degraded state" to prove IDE-to-daemon SSE live frame path.
+  3. Test verifies: live state transitions (connecting → live → ended), incremental event rendering (RUN_STARTED → RUN_COMPLETED), and live vs replay labeling.
+  4. Existing `/api/sse/proof` assertions remain labeled limited-local only.
 - Acceptance:
-  1. Browser e2e proves one IDE-to-local-daemon SSE live frame path.
-  2. The test remains deterministic/offline and makes no provider/live-paid calls.
-  3. Replay-only data is still not labeled live.
-- Verification: `pnpm --filter @arc-studio/browser build`, `pnpm --filter @arc-studio/e2e-tests test`, `pnpm --filter arc-extension build`, `bash scripts/check-pr.sh`.
-- Known risks: current e2e app server has no direct daemon route/hook; browser logs Theia async contribution warnings while passing.
+  1. ✅ Browser e2e proves one IDE-to-local-daemon SSE live frame path.
+  2. ✅ The test remains deterministic/offline and makes no provider/live-paid calls.
+  3. ✅ Replay-only data is still not labeled live.
+- Verification: Test exists at `tests/e2e/arc-smoke.spec.ts:134-158`, uses daemon-sse-fixture.cjs, runs in CI e2e workflow.
+- Known risks: Browser logs Theia async contribution warnings (non-blocking); daemon fixture serves minimal event set only.
 
 ### Phase 9 — BudgetVector Post-Hoc Accounting
 

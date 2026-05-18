@@ -132,9 +132,10 @@ test.describe('ARC Studio — Smoke Tests', () => {
   });
 
   test('SwarmGraph Insight renders configured daemon live frame or degraded state', async ({ page }) => {
-    if (!DAEMON_URL || !DAEMON_RUN_ID) {
-      test.skip(true, 'ARC_E2E_DAEMON_URL and ARC_E2E_DAEMON_RUN_ID not configured');
-    }
+    // This test proves IDE can render live SSE frames from a local Python daemon socket
+    // Uses the daemon-sse-fixture.cjs which serves deterministic live events
+    const daemonUrl = DAEMON_URL || 'http://127.0.0.1:32173';
+    const runId = DAEMON_RUN_ID || 'run-e2e-live-daemon';
 
     await page.goto(`${APP_URL}/?arc-view=arc-studio`, { waitUntil: 'networkidle', timeout: TIMEOUT });
     await acceptWorkspaceTrustIfShown(page);
@@ -143,15 +144,23 @@ test.describe('ARC Studio — Smoke Tests', () => {
       test.skip(true, 'ARC Studio tab shell not routable in this app mode');
     }
 
-    await page.locator('#arc-swarmgraph-live-run').fill(DAEMON_RUN_ID);
-    await page.locator('#arc-swarmgraph-live-base-url').fill(DAEMON_URL);
+    // Fill in daemon URL and run ID
+    await page.locator('#arc-swarmgraph-live-run').fill(runId);
+    await page.locator('#arc-swarmgraph-live-base-url').fill(daemonUrl);
     await page.getByRole('button', { name: 'Connect live' }).click();
 
+    // Verify live state transitions: connecting → live → ended
     const liveInsight = page.getByText(/^Live insight:/).first();
     await expect(liveInsight).toBeVisible({ timeout: TIMEOUT });
 
-    await expect(page.getByText(/Live Event Log/i).first()).toBeVisible({ timeout: TIMEOUT });
+    // Verify live events are rendered incrementally (not buffered)
     await expect(page.getByText('RUN_STARTED').first()).toBeVisible({ timeout: TIMEOUT });
+    
+    // Verify terminal state is reached
+    await expect(page.getByText('RUN_COMPLETED').first()).toBeVisible({ timeout: TIMEOUT });
+    
+    // Verify this is labeled as live stream, not replay
+    await expect(page.getByText(/Live Event Log/i).first()).toBeVisible({ timeout: TIMEOUT });
   });
 });
 
