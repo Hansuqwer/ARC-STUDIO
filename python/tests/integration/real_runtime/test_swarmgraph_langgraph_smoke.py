@@ -2,6 +2,9 @@
 
 These tests are intentionally skipped in the default offline gate. Enable with
 ``ARC_REAL_RUNTIME_SMOKE=1`` when validating a release candidate or nightly CI.
+The ``langgraph+swarmgraph`` local-real fixture also requires
+``ARC_LANGGRAPH_SWARMGRAPH_REAL=1``. It uses an in-process graph, expects
+``real_provider_call=False``, and must not make paid/provider calls.
 """
 from __future__ import annotations
 

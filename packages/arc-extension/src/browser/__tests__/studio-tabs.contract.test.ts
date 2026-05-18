@@ -648,6 +648,23 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/token expired/);
         });
 
+        it('should render empty HITL and replay states without claiming live data', () => {
+            expect(source).toMatch(/hitlPrompts\.length === 0/);
+            expect(source).toMatch(/No pending HITL prompts\./);
+            expect(source).toMatch(/replayEvents\.length === 0/);
+            expect(source).toMatch(/No replay events loaded\./);
+            expect(source).not.toMatch(/streamActiveTrace/);
+        });
+
+        it('should gate HITL action submissions through token validation and refresh', () => {
+            expect(source).toMatch(/if \(hitlBlocked\(prompt\)\)/);
+            expect(source).toMatch(/has missing or expired token/);
+            expect(source).toMatch(/token: prompt\.token!/);
+            expect(source).toMatch(/await loadHitlPrompts\(\)/);
+            expect(source).toMatch(/setHitlRespondingId\(prompt\.promptId\)/);
+            expect(source).toMatch(/setHitlRespondingId\(null\)/);
+        });
+
         it('should render audit present missing degraded states honestly', () => {
             expect(source).toMatch(/type AuditState = 'present' \| 'missing' \| 'degraded'/);
             expect(source).toMatch(/return 'missing'/);
@@ -655,6 +672,23 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/state:\s*\{state\}/);
             expect(source).toMatch(/No adapter-wide keyed audit\/HMAC claim/);
             expect(source).not.toMatch(/adapter-wide keyed audit\/HMAC verified/);
+        });
+
+        it('should show degraded audit when records exist but verification fails', () => {
+            expect(source).toMatch(/!info \|\| !info\.auditPath \|\| info\.recordCount <= 0/);
+            expect(source).toMatch(/return info\.chainVerified \? 'present' : 'degraded'/);
+            expect(source).toMatch(/auditInfo\.recordCount/);
+            expect(source).toMatch(/auditInfo\.chainVerified \? 'yes' : 'no'/);
+            expect(source).toMatch(/auditInfo\.signature \|\| 'not provided'/);
+            expect(source).toMatch(/auditInfo\.hmacAlgo \|\| 'not provided'/);
+        });
+
+        it('should require run id before audit verify or replay load actions', () => {
+            expect(source).toMatch(/const trimmedRunId = runId\.trim\(\)/);
+            expect(source).toMatch(/setAuditError\('Run id required\.'\)/);
+            expect(source).toMatch(/setReplayError\('Run id required\.'\)/);
+            expect(source).toMatch(/arcService\.getAuditChainInfo\(trimmedRunId\)/);
+            expect(source).toMatch(/arcService\.replayRun\(trimmedRunId\)/);
         });
 
         it('should expose replay stepper with prev next controls', () => {
@@ -725,7 +759,7 @@ describe('Studio Tabs Contracts', () => {
             expect(insightSource).toMatch(/buildActiveTrace/);
             expect(insightSource).toMatch(/Live insight:/);
             expect(insightSource).toMatch(/disconnected\/degraded/);
-            expect(insightSource).toMatch(/No real-live backend claim/);
+            expect(insightSource).toMatch(/uses the configured Python SSE endpoint when available/);
         });
     });
 });

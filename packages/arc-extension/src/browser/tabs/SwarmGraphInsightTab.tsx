@@ -227,6 +227,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
         if (!baseUrl) {
             setLiveState('disconnected');
             setLiveReason('no Python web/SSE base URL configured');
+            setError(null);
             return;
         }
         streamCancelled.current = false;
@@ -307,7 +308,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
                 <button className='arc-studio-swarmgraph__button' onClick={disconnectLiveStream} disabled={liveState !== 'connecting' && liveState !== 'live'}>Disconnect</button>
             </div>
             <div className={`arc-studio-swarmgraph__live-status arc-studio-swarmgraph__live-status--${liveState}`}>
-                Live insight: {liveStatus.text}. Base URL: {liveStatus.baseUrlConfigured ? 'configured' : 'not configured'}. No real-live backend claim; disconnected/degraded states are expected when active stream wiring is unavailable.
+                Live insight: {liveStatus.text}. Base URL: {liveStatus.baseUrlConfigured ? 'configured' : 'not configured'}. Live mode uses the configured Python SSE endpoint when available; disconnected/degraded states mean no active stream is reachable.
             </div>
             {error && <div className='arc-studio-swarmgraph__error' role='alert'>{error}</div>}
             {loadingTrace && <div className='arc-studio-swarmgraph__loading'>Loading trace...</div>}

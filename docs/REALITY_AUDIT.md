@@ -1,6 +1,6 @@
 # ARC Studio — Full Repo Reality Audit
 
-Generated: 2026-05-14; truth notes refreshed 2026-05-17 for release-facing stale claims.
+Generated: 2026-05-14; truth notes refreshed 2026-05-18 against locked status docs and release smoke wording.
 
 > **Prerequisite decision confirmed**: `packages/arc-extension` is the true/canonical Theia extension. It is wired into the browser app, has 581 tests in the canonical extension suite, recent commits, and active DI bindings. Legacy `theia-extensions/*` source directories are archived under `docs/archive/theia-extensions/`; they are unwired from browser/electron apps, root typecheck, and the pnpm workspace. This audit is historical unless a row is explicitly refreshed below.
 
@@ -24,7 +24,7 @@ Generated: 2026-05-14; truth notes refreshed 2026-05-17 for release-facing stale
 
 8. **The "combo runtime adapter" exists** but only runs adapters sequentially (not SwarmGraph composition). It's a for-loop calling each adapter's `run_workflow` in order. No queen/worker decomposition, no voting, no consensus.
 
-9. **Test coverage is entirely unit/contract/mock.** No end-to-end test proves any real runtime executes a real workflow. Tests prove ARC plumbing, schema compatibility, trace persistence, and SSE endpoints — but not runtime execution against real SwarmGraph/LangGraph/CrewAI/OpenAI Agents.
+9. **Default test coverage is unit/contract/mock/offline.** An opt-in real-runtime smoke suite exists for release validation, including vendored SwarmGraph imports and a narrow `langgraph+swarmgraph` local-real fixture path. It requires explicit env flags, performs no provider/paid calls, and is not evidence for broad provider-backed adoption.
 
 10. **Security:** no auth by default (optional bearer token via `ARC_DAEMON_TOKEN`), subprocess env redaction exists, ARC adapter run paths generally use SHA-256 audit chains, and a separate keyed-audit CLI/key-management path exists. Do not claim concurrent-user readiness or adapter-wide keyed audit without run-specific evidence.
 
@@ -46,8 +46,8 @@ Generated: 2026-05-14; truth notes refreshed 2026-05-17 for release-facing stale
 | **LlamaIndex adapter** | Detection + export/run/adoption scaffold | Fake-tested/gated adapter/adoption path exists | Partial | `adapters/llamaindex.py`; `adoption/` | No broad live provider claim |
 | **LM Arena adapter** | Live provider comparison | 100% stub responses | Static | `arena/service.py` L78-150 `_stub_battle/direct/code/agent_preview` | No real LLM calls |
 | **Combo adapter** | SwarmGraph composition | Sequential for-loop, no composition | Static | `runtime_router.py:ComboRuntimeAdapter` L42-101 | Not adoption; not SwarmGraph |
-| **Theia UI** | Full runtime cockpit | Status cards + basic actions | Partial | `arc-main-widget.tsx` runtime readiness, recent runs | No runtime config, HITL, audit viewer, event stream |
-| **Python daemon** | Full REST API | 18 endpoints, CORS, optional auth | Implemented | `web/routes.py` L558-590; `web/server.py` L70-98 | SSE replay-only, no live streaming |
+| **Theia UI** | Full runtime cockpit | Tabbed canonical extension with Chat/Runs/Workflows/Config plus ported adapters, workflow graph, run timeline, event stream, assurance, and SwarmGraph insight views | Partial | `packages/arc-extension/src/browser/`; locked docs | Active-run SSE bridge still disconnected; provider/cost setup UX remains limited |
+| **Python daemon** | Full REST API | REST/SSE endpoints, CORS, optional bearer auth | Implemented | `web/routes.py`; `web/server.py` | Stored-trace SSE/replay exists; active-run SSE wiring in IDE remains a known gap |
 
 ---
 
@@ -81,15 +81,13 @@ Generated: 2026-05-14; truth notes refreshed 2026-05-17 for release-facing stale
 ## 4. Theia UI/UX Status
 
 ### Implemented Views (in `packages/arc-extension/`)
-- **ARC Main Widget** (`arc-widget.tsx`): Runtime readiness cards, recent runs list, execution steps, trace viewer, workflow detection — reads from Python daemon/CLI via backend service
-- **ProgressBar**: Progress bar component
-- **ToastContainer**: Toast notifications with auto-dismiss
-- **ShortcutsModal**: Keyboard shortcuts help dialog
-- **ExecutionSteps**: Workflow execution progress steps
-- **ErrorBanner**: Error display with retry action
-- **WorkflowExecutionSection**: Workflow execution UI section
-- **TraceViewerSection**: Trace viewer UI section with filtering
-- **WorkflowDetectionSection**: Workflow detection UI section
+- **ARC Studio Widget** (`arc-studio-widget.tsx`): Canonical tabbed shell with Chat, Runs, Workflows, and Config tabs.
+- **Legacy ARC Widget** (`arc-widget.tsx`): Retained/marked legacy; runtime readiness, recent runs, execution steps, trace viewer, workflow detection.
+- **Runs tab**: Run list basics plus audit-chain verification, replay events, and pending HITL approve/reject basics.
+- **Chat tab**: Runtime/profile selectors plus explicit fake/offline run launch path for supported safe modes.
+- **Config tab**: Backend-backed config status/save basics.
+- **Ported views**: Adapters, workflow graph, run timeline, event stream, assurance, and SwarmGraph insight views live under `packages/arc-extension`.
+- **Shared components**: Progress, toast, shortcuts, execution steps, errors, workflow execution, trace viewer, workflow detection, and related reusable UI pieces.
 
 ### Legacy Views (source retained, not wired)
 - Legacy `theia-extensions/*` source dirs are archived under `docs/archive/theia-extensions/` for rollback/history only and are not active in browser/electron apps, root typecheck, or the pnpm workspace.
@@ -97,14 +95,12 @@ Generated: 2026-05-14; truth notes refreshed 2026-05-17 for release-facing stale
 - `arc-context`, `arc-schemas`, and `arc-arena` remain legacy/out-of-scope source references unless intentionally ported later.
 
 ### Missing Core UX
-- Runtime/profile selection exists in the modern Chat tab; richer comparison/setup UX remains deferred.
-- Adapter config UI (set `ARC_CREWAI_EXPORT`, etc.)
-- SwarmGraph adoption mode toggle (fiction)
-- Live run launch with streaming events (only post-hoc replay via SSE)
-- Live event stream during run (SSE is replay-only from stored JSONL)
-- Dedicated audit viewer remains deferred; Runs tab exposes audit verification info for selected runs.
-- Dedicated HITL inbox remains deferred; Runs tab exposes pending prompt approval/rejection basics.
-- Provider/cost controls (daemon routes exist, no Theia view)
+- Rich adapter setup UX for env/export targets remains limited.
+- Broad SwarmGraph adoption product mode remains fake-tested/gated, not a live/provider-backed UI claim.
+- Active-run streaming remains incomplete: `streamActiveTrace()` reports disconnected for live streams even when a base URL exists; SwarmGraph Insight can ask for a base URL manually.
+- Stored trace replay/event viewing exists; do not describe it as live active-run SSE.
+- Dedicated audit/HITL workspaces remain deferred; Runs tab exposes basic audit verification and pending HITL actions.
+- Provider/cost controls remain explicit opt-in/gated; no paid/provider calls are default.
 - Workspace/project setup wizard
 - Run comparison side-by-side
 - Trace/replay with step-through
@@ -123,7 +119,7 @@ Generated: 2026-05-14; truth notes refreshed 2026-05-17 for release-facing stale
 | "LM Arena with live modes" | `lmarena.py` docstring | All 4 arena modes are 100% stub responses. `ARC_ALLOW_LIVE_ARENA=true` is a fiction — no live provider integration |
 | "CLI has 15 commands" | README L142-155 | Commands exist but `eval`, `context` are thin wrappers; `adapter test` runs conformance only; `run` defaults to fixture ID |
 | "HMAC-SHA256 audit chain in ARC" | `docs/SECURITY_AUDIT_REPORT.md` | ARC has `audit/hmac_chain.py` + key manager + CLI verify/export/key path, but adapter-wide run paths generally still use SHA-256 chains unless HMAC material is explicitly written |
-| "ARC can stream live events" | `RUNTIMES.md` streaming section | SSE endpoint (`run_events_sse`) reads stored JSONL traces — replay only. No live streaming channel |
+| "ARC can stream live events" | `RUNTIMES.md` streaming section | Stored-trace SSE/replay exists, but active-run IDE streaming remains disconnected (`streamActiveTrace()` returns disconnected for live requests). No broad live active-run stream claim |
 | "AG2 support" | README L163-164 | AG2 is registered/gated; real dependency/runtime execution remains gated |
 | "Combo runtime = SwarmGraph composition" | `runtime_router.py:ComboRuntimeAdapter` | Sequential for-loop adapter execution. No SwarmGraph concepts |
 
@@ -148,7 +144,7 @@ Generated: 2026-05-14; truth notes refreshed 2026-05-17 for release-facing stale
 
 ## 7. Historical Roadmap Snapshot
 
-This section is retained as historical audit context from 2026-05-14. Many items below are now complete, scaffolded, or explicitly deferred; use `docs/handover/HANDOVER.md` and `docs/handover/NEXT_IMPLEMENTATION_HANDOVER.md` for current ordered work.
+This section is retained as historical audit context from 2026-05-14. Many items below are now complete, scaffolded, or explicitly deferred; use `docs/LOCKED_REMAINING_ROADMAP.md` and `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` for current ordered work.
 
 ### P0: Make Truth Coherent and Runnable (1-2 weeks)
 
@@ -231,7 +227,7 @@ This section is retained as historical audit context from 2026-05-14. Many items
 - "LlamaIndex: gated/fake-tested path; no broad live provider claim"
 - "LM Arena: stub/test mode only"
 - "Trace visualization via Theia shell (optional); `packages/arc-extension` is the primary Theia extension"
-- "All runtime execution is gated behind environment variables and paid-call flags"
+- "Provider-backed or paid-call execution is opt-in/gated; offline/fake/local-real smoke paths are the defaults for release validation"
 - "Pre-release v0.1.0-alpha. No API stability guarantees."
 - "No telemetry. Loopback-only by default."
 
@@ -242,5 +238,5 @@ This section is retained as historical audit context from 2026-05-14. Many items
 - "AG2 support" → registered/gated; real dependency/runtime path gated
 - "`packages/arc-extension` not used" → **FALSE** — it IS the canonical extension
 - "HMAC-SHA256 audit" → adapter paths generally use ARC SHA-256 chains; keyed CLI audit path exists separately
-- "Live streaming" → replay only
+- "Live streaming" → stored-trace replay exists; active-run IDE stream still disconnected
 - "15 CLI commands" → 9-10 are real, rest are thin

@@ -9,6 +9,7 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     env:
+      # Opt-in local-real smoke only. This workflow must not use paid/provider backends.
       ARC_REAL_RUNTIME_SMOKE: '1'
       ARC_LANGGRAPH_SWARMGRAPH_REAL: '1'
       ARC_SWARMGRAPH_RUN_BACKEND: ''

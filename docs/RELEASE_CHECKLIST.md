@@ -4,14 +4,14 @@
 **Version:** v0.1.0-alpha
 **Last Updated:** 2026-05-18
 
-**Evidence refresh:** Docs refreshed against local commit `13b34b4` on 2026-05-18. Current GitHub run IDs are not available from this local evidence pass, so run-ID fields remain TBD/not yet refreshed rather than inferred.
+**Evidence refresh:** Docs refreshed against local commit `13b34b4` on 2026-05-18. Current GitHub run IDs are not available from this local evidence pass, so run-ID fields remain TBD/not yet refreshed rather than inferred. Real-runtime smoke wording below describes opt-in/local-only validation, not a default release gate.
 
 **v0.1 Scope:**
 - ✅ Browser app (`applications/browser`)
 - ✅ Python CLI/wheel (`python/`)
 - ❌ Electron packaging — post-v0.1 spike only
 - ❌ LM Arena product feature — stub-default with gated live path, not v0.1 scope
-- ❌ SwarmGraph adoption product claim — fake-tested/gated adoption runners exist; `langgraph+swarmgraph` has only a narrow opt-in local-real smoke path with no provider calls. v0.1 release docs must not claim broad live/provider-backed adoption support.
+- ❌ SwarmGraph adoption product claim — fake-tested/gated adoption runners exist; `langgraph+swarmgraph` has only a narrow opt-in local-real smoke path with no provider/paid calls. v0.1 release docs must not claim broad live/provider-backed adoption support.
 
 ---
 
@@ -107,7 +107,7 @@ bash scripts/check-banned-claims.sh AGENTS.md README.md docs/LOCKED_REMAINING_RO
 
 **Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
 
-Latest local run: `782 passed, 14 skipped`. Real-runtime smoke paths are opt-in because dependency shape and provider availability differ across platforms. The narrow `langgraph+swarmgraph` local-real smoke requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; it performs no provider/paid calls and is not evidence for provider-backed adoption.
+Latest local run: `782 passed, 14 skipped`. Real-runtime smoke paths are outside the default offline gate because dependency shape differs across platforms. The narrow `langgraph+swarmgraph` local-real smoke requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; it uses an in-process fixture graph, forces no-cost SwarmGraph env defaults, performs no provider/paid calls, and is not evidence for provider-backed adoption.
 
 **Evidence:** Local commit `13b34b4`; GitHub run ID TBD/not yet refreshed.
 
@@ -201,7 +201,7 @@ curl -s http://localhost:3000 | grep -q 'arc-widget'
 
 **Status:** ⏸️ Deferred until release date is re-set
 
-Offline PR/push gates exist (`python`, `node`, `ARC Roadmap Gate`). A separate `real-runtime-smoke` workflow runs manually and nightly with `ARC_REAL_RUNTIME_SMOKE=1`; that smoke scope is opt-in local-real validation only and must not perform or imply paid/live provider calls. The 3-day green-window clock should start only after a release date is re-set.
+Offline PR/push gates exist (`python`, `node`, `ARC Roadmap Gate`). A separate `real-runtime-smoke` workflow runs manually and nightly with `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; that smoke scope is opt-in local-real validation only, explicitly clears SwarmGraph backend/cost env vars, and must not perform or imply paid/live provider calls. The 3-day green-window clock should start only after a release date is re-set.
 
 No release date is currently set in these source-of-truth docs. The 3-day green-window was not started during the 2026-05-18 evidence refresh. GitHub run IDs remain TBD/not yet refreshed.
 

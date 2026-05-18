@@ -1391,16 +1391,7 @@ export class ArcBackendService implements ArcService {
             }
 
             if (request.mode === 'live') {
-                const baseUrlConfigured = Boolean(request.baseUrl?.trim());
-                yield this.activeTraceTerminalChunk(
-                    request,
-                    1,
-                    'STREAM_END',
-                    'disconnected',
-                    baseUrlConfigured
-                        ? 'Live SSE base URL configured, but Theia SSE proxy is not wired; use replay until web URL streaming is implemented.'
-                        : 'Live SSE proxy disconnected; no Python web/SSE base URL configured.'
-                );
+                yield* this.streamLiveActiveTrace(request, cancelToken, timeoutMs, startedAt);
                 return;
             }
 
@@ -1436,6 +1427,123 @@ export class ArcBackendService implements ArcService {
             );
         } finally {
             this.activeStreamCancels.delete(request.runId);
+        }
+    }
+
+    private async *streamLiveActiveTrace(
+        request: ActiveTraceStreamRequest,
+        cancelToken: { cancelled: boolean },
+        timeoutMs: number,
+        startedAt: number
+    ): AsyncIterable<ActiveTraceEventChunk> {
+        const baseUrl = request.baseUrl?.trim();
+        if (!baseUrl) {
+            yield this.activeTraceTerminalChunk(
+                request,
+                1,
+                'STREAM_END',
+                'disconnected',
+                'Live SSE proxy disconnected; no Python web/SSE base URL configured.'
+            );
+            return;
+        }
+
+        let streamUrl: URL;
+        try {
+            streamUrl = new URL(`/api/runs/${encodeURIComponent(request.runId)}/events`, baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`);
+        } catch {
+            yield this.activeTraceTerminalChunk(request, 1, 'STREAM_END', 'error', 'Invalid Python web/SSE base URL.');
+            return;
+        }
+        if (streamUrl.protocol !== 'http:' && streamUrl.protocol !== 'https:') {
+            yield this.activeTraceTerminalChunk(request, 1, 'STREAM_END', 'error', 'Python web/SSE base URL must use http or https.');
+            return;
+        }
+        if (streamUrl.username || streamUrl.password) {
+            yield this.activeTraceTerminalChunk(request, 1, 'STREAM_END', 'error', 'Python web/SSE base URL must not include credentials.');
+            return;
+        }
+        streamUrl.searchParams.set('mode', 'live');
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        let sequence = 1;
+        try {
+            const response = await fetch(streamUrl, {
+                method: 'GET',
+                headers: { Accept: 'text/event-stream' },
+                signal: controller.signal,
+            });
+            if (!response.ok || !response.body) {
+                yield this.activeTraceTerminalChunk(request, sequence, 'STREAM_END', 'error', `Live SSE request failed with HTTP ${response.status}.`);
+                return;
+            }
+            yield {
+                runId: request.runId,
+                mode: 'live',
+                sequence: sequence++,
+                status: {
+                    runId: request.runId,
+                    mode: 'live',
+                    state: 'connected',
+                    message: 'Live SSE stream connected.',
+                    baseUrlConfigured: true,
+                    timestamp: new Date().toISOString(),
+                },
+                done: false,
+            };
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            while (!cancelToken.cancelled) {
+                if (Date.now() - startedAt > timeoutMs) {
+                    controller.abort();
+                    yield this.activeTraceTerminalChunk(request, sequence, 'STREAM_END', 'error', 'Stream timed out.');
+                    return;
+                }
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const frames = buffer.split(/\r?\n\r?\n/);
+                buffer = frames.pop() ?? '';
+                for (const frame of frames) {
+                    const event = this.parseSseEvent(frame);
+                    if (!event) continue;
+                    const terminal = this.activeTraceTerminalFromEventType(String(event.type ?? ''));
+                    yield { runId: request.runId, mode: 'live', sequence: sequence++, event, terminal, done: false };
+                    if (terminal) {
+                        yield this.activeTraceTerminalChunk(request, sequence, terminal, 'ended', 'Live SSE stream ended.');
+                        return;
+                    }
+                }
+            }
+            yield this.activeTraceTerminalChunk(
+                request,
+                sequence,
+                cancelToken.cancelled ? 'RUN_CANCELLED' : 'STREAM_END',
+                cancelToken.cancelled ? 'cancelled' : 'disconnected',
+                cancelToken.cancelled ? 'Stream cancelled.' : 'Live SSE stream disconnected.'
+            );
+        } catch (error) {
+            yield this.activeTraceTerminalChunk(request, sequence, 'STREAM_END', 'error', error instanceof Error ? error.message : 'Unknown live SSE error');
+        } finally {
+            clearTimeout(timeout);
+            controller.abort();
+        }
+    }
+
+    private parseSseEvent(frame: string): Record<string, unknown> | undefined {
+        const data = frame
+            .split(/\r?\n/)
+            .filter(line => line.startsWith('data:'))
+            .map(line => line.slice(5).trimStart())
+            .join('\n');
+        if (!data) return undefined;
+        try {
+            return JSON.parse(data) as Record<string, unknown>;
+        } catch {
+            return { type: 'MESSAGE', data: { message: data } };
         }
     }
 

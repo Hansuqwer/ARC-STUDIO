@@ -557,6 +557,169 @@ describe('ArcBackendService Integration Tests', () => {
         });
     });
 
+    describe('config status/save', () => {
+        let originalPath: string | undefined;
+
+        afterEach(() => {
+            process.env.PATH = originalPath;
+        });
+
+        async function installArcFixture(script: string): Promise<string> {
+            originalPath = process.env.PATH;
+            const binDir = path.join(tempDir, 'bin');
+            await fs.ensureDir(binDir);
+            const arcPath = path.join(binDir, 'arc');
+            await fs.writeFile(arcPath, script, 'utf-8');
+            await fs.chmod(arcPath, 0o755);
+            process.env.PATH = `${binDir}${path.delimiter}${originalPath || ''}`;
+            return arcPath;
+        }
+
+        it('should return safe config status from CLI output without secret values', async () => {
+            await installArcFixture(`#!/bin/sh
+if [ "$1 $2 $3" = "providers status --json" ]; then
+  printf '%s' '{"ok":true,"data":[{"provider":"openai","display_name":"OpenAI","apiKeyConfigured":true,"apiKeySource":"env","api_key_env":"OPENAI_API_KEY","default_model":"gpt-4o","api_key":"sk-should-not-surface"},{"provider":"anthropic","display_name":"Anthropic","api_key_configured":false,"api_key":"sk-ant-should-not-surface"}]}'
+  exit 0
+fi
+if [ "$1 $2 $3" = "config show --json" ]; then
+  printf '%s' '{"ok":true,"data":{"runtime":{"default":"langgraph","auto_detect":false,"fallback":"stub"},"execution":{"isolation":"subprocess","timeout_seconds":120,"allow_paid_calls":true},"providers":{"dry_run":false,"routing_mode":"auto"},"profiles":{"selected_profile":"local-dev"},"workspace":{"trust_level":"trusted"}}}'
+  exit 0
+fi
+exit 2
+`);
+
+            const result = await service.getConfigStatus();
+
+            expect(result.backendAvailable).toBe(true);
+            expect(result.workspace.trusted).toBe(true);
+            expect(result.runtime).toMatchObject({
+                defaultRuntime: 'langgraph',
+                autoDetect: false,
+                isolation: 'subprocess',
+                timeoutSeconds: 120,
+                allowPaidCalls: true,
+                dryRun: false,
+                routingMode: 'auto'
+            });
+            expect(result.selectedProfile).toBe('local-dev');
+            expect(result.providers[0]).toEqual({
+                provider: 'openai',
+                displayName: 'OpenAI',
+                configured: true,
+                source: 'env',
+                defaultModel: 'gpt-4o',
+                envOverride: 'OPENAI_API_KEY'
+            });
+            expect(JSON.stringify(result)).not.toContain('sk-should-not-surface');
+            expect(JSON.stringify(result)).not.toContain('sk-ant-should-not-surface');
+        });
+
+        it('should return degraded provider status when providers CLI fails but keep config defaults', async () => {
+            await installArcFixture(`#!/bin/sh
+if [ "$1 $2 $3" = "providers status --json" ]; then
+  printf '%s' 'arc missing' >&2
+  exit 1
+fi
+if [ "$1 $2 $3" = "config show --json" ]; then
+  printf '%s' '{"ok":false}'
+  exit 0
+fi
+exit 2
+`);
+
+            const result = await service.getConfigStatus();
+
+            expect(result.backendAvailable).toBe(false);
+            expect(result.backendMessage).toContain('Backend unavailable:');
+            expect(result.providers).toEqual([
+                { provider: 'openai', displayName: 'OpenAI', configured: false, source: 'unset' },
+                { provider: 'anthropic', displayName: 'Anthropic', configured: false, source: 'unset' },
+                { provider: 'ollama', displayName: 'Ollama', configured: false, source: 'unset' }
+            ]);
+            expect(result.runtime).toMatchObject({
+                defaultRuntime: 'swarmgraph',
+                autoDetect: true,
+                fallback: 'stub',
+                isolation: 'none',
+                timeoutSeconds: 300,
+                allowPaidCalls: false,
+                dryRun: true,
+                routingMode: 'manual'
+            });
+        });
+
+        it('should reject unsafe save config fields before invoking CLI', async () => {
+            const markerPath = path.join(tempDir, 'cli-called');
+            await installArcFixture(`#!/bin/sh
+touch "${markerPath}"
+exit 1
+`);
+
+            const result = await service.saveConfig({ apiKey: 'sk-secret' } as any);
+
+            expect(result.success).toBe(false);
+            expect(result.message).toContain('Rejected unsafe config field: apiKey');
+            expect(await fs.pathExists(markerPath)).toBe(false);
+        });
+
+        it('should reject empty save config updates before invoking CLI', async () => {
+            const markerPath = path.join(tempDir, 'cli-called');
+            await installArcFixture(`#!/bin/sh
+touch "${markerPath}"
+exit 1
+`);
+
+            const result = await service.saveConfig({});
+
+            expect(result).toEqual({ success: false, message: 'No config fields to update.' });
+            expect(await fs.pathExists(markerPath)).toBe(false);
+        });
+
+        it('should save only safe config fields through arc config set', async () => {
+            const argsPath = path.join(tempDir, 'arc-args.txt');
+            await installArcFixture(`#!/bin/sh
+printf '%s\n' "$@" > "${argsPath}"
+exit 0
+`);
+
+            const result = await service.saveConfig({
+                defaultRuntime: 'langgraph',
+                mode: 'build',
+                isolation: 'subprocess',
+                allowPaidCalls: false,
+                dryRun: true,
+                routingMode: 'manual',
+                selectedProfile: 'local-dev'
+            });
+
+            expect(result).toEqual({ success: true, message: 'Configuration saved.' });
+            const args = (await fs.readFile(argsPath, 'utf-8')).trim().split('\n');
+            expect(args).toEqual([
+                'config',
+                'set',
+                'runtime.default=langgraph',
+                'execution.mode=build',
+                'execution.isolation=subprocess',
+                'execution.allow_paid_calls=false',
+                'providers.dry_run=true',
+                'providers.routing_mode=manual',
+                'profiles.selected_profile=local-dev'
+            ]);
+        });
+
+        it('should report save config CLI failures', async () => {
+            await installArcFixture(`#!/bin/sh
+printf '%s' 'permission denied' >&2
+exit 1
+`);
+
+            const result = await service.saveConfig({ defaultRuntime: 'langgraph' });
+
+            expect(result.success).toBe(false);
+            expect(result.message).toContain('Failed to save config:');
+        });
+    });
+
     describe('parseJsonlTrace (via readTrace)', () => {
         it('should parse single-line JSON trace', async () => {
             const tracesDir = path.join(tempDir, '.arc', 'traces');

@@ -24,3 +24,7 @@ Allowlist scope is intentionally narrow: `.env.example`, archived/generated
 patches under `docs/history/`, `docs/patches/`, `site/patches/`, local
 GitNexus metadata, and named fake fixtures under
 `tests/fixtures/secret_shapes/`. Do not add blanket `docs/` or `tests/` skips.
+
+Regression tests that need planted secrets build synthetic detector-shaped values
+from safe fragments at runtime. Do not commit real-looking token literals just to
+exercise scanner rules.
