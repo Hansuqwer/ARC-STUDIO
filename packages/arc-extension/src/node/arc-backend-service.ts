@@ -41,6 +41,8 @@ import {
     ProviderQuotaInfo,
     ProviderQuotaResetResult,
     ProviderKeyRefRequest,
+    GatedProviderActionRequest,
+    GatedProviderActionResult,
     RunPreflightRequest,
     RunPreflightResponse,
     StartRunRequest,
@@ -896,6 +898,84 @@ export class ArcBackendService implements ArcService {
                 ArcErrorCode.EXECUTION_FAILED,
                 `Provider quota reset unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`
             );
+        }
+    }
+
+    async runGatedProviderAction(request: GatedProviderActionRequest): Promise<GatedProviderActionResult> {
+        const dryRun = request.dryRun !== false;
+        const args = ['providers', 'action', '--provider', request.provider, '--prompt', request.prompt, '--json'];
+        if (request.model) {
+            args.push('--model', request.model);
+        }
+        if (!dryRun) {
+            args.push('--live');
+        }
+        if (request.allowPaidCalls) {
+            args.push('--allow-paid-calls');
+        }
+        if (request.confirmProviderCall && request.model) {
+            args.push('--confirm', `RUN_PROVIDER_ACTION:${request.provider}:${request.model}`);
+        }
+
+        try {
+            const output = execFileSync('arc', args, {
+                timeout: 30000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            return this.mapGatedProviderActionOutput(output, dryRun, request);
+        } catch (error: any) {
+            const output = String(error?.stdout || error?.stderr || '');
+            if (output.trim()) {
+                return this.mapGatedProviderActionOutput(output, dryRun, request, true);
+            }
+            return {
+                success: false,
+                blocked: true,
+                dryRun,
+                providerCall: false,
+                provider: request.provider,
+                model: request.model,
+                message: `Provider action unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            };
+        }
+    }
+
+    private mapGatedProviderActionOutput(
+        output: string,
+        dryRun: boolean,
+        request: GatedProviderActionRequest,
+        cliFailed = false
+    ): GatedProviderActionResult {
+        try {
+            const parsed = JSON.parse(output);
+            const data = parsed?.data || {};
+            const error = parsed?.error;
+            const ok = parsed?.ok === true && !cliFailed;
+            return {
+                success: ok,
+                blocked: !ok || data.blocked === true,
+                dryRun: data.dry_run ?? dryRun,
+                providerCall: data.provider_call === true,
+                provider: data.provider || request.provider,
+                model: data.model || request.model,
+                message: data.message || error?.message || (ok ? 'Provider action completed.' : 'Provider action blocked.'),
+                quota: data.quota || data.provider_quota,
+                estimatedCost: data.estimated_cost ?? null,
+                data,
+                error,
+            };
+        } catch {
+            return {
+                success: false,
+                blocked: true,
+                dryRun,
+                providerCall: false,
+                provider: request.provider,
+                model: request.model,
+                message: output.trim() || 'Provider action failed.',
+            };
         }
     }
 

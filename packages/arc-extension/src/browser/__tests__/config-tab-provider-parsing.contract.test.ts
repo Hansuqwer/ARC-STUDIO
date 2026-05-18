@@ -116,4 +116,21 @@ describe('ConfigTab provider telemetry parsing contract', () => {
         expect(source).toMatch(/providerCall:false|providerCall: false/);
         expect(source).not.toMatch(/runLiveProvider|startProviderRun|executeProvider|enableRealProvider/);
     });
+
+    it('requires explicit paid-call confirmation and fails closed without optional backend method', () => {
+        expect(helperSource).toMatch(/I UNDERSTAND THIS MAY COST MONEY/);
+        expect(helperSource).toMatch(/optional backend action is unavailable; fail closed/);
+        expect(helperSource).toMatch(/provider=\$\{provider\}, model=\$\{model\}/);
+        expect(helperSource).toMatch(/Local accounting preview only/);
+        expect(source).toMatch(/confirmProviderAction\?:/);
+        expect(source).toMatch(/providerActionAvailable/);
+        expect(source).toMatch(/liveProviderConfirmPhrase/);
+        expect(source).toMatch(/arc-studio-config__provider-action-confirm/);
+        expect(source).toMatch(/arc-studio-config__provider-action-warning/);
+        expect(source).toMatch(/arc-studio-config__provider-accounting-label/);
+        expect(source).toMatch(/Backend action unavailable - fail closed/);
+        expect(source).toMatch(/disabled=\{liveProviderActionDisabled\}/);
+        expect(source).toMatch(/Local accounting only; no provider call attempted/);
+        expect(source).toMatch(/no raw secrets/i);
+    });
 });

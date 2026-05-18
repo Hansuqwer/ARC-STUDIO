@@ -55,6 +55,110 @@ describe('ArcBackendService Integration Tests', () => {
         });
     });
 
+    describe('gated provider action bridge', () => {
+        let originalPath: string | undefined;
+
+        afterEach(() => {
+            process.env.PATH = originalPath;
+        });
+
+        async function installArcFixture(script: string): Promise<void> {
+            originalPath = process.env.PATH;
+            const binDir = path.join(tempDir, 'bin');
+            await fs.ensureDir(binDir);
+            const arcPath = path.join(binDir, 'arc');
+            await fs.writeFile(arcPath, script, 'utf-8');
+            await fs.chmod(arcPath, 0o755);
+            process.env.PATH = `${binDir}${path.delimiter}${originalPath || ''}`;
+        }
+
+        it('should default to dry-run and pass only provider/model/prompt/gate flags', async () => {
+            const argsPath = path.join(tempDir, 'arc-args.txt');
+            await installArcFixture(`#!/bin/sh
+printf '%s\n' "$@" > "${argsPath}"
+printf '%s' '{"ok":true,"data":{"provider":"openai","model":"gpt-4o-mini","dry_run":true,"provider_call":false,"blocked":false,"message":"dry run only","quota":{"remaining":5}}}'
+`);
+
+            const result = await service.runGatedProviderAction({
+                provider: 'openai',
+                model: 'gpt-4o-mini',
+                prompt: 'hello'
+            });
+
+            const args = (await fs.readFile(argsPath, 'utf-8')).trim().split('\n');
+            expect(args).toEqual([
+                'providers',
+                'action',
+                '--provider',
+                'openai',
+                '--prompt',
+                'hello',
+                '--json',
+                '--model',
+                'gpt-4o-mini'
+            ]);
+            expect(args.join(' ')).not.toMatch(/sk-|api[_-]?key|token/i);
+            expect(result).toMatchObject({
+                success: true,
+                blocked: false,
+                dryRun: true,
+                providerCall: false,
+                provider: 'openai',
+                model: 'gpt-4o-mini',
+                message: 'dry run only',
+                quota: { remaining: 5 }
+            });
+        });
+
+        it('should surface blocked CLI JSON from failed commands', async () => {
+            await installArcFixture(`#!/bin/sh
+printf '%s' '{"ok":false,"error":{"code":"provider_gate_blocked","message":"Provider call blocked: confirmation required"},"data":{"provider":"openai","dry_run":false,"provider_call":false,"blocked":true}}' >&2
+exit 2
+`);
+
+            const result = await service.runGatedProviderAction({
+                provider: 'openai',
+                model: 'gpt-4o-mini',
+                prompt: 'hello',
+                dryRun: false,
+                allowPaidCalls: true
+            });
+
+            expect(result).toMatchObject({
+                success: false,
+                blocked: true,
+                dryRun: false,
+                providerCall: false,
+                provider: 'openai',
+                message: 'Provider call blocked: confirmation required'
+            });
+        });
+
+        it('should include explicit confirmation flags only when requested', async () => {
+            const argsPath = path.join(tempDir, 'arc-args.txt');
+            await installArcFixture(`#!/bin/sh
+printf '%s\n' "$@" > "${argsPath}"
+printf '%s' '{"ok":true,"data":{"provider":"openai","dry_run":false,"provider_call":true,"blocked":false,"message":"completed"}}'
+`);
+
+            const result = await service.runGatedProviderAction({
+                provider: 'openai',
+                prompt: 'hello',
+                dryRun: false,
+                allowPaidCalls: true,
+                confirmProviderCall: true
+            });
+
+            const args = (await fs.readFile(argsPath, 'utf-8')).trim().split('\n');
+            expect(args).toContain('--allow-paid-calls');
+            expect(args).toContain('--live');
+            expect(args).toContain('--confirm');
+            expect(args).toContain('RUN_PROVIDER_ACTION:openai:gpt-4o-mini');
+            expect(args).not.toContain('--dry-run');
+            expect(result).toMatchObject({ success: true, blocked: false, dryRun: false, providerCall: true });
+        });
+    });
+
     describe('run cost metadata bridge', () => {
         let originalPath: string | undefined;
 

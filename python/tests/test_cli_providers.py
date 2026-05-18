@@ -165,6 +165,111 @@ def test_providers_proxy_live_explicit_gate_still_no_network(monkeypatch):
     assert "no network call was made" in result.output
 
 
+def test_providers_action_dry_run_default_no_network(tmp_path, monkeypatch):
+    """arc providers action defaults to dry-run and records local accounting only."""
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
+    result = CliRunner().invoke(app, [
+        "providers", "action",
+        "--provider", "openai",
+        "--model", "gpt-4.1-mini",
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert data["dry_run"] is True
+    assert data["real_provider_call"] is False
+    assert data["network_call_attempted"] is False
+    assert data["accounting"]["scope"] == "local_quota_counters_only"
+    assert "No network call" in data["message"]
+
+
+def test_providers_action_live_requires_env_gate(monkeypatch):
+    """Live action is blocked without ARC_ALLOW_LIVE_PROVIDER_TESTS=true."""
+    monkeypatch.delenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", raising=False)
+    result = CliRunner().invoke(app, [
+        "providers", "action",
+        "--provider", "openai",
+        "--live",
+        "--allow-paid-calls",
+        "--confirm", "RUN_PROVIDER_ACTION:openai:gpt-4.1-mini",
+        "--json",
+    ])
+    assert result.exit_code == 1
+    assert "ARC_ALLOW_LIVE_PROVIDER_TESTS=true" in result.output
+
+
+def test_providers_action_live_requires_paid_flag(monkeypatch):
+    """Live action is blocked without explicit paid opt-in."""
+    monkeypatch.setenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", "true")
+    result = CliRunner().invoke(app, [
+        "providers", "action",
+        "--provider", "openai",
+        "--live",
+        "--confirm", "RUN_PROVIDER_ACTION:openai:gpt-4.1-mini",
+        "--json",
+    ])
+    assert result.exit_code == 1
+    assert "--allow-paid-calls" in result.output
+
+
+def test_providers_action_live_requires_key_env(monkeypatch):
+    """Live action is blocked when provider key env is absent."""
+    monkeypatch.setenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", "true")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    result = CliRunner().invoke(app, [
+        "providers", "action",
+        "--provider", "openai",
+        "--live",
+        "--allow-paid-calls",
+        "--confirm", "RUN_PROVIDER_ACTION:openai:gpt-4.1-mini",
+        "--json",
+    ])
+    assert result.exit_code == 1
+    assert "Provider key env var missing" in result.output
+
+
+def test_providers_action_live_requires_confirmation(monkeypatch):
+    """Live action is blocked without exact confirmation string."""
+    monkeypatch.setenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", "true")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-should-not-emit")
+    result = CliRunner().invoke(app, [
+        "providers", "action",
+        "--provider", "openai",
+        "--live",
+        "--allow-paid-calls",
+        "--json",
+    ])
+    assert result.exit_code == 1
+    assert "provider_action_confirmation_required:RUN_PROVIDER_ACTION:openai:gpt-4.1-mini" in result.output
+    assert "sk-test-should-not-emit" not in result.output
+
+
+def test_providers_action_all_gates_pass_closed_smoke(tmp_path, monkeypatch):
+    """All gates pass reaches closed smoke scaffold; still no network call."""
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
+    monkeypatch.setenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", "true")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-should-not-emit")
+    result = CliRunner().invoke(app, [
+        "providers", "action",
+        "--provider", "openai",
+        "--model", "gpt-4.1-mini",
+        "--live",
+        "--allow-paid-calls",
+        "--confirm", "RUN_PROVIDER_ACTION:openai:gpt-4.1-mini",
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    assert "sk-test-should-not-emit" not in result.output
+    data = json.loads(result.output)["data"]
+    assert data["dry_run"] is False
+    assert data["real_provider_call"] is False
+    assert data["network_call_attempted"] is False
+    assert data["accounting"]["scope"] == "local_quota_counters_only"
+    assert data["accounting"]["provider_count"] == 1
+    assert data["metadata"]["key_ref_source"] == "OPENAI_API_KEY"
+    assert "No network call was made" in data["message"]
+
+
 def test_providers_quota_show(tmp_path, monkeypatch):
     """arc providers quota show returns today's usage."""
     monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))

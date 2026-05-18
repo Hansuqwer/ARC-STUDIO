@@ -43,6 +43,10 @@ export interface LiveProviderGateInput {
     allowPaidCalls: boolean;
     liveTestsEnabled: boolean;
     profile?: unknown;
+    provider?: string;
+    model?: string;
+    confirmationText?: string;
+    backendActionAvailable?: boolean;
 }
 
 export interface LiveProviderGateState {
@@ -52,10 +56,17 @@ export interface LiveProviderGateState {
     enforcement: string;
     message: string;
     providerCall: false;
+    requiredPhrase: string;
+    confirmed: boolean;
+    provider: string;
+    model: string;
+    costWarning: string;
+    accountingLabel: string;
 }
 
 const QUOTA_COUNTER_KEY = /^(dry_run|live):(provider|account):([A-Za-z0-9_.:-]+)$/;
 const QUOTA_RESET_CONFIRMATION_PHRASE = 'RESET LOCAL PROVIDER QUOTA';
+const LIVE_PROVIDER_CONFIRMATION_PHRASE = 'I UNDERSTAND THIS MAY COST MONEY';
 
 export function parseProviderDiagnostics(value: unknown): ProviderDiagnosticsSummary {
     const object = asRecord(value);
@@ -155,6 +166,9 @@ export function buildQuotaResetConfirmation(
 export function buildLiveProviderGate(input: LiveProviderGateInput): LiveProviderGateState {
     const profile = asRecord(input.profile);
     const name = stringValue(firstValue(profile, ['name', 'profile', 'id'])) || 'current profile';
+    const provider = input.provider || 'selected provider';
+    const model = input.model || 'selected/default model';
+    const confirmationText = typeof input.confirmationText === 'string' ? input.confirmationText.trim() : '';
     const reasons: string[] = [];
     const dryRun = input.dryRun === true;
     const allowPaidCalls = input.allowPaidCalls === true;
@@ -169,6 +183,9 @@ export function buildLiveProviderGate(input: LiveProviderGateInput): LiveProvide
     if (!liveTestsEnabled) {
         reasons.push('live provider tests are disabled');
     }
+    if (input.backendActionAvailable === false) {
+        reasons.push('optional backend action is unavailable; fail closed');
+    }
 
     const state = dryRun ? 'blocked' : reasons.length > 0 ? 'gated' : 'preview';
     const cta =
@@ -181,8 +198,16 @@ export function buildLiveProviderGate(input: LiveProviderGateInput): LiveProvide
         ? `Local/offline quota/cost preview only; blocked by ${reasons.join('; ')}.`
         : 'Local/offline quota/cost preview only; no provider execution is enabled by this state.';
     const enforcement = 'backend-enforced opt-in; UI remains preview/offline and never enables provider execution';
-
-    return { state, reasons, cta, enforcement, message, providerCall: false };
+    const gate = { state, reasons, cta, enforcement, message, providerCall: false as const };
+    Object.defineProperties(gate, {
+        requiredPhrase: { value: LIVE_PROVIDER_CONFIRMATION_PHRASE },
+        confirmed: { value: state === 'preview' && confirmationText === LIVE_PROVIDER_CONFIRMATION_PHRASE },
+        provider: { value: provider },
+        model: { value: model },
+        costWarning: { value: `Paid/live action would target provider=${provider}, model=${model}; explicit confirmation required and UI still performs no raw secret display.` },
+        accountingLabel: { value: `Local accounting preview only for provider=${provider}; ARC local counters only, no provider remote quota or billing read.` },
+    });
+    return gate as LiveProviderGateState;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {

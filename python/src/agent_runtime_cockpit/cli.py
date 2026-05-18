@@ -1061,6 +1061,45 @@ def providers_proxy(
         raise typer.Exit(1)
 
 
+@providers_app.command("action")
+def providers_action(
+    provider: Optional[str] = typer.Option(None, "--provider", help="Provider id (default: routing default)"),
+    model: Optional[str] = typer.Option(None, "--model", help="Model name (default: routing default)"),
+    prompt: str = typer.Option("ARC provider action smoke", "--prompt", help="Prompt text for smoke contract"),
+    live: bool = typer.Option(False, "--live", help="Request gated live smoke scaffold"),
+    allow_paid_calls: bool = typer.Option(False, "--allow-paid-calls", help="Allow paid provider calls when --live is set"),
+    confirm: Optional[str] = typer.Option(None, "--confirm", help="Required value: RUN_PROVIDER_ACTION:<provider>:<model>"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Run narrow provider action contract; live path is gated closed smoke scaffold."""
+    _setup_logging(debug)
+    import os
+    from .providers import ProviderActionRequest, ProviderRoutingStore, run_provider_action
+    routing = ProviderRoutingStore().get()
+    req = ProviderActionRequest(
+        provider=provider or routing.default_provider,
+        model=model or routing.default_model,
+        prompt=prompt,
+        dry_run=not live,
+        allow_paid_calls=allow_paid_calls,
+        confirmation=confirm,
+    )
+    try:
+        result = run_provider_action(req, os.environ)
+    except RuntimeError as exc:
+        messages = {
+            "live_provider_calls_disabled": "Live provider action disabled. Set ARC_ALLOW_LIVE_PROVIDER_TESTS=true and pass --live --allow-paid-calls plus --confirm.",
+            "paid_provider_calls_disabled": "Paid provider calls disabled. Pass --allow-paid-calls with --live.",
+            "provider_key_env_missing": "Provider key env var missing. Configure an env ref; raw keys are not accepted.",
+        }
+        raw_message = str(exc)
+        message = messages.get(raw_message, raw_message)
+        _out(err(ArcErrorCode.INVALID_INPUT, message), json_output)
+        raise typer.Exit(1)
+    _out(ok(result.model_dump()), json_output)
+
+
 accounts_app = typer.Typer(name="accounts", help="Provider account metadata")
 providers_app.add_typer(accounts_app)
 

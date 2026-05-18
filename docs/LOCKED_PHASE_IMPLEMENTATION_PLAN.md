@@ -103,7 +103,7 @@ git status --short
 ## Phase 3 — Provider/Quota/Cost UI
 
 **Roadmap:** R3  
-**Status:** Partial — provider diagnostics/quota scaffold exists with typed parsing/tests, targeted confirmation before local quota-counter reset, profile-linked cost policy summary, backend cost-gate enforcement, and explicit paid/live opt-in gates. Reset remains local quota-counter reset only; default UX is offline/gated and performs no provider network calls without explicit opt-in. Real provider execution is future work and not implemented unless explicitly reprioritized.
+**Status:** Active narrow real-provider scaffold — provider diagnostics/quota scaffold exists with typed parsing/tests, targeted confirmation before local quota-counter reset, profile-linked cost policy summary, backend cost-gate enforcement, and explicit paid/live opt-in gates. Reset remains local quota-counter reset only; default UX is offline/gated and performs no provider network calls without explicit opt-in. R3 now includes a narrow gated provider-action track, but this is contract/scaffold status only unless all gates, confirmation, local accounting, and opt-in smoke/manual evidence are present; it is not a broad provider-backed adoption or real-runtime completion claim.
 
 ### Chunk 3.1 — Provider Diagnostics Panel
 - Surface existing CLI/provider diagnostics.
@@ -118,7 +118,27 @@ git status --short
 ### Chunk 3.3 — Paid-Call Gate UX
 - Add explicit warnings/confirmations before provider-backed paths.
 - Tests prove no live call without explicit opt-in.
-- Status: Partial — provider-backed/live actions remain gated/offline by default. Current live-provider UX is preview/gate only and performs no network/provider calls without explicit opt-in; hardened UI copy/actions distinguish dry-run/offline, local quota reset, backend cost-gate enforcement, and any future live/provider path. Real provider execution remains future work and is not implemented unless explicitly reprioritized.
+- Status: Partial — provider-backed/live actions remain gated/offline by default. Current live-provider UX is preview/gate only and performs no network/provider calls without explicit opt-in; hardened UI copy/actions distinguish dry-run/offline, local quota reset, backend cost-gate enforcement, and the narrow reprioritized provider-action scaffold. Real provider execution is reprioritized but still contract/scaffold only unless all gates and manual evidence are present.
+
+### Chunk 3.4 — Real Provider Execution Contract
+- Define the narrow real provider-backed action contract before implementation.
+- Preserve dry-run default, explicit `allowPaidCalls`/provider-live gates, env/keychain references only, no raw secret persistence/display, and no broad provider-backed adoption claim.
+- Status: Baseline contract/scaffold — any implementation must stay narrow: one explicit provider-backed action path, dry-run default, no default network, explicit paid/provider gates, env/keychain refs only, no raw secrets, and no broad adoption claim.
+
+### Chunk 3.5 — Gated Backend Provider Action Path
+- Implement a backend action path that can make a provider-backed request only when all explicit gates pass.
+- Keep default/test paths offline and deterministic; return clear blocked/gated errors when any gate is missing.
+- Status: Scaffold/contract — backend action may be considered available only when tests prove no provider/network call occurs without every gate. Default dry-run/offline behavior remains authoritative.
+
+### Chunk 3.6 — UI Confirmation + Accounting
+- Add UI confirmation flow for the gated provider-backed action with model/provider/cost warning, dry-run/offline labeling, and paid-call confirmation.
+- Integrate local cost/quota accounting metadata for successful gated actions. Local quota reset remains ARC local counters only, not provider remote quota.
+- Status: Scaffold/contract — UI must require explicit confirmation before any live/provider path, show dry-run/offline labeling by default, display only env/keychain refs, and keep quota reset copy local-only.
+
+### Chunk 3.7 — Opt-In Smoke + Manual Verification
+- Add an opt-in smoke/manual verification path for real provider-backed behavior with required env/keychain setup and paid-call gates.
+- Keep CI offline by default and avoid real provider calls in normal tests.
+- Status: Scaffold/contract — smoke/manual verification must be opt-in and narrow. Evidence may prove only the gated provider action path, not provider-backed adoption, SwarmGraph runtime execution, or broad real-runtime completion.
 
 ## Phase 4 — HITL + Audit Dedicated UX
 
@@ -203,7 +223,7 @@ git status --short
 |---|---|---|---|
 | 1 Active Live Streaming | Complete | current CLI/IDE run basics | Full vertical baseline: Python SSE, Theia proxy contract, UI live/replay/disconnected states, stub e2e |
 | 2 Runtime Setup UI | Complete polished UI baseline | config/profile CLI | Safe ConfigTab baseline plus YAML-backed safe fields summary, persisted profile copy, remediation wizard, and dedicated export-target env-ref helpers in place |
-| 3 Provider/Quota UI | Partial | provider CLI | Typed parser/tests, confirmed local quota-counter reset affordance, profile-linked cost summary, backend cost-gate enforcement, hardened paid/live opt-in gates; offline/gated by default with no provider network calls without explicit opt-in; real provider execution remains future work/not implemented |
+| 3 Provider/Quota UI | Active narrow real-provider scaffold | provider CLI + explicit paid/provider gates | Typed parser/tests, confirmed local quota-counter reset affordance, profile-linked cost summary, backend cost-gate enforcement, hardened paid/live opt-in gates; offline/gated by default with no provider network calls without explicit opt-in; narrow gated provider-action track is contract/scaffold only unless all gates, confirmation, local accounting, and opt-in smoke/manual evidence are present |
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; live-aware UI with backend live SSE still degraded/disconnected |
 | 6 Real Adoption | Partial | adoption protocol | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` across router/capability/preflight/runner surfaces with no provider calls; provider-backed path gated/not claimed |

@@ -1039,6 +1039,29 @@ export interface RunPreflightResponse {
     costMetadata: RunCostMetadata;
 }
 
+export interface GatedProviderActionRequest {
+    provider: string;
+    model?: string;
+    prompt: string;
+    dryRun?: boolean;
+    allowPaidCalls?: boolean;
+    confirmProviderCall?: boolean;
+}
+
+export interface GatedProviderActionResult {
+    success: boolean;
+    blocked: boolean;
+    dryRun: boolean;
+    providerCall: boolean;
+    provider?: string;
+    model?: string;
+    message: string;
+    quota?: Record<string, unknown>;
+    estimatedCost?: Record<string, unknown> | null;
+    data?: Record<string, unknown>;
+    error?: Record<string, unknown> | string;
+}
+
 export interface StartRunRequest {
     workflow: string;
     prompt?: string;
@@ -1203,6 +1226,9 @@ export interface ArcService {
 
     /** Dry-run a runtime launch through the Python CLI. No provider calls are made. */
     preflightRun(request: RunPreflightRequest): Promise<RunPreflightResponse>;
+
+    /** Narrow provider action bridge. Dry-run by default; provider calls require explicit gates. */
+    runGatedProviderAction(request: GatedProviderActionRequest): Promise<GatedProviderActionResult>;
 
     /** Start a runtime launch through the Python CLI after explicit user action. */
     startRun(request: StartRunRequest): Promise<StartRunResponse>;

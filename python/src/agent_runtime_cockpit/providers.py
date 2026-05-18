@@ -102,6 +102,28 @@ class ProviderResponse(BaseModel):
     message: str
 
 
+class ProviderActionRequest(BaseModel):
+    provider: ProviderId | None = None
+    model: str | None = None
+    action: Literal["chat_completion_smoke"] = "chat_completion_smoke"
+    prompt: str = "ARC provider action smoke"
+    dry_run: bool = True
+    allow_paid_calls: bool = False
+    confirmation: str | None = None
+
+
+class ProviderActionResult(BaseModel):
+    provider: str
+    model: str
+    action: str
+    dry_run: bool
+    real_provider_call: bool = False
+    network_call_attempted: bool = False
+    message: str
+    accounting: dict[str, Any]
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class ProviderCostGateResult(BaseModel):
     provider: str
     model: str
@@ -488,6 +510,64 @@ def check_provider_cost_gate(request: ProviderRequest, env: dict[str, str] | Non
         live_enabled=live_enabled,
         paid_allowed=paid_allowed,
         allowed=True,
+    )
+
+
+def run_provider_action(request: ProviderActionRequest, env: dict[str, str] | None = None) -> ProviderActionResult:
+    """Narrow provider-backed action contract. Closed/fake unless every gate passes."""
+    env = env or os.environ
+    routing = ProviderRoutingStore().get()
+    provider = request.provider or routing.default_provider
+    model = request.model or routing.default_model
+    definition = next((item for item in PROVIDERS if item.id == provider), None)
+    if definition is None:
+        raise RuntimeError(f"Unknown provider: {provider}")
+
+    gate = check_provider_cost_gate(
+        ProviderRequest(
+            provider=provider,
+            model=model,
+            prompt=request.prompt,
+            dry_run=request.dry_run,
+            allow_paid_calls=request.allow_paid_calls,
+        ),
+        env,
+    )
+    if not gate.allowed:
+        raise RuntimeError(gate.reason or "provider_action_blocked")
+
+    source = next((name for name in definition.env_key_names if env.get(name)), None)
+    if not request.dry_run and definition.auth_kind != ProviderAuthKind.LOCAL and not source:
+        raise RuntimeError("provider_key_env_missing")
+    expected_confirmation = f"RUN_PROVIDER_ACTION:{provider}:{model}"
+    if not request.dry_run and request.confirmation != expected_confirmation:
+        raise RuntimeError(f"provider_action_confirmation_required:{expected_confirmation}")
+
+    quota = ProviderQuotaStore().reserve(provider, dry_run=request.dry_run)
+    if not quota["allowed"]:
+        raise RuntimeError(str(quota["reason"]))
+
+    if request.dry_run:
+        return ProviderActionResult(
+            provider=provider,
+            model=model,
+            action=request.action,
+            dry_run=True,
+            message="Dry-run provider action. No network call was made.",
+            accounting={"scope": "local_quota_counters_only", **quota},
+            metadata={"key_ref_source": source, "provider_status": definition.status},
+        )
+
+    return ProviderActionResult(
+        provider=provider,
+        model=model,
+        action=request.action,
+        dry_run=False,
+        real_provider_call=False,
+        network_call_attempted=False,
+        message="All gates passed; live provider execution remains a closed smoke scaffold. No network call was made.",
+        accounting={"scope": "local_quota_counters_only", **quota},
+        metadata={"key_ref_source": source, "provider_status": definition.status, "confirmation": "accepted"},
     )
 
 
