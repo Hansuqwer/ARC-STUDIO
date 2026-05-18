@@ -34,6 +34,7 @@ export interface SwarmGraphCostInsight {
     totalTokens?: number;
     currency?: string;
     items: Record<string, unknown>[];
+    reason?: string;
 }
 
 export interface SwarmGraphRuntimeMetadata {
@@ -80,9 +81,9 @@ export function buildLiveInsightStatus(input: LiveInsightStatusInput): LiveInsig
     if (!baseUrlConfigured && (input.state === 'connecting' || input.state === 'live')) {
         text = 'live stream disconnected; no Python web/SSE base URL configured';
     } else if (input.state === 'connecting') {
-        text = 'connecting to configured active trace stream';
+        text = 'attempting live stream via configured Python web/SSE base URL';
     } else if (input.state === 'live') {
-        text = `live stream connected; ${count} active event${count === 1 ? '' : 's'} appended in memory`;
+        text = `live stream connected to configured Python SSE endpoint; ${count} active event${count === 1 ? '' : 's'} appended in memory`;
     } else if (input.state === 'disconnected') {
         text = `live stream disconnected; showing ${count} captured active event${count === 1 ? '' : 's'}`;
     } else if (input.state === 'degraded') {
@@ -90,7 +91,7 @@ export function buildLiveInsightStatus(input: LiveInsightStatusInput): LiveInsig
     } else if (input.state === 'error') {
         text = 'live stream error; stored trace flow still works';
     } else {
-        text = 'stored trace mode';
+        text = 'stored trace mode; live requires a configured Python web/SSE base URL';
     }
     return { state: input.state, baseUrlConfigured, text: input.reason ? `${text}: ${input.reason}` : text };
 }
@@ -180,7 +181,9 @@ function extractConsensus(events: TraceEvent[], degraded: boolean): SwarmGraphCo
 function extractCost(events: TraceEvent[], degraded: boolean): SwarmGraphCostInsight {
     const source = events.find(event => isInsightEvent(event, 'cost'))?.data;
     if (!source) {
-        return degraded ? { ...EMPTY_COST, status: 'degraded' } : EMPTY_COST;
+        return degraded
+            ? { ...EMPTY_COST, status: 'degraded', reason: 'Cost requires explicit measured SwarmGraph cost trace events; runtime/provider metadata is not used.' }
+            : EMPTY_COST;
     }
 
     const items = asRecords(source.items ?? source.breakdown);
@@ -190,7 +193,7 @@ function extractCost(events: TraceEvent[], degraded: boolean): SwarmGraphCostIns
 
     return totalCost !== undefined || totalTokens !== undefined || currency || items.length
         ? { status: 'present', totalCost, totalTokens, currency, items }
-        : { ...EMPTY_COST, status: 'degraded' };
+        : { ...EMPTY_COST, status: 'degraded', reason: 'Cost event was present but did not include measured cost, token, currency, or item data.' };
 }
 
 function asBoolean(value: unknown): boolean | undefined {

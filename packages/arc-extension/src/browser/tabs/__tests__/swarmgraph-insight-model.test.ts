@@ -44,6 +44,7 @@ describe('buildSwarmGraphInsight', () => {
         expect(insight.topology.status).toBe('degraded');
         expect(insight.consensus.status).toBe('degraded');
         expect(insight.cost.status).toBe('degraded');
+        expect(insight.cost.reason).toContain('measured SwarmGraph cost trace events');
     });
 
     it('extracts topology only from explicit topology trace events', () => {
@@ -101,6 +102,19 @@ describe('buildSwarmGraphInsight', () => {
         expect(insight.cost.totalTokens).toBe(1200);
         expect(insight.cost.currency).toBe('USD');
         expect(insight.cost.items).toEqual([{ node: 'queen', cost: 0.2 }]);
+    });
+
+    it('keeps cost degraded when explicit cost event lacks measured fields', () => {
+        const insight = buildSwarmGraphInsight(trace({
+            runtime: 'crewai+swarmgraph',
+            events: [event('SWARMGRAPH_COST', { provider: 'offline-fixture' })],
+        }));
+
+        expect(insight.status).toBe('degraded');
+        expect(insight.cost.status).toBe('degraded');
+        expect(insight.cost.totalCost).toBeUndefined();
+        expect(insight.cost.totalTokens).toBeUndefined();
+        expect(insight.cost.reason).toContain('did not include measured cost');
     });
 
     it('extracts insight from appended active stream events in a synthetic trace', () => {
@@ -187,8 +201,13 @@ describe('buildLiveInsightStatus', () => {
 
     it('does not claim connected until state is live and base URL is configured', () => {
         expect(buildLiveInsightStatus({ state: 'connecting', eventCount: 0, baseUrl: 'http://127.0.0.1:8000' }).text)
-            .toBe('connecting to configured active trace stream');
+            .toBe('attempting live stream via configured Python web/SSE base URL');
         expect(buildLiveInsightStatus({ state: 'live', eventCount: 1, baseUrl: 'http://127.0.0.1:8000' }).text)
-            .toBe('live stream connected; 1 active event appended in memory');
+            .toBe('live stream connected to configured Python SSE endpoint; 1 active event appended in memory');
+    });
+
+    it('keeps idle copy explicit about Python SSE live requirement', () => {
+        expect(buildLiveInsightStatus({ state: 'idle', eventCount: 0 }).text)
+            .toBe('stored trace mode; live requires a configured Python web/SSE base URL');
     });
 });

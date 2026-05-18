@@ -123,7 +123,7 @@ const CostPanel: React.FC<{ cost: SwarmGraphCostInsight }> = ({ cost }) => (
                 <dt>line items</dt><dd>{cost.items.length}</dd>
             </dl>
         ) : (
-                <p className='arc-studio-swarmgraph__empty'>No SwarmGraph cost events found. Waiting for real cost trace events.</p>
+                <p className='arc-studio-swarmgraph__empty'>{cost.reason ?? 'No SwarmGraph cost events found. Cost stays empty until measured cost trace events are present.'}</p>
         )}
     </Panel>
 );
@@ -285,7 +285,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
             <div className='arc-studio-swarmgraph__header'>
                 <div>
                     <h2>SwarmGraph Insight</h2>
-                    <p>Trace-backed only. Runtime metadata is not promoted to insight.</p>
+                    <p>Trace-backed only. Cost requires measured trace events; runtime metadata is not promoted to insight.</p>
                 </div>
                 <button className='arc-studio-swarmgraph__button' onClick={loadTraces} disabled={loadingTraces}>
                     {loadingTraces ? 'Loading...' : 'Refresh'}
@@ -303,12 +303,12 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
                 <label htmlFor='arc-swarmgraph-live-run'>Optional active run ID</label>
                 <input id='arc-swarmgraph-live-run' className='arc-studio-swarmgraph__input' value={liveRunId} onChange={event => setLiveRunId(event.currentTarget.value)} placeholder='run id for live/degraded stream probe' />
                 <label htmlFor='arc-swarmgraph-live-base-url'>Python web/SSE base URL</label>
-                <input id='arc-swarmgraph-live-base-url' className='arc-studio-swarmgraph__input' value={liveBaseUrl} onChange={event => setLiveBaseUrl(event.currentTarget.value)} placeholder='required for live attempt, e.g. http://127.0.0.1:8000' />
+                <input id='arc-swarmgraph-live-base-url' className='arc-studio-swarmgraph__input' value={liveBaseUrl} onChange={event => setLiveBaseUrl(event.currentTarget.value)} placeholder='required for degraded live attempt, e.g. http://127.0.0.1:8000' />
                 <button className='arc-studio-swarmgraph__button' onClick={connectLiveStream} disabled={liveState === 'connecting' || liveState === 'live'}>Connect live</button>
                 <button className='arc-studio-swarmgraph__button' onClick={disconnectLiveStream} disabled={liveState !== 'connecting' && liveState !== 'live'}>Disconnect</button>
             </div>
             <div className={`arc-studio-swarmgraph__live-status arc-studio-swarmgraph__live-status--${liveState}`}>
-                Live insight: {liveStatus.text}. Base URL: {liveStatus.baseUrlConfigured ? 'configured' : 'not configured'}. Live mode uses the configured Python SSE endpoint when available; disconnected/degraded states mean no active stream is reachable.
+                Live insight: {liveStatus.text}. Base URL: {liveStatus.baseUrlConfigured ? 'configured' : 'not configured'}. Live mode is a limited Python SSE probe; disconnected/degraded states mean no active stream is reachable.
             </div>
             {error && <div className='arc-studio-swarmgraph__error' role='alert'>{error}</div>}
             {loadingTrace && <div className='arc-studio-swarmgraph__loading'>Loading trace...</div>}

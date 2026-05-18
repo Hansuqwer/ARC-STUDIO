@@ -21,6 +21,20 @@ async function acceptWorkspaceTrustIfShown(page: import('@playwright/test').Page
   }
 }
 
+async function openArcStudioTab(
+  page: import('@playwright/test').Page,
+  tabName: string
+): Promise<boolean> {
+  const tab = page.getByRole('tab', { name: tabName }).first();
+  if (!(await tab.isVisible({ timeout: 5000 }).catch(() => false))) {
+    return false;
+  }
+
+  await tab.click();
+  await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: TIMEOUT });
+  return true;
+}
+
 function parseServerSentEventTypes(body: string): string[] {
   return body
     .split('\n')
@@ -89,6 +103,30 @@ test.describe('ARC Studio — Smoke Tests', () => {
     await expect(page.getByText('Ready Runtimes').first()).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText('Poll Interval').first()).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByRole('button', { name: 'Refresh Health' })).toBeVisible({ timeout: TIMEOUT });
+  });
+
+  test('config release shell is visible when ARC Studio tabs are routable', async ({ page }) => {
+    if (!(await openArcStudioTab(page, 'Config'))) {
+      test.skip(true, 'ARC Studio tab shell not routable in this app mode');
+    }
+
+    await expect(page.getByRole('region', { name: 'Config panel' })).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText('Config').first()).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText(/Dry run|Run Policy|Safe Config Snapshot|Config unavailable/).first()).toBeVisible({
+      timeout: TIMEOUT,
+    });
+  });
+
+  test('SwarmGraph Insight release shell is visible when ARC Studio tabs are routable', async ({ page }) => {
+    if (!(await openArcStudioTab(page, 'SwarmGraph Insight'))) {
+      test.skip(true, 'ARC Studio tab shell not routable in this app mode');
+    }
+
+    await expect(page.getByRole('heading', { name: 'SwarmGraph Insight' })).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText(/Live insight:/)).toBeVisible({ timeout: TIMEOUT });
+    await expect(page.getByText(/disconnected|degraded|not configured|no active stream/i).first()).toBeVisible({
+      timeout: TIMEOUT,
+    });
   });
 });
 

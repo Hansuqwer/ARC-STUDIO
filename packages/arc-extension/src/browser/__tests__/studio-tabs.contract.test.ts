@@ -523,6 +523,8 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/no provider network calls/);
             expect(source).toMatch(/no live API calls/);
             expect(source).toMatch(/no billing action/);
+            expect(source).not.toMatch(/remote quota reset/i);
+            expect(source).not.toMatch(/provider quota reset/i);
         });
 
         it('should show profile-linked cost policy summary and explicit gates', () => {
@@ -537,6 +539,37 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/arc-studio-config__live-provider-gate/);
             expect(source).toMatch(/No network by default: providerCall:false/);
             expect(source).toMatch(/never calls provider API, provider proxy, live API, or billing endpoints/);
+            expect(source).not.toMatch(/Local provider readiness gate:[\s\S]*'ready'/);
+            expect(source).not.toMatch(/Allow paid provider calls/);
+        });
+
+        it('should avoid ready/configured wording for provider gate and live-test status', () => {
+            expect(source).not.toMatch(/Local provider readiness gate:[\s\S]*\? 'blocked\/gated' : 'ready'/);
+            expect(source).not.toMatch(/\bLive tests:[\s\S]*\? 'configured' : 'disabled\/gated'/);
+            expect(source).toMatch(/Offline\/local|local preview/i);
+            expect(source).toMatch(/disabled\/gated/);
+            expect(source).toMatch(/provider execution is not implemented here/);
+        });
+
+        it('should distinguish offline provider telemetry states and future live paths', () => {
+            expect(source).toMatch(/arc-studio-config__provider-telemetry-state/);
+            expect(source).toMatch(/unavailable\/degraded - backend method not wired; no provider call attempted/);
+            expect(source).toMatch(/error\/degraded - local telemetry read failed; provider execution still disabled/);
+            expect(source).toMatch(/loaded from local ARC telemetry only/);
+            expect(source).toMatch(/arc-studio-config__provider-paths-note/);
+            expect(source).toMatch(/dry-run\/offline = local preview only/);
+            expect(source).toMatch(/local quota reset = ARC storage counters only/);
+            expect(source).toMatch(/future live provider paths = separate backend-gated flow, not launched from this panel/);
+        });
+
+        it('should render empty quota state without fabricated measured cost', () => {
+            expect(source).toMatch(/arc-studio-config__quota-empty/);
+            expect(source).toMatch(/No local quota counters recorded yet/);
+            expect(source).toMatch(/event-backed counters/);
+            expect(source).toMatch(/Quota counters unavailable\/degraded; no provider calls attempted/);
+            expect(source).toMatch(/arc-studio-config__quota-reset-disabled/);
+            expect(source).not.toMatch(/measured cost/i);
+            expect(source).not.toMatch(/estimated spend/i);
         });
 
         it('should guide export targets through pure env-ref helper only', () => {
@@ -765,7 +798,7 @@ describe('Studio Tabs Contracts', () => {
             expect(insightSource).toMatch(/buildActiveTrace/);
             expect(insightSource).toMatch(/Live insight:/);
             expect(insightSource).toMatch(/disconnected\/degraded/);
-            expect(insightSource).toMatch(/uses the configured Python SSE endpoint when available/);
+            expect(insightSource).toMatch(/Live mode is a limited Python SSE probe/);
         });
     });
 });
