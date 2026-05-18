@@ -268,7 +268,7 @@ Every new phase/chunk should include:
 
 ### Phase 8 — Live Stream Productization
 
-- Status: Baseline Complete — configured Python daemon/local live stream wiring is implemented for IDE `streamActiveTrace()` via explicit/requested base URL or `ARC_PYTHON_DAEMON_URL`, with local live terminal/degraded handling and replay-not-live UI copy/tests. Evidence: local Phase 8 verification on `bec8d4b` worktree (`python` web SSE tests, arc-extension tests/build, browser build/e2e, `scripts/check-pr.sh`). This proves configured local daemon/stub runtime streaming only, not broad runtime/provider-backed live streaming.
+- Status: Baseline Complete — configured Python daemon/local live stream wiring is implemented for IDE `streamActiveTrace()` via explicit/requested base URL or `ARC_PYTHON_DAEMON_URL`, with local live terminal/degraded handling and replay-not-live UI copy/tests. Evidence: local Phase 8 verification on `bec8d4b` worktree (`python` web SSE tests, arc-extension tests/build, browser build/e2e, `scripts/check-pr.sh`). This proves configured local daemon/stub runtime event streams only, not broad runtime/provider-backed live event support.
 - Wire Theia live mode to configured Python daemon/local runtime stream beyond deterministic `/api/sse-proof`.
 - Preserve live/replay/disconnected distinctions; do not label replay as live.
 - Add/refresh tests proving configured local stream behavior without provider calls.
@@ -278,6 +278,25 @@ Every new phase/chunk should include:
   3. UI never labels replay-only data as live.
 - Verification: Python web/event tests, arc-extension build/tests, browser/e2e if UI behavior changes.
 - Known risks: configured daemon URL drift, local-runtime dependency shape, and temptation to treat SSE proof stub as broad live runtime evidence.
+
+### Phase 8.1 — IDE-to-Daemon E2E Harness
+
+- Status: Planned.
+- Goal: Add one narrow browser e2e harness path proving Theia UI can render a live frame from a real local Python daemon SSE socket, not only backend/protocol/static coverage.
+- Do:
+  1. Add a deterministic local daemon route/hook or fixture to the e2e harness for `/api/runs/{id}/events?mode=live` without provider calls.
+  2. Add one smoke test that opens the relevant IDE surface, connects to the configured daemon URL, and observes a live `RUN_STARTED` plus terminal or explicit degraded/disconnected state.
+  3. Keep existing `/api/sse-proof` assertions labeled limited-local only.
+- Do not:
+  1. Do not claim broad runtime/provider-backed live event support.
+  2. Do not treat stored replay or `/api/sse-proof` as proof of UI-rendered daemon live frames.
+  3. Do not expand scope into unrelated Theia warning cleanup unless the warning blocks this e2e path.
+- Acceptance:
+  1. Browser e2e proves one IDE-to-local-daemon SSE live frame path.
+  2. The test remains deterministic/offline and makes no provider/live-paid calls.
+  3. Replay-only data is still not labeled live.
+- Verification: `pnpm --filter @arc-studio/browser build`, `pnpm --filter @arc-studio/e2e-tests test`, `pnpm --filter arc-extension build`, `bash scripts/check-pr.sh`.
+- Known risks: current e2e app server has no direct daemon route/hook; browser logs Theia async contribution warnings while passing.
 
 ### Phase 9 — BudgetVector Post-Hoc Accounting
 

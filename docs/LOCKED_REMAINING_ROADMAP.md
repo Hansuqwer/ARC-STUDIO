@@ -77,7 +77,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 
 **Goal:** Active runs stream events into IDE views while running, not only replay stored traces.
 
-**Current:** Complete Phase 1 vertical baseline plus Phase 8 local daemon productization baseline. Python SSE supports active/replay modes and terminal/disconnected semantics; Theia exposes a typed `streamActiveTrace()` proxy that can use an explicit/requested Python web base URL or `ARC_PYTHON_DAEMON_URL`; Event Stream/SwarmGraph Insight surfaces distinguish live/replay/disconnected states; `/api/sse-proof` has deterministic limited-local coverage only and is not evidence of broad runtime live streaming.
+**Current:** Complete Phase 1 vertical baseline plus Phase 8 local daemon productization baseline. Python SSE supports active/replay modes and terminal/disconnected semantics; Theia exposes a typed `streamActiveTrace()` proxy that can use an explicit/requested Python web base URL or `ARC_PYTHON_DAEMON_URL`; Event Stream/SwarmGraph Insight surfaces distinguish live/replay/disconnected states; `/api/sse-proof` has deterministic limited-local coverage only and is not evidence of broad runtime live event support.
 
 **Deliverables:**
 - Python active run stream endpoint or command path backed by `EventBroker`/`JobSupervisor`.
@@ -90,7 +90,9 @@ Only render rich UI data from event producers listed here. Missing producers mus
 - E2E launches or connects to a stub live stream and observes at least `RUN_STARTED` and terminal event live.
 - Docs distinguish broker-backed active stream, deterministic SSE proof stub, and stored-trace replay.
 
-**Status:** Baseline Complete for configured local daemon/stub runtime live streaming. Evidence: local Phase 8 verification on `bec8d4b` worktree (`python` web SSE tests, arc-extension tests/build, browser build/e2e, `scripts/check-pr.sh`). Notes: IDE live mode can connect to configured Python daemon/local runtime streams and handles terminal/degraded states while preserving replay-not-live copy; this is not a broad runtime/provider-backed live-streaming claim.
+**Status:** Baseline Complete for configured local daemon/stub runtime live event streams. Evidence: local Phase 8 verification on `bec8d4b` worktree (`python` web SSE tests, arc-extension tests/build, browser build/e2e, `scripts/check-pr.sh`). Notes: IDE live mode can connect to configured Python daemon/local runtime streams and handles terminal/degraded states while preserving replay-not-live copy; this is not a broad runtime/provider-backed live event claim.
+
+**Follow-up:** Browser e2e still logs Theia async contribution warnings while passing; treat as known harness/runtime noise until a dedicated cleanup phase proves otherwise. A separate Phase 8.1 should add a true IDE-to-daemon SSE e2e harness before claiming UI-rendered live daemon frames end-to-end.
 
 ## R2 — IDE Runtime Setup + Config Wizard
 
