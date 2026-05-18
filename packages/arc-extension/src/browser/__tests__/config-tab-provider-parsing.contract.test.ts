@@ -87,6 +87,9 @@ describe('ConfigTab provider telemetry parsing contract', () => {
         expect(source).toMatch(/Preview-only\/no network: providerCall:false/);
         expect(source).toMatch(/never calls provider API, provider proxy, live API, or billing endpoints/);
         expect(source).toMatch(/providerCall: false/);
+        expect(helperSource).toMatch(/providerCall: false/);
+        expect(helperSource).toMatch(/future backend enforcement; UI is preview\/offline scaffold only/);
+        expect(helperSource).toMatch(/Local\/offline quota\/cost preview only/);
         expect(source).not.toMatch(/providerTelemetryService\.(?!getProviderDiagnostics|getProviderQuota|resetProviderQuota)/);
     });
 });

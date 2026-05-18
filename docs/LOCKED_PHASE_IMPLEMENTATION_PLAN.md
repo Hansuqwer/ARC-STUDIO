@@ -78,7 +78,7 @@ git status --short
 ## Phase 2 — IDE Runtime Setup + Config
 
 **Roadmap:** R2  
-**Status:** Partial — ConfigTab safe runtime/profile/isolation baseline plus remediation helper/wizard baseline implemented
+**Status:** Complete polished UI baseline — ConfigTab safe runtime/profile/isolation baseline, YAML-backed safe fields summary, persisted profile selection copy, remediation wizard, and dedicated export-target helper UI implemented
 
 ### Chunk 2.1 — Config Backend Methods
 - Expose read/write/dry-run config methods needed by UI.
@@ -93,12 +93,12 @@ git status --short
 ### Chunk 2.3 — Profile + Isolation UI
 - Show current profile, workspace trust, isolation provider.
 - Allow safe profile selection/update.
-- Status: Partial — ConfigTab loads backend profile inventory and isolation providers/status, displays trust/isolation, and keeps profile choice UI-local for now.
+- Status: Complete polished UI baseline — ConfigTab loads backend profile inventory and isolation providers/status, displays trust/isolation, and includes persisted-profile selection copy backed by existing safe config/profile flows. No raw secrets are stored.
 
 ### Chunk 2.4 — Export Target Helpers
 - UI for CrewAI/OpenAI/LlamaIndex export target references.
 - Store references only; do not store provider secrets.
-- Status: Partial — ConfigTab exports a copy-safe config snapshot and stores provider env-var references only; dedicated target helpers remain.
+- Status: Complete polished UI baseline — ConfigTab exports a copy-safe config snapshot, stores provider env-var references only, and provides dedicated helper UI for CrewAI, OpenAI Agents, and LlamaIndex export targets. No provider secrets are persisted.
 
 ## Phase 3 — Provider/Quota/Cost UI
 
@@ -118,7 +118,7 @@ git status --short
 ### Chunk 3.3 — Paid-Call Gate UX
 - Add explicit warnings/confirmations before provider-backed paths.
 - Tests prove no live call without explicit opt-in.
-- Status: Partial — provider-backed/live actions remain gated/offline by default. Current live-provider UX is preview/gate only and performs no network/provider calls; UI copy/actions distinguish dry-run/offline, local quota reset, and any future live/provider path.
+- Status: Partial — provider-backed/live actions remain gated/offline by default. Current live-provider UX is preview/gate only and performs no network/provider calls; hardened UI copy/actions distinguish dry-run/offline, local quota reset, and any future live/provider path. Backend cost enforcement and real provider execution remain future work behind explicit opt-in.
 
 ## Phase 4 — HITL + Audit Dedicated UX
 
@@ -202,8 +202,8 @@ git status --short
 | Phase | Status | Depends On | Notes |
 |---|---|---|---|
 | 1 Active Live Streaming | Complete | current CLI/IDE run basics | Full vertical baseline: Python SSE, Theia proxy contract, UI live/replay/disconnected states, stub e2e |
-| 2 Runtime Setup UI | Partial | config/profile CLI | Safe ConfigTab baseline plus remediation wizard/helpers in place; profile persistence/export-target dedicated helpers remain |
-| 3 Provider/Quota UI | Partial | provider CLI | Typed parser/tests, confirmed local quota-counter reset affordance, informational profile-linked cost summary, and explicit paid/live preview gates; no provider network calls by default |
+| 2 Runtime Setup UI | Complete polished UI baseline | config/profile CLI | Safe ConfigTab baseline plus YAML-backed safe fields summary, persisted profile copy, remediation wizard, and dedicated export-target env-ref helpers in place |
+| 3 Provider/Quota UI | Partial | provider CLI | Typed parser/tests, confirmed local quota-counter reset affordance, informational profile-linked cost summary, hardened paid/live preview gates; no provider network calls by default; backend cost enforcement/live provider execution remain future work |
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; live-aware UI with backend live SSE still degraded/disconnected |
 | 6 Real Adoption | Partial | adoption protocol | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path is explicit `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` opt-in/smoke-scoped with no provider calls; provider-backed path gated/not claimed |

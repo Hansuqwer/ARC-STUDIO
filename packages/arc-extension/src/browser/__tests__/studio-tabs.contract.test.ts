@@ -433,6 +433,18 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/status\.selectedProfile/);
             expect(source).toMatch(/setSelectedProfile\(status\.selectedProfile\)/);
             expect(source).toMatch(/value=\{selectedProfile\}/);
+            expect(source).toMatch(/selectedProfile,/);
+            expect(source).toMatch(/YAML-backed safe config save persists runtime, mode, isolation, dry-run, paid-call opt-in, and selected profile/);
+            expect(source).not.toMatch(/profile selection follows backend profile inventory but is not persisted/);
+        });
+
+        it('should summarize YAML-backed safe config fields without secrets or provider calls', () => {
+            expect(source).toMatch(/arc-studio-config__safe-fields-summary/);
+            expect(source).toMatch(/Safe fields only:/);
+            expect(source).toMatch(/defaultRuntime=\{selectedRuntime\}/);
+            expect(source).toMatch(/selectedProfile=\{selectedProfile\}/);
+            expect(source).toMatch(/no raw secrets or provider calls/);
+            expect(source).not.toMatch(/providerCall:true/);
         });
 
         it('should export safe config snapshot without raw credentials', () => {
@@ -459,6 +471,7 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/Paid\/live provider calls require explicit future backend gates/);
             expect(source).toMatch(/dry-run\/offline stays providerCall:false/);
             expect(source).toMatch(/Quota\/cost display and reset use local counters only/);
+            expect(source).not.toMatch(/provider execution is enabled/);
         });
 
         it('should load optional provider diagnostics and quota without hard protocol dependency', () => {
@@ -518,6 +531,18 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/arc-studio-config__live-provider-gate/);
             expect(source).toMatch(/Preview-only\/no network: providerCall:false/);
             expect(source).toMatch(/never calls provider API, provider proxy, live API, or billing endpoints/);
+        });
+
+        it('should guide export targets through pure env-ref helper only', () => {
+            expect(source).toMatch(/validateExportTarget/);
+            expect(source).toMatch(/arc-studio-config__export-target-guidance/);
+            expect(source).toMatch(/arc-studio-config__export-target-env/);
+            expect(source).toMatch(/arc-studio-config__export-target-module/);
+            expect(source).toMatch(/Copy env-ref/);
+            expect(source).toMatch(/package\.module:factory/);
+            expect(source).toMatch(/ARC does not save export target values/);
+            expect(source).not.toMatch(/setExportTarget/);
+            expect(source).not.toMatch(/saveExportTarget/);
         });
 
         it('should render richer quota rows without raw quota JSON dump', () => {

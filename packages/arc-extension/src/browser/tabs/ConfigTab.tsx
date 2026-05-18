@@ -28,6 +28,7 @@ import {
     parseQuotaCounters,
     summarizeProfileCostPolicy,
 } from './provider-telemetry';
+import { validateExportTarget } from './export-target';
 import { buildRuntimeRemediationPlan } from './runtime-remediation';
 
 export interface ConfigTabProps {
@@ -296,6 +297,8 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
     const quotaResetConfirmed = quotaResetAvailable && (quotaResetConfirmation.confirmed || quotaResetConfirmation.canReset || quotaResetPhrase === quotaResetRequiredPhrase);
     const selectedRuntimeCapability = capabilities?.find(c => c.runtime_id === selectedRuntime) || null;
     const runtimeRemediationPlan = buildRuntimeRemediationPlan(selectedRuntimeCapability);
+    const exportTargetValidation = validateExportTarget(selectedRuntime, {});
+    const exportTargetCopyText = exportTargetValidation.envName ? `${exportTargetValidation.envName}=package.module:factory` : '';
     const liveProviderGate = (buildLiveProviderGate as (...args: unknown[]) => {
         state?: string;
         status?: string;
@@ -494,6 +497,37 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     </div>
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {exportTargetValidation.envName && (
+                        <div className='arc-studio-config__export-target-guidance' style={{ padding: '8px', border: '1px solid var(--theia-widgetBorder)', borderRadius: '4px', backgroundColor: 'var(--theia-editor-background)', fontSize: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'flex-start' }}>
+                                <div>
+                                    <strong>Export target env-ref</strong>
+                                    <span className='arc-studio-config__export-target-status' style={{ marginLeft: '6px', fontSize: '10px', color: 'var(--theia-descriptionForeground)', fontFamily: 'monospace' }}>
+                                        {exportTargetValidation.status}
+                                    </span>
+                                </div>
+                                <button
+                                    className='arc-studio-config__export-target-copy'
+                                    onClick={() => navigator.clipboard?.writeText(exportTargetCopyText)}
+                                    style={{ fontSize: '11px' }}
+                                >
+                                    Copy env-ref
+                                </button>
+                            </div>
+                            <p style={{ margin: '4px 0 0', color: 'var(--theia-descriptionForeground)' }}>
+                                {exportTargetValidation.message} Configure the shell/env only; ARC does not save export target values.
+                            </p>
+                            <div className='arc-studio-config__export-target-env' style={{ marginTop: '4px', fontSize: '11px' }}>
+                                Env ref: <span style={{ fontFamily: 'monospace' }}>{exportTargetValidation.envName}</span>
+                            </div>
+                            <code className='arc-studio-config__export-target-module' style={{ display: 'block', marginTop: '4px', padding: '4px 6px', fontSize: '11px', whiteSpace: 'pre-wrap', backgroundColor: 'var(--theia-input-background)' }}>
+                                {exportTargetCopyText}
+                            </code>
+                            <p style={{ margin: '4px 0 0', color: 'var(--theia-descriptionForeground)' }}>
+                                {exportTargetValidation.remediation}
+                            </p>
+                        </div>
+                    )}
                     {runtimeRemediationPlan.steps.length > 0 ? runtimeRemediationPlan.steps.map(step => {
                         const copyText = step.copyText || step.command || '';
                         const canCopy = Boolean(step.copyText || step.command);
@@ -635,7 +669,10 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
                     </label>
                 </div>
                 <p className='arc-studio-config__run-policy-note' style={{ margin: '8px 0 0', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
-                    Dry-run saves force paid calls off; profile selection follows backend profile inventory but is not persisted by this safe config update; provider auth remains env-var references only.
+                    YAML-backed safe config save persists runtime, mode, isolation, dry-run, paid-call opt-in, and selected profile. Dry-run saves force paid calls off; provider auth remains env-var references only.
+                </p>
+                <p className='arc-studio-config__safe-fields-summary' style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
+                    Safe fields only: defaultRuntime={selectedRuntime}, mode={selectedMode}, isolation={selectedIsolation}, selectedProfile={selectedProfile}; no raw secrets or provider calls.
                 </p>
                 <p className='arc-studio-config__cost-policy-summary' style={{ margin: '4px 0 0', fontSize: '11px', color: dryRun || !allowPaidCalls ? 'var(--theia-descriptionForeground)' : 'var(--theia-editorWarning-foreground)' }}>
                     Local cost preview: {costPolicySummary.label}. Dry-run blocks paid calls; current profile dryRun={String(Boolean(currentProfile?.dryRun))}, allowPaidCalls={String(Boolean(currentProfile?.allowPaidCalls))}; effective allowPaidCalls={String(costPolicySummary.paidCallsAllowed)}. Backend quota/cost enforcement is future/offline-gated; this UI does not enable provider execution.

@@ -117,7 +117,7 @@ export function summarizeProfileCostPolicy(
     const paidCallsBlocked = dryRun || !allowPaidCalls;
     const liveCallsGated = dryRun || !allowPaidCalls;
     const enforcement = enforced ? 'enforced' : 'informational';
-    const enforcementLabel = enforced ? 'enforced by current UI policy' : 'informational; not full enforcement';
+    const enforcementLabel = enforced ? 'enforced by current UI policy' : 'future backend enforcement only';
     const label = dryRun
         ? `${name}: dry-run/offline hard-blocks paid/live provider calls (${enforcementLabel})`
         : paidCallsAllowed
@@ -145,7 +145,7 @@ export function buildQuotaResetConfirmation(
         confirmed,
         disabledReason: confirmed ? '' : `Type ${QUOTA_RESET_CONFIRMATION_PHRASE} to enable local reset`,
         warning:
-            'Resets local ARC provider quota counters only; no provider network request, billing action, or remote quota change occurs.',
+            'Resets local ARC provider quota counters only; no provider execution, billing action, or remote quota change occurs.',
     };
 }
 
@@ -167,13 +167,13 @@ export function buildLiveProviderGate(input: LiveProviderGateInput): LiveProvide
     const state = input.dryRun ? 'blocked' : reasons.length > 0 ? 'gated' : 'ready';
     const cta =
         state === 'ready'
-            ? `${name}: local preview ready; provider execution remains disabled here`
+            ? `${name}: local/offline preview ready; provider execution remains disabled here`
             : state === 'blocked'
               ? `${name}: disable dry-run before local live-readiness preview can proceed`
               : `${name}: satisfy all gates before local live-readiness preview can proceed`;
     const message = reasons.length > 0
-        ? `Local quota/cost preview only; blocked by ${reasons.join('; ')}.`
-        : 'Local quota/cost preview only; no provider execution is enabled by this state.';
+        ? `Local/offline quota/cost preview only; blocked by ${reasons.join('; ')}.`
+        : 'Local/offline quota/cost preview only; no provider execution is enabled by this state.';
     const enforcement = 'future backend enforcement; UI is preview/offline scaffold only';
 
     return { state, reasons, cta, enforcement, message, providerCall: false };

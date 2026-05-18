@@ -49,6 +49,20 @@ describe('provider telemetry helpers', () => {
             providers: [],
             accounts: [],
         });
+
+        expect(parseProviderDiagnostics({
+            live_tests_enabled: 'true',
+            routing_default: 12,
+            configured_providers: 'openai',
+            configured_accounts_count: Number.POSITIVE_INFINITY,
+        })).toEqual({
+            liveTestsEnabled: false,
+            routingDefault: '',
+            configuredProvidersCount: 0,
+            configuredAccountsCount: 0,
+            providers: [],
+            accounts: [],
+        });
     });
 
     it('parses nested quota counters and ignores invalid/non-number values', () => {
@@ -82,6 +96,14 @@ describe('provider telemetry helpers', () => {
         ]);
     });
 
+    it('returns no quota rows for malformed or partial telemetry', () => {
+        expect(parseQuotaCounters(null)).toEqual([]);
+        expect(parseQuotaCounters([])).toEqual([]);
+        expect(parseQuotaCounters({ quota: null })).toEqual([]);
+        expect(parseQuotaCounters({ quota: { counters: ['dry_run:provider:openai'] } })).toEqual([]);
+        expect(parseQuotaCounters({ quota: { counters: { 'dry_run:provider:openai': Infinity } } })).toEqual([]);
+    });
+
     it('detects resettable quota only when valid counters exist', () => {
         expect(canResetQuota({ counters: { 'dry_run:provider:openai': 1 } })).toBe(true);
         expect(canResetQuota({ counters: { 'dry_run:provider:openai': '1' } })).toBe(false);
@@ -90,7 +112,7 @@ describe('provider telemetry helpers', () => {
     it('summarizes profile cost policy with dry-run paid-call blocking', () => {
         expect(summarizeProfileCostPolicy({ name: 'safe' }, true, true)).toEqual({
             label:
-                'safe: dry-run/offline hard-blocks paid/live provider calls (informational; not full enforcement)',
+                'safe: dry-run/offline hard-blocks paid/live provider calls (future backend enforcement only)',
             dryRun: true,
             paidCallsAllowed: false,
             paidCallsBlocked: true,
@@ -101,7 +123,7 @@ describe('provider telemetry helpers', () => {
         });
 
         expect(summarizeProfileCostPolicy({ id: 'prod' }, false, false)).toMatchObject({
-            label: 'prod: paid/live provider calls gated (informational; not full enforcement)',
+            label: 'prod: paid/live provider calls gated (future backend enforcement only)',
             paidCallsAllowed: false,
             paidCallsBlocked: true,
             enforcement: 'informational',
@@ -135,9 +157,9 @@ describe('provider telemetry helpers', () => {
         });
     });
 
-    it('warns quota reset is local only with no provider network or billing action', () => {
+    it('warns quota reset is local only with no provider execution or billing action', () => {
         expect(buildQuotaResetConfirmation().warning).toBe(
-            'Resets local ARC provider quota counters only; no provider network request, billing action, or remote quota change occurs.'
+            'Resets local ARC provider quota counters only; no provider execution, billing action, or remote quota change occurs.'
         );
     });
 
@@ -155,7 +177,7 @@ describe('provider telemetry helpers', () => {
             cta: 'safe: disable dry-run before local live-readiness preview can proceed',
             enforcement: 'future backend enforcement; UI is preview/offline scaffold only',
             message:
-                'Local quota/cost preview only; blocked by dry-run is enabled; live provider calls are hard-blocked.',
+                'Local/offline quota/cost preview only; blocked by dry-run is enabled; live provider calls are hard-blocked.',
             providerCall: false,
         });
     });
@@ -186,11 +208,22 @@ describe('provider telemetry helpers', () => {
         ).toEqual({
             state: 'ready',
             reasons: [],
-            cta: 'current profile: local preview ready; provider execution remains disabled here',
+            cta: 'current profile: local/offline preview ready; provider execution remains disabled here',
             enforcement: 'future backend enforcement; UI is preview/offline scaffold only',
-            message: 'Local quota/cost preview only; no provider execution is enabled by this state.',
+            message: 'Local/offline quota/cost preview only; no provider execution is enabled by this state.',
             providerCall: false,
         });
+    });
+
+    it('keeps providerCall false across all gate combinations', () => {
+        const bools = [false, true];
+        for (const dryRun of bools) {
+            for (const allowPaidCalls of bools) {
+                for (const liveTestsEnabled of bools) {
+                    expect(buildLiveProviderGate({ dryRun, allowPaidCalls, liveTestsEnabled }).providerCall).toBe(false);
+                }
+            }
+        }
     });
 
     it('keeps ready-state text explicitly local and non-enabling', () => {

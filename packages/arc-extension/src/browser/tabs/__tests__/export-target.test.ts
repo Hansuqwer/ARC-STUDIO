@@ -14,6 +14,19 @@ describe('export target helpers', () => {
         });
     });
 
+    it('resolves OpenAI and LlamaIndex export target env refs', () => {
+        expect(resolveExportTargetEnvName('openai-agents')).toBe('OPENAI_AGENTS_EXPORT_PATH');
+        expect(resolveExportTargetEnvName('llamaindex')).toBe('LLAMAINDEX_EXPORT_PATH');
+        expect(validateExportTarget('llamaindex', {
+            LLAMAINDEX_EXPORT_PATH: 'arc_exports.llama:index_factory',
+        })).toMatchObject({
+            envName: 'LLAMAINDEX_EXPORT_PATH',
+            valid: true,
+            status: 'valid',
+            value: 'arc_exports.llama:index_factory',
+        });
+    });
+
     it('reports missing required export target with remediation', () => {
         const result = validateExportTarget('openai-agents', {});
 
