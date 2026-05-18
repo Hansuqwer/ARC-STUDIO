@@ -166,7 +166,13 @@ class CrewAISwarmGraphFakeAdapter(RuntimeAdapter):
         )
         consensus = await runner.run(spec, run_id, emit_event)
         ended = datetime.now(timezone.utc)
-        emit_event(run_id, "RUN_COMPLETED", {"confidence": consensus.confidence, "consensus_reached": consensus.consensus_reached})
+        emit_event(run_id, "RUN_COMPLETED", {
+            "confidence": consensus.confidence,
+            "consensus_reached": consensus.consensus_reached,
+            "runtime_mode": mode,
+            "real_provider_call": False,
+            "provider_backed": False,
+        })
         return RunRecord(
             id=run_id,
             workflow_id=workflow_id,
@@ -279,7 +285,13 @@ class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
         )
         consensus = await runner.run(spec, run_id, emit_event)
         ended = datetime.now(timezone.utc)
-        emit_event(run_id, "RUN_COMPLETED", {"confidence": consensus.confidence, "consensus_reached": consensus.consensus_reached})
+        emit_event(run_id, "RUN_COMPLETED", {
+            "confidence": consensus.confidence,
+            "consensus_reached": consensus.consensus_reached,
+            "runtime_mode": mode,
+            "real_provider_call": False,
+            "provider_backed": False,
+        })
         return RunRecord(
             id=run_id,
             workflow_id=workflow_id,
@@ -299,7 +311,12 @@ class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
                     else "fake/offline deterministic; local-real requires ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1"
                 ),
                 "audit_path": None,
-                "audit_absent_reason": "fake/offline adoption run does not create SwarmGraph HMAC audit records",
+                "provider_backed": False,
+                "audit_absent_reason": (
+                    "local-real no-provider adoption run does not create SwarmGraph HMAC audit records"
+                    if local_real
+                    else "fake/offline adoption run does not create SwarmGraph HMAC audit records"
+                ),
                 "consensus": consensus.model_dump(),
             },
         )

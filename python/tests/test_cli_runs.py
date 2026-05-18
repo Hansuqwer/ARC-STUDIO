@@ -95,7 +95,9 @@ def test_run_dry_run_crewai_swarmgraph_fake_ready_no_execution(monkeypatch, tmp_
     assert not (tmp_path / ".arc" / "traces").exists()
 
 
-def test_run_dry_run_langgraph_swarmgraph_fake_offline_ready(tmp_path):
+def test_run_dry_run_langgraph_swarmgraph_fake_offline_ready(monkeypatch, tmp_path):
+    monkeypatch.delenv("ARC_REAL_RUNTIME_SMOKE", raising=False)
+    monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
     result = CliRunner().invoke(app, [
         "run", "graph.py",
         "--workspace", str(tmp_path),
@@ -117,7 +119,9 @@ def test_run_dry_run_langgraph_swarmgraph_fake_offline_ready(tmp_path):
     assert not (tmp_path / ".arc" / "traces").exists()
 
 
-def test_run_dry_run_langgraph_swarmgraph_local_real_blocked_without_gate(tmp_path):
+def test_run_dry_run_langgraph_swarmgraph_local_real_blocked_without_gate(monkeypatch, tmp_path):
+    monkeypatch.delenv("ARC_REAL_RUNTIME_SMOKE", raising=False)
+    monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
     result = CliRunner().invoke(app, [
         "run", "graph.py",
         "--workspace", str(tmp_path),
@@ -134,6 +138,27 @@ def test_run_dry_run_langgraph_swarmgraph_local_real_blocked_without_gate(tmp_pa
     assert payload["dependency_status"]["runtime_mode"] == "local-real"
     assert payload["dependency_status"]["real_provider_call"] is False
     assert payload["runnable"] is False
+    codes = {blocker["code"] for blocker in payload["blockers"]}
+    assert "LOCAL_REAL_GATE_REQUIRED" in codes
+    assert not (tmp_path / ".arc" / "traces").exists()
+
+
+def test_run_dry_run_langgraph_swarmgraph_local_real_blocked_with_partial_gate(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
+    monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
+    result = CliRunner().invoke(app, [
+        "run", "graph.py",
+        "--workspace", str(tmp_path),
+        "--runtime", "langgraph+swarmgraph",
+        "--runtime-mode", "local-real",
+        "--dry-run",
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)["data"]
+    assert payload["runnable"] is False
+    assert payload["provider_call"] is False
+    assert payload["dependency_status"]["real_provider_call"] is False
     codes = {blocker["code"] for blocker in payload["blockers"]}
     assert "LOCAL_REAL_GATE_REQUIRED" in codes
     assert not (tmp_path / ".arc" / "traces").exists()
@@ -286,6 +311,8 @@ def test_runtimes_capabilities_json(tmp_path):
     assert "fake/offline" in langgraph_sg["reason"]
     assert "real" in langgraph_sg["reason"]
     assert "gated" in langgraph_sg["reason"]
+    assert langgraph_sg["fake_offline_supported"] is True
+    assert langgraph_sg["provider_backed"] is False
 
 
 def test_runtimes_capabilities_table(tmp_path):

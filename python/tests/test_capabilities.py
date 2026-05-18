@@ -160,3 +160,6 @@ class TestCapabilityReportCockpitPrimitives:
         assert data["provider_backed"] is False
         assert data["requires_paid_calls"] is False
         assert data["required_env"] == []
+        assert "local-real" in data["reason"]
+        assert "no provider-backed claim" in data["reason"]
+        assert "local-real gates ARC_REAL_RUNTIME_SMOKE=1 + ARC_LANGGRAPH_SWARMGRAPH_REAL=1" in data["detected_artifacts"]

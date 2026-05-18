@@ -344,7 +344,7 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             votes=votes,
             consensus_reached=True,
             confidence=1.0,
-            metadata={"runtime_mode": "fake/offline", "real_provider_call": False},
+            metadata={"runtime_mode": "fake/offline", "real_provider_call": False, "provider_backed": False},
         )
 
     def _topology_payload(self, tasks: list[dict[str, Any]]) -> dict[str, Any]:

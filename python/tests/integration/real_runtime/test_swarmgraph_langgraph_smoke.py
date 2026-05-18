@@ -133,6 +133,25 @@ def test_langgraph_swarmgraph_local_real_requires_dual_gate(tmp_path, monkeypatc
     )]
 
 
+def test_langgraph_swarmgraph_local_real_requires_both_gate_envs(tmp_path, monkeypatch) -> None:
+    _requires_langgraph_runtime()
+    monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
+    monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
+
+    spec = AdoptionSpec(
+        mode=AdoptionMode.LANGGRAPH,
+        runtime_config={
+            "runtime_mode": "local-real",
+            "graph": _LocalRealNoProviderGraph(),
+            "input": {"prompt": "local smoke only"},
+        },
+        max_workers=1,
+    )
+
+    with pytest.raises(PermissionError, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
+        asyncio.run(LangGraphAdoptionRunner().run(spec, "local-real-partial-gate", lambda *args: None))
+
+
 def test_langgraph_swarmgraph_local_real_fixture_runs_without_provider_calls(tmp_path) -> None:
     _requires_langgraph_swarmgraph_local_real()
 

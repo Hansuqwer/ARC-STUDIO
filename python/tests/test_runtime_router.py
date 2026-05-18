@@ -125,6 +125,11 @@ def test_langgraph_swarmgraph_resolves_as_fake_offline_runnable(tmp_path):
     assert "ARC_LANGGRAPH_SWARMGRAPH_REAL=1" in (routed.report.reason or "")
     assert "ARC_REAL_RUNTIME_SMOKE" in routed.report.required_env
     assert "ARC_LANGGRAPH_SWARMGRAPH_REAL" in routed.report.required_env
+    assert routed.report.test_level == "fake_offline"
+    assert routed.report.fake_offline_supported is True
+    assert routed.report.local_real_gated is True
+    assert routed.report.local_real_available is False
+    assert routed.report.provider_backed is False
 
 
 @pytest.mark.asyncio
@@ -142,6 +147,20 @@ async def test_langgraph_swarmgraph_local_real_requires_both_envs(monkeypatch, t
     routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
 
     assert "ARC_REAL_RUNTIME_SMOKE" in routed.report.required_env
+    assert routed.report.local_real_gated is True
+    assert routed.report.local_real_available is False
+
+    with pytest.raises(runtime_router.RuntimeNotRunnable, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
+        await routed.adapter.run_workflow("wf-local", {"runtime_mode": "local-real"})
+
+
+@pytest.mark.asyncio
+async def test_langgraph_swarmgraph_local_real_requires_second_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
+    monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
+    routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
+
+    assert routed.report.required_env == ["ARC_LANGGRAPH_SWARMGRAPH_REAL"]
     assert routed.report.local_real_gated is True
     assert routed.report.local_real_available is False
 
@@ -168,6 +187,7 @@ async def test_langgraph_swarmgraph_local_real_routes_when_env_set(monkeypatch, 
     assert "no provider-backed claim" in run.metadata["real_path_absent_reason"]
     assert run.metadata["consensus"]["metadata"]["runtime_mode"] == "local-real"
     assert run.metadata["consensus"]["metadata"]["real_provider_call"] is False
+    assert run.metadata["consensus"]["metadata"]["provider_backed"] is False
 
 
 

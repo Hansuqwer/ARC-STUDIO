@@ -506,6 +506,30 @@ class TestLangGraphRunner:
         consensus = first_events[-1][1]
         assert consensus["consensus_reached"] is True
         assert consensus["real_provider_call"] is False
+        assert consensus["provider_backed"] is False
+        assert first_result.metadata["provider_backed"] is False
+
+    @pytest.mark.asyncio
+    async def test_runner_offline_fake_is_default_even_when_real_gate_set(self, monkeypatch):
+        from agent_runtime_cockpit.adoption.langgraph_runner import (
+            LangGraphAdoptionRunner,
+        )
+
+        monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
+        monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
+
+        result = await LangGraphAdoptionRunner().run(
+            AdoptionSpec(
+                mode=AdoptionMode.LANGGRAPH,
+                runtime_config={"offline": True, "fake": True, "prompt": "default remains offline"},
+            ),
+            "lg-sg-default-offline",
+            lambda *args: None,
+        )
+
+        assert result.metadata["runtime_mode"] == "fake/offline"
+        assert result.metadata["real_provider_call"] is False
+        assert result.metadata["provider_backed"] is False
 
     @pytest.mark.asyncio
     async def test_runner_local_real_blocked_without_gate(self, monkeypatch):
@@ -541,6 +565,40 @@ class TestLangGraphRunner:
                 "provider_backed": False,
             },
         )]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("real_runtime_smoke", "langgraph_swarmgraph_real"),
+        [("1", None), (None, "1")],
+    )
+    async def test_runner_local_real_blocked_with_partial_gate(
+        self,
+        monkeypatch,
+        real_runtime_smoke,
+        langgraph_swarmgraph_real,
+    ):
+        from agent_runtime_cockpit.adoption.langgraph_runner import (
+            LangGraphAdoptionRunner,
+        )
+
+        if real_runtime_smoke is None:
+            monkeypatch.delenv("ARC_REAL_RUNTIME_SMOKE", raising=False)
+        else:
+            monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", real_runtime_smoke)
+        if langgraph_swarmgraph_real is None:
+            monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
+        else:
+            monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", langgraph_swarmgraph_real)
+
+        with pytest.raises(PermissionError, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
+            await LangGraphAdoptionRunner().run(
+                AdoptionSpec(
+                    mode=AdoptionMode.LANGGRAPH,
+                    runtime_config={"runtime_mode": "local-real", "graph": object()},
+                ),
+                "lg-sg-local-real-partial-gate",
+                lambda *args: None,
+            )
 
     @pytest.mark.asyncio
     async def test_runner_local_real_gate_metadata_no_provider_calls(self, monkeypatch):

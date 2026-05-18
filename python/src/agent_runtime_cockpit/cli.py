@@ -613,8 +613,9 @@ def run_workflow(
     if runtime.lower() == "langgraph+swarmgraph" and runtime_mode == "local-real" and not _local_real_gate_open():
         _out(err(
             ArcErrorCode.INVALID_INPUT,
-            "Set ARC_LANGGRAPH_SWARMGRAPH_REAL=1 to request langgraph+swarmgraph local-real",
-            details={"code": "LOCAL_REAL_GATE_REQUIRED"},
+            "Set ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1 "
+            "to request langgraph+swarmgraph local-real; no provider calls were made",
+            details={"code": "LOCAL_REAL_GATE_REQUIRED", "required_env": list(LOCAL_REAL_GATE_ENVS)},
         ), json_output)
         raise typer.Exit(2)
     try:
