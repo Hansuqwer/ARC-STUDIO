@@ -56,6 +56,7 @@ isolation_app = typer.Typer(name="isolation", help="Execution isolation provider
 config_app = typer.Typer(name="config", help="ARC workspace configuration (ADR-001)")
 hitl_app = typer.Typer(name="hitl", help="Human-in-the-loop approval commands")
 storage_app = typer.Typer(name="storage", help="Storage management commands")
+studio_app = typer.Typer(name="studio", help="ARC Studio — chat REPL, sessions, and IDE tooling")
 app.add_typer(context_app)
 app.add_typer(adapter_app)
 app.add_typer(doctor_app)
@@ -64,6 +65,7 @@ app.add_typer(isolation_app)
 app.add_typer(config_app)
 app.add_typer(hitl_app)
 app.add_typer(storage_app)
+app.add_typer(studio_app)
 
 console = Console()
 err_console = Console(stderr=True)
@@ -2532,6 +2534,49 @@ def hitl_reject(
 ) -> None:
     """Reject a pending workspace-local HITL prompt."""
     hitl_respond(hitl_id, "reject", token, notes, workspace, json_output, debug)
+
+
+# ─── studio (Chat REPL) ──────────────────────────────────────────────────────
+
+
+@studio_app.command("chat")
+def studio_chat(
+    prompt: Optional[str] = typer.Argument(None, help="Initial prompt"),
+    session: Optional[str] = typer.Option(None, "--session", "-s", help="Resume session ID"),
+    non_interactive: bool = typer.Option(False, "--non-interactive", "-n", help="Run once and exit"),
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Launch the ARC Studio chat REPL with the native SwarmGraph runtime.
+
+    Starts an interactive chat session. Provide an initial prompt to run
+    once, or omit it to enter the REPL loop.
+    """
+    _setup_logging(debug)
+    from .cli_repl.chat_repl import run_chat_repl
+    run_chat_repl(
+        initial_prompt=prompt,
+        session_id=session,
+        non_interactive=non_interactive,
+    )
+
+
+@studio_app.command("sessions")
+def studio_sessions(
+    json_output: bool = JSON_FLAG,
+) -> None:
+    """List saved chat sessions."""
+    from .cli_repl.session import ChatSession
+    sessions = ChatSession.list_sessions()
+    if json_output:
+        _out(ok([s.model_dump() for s in sessions]), json_output)
+        return
+    if not sessions:
+        console.print("[dim]No saved sessions.[/dim]")
+        return
+    table = Table("ID", "Messages", "Updated")
+    for s in sessions[:20]:
+        table.add_row(s.id[:16], str(len(s.history)), s.updated_at[:19])
+    console.print(table)
 
 @workspace_app.command("trust-status")
 def workspace_trust_status(

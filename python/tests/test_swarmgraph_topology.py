@@ -27,6 +27,39 @@ def _make_swarmgraph_cli(tmp_path: Path, output: dict[str, Any]) -> Path:
     return cli
 
 
+def test_swarmgraph_adapter_rejects_explicit_invalid_cli(monkeypatch, tmp_path):
+    """Explicit ARC_SWARMGRAPH_CLI errors must not fall back to native mode."""
+    from agent_runtime_cockpit.adapters.swarmgraph import SwarmGraphAdapter
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(tmp_path / "missing-swarmgraph"))
+
+    import asyncio
+    adapter = SwarmGraphAdapter()
+    with pytest.raises(FileNotFoundError):
+        asyncio.run(adapter.run_workflow("wf-test", {"workspace": str(ws), "prompt": "test"}))
+
+
+def test_swarmgraph_adapter_native_events_not_duplicated(monkeypatch, tmp_path):
+    """Native path emits one topology and one consensus event."""
+    from agent_runtime_cockpit.adapters.swarmgraph import SwarmGraphAdapter
+
+    monkeypatch.delenv("ARC_SWARMGRAPH_CLI", raising=False)
+    ws = tmp_path / "ws"
+    ws.mkdir()
+
+    import asyncio
+    adapter = SwarmGraphAdapter()
+    result = asyncio.run(adapter.run_workflow("wf-native", {"workspace": str(ws), "prompt": "test"}))
+
+    topology_events = [e for e in result.events if e.type == "SWARMGRAPH_TOPOLOGY"]
+    consensus_events = [e for e in result.events if e.type == "SWARMGRAPH_CONSENSUS"]
+    assert len(topology_events) == 1
+    assert len(consensus_events) == result.metadata["total_tasks"]
+    assert result.started_at <= result.ended_at
+
+
 def test_swarmgraph_adapter_emits_topology_event(monkeypatch, tmp_path):
     """SwarmGraphAdapter.run_workflow emits SWARMGRAPH_TOPOLOGY with nodes/edges."""
     from agent_runtime_cockpit.adapters.swarmgraph import SwarmGraphAdapter

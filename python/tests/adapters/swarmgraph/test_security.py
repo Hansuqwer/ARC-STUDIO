@@ -157,11 +157,18 @@ def test_resolve_cli_expands_user_home(layout, monkeypatch):
     assert not Path("~/nonexistent-swarmgraph-cli").expanduser().exists()
 
 
-def test_monolithic_gating_matches_modular(layout, monkeypatch):
-    """Monolithic adapter enforces require_dual_gate identically to SwarmGraphRunner.
+def test_native_mode_no_gating_required(layout, monkeypatch):
+    """Native SwarmGraphRunner runs without cost gating (fake_offline default)."""
+    from agent_runtime_cockpit.swarmgraph import SwarmGraphRunner
+    from agent_runtime_cockpit.swarmgraph.config import SwarmGraphConfig
 
-    Prove centralized gating consistency between the two code paths.
-    """
+    cfg = SwarmGraphConfig(execution_mode="fake_offline", allow_paid_calls=False)
+    runner = SwarmGraphRunner(config=cfg)
+    result = runner.run("test native gating")
+    assert result["status"] == "completed"
+
+def test_cli_path_still_gates(layout, monkeypatch):
+    """CLI subprocess path still enforces require_dual_gate."""
     import asyncio
 
     from agent_runtime_cockpit.gating import GatingError
@@ -174,35 +181,18 @@ def test_monolithic_gating_matches_modular(layout, monkeypatch):
     monkeypatch.setenv("ARC_SWARMGRAPH_RUN_BACKEND", "local")
     monkeypatch.delenv("ARC_SWARMGRAPH_ALLOW_COSTS", raising=False)
 
-    # 1. Monolithic path raises GatingError for non-stub without costs
     adapter = SwarmGraphAdapter()
     with pytest.raises(GatingError):
         asyncio.run(adapter.run_workflow("wf-test", {"workspace": str(ws)}))
 
-    # 2. Modular path raises GatingError for same conditions
-    from agent_runtime_cockpit.adapters.swarmgraph.runner import SwarmGraphRunner
-    runner = SwarmGraphRunner(ws)
-    with pytest.raises(GatingError):
-        asyncio.run(runner.run("test:entry", {}))
-
-    # 3. With costs approved, both pass
+    # With costs approved, gating passes (subprocess may still fail — not our concern)
     monkeypatch.setenv("ARC_SWARMGRAPH_ALLOW_COSTS", "true")
-    # Monolithic passes gating but fails on subprocess (not our concern)
-    # We just need gating not to raise
     try:
         asyncio.run(adapter.run_workflow("wf-test", {"workspace": str(ws)}))
     except GatingError:
         pytest.fail("GatingError raised despite ALLOW_COSTS=true")
     except (FileNotFoundError, PermissionError):
         pass  # Expected: subprocess fails but gating passed
-    except Exception:
-        pass  # Other errors mean gating passed
-
-    # Modular passes similarly
-    try:
-        asyncio.run(runner.run("test:entry", {}))
-    except GatingError:
-        pytest.fail("GatingError raised despite ALLOW_COSTS=true")
     except Exception:
         pass  # Other errors mean gating passed
 

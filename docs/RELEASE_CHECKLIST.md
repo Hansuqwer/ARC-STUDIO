@@ -110,7 +110,7 @@ bash scripts/check-banned-claims.sh AGENTS.md README.md docs/LOCKED_REMAINING_RO
 
 **Status:** ✅ Passing locally (2026-05-18)
 
-Latest local run on `4b0f6b5`: `908 passed, 19 skipped` (up from 867 — 3 daemon build tests, 2 fork tests, adapter status, budget enforcer, swarmgraph topology, provider action tests) (verified 2026-05-19). Real-runtime smoke paths are outside the default offline gate because dependency shape differs across platforms. The narrow `langgraph+swarmgraph` local-real smoke requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; it uses an in-process fixture graph, forces no-cost SwarmGraph env defaults, performs no provider/paid calls, and is not evidence for provider-backed adoption.
+Latest local run on local worktree: `989 passed, 19 skipped` (up from 908 — P1 native runtime: 57 tests, P2 adapter bridge/security/topology tests, P3 CLI REPL tests; includes SwarmGraph topology, native runner, adapter/security, CLI REPL tests). Real-runtime smoke paths are outside the default offline gate because dependency shape differs across platforms. The narrow `langgraph+swarmgraph` local-real smoke requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; it uses an in-process fixture graph, forces no-cost SwarmGraph env defaults, performs no provider/paid calls, and is not evidence for provider-backed adoption.
 
 **Evidence:** Pushed `main` commit `4b0f6b5` (908 Python tests passed, 19 skipped); latest observed `python` on `main` is green (`7a300fe`).
 

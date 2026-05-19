@@ -1,0 +1,116 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from .session import ChatSession
+from .slash_commands import SlashCommandHandler
+
+HISTORY_FILE = Path.home() / ".arc" / "repl_history.txt"
+
+
+def _load_history() -> list[str]:
+    if not HISTORY_FILE.exists():
+        return []
+    return [line.rstrip("\n") for line in HISTORY_FILE.read_text().splitlines() if line.strip()]
+
+
+def _save_history(history: list[str]) -> None:
+    HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    HISTORY_FILE.write_text("\n".join(history[-500:]) + "\n")
+
+
+def run_chat_repl(
+    initial_prompt: str | None = None,
+    session_id: str | None = None,
+    non_interactive: bool = False,
+    config: Any = None,
+) -> None:
+    session: ChatSession | None = None
+    if session_id:
+        session = ChatSession.load(session_id)
+    if not session:
+        session = ChatSession()
+
+    handler = SlashCommandHandler()
+
+    if initial_prompt:
+        _handle_input(initial_prompt, session, handler, print)
+        if non_interactive:
+            session.save()
+            return
+
+    history = _load_history()
+    welcome = f"ARC Studio - SwarmGraph Chat (session: {session.id[:12]}...)"
+    print(welcome)
+    print("Type /help for commands, /quit to exit.")
+
+    try:
+        while True:
+            try:
+                user_input = input("> ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                break
+
+            if not user_input:
+                continue
+
+            history.append(user_input)
+            _handle_input(user_input, session, handler, print)
+
+            if user_input.strip().lower() in ("/quit", "/exit"):
+                break
+
+    finally:
+        session.save()
+        _save_history(history)
+        print(f"Session saved: {session.id[:12]}...")
+
+
+def _handle_input(
+    text: str,
+    session: ChatSession,
+    handler: SlashCommandHandler,
+    output: Any,
+) -> None:
+    text = text.strip()
+    if not text:
+        return
+
+    if text.startswith("/"):
+        result = handler.handle(text, session)
+        if result is None:
+            output(f"Unknown command: {text}")
+        elif result == "__EXIT__":
+            session.add_message("user", text)
+            raise SystemExit(0)
+        else:
+            output(result)
+        return
+
+    session.add_message("user", text)
+    from ..swarmgraph import SwarmGraphRunner
+    from ..swarmgraph.config import SwarmGraphConfig
+
+    cfg = SwarmGraphConfig(num_workers=3, max_rounds=1)
+    runner = SwarmGraphRunner(config=cfg)
+    result = runner.run(prompt=text)
+    reply = _format_result(result)
+    session.add_message("assistant", reply)
+    output(reply)
+
+
+def _format_result(result: dict[str, Any]) -> str:
+    status = result.get("status", "unknown")
+    tasks = result.get("total_tasks", 0)
+    completed = result.get("completed_tasks", 0)
+    cost = result.get("total_cost_usd", 0.0)
+
+    lines: list[str] = []
+    lines.append(f"[SwarmGraph] Run {status} - {completed}/{tasks} tasks, ${cost:.4f}")
+    for r in result.get("results", []):
+        output_text = r.get("output", "")
+        if output_text:
+            lines.append(f"  {output_text[:500]}")
+    return "\n".join(lines)

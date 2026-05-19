@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-19 against `4b0f6b5` — all 6 Active Work Ledger items implemented.  
-**Current evidence anchor:** `4b0f6b5` | 18 files changed, 1953 insertions, 25 deletions | 908 Python tests passed, 19 skipped; protocol + extension builds OK; PR hygiene OK; banned claims OK.  
+**Last reality refresh:** 2026-05-19 — SwarmGraph native runtime P1+P2 implemented.  
+**Current evidence anchor:** local worktree | 989 Python tests passed (was 908), 19 skipped; 762 TS tests passed; protocol + extension builds OK; P1-P4 SwarmGraph native runtime, adapter bridge, CLI REPL, and IDE default alignment complete.  
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -209,8 +209,30 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | R10 Doctor/Daemon Parity Closure | Baseline Complete | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added; all orphan routes have explicit fate labels (`ui-deferred`, `daemon-only-deprecated`, or CLI added); no docs imply complete parity |
 | R11 SwarmGraph Cost Producer | Baseline Complete | Schema updated with model/promptTokens/completionTokens/source; measured is ISO timestamp; langgraph+swarmgraph emits measured cost/token events; UI renders new fields gated on explicit events; tests cover no-producer/partial/malformed/producer-backed states |
 | R12 Packaging/Optional Features | Baseline Complete | ADR-008 accepted (daemon-bundling plan); electron-builder configs + signing preflight exist and guard release-config signing drift; check-pr.sh validates required signing keys; LM Arena live productization is deferred; **all 6 Active Work Ledger items implemented in `4b0f6b5`** |
+| R13 SwarmGraph Native Runtime | P1-P4 Baseline Complete | 989 Python tests passed; 100 targeted SwarmGraph/REPL tests pass; 762 TS tests pass; protocol + extension builds clean |
 
 **v0.2 execution order (all implemented, v0.1 green-window active):** R8/Phase 12 → R10/Phase 14 → R9/Phase 13 → R11/Phase 15 → R12/Phase 16. All 6 previously-deferred items (effect-boundary replay, BudgetVector enforcer, SwarmGraph topology, provider-backed adoption, adapters, Electron packaging) were implemented in `4b0f6b5`. Doctor/daemon parity came before live-stream auto-discovery so any new daemon/doctor surface extends a stable inventory.
+
+## R13 — SwarmGraph Native Runtime
+
+**Goal:** Replace the external SwarmGraph CLI subprocess dependency with a native Python runtime that owns the full queen/worker lifecycle in-process.
+
+**Current:** P1 native core (57 tests), P2 adapter bridge/security/topology tests, P3 CLI chat REPL tests, P4 IDE ChatTab defaults to `swarmgraph` native runtime. All verified: 989 Python tests + 762 TS tests pass.
+
+**Deliverables:**
+- P1: Native SwarmGraph runtime package (`swarmgraph/`) with queen/worker/consensus/approval lifecycle, checkpoint save/restore, budget enforcement, event emission.
+- P2: Adapter bridge that wires the native runtime into the existing `SwarmGraphAdapter` interface.
+- P3: CLI chat REPL (`cli_repl/` package with `arc studio chat`, `/slash` commands, session persistence).
+- P4: IDE alignment (ChatTab defaults to `swarmgraph` native runtime).
+- P5: Doc overclaim correction.
+
+**Acceptance:**
+- P1: All 57 native runtime tests pass.
+- P2: Adapter runs natively without ARC_SWARMGRAPH_CLI; 19 adapter/topology tests pass.
+- P3: `arc studio chat` launches REPL with native runner; 19 REPL tests pass.
+- P4: ChatTab defaults to `swarmgraph` runtime.
+
+**Status:** P1-P4 Baseline Complete | Evidence: 989 Python tests passed, 19 skipped; 762 TS tests passed; protocol + extension builds clean.
 
 ## v0.2 Planning Decision — Option A
 

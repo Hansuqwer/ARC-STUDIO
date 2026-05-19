@@ -39,7 +39,7 @@ export interface ChatTabProps {
 export const ChatTab: React.FC<ChatTabProps> = ({ arcService, onSendMessage, onNavigateToRuns }) => {
     const [input, setInput] = useState('');
     const [mode, setMode] = useState<'plan' | 'build' | 'auto'>('build');
-    const [runtimeId, setRuntimeId] = useState('crewai+swarmgraph');
+    const [runtimeId, setRuntimeId] = useState('swarmgraph');
     const [profileId, setProfileId] = useState('local-safe');
     const [preflight, setPreflight] = useState<RunPreflightResponse | null>(null);
     const [preflightError, setPreflightError] = useState<string | null>(null);
@@ -175,7 +175,7 @@ export const ChatTab: React.FC<ChatTabProps> = ({ arcService, onSendMessage, onN
                         Runtime
                         <select className='arc-studio-chat__runtime-selector' value={runtimeId} onChange={e => setRuntimeId(e.currentTarget.value)}>
                             {runtimeOptions.map(({ value, label, cap }) => {
-                                const disabled = cap !== undefined && !cap.can_run && value !== 'crewai+swarmgraph';
+                                const disabled = cap !== undefined && !cap.can_run && value !== 'crewai+swarmgraph' && value !== 'swarmgraph';
                                 const reason = disabled ? (cap?.reason || 'not available') : '';
                                 return (
                                     <option key={value} value={value} disabled={disabled} title={reason}>

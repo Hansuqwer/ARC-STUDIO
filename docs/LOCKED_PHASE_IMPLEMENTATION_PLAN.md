@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-19 against `4b0f6b5` — all 6 Active Work Ledger items implemented.  
-**Current evidence anchor:** `4b0f6b5` | 18 files changed, 1953 insertions, 25 deletions | 908 Python tests passed, 19 skipped; protocol + extension builds OK; PR hygiene OK; banned claims OK.  
+**Last reality refresh:** 2026-05-19 — SwarmGraph native runtime P1+P2 implemented (Phase 17).  
+**Current evidence anchor:** local worktree | 989 Python tests passed (was 908), 19 skipped; 762 TS tests passed; protocol + extension builds OK; 100 targeted SwarmGraph/REPL tests pass.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -262,6 +262,7 @@ Every new phase/chunk should include:
 | Phase 13 | R9 | IDE Live Stream Polish |
 | Phase 15 | R11 | SwarmGraph Cost Producer + Cost UX |
 | Phase 16 | R12 | Packaging/Optional Feature Decisions (In Progress) |
+| **Phase 17** | **R13** | **SwarmGraph Native Runtime (P1+P2 Baseline Complete)** |
 
 | Phase | Status | Depends On | Notes |
 |---|---|---|---|
@@ -282,6 +283,7 @@ Every new phase/chunk should include:
 | 13 Live Stream UX Polish | Baseline Complete | Phase 8 + 8.1 + Phase 14 decisions | Daemon URL auto-discovery (loopback probe), async warning fingerprint test + doc, 3-tier fallback in SwarmGraphInsightTab |
 | 15 SwarmGraph Cost Producer + Cost UX | Baseline Complete | Phase 5 + Phase 9 | Schema expanded with model/promptTokens/completionTokens/source; measured is ISO timestamp; UI renders all new fields gated on explicit events; 17 new tests across Python+TS |
 | 16 Packaging/Optional Feature Decisions | Baseline Complete | browser v0.1 stabilization | ADR-008 accepted; electron-builder + signing preflight exist; release config signs validated by both signing-preflight and PR hygiene workflows; live LM Arena implementation deferred; **all 6 Active Work Ledger items implemented in `4b0f6b5`** |
+| **17 SwarmGraph Native Runtime** | **P1-P4 Baseline Complete** | existing adapter/swarmgraph.py + CLI/IDE surfaces | P1: native `swarmgraph/` package. P2: adapter bridge rewrite using native `SwarmGraphRunner` by default, CLI fallback. P3: CLI REPL. P4: ChatTab default alignment. 989 total Python tests pass; 762 TS tests pass. |
 
 ## v0.1 Polish Deferral Decision
 
@@ -521,3 +523,52 @@ Most dimensions render absent/degraded until the Phase 15 measured cost/token pr
     4. ✅ Protocol + extension builds pass; PR hygiene OK; banned claims OK.
 - Verification: `cd python && uv run pytest -q --deselect tests/test_cli_providers.py::test_providers_action_all_gates_pass_closed_smoke` (908 passed, 19 skipped); `pnpm --filter @arc-studio/protocol build && pnpm --filter arc-extension build` (OK); `bash scripts/check-pr.sh` (OK); `bash scripts/check-banned-claims.sh ...` (OK).
 - Known risks: signing complexity, platform drift, premature optional-feature claims — all mitigated by deferring live release artifact build to post-v0.1 green-window.
+
+### Phase 17 — SwarmGraph Native Runtime
+
+**Roadmap:** R13
+**Status:** P1-P4 Baseline Complete | Evidence: `cd python && uv run pytest tests/test_swarmgraph_native.py tests/adapters/swarmgraph/test_security.py tests/test_swarmgraph_topology.py tests/test_cli_repl.py -q` (100 passed), `cd python && uv run pytest -q` (989 passed, 19 skipped), `pnpm --filter @arc-studio/protocol build && pnpm --filter arc-extension build` (OK), `pnpm --filter arc-extension test` (762 passed).
+
+- **P1** (this session): Native `swarmgraph/` package with config, models, state, consensus, graph, events, 4 node modules (queen, worker, consensus, approval), runner, fixtures.
+  - Queen: decompose (star/chain topologies), assign, prepare agents.
+  - Worker: execute (fake_offline mode), process results.
+  - Consensus: run consensus rounds, majority/quorum protocols.
+  - Approval: HITL require/approve/reject with token-based safety.
+  - Runner: orchestrates full lifecycle, checkpoint save/restore, budget enforcement, event emission.
+  - 57 comprehensive tests covering all modules.
+- **P2** (this session): Adapter bridge rewrite in `adapters/swarmgraph.py`.
+  - `run_workflow()` defaults to native `SwarmGraphRunner` when no `ARC_SWARMGRAPH_CLI` configured.
+  - Falls back to CLI subprocess when CLI is explicitly configured (backward compat for topology tests).
+  - Maps native `SwarmGraphEvent` → protocol `RunEvent` types.
+  - `capability_report()` works without requiring CLI; reports `fake_offline_supported=True`.
+  - 19 adapter/topology/security tests pass (2 new: native-no-gating, CLI-still-gates).
+- **P3** (this session): CLI chat REPL (`cli_repl/` package).
+  - `cli_repl/chat_repl.py` — Interactive REPL with `input()`-based prompt loop, file-backed history.
+  - `cli_repl/slash_commands.py` — `/help`, `/clear`, `/run`, `/summary`, `/sessions`, `/history`, `/version`, `/quit`, `/exit`.
+  - `cli_repl/session.py` — `ChatSession` with Pydantic model, JSON persistence to `~/.arc/sessions/`.
+  - Wired into `cli.py` as `arc studio chat` and `arc studio sessions`.
+  - 19 new tests.
+- **P4** (this session): IDE alignment.
+  - ChatTab default runtime changed from `'crewai+swarmgraph'` to `'swarmgraph'`.
+  - `swarmgraph` added to the always-selectable runtime list.
+  - 762 TS tests pass; build clean.
+- **Bugs fixed:**
+  - Pydantic frozen `SwarmTask` prevented state mutations → removed `frozen=True`.
+  - Runner `all_tasks_completed()` overrode budget exhaustion `failed` status → guarded with `status != failed`.
+  - Missing `SwarmStatus` import in tests.
+  - HITL test checked non-existent events → fixed to check task state.
+- **Acceptance (P1-P4):**
+  1. ✅ 57 native runtime tests pass.
+  2. ✅ 19 adapter/topology/security tests pass.
+  3. ✅ 19 CLI REPL tests pass.
+  4. ✅ 989 total Python tests pass (no regressions from 908 baseline).
+  5. ✅ 762 TS tests pass.
+  6. ✅ Protocol + extension builds clean.
+  7. ✅ Adapter runs natively without ARC_SWARMGRAPH_CLI.
+  8. ✅ CLI subprocess path preserved for provider-backed mode.
+  9. ✅ `arc studio chat` REPL launches with SwarmGraph runner.
+  10. ✅ Sessions persist to `~/.arc/sessions/` with save/load/resume.
+  11. ✅ ChatTab defaults to `swarmgraph` native runtime.
+- **Next (P5):**
+  - P5: Correct doc overclaims in locked roadmap, phase plan, release checklist.
+- **Known risks:** Provider-backed runtime still requires external CLI subprocess; native runtime is `fake_offline` only. No provider-backed adoption claim.

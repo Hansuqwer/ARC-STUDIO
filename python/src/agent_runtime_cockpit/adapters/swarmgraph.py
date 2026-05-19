@@ -1,15 +1,9 @@
 """
 SwarmGraph Runtime Adapter
 
-DEPRECATED — Prefer `adapters.swarmgraph.runner.SwarmGraphRunner` for new code.
-
-This module retains the original monolithic adapter path for backward
-compatibility. The modular runner in `adapters.swarmgraph.runner` handles
-all backends (STUB / LOCAL / GATEWAY) with real-time event streaming,
-unified cost gating, and the full audit chain.
-
-PRs that modify this file should be reviewed with attention to whether
-the change should land in the canonical runner instead.
+Dual-path adapter: uses the native SwarmGraphRunner (internal Python runtime)
+by default. Falls back to external CLI subprocess when ARC_SWARMGRAPH_CLI is
+explicitly configured (provider-backed mode).
 
 Source: https://github.com/Hansuqwer/SwarmGraph
 """
@@ -34,6 +28,10 @@ from ..protocol.schemas import (
 )
 from ..security.redaction import Redactor
 from ..workspace import iter_workspace_files
+from ..swarmgraph import SwarmGraphRunner as NativeSwarmGraphRunner
+from ..swarmgraph.config import ExecutionMode, SwarmGraphConfig
+from ..swarmgraph.events import SwarmGraphEvent, SwarmGraphEventKind
+from ..swarmgraph.models import SwarmStatus
 from .base import RuntimeAdapter
 
 log = logging.getLogger(__name__)
@@ -120,19 +118,21 @@ class SwarmGraphAdapter(RuntimeAdapter):
         return RuntimeCapabilities(
             can_inspect=True,
             can_run=True,
-            can_trace=False,
-            can_replay=False,       # not yet implemented
+            can_trace=True,
+            can_replay=False,
             can_export_schema=True,
             can_export_workflow=True,
             can_stream_events=False,
-            can_audit=False,        # planned
+            can_audit=False,
         )
 
     def capability_report(self, workspace: Path) -> CapabilityReport:
         detected, _, evidence = self.detect(workspace)
         doctor: list[DoctorAction] = []
+        cli_available = False
         try:
             self._resolve_cli(workspace)
+            cli_available = True
         except Exception as exc:
             doctor.append(DoctorAction(
                 id="install-swarmgraph",
@@ -141,23 +141,26 @@ class SwarmGraphAdapter(RuntimeAdapter):
                 command="pip install git+https://github.com/Hansuqwer/SwarmGraph",
                 safe_to_auto_run=False,
             ))
+
+        if detected or cli_available:
             return CapabilityReport(
                 runtime_id=self.adapter_id,
                 detected=detected,
-                can_run=False,
-                availability="missing_dependency",
-                reason=str(exc),
+                can_run=True,
+                availability="runnable",
+                reason=None if cli_available else "Using native SwarmGraph runtime (fake_offline mode)",
                 detected_artifacts=evidence,
-                required_env=["ARC_SWARMGRAPH_CLI"],
-                doctor_actions=doctor,
+                required_env=["ARC_SWARMGRAPH_CLI"] if cli_available else [],
+                doctor_actions=doctor if not cli_available else [],
+                fake_offline_supported=True,
+                local_real_gated=cli_available,
             )
         return CapabilityReport(
             runtime_id=self.adapter_id,
-            detected=detected,
-            can_run=True,
-            availability="runnable",
+            detected=False,
+            can_run=False,
+            availability="not_detected",
             detected_artifacts=evidence,
-            required_env=["ARC_SWARMGRAPH_CLI"],
             doctor_actions=doctor,
         )
 
@@ -290,18 +293,119 @@ class SwarmGraphAdapter(RuntimeAdapter):
         )]
 
     async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
-        """Run a SwarmGraph workflow via the real local SwarmGraph CLI.
-
-        The default backend is SwarmGraph's local `stub` backend, which avoids
-        paid/provider calls while still exercising the actual SwarmGraph command.
-        Set ARC_SWARMGRAPH_RUN_BACKEND explicitly to opt into another backend.
-        """
         inputs = inputs or {}
         workspace = Path(str(inputs.get("workspace") or ".")).resolve()
+        prompt = str(inputs.get("prompt") or f"Run ARC workflow {workflow_id}")
+
+        if os.environ.get("ARC_SWARMGRAPH_CLI"):
+            self._resolve_cli(workspace)
+            return await self._run_cli_workflow(workflow_id, workspace, prompt, inputs)
+        return await self._run_native_workflow(workflow_id, prompt, inputs)
+
+    async def _run_native_workflow(
+        self, workflow_id: str, prompt: str, inputs: dict[str, Any] | None = None,
+    ) -> RunRecord:
+        inputs = inputs or {}
+        num_workers = int(inputs.get("max_agents", 3))
+        max_rounds = int(inputs.get("max_rounds", 1))
+
+        cfg = SwarmGraphConfig(
+            num_workers=num_workers,
+            max_rounds=max_rounds,
+            execution_mode=ExecutionMode.fake_offline,
+            allow_paid_calls=False,
+            require_hitl=False,
+            enable_audit=False,
+            enable_budget=False,
+        )
+        runner = NativeSwarmGraphRunner(config=cfg)
+
+        def _run() -> dict[str, Any]:
+            return runner.run(prompt=prompt)
+
+        run_id = f"run-sg-{uuid.uuid4().hex[:8]}"
+        started = datetime.now(timezone.utc)
+
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, _run)
+
+        events: list[RunEvent] = []
+        events.append(self._event(run_id, 0, "RUN_STARTED", {
+            "workflow_id": workflow_id,
+            "prompt": prompt,
+            "mode": "native_fake_offline",
+        }))
+
+        sw_events = runner.get_events() or []
+        for i, sw_evt in enumerate(sw_events, start=1):
+            proto_events = self._map_swarmgraph_event(sw_evt, run_id, i)
+            events.extend(proto_events)
+
+        worker_count = num_workers
+        swarm_status = result.get("status", "completed")
+
+        seq = len(events)
+        events.append(self._event(run_id, seq, "RUN_COMPLETED", {
+            "swarm_id": result.get("swarm_id"),
+            "worker_count": worker_count,
+            "total_tasks": result.get("total_tasks", 0),
+            "completed_tasks": result.get("completed_tasks", 0),
+            "mode": "native_fake_offline",
+        }))
+
+        ended = datetime.now(timezone.utc)
+        return RunRecord(
+            id=run_id,
+            workflow_id=workflow_id,
+            runtime="swarmgraph",
+            status=RunStatus.COMPLETED if swarm_status == "completed" else RunStatus.FAILED,
+            started_at=started.isoformat(),
+            ended_at=ended.isoformat(),
+            events=events,
+            metadata={
+                "mode": "native_fake_offline",
+                "swarm_id": result.get("swarm_id"),
+                "swarm_status": swarm_status,
+                "worker_count": worker_count,
+                "total_tasks": result.get("total_tasks", 0),
+                "completed_tasks": result.get("completed_tasks", 0),
+                "results": result.get("results", []),
+            },
+        )
+
+    def _map_swarmgraph_event(
+        self, sw_evt: SwarmGraphEvent, run_id: str, sequence: int,
+    ) -> list[RunEvent]:
+        kind = sw_evt.kind
+        data = dict(sw_evt.data)
+        if kind == SwarmGraphEventKind.worker:
+            return [self._event(run_id, sequence, "NODE_COMPLETED", {
+                "node": data.get("worker_id", "unknown"),
+                "task_id": data.get("task_id", ""),
+                "duration_seconds": data.get("duration_seconds", 0),
+                "cost_usd": data.get("cost_usd", 0),
+                "status": "completed" if not data.get("has_error") else "failed",
+            })]
+        if kind == SwarmGraphEventKind.consensus:
+            return [self._event(run_id, sequence, "SWARMGRAPH_CONSENSUS", data)]
+        if kind == SwarmGraphEventKind.budget:
+            return [self._event(run_id, sequence, "BUDGET_UPDATE", data)]
+        if kind == SwarmGraphEventKind.hitl:
+            return [self._event(run_id, sequence, "HITL_REQUIRED", data)]
+        if kind == SwarmGraphEventKind.error:
+            return [self._event(run_id, sequence, "RUN_FAILED", data)]
+        if kind == SwarmGraphEventKind.topology:
+            return [self._event(run_id, sequence, "SWARMGRAPH_TOPOLOGY", data)]
+        return [self._event(run_id, sequence, "STATE_CHANGE", data)]
+
+    async def _run_cli_workflow(
+        self, workflow_id: str, workspace: Path, prompt: str, inputs: dict[str, Any] | None = None,
+    ) -> RunRecord:
+        """Run via external SwarmGraph CLI subprocess (provider-backed mode)."""
+        inputs = inputs or {}
         cli = self._resolve_cli(workspace)
         backend, allow_costs = require_dual_gate("SWARMGRAPH")
         provider = os.environ.get("AI_PROVIDER_SWARM_GATEWAY_DEFAULT_PROVIDER", "openai")
-        prompt = str(inputs.get("prompt") or f"Run ARC workflow {workflow_id}")
         run_id = f"run-sg-{uuid.uuid4().hex[:8]}"
         started = datetime.now(timezone.utc)
 
@@ -380,7 +484,6 @@ class SwarmGraphAdapter(RuntimeAdapter):
                 },
             )
 
-        # Emit standalone SwarmGraph topology from worker_count
         worker_count = int(payload.get("worker_count", 0))
         topology_nodes = [{"id": "queen", "role": "queen", "label": "SwarmGraph Queen"}]
         topology_edges: list[dict[str, str]] = []
@@ -396,7 +499,6 @@ class SwarmGraphAdapter(RuntimeAdapter):
             "worker_count": worker_count,
         }))
 
-        # Emit standalone SwarmGraph consensus from swarm status
         events.append(self._event(run_id, 2, "SWARMGRAPH_CONSENSUS", {
             "task_id": payload.get("swarm_id", ""),
             "consensus_reached": payload.get("status") == "completed",
