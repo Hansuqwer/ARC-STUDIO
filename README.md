@@ -10,7 +10,7 @@ ARC Studio is currently pre-release software (`v0.1.0-alpha`). Public APIs, UI s
 
 - Local-first workflow execution via the `arc` CLI and loopback daemon.
 - Eclipse Theia browser app for workflow, run, trace, adapter, HITL, audit, and replay surfaces.
-- Runtime detection and adapter scaffolding for SwarmGraph, LangGraph, CrewAI, OpenAI Agents SDK, AG2, LlamaIndex, and LM Arena.
+- Runtime detection and adapter scaffolding for SwarmGraph, LangGraph, CrewAI, OpenAI Agents SDK, AG2, LlamaIndex, and LM Arena (stub/gated).
 - JSONL trace storage with a SQLite metadata index.
 - Run lifecycle commands for status, search, export, import, replay, delete, backfill, prune, and storage maintenance.
 - HITL prompt persistence with approval/rejection CLI and IDE integration.
@@ -28,10 +28,10 @@ ARC Studio is an alpha developer tool. Pin usage to a tag or commit SHA.
 | Browser app | Primary UI target |
 | Electron app | Development/proof path, post-v0.1 release target |
 | Runtime adapters | Mixed: some runnable, some detection/export/scaffold only |
-| SwarmGraph adoption layer | Planned direction; not fully implemented |
+| SwarmGraph adoption layer | Fake/offline default; narrow gated local-real path exists; no provider-backed execution |
 | Security model | Single-user, loopback-only workstation tool |
 
-See [CHANGELOG.md](./CHANGELOG.md), [docs/RELEASE_CHECKLIST.md](./docs/RELEASE_CHECKLIST.md), and [docs/SECURITY_AUDIT_REPORT.md](./docs/SECURITY_AUDIT_REPORT.md) for current release notes, verification, and residual risks.
+See [CHANGELOG.md](./CHANGELOG.md), [docs/RELEASE_CHECKLIST.md](./docs/RELEASE_CHECKLIST.md), and [docs/SECURITY.md](./docs/SECURITY.md) for current release notes, verification, and residual risks.
 
 ## Architecture
 
@@ -228,7 +228,7 @@ ARC Studio is designed for a single trusted user on a local workstation. The dae
 
 Do not expose ARC Studio on multi-tenant hosts, shared dev containers, or untrusted networks. Report security issues through a private GitHub security advisory, not a public issue.
 
-See [docs/SECURITY_AUDIT_REPORT.md](./docs/SECURITY_AUDIT_REPORT.md) for the full threat model and audit status.
+See [docs/SECURITY.md](./docs/SECURITY.md) for the full threat model and audit status.
 
 ## Troubleshooting
 
