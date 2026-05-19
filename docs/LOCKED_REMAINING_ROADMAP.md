@@ -236,7 +236,7 @@ v0.2 product work is scoped to IDE productization of existing/gated capabilities
 
 ### Remaining IDE Work
 
-**Status:** Not Started for v0.2+ unless a blocking v0.1 bug appears.
+**Status:** In Progress | Evidence: `89c5325` | Notes: R8/R9/R10 are Baseline Complete; R11/R12 remain.
 
 The browser IDE is v0.1-alpha shippable but not fully complete. Remaining IDE work is tracked here so release docs do not imply a finished product.
 

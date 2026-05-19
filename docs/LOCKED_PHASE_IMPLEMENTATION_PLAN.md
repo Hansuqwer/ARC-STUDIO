@@ -324,7 +324,7 @@ Order rationale: close parity/doctor decisions before live-stream auto-discovery
 ### Phase 8 — Live Stream Productization
 
 - Status: Baseline Complete — configured Python daemon/local live stream wiring is implemented for IDE `streamActiveTrace()` via explicit/requested base URL or `ARC_PYTHON_DAEMON_URL`, with local live terminal/degraded handling and replay-not-live UI copy/tests. Evidence: local Phase 8 worktree verification on `bec8d4b` (`python` web SSE tests, arc-extension tests/build, browser build/e2e, `scripts/check-pr.sh`), distinct from pushed-main workflow evidence. This proves configured local daemon/stub runtime event streams only, not broad runtime/provider-backed live event support.
-- **v0.1 decision:** Ship at current status. Remaining polish (Theia async contribution warnings, daemon URL auto-discovery) deferred to v0.2. No user-facing bugs exist at baseline.
+- **v0.1 decision:** Ship at current status. Remaining polish (Theia async contribution warnings, daemon URL auto-discovery) was addressed by Phase 13. No user-facing bugs exist at baseline.
 - Wire Theia live mode to configured Python daemon/local runtime stream beyond deterministic `/api/sse/proof`.
 - Preserve live/replay/disconnected distinctions; do not label replay as live.
 - Add/refresh tests proving configured local stream behavior without provider calls.
@@ -389,17 +389,17 @@ Most dimensions render absent/degraded until the Phase 15 measured cost/token pr
 
 ### Phase 11 — Discipline Audits
 
-**v0.1 decision:** Ship at current status. Remaining orphan surfaces documented; `arc doctor storage` subcheck not merged into `arc doctor all` yet. Both deferred to v0.2. No user-facing bugs exist at baseline.
+**v0.1 decision:** Ship at current status. Remaining orphan surfaces and `arc doctor storage` inclusion were addressed by Phase 14. No user-facing bugs exist at baseline.
 
 - Run daemon/CLI parity audit and decide command vs endpoint fate for remaining orphan surfaces.
 - Audit `arc doctor all` coverage against existing subchecks without changing CLI behavior.
 - Keep release-facing docs aligned with reality; no release claims beyond proven gated/local/offline behavior.
 - Phase 11 audit ledger draft:
   - Daemon route inventory source: `python/src/agent_runtime_cockpit/web/routes.py:710-744`.
-  - Endpoint parity status: audited against current CLI and Theia extension sources. Core daemon surfaces have explicit CLI analogs or active UI consumers for health, inspect, runtimes/capabilities, workflows, schemas, run list/get/events, providers/status/accounts/routing/proxy/diagnostics, run diff, and eval run. Remaining direct-daemon orphan/deferred surfaces are `/api/runs/start` (UI launches through CLI `arc run` instead), `/api/runs/{run_id}/links` (extension expects CLI `arc runs links`, but no matching CLI command was found), `/api/telemetry/export/{run_id}` (no active CLI/UI consumer found), `/api/context/pack` (no active CLI/UI consumer found), `/api/providers/accounts/{account_id}/test` (no active CLI/UI consumer found), `/api/sse/proof` (limited-local stub/proof only), and `/api/arena/*` (stub/gated Arena surfaces with no product live-Arena claim).
-  - `arc doctor all` source: `python/src/agent_runtime_cockpit/cli.py:739-851`.
-  - `arc doctor all` currently reports Python, CLI version, runtime detection, daemon health, SwarmGraph CLI availability, and provider env-presence diagnostics.
-  - Storage diagnostics exist separately in `arc doctor storage` at `python/src/agent_runtime_cockpit/cli.py:939-980`; they are not included in `arc doctor all` based on current source.
+  - Endpoint parity status: audited against current CLI and Theia extension sources. Core daemon surfaces have explicit CLI analogs or active UI consumers for health, inspect, runtimes/capabilities, workflows, schemas, run list/get/events, providers/status/accounts/routing/proxy/diagnostics, run diff, and eval run. Phase 14 assigned explicit fates for remaining surfaces: `/api/runs/start` → `ui-deferred`, `/api/runs/{run_id}/links` → CLI `arc runs links` added, `/api/telemetry/export/{run_id}` → `daemon-only-deprecated`, `/api/context/pack` → already has CLI `arc context pack`, `/api/providers/accounts/{account_id}/test` → `daemon-only-deprecated`, `/api/sse/proof` → `daemon-only-deprecated`, `/api/arena/*` → `daemon-only-deprecated`.
+  - `arc doctor all` source: `python/src/agent_runtime_cockpit/cli.py`.
+  - `arc doctor all` currently reports Python, CLI version, runtime detection, daemon health, SwarmGraph CLI availability, provider env-presence diagnostics, and workspace storage per ADR-009.
+  - Storage diagnostics still exist separately in `arc doctor storage`; Phase 14 also includes workspace storage in `arc doctor all`.
   - Relevant CLI test evidence: `cd python && uv run pytest tests/test_cli_doctor.py tests/cli/test_cli_discoverability.py tests/test_cli_providers.py tests/test_cli_runs.py -q` passed locally with 76 tests.
 - Acceptance:
   1. Remaining orphan daemon endpoints each have an explicit CLI command, UI consumer, or deferral note.
