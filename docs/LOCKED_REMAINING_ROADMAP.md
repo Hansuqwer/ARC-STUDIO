@@ -206,7 +206,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | R7 Release Ops | Complete | Release date set for 2026-06-01; green-window active; `.env` scrub completed on 2026-05-18 (commit `ffc1fd1`); all required GitHub workflows green on `ec36b55` |
 | R8 IDE Provider/Quota Completion | Baseline Complete | Chunks 3.1-3.3 hardened — typed diagnostics parser with malformed/partial/success tests, local-only quota reset with targeted confirmation, three-layer provider gate (env + paid opt-in + exact confirmation) impossible to trigger without every gate; no remote quota reset or adoption claim |
 | R9 IDE Live Stream Polish | Not Started | Resolve/accept Theia async warning noise and add daemon URL discovery/guided setup for configured local daemon streams only |
-| R10 Doctor/Daemon Parity Closure | Not Started | Decide CLI/UI/deferral fate for orphan daemon routes; decide if `arc doctor storage` joins `arc doctor all` |
+| R10 Doctor/Daemon Parity Closure | Baseline Complete | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added; all orphan routes have explicit fate labels (`ui-deferred`, `daemon-only-deprecated`, or CLI added); no docs imply complete parity |
 | R11 SwarmGraph Cost Producer | Not Started | Add measured cost/token producer before enriching IDE cost panels beyond absent/degraded states |
 | R12 Packaging/Optional Features | Not Started | Re-evaluate Electron packaging/signing and live LM Arena separately after browser v0.1 stabilizes |
 
@@ -227,12 +227,11 @@ v0.2 product work is scoped to IDE productization of existing/gated capabilities
 **v0.1 actions:**
 
 - Freeze Phase 4, 5, 8, 10, and 11 behavior except for blocker fixes.
-- Keep release docs honest about configured local daemon streams, conditional audit material, absent cost producers, and daemon/doctor parity gaps.
+- Keep release docs honest about configured local daemon streams, conditional audit material, absent cost producers, and known parity state.
 - Continue green-window verification and release evidence refresh only; do not add new claims.
 
 **v0.2 carry-forward:**
 
-- Phase 11: Merge `arc doctor storage` into `arc doctor all` if accepted, and decide CLI/UI fate for orphan daemon routes.
 - Phase 8: Resolve non-blocking Theia async contribution warnings and add daemon URL auto-discovery.
 - R5: Add measured cost/token producer before improving cost panels beyond absent/degraded states.
 
@@ -247,8 +246,8 @@ The browser IDE is v0.1-alpha shippable but not fully complete. Remaining IDE wo
 | Provider/Quota UI | Complete — chunks 3.1-3.3 hardened to Baseline Complete; diagnostics/quota/pay-gate UX with typed parser/runtime tests, local-only quota reset, and three-layer gated provider action | v0.2 | No remote quota reset; no broad provider-backed adoption claim |
 | Live Stream UX | Remove/quiet non-blocking Theia async contribution warnings; add daemon URL auto-discovery or guided connection setup | v0.2 after Doctor/Daemon Parity | Configured local daemon stream only; not broad runtime/provider live support |
 | SwarmGraph Cost UX | Add measured cost/token producer before rendering rich cost panels | v0.2+ | Empty/degraded cost state remains correct until producer exists |
-| Doctor/Daemon Parity | Decide CLI/UI fate for `/api/runs/start`, `/api/runs/{run_id}/links`, `/api/telemetry/export/{run_id}`, `/api/context/pack`, `/api/providers/accounts/{account_id}/test`, `/api/sse/proof`, `/api/arena/*` | v0.2 | No complete daemon CLI/UI parity claim until closed |
-| Doctor Coverage | Decide whether `arc doctor storage` belongs in `arc doctor all`; add tests if changed | v0.2 | Release docs must state storage is separate until implemented |
+| Doctor/Daemon Parity | Complete — all orphan routes have fate labels; `arc runs links` CLI added; remaining routes marked `ui-deferred` or `daemon-only-deprecated` | v0.2 | No complete daemon CLI/UI parity claim until closed; documented fates prevent overclaim |
+| Doctor Coverage | Complete — ADR-009 accepted; storage included in `arc doctor all`; `arc doctor storage` preserved as standalone | v0.2 | Release docs must accurately reflect storage inclusion status |
 | Electron App | Package/sign Electron only after browser release stabilizes | Post-v0.1 | Browser app remains canonical release target |
 | LM Arena | Keep stub/gated; productize only with separate gates/tests/docs | Later | No live Arena product claim |
 
@@ -263,9 +262,9 @@ The browser IDE is v0.1-alpha shippable but not fully complete. Remaining IDE wo
 
 **Status:** Baseline Complete | Evidence: local source audit against daemon routes in `python/src/agent_runtime_cockpit/web/routes.py:710-744`, doctor implementation in `python/src/agent_runtime_cockpit/cli.py:739-851`, storage subcheck at `:939-980`, and scoped CLI tests (`76 passed`) | Notes: remaining direct-daemon orphan/deferred surfaces are documented below; docs must not imply complete CLI/UI parity for every daemon route.
 
-`arc doctor all` currently covers Python, CLI version, runtime detection, daemon health, SwarmGraph CLI availability, and provider env-presence diagnostics. Storage diagnostics are implemented as `arc doctor storage`, but current source does not show storage included in `arc doctor all`; release docs should state that gap until tests or code change prove otherwise.
+`arc doctor all` currently covers Python, CLI version, runtime detection, daemon health, SwarmGraph CLI availability, provider env-presence diagnostics, and workspace storage (traces directory, SQLite index, indexed runs count, evals directory — per ADR-009). `arc doctor storage` remains as a standalone subcommand for dedicated storage diagnostics.
 
-Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/eval routes have CLI analogs or active UI consumers. Remaining deferred/orphan surfaces are `/api/runs/start` direct daemon start (current UI uses CLI `arc run`), `/api/runs/{run_id}/links` (daemon route exists while Theia expects missing CLI `arc runs links`), `/api/telemetry/export/{run_id}`, `/api/context/pack`, `/api/providers/accounts/{account_id}/test`, limited-local `/api/sse/proof`, and gated/stub `/api/arena/*` surfaces. These are not release claims.
+Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/eval routes have CLI analogs or active UI consumers. All remaining orphan surfaces now have explicit fate labels: `/api/runs/start` → `ui-deferred` (UI uses CLI `arc run`), `/api/runs/{run_id}/links` → CLI `arc runs links` added, `/api/telemetry/export/{run_id}` → `daemon-only-deprecated`, `/api/context/pack` → already has CLI `arc context pack`, `/api/providers/accounts/{account_id}/test` → `daemon-only-deprecated`, `/api/sse/proof` → `daemon-only-deprecated`, `/api/arena/*` → `daemon-only-deprecated`. No docs imply complete parity unless all gaps are closed.
 
 ### Deferred From v0.2
 

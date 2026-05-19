@@ -876,6 +876,54 @@ def doctor_all(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
             "error": str(e),
         })
 
+    # 7. Workspace storage (fast checks: dir existence, file count, DB size, index count)
+    try:
+        ws = Path.cwd()
+        traces_dir = ws / ".arc" / "traces"
+        db_path = ws / ".arc" / "arc.db"
+        evals_dir = ws / ".arc" / "evals"
+        storage_checks = []
+        storage_checks.append({
+            "check": "traces_dir",
+            "ok": traces_dir.exists(),
+            "path": str(traces_dir),
+            "trace_count": len(list(traces_dir.glob("*.jsonl"))) if traces_dir.exists() else 0,
+        })
+        storage_checks.append({
+            "check": "sqlite_index",
+            "ok": db_path.exists(),
+            "path": str(db_path),
+            "size_bytes": db_path.stat().st_size if db_path.exists() else 0,
+        })
+        if db_path.exists():
+            from .storage.sqlite import SqliteStore
+            store = SqliteStore(db_path)
+            storage_checks.append({
+                "check": "indexed_runs",
+                "ok": True,
+                "count": store.count_runs(),
+            })
+        storage_checks.append({
+            "check": "evals_dir",
+            "ok": evals_dir.exists(),
+            "path": str(evals_dir),
+        })
+        storage_all_ok = all(c["ok"] for c in storage_checks if c["check"] != "evals_dir")
+        if not storage_all_ok:
+            all_ok = False
+        checks.append({
+            "check": "workspace_storage",
+            "ok": storage_all_ok,
+            "scope": "workspace_storage",
+            "details": storage_checks,
+        })
+    except Exception as e:
+        checks.append({
+            "check": "workspace_storage",
+            "ok": False,
+            "error": str(e),
+        })
+
     data = {"ok": all_ok, "checks": checks}
     _out(ok(data), json_output)
     if not all_ok:
@@ -1710,6 +1758,85 @@ def runs_search(
                 run.get("started_at", "")[:19],
             )
         console.print(table)
+
+
+@runs_app.command("links")
+def runs_links(
+    run_id: str = typer.Argument(..., help="Run ID to get cross-linked event chains for"),
+    filter: Optional[str] = typer.Option(None, "--filter", help="Filter link type (node_id, message_id, tool_call_id, evidence_id)"),
+    stable_id: Optional[str] = typer.Option(None, "--stable-id", help="Specific stable ID to look up"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Get cross-linked event chains for a run by stable ID.
+
+    Uses CrossLinker to build event chains keyed by node, message, tool call,
+    and evidence stable IDs from stored trace events.
+    """
+    _setup_logging(debug)
+    from .storage.jsonl import JsonlTraceStore
+    from .orchestration.cross_linker import CrossLinker
+
+    ws = _workspace(workspace)
+    store = JsonlTraceStore(ws / ".arc" / "traces")
+    run_record = store.load(run_id)
+    if run_record is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
+        raise typer.Exit(1)
+
+    linker = CrossLinker()
+    linker.index_all(run_record.events)
+
+    if stable_id:
+        # Single stable ID lookup
+        linked = linker.get_linked_events(stable_id)
+        node_chain = linker.get_node_chain(stable_id) if filter in (None, "node_id") else []
+        message_chain = linker.get_message_chain(stable_id) if filter in (None, "message_id") else []
+        tool_call_chain = linker.get_tool_call_chain(stable_id) if filter in (None, "tool_call_id") else []
+        evidence_chain = linker.get_evidence_events(stable_id) if filter in (None, "evidence_id") else []
+        payload = {
+            "node_chains": {stable_id: [e.model_dump() for e in node_chain]},
+            "message_chains": {stable_id: [e.model_dump() for e in message_chain]},
+            "tool_call_chains": {stable_id: [e.model_dump() for e in tool_call_chain]},
+            "evidence_chains": {stable_id: [e.model_dump() for e in evidence_chain]},
+            "has_stable_ids": linker.has_stable_ids(),
+            "stable_id_count": 1,
+        }
+    else:
+        # Build all chains
+        ids = linker.get_run_event_ids()
+        node_chains: dict[str, list[dict]] = {}
+        message_chains: dict[str, list[dict]] = {}
+        tool_call_chains: dict[str, list[dict]] = {}
+        evidence_chains: dict[str, list[dict]] = {}
+        for sid in ids:
+            if filter in (None, "node_id"):
+                chain = linker.get_node_chain(sid)
+                if chain:
+                    node_chains[sid] = [e.model_dump() for e in chain]
+            if filter in (None, "message_id"):
+                chain = linker.get_message_chain(sid)
+                if chain:
+                    message_chains[sid] = [e.model_dump() for e in chain]
+            if filter in (None, "tool_call_id"):
+                chain = linker.get_tool_call_chain(sid)
+                if chain:
+                    tool_call_chains[sid] = [e.model_dump() for e in chain]
+            if filter in (None, "evidence_id"):
+                chain = linker.get_evidence_events(sid)
+                if chain:
+                    evidence_chains[sid] = [e.model_dump() for e in chain]
+        payload = {
+            "node_chains": node_chains,
+            "message_chains": message_chains,
+            "tool_call_chains": tool_call_chains,
+            "evidence_chains": evidence_chains,
+            "has_stable_ids": linker.has_stable_ids(),
+            "stable_id_count": len(ids),
+        }
+
+    _out(ok(payload, workspace=str(ws)), json_output)
 
 
 # ─── isolation ──────────────────────────────────────────────────────────────────

@@ -140,7 +140,8 @@ def test_doctor_all_json(run_cli):
     assert "python" in check_names
     assert "cli" in check_names
     assert "runtimes" in check_names
-    assert len(checks) >= 4  # python, cli, runtimes, daemon, swarmgraph_cli
+    assert "workspace_storage" in check_names
+    assert len(checks) >= 5  # python, cli, runtimes, daemon, swarmgraph_cli, providers, workspace_storage
 
 
 def test_doctor_all_json_python_check(run_cli):

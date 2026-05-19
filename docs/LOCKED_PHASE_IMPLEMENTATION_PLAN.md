@@ -278,7 +278,7 @@ Every new phase/chunk should include:
 | 10 Assurance Polish | Baseline Complete | Assurance tab baseline | Live refresh, filtering, export affordances, improved states implemented; no v0.1 polish blocker |
 | 11 Discipline Audits | Baseline Complete | daemon routes + CLI doctor | Orphan/deferred daemon surfaces documented; storage doctor remains separate from `arc doctor all` |
 | 12 Provider/Quota UX Completion | Baseline Complete | Phase 3 provider CLI + explicit gates | Chunks 3.1-3.3 hardened to Baseline Complete; diagnostics/quota/pay-gate UX with typed parser/runtime tests, local-only quota reset, and gated provider action impossible without every explicit gate; no remote quota reset or adoption claim |
-| 14 Doctor/Daemon Parity Closure | Not Started | Phase 11 | Decide CLI/UI/deferral fate for orphan daemon routes; decide `arc doctor storage` inclusion in `arc doctor all` |
+| 14 Doctor/Daemon Parity Closure | Baseline Complete | Phase 11 | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added (3 new tests); all orphan routes have explicit fate labels; no docs imply complete parity |
 | 13 Live Stream UX Polish | Not Started | Phase 8 + 8.1 + Phase 14 decisions | Resolve/accept async warning noise; add daemon URL discovery/guided setup without broad live-runtime claims |
 | 15 SwarmGraph Cost Producer + Cost UX | Not Started | Phase 5 + Phase 9 | Add measured cost/token producer before richer cost panels; keep absent/degraded states until data exists |
 | 16 Packaging/Optional Feature Decisions | Not Started | browser v0.1 stabilization | Decide Electron packaging/signing and live-Arena productization separately; no current product claims |
@@ -442,12 +442,20 @@ Most dimensions render absent/degraded until the Phase 15 measured cost/token pr
 
 ### Phase 14 — Doctor/Daemon Parity Closure
 
-**Status:** Not Started.
+**Status:** Baseline Complete | Evidence: local verification — ADR-009 accepted; `arc runs links` added (3 new tests); storage checks included in `arc doctor all`; orphan routes labeled with fates. Full baseline: 863 Python passed, 754 TS passed, builds clean, banned-claims OK.
 
 - Decide CLI command, UI consumer, or explicit deferral for every remaining orphan daemon route.
 - Decide whether `arc doctor storage` is included in `arc doctor all`; implement only if accepted.
 - Record the `arc doctor storage` inclusion decision in an ADR before implementation; storage scans may be slower than normal doctor checks.
 - Update release-facing docs with final parity state.
+- Orphan route fates:
+  - `/api/runs/start` → `ui-deferred` (UI uses CLI `arc run` instead)
+  - `/api/runs/{run_id}/links` → Added `arc runs links` CLI command (CRITICAL: Theia backend called this non-existent command)
+  - `/api/telemetry/export/{run_id}` → `daemon-only-deprecated` (daemon handler is simulated/experimental OTLP export)
+  - `/api/context/pack` → Already has CLI `arc context pack`
+  - `/api/providers/accounts/{account_id}/test` → `daemon-only-deprecated` (daemon handler is stub)
+  - `/api/sse/proof` → `daemon-only-deprecated` (developer proof endpoint)
+  - `/api/arena/*` → `daemon-only-deprecated` (stub/gated Arena surfaces, no product claim)
 - Acceptance:
   1. Each orphan route has a CLI analog, active UI consumer, or one explicit fate label: `cli-todo`, `ui-deferred`, or `daemon-only-deprecated`.
   2. `arc doctor all` storage behavior is ADR-backed, tested, and documented.

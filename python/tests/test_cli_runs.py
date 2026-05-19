@@ -667,3 +667,95 @@ def test_hitl_cli_pending_and_approve(tmp_path):
     ])
     assert approved.exit_code == 0, approved.output
     assert json.loads(approved.output)["data"]["decision"] == "approve"
+
+
+def test_runs_links_returns_structured_event_chains(tmp_path):
+    """`arc runs links <runId> --json` returns organized event chains by stable ID."""
+    from agent_runtime_cockpit.protocol.schemas import RunEvent, RunRecord, RunStatus
+    from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
+
+    ws = tmp_path / "ws"
+    traces_dir = ws / ".arc" / "traces"
+    traces_dir.mkdir(parents=True)
+
+    events = [
+        RunEvent(type="NODE_START", timestamp="2026-01-01T00:00:00Z", run_id="run-links-1", sequence=1,
+                 data={"node_id": "node-a", "message_id": "msg-1"}),
+        RunEvent(type="NODE_END", timestamp="2026-01-01T00:00:01Z", run_id="run-links-1", sequence=2,
+                 data={"node_id": "node-a", "message_id": "msg-1", "tool_call_id": "tc-1"}),
+        RunEvent(type="TOOL_START", timestamp="2026-01-01T00:00:02Z", run_id="run-links-1", sequence=3,
+                 data={"tool_call_id": "tc-1", "message_id": "msg-1"}),
+        RunEvent(type="TOOL_END", timestamp="2026-01-01T00:00:03Z", run_id="run-links-1", sequence=4,
+                 data={"tool_call_id": "tc-1", "evidence_refs": [{"evidence_id": "ev-1"}]}),
+        RunEvent(type="RUN_COMPLETED", timestamp="2026-01-01T00:00:04Z", run_id="run-links-1", sequence=5,
+                 data={}),
+    ]
+    record = RunRecord(
+        id="run-links-1",
+        workflow_id="wf-links",
+        runtime="swarmgraph",
+        status=RunStatus.COMPLETED,
+        started_at="2026-01-01T00:00:00Z",
+        ended_at="2026-01-01T00:00:05Z",
+        events=events,
+    )
+    store = JsonlTraceStore(traces_dir)
+    store.save(record)
+
+    result = CliRunner().invoke(app, ["runs", "links", "run-links-1", "--workspace", str(ws), "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+
+    assert data["has_stable_ids"] is True
+    assert data["stable_id_count"] >= 2  # node-a, msg-1, tc-1, ev-1
+    assert "node-a" in data["node_chains"]
+    assert len(data["node_chains"]["node-a"]) >= 2  # NODE_START + NODE_END
+    assert "msg-1" in data["message_chains"]
+    assert "tc-1" in data["tool_call_chains"]
+    assert "ev-1" in data["evidence_chains"]
+
+
+def test_runs_links_returns_empty_for_run_without_stable_ids(tmp_path):
+    """`arc runs links <runId> --json` returns empty chains when no stable IDs exist."""
+    from agent_runtime_cockpit.protocol.schemas import RunEvent, RunRecord, RunStatus
+    from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
+
+    ws = tmp_path / "ws2"
+    traces_dir = ws / ".arc" / "traces"
+    traces_dir.mkdir(parents=True)
+
+    events = [
+        RunEvent(type="RUN_STARTED", timestamp="2026-01-01T00:00:00Z", run_id="run-no-links", sequence=1, data={}),
+        RunEvent(type="RUN_COMPLETED", timestamp="2026-01-01T00:00:01Z", run_id="run-no-links", sequence=2, data={}),
+    ]
+    record = RunRecord(
+        id="run-no-links",
+        workflow_id="wf-no-links",
+        runtime="swarmgraph",
+        status=RunStatus.COMPLETED,
+        started_at="2026-01-01T00:00:00Z",
+        ended_at="2026-01-01T00:00:01Z",
+        events=events,
+    )
+    store = JsonlTraceStore(traces_dir)
+    store.save(record)
+
+    result = CliRunner().invoke(app, ["runs", "links", "run-no-links", "--workspace", str(ws), "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+
+    assert data["has_stable_ids"] is False
+    assert data["stable_id_count"] == 0
+    assert data["node_chains"] == {}
+    assert data["message_chains"] == {}
+    assert data["tool_call_chains"] == {}
+    assert data["evidence_chains"] == {}
+
+
+def test_runs_links_reports_not_found(tmp_path):
+    """`arc runs links <runId> --json` exits 1 for missing run."""
+    result = CliRunner().invoke(app, ["runs", "links", "missing-run", "--workspace", str(tmp_path), "--json"])
+    assert result.exit_code == 1
+    data = json.loads(result.output)
+    assert data["ok"] is False
+    assert data["error"]["code"] == "RUN_NOT_FOUND"
