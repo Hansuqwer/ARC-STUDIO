@@ -208,7 +208,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | R9 IDE Live Stream Polish | Baseline Complete | Daemon URL auto-discovery (loopback probe of 127.0.0.1:7777, no background connections), async warning fingerprint test + documentation, 3-tier fallback in SwarmGraphInsightTab (manual → ARC_PYTHON_DAEMON_URL → loopback probe) |
 | R10 Doctor/Daemon Parity Closure | Baseline Complete | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added; all orphan routes have explicit fate labels (`ui-deferred`, `daemon-only-deprecated`, or CLI added); no docs imply complete parity |
 | R11 SwarmGraph Cost Producer | Baseline Complete | Schema updated with model/promptTokens/completionTokens/source; measured is ISO timestamp; langgraph+swarmgraph emits measured cost/token events; UI renders new fields gated on explicit events; tests cover no-producer/partial/malformed/producer-backed states |
-| R12 Packaging/Optional Features | In Progress | ADR-008 accepted (daemon-bundling plan); electron-builder configs + signing preflight exist; LM Arena stub/gated and banned-claims enforced; implementation deferred to post-browser-v0.1 |
+| R12 Packaging/Optional Features | In Progress | ADR-008 accepted (daemon-bundling plan); electron-builder configs + signing preflight exist; LM Arena live productization is deferred; Electron packaging/daemon bundling remains post-browser-v0.1 work |
 
 **Active v0.2 execution order:** R8/Phase 12 → R10/Phase 14 → R9/Phase 13 → R11/Phase 15 → R12/Phase 16. Doctor/daemon parity comes before live-stream auto-discovery so any new daemon/doctor surface extends a stable inventory.
 
@@ -236,7 +236,7 @@ v0.2 product work is scoped to IDE productization of existing/gated capabilities
 
 ### Remaining IDE Work
 
-**Status:** In Progress | Evidence: Phase 16 first commit — ADR-008 accepted | Notes: R8/R9/R10/R11 are Baseline Complete; R12 is In Progress (decisions documented, implementation deferred).
+**Status:** In Progress | Evidence: Phase 16 first commit — ADR-008 accepted | Notes: R8/R9/R10/R11 are Baseline Complete; R12 remains active for Electron packaging/daemon-bundling decisions; live LM Arena is deferred.
 
 The browser IDE is v0.1-alpha shippable but not fully complete. Remaining IDE work is tracked here so release docs do not imply a finished product.
 
@@ -248,7 +248,7 @@ The browser IDE is v0.1-alpha shippable but not fully complete. Remaining IDE wo
 | Doctor/Daemon Parity | Complete — all orphan routes have fate labels; `arc runs links` CLI added; remaining routes marked `ui-deferred` or `daemon-only-deprecated` | v0.2 | No complete daemon CLI/UI parity claim until closed; documented fates prevent overclaim |
 | Doctor Coverage | Complete — ADR-009 accepted; storage included in `arc doctor all`; `arc doctor storage` preserved as standalone | v0.2 | Release docs must accurately reflect storage inclusion status |
 | Electron App | Package/sign Electron only after browser release stabilizes | Post-v0.1 | Browser app remains canonical release target |
-| LM Arena | Keep stub/gated; productize only with separate gates/tests/docs | Later | No live Arena product claim |
+| LM Arena | Deferred — keep stub/gated; productize only with separate plan, gates, tests, and docs | Later | No live Arena product claim |
 
 ### v0.2 Scope
 
