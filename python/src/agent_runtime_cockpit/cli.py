@@ -1790,7 +1790,6 @@ def runs_links(
 
     if stable_id:
         # Single stable ID lookup
-        linked = linker.get_linked_events(stable_id)
         node_chain = linker.get_node_chain(stable_id) if filter in (None, "node_id") else []
         message_chain = linker.get_message_chain(stable_id) if filter in (None, "message_id") else []
         tool_call_chain = linker.get_tool_call_chain(stable_id) if filter in (None, "tool_call_id") else []
