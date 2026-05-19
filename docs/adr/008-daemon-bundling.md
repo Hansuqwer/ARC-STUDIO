@@ -1,7 +1,10 @@
 # ADR-008: Python Daemon Bundling for Electron/Desktop
 
 ## Status
-Proposed
+Accepted
+
+**Accepted:** 2026-05-19 via Phase 16 (R12) first commit.
+**Scope:** ADR-008 describes the target Electron daemon-bundling architecture. Phase 1 (packaging spike) starts after browser v0.1.0-alpha release. The current `applications/electron/` directory already contains working electron-builder configs and signing preflight; daemon bundling via one of the three options (PyInstaller, embedded Python, uv bootstrap) will be decided after the Phase 1 spike. Release packaging remains blocked until browser release gates are stable.
 
 ## Context
 

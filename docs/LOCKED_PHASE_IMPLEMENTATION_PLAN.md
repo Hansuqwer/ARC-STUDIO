@@ -256,12 +256,12 @@ Every new phase/chunk should include:
 ### Plan Phase ↔ Roadmap ID
 
 | Plan Phase | Roadmap ID | Scope |
-|---|---|---|
+|---|---|---|---|
 | Phase 12 | R8 | IDE Provider/Quota Completion |
 | Phase 14 | R10 | Doctor/Daemon Parity Closure |
 | Phase 13 | R9 | IDE Live Stream Polish |
 | Phase 15 | R11 | SwarmGraph Cost Producer + Cost UX |
-| Phase 16 | R12 | Packaging/Optional Feature Decisions |
+| Phase 16 | R12 | Packaging/Optional Feature Decisions (In Progress) |
 
 | Phase | Status | Depends On | Notes |
 |---|---|---|---|
@@ -281,7 +281,7 @@ Every new phase/chunk should include:
 | 14 Doctor/Daemon Parity Closure | Baseline Complete | Phase 11 | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added (3 new tests); all orphan routes have explicit fate labels; no docs imply complete parity |
 | 13 Live Stream UX Polish | Baseline Complete | Phase 8 + 8.1 + Phase 14 decisions | Daemon URL auto-discovery (loopback probe), async warning fingerprint test + doc, 3-tier fallback in SwarmGraphInsightTab |
 | 15 SwarmGraph Cost Producer + Cost UX | Baseline Complete | Phase 5 + Phase 9 | Schema expanded with model/promptTokens/completionTokens/source; measured is ISO timestamp; UI renders all new fields gated on explicit events; 17 new tests across Python+TS |
-| 16 Packaging/Optional Feature Decisions | Not Started | browser v0.1 stabilization | Decide Electron packaging/signing and live-Arena productization separately; no current product claims |
+| 16 Packaging/Optional Feature Decisions | In Progress | browser v0.1 stabilization | ADR-008 accepted; electron-builder + signing preflight exist; LM Arena stub/gated and banned-claims enforced; implementation deferred to post-v0.1 |
 
 ## v0.1 Polish Deferral Decision
 
@@ -495,13 +495,18 @@ Most dimensions render absent/degraded until the Phase 15 measured cost/token pr
 
 ### Phase 16 — Packaging/Optional Feature Decisions
 
-**Status:** Not Started.
+**Status:** In Progress | Evidence: ADR-008 accepted (daemon-bundling plan); `applications/electron/` with electron-builder + signing preflight exists; LM Arena stub/gated and enforced by banned-claims.
 
 - Re-evaluate Electron packaging/signing after browser v0.1 stabilizes.
 - Keep LM Arena stub/gated unless a separate live-Arena implementation plan, gates, tests, and release docs are accepted.
 - Track Electron packaging and live LM Arena in separate ADRs/checklist lines; do not bundle their gate decisions.
+- **Implementation (first commit):**
+  1. ADR-008 accepted from Proposed → Accepted. Documents 3-phase daemon-bundling approach (PyInstaller spike → embedded Python → uv bootstrap). Phase 1 packaging spike deferred until after browser v0.1.0-alpha release.
+  2. Electron packaging/signing preflight already exists at `applications/electron/electron-builder.release.yml` with `forceCodeSigning: true`, `scripts/require-electron-signing.mjs`, and `.github/workflows/signing-preflight.yml`.
+  3. LM Arena remains stub-default with gated live mode; banned-claims (check-banned-claims.sh) enforces honest documentation.
+  4. Electron and Arena tracked as separate items in both the Phase Status Table and the deferred ledger.
 - Acceptance:
-  1. Electron has a concrete packaging/signing plan before implementation starts.
-  2. LM Arena remains unclaimed unless live product behavior is separately implemented and verified.
-- Verification: packaging/signing preflight for Electron; banned-claims check for Arena docs.
-- Known risks: signing complexity, platform drift, premature optional-feature claims.
+   1. ✅ Electron has a concrete packaging/signing plan (ADR-008 + existing electron-builder configs). Implementation blocked on browser v0.1 stabilization.
+   2. ✅ LM Arena remains unclaimed — stub-default with gated live mode, enforced by banned-claims checker.
+- Verification: `bash scripts/check-banned-claims.sh ...` (OK); `bash scripts/check-pr.sh` (signing preflight enforced); builds continue to pass.
+- Known risks: signing complexity, platform drift, premature optional-feature claims — all mitigated by deferring implementation to post-v0.1.
