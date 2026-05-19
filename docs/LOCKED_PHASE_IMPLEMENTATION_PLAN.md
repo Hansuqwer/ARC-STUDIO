@@ -3,7 +3,7 @@
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
 **Last reality refresh:** 2026-05-19 against locked roadmap and release evidence.  
-**Current evidence anchor:** `b8bcc8d` | refreshed 2026-05-19 | docs-only updates after this anchor must not widen release claims.  
+**Current evidence anchor:** `7a300fe` | refreshed 2026-05-19 | docs-only updates after this anchor must not widen release claims.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -235,17 +235,17 @@ Every new phase/chunk should include:
 ## Phase 7 — Release Operations
 
 **Roadmap:** R7  
-**Status:** Complete — 7.1 evidence refreshed; 7.2 green-window active from 2026-05-18 evidence with current pushed-main anchor `b8bcc8d`; 7.3 `.env` history scrub completed on 2026-05-18
+**Status:** Complete — 7.1 evidence refreshed; 7.2 green-window active from 2026-05-18 evidence with current pushed-main anchor `7a300fe`; 7.3 `.env` history scrub completed on 2026-05-18
 
 ### Chunk 7.1 — Release Evidence Refresh
 - Update release checklist with latest commit/run IDs.
 - Do not overclaim deferred features.
-- Status: Complete — evidence refreshed for pushed `main` commit `b8bcc8d`. Latest GitHub `main` evidence is green for python, node, ARC Roadmap Gate, e2e, and signing-preflight. Banned-claims verification remains the docs-touch check for this phase.
+- Status: Complete — evidence refreshed for pushed `main` commit `7a300fe`. Latest GitHub `main` evidence is green for python, node, ARC Roadmap Gate, e2e, and signing-preflight. Banned-claims verification remains the docs-touch check for this phase.
 
 ### Chunk 7.2 — Green Window
 - Start only after release date is set.
 - Track GitHub green runs for required workflows.
-- Status: Active — release date is set for 2026-06-01. The 3-day green-window starts from 2026-05-18 green evidence and current pushed-main anchor `b8bcc8d`; it completes on 2026-05-21 only if required workflows stay green.
+- Status: Active — release date is set for 2026-06-01. The 3-day green-window starts from 2026-05-18 green evidence and current pushed-main anchor `7a300fe`; it completes on 2026-05-21 only if required workflows stay green.
 
 ### Chunk 7.3 — `.env` History Scrub
 - Execute only after explicit approval for release date + history rewrite + force-push plan.
@@ -271,7 +271,7 @@ Every new phase/chunk should include:
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; configured local daemon SSE is wired in Phase 8 while SwarmGraph insight live producer/cost producer work remains Phase 15 |
 | 6 Real Adoption | Complete local-real hardening baseline | adoption protocol + dual explicit local-real gates | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path has contract, dependency/preflight states, metadata/IDE surfacing, and smoke/regression coverage; both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` are required for local-real availability; no provider calls are made or claimed |
-| 7 Release Ops | Complete | green CI | 7.1 evidence refreshed for current pushed-main anchor `b8bcc8d` with green `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`; 7.2 green-window active from 2026-05-18 toward 2026-06-01 release date; 7.3 `.env` history scrub completed on 2026-05-18 with git-filter-repo, 4 commits cleaned, backup branch created, force-pushed to main |
+| 7 Release Ops | Complete | green CI | 7.1 evidence refreshed for current pushed-main anchor `7a300fe` with green `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`; 7.2 green-window active from 2026-05-18 toward 2026-06-01 release date; 7.3 `.env` history scrub completed on 2026-05-18 with git-filter-repo, 4 commits cleaned, backup branch created, force-pushed to main |
 | 8 Live Stream Productization | Baseline Complete | configured Python daemon/local stream | Configured local daemon/stub runtime live streams work; remaining IDE polish is Phase 13 |
 | 8.1 IDE-to-Daemon E2E Harness | Complete | Phase 8 | Deterministic offline browser e2e proves one IDE-to-local-daemon SSE live frame path |
 | 9 BudgetVector Post-Hoc Accounting | Complete | trace/metadata budget data | Post-hoc accounting/reporting implemented; real-time budget interrupts deferred |
@@ -281,7 +281,7 @@ Every new phase/chunk should include:
 | 14 Doctor/Daemon Parity Closure | Baseline Complete | Phase 11 | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added (3 new tests); all orphan routes have explicit fate labels; no docs imply complete parity |
 | 13 Live Stream UX Polish | Baseline Complete | Phase 8 + 8.1 + Phase 14 decisions | Daemon URL auto-discovery (loopback probe), async warning fingerprint test + doc, 3-tier fallback in SwarmGraphInsightTab |
 | 15 SwarmGraph Cost Producer + Cost UX | Baseline Complete | Phase 5 + Phase 9 | Schema expanded with model/promptTokens/completionTokens/source; measured is ISO timestamp; UI renders all new fields gated on explicit events; 17 new tests across Python+TS |
-| 16 Packaging/Optional Feature Decisions | In Progress | browser v0.1 stabilization | ADR-008 accepted; electron-builder + signing preflight exist; live LM Arena implementation deferred; Electron packaging/daemon bundling remains post-browser-v0.1 work |
+| 16 Packaging/Optional Feature Decisions | Baseline Complete | browser v0.1 stabilization | ADR-008 accepted; electron-builder + signing preflight exist; release config signs validated by both signing-preflight and PR hygiene workflows; live LM Arena implementation deferred; Electron packaging/daemon bundling remains post-browser-v0.1 work |
 
 ## v0.1 Polish Deferral Decision
 
@@ -495,7 +495,7 @@ Most dimensions render absent/degraded until the Phase 15 measured cost/token pr
 
 ### Phase 16 — Packaging/Optional Feature Decisions
 
-**Status:** In Progress | Evidence: ADR-008 accepted (daemon-bundling plan); `applications/electron/` with electron-builder + signing preflight exists; release config now explicitly requires macOS hardened runtime/Gatekeeper posture plus Windows signature verification settings; live LM Arena deferred and enforced as unclaimed by banned-claims.
+**Status:** Baseline Complete | Evidence: `7a300fe` (all 5 workflows green); ADR-008 accepted; release config guarded by both signing-preflight and PR hygiene; live LM Arena deferred and enforced as unclaimed by banned-claims.
 
 - Re-evaluate Electron packaging/signing after browser v0.1 stabilizes.
 - Defer live LM Arena productization; keep LM Arena stub/gated unless a separate implementation plan, gates, tests, and release docs are accepted.

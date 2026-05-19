@@ -3,7 +3,7 @@
 **Status:** Locked source of truth for remaining product work.  
 **Created:** 2026-05-17  
 **Last reality refresh:** 2026-05-19 against current locked phase status and release evidence.  
-**Current evidence anchor:** `b8bcc8d` | refreshed 2026-05-19 | docs-only updates after this anchor must not widen release claims.  
+**Current evidence anchor:** `7a300fe` | refreshed 2026-05-19 | docs-only updates after this anchor must not widen release claims.  
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -25,7 +25,7 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 
 - Canonical app: `applications/browser` + `packages/arc-extension`.
 - Legacy `theia-extensions/*` and `packages/arc-browser-app` are archived under `docs/archive/`.
-- GitHub CI green on `b8bcc8d`: `python`, `node`, `ARC Roadmap Gate`, `signing-preflight`, `e2e`. All Baseline Complete phases evaluated for polish; all ship at current status for v0.1 (polish deferred to v0.2).
+- GitHub CI green on `7a300fe`: `python`, `node`, `ARC Roadmap Gate`, `signing-preflight`, `e2e`. All Baseline Complete phases evaluated for polish; all ship at current status for v0.1 (polish deferred to v0.2).
 - Release-scope CLI/IDE basics are implemented and tested.
 - Remaining work is product depth, not repo stabilization.
 
@@ -180,7 +180,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 
 **Goal:** Prepare v0.1 release without rewriting history prematurely.
 
-**Current:** Release ops complete as Phase 7. Target release date is 2026-06-01. Pushed `main` commit `b8bcc8d` is green for the required GitHub workflows: `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`. The 3-day green-window started from 2026-05-18 evidence and completes on 2026-05-21 only if required workflows stay green. `.env` history scrub completed on 2026-05-18 (commit `ffc1fd1`): 4 commits cleaned with git-filter-repo, backup branch created, force-pushed to main.
+**Current:** Release ops complete as Phase 7. Target release date is 2026-06-01. Pushed `main` commit `7a300fe` is green for the required GitHub workflows: `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`. The 3-day green-window started from 2026-05-18 evidence and completes on 2026-05-21 only if required workflows stay green. `.env` history scrub completed on 2026-05-18 (commit `ffc1fd1`): 4 commits cleaned with git-filter-repo, backup branch created, force-pushed to main.
 
 **Deliverables:**
 - Final release checklist evidence with commit/run IDs.
@@ -203,14 +203,14 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | R4 HITL/Audit UX | Complete baseline | Dedicated Assurance tab baseline exists; Phase 10 adds live refresh, filtering, export, and improved states without adapter-wide HMAC claims |
 | R5 SwarmGraph Insight | Complete baseline + first producer events | Configured local daemon SSE is wired in Phase 8; SwarmGraph insight live producer/cost producer work remains Phase 15 |
 | R6 Real Adoption | Complete local-real hardening baseline | Keep fake/offline deterministic/default; local-real availability requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; no paid/live provider calls; provider-backed execution remains blocked/unclaimed |
-| R7 Release Ops | Complete | Release date set for 2026-06-01; green-window active; `.env` scrub completed on 2026-05-18 (commit `ffc1fd1`); all required GitHub workflows green on `b8bcc8d` |
+| R7 Release Ops | Complete | Release date set for 2026-06-01; green-window active; `.env` scrub completed on 2026-05-18 (commit `ffc1fd1`); all required GitHub workflows green on `7a300fe` |
 | R8 IDE Provider/Quota Completion | Baseline Complete | Chunks 3.1-3.3 hardened — typed diagnostics parser with malformed/partial/success tests, local-only quota reset with targeted confirmation, three-layer provider gate (env + paid opt-in + exact confirmation) impossible to trigger without every gate; no remote quota reset or adoption claim |
 | R9 IDE Live Stream Polish | Baseline Complete | Daemon URL auto-discovery (loopback probe of 127.0.0.1:7777, no background connections), async warning fingerprint test + documentation, 3-tier fallback in SwarmGraphInsightTab (manual → ARC_PYTHON_DAEMON_URL → loopback probe) |
 | R10 Doctor/Daemon Parity Closure | Baseline Complete | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added; all orphan routes have explicit fate labels (`ui-deferred`, `daemon-only-deprecated`, or CLI added); no docs imply complete parity |
 | R11 SwarmGraph Cost Producer | Baseline Complete | Schema updated with model/promptTokens/completionTokens/source; measured is ISO timestamp; langgraph+swarmgraph emits measured cost/token events; UI renders new fields gated on explicit events; tests cover no-producer/partial/malformed/producer-backed states |
-| R12 Packaging/Optional Features | In Progress | ADR-008 accepted (daemon-bundling plan); electron-builder configs + signing preflight exist and now guard release-config signing drift; LM Arena live productization is deferred; Electron packaging/daemon bundling remains post-browser-v0.1 work |
+| R12 Packaging/Optional Features | Baseline Complete | ADR-008 accepted (daemon-bundling plan); electron-builder configs + signing preflight exist and guard release-config signing drift; check-pr.sh validates required signing keys; LM Arena live productization is deferred; Electron packaging/daemon bundling remains post-browser-v0.1 work |
 
-**Active v0.2 execution order:** R8/Phase 12 → R10/Phase 14 → R9/Phase 13 → R11/Phase 15 → R12/Phase 16. Doctor/daemon parity comes before live-stream auto-discovery so any new daemon/doctor surface extends a stable inventory.
+**v0.2 execution order (all Baseline Complete, no active implementation):** R8/Phase 12 → R10/Phase 14 → R9/Phase 13 → R11/Phase 15 → R12/Phase 16. Doctor/daemon parity comes before live-stream auto-discovery so any new daemon/doctor surface extends a stable inventory. Electron packaging/daemon bundling implementation for R12/Phase 16 is deferred to post-browser-v0.1.
 
 ## v0.2 Planning Decision — Option A
 
@@ -236,7 +236,7 @@ v0.2 product work is scoped to IDE productization of existing/gated capabilities
 
 ### Remaining IDE Work
 
-**Status:** In Progress | Evidence: Phase 16 first commit — ADR-008 accepted | Notes: R8/R9/R10/R11 are Baseline Complete; R12 remains active for Electron packaging/daemon-bundling decisions; live LM Arena is deferred.
+**Status:** Baseline Complete | Evidence: `7a300fe` (all 5 workflows green) | Notes: R8/R9/R10/R11/R12 are Baseline Complete; Electron packaging/daemon bundling and live LM Arena implementation remain deferred per the Deferred Ledger.
 
 The browser IDE is v0.1-alpha shippable but not fully complete. Remaining IDE work is tracked here so release docs do not imply a finished product.
 
