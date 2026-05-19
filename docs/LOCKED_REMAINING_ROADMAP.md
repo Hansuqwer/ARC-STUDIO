@@ -2,7 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-18 against current locked phase status and release evidence.  
+**Last reality refresh:** 2026-05-19 against current locked phase status and release evidence.  
+**Current evidence anchor:** `ec36b55` | refreshed 2026-05-19 | docs-only updates after this anchor must not widen release claims.  
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -24,7 +25,7 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 
 - Canonical app: `applications/browser` + `packages/arc-extension`.
 - Legacy `theia-extensions/*` and `packages/arc-browser-app` are archived under `docs/archive/`.
-- GitHub CI green on `6d3f559`: `python`, `node`, `ARC Roadmap Gate`, `signing-preflight`, `e2e`.
+- GitHub CI green on `ec36b55`: `python`, `node`, `ARC Roadmap Gate`, `signing-preflight`, `e2e`. All Baseline Complete phases evaluated for polish; all ship at current status for v0.1 (polish deferred to v0.2).
 - Release-scope CLI/IDE basics are implemented and tested.
 - Remaining work is product depth, not repo stabilization.
 
@@ -115,7 +116,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 
 **Goal:** Existing CLI/provider diagnostics and quota controls are visible and actionable in IDE.
 
-**Current:** CLI provider diagnostics/quota commands exist; IDE has a provider diagnostics/quota scaffold with typed telemetry parsing/tests, targeted confirmation before local quota-counter reset, a profile-linked cost policy summary, backend cost-gate metadata/enforcement, and hardened explicit paid/live opt-in gate wording. Reset is backed only by existing `arc providers quota reset --json` local quota-counter semantics. Live/provider UX remains offline/gated by default and performs no provider network calls. R3 now includes one narrow gated provider-action baseline for 9router-routed model calls via `arc providers action`, requiring the live env gate, paid-call opt-in, exact confirmation, and env/key references only. Opt-in smoke evidence passed on `9184f9b` for `9router` with `nvidia/minimaxai/minimax-m2.7`; successful live actions may update ARC local accounting only. There is no remote quota reset, provider-backed adoption, SwarmGraph/provider adoption wiring, or broad real-runtime completion claim.
+**Current:** Chunks 3.1-3.3 hardened to Baseline Complete. CLI provider diagnostics/quota commands work; IDE has provider diagnostics with typed telemetry parsing/tests covering empty/partial/malformed/success states, targeted confirmation before local quota-counter reset (local-only copy, no remote/provider reset implication), a profile-linked cost policy summary, backend cost-gate metadata/enforcement, and hardened explicit paid/live opt-in gate wording with three-layer gated provider action (env + paid opt-in + exact confirmation) impossible to trigger without every gate. Reset is backed only by existing `arc providers quota reset --json` local quota-counter semantics. Live/provider UX remains offline/gated by default and performs no provider network calls. R3 now includes one narrow gated provider-action baseline for 9router-routed model calls via `arc providers action`, requiring the live env gate, paid-call opt-in, exact confirmation, and env/key references only. Opt-in smoke evidence passed on `9184f9b` for `9router` with `nvidia/minimaxai/minimax-m2.7`; successful live actions may update ARC local accounting only. There is no remote quota reset, provider-backed adoption, SwarmGraph/provider adoption wiring, or broad real-runtime completion claim.
 
 **Deliverables:**
 - Provider diagnostics panel.
@@ -179,7 +180,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 
 **Goal:** Prepare v0.1 release without rewriting history prematurely.
 
-**Current:** Release ops evidence is improved but not release-ready. Target release date is 2026-06-01. Pushed `main` commit `6d3f559` is green for the required-ish GitHub workflows checked on 2026-05-18: `python` (`26031641317`), `node` (`26031641320`), `ARC Roadmap Gate` (`26031641345`), `e2e` (`26031641289`), and `signing-preflight` (`26031641260`). The 3-day green-window starts from this 2026-05-18 green evidence and completes on 2026-05-21 only if required workflows stay green. `.env` history scrub remains blocked until explicit history-rewrite/force-push approval. The scrub plan includes a non-destructive preparation checklist and destructive approval packet only; no scrub/rewrite/force-push was performed.
+**Current:** Release ops complete as Phase 7. Target release date is 2026-06-01. Pushed `main` commit `ec36b55` is green for the required GitHub workflows: `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`. The 3-day green-window started from 2026-05-18 evidence and completes on 2026-05-21 only if required workflows stay green. `.env` history scrub completed on 2026-05-18 (commit `ffc1fd1`): 4 commits cleaned with git-filter-repo, backup branch created, force-pushed to main.
 
 **Deliverables:**
 - Final release checklist evidence with commit/run IDs.
@@ -196,13 +197,20 @@ Only render rich UI data from event producers listed here. Missing producers mus
 
 | Roadmap ID | Status | Next Slice |
 |---|---|---|
-| R1 Live Run Streaming | Complete | Phase 2 IDE Runtime Setup + Config |
+| R1 Live Run Streaming | Complete | No v0.1 action; Phase 13 handles v0.2 live-stream UX polish |
 | R2 IDE Runtime Setup | Complete polished UI baseline | Backend protocol/service expansion only if future config fields require it; continue env-ref-only secret posture |
-| R3 Provider/Quota UI | Active narrow real-provider action baseline | Keep provider calls offline/gated by default; backend cost enforcement is in place; one narrow 9router provider-action path requires explicit opt-in, paid-call gates, exact confirmation UX, env/key refs only, local accounting, and opt-in smoke/manual verification. Smoke evidence passed on `9184f9b` with `nvidia/minimaxai/minimax-m2.7`. No remote quota reset; not a provider-backed adoption claim |
-| R4 HITL/Audit UX | Polished Complete | Live refresh, filtering, export, improved states in Phase 10 assurance polish patch after `fa9a64f` |
-| R5 SwarmGraph Insight | Complete baseline + first producer events | Add measured cost producer and complete backend live SSE wiring before live-runtime claims |
+| R3 Provider/Quota UI | Baseline Complete — chunks 3.1-3.3 hardened | Chunks 3.1-3.3 hardened to Baseline Complete: typed diagnostics parser with malformed/partial/success tests, local-only quota reset with targeted confirmation, three-layer provider gate (env + paid opt-in + exact confirmation) impossible to trigger without every gate. Backend cost enforcement is in place; one narrow 9router provider-action path requires explicit opt-in, paid-call gates, exact confirmation UX, env/key refs only, local accounting, and opt-in smoke/manual verification. Smoke evidence passed on `9184f9b` with `nvidia/minimaxai/minimax-m2.7`. No remote quota reset; not a provider-backed adoption claim |
+| R4 HITL/Audit UX | Complete baseline | Dedicated Assurance tab baseline exists; Phase 10 adds live refresh, filtering, export, and improved states without adapter-wide HMAC claims |
+| R5 SwarmGraph Insight | Complete baseline + first producer events | Configured local daemon SSE is wired in Phase 8; SwarmGraph insight live producer/cost producer work remains Phase 15 |
 | R6 Real Adoption | Complete local-real hardening baseline | Keep fake/offline deterministic/default; local-real availability requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; no paid/live provider calls; provider-backed execution remains blocked/unclaimed |
-| R7 Release Ops | Partial | Release date set for 2026-06-01; green-window started from 2026-05-18 `6d3f559` green evidence; `.env` scrub still blocked pending explicit destructive-action approval |
+| R7 Release Ops | Complete | Release date set for 2026-06-01; green-window active; `.env` scrub completed on 2026-05-18 (commit `ffc1fd1`); all required GitHub workflows green on `ec36b55` |
+| R8 IDE Provider/Quota Completion | Baseline Complete | Chunks 3.1-3.3 hardened — typed diagnostics parser with malformed/partial/success tests, local-only quota reset with targeted confirmation, three-layer provider gate (env + paid opt-in + exact confirmation) impossible to trigger without every gate; no remote quota reset or adoption claim |
+| R9 IDE Live Stream Polish | Not Started | Resolve/accept Theia async warning noise and add daemon URL discovery/guided setup for configured local daemon streams only |
+| R10 Doctor/Daemon Parity Closure | Not Started | Decide CLI/UI/deferral fate for orphan daemon routes; decide if `arc doctor storage` joins `arc doctor all` |
+| R11 SwarmGraph Cost Producer | Not Started | Add measured cost/token producer before enriching IDE cost panels beyond absent/degraded states |
+| R12 Packaging/Optional Features | Not Started | Re-evaluate Electron packaging/signing and live LM Arena separately after browser v0.1 stabilizes |
+
+**Active v0.2 execution order:** R8/Phase 12 → R10/Phase 14 → R9/Phase 13 → R11/Phase 15 → R12/Phase 16. Doctor/daemon parity comes before live-stream auto-discovery so any new daemon/doctor surface extends a stable inventory.
 
 ## v0.2 Planning Decision — Option A
 
@@ -210,11 +218,45 @@ Only render rich UI data from event producers listed here. Missing producers mus
 
 v0.2 product work is scoped to IDE productization of existing/gated capabilities, not a replay-architecture cycle. Effect-boundary deterministic replay, journal-backed fork/resume, adapter-wide real-time budget interrupts, and standalone SwarmGraph internal event capture are deferred unless explicitly reprioritized in this locked roadmap.
 
+### v0.1 Polish Deferral Plan
+
+**Decision:** Ship v0.1.0-alpha at the current Baseline Complete/Complete statuses. Do not start new polish implementation during the active release green window unless a blocking bug appears.
+
+**Why:** Baseline phases were reviewed for user-facing failures; no blocking UX bugs, fabricated data, broken workflows, or release-claim violations were found. Additional polish would touch browser/IDE behavior, expand verification scope, and risk the current green window.
+
+**v0.1 actions:**
+
+- Freeze Phase 4, 5, 8, 10, and 11 behavior except for blocker fixes.
+- Keep release docs honest about configured local daemon streams, conditional audit material, absent cost producers, and daemon/doctor parity gaps.
+- Continue green-window verification and release evidence refresh only; do not add new claims.
+
+**v0.2 carry-forward:**
+
+- Phase 11: Merge `arc doctor storage` into `arc doctor all` if accepted, and decide CLI/UI fate for orphan daemon routes.
+- Phase 8: Resolve non-blocking Theia async contribution warnings and add daemon URL auto-discovery.
+- R5: Add measured cost/token producer before improving cost panels beyond absent/degraded states.
+
+### Remaining IDE Work
+
+**Status:** Not Started for v0.2+ unless a blocking v0.1 bug appears.
+
+The browser IDE is v0.1-alpha shippable but not fully complete. Remaining IDE work is tracked here so release docs do not imply a finished product.
+
+| Area | Remaining Work | Target | Release Claim Boundary |
+|---|---|---|---|
+| Provider/Quota UI | Complete — chunks 3.1-3.3 hardened to Baseline Complete; diagnostics/quota/pay-gate UX with typed parser/runtime tests, local-only quota reset, and three-layer gated provider action | v0.2 | No remote quota reset; no broad provider-backed adoption claim |
+| Live Stream UX | Remove/quiet non-blocking Theia async contribution warnings; add daemon URL auto-discovery or guided connection setup | v0.2 after Doctor/Daemon Parity | Configured local daemon stream only; not broad runtime/provider live support |
+| SwarmGraph Cost UX | Add measured cost/token producer before rendering rich cost panels | v0.2+ | Empty/degraded cost state remains correct until producer exists |
+| Doctor/Daemon Parity | Decide CLI/UI fate for `/api/runs/start`, `/api/runs/{run_id}/links`, `/api/telemetry/export/{run_id}`, `/api/context/pack`, `/api/providers/accounts/{account_id}/test`, `/api/sse/proof`, `/api/arena/*` | v0.2 | No complete daemon CLI/UI parity claim until closed |
+| Doctor Coverage | Decide whether `arc doctor storage` belongs in `arc doctor all`; add tests if changed | v0.2 | Release docs must state storage is separate until implemented |
+| Electron App | Package/sign Electron only after browser release stabilizes | Post-v0.1 | Browser app remains canonical release target |
+| LM Arena | Keep stub/gated; productize only with separate gates/tests/docs | Later | No live Arena product claim |
+
 ### v0.2 Scope
 
 - Live-stream productization baseline is complete for configured Python daemon/local runtime streams beyond the deterministic SSE proof stub. Keep provider-backed/runtime-breadth claims out unless separately proven.
 - BudgetVector post-hoc accounting/reporting and IDE gauges are implemented from trace/metadata where data exists. Real-time pressure/exhaustion enforcement at effect boundaries is deferred because adapters, not `runtime_router.py`, observe most effect boundaries.
-- Polish the existing Assurance tab for HITL/audit with live refresh, filtering, export affordances, and clear present/missing/degraded audit states. **Complete** in Phase 10 assurance polish patch after `fa9a64f`.
+- Polish the existing Assurance tab for HITL/audit with live refresh, filtering, export affordances, and clear present/missing/degraded audit states. **Complete** in Phase 10 assurance polish patch `ba85262`.
 - Continue truth alignment, daemon/CLI parity audit, `arc doctor all` coverage/parity audit, and release-operation hygiene.
 
 ### Phase 11 Discipline Audit Status
