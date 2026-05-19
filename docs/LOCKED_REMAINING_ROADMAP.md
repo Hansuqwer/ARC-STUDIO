@@ -208,15 +208,15 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | R9 IDE Live Stream Polish | Baseline Complete | Daemon URL auto-discovery (loopback probe of 127.0.0.1:7777, no background connections), async warning fingerprint test + documentation, 3-tier fallback in SwarmGraphInsightTab (manual → ARC_PYTHON_DAEMON_URL → loopback probe) |
 | R10 Doctor/Daemon Parity Closure | Baseline Complete | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added; all orphan routes have explicit fate labels (`ui-deferred`, `daemon-only-deprecated`, or CLI added); no docs imply complete parity |
 | R11 SwarmGraph Cost Producer | Baseline Complete | Schema updated with model/promptTokens/completionTokens/source; measured is ISO timestamp; langgraph+swarmgraph emits measured cost/token events; UI renders new fields gated on explicit events; tests cover no-producer/partial/malformed/producer-backed states |
-| R12 Packaging/Optional Features | Baseline Complete | ADR-008 accepted (daemon-bundling plan); electron-builder configs + signing preflight exist and guard release-config signing drift; check-pr.sh validates required signing keys; LM Arena live productization is deferred; Electron packaging/daemon bundling remains post-browser-v0.1 work |
+| R12 Packaging/Optional Features | Baseline Complete | ADR-008 accepted (daemon-bundling plan); electron-builder configs + signing preflight exist and guard release-config signing drift; check-pr.sh validates required signing keys; LM Arena live productization is deferred; Electron packaging/daemon bundling is active per the Active Work Ledger |
 
-**v0.2 execution order (all Baseline Complete, no active implementation):** R8/Phase 12 → R10/Phase 14 → R9/Phase 13 → R11/Phase 15 → R12/Phase 16. Doctor/daemon parity comes before live-stream auto-discovery so any new daemon/doctor surface extends a stable inventory. Electron packaging/daemon bundling implementation for R12/Phase 16 is deferred to post-browser-v0.1.
+**v0.2 execution order (active implementation resumed):** R8/Phase 12 → R10/Phase 14 → R9/Phase 13 → R11/Phase 15 → R12/Phase 16. Doctor/daemon parity comes before live-stream auto-discovery so any new daemon/doctor surface extends a stable inventory. Electron packaging/daemon bundling for R12/Phase 16 is active per the Active Work Ledger.
 
 ## v0.2 Planning Decision — Option A
 
 **Status:** Accepted planning input, subordinate to this locked roadmap and `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`.
 
-v0.2 product work is scoped to IDE productization of existing/gated capabilities, not a replay-architecture cycle. Effect-boundary deterministic replay, journal-backed fork/resume, adapter-wide real-time budget interrupts, and standalone SwarmGraph internal event capture are deferred unless explicitly reprioritized in this locked roadmap.
+v0.2 product work includes IDE productization of existing/gated capabilities plus the newly activated items in the Active Work Ledger (effect-boundary replay, BudgetVector interrupts, SwarmGraph internal capture, broad provider-backed adoption, new adapters, Electron packaging). Live LM Arena remains deferred.
 
 ### v0.1 Polish Deferral Plan
 
@@ -236,7 +236,7 @@ v0.2 product work is scoped to IDE productization of existing/gated capabilities
 
 ### Remaining IDE Work
 
-**Status:** Baseline Complete | Evidence: `7a300fe` (all 5 workflows green) | Notes: R8/R9/R10/R11/R12 are Baseline Complete; Electron packaging/daemon bundling and live LM Arena implementation remain deferred per the Deferred Ledger.
+**Status:** Baseline Complete | Evidence: `7a300fe` (all 5 workflows green) | Notes: R8/R9/R10/R11/R12 are Baseline Complete; live LM Arena implementation remains deferred; Electron packaging/daemon bundling and all deferred items are now active per the Active Work Ledger.
 
 The browser IDE is v0.1-alpha shippable but not fully complete. Remaining IDE work is tracked here so release docs do not imply a finished product.
 
@@ -247,8 +247,8 @@ The browser IDE is v0.1-alpha shippable but not fully complete. Remaining IDE wo
 | SwarmGraph Cost UX | Baseline Complete — `langgraph+swarmgraph` produces measured cost/token events with provider/model/promptTokens/completionTokens/totalCost/source/ISO timestamp; UI renders all fields gated on explicit events; absent/degraded states preserved for missing/incomplete data | v0.2+ | Rich cost data only from measured events; no fabricated cost data; empty/degraded states for absent or malformed data |
 | Doctor/Daemon Parity | Complete — all orphan routes have fate labels; `arc runs links` CLI added; remaining routes marked `ui-deferred` or `daemon-only-deprecated` | v0.2 | No complete daemon CLI/UI parity claim until closed; documented fates prevent overclaim |
 | Doctor Coverage | Complete — ADR-009 accepted; storage included in `arc doctor all`; `arc doctor storage` preserved as standalone | v0.2 | Release docs must accurately reflect storage inclusion status |
-| Electron App | Package/sign Electron only after browser release stabilizes | Post-v0.1 | Browser app remains canonical release target |
-| LM Arena | Deferred — keep stub/gated; productize only with separate plan, gates, tests, and docs | Later | No live Arena product claim |
+| Electron App | Not Started — package/sign Electron per ADR-008 daemon-bundling plan | v0.2 | Browser app remains canonical release target |
+| LM Arena | Deferred — keep stub/gated; productize only with separate plan, gates, tests, and docs | Deferred | No live Arena product claim |
 
 ### v0.2 Scope
 
@@ -265,20 +265,18 @@ The browser IDE is v0.1-alpha shippable but not fully complete. Remaining IDE wo
 
 Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/eval routes have CLI analogs or active UI consumers. All remaining orphan surfaces now have explicit fate labels: `/api/runs/start` → `ui-deferred` (UI uses CLI `arc run`), `/api/runs/{run_id}/links` → CLI `arc runs links` added, `/api/telemetry/export/{run_id}` → `daemon-only-deprecated`, `/api/context/pack` → already has CLI `arc context pack`, `/api/providers/accounts/{account_id}/test` → `daemon-only-deprecated`, `/api/sse/proof` → `daemon-only-deprecated`, `/api/arena/*` → `daemon-only-deprecated`. No docs imply complete parity unless all gaps are closed.
 
-### Deferred From v0.2
+### Deferred From v0.2 (only)
 
-- Effect-boundary replay and `arc runs fork` over journaled adapter responses.
-- Adapter-wide BudgetVector interrupts and hard enforcement at model/tool-call boundaries.
-- New adapters or adapter status upgrades without corresponding IDE views.
-- Live LM Arena and Electron release packaging.
+- Live LM Arena.
 
 ## Deferred Ledger
 
-| Item | Deferred Until | Unblock Gate |
+| Item | Status | Action |
 |---|---|---|
-| Effect-boundary replay / journal-backed fork | v0.3+ | Adapter/effect instrumentation is explicitly in scope. |
-| Real-time BudgetVector pressure/exhaustion interrupts | v0.3+ | Effect-boundary data is observable for the target runtime path. |
-| Standalone SwarmGraph internal topology/consensus capture | Later productization | ARC can consume real emitted events from standalone SwarmGraph, not fabricated summaries. |
-| Broad provider-backed adoption | Later productization | Provider gates, privacy gates, tests, and IDE views are all present. |
-| New adapters | Later roadmap | IDE views and support burden are explicitly accepted. |
-| Electron release packaging | Post-browser release | Browser release gates are stable and packaging/signing is reprioritized. |
+| Effect-boundary replay / journal-backed fork | Not Started | Implement `arc runs fork` over journaled adapter responses. |
+| Real-time BudgetVector pressure/exhaustion interrupts | Not Started | Implement adapter-wide BudgetVector hard enforcement at model/tool-call boundaries. |
+| Standalone SwarmGraph internal topology/consensus capture | Not Started | ARC consumes real emitted events from standalone SwarmGraph. |
+| Broad provider-backed adoption | Not Started | Extend provider gates, privacy gates, tests, and IDE views for provider-backed execution. |
+| New adapters | Not Started | Implement adapter status upgrades with corresponding IDE views. |
+| Electron release packaging | Not Started | Package/sign Electron after browser release stabilizes (daemon bundling per ADR-008). |
+| Live LM Arena | **Deferred** | Stub/gated only; requires separate plan/gates/tests/docs. |

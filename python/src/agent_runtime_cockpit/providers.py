@@ -516,8 +516,23 @@ def check_provider_cost_gate(request: ProviderRequest, env: dict[str, str] | Non
     )
 
 
+def _is_openai_compatible(definition: ProviderDefinition) -> bool:
+    """Check if a provider definition supports OpenAI-compatible chat completion."""
+    return (
+        definition.supports_chat
+        and bool(definition.default_base_url)
+        and definition.auth_kind
+        in (ProviderAuthKind.API_KEY, ProviderAuthKind.BEARER_TOKEN, ProviderAuthKind.LOCAL)
+    )
+
+
 def run_provider_action(request: ProviderActionRequest, env: dict[str, str] | None = None) -> ProviderActionResult:
-    """Narrow provider-backed action contract. Closed/fake unless every gate passes."""
+    """Narrow provider-backed action contract. Closed/fake unless every gate passes.
+
+    Supports all OpenAI-compatible chat completion providers (those with
+    ``supports_chat``, a ``default_base_url``, and API_KEY/BEARER_TOKEN/LOCAL auth).
+    Non-OpenAI-compatible providers remain closed smoke scaffolds.
+    """
     env = env or os.environ
     routing = ProviderRoutingStore().get()
     provider = request.provider or routing.default_provider
@@ -561,8 +576,11 @@ def run_provider_action(request: ProviderActionRequest, env: dict[str, str] | No
             metadata={"key_ref_source": source, "provider_status": definition.status},
         )
 
-    if provider == "9router":
-        return _run_openai_compatible_chat_completion(request, definition, model, source or "", env, quota)
+    # Route to OpenAI-compatible chat completion for any supported provider
+    if _is_openai_compatible(definition):
+        return _run_openai_compatible_chat_completion(
+            request, definition, model, source or "", env, quota
+        )
 
     return ProviderActionResult(
         provider=provider,
@@ -628,7 +646,7 @@ def _run_openai_compatible_chat_completion(
         dry_run=False,
         real_provider_call=True,
         network_call_attempted=True,
-        message="Gated 9router chat completion smoke succeeded.",
+        message=f"Gated {definition.id} chat completion smoke succeeded.",
         accounting={"scope": "provider_reported_usage", "usage": usage, **quota},
         metadata={"key_ref_source": key_source, "provider_status": definition.status, "confirmation": "accepted", "http_status": status, "choice_count": choice_count},
     )

@@ -380,9 +380,35 @@ class SwarmGraphAdapter(RuntimeAdapter):
                 },
             )
 
-        events.append(self._event(run_id, 1, "NODE_COMPLETED", {"node": "swarmgraph.cli", "status": payload.get("status")}))
-        events.append(self._event(run_id, 2, "MESSAGE", {"output": payload.get("final_output", "")}))
-        events.append(self._event(run_id, 3, "RUN_COMPLETED", {"swarm_id": payload.get("swarm_id"), "worker_count": payload.get("worker_count", 0)}))
+        # Emit standalone SwarmGraph topology from worker_count
+        worker_count = int(payload.get("worker_count", 0))
+        topology_nodes = [{"id": "queen", "role": "queen", "label": "SwarmGraph Queen"}]
+        topology_edges: list[dict[str, str]] = []
+        for i in range(worker_count):
+            worker_id = f"worker-{i + 1}"
+            topology_nodes.append({"id": worker_id, "role": "worker", "label": worker_id})
+            topology_edges.append({"source": "queen", "target": worker_id, "type": "assignment"})
+        events.append(self._event(run_id, 1, "SWARMGRAPH_TOPOLOGY", {
+            "nodes": topology_nodes,
+            "edges": topology_edges,
+            "source": "swarmgraph_standalone",
+            "task_id": payload.get("swarm_id", ""),
+            "worker_count": worker_count,
+        }))
+
+        # Emit standalone SwarmGraph consensus from swarm status
+        events.append(self._event(run_id, 2, "SWARMGRAPH_CONSENSUS", {
+            "task_id": payload.get("swarm_id", ""),
+            "consensus_reached": payload.get("status") == "completed",
+            "confidence": 1.0 if payload.get("status") == "completed" else 0.0,
+            "strategy": "standalone_swarmgraph",
+            "voters": [f"worker-{i + 1}" for i in range(worker_count)],
+            "source": "swarmgraph_standalone",
+        }))
+
+        events.append(self._event(run_id, 3, "NODE_COMPLETED", {"node": "swarmgraph.cli", "status": payload.get("status")}))
+        events.append(self._event(run_id, 4, "MESSAGE", {"output": payload.get("final_output", "")}))
+        events.append(self._event(run_id, 5, "RUN_COMPLETED", {"swarm_id": payload.get("swarm_id"), "worker_count": worker_count}))
         return RunRecord(
             id=run_id,
             workflow_id=workflow_id,

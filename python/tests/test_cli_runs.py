@@ -4,6 +4,7 @@ import json
 from typer.testing import CliRunner
 
 from agent_runtime_cockpit.cli import app
+from agent_runtime_cockpit.protocol.schemas import RunRecord, RunStatus
 
 
 def test_run_command_persists_trace_in_workspace(monkeypatch, tmp_path):
@@ -759,3 +760,104 @@ def test_runs_links_reports_not_found(tmp_path):
     data = json.loads(result.output)
     assert data["ok"] is False
     assert data["error"]["code"] == "RUN_NOT_FOUND"
+
+
+# ─── runs fork ────────────────────────────────────────────────────────────────
+
+
+def test_runs_fork_creates_new_run_from_existing(tmp_path):
+    """`arc runs fork <runId>` creates a new pending run with fork metadata."""
+    from agent_runtime_cockpit.orchestration.events import new_run_id, now, event
+    from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    traces_dir = ws / ".arc" / "traces"
+    traces_dir.mkdir(parents=True)
+    store = JsonlTraceStore(traces_dir)
+
+    # Create a source run
+    source_id = new_run_id(prefix="run")
+    source_record = RunRecord(
+        id=source_id,
+        workflow_id="wf-test",
+        runtime="swarmgraph",
+        status=RunStatus.COMPLETED,
+        started_at=now(),
+        ended_at=now(),
+        events=[
+            event(source_id, 0, "RUN_STARTED", {"workflow_id": "wf-test", "runtime": "swarmgraph"}),
+            event(source_id, 1, "STEP_STARTED", {"step_id": "s1", "step_name": "load"}),
+        ],
+        metadata={"original": True},
+    )
+    store.save(source_record)
+
+    # Fork it
+    result = CliRunner().invoke(app, ["runs", "fork", source_id, "--workspace", str(ws), "--json"])
+    assert result.exit_code == 0, f"exit {result.exit_code}: {result.output[:500]}"
+    data = json.loads(result.output)["data"]
+
+    assert data["source_id"] == source_id
+    assert data["workflow_id"] == "wf-test"
+    assert data["runtime"] == "swarmgraph"
+    assert data["event_count"] == 2  # Only RUN_STARTED + STEP_STARTED
+    assert data["status"] == "pending"
+    assert data["metadata"]["forked_from"] == source_id
+    assert "forked_at" in data["metadata"]
+
+    # Verify fork exists in store
+    fork_id = data["fork_id"]
+    fork_record = store.load(fork_id)
+    assert fork_record is not None
+    assert fork_record.status == RunStatus.PENDING
+    assert fork_record.metadata["forked_from"] == source_id
+
+    # Verify source has fork reference
+    source_updated = store.load(source_id)
+    assert source_updated is not None
+    assert fork_id in source_updated.metadata.get("forked_to", [])
+
+
+def test_runs_fork_reports_not_found(tmp_path):
+    """`arc runs fork <missingId> --json` exits 1 for missing run."""
+    result = CliRunner().invoke(app, ["runs", "fork", "missing-run", "--workspace", str(tmp_path), "--json"])
+    assert result.exit_code == 1
+    data = json.loads(result.output)
+    assert data["ok"] is False
+    assert data["error"]["code"] == "RUN_NOT_FOUND"
+
+
+def test_runs_fork_preserves_workflow_and_runtime(tmp_path):
+    """Fork preserves workflow_id and runtime from source."""
+    from agent_runtime_cockpit.orchestration.events import new_run_id, now, event
+    from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    traces_dir = ws / ".arc" / "traces"
+    traces_dir.mkdir(parents=True)
+    store = JsonlTraceStore(traces_dir)
+
+    source_id = new_run_id(prefix="run")
+    source_record = RunRecord(
+        id=source_id,
+        workflow_id="crewai-workflow",
+        runtime="crewai+swarmgraph",
+        status=RunStatus.FAILED,
+        started_at=now(),
+        ended_at=now(),
+        events=[
+            event(source_id, 0, "RUN_STARTED", {"workflow_id": "crewai-workflow", "runtime": "crewai+swarmgraph"}),
+        ],
+        metadata={"tag": "original"},
+    )
+    store.save(source_record)
+
+    result = CliRunner().invoke(app, ["runs", "fork", source_id, "--workspace", str(ws), "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+
+    assert data["workflow_id"] == "crewai-workflow"
+    assert data["runtime"] == "crewai+swarmgraph"
+    assert data["source_event_count"] == 1

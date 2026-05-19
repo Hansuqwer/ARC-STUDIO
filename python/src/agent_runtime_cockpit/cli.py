@@ -38,6 +38,7 @@ from .gating import GatingError
 from .orchestration import runtime_router
 from .protocol.envelope import ok, err, ArcEnvelope
 from .protocol.errors import ArcErrorCode
+from .protocol.schemas import RunRecord, RunStatus
 from .security.validation import validate_workspace_path
 from .workspace import iter_workspace_files
 
@@ -1758,6 +1759,84 @@ def runs_search(
                 run.get("started_at", "")[:19],
             )
         console.print(table)
+
+
+@runs_app.command("fork")
+def runs_fork(
+    run_id: str = typer.Argument(..., help="Run ID to fork"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Fork a stored run by copying its initial state into a new run record.
+
+    Creates a new run with the same workflow_id, runtime, and initial event
+    data (RUN_STARTED + first N events) as the source run. The new run has
+    a fresh ID and status of PENDING — it can be re-executed as a fork of
+    the original.
+
+    This is the CLI foundation for effect-boundary replay / journal-backed
+    fork over stored adapter responses.
+    """
+    _setup_logging(debug)
+    from .storage.jsonl import JsonlTraceStore
+    from .orchestration.events import new_run_id, now
+
+    ws = _workspace(workspace)
+    store = JsonlTraceStore(ws / ".arc" / "traces")
+    source = store.load(run_id)
+    if source is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
+        raise typer.Exit(1)
+
+    # Create fork — new ID, same workflow/runtime, fresh status
+    new_id = new_run_id(prefix="fork")
+    fork_events = [
+        event for event in source.events
+        if event.type in {"RUN_STARTED", "STEP_STARTED"}
+    ]
+    if not fork_events:
+        # If no lifecycle events, just copy the first event
+        fork_events = source.events[:1] if source.events else []
+
+    # Re-create RUN_STARTED with fork metadata
+    fork_record = RunRecord(
+        id=new_id,
+        workflow_id=source.workflow_id,
+        runtime=source.runtime,
+        status=RunStatus.PENDING,
+        started_at=now(),
+        events=fork_events,
+        metadata={
+            **source.metadata,
+            "forked_from": run_id,
+            "forked_at": now(),
+            "original_status": source.status.value,
+        },
+    )
+    store.save(fork_record)
+
+    payload = {
+        "fork_id": new_id,
+        "source_id": run_id,
+        "workflow_id": source.workflow_id,
+        "runtime": source.runtime,
+        "event_count": len(fork_events),
+        "source_event_count": len(source.events),
+        "status": "pending",
+        "metadata": fork_record.metadata,
+    }
+    _out(ok(payload, workspace=str(ws)), json_output)
+    if not json_output:
+        console.print(f"[green]Fork created:[/green] {new_id}")
+        console.print(f"  Source: {run_id} ({source.status.value})")
+        console.print(f"  Workflow: {source.workflow_id}")
+        console.print(f"  Runtime: {source.runtime}")
+        console.print(f"  Events: {len(fork_events)} (of {len(source.events)} source events)")
+
+    # Update source metadata to record the fork
+    source.metadata["forked_to"] = source.metadata.get("forked_to", []) + [new_id]
+    store.save(source)
 
 
 @runs_app.command("links")

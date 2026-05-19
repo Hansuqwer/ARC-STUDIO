@@ -2,6 +2,8 @@ from agent_runtime_cockpit.providers import (
     DEFAULT_ROUTING,
     PROVIDERS,
     ProviderAccountStore,
+    ProviderAuthKind,
+    ProviderDefinition,
     ProviderQuotaStore,
     ProviderRequest,
     ProviderActionRequest,
@@ -13,6 +15,7 @@ from agent_runtime_cockpit.providers import (
     provider_statuses,
     redact,
     run_provider_action,
+    _is_openai_compatible,
 )
 
 
@@ -230,3 +233,274 @@ def test_9router_mocked_live_action_succeeds_with_all_gates(monkeypatch, tmp_pat
     assert seen["url"] == "http://localhost:20128/v1/chat/completions"
     assert seen["auth"] == "Bearer sk-test-should-not-emit"
     assert "sk-test-should-not-emit" not in dumped
+
+
+# ─── Broad Provider-Backed Adoption Tests ──────────────────────────────────
+
+
+def test_openai_compatible_provider_dry_run_no_network(monkeypatch, tmp_path):
+    """OpenAI-compatible provider dry-run makes no network call."""
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
+    monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(tmp_path / "providers.json"))
+
+    def fail_urlopen(*_args, **_kwargs):
+        raise AssertionError("network must not be attempted")
+
+    monkeypatch.setattr("urllib.request.urlopen", fail_urlopen)
+    result = run_provider_action(
+        ProviderActionRequest(
+            provider="openai",
+            model="gpt-4.1-mini",
+            dry_run=True,
+        ),
+        {"OPENAI_API_KEY": "sk-test-should-not-emit"},
+    )
+    assert result.dry_run is True
+    assert result.real_provider_call is False
+    assert result.network_call_attempted is False
+    assert "No network call" in result.message
+
+
+def test_openai_compatible_provider_mocked_live_action_succeeds(monkeypatch, tmp_path):
+    """OpenAI-compatible provider (openai) live action succeeds with all gates."""
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
+    monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(tmp_path / "providers.json"))
+    seen = {}
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return b'{"choices":[{"message":{"content":"ok"}}],"usage":{"total_tokens":3}}'
+
+    def fake_urlopen(req, timeout):
+        seen["url"] = req.full_url
+        seen["auth"] = req.headers.get("Authorization")
+        seen["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    result = run_provider_action(
+        ProviderActionRequest(
+            provider="openai",
+            model="gpt-4.1-mini",
+            dry_run=False,
+            allow_paid_calls=True,
+            confirmation="RUN_PROVIDER_ACTION:openai:gpt-4.1-mini",
+        ),
+        {"ARC_ALLOW_LIVE_PROVIDER_TESTS": "true", "OPENAI_API_KEY": "sk-test-openai"},
+    )
+    assert result.real_provider_call is True
+    assert result.network_call_attempted is True
+    assert result.accounting["usage"] == {"total_tokens": 3}
+    assert "openai" in result.message
+    assert seen["url"] == "https://api.openai.com/v1/chat/completions"
+
+
+def test_qwen_provider_mocked_live_action_succeeds(monkeypatch, tmp_path):
+    """Qwen (OpenAI-compatible) provider live action succeeds with all gates."""
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
+    monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(tmp_path / "providers.json"))
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return b'{"choices":[{"message":{"content":"ok"}}],"usage":{"total_tokens":5}}'
+
+    def fake_urlopen(req, **kwargs):
+        return FakeResponse()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    result = run_provider_action(
+        ProviderActionRequest(
+            provider="qwen",
+            model="qwen-plus",
+            dry_run=False,
+            allow_paid_calls=True,
+            confirmation="RUN_PROVIDER_ACTION:qwen:qwen-plus",
+        ),
+        {"ARC_ALLOW_LIVE_PROVIDER_TESTS": "true", "QWEN_API_KEY": "sk-test-qwen"},
+    )
+    assert result.real_provider_call is True
+    assert result.network_call_attempted is True
+    assert result.accounting["usage"] == {"total_tokens": 5}
+    assert "qwen" in result.message
+
+
+def test_openrouter_provider_mocked_live_action_succeeds(monkeypatch, tmp_path):
+    """OpenRouter (OpenAI-compatible) provider live action succeeds."""
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
+    monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(tmp_path / "providers.json"))
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return b'{"choices":[{"message":{"content":"ok"}}],"usage":{"total_tokens":2}}'
+
+    def fake_urlopen(req, **kwargs):
+        return FakeResponse()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    result = run_provider_action(
+        ProviderActionRequest(
+            provider="openrouter",
+            model="openai/gpt-4.1-mini",
+            dry_run=False,
+            allow_paid_calls=True,
+            confirmation="RUN_PROVIDER_ACTION:openrouter:openai/gpt-4.1-mini",
+        ),
+        {"ARC_ALLOW_LIVE_PROVIDER_TESTS": "true", "OPENROUTER_API_KEY": "sk-test-or"},
+    )
+    assert result.real_provider_call is True
+    assert result.accounting["usage"] == {"total_tokens": 2}
+    assert "openrouter" in result.message
+
+
+def test_local_provider_dry_run_no_network(monkeypatch, tmp_path):
+    """Local provider (ollama) dry-run makes no network call."""
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
+
+    def fail_urlopen(*_args, **_kwargs):
+        raise AssertionError("network must not be attempted")
+
+    monkeypatch.setattr("urllib.request.urlopen", fail_urlopen)
+    result = run_provider_action(
+        ProviderActionRequest(
+            provider="ollama",
+            model="llama3.1",
+            dry_run=True,
+        ),
+        {},
+    )
+    assert result.dry_run is True
+    assert result.real_provider_call is False
+
+
+def test_research_only_provider_blocked_for_live(monkeypatch, tmp_path):
+    """Research-only provider (chatgpt-web) cannot make live calls."""
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
+    monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(tmp_path / "providers.json"))
+
+    def fail_urlopen(*_args, **_kwargs):
+        raise AssertionError("network must not be attempted")
+
+    monkeypatch.setattr("urllib.request.urlopen", fail_urlopen)
+    # Chat completion action should fail at the confirmation or key step
+    try:
+        run_provider_action(
+            ProviderActionRequest(
+                provider="chatgpt-web",
+                model="gpt-4",
+                dry_run=False,
+                allow_paid_calls=True,
+                confirmation="RUN_PROVIDER_ACTION:chatgpt-web:gpt-4",
+            ),
+            {"ARC_ALLOW_LIVE_PROVIDER_TESTS": "true"},
+        )
+    except RuntimeError as exc:
+        # Either key missing or the provider is not OpenAI-compatible
+        error_msg = str(exc)
+        assert any(
+            phrase in error_msg
+            for phrase in ["provider_key_env_missing", "No network call", "closed smoke scaffold"]
+        )
+    else:
+        # If it somehow returns, it should NOT have made a real provider call
+        pass
+
+
+def test_is_openai_compatible_classification():
+    """Verify _is_openai_compatible correctly classifies providers."""
+    openai_def = next(p for p in PROVIDERS if p.id == "openai")
+    assert _is_openai_compatible(openai_def) is True
+
+    qwen_def = next(p for p in PROVIDERS if p.id == "qwen")
+    assert _is_openai_compatible(qwen_def) is True
+
+    kimi_def = next(p for p in PROVIDERS if p.id == "kimi")
+    assert _is_openai_compatible(kimi_def) is True
+
+    local_def = next(p for p in PROVIDERS if p.id == "ollama")
+    assert _is_openai_compatible(local_def) is True
+
+    research_def = next(p for p in PROVIDERS if p.id == "chatgpt-web")
+    # Research-only: no base_url and supports_chat=False
+    assert _is_openai_compatible(research_def) is False
+
+    embedding_def = next(p for p in PROVIDERS if p.id == "voyage")
+    assert _is_openai_compatible(embedding_def) is False
+
+
+def test_openai_compatible_action_blocks_before_network_without_gates(monkeypatch, tmp_path):
+    """OpenAI-compatible provider live action blocked without env gate."""
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
+    monkeypatch.delenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", raising=False)
+
+    def fail_urlopen(*_args, **_kwargs):
+        raise AssertionError("network must not be attempted")
+
+    monkeypatch.setattr("urllib.request.urlopen", fail_urlopen)
+    try:
+        run_provider_action(
+            ProviderActionRequest(
+                provider="openai",
+                model="gpt-4.1-mini",
+                dry_run=False,
+                allow_paid_calls=True,
+                confirmation="RUN_PROVIDER_ACTION:openai:gpt-4.1-mini",
+            ),
+            {"OPENAI_API_KEY": "sk-test"},
+        )
+    except RuntimeError as exc:
+        assert str(exc) == "live_provider_calls_disabled"
+    else:
+        raise AssertionError("live action should require env gate")
+
+
+def test_broad_provider_action_dry_run_makes_no_network_call(monkeypatch, tmp_path):
+    """Verify ALL OpenAI-compatible providers skip network in dry-run mode."""
+    monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
+    monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(tmp_path / "providers.json"))
+
+    def fail_urlopen(*_args, **_kwargs):
+        raise AssertionError("network must not be attempted")
+
+    monkeypatch.setattr("urllib.request.urlopen", fail_urlopen)
+
+    openai_compatible_ids = [
+        p.id for p in PROVIDERS
+        if _is_openai_compatible(p)
+    ]
+
+    for provider_id in openai_compatible_ids:
+        result = run_provider_action(
+            ProviderActionRequest(
+                provider=provider_id,
+                model="test-model",
+                dry_run=True,
+            ),
+            {},
+        )
+        assert result.dry_run is True, f"{provider_id} dry-run should be true"
+        assert result.real_provider_call is False, f"{provider_id} should not make real call"
+        assert result.network_call_attempted is False, f"{provider_id} should not attempt network"
