@@ -37,6 +37,23 @@ if git grep -nE 'forceCodeSigning:[[:space:]]*false' -- \
   exit 1
 fi
 
+# Validate release config has required signing keys (mirrors require-electron-signing.mjs release_config check)
+RELEASE_CONFIG='applications/electron/electron-builder.release.yml'
+SIGNING_PATTERNS=(
+  'forceCodeSigning:\s*true'
+  'hardenedRuntime:\s*true'
+  'gatekeeperAssess:\s*false'
+  'verifyUpdateCodeSignature:\s*true'
+  'signAndEditExecutable:\s*true'
+  'requestedExecutionLevel:\s*"asInvoker"'
+)
+for pat in "${SIGNING_PATTERNS[@]}"; do
+  if ! grep -qE "$pat" "$RELEASE_CONFIG"; then
+    echo "ERROR: Release config missing required signing key: $pat"
+    exit 1
+  fi
+done
+
 if git grep -n 'swarmgraph-stub.sh' -- \
   ':(exclude).github/workflows/e2e.yml' \
   ':(exclude)docs/**' \
