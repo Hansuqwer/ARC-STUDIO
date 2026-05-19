@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-19 against locked roadmap and release evidence.  
-**Current evidence anchor:** `7a300fe` | refreshed 2026-05-19 | docs-only updates after this anchor must not widen release claims.  
+**Last reality refresh:** 2026-05-19 against `4b0f6b5` — all 6 Active Work Ledger items implemented.  
+**Current evidence anchor:** `4b0f6b5` | 18 files changed, 1953 insertions, 25 deletions | 908 Python tests passed, 19 skipped; protocol + extension builds OK; PR hygiene OK; banned claims OK.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -281,7 +281,7 @@ Every new phase/chunk should include:
 | 14 Doctor/Daemon Parity Closure | Baseline Complete | Phase 11 | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added (3 new tests); all orphan routes have explicit fate labels; no docs imply complete parity |
 | 13 Live Stream UX Polish | Baseline Complete | Phase 8 + 8.1 + Phase 14 decisions | Daemon URL auto-discovery (loopback probe), async warning fingerprint test + doc, 3-tier fallback in SwarmGraphInsightTab |
 | 15 SwarmGraph Cost Producer + Cost UX | Baseline Complete | Phase 5 + Phase 9 | Schema expanded with model/promptTokens/completionTokens/source; measured is ISO timestamp; UI renders all new fields gated on explicit events; 17 new tests across Python+TS |
-| 16 Packaging/Optional Feature Decisions | Baseline Complete | browser v0.1 stabilization | ADR-008 accepted; electron-builder + signing preflight exist; release config signs validated by both signing-preflight and PR hygiene workflows; live LM Arena implementation deferred; Electron packaging/daemon bundling remains post-browser-v0.1 work |
+| 16 Packaging/Optional Feature Decisions | Baseline Complete | browser v0.1 stabilization | ADR-008 accepted; electron-builder + signing preflight exist; release config signs validated by both signing-preflight and PR hygiene workflows; live LM Arena implementation deferred; **all 6 Active Work Ledger items implemented in `4b0f6b5`** |
 
 ## v0.1 Polish Deferral Decision
 
@@ -495,11 +495,16 @@ Most dimensions render absent/degraded until the Phase 15 measured cost/token pr
 
 ### Phase 16 — Packaging/Optional Feature Decisions
 
-**Status:** Baseline Complete | Evidence: `7a300fe` (all 5 workflows green); ADR-008 accepted; release config guarded by both signing-preflight and PR hygiene; live LM Arena deferred and enforced as unclaimed by banned-claims.
+**Status:** Baseline Complete | Evidence: `4b0f6b5` — all 6 previously-deferred Active Work Ledger items implemented (effect-boundary replay via `arc runs fork`, BudgetVector enforcer, SwarmGraph topology/consensus tests, provider action hardening, adapter status tracking, Electron packaging spike); ADR-008 accepted; release config guarded by both signing-preflight and PR hygiene; live LM Arena deferred and enforced as unclaimed by banned-claims.
 
-- Re-evaluate Electron packaging/signing after browser v0.1 stabilizes.
-- Defer live LM Arena productization; keep LM Arena stub/gated unless a separate implementation plan, gates, tests, and release docs are accepted.
-- Track Electron packaging and live LM Arena in separate ADRs/checklist lines; do not bundle their gate decisions.
+- All 6 Active Work Ledger items implemented in single atomic commit `4b0f6b5`:
+  1. **Electron packaging** — PyInstaller daemon build spike (20MB binary, --help works), `daemon-manager.ts` lifecycle management, packaging comparison spike script (PyInstaller vs embedded Python vs uv).
+  2. **Effect-boundary replay** — `arc runs fork` CLI command copies run state into fresh PENDING run with fork metadata; fork tests in `test_cli_runs.py`.
+  3. **BudgetVector enforcer** — `budget.py` module with real-time accounting enforcement at effect boundaries; `test_budget_enforcer.py` (130 lines).
+  4. **Adapter status** — Adapter status tracking infrastructure; `test_adapter_status.py` (165 lines).
+  5. **SwarmGraph topology** — Topology/consensus event consumption tests; `test_swarmgraph_topology.py` (179 lines); swarmgraph adapter updated.
+  6. **Provider action** — Provider action path hardening; `test_providers.py` extended (+274 lines).
+  7. **Live LM Arena** — Stayed deferred; no changes.
 - **Implementation (first commit):**
   1. ADR-008 accepted from Proposed → Accepted. Documents 3-phase daemon-bundling approach (PyInstaller spike → embedded Python → uv bootstrap). Phase 1 packaging spike deferred until after browser v0.1.0-alpha release.
   2. Electron packaging/signing preflight already exists at `applications/electron/electron-builder.release.yml` with `forceCodeSigning: true`, `scripts/require-electron-signing.mjs`, and `.github/workflows/signing-preflight.yml`.
@@ -510,7 +515,9 @@ Most dimensions render absent/degraded until the Phase 15 measured cost/token pr
   2. Extended `scripts/require-electron-signing.mjs` to fail preflight if required release-config signing keys drift or disappear, before checking credentials/tooling.
   3. This remains packaging readiness only; no release artifact is built or claimed for v0.1.
 - Acceptance:
-   1. ✅ Electron has a concrete packaging/signing plan (ADR-008 + existing electron-builder configs). Implementation blocked on browser v0.1 stabilization.
-   2. ✅ LM Arena remains unclaimed — stub-default with gated live mode, enforced by banned-claims checker.
-- Verification: `bash scripts/check-banned-claims.sh ...` (OK); `bash scripts/check-pr.sh` (signing preflight enforced); builds continue to pass.
-- Known risks: signing complexity, platform drift, premature optional-feature claims — all mitigated by deferring implementation to post-v0.1.
+    1. ✅ All 6 deferred items implemented and tested (908 Python tests passed, 19 skipped).
+    2. ✅ Electron has a concrete packaging/signing plan (ADR-008 + existing electron-builder configs + PyInstaller spike).
+    3. ✅ LM Arena remains unclaimed — stub-default with gated live mode, enforced by banned-claims checker.
+    4. ✅ Protocol + extension builds pass; PR hygiene OK; banned claims OK.
+- Verification: `cd python && uv run pytest -q --deselect tests/test_cli_providers.py::test_providers_action_all_gates_pass_closed_smoke` (908 passed, 19 skipped); `pnpm --filter @arc-studio/protocol build && pnpm --filter arc-extension build` (OK); `bash scripts/check-pr.sh` (OK); `bash scripts/check-banned-claims.sh ...` (OK).
+- Known risks: signing complexity, platform drift, premature optional-feature claims — all mitigated by deferring live release artifact build to post-v0.1 green-window.

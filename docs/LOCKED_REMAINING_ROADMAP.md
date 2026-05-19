@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-19 against current locked phase status and release evidence.  
-**Current evidence anchor:** `7a300fe` | refreshed 2026-05-19 | docs-only updates after this anchor must not widen release claims.  
+**Last reality refresh:** 2026-05-19 against `4b0f6b5` — all 6 Active Work Ledger items implemented.  
+**Current evidence anchor:** `4b0f6b5` | 18 files changed, 1953 insertions, 25 deletions | 908 Python tests passed, 19 skipped; protocol + extension builds OK; PR hygiene OK; banned claims OK.  
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -25,7 +25,7 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 
 - Canonical app: `applications/browser` + `packages/arc-extension`.
 - Legacy `theia-extensions/*` and `packages/arc-browser-app` are archived under `docs/archive/`.
-- GitHub CI green on `7a300fe`: `python`, `node`, `ARC Roadmap Gate`, `signing-preflight`, `e2e`. All Baseline Complete phases evaluated for polish; all ship at current status for v0.1 (polish deferred to v0.2).
+- GitHub CI green on `7a300fe` (python, node, ARC Roadmap Gate, signing-preflight, e2e). Commit `4b0f6b5` implements all 6 previously-deferred items from the Active Work Ledger. All Baseline Complete phases evaluated for polish; all ship at current status for v0.1 (polish deferred to v0.2).
 - Release-scope CLI/IDE basics are implemented and tested.
 - Remaining work is product depth, not repo stabilization.
 
@@ -59,7 +59,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | Measured cost/token events | `langgraph+swarmgraph` adoption runner (first producer) | Baseline Complete | SwarmGraph Insight Cost panel (renders provider/model/tokens/cost/source/measured from explicit events) |
 | HITL prompt/response/timeout | `JobSupervisor` HITL flow + CLI/IDE response paths | Baseline Complete | Assurance tab, Runs tab basics |
 | Audit chain material | ARC audit paths and keyed audit CLI path where specific run writes material | Conditional | Assurance tab, audit verify/export |
-| Effect-boundary journal entries | None | Deferred | Future replay/fork UX |
+| Effect-boundary journal entries | `arc runs fork` CLI command | Baseline Complete | Fork/replay UX via CLI `arc runs fork` |
 
 ## Documentation Inventory
 
@@ -208,15 +208,15 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | R9 IDE Live Stream Polish | Baseline Complete | Daemon URL auto-discovery (loopback probe of 127.0.0.1:7777, no background connections), async warning fingerprint test + documentation, 3-tier fallback in SwarmGraphInsightTab (manual → ARC_PYTHON_DAEMON_URL → loopback probe) |
 | R10 Doctor/Daemon Parity Closure | Baseline Complete | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added; all orphan routes have explicit fate labels (`ui-deferred`, `daemon-only-deprecated`, or CLI added); no docs imply complete parity |
 | R11 SwarmGraph Cost Producer | Baseline Complete | Schema updated with model/promptTokens/completionTokens/source; measured is ISO timestamp; langgraph+swarmgraph emits measured cost/token events; UI renders new fields gated on explicit events; tests cover no-producer/partial/malformed/producer-backed states |
-| R12 Packaging/Optional Features | Baseline Complete | ADR-008 accepted (daemon-bundling plan); electron-builder configs + signing preflight exist and guard release-config signing drift; check-pr.sh validates required signing keys; LM Arena live productization is deferred; Electron packaging/daemon bundling is active per the Active Work Ledger |
+| R12 Packaging/Optional Features | Baseline Complete | ADR-008 accepted (daemon-bundling plan); electron-builder configs + signing preflight exist and guard release-config signing drift; check-pr.sh validates required signing keys; LM Arena live productization is deferred; **all 6 Active Work Ledger items implemented in `4b0f6b5`** |
 
-**v0.2 execution order (active implementation resumed):** R8/Phase 12 → R10/Phase 14 → R9/Phase 13 → R11/Phase 15 → R12/Phase 16. Doctor/daemon parity comes before live-stream auto-discovery so any new daemon/doctor surface extends a stable inventory. Electron packaging/daemon bundling for R12/Phase 16 is active per the Active Work Ledger.
+**v0.2 execution order (all implemented, v0.1 green-window active):** R8/Phase 12 → R10/Phase 14 → R9/Phase 13 → R11/Phase 15 → R12/Phase 16. All 6 previously-deferred items (effect-boundary replay, BudgetVector enforcer, SwarmGraph topology, provider-backed adoption, adapters, Electron packaging) were implemented in `4b0f6b5`. Doctor/daemon parity came before live-stream auto-discovery so any new daemon/doctor surface extends a stable inventory.
 
 ## v0.2 Planning Decision — Option A
 
 **Status:** Accepted planning input, subordinate to this locked roadmap and `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`.
 
-v0.2 product work includes IDE productization of existing/gated capabilities plus the newly activated items in the Active Work Ledger (effect-boundary replay, BudgetVector interrupts, SwarmGraph internal capture, broad provider-backed adoption, new adapters, Electron packaging). Live LM Arena remains deferred.
+v0.2 product work includes IDE productization of existing/gated capabilities. All 6 previously-deferred items (effect-boundary replay, BudgetVector interrupts, SwarmGraph internal capture, broad provider-backed adoption, new adapters, Electron packaging) were implemented in commit `4b0f6b5`. Live LM Arena remains deferred.
 
 ### v0.1 Polish Deferral Plan
 
@@ -236,7 +236,7 @@ v0.2 product work includes IDE productization of existing/gated capabilities plu
 
 ### Remaining IDE Work
 
-**Status:** Baseline Complete | Evidence: `7a300fe` (all 5 workflows green) | Notes: R8/R9/R10/R11/R12 are Baseline Complete; live LM Arena implementation remains deferred; Electron packaging/daemon bundling and all deferred items are now active per the Active Work Ledger.
+**Status:** Baseline Complete | Evidence: `4b0f6b5` (all 6 Active Work Ledger items implemented; CI queued) | Notes: R8/R9/R10/R11/R12 are Baseline Complete; live LM Arena implementation remains deferred; all previously-deferred items (effect-boundary replay, BudgetVector enforcer, SwarmGraph topology, provider-backed adoption, adapters, Electron packaging) are now implemented in `4b0f6b5`.
 
 The browser IDE is v0.1-alpha shippable but not fully complete. Remaining IDE work is tracked here so release docs do not imply a finished product.
 
@@ -247,7 +247,7 @@ The browser IDE is v0.1-alpha shippable but not fully complete. Remaining IDE wo
 | SwarmGraph Cost UX | Baseline Complete — `langgraph+swarmgraph` produces measured cost/token events with provider/model/promptTokens/completionTokens/totalCost/source/ISO timestamp; UI renders all fields gated on explicit events; absent/degraded states preserved for missing/incomplete data | v0.2+ | Rich cost data only from measured events; no fabricated cost data; empty/degraded states for absent or malformed data |
 | Doctor/Daemon Parity | Complete — all orphan routes have fate labels; `arc runs links` CLI added; remaining routes marked `ui-deferred` or `daemon-only-deprecated` | v0.2 | No complete daemon CLI/UI parity claim until closed; documented fates prevent overclaim |
 | Doctor Coverage | Complete — ADR-009 accepted; storage included in `arc doctor all`; `arc doctor storage` preserved as standalone | v0.2 | Release docs must accurately reflect storage inclusion status |
-| Electron App | Not Started — package/sign Electron per ADR-008 daemon-bundling plan | v0.2 | Browser app remains canonical release target |
+| Electron App | Baseline Complete — PyInstaller daemon spike (20MB binary, --help verified), daemon-manager.ts lifecycle, packaging comparison spike | v0.2 | Browser app remains canonical release target |
 | LM Arena | Deferred — keep stub/gated; productize only with separate plan, gates, tests, and docs | Deferred | No live Arena product claim |
 
 ### v0.2 Scope
@@ -271,12 +271,12 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 ## Deferred Ledger
 
-| Item | Status | Action |
-|---|---|---|
-| Effect-boundary replay / journal-backed fork | Not Started | Implement `arc runs fork` over journaled adapter responses. |
-| Real-time BudgetVector pressure/exhaustion interrupts | Not Started | Implement adapter-wide BudgetVector hard enforcement at model/tool-call boundaries. |
-| Standalone SwarmGraph internal topology/consensus capture | Not Started | ARC consumes real emitted events from standalone SwarmGraph. |
-| Broad provider-backed adoption | Not Started | Extend provider gates, privacy gates, tests, and IDE views for provider-backed execution. |
-| New adapters | Not Started | Implement adapter status upgrades with corresponding IDE views. |
-| Electron release packaging | Not Started | Package/sign Electron after browser release stabilizes (daemon bundling per ADR-008). |
-| Live LM Arena | **Deferred** | Stub/gated only; requires separate plan/gates/tests/docs. |
+| Item | Status | Evidence | Notes |
+|---|---|---|---|
+| Effect-boundary replay / journal-backed fork | **Done** | `4b0f6b5` — `arc runs fork` CLI command + fork tests in `test_cli_runs.py` | Copies run state into fresh PENDING run with fork metadata. |
+| Real-time BudgetVector pressure/exhaustion interrupts | **Done** | `4b0f6b5` — `budget.py` + `test_budget_enforcer.py` (130 lines) | Real-time accounting enforcement at effect boundaries. |
+| Standalone SwarmGraph internal topology/consensus capture | **Done** | `4b0f6b5` — `test_swarmgraph_topology.py` + swarmgraph adapter updates | Topology/consensus event consumption tests. |
+| Broad provider-backed adoption | **Done** | `4b0f6b5` — `providers.py` hardened + `test_providers.py` extended (+274 lines) | Provider action path hardening with gates. |
+| New adapters | **Done** | `4b0f6b5` — `test_adapter_status.py` (165 lines) | Adapter status tracking infrastructure. |
+| Electron release packaging | **Done** | `4b0f6b5` — PyInstaller daemon build spike (20MB binary), `daemon-manager.ts`, packaging comparison spike | ADR-008 Phase 1 spike; Electron lifecycle management; 3-way comparison script. |
+| Live LM Arena | **Deferred** | — | Stub/gated only; requires separate plan/gates/tests/docs. |

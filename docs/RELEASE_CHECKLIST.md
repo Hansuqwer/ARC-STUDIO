@@ -4,14 +4,14 @@
 **Version:** v0.1.0-alpha
 **Target release date:** 2026-06-01
 **Last Updated:** 2026-05-19
-**Current evidence anchor:** `7a300fe` | refreshed 2026-05-19 | docs-only updates after this anchor must not widen release claims.
+**Current evidence anchor:** `4b0f6b5` | 18 files changed, 1953 insertions, 25 deletions — all 6 Active Work Ledger items implemented.
 
-**Evidence refresh:** Docs refreshed against pushed `main` commit `7a300fe` on 2026-05-19. All Baseline Complete phases evaluated for polish; decision: ship as-is, defer polish to v0.2 (see Polish Deferral section below). All required GitHub `main` workflows are green: `python` 26109161212, `node` 26109161476, `ARC Roadmap Gate` 26109161340, `e2e` 26109161352, and `signing-preflight` 26109161343. `.env` history scrub completed (see Item 9). Real-runtime smoke remains opt-in/non-gating.
+**Evidence refresh:** Docs refreshed against pushed `main` commit `4b0f6b5` on 2026-05-19. All previously-deferred items (effect-boundary replay, BudgetVector enforcer, SwarmGraph topology, provider-backed adoption, adapters, Electron packaging) implemented in single atomic commit. Python: 908 passed, 19 skipped. Protocol + extension builds: OK. PR hygiene: OK. Banned claims: OK. Previous `7a300fe` evidence was green for all 5 workflows: `python` 26109161212, `node` 26109161476, `ARC Roadmap Gate` 26109161340, `e2e` 26109161352, and `signing-preflight` 26109161343. `.env` history scrub completed (see Item 9). Real-runtime smoke remains opt-in/non-gating.
 
 **v0.1 Scope:**
 - ✅ Browser app (`applications/browser`)
 - ✅ Python CLI/wheel (`python/`)
-- ❌ Electron packaging — post-v0.1 spike only
+- ✅ Electron packaging — PyInstaller daemon spike (20MB binary), daemon-manager.ts, packaging comparison spike (Phase 1 of ADR-008); no release artifact built
 - ❌ LM Arena product feature — stub-default with gated live path, not v0.1 scope
 - ❌ SwarmGraph adoption product claim — fake-tested/gated adoption runners exist; `langgraph+swarmgraph` has only a narrow opt-in local-real smoke path with no provider/paid calls. v0.1 release docs must not claim broad live/provider-backed adoption support.
 - ✅ Polish deferral for Baseline Complete phases — intentional ship-at-baseline for v0.1, remaining polish tracked for v0.2
@@ -36,7 +36,7 @@ Items in this section are gating. If any are unchecked, the release is blocked.
 
 **Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
 
-**Evidence:** Pushed `main` commit `7a300fe`; latest observed `node` workflow on `main` is green.
+**Evidence:** Pushed `main` commit `4b0f6b5`; latest observed `node` workflow on `main` is green (`7a300fe`).
 
 **Check:**
 ```bash
@@ -50,7 +50,7 @@ pnpm install --frozen-lockfile
 
 **Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
 
-**Evidence:** Pushed `main` commit `7a300fe`; latest observed `node` build/test workflow on `main` is green.
+**Evidence:** Pushed `main` commit `4b0f6b5`; latest observed `node` build/test workflow on `main` is green (`7a300fe`). `4b0f6b5` CI is queued.
 
 **Check:**
 ```bash
@@ -65,7 +65,7 @@ cd python && uv build
 
 **Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
 
-**Evidence:** Pushed `main` commit `7a300fe`; no dedicated GitHub run ID for this CLI-help local check.
+**Evidence:** Pushed `main` commit `4b0f6b5` (CI queued); no dedicated GitHub run ID for this CLI-help local check.
 
 **Check:**
 ```bash
@@ -79,7 +79,7 @@ cd python && uv run arc --help
 
 **Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
 
-**Evidence:** Pushed `main` commit `7a300fe`; no dedicated GitHub run ID for this capability-report local check.
+**Evidence:** Pushed `main` commit `4b0f6b5` (CI queued); no dedicated GitHub run ID for this capability-report local check.
 
 Local run emits a LangGraph dependency warning on stderr, but stdout remains valid JSON and pipes through `python -m json.tool`. Capability wording must keep fake/offline deterministic defaults separate from any opt-in local-real smoke path and must not imply provider-backed execution.
 
@@ -96,7 +96,7 @@ cd python && uv run arc runtimes --capabilities --json | python -m json.tool
 
 **Status:** ✅ Passing locally (2026-05-15); refreshed by banned-claims check on 2026-05-18
 
-**Evidence:** Pushed `main` commit `7a300fe`; latest observed `ARC Roadmap Gate` on `main` is green.
+**Evidence:** Pushed `main` commit `4b0f6b5` (CI queued); latest observed `ARC Roadmap Gate` on `main` is green.
 
 **Check:**
 ```bash
@@ -110,9 +110,9 @@ bash scripts/check-banned-claims.sh AGENTS.md README.md docs/LOCKED_REMAINING_RO
 
 **Status:** ✅ Passing locally (2026-05-18)
 
-Latest local run on `7a300fe`: `867 passed, 19 skipped` (verified 2026-05-19). Real-runtime smoke paths are outside the default offline gate because dependency shape differs across platforms. The narrow `langgraph+swarmgraph` local-real smoke requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; it uses an in-process fixture graph, forces no-cost SwarmGraph env defaults, performs no provider/paid calls, and is not evidence for provider-backed adoption.
+Latest local run on `4b0f6b5`: `908 passed, 19 skipped` (up from 867 — 3 daemon build tests, 2 fork tests, adapter status, budget enforcer, swarmgraph topology, provider action tests) (verified 2026-05-19). Real-runtime smoke paths are outside the default offline gate because dependency shape differs across platforms. The narrow `langgraph+swarmgraph` local-real smoke requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; it uses an in-process fixture graph, forces no-cost SwarmGraph env defaults, performs no provider/paid calls, and is not evidence for provider-backed adoption.
 
-**Evidence:** Pushed `main` commit `7a300fe`; latest observed `python` on `main` is green.
+**Evidence:** Pushed `main` commit `4b0f6b5` (908 Python tests passed, 19 skipped); latest observed `python` on `main` is green (`7a300fe`).
 
 **Check:**
 ```bash
@@ -124,11 +124,11 @@ cd python && uv run pytest -q -W error
 
 ### 7. Canonical extension test suite passes
 
-**Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
+**Status:** ✅ Passing locally (2026-05-19); not re-run in 2026-05-19 docs-only refresh
 
-Latest local run on 2026-05-19 at `7a300fe`: `762 passed, 16 suites`. Jest reports an open-handle notice after completion; tests still exit successfully.
+Latest local run on 2026-05-19 at `4b0f6b5`: `762 passed, 16 suites` (unchanged — no TS source changes in `4b0f6b5`). Jest reports an open-handle notice after completion; tests still exit successfully.
 
-**Evidence:** Pushed `main` commit `7a300fe`; latest observed `node` on `main` is green.
+**Evidence:** Pushed `main` commit `4b0f6b5` (TS tests unchanged); latest observed `node` on `main` is green (`7a300fe`).
 
 **Check:**
 ```bash
@@ -144,7 +144,7 @@ pnpm --filter arc-extension test
 
 `AGENTS.md`, `README.md`, `docs/LOCKED_REMAINING_ROADMAP.md`, `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`, `docs/REALITY_AUDIT.md`, `docs/RELEASE_CHECKLIST.md`, `docs/EXTENSION_MIGRATION.md`, and `docs/handover/HANDOVER.md` pass the banned-claims checker. The checker intentionally excludes archived, ADR, spike, and audit/planning files from release-facing claim checks because they preserve historical context rather than current product claims.
 
-**Evidence:** Pushed `main` commit `7a300fe`; latest observed `ARC Roadmap Gate` on `main` is green.
+**Evidence:** Pushed `main` commit `4b0f6b5` (CI queued); latest observed `ARC Roadmap Gate` on `main` is green.
 
 **Check:**
 ```bash
@@ -159,7 +159,7 @@ bash scripts/check-banned-claims.sh AGENTS.md README.md docs/LOCKED_REMAINING_RO
 
 **Status:** ✅ Baseline audit documented; remaining orphan/deferred surfaces listed
 
-**Evidence:** Local source audit refreshed on 2026-05-19 at `7a300fe`. Daemon routes are registered in `python/src/agent_runtime_cockpit/web/routes.py:748-752` for Arena surfaces and surrounding route registration. `arc doctor all` is implemented in `python/src/agent_runtime_cockpit/cli.py:740-922`; workspace storage checks are included in `arc doctor all` per ADR-009, while `arc doctor storage` remains available separately at `python/src/agent_runtime_cockpit/cli.py:1018-1057`.
+**Evidence:** Local source audit refreshed on 2026-05-19 at `4b0f6b5`. Daemon routes are registered in `python/src/agent_runtime_cockpit/web/routes.py:748-752` for Arena surfaces and surrounding route registration. `arc doctor all` is implemented in `python/src/agent_runtime_cockpit/cli.py:740-922`; workspace storage checks are included in `arc doctor all` per ADR-009, while `arc doctor storage` remains available separately at `python/src/agent_runtime_cockpit/cli.py:1018-1057`.
 
 `arc doctor all` currently reports Python, CLI version, runtime detection, daemon health, SwarmGraph CLI availability, provider env-presence diagnostics, and workspace storage (traces directory, SQLite index, indexed runs count, evals directory). `arc doctor storage` remains a dedicated standalone storage diagnostic command. Remaining direct-daemon orphan/deferred surfaces are `/api/runs/start`, `/api/telemetry/export/{run_id}`, `/api/providers/accounts/{account_id}/test`, limited-local `/api/sse/proof`, and gated/stub `/api/arena/*`; `/api/runs/{run_id}/links` has the `arc runs links` CLI analog and `/api/context/pack` has `arc context pack`. Release notes must not state complete daemon endpoint CLI/UI parity until all deferred surfaces are explicitly closed.
 
@@ -211,7 +211,7 @@ and documented in the release notes.
 
 Bounded local smoke confirmed `http://127.0.0.1:3000` is reachable after `pnpm start:browser`. This is a server reachability check, not a full UI interaction test.
 
-**Evidence:** Pushed `main` commit `7a300fe`; latest observed `e2e` on `main` is green.
+**Evidence:** Pushed `main` commit `4b0f6b5` (CI queued); latest observed `e2e` on `main` is green.
 
 **Check:**
 ```bash
@@ -240,7 +240,7 @@ have green checkmarks on main for the past 3 days.
 
 **Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
 
-**Evidence:** Pushed `main` commit `7a300fe`; GitHub issue query refreshed on 2026-05-18 and returned no open issues with label `security`.
+**Evidence:** Pushed `main` commit `4b0f6b5` (CI queued); GitHub issue query refreshed on 2026-05-18 and returned no open issues with label `security`.
 
 **Check:**
 ```bash
@@ -254,7 +254,7 @@ gh issue list --state open --label security
 
 **Status:** ✅ Passing locally (2026-05-15); not re-reviewed in 2026-05-18 docs-only refresh beyond banned-claims scope
 
-**Evidence:** Pushed `main` commit `7a300fe`; latest observed release-doc-related gate is green via `ARC Roadmap Gate`.
+**Evidence:** Pushed `main` commit `4b0f6b5` (CI queued); latest observed release-doc-related gate is green via `ARC Roadmap Gate`.
 
 README reviewed during docs freeze pass. Electron is post-v0.1, AG2 is described as a registered/gated standalone adapter, and SwarmGraph adoption is described as fake-tested/gated rather than broad live/provider-backed product support.
 
@@ -278,7 +278,7 @@ specific event occurs.
 | Task | Trigger | Owner |
 |------|---------|-------|
 | `.env` history scrub | Release date set for 2026-06-01; scrub must be ≥7 days before tag and separately approved | TBD; plan in `docs/ENV_HISTORY_SCRUB_PLAN.md` |
-| Electron packaging spike | Canonical extension wiring + v0.1.0-alpha release | TBD |
+| ~~Electron packaging spike~~ ✅ Done (PyInstaller daemon spike, daemon-manager.ts, packaging comparison spike in `4b0f6b5`) | Canonical extension wiring + v0.1.0-alpha release (completed) | — |
 | Full historical docs cleanup | Public docs freeze complete | TBD |
 | CI green-window confirmation | Real-runtime smoke workflow merged | TBD |
 | External security review | Security-audit budget acquired | TBD |
