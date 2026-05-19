@@ -3,7 +3,7 @@
 **Status:** Locked source of truth for remaining product work.  
 **Created:** 2026-05-17  
 **Last reality refresh:** 2026-05-19 against current locked phase status and release evidence.  
-**Current evidence anchor:** `b88b189` | refreshed 2026-05-19 | docs-only updates after this anchor must not widen release claims.  
+**Current evidence anchor:** `b8bcc8d` | refreshed 2026-05-19 | docs-only updates after this anchor must not widen release claims.  
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -25,7 +25,7 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 
 - Canonical app: `applications/browser` + `packages/arc-extension`.
 - Legacy `theia-extensions/*` and `packages/arc-browser-app` are archived under `docs/archive/`.
-- GitHub CI green on `b88b189`: `python`, `node`, `ARC Roadmap Gate`, `signing-preflight`, `e2e`. All Baseline Complete phases evaluated for polish; all ship at current status for v0.1 (polish deferred to v0.2).
+- GitHub CI green on `b8bcc8d`: `python`, `node`, `ARC Roadmap Gate`, `signing-preflight`, `e2e`. All Baseline Complete phases evaluated for polish; all ship at current status for v0.1 (polish deferred to v0.2).
 - Release-scope CLI/IDE basics are implemented and tested.
 - Remaining work is product depth, not repo stabilization.
 
@@ -180,7 +180,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 
 **Goal:** Prepare v0.1 release without rewriting history prematurely.
 
-**Current:** Release ops complete as Phase 7. Target release date is 2026-06-01. Pushed `main` commit `b88b189` is green for the required GitHub workflows: `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`. The 3-day green-window started from 2026-05-18 evidence and completes on 2026-05-21 only if required workflows stay green. `.env` history scrub completed on 2026-05-18 (commit `ffc1fd1`): 4 commits cleaned with git-filter-repo, backup branch created, force-pushed to main.
+**Current:** Release ops complete as Phase 7. Target release date is 2026-06-01. Pushed `main` commit `b8bcc8d` is green for the required GitHub workflows: `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`. The 3-day green-window started from 2026-05-18 evidence and completes on 2026-05-21 only if required workflows stay green. `.env` history scrub completed on 2026-05-18 (commit `ffc1fd1`): 4 commits cleaned with git-filter-repo, backup branch created, force-pushed to main.
 
 **Deliverables:**
 - Final release checklist evidence with commit/run IDs.
@@ -203,7 +203,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | R4 HITL/Audit UX | Complete baseline | Dedicated Assurance tab baseline exists; Phase 10 adds live refresh, filtering, export, and improved states without adapter-wide HMAC claims |
 | R5 SwarmGraph Insight | Complete baseline + first producer events | Configured local daemon SSE is wired in Phase 8; SwarmGraph insight live producer/cost producer work remains Phase 15 |
 | R6 Real Adoption | Complete local-real hardening baseline | Keep fake/offline deterministic/default; local-real availability requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; no paid/live provider calls; provider-backed execution remains blocked/unclaimed |
-| R7 Release Ops | Complete | Release date set for 2026-06-01; green-window active; `.env` scrub completed on 2026-05-18 (commit `ffc1fd1`); all required GitHub workflows green on `b88b189` |
+| R7 Release Ops | Complete | Release date set for 2026-06-01; green-window active; `.env` scrub completed on 2026-05-18 (commit `ffc1fd1`); all required GitHub workflows green on `b8bcc8d` |
 | R8 IDE Provider/Quota Completion | Baseline Complete | Chunks 3.1-3.3 hardened — typed diagnostics parser with malformed/partial/success tests, local-only quota reset with targeted confirmation, three-layer provider gate (env + paid opt-in + exact confirmation) impossible to trigger without every gate; no remote quota reset or adoption claim |
 | R9 IDE Live Stream Polish | Baseline Complete | Daemon URL auto-discovery (loopback probe of 127.0.0.1:7777, no background connections), async warning fingerprint test + documentation, 3-tier fallback in SwarmGraphInsightTab (manual → ARC_PYTHON_DAEMON_URL → loopback probe) |
 | R10 Doctor/Daemon Parity Closure | Baseline Complete | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added; all orphan routes have explicit fate labels (`ui-deferred`, `daemon-only-deprecated`, or CLI added); no docs imply complete parity |
