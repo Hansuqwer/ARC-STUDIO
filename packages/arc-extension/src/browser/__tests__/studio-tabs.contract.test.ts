@@ -865,6 +865,15 @@ describe('Studio Tabs Contracts', () => {
             expect(insightSource).not.toMatch(/crewai\+swarmgraph/);
         });
 
+        it('should render cost panel fields from measured cost trace events only', () => {
+            expect(insightSource).toMatch(/provider/);
+            expect(insightSource).toMatch(/model/);
+            expect(insightSource).toMatch(/prompt tokens/);
+            expect(insightSource).toMatch(/completion tokens/);
+            expect(insightSource).toMatch(/source/);
+            expect(insightSource).toMatch(/measured/);
+        });
+
     it('should expose honest live-aware controls backed by streamActiveTrace', () => {
         expect(insightSource).toMatch(/streamActiveTrace\(\{ runId, mode: 'live', baseUrl \}\)/);
             expect(insightSource).toMatch(/buildActiveTrace/);

@@ -89,25 +89,97 @@ describe('buildSwarmGraphInsight', () => {
     it('extracts cost only from explicit cost trace events', () => {
         const insight = buildSwarmGraphInsight(trace({
             events: [event('SWARMGRAPH_COST', {
+                provider: 'openai',
+                model: 'gpt-4o',
+                promptTokens: 600,
+                completionTokens: 600,
                 totalCost: 0.42,
                 totalTokens: 1200,
                 currency: 'USD',
+                source: 'langgraph+swarmgraph',
+                measured: '2026-05-19T12:00:00.000Z',
                 items: [{ node: 'queen', cost: 0.2 }],
             })],
         }));
 
         expect(insight.status).toBe('present');
         expect(insight.cost.status).toBe('present');
+        expect(insight.cost.provider).toBe('openai');
+        expect(insight.cost.model).toBe('gpt-4o');
+        expect(insight.cost.promptTokens).toBe(600);
+        expect(insight.cost.completionTokens).toBe(600);
         expect(insight.cost.totalCost).toBe(0.42);
         expect(insight.cost.totalTokens).toBe(1200);
         expect(insight.cost.currency).toBe('USD');
+        expect(insight.cost.source).toBe('langgraph+swarmgraph');
+        expect(insight.cost.measured).toBe('2026-05-19T12:00:00.000Z');
         expect(insight.cost.items).toEqual([{ node: 'queen', cost: 0.2 }]);
+    });
+
+    it('extracts cost from partial fields only', () => {
+        const insight = buildSwarmGraphInsight(trace({
+            runtime: 'langgraph+swarmgraph',
+            events: [event('SWARMGRAPH_COST', {
+                provider: 'openai',
+                model: 'gpt-4o-mini',
+                promptTokens: 300,
+            })],
+        }));
+
+        expect(insight.status).toBe('present');
+        expect(insight.cost.status).toBe('present');
+        expect(insight.cost.provider).toBe('openai');
+        expect(insight.cost.model).toBe('gpt-4o-mini');
+        expect(insight.cost.promptTokens).toBe(300);
+        expect(insight.cost.completionTokens).toBeUndefined();
+        expect(insight.cost.totalCost).toBeUndefined();
+        expect(insight.cost.totalTokens).toBeUndefined();
+    });
+
+    it('handles malformed cost event data gracefully', () => {
+        const insight = buildSwarmGraphInsight(trace({
+            runtime: 'langgraph+swarmgraph',
+            events: [event('SWARMGRAPH_COST', {
+                totalCost: 'not-a-number',
+                model: 42,
+                promptTokens: null,
+            } as unknown as Record<string, unknown>)],
+        }));
+
+        // All fields are malformed (no valid number/string values), so cost stays degraded
+        expect(insight.status).toBe('degraded');
+        expect(insight.cost.status).toBe('degraded');
+        expect(insight.cost.reason).toContain('did not include measured cost');
+        expect(insight.cost.totalCost).toBeUndefined();
+        expect(insight.cost.model).toBeUndefined();
+        expect(insight.cost.promptTokens).toBeUndefined();
+    });
+
+    it('handles partially malformed cost event data with some valid fields', () => {
+        const insight = buildSwarmGraphInsight(trace({
+            runtime: 'langgraph+swarmgraph',
+            events: [event('SWARMGRAPH_COST', {
+                totalCost: 'not-a-number',
+                totalTokens: 100,
+                model: 42,
+                provider: 'openai',
+            } as unknown as Record<string, unknown>)],
+        }));
+
+        // totalTokens=100 and provider='openai' are valid, so status is present
+        expect(insight.status).toBe('present');
+        expect(insight.cost.status).toBe('present');
+        expect(insight.cost.totalTokens).toBe(100);
+        expect(insight.cost.provider).toBe('openai');
+        // Malformed values are skipped
+        expect(insight.cost.totalCost).toBeUndefined();
+        expect(insight.cost.model).toBeUndefined();
     });
 
     it('keeps cost degraded when explicit cost event lacks measured fields', () => {
         const insight = buildSwarmGraphInsight(trace({
             runtime: 'crewai+swarmgraph',
-            events: [event('SWARMGRAPH_COST', { provider: 'offline-fixture' })],
+            events: [event('SWARMGRAPH_COST', {})],
         }));
 
         expect(insight.status).toBe('degraded');

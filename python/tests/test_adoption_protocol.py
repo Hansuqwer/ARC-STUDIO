@@ -403,6 +403,7 @@ class TestLangGraphRunner:
 
     @pytest.mark.asyncio
     async def test_runner_emits_swarmgraph_cost_from_measured_metadata_only(self):
+        import re
         from agent_runtime_cockpit.adoption.langgraph_runner import (
             LangGraphAdoptionRunner,
         )
@@ -421,6 +422,9 @@ class TestLangGraphRunner:
                         "total_tokens": 2500,
                         "currency": "USD",
                         "provider": "test-provider",
+                        "model": "gpt-4o",
+                        "prompt_tokens": 1500,
+                        "completion_tokens": 1000,
                         "items": [{"tokens": 2500, "cost": 0.025}],
                     },
                 },
@@ -430,15 +434,97 @@ class TestLangGraphRunner:
         )
 
         cost_events = [data for event_type, data in events if event_type == "SWARMGRAPH_COST"]
-        assert cost_events == [{
-            "runtime": "langgraph+swarmgraph",
-            "measured": True,
-            "totalCost": 0.025,
-            "totalTokens": 2500,
-            "currency": "USD",
-            "provider": "test-provider",
-            "items": [{"tokens": 2500, "cost": 0.025}],
-        }]
+        assert len(cost_events) == 1
+        payload = cost_events[0]
+        assert payload["source"] == "langgraph+swarmgraph"
+        assert payload["runtime"] == "langgraph+swarmgraph"
+        assert re.match(r"\d{4}-\d{2}-\d{2}T", str(payload.get("measured", ""))), (
+            "measured should be an ISO-8601 timestamp string"
+        )
+        assert payload["totalCost"] == 0.025
+        assert payload["totalTokens"] == 2500
+        assert payload["currency"] == "USD"
+        assert payload["provider"] == "test-provider"
+        assert payload["model"] == "gpt-4o"
+        assert payload["promptTokens"] == 1500
+        assert payload["completionTokens"] == 1000
+        assert payload["items"] == [{"tokens": 2500, "cost": 0.025}]
+
+    @pytest.mark.asyncio
+    async def test_runner_emits_swarmgraph_cost_partial_metadata(self):
+        """Cost event emitted with only some fields from measured metadata."""
+        from agent_runtime_cockpit.adoption.langgraph_runner import (
+            LangGraphAdoptionRunner,
+        )
+
+        events: list[tuple[str, dict]] = []
+        await LangGraphAdoptionRunner().run(
+            AdoptionSpec(
+                mode=AdoptionMode.LANGGRAPH,
+                runtime_config={
+                    "offline": True,
+                    "fake": True,
+                    "prompt": "partial cost",
+                    "measured_cost": {
+                        "measured": True,
+                        "provider": "partial-provider",
+                        "model": "gpt-4o-mini",
+                        "total_tokens": 500,
+                    },
+                },
+            ),
+            "lg-sg-partial-cost",
+            lambda run_id, event_type, data: events.append((event_type, data)),
+        )
+
+        cost_events = [data for event_type, data in events if event_type == "SWARMGRAPH_COST"]
+        assert len(cost_events) == 1
+        payload = cost_events[0]
+        assert payload["provider"] == "partial-provider"
+        assert payload["model"] == "gpt-4o-mini"
+        assert payload["totalTokens"] == 500
+        assert "totalCost" not in payload
+        assert "currency" not in payload
+        assert "items" not in payload
+
+    @pytest.mark.asyncio
+    async def test_runner_emits_swarmgraph_cost_malformed_metadata(self):
+        """Malformed cost metadata fields still appear in emitted payload."""
+        from agent_runtime_cockpit.adoption.langgraph_runner import (
+            LangGraphAdoptionRunner,
+        )
+
+        events: list[tuple[str, dict]] = []
+        await LangGraphAdoptionRunner().run(
+            AdoptionSpec(
+                mode=AdoptionMode.LANGGRAPH,
+                runtime_config={
+                    "offline": True,
+                    "fake": True,
+                    "prompt": "malformed cost",
+                    "measured_cost": {
+                        "measured": True,
+                        "totalCost": "not-a-number",
+                        "model": 42,
+                        "promptTokens": None,
+                        "total_tokens": 100,
+                    },
+                },
+            ),
+            "lg-sg-malformed-cost",
+            lambda run_id, event_type, data: events.append((event_type, data)),
+        )
+
+        cost_events = [data for event_type, data in events if event_type == "SWARMGRAPH_COST"]
+        assert len(cost_events) == 1
+        payload = cost_events[0]
+        # Malformed values pass through as-is (schema does not enforce types)
+        assert payload["totalCost"] == "not-a-number"
+        assert payload["model"] == 42
+        # None values are skipped by the normalization
+        assert "promptTokens" not in payload
+        # total_tokens is present, so payload is emitted
+        assert payload["totalTokens"] == 100
 
     @pytest.mark.asyncio
     async def test_runner_ignores_unmeasured_swarmgraph_cost_metadata(self):

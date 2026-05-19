@@ -13,6 +13,7 @@ import os
 import sys
 import time
 import warnings
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator
 
@@ -383,15 +384,24 @@ class LangGraphAdoptionRunner(AdoptionRunner):
         if not isinstance(raw, dict) or raw.get("measured") is not True:
             return None
 
-        payload: dict[str, Any] = {"runtime": "langgraph+swarmgraph", "measured": True}
+        payload: dict[str, Any] = {
+            "source": "langgraph+swarmgraph",
+            "runtime": "langgraph+swarmgraph",
+            "measured": datetime.now(timezone.utc).isoformat(),
+        }
         for source, target in (
             ("totalCost", "totalCost"),
             ("total_cost", "totalCost"),
             ("totalTokens", "totalTokens"),
             ("total_tokens", "totalTokens"),
+            ("provider", "provider"),
+            ("model", "model"),
+            ("promptTokens", "promptTokens"),
+            ("prompt_tokens", "promptTokens"),
+            ("completionTokens", "completionTokens"),
+            ("completion_tokens", "completionTokens"),
             ("currency", "currency"),
             ("items", "items"),
-            ("provider", "provider"),
         ):
             if source in raw and raw[source] is not None:
                 payload[target] = raw[source]

@@ -172,8 +172,10 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
     ),
     "SWARMGRAPH_COST": EventTypeDef(
         optional_fields={
-            "totalCost", "totalTokens", "currency", "items", "provider", "runtime",
-            "measured", "node_id", "message_id", "evidence_refs",
+            "provider", "model", "promptTokens", "completionTokens",
+            "totalCost", "totalTokens", "currency", "items", "source",
+            "runtime", "measured",
+            "node_id", "message_id", "evidence_refs",
         },
     ),
 

@@ -224,33 +224,72 @@ class TestCreateEvent:
         assert ev.data["votes"][0]["vote"] == "approve"
         assert ev.data["consensus_reached"] is True
 
-    def test_swarmgraph_cost_event_accepts_measured_optional_fields(self):
+    def test_swarmgraph_cost_event_accepts_all_optional_fields(self):
         ev = create_event("run-1", 13, "SWARMGRAPH_COST", {
+            "provider": "openai",
+            "model": "gpt-4o",
+            "promptTokens": 600,
+            "completionTokens": 600,
             "totalCost": 0.012,
             "totalTokens": 1200,
             "currency": "USD",
-            "items": [{"provider": "openai", "tokens": 1200, "cost": 0.012}],
-            "provider": "openai",
+            "source": "langgraph+swarmgraph",
+            "items": [{"model": "gpt-4o", "tokens": 1200, "cost": 0.012}],
             "runtime": "swarmgraph",
+            "measured": "2026-05-19T12:00:00.000000+00:00",
         })
         assert ev.type == "SWARMGRAPH_COST"
+        assert ev.data["provider"] == "openai"
+        assert ev.data["model"] == "gpt-4o"
+        assert ev.data["promptTokens"] == 600
+        assert ev.data["completionTokens"] == 600
         assert ev.data["totalCost"] == 0.012
         assert ev.data["totalTokens"] == 1200
+        assert ev.data["source"] == "langgraph+swarmgraph"
+        assert ev.data["measured"] == "2026-05-19T12:00:00.000000+00:00"
 
     def test_swarmgraph_cost_event_allows_empty_payload(self):
         ev = create_event("run-1", 14, "SWARMGRAPH_COST", {})
         assert ev.type == "SWARMGRAPH_COST"
         assert ev.data == {}
 
+    def test_swarmgraph_cost_event_partial_fields(self):
+        """Cost event with only some fields populated is valid."""
+        ev = create_event("run-1", 15, "SWARMGRAPH_COST", {
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "promptTokens": 300,
+            "completionTokens": 150,
+        })
+        assert ev.type == "SWARMGRAPH_COST"
+        assert ev.data["provider"] == "openai"
+        assert ev.data["model"] == "gpt-4o-mini"
+        assert ev.data["promptTokens"] == 300
+        assert ev.data["completionTokens"] == 150
+        assert "totalCost" not in ev.data
+        assert "totalTokens" not in ev.data
+
+    def test_swarmgraph_cost_event_malformed_types_still_valid_as_optional(self):
+        """Schema does not enforce types; malformed data passes optional-field check."""
+        ev = create_event("run-1", 16, "SWARMGRAPH_COST", {
+            "totalCost": "not-a-number",
+            "model": 42,
+            "promptTokens": None,
+        })
+        assert ev.type == "SWARMGRAPH_COST"
+        assert ev.data["totalCost"] == "not-a-number"
+        assert ev.data["model"] == 42
+        assert ev.data["promptTokens"] is None
+
     def test_swarmgraph_topology_event_rejects_missing_edges(self):
         import pytest
         with pytest.raises(ValueError, match="required"):
-            create_event("run-1", 15, "SWARMGRAPH_TOPOLOGY", {"nodes": []})
+            create_event("run-1", 17, "SWARMGRAPH_TOPOLOGY", {"nodes": []})
 
     def test_swarmgraph_consensus_event_rejects_missing_votes(self):
         import pytest
         with pytest.raises(ValueError, match="required"):
-            create_event("run-1", 16, "SWARMGRAPH_CONSENSUS", {"decision": "approve"})
+            create_event("run-1", 18, "SWARMGRAPH_CONSENSUS", {"decision": "approve"})
 
 
 class TestRunEventSchemaVersion:

@@ -56,7 +56,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | `RUN_STARTED` / terminal events | SSE proof stub and supported run paths | Baseline Complete | Event Stream, Run Timeline |
 | SwarmGraph topology | `langgraph+swarmgraph` event path | Baseline Complete for first producer; absent elsewhere | SwarmGraph Insight |
 | Consensus/vote events | `langgraph+swarmgraph` event path | Baseline Complete for first producer; absent elsewhere | SwarmGraph Insight |
-| Measured cost/token events | None broadly wired | Not Started | Budget/Cost panels show absent/degraded |
+| Measured cost/token events | `langgraph+swarmgraph` adoption runner (first producer) | Baseline Complete | SwarmGraph Insight Cost panel (renders provider/model/tokens/cost/source/measured from explicit events) |
 | HITL prompt/response/timeout | `JobSupervisor` HITL flow + CLI/IDE response paths | Baseline Complete | Assurance tab, Runs tab basics |
 | Audit chain material | ARC audit paths and keyed audit CLI path where specific run writes material | Conditional | Assurance tab, audit verify/export |
 | Effect-boundary journal entries | None | Deferred | Future replay/fork UX |
@@ -207,7 +207,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | R8 IDE Provider/Quota Completion | Baseline Complete | Chunks 3.1-3.3 hardened — typed diagnostics parser with malformed/partial/success tests, local-only quota reset with targeted confirmation, three-layer provider gate (env + paid opt-in + exact confirmation) impossible to trigger without every gate; no remote quota reset or adoption claim |
 | R9 IDE Live Stream Polish | Baseline Complete | Daemon URL auto-discovery (loopback probe of 127.0.0.1:7777, no background connections), async warning fingerprint test + documentation, 3-tier fallback in SwarmGraphInsightTab (manual → ARC_PYTHON_DAEMON_URL → loopback probe) |
 | R10 Doctor/Daemon Parity Closure | Baseline Complete | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added; all orphan routes have explicit fate labels (`ui-deferred`, `daemon-only-deprecated`, or CLI added); no docs imply complete parity |
-| R11 SwarmGraph Cost Producer | Not Started | Add measured cost/token producer before enriching IDE cost panels beyond absent/degraded states |
+| R11 SwarmGraph Cost Producer | Baseline Complete | Schema updated with model/promptTokens/completionTokens/source; measured is ISO timestamp; langgraph+swarmgraph emits measured cost/token events; UI renders new fields gated on explicit events; tests cover no-producer/partial/malformed/producer-backed states |
 | R12 Packaging/Optional Features | Not Started | Re-evaluate Electron packaging/signing and live LM Arena separately after browser v0.1 stabilizes |
 
 **Active v0.2 execution order:** R8/Phase 12 → R10/Phase 14 → R9/Phase 13 → R11/Phase 15 → R12/Phase 16. Doctor/daemon parity comes before live-stream auto-discovery so any new daemon/doctor surface extends a stable inventory.
@@ -220,7 +220,7 @@ v0.2 product work is scoped to IDE productization of existing/gated capabilities
 
 ### v0.1 Polish Deferral Plan
 
-**Decision:** Ship v0.1.0-alpha at the current Baseline Complete/Complete statuses. Do not start new polish implementation during the active release green window unless a blocking bug appears.
+**Decision:** Ship v0.1.0-alpha at the current Baseline Complete/Complete statuses. Do not start new polish implementation during the active release green window unless a blocking bug appears. Phase 15 (R11) was completed during the green window as planned implementation (Baseline Complete), not as polish deviation.
 
 **Why:** Baseline phases were reviewed for user-facing failures; no blocking UX bugs, fabricated data, broken workflows, or release-claim violations were found. Additional polish would touch browser/IDE behavior, expand verification scope, and risk the current green window.
 
@@ -232,11 +232,11 @@ v0.2 product work is scoped to IDE productization of existing/gated capabilities
 
 **v0.2 carry-forward:**
 
-- R5: Add measured cost/token producer before improving cost panels beyond absent/degraded states.
+- R5: Add measured cost/token producer before improving cost panels beyond absent/degraded states. (Complete — Phase 15, Baseline Complete)
 
 ### Remaining IDE Work
 
-**Status:** In Progress | Evidence: `89c5325` | Notes: R8/R9/R10 are Baseline Complete; R11/R12 remain.
+**Status:** In Progress | Evidence: local Phase 15 verification | Notes: R8/R9/R10/R11 are Baseline Complete; R12 remains.
 
 The browser IDE is v0.1-alpha shippable but not fully complete. Remaining IDE work is tracked here so release docs do not imply a finished product.
 
@@ -244,7 +244,7 @@ The browser IDE is v0.1-alpha shippable but not fully complete. Remaining IDE wo
 |---|---|---|---|
 | Provider/Quota UI | Complete — chunks 3.1-3.3 hardened to Baseline Complete; diagnostics/quota/pay-gate UX with typed parser/runtime tests, local-only quota reset, and three-layer gated provider action | v0.2 | No remote quota reset; no broad provider-backed adoption claim |
 | Live Stream UX | Complete — async warning fingerprint captured/tested, daemon URL auto-discovery via loopback probe (127.0.0.1:7777/health), 3-tier fallback in SwarmGraphInsightTab | v0.2 | Configured local daemon stream only; not broad runtime/provider live support |
-| SwarmGraph Cost UX | Add measured cost/token producer before rendering rich cost panels | v0.2+ | Empty/degraded cost state remains correct until producer exists |
+| SwarmGraph Cost UX | Baseline Complete — `langgraph+swarmgraph` produces measured cost/token events with provider/model/promptTokens/completionTokens/totalCost/source/ISO timestamp; UI renders all fields gated on explicit events; absent/degraded states preserved for missing/incomplete data | v0.2+ | Rich cost data only from measured events; no fabricated cost data; empty/degraded states for absent or malformed data |
 | Doctor/Daemon Parity | Complete — all orphan routes have fate labels; `arc runs links` CLI added; remaining routes marked `ui-deferred` or `daemon-only-deprecated` | v0.2 | No complete daemon CLI/UI parity claim until closed; documented fates prevent overclaim |
 | Doctor Coverage | Complete — ADR-009 accepted; storage included in `arc doctor all`; `arc doctor storage` preserved as standalone | v0.2 | Release docs must accurately reflect storage inclusion status |
 | Electron App | Package/sign Electron only after browser release stabilizes | Post-v0.1 | Browser app remains canonical release target |

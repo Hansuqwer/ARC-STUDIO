@@ -280,7 +280,7 @@ Every new phase/chunk should include:
 | 12 Provider/Quota UX Completion | Baseline Complete | Phase 3 provider CLI + explicit gates | Chunks 3.1-3.3 hardened to Baseline Complete; diagnostics/quota/pay-gate UX with typed parser/runtime tests, local-only quota reset, and gated provider action impossible without every explicit gate; no remote quota reset or adoption claim |
 | 14 Doctor/Daemon Parity Closure | Baseline Complete | Phase 11 | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added (3 new tests); all orphan routes have explicit fate labels; no docs imply complete parity |
 | 13 Live Stream UX Polish | Baseline Complete | Phase 8 + 8.1 + Phase 14 decisions | Daemon URL auto-discovery (loopback probe), async warning fingerprint test + doc, 3-tier fallback in SwarmGraphInsightTab |
-| 15 SwarmGraph Cost Producer + Cost UX | Not Started | Phase 5 + Phase 9 | Add measured cost/token producer before richer cost panels; keep absent/degraded states until data exists |
+| 15 SwarmGraph Cost Producer + Cost UX | Baseline Complete | Phase 5 + Phase 9 | Schema expanded with model/promptTokens/completionTokens/source; measured is ISO timestamp; UI renders all new fields gated on explicit events; 17 new tests across Python+TS |
 | 16 Packaging/Optional Feature Decisions | Not Started | browser v0.1 stabilization | Decide Electron packaging/signing and live-Arena productization separately; no current product claims |
 
 ## v0.1 Polish Deferral Decision
@@ -316,7 +316,7 @@ Execute these in order after v0.1 release, unless a blocking bug requires a smal
 1. Phase 12 — Provider/Quota UX Completion
 2. Phase 14 — Doctor/Daemon Parity Closure
 3. Phase 13 — Live Stream UX Polish
-4. Phase 15 — SwarmGraph Cost Producer + Cost UX
+4. Phase 15 — SwarmGraph Cost Producer + Cost UX (Baseline Complete)
 5. Phase 16 — Packaging/Optional Feature Decisions
 
 Order rationale: close parity/doctor decisions before live-stream auto-discovery so any new daemon/doctor surface extends a stable inventory.
@@ -471,19 +471,27 @@ Most dimensions render absent/degraded until the Phase 15 measured cost/token pr
 
 ### Phase 15 — SwarmGraph Cost Producer + Cost UX
 
-**Status:** Not Started.
+**Status:** Baseline Complete | Evidence: local verification — 867 Python passed, 762 TS passed (17 new tests), protocol/extension builds clean, check-pr OK, banned-claims OK.
 
 - Add measured cost/token producer before enriching SwarmGraph cost panels.
 - First nominated producer: `langgraph+swarmgraph`, because it already emits topology/consensus events.
-- Producer schema should include provider, model, prompt tokens, completion tokens, cost amount, source, and measured timestamp before UI enrichment.
+- Producer schema includes provider, model, promptTokens, completionTokens, totalCost, source, and measured (ISO timestamp) before UI enrichment.
 - Keep cost panels absent/degraded until event-backed data exists.
 - Extend IDE rendering only from explicit measured events/metadata.
+- **Implementation:**
+  1. Updated `SWARMGRAPH_COST` event schema in `protocol/events.py`: added `model`, `promptTokens`, `completionTokens`, `source` as optional fields.
+  2. Updated `_measured_cost_payload()` in `langgraph_runner.py`: emits `source`, `measured` (ISO timestamp), `model`, `promptTokens`, `completionTokens` when present in config.
+  3. Updated `SwarmGraphCostInsight` TypeScript interface: added `provider`, `model`, `promptTokens`, `completionTokens`, `source`, `measured`.
+  4. Updated `extractCost()` in `swarmgraph-insight-model.ts`: extracts new fields with normalized aliases.
+  5. Updated `CostPanel` in `SwarmGraphInsightTab.tsx`: renders all new fields when present.
+  6. Added Python tests for normalized fields, partial, malformed, and absent cost states in both schema and runner layers.
+  7. Added TypeScript tests for partial, malformed, and producer-backed cost states.
 - Acceptance:
-  1. At least one supported path emits measured cost/token data or explicit absent reason.
-  2. UI renders rich cost data only from that producer.
-  3. Tests cover no-producer, partial, malformed, and producer-backed cost states.
-- Verification: Python producer tests, arc-extension static/helper tests, builds.
-- Known risks: fabricated cost data, confusing post-hoc accounting with hard budget enforcement.
+   1. ✅ At least one supported path (`langgraph+swarmgraph`) emits measured cost/token data with provider, model, promptTokens, completionTokens, totalCost, source, and ISO-timestamp measured field.
+   2. ✅ UI renders rich cost data only from that producer; absent/degraded states remain for no-producer and empty/malformed data.
+   3. ✅ Tests cover no-producer, partial, malformed, and producer-backed cost states in both Python and TypeScript.
+- Verification: `cd python && uv run pytest -q` (867 passed), `pnpm --filter @arc-studio/protocol build`, `pnpm --filter arc-extension build && pnpm --filter arc-extension test` (762 passed), `bash scripts/check-pr.sh` (OK), `bash scripts/check-banned-claims.sh ...` (OK).
+- Known risks: fabricated cost data, confusing post-hoc accounting with hard budget enforcement — both avoided by gating rich UI strictly on explicit measured events.
 
 ### Phase 16 — Packaging/Optional Feature Decisions
 

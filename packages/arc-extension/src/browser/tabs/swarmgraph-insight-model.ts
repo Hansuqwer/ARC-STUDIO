@@ -30,9 +30,15 @@ export interface SwarmGraphConsensusInsight {
 
 export interface SwarmGraphCostInsight {
     status: SwarmGraphInsightStatus;
+    provider?: string;
+    model?: string;
+    promptTokens?: number;
+    completionTokens?: number;
     totalCost?: number;
     totalTokens?: number;
     currency?: string;
+    source?: string;
+    measured?: string;
     items: Record<string, unknown>[];
     reason?: string;
 }
@@ -181,21 +187,44 @@ function extractConsensus(events: TraceEvent[], degraded: boolean): SwarmGraphCo
 }
 
 function extractCost(events: TraceEvent[], degraded: boolean): SwarmGraphCostInsight {
-    const source = events.find(event => isInsightEvent(event, 'cost'))?.data;
-    if (!source) {
+    const eventData = events.find(event => isInsightEvent(event, 'cost'))?.data;
+    if (!eventData) {
         return degraded
             ? { ...EMPTY_COST, status: 'degraded', reason: 'Cost requires explicit measured SwarmGraph cost trace events; runtime/provider metadata is not used.' }
             : EMPTY_COST;
     }
 
+    const source = eventData as Record<string, unknown>;
     const items = asRecords(source.items ?? source.breakdown);
     const totalCost = asNumber(source.totalCost) ?? asNumber(source.cost) ?? asNumber(source.total_cost);
     const totalTokens = asNumber(source.totalTokens) ?? asNumber(source.tokens) ?? asNumber(source.total_tokens);
     const currency = asString(source.currency);
+    const provider = asString(source.provider);
+    const model = asString(source.model);
+    const promptTokens = asNumber(source.promptTokens) ?? asNumber(source.prompt_tokens);
+    const completionTokens = asNumber(source.completionTokens) ?? asNumber(source.completion_tokens);
+    const sourceField = asString(source.source);
+    const measured = asString(source.measured);
 
-    return totalCost !== undefined || totalTokens !== undefined || currency || items.length
-        ? { status: 'present', totalCost, totalTokens, currency, items }
-        : { ...EMPTY_COST, status: 'degraded', reason: 'Cost event was present but did not include measured cost, token, currency, or item data.' };
+    const hasData = totalCost !== undefined || totalTokens !== undefined || currency || items.length
+        || provider !== undefined || model !== undefined || promptTokens !== undefined || completionTokens !== undefined
+        || sourceField !== undefined || measured !== undefined;
+
+    if (!hasData) {
+        return { ...EMPTY_COST, status: 'degraded', reason: 'Cost event was present but did not include measured cost, token, currency, or item data.' };
+    }
+
+    const result: SwarmGraphCostInsight = { status: 'present', items };
+    if (totalCost !== undefined) result.totalCost = totalCost;
+    if (totalTokens !== undefined) result.totalTokens = totalTokens;
+    if (currency !== undefined) result.currency = currency;
+    if (provider !== undefined) result.provider = provider;
+    if (model !== undefined) result.model = model;
+    if (promptTokens !== undefined) result.promptTokens = promptTokens;
+    if (completionTokens !== undefined) result.completionTokens = completionTokens;
+    if (sourceField !== undefined) result.source = sourceField;
+    if (measured !== undefined) result.measured = measured;
+    return result;
 }
 
 function asBoolean(value: unknown): boolean | undefined {

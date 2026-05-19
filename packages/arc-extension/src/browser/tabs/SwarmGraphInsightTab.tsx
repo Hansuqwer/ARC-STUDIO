@@ -133,9 +133,15 @@ const CostPanel: React.FC<{ cost: SwarmGraphCostInsight }> = ({ cost }) => (
     <Panel title='Cost' status={cost.status}>
         {cost.status === 'present' ? (
             <dl className='arc-studio-swarmgraph__details'>
+                <dt>provider</dt><dd>{cost.provider ?? 'not reported'}</dd>
+                <dt>model</dt><dd>{cost.model ?? 'not reported'}</dd>
+                <dt>prompt tokens</dt><dd>{cost.promptTokens ?? 'not reported'}</dd>
+                <dt>completion tokens</dt><dd>{cost.completionTokens ?? 'not reported'}</dd>
                 <dt>total cost</dt><dd>{cost.totalCost ?? 'not reported'}</dd>
-                <dt>tokens</dt><dd>{cost.totalTokens ?? 'not reported'}</dd>
+                <dt>total tokens</dt><dd>{cost.totalTokens ?? 'not reported'}</dd>
                 <dt>currency</dt><dd>{cost.currency ?? 'not reported'}</dd>
+                <dt>source</dt><dd>{cost.source ?? 'not reported'}</dd>
+                <dt>measured</dt><dd>{cost.measured ?? 'not reported'}</dd>
                 <dt>line items</dt><dd>{cost.items.length}</dd>
             </dl>
         ) : (
