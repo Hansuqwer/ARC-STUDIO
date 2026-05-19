@@ -208,7 +208,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | R9 IDE Live Stream Polish | Baseline Complete | Daemon URL auto-discovery (loopback probe of 127.0.0.1:7777, no background connections), async warning fingerprint test + documentation, 3-tier fallback in SwarmGraphInsightTab (manual → ARC_PYTHON_DAEMON_URL → loopback probe) |
 | R10 Doctor/Daemon Parity Closure | Baseline Complete | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added; all orphan routes have explicit fate labels (`ui-deferred`, `daemon-only-deprecated`, or CLI added); no docs imply complete parity |
 | R11 SwarmGraph Cost Producer | Baseline Complete | Schema updated with model/promptTokens/completionTokens/source; measured is ISO timestamp; langgraph+swarmgraph emits measured cost/token events; UI renders new fields gated on explicit events; tests cover no-producer/partial/malformed/producer-backed states |
-| R12 Packaging/Optional Features | In Progress | ADR-008 accepted (daemon-bundling plan); electron-builder configs + signing preflight exist; LM Arena live productization is deferred; Electron packaging/daemon bundling remains post-browser-v0.1 work |
+| R12 Packaging/Optional Features | In Progress | ADR-008 accepted (daemon-bundling plan); electron-builder configs + signing preflight exist and now guard release-config signing drift; LM Arena live productization is deferred; Electron packaging/daemon bundling remains post-browser-v0.1 work |
 
 **Active v0.2 execution order:** R8/Phase 12 → R10/Phase 14 → R9/Phase 13 → R11/Phase 15 → R12/Phase 16. Doctor/daemon parity comes before live-stream auto-discovery so any new daemon/doctor surface extends a stable inventory.
 

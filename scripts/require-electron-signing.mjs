@@ -1,10 +1,12 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { platform } from 'node:process';
 
 const SIGNING_ENVS = ['CSC_LINK', 'CSC_KEY_PASSWORD'];
 const API_KEY_ENVS = ['APPLE_API_KEY_PATH', 'APPLE_API_KEY_ID', 'APPLE_API_ISSUER_ID'];
 const LEGACY_APPLE_ID_ENVS = ['APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID'];
 const PHASE = process.env.ARC_SIGNING_PREFLIGHT_PHASE || 'pre-import';
+const RELEASE_CONFIG_PATH = new URL('../applications/electron/electron-builder.release.yml', import.meta.url);
 
 function envShape(env = process.env) {
   const missing = [...SIGNING_ENVS, ...API_KEY_ENVS].filter(name => !env[name]);
@@ -41,6 +43,26 @@ function toolingCheck() {
     stapler,
     codesign,
   };
+}
+
+function releaseConfigCheck() {
+  let config;
+  try {
+    config = readFileSync(RELEASE_CONFIG_PATH, 'utf8');
+  } catch (error) {
+    return { ok: false, reason: 'release-config-missing', detail: redact(String(error.message || error)) };
+  }
+
+  const required = [
+    { key: 'forceCodeSigning', pattern: /^forceCodeSigning:\s*true\s*$/m },
+    { key: 'mac.hardenedRuntime', pattern: /^\s{2}hardenedRuntime:\s*true\s*$/m },
+    { key: 'mac.gatekeeperAssess', pattern: /^\s{2}gatekeeperAssess:\s*false\s*$/m },
+    { key: 'win.verifyUpdateCodeSignature', pattern: /^\s{2}verifyUpdateCodeSignature:\s*true\s*$/m },
+    { key: 'win.signAndEditExecutable', pattern: /^\s{2}signAndEditExecutable:\s*true\s*$/m },
+    { key: 'win.requestedExecutionLevel', pattern: /^\s{2}requestedExecutionLevel:\s*"asInvoker"\s*$/m },
+  ];
+  const missing = required.filter(item => !item.pattern.test(config)).map(item => item.key);
+  return { ok: missing.length === 0, missing_keys: missing };
 }
 
 function certificateCheck(phase = PHASE) {
@@ -98,6 +120,7 @@ function certificateExpiry(commonName) {
 
 function preflight(env = process.env) {
   const envResult = envShape(env);
+  const releaseConfig = releaseConfigCheck();
   const tooling = toolingCheck();
   const cert = certificateCheck();
   const warnings = [];
@@ -107,12 +130,13 @@ function preflight(env = process.env) {
   if (cert.warning) {
     warnings.push({ code: cert.warning });
   }
-  const exitCode = !envResult.ok ? 10 : !tooling.ok ? 20 : !cert.ok ? 30 : 0;
+  const exitCode = !releaseConfig.ok ? 40 : !envResult.ok ? 10 : !tooling.ok ? 20 : !cert.ok ? 30 : 0;
   return {
     platform,
     phase: PHASE,
     checks: {
       env_shape: envResult,
+      release_config: releaseConfig,
       tooling,
       cert,
     },

@@ -495,7 +495,7 @@ Most dimensions render absent/degraded until the Phase 15 measured cost/token pr
 
 ### Phase 16 — Packaging/Optional Feature Decisions
 
-**Status:** In Progress | Evidence: ADR-008 accepted (daemon-bundling plan); `applications/electron/` with electron-builder + signing preflight exists; live LM Arena deferred and enforced as unclaimed by banned-claims.
+**Status:** In Progress | Evidence: ADR-008 accepted (daemon-bundling plan); `applications/electron/` with electron-builder + signing preflight exists; release config now explicitly requires macOS hardened runtime/Gatekeeper posture plus Windows signature verification settings; live LM Arena deferred and enforced as unclaimed by banned-claims.
 
 - Re-evaluate Electron packaging/signing after browser v0.1 stabilizes.
 - Defer live LM Arena productization; keep LM Arena stub/gated unless a separate implementation plan, gates, tests, and release docs are accepted.
@@ -505,6 +505,10 @@ Most dimensions render absent/degraded until the Phase 15 measured cost/token pr
   2. Electron packaging/signing preflight already exists at `applications/electron/electron-builder.release.yml` with `forceCodeSigning: true`, `scripts/require-electron-signing.mjs`, and `.github/workflows/signing-preflight.yml`.
   3. LM Arena remains stub-default with gated live mode; banned-claims (check-banned-claims.sh) enforces honest documentation.
   4. Electron and Arena tracked as separate items in both the Phase Status Table and the deferred ledger.
+- **Implementation (R12 signing-readiness slice):**
+  1. Aligned release config with electron-builder signing guidance: macOS `hardenedRuntime: true` / `gatekeeperAssess: false`; Windows `requestedExecutionLevel: "asInvoker"`, `verifyUpdateCodeSignature: true`, and `signAndEditExecutable: true`.
+  2. Extended `scripts/require-electron-signing.mjs` to fail preflight if required release-config signing keys drift or disappear, before checking credentials/tooling.
+  3. This remains packaging readiness only; no release artifact is built or claimed for v0.1.
 - Acceptance:
    1. ✅ Electron has a concrete packaging/signing plan (ADR-008 + existing electron-builder configs). Implementation blocked on browser v0.1 stabilization.
    2. ✅ LM Arena remains unclaimed — stub-default with gated live mode, enforced by banned-claims checker.

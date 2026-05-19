@@ -39,6 +39,8 @@ mac:
       arch: [x64, arm64]
   category: "public.app-category.developer-tools"
   icon: "resources/icons/icon.icns"
+  hardenedRuntime: true
+  gatekeeperAssess: false
 
 linux:
   target:
@@ -54,6 +56,9 @@ win:
     - target: nsis
       arch: [x64]
   icon: "resources/icons/icon.ico"
+  requestedExecutionLevel: "asInvoker"
+  verifyUpdateCodeSignature: true
+  signAndEditExecutable: true
 
 nsis:
   oneClick: false
