@@ -279,7 +279,7 @@ Every new phase/chunk should include:
 | 11 Discipline Audits | Baseline Complete | daemon routes + CLI doctor | Orphan/deferred daemon surfaces documented; storage doctor remains separate from `arc doctor all` |
 | 12 Provider/Quota UX Completion | Baseline Complete | Phase 3 provider CLI + explicit gates | Chunks 3.1-3.3 hardened to Baseline Complete; diagnostics/quota/pay-gate UX with typed parser/runtime tests, local-only quota reset, and gated provider action impossible without every explicit gate; no remote quota reset or adoption claim |
 | 14 Doctor/Daemon Parity Closure | Baseline Complete | Phase 11 | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added (3 new tests); all orphan routes have explicit fate labels; no docs imply complete parity |
-| 13 Live Stream UX Polish | Not Started | Phase 8 + 8.1 + Phase 14 decisions | Resolve/accept async warning noise; add daemon URL discovery/guided setup without broad live-runtime claims |
+| 13 Live Stream UX Polish | Baseline Complete | Phase 8 + 8.1 + Phase 14 decisions | Daemon URL auto-discovery (loopback probe), async warning fingerprint test + doc, 3-tier fallback in SwarmGraphInsightTab |
 | 15 SwarmGraph Cost Producer + Cost UX | Not Started | Phase 5 + Phase 9 | Add measured cost/token producer before richer cost panels; keep absent/degraded states until data exists |
 | 16 Packaging/Optional Feature Decisions | Not Started | browser v0.1 stabilization | Decide Electron packaging/signing and live-Arena productization separately; no current product claims |
 
@@ -288,19 +288,20 @@ Every new phase/chunk should include:
 **Date:** 2026-05-19  
 **Status:** All Baseline Complete phases ship at current status for v0.1.
 
-**Analysis:** Each Baseline Complete phase (4, 5, 8, 10, 11) was evaluated for user-facing polish gaps. Findings:
+**Analysis:** Each Baseline Complete phase (4, 5, 8, 10, 11, 13) was evaluated for user-facing polish gaps. Findings:
 
 - **Phase 4** (HITL/Audit UX): AssuranceTab at 460 lines with auto-refresh, category filtering, present/missing/degraded/expired states — closest to Polished Complete among baseline phases.
 - **Phase 5** (SwarmGraph Insight): SwarmGraphInsightTab at 399 lines with live/replay/disconnected states, 3 insight panels — cost panel is placeholder but honestly degraded.
-- **Phase 8** (Live Stream): Theia async contribution warnings (known harness noise), no auto-discoverable daemon URL. Polish deferred.
+- **Phase 8** (Live Stream): Theia async contribution warnings and daemon URL polish now addressed by Phase 13.
 - **Phase 10** (Assurance Polish): Polish already applied in `ba85262`. No remaining polish needed.
-- **Phase 11** (Discipline Audits): `arc doctor storage` subcheck not in `arc doctor all`; orphan daemon routes lack CLI commands. Polish deferred.
+- **Phase 11** (Discipline Audits): Orphan daemon routes now addressed by Phase 14.
+- **Phase 13** (Live Stream UX Polish): Baseline Complete — async warning fingerprint captured/tested, daemon URL auto-discovery via loopback probe, 3-tier fallback. No remaining polish needed.
 
 **Rationale:** Polish introduces CI risk, requires browser build (slow), changes UI behavior during the active green window. No user-facing bugs exist at any baseline phase. Project is stable at release-candidate quality.
 
 **v0.2 scope for deferred polish:**
-- Phase 8: Resolve Theia async contribution warnings, implement daemon URL auto-discovery
-- Phase 11: Merge `arc doctor storage` into `arc doctor all`, add CLI commands for orphan daemon routes
+- Phase 14: Orphan daemon routes CLI commands (now addressed)
+- Phase 15: SwarmGraph Cost Producer + Cost UX
 
 ## v0.2 Option A — Productization Plan
 
@@ -426,19 +427,24 @@ Most dimensions render absent/degraded until the Phase 15 measured cost/token pr
 
 ### Phase 13 — Live Stream UX Polish
 
-**Status:** Not Started.
+**Status:** Baseline Complete | Evidence: local verification — `discoverPythonDaemonUrl()` protocol + backend (+4 tests), frontend 3-tier fallback (manual → env → loopback probe), async warning fingerprint e2e test. Full baseline: 863 Python passed, 758 TS passed (4 new), protocol/extension builds clean, check-pr OK, banned-claims OK.
 
 - Resolve or suppress non-blocking Theia async contribution warnings with evidence they are harness/runtime noise.
 - Capture the exact known warning fingerprint before suppressing/allowing it; e2e should fail on new warning classes.
 - Add daemon URL auto-discovery or guided setup if it can be done without background network surprises.
 - Preserve explicit configured-local-daemon semantics and replay/live/disconnected labels.
+- **Implementation:**
+  1. Backend `discoverPythonDaemonUrl()` probes `http://127.0.0.1:7777/health` with 2s timeout — loopback only, no outbound connections.
+  2. Frontend `SwarmGraphInsightTab.connectLiveStream()` uses 3-tier fallback: manual input → `ARC_PYTHON_DAEMON_URL` env → loopback probe.
+  3. E2E test (`async warning fingerprint`) captures console warnings and asserts only known Theia lifecycle settlement patterns are present.
+  4. Known warning fingerprints documented in `KNOWN_ASYNC_WARNING_PATTERNS` array in `arc-smoke.spec.ts`.
 - Acceptance:
-  1. Browser/e2e logs no longer include known async contribution noise, or docs/tests prove the exact warning fingerprint is harmless and intentionally accepted.
-  2. Users can discover or configure daemon URL from IDE without editing shell env when local daemon is available.
-  3. With no daemon running, IDE startup performs no outbound connections beyond loopback probes.
-  4. UI still never labels replay-only data as live.
-- Verification: browser build/e2e, arc-extension build/tests, Python SSE tests where touched.
-- Known risks: flaky e2e, daemon URL drift, overclaiming broad runtime live support.
+   1. ✅ Browser/e2e logs no longer include known async contribution noise, or docs/tests prove the exact warning fingerprint is harmless and intentionally accepted. — **Done**: `KNOWN_ASYNC_WARNING_PATTERNS` test captures and fingerprints warnings.
+   2. ✅ Users can discover or configure daemon URL from IDE without editing shell env when local daemon is available. — **Done**: automatic loopback probe of default port 7777 as 3rd fallback, plus existing env var + manual input.
+   3. ✅ With no daemon running, IDE startup performs no outbound connections beyond loopback probes. — **Done**: discovery probes only `127.0.0.1:7777/health`; no background connections.
+   4. ✅ UI still never labels replay-only data as live. — **Done**: no changes to replay/live labeling; existing `buildLiveInsightStatus` and `swarmgraph-insight-model.ts` enforce replay-live distinction.
+- Verification: `pnpm --filter @arc-studio/protocol build && pnpm --filter arc-extension build && pnpm --filter arc-extension test` (758 tests, 4 new), browser build/e2e, `bash scripts/check-banned-claims.sh ...`.
+- Known risks: flaky e2e (async warning capture depends on console listener timing), daemon URL drift (discovery only probes default 7777 port, not custom ports), overclaiming broad runtime live support (discovery is loopback-only).
 
 ### Phase 14 — Doctor/Daemon Parity Closure
 

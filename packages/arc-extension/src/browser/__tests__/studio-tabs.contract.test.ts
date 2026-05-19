@@ -871,6 +871,7 @@ describe('Studio Tabs Contracts', () => {
             expect(insightSource).toMatch(/Live insight:/);
             expect(insightSource).toMatch(/disconnected\/degraded/);
             expect(insightSource).toMatch(/Live mode is a limited Python SSE probe/);
+            expect(insightSource).toMatch(/discoverPythonDaemonUrl/);
         });
 
         it('should keep replay trace insight distinct from active live stream insight', () => {

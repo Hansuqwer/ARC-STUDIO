@@ -265,7 +265,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
         const runId = liveRunId.trim();
         let baseUrl = liveBaseUrl.trim();
         
-        // Auto-resolve from backend env if not provided
+        // Auto-resolve: 1) env var, 2) loopback probe
         if (!baseUrl) {
             try {
                 const envBaseUrl = await arcService.getPythonDaemonUrl();
@@ -274,7 +274,18 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
                     setLiveBaseUrl(envBaseUrl);
                 }
             } catch {
-                // Ignore env resolution errors, fall through to manual requirement
+                // Ignore env resolution errors, fall through
+            }
+        }
+        if (!baseUrl) {
+            try {
+                const discoveredUrl = await arcService.discoverPythonDaemonUrl();
+                if (discoveredUrl) {
+                    baseUrl = discoveredUrl;
+                    setLiveBaseUrl(discoveredUrl);
+                }
+            } catch {
+                // Ignore discovery errors, fall through to manual requirement
             }
         }
         
@@ -285,7 +296,7 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
         }
         if (!baseUrl) {
             setLiveState('disconnected');
-            setLiveReason('no Python web/SSE base URL configured (set ARC_PYTHON_DAEMON_URL or enter manually)');
+            setLiveReason('no Python web/SSE base URL configured (set ARC_PYTHON_DAEMON_URL, start daemon on port 7777, or enter manually)');
             setError(null);
             return;
         }

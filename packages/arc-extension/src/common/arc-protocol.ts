@@ -1373,6 +1373,14 @@ export interface ArcService {
     /** Get configured Python daemon URL from ARC_PYTHON_DAEMON_URL env var. */
     getPythonDaemonUrl(): Promise<string | undefined>;
 
+    /**
+     * Discover a running Python daemon by probing the default loopback URL
+     * (http://127.0.0.1:7777/health) with a short timeout.
+     * Returns the base URL if the daemon responds, undefined otherwise.
+     * Only probes loopback addresses; no outbound connections.
+     */
+    discoverPythonDaemonUrl(): Promise<string | undefined>;
+
     // ========== Capability Diff (Session B) ==========
 
     /**

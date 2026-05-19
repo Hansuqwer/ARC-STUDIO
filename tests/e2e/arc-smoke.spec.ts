@@ -44,6 +44,25 @@ function parseServerSentEventTypes(body: string): string[] {
     .map((line) => JSON.parse(line.slice('data: '.length)).type);
 }
 
+/**
+ * Known Theia async contribution warning fingerprints.
+ *
+ * Theia 1.71 tracks async lifecycle promises returned by
+ * FrontendApplicationContribution methods (initializeLayout, onStart, etc.)
+ * and emits "took longer than expected to settle" warnings when a contribution
+ * returns promises across multiple lifecycle hooks. These are harness/runtime
+ * noise from ARC's AbstractViewContribution subclasses that conditionally
+ * open views based on URL params or preferences. All tests pass regardless,
+ * these warnings have no user-facing impact.
+ *
+ * If new warning patterns appear, add them here with a comment explaining
+ * the source. If a warning is NOT in this set, the test below will fail.
+ */
+const KNOWN_ASYNC_WARNING_PATTERNS: RegExp[] = [
+  /took longer than expected to settle/,
+  // Add new known patterns above this line
+];
+
 test.describe('ARC Studio — Smoke Tests', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(APP_URL, { waitUntil: 'networkidle', timeout: TIMEOUT });
@@ -55,6 +74,38 @@ test.describe('ARC Studio — Smoke Tests', () => {
     expect(title).toBeTruthy();
     expect(title).not.toContain('ERR_');
     expect(title).not.toContain('Cannot GET');
+  });
+
+  test('Theia async contribution warnings have known harmless fingerprint', async ({ page }) => {
+    const warnings: string[] = [];
+    page.on('console', (msg) => {
+      if (msg.type() === 'warning') {
+        warnings.push(msg.text());
+      }
+    });
+
+    await page.goto(APP_URL, { waitUntil: 'networkidle', timeout: TIMEOUT });
+    await acceptWorkspaceTrustIfShown(page);
+
+    // Filter to ARC/Theia lifecycle warnings only
+    const lifecycleWarnings = warnings.filter((w) =>
+      /settle|contribution|FrontendApplication/i.test(w)
+    );
+
+    for (const warning of lifecycleWarnings) {
+      const isKnown = KNOWN_ASYNC_WARNING_PATTERNS.some((pattern) =>
+        pattern.test(warning)
+      );
+      if (!isKnown) {
+        console.log(`UNKNOWN LIFECYCLE WARNING: ${warning}`);
+      }
+      expect(isKnown).toBe(true);
+    }
+
+    // At least one known warning should be present if any are emitted
+    if (lifecycleWarnings.length > 0) {
+      console.log(`Known Theia async contribution warnings present: ${lifecycleWarnings.length}`);
+    }
   });
 
   test('page title contains ARC Studio', async ({ page }) => {

@@ -1474,4 +1474,55 @@ graph = builder.compile(checkpointer=MemorySaver())
             expect(chunks[chunks.length - 1]?.status?.message).toContain('Live SSE proxy degraded; ECONNREFUSED');
         });
     });
+
+    describe('discoverPythonDaemonUrl', () => {
+        beforeEach(() => {
+            delete process.env.ARC_PYTHON_DAEMON_URL;
+            global.fetch = undefined as any;
+        });
+
+        it('should return base URL when daemon health responds OK', async () => {
+            global.fetch = jest.fn(async (url: RequestInfo | URL) => {
+                const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.href : String(url);
+                expect(urlStr).toContain('/health');
+                return { ok: true, status: 200 } as Response;
+            });
+
+            const result = await service.discoverPythonDaemonUrl();
+            expect(result).toBe('http://127.0.0.1:7777');
+        });
+
+        it('should return undefined when daemon health responds non-OK', async () => {
+            global.fetch = jest.fn(async () => {
+                return { ok: false, status: 502 } as Response;
+            });
+
+            const result = await service.discoverPythonDaemonUrl();
+            expect(result).toBeUndefined();
+        });
+
+        it('should return undefined when daemon is not reachable', async () => {
+            global.fetch = jest.fn(async () => {
+                throw new Error('ECONNREFUSED');
+            });
+
+            const result = await service.discoverPythonDaemonUrl();
+            expect(result).toBeUndefined();
+        });
+
+        it('should probe only loopback address 127.0.0.1:7777', async () => {
+            global.fetch = jest.fn(async () => {
+                return { ok: true, status: 200 } as Response;
+            });
+
+            const fetchMock = global.fetch as jest.Mock;
+            const result = await service.discoverPythonDaemonUrl();
+
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+            const calledUrl = fetchMock.mock.calls[0][0] as URL;
+            expect(calledUrl.hostname).toBe('127.0.0.1');
+            expect(calledUrl.port).toBe('7777');
+            expect(result).toBe('http://127.0.0.1:7777');
+        });
+    });
 });

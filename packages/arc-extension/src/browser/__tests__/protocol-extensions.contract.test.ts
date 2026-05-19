@@ -273,6 +273,8 @@ describe('Protocol Extensions (Session B + B7)', () => {
             expect(source).toMatch(/state:\s*ActiveTraceStreamState/);
             expect(source).toMatch(/streamActiveTrace\(request:\s*ActiveTraceStreamRequest\)/);
             expect(source).toMatch(/cancelActiveTraceStream\(runId:\s*string\)/);
+            expect(source).toMatch(/getPythonDaemonUrl\(\):\s*Promise<string \| undefined>/);
+            expect(source).toMatch(/discoverPythonDaemonUrl\(\):\s*Promise<string \| undefined>/);
         });
 
         it('should expose optional capability metadata without provider readiness claims', () => {

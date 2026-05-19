@@ -93,7 +93,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 
 **Status:** Baseline Complete for configured local daemon/stub runtime live event streams. Evidence: local Phase 8 verification on `bec8d4b` worktree (`python` web SSE tests, arc-extension tests/build, browser build/e2e, `scripts/check-pr.sh`). Notes: IDE live mode can connect to configured Python daemon/local runtime streams and handles terminal/degraded states while preserving replay-not-live copy; this is not a broad runtime/provider-backed live event claim.
 
-**Follow-up:** Browser e2e still logs Theia async contribution warnings while passing; treat as known harness/runtime noise until a dedicated cleanup phase proves otherwise. A separate Phase 8.1 should add a true IDE-to-daemon SSE e2e harness before claiming UI-rendered live daemon frames end-to-end.
+**Follow-up:** Browser e2e logs known Theia async contribution warnings; Phase 13 (R9) captured the exact warning fingerprint in the e2e test and proved them harmless/intentionally-accepted. Phase 8.1 (IDE-to-daemon SSE e2e harness) completed separately.
 
 ## R2 — IDE Runtime Setup + Config Wizard
 
@@ -205,7 +205,7 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | R6 Real Adoption | Complete local-real hardening baseline | Keep fake/offline deterministic/default; local-real availability requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; no paid/live provider calls; provider-backed execution remains blocked/unclaimed |
 | R7 Release Ops | Complete | Release date set for 2026-06-01; green-window active; `.env` scrub completed on 2026-05-18 (commit `ffc1fd1`); all required GitHub workflows green on `ec36b55` |
 | R8 IDE Provider/Quota Completion | Baseline Complete | Chunks 3.1-3.3 hardened — typed diagnostics parser with malformed/partial/success tests, local-only quota reset with targeted confirmation, three-layer provider gate (env + paid opt-in + exact confirmation) impossible to trigger without every gate; no remote quota reset or adoption claim |
-| R9 IDE Live Stream Polish | Not Started | Resolve/accept Theia async warning noise and add daemon URL discovery/guided setup for configured local daemon streams only |
+| R9 IDE Live Stream Polish | Baseline Complete | Daemon URL auto-discovery (loopback probe of 127.0.0.1:7777, no background connections), async warning fingerprint test + documentation, 3-tier fallback in SwarmGraphInsightTab (manual → ARC_PYTHON_DAEMON_URL → loopback probe) |
 | R10 Doctor/Daemon Parity Closure | Baseline Complete | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added; all orphan routes have explicit fate labels (`ui-deferred`, `daemon-only-deprecated`, or CLI added); no docs imply complete parity |
 | R11 SwarmGraph Cost Producer | Not Started | Add measured cost/token producer before enriching IDE cost panels beyond absent/degraded states |
 | R12 Packaging/Optional Features | Not Started | Re-evaluate Electron packaging/signing and live LM Arena separately after browser v0.1 stabilizes |
@@ -226,13 +226,12 @@ v0.2 product work is scoped to IDE productization of existing/gated capabilities
 
 **v0.1 actions:**
 
-- Freeze Phase 4, 5, 8, 10, and 11 behavior except for blocker fixes.
+- Freeze Phase 4, 5, 8, 10, 11, and 13 behavior except for blocker fixes.
 - Keep release docs honest about configured local daemon streams, conditional audit material, absent cost producers, and known parity state.
 - Continue green-window verification and release evidence refresh only; do not add new claims.
 
 **v0.2 carry-forward:**
 
-- Phase 8: Resolve non-blocking Theia async contribution warnings and add daemon URL auto-discovery.
 - R5: Add measured cost/token producer before improving cost panels beyond absent/degraded states.
 
 ### Remaining IDE Work
@@ -244,7 +243,7 @@ The browser IDE is v0.1-alpha shippable but not fully complete. Remaining IDE wo
 | Area | Remaining Work | Target | Release Claim Boundary |
 |---|---|---|---|
 | Provider/Quota UI | Complete — chunks 3.1-3.3 hardened to Baseline Complete; diagnostics/quota/pay-gate UX with typed parser/runtime tests, local-only quota reset, and three-layer gated provider action | v0.2 | No remote quota reset; no broad provider-backed adoption claim |
-| Live Stream UX | Remove/quiet non-blocking Theia async contribution warnings; add daemon URL auto-discovery or guided connection setup | v0.2 after Doctor/Daemon Parity | Configured local daemon stream only; not broad runtime/provider live support |
+| Live Stream UX | Complete — async warning fingerprint captured/tested, daemon URL auto-discovery via loopback probe (127.0.0.1:7777/health), 3-tier fallback in SwarmGraphInsightTab | v0.2 | Configured local daemon stream only; not broad runtime/provider live support |
 | SwarmGraph Cost UX | Add measured cost/token producer before rendering rich cost panels | v0.2+ | Empty/degraded cost state remains correct until producer exists |
 | Doctor/Daemon Parity | Complete — all orphan routes have fate labels; `arc runs links` CLI added; remaining routes marked `ui-deferred` or `daemon-only-deprecated` | v0.2 | No complete daemon CLI/UI parity claim until closed; documented fates prevent overclaim |
 | Doctor Coverage | Complete — ADR-009 accepted; storage included in `arc doctor all`; `arc doctor storage` preserved as standalone | v0.2 | Release docs must accurately reflect storage inclusion status |

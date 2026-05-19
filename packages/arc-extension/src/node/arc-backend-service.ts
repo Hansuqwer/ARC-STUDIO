@@ -1742,4 +1742,28 @@ export class ArcBackendService implements ArcService {
     async getPythonDaemonUrl(): Promise<string | undefined> {
         return process.env[ARC_PYTHON_DAEMON_URL_ENV]?.trim() || undefined;
     }
+
+    async discoverPythonDaemonUrl(): Promise<string | undefined> {
+        const defaultUrl = 'http://127.0.0.1:7777';
+        try {
+            const url = new URL('/health', defaultUrl);
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 2000);
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    signal: controller.signal,
+                });
+                if (response.ok) {
+                    return defaultUrl;
+                }
+                return undefined;
+            } finally {
+                clearTimeout(timeout);
+                controller.abort();
+            }
+        } catch {
+            return undefined;
+        }
+    }
 }
