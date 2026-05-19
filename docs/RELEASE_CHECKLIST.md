@@ -4,7 +4,7 @@
 **Version:** v0.1.0-alpha
 **Target release date:** 2026-06-01
 **Last Updated:** 2026-05-19
-**Current evidence anchor:** `ec36b55` | refreshed 2026-05-19 | docs-only updates after this anchor must not widen release claims.
+**Current evidence anchor:** `ec36b55` | refreshed 2026-05-19 | local docs review on `f9f7af2`; docs-only updates after this anchor must not widen release claims.
 
 **Evidence refresh:** Docs refreshed against pushed `main` commit `ec36b55` on 2026-05-19. All Baseline Complete phases evaluated for polish; decision: ship as-is, defer polish to v0.2 (see Polish Deferral section below). All required GitHub `main` workflows are green. `.env` history scrub completed (see Item 9). Real-runtime smoke remains opt-in/non-gating.
 
@@ -110,7 +110,7 @@ bash scripts/check-banned-claims.sh AGENTS.md README.md docs/LOCKED_REMAINING_RO
 
 **Status:** ✅ Passing locally (2026-05-18)
 
-Latest local run: `860 passed, 19 skipped`. Real-runtime smoke paths are outside the default offline gate because dependency shape differs across platforms. The narrow `langgraph+swarmgraph` local-real smoke requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; it uses an in-process fixture graph, forces no-cost SwarmGraph env defaults, performs no provider/paid calls, and is not evidence for provider-backed adoption.
+Latest local run on `f9f7af2`: `867 passed, 19 skipped`. Real-runtime smoke paths are outside the default offline gate because dependency shape differs across platforms. The narrow `langgraph+swarmgraph` local-real smoke requires both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`; it uses an in-process fixture graph, forces no-cost SwarmGraph env defaults, performs no provider/paid calls, and is not evidence for provider-backed adoption.
 
 **Evidence:** Pushed `main` commit `ec36b55`; latest observed `python` on `main` is green.
 
@@ -126,7 +126,7 @@ cd python && uv run pytest -q -W error
 
 **Status:** ✅ Passing locally (2026-05-15); not re-run in 2026-05-18 docs-only refresh
 
-Latest local run on 2026-05-19: `754 passed, 16 suites`. Jest reports an open-handle notice after completion; tests still exit successfully.
+Latest local run on 2026-05-19 at `f9f7af2`: `762 passed, 16 suites`. Jest reports an open-handle notice after completion; tests still exit successfully.
 
 **Evidence:** Pushed `main` commit `ec36b55`; latest observed `node` on `main` is green.
 
@@ -159,9 +159,9 @@ bash scripts/check-banned-claims.sh AGENTS.md README.md docs/LOCKED_REMAINING_RO
 
 **Status:** ✅ Baseline audit documented; remaining orphan/deferred surfaces listed
 
-**Evidence:** Local source audit draft on 2026-05-18. Daemon routes are registered in `python/src/agent_runtime_cockpit/web/routes.py:710-744`. `arc doctor all` is implemented in `python/src/agent_runtime_cockpit/cli.py:739-851`; storage diagnostics are separate at `python/src/agent_runtime_cockpit/cli.py:939-980`.
+**Evidence:** Local source audit refreshed on 2026-05-19 at `f9f7af2`. Daemon routes are registered in `python/src/agent_runtime_cockpit/web/routes.py:748-752` for Arena surfaces and surrounding route registration. `arc doctor all` is implemented in `python/src/agent_runtime_cockpit/cli.py:740-922`; workspace storage checks are included in `arc doctor all` per ADR-009, while `arc doctor storage` remains available separately at `python/src/agent_runtime_cockpit/cli.py:1018-1057`.
 
-`arc doctor all` currently reports Python, CLI version, runtime detection, daemon health, SwarmGraph CLI availability, and provider env-presence diagnostics. It does not include the storage subcheck based on current source. Remaining direct-daemon orphan/deferred surfaces are `/api/runs/start`, `/api/runs/{run_id}/links`, `/api/telemetry/export/{run_id}`, `/api/context/pack`, `/api/providers/accounts/{account_id}/test`, limited-local `/api/sse/proof`, and gated/stub `/api/arena/*`. Release notes must not state complete daemon endpoint CLI/UI parity or complete doctor storage coverage until a later implementation closes those gaps.
+`arc doctor all` currently reports Python, CLI version, runtime detection, daemon health, SwarmGraph CLI availability, provider env-presence diagnostics, and workspace storage (traces directory, SQLite index, indexed runs count, evals directory). `arc doctor storage` remains a dedicated standalone storage diagnostic command. Remaining direct-daemon orphan/deferred surfaces are `/api/runs/start`, `/api/telemetry/export/{run_id}`, `/api/providers/accounts/{account_id}/test`, limited-local `/api/sse/proof`, and gated/stub `/api/arena/*`; `/api/runs/{run_id}/links` has the `arc runs links` CLI analog and `/api/context/pack` has `arc context pack`. Release notes must not state complete daemon endpoint CLI/UI parity until all deferred surfaces are explicitly closed.
 
 **Check:**
 ```bash
