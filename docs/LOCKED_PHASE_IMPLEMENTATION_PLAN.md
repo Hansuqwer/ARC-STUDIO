@@ -3,7 +3,7 @@
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
 **Last reality refresh:** 2026-05-19 against locked roadmap and release evidence.  
-**Current evidence anchor:** `83673e8` | refreshed 2026-05-19 | docs-only updates after this anchor must not widen release claims.  
+**Current evidence anchor:** `b88b189` | refreshed 2026-05-19 | docs-only updates after this anchor must not widen release claims.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -235,17 +235,17 @@ Every new phase/chunk should include:
 ## Phase 7 — Release Operations
 
 **Roadmap:** R7  
-**Status:** Complete — 7.1 evidence refreshed; 7.2 green-window active from 2026-05-18 evidence with current pushed-main anchor `83673e8`; 7.3 `.env` history scrub completed on 2026-05-18
+**Status:** Complete — 7.1 evidence refreshed; 7.2 green-window active from 2026-05-18 evidence with current pushed-main anchor `b88b189`; 7.3 `.env` history scrub completed on 2026-05-18
 
 ### Chunk 7.1 — Release Evidence Refresh
 - Update release checklist with latest commit/run IDs.
 - Do not overclaim deferred features.
-- Status: Complete — evidence refreshed for pushed `main` commit `83673e8`. Latest GitHub `main` evidence is green for python, node, ARC Roadmap Gate, e2e, and signing-preflight. Banned-claims verification remains the docs-touch check for this phase.
+- Status: Complete — evidence refreshed for pushed `main` commit `b88b189`. Latest GitHub `main` evidence is green for python, node, ARC Roadmap Gate, e2e, and signing-preflight. Banned-claims verification remains the docs-touch check for this phase.
 
 ### Chunk 7.2 — Green Window
 - Start only after release date is set.
 - Track GitHub green runs for required workflows.
-- Status: Active — release date is set for 2026-06-01. The 3-day green-window starts from 2026-05-18 green evidence and current pushed-main anchor `83673e8`; it completes on 2026-05-21 only if required workflows stay green.
+- Status: Active — release date is set for 2026-06-01. The 3-day green-window starts from 2026-05-18 green evidence and current pushed-main anchor `b88b189`; it completes on 2026-05-21 only if required workflows stay green.
 
 ### Chunk 7.3 — `.env` History Scrub
 - Execute only after explicit approval for release date + history rewrite + force-push plan.
@@ -271,7 +271,7 @@ Every new phase/chunk should include:
 | 4 HITL/Audit UX | Complete baseline | existing CLI/RunsTab basics | Dedicated Assurance tab; avoids adapter-wide HMAC claim |
 | 5 SwarmGraph Insight | Complete baseline + first producer events | event-backed adoption data | LangGraph + SwarmGraph topology/consensus events; no fabricated cost; configured local daemon SSE is wired in Phase 8 while SwarmGraph insight live producer/cost producer work remains Phase 15 |
 | 6 Real Adoption | Complete local-real hardening baseline | adoption protocol + dual explicit local-real gates | `langgraph+swarmgraph` fake/offline CLI baseline remains default; narrow local-real path has contract, dependency/preflight states, metadata/IDE surfacing, and smoke/regression coverage; both `ARC_REAL_RUNTIME_SMOKE=1` and `ARC_LANGGRAPH_SWARMGRAPH_REAL=1` are required for local-real availability; no provider calls are made or claimed |
-| 7 Release Ops | Complete | green CI | 7.1 evidence refreshed for current pushed-main anchor `83673e8` with green `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`; 7.2 green-window active from 2026-05-18 toward 2026-06-01 release date; 7.3 `.env` history scrub completed on 2026-05-18 with git-filter-repo, 4 commits cleaned, backup branch created, force-pushed to main |
+| 7 Release Ops | Complete | green CI | 7.1 evidence refreshed for current pushed-main anchor `b88b189` with green `python`, `node`, `ARC Roadmap Gate`, `e2e`, and `signing-preflight`; 7.2 green-window active from 2026-05-18 toward 2026-06-01 release date; 7.3 `.env` history scrub completed on 2026-05-18 with git-filter-repo, 4 commits cleaned, backup branch created, force-pushed to main |
 | 8 Live Stream Productization | Baseline Complete | configured Python daemon/local stream | Configured local daemon/stub runtime live streams work; remaining IDE polish is Phase 13 |
 | 8.1 IDE-to-Daemon E2E Harness | Complete | Phase 8 | Deterministic offline browser e2e proves one IDE-to-local-daemon SSE live frame path |
 | 9 BudgetVector Post-Hoc Accounting | Complete | trace/metadata budget data | Post-hoc accounting/reporting implemented; real-time budget interrupts deferred |
