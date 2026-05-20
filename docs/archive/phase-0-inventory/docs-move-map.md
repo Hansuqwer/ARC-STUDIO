@@ -52,16 +52,157 @@ Command run: `git ls-files '*.md' 'docs/**/*.md'`.
 
 Scope note: output includes root docs, active `docs/`, archived docs, package READMEs, and vendored `runtimes/swarmgraph` docs. Phase 1 consolidation should operate on ARC-owned root/docs files first; vendored/runtime docs are not moved unless explicitly scoped.
 
-Counts from current repo snapshot:
+### ARC-Owned Docs — Exhaustive Enumeration
 
-| Scope | Count / status | Phase 1 action |
+#### Root Markdown Files (ARC-owned, 4 files)
+
+| File | Disposition | Target path | Notes |
+|---|---|---|---|
+| `AGENTS.md` | Pointer-only | `docs/agents.md` | old file becomes stub |
+| `CHANGELOG.md` | Keep-canonical | — | release history; update normally |
+| `CONTRIBUTING.md` | Keep-canonical | — | contribution guide; update normally |
+| `README.md` | Keep-canonical | — | update CLI section in Phase 1 |
+
+#### `docs/` Root — Active Documents (ARC-owned, 21 files)
+
+| File | Disposition | Target path | Notes |
+|---|---|---|---|
+| `docs/ADAPTER_DEVELOPMENT.md` | Keep-canonical | — | adapter development guide |
+| `docs/AG_UI_MAPPING.md` | Archive | `docs/archive/AG_UI_MAPPING.md` | legacy mapping |
+| `docs/CLI_IDE_GAP_ANALYSIS.md` | Archive | `docs/archive/CLI_IDE_GAP_ANALYSIS.md` | gap analysis, not canonical |
+| `docs/DEVELOPMENT.md` | Keep-canonical | — | development guide |
+| `docs/ENV_HISTORY_SCRUB_PLAN.md` | Keep-canonical | — | active env scrub plan |
+| `docs/EXTENSION_MIGRATION.md` | Keep-canonical | — | extension migration guide |
+| `docs/EXTENSIONS.md` | Keep-canonical | — | extensions reference |
+| `docs/INDEX.md` | Pointer-only | `docs/wiki/research-context/README.md` | index → wiki README |
+| `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` | Pointer-only | `docs/phases.md` | canonical phases doc |
+| `docs/LOCKED_REMAINING_ROADMAP.md` | Pointer-only | `docs/roadmap.md` | canonical roadmap doc |
+| `docs/MOCK_POLICY.md` | Keep-canonical | — | mock policy reference |
+| `docs/PLANNER_HANDOVER_REVIEW.md` | Archive | `docs/archive/PLANNER_HANDOVER_REVIEW.md` | stale handover review |
+| `docs/QUICKSTART.md` | Keep-canonical | — | quickstart guide |
+| `docs/REALITY_AUDIT.md` | Keep-canonical | — | reality audit reference |
+| `docs/RELEASE_CHECKLIST.md` | Pointer-only | `docs/release/checklist.md` | release checklist canonical |
+| `docs/RUNTIMES.md` | Keep-canonical | — | runtimes reference |
+| `docs/SECURITY.md` | Keep-canonical | — | security reference |
+| `docs/TELEMETRY_SEMCONV.md` | Keep-canonical | — | telemetry semconv reference |
+| `docs/TESTING.md` | Keep-canonical | — | testing guide |
+| `docs/theia-version-audit.md` | Archive | `docs/archive/theia-version-audit.md` | historical audit |
+| `docs/SPIKE_KEYCHAIN_STORAGE.md` | Archive | `docs/archive/SPIKE_KEYCHAIN_STORAGE.md` | spike research |
+| `docs/SPIKE_SWARMGRAPH_IMPORT.md` | Archive | `docs/archive/SPIKE_SWARMGRAPH_IMPORT.md` | spike research |
+| `docs/SECURITY.md` | Keep-canonical | — | security architecture |
+| `docs/context-packs/bootstrap.md` | Keep-canonical | — | bootstrap context pack |
+
+#### `docs/adr/` — Architecture Decisions (ARC-owned, 15 files)
+
+All ADRs are Keep-canonical in place.
+
+| File | Notes |
+|---|---|
+| `docs/adr/000-execution-core-contract.md` | Core contract |
+| `docs/adr/001-config-model.md` | Config model |
+| `docs/adr/002-run-lifecycle-state-machine.md` | Run lifecycle |
+| `docs/adr/003-storage-strategy.md` | Storage strategy |
+| `docs/adr/004-event-schema-versioning.md` | Event schema |
+| `docs/adr/005-audit-key-management.md` | Audit key management |
+| `docs/adr/006-workspace-trust-isolation.md` | Trust isolation |
+| `docs/adr/007-provider-routing-unification.md` | Provider routing |
+| `docs/adr/008-daemon-bundling.md` | Daemon bundling |
+| `docs/adr/009-doctor-storage-inclusion.md` | Doctor storage inclusion |
+| `docs/adr/ADR-011-full-parity-framing.md` | Full parity framing |
+| `docs/adr/ADR-012-provenance-wedge-framing.md` | Rejected provenance wedge |
+| `docs/adr/ADR-013-swarmgraph-architecture.md` | SwarmGraph architecture |
+| `docs/adr/ADR-014-security-architecture.md` | Security architecture |
+| `docs/adr/ADR-015-ide-compliance-mode.md` | IDE compliance mode |
+
+#### `docs/archive/` — Historical Documents (ARC-owned, ~45 files)
+
+All files under `docs/archive/` are Keep-canonical (archived content, already in archive). No Phase 1 move actions needed. Subdirectories:
+
+- `docs/archive/phase-0-inventory/*` — Phase 0 inventory evidence (9 files)
+- `docs/archive/stale-roadmaps/*` — Stale roadmaps (~23 files)
+- `docs/archive/theia-extensions/*` — Theia extension sources
+- `docs/archive/DECISIONS/*` — Archived ADRs
+- `docs/archive/history/*` — Historical status docs
+- `docs/archive/handover/*` — Archived handover docs
+
+#### `docs/research/` — Supporting Research (ARC-owned, ~30 files)
+
+All Keep-canonical. Not moved in Phase 1. Not source of truth.
+
+- `docs/research/IMPLEMENTATION_RESEARCH.md`
+- `docs/research/ARC_STUDIO_UX_SPEC*.md`
+- `docs/research/EXTERNAL_TOOLS_UI_RESEARCH.md`
+- `docs/research/PROVIDER_AUTH_CATALOG_RESEARCH.md`
+- `docs/research/feature-roadmap-review/*` (19 files, 00-18)
+- `docs/research/innovation-critical-review/*` (13 files, 00-12)
+
+#### `docs/wiki/` — Wiki and Cockpit Docs (ARC-owned, ~20 files)
+
+All Keep-canonical. Not moved in Phase 1.
+
+- `docs/wiki/implementation-cockpit/*` (17 files, 00-16 + model-workflow + remaining-plan-sessions)
+- `docs/wiki/research-context/README.md`
+
+#### `docs/handover/` — Handover Pointers (ARC-owned, 2 files)
+
+| File | Disposition | Notes |
 |---|---|---|
-| root active docs | `AGENTS.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `README.md` | keep or pointer per rows above |
-| active `docs/*.md` | many active docs including locked roadmap/phase/checklist | consolidate canonical docs only |
-| `docs/adr/*.md` | existing `000-009` plus new `ADR-011` through `ADR-015` pending add | keep in place |
-| `docs/archive/**` | historical/stale docs | do not move except if Phase 1 archives old locked files |
-| `docs/research/**` | supporting research | keep; not source of truth |
-| `runtimes/swarmgraph/**` | vendored/runtime docs | out of ARC docs consolidation scope |
+| `docs/handover/HANDOVER.md` | Pointer-only | thin pointer to locked docs |
+| `docs/handover/NEXT_IMPLEMENTATION_HANDOVER.md` | Pointer-only | thin pointer to next implementation |
+
+#### `docs/ARC-Studio/` — ARC Studio Session Docs (ARC-owned, 3 files)
+
+| File | Disposition | Notes |
+|---|---|---|
+| `docs/ARC-Studio/2026-05-19/01-swarmgraph-original-inventory.md` | Archive | session research |
+| `docs/ARC-Studio/2026-05-19/02-arc-current-swarmgraph-audit.md` | Archive | session research |
+| `docs/ARC-Studio/2026-05-19/03-gap-analysis-and-implementation-plan.md` | Archive | session research |
+
+#### `docs/architecture/` (ARC-owned, 1 file)
+
+| File | Disposition | Notes |
+|---|---|---|
+| `docs/architecture/DEEP_ARCHITECTURE_ANALYSIS.md` | Keep-canonical | deep architecture analysis |
+
+#### `docs/audits/` (ARC-owned, 1 file)
+
+| File | Disposition | Notes |
+|---|---|---|
+| `docs/audits/audit-2026-05-14-55b9c25.md` | Keep-canonical | audit evidence |
+
+#### `docs/spec/` (ARC-owned, 1 file)
+
+| File | Disposition | Notes |
+|---|---|---|
+| `docs/spec/SECTION_07_CLI_LAYOUT_MOCKUPS.md` | Keep-canonical | CLI mockup spec |
+
+### Out-of-Scope (Vendored/Runtime Docs — NOT Moved)
+
+| Scope | Count | Rationale |
+|---|---|---|
+| `runtimes/swarmgraph/**/*.md` | ~100+ files | vendored runtime; out of ARC docs consolidation scope |
+| `.opencode/agents/*.md` | 7 files | opencode agent configs; not ARC docs |
+| `plugins/README.md` | 1 file | plugin documentation |
+| `python/README.md` | 1 file | Python package README |
+| `python/benchmarks/README.md` | 1 file | benchmark docs |
+| `python/examples/adapters/README.md` | 1 file | adapter examples docs |
+| `packages/arc-extension/ACCESSIBILITY.md` | 1 file | package accessibility |
+| `runtimes/swarmgraph/.github/*.md` | ~5 files | vendored GitHub templates |
+
+### Total Counts
+
+| Scope | Count | Phase 1 action |
+|---|---|---|
+| root active docs | 4 (`AGENTS.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `README.md`) | keep or pointer per rows above |
+| active `docs/*.md` (non-archive, non-research, non-wiki, non-adr) | ~21 files | consolidate canonical docs only |
+| `docs/adr/*.md` | 15 files | keep in place |
+| `docs/archive/**/*.md` | ~50+ files | already archived; no move needed |
+| `docs/research/**/*.md` | ~32 files | keep; not source of truth |
+| `docs/wiki/**/*.md` | ~18 files | keep; wiki context |
+| `docs/handover/*.md` | 2 files | pointer-only |
+| `runtimes/swarmgraph/**/*.md` | ~100+ files | out of scope |
+| `.opencode/agents/*.md` | 7 files | out of scope |
+| Other package READMEs | ~5 files | out of scope |
 
 ## Required Phase 1 First Pass
 
@@ -106,11 +247,24 @@ For each Rename / Archive / Pointer-only row above, list inbound references that
 
 | Target moved file | Inbound reference (file:line) | Action |
 |---|---|---|
-| docs/LOCKED_REMAINING_ROADMAP.md | README.md:<line> | update link to docs/roadmap.md |
-| docs/LOCKED_REMAINING_ROADMAP.md | AGENTS.md:<line> | resolved via pointer |
-| <add row per inbound link> | | |
+| `docs/roadmap.md` (from LOCKED_REMAINING_ROADMAP.md) | `README.md`: CLI section links to locked roadmap | update link to `docs/roadmap.md` |
+| `docs/roadmap.md` (from LOCKED_REMAINING_ROADMAP.md) | `AGENTS.md`: references roadmap | resolved via pointer |
+| `docs/roadmap.md` (from LOCKED_REMAINING_ROADMAP.md) | `docs/RELEASE_CHECKLIST.md`: references R1-R13 status | update to `docs/roadmap.md` |
+| `docs/phases.md` (from LOCKED_PHASE_IMPLEMENTATION_PLAN.md) | `docs/RELEASE_CHECKLIST.md`: references phase status | update to `docs/phases.md` |
+| `docs/phases.md` (from LOCKED_PHASE_IMPLEMENTATION_PLAN.md) | `docs/handover/HANDOVER.md`: references phase plan | resolved via pointer |
+| `docs/release/checklist.md` (from RELEASE_CHECKLIST.md) | `README.md`: links to release checklist | update to `docs/release/checklist.md` |
+| `docs/release/checklist.md` (from RELEASE_CHECKLIST.md) | `scripts/check-banned-claims.sh`: references RELEASE_CHECKLIST.md | update script paths |
+| `docs/agents.md` (from AGENTS.md) | `README.md`: references AGENTS.md | resolved via pointer |
+| `docs/agents.md` (from AGENTS.md) | GitHub CI/community references AGENTS.md | resolved via pointer |
+| `docs/archive/AG_UI_MAPPING.md` | `AGENTS.md` historical reference | resolved via pointer |
+| `docs/archive/CLI_IDE_GAP_ANALYSIS.md` | handover docs reference | resolved via pointer |
+| `docs/archive/PLANNER_HANDOVER_REVIEW.md` | handover docs reference | resolved via pointer |
+| `docs/archive/theia-version-audit.md` | internal reference | resolved via pointer |
+| `docs/archive/SPIKE_KEYCHAIN_STORAGE.md` | internal reference | resolved via pointer |
+| `docs/archive/SPIKE_SWARMGRAPH_IMPORT.md` | internal reference | resolved via pointer |
+| `docs/archive/ARC-Studio/2026-05-19/*.md` | session internal | resolved via pointer |
 
-Phase 0 review finding: move map is structurally ready but not exhaustive. Do not execute Phase 1 moves until exhaustive enumeration excludes vendored/runtime docs or explicitly classifies them out of scope.
+Phase 0 review finding: move map is now exhaustive for ARC-owned docs. Vendored/runtime docs (`runtimes/swarmgraph/`, `.opencode/`, package READMEs) are explicitly classified out of scope. Do not execute Phase 1 moves until Phase 0 acceptance is complete.
 
 ## Acceptance for this file
 

@@ -66,8 +66,18 @@ This audit is the input to that list.
 ## Hits
 
 | Claim # | File:line | Surrounding sentence | Remediation | Phase |
-|---|---|---|---|---|
-| | | | | |
+|---|---|---|---|---|---|
+| 9 | `python/tests/test_providers.py:238` | `# ─── Broad Provider-Backed Adoption Tests ──────────────────────────────────` | Rename section header to `# ─── Provider Action Gating Tests ──────────────────────────────────`. Tests verify gates (all assert `provider_backed is False`), no adoption claim intended. | 1 |
+| 9 | `docs/LOCKED_REMAINING_ROADMAP.md:241` | `All 6 previously-deferred items (effect-boundary replay, BudgetVector interrupts, SwarmGraph internal capture, broad provider-backed adoption, new adapters, Electron packaging) were implemented in commit 4b0f6b5.` | **False-positive** — describing the deferred ledger item. Context says "gated provider action" not adoption. OK. | — |
+| 15 | `docs/adr/004-event-schema-versioning.md` | `# Event type registry — single source of truth` | **False-positive** — unrelated to docs consolidation claim. About event type registry. OK. | — |
+| 15 | `docs/adr/007-provider-routing-unification.md` | `- Gateway remains the single source of truth for inference` | **False-positive** — unrelated to docs consolidation claim. About provider routing. OK. | — |
+| 15 | `docs/research/feature-roadmap-review/11-sessions-daemon.md` | `Rationale: Multi-client attach requires a single source of truth.` | **False-positive** — about daemon session lock, not docs consolidation. OK. | — |
+| 15 | `docs/research/IMPLEMENTATION_RESEARCH.md` | `4. Version management: Single source of truth in python/pyproject.toml version field.` | **False-positive** — about version management, not docs consolidation. OK. | — |
+| 4 | `docs/LOCKED_REMAINING_ROADMAP.md:214` | `R8/Phase 12 → R10/Phase 14 → R9/Phase 13 → R11/Phase 15 → R12/Phase 16. All 6 previously-deferred items (...) were implemented in 4b0f6b5.` | **False-positive** — locked roadmap describing deferred item status, not claiming "CLI is 100% done". OK. | — |
+| 7 | (no hits) | — | No production-ready claim found outside archive. OK. | — |
+| 10 | (no hits) | — | No "arc-studio is deprecated" claim found outside archive. OK. | — |
+| 8 | (no hits) | — | No "End-to-end real SwarmGraph agents" claim found outside archive. OK. | — |
+| 11–44 | (no hits) | — | No remaining banned claim hits found outside `docs/archive/`, `runtimes/swarmgraph/`, or false-positive contexts. | — |
 
 ## Safe-wording replacements (locked)
 
