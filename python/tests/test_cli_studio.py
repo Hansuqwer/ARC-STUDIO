@@ -16,6 +16,7 @@ from agent_runtime_cockpit.cli_repl.session import (
     MODE_PLAN,
     MODE_BUILD,
     MODE_AUTO,
+    SESSION_SCHEMA_VERSION,
     _get_sessions_dir,
 )
 
@@ -56,7 +57,26 @@ class TestSessionPersistence:
         assert len(loaded_data["history"]) == 2
         assert loaded_data["history"][0]["role"] == "user"
         assert loaded_data["history"][0]["content"] == "hello"
-        assert loaded_data["version"] == 1
+        assert loaded_data["version"] == SESSION_SCHEMA_VERSION
+        assert loaded_data["runtime_mode"] == "fake"
+        assert loaded_data["profile_id"] == "default"
+        assert loaded_data["isolation_id"] == "none"
+
+    def test_v1_session_migrates_to_v2(self):
+        loaded = ChatSession.model_validate({
+            "version": 1,
+            "id": "s-old",
+            "mode": MODE_BUILD,
+            "runtime_mode": "offline",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "updated_at": "2026-01-01T00:00:00+00:00",
+            "history": [],
+            "metadata": {},
+        })
+        assert loaded.version == SESSION_SCHEMA_VERSION
+        assert loaded.runtime_mode == "fake"
+        assert loaded.profile_id == "default"
+        assert loaded.isolation_id == "none"
 
     def test_session_save_and_load(self, tmp_path):
         """Verify ChatSession save/load with custom sessions dir."""

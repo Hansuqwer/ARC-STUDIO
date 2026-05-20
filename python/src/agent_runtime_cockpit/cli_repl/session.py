@@ -9,8 +9,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from agent_runtime_cockpit.runtime.mode import RuntimeMode
 
-SESSION_SCHEMA_VERSION = 1
+
+SESSION_SCHEMA_VERSION = 2
 MODE_PLAN = "plan"
 MODE_BUILD = "build"
 MODE_AUTO = "auto"
@@ -92,6 +94,10 @@ def _session_from_legacy(data: dict[str, Any], fallback_id: str) -> ChatSession:
     session = ChatSession(
         id=data.get("session_id", fallback_id),
         mode=data.get("mode", MODE_BUILD),
+        runtime_mode=RuntimeMode.from_legacy(data.get("runtime_mode", RuntimeMode.FAKE)),
+        profile_id=str(data.get("profile_id") or "default"),
+        isolation_id=str(data.get("isolation_id") or "none"),
+        allow_paid_calls=bool(data.get("allow_paid_calls", False)),
         metadata={"source_trust": "workspace", "source_format": "legacy_studio_session"},
     )
     for msg in data.get("messages", []):
@@ -102,6 +108,21 @@ def _session_from_legacy(data: dict[str, Any], fallback_id: str) -> ChatSession:
             "source_trust": "workspace",
         })
     return session
+
+
+def _migrate_chat_session(data: dict[str, Any]) -> dict[str, Any]:
+    if data.get("version", 1) == SESSION_SCHEMA_VERSION:
+        migrated = dict(data)
+    elif data.get("version", 1) == 1:
+        migrated = dict(data)
+        migrated["version"] = SESSION_SCHEMA_VERSION
+    else:
+        return data
+    migrated["runtime_mode"] = RuntimeMode.from_legacy(migrated.get("runtime_mode", RuntimeMode.FAKE)).value
+    migrated.setdefault("profile_id", "default")
+    migrated.setdefault("isolation_id", "none")
+    migrated.setdefault("allow_paid_calls", RuntimeMode(migrated["runtime_mode"]) is RuntimeMode.PROVIDER_BACKED)
+    return migrated
 
 
 def migrate_all_legacy_sessions() -> list[tuple[str, bool]]:
@@ -123,15 +144,30 @@ def migrate_all_legacy_sessions() -> list[tuple[str, bool]]:
 
 
 class ChatSession(BaseModel):
-    """Canonical chat session schema (version 1)."""
+    """Canonical chat session schema (version 2)."""
 
     version: int = Field(default=SESSION_SCHEMA_VERSION)
     id: str = Field(default_factory=lambda: f"s-{uuid.uuid4().hex[:12]}")
     mode: str = Field(default=MODE_BUILD)
+    runtime_mode: RuntimeMode = RuntimeMode.FAKE
+    profile_id: str = "default"
+    isolation_id: str = "none"
+    allow_paid_calls: bool = False
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     history: list[dict[str, str]] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @classmethod
+    def model_validate_json(cls, json_data: str | bytes | bytearray, *args: Any, **kwargs: Any) -> ChatSession:
+        data = json.loads(json_data)
+        return cls.model_validate(_migrate_chat_session(data), *args, **kwargs)
+
+    @classmethod
+    def model_validate(cls, obj: Any, *args: Any, **kwargs: Any) -> ChatSession:
+        if isinstance(obj, dict):
+            obj = _migrate_chat_session(obj)
+        return super().model_validate(obj, *args, **kwargs)
 
     def add_message(self, role: str, content: str) -> None:
         self.history.append({
