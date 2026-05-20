@@ -20,14 +20,14 @@ Consolidated two separate REPL implementations (`cli_studio.py` standalone binar
 | `arc studio sessions migrate` CLI command | ✅ Done | `cli.py:studio_sessions_migrate()` |
 | Bare `arc` TUI launch (`ARC_NO_TUI` guard) | ✅ Done | `cli.py:_arc_default()` |
 | ADR-016 Phase 2 subset scope | ✅ Done | `docs/adr/ADR-016-phase-2-cli-subset.md` |
-| Registry metadata contract | ✅ Done | `tests/test_cli_repl.py` |
+| Registry metadata contract | ✅ Done | `tests/contract/test_slash_registry_contract.py` |
 | `/run` cancellation + mode gate | ✅ Done | `cli_repl/cancellation.py`, `slash_commands.py`, `tests/integration/test_slash_run.py` |
 | Tests for all changes | ✅ Done | `tests/test_cli_repl.py`, `tests/test_cli_studio.py` |
 | Docs updated (phases.md, CHANGELOG) | ✅ Done | `docs/phases.md`, `CHANGELOG.md` |
 
 ## Tests Added/Changed
 
-### `python/tests/test_cli_repl.py` — 39 tests (was 22)
+### `python/tests/test_cli_repl.py` — 52 tests (was 22)
 - TestChatSession (6): session override, create, add_message, save/load, list/latest, load_nonexistent
 - TestSlashCommands (10): help, clear, summary(2), run(2), history(2), version, quit, exit, unknown, non-slash
 - TestFormatResult (2): format_completed, format_no_results
@@ -41,6 +41,9 @@ Consolidated two separate REPL implementations (`cli_studio.py` standalone binar
 ### `python/tests/test_cli_studio.py` — 9 tests (was 22)
 - TestBanner (2): no-arg, version
 - TestSessionPersistence (7): roundtrip, save/load, list, nonexistent, mode-tracking(2), **legacy-flat-read**
+
+### `python/tests/contract/test_slash_registry_contract.py` — 3 tests
+- Phase 2 command set exactness, explicit metadata, alias contract.
 
 ### `python/tests/unit/test_cancellation.py` — 22 tests
 - Cooperative cancellation primitive: state, idempotency, wait semantics, child propagation, cross-thread observability, singleton sentinel.
@@ -60,8 +63,8 @@ Result: **OK** — No banned claims found in docs/agents.md, docs/roadmap.md, do
 
 ### Python tests (CLI/cancellation/SwarmGraph targeted):
 ```
-tests/unit/test_cancellation.py tests/integration/test_slash_run.py tests/test_cli_repl.py tests/test_cli_studio.py tests/test_swarmgraph_native.py
-149 passed in 0.62s
+tests/contract/test_slash_registry_contract.py tests/unit/test_cancellation.py tests/integration/test_slash_run.py tests/test_cli_repl.py tests/test_cli_studio.py tests/test_swarmgraph_native.py
+153 passed in 0.67s
 ```
 
 ### Full Python suite (excl. known opt-in failure):

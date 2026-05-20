@@ -2663,6 +2663,16 @@ def studio_sessions_migrate(
         console.print(f"[yellow]  Failed: {', '.join(failed[:5])}[/yellow]")
 
 
+@studio_app.command("sessions-migrate")
+def studio_sessions_migrate_deprecated(
+    json_output: bool = JSON_FLAG,
+) -> None:
+    """Deprecated alias for `arc studio sessions migrate`."""
+    if not json_output:
+        console.print("[yellow]Deprecated:[/yellow] use `arc studio sessions migrate`.")
+    studio_sessions_migrate(json_output=json_output)
+
+
 @workspace_app.command("trust-status")
 def workspace_trust_status(
     workspace: Optional[str] = WORKSPACE_FLAG,

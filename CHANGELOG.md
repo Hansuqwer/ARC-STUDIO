@@ -14,7 +14,7 @@ The "Unreleased" section below describes what is currently on `main`. The first 
 - `ChatSession.version` field (schema v1) for forward-compatible session serialization.
 - Legacy `StudioSession` flat JSON reader via `ChatSession.load()` fallback with workspace-trust metadata for legacy file content.
 - ADR-016 documents the bounded Phase 2 CLI consolidation subset and defers full slash/session inventory items to dependent phases.
-- 26 new tests covering: merged slash commands (plan/build/auto/status/doctor/runs), command registry (register/lookup/aliases/duplicates/categories), legacy session detection/migration, sessions-migrate CLI (no-legacy/with-legacy/idempotent), bare `arc` TUI behavior (version/non-TTY/ARC_NO_TUI/subcommand).
+- 38 new tests covering: merged slash commands (plan/build/auto/status/doctor/runs), command registry contract, cancellation primitives, `/run` gate/cancel integration, legacy session detection/migration, `sessions migrate` CLI (no-legacy/with-legacy/idempotent/deprecated-alias), bare `arc` TTY behavior.
 
 ### Changed
 
@@ -22,7 +22,11 @@ The "Unreleased" section below describes what is currently on `main`. The first 
 - `cli_repl/slash_commands.py` refactored: `SlashCommandHandler` now uses the declarative `CommandRegistry`; merged commands from `cli_studio.py` (`/plan`, `/build`, `/auto`, `/status`, `/doctor`, `/runs`); registered commands now carry explicit gate/mode/trust/privilege/render/event metadata.
 - `cli_repl/session.py`: `ChatSession` now includes `version`, `mode`, `set_mode()`; added `_detect_legacy_sessions()`, `_read_legacy_session()`, `_list_legacy_session_ids()`, `migrate_legacy_session()`, `migrate_all_legacy_sessions()`. `list_sessions()` scans the canonical sessions dir for both subdirectory-based and flat-file sessions, skipping the `latest` symlink. `save()` creates a `latest` symlink for backward compatibility.
 - `tests/test_cli_studio.py` refactored: imports from `cli_repl.session` instead of removed `cli_studio.StudioSession`; covers ChatSession persistence, mode tracking, and legacy compat.
-- `tests/test_cli_repl.py` expanded from 22 to 36 tests with merged commands, registry, migration, sessions-migrate, and bare-arc test classes.
+- `tests/test_cli_repl.py` expanded from 22 to 52 tests with merged commands, registry, migration, sessions-migrate alias, and bare-arc test classes.
+
+### Deprecated
+
+- `arc studio sessions-migrate` remains as a compatibility alias and prints a deprecation warning. Use `arc studio sessions migrate`.
 
 - `docs/audits/audit-2026-05-14-55b9c25.md` — full 6-dimension health audit (accessibility, architecture, code quality, performance, security, test/CI integrity).
 - Input validators in `theia-extensions/arc-core/src/node/arc-service-impl.ts`: `validateRunId`, `validateOtlpEndpoint`, `resolveWorkspaceRoot`, `safeJoinInsideWorkspace`.

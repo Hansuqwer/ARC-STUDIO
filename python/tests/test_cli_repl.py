@@ -527,6 +527,13 @@ class TestSessionsMigrate:
         payload2 = json.loads(result2.output)
         assert payload2["data"]["newly_migrated"] == 0
 
+    def test_deprecated_sessions_migrate_alias_warns(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("ARC_STUDIO_SESSIONS_DIR", str(tmp_path / "alias"))
+        result = CliRunner().invoke(app, ["studio", "sessions-migrate"])
+        assert result.exit_code == 0, result.output
+        assert "Deprecated" in result.output
+        assert "arc studio sessions migrate" in result.output
+
 
 class TestBareArc:
     def test_bare_arc_with_version_flag(self):
