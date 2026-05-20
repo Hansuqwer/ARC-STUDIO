@@ -601,7 +601,7 @@ Consolidates two separate REPL implementations (`cli_studio.py` and `cli_repl/`)
 - `cli_repl/chat_repl.py` — minor import updates
 - `cli_studio.py` — thin shim delegation to cli_repl
 - `cli.py` — added `_arc_default` callback, added nested `sessions migrate` command
-- `tests/test_cli_repl.py` — 36 tests (added merged commands, registry, migration, sessions-migrate, bare arc tests)
+- `tests/test_cli_repl.py` — 56 tests (added merged commands, registry, migration, sessions-migrate, bare arc tests, and shared `/run` gate/cancellation parity)
 - `tests/test_cli_studio.py` — 9 tests (refactored for ChatSession + legacy compat)
 
 **Acceptance:**

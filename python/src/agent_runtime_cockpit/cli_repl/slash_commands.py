@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import signal
 import time
+import inspect
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -171,10 +172,6 @@ def cmd_run(arg: Any, session: Any, cancellation_token: Any = None) -> str | Com
     return _execute_run(str(arg or ""), session=session, cancellation_token=token)
 
 
-def _gate_open(ctx: Any) -> bool:
-    return os.environ.get("ARC_ALLOW_RUN") == "1" or bool(getattr(ctx.session, "allow_run", False))
-
-
 def _run_gate_open(session: Any) -> bool:
     return os.environ.get("ARC_ALLOW_RUN") == "1" or bool(getattr(session, "allow_run", False))
 
@@ -212,20 +209,24 @@ def _result_summary(result: Any) -> dict[str, Any]:
 
 
 def _make_runner(config: Any, cancellation_token: CancellationToken) -> Any:
-    try:
-        return SwarmGraphRunner(config, cancellation_token=cancellation_token)
-    except TypeError:
-        return SwarmGraphRunner(config=config)
+    parameters = inspect.signature(SwarmGraphRunner).parameters
+    accepts_kwargs = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in parameters.values())
+    kwargs: dict[str, Any] = {}
+    if "cancellation_token" in parameters or accepts_kwargs:
+        kwargs["cancellation_token"] = cancellation_token
+    if "config" in parameters:
+        return SwarmGraphRunner(config=config, **kwargs)
+    return SwarmGraphRunner(config, **kwargs)
 
 
 def _run_runner(runner: Any, prompt: str, cancellation_token: CancellationToken, on_progress: Callable[[dict[str, Any]], None]) -> Any:
-    try:
-        return runner.run(prompt=prompt, cancellation_token=cancellation_token, on_progress=on_progress)
-    except TypeError:
-        try:
-            return runner.run(prompt=prompt, cancellation_token=cancellation_token)
-        except TypeError:
-            return runner.run(prompt, on_progress=on_progress)
+    parameters = inspect.signature(runner.run).parameters
+    kwargs: dict[str, Any] = {}
+    if "cancellation_token" in parameters:
+        kwargs["cancellation_token"] = cancellation_token
+    if "on_progress" in parameters:
+        kwargs["on_progress"] = on_progress
+    return runner.run(prompt=prompt, **kwargs)
 
 
 def _execute_run(
