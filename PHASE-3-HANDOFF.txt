@@ -1,0 +1,166 @@
+================================================================================
+PHASE 3 FOUNDATION - HANDOFF SUMMARY
+================================================================================
+Date: 2026-05-20
+Time: 10:17 UTC
+Branch: phase-2-cli-consolidation (Phase 2 still in progress)
+Status: Phase 3 Slice 1 complete and ready
+
+================================================================================
+WHAT'S BEEN DELIVERED
+================================================================================
+
+1. RuntimeMode Enum (PRODUCTION READY)
+   Location: python/src/agent_runtime_cockpit/runtime/mode.py
+   Lines: 115
+   Tests: 24 passing in 0.02s
+   
+   Three canonical modes:
+   - FAKE (offline stub mode)
+   - GATED_LOCAL (local model execution)
+   - PROVIDER_BACKED (external provider calls)
+   
+   Legacy string support with deprecation warnings:
+   - offline → FAKE
+   - local → GATED_LOCAL
+   - gated → GATED_LOCAL
+   - live → PROVIDER_BACKED
+
+2. RuntimeMode Unit Tests (COMPLETE)
+   Location: python/tests/unit/test_runtime_mode.py
+   Lines: 186
+   Coverage: All edge cases, error paths, deprecation warnings
+   
+   Test categories:
+   - Enum value locks (3 modes exactly, snake_case preserved)
+   - Pass-through behavior (enum instances, canonical strings)
+   - Legacy mapping (4 legacy strings)
+   - Case/whitespace tolerance
+   - Error handling (unknown strings, type errors)
+   - Helper methods (is_paid, requires_gate)
+   - Stacklevel verification (warnings point to caller)
+
+3. RuntimeCapability Migration Contract Test (SKELETON READY)
+   Location: python/tests/contract/test_runtime_capability_migration.py
+   Lines: 244
+   Status: Ready to run once capability.py is created
+   
+   Test coverage:
+   - Schema version bump (v1 → v2)
+   - Migration idempotency
+   - Field preservation
+   - v2 required fields
+   - Consistency invariants
+   - Per-fixture expectations
+   - Cross-check with v2 fixtures
+
+4. Test Fixtures (BASELINE ESTABLISHED)
+   Location: python/tests/contract/fixtures/runtime-capability/
+   
+   v1/ (3 fixtures):
+   - fake_minimal_v1.json (minimal fake runtime)
+   - gated_local_default_v1.json (local model)
+   - provider_backed_anthropic_v1.json (uses legacy "live" string)
+   
+   v2/ (empty, ready for migration outputs)
+
+5. Verification Script
+   Location: scripts/verify-phase-3-prep.sh
+   Purpose: Pre-flight checks before Phase 3 execution
+
+6. Documentation
+   - PHASE-3-READY.md (execution plan)
+   - docs/phase-3-prep-summary.md (detailed summary)
+
+================================================================================
+VERIFICATION RESULTS
+================================================================================
+
+✓ RuntimeMode enum exists and imports cleanly
+✓ Three canonical modes: fake, gated_local, provider_backed
+✓ Legacy string mapping works (offline, local, gated, live)
+✓ Helper methods work (is_paid, requires_gate)
+✓ 24 unit tests pass in 0.02s
+✓ All fixtures created (3 v1 fixtures)
+✓ v2 fixture directory ready
+
+RuntimeMode enum is PRODUCTION READY.
+
+================================================================================
+WHAT'S NEXT (Phase 3 Slice 2)
+================================================================================
+
+When Phase 2 is complete and merged:
+
+1. Create phase-3-runtime-semantics branch from main
+2. Port Phase 3 Slice 1 artifacts (RuntimeMode + tests)
+3. Create RuntimeCapability model:
+   - Location: python/src/agent_runtime_cockpit/runtime/capability.py
+   - Must be Pydantic model with schema_version field
+   - Add v2 fields: mode, profile_id, isolation_id, allow_paid_calls,
+     cost_source_default, supports_cancellation, supports_streaming
+   - Implement migrate_v1_to_v2(payload: dict) -> dict
+4. Run contract tests (should pass)
+5. Generate v2 fixtures from v1 via migration
+
+================================================================================
+FILES CREATED (7 new files)
+================================================================================
+
+python/src/agent_runtime_cockpit/runtime/mode.py (115 lines)
+python/tests/unit/test_runtime_mode.py (186 lines)
+python/tests/contract/test_runtime_capability_migration.py (244 lines)
+python/tests/contract/fixtures/runtime-capability/v1/fake_minimal_v1.json
+python/tests/contract/fixtures/runtime-capability/v1/gated_local_default_v1.json
+python/tests/contract/fixtures/runtime-capability/v1/provider_backed_anthropic_v1.json
+scripts/verify-phase-3-prep.sh
+
+Plus documentation:
+- PHASE-3-READY.md
+- docs/phase-3-prep-summary.md
+
+================================================================================
+KEY DESIGN LOCKS (ADR-011)
+================================================================================
+
+1. Exactly three runtime modes (no additions without ADR amendment)
+2. gated_local uses snake_case (backward compatibility)
+3. Legacy strings deprecated (removed Phase 6)
+4. Migration must be idempotent
+5. Invariants:
+   - allow_paid_calls=True only with PROVIDER_BACKED
+   - cost_source_default="measured" only with PROVIDER_BACKED
+   - All non-fake runtimes must support cancellation
+
+================================================================================
+TEST COMMANDS
+================================================================================
+
+# Run RuntimeMode unit tests
+cd python && uv run pytest tests/unit/test_runtime_mode.py -v
+
+# Verify RuntimeMode functionality
+cd python && uv run python -c "from agent_runtime_cockpit.runtime.mode import RuntimeMode; print([m.value for m in RuntimeMode])"
+
+# Run migration contract tests (will fail until capability.py exists)
+cd python && uv run pytest tests/contract/test_runtime_capability_migration.py -v
+
+# Full Python test suite
+cd python && uv run pytest -q
+
+================================================================================
+CURRENT STATUS
+================================================================================
+
+Branch: phase-2-cli-consolidation
+Phase 2: In progress
+Phase 3 Slice 1: Complete and tested
+Next: Complete Phase 2, then start Phase 3 Slice 2
+
+Phase 3 foundation is solid. RuntimeMode enum is production-ready with
+comprehensive test coverage. Migration contract test skeleton is ready
+to validate RuntimeCapability v2 once the model is created.
+
+================================================================================
+END OF HANDOFF
+================================================================================

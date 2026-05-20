@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "mode": "gated_local",
+  "runtime_id": "ollama-local"
+}
