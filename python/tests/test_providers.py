@@ -235,7 +235,7 @@ def test_9router_mocked_live_action_succeeds_with_all_gates(monkeypatch, tmp_pat
     assert "sk-test-should-not-emit" not in dumped
 
 
-# ─── Broad Provider-Backed Adoption Tests ──────────────────────────────────
+# ─── Provider Action Gating Tests ──────────────────────────────────
 
 
 def test_openai_compatible_provider_dry_run_no_network(monkeypatch, tmp_path):

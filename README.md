@@ -31,7 +31,7 @@ ARC Studio is an alpha developer tool. Pin usage to a tag or commit SHA.
 | SwarmGraph adoption layer | Fake/offline default; narrow gated local-real path exists; no provider-backed execution |
 | Security model | Single-user, loopback-only workstation tool |
 
-See [CHANGELOG.md](./CHANGELOG.md), [docs/RELEASE_CHECKLIST.md](./docs/RELEASE_CHECKLIST.md), and [docs/SECURITY.md](./docs/SECURITY.md) for current release notes, verification, and residual risks.
+See [CHANGELOG.md](./CHANGELOG.md), [docs/release/checklist.md](./docs/release/checklist.md), and [docs/SECURITY.md](./docs/SECURITY.md) for current release notes, verification, and residual risks.
 
 ## Architecture
 

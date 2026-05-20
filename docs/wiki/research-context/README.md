@@ -3,8 +3,8 @@
 This wiki folder keeps non-authoritative research context for future agents.
 
 Authoritative planning lives only in:
-- `docs/LOCKED_REMAINING_ROADMAP.md`
-- `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`
+- `docs/roadmap.md`
+- `docs/phases.md`
 
 Use this folder for supporting notes, Context7 summaries, external research, and archived-plan pointers. Do not treat wiki notes as implementation status.
 

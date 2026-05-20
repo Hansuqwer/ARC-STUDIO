@@ -23,7 +23,6 @@ test-results/
 tests/e2e/test-results/
 .gitnexus
 .claude/
-AGENTS.md
 CLAUDE.md
 
 # Environment files - prevent committing secrets

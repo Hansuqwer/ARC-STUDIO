@@ -97,9 +97,7 @@ ALLOWLISTED_SECTION_HEADERS=(
 SKIP_PATH_PATTERNS=(
     "docs/archive/"
     "docs/adr/"
-    "docs/CLI_IDE_GAP_ANALYSIS.md"
-    "docs/PLAN_COMPLETION_AUDIT.md"
-    "docs/SPIKE_SWARMGRAPH_IMPORT.md"
+    "docs/archive/locked-old/"
 )
 
 should_skip_file() {

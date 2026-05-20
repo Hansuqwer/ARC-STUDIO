@@ -5,7 +5,7 @@
 **Test count:** Python 782 passed / 14 skipped; TS protocol + arc-extension builds clean; arc-extension test suite 581 tests / 9 suites.
 
 ## Goal
-Continue remaining ARC Studio product work from `docs/LOCKED_REMAINING_ROADMAP.md` and `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` with green tests and builds. Those two locked docs are authoritative. Current v0.2 planning selects Option A: IDE productization of existing/gated capabilities, while effect-boundary replay/fork and adapter-wide real-time budget interrupts are deferred. Commit only if explicitly requested.
+Continue remaining ARC Studio product work from `docs/roadmap.md` and `docs/phases.md` with green tests and builds. Those two locked docs are authoritative. Current v0.2 planning selects Option A: IDE productization of existing/gated capabilities, while effect-boundary replay/fork and adapter-wide real-time budget interrupts are deferred. Commit only if explicitly requested.
 
 ## Constraints & Preferences
 - Work in larger coherent phase chunks when safe; after each chunk run tests/lint/build, fix failures, commit only when green.
@@ -15,7 +15,7 @@ Continue remaining ARC Studio product work from `docs/LOCKED_REMAINING_ROADMAP.m
 - LM Arena = stub-default with gated live path, excluded from v0.1 product claims.
 - v0.1 scope = browser app + Python CLI/wheel only; Electron is post-v0.1.
 - JSONL canonical, SQLite rebuildable index; event streams use bounded queues.
-- Always read `docs/LOCKED_REMAINING_ROADMAP.md` and `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` before each implementation chunk.
+- Always read `docs/roadmap.md` and `docs/phases.md` before each implementation chunk.
 - Use `docs/research/IMPLEMENTATION_RESEARCH.md` and `docs/wiki/research-context/` for supporting context only; they are not status sources.
 - Before every new slice, read relevant `docs/adr/*`.
 
@@ -45,7 +45,7 @@ Continue remaining ARC Studio product work from `docs/LOCKED_REMAINING_ROADMAP.m
 - ✅ Subprocess env allowlists (SwarmGraph adapter only; other adapters are in-process)
 
 ### P1b–P5 Items Still Open
-- (none as a broad implementation phase; see `AGENTS.md` current status for completed prompt optimizer, adoption skeleton/runners, Theia port notes, and release caveats.)
+- (none as a broad implementation phase; see `docs/agents.md` current status for completed prompt optimizer, adoption skeleton/runners, Theia port notes, and release caveats.)
 
 ### In Progress
 - (none)
@@ -55,7 +55,7 @@ Continue remaining ARC Studio product work from `docs/LOCKED_REMAINING_ROADMAP.m
 
 ## Next Slices
 
-Use `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` as the ordered execution plan. Current planned v0.2 Option A slices are:
+Use `docs/phases.md` as the ordered execution plan. Current planned v0.2 Option A slices are:
 
 - Phase 8: live stream productization to a configured Python daemon/local runtime stream.
 - Phase 9: BudgetVector post-hoc accounting/reporting and IDE gauges.
@@ -158,12 +158,12 @@ Safe language:
 | 008-daemon-bundling | P5/post-v0.1 | Smoke workflow/scaffold exists; Electron bundling remains post-v0.1 |
 
 ## Relevant Files
-- `docs/LOCKED_REMAINING_ROADMAP.md` — Locked remaining roadmap/status
-- `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md` — Locked ordered phase/slice plan
+- `docs/roadmap.md` — Locked remaining roadmap/status
+- `docs/phases.md` — Locked ordered phase/slice plan
 - `docs/research/IMPLEMENTATION_RESEARCH.md` — Scaffolds and guidance (MUST READ before each PR)
 - `docs/adr/` — ADR-000 through ADR-008
 - `docs/SPIKE_KEYCHAIN_STORAGE.md` — Keychain platform validation report
 - `docs/SPIKE_SWARMGRAPH_IMPORT.md` — SwarmGraph library import spike results
 - `docs/EXTENSION_MIGRATION.md` — Port/archive/delete sequence for theia-extensions
-- `AGENTS.md` — Full project context (updated frequently)
-- `docs/RELEASE_CHECKLIST.md` — v0.1.0-alpha release checklist
+- `docs/agents.md` — Full project context (updated frequently)
+- `docs/release/checklist.md` — v0.1.0-alpha release checklist
