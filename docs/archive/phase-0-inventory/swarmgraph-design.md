@@ -82,6 +82,27 @@ Results of this cross-check go in `runtime-matrix.md` under implementation statu
 
 Native SwarmGraph currently satisfies the fake/offline topology/worker/consensus event baseline. It does not satisfy ADR-013 provider-backed execution, bounded hierarchy, pluggable prompt role files, full six-strategy consensus, MASS/GEPA optimization, or ADR-014 security layers. External `ARC_SWARMGRAPH_CLI` delegation remains a legacy/delegated path and must not be used as evidence for native provider-backed completeness.
 
+## ADR Review (Phase 0 — ADR-011 through ADR-015)
+
+All five ADRs were read in full during Phase 0. Findings:
+
+- **ADR-011** (34 lines): Full parity framing accepted. Sub-ADRs 013/014/015 refine specific commitments. No text condensation issues found.
+- **ADR-012** (28 lines): Rejected in favor of ADR-011. Preserved as historical record. Correctly marked `Status: Rejected`.
+- **ADR-013** (112 lines): Complete architecture lock with pattern, fan-out gate, six consensus strategies, 13 failure modes, checkpoint-restore, MASS optimization plan, event attributes, slash commands, banned claims (10 items), and Phase 4 acceptance criteria. No condensation issues.
+- **ADR-014** (79 lines): Complete security architecture with four-tier trust model, six defense layers, MCP-specific defense, privileged action boundary, banned claims (8 items), and Phase 4 acceptance criteria. No condensation issues.
+- **ADR-015** (68 lines): Complete compliance mode design with AssuranceTab two-mode (Developer/Compliance/Both), compliance-grade receipt v2 schema, regulator export bundle, retention policy, banned claims (6 items), and Phase 5 acceptance criteria. No condensation issues.
+
+**Overall finding**: ADR texts are full, not condensed. Earlier "condensed" notes in Phase 0 inventory docs may refer to earlier summary versions in this inventory, not the ADR files themselves. The ADR files are authoritative and complete as-is.
+
+**Cross-reference mapping**:
+- ADR-013 banned claims (#74-83) correctly mapped in `claims-audit.md:119-132`
+- ADR-014 banned claims (#84-91) correctly mapped in `claims-audit.md:134-145`
+- ADR-015 banned claims (#92-97) correctly mapped in `claims-audit.md:147-156`
+- ADR-014 security capabilities correctly listed in `runtime-matrix.md:114-130`
+- ADR-015 compliance capabilities correctly listed in `runtime-matrix.md:132-145`
+
+**No updates needed** to ADR files, banned claims mapping, or capability tables based on this review.
+
 ## References
 
 - Anthropic, "How we built our multi-agent research system" (2025)

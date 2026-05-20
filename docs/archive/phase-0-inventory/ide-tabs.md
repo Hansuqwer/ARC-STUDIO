@@ -43,11 +43,14 @@ Output: list of Python APIs called per tab, env dependencies, and any hidden IDE
 | Aspect | Value |
 |---|---|
 | File | packages/arc-extension/src/browser/tabs/WorkflowsTab.tsx |
-| Backend services called | workflow detection/listing via `ArcService` (source-contract; exact methods in `WorkflowsTab.tsx`) |
+| Lines of code | 53 (pure presentational component) |
+| Backend services called | none directly — receives `workflows: WorkflowInfo[]`, `isScanning: boolean`, `onScanWorkspace: () => void` as props from parent (`WorkflowsTab.tsx:10-14`) |
 | Python CLI commands invoked | none directly from React |
 | Env vars read | none in React |
-| Hidden execution path? | no direct React subprocess found in tab inventory |
-| Phase to fix | 5 |
+| Hidden execution path? | **no** — purely presentational; no subprocess, no Theia service calls |
+| Empty state | "No workflows detected." with hint "Click Scan to detect SwarmGraph or LangGraph workflows" (`WorkflowsTab.tsx:32-39`) |
+| Card rendering | workflow name + type badge + file path, keyed by index (`WorkflowsTab.tsx:41-49`) |
+| Phase to fix | 5 (parity: parent integration audit) |
 
 ## ConfigTab
 
@@ -79,11 +82,23 @@ Output: list of Python APIs called per tab, env dependencies, and any hidden IDE
 | Aspect | Value |
 |---|---|
 | File | packages/arc-extension/src/browser/tabs/AssuranceTab.tsx |
-| Backend services called | run/receipt/audit/HITL service calls; needs source-contract fill in Phase 5 |
-| Auto-refresh interval | current value to verify in `AssuranceTab.tsx` during Phase 5 |
-| LIVE badge source | current value to verify; target must come from live transport status, not optimistic UI |
-| Hidden execution path? | unknown until `AssuranceTab.tsx` line audit; no execution claim in Phase 0 |
-| Phase to fix | 5 |
+| Lines of code | 460 |
+| Backend services called | `listPendingHitlPrompts()` (line 136), `respondHitlPrompt()` (line 153), `getAuditChainInfo()` (line 177), `replayRun()` (line 197) (`AssuranceTab.tsx:110-205`) |
+| Python CLI commands invoked | none directly from React |
+| Env vars read | none in React |
+| Auto-refresh interval | `AUTO_REFRESH_INTERVAL_MS = 10_000` (10s, line 15); togglable via `autoRefreshEnabled` state (line 128) |
+| LIVE badge source | from `autoRefreshEnabled` boolean state (line 252-254); shows `<span>LIVE</span>` when auto-refresh is on; **not** from live transport status — target must come from live transport, not optimistic UI (`AssuranceTab.tsx:252-254`) |
+| Replay categories | `['lifecycle', 'message', 'tool', 'error', 'hitl', 'audit', 'unknown']` (line 16); all 7 categories selectable via checkboxes, "Clear filters" button, filtered-count display (`AssuranceTab.tsx:390-425`) |
+| Audit state | `present` / `missing` / `degraded` via `auditState()` (lines 51-56); state banner shows icon + title + detail copy (`AssuranceTab.tsx:350-356`) |
+| Audit disclaimer | "No adapter-wide keyed audit/HMAC claim. This view reports available run audit material only." (line 348) |
+| Export buttons | HITL JSON download (line 265), audit JSON download (line 330), replay events JSON download (line 376); buttons visible/disabled based on data existence |
+| HITL decisions | approve/reject/modify with token expiry/blocked checks (`AssuranceTab.tsx:47-49`, `287-319`) |
+| Mode selector | **absent** — no Developer/Compliance/Both mode selector (gap vs ADR-015 two-mode target) |
+| Timeline replay | present as ReplayStepper section (lines 369-457); step + total display, prev/next nav, annotations (HITL/AUDIT/APPROVAL/REPLAY), event data as JSON |
+| Compliance mode features | **absent**: no policy attribution, evidence panel, injection events, trust changes, regulator export, compliance bundle (`AssuranceTab.tsx` line audit — compliance features not implemented) |
+| Write secrets directly? | **no** — data flows through `ArcService` only |
+| Hidden execution path? | **no** — purely visualization/UI layer; no subprocess, no direct Python execution |
+| Phase to fix | 5 (parity: add mode selector; compliance features per ADR-015; LIVE badge from transport) |
 
 ## Transport parity audit
 
@@ -108,18 +123,18 @@ The AssuranceTab inventory row above needs expansion. The locked design is two-m
 
 | Aspect | Current state | Target (ADR-015) | Gap |
 |---|---|---|---|
-| Mode selector | absent | Developer / Compliance / Both | new |
-| Timeline replay | <fill> | required (Developer) | <fill> |
-| Trace tree | <fill> | required (Developer) | <fill> |
-| Run summary card | <fill> | required (Compliance) | <fill> |
-| Policy attribution | <fill> | required (Compliance) | <fill> |
-| Evidence panel | <fill> | required (Compliance) | <fill> |
-| Audit chain integrity | <fill> | required (Compliance) | <fill> |
-| HITL decisions view | partial | required (both modes) | <fill> |
-| Injection events view | absent | required (Compliance) | <fill> |
-| Trust changes view | absent | required (Compliance) | <fill> |
-| Regulator export button | absent | required (Compliance) | <fill> |
-| Side-by-side Both mode | absent | required | <fill> |
+| Mode selector | absent (lines 246-458 — no mode selector rendered) | Developer / Compliance / Both | new |
+| Timeline replay | present as ReplayStepper (lines 369-457), step/filter/export, category checkboxes | required (Developer) | Add annotations from audit events |
+| Trace tree | absent (no hierarchy/span detail view) | required (Developer) | new |
+| Run summary card | absent (no dedicated summary card) | required (Compliance) | new |
+| Policy attribution | absent (no policy/remediation summary) | required (Compliance) | new |
+| Evidence panel | absent (no evidence drill-down) | required (Compliance) | new |
+| Audit chain integrity | present: `present`/`missing`/`degraded` states, verify button, detail dl (lines 323-367) | required (Compliance) | Add timestamps per record |
+| HITL decisions view | present: approve/reject/modify with token/expiry, inline cards (lines 248-321) | required (both modes) | Moderate gap |
+| Injection events view | absent | required (Compliance) | new |
+| Trust changes view | absent | required (Compliance) | new |
+| Regulator export button | absent | required (Compliance) | new |
+| Side-by-side Both mode | absent | required | new |
 
 ## Transport Parity Audit (additions per ADR-014)
 
