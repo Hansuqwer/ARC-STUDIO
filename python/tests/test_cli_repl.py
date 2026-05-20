@@ -1,14 +1,80 @@
 from __future__ import annotations
 
 import json
+import os
+import signal
+import threading
+import time
 from pathlib import Path
+from dataclasses import dataclass, field
+from types import SimpleNamespace
+from typing import Any, Callable, Optional
+from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
 
 from agent_runtime_cockpit.cli import app
+from agent_runtime_cockpit.cli_repl.cancellation import CancellationReason, CancellationToken
 from agent_runtime_cockpit.cli_repl.session import ChatSession
-from agent_runtime_cockpit.cli_repl.slash_commands import SlashCommandHandler
+from agent_runtime_cockpit.cli_repl.slash_commands import SlashCommandHandler, _build_registry
+
+
+@dataclass
+class _StubRunResult:
+    text: str
+
+    def render(self) -> str:
+        return self.text
+
+    def summary(self) -> dict[str, Any]:
+        return {"chars": len(self.text)}
+
+
+class _StubRunner:
+    def __init__(
+        self,
+        *,
+        config: Any = None,
+        cancellation_token: Optional[CancellationToken] = None,
+        mode: str = "instant",
+    ) -> None:
+        self.config = config
+        self.cancellation_token = cancellation_token
+        self.mode = mode
+
+    def run(
+        self,
+        prompt: str,
+        cancellation_token: Optional[CancellationToken] = None,
+        on_progress: Optional[Callable[[dict[str, Any]], None]] = None,
+    ) -> _StubRunResult:
+        token = cancellation_token or self.cancellation_token
+        if self.mode == "instant":
+            return _StubRunResult(text=f"ok: {prompt}")
+        if self.mode == "cancellable":
+            deadline = time.monotonic() + 5.0
+            while time.monotonic() < deadline:
+                if token is not None:
+                    token.raise_if_cancelled()
+                if on_progress is not None:
+                    on_progress({"stage": "execute"})
+                time.sleep(0.01)
+            raise AssertionError("Cancellable runner ran to completion")
+        raise AssertionError(f"Unknown stub runner mode: {self.mode}")
+
+
+@dataclass
+class _StubRunnerFactory:
+    mode: str = "instant"
+    instances: list[_StubRunner] = field(default_factory=list)
+
+    def __call__(self, *args, **kwargs) -> _StubRunner:
+        if args and "config" not in kwargs:
+            kwargs["config"] = args[0]
+        stub = _StubRunner(mode=self.mode, **kwargs)
+        self.instances.append(stub)
+        return stub
 
 
 class TestChatSession:
@@ -85,12 +151,87 @@ class TestSlashCommands:
         result = handler.handle("/summary", s)
         assert "1 messages" in result
 
-    def test_run(self):
+    def test_repl_run_blocked_when_gate_closed(self, monkeypatch):
+        monkeypatch.delenv("ARC_ALLOW_RUN", raising=False)
         handler = SlashCommandHandler()
         s = ChatSession()
         result = handler.handle("/run hello world", s)
         assert result is not None
-        assert "completed" in result
+        assert result.state == "blocked"
+        assert result.reason == "gate_closed"
+
+    def test_repl_run_succeeds_when_gate_open_via_env(self, monkeypatch):
+        monkeypatch.setenv("ARC_ALLOW_RUN", "1")
+        factory = _StubRunnerFactory(mode="instant")
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        with patch("agent_runtime_cockpit.cli_repl.slash_commands.SwarmGraphRunner", factory):
+            result = handler.handle("/run hello world", s)
+        assert result is not None
+        assert result.state == "present"
+        assert "ok: hello world" in result.output
+        assert ("run.started", {"prompt_chars": 11}) in handler.events
+        assert any(name == "run.completed" for name, _payload in handler.events)
+
+    def test_repl_run_succeeds_when_gate_open_via_session(self, monkeypatch):
+        monkeypatch.delenv("ARC_ALLOW_RUN", raising=False)
+        factory = _StubRunnerFactory(mode="instant")
+        handler = SlashCommandHandler()
+        s = SimpleNamespace(mode="build", allow_run=True, add_message=lambda *_args: None)
+        with patch("agent_runtime_cockpit.cli_repl.slash_commands.SwarmGraphRunner", factory):
+            result = handler.handle("/run hello", s)
+        assert result is not None
+        assert result.state == "present"
+
+    @pytest.mark.skipif(os.name == "nt", reason="SIGINT unreliable on Windows")
+    def test_repl_run_honors_cancellation_via_sigint(self, monkeypatch):
+        monkeypatch.setenv("ARC_ALLOW_RUN", "1")
+        factory = _StubRunnerFactory(mode="cancellable")
+        handler = SlashCommandHandler()
+        s = ChatSession()
+
+        def _send_sigint_soon():
+            time.sleep(0.05)
+            os.kill(os.getpid(), signal.SIGINT)
+
+        sender = threading.Thread(target=_send_sigint_soon)
+        sender.start()
+        try:
+            with patch("agent_runtime_cockpit.cli_repl.slash_commands.SwarmGraphRunner", factory):
+                result = handler.handle("/run loop", s)
+        finally:
+            sender.join(timeout=2.0)
+
+        assert result is not None
+        assert result.state == "degraded"
+        assert result.reason == "cancelled"
+        cancelled = [payload for name, payload in handler.events if name == "run.cancelled"]
+        assert len(cancelled) == 1
+        assert cancelled[0]["reason"] == "user"
+
+    def test_repl_run_and_registry_run_share_contract(self, monkeypatch, make_repl_context):
+        monkeypatch.setenv("ARC_ALLOW_RUN", "1")
+        factory = _StubRunnerFactory(mode="instant")
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        ctx = make_repl_context()
+        ctx.session.allow_run = True
+        registry = _build_registry()
+        run_entry = registry.get("/run")
+
+        with patch("agent_runtime_cockpit.cli_repl.slash_commands.SwarmGraphRunner", factory):
+            repl_result = handler.handle("/run shared prompt", s)
+            registry_result = run_entry.handler(["shared", "prompt"], ctx)
+
+        assert repl_result.state == registry_result.state == "present"
+        assert [name for name, _payload in handler.events if name.startswith("run.")] == [
+            "run.started",
+            "run.completed",
+        ]
+        assert [event.name for event in ctx.events if event.name.startswith("run.")] == [
+            "run.started",
+            "run.completed",
+        ]
 
     def test_run_blocked_in_plan_mode(self):
         handler = SlashCommandHandler()
@@ -99,23 +240,28 @@ class TestSlashCommands:
         assert result is not None
         assert "Blocked" in result
 
-    def test_run_accepts_cancellation_token(self):
-        class Cancelled:
-            def is_cancelled(self) -> bool:
-                return True
-
+    def test_run_accepts_pre_cancelled_token(self, monkeypatch):
+        monkeypatch.setenv("ARC_ALLOW_RUN", "1")
+        token = CancellationToken()
+        token.cancel(reason=CancellationReason.USER, detail="pre-cancelled")
         handler = SlashCommandHandler()
-        handler.cancellation_token = Cancelled()
+        handler.cancellation_token = token
         s = ChatSession()
         result = handler.handle("/run hello world", s)
         assert result is not None
-        assert "cancelled" in result
+        assert result.state == "degraded"
+        assert result.reason == "cancelled"
 
     def test_run_no_arg(self):
+        os.environ["ARC_ALLOW_RUN"] = "1"
         handler = SlashCommandHandler()
         s = ChatSession()
-        result = handler.handle("/run", s)
-        assert "Usage" in result
+        try:
+            result = handler.handle("/run", s)
+            assert result.reason == "missing_prompt"
+            assert "Usage" in result.remediation
+        finally:
+            os.environ.pop("ARC_ALLOW_RUN", None)
 
     def test_history_empty(self):
         handler = SlashCommandHandler()

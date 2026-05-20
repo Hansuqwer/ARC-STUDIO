@@ -580,7 +580,7 @@ Most dimensions render absent/degraded until the Phase 15 measured cost/token pr
 ### Phase 18 — CLI Consolidation
 
 **Roadmap:** ADR-016 Phase 2 subset of Phase 0 CLI inventory
-**Status:** In Progress | Evidence: `715dfd3` cleanup leaves Phase 2 branch scoped to ADR-016 subset; targeted CLI + SwarmGraph tests pass locally; full verification and re-review still required before Complete.
+**Status:** In Progress | Evidence: Phase 2 branch scoped to ADR-016 subset; REPL and registry `/run` paths share gate/cancellation semantics; targeted CLI + SwarmGraph tests pass locally; full verification and re-review still required before Complete.
 
 Consolidates two separate REPL implementations (`cli_studio.py` and `cli_repl/`) and their slash command registries, session schemas, and CLI entry points for the ADR-016 Phase 2 subset. The full Phase 0 target slash/session inventory is not claimed complete in this phase.
 

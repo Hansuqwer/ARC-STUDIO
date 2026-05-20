@@ -167,26 +167,16 @@ def cmd_clear(_arg: str, session: ChatSession) -> str:
 def cmd_run(arg: Any, session: Any, cancellation_token: Any = None) -> str | CommandResult:
     if isinstance(arg, list):
         return _handle_run_context(arg, session)
-    if not arg:
-        return "Usage: /run <prompt>"
-    config = SwarmGraphConfig(
-        num_workers=3,
-        max_rounds=1,
-    )
-    runner = SwarmGraphRunner(config=config)
-    result = runner.run(prompt=arg, cancellation_token=cancellation_token)
-    session.add_message("user", arg)
-    output = result.get("results", [])
-    summary = f"Run completed: status={result.get('status')}, "
-    summary += f"tasks={result.get('total_tasks', 0)}, "
-    summary += f"cost=${result.get('total_cost_usd', 0):.4f}"
-    if output:
-        summary += f"\nOutput: {output[0].get('output', '')}"
-    return summary
+    token = cancellation_token if isinstance(cancellation_token, CancellationToken) else CancellationToken()
+    return _execute_run(str(arg or ""), session=session, cancellation_token=token)
 
 
 def _gate_open(ctx: Any) -> bool:
     return os.environ.get("ARC_ALLOW_RUN") == "1" or bool(getattr(ctx.session, "allow_run", False))
+
+
+def _run_gate_open(session: Any) -> bool:
+    return os.environ.get("ARC_ALLOW_RUN") == "1" or bool(getattr(session, "allow_run", False))
 
 
 def _emit(ctx: Any, name: str, payload: dict[str, Any]) -> None:
@@ -195,39 +185,94 @@ def _emit(ctx: Any, name: str, payload: dict[str, Any]) -> None:
         emit(name, payload)
 
 
-def _handle_run_context(args: list[str], ctx: Any) -> CommandResult:
-    if not _gate_open(ctx):
+def _render_run_result(result: Any) -> str:
+    if hasattr(result, "render"):
+        return str(result.render())
+    if isinstance(result, dict):
+        output = result.get("results", [])
+        summary = f"Run completed: status={result.get('status')}, "
+        summary += f"tasks={result.get('total_tasks', 0)}, "
+        summary += f"cost=${result.get('total_cost_usd', 0):.4f}"
+        if output:
+            summary += f"\nOutput: {output[0].get('output', '')}"
+        return summary
+    return str(result)
+
+
+def _result_summary(result: Any) -> dict[str, Any]:
+    if hasattr(result, "summary"):
+        return dict(result.summary())
+    if isinstance(result, dict):
+        return {
+            "status": result.get("status"),
+            "total_tasks": result.get("total_tasks", 0),
+            "completed_tasks": result.get("completed_tasks", 0),
+        }
+    return {"type": type(result).__name__}
+
+
+def _make_runner(config: Any, cancellation_token: CancellationToken) -> Any:
+    try:
+        return SwarmGraphRunner(config, cancellation_token=cancellation_token)
+    except TypeError:
+        return SwarmGraphRunner(config=config)
+
+
+def _run_runner(runner: Any, prompt: str, cancellation_token: CancellationToken, on_progress: Callable[[dict[str, Any]], None]) -> Any:
+    try:
+        return runner.run(prompt=prompt, cancellation_token=cancellation_token, on_progress=on_progress)
+    except TypeError:
+        try:
+            return runner.run(prompt=prompt, cancellation_token=cancellation_token)
+        except TypeError:
+            return runner.run(prompt, on_progress=on_progress)
+
+
+def _execute_run(
+    prompt: str,
+    *,
+    session: Any,
+    cancellation_token: CancellationToken,
+    event_sink: Any = None,
+    runtime: Any = None,
+) -> CommandResult:
+    """Single source of truth for /run gate, cancellation, and events."""
+    prompt = prompt.strip()
+    if not _run_gate_open(session):
         return CommandResult(
             state="blocked",
             reason="gate_closed",
             remediation="Set ARC_ALLOW_RUN=1 or enable session allow_run.",
         )
-    prompt = " ".join(args).strip()
     if not prompt:
         return CommandResult(state="blocked", reason="missing_prompt", remediation="Usage: /run <prompt>")
 
-    factory = getattr(ctx, "run_token_factory", None)
-    token: CancellationToken = factory() if callable(factory) else CancellationToken()
     started = time.monotonic()
     previous = signal.getsignal(signal.SIGINT)
 
     def _on_sigint(signum: int, frame: Any) -> None:  # noqa: ARG001
-        token.cancel(CancellationReason.USER, "SIGINT")
+        cancellation_token.cancel(CancellationReason.USER, "SIGINT")
 
     def _on_progress(payload: dict[str, Any]) -> None:
         stage = str(payload.get("stage", "unknown"))
-        _emit(ctx, f"run.progress.{stage}", payload)
+        _emit(event_sink, f"run.progress.{stage}", payload)
 
     signal.signal(signal.SIGINT, _on_sigint)
     try:
-        _emit(ctx, "run.started", {"prompt_chars": len(prompt)})
-        runner = SwarmGraphRunner(getattr(ctx, "runtime", None), cancellation_token=token)
-        result = runner.run(prompt, on_progress=_on_progress)
-        output = result.render() if hasattr(result, "render") else str(result)
-        _emit(ctx, "run.completed", {"elapsed_ms": int((time.monotonic() - started) * 1000)})
-        return CommandResult(state="present", output=output)
+        _emit(event_sink, "run.started", {"prompt_chars": len(prompt)})
+        cancellation_token.raise_if_cancelled()
+        config = runtime if runtime is not None else SwarmGraphConfig(num_workers=3, max_rounds=1)
+        runner = _make_runner(config, cancellation_token)
+        result = _run_runner(runner, prompt, cancellation_token, _on_progress)
+        if hasattr(session, "add_message"):
+            session.add_message("user", prompt)
+        _emit(event_sink, "run.completed", {
+            "elapsed_ms": int((time.monotonic() - started) * 1000),
+            "result_summary": _result_summary(result),
+        })
+        return CommandResult(state="present", output=_render_run_result(result))
     except Cancelled as exc:
-        _emit(ctx, "run.cancelled", {
+        _emit(event_sink, "run.cancelled", {
             "reason": exc.reason.value,
             "detail": exc.detail,
             "elapsed_ms": int((time.monotonic() - started) * 1000),
@@ -235,6 +280,19 @@ def _handle_run_context(args: list[str], ctx: Any) -> CommandResult:
         return CommandResult(state="degraded", output=str(exc), reason="cancelled")
     finally:
         signal.signal(signal.SIGINT, previous)
+
+
+def _handle_run_context(args: list[str], ctx: Any) -> CommandResult:
+    prompt = " ".join(args).strip()
+    factory = getattr(ctx, "run_token_factory", None)
+    token: CancellationToken = factory() if callable(factory) else CancellationToken()
+    return _execute_run(
+        prompt,
+        session=ctx.session,
+        cancellation_token=token,
+        event_sink=ctx,
+        runtime=getattr(ctx, "runtime", None),
+    )
 
 
 def cmd_summary(_arg: str, session: ChatSession) -> str:
@@ -340,8 +398,15 @@ class SlashCommandHandler:
 
     def __init__(self, runner: Any = None) -> None:
         self.runner = runner
-        self.cancellation_token: Any = None
+        self.cancellation_token: CancellationToken = CancellationToken()
+        self.events: list[tuple[str, dict[str, Any]]] = []
         self._registry = _build_registry()
+
+    def emit_event(self, name: str, payload: dict[str, Any]) -> None:
+        self.events.append((name, dict(payload)))
+
+    def run_token_factory(self) -> CancellationToken:
+        return self.cancellation_token.child()
 
     def handle(self, command: str, session: ChatSession) -> str | None:
         cmd = command.strip()
@@ -360,5 +425,11 @@ class SlashCommandHandler:
             return f"Blocked: /{name} requires mode: {allowed}. Current mode: {session.mode}."
 
         if name == "run":
-            return defn.handler(arg, session, self.cancellation_token)
+            return _execute_run(
+                arg,
+                session=session,
+                cancellation_token=self.run_token_factory(),
+                event_sink=self,
+                runtime=self.runner,
+            )
         return defn.handler(arg, session)
