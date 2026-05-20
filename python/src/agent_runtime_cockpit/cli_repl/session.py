@@ -82,19 +82,25 @@ def migrate_legacy_session(session_id: str) -> ChatSession | None:
     if legacy_data is None:
         return None
 
-    legacy_messages = legacy_data.get("messages", [])
-    legacy_mode = legacy_data.get("mode", MODE_BUILD)
-
-    session = ChatSession(
-        id=legacy_data.get("session_id", session_id),
-        mode=legacy_mode,
-    )
-    for msg in legacy_messages:
-        role = msg.get("role", "user")
-        content = msg.get("content", "")
-        session.add_message(role, content)
+    session = _session_from_legacy(legacy_data, session_id)
 
     session.save()
+    return session
+
+
+def _session_from_legacy(data: dict[str, Any], fallback_id: str) -> ChatSession:
+    session = ChatSession(
+        id=data.get("session_id", fallback_id),
+        mode=data.get("mode", MODE_BUILD),
+        metadata={"source_trust": "workspace", "source_format": "legacy_studio_session"},
+    )
+    for msg in data.get("messages", []):
+        session.history.append({
+            "role": msg.get("role", "user"),
+            "content": msg.get("content", ""),
+            "timestamp": msg.get("timestamp", data.get("updated", session.updated_at)),
+            "source_trust": "workspace",
+        })
     return session
 
 
@@ -170,10 +176,7 @@ class ChatSession(BaseModel):
         # Fallback: try legacy flat format (.json file in sessions dir)
         legacy = _read_legacy_session(session_id)
         if legacy is not None:
-            return cls(
-                id=legacy.get("session_id", session_id),
-                mode=legacy.get("mode", MODE_BUILD),
-            )
+            return _session_from_legacy(legacy, session_id)
         return None
 
     @classmethod
@@ -185,6 +188,8 @@ class ChatSession(BaseModel):
         sess_dir = _get_sessions_dir()
         if sess_dir.exists():
             for d in sorted(sess_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+                if d.name == "latest":
+                    continue
                 if d.is_dir():
                     sess_path = d / "session.json"
                     if sess_path.exists():
@@ -196,10 +201,7 @@ class ChatSession(BaseModel):
                     # Legacy flat file in canonical dir
                     try:
                         data = json.loads(d.read_text(encoding="utf-8"))
-                        sessions.append(cls(
-                            id=data.get("session_id", d.stem),
-                            mode=data.get("mode", MODE_BUILD),
-                        ))
+                        sessions.append(_session_from_legacy(data, d.stem))
                     except Exception:
                         pass
 

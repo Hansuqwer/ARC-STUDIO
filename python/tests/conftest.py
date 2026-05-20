@@ -4,6 +4,47 @@ from __future__ import annotations
 
 import gc
 import socket
+from dataclasses import dataclass, field
+from typing import Any
+
+import pytest
+
+from agent_runtime_cockpit.cli_repl.cancellation import CancellationToken
+
+
+@dataclass
+class _CapturedEvent:
+    name: str
+    payload: dict[str, Any]
+
+
+@dataclass
+class _StubSession:
+    allow_run: bool = False
+
+
+@dataclass
+class _StubReplContext:
+    events: list[_CapturedEvent] = field(default_factory=list)
+    session: _StubSession = field(default_factory=_StubSession)
+    runtime: Any = None
+    _session_token: CancellationToken = field(default_factory=CancellationToken)
+
+    def emit_event(self, name: str, payload: dict[str, Any]) -> None:
+        self.events.append(_CapturedEvent(name=name, payload=dict(payload)))
+
+    def run_token_factory(self) -> CancellationToken:
+        return self._session_token.child()
+
+
+@pytest.fixture
+def make_repl_context():
+    def _factory(**overrides):
+        ctx = _StubReplContext()
+        for k, v in overrides.items():
+            setattr(ctx, k, v)
+        return ctx
+    return _factory
 
 
 def pytest_sessionfinish(session, exitstatus):  # noqa: ARG001

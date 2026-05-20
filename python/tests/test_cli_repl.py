@@ -92,6 +92,25 @@ class TestSlashCommands:
         assert result is not None
         assert "completed" in result
 
+    def test_run_blocked_in_plan_mode(self):
+        handler = SlashCommandHandler()
+        s = ChatSession(mode="plan")
+        result = handler.handle("/run hello world", s)
+        assert result is not None
+        assert "Blocked" in result
+
+    def test_run_accepts_cancellation_token(self):
+        class Cancelled:
+            def is_cancelled(self) -> bool:
+                return True
+
+        handler = SlashCommandHandler()
+        handler.cancellation_token = Cancelled()
+        s = ChatSession()
+        result = handler.handle("/run hello world", s)
+        assert result is not None
+        assert "cancelled" in result
+
     def test_run_no_arg(self):
         handler = SlashCommandHandler()
         s = ChatSession()
@@ -305,6 +324,19 @@ class TestCommandRegistry:
         assert "meta" in cats
         assert "runtime" in cats
 
+    def test_registered_commands_have_explicit_metadata(self):
+        handler = SlashCommandHandler()
+        for cmd in handler._registry.list_commands():
+            assert cmd.category
+            assert isinstance(cmd.gates_required, list)
+            assert isinstance(cmd.mode_required, list)
+            assert cmd.renders, cmd.name
+            assert isinstance(cmd.requires_events, list)
+            assert cmd.trust_required in {"system", "user", "workspace"}
+            assert isinstance(cmd.privileged, bool)
+            assert isinstance(cmd.visible_in_ide, bool)
+            assert isinstance(cmd.popup_visible, bool)
+
 
 class TestSessionMigration:
     def test_detect_legacy_sessions(self, tmp_path):
@@ -447,7 +479,7 @@ class TestSessionMigration:
 class TestSessionsMigrate:
     def test_migrate_no_legacy(self, monkeypatch, tmp_path):
         monkeypatch.setenv("ARC_STUDIO_SESSIONS_DIR", str(tmp_path / "no_legacy"))
-        result = CliRunner().invoke(app, ["studio", "sessions-migrate", "--json"])
+        result = CliRunner().invoke(app, ["studio", "sessions", "migrate", "--json"])
         assert result.exit_code == 0, result.output
         payload = json.loads(result.output)
         assert payload["ok"] is True
@@ -467,7 +499,7 @@ class TestSessionsMigrate:
         }
         (sess_dir / "migrate-me.json").write_text(json.dumps(legacy), encoding="utf-8")
 
-        result = CliRunner().invoke(app, ["studio", "sessions-migrate", "--json"])
+        result = CliRunner().invoke(app, ["studio", "sessions", "migrate", "--json"])
         assert result.exit_code == 0, result.output
         payload = json.loads(result.output)
         assert payload["data"]["newly_migrated"] == 1
@@ -486,11 +518,11 @@ class TestSessionsMigrate:
         (sess_dir / "dup-test.json").write_text(json.dumps(legacy), encoding="utf-8")
 
         # First migration
-        result1 = CliRunner().invoke(app, ["studio", "sessions-migrate", "--json"])
+        result1 = CliRunner().invoke(app, ["studio", "sessions", "migrate", "--json"])
         assert result1.exit_code == 0
 
         # Second migration should report 0 new migrations
-        result2 = CliRunner().invoke(app, ["studio", "sessions-migrate", "--json"])
+        result2 = CliRunner().invoke(app, ["studio", "sessions", "migrate", "--json"])
         assert result2.exit_code == 0
         payload2 = json.loads(result2.output)
         assert payload2["data"]["newly_migrated"] == 0

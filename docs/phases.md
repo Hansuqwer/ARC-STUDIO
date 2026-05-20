@@ -287,7 +287,7 @@ Every new phase/chunk should include:
 | 15 SwarmGraph Cost Producer + Cost UX | Baseline Complete | Phase 5 + Phase 9 | Schema expanded with model/promptTokens/completionTokens/source; measured is ISO timestamp; UI renders all new fields gated on explicit events; 17 new tests across Python+TS |
 | 16 Packaging/Optional Feature Decisions | Baseline Complete | browser v0.1 stabilization | ADR-008 accepted; electron-builder + signing preflight exist; release config signs validated by both signing-preflight and PR hygiene workflows; live LM Arena implementation deferred; **all 6 Active Work Ledger items implemented in `4b0f6b5`** |
 | **17 SwarmGraph Native Runtime** | **P1-P4 Baseline Complete** | existing adapter/swarmgraph.py + CLI/IDE surfaces | P1: native `swarmgraph/` package. P2: adapter bridge rewrite using native `SwarmGraphRunner` by default, CLI fallback. P3: CLI REPL. P4: ChatTab default alignment. 989 total Python tests pass; 762 TS tests pass. |
-| **18 CLI Consolidation** | **Complete** | Phase 0 inventory (cli-commands, slash-commands, sessions) | Unified slash command registry under `cli_repl/commands/`; merged cli_studio.py and cli_repl slash commands; cli_studio.py reduced to thin ≤30-line shim; ChatSession schema version (v1); legacy flat session migration (`arc studio sessions-migrate`); bare `arc` TUI launch with `ARC_NO_TUI` guard. 57 CLI REPL/studio tests pass; 1002 Python tests pass total (no regressions). |
+| **18 CLI Consolidation** | **In Progress** | ADR-016 Phase 2 subset | Unified slash command registry under `cli_repl/commands/`; merged current cli_studio.py and cli_repl slash commands; cli_studio.py reduced to thin shim; ChatSession schema version (v1 subset); nested legacy flat session migration (`arc studio sessions migrate`); bare `arc` TTY launch with `ARC_NO_TUI` guard. Full Phase 0 target slash/session inventory is deferred by ADR-016. |
 
 ## v0.1 Polish Deferral Decision
 
@@ -579,19 +579,20 @@ Most dimensions render absent/degraded until the Phase 15 measured cost/token pr
 
 ### Phase 18 — CLI Consolidation
 
-**Roadmap:** Phase 0 inventory scope (cli-commands, slash-commands, sessions)
-**Status:** Complete | Evidence: 57 CLI REPL/studio tests pass; 1002 Python tests total; TS protocol build clean; banned-claims OK; check-pr OK.
+**Roadmap:** ADR-016 Phase 2 subset of Phase 0 CLI inventory
+**Status:** In Progress | Evidence: targeted CLI + SwarmGraph tests pass locally; re-review required after ADR-016 subset fix-up.
 
-Consolidates two separate REPL implementations (`cli_studio.py` and `cli_repl/`) and their slash command registries, session schemas, and CLI entry points.
+Consolidates two separate REPL implementations (`cli_studio.py` and `cli_repl/`) and their slash command registries, session schemas, and CLI entry points for the ADR-016 Phase 2 subset. The full Phase 0 target slash/session inventory is not claimed complete in this phase.
 
 **Implementation:**
 1. Created `cli_repl/commands/` package with declarative `CommandRegistry` and `CommandDef` dataclass — single source of truth for all slash commands.
 2. Merged all 8 `cli_studio.py` slash commands (`/help`, `/status`, `/doctor`, `/runs`, `/plan`, `/build`, `/auto`, `/exit`) into the unified registry alongside existing `cli_repl` commands.
 3. Rewrote `cli_studio.py` as a thin shim (≤30 lines of active code) that delegates to `arc studio chat` via `run_chat_repl()`.
 4. Added `version=1` schema version field to `ChatSession` (canonical session schema).
-5. Added legacy `StudioSession` flat JSON reader with `ChatSession.load()` fallback.
-6. Added `arc studio sessions-migrate` CLI command for one-shot conversion of legacy flat sessions to canonical dir-per-session format.
+5. Added legacy `StudioSession` flat JSON reader with `ChatSession.load()` fallback and workspace-trust metadata on legacy content.
+6. Added `arc studio sessions migrate` CLI command for one-shot conversion of legacy flat sessions to canonical dir-per-session format.
 7. Changed bare `arc` CLI behavior: when invoked with no subcommand in a TTY, launches the ARC Studio REPL instead of showing help. Respects `ARC_NO_TUI=1` env var to disable TUI launch.
+8. Added explicit registry metadata for registered commands and mode/cancellation handling for `/run`.
 
 **Files modified:**
 - `cli_repl/commands/__init__.py` — new declarative command registry
@@ -599,18 +600,18 @@ Consolidates two separate REPL implementations (`cli_studio.py` and `cli_repl/`)
 - `cli_repl/session.py` — added version field, legacy reader, migration functions
 - `cli_repl/chat_repl.py` — minor import updates
 - `cli_studio.py` — thin shim delegation to cli_repl
-- `cli.py` — added `_arc_default` callback, added `sessions-migrate` command
+- `cli.py` — added `_arc_default` callback, added nested `sessions migrate` command
 - `tests/test_cli_repl.py` — 36 tests (added merged commands, registry, migration, sessions-migrate, bare arc tests)
 - `tests/test_cli_studio.py` — 9 tests (refactored for ChatSession + legacy compat)
 
 **Acceptance:**
-1. ✅ All existing slash commands from both implementations work identically.
-2. ✅ `cli_studio.py` is a thin shim (≤30 active lines) delegating to `cli_repl`.
+1. ✅ Current legacy and cli_repl slash commands are available through one registry.
+2. ✅ `cli_studio.py` is a thin shim delegating to `cli_repl`.
 3. ✅ Legacy flat `StudioSession` JSON sessions are still readable via `ChatSession.load()`.
-4. ✅ `arc studio sessions-migrate` converts legacy to canonical idempotently.
+4. ✅ `arc studio sessions migrate` converts legacy to canonical idempotently.
 5. ✅ Bare `arc` with TTY launches studio REPL; `ARC_NO_TUI=1` shows help.
-6. ✅ 1002 Python tests pass (up from 990 baseline), 19 skipped, 1 deselected known opt-in failure.
-7. ✅ Banned-claims and check-pr pass.
-8. ✅ No regressions in existing CLI or TS surfaces.
+6. ✅ Registered commands have explicit category/gate/mode/trust/privilege/render/event metadata.
+7. ✅ `/run` is blocked outside build/auto mode and accepts a cancellation token.
+8. ⏳ Re-run full verification and re-review before flipping to Complete.
 
-**Known risks:** `cli_studio.py` legacy flat sessions are readable but never written — users must run `arc studio sessions-migrate` to convert. The bare `arc` TUI behavior uses `sys.stdin.isatty()` which always returns False in test runner (tested via `ARC_NO_TUI` guard).
+**Known risks:** `cli_studio.py` legacy flat sessions are readable but never written — users must run `arc studio sessions migrate` to convert. The bare `arc` TTY behavior uses `sys.stdin.isatty()` which always returns False in test runner (tested via `ARC_NO_TUI` guard). Full CLI target inventory is deferred by ADR-016, not complete in this phase.

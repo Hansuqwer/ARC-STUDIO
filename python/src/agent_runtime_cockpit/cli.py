@@ -91,6 +91,7 @@ config_app = typer.Typer(name="config", help="ARC workspace configuration (ADR-0
 hitl_app = typer.Typer(name="hitl", help="Human-in-the-loop approval commands")
 storage_app = typer.Typer(name="storage", help="Storage management commands")
 studio_app = typer.Typer(name="studio", help="ARC Studio — chat REPL, sessions, and IDE tooling")
+studio_sessions_app = typer.Typer(name="sessions", help="ARC Studio chat sessions")
 app.add_typer(context_app)
 app.add_typer(adapter_app)
 app.add_typer(doctor_app)
@@ -100,6 +101,7 @@ app.add_typer(config_app)
 app.add_typer(hitl_app)
 app.add_typer(storage_app)
 app.add_typer(studio_app)
+studio_app.add_typer(studio_sessions_app)
 
 console = Console()
 err_console = Console(stderr=True)
@@ -2594,11 +2596,14 @@ def studio_chat(
     )
 
 
-@studio_app.command("sessions")
+@studio_sessions_app.callback(invoke_without_command=True)
 def studio_sessions(
+    ctx: typer.Context,
     json_output: bool = JSON_FLAG,
 ) -> None:
     """List saved chat sessions."""
+    if ctx.invoked_subcommand is not None:
+        return
     from .cli_repl.session import ChatSession
     sessions = ChatSession.list_sessions()
     if json_output:
@@ -2613,7 +2618,7 @@ def studio_sessions(
     console.print(table)
 
 
-@studio_app.command("sessions-migrate")
+@studio_sessions_app.command("migrate")
 def studio_sessions_migrate(
     json_output: bool = JSON_FLAG,
 ) -> None:

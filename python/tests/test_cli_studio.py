@@ -148,5 +148,7 @@ class TestLegacyReadCompat:
             assert loaded is not None
             assert loaded.id == sid
             assert loaded.mode == MODE_PLAN  # plan → canonical plan
+            assert loaded.metadata["source_trust"] == "workspace"
+            assert loaded.history[0]["source_trust"] == "workspace"
         finally:
             os.environ.pop("ARC_STUDIO_SESSIONS_DIR", None)

@@ -9,7 +9,7 @@ single source of truth for both the CLI REPL and IDE command palette.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Callable
 
 
 @dataclass
@@ -25,10 +25,10 @@ class CommandDef:
     mode_required: list[str] = field(default_factory=list)
     visible_in_ide: bool = True
     popup_visible: bool = True
-    renders: list[str] = field(default_factory=lambda: ["present"])
+    renders: list[str] = field(default_factory=list)
     requires_events: list[str] = field(default_factory=list)
     privileged: bool = False
-    trust_required: str | None = None  # system | user | workspace
+    trust_required: str = "user"  # system | user | workspace
 
 
 class CommandRegistry:

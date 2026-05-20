@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Protocol
 
 from .config import ExecutionMode, SwarmGraphConfig
 from .consensus import run_consensus
@@ -31,6 +31,10 @@ from .nodes.worker import process_worker_results, worker_execute
 from .state import SwarmState
 
 
+class CancellationToken(Protocol):
+    def is_cancelled(self) -> bool: ...
+
+
 class SwarmGraphRunner:
     def __init__(self, config: SwarmGraphConfig | None = None):
         self.config = config or SwarmGraphConfig()
@@ -41,11 +45,18 @@ class SwarmGraphRunner:
         self,
         prompt: str,
         config: SwarmGraphConfig | None = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> dict[str, Any]:
         cfg = config or self.config
         self.state = SwarmState(config=cfg)
         self.state.status = SwarmStatus.running
         self.events = []
+
+        if cancellation_token and cancellation_token.is_cancelled():
+            self.state.status = SwarmStatus.cancelled
+            self.state.error = "cancelled"
+            self.state.updated_at = datetime.now(timezone.utc)
+            return self._build_result()
 
         queen_prepare_agents(self.state, cfg.num_workers)
         self.state.save_checkpoint()
@@ -58,6 +69,10 @@ class SwarmGraphRunner:
         self.events.append(emit_topology_event(self.state, topology))
 
         for round_num in range(cfg.max_rounds):
+            if cancellation_token and cancellation_token.is_cancelled():
+                self.state.status = SwarmStatus.cancelled
+                self.state.error = "cancelled"
+                break
             self.state.current_round = round_num
             pending = self.state.get_pending_tasks()
             if not pending:
@@ -66,6 +81,11 @@ class SwarmGraphRunner:
             assignment = queen_assign(self.state, pending)
             worker_results: list[WorkerResult] = []
             for task in pending:
+                if cancellation_token and cancellation_token.is_cancelled():
+                    task.status = TaskStatus.cancelled
+                    self.state.status = SwarmStatus.cancelled
+                    self.state.error = "cancelled"
+                    break
                 if task.id not in assignment:
                     continue
                 result = worker_execute(
@@ -80,6 +100,9 @@ class SwarmGraphRunner:
                     self.events.append(emit_budget_event(
                         self.state, result.cost_usd, cfg.budget_limit_usd,
                     ))
+
+            if self.state.status == SwarmStatus.cancelled:
+                break
 
             process_worker_results(pending, worker_results)
 
@@ -100,7 +123,7 @@ class SwarmGraphRunner:
 
             self.state.save_checkpoint()
 
-        if self.state.status != SwarmStatus.failed:
+        if self.state.status not in (SwarmStatus.failed, SwarmStatus.cancelled):
             if self.state.all_tasks_completed():
                 self.state.status = SwarmStatus.completed
             else:
