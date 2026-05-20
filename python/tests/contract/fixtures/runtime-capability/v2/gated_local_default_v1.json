@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "mode": "gated_local",
+  "profile_id": "ollama-local",
+  "isolation_id": "none",
+  "allow_paid_calls": false,
+  "cost_source_default": "estimated",
+  "supports_cancellation": true,
+  "supports_streaming": false,
+  "runtime_id": "ollama-local"
+}

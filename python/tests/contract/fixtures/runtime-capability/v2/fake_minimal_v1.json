@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "mode": "fake",
+  "profile_id": "default-fake",
+  "isolation_id": "none",
+  "allow_paid_calls": false,
+  "cost_source_default": "estimated",
+  "supports_cancellation": true,
+  "supports_streaming": false,
+  "runtime_id": "default-fake"
+}
