@@ -6,7 +6,9 @@ from __future__ import annotations
 
 from enum import Enum
 from typing import Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from agent_runtime_cockpit.runtime.mode import RuntimeMode
 
 from .capabilities import RuntimeCapabilities
 
@@ -107,12 +109,31 @@ class RunStatus(str, Enum):
 
 
 class RunEvent(BaseModel):
-    schema_version: int = 1  # Event schema version (ADR-004)
+    schema_version: int = 2  # Event schema version (ADR-004)
     type: str
     timestamp: str
     run_id: str
     sequence: int
     data: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_v1_to_v2(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        if data.get("schema_version", 1) != 1:
+            return data
+        migrated = dict(data)
+        payload = dict(migrated.get("data") or {})
+        if "runtime_mode" in payload:
+            payload["runtime_mode"] = RuntimeMode.from_legacy(payload["runtime_mode"]).value
+        payload.setdefault("runtime_mode", RuntimeMode.FAKE.value)
+        payload.setdefault("profile_id", "default")
+        payload.setdefault("isolation_id", "none")
+        payload.setdefault("source_trust", "workspace")
+        migrated["schema_version"] = 2
+        migrated["data"] = payload
+        return migrated
 
 
 class BudgetVector(BaseModel):

@@ -293,15 +293,15 @@ class TestCreateEvent:
 
 
 class TestRunEventSchemaVersion:
-    """RunEvent model carries schema_version (default 1)."""
+    """RunEvent model carries schema_version (default 2)."""
 
-    def test_run_event_defaults_to_version_1(self):
+    def test_run_event_defaults_to_version_2(self):
         from datetime import datetime, timezone
         ev = RunEvent(
             type="TEST", timestamp=datetime.now(timezone.utc).isoformat(),
             run_id="r1", sequence=0, data={},
         )
-        assert ev.schema_version == 1
+        assert ev.schema_version == 2
 
     def test_run_event_serializes_schema_version(self):
         from datetime import datetime, timezone
@@ -311,7 +311,7 @@ class TestRunEventSchemaVersion:
         )
         d = ev.model_dump()
         assert "schema_version" in d
-        assert d["schema_version"] == 1
+        assert d["schema_version"] == 2
 
     def test_run_event_custom_version(self):
         from datetime import datetime, timezone
@@ -321,3 +321,16 @@ class TestRunEventSchemaVersion:
             run_id="r1", sequence=0, data={},
         )
         assert ev.schema_version == 2
+
+    def test_run_event_migrates_v1_payload_to_v2(self):
+        from datetime import datetime, timezone
+        ev = RunEvent(
+            schema_version=1,
+            type="TEST", timestamp=datetime.now(timezone.utc).isoformat(),
+            run_id="r1", sequence=0, data={"runtime_mode": "offline"},
+        )
+        assert ev.schema_version == 2
+        assert ev.data["runtime_mode"] == "fake"
+        assert ev.data["profile_id"] == "default"
+        assert ev.data["isolation_id"] == "none"
+        assert ev.data["source_trust"] == "workspace"

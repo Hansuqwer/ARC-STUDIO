@@ -19,7 +19,7 @@ from .schemas import RunEvent
 
 # The current event schema version. Increment on breaking changes.
 # Readers must support N and N-1.
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 
 
 class EventTypeDef(BaseModel):

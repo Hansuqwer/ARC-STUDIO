@@ -113,7 +113,7 @@ export interface RunRecord {
 }
 
 /** Event schema version constant — mirrors Python CURRENT_SCHEMA_VERSION */
-export const EVENT_SCHEMA_VERSION = 1;
+export const EVENT_SCHEMA_VERSION = 2;
 
 export interface RunEvent {
   schema_version: number;
@@ -134,6 +134,15 @@ export function parseEvent(raw: string): RunEvent {
   if (!event.schema_version) {
     event.schema_version = 1;
   }
+  if (event.schema_version === 1) {
+    const data = { ...(event.data ?? {}) } as Record<string, unknown>;
+    data.runtime_mode = runtimeModeFromLegacy(data.runtime_mode);
+    data.profile_id ??= 'default';
+    data.isolation_id ??= 'none';
+    data.source_trust ??= 'workspace';
+    event.schema_version = 2;
+    event.data = data;
+  }
   if (event.schema_version > EVENT_SCHEMA_VERSION) {
     return {
       ...event,
@@ -142,6 +151,15 @@ export function parseEvent(raw: string): RunEvent {
     };
   }
   return event;
+}
+
+function runtimeModeFromLegacy(value: unknown): 'fake' | 'gated_local' | 'provider_backed' {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : 'fake';
+  if (normalized === 'offline') return 'fake';
+  if (normalized === 'local' || normalized === 'gated') return 'gated_local';
+  if (normalized === 'live') return 'provider_backed';
+  if (normalized === 'fake' || normalized === 'gated_local' || normalized === 'provider_backed') return normalized;
+  return 'fake';
 }
 
 export interface ContextPackEntry {
