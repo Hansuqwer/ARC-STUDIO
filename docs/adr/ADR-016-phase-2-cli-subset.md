@@ -1,7 +1,8 @@
 # ADR-016: Phase 2 CLI Consolidation Subset
 
-Status: Proposed
+Status: Accepted
 Date: 2026-05-20
+Date-Accepted: 2026-05-20
 Deciders: ARC Studio core team
 Refines: ADR-011, docs/phases.md Phase 18, Phase 0 CLI inventory
 
