@@ -170,8 +170,10 @@ class TestSlashCommands:
         assert result is not None
         assert result.state == "present"
         assert "ok: hello world" in result.output
-        assert ("run.started", {"prompt_chars": 11}) in handler.events
+        assert any(name == "run.started" and payload["prompt_chars"] == 11 for name, payload in handler.events)
         assert any(name == "run.completed" for name, _payload in handler.events)
+        started = [payload for name, payload in handler.events if name == "run.started"][0]
+        assert started["runtime_mode"] == "fake"
 
     def test_repl_run_succeeds_when_gate_open_via_session(self, monkeypatch):
         monkeypatch.delenv("ARC_ALLOW_RUN", raising=False)
@@ -239,6 +241,29 @@ class TestSlashCommands:
         result = handler.handle("/run hello world", s)
         assert result is not None
         assert "Blocked" in result
+
+    def test_runtime_command_shows_current_runtime(self):
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        result = handler.handle("/runtime", s)
+        assert result is not None
+        assert "Runtime: fake" in result
+
+    def test_mode_alias_sets_runtime_mode(self):
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        result = handler.handle("/mode gated", s)
+        assert result == "Runtime mode: gated_local"
+        assert s.runtime_mode == "gated_local"
+
+    def test_provider_backed_run_requires_paid_calls(self, monkeypatch):
+        monkeypatch.setenv("ARC_ALLOW_RUN", "1")
+        handler = SlashCommandHandler()
+        s = ChatSession(runtime_mode="provider_backed", allow_paid_calls=False)
+        result = handler.handle("/run hello", s)
+        assert result is not None
+        assert result.state == "blocked"
+        assert result.reason == "paid_calls_disabled"
 
     def test_run_accepts_pre_cancelled_token(self, monkeypatch):
         monkeypatch.setenv("ARC_ALLOW_RUN", "1")

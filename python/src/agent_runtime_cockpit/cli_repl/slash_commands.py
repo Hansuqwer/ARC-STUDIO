@@ -12,6 +12,8 @@ from .cancellation import Cancelled, CancellationReason, CancellationToken
 from .session import ChatSession
 from ..swarmgraph import SwarmGraphRunner
 from ..swarmgraph.config import SwarmGraphConfig
+from ..runtime.mode import RuntimeMode
+from ..runtime.registry import default_runtime_registry
 
 
 @dataclass
@@ -99,6 +101,20 @@ def _build_registry():
         category="runtime",
         handler=cmd_run,
         gates_required=[], mode_required=["build", "auto"], renders=["present", "blocked"], requires_events=[], privileged=False, trust_required="user",
+    ))
+    registry.register(CommandDef(
+        name="runtime",
+        help_text="Show or set runtime mode: fake, gated_local, provider_backed",
+        category="runtime",
+        handler=cmd_runtime,
+        gates_required=[], mode_required=[], renders=["present", "blocked"], requires_events=[], privileged=False, trust_required="user",
+    ))
+    registry.register(CommandDef(
+        name="mode",
+        help_text="Alias for /runtime",
+        category="runtime",
+        handler=cmd_runtime,
+        gates_required=[], mode_required=[], renders=["present", "blocked"], requires_events=[], privileged=False, trust_required="user",
     ))
     registry.register(CommandDef(
         name="plan",
@@ -239,6 +255,15 @@ def _execute_run(
 ) -> CommandResult:
     """Single source of truth for /run gate, cancellation, and events."""
     prompt = prompt.strip()
+    runtime_mode = RuntimeMode.from_legacy(getattr(session, "runtime_mode", RuntimeMode.FAKE))
+    capability = default_runtime_registry().get(runtime_mode)
+    if runtime_mode is RuntimeMode.PROVIDER_BACKED and not getattr(session, "allow_paid_calls", False):
+        return CommandResult(
+            state="blocked",
+            reason="paid_calls_disabled",
+            remediation="Set allow_paid_calls before using provider_backed runtime mode.",
+            metadata=capability.model_dump(mode="json"),
+        )
     if not _run_gate_open(session):
         return CommandResult(
             state="blocked",
@@ -260,7 +285,12 @@ def _execute_run(
 
     signal.signal(signal.SIGINT, _on_sigint)
     try:
-        _emit(event_sink, "run.started", {"prompt_chars": len(prompt)})
+        _emit(event_sink, "run.started", {
+            "prompt_chars": len(prompt),
+            "runtime_mode": runtime_mode.value,
+            "profile_id": getattr(session, "profile_id", "default"),
+            "isolation_id": getattr(session, "isolation_id", "none"),
+        })
         cancellation_token.raise_if_cancelled()
         config = runtime if runtime is not None else SwarmGraphConfig(num_workers=3, max_rounds=1)
         runner = _make_runner(config, cancellation_token)
@@ -348,12 +378,33 @@ def cmd_auto(_arg: str, session: ChatSession) -> str:
     return "Switched to Auto mode (policy-driven)."
 
 
+def cmd_runtime(arg: str, session: ChatSession) -> str:
+    value = arg.strip()
+    if not value:
+        capability = default_runtime_registry().get(session.runtime_mode)
+        return (
+            f"Runtime: {RuntimeMode.from_legacy(session.runtime_mode).value}\n"
+            f"Profile: {session.profile_id}\n"
+            f"Isolation: {session.isolation_id}\n"
+            f"Allow paid calls: {session.allow_paid_calls}\n"
+            f"Cost source: {capability.cost_source_default}"
+        )
+    try:
+        mode = RuntimeMode.from_legacy(value)
+    except (TypeError, ValueError) as exc:
+        return f"Blocked: {exc}"
+    session.runtime_mode = mode
+    session.allow_paid_calls = mode is RuntimeMode.PROVIDER_BACKED
+    return f"Runtime mode: {mode.value}"
+
+
 def cmd_status(_arg: str, session: ChatSession) -> str:
     from pathlib import Path
     ws = Path.cwd().resolve()
     lines = [
         f"Workspace: {ws}",
         f"Mode: {session.mode.upper()}",
+        f"Runtime: {RuntimeMode.from_legacy(session.runtime_mode).value}",
         f"Session: {session.id[:12]}",
         f"Messages: {len(session.history)}",
     ]
