@@ -1,11 +1,23 @@
-"""Tests: ARC Studio chat-first CLI entry point (cli_studio.py)."""
+"""Tests: ARC Studio chat-first CLI entry point (cli_studio.py shim).
+
+The cli_studio.py module is now a thin shim that delegates to cli_repl.
+These tests verify the shim still provides the expected CLI behavior.
+"""
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from typer.testing import CliRunner
 
-from agent_runtime_cockpit.cli_studio import app, StudioSession, SESSION_DIR, MODE_PLAN, MODE_BUILD, MODE_AUTO
+from agent_runtime_cockpit.cli_studio import app
+from agent_runtime_cockpit.cli_repl.session import (
+    ChatSession,
+    MODE_PLAN,
+    MODE_BUILD,
+    MODE_AUTO,
+    _get_sessions_dir,
+)
 
 runner = CliRunner()
 
@@ -15,7 +27,6 @@ class TestBanner:
         result = runner.invoke(app, [])
         assert result.exit_code == 0
         assert "ARC Studio" in result.stdout
-        assert "/help" in result.stdout
 
     def test_version_flag(self):
         result = runner.invoke(app, ["--version"])
@@ -23,59 +34,78 @@ class TestBanner:
         assert "ARC Studio v" in result.stdout
 
 
-class TestSlashCommands:
-    def test_help_lists_commands(self):
-        result = runner.invoke(app, ["/help"])
-        assert result.exit_code == 0
-        assert "/help" in result.stdout
-        assert "/status" in result.stdout
-        assert "/doctor" in result.stdout
-        assert "/runs" in result.stdout
-        assert "/plan" in result.stdout
-        assert "/build" in result.stdout
-        assert "/auto" in result.stdout
-        assert "/exit" in result.stdout
+class TestSessionPersistence:
+    def test_session_roundtrip(self, tmp_path):
+        """Verify ChatSession serialization roundtrip."""
+        session_dir = tmp_path / "sessions"
+        session_dir.mkdir(parents=True, exist_ok=True)
 
-    def test_unknown_slash_command(self):
-        result = runner.invoke(app, ["/nonexistent"])
-        assert result.exit_code == 0
-        assert "Unknown command" in result.stdout
+        s = ChatSession(mode=MODE_PLAN)
+        s.add_message("user", "hello")
+        s.add_message("assistant", "hi")
 
-    def test_status_shows_info(self):
-        result = runner.invoke(app, ["/status"])
-        assert result.exit_code == 0
-        assert "Workspace" in result.stdout
-        assert "Mode" in result.stdout
-        assert "BUILD" in result.stdout
+        # Write as canonical format (dir/session.json)
+        sess_dir = session_dir / s.id
+        sess_dir.mkdir(parents=True, exist_ok=True)
+        path = sess_dir / "session.json"
+        path.write_text(s.model_dump_json(indent=2), encoding="utf-8")
 
-    def test_doctor_runs_checks(self):
-        result = runner.invoke(app, ["/doctor"])
-        assert result.exit_code == 0
-        assert "✓" in result.stdout or "✗" in result.stdout
+        loaded_data = json.loads(path.read_text())
+        assert loaded_data["id"] == s.id
+        assert loaded_data["mode"] == MODE_PLAN
+        assert len(loaded_data["history"]) == 2
+        assert loaded_data["history"][0]["role"] == "user"
+        assert loaded_data["history"][0]["content"] == "hello"
+        assert loaded_data["version"] == 1
 
-    def test_runs_with_no_traces(self):
-        result = runner.invoke(app, ["/runs"])
-        assert result.exit_code == 0
+    def test_session_save_and_load(self, tmp_path):
+        """Verify ChatSession save/load with custom sessions dir."""
+        from agent_runtime_cockpit.cli_repl.session import SESSION_SCHEMA_VERSION
 
+        # Use a custom sessions dir via the env var
+        custom_dir = tmp_path / "custom_sessions"
+        import os
+        os.environ["ARC_STUDIO_SESSIONS_DIR"] = str(custom_dir)
 
-class TestModeSwitching:
-    def test_plan_switches_mode(self):
-        result = runner.invoke(app, ["/plan"])
-        assert result.exit_code == 0
-        assert "Plan" in result.stdout
+        try:
+            s = ChatSession()
+            s.add_message("user", "test")
+            path = s.save()
+            assert path.exists()
+            assert path.parent.name == s.id
 
-    def test_build_switches_mode(self):
-        result = runner.invoke(app, ["/build"])
-        assert result.exit_code == 0
-        assert "Build" in result.stdout
+            loaded = ChatSession.load(s.id)
+            assert loaded is not None
+            assert loaded.id == s.id
+            assert len(loaded.history) == 1
+            assert loaded.history[0]["content"] == "test"
+            assert loaded.version == SESSION_SCHEMA_VERSION
+        finally:
+            os.environ.pop("ARC_STUDIO_SESSIONS_DIR", None)
 
-    def test_auto_switches_mode(self):
-        result = runner.invoke(app, ["/auto"])
-        assert result.exit_code == 0
-        assert "Auto" in result.stdout
+    def test_session_list(self, tmp_path):
+        """Verify session listing with custom dir."""
+        import os
+        os.environ["ARC_STUDIO_SESSIONS_DIR"] = str(tmp_path / "sessions_list")
+        try:
+            s1 = ChatSession()
+            s1.save()
+            s2 = ChatSession()
+            s2.save()
+
+            sessions = ChatSession.list_sessions()
+            session_ids = [s.id for s in sessions]
+            assert s1.id in session_ids
+            assert s2.id in session_ids
+        finally:
+            os.environ.pop("ARC_STUDIO_SESSIONS_DIR", None)
+
+    def test_load_nonexistent_returns_none(self):
+        loaded = ChatSession.load("nonexistent-session-id")
+        assert loaded is None
 
     def test_session_state_tracks_mode(self):
-        session = StudioSession("test-session")
+        session = ChatSession()
         assert session.mode == MODE_BUILD
         session.set_mode(MODE_PLAN)
         assert session.mode == MODE_PLAN
@@ -85,92 +115,38 @@ class TestModeSwitching:
         assert session.mode == MODE_BUILD
 
     def test_session_state_rejects_invalid_mode(self):
-        session = StudioSession("test-session", mode=MODE_BUILD)
+        session = ChatSession(mode=MODE_BUILD)
         session.set_mode("invalid")
         assert session.mode == MODE_BUILD
 
 
-class TestOneShot:
-    def test_oneshot_exits_zero(self):
-        result = runner.invoke(app, ["hello world"])
-        assert result.exit_code == 0
+class TestLegacyReadCompat:
+    def test_read_legacy_flat_session(self, tmp_path):
+        """Verify legacy flat StudioSession JSON can be read."""
+        from agent_runtime_cockpit.cli_repl.session import _read_legacy_session
+        import os
+        os.environ["ARC_STUDIO_SESSIONS_DIR"] = str(tmp_path / "legacy_read")
+        try:
+            sid = "legacy-session-001"
+            legacy_data = {
+                "session_id": sid,
+                "mode": "plan",
+                "messages": [
+                    {"role": "user", "content": "hello", "timestamp": "2026-01-01T00:00:00"},
+                    {"role": "assistant", "content": "hi", "timestamp": "2026-01-01T00:00:01"},
+                ],
+                "created": "2026-01-01T00:00:00",
+                "updated": "2026-01-01T00:00:01",
+            }
+            legacy_dir = tmp_path / "legacy_read"
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+            (legacy_dir / f"{sid}.json").write_text(
+                json.dumps(legacy_data), encoding="utf-8"
+            )
 
-    def test_oneshot_echoes_message(self):
-        result = runner.invoke(app, ["hello world"])
-        assert result.exit_code == 0
-        assert "hello world" in result.stdout or "You said" in result.stdout
-
-    def test_oneshot_help(self):
-        result = runner.invoke(app, ["/help"])
-        assert result.exit_code == 0
-        assert "/status" in result.stdout
-
-    def test_oneshot_unknown_command(self):
-        result = runner.invoke(app, ["/bogus"])
-        assert result.exit_code == 0
-        assert "Unknown command" in result.stdout
-
-    def test_oneshot_mode_switch(self):
-        result = runner.invoke(app, ["/plan"])
-        assert result.exit_code == 0
-        assert "Plan" in result.stdout
-
-    def test_oneshot_exit(self):
-        result = runner.invoke(app, ["/exit"])
-        assert result.exit_code == 0
-        assert "Session saved" in result.stdout
-
-
-class TestSessionPersistence:
-    def test_session_roundtrip(self, tmp_path):
-        sid = "test-roundtrip-001"
-        session = StudioSession(sid, mode=MODE_PLAN)
-        session.add_message("user", "hello")
-        session.add_message("assistant", "hi")
-
-        (tmp_path / "sessions").mkdir(parents=True, exist_ok=True)
-        path = tmp_path / "sessions" / f"{sid}.json"
-        path.write_text(json.dumps(session.to_dict(), indent=2), encoding="utf-8")
-
-        loaded_data = json.loads(path.read_text())
-        assert loaded_data["session_id"] == sid
-        assert loaded_data["mode"] == MODE_PLAN
-        assert len(loaded_data["messages"]) == 2
-        assert loaded_data["messages"][0]["role"] == "user"
-        assert loaded_data["messages"][0]["content"] == "hello"
-
-    def test_session_save_and_load(self, tmp_path):
-        sid = "test-save-load-001"
-        session_dir = tmp_path / "sessions"
-        session = StudioSession(sid)
-        session.add_message("user", "test")
-        session.save(session_dir=session_dir)
-
-        loaded = StudioSession.load(sid, session_dir=session_dir)
-        assert loaded is not None
-        assert loaded.session_id == sid
-        assert len(loaded.messages) == 1
-        assert loaded.messages[0]["content"] == "test"
-
-    def test_session_list(self, tmp_path):
-        sid1, sid2 = "list-ses-001", "list-ses-002"
-        session_dir = tmp_path / "sessions"
-        s1 = StudioSession(sid1)
-        s1.save(session_dir=session_dir)
-        s2 = StudioSession(sid2)
-        s2.save(session_dir=session_dir)
-
-        sessions = StudioSession.list_sessions(session_dir=session_dir)
-        assert sid1 in sessions
-        assert sid2 in sessions
-
-    def test_load_nonexistent_returns_none(self):
-        loaded = StudioSession.load("nonexistent-session-id")
-        assert loaded is None
-
-    def test_oneshot_does_not_write_real_session_dir(self, tmp_path):
-        before = set(SESSION_DIR.glob("*.json")) if SESSION_DIR.exists() else set()
-        result = runner.invoke(app, ["hello isolated world"])
-        after = set(SESSION_DIR.glob("*.json")) if SESSION_DIR.exists() else set()
-        assert result.exit_code == 0
-        assert after == before
+            loaded = ChatSession.load(sid)
+            assert loaded is not None
+            assert loaded.id == sid
+            assert loaded.mode == MODE_PLAN  # plan → canonical plan
+        finally:
+            os.environ.pop("ARC_STUDIO_SESSIONS_DIR", None)

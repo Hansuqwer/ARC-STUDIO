@@ -42,11 +42,45 @@ from .protocol.schemas import RunRecord, RunStatus
 from .security.validation import validate_workspace_path
 from .workspace import iter_workspace_files
 
+import sys as _sys
+
 app = typer.Typer(
     name="arc",
     help="ARC — Agent Runtime Cockpit CLI",
-    no_args_is_help=True,
+    no_args_is_help=False,
+    add_completion=False,
 )
+
+
+@app.callback(invoke_without_command=True)
+def _arc_default(
+    ctx: typer.Context,
+    version: bool = typer.Option(False, "--version", help="Show version and exit"),
+) -> None:
+    """ARC — Agent Runtime Cockpit CLI.
+
+    With no arguments and a TTY, launches the ARC Studio interactive REPL.
+    Use ARC_NO_TUI=1 to disable this behavior and show help instead.
+    """
+    if version:
+        console.print(f"ARC Studio v{arc_version}")
+        raise typer.Exit()
+
+    # If a subcommand was invoked, do nothing here
+    if ctx.invoked_subcommand is not None:
+        return
+
+    # Launch TUI when TTY, unless ARC_NO_TUI is set
+    no_tui = os.environ.get("ARC_NO_TUI", "")
+    if not no_tui and _sys.stdin.isatty():
+        from .cli_repl.chat_repl import run_chat_repl
+
+        run_chat_repl()
+    else:
+        # Show help for non-TTY or explicit no-TUI
+        import click as _click
+
+        _click.echo(ctx.get_help())
 
 context_app = typer.Typer(name="context", help="Context retrieval commands")
 adapter_app = typer.Typer(name="adapter", help="Adapter management commands")
@@ -2577,6 +2611,52 @@ def studio_sessions(
     for s in sessions[:20]:
         table.add_row(s.id[:16], str(len(s.history)), s.updated_at[:19])
     console.print(table)
+
+
+@studio_app.command("sessions-migrate")
+def studio_sessions_migrate(
+    json_output: bool = JSON_FLAG,
+) -> None:
+    """Migrate legacy flat sessions to canonical format."""
+    from .cli_repl.session import _get_sessions_dir, _list_legacy_session_ids, migrate_legacy_session
+
+    legacy_ids = _list_legacy_session_ids()
+    newly_migrated: list[str] = []
+    failed: list[str] = []
+    for sid in legacy_ids:
+        canonical_path = _get_sessions_dir() / sid / "session.json"
+        if canonical_path.exists():
+            # Already migrated — skip
+            continue
+        result = migrate_legacy_session(sid)
+        if result is not None:
+            newly_migrated.append(sid)
+        else:
+            failed.append(sid)
+
+    if json_output:
+        _out(ok({
+            "total_legacy": len(legacy_ids),
+            "newly_migrated": len(newly_migrated),
+            "already_migrated": len(legacy_ids) - len(newly_migrated) - len(failed),
+            "failed": len(failed),
+            "session_ids": newly_migrated,
+        }), json_output)
+        return
+
+    if not legacy_ids:
+        console.print("[dim]No legacy sessions found to migrate.[/dim]")
+        return
+
+    console.print(
+        f"Migration complete: {len(newly_migrated)} migrated, "
+        f"{len(failed)} failed."
+    )
+    if newly_migrated:
+        console.print(f"  Migrated: {', '.join(newly_migrated[:10])}")
+    if failed:
+        console.print(f"[yellow]  Failed: {', '.join(failed[:5])}[/yellow]")
+
 
 @workspace_app.command("trust-status")
 def workspace_trust_status(

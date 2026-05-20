@@ -8,6 +8,21 @@ The "Unreleased" section below describes what is currently on `main`. The first 
 
 ### Added
 
+- `cli_repl/commands/` — declarative slash command registry (`CommandRegistry`, `CommandDef`), single source of truth for all slash commands.
+- `arc studio sessions-migrate` CLI command for converting legacy flat `StudioSession` JSON files to canonical `ChatSession` dir-per-session format (idempotent).
+- Bare `arc` CLI launches ARC Studio interactive REPL when invoked without subcommand in a TTY (respects `ARC_NO_TUI=1` to show help instead).
+- `ChatSession.version` field (schema v1) for forward-compatible session serialization.
+- Legacy `StudioSession` flat JSON reader via `ChatSession.load()` fallback.
+- 26 new tests covering: merged slash commands (plan/build/auto/status/doctor/runs), command registry (register/lookup/aliases/duplicates/categories), legacy session detection/migration, sessions-migrate CLI (no-legacy/with-legacy/idempotent), bare `arc` TUI behavior (version/non-TTY/ARC_NO_TUI/subcommand).
+
+### Changed
+
+- CLI consolidation: `cli_studio.py` rewritten as thin shim (≤30 active lines) delegating to `cli_repl/chat_repl.py`. Slash commands from both implementations unified in the declarative registry. `cli_studio.py`'s legacy `StudioSession` class removed — canonical `ChatSession` is the only write target; legacy sessions are readable via fallback.
+- `cli_repl/slash_commands.py` refactored: `SlashCommandHandler` now uses the declarative `CommandRegistry`; merged commands from `cli_studio.py` (`/plan`, `/build`, `/auto`, `/status`, `/doctor`, `/runs`).
+- `cli_repl/session.py`: `ChatSession` now includes `version`, `mode`, `set_mode()`; added `_detect_legacy_sessions()`, `_read_legacy_session()`, `_list_legacy_session_ids()`, `migrate_legacy_session()`, `migrate_all_legacy_sessions()`. `list_sessions()` scans the canonical sessions dir for both subdirectory-based and flat-file sessions. `save()` creates a `latest` symlink for backward compatibility.
+- `tests/test_cli_studio.py` refactored: imports from `cli_repl.session` instead of removed `cli_studio.StudioSession`; covers ChatSession persistence, mode tracking, and legacy compat.
+- `tests/test_cli_repl.py` expanded from 22 to 36 tests with merged commands, registry, migration, sessions-migrate, and bare-arc test classes.
+
 - `docs/audits/audit-2026-05-14-55b9c25.md` — full 6-dimension health audit (accessibility, architecture, code quality, performance, security, test/CI integrity).
 - Input validators in `theia-extensions/arc-core/src/node/arc-service-impl.ts`: `validateRunId`, `validateOtlpEndpoint`, `resolveWorkspaceRoot`, `safeJoinInsideWorkspace`.
 - `theia-extensions/arc-core/test/start-run-paid-calls.test.js` covering paid-call gating and traversal validators.
