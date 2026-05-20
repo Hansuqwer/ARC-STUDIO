@@ -256,7 +256,8 @@ Every new phase/chunk should include:
 ### Plan Phase ↔ Roadmap ID
 
 | Plan Phase | Roadmap ID | Scope |
-|---|---|---|---|
+|---|---|---|
+| Phase 0 | — | Docs baseline inventory + move map (Phase 0) |
 | Phase 12 | R8 | IDE Provider/Quota Completion |
 | Phase 14 | R10 | Doctor/Daemon Parity Closure |
 | Phase 13 | R9 | IDE Live Stream Polish |
@@ -265,7 +266,8 @@ Every new phase/chunk should include:
 | **Phase 17** | **R13** | **SwarmGraph Native Runtime (P1+P2 Baseline Complete)** |
 
 | Phase | Status | Depends On | Notes |
-|---|---|---|---|
+|---|---|---|
+| 0 Docs Baseline Inventory | Complete | pre-existing docs | Phase 0 baseline inventory landed at `e61db62` 2026-05-20; 10 inventory files under `docs/archive/phase-0-inventory/`; read-only ground truth for Phases 2-7 |
 | 1 Active Live Streaming | Complete | current CLI/IDE run basics | Full vertical baseline: Python SSE, Theia proxy contract, UI live/replay/disconnected states, stub e2e |
 | 2 Runtime Setup UI | Complete polished UI baseline | config/profile CLI | Safe ConfigTab baseline plus YAML-backed safe fields summary, persisted profile copy, remediation wizard, and dedicated export-target env-ref helpers in place |
 | 3 Provider/Quota UI | Baseline Complete — chunks 3.1-3.3 hardened | provider CLI + explicit paid/provider gates | Typed parser/tests, confirmed local quota-counter reset affordance, profile-linked cost summary, backend cost-gate enforcement, hardened paid/live opt-in gates; offline/gated by default with no provider network calls; one narrow 9router provider action exists behind live env gate, paid opt-in, exact confirmation, env/key refs only, and ARC local accounting only; opt-in smoke passed on `9184f9b` with `nvidia/minimaxai/minimax-m2.7`; no remote quota reset or provider-backed adoption claim |
