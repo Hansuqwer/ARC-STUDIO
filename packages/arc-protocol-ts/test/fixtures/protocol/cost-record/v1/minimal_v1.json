@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "provider": "openai",
+  "model": "gpt-4.1",
+  "promptTokens": 50,
+  "completionTokens": 10,
+  "totalTokens": 60,
+  "totalCost": 0.0002,
+  "currency": "USD",
+  "source": "estimated"
+}

@@ -17,6 +17,7 @@ from typer.testing import CliRunner
 from agent_runtime_cockpit.cli import app
 from agent_runtime_cockpit.cli_repl.cancellation import CancellationReason, CancellationToken
 from agent_runtime_cockpit.cli_repl.session import ChatSession
+import agent_runtime_cockpit.cli_repl.slash_commands as slash_commands
 from agent_runtime_cockpit.cli_repl.slash_commands import SlashCommandHandler, _build_registry
 
 
@@ -264,6 +265,61 @@ class TestSlashCommands:
         assert result is not None
         assert result.state == "blocked"
         assert result.reason == "paid_calls_disabled"
+
+    def test_provider_backed_run_invokes_budget_preflight(self, monkeypatch):
+        monkeypatch.setenv("ARC_ALLOW_RUN", "1")
+        calls: list[dict[str, Any]] = []
+
+        def fake_preflight(*args: Any, **kwargs: Any) -> None:
+            calls.append(kwargs)
+
+        monkeypatch.setattr(slash_commands, "preflight_with_estimator", fake_preflight)
+        monkeypatch.setattr(slash_commands, "SwarmGraphRunner", _StubRunner)
+        handler = SlashCommandHandler()
+        s = ChatSession(runtime_mode="provider_backed", allow_paid_calls=True)
+        result = handler.handle("/run hello", s)
+        assert result is not None
+        assert result.state == "present"
+        assert calls
+        assert calls[0]["provider_id"] == "anthropic"
+        assert calls[0]["request_messages"] == [{"role": "user", "content": "hello"}]
+
+    def test_fake_run_skips_budget_preflight(self, monkeypatch):
+        monkeypatch.setenv("ARC_ALLOW_RUN", "1")
+
+        def fail_preflight(*args: Any, **kwargs: Any) -> None:
+            raise AssertionError("provider preflight should not run for fake mode")
+
+        monkeypatch.setattr(slash_commands, "preflight_with_estimator", fail_preflight)
+        monkeypatch.setattr(slash_commands, "SwarmGraphRunner", _StubRunner)
+        handler = SlashCommandHandler()
+        s = ChatSession(runtime_mode="fake", allow_paid_calls=False)
+        result = handler.handle("/run hello", s)
+        assert result is not None
+        assert result.state == "present"
+
+    def test_provider_backed_budget_failure_blocks_runner(self, monkeypatch):
+        monkeypatch.setenv("ARC_ALLOW_RUN", "1")
+
+        def fail_runner(*args: Any, **kwargs: Any) -> Any:
+            raise AssertionError("runner should not execute after budget block")
+
+        monkeypatch.setattr(slash_commands, "SwarmGraphRunner", fail_runner)
+        handler = SlashCommandHandler()
+        s = ChatSession(
+            runtime_mode="provider_backed",
+            allow_paid_calls=True,
+            metadata={
+                "provider_budget": {
+                    "first_launch_confirmed": True,
+                    "caps": [{"scope": "session", "amount_usd": "0.00000001"}],
+                }
+            },
+        )
+        result = handler.handle("/run " + ("hello " * 200), s)
+        assert result is not None
+        assert result.state == "blocked"
+        assert result.reason == "budget_preflight_failed"
 
     def test_run_accepts_pre_cancelled_token(self, monkeypatch):
         monkeypatch.setenv("ARC_ALLOW_RUN", "1")

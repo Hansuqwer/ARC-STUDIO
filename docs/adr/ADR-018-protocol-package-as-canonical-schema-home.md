@@ -55,13 +55,17 @@ budget internal state) stay in their domain packages.
 
 ## Acceptance
 
-- [ ] Move `runtime/capability.py` → `protocol/runtime_capability.py`
+- [x] Move `runtime/capability.py` → `protocol/runtime_capability.py`
       with import updates and a contract test asserting v2 fixtures
-      still validate. (Deferred to Phase 4.1.)
-- [ ] Create `scripts/sync-protocol-fixtures.sh` to iterate `protocol/`.
-      (Deferred to Phase 4.1 — no sync script exists yet.)
+      still validate. (Done — Phase 4.1.)
+- [x] Move event envelope to `protocol/event_envelope.py` with a one-release shim at `protocol/envelope.py`. (Done — Phase 4.1.)
+- [x] Create `scripts/sync-protocol-fixtures.sh` and TS fixture mirrors for `cost-record/`, `cache-breakpoints/`, `runtime-capability/`, and `event-envelope/`. (Done — Phase 4.1.)
 - [x] `protocol/__init__.py` carries a comment stating this policy.
       (Done — ADR-018.)
+
+## Wave 2 Status (Phase 4.1)
+
+Wave 2 is complete on `phase-4.1-protocol-cleanup`: `RuntimeCapability` is canonical at `protocol/runtime_capability.py`; `ArcEnvelope` is canonical at `protocol/event_envelope.py`; old import paths warn for one release cycle; protocol fixtures are mirrored under `packages/arc-protocol-ts/test/fixtures/protocol/`; provider-backed `/run` now invokes estimator-backed budget preflight; and the paid-smoke provider test is excluded from default runs behind `ARC_RUN_PAID_SMOKE=1`.
 
 ## Migration Plan (Phase 4.1)
 

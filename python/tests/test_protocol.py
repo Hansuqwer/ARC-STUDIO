@@ -1,7 +1,7 @@
 """
 Tests: ARC Protocol models — envelope, errors, capabilities, schemas.
 """
-from agent_runtime_cockpit.protocol.envelope import ok, err, ARC_PROTOCOL_VERSION
+from agent_runtime_cockpit.protocol.event_envelope import ok, err, ARC_PROTOCOL_VERSION
 from agent_runtime_cockpit.protocol.errors import ArcErrorCode
 from agent_runtime_cockpit.protocol.capabilities import RuntimeCapabilities
 from agent_runtime_cockpit.protocol.schemas import (

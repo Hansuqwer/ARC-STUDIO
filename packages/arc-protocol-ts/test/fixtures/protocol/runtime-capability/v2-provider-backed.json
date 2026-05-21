@@ -1,0 +1,10 @@
+{
+  "schema_version": 2,
+  "mode": "provider_backed",
+  "profile_id": "default",
+  "isolation_id": "none",
+  "allow_paid_calls": true,
+  "cost_source_default": "measured",
+  "supports_cancellation": true,
+  "supports_streaming": false
+}

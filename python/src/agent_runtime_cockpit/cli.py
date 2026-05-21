@@ -36,7 +36,7 @@ from .adapters.registry import default_registry
 from .context.pack import ContextPackGenerator
 from .gating import GatingError
 from .orchestration import runtime_router
-from .protocol.envelope import ok, err, ArcEnvelope
+from .protocol.event_envelope import ok, err, ArcEnvelope
 from .protocol.errors import ArcErrorCode
 from .protocol.schemas import RunRecord, RunStatus
 from .security.validation import validate_workspace_path

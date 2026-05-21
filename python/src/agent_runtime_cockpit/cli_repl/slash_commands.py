@@ -7,6 +7,8 @@ import inspect
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from ..budget.schema import BudgetConfig, BudgetEnforcer, BudgetExceeded, BudgetState, ConfirmationRequired
+from ..providers import AnthropicClient, preflight_with_estimator
 from .commands import CommandDef, get_registry
 from .cancellation import Cancelled, CancellationReason, CancellationToken
 from .session import ChatSession
@@ -192,6 +194,30 @@ def _run_gate_open(session: Any) -> bool:
     return os.environ.get("ARC_ALLOW_RUN") == "1" or bool(getattr(session, "allow_run", False))
 
 
+def _provider_budget_config(session: Any) -> BudgetConfig:
+    metadata = getattr(session, "metadata", {}) or {}
+    raw = metadata.get("provider_budget")
+    if isinstance(raw, dict):
+        return BudgetConfig.model_validate(raw)
+    return BudgetConfig(first_launch_confirmed=True)
+
+
+def _preflight_provider_backed_run(session: Any, prompt: str) -> None:
+    client = AnthropicClient()
+    capability = client.capabilities()
+    model = str((getattr(session, "metadata", {}) or {}).get("provider_model") or capability.default_model)
+    enforcer = BudgetEnforcer(_provider_budget_config(session), BudgetState())
+    preflight_with_estimator(
+        enforcer,
+        provider_capability=capability,
+        request_model=model,
+        request_messages=[{"role": "user", "content": prompt}],
+        provider_id=capability.provider_id,
+        run_active=True,
+        workflow_active=False,
+    )
+
+
 def _emit(ctx: Any, name: str, payload: dict[str, Any]) -> None:
     emit = getattr(ctx, "emit_event", None)
     if callable(emit):
@@ -292,6 +318,12 @@ def _execute_run(
             "isolation_id": getattr(session, "isolation_id", "none"),
         })
         cancellation_token.raise_if_cancelled()
+        if runtime_mode is RuntimeMode.PROVIDER_BACKED:
+            try:
+                _preflight_provider_backed_run(session, prompt)
+            except (BudgetExceeded, ConfirmationRequired) as exc:
+                _emit(event_sink, "run.blocked.budget", {"reason": type(exc).__name__, "detail": str(exc)})
+                return CommandResult(state="blocked", reason="budget_preflight_failed", remediation=str(exc))
         config = runtime if runtime is not None else SwarmGraphConfig(num_workers=3, max_rounds=1)
         runner = _make_runner(config, cancellation_token)
         result = _run_runner(runner, prompt, cancellation_token, _on_progress)
