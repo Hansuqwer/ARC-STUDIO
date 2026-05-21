@@ -668,6 +668,8 @@ Consolidates two separate REPL implementations (`cli_studio.py` and `cli_repl/`)
 - TypeScript fixture sync script for protocol schemas (no `scripts/sync-protocol-fixtures.sh` exists yet)
 - Runtime integration of `preflight_with_estimator()` into the actual runtime/REPL execution path
 
+**Phase 4.1 — Protocol Package Cleanup & Migration.** Mechanical follow-ups from Phase 4. Move `runtime/capability.py` to `protocol/runtime_capability.py` and `events/envelope.py` to `protocol/event_envelope.py`, each with a deprecation-warning shim at the old path for one release cycle. Create `scripts/sync-protocol-fixtures.sh` and add TypeScript fixture mirrors for `cost-record/` and `cache-breakpoints/` (and the moved schemas). Wire `preflight_with_estimator()` from `providers/budget_preflight.py` into the live runtime/REPL preflight path so budget pre-flight decisions use real token estimates. Resolve the paid-smoke taxonomy: either gate `test_providers_action_all_gates_pass_closed_smoke` behind `ARC_RUN_PAID_SMOKE=1`, mock the OpenAI key, or move it into a paid taxonomy excluded from default runs. After this phase, no full pytest run requires `--deselect`. Update ADR-018 status section to record Wave 2 completion.
+
 ### Verification
 ```bash
 cd python && uv run pytest -q          # 1246 passed, 1 pre-existing failure
