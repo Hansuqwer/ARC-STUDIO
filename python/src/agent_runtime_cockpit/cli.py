@@ -762,7 +762,7 @@ app.add_typer(providers_app)
 def providers_list(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
     """List built-in provider definitions. No network calls are made."""
     _setup_logging(debug)
-    from .providers import PROVIDERS
+    from .provider_action import PROVIDERS
     _out(ok([provider.model_dump() for provider in PROVIDERS]), json_output)
 
 
@@ -770,7 +770,7 @@ def providers_list(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> N
 def providers_catalog(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
     """List provider auth catalog entries. No secrets or network calls."""
     _setup_logging(debug)
-    from .providers import PROVIDERS
+    from .provider_action import PROVIDERS
     _out(ok([provider.model_dump() for provider in PROVIDERS]), json_output)
 
 
@@ -907,7 +907,7 @@ def doctor_all(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
 
     # 6. Provider diagnostics (env presence only, no network calls)
     try:
-        from .providers import provider_statuses
+        from .provider_action import provider_statuses
         providers = provider_statuses(os.environ)
         configured_count = sum(1 for p in providers if p.api_key_configured)
         checks.append({
@@ -1120,7 +1120,7 @@ def bug_report(
     import os
     import sys
     _setup_logging(debug)
-    from .providers import redacted_diagnostics
+    from .provider_action import redacted_diagnostics
     from .config.loader import load_config
     ws = _workspace(workspace)
     config = load_config(workspace=ws)
@@ -1163,7 +1163,7 @@ def providers_status(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) ->
     """Return dry-run provider status from environment presence only."""
     import os
     _setup_logging(debug)
-    from .providers import provider_statuses
+    from .provider_action import provider_statuses
     _out(ok([status.model_dump() for status in provider_statuses(os.environ)]), json_output)
 
 
@@ -1175,7 +1175,7 @@ def providers_diagnostics(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLA
     """
     import os
     _setup_logging(debug)
-    from .providers import redacted_diagnostics
+    from .provider_action import redacted_diagnostics
     _out(ok(redacted_diagnostics(os.environ)), json_output)
 
 
@@ -1197,8 +1197,8 @@ def providers_proxy(
     """
     _setup_logging(debug)
     import os
-    from .providers import ProviderRequest, check_provider_cost_gate, dry_run_proxy
-    from .providers import ProviderRoutingStore
+    from .provider_action import ProviderRequest, check_provider_cost_gate, dry_run_proxy
+    from .provider_action import ProviderRoutingStore
     routing = ProviderRoutingStore().get()
     req = ProviderRequest(
         provider=provider or routing.default_provider,
@@ -1240,7 +1240,7 @@ def providers_action(
     """Run narrow provider action contract; live path is gated closed smoke scaffold."""
     _setup_logging(debug)
     import os
-    from .providers import ProviderActionRequest, ProviderRoutingStore, run_provider_action
+    from .provider_action import ProviderActionRequest, ProviderRoutingStore, run_provider_action
     routing = ProviderRoutingStore().get()
     req = ProviderActionRequest(
         provider=provider or routing.default_provider,
@@ -1281,7 +1281,7 @@ def providers_key_status(
     """Show provider key status from env vars and saved env-ref accounts."""
     import os
     _setup_logging(debug)
-    from .providers import PROVIDERS, ProviderAccountStore, provider_statuses
+    from .provider_action import PROVIDERS, ProviderAccountStore, provider_statuses
     env_status = {status.provider: status.model_dump() for status in provider_statuses(os.environ)}
     accounts = ProviderAccountStore().list_accounts()
     entries = []
@@ -1316,7 +1316,7 @@ def providers_key_set(
 ) -> None:
     """Save an env-var-backed provider key reference. Never stores raw keys."""
     _setup_logging(debug)
-    from .providers import PROVIDERS, ProviderAccountStore, validate_env_var_name
+    from .provider_action import PROVIDERS, ProviderAccountStore, validate_env_var_name
     provider_ids = {p.id for p in PROVIDERS}
     if provider not in provider_ids:
         _out(err(ArcErrorCode.INVALID_INPUT, f"Unknown provider: {provider}"), json_output)
@@ -1338,7 +1338,7 @@ def providers_key_unset(
 ) -> None:
     """Delete saved provider key references. Does not modify environment variables."""
     _setup_logging(debug)
-    from .providers import ProviderAccountStore
+    from .provider_action import ProviderAccountStore
     store = ProviderAccountStore()
     accounts = store.list_accounts()
     deleted: list[str] = []
@@ -1353,7 +1353,7 @@ def providers_key_unset(
 def providers_accounts_list(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
     """List provider accounts without exposing secrets."""
     _setup_logging(debug)
-    from .providers import ProviderAccountStore
+    from .provider_action import ProviderAccountStore
     accounts = ProviderAccountStore().list_accounts()
     _out(ok([account.model_dump() for account in accounts]), json_output)
 
@@ -1369,7 +1369,7 @@ def providers_accounts_add(
 ) -> None:
     """Add an env-var-backed provider account. The key is never printed."""
     _setup_logging(debug)
-    from .providers import ProviderAccountStore
+    from .provider_action import ProviderAccountStore
     account = ProviderAccountStore().add_env_account(provider, label, api_key_env, default_model)
     _out(ok(account.model_dump()), json_output)
 
@@ -1382,7 +1382,7 @@ def providers_accounts_disable(
 ) -> None:
     """Disable a provider account."""
     _setup_logging(debug)
-    from .providers import ProviderAccountStore
+    from .provider_action import ProviderAccountStore
     account = ProviderAccountStore().set_enabled(account_id, False)
     if account is None:
         _out(err(ArcErrorCode.INVALID_INPUT, f"Provider account not found: {account_id}"), json_output)
@@ -1398,7 +1398,7 @@ def providers_accounts_delete(
 ) -> None:
     """Delete a provider account metadata record."""
     _setup_logging(debug)
-    from .providers import ProviderAccountStore
+    from .provider_action import ProviderAccountStore
     deleted = ProviderAccountStore().delete(account_id)
     _out(ok({"deleted": deleted, "account_id": account_id}), json_output)
 
@@ -1415,7 +1415,7 @@ def providers_quota_show(
 ) -> None:
     """Show today's provider quota usage."""
     _setup_logging(debug)
-    from .providers import ProviderQuotaStore
+    from .provider_action import ProviderQuotaStore
     store = ProviderQuotaStore()
     usage = store.usage()
     if provider:
@@ -1433,7 +1433,7 @@ def providers_quota_reset(
 ) -> None:
     """Reset today's local provider quota counters only."""
     _setup_logging(debug)
-    from .providers import ProviderQuotaStore
+    from .provider_action import ProviderQuotaStore
     store = ProviderQuotaStore()
     store.reset()
     _out(ok({"reset": True, "scope": "local_quota_counters_only"}), json_output)
@@ -1447,7 +1447,7 @@ providers_app.add_typer(routing_app)
 def providers_routing_get(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
     """Return persisted dry-run routing policy."""
     _setup_logging(debug)
-    from .providers import ProviderRoutingStore
+    from .provider_action import ProviderRoutingStore
     _out(ok(ProviderRoutingStore().get().model_dump()), json_output)
 
 
@@ -1461,7 +1461,7 @@ def providers_routing_set(
 ) -> None:
     """Persist provider routing policy. Live calls remain gated."""
     _setup_logging(debug)
-    from .providers import ProviderRoutingPolicy, ProviderRoutingStore
+    from .provider_action import ProviderRoutingPolicy, ProviderRoutingStore
     policy = ProviderRoutingPolicy(mode=mode, default_provider=provider, default_model=model)
     _out(ok(ProviderRoutingStore().set(policy).model_dump()), json_output)
 

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from agent_runtime_cockpit.cli_repl.cancellation import CancellationReason, CancellationToken, never_cancelled
-from agent_runtime_cockpit.provider_clients import (
+from agent_runtime_cockpit.providers import (
     AnthropicClient,
     CancelledError,
     ProviderFeature,

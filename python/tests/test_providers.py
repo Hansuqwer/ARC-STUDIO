@@ -1,4 +1,4 @@
-from agent_runtime_cockpit.providers import (
+from agent_runtime_cockpit.provider_action import (
     DEFAULT_ROUTING,
     PROVIDERS,
     ProviderAccountStore,

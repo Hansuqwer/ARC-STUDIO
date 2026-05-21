@@ -284,7 +284,7 @@ def test_providers_quota_reset(tmp_path, monkeypatch):
     """arc providers quota reset clears today's counters."""
     quota_file = tmp_path / "quota.json"
     monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(quota_file))
-    from agent_runtime_cockpit.providers import ProviderQuotaStore
+    from agent_runtime_cockpit.provider_action import ProviderQuotaStore
     store = ProviderQuotaStore(path=quota_file)
     store.reserve("openai", dry_run=True)
     usage_before = store.usage()
@@ -302,7 +302,7 @@ def test_providers_quota_show_filtered(tmp_path, monkeypatch):
     """arc providers quota show --provider filters counters."""
     quota_file = tmp_path / "quota.json"
     monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(quota_file))
-    from agent_runtime_cockpit.providers import ProviderQuotaStore
+    from agent_runtime_cockpit.provider_action import ProviderQuotaStore
     store = ProviderQuotaStore(path=quota_file)
     store.reserve("openai", dry_run=True)
     store.reserve("anthropic", dry_run=True)

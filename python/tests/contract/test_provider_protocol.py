@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 import pytest
 
 from agent_runtime_cockpit.cli_repl.cancellation import never_cancelled
-from agent_runtime_cockpit.provider_clients import (
+from agent_runtime_cockpit.providers import (
     CostRates,
     ProviderCapability,
     ProviderClient,
