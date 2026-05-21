@@ -1,5 +1,5 @@
 """Tests for BudgetEnforcer — real-time budget enforcement at effect boundaries."""
-from agent_runtime_cockpit.budget import BudgetEnforcer, BudgetExceededError
+from agent_runtime_cockpit.budget.legacy_vector import BudgetVectorEnforcer as BudgetEnforcer, BudgetExceededError
 from agent_runtime_cockpit.protocol.schemas import BudgetVector
 
 
