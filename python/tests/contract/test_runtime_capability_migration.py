@@ -30,7 +30,7 @@ from typing import Any
 
 import pytest
 
-from agent_runtime_cockpit.runtime.capability import RuntimeCapability
+from agent_runtime_cockpit.protocol.runtime_capability import RuntimeCapability
 from agent_runtime_cockpit.runtime.mode import RuntimeMode
 
 

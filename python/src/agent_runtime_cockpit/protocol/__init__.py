@@ -19,6 +19,7 @@ from .cache_breakpoints import (
 )
 from .cost_record import CostRecord, migrate_v1_to_v2
 from .errors import ArcErrorCode
+from .runtime_capability import RuntimeCapability
 from .stable_ids import (
     generate_stable_id,
     generate_node_id,
@@ -44,7 +45,7 @@ from .run_receipt import FileChange, RunReceipt
 
 __all__ = [
     "ArcEnvelope", "ArcError", "ArcMeta", "ok", "err",
-    "RuntimeCapabilities", "ArcErrorCode",
+    "RuntimeCapabilities", "RuntimeCapability", "ArcErrorCode",
     "CacheBreakpoint", "CacheBreakpointInput", "MessageTokenInfo",
     "compute_breakpoints", "estimate_cache_savings",
     "CostRecord", "migrate_v1_to_v2",
