@@ -21,12 +21,22 @@ from .base import (
 )
 from .anthropic import AnthropicClient
 from .anthropic_cost import extract_cost
+from .anthropic_estimator import (
+    AnthropicCountTokensEstimator,
+    EstimateFallback,
+    TiktokenApproximateEstimator,
+    select_estimator,
+)
 
 __all__ = [
-    "AuthError",
     "AnthropicClient",
+    "AnthropicCountTokensEstimator",
+    "AuthError",
     "CostExtractionError",
+    "EstimateFallback",
     "extract_cost",
+    "select_estimator",
+    "TiktokenApproximateEstimator",
     "CacheBreakpoint",
     "CancelledError",
     "CostRates",

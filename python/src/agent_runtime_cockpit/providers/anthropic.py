@@ -14,6 +14,7 @@ from agent_runtime_cockpit.cli_repl.cancellation import Cancelled, CancellationT
 from agent_runtime_cockpit.protocol.cost_record import CostRecord
 
 from .anthropic_cost import extract_cost
+from .anthropic_estimator import build_estimate_fn, select_estimator
 from .base import (
     AuthError,
     CancelledError,
@@ -39,6 +40,8 @@ class AnthropicClient:
         self._sdk_factory = sdk_factory
         self._client: Any | None = None
         self._cancelled_calls: set[str] = set()
+        self._last_request_kwargs: dict[str, Any] | None = None
+        self._last_estimate_fn: Callable[[], tuple[int, int]] | None = None
 
     def capabilities(self) -> ProviderCapability:
         model = os.environ.get("ARC_ANTHROPIC_DEFAULT_MODEL", DEFAULT_ANTHROPIC_MODEL)
@@ -61,7 +64,12 @@ class AnthropicClient:
             timeout_seconds=timeout,
         )
 
-    def extract_cost(self, response: ProviderResponse) -> CostRecord:
+    def extract_cost(
+        self,
+        response: ProviderResponse,
+        *,
+        estimate_fn: Callable[[], tuple[int, int]] | None = None,
+    ) -> CostRecord:
         """Extract a ``CostRecord`` from a completed provider response.
 
         Uses the model's cost rates from :meth:`capabilities` to compute
@@ -69,26 +77,38 @@ class AnthropicClient:
 
         Args:
             response: A ``ProviderResponse`` returned by :meth:`complete`.
+            estimate_fn: Optional callable that returns ``(input_tokens,
+                output_tokens)`` for the degraded path. When provided,
+                replaces the hardcoded 100/32 fallback with a real
+                tokenizer-based estimate. Built automatically by
+                :meth:`complete` when the response is degraded; if not
+                provided and the response is degraded, falls back to
+                ``self._last_estimate_fn`` (set by the most recent
+                :meth:`complete` call).
 
         Returns:
             A ``CostRecord`` with ``source="measured"`` when usage data is
             available, ``"estimated"`` otherwise.
 
         Raises:
-            KeyError: If the response model is not found in cost rates.
+            CostExtractionError: If the response model is not found in
+                cost rates.
         """
-        return extract_cost(response, self.capabilities())
+        fn = estimate_fn or self._last_estimate_fn
+        return extract_cost(response, self.capabilities(), estimate_fn=fn)
 
     async def complete(self, request: ProviderRequest, *, cancellation_token: CancellationToken) -> ProviderResponse:
         try:
             cancellation_token.raise_if_cancelled()
-            response = self._client_instance().messages.create(**self._request_kwargs(request, stream=False))
+            kwargs = self._request_kwargs(request, stream=False)
+            self._last_request_kwargs = kwargs
+            response = self._client_instance().messages.create(**kwargs)
             cancellation_token.raise_if_cancelled()
         except Cancelled as exc:
             raise CancelledError(str(exc)) from exc
         except Exception as exc:  # provider SDK types are optional at import time
             raise self._map_error(exc) from exc
-        return ProviderResponse(
+        provider_response = ProviderResponse(
             call_id=request.call_id,
             model=str(getattr(response, "model", request.model)),
             content=self._extract_content(response),
@@ -97,6 +117,21 @@ class AnthropicClient:
             degraded=getattr(response, "usage", None) is None,
             degraded_reason=None if getattr(response, "usage", None) is not None else "provider usage data unavailable",
         )
+        # If degraded, wire the estimator for subsequent extract_cost() calls
+        if provider_response.degraded:
+            try:
+                estimator = select_estimator(
+                    prefer_sdk=self._client is not None,
+                    sdk_client=self._client,
+                )
+                messages = kwargs.get("messages", [])
+                if messages:
+                    self._last_estimate_fn = build_estimate_fn(estimator, messages)
+                else:
+                    self._last_estimate_fn = None
+            except (ImportError, ValueError):
+                self._last_estimate_fn = None
+        return provider_response
 
     async def stream(self, request: ProviderRequest, *, cancellation_token: CancellationToken) -> AsyncIterator[StreamChunk]:
         try:

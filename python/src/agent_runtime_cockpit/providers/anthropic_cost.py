@@ -6,7 +6,9 @@ unit-tested without mocking the Anthropic SDK.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from decimal import ROUND_HALF_EVEN, Decimal
+from typing import Any
 
 from agent_runtime_cockpit.protocol.cost_record import CostRecord
 from agent_runtime_cockpit.providers.base import (
@@ -55,6 +57,8 @@ def _compute_cost(usage: UsageRecord, rates: CostRates) -> Decimal:
 def extract_cost(
     response: ProviderResponse,
     capability: ProviderCapability,
+    *,
+    estimate_fn: Callable[[], tuple[int, int]] | None = None,
 ) -> CostRecord:
     """Extract a ``CostRecord`` from a completed provider response.
 
@@ -62,6 +66,11 @@ def extract_cost(
         response: The completed ``ProviderResponse`` containing usage data.
         capability: The ``ProviderCapability`` containing cost rates for
             the model.
+        estimate_fn: Optional callable that returns ``(input_tokens,
+            output_tokens)`` for the degraded path. When provided and
+            the response is degraded, this replaces the default
+            hardcoded fallback (100 input / 32 output tokens). The
+            ``AnthropicClient`` passes an estimator-based function here.
 
     Returns:
         A ``CostRecord`` with ``source`` set to ``"measured"`` when usage
@@ -88,8 +97,17 @@ def extract_cost(
     cost_usd: Decimal
     if source == "measured":
         cost_usd = _compute_cost(usage, rates)
+    elif estimate_fn is not None:
+        # Use the caller-provided estimator (e.g., from anthropic_estimator)
+        estimated_input, estimated_output = estimate_fn()
+        fallback_usage = UsageRecord(
+            available=False,
+            input_tokens=estimated_input,
+            output_tokens=estimated_output,
+        )
+        cost_usd = _compute_cost(fallback_usage, rates)
     else:
-        # Estimated cost: use a rough average token count as fallback
+        # Hardcoded fallback — used when no estimator is wired in
         estimated_input = max(usage.input_tokens, 100) if usage.input_tokens else 100
         estimated_output = max(usage.output_tokens, 32) if usage.output_tokens else 32
         fallback_usage = UsageRecord(
