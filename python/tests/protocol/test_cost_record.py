@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from agent_runtime_cockpit.protocol.cost_record import CostRecord, migrate_v2_to_v3
+from agent_runtime_cockpit.protocol.cost_record import CostRecord, migrate_v2_to_v3, migrate_cost_record_to_latest
 
 
 def _record(**overrides):
@@ -58,3 +58,59 @@ def test_migrate_v2_to_v3_sets_single_component():
     assert len(record.cost_components) == 1
     assert record.cost_usd == record.cost_components[0].cost_usd
     assert record.cost_components[0].cost_components == []
+
+
+def test_migrate_to_latest_v1_to_v3():
+    """Test v1 → v2 → v3 chained migration."""
+    v1 = {
+        "schema_version": 1,
+        "provider": "anthropic",
+        "model": "claude-sonnet-4",
+        "promptTokens": 100,
+        "completionTokens": 50,
+        "totalCost": 0.00525,
+        "source": "measured",
+    }
+    migrated = migrate_cost_record_to_latest(v1)
+    record = CostRecord.model_validate(migrated)
+    assert record.schema_version == 3
+    assert record.provider_id == "anthropic"
+    assert record.input_tokens == 100
+    assert record.output_tokens == 50
+    assert record.cost_usd == Decimal("0.00525000")
+    assert record.source == "measured"
+    assert record.degraded is False
+    assert len(record.cost_components) == 1
+
+
+def test_migrate_to_latest_v2_to_v3():
+    """Test v2 → v3 single migration."""
+    v2 = _record(schema_version=2).model_dump(mode="json")
+    migrated = migrate_cost_record_to_latest(v2)
+    record = CostRecord.model_validate(migrated)
+    assert record.schema_version == 3
+    assert len(record.cost_components) == 1
+
+
+def test_migrate_to_latest_v3_noop():
+    """Test v3 → v3 no-op."""
+    v3 = _record(schema_version=3).model_dump(mode="json")
+    migrated = migrate_cost_record_to_latest(v3)
+    record = CostRecord.model_validate(migrated)
+    assert record.schema_version == 3
+    assert migrated == v3
+
+
+def test_migrate_to_latest_unsupported_version():
+    """Test unsupported schema_version raises clear error."""
+    unsupported = {
+        "schema_version": 99,
+        "provider_id": "anthropic",
+        "model": "claude-sonnet-4",
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "cost_usd": "0.00010500",
+        "source": "measured",
+    }
+    with pytest.raises(ValueError, match=r"Unsupported schema_version=99.*v1, v2, and v3"):
+        migrate_cost_record_to_latest(unsupported)

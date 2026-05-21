@@ -166,3 +166,34 @@ def migrate_v2_to_v3(payload: dict[str, Any]) -> dict[str, Any]:
     component["cost_components"] = []
     migrated["cost_components"] = [component]
     return migrated
+
+
+def migrate_cost_record_to_latest(payload: dict[str, Any]) -> dict[str, Any]:
+    """Migrate a cost record dict to the latest schema version (v3).
+
+    Chains v1 → v2 → v3 migrations as needed.
+
+    Args:
+        payload: A dict representing a cost record at any supported version.
+
+    Returns:
+        A v3 dict ready for ``CostRecord.model_validate()``.
+
+    Raises:
+        ValueError: If the payload has an unsupported ``schema_version``
+            or is missing required fields for its declared version.
+    """
+    sv = payload.get("schema_version", 1)
+    
+    if sv == 3:
+        return dict(payload)
+    elif sv == 2:
+        return migrate_v2_to_v3(payload)
+    elif sv == 1:
+        v2 = migrate_v1_to_v2(payload)
+        return migrate_v2_to_v3(v2)
+    else:
+        raise ValueError(
+            f"Unsupported schema_version={sv}. "
+            f"Only v1, v2, and v3 are supported."
+        )
