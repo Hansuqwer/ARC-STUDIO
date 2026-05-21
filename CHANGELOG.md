@@ -101,6 +101,25 @@ The "Unreleased" section below describes what is currently on `main`. The first 
 - `extract_cost()` in `providers/anthropic_cost.py` — per-provider cost extraction from `ProviderResponse` + `ProviderCapability.cost_rates`, with measured and estimated (degraded) paths.
 - 56 new tests across Phase 4: provider protocol contract, budget schema, injection patterns, Anthropic client, cost record migration (42), and Anthropic cost extraction (12).
 
+### Added (Phase 20 — Streaming, Tool Use, and Multi-Turn Sessions)
+
+- `AnthropicClient.stream()` async generator yielding `StreamChunk` with incremental text deltas, usage, and stop reasons.
+- `ToolRegistry` and `ToolHandler` protocol with ADR-019 `output_trust_level` declarations (`trusted`, `untrusted`, `mixed`).
+- Built-in read-only tools: `read_file`, `list_directory`, `get_current_time` with trust declarations and output byte limits.
+- `ChatSession` v3→v4 schema with `tools_enabled`, `max_tool_iterations`, and `available_tools` fields plus v3→v4 migration.
+- `TurnManager` for provider-backed multi-turn conversations with sequential tool execution loops, iteration caps, and trust-tagged history.
+- `CostRecord` v2→v3 schema with `cost_components` field for per-call cost breakdown and parent-sum invariant enforcement.
+- `/tools list`, `/tools enable`, `/tools disable` slash commands for session-level tool management.
+- Structured injection scanner (`scan_structured()`) for nested dict/list/string payloads with tool-result attack patterns.
+- Provider-backed `/run` routed through `TurnManager` with streaming chunks, tool calls, and turn events; fake/gated-local modes remain on existing SwarmGraph path.
+- 273 new tests across Phase 20: streaming, tool registry/trust, built-in tools, ChatSession v4 migration, TurnManager single/multi-turn, cost components, /tools commands, structured scanner.
+
+### Added (Phase 5.1 — Runtime Cleanup Follow-ups)
+
+- `migrate_cost_record_to_latest()` canonical migration helper that chains v1→v2→v3, v2→v3, and v3 no-op migrations with clear errors for unsupported versions.
+- `_run_coro_sync()` async-safe wrapper for provider-backed `/run` that detects running event loops and uses worker threads when called from async contexts, avoiding nested event loop errors.
+- 5 new tests: CostRecord latest migration (v1→v3, v2→v3, v3 no-op, unsupported version), async-safe /run in both sync and async contexts.
+
 ### Changed
 
 - `provider_clients/` package renamed to `providers/`; `providers.py` module renamed to `provider_action.py`. All imports updated.
