@@ -13,6 +13,7 @@ from .cache_breakpoints import (
     MAX_BREAKPOINTS,
     CacheBreakpoint,
     CacheBreakpointInput,
+    MessageTokenInfo,
     compute_breakpoints,
     estimate_cache_savings,
 )
@@ -44,7 +45,7 @@ from .run_receipt import FileChange, RunReceipt
 __all__ = [
     "ArcEnvelope", "ArcError", "ArcMeta", "ok", "err",
     "RuntimeCapabilities", "ArcErrorCode",
-    "CacheBreakpoint", "CacheBreakpointInput",
+    "CacheBreakpoint", "CacheBreakpointInput", "MessageTokenInfo",
     "compute_breakpoints", "estimate_cache_savings",
     "CostRecord", "migrate_v1_to_v2",
     "MAX_BREAKPOINTS",

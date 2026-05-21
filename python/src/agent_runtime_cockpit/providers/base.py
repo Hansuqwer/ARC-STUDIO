@@ -8,7 +8,7 @@ from abc import abstractmethod
 from enum import StrEnum
 from typing import Any, AsyncIterator, Final, Literal, Protocol, runtime_checkable
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from agent_runtime_cockpit.cli_repl.cancellation import CancellationToken
 
@@ -74,9 +74,17 @@ class ProviderCapability(BaseModel):
 
 
 class CacheBreakpoint(BaseModel):
-    position: Literal["system", "tools", "context", "messages"]
+    position: Literal["system", "tools", "messages"]
     index: int = Field(ge=0)
     ttl_seconds: int | None = None
+
+    @model_validator(mode="after")
+    def _check_index_for_position(self) -> "CacheBreakpoint":
+        if self.position in ("system", "tools") and self.index != 0:
+            raise ValueError(
+                f"CacheBreakpoint position={self.position!r} requires index=0, got index={self.index}"
+            )
+        return self
 
 
 class ProviderMessage(BaseModel):

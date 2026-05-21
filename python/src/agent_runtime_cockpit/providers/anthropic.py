@@ -33,6 +33,7 @@ from .base import (
 
 
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
+_ANTHROPIC_MAX_BREAKPOINTS = 4
 
 
 class AnthropicClient:
@@ -195,13 +196,32 @@ class AnthropicClient:
             kwargs["tools"] = request.tools
         if stream:
             kwargs["stream"] = True
-        # Apply cache control to message content blocks
         if request.cache_control:
-            kwargs["messages"] = self._apply_message_cache_control(
-                kwargs["messages"],
-                request.cache_control,
-            )
+            kwargs = self._apply_cache_breakpoints_to_request(kwargs, request.cache_control)
         return kwargs
+
+    @staticmethod
+    def _apply_cache_breakpoints_to_request(
+        request_dict: dict[str, Any],
+        cache_control: list,
+    ) -> dict[str, Any]:
+        """Apply all Anthropic cache breakpoints to a request dict.
+
+        Enforces the Anthropic 4-breakpoint limit across system, tools, and
+        messages combined.
+        """
+        if len(cache_control) > _ANTHROPIC_MAX_BREAKPOINTS:
+            raise ValueError(
+                f"Anthropic allows at most {_ANTHROPIC_MAX_BREAKPOINTS} cache breakpoints per request, "
+                f"got {len(cache_control)}"
+            )
+        updated = dict(request_dict)
+        if "messages" in updated:
+            updated["messages"] = AnthropicClient._apply_message_cache_control(
+                updated["messages"],
+                cache_control,
+            )
+        return updated
 
     @staticmethod
     def _system_with_cache_control(
@@ -231,33 +251,41 @@ class AnthropicClient:
         messages: list[dict],
         cache_control: list,
     ) -> list[dict]:
-        """Apply cache control to the final message when requested.
+        """Apply cache control to specific message indices.
 
-        NOTE: per-message/per-attachment indexing is not supported in this
-        release. Any ``messages`` breakpoint collapses to a single cache
-        marker on the final message. Indexed mapping is a Phase 4.1 follow-up.
+        Each ``CacheBreakpoint(position="messages", index=i)`` places a
+        cache-control marker on ``messages[i]``. Anthropic caches all content
+        up to and including each marked message.
         """
         if not cache_control:
             return messages
-        has_messages_breakpoint = any(
-            (hasattr(bp, "position") and bp.position == "messages")
-            or (isinstance(bp, dict) and bp.get("position") == "messages")
+        message_breakpoints = [
+            bp
             for bp in cache_control
-        )
-        if not has_messages_breakpoint or not messages:
+            if (hasattr(bp, "position") and bp.position == "messages")
+            or (isinstance(bp, dict) and bp.get("position") == "messages")
+        ]
+        if not message_breakpoints or not messages:
             return messages
-        last = messages[-1]
-        content = last["content"]
-        if isinstance(content, str):
-            last["content"] = [
-                {"type": "text", "text": content, "cache_control": {"type": "ephemeral"}},
-            ]
-        elif isinstance(content, list) and content:
-            # Multiple content blocks — cache the last one
-            last_block = content[-1]
-            if isinstance(last_block, dict) and "cache_control" not in last_block:
-                last_block["cache_control"] = {"type": "ephemeral"}
-        return messages
+        annotated = [dict(message) for message in messages]
+        for bp in message_breakpoints:
+            index = bp.index if hasattr(bp, "index") else bp.get("index", 0)
+            if index >= len(annotated):
+                raise ValueError(
+                    f"CacheBreakpoint index={index} out of range for messages of length {len(annotated)}"
+                )
+            content = annotated[index]["content"]
+            if isinstance(content, str):
+                annotated[index]["content"] = [
+                    {"type": "text", "text": content, "cache_control": {"type": "ephemeral"}},
+                ]
+            elif isinstance(content, list) and content:
+                content = [dict(block) if isinstance(block, dict) else block for block in content]
+                last_block = content[-1]
+                if isinstance(last_block, dict):
+                    last_block["cache_control"] = {"type": "ephemeral"}
+                annotated[index]["content"] = content
+        return annotated
 
     @staticmethod
     def _extract_content(response: Any) -> str:

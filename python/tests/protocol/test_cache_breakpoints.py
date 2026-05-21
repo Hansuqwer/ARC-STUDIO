@@ -8,6 +8,7 @@ from agent_runtime_cockpit.protocol.cache_breakpoints import (
     CacheBreakpoint,
     CacheBreakpointInput,
     MAX_BREAKPOINTS,
+    MessageTokenInfo,
     compute_breakpoints,
     estimate_cache_savings,
 )
@@ -15,150 +16,105 @@ from agent_runtime_cockpit.protocol.cache_breakpoints import (
 
 class TestComputeBreakpoints:
     def test_empty_input_returns_empty_list(self):
-        result = compute_breakpoints(CacheBreakpointInput())
-        assert result == []
+        assert compute_breakpoints(CacheBreakpointInput()) == []
 
-    def test_system_prompt_always_cached_when_non_empty(self):
-        result = compute_breakpoints(CacheBreakpointInput(system_prompt_tokens=500))
-        assert len(result) == 1
-        assert result[0].position == "system"
-        assert result[0].estimated_tokens == 500
+    def test_system_prompt_cached_when_above_threshold(self):
+        result = compute_breakpoints(CacheBreakpointInput(system_prompt_tokens=1500))
+        assert [(bp.position, bp.index, bp.estimated_tokens) for bp in result] == [("system", 0, 1500)]
 
-    def test_tools_cached_when_present(self):
-        result = compute_breakpoints(
-            CacheBreakpointInput(tool_definition_tokens=1200),
+    def test_system_prompt_below_threshold_skipped(self):
+        assert compute_breakpoints(CacheBreakpointInput(system_prompt_tokens=100)) == []
+
+    def test_tools_cached_when_above_threshold(self):
+        result = compute_breakpoints(CacheBreakpointInput(tool_definition_tokens=1200))
+        assert [(bp.position, bp.index, bp.estimated_tokens) for bp in result] == [("tools", 0, 1200)]
+
+    def test_compute_breakpoints_emits_message_indices(self):
+        input_data = CacheBreakpointInput(
+            messages=[
+                MessageTokenInfo(index=0, tokens=100),
+                MessageTokenInfo(index=1, tokens=2000),
+                MessageTokenInfo(index=2, tokens=50),
+                MessageTokenInfo(index=3, tokens=1500),
+            ],
+            threshold=1024,
         )
-        assert len(result) == 1
-        assert result[0].position == "tools"
-        assert result[0].estimated_tokens == 1200
+        result = compute_breakpoints(input_data)
+        indices = [bp.index for bp in result if bp.position == "messages"]
+        assert indices == [1, 3]
 
-    def test_system_and_tools_both_cached(self):
-        result = compute_breakpoints(
-            CacheBreakpointInput(system_prompt_tokens=300, tool_definition_tokens=800),
+    def test_compute_breakpoints_caps_at_four_total(self):
+        input_data = CacheBreakpointInput(
+            system_prompt_tokens=2000,
+            tool_definition_tokens=2000,
+            messages=[MessageTokenInfo(index=i, tokens=1500) for i in range(10)],
+            threshold=1024,
         )
-        assert len(result) == 2
-        assert result[0].position == "system"
-        assert result[1].position == "tools"
+        result = compute_breakpoints(input_data)
+        assert len(result) == MAX_BREAKPOINTS
+        message_bps = [bp for bp in result if bp.position == "messages"]
+        assert len(message_bps) == 2
 
-    def test_context_attachments_above_threshold(self):
-        result = compute_breakpoints(
-            CacheBreakpointInput(
-                context_attachments=[
-                    ("readme.md", 500),
-                    ("large_file.py", 2048),
-                ],
-                threshold=1024,
-            ),
+    def test_compute_breakpoints_prefers_largest_messages_when_capped(self):
+        input_data = CacheBreakpointInput(
+            messages=[
+                MessageTokenInfo(index=0, tokens=1100),
+                MessageTokenInfo(index=1, tokens=5000),
+                MessageTokenInfo(index=2, tokens=1200),
+                MessageTokenInfo(index=3, tokens=8000),
+                MessageTokenInfo(index=4, tokens=1500),
+                MessageTokenInfo(index=5, tokens=10000),
+            ],
+            threshold=1024,
         )
-        assert len(result) == 1
-        assert result[0].position == "context"
-        assert result[0].index == 1  # second attachment (large_file.py)
-        assert result[0].estimated_tokens == 2048
+        result = compute_breakpoints(input_data)
+        indices = [bp.index for bp in result if bp.position == "messages"]
+        assert indices == [1, 3, 4, 5]
 
-    def test_context_attachments_below_threshold_skipped(self):
-        result = compute_breakpoints(
-            CacheBreakpointInput(
-                context_attachments=[("small.py", 500)],
-                threshold=1024,
-            ),
+    def test_compute_breakpoints_below_threshold_emits_nothing(self):
+        input_data = CacheBreakpointInput(
+            system_prompt_tokens=100,
+            messages=[MessageTokenInfo(index=0, tokens=100)],
+            threshold=1024,
         )
-        assert result == []
+        assert compute_breakpoints(input_data) == []
 
-    def test_system_tools_and_context_all_together(self):
-        result = compute_breakpoints(
-            CacheBreakpointInput(
-                system_prompt_tokens=200,
-                tool_definition_tokens=600,
-                context_attachments=[("data.json", 1500)],
-                threshold=1024,
-            ),
-        )
-        assert len(result) == 3
-        assert [bp.position for bp in result] == ["system", "tools", "context"]
+    def test_system_breakpoint_rejects_nonzero_index(self):
+        with pytest.raises(ValueError, match="requires index=0"):
+            CacheBreakpoint(position="system", index=1)
 
-    def test_drops_smallest_context_when_over_max(self):
-        """When more breakpoints than MAX_BREAKPOINTS, drop smallest context."""
-        result = compute_breakpoints(
-            CacheBreakpointInput(
-                system_prompt_tokens=100,
-                tool_definition_tokens=200,
-                context_attachments=[
-                    ("small.py", 500),
-                    ("medium.py", 2000),
-                    ("large.py", 5000),
-                    ("huge.py", 10000),
-                ],
-                threshold=1,  # all qualify
-            ),
-        )
-        # 2 (system + tools) + 4 context = 6, limit is 4 → keep 2 largest context
-        assert len(result) == MAX_BREAKPOINTS  # 4
-        context_bps = [bp for bp in result if bp.position == "context"]
-        assert len(context_bps) == 2
-        # Should keep the two largest: huge (10000) and large (5000)
-        assert {bp.estimated_tokens for bp in context_bps} == {5000, 10000}
+    def test_tools_breakpoint_rejects_nonzero_index(self):
+        with pytest.raises(ValueError, match="requires index=0"):
+            CacheBreakpoint(position="tools", index=2)
 
-    def test_max_breakpoints_constant_is_4(self):
-        assert MAX_BREAKPOINTS == 4
+    def test_negative_breakpoint_index_rejected(self):
+        with pytest.raises(ValueError, match=">= 0"):
+            CacheBreakpoint(position="messages", index=-1)
 
-    def test_context_ordered_by_original_index(self):
-        """After dropping, remaining context breakpoints keep original order."""
-        result = compute_breakpoints(
-            CacheBreakpointInput(
-                system_prompt_tokens=100,
-                tool_definition_tokens=200,
-                context_attachments=[
-                    ("a.py", 5000),
-                    ("b.py", 10000),
-                    ("c.py", 2000),
-                ],
-                threshold=1,
-            ),
-        )
-        # 2 (system+tools) + 3 context = 5, limit 4 → keep 2 largest context
-        context_bps = [bp for bp in result if bp.position == "context"]
-        assert len(context_bps) == 2
-        # Order should be: a.py (5000), b.py (10000) — original index order
-        assert context_bps[0].index == 0  # a.py
-        assert context_bps[1].index == 1  # b.py
+    def test_negative_message_index_rejected(self):
+        with pytest.raises(ValueError, match=">= 0"):
+            MessageTokenInfo(index=-1, tokens=100)
+
+    def test_negative_message_tokens_rejected(self):
+        with pytest.raises(ValueError, match=">= 0"):
+            MessageTokenInfo(index=0, tokens=-1)
 
     def test_default_threshold_is_1024(self):
         assert CacheBreakpointInput().threshold == 1024
-
-    def test_system_zero_tokens_skipped(self):
-        result = compute_breakpoints(
-            CacheBreakpointInput(system_prompt_tokens=0, tool_definition_tokens=500),
-        )
-        assert len(result) == 1
-        assert result[0].position == "tools"
-
-    def test_tools_zero_tokens_skipped(self):
-        result = compute_breakpoints(
-            CacheBreakpointInput(system_prompt_tokens=500, tool_definition_tokens=0),
-        )
-        assert len(result) == 1
-        assert result[0].position == "system"
 
 
 class TestEstimateCacheSavings:
     def test_empty_breakpoints_save_zero(self):
         assert estimate_cache_savings([]) == 0
 
-    def test_single_breakpoint(self):
-        bps = [CacheBreakpoint(position="system", estimated_tokens=500)]
-        assert estimate_cache_savings(bps) == 500
-
     def test_multiple_breakpoints(self):
         bps = [
             CacheBreakpoint(position="system", estimated_tokens=200),
             CacheBreakpoint(position="tools", estimated_tokens=600),
-            CacheBreakpoint(position="context", index=0, estimated_tokens=1500),
+            CacheBreakpoint(position="messages", index=2, estimated_tokens=1500),
         ]
         assert estimate_cache_savings(bps) == 2300
 
     def test_ttl_not_counted_in_savings(self):
-        """TTL affects cache hit rate, not the per-call token savings."""
-        bps = [
-            CacheBreakpoint(position="system", estimated_tokens=100, ttl_seconds=300),
-        ]
+        bps = [CacheBreakpoint(position="system", estimated_tokens=100, ttl_seconds=300)]
         assert estimate_cache_savings(bps) == 100

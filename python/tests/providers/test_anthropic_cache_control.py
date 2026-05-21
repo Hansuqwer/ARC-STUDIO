@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
 from agent_runtime_cockpit.providers.anthropic import AnthropicClient
 from agent_runtime_cockpit.providers.base import CacheBreakpoint, ProviderMessage, ProviderRequest
 
@@ -81,55 +84,82 @@ class TestMessageCacheControl:
         )
         assert kwargs["messages"][-1]["content"] == "hello"
 
-    def test_context_cache_control_is_not_applied_to_messages_yet(self):
-        """Context/per-attachment indexing is deferred to Phase 4.1."""
-        client = AnthropicClient()
-        kwargs = client._request_kwargs(
-            _request(
-                user_message="long context here",
-                cache_control=[
-                    CacheBreakpoint(position="system", index=0),
-                    CacheBreakpoint(position="context", index=0),
-                ],
-            ),
-            stream=False,
-        )
-        last = kwargs["messages"][-1]
-        assert last["content"] == "long context here"
-
-    def test_messages_cache_control_applied_to_last_message(self):
-        """Cache control at 'messages' position wraps the last message."""
-        client = AnthropicClient()
-        kwargs = client._request_kwargs(
-            _request(
-                user_message="final message",
-                cache_control=[CacheBreakpoint(position="messages", index=0)],
-            ),
-            stream=False,
-        )
-        last = kwargs["messages"][-1]
-        assert isinstance(last["content"], list)
-        assert last["content"][0]["cache_control"]["type"] == "ephemeral"
-
-    def test_multiple_messages_only_last_gets_cache(self):
-        """Only the last message gets cache control, others stay as strings."""
+    def test_messages_breakpoint_applies_to_specified_index(self):
         messages = [
             ProviderMessage(role="user", content="first", trust="user"),
-            ProviderMessage(role="assistant", content="response", trust="workspace"),
-            ProviderMessage(role="user", content="second", trust="user"),
+            ProviderMessage(role="assistant", content="second", trust="workspace"),
+            ProviderMessage(role="user", content="third", trust="user"),
         ]
         request = ProviderRequest(
             model="claude-sonnet-4-6",
             messages=messages,
             max_tokens=32,
-            cache_control=[CacheBreakpoint(position="messages", index=99)],
+            cache_control=[CacheBreakpoint(position="messages", index=1)],
         )
         client = AnthropicClient()
         kwargs = client._request_kwargs(request, stream=False)
-        # Only the last message should have content as a list; index is ignored.
         assert kwargs["messages"][0]["content"] == "first"
-        assert kwargs["messages"][1]["content"] == "response"
-        assert isinstance(kwargs["messages"][2]["content"], list)
+        assert kwargs["messages"][1]["content"][0]["cache_control"] == {"type": "ephemeral"}
+        assert kwargs["messages"][2]["content"] == "third"
+
+    def test_multiple_message_breakpoints_apply_to_each_index(self):
+        messages = [
+            ProviderMessage(role="user", content="a", trust="user"),
+            ProviderMessage(role="assistant", content="b", trust="workspace"),
+            ProviderMessage(role="user", content="c", trust="user"),
+            ProviderMessage(role="assistant", content="d", trust="workspace"),
+        ]
+        request = ProviderRequest(
+            model="claude-sonnet-4-6",
+            messages=messages,
+            max_tokens=32,
+            cache_control=[
+                CacheBreakpoint(position="messages", index=0),
+                CacheBreakpoint(position="messages", index=2),
+            ],
+        )
+        client = AnthropicClient()
+        kwargs = client._request_kwargs(request, stream=False)
+        assert kwargs["messages"][0]["content"][0]["cache_control"] == {"type": "ephemeral"}
+        assert kwargs["messages"][1]["content"] == "b"
+        assert kwargs["messages"][2]["content"][0]["cache_control"] == {"type": "ephemeral"}
+        assert kwargs["messages"][3]["content"] == "d"
+
+    def test_message_breakpoint_out_of_range_raises(self):
+        client = AnthropicClient()
+        with pytest.raises(ValueError, match="out of range"):
+            client._request_kwargs(
+                _request(cache_control=[CacheBreakpoint(position="messages", index=5)]),
+                stream=False,
+            )
+
+    def test_no_message_breakpoints_returns_messages_unchanged(self):
+        client = AnthropicClient()
+        kwargs = client._request_kwargs(
+            _request(cache_control=[CacheBreakpoint(position="system", index=0)]),
+            stream=False,
+        )
+        assert kwargs["messages"] == [{"role": "user", "content": "hello"}]
+
+    def test_total_breakpoints_exceeding_four_raises(self):
+        messages = [ProviderMessage(role="user", content=f"m{i}", trust="user") for i in range(5)]
+        request = ProviderRequest(
+            model="claude-sonnet-4-6",
+            messages=messages,
+            max_tokens=32,
+            cache_control=[CacheBreakpoint(position="messages", index=i) for i in range(5)],
+        )
+        client = AnthropicClient()
+        with pytest.raises(ValueError, match="at most 4 cache breakpoints"):
+            client._request_kwargs(request, stream=False)
+
+    def test_system_breakpoint_rejects_nonzero_index(self):
+        with pytest.raises(ValidationError, match="requires index=0"):
+            CacheBreakpoint(position="system", index=1)
+
+    def test_tools_breakpoint_rejects_nonzero_index(self):
+        with pytest.raises(ValidationError, match="requires index=0"):
+            CacheBreakpoint(position="tools", index=2)
 
 
 class TestStreamingPreserved:
