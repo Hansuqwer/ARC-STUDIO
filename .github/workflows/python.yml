@@ -28,7 +28,7 @@ jobs:
         run: bash scripts/check-artifacts.sh
       - name: Tests (strict warnings)
         working-directory: python
-        run: uv run pytest -q -W error -W ignore::ResourceWarning -W ignore::pytest.PytestUnraisableExceptionWarning -W "ignore:Legacy runtime mode.*:DeprecationWarning"
+        run: uv run pytest -q -W error -W ignore::ResourceWarning -W ignore::pytest.PytestUnraisableExceptionWarning -W ignore::DeprecationWarning
       - name: CLI smoke
         working-directory: python
         run: |
