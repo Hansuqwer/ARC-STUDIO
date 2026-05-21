@@ -8,6 +8,12 @@ The "Unreleased" section below describes what is currently on `main`. The first 
 
 ### Added
 
+- `RuntimeMode` enum with canonical `fake`, `gated_local`, and `provider_backed` values plus legacy migration warnings for prior runtime-mode strings.
+- `RuntimeCapability` schema v2 with deterministic v1-to-v2 migration and preserved v1/v2 contract fixtures.
+- Event envelope schema v2 migration in Python plus synced TypeScript protocol parsing defaults for legacy v1 events.
+- `ChatSession` schema v2 runtime/profile/isolation/paid-call fields with v1 read migration.
+- Minimal `RuntimeRegistry` for canonical runtime capability introspection.
+- `/runtime` and `/mode` slash commands, plus capability-aware `/run` gating metadata.
 - `cli_repl/commands/` — declarative slash command registry (`CommandRegistry`, `CommandDef`), single source of truth for all slash commands.
 - `arc studio sessions migrate` CLI command for converting legacy flat `StudioSession` JSON files to canonical `ChatSession` dir-per-session format (idempotent).
 - Bare `arc` CLI launches ARC Studio interactive REPL when invoked without subcommand in a TTY (respects `ARC_NO_TUI=1` to show help instead).
@@ -18,6 +24,8 @@ The "Unreleased" section below describes what is currently on `main`. The first 
 
 ### Changed
 
+- `arc run --runtime-mode` accepts canonical runtime-mode values while preserving legacy CLI aliases for existing adoption/router paths.
+- `/status` includes canonical runtime-mode context from the session.
 - CLI consolidation: `cli_studio.py` rewritten as thin shim (≤30 active lines) delegating to `cli_repl/chat_repl.py`. Slash commands from both implementations unified in the declarative registry. `cli_studio.py`'s legacy `StudioSession` class removed — canonical `ChatSession` is the only write target; legacy sessions are readable via fallback.
 - `cli_repl/slash_commands.py` refactored: `SlashCommandHandler` now uses the declarative `CommandRegistry`; merged commands from `cli_studio.py` (`/plan`, `/build`, `/auto`, `/status`, `/doctor`, `/runs`); registered commands now carry explicit gate/mode/trust/privilege/render/event metadata.
 - `cli_repl/session.py`: `ChatSession` now includes `version`, `mode`, `set_mode()`; added `_detect_legacy_sessions()`, `_read_legacy_session()`, `_list_legacy_session_ids()`, `migrate_legacy_session()`, `migrate_all_legacy_sessions()`. `list_sessions()` scans the canonical sessions dir for both subdirectory-based and flat-file sessions, skipping the `latest` symlink. `save()` creates a `latest` symlink for backward compatibility.

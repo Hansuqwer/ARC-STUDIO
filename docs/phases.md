@@ -3,7 +3,7 @@
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
 **Last reality refresh:** 2026-05-19 — SwarmGraph native runtime P1+P2 implemented (Phase 17).  
-**Current evidence anchor:** local worktree | 989 Python tests passed (was 908), 19 skipped; 762 TS tests passed; protocol + extension builds OK; 100 targeted SwarmGraph/REPL tests pass.  
+**Current evidence anchor:** `phase-3-runtime-semantics` local branch | 1111 Python tests passed, 19 skipped, 1 deselected (`test_providers_action_all_gates_pass_closed_smoke`, pre-existing provider-key smoke); `pnpm -w build` PASS; `pnpm -w test` PASS on rerun; `bash scripts/check-pr.sh` PASS.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -45,6 +45,33 @@ Every new phase/chunk should include:
 - `Acceptance:` numbered, testable conditions.
 - `Verification:` exact commands required for that phase.
 - `Known risks:` residual risk even after acceptance.
+
+## Phase 3R — Runtime Semantics Unification
+
+**Roadmap:** runtime/session/protocol unification after Phase 2 CLI consolidation  
+**Status:** Implementation complete on `phase-3-runtime-semantics`; final merge SHA pending.
+
+### Acceptance
+- RuntimeMode enum has locked canonical values `fake`, `gated_local`, `provider_backed`, with noisy legacy migration for Phase 0/1/2 artifacts.
+- RuntimeCapability schema v2 preserves v1 fixtures and migrates v1 to v2 deterministically.
+- Event envelope schema v2 migrates legacy v1 events and keeps TypeScript protocol parsing in sync.
+- ChatSession schema v2 adds runtime/profile/isolation/paid-call fields and migrates v1 session payloads on read.
+- RuntimeRegistry exposes canonical capabilities without provider-backed implementation.
+- `/runtime` and `/mode` are the only new slash commands; `/run` consults runtime capability gates.
+
+### Verification
+- `uv run pytest tests/unit/test_runtime_mode.py -v` → 24 passed.
+- `uv run pytest tests/contract/test_runtime_capability_migration.py tests/unit/test_runtime_mode.py -q` → 60 passed.
+- `uv run pytest tests/test_event_schema.py -q` → 45 passed.
+- `uv run pytest -q --deselect tests/test_cli_providers.py::test_providers_action_all_gates_pass_closed_smoke` → 1111 passed, 19 skipped, 1 deselected.
+- `bash scripts/check-pr.sh` → PASS.
+- `pnpm -w build` → PASS.
+- `pnpm -w test` → PASS on rerun for both `phase-2-complete` and `phase-3-runtime-semantics` (`11 passed, 4 skipped` e2e in each run).
+
+### Known Risks
+- Full Python suite still fails locally if `tests/test_cli_providers.py::test_providers_action_all_gates_pass_closed_smoke` reaches an invalid local OpenAI key; this was already handled by deselect in Phase 2 verification.
+- Theia async contribution warnings are emitted during e2e runs on both baseline and Phase 3; one earlier Phase 3 run failed fingerprint matching, but reruns on both `phase-2-complete` and `phase-3-runtime-semantics` passed.
+- Legacy `fake/offline` and `local-real` strings remain inside older adoption/router surfaces for compatibility; new canonical entrypoints migrate through `RuntimeMode`.
 
 ## Phase 1 — Active Live Streaming
 
