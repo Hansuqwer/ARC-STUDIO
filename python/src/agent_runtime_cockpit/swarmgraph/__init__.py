@@ -37,6 +37,7 @@ __all__ = [
     "SwarmCheckpoint",
     "ConsensusResult",
     "majority_consensus",
+    "quorum_consensus",
     "run_consensus",
     "build_swarm_graph",
     "SwarmGraphRunner",
