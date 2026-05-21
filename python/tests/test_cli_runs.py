@@ -151,6 +151,23 @@ def test_run_dry_run_langgraph_swarmgraph_local_real_blocked_without_gate(monkey
     assert not (tmp_path / ".arc" / "traces").exists()
 
 
+def test_run_dry_run_accepts_canonical_gated_local(monkeypatch, tmp_path):
+    monkeypatch.delenv("ARC_REAL_RUNTIME_SMOKE", raising=False)
+    monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
+    result = CliRunner().invoke(app, [
+        "run", "graph.py",
+        "--workspace", str(tmp_path),
+        "--runtime", "langgraph+swarmgraph",
+        "--runtime-mode", "gated_local",
+        "--dry-run",
+        "--json",
+    ])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)["data"]
+    assert payload["runtime_mode"] == "local-real"
+    assert payload["runnable"] is False
+
+
 def test_run_dry_run_langgraph_swarmgraph_local_real_blocked_with_partial_gate(monkeypatch, tmp_path):
     monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
     monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)

@@ -150,13 +150,22 @@ def _profile_payload(profile) -> dict[str, object]:
 
 
 RUNTIME_MODES = {"fake/offline", "local-real"}
+CANONICAL_RUNTIME_MODES = {"fake", "gated_local", "provider_backed"}
 LOCAL_REAL_GATE_ENVS = ("ARC_REAL_RUNTIME_SMOKE", "ARC_LANGGRAPH_SWARMGRAPH_REAL")
 
 
 def _validate_runtime_mode(runtime_mode: str) -> str:
-    if runtime_mode not in RUNTIME_MODES:
-        raise typer.BadParameter("runtime-mode must be one of: fake/offline, local-real")
-    return runtime_mode
+    from .runtime.mode import RuntimeMode
+
+    legacy_cli_map = {"fake/offline": "fake", "local-real": "gated_local"}
+    runtime_mode = legacy_cli_map.get(runtime_mode, runtime_mode)
+    try:
+        mode = RuntimeMode.from_legacy(runtime_mode)
+    except (TypeError, ValueError) as exc:
+        raise typer.BadParameter("runtime-mode must be one of: fake, gated_local, provider_backed") from exc
+    if mode is RuntimeMode.PROVIDER_BACKED:
+        return mode.value
+    return "local-real" if mode is RuntimeMode.GATED_LOCAL else "fake/offline"
 
 
 def _local_real_gate_open() -> bool:
