@@ -5,8 +5,9 @@ import signal
 import time
 import inspect
 import asyncio
+import concurrent.futures
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Coroutine, TypeVar
 
 from ..budget.schema import BudgetConfig, BudgetEnforcer, BudgetExceeded, BudgetState, ConfirmationRequired
 from ..providers import AnthropicClient, preflight_with_estimator
@@ -19,6 +20,34 @@ from ..swarmgraph.config import SwarmGraphConfig
 from ..runtime.mode import RuntimeMode
 from ..runtime.registry import default_runtime_registry
 from ..runtime.turn_manager import TurnManager
+
+
+T = TypeVar("T")
+
+
+def _run_coro_sync(coro: Coroutine[Any, Any, T]) -> T:
+    """Run a coroutine synchronously, handling both sync and async contexts.
+
+    If called from a sync context (no running event loop), uses asyncio.run().
+    If called from an async context (event loop already running), runs the
+    coroutine in a worker thread to avoid nesting event loops.
+
+    Args:
+        coro: The coroutine to execute.
+
+    Returns:
+        The result of the coroutine.
+    """
+    try:
+        # Check if we're already in an event loop
+        asyncio.get_running_loop()
+        # We're in an async context; run in a worker thread
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(asyncio.run, coro)
+            return future.result()
+    except RuntimeError:
+        # No event loop running; safe to use asyncio.run()
+        return asyncio.run(coro)
 
 
 @dataclass
@@ -304,7 +333,7 @@ def _run_provider_turn(
         event_sink=lambda name, payload: _emit(event_sink, name, payload),
         tool_registry=default_tool_registry() if getattr(session, "tools_enabled", False) else None,
     )
-    return asyncio.run(manager.run_turn(session, prompt, cancellation_token=cancellation_token))
+    return _run_coro_sync(manager.run_turn(session, prompt, cancellation_token=cancellation_token))
 
 
 def _execute_run(
