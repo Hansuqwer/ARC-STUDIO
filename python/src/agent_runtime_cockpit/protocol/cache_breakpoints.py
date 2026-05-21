@@ -88,8 +88,10 @@ def compute_breakpoints(input_data: CacheBreakpointInput) -> list[CacheBreakpoin
     more breakpoints are wanted than :data:`MAX_BREAKPOINTS`, the algorithm
     drops the smallest-token context attachments first.
 
-    The output is provider-agnostic. Per-provider clients translate these
-    into the provider's cache-control wire format.
+The output is provider-agnostic. Per-provider clients translate these
+    into the provider's cache-control wire format. In the current Anthropic
+    client, message-position indexes are informational only and collapse to a
+    final-message cache marker; per-index mapping is deferred to Phase 4.1.
     """
     candidates: list[CacheBreakpoint] = []
 

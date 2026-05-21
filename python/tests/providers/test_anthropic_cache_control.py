@@ -81,8 +81,8 @@ class TestMessageCacheControl:
         )
         assert kwargs["messages"][-1]["content"] == "hello"
 
-    def test_context_cache_control_wraps_last_message_content(self):
-        """With context breakpoint, last message content becomes a block list."""
+    def test_context_cache_control_is_not_applied_to_messages_yet(self):
+        """Context/per-attachment indexing is deferred to Phase 4.1."""
         client = AnthropicClient()
         kwargs = client._request_kwargs(
             _request(
@@ -95,11 +95,7 @@ class TestMessageCacheControl:
             stream=False,
         )
         last = kwargs["messages"][-1]
-        assert isinstance(last["content"], list)
-        block = last["content"][0]
-        assert block["type"] == "text"
-        assert block["text"] == "long context here"
-        assert block["cache_control"]["type"] == "ephemeral"
+        assert last["content"] == "long context here"
 
     def test_messages_cache_control_applied_to_last_message(self):
         """Cache control at 'messages' position wraps the last message."""
@@ -126,11 +122,11 @@ class TestMessageCacheControl:
             model="claude-sonnet-4-6",
             messages=messages,
             max_tokens=32,
-            cache_control=[CacheBreakpoint(position="context", index=0)],
+            cache_control=[CacheBreakpoint(position="messages", index=99)],
         )
         client = AnthropicClient()
         kwargs = client._request_kwargs(request, stream=False)
-        # Only the last message should have content as a list
+        # Only the last message should have content as a list; index is ignored.
         assert kwargs["messages"][0]["content"] == "first"
         assert kwargs["messages"][1]["content"] == "response"
         assert isinstance(kwargs["messages"][2]["content"], list)
