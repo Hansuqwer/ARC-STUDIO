@@ -1,0 +1,10 @@
+{
+  "messages": [
+    { "index": 0, "tokens": 512 },
+    { "index": 1, "tokens": 2048 }
+  ],
+  "threshold_tokens": 1024,
+  "expected": [
+    { "position": "messages", "index": 1 }
+  ]
+}
