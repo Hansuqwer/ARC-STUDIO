@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from agent_runtime_cockpit.runtime.mode import RuntimeMode
 
 
-SESSION_SCHEMA_VERSION = 2
+SESSION_SCHEMA_VERSION = 4
 MODE_PLAN = "plan"
 MODE_BUILD = "build"
 MODE_AUTO = "auto"
@@ -111,9 +111,10 @@ def _session_from_legacy(data: dict[str, Any], fallback_id: str) -> ChatSession:
 
 
 def _migrate_chat_session(data: dict[str, Any]) -> dict[str, Any]:
-    if data.get("version", 1) == SESSION_SCHEMA_VERSION:
+    version = int(data.get("version", 1))
+    if version == SESSION_SCHEMA_VERSION:
         migrated = dict(data)
-    elif data.get("version", 1) == 1:
+    elif version in (1, 2, 3):
         migrated = dict(data)
         migrated["version"] = SESSION_SCHEMA_VERSION
     else:
@@ -122,6 +123,9 @@ def _migrate_chat_session(data: dict[str, Any]) -> dict[str, Any]:
     migrated.setdefault("profile_id", "default")
     migrated.setdefault("isolation_id", "none")
     migrated.setdefault("allow_paid_calls", RuntimeMode(migrated["runtime_mode"]) is RuntimeMode.PROVIDER_BACKED)
+    migrated.setdefault("tools_enabled", False)
+    migrated.setdefault("max_tool_iterations", 10)
+    migrated.setdefault("available_tools", None)
     return migrated
 
 
@@ -144,7 +148,7 @@ def migrate_all_legacy_sessions() -> list[tuple[str, bool]]:
 
 
 class ChatSession(BaseModel):
-    """Canonical chat session schema (version 2)."""
+    """Canonical chat session schema (version 4)."""
 
     version: int = Field(default=SESSION_SCHEMA_VERSION)
     id: str = Field(default_factory=lambda: f"s-{uuid.uuid4().hex[:12]}")
@@ -153,6 +157,9 @@ class ChatSession(BaseModel):
     profile_id: str = "default"
     isolation_id: str = "none"
     allow_paid_calls: bool = False
+    tools_enabled: bool = False
+    max_tool_iterations: int = Field(default=10, ge=1, le=100)
+    available_tools: list[str] | None = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     history: list[dict[str, str]] = Field(default_factory=list)
