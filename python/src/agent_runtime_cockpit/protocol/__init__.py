@@ -9,6 +9,13 @@ across the language boundary) stay in their domain packages.
 """
 from .envelope import ArcEnvelope, ArcError, ArcMeta, ok, err
 from .capabilities import RuntimeCapabilities
+from .cache_breakpoints import (
+    MAX_BREAKPOINTS,
+    CacheBreakpoint,
+    CacheBreakpointInput,
+    compute_breakpoints,
+    estimate_cache_savings,
+)
 from .cost_record import CostRecord, migrate_v1_to_v2
 from .errors import ArcErrorCode
 from .stable_ids import (
@@ -37,7 +44,10 @@ from .run_receipt import FileChange, RunReceipt
 __all__ = [
     "ArcEnvelope", "ArcError", "ArcMeta", "ok", "err",
     "RuntimeCapabilities", "ArcErrorCode",
+    "CacheBreakpoint", "CacheBreakpointInput",
+    "compute_breakpoints", "estimate_cache_savings",
     "CostRecord", "migrate_v1_to_v2",
+    "MAX_BREAKPOINTS",
     "generate_stable_id", "generate_node_id", "generate_edge_id",
     "ensure_stable_id", "parse_stable_id", "is_valid_stable_id",
     "DegradationManifest",

@@ -171,7 +171,7 @@ class AnthropicClient:
         return self._client
 
     def _request_kwargs(self, request: ProviderRequest, *, stream: bool) -> dict[str, Any]:
-        system = [message.content for message in request.messages if message.role == "system"]
+        system_texts = [message.content for message in request.messages if message.role == "system"]
         messages = [
             {"role": message.role, "content": message.content}
             for message in request.messages
@@ -183,15 +183,81 @@ class AnthropicClient:
             "max_tokens": request.max_tokens,
             "temperature": request.temperature,
         }
-        if system:
-            kwargs["system"] = "\n\n".join(system)
+        if system_texts:
+            kwargs["system"] = self._system_with_cache_control(system_texts, request.cache_control)
         if request.stop_sequences:
             kwargs["stop_sequences"] = request.stop_sequences
         if request.tools:
             kwargs["tools"] = request.tools
         if stream:
             kwargs["stream"] = True
+        # Apply cache control to message content blocks
+        if request.cache_control:
+            kwargs["messages"] = self._apply_message_cache_control(
+                kwargs["messages"],
+                request.cache_control,
+            )
         return kwargs
+
+    @staticmethod
+    def _system_with_cache_control(
+        system_texts: list[str],
+        cache_control: list,
+    ) -> str | list[dict]:
+        """Build the system parameter, optionally wrapping in a content block
+        for cache control.
+
+        When a system-position breakpoint is present, the system prompt must
+        be sent as a content block list to attach ``cache_control``:
+        ``[{"type": "text", "text": "...", "cache_control": {"type": "ephemeral"}}]``
+        """
+        text = "\n\n".join(system_texts)
+        has_system_cache = any(
+            getattr(bp, "position", None) == "system"
+            or (isinstance(bp, dict) and bp.get("position") == "system")
+            for bp in cache_control
+        )
+        if has_system_cache:
+            block: dict = {"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}
+            return [block]
+        return text
+
+    @staticmethod
+    def _apply_message_cache_control(
+        messages: list[dict],
+        cache_control: list,
+    ) -> list[dict]:
+        """Apply cache control to the last non-system message.
+
+        Currently only supports caching the final user/assistant message
+        (the most common pattern for multi-turn conversations). The
+        breakpoint at position "messages" or "context" with the highest
+        index is applied to the last message's content.
+        """
+        if not cache_control:
+            return messages
+        # Find the highest-indexed context/messages breakpoint
+        context_indices = [
+            bp.index if hasattr(bp, "index") else bp.get("index", 0)
+            for bp in cache_control
+            if (hasattr(bp, "position") and bp.position in ("context", "messages"))
+            or (isinstance(bp, dict) and bp.get("position") in ("context", "messages"))
+        ]
+        if not context_indices or not messages:
+            return messages
+        # Apply to the last message (most common pattern)
+        last = messages[-1]
+        content = last["content"]
+        if isinstance(content, str):
+            last["content"] = [
+                {"type": "text", "text": content, "cache_control": {"type": "ephemeral"}},
+            ]
+        elif isinstance(content, list) and content:
+            # Multiple content blocks — cache the last one
+            last_block = content[-1]
+            if isinstance(last_block, dict) and "cache_control" not in last_block:
+                last_block["cache_control"] = {"type": "ephemeral"}
+        return messages
 
     @staticmethod
     def _extract_content(response: Any) -> str:
