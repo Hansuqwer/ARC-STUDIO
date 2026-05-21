@@ -292,6 +292,7 @@ Every new phase/chunk should include:
 | Phase 16 | R12 | Packaging/Optional Feature Decisions (In Progress) |
 | **Phase 17** | **R13** | **SwarmGraph Native Runtime (P1+P2 Baseline Complete)** |
 | **Phase 18** | **—** | **CLI Consolidation (Phase 2 inventory scope)** |
+| **Phase 19** | **—** | **Provider-Backed Runtime Foundations** |
 
 | Phase | Status | Depends On | Notes |
 |---|---|---|
@@ -315,6 +316,7 @@ Every new phase/chunk should include:
 | 16 Packaging/Optional Feature Decisions | Baseline Complete | browser v0.1 stabilization | ADR-008 accepted; electron-builder + signing preflight exist; release config signs validated by both signing-preflight and PR hygiene workflows; live LM Arena implementation deferred; **all 6 Active Work Ledger items implemented in `4b0f6b5`** |
 | **17 SwarmGraph Native Runtime** | **P1-P4 Baseline Complete** | existing adapter/swarmgraph.py + CLI/IDE surfaces | P1: native `swarmgraph/` package. P2: adapter bridge rewrite using native `SwarmGraphRunner` by default, CLI fallback. P3: CLI REPL. P4: ChatTab default alignment. 989 total Python tests pass; 762 TS tests pass. |
 | **18 CLI Consolidation** | **In Progress** | ADR-016 Phase 2 subset | Unified slash command registry under `cli_repl/commands/`; merged current cli_studio.py and cli_repl slash commands; cli_studio.py reduced to thin shim; ChatSession schema version (v1 subset); nested legacy flat session migration (`arc studio sessions migrate`); bare `arc` TTY launch with `ARC_NO_TUI` guard. Full Phase 0 target slash/session inventory is deferred by ADR-016. |
+| **19 Provider-Backed Runtime** | **Baseline Complete** | Phase 3 (provider_action) + Phase 17 (SwarmGraph) | ProviderClient protocol, BudgetEnforcer, AnthropicClient skeleton, CostRecord v2 schema + migration, extract_cost(), tokenizer-based estimator (AnthropicCountTokens + TiktokenApproximate), per-message/tools cache-control breakpoint computation + Anthropic wire format. 1246 Python tests pass (pre-existing 1 failure). Review-fix code tip `c2f39df`; docs refreshed in follow-up commits. |
 
 ## v0.1 Polish Deferral Decision
 
@@ -642,3 +644,33 @@ Consolidates two separate REPL implementations (`cli_studio.py` and `cli_repl/`)
 8. ⏳ Re-run full verification and re-review before flipping to Complete.
 
 **Known risks:** `cli_studio.py` legacy flat sessions are readable but never written — users must run `arc studio sessions migrate` to convert. The bare `arc` TTY behavior uses `sys.stdin.isatty()` which always returns False in test runner (tested via `ARC_NO_TUI` guard). Full CLI target inventory is deferred by ADR-016, not complete in this phase.
+
+## Phase 19 — Provider-Backed Runtime Foundations
+
+**Roadmap:** —  
+**Status:** Baseline Complete — 8 slices on `phase-4-provider-backed` branch; review-fix code tip `c2f39df`, docs refreshed in follow-up commits.  
+**Evidence anchor:** `phase-4-provider-backed` branch, 1246 Python tests pass, 1 pre-existing failure (`test_providers_action_all_gates_pass_closed_smoke`).  
+**Depends on:** Phase 3 (provider_action.py), Phase 6 (BudgetEnforcer), Phase 18 (CLI consolidation).
+
+### Slices
+1. **ProviderClient protocol + BudgetEnforcer** — `ProviderClient` runtime-checkable protocol with `complete()/stream()/cancel()`, error taxonomy, `BudgetEnforcer` with Decimal arithmetic, AND-combined scope caps, first-launch confirmation gate, injection-pattern scanner. (Commit `010c1e8`)
+2. **AnthropicClient skeleton** — Mocked `AnthropicClient` with lazy SDK import, dependency-injected SDK factory, error mapping, `complete()`/`stream()` paths. (Commit `2464076`)
+3. **Package rename** — `providers.py` → `provider_action.py`, `provider_clients/` → `providers/`, `tests/provider_clients/` → `tests/providers/`. (Commit `c8cdf1d`)
+4. **CostRecord v2 + extraction** — `CostRecord` v2 Pydantic schema with Decimal cost arithmetic (ROUND_HALF_EVEN, 8-decimal quantization), v1→v2 migration, fixture pairs, contract tests (42 tests), `extract_cost()` for Anthropic. (Commit `57360a6`)
+5. **CostExtractionError fix-up** — Replaced bare `KeyError` with `CostExtractionError` carrying provider/model/configured models for operator diagnosis. (Commit `4fdb915`)
+6. **ADR-018 protocol home** — `protocol/` designated canonical home for cross-language schemas. (Commit `64a2f15`)
+7. **Tokenizer estimator** — `AnthropicCountTokensEstimator` (SDK `messages.count_tokens`) + `TiktokenApproximateEstimator` (tiktoken cl100k_base, ~15% bias) replacing hardcoded 100/32 fallback. `preflight_with_estimator()` helper added in `providers/budget_preflight.py`; runtime/REPL integration deferred to Phase 4.1. (Commits `ec9ce85`, `6069904`, `5ed7762`)
+8. **Prompt caching** — Cache breakpoint computation (system/tools/messages above 1024-token threshold, max 4 breakpoints) + Anthropic wire format (`cache_control: ephemeral`). `CacheBreakpoint(position="messages", index=i)` maps to `messages[i]`; `CacheBreakpoint(position="tools", index=0)` maps to the last tool definition; capped selections keep largest messages by token count and re-sort by index for stable wire order. (Commits `62ac362`, `626c548`, `7fd2d53`, `e005353`, `c2f39df`)
+
+### Deferred to Phase 4.1
+- `runtime/capability.py` → `protocol/runtime_capability.py` move (per ADR-018)
+- Event envelope move from `events/` to `protocol/` (per ADR-018)
+- TypeScript fixture sync script for protocol schemas (no `scripts/sync-protocol-fixtures.sh` exists yet)
+- Runtime integration of `preflight_with_estimator()` into the actual runtime/REPL execution path
+
+### Verification
+```bash
+cd python && uv run pytest -q          # 1246 passed, 1 pre-existing failure
+bash scripts/check-banned-claims.sh     # PASS
+scripts/check-pr.sh                     # PASS
+```

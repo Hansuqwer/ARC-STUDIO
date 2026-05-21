@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-6",
+  "promptTokens": 100,
+  "completionTokens": 30,
+  "totalTokens": 135,
+  "totalCost": 0.000915,
+  "currency": "USD",
+  "source": "measured",
+  "cache_creation_input_tokens": 5,
+  "cache_read_input_tokens": 0,
+  "items": []
+}

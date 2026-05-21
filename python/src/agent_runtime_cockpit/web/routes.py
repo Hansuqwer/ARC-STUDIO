@@ -41,7 +41,7 @@ from ..gating import GatingError
 from ..security.profiles import enforce_profile, resolve_profile
 from ..telemetry.otlp_exporter import export_run_to_otlp, validate_otlp_endpoint
 from ..workspace import iter_workspace_files
-from ..providers import (
+from ..provider_action import (
     PROVIDERS,
     ProviderAccountStore,
     ProviderRequest,
