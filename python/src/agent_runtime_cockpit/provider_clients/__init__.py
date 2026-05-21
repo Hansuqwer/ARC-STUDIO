@@ -18,9 +18,11 @@ from .base import (
     ValidationError,
     validate_provider_id,
 )
+from .anthropic import AnthropicClient
 
 __all__ = [
     "AuthError",
+    "AnthropicClient",
     "CacheBreakpoint",
     "CancelledError",
     "CostRates",
