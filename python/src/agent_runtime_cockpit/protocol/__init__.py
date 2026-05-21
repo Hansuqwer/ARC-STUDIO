@@ -17,7 +17,7 @@ from .cache_breakpoints import (
     compute_breakpoints,
     estimate_cache_savings,
 )
-from .cost_record import CostRecord, migrate_v1_to_v2
+from .cost_record import CostRecord, migrate_v1_to_v2, migrate_v2_to_v3
 from .errors import ArcErrorCode
 from .runtime_capability import RuntimeCapability
 from .stable_ids import (
@@ -48,7 +48,7 @@ __all__ = [
     "RuntimeCapabilities", "RuntimeCapability", "ArcErrorCode",
     "CacheBreakpoint", "CacheBreakpointInput", "MessageTokenInfo",
     "compute_breakpoints", "estimate_cache_savings",
-    "CostRecord", "migrate_v1_to_v2",
+    "CostRecord", "migrate_v1_to_v2", "migrate_v2_to_v3",
     "MAX_BREAKPOINTS",
     "generate_stable_id", "generate_node_id", "generate_edge_id",
     "ensure_stable_id", "parse_stable_id", "is_valid_stable_id",

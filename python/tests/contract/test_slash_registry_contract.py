@@ -20,6 +20,7 @@ PHASE_3_COMMANDS = {
     "status",
     "doctor",
     "runs",
+    "tools",
 }
 
 

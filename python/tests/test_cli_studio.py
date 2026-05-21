@@ -77,6 +77,46 @@ class TestSessionPersistence:
         assert loaded.runtime_mode == "fake"
         assert loaded.profile_id == "default"
         assert loaded.isolation_id == "none"
+        assert loaded.tools_enabled is False
+        assert loaded.max_tool_iterations == 10
+        assert loaded.available_tools is None
+
+    def test_v3_session_migrates_to_v4_tool_fields(self):
+        loaded = ChatSession.model_validate({
+            "version": 3,
+            "id": "s-v3",
+            "mode": MODE_BUILD,
+            "runtime_mode": "provider_backed",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "updated_at": "2026-01-01T00:00:00+00:00",
+            "history": [],
+            "metadata": {},
+        })
+        assert loaded.version == SESSION_SCHEMA_VERSION
+        assert loaded.runtime_mode == "provider_backed"
+        assert loaded.allow_paid_calls is True
+        assert loaded.tools_enabled is False
+        assert loaded.max_tool_iterations == 10
+        assert loaded.available_tools is None
+
+    def test_v4_session_preserves_tool_allowlist(self):
+        loaded = ChatSession.model_validate({
+            "version": 4,
+            "id": "s-v4",
+            "mode": MODE_BUILD,
+            "runtime_mode": "fake",
+            "tools_enabled": True,
+            "max_tool_iterations": 3,
+            "available_tools": ["get_current_time"],
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "updated_at": "2026-01-01T00:00:00+00:00",
+            "history": [],
+            "metadata": {},
+        })
+        assert loaded.version == SESSION_SCHEMA_VERSION
+        assert loaded.tools_enabled is True
+        assert loaded.max_tool_iterations == 3
+        assert loaded.available_tools == ["get_current_time"]
 
     def test_session_save_and_load(self, tmp_path):
         """Verify ChatSession save/load with custom sessions dir."""

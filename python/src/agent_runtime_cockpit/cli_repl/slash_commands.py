@@ -4,11 +4,13 @@ import os
 import signal
 import time
 import inspect
+import asyncio
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from ..budget.schema import BudgetConfig, BudgetEnforcer, BudgetExceeded, BudgetState, ConfirmationRequired
 from ..providers import AnthropicClient, preflight_with_estimator
+from ..tools import default_tool_registry
 from .commands import CommandDef, get_registry
 from .cancellation import Cancelled, CancellationReason, CancellationToken
 from .session import ChatSession
@@ -16,6 +18,7 @@ from ..swarmgraph import SwarmGraphRunner
 from ..swarmgraph.config import SwarmGraphConfig
 from ..runtime.mode import RuntimeMode
 from ..runtime.registry import default_runtime_registry
+from ..runtime.turn_manager import TurnManager
 
 
 @dataclass
@@ -109,6 +112,13 @@ def _build_registry():
         help_text="Show or set runtime mode: fake, gated_local, provider_backed",
         category="runtime",
         handler=cmd_runtime,
+        gates_required=[], mode_required=[], renders=["present", "blocked"], requires_events=[], privileged=False, trust_required="user",
+    ))
+    registry.register(CommandDef(
+        name="tools",
+        help_text="Manage session tools: /tools list|enable|disable",
+        category="runtime",
+        handler=cmd_tools,
         gates_required=[], mode_required=[], renders=["present", "blocked"], requires_events=[], privileged=False, trust_required="user",
     ))
     registry.register(CommandDef(
@@ -271,6 +281,32 @@ def _run_runner(runner: Any, prompt: str, cancellation_token: CancellationToken,
     return runner.run(prompt=prompt, **kwargs)
 
 
+def _provider_client_for_run(runtime: Any) -> Any:
+    if runtime is not None and hasattr(runtime, "complete") and hasattr(runtime, "stream"):
+        return runtime
+    return AnthropicClient()
+
+
+def _run_provider_turn(
+    *,
+    session: Any,
+    prompt: str,
+    cancellation_token: CancellationToken,
+    event_sink: Any,
+    runtime: Any,
+) -> Any:
+    client = _provider_client_for_run(runtime)
+    capability = client.capabilities() if hasattr(client, "capabilities") else AnthropicClient().capabilities()
+    model = str((getattr(session, "metadata", {}) or {}).get("provider_model") or capability.default_model)
+    manager = TurnManager(
+        client,
+        model=model,
+        event_sink=lambda name, payload: _emit(event_sink, name, payload),
+        tool_registry=default_tool_registry() if getattr(session, "tools_enabled", False) else None,
+    )
+    return asyncio.run(manager.run_turn(session, prompt, cancellation_token=cancellation_token))
+
+
 def _execute_run(
     prompt: str,
     *,
@@ -324,6 +360,18 @@ def _execute_run(
             except (BudgetExceeded, ConfirmationRequired) as exc:
                 _emit(event_sink, "run.blocked.budget", {"reason": type(exc).__name__, "detail": str(exc)})
                 return CommandResult(state="blocked", reason="budget_preflight_failed", remediation=str(exc))
+            result = _run_provider_turn(
+                session=session,
+                prompt=prompt,
+                cancellation_token=cancellation_token,
+                event_sink=event_sink,
+                runtime=runtime,
+            )
+            _emit(event_sink, "run.completed", {
+                "elapsed_ms": int((time.monotonic() - started) * 1000),
+                "result_summary": {"type": "provider_turn", "degraded": result.degraded},
+            })
+            return CommandResult(state="degraded" if result.degraded else "present", output=result.content, reason=result.degraded_reason or "")
         config = runtime if runtime is not None else SwarmGraphConfig(num_workers=3, max_rounds=1)
         runner = _make_runner(config, cancellation_token)
         result = _run_runner(runner, prompt, cancellation_token, _on_progress)
@@ -428,6 +476,39 @@ def cmd_runtime(arg: str, session: ChatSession) -> str:
     session.runtime_mode = mode
     session.allow_paid_calls = mode is RuntimeMode.PROVIDER_BACKED
     return f"Runtime mode: {mode.value}"
+
+
+def cmd_tools(arg: str, session: ChatSession) -> str:
+    parts = arg.strip().split()
+    subcommand = parts[0] if parts else "list"
+    registry = default_tool_registry()
+    all_tools = registry.list_tools()
+    if subcommand == "list":
+        allowed = session.available_tools or all_tools
+        lines = [f"Tools enabled: {session.tools_enabled}", "Available tools:"]
+        for name in all_tools:
+            marker = "enabled" if name in allowed else "disabled"
+            lines.append(f"  {name} ({marker})")
+        return "\n".join(lines)
+    if subcommand == "enable":
+        if len(parts) > 1:
+            requested = parts[1:]
+            unknown = [name for name in requested if name not in all_tools]
+            if unknown:
+                return f"Blocked: unknown tools: {', '.join(unknown)}"
+            session.available_tools = requested
+        session.tools_enabled = True
+        return "Tools enabled."
+    if subcommand == "disable":
+        session.tools_enabled = False
+        if len(parts) > 1:
+            disabled = set(parts[1:])
+            current = session.available_tools or all_tools
+            session.available_tools = [name for name in current if name not in disabled]
+            session.tools_enabled = bool(session.available_tools)
+            return f"Disabled tools: {', '.join(parts[1:])}"
+        return "Tools disabled."
+    return "Usage: /tools list|enable [tool ...]|disable [tool ...]"
 
 
 def cmd_status(_arg: str, session: ChatSession) -> str:
