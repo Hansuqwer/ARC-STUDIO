@@ -27,6 +27,7 @@ from .anthropic_estimator import (
     TiktokenApproximateEstimator,
     select_estimator,
 )
+from .budget_preflight import preflight_with_estimator
 
 __all__ = [
     "AnthropicClient",
@@ -49,6 +50,7 @@ __all__ = [
     "ProviderMessage",
     "ProviderRequest",
     "ProviderResponse",
+    "preflight_with_estimator",
     "RateLimitError",
     "StreamChunk",
     "UsageRecord",
