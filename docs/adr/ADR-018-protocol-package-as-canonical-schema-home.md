@@ -57,10 +57,29 @@ budget internal state) stay in their domain packages.
 
 - [ ] Move `runtime/capability.py` → `protocol/runtime_capability.py`
       with import updates and a contract test asserting v2 fixtures
-      still validate.
-- [ ] Update `scripts/sync-protocol-fixtures.sh` to iterate `protocol/`.
-- [ ] `protocol/__init__.py` carries a comment stating this policy.
+      still validate. (Deferred to Phase 4.1.)
+- [ ] Create `scripts/sync-protocol-fixtures.sh` to iterate `protocol/`.
+      (Deferred to Phase 4.1 — no sync script exists yet.)
+- [x] `protocol/__init__.py` carries a comment stating this policy.
       (Done — ADR-018.)
+
+## Migration Plan (Phase 4.1)
+
+1. `git mv runtime/capability.py protocol/runtime_capability.py`
+2. Update all imports: `git grep 'from agent_runtime_cockpit.runtime.capability\|from agent_runtime_cockpit.runtime import.*capability'`
+3. Update `runtime/__init__.py` exports
+4. Create `scripts/sync-protocol-fixtures.sh` that iterates all `protocol/*.py` with matching v1/v2 fixture directories
+5. Run full pytest to verify
+6. Event envelope: `protocol/schemas.py` and `protocol/events.py` are already in `protocol/` — no move needed
+
+## Sync script design (deferred)
+
+The sync script should:
+- Iterate `python/src/agent_runtime_cockpit/protocol/*.py`
+- For each module with a matching `tests/contract/fixtures/<module_name>/` directory,
+  generate TypeScript types in `packages/arc-protocol-ts/src/protocol/`
+- Verify generated TS compiles via `pnpm --filter @arc-studio/protocol build`
+- Fail if any v1/v2 fixture pair in `tests/contract/` lacks a TS counterpart
 
 ## Consequences
 
