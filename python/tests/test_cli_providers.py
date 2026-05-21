@@ -4,6 +4,9 @@ Tests: CLI provider commands (list, status, diagnostics, proxy).
 from __future__ import annotations
 
 import json
+import os
+
+import pytest
 from typer.testing import CliRunner
 from agent_runtime_cockpit.cli import app
 
@@ -246,6 +249,8 @@ def test_providers_action_live_requires_confirmation(monkeypatch):
 
 def test_providers_action_all_gates_pass_closed_smoke(tmp_path, monkeypatch):
     """All gates pass reaches closed smoke scaffold; still no network call."""
+    if os.environ.get("ARC_RUN_PAID_SMOKE") != "1":
+        pytest.skip("paid-smoke taxonomy: set ARC_RUN_PAID_SMOKE=1 to run closed provider-gate smoke")
     monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
     monkeypatch.setenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", "true")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-should-not-emit")
