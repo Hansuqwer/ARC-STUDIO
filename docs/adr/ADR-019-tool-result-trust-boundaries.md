@@ -1,6 +1,6 @@
 # ADR-019: Tool Result Trust Boundaries
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2026-05-21  
 **Context:** Phase 5 — Streaming, Tool Use, and Multi-Turn Sessions  
 **Related:** ADR-011, ADR-014, ADR-018
