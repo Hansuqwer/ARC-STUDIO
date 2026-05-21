@@ -4,6 +4,7 @@ import os
 import signal
 import time
 import inspect
+import asyncio
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -17,6 +18,7 @@ from ..swarmgraph import SwarmGraphRunner
 from ..swarmgraph.config import SwarmGraphConfig
 from ..runtime.mode import RuntimeMode
 from ..runtime.registry import default_runtime_registry
+from ..runtime.turn_manager import TurnManager
 
 
 @dataclass
@@ -279,6 +281,32 @@ def _run_runner(runner: Any, prompt: str, cancellation_token: CancellationToken,
     return runner.run(prompt=prompt, **kwargs)
 
 
+def _provider_client_for_run(runtime: Any) -> Any:
+    if runtime is not None and hasattr(runtime, "complete") and hasattr(runtime, "stream"):
+        return runtime
+    return AnthropicClient()
+
+
+def _run_provider_turn(
+    *,
+    session: Any,
+    prompt: str,
+    cancellation_token: CancellationToken,
+    event_sink: Any,
+    runtime: Any,
+) -> Any:
+    client = _provider_client_for_run(runtime)
+    capability = client.capabilities() if hasattr(client, "capabilities") else AnthropicClient().capabilities()
+    model = str((getattr(session, "metadata", {}) or {}).get("provider_model") or capability.default_model)
+    manager = TurnManager(
+        client,
+        model=model,
+        event_sink=lambda name, payload: _emit(event_sink, name, payload),
+        tool_registry=default_tool_registry() if getattr(session, "tools_enabled", False) else None,
+    )
+    return asyncio.run(manager.run_turn(session, prompt, cancellation_token=cancellation_token))
+
+
 def _execute_run(
     prompt: str,
     *,
@@ -332,6 +360,18 @@ def _execute_run(
             except (BudgetExceeded, ConfirmationRequired) as exc:
                 _emit(event_sink, "run.blocked.budget", {"reason": type(exc).__name__, "detail": str(exc)})
                 return CommandResult(state="blocked", reason="budget_preflight_failed", remediation=str(exc))
+            result = _run_provider_turn(
+                session=session,
+                prompt=prompt,
+                cancellation_token=cancellation_token,
+                event_sink=event_sink,
+                runtime=runtime,
+            )
+            _emit(event_sink, "run.completed", {
+                "elapsed_ms": int((time.monotonic() - started) * 1000),
+                "result_summary": {"type": "provider_turn", "degraded": result.degraded},
+            })
+            return CommandResult(state="degraded" if result.degraded else "present", output=result.content, reason=result.degraded_reason or "")
         config = runtime if runtime is not None else SwarmGraphConfig(num_workers=3, max_rounds=1)
         runner = _make_runner(config, cancellation_token)
         result = _run_runner(runner, prompt, cancellation_token, _on_progress)

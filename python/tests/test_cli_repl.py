@@ -17,6 +17,7 @@ from typer.testing import CliRunner
 from agent_runtime_cockpit.cli import app
 from agent_runtime_cockpit.cli_repl.cancellation import CancellationReason, CancellationToken
 from agent_runtime_cockpit.cli_repl.session import ChatSession
+from agent_runtime_cockpit.providers import ProviderResponse, UsageRecord
 import agent_runtime_cockpit.cli_repl.slash_commands as slash_commands
 from agent_runtime_cockpit.cli_repl.slash_commands import SlashCommandHandler, _build_registry
 
@@ -76,6 +77,32 @@ class _StubRunnerFactory:
         stub = _StubRunner(mode=self.mode, **kwargs)
         self.instances.append(stub)
         return stub
+
+
+class _StubProviderClient:
+    def __init__(self) -> None:
+        self.complete_requests = []
+
+    def capabilities(self):
+        return slash_commands.AnthropicClient().capabilities()
+
+    async def complete(self, request, *, cancellation_token):
+        self.complete_requests.append(request)
+        cancellation_token.raise_if_cancelled()
+        return ProviderResponse(
+            call_id="c1",
+            model=request.model,
+            content="provider ok",
+            finish_reason="stop",
+            usage=UsageRecord(input_tokens=1, output_tokens=1),
+        )
+
+    async def stream(self, request, *, cancellation_token):
+        return
+        yield
+
+    async def cancel(self, call_id: str) -> None:
+        return None
 
 
 class TestChatSession:
@@ -314,15 +341,52 @@ class TestSlashCommands:
             calls.append(kwargs)
 
         monkeypatch.setattr(slash_commands, "preflight_with_estimator", fake_preflight)
-        monkeypatch.setattr(slash_commands, "SwarmGraphRunner", _StubRunner)
-        handler = SlashCommandHandler()
+        provider = _StubProviderClient()
+        handler = SlashCommandHandler(runner=provider)
         s = ChatSession(runtime_mode="provider_backed", allow_paid_calls=True)
         result = handler.handle("/run hello", s)
         assert result is not None
         assert result.state == "present"
+        assert result.output == "provider ok"
         assert calls
         assert calls[0]["provider_id"] == "anthropic"
         assert calls[0]["request_messages"] == [{"role": "user", "content": "hello"}]
+        assert provider.complete_requests
+
+    def test_provider_backed_run_uses_turn_manager_not_swarmgraph(self, monkeypatch):
+        monkeypatch.setenv("ARC_ALLOW_RUN", "1")
+        monkeypatch.setattr(slash_commands, "preflight_with_estimator", lambda *args, **kwargs: None)
+
+        def fail_runner(*args: Any, **kwargs: Any) -> Any:
+            raise AssertionError("SwarmGraphRunner should not execute provider-backed /run")
+
+        monkeypatch.setattr(slash_commands, "SwarmGraphRunner", fail_runner)
+        provider = _StubProviderClient()
+        handler = SlashCommandHandler(runner=provider)
+        s = ChatSession(runtime_mode="provider_backed", allow_paid_calls=True)
+        result = handler.handle("/run hello", s)
+        assert result is not None
+        assert result.state == "present"
+        assert provider.complete_requests
+
+    def test_provider_backed_run_passes_tool_registry_when_tools_enabled(self, monkeypatch):
+        monkeypatch.setenv("ARC_ALLOW_RUN", "1")
+        monkeypatch.setattr(slash_commands, "preflight_with_estimator", lambda *args, **kwargs: None)
+        seen: dict[str, Any] = {}
+        original = slash_commands.TurnManager
+
+        class RecordingTurnManager(original):
+            def __init__(self, *args: Any, **kwargs: Any) -> None:
+                seen["tool_registry"] = kwargs.get("tool_registry")
+                super().__init__(*args, **kwargs)
+
+        monkeypatch.setattr(slash_commands, "TurnManager", RecordingTurnManager)
+        handler = SlashCommandHandler(runner=_StubProviderClient())
+        s = ChatSession(runtime_mode="provider_backed", allow_paid_calls=True, tools_enabled=True)
+        result = handler.handle("/run hello", s)
+        assert result is not None
+        assert result.state == "present"
+        assert seen["tool_registry"] is not None
 
     def test_fake_run_skips_budget_preflight(self, monkeypatch):
         monkeypatch.setenv("ARC_ALLOW_RUN", "1")
