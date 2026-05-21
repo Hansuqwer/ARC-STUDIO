@@ -13,6 +13,8 @@ class InjectionPattern(StrEnum):
     TOOL_HIJACKING = "tool_hijacking"
     EXFILTRATION = "exfiltration"
     JAILBREAK_ROLEPLAY = "jailbreak_roleplay"
+    TOOL_RESULT_INSTRUCTION = "tool_result_instruction"
+    FIELD_NAME_SPOOFING = "field_name_spoofing"
 
 
 class Severity(StrEnum):
@@ -26,6 +28,8 @@ SEVERITY: dict[InjectionPattern, Severity] = {
     InjectionPattern.TOOL_HIJACKING: Severity.BLOCKED,
     InjectionPattern.EXFILTRATION: Severity.BLOCKED,
     InjectionPattern.JAILBREAK_ROLEPLAY: Severity.DEGRADED,
+    InjectionPattern.TOOL_RESULT_INSTRUCTION: Severity.BLOCKED,
+    InjectionPattern.FIELD_NAME_SPOOFING: Severity.BLOCKED,
 }
 
 
@@ -83,6 +87,14 @@ _PATTERNS: dict[InjectionPattern, list[re.Pattern[str]]] = {
         r"hypothetically,? (?:if you|imagine|suppose)",
         r"in a (?:fictional|hypothetical|alternate) (?:world|universe|scenario)",
     ]),
+    InjectionPattern.TOOL_RESULT_INSTRUCTION: _compile([
+        r"(?:assistant|model|ai)\s*[:=]\s*(?:ignore|disregard|forget)",
+        r"(?:instruction|system|prompt)\s*[:=]\s*(?:ignore|disregard|forget)",
+    ]),
+    InjectionPattern.FIELD_NAME_SPOOFING: _compile([
+        r"^(?:system|assistant|developer|tool)_?(?:prompt|instruction|message)$",
+        r"^(?:ignore_previous_instructions|system_override)$",
+    ]),
 }
 
 
@@ -95,6 +107,40 @@ def scan(text: str) -> list[Detection]:
             match = regex.search(text)
             if match:
                 detections.append(Detection(pattern, SEVERITY[pattern], match.group(0), 1.0))
+    return detections
+
+
+def scan_structured(payload: dict | list | str) -> list[Detection]:
+    """Scan structured tool-result payloads recursively.
+
+    Dict keys are scanned for field-name spoofing. String leaves are scanned
+    with the prose scanner plus tool-result-specific patterns.
+    """
+    detections: list[Detection] = []
+
+    def walk(value: object) -> None:
+        if isinstance(value, str):
+            detections.extend(scan(value))
+            return
+        if isinstance(value, dict):
+            for key, child in value.items():
+                detections.extend(_scan_field_name(str(key)))
+                walk(child)
+            return
+        if isinstance(value, list):
+            for child in value:
+                walk(child)
+
+    walk(payload)
+    return detections
+
+
+def _scan_field_name(name: str) -> list[Detection]:
+    detections: list[Detection] = []
+    for regex in _PATTERNS[InjectionPattern.FIELD_NAME_SPOOFING]:
+        match = regex.search(name)
+        if match:
+            detections.append(Detection(InjectionPattern.FIELD_NAME_SPOOFING, Severity.BLOCKED, match.group(0), 1.0))
     return detections
 
 
