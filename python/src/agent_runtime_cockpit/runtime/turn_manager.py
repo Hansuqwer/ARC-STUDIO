@@ -8,6 +8,7 @@ from typing import Any, Callable
 from agent_runtime_cockpit.cli_repl.cancellation import Cancelled, CancellationToken
 from agent_runtime_cockpit.cli_repl.session import ChatSession
 from agent_runtime_cockpit.providers import ProviderClient, ProviderMessage, ProviderRequest, ProviderResponse, StreamChunk
+from agent_runtime_cockpit.security.injection_patterns import Severity, scan_structured
 from agent_runtime_cockpit.tools import ToolRegistry, wrap_tool_result
 
 
@@ -136,8 +137,13 @@ class TurnManager:
                     self._emit("tool.requested", {"tool": tool_name, "iteration": iteration})
                     args = handler.args_schema.model_validate(args_payload)
                     result = handler.execute(args, cancellation_token)
-                    wrapped = wrap_tool_result(tool_name, handler.output_trust_level, result)
-                    self._emit("tool.executed", {"tool": tool_name, "iteration": iteration, "trust": handler.output_trust_level})
+                    detections = scan_structured(result.content) if handler.output_trust_level == "untrusted" else []
+                    if any(detection.severity is Severity.BLOCKED for detection in detections):
+                        wrapped = f'<tool_result trust="blocked" tool="{tool_name}" reason="injection_detected"/>'
+                        self._emit("tool.result.blocked", {"tool": tool_name, "reason": "injection_detected"})
+                    else:
+                        wrapped = wrap_tool_result(tool_name, handler.output_trust_level, result)
+                        self._emit("tool.executed", {"tool": tool_name, "iteration": iteration, "trust": handler.output_trust_level})
                 session.history.append({"role": "tool", "content": wrapped})
             request = self._request_from_session(session)
             current = await self._provider_client.complete(request, cancellation_token=cancellation_token)
