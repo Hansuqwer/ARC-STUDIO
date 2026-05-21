@@ -14,7 +14,7 @@ from __future__ import annotations
 from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class CostRecord(BaseModel):
@@ -41,6 +41,16 @@ class CostRecord(BaseModel):
     @property
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens + self.cache_creation_input_tokens + self.cache_read_input_tokens
+
+    @model_validator(mode="after")
+    def _check_source_degraded_consistency(self) -> "CostRecord":
+        expected_degraded = self.source == "estimated"
+        if self.degraded != expected_degraded:
+            raise ValueError(
+                f"CostRecord invariant violation: source={self.source!r} "
+                f"requires degraded={expected_degraded}, got degraded={self.degraded}"
+            )
+        return self
 
     def quantized(self, places: int = 8) -> CostRecord:
         """Return a copy with ``cost_usd`` quantized to *places* decimals.
