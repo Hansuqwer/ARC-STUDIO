@@ -1,4 +1,12 @@
-"""ARC Protocol — envelope, errors, capabilities, methods, schemas."""
+"""ARC Protocol — envelope, errors, capabilities, methods, schemas.
+
+Canonical home for all cross-language schemas (ADR-018). Schemas that are
+mirrored to TypeScript (event envelope, RuntimeCapability, CostRecord)
+live under ``protocol/`` so the sync script has one source directory.
+
+Python-only schemas (e.g., ChatSession v3, which is never transmitted
+across the language boundary) stay in their domain packages.
+"""
 from .envelope import ArcEnvelope, ArcError, ArcMeta, ok, err
 from .capabilities import RuntimeCapabilities
 from .cost_record import CostRecord, migrate_v1_to_v2
