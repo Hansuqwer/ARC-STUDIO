@@ -250,6 +250,46 @@ class TestSlashCommands:
         assert result is not None
         assert "Runtime: fake" in result
 
+    def test_tools_list_shows_builtin_tools(self):
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        result = handler.handle("/tools list", s)
+        assert result is not None
+        assert "Tools enabled: False" in result
+        assert "read_file" in result
+        assert "list_directory" in result
+        assert "get_current_time" in result
+
+    def test_tools_enable_all(self):
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        result = handler.handle("/tools enable", s)
+        assert result == "Tools enabled."
+        assert s.tools_enabled is True
+        assert s.available_tools is None
+
+    def test_tools_enable_allowlist(self):
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        result = handler.handle("/tools enable get_current_time", s)
+        assert result == "Tools enabled."
+        assert s.tools_enabled is True
+        assert s.available_tools == ["get_current_time"]
+
+    def test_tools_enable_unknown_blocks(self):
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        result = handler.handle("/tools enable unknown_tool", s)
+        assert result == "Blocked: unknown tools: unknown_tool"
+        assert s.tools_enabled is False
+
+    def test_tools_disable_all(self):
+        handler = SlashCommandHandler()
+        s = ChatSession(tools_enabled=True)
+        result = handler.handle("/tools disable", s)
+        assert result == "Tools disabled."
+        assert s.tools_enabled is False
+
     def test_mode_alias_sets_runtime_mode(self):
         handler = SlashCommandHandler()
         s = ChatSession()

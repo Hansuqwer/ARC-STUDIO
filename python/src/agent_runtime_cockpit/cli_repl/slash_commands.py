@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 from ..budget.schema import BudgetConfig, BudgetEnforcer, BudgetExceeded, BudgetState, ConfirmationRequired
 from ..providers import AnthropicClient, preflight_with_estimator
+from ..tools import default_tool_registry
 from .commands import CommandDef, get_registry
 from .cancellation import Cancelled, CancellationReason, CancellationToken
 from .session import ChatSession
@@ -109,6 +110,13 @@ def _build_registry():
         help_text="Show or set runtime mode: fake, gated_local, provider_backed",
         category="runtime",
         handler=cmd_runtime,
+        gates_required=[], mode_required=[], renders=["present", "blocked"], requires_events=[], privileged=False, trust_required="user",
+    ))
+    registry.register(CommandDef(
+        name="tools",
+        help_text="Manage session tools: /tools list|enable|disable",
+        category="runtime",
+        handler=cmd_tools,
         gates_required=[], mode_required=[], renders=["present", "blocked"], requires_events=[], privileged=False, trust_required="user",
     ))
     registry.register(CommandDef(
@@ -428,6 +436,39 @@ def cmd_runtime(arg: str, session: ChatSession) -> str:
     session.runtime_mode = mode
     session.allow_paid_calls = mode is RuntimeMode.PROVIDER_BACKED
     return f"Runtime mode: {mode.value}"
+
+
+def cmd_tools(arg: str, session: ChatSession) -> str:
+    parts = arg.strip().split()
+    subcommand = parts[0] if parts else "list"
+    registry = default_tool_registry()
+    all_tools = registry.list_tools()
+    if subcommand == "list":
+        allowed = session.available_tools or all_tools
+        lines = [f"Tools enabled: {session.tools_enabled}", "Available tools:"]
+        for name in all_tools:
+            marker = "enabled" if name in allowed else "disabled"
+            lines.append(f"  {name} ({marker})")
+        return "\n".join(lines)
+    if subcommand == "enable":
+        if len(parts) > 1:
+            requested = parts[1:]
+            unknown = [name for name in requested if name not in all_tools]
+            if unknown:
+                return f"Blocked: unknown tools: {', '.join(unknown)}"
+            session.available_tools = requested
+        session.tools_enabled = True
+        return "Tools enabled."
+    if subcommand == "disable":
+        session.tools_enabled = False
+        if len(parts) > 1:
+            disabled = set(parts[1:])
+            current = session.available_tools or all_tools
+            session.available_tools = [name for name in current if name not in disabled]
+            session.tools_enabled = bool(session.available_tools)
+            return f"Disabled tools: {', '.join(parts[1:])}"
+        return "Tools disabled."
+    return "Usage: /tools list|enable [tool ...]|disable [tool ...]"
 
 
 def cmd_status(_arg: str, session: ChatSession) -> str:
