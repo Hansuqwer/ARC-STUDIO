@@ -91,6 +91,14 @@ class TestComputeBreakpoints:
         with pytest.raises(ValueError, match=">= 0"):
             CacheBreakpoint(position="messages", index=-1)
 
+    def test_invalid_position_rejected(self):
+        with pytest.raises(ValueError, match="position"):
+            CacheBreakpoint(position="context", index=0)  # type: ignore[arg-type]
+
+    def test_arbitrary_string_position_rejected(self):
+        with pytest.raises(ValueError, match="position"):
+            CacheBreakpoint(position="bad", index=0)  # type: ignore[arg-type]
+
     def test_negative_message_index_rejected(self):
         with pytest.raises(ValueError, match=">= 0"):
             MessageTokenInfo(index=-1, tokens=100)

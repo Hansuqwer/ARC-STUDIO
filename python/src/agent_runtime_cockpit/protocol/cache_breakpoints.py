@@ -23,11 +23,11 @@ system > tools > largest messages first.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Literal, Optional
 
 MAX_BREAKPOINTS = 4
 DEFAULT_CONTEXT_CACHE_THRESHOLD = 1024
-CacheBreakpointPosition = str  # "system" | "tools" | "messages"
+CacheBreakpointPosition = Literal["system", "tools", "messages"]
 
 
 @dataclass(frozen=True)
@@ -46,6 +46,11 @@ class CacheBreakpoint:
     ttl_seconds: Optional[int] = None
 
     def __post_init__(self) -> None:
+        valid = ("system", "tools", "messages")
+        if self.position not in valid:
+            raise ValueError(
+                f"CacheBreakpoint.position must be one of {valid}, got {self.position!r}"
+            )
         if self.index < 0:
             raise ValueError(f"CacheBreakpoint.index must be >= 0, got {self.index}")
         if self.position in ("system", "tools") and self.index != 0:
