@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import signal
@@ -387,6 +388,24 @@ class TestSlashCommands:
         assert result is not None
         assert result.state == "present"
         assert seen["tool_registry"] is not None
+
+    @pytest.mark.asyncio
+    async def test_provider_backed_run_works_in_async_context(self, monkeypatch):
+        """Verify provider-backed /run works when called from async context (event loop running)."""
+        monkeypatch.setenv("ARC_ALLOW_RUN", "1")
+        monkeypatch.setattr(slash_commands, "preflight_with_estimator", lambda *args, **kwargs: None)
+        provider = _StubProviderClient()
+        handler = SlashCommandHandler(runner=provider)
+        s = ChatSession(runtime_mode="provider_backed", allow_paid_calls=True)
+        
+        # Call from within async context (event loop is running)
+        # The _run_coro_sync wrapper should detect this and use thread pool
+        result = handler.handle("/run hello", s)
+        
+        assert result is not None
+        assert result.state == "present"
+        assert result.output == "provider ok"
+        assert provider.complete_requests
 
     def test_fake_run_skips_budget_preflight(self, monkeypatch):
         monkeypatch.setenv("ARC_ALLOW_RUN", "1")

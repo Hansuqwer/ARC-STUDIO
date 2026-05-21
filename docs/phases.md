@@ -699,3 +699,34 @@ Phase 5 makes provider-backed runtime conversational and tool-capable: implement
 9. Extend injection scanner with structured-content walking plus tool-result attack patterns.
 
 **Acceptance:** streaming chunks ordered with final usage; single-turn, single-tool, and multi-tool loops pass; cancellation preserves partial state and emits `turn.cancelled`; untrusted tool output is scanned before history insertion; built-in tools are read-only and trust-tagged; `CostRecord` parent cost equals component sum within tolerance; schema migrations pass; structured scanner covers nested dict/list/string payloads and field-name spoofing; all Phase 4/4.1 tests remain green; full pytest requires no `--deselect` after Phase 4.1.
+
+## Phase 5.1 — Runtime Cleanup Follow-ups
+
+**Roadmap:** Phase 5.1 cleanup after Phase 5 merge.  
+**Status:** Baseline Complete — implementation on `phase-5.1-runtime-cleanup`. Evidence: `cd python && .venv/bin/python -m pytest tests/ -q` (1318 passed, 20 skipped, 13 warnings), protocol/extension builds pass, PR hygiene pass.
+
+Phase 5.1 addresses two follow-up items from Phase 5 review:
+
+1. **Canonical CostRecord migration:** Add `migrate_cost_record_to_latest()` helper that chains v1→v2→v3, v2→v3, and v3 no-op migrations, with clear errors for unsupported versions. Existing `migrate_v1_to_v2()` and `migrate_v2_to_v3()` remain for compatibility.
+
+2. **Async-safe provider-backed `/run`:** Replace unconditional `asyncio.run()` in `_run_provider_turn()` with `_run_coro_sync()` helper that detects running event loops and uses a worker thread when called from async contexts, avoiding nested event loop errors.
+
+### Acceptance
+- `migrate_cost_record_to_latest()` handles v1→v3, v2→v3, v3→v3 (no-op), and raises `ValueError` for unsupported versions.
+- Provider-backed `/run` works in sync CLI context (no event loop).
+- Provider-backed `/run` works when called from async context (event loop running).
+- All Phase 5 tests remain green.
+- New tests cover migration paths and async-safe wrapper.
+
+### Verification
+```bash
+cd python && .venv/bin/python -m pytest tests/protocol/test_cost_record.py tests/test_cli_repl.py -q
+cd python && .venv/bin/python -m pytest tests/ -q
+pnpm --filter @arc-studio/protocol build
+pnpm --filter arc-extension build
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- Worker thread approach for nested event loops adds minor overhead but is necessary for async caller compatibility.
+- Canonical migration helper does not deprecate existing `migrate_v1_to_v2()` to preserve backward compatibility.
