@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import time
 from datetime import datetime, timezone
 from typing import Any, Protocol
 
-from .config import ExecutionMode, SwarmGraphConfig
-from .consensus import run_consensus
+from .config import SwarmGraphConfig
 from .events import (
     SwarmGraphEvent,
     emit_budget_event,
@@ -15,12 +13,7 @@ from .events import (
 )
 from .graph import build_swarm_graph
 from .models import (
-    AgentStatus,
-    AgentVote,
-    ApprovalDecision,
-    SwarmFailureCause,
     SwarmStatus,
-    SwarmTask,
     TaskStatus,
     WorkerResult,
 )

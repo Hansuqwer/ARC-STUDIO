@@ -12,7 +12,6 @@ from agent_runtime_cockpit.swarmgraph import (
     AgentVote,
     SwarmTask,
     SwarmState,
-    SwarmCheckpoint,
     majority_consensus,
     quorum_consensus,
     run_consensus,
@@ -21,18 +20,15 @@ from agent_runtime_cockpit.swarmgraph import (
 from agent_runtime_cockpit.swarmgraph.config import (
     ConsensusProtocol,
     ExecutionMode,
-    SwarmStrategy,
     SwarmTopology,
 )
 from agent_runtime_cockpit.swarmgraph.models import (
     AgentRole,
-    AgentStatus,
     ApprovalDecision,
     SwarmStatus,
     TaskStatus,
     WorkerResult,
     TaskPriority,
-    SwarmFailureCause,
 )
 from agent_runtime_cockpit.swarmgraph.graph import (
     build_swarm_graph,
@@ -309,7 +305,6 @@ class TestWorkerNode:
         assert "hello" in result.output
 
     def test_worker_result_timeout(self):
-        import time
         task = SwarmTask(prompt="timeout")
         task.assigned_agent_id = "worker-1"
         result = worker_execute(task, mode=ExecutionMode.fake_offline, timeout=0.001)

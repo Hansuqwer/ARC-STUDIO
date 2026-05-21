@@ -6,7 +6,6 @@ These tests verify the shim still provides the expected CLI behavior.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from typer.testing import CliRunner
 
@@ -17,7 +16,6 @@ from agent_runtime_cockpit.cli_repl.session import (
     MODE_BUILD,
     MODE_AUTO,
     SESSION_SCHEMA_VERSION,
-    _get_sessions_dir,
 )
 
 runner = CliRunner()
@@ -183,7 +181,6 @@ class TestSessionPersistence:
 class TestLegacyReadCompat:
     def test_read_legacy_flat_session(self, tmp_path):
         """Verify legacy flat StudioSession JSON can be read."""
-        from agent_runtime_cockpit.cli_repl.session import _read_legacy_session
         import os
         os.environ["ARC_STUDIO_SESSIONS_DIR"] = str(tmp_path / "legacy_read")
         try:

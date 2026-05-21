@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 
 from ..config import ExecutionMode
 from ..models import (
-    AgentStatus,
     SwarmTask,
     TaskStatus,
     WorkerResult,

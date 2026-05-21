@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from decimal import ROUND_HALF_EVEN, Decimal
-from typing import Any
 
 from agent_runtime_cockpit.protocol.cost_record import CostRecord
 from agent_runtime_cockpit.providers.base import (

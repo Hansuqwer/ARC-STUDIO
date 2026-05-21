@@ -5,9 +5,8 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel
 
-from agent_runtime_cockpit.cli_repl.cancellation import CancellationToken, never_cancelled
+from agent_runtime_cockpit.cli_repl.cancellation import CancellationToken
 from agent_runtime_cockpit.tools import (
-    ToolHandler,
     ToolRegistry,
     ToolRegistrationError,
     ToolResult,

@@ -6,7 +6,6 @@ statuses and that the CLI integration works for adapter discovery.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from typer.testing import CliRunner
 

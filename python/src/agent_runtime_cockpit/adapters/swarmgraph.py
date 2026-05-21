@@ -31,7 +31,6 @@ from ..workspace import iter_workspace_files
 from ..swarmgraph import SwarmGraphRunner as NativeSwarmGraphRunner
 from ..swarmgraph.config import ExecutionMode, SwarmGraphConfig
 from ..swarmgraph.events import SwarmGraphEvent, SwarmGraphEventKind
-from ..swarmgraph.models import SwarmStatus
 from .base import RuntimeAdapter
 
 log = logging.getLogger(__name__)
@@ -133,7 +132,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
         try:
             self._resolve_cli(workspace)
             cli_available = True
-        except Exception as exc:
+        except Exception:
             doctor.append(DoctorAction(
                 id="install-swarmgraph",
                 label="Install SwarmGraph",
