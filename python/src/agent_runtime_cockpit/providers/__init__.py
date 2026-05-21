@@ -19,10 +19,12 @@ from .base import (
     validate_provider_id,
 )
 from .anthropic import AnthropicClient
+from .anthropic_cost import extract_cost
 
 __all__ = [
     "AuthError",
     "AnthropicClient",
+    "extract_cost",
     "CacheBreakpoint",
     "CancelledError",
     "CostRates",

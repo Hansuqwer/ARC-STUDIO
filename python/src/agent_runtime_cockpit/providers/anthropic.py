@@ -11,7 +11,9 @@ from collections.abc import Callable
 from typing import Any, AsyncIterator
 
 from agent_runtime_cockpit.cli_repl.cancellation import Cancelled, CancellationToken
+from agent_runtime_cockpit.protocol.cost_record import CostRecord
 
+from .anthropic_cost import extract_cost
 from .base import (
     AuthError,
     CancelledError,
@@ -58,6 +60,24 @@ class AnthropicClient:
             },
             timeout_seconds=timeout,
         )
+
+    def extract_cost(self, response: ProviderResponse) -> CostRecord:
+        """Extract a ``CostRecord`` from a completed provider response.
+
+        Uses the model's cost rates from :meth:`capabilities` to compute
+        the USD cost of the call.
+
+        Args:
+            response: A ``ProviderResponse`` returned by :meth:`complete`.
+
+        Returns:
+            A ``CostRecord`` with ``source="measured"`` when usage data is
+            available, ``"estimated"`` otherwise.
+
+        Raises:
+            KeyError: If the response model is not found in cost rates.
+        """
+        return extract_cost(response, self.capabilities())
 
     async def complete(self, request: ProviderRequest, *, cancellation_token: CancellationToken) -> ProviderResponse:
         try:
