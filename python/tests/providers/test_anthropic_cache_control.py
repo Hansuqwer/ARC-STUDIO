@@ -162,6 +162,45 @@ class TestMessageCacheControl:
             CacheBreakpoint(position="tools", index=2)
 
 
+class TestToolsCacheControl:
+    def test_tools_breakpoint_applies_cache_control_to_last_tool(self):
+        request_dict = {
+            "tools": [
+                {"name": "tool_a", "description": "a"},
+                {"name": "tool_b", "description": "b"},
+                {"name": "tool_c", "description": "c"},
+            ],
+        }
+        breakpoints = [CacheBreakpoint(position="tools", index=0)]
+        result = AnthropicClient._apply_cache_breakpoints_to_request(request_dict, breakpoints)
+
+        assert "cache_control" not in result["tools"][0]
+        assert "cache_control" not in result["tools"][1]
+        assert result["tools"][2]["cache_control"] == {"type": "ephemeral"}
+
+    def test_no_tools_breakpoint_leaves_tools_unchanged(self):
+        request_dict = {
+            "tools": [{"name": "tool_a"}],
+            "messages": [{"role": "user", "content": "x"}],
+        }
+        breakpoints = [CacheBreakpoint(position="messages", index=0)]
+        result = AnthropicClient._apply_cache_breakpoints_to_request(request_dict, breakpoints)
+
+        assert "cache_control" not in result["tools"][0]
+
+    def test_tools_breakpoint_with_empty_tools_is_noop(self):
+        request_dict = {"tools": []}
+        breakpoints = [CacheBreakpoint(position="tools", index=0)]
+        result = AnthropicClient._apply_cache_breakpoints_to_request(request_dict, breakpoints)
+        assert result["tools"] == []
+
+    def test_tools_breakpoint_without_tools_key_is_noop(self):
+        request_dict = {}
+        breakpoints = [CacheBreakpoint(position="tools", index=0)]
+        result = AnthropicClient._apply_cache_breakpoints_to_request(request_dict, breakpoints)
+        assert "tools" not in result
+
+
 class TestStreamingPreserved:
     def test_cache_control_with_streaming(self):
         """Cache control works with streaming requests."""

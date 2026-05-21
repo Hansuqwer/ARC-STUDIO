@@ -216,12 +216,33 @@ class AnthropicClient:
                 f"got {len(cache_control)}"
             )
         updated = dict(request_dict)
+        has_tools_breakpoint = any(
+            (hasattr(bp, "position") and bp.position == "tools")
+            or (isinstance(bp, dict) and bp.get("position") == "tools")
+            for bp in cache_control
+        )
+        if has_tools_breakpoint and updated.get("tools"):
+            updated["tools"] = AnthropicClient._apply_tools_cache_control(updated["tools"])
         if "messages" in updated:
             updated["messages"] = AnthropicClient._apply_message_cache_control(
                 updated["messages"],
                 cache_control,
             )
         return updated
+
+    @staticmethod
+    def _apply_tools_cache_control(tools: list[dict]) -> list[dict]:
+        """Apply Anthropic ephemeral cache_control to the tools block.
+
+        Anthropic treats tools as a single cacheable block; the marker is
+        placed on the last tool definition and caches all tools up to and
+        including it.
+        """
+        if not tools:
+            return tools
+        annotated = [dict(tool) for tool in tools]
+        annotated[-1] = {**annotated[-1], "cache_control": {"type": "ephemeral"}}
+        return annotated
 
     @staticmethod
     def _system_with_cache_control(
