@@ -1,6 +1,6 @@
 """Provider-agnostic cost record schema (ADR-011/013).
 
-``CostRecord`` v2 is the structured representation of a single provider
+``CostRecord`` v3 is the structured representation of a provider or turn
 call's cost. It lives with the event envelope so any runtime can record
 costs without importing per-provider modules.
 
@@ -26,7 +26,7 @@ class CostRecord(BaseModel):
     quantization.
     """
 
-    schema_version: int = 2
+    schema_version: int = 3
     provider_id: str
     model: str
     input_tokens: int = Field(ge=0)
@@ -37,6 +37,7 @@ class CostRecord(BaseModel):
     source: Literal["measured", "estimated"]
     degraded: bool = False
     currency: str = "USD"
+    cost_components: list[CostRecord] = Field(default_factory=list)
 
     @property
     def total_tokens(self) -> int:
@@ -50,6 +51,14 @@ class CostRecord(BaseModel):
                 f"CostRecord invariant violation: source={self.source!r} "
                 f"requires degraded={expected_degraded}, got degraded={self.degraded}"
             )
+        if self.cost_components:
+            component_sum = sum((component.cost_usd for component in self.cost_components), Decimal("0"))
+            quantum = Decimal("1.00000000")
+            if component_sum.quantize(quantum, rounding=ROUND_HALF_EVEN) != self.cost_usd.quantize(quantum, rounding=ROUND_HALF_EVEN):
+                raise ValueError(
+                    "CostRecord invariant violation: cost_usd must equal "
+                    "sum(cost_components.cost_usd) within 8 decimal places"
+                )
         return self
 
     def quantized(self, places: int = 8) -> CostRecord:
@@ -136,4 +145,24 @@ def migrate_v1_to_v2(payload: dict[str, Any]) -> dict[str, Any]:
     # currency default
     migrated.setdefault("currency", "USD")
 
+    return migrated
+
+
+def migrate_v2_to_v3(payload: dict[str, Any]) -> dict[str, Any]:
+    """Migrate a v2 cost record to v3 with component breakdown.
+
+    The migrated parent record carries one component copy of the original
+    single-call record, preserving the parent-sum invariant without recursion.
+    """
+    sv = payload.get("schema_version", 2)
+    if sv == 3:
+        return dict(payload)
+    if sv != 2:
+        raise ValueError(f"Unsupported schema_version={sv}. Only v2 -> v3 migration is supported.")
+    migrated = dict(payload)
+    migrated["schema_version"] = 3
+    component = dict(payload)
+    component["schema_version"] = 3
+    component["cost_components"] = []
+    migrated["cost_components"] = [component]
     return migrated
