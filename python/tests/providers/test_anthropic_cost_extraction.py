@@ -8,6 +8,7 @@ import pytest
 
 from agent_runtime_cockpit.protocol.cost_record import CostRecord
 from agent_runtime_cockpit.providers import (
+    CostExtractionError,
     CostRates,
     ProviderCapability,
     ProviderFeature,
@@ -117,10 +118,26 @@ class TestExtractCost:
         # 32 * 15.0 / 1_000_000 = 0.00048
         assert cost.cost_usd == Decimal("0.00108000")
 
-    def test_raises_key_error_for_unknown_model(self):
-        """A model not in cost_rates raises KeyError."""
-        with pytest.raises(KeyError, match="unknown-model"):
+    def test_raises_cost_extraction_error_for_unknown_model(self):
+        """A model not in cost_rates raises CostExtractionError, not KeyError."""
+        with pytest.raises(CostExtractionError, match="not in rate map"):
             extract_cost(_response(model="unknown-model"), _capability())
+
+    def test_unknown_model_error_lists_configured_models(self):
+        """Error message must enumerate configured models for operator diagnosis."""
+        cap = _capability(model="claude-sonnet-4-6")
+        with pytest.raises(CostExtractionError) as excinfo:
+            extract_cost(_response(model="claude-opus-4-7"), cap)
+        message = str(excinfo.value)
+        assert "claude-sonnet-4-6" in message
+        assert "claude-opus-4-7" in message
+        assert "anthropic" in message
+
+    def test_cost_extraction_error_is_non_retryable(self):
+        """CostExtractionError is a configuration bug, not transient."""
+        with pytest.raises(CostExtractionError) as excinfo:
+            extract_cost(_response(model="unknown-model"), _capability())
+        assert excinfo.value.retryable is False
 
     def test_quantized_cost(self):
         """Cost is quantized to 8 decimal places with ROUND_HALF_EVEN."""

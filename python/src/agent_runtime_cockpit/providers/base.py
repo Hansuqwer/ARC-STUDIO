@@ -162,6 +162,34 @@ class CancelledError(ProviderError):
     user_facing_reason = "Call cancelled."
 
 
+class CostExtractionError(ProviderError):
+    """Raised when a model is not found in a provider's cost rate map.
+
+    Non-retryable — this is a configuration bug (missing rate entry for
+    a known model), not a transient failure. Carries the provider ID,
+    the requested model, and the list of configured models so operators
+    can diagnose rate-map misconfiguration without reading source.
+    """
+
+    retryable = False
+
+    def __init__(
+        self,
+        model: str,
+        provider_id: str,
+        configured_models: list[str],
+    ) -> None:
+        self.model = model
+        self.provider_id = provider_id
+        self.configured_models = sorted(configured_models)
+        super().__init__(
+            f"Model {model!r} not in rate map for provider {provider_id!r}. "
+            f"Configured models: {self.configured_models}. "
+            f"Add the model to ProviderCapability.cost_rates or use a "
+            f"configured model."
+        )
+
+
 @runtime_checkable
 class ProviderClient(Protocol):
     @abstractmethod

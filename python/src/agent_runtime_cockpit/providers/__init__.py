@@ -2,6 +2,7 @@ from .base import (
     AuthError,
     CacheBreakpoint,
     CancelledError,
+    CostExtractionError,
     CostRates,
     ModelError,
     NetworkError,
@@ -24,6 +25,7 @@ from .anthropic_cost import extract_cost
 __all__ = [
     "AuthError",
     "AnthropicClient",
+    "CostExtractionError",
     "extract_cost",
     "CacheBreakpoint",
     "CancelledError",

@@ -89,7 +89,25 @@ The "Unreleased" section below describes what is currently on `main`. The first 
 
 - `docs/FINAL_STATUS.md`, `docs/HANDOFF.md`, `docs/ORCHESTRATOR_HANDOVER_PROMPT.md` → `docs/history/`.
 
-### Known CI gaps
+### Added (Phase 4)
+
+- `ProviderClient` runtime-checkable protocol with `complete()`, `stream()`, `cancel()` methods and associated types (`ProviderRequest`, `ProviderResponse`, `UsageRecord`, `StreamChunk`, `ProviderCapability`, `CostRates`, error taxonomy).
+- `BudgetEnforcer`, `BudgetConfig`, `BudgetState` in `budget/schema.py` — Decimal-based budget enforcement with AND-combined scope caps, first-launch confirmation gate.
+- Heuristic injection-pattern scanner in `security/injection_patterns.py` with 5 locked ADR-014 patterns (prompt-injection, code-exec, data-exfil, role-play, override) and `--bypass-injection-scan` flag.
+- `CancellationToken` with thread-safe cancel/reason/timestamp propagation, parent-child linkage, and `never_cancelled()` singleton.
+- Mocked `AnthropicClient` skeleton with lazy SDK import, dependency-injected SDK factory, error mapping, and both `complete()`/`stream()` paths (6 tests).
+- Package rename: `providers.py` → `provider_action.py`, `provider_clients/` → `providers/` to unblock provider-backed runtime package layout.
+- `CostRecord` v2 Pydantic schema in `protocol/cost_record.py` with `Decimal` cost arithmetic (ROUND_HALF_EVEN, 8-decimal quantization), v1→v2 migration function, and 4 fixture pairs under `tests/contract/fixtures/cost-record/`.
+- `extract_cost()` in `providers/anthropic_cost.py` — per-provider cost extraction from `ProviderResponse` + `ProviderCapability.cost_rates`, with measured and estimated (degraded) paths.
+- 56 new tests across Phase 4: provider protocol contract, budget schema, injection patterns, Anthropic client, cost record migration (42), and Anthropic cost extraction (12).
+
+### Changed
+
+- `provider_clients/` package renamed to `providers/`; `providers.py` module renamed to `provider_action.py`. All imports updated.
+
+### Known CI gaps / pre-existing failures
 
 - **Node/E2E** ([#19](https://github.com/Hansuqwer/arc-theia-studio/issues/19)): webpack `Aborted (core dump)` exit code 134 during `packages/arc-browser-app prepare` on Ubuntu CI runner. V8 crash during JSON stringification in Theia's webpack pipeline. Workaround: set `NODE_OPTIONS=--max-old-space-size=8192` in CI, or pin Node to a version compatible with this Theia release.
 - **Python** ([#20](https://github.com/Hansuqwer/arc-theia-studio/issues/20)): 52 web/daemon tests return HTTP 500 on Python 3.12/Ubuntu (all pass on Python 3.11/macOS). Suspect asyncio event-loop compatibility (`asyncio.get_event_loop()` vs `asyncio.get_running_loop()` on 3.12). Check `pytest-asyncio` version pin and `asyncio_mode` config.
+- **Python** (pre-existing, unmitigated): `test_providers_action_all_gates_pass_closed_smoke` makes a real HTTP call to OpenAI with a fake API key (`sk-test-*`) and fails with HTTP 401. The test was designed to exercise the full gated live-action path but was never mocked. Present on `phase-3-complete` tag; unchanged in Phase 4. Fix: mock `urllib.request.urlopen` like the other live-action tests. Tracked for Phase 4.x.
+- **Python** (transient, resolved): `test_langgraph_swarmgraph_local_real_routes_when_env_set` showed a one-off `ModuleNotFoundError: No module named 'swarm'` during initial Phase 4 package install. Test passes cleanly on re-run and on `phase-3-complete` tag. No code change needed; likely module-resolution race during editable install.

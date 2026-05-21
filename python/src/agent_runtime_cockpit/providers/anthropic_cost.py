@@ -10,6 +10,7 @@ from decimal import ROUND_HALF_EVEN, Decimal
 
 from agent_runtime_cockpit.protocol.cost_record import CostRecord
 from agent_runtime_cockpit.providers.base import (
+    CostExtractionError,
     CostRates,
     ProviderCapability,
     ProviderResponse,
@@ -68,15 +69,16 @@ def extract_cost(
         usage data was unavailable.
 
     Raises:
-        KeyError: If the response model is not found in the capability's
-            cost rates.
+        CostExtractionError: If the response model is not found in the
+            capability's cost rates.
     """
     model = response.model
     rates = capability.cost_rates.get(model)
     if rates is None:
-        raise KeyError(
-            f"Model {model!r} not found in ProviderCapability.cost_rates. "
-            f"Available models: {list(capability.cost_rates.keys())}"
+        raise CostExtractionError(
+            model=model,
+            provider_id=capability.provider_id,
+            configured_models=list(capability.cost_rates.keys()),
         )
 
     usage = response.usage
