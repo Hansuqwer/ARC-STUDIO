@@ -125,12 +125,12 @@ class RunEvent(BaseModel):
             return data
         migrated = dict(data)
         payload = dict(migrated.get("data") or {})
-        if "runtime_mode" in payload:
-            payload["runtime_mode"] = RuntimeMode.from_legacy(payload["runtime_mode"]).value
-        payload.setdefault("runtime_mode", RuntimeMode.FAKE.value)
-        payload.setdefault("profile_id", "default")
-        payload.setdefault("isolation_id", "none")
-        payload.setdefault("source_trust", "workspace")
+        if payload.get("runtime_mode") is not None:
+            legacy_cli_map = {"fake/offline": "fake", "local-real": "gated_local"}
+            payload["runtime_mode"] = RuntimeMode.from_legacy(legacy_cli_map.get(payload["runtime_mode"], payload["runtime_mode"])).value
+            payload.setdefault("profile_id", "default")
+            payload.setdefault("isolation_id", "none")
+            payload.setdefault("source_trust", "workspace")
         migrated["schema_version"] = 2
         migrated["data"] = payload
         return migrated
