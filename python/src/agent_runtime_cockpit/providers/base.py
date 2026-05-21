@@ -119,6 +119,7 @@ class ProviderResponse(BaseModel):
     content: str
     finish_reason: Literal["stop", "length", "tool_use", "content_filter", "cancelled", "error"]
     usage: UsageRecord
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
     degraded: bool = False
     degraded_reason: str | None = None
 
