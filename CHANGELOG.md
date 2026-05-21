@@ -2,9 +2,9 @@
 
 All notable changes to ARC Studio are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follow [SemVer](https://semver.org/spec/v2.0.0.html); pre-release identifiers (`-alpha`, `-alphaN`) precede a stable `1.0.0`.
 
-The "Unreleased" section below describes what is currently on `main`. The first tag (`v0.1.0-alpha`, cut 2026-05-14) is the alpha release; see [git tag](https://github.com/Hansuqwer/arc-theia-studio/tags).
-
 ## [Unreleased]
+
+## [0.1.0-alpha] - 2026-05-21
 
 ### Added
 
