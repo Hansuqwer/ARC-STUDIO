@@ -73,7 +73,7 @@ Tool versions are pinned in [`.tool-versions`](./.tool-versions):
 ## Quick Start
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/Hansuqwer/arc-theia-studio.git
 cd arc-theia-studio
 pnpm install --frozen-lockfile
 bash scripts/bootstrap-dev.sh
