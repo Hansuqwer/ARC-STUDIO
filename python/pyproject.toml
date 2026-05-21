@@ -70,6 +70,8 @@ filterwarnings = [
     # Ignore resource warnings from unclosed sockets in test cleanup
     "ignore::ResourceWarning",
     "ignore::pytest.PytestUnraisableExceptionWarning",
+    # Ignore intentional deprecation warnings for legacy runtime mode migration
+    "ignore:Legacy runtime mode.*:DeprecationWarning",
 ]
 
 [tool.ruff]
