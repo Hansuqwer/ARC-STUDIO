@@ -703,7 +703,7 @@ Phase 5 makes provider-backed runtime conversational and tool-capable: implement
 ## Phase 5.1 — Runtime Cleanup Follow-ups
 
 **Roadmap:** Phase 5.1 cleanup after Phase 5 merge.  
-**Status:** Implementation complete on `phase-5.1-runtime-cleanup`; verification pending.
+**Status:** Baseline Complete — implementation on `phase-5.1-runtime-cleanup`. Evidence: `cd python && .venv/bin/python -m pytest tests/ -q` (1318 passed, 20 skipped, 13 warnings), protocol/extension builds pass, PR hygiene pass.
 
 Phase 5.1 addresses two follow-up items from Phase 5 review:
 
