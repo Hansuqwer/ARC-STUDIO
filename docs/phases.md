@@ -676,3 +676,25 @@ cd python && uv run pytest -q          # 1246 passed, 1 pre-existing failure
 bash scripts/check-banned-claims.sh     # PASS
 scripts/check-pr.sh                     # PASS
 ```
+
+## Phase 20 — Streaming, Tool Use, and Multi-Turn Sessions
+
+**Roadmap:** Phase 5 after Phase 4.1 completion.  
+**Status:** Planned — prerequisites are `phase-4-complete` and Phase 4.1 (`phase-4.1-complete`) unless explicitly deferred. ADR-019 must be accepted before ToolRegistry lands.
+
+Phase 5 makes provider-backed runtime conversational and tool-capable: implement `AnthropicClient.stream()` as an async generator yielding `StreamChunk`; add an in-process `ToolRegistry`/`ToolHandler` protocol with ADR-019 `output_trust_level`; add read-only built-in tools (`read_file`, `list_directory`, `get_current_time`); bump `ChatSession` v3→v4 with `tools_enabled`, `max_tool_iterations`, and `available_tools`; add `TurnManager` to drive request → response → tool-call → tool-result → request loops; aggregate per-call costs into `CostRecord.cost_components`; add turn/stream/tool events; extend the ADR-014 scanner for structured tool-result payloads; and route `/run` plus `/tools list|enable|disable` through the new turn/tool layer. Out of scope: write tools, shell/subprocess/network tools, MCP, parallel tools, Skills, web search, vision/computer-use APIs, SwarmGraph multi-agent orchestration, and real mixed-trust tool handling.
+
+**Locked early decisions:** `complete()` fallback may aggregate streams transparently when needed and return a normal response with `degraded=False`; `available_tools` is a per-session allowlist, defaulting to all registered tools when unset; ADR-019 keeps `mixed` in the type contract but Phase 5 wrapper execution raises `NotImplementedError`; `wrap_tool_result` starts in `tools/wrapping.py`; read-like tools must enforce an output byte limit with an explicit truncation marker.
+
+**Slice plan:**
+1. Streaming in `AnthropicClient.stream()` with stubbed SDK stream tests.
+2. Accept ADR-019; add `ToolHandler`, `ToolRegistry`, and wrapper contracts.
+3. Add `read_file`, `list_directory`, `get_current_time` with trust declarations and cancellation/args tests.
+4. Bump `ChatSession` v3→v4 and add migration tests.
+5. Add `TurnManager` single-turn path with turn event ordering and cancellation behavior.
+6. Add multi-turn sequential tool loop, iteration cap, trust-tagged history, and degraded-on-cap behavior.
+7. Bump `CostRecord` v2→v3 with `cost_components` and parent-sum invariant.
+8. Add `/tools list`, `/tools enable`, `/tools disable`; route `/run` through `TurnManager`.
+9. Extend injection scanner with structured-content walking plus tool-result attack patterns.
+
+**Acceptance:** streaming chunks ordered with final usage; single-turn, single-tool, and multi-tool loops pass; cancellation preserves partial state and emits `turn.cancelled`; untrusted tool output is scanned before history insertion; built-in tools are read-only and trust-tagged; `CostRecord` parent cost equals component sum within tolerance; schema migrations pass; structured scanner covers nested dict/list/string payloads and field-name spoofing; all Phase 4/4.1 tests remain green; full pytest requires no `--deselect` after Phase 4.1.
