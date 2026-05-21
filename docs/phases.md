@@ -315,7 +315,7 @@ Every new phase/chunk should include:
 | 15 SwarmGraph Cost Producer + Cost UX | Baseline Complete | Phase 5 + Phase 9 | Schema expanded with model/promptTokens/completionTokens/source; measured is ISO timestamp; UI renders all new fields gated on explicit events; 17 new tests across Python+TS |
 | 16 Packaging/Optional Feature Decisions | Baseline Complete | browser v0.1 stabilization | ADR-008 accepted; electron-builder + signing preflight exist; release config signs validated by both signing-preflight and PR hygiene workflows; live LM Arena implementation deferred; **all 6 Active Work Ledger items implemented in `4b0f6b5`** |
 | **17 SwarmGraph Native Runtime** | **P1-P4 Baseline Complete** | existing adapter/swarmgraph.py + CLI/IDE surfaces | P1: native `swarmgraph/` package. P2: adapter bridge rewrite using native `SwarmGraphRunner` by default, CLI fallback. P3: CLI REPL. P4: ChatTab default alignment. 989 total Python tests pass; 762 TS tests pass. |
-| **18 CLI Consolidation** | **In Progress** | ADR-016 Phase 2 subset | Unified slash command registry under `cli_repl/commands/`; merged current cli_studio.py and cli_repl slash commands; cli_studio.py reduced to thin shim; ChatSession schema version (v1 subset); nested legacy flat session migration (`arc studio sessions migrate`); bare `arc` TTY launch with `ARC_NO_TUI` guard. Full Phase 0 target slash/session inventory is deferred by ADR-016. |
+| **18 CLI Consolidation** | **Baseline Complete** | ADR-016 Phase 2 subset | Unified slash command registry under `cli_repl/commands/`; merged current cli_studio.py and cli_repl slash commands; cli_studio.py reduced to thin shim; ChatSession schema version (v1 subset); nested legacy flat session migration (`arc studio sessions migrate`); bare `arc` TTY launch with `ARC_NO_TUI` guard. 1318 Python tests pass. Full Phase 0 target slash/session inventory is deferred by ADR-016. |
 | **19 Provider-Backed Runtime** | **Baseline Complete** | Phase 3 (provider_action) + Phase 17 (SwarmGraph) | ProviderClient protocol, BudgetEnforcer, AnthropicClient skeleton, CostRecord v2 schema + migration, extract_cost(), tokenizer-based estimator (AnthropicCountTokens + TiktokenApproximate), per-message/tools cache-control breakpoint computation + Anthropic wire format. 1246 Python tests pass (pre-existing 1 failure). Review-fix code tip `c2f39df`; docs refreshed in follow-up commits. |
 | **20 Streaming, Tool Use, and Multi-Turn Sessions** | **Baseline Complete (review pending)** | Phase 4.1 complete | Slices 1-9 implemented on `phase-5-streaming-tools`: streaming verified, ADR-019 accepted, ToolRegistry + built-in read-only tools, ChatSession v4, TurnManager single/multi-turn tool loop, CostRecord cost components, `/tools` commands, provider-backed `/run` routed through TurnManager, structured scanner. 1313 Python tests pass; final re-review required before merge/tag. |
 
@@ -610,7 +610,7 @@ Most dimensions render absent/degraded until the Phase 15 measured cost/token pr
 ### Phase 18 — CLI Consolidation
 
 **Roadmap:** ADR-016 Phase 2 subset of Phase 0 CLI inventory
-**Status:** In Progress | Evidence: Phase 2 branch scoped to ADR-016 subset; REPL and registry `/run` paths share gate/cancellation semantics; targeted CLI + SwarmGraph tests pass locally; full verification and re-review still required before Complete.
+**Status:** Baseline Complete | Evidence: `phase-2-cli-consolidation` branch merged with main; 1318 Python tests passed, 20 skipped, 13 warnings; protocol/extension builds pass; PR hygiene pass.
 
 Consolidates two separate REPL implementations (`cli_studio.py` and `cli_repl/`) and their slash command registries, session schemas, and CLI entry points for the ADR-016 Phase 2 subset. The full Phase 0 target slash/session inventory is not claimed complete in this phase.
 
@@ -642,7 +642,7 @@ Consolidates two separate REPL implementations (`cli_studio.py` and `cli_repl/`)
 5. ✅ Bare `arc` with TTY launches studio REPL; `ARC_NO_TUI=1` shows help.
 6. ✅ Registered commands have explicit category/gate/mode/trust/privilege/render/event metadata.
 7. ✅ `/run` is blocked outside build/auto mode and accepts a cancellation token.
-8. ⏳ Re-run full verification and re-review before flipping to Complete.
+8. ✅ Full verification complete: 1318 Python tests pass, protocol/extension builds pass, PR hygiene pass.
 
 **Known risks:** `cli_studio.py` legacy flat sessions are readable but never written — users must run `arc studio sessions migrate` to convert. The bare `arc` TTY behavior uses `sys.stdin.isatty()` which always returns False in test runner (tested via `ARC_NO_TUI` guard). Full CLI target inventory is deferred by ADR-016, not complete in this phase.
 
