@@ -30,6 +30,7 @@ class _ClientStub:
     def __init__(self, returned_tokens: int):
         self.returned_tokens = returned_tokens
         self.calls: list[dict] = []
+        self.messages = self
 
     def count_tokens(self, *, model: str, messages: list[dict]):
         self.calls.append({"model": model, "messages": messages})
@@ -70,7 +71,7 @@ class TestAnthropicCountTokensEstimator:
         input_tokens, output_tokens = estimator.estimate_tokens(response)
 
         assert input_tokens == 1234
-        assert output_tokens == int(1234 * 0.3)  # default ratio
+        assert output_tokens == int(1234 * 0.32)  # default ratio
         assert client.calls[0]["model"] == "claude-sonnet-4-6"
 
     def test_missing_original_messages_raises(self):
@@ -206,7 +207,7 @@ class TestBuildEstimateFn:
     def test_returns_callable_that_returns_token_counts(self):
         estimator = TiktokenApproximateEstimator()
         messages = [{"role": "user", "content": "hello world this is a longer text to produce enough tokens"}]
-        fn = build_estimate_fn(estimator, messages)
+        fn = build_estimate_fn(estimator, messages, model="claude-sonnet-4-6")
         input_tokens, output_tokens = fn()
         assert input_tokens > 0
         assert output_tokens > 0
@@ -215,7 +216,39 @@ class TestBuildEstimateFn:
         client = _ClientStub(returned_tokens=500)
         estimator = AnthropicCountTokensEstimator(client=client)
         messages = [{"role": "user", "content": "test"}]
-        fn = build_estimate_fn(estimator, messages)
+        fn = build_estimate_fn(estimator, messages, model="claude-sonnet-4-6")
         input_tokens, output_tokens = fn()
         assert input_tokens == 500
-        assert output_tokens == 150  # 500 * 0.3
+        assert output_tokens == 160  # 500 * 0.32
+
+    def test_sdk_estimator_uses_messages_count_tokens_with_model(self):
+        calls = []
+
+        class _StubMessages:
+            def count_tokens(self, *, model, messages):
+                calls.append({"model": model, "messages": messages})
+                return _CountTokensStub(input_tokens=1234)
+
+        class _StubClient:
+            messages = _StubMessages()
+
+        estimator = AnthropicCountTokensEstimator(_StubClient())
+        fn = build_estimate_fn(
+            estimator,
+            request_messages=[{"role": "user", "content": "hi"}],
+            model="claude-sonnet-4-6",
+        )
+        input_tokens, output_tokens = fn()
+
+        assert calls == [{
+            "model": "claude-sonnet-4-6",
+            "messages": [{"role": "user", "content": "hi"}],
+        }]
+        assert input_tokens == 1234
+        assert output_tokens >= 1
+
+    def test_sdk_estimator_rejects_missing_model(self):
+        estimator = AnthropicCountTokensEstimator(_ClientStub(100))
+        fn = build_estimate_fn(estimator, request_messages=[], model=None)
+        with pytest.raises(ValueError, match="requires request.model"):
+            fn()

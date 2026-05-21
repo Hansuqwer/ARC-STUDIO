@@ -126,7 +126,11 @@ class AnthropicClient:
                 )
                 messages = kwargs.get("messages", [])
                 if messages:
-                    self._last_estimate_fn = build_estimate_fn(estimator, messages)
+                    self._last_estimate_fn = build_estimate_fn(
+                        estimator,
+                        messages,
+                        model=provider_response.model,
+                    )
                 else:
                     self._last_estimate_fn = None
             except (ImportError, ValueError):
@@ -227,25 +231,21 @@ class AnthropicClient:
         messages: list[dict],
         cache_control: list,
     ) -> list[dict]:
-        """Apply cache control to the last non-system message.
+        """Apply cache control to the final message when requested.
 
-        Currently only supports caching the final user/assistant message
-        (the most common pattern for multi-turn conversations). The
-        breakpoint at position "messages" or "context" with the highest
-        index is applied to the last message's content.
+        NOTE: per-message/per-attachment indexing is not supported in this
+        release. Any ``messages`` breakpoint collapses to a single cache
+        marker on the final message. Indexed mapping is a Phase 4.1 follow-up.
         """
         if not cache_control:
             return messages
-        # Find the highest-indexed context/messages breakpoint
-        context_indices = [
-            bp.index if hasattr(bp, "index") else bp.get("index", 0)
+        has_messages_breakpoint = any(
+            (hasattr(bp, "position") and bp.position == "messages")
+            or (isinstance(bp, dict) and bp.get("position") == "messages")
             for bp in cache_control
-            if (hasattr(bp, "position") and bp.position in ("context", "messages"))
-            or (isinstance(bp, dict) and bp.get("position") in ("context", "messages"))
-        ]
-        if not context_indices or not messages:
+        )
+        if not has_messages_breakpoint or not messages:
             return messages
-        # Apply to the last message (most common pattern)
         last = messages[-1]
         content = last["content"]
         if isinstance(content, str):

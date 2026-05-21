@@ -62,6 +62,12 @@ class _CountTokensClient(Protocol):
     the real SDK.
     """
 
+    @property
+    def messages(self) -> _MessagesClient:
+        ...
+
+
+class _MessagesClient(Protocol):
     def count_tokens(self, *, model: str, messages: list[dict]) -> _CountTokensResult:
         ...
 
@@ -84,7 +90,7 @@ class AnthropicCountTokensEstimator:
 
     client: _CountTokensClient
     method_name: str = "anthropic-count-tokens"
-    output_to_input_ratio: float = 0.3
+    output_to_input_ratio: float = 0.32
 
     def estimate_tokens(self, response: Any) -> tuple[int, int]:
         """Estimate (input_tokens, output_tokens) for *response*.
@@ -101,10 +107,15 @@ class AnthropicCountTokensEstimator:
                 "must attach these in the degraded path. Falling back "
                 "to TiktokenApproximate is the caller's responsibility."
             )
-        model = getattr(response, "model", "unknown")
-        result = self.client.count_tokens(model=model, messages=original_messages)
+        model = getattr(response, "model", None)
+        if not model:
+            raise ValueError(
+                "AnthropicCountTokensEstimator requires request.model to be set; "
+                "got None or empty"
+            )
+        result = self.client.messages.count_tokens(model=model, messages=original_messages)
         input_tokens = result.input_tokens
-        output_tokens = int(input_tokens * self.output_to_input_ratio)
+        output_tokens = max(1, int(input_tokens * self.output_to_input_ratio))
         return input_tokens, output_tokens
 
 
@@ -230,6 +241,7 @@ def select_estimator(
 def build_estimate_fn(
     estimator: EstimateFallback,
     request_messages: list[dict[str, Any]],
+    model: str | None = None,
 ) -> Callable[[], tuple[int, int]]:
     """Build a closure that the cost-extraction pipeline can call.
 
@@ -246,7 +258,7 @@ def build_estimate_fn(
     """
 
     def _estimate() -> tuple[int, int]:
-        ns = _Namespace(original_messages=request_messages)
+        ns = _Namespace(original_messages=request_messages, model=model)
         return estimator.estimate_tokens(ns)
 
     return _estimate

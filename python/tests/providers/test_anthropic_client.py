@@ -22,6 +22,7 @@ class _Messages:
         self.error = error
         self.create_kwargs = None
         self.stream_kwargs = None
+        self.count_tokens_kwargs = None
 
     def create(self, **kwargs):
         self.create_kwargs = kwargs
@@ -34,6 +35,10 @@ class _Messages:
         if self.error is not None:
             raise self.error
         return self.stream_response
+
+    def count_tokens(self, **kwargs):
+        self.count_tokens_kwargs = kwargs
+        return SimpleNamespace(input_tokens=1234)
 
 
 class _Stream:
@@ -99,6 +104,22 @@ async def test_complete_missing_usage_returns_degraded_response() -> None:
     assert result.degraded is True
     assert result.usage.available is False
     assert result.degraded_reason == "provider usage data unavailable"
+
+
+@pytest.mark.asyncio
+async def test_degraded_extract_cost_uses_sdk_count_tokens_with_model() -> None:
+    response = SimpleNamespace(model="claude-sonnet-4-6", content=[SimpleNamespace(text="ok")], stop_reason="end_turn")
+    messages = _Messages(response=response)
+    client = AnthropicClient(sdk_factory=lambda: _Sdk(messages))
+
+    result = await client.complete(_request(), cancellation_token=never_cancelled())
+    cost = client.extract_cost(result)
+
+    assert cost.source == "estimated"
+    assert messages.count_tokens_kwargs == {
+        "model": "claude-sonnet-4-6",
+        "messages": [{"role": "user", "content": "hello"}],
+    }
 
 
 @pytest.mark.asyncio
