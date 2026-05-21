@@ -7,7 +7,7 @@ live under ``protocol/`` so the sync script has one source directory.
 Python-only schemas (e.g., ChatSession v3, which is never transmitted
 across the language boundary) stay in their domain packages.
 """
-from .envelope import ArcEnvelope, ArcError, ArcMeta, ok, err
+from .event_envelope import ArcEnvelope, ArcError, ArcMeta, ok, err
 from .capabilities import RuntimeCapabilities
 from .cache_breakpoints import (
     MAX_BREAKPOINTS,

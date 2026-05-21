@@ -21,7 +21,7 @@ from ..context.pack import ContextPackGenerator
 from ..orchestration import runtime_router
 from ..orchestration.cross_linker import CrossLinker
 from ..orchestration.event_broker import EventBroker
-from ..protocol.envelope import ok, err
+from ..protocol.event_envelope import ok, err
 from ..protocol.errors import ArcErrorCode
 from ..protocol.schemas import RunStatus, WorkspaceInfo
 from ..security.validation import validate_workspace_path
