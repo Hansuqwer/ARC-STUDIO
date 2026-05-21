@@ -3,10 +3,10 @@
 **Project:** ARC Studio
 **Version:** v0.1.0-alpha
 **Target release date:** 2026-06-01
-**Last Updated:** 2026-05-19
-**Current evidence anchor:** `4b0f6b5` | 18 files changed, 1953 insertions, 25 deletions — all 6 Active Work Ledger items implemented.
+**Last Updated:** 2026-05-21
+**Current evidence anchor:** `0018db8` | Phase 5.1 (Runtime Cleanup) and Phase 18 (CLI Consolidation) complete; all phases 0-20 baseline complete.
 
-**Evidence refresh:** Docs refreshed against pushed `main` commit `4b0f6b5` on 2026-05-19. All previously-deferred items (effect-boundary replay, BudgetVector enforcer, SwarmGraph topology, provider-backed adoption, adapters, Electron packaging) implemented in single atomic commit. Python: 908 passed, 19 skipped. Protocol + extension builds: OK. PR hygiene: OK. Banned claims: OK. Previous `7a300fe` evidence was green for all 5 workflows: `python` 26109161212, `node` 26109161476, `ARC Roadmap Gate` 26109161340, `e2e` 26109161352, and `signing-preflight` 26109161343. `.env` history scrub completed (see Item 9). Real-runtime smoke remains opt-in/non-gating.
+**Evidence refresh:** Docs refreshed against pushed `main` commit `0018db8` on 2026-05-21. Phase 5.1 added canonical CostRecord migration helper and async-safe provider-backed `/run` wrapper. Phase 18 completed CLI consolidation with unified slash command registry, session migration, and bare `arc` TTY launch. Python: 1318 passed, 20 skipped, 13 warnings (up from 908 passed). Protocol + extension builds: OK. PR hygiene: OK. All phases 0-20 now baseline complete. Previous `4b0f6b5` evidence (2026-05-19) implemented all 6 Active Work Ledger items. `.env` history scrub completed. Real-runtime smoke remains opt-in/non-gating.
 
 **v0.1 Scope:**
 - ✅ Browser app (`applications/browser`)
