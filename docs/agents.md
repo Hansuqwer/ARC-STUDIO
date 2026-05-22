@@ -1,6 +1,6 @@
 # ARC Studio - Agent Context
 
-**Last reality refresh:** 2026-05-18. This file is agent onboarding/context, not a status source of truth.
+**Last reality refresh:** 2026-05-22. This file is agent onboarding/context, not a status source of truth.
 
 When in doubt, `docs/roadmap.md` and `docs/phases.md` override this file. Do not resolve conflicts by creating a new roadmap/status/handover doc; update the locked docs instead.
 
@@ -83,7 +83,10 @@ Uses Inversify DI (@theia/core/shared/inversify). Backend services are bound exp
 
 ### Protocol
 
-ARC services communicate via JSON-RPC over Theia's connection infrastructure. Protocol types defined in `src/common/arc-protocol.ts`.
+ARC services communicate via JSON-RPC over Theia's connection infrastructure. Protocol types defined in:
+- `src/common/arc-protocol.ts` (theia-extension wire protocol)
+- `packages/arc-protocol-ts/src/` (shared TypeScript types, including `audit-events.ts`)
+- `python/src/agent_runtime_cockpit/schemas/` (Pydantic v2 Python mirrors, including `audit_events.py`)
 
 ## Build & Test
 
@@ -166,6 +169,18 @@ Split the monolithic `arc-widget.tsx` (974 lines) into:
 - Backend services tested with Jest unit tests
 - Branch coverage improved from 57.51% → 67.34%
 - Added spawn-mocked tests for WorkflowExecutor (ARC_SWARMGRAPH_CLI, workspace-local CLI, timeout, parsing, cancel)
+
+### B.3: Getting Started Guide
+- Rewrote `docs/tutorials/getting-started.md` with install, first workflow via CLI, CLI exploration, browser IDE, viewing runs, next steps, troubleshooting, and more resources sections.
+
+### B.4: Architecture Overview
+- Created `docs/architecture/overview.md` with three-layer ASCII diagram (Browser App → Theia Extension → Python Backend), data flow description, 6 key subsystem explanations, protocol boundary, and links to 11 related docs/ADRs.
+
+### D.1: Audit Event Schema
+- Created shared audit event types in TS (`packages/arc-protocol-ts/src/audit-events.ts`) covering `AuditEventType` (7 literal types), `AuditEventSeverity` (3 levels), `AuditEvent`, `AuditChainLink`, and `AuditChainManifest`.
+- Created Pydantic v2 Python mirror (`python/src/agent_runtime_cockpit/schemas/audit_events.py`) with camelCase aliases and equivalent models.
+- Added 6 TS tests + 12 Python tests (all passing).
+- Note: The `replayCategoryForType` function (in both `arc-backend-service.ts` and the Python event broker) already mapped `AUDIT` → `'audit'` — no changes needed there.
 
 ### P1-8: Build Optimization
 - Webpack split chunks configured

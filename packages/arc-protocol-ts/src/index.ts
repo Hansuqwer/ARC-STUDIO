@@ -5,3 +5,4 @@
 export * from './arc-protocol-types';
 export * from './runtime-mode';
 export * from './runtime-capability-v2';
+export * from './audit-events';
