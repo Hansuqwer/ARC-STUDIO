@@ -77,10 +77,17 @@ export interface WorkflowInfo {
   metadata: Record<string, unknown>;
 }
 
+export interface SourceLocation {
+  file: string;
+  line: number;
+  column?: number;
+}
+
 export interface WorkflowNode {
   id: string;
   label: string;
   type: 'agent' | 'tool' | 'router' | 'start' | 'end' | 'unknown';
+  source_location?: SourceLocation;
   metadata: Record<string, unknown>;
 }
 
