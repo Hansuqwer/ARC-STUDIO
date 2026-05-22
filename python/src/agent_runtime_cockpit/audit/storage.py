@@ -103,9 +103,16 @@ class AuditChainStore:
                 "message": msg,
             },
         }
-        out = output_path or Path(
-            tempfile.mktemp(suffix=f".{run_id}.audit.bundle.json")
-        )
+        if output_path:
+            out = output_path
+        else:
+            fd = tempfile.NamedTemporaryFile(
+                mode='w',
+                suffix=f".{run_id}.audit.bundle.json",
+                delete=False
+            )
+            out = Path(fd.name)
+            fd.close()
         out.write_text(
             json.dumps(bundle, sort_keys=True, separators=(",", ":"))
             + "\n"
