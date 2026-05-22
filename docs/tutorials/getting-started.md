@@ -89,7 +89,7 @@ The ARC Studio IDE loads with the Theia shell. The left activity bar has a proje
 Now that you've run your first workflow:
 
 - **Explore the CLI:** `arc --help` lists all commands. Try `arc studio chat` for the interactive REPL.
-- **Configure a provider:** Copy `.env.example` to `.env` and `arc provider` configuration.
+- **Configure a provider:** Copy `.env.example` to `.env` and see `arc providers --help` for configuration.
 - **Inspect a trace:** `arc runs export <run-id>` shows the full event stream.
 - **Read the docs:** `docs/SECURITY.md` for the security model, `docs/release/checklist.md` for verification evidence.
 - **Contribute:** Branch from `main`, run `pnpm check:pr` before opening a PR.
