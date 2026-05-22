@@ -55,7 +55,7 @@ Phase 1 transforms ARC Studio from "functional alpha" to "polished developer too
 | D.1 | **Implement audit event schema** | `python/src/agent_runtime_cockpit/audit/schema.py` | 3 hours | All event types defined as Pydantic models. Event schema tests pass. |
 | D.2 | **Implement HMAC signing/verification** | `python/src/agent_runtime_cockpit/audit/hmac.py` | 4 hours | HMAC-SHA256 signing and verification with hash chain linkage. Unit tests for tamper detection, boundary cases. |
 | D.3 | **Implement audit chain storage** | `python/src/agent_runtime_cockpit/audit/storage.py` | 3 hours | Append-only JSONL storage at `~/.arc/audit/<run_id>.audit.jsonl`. Key generated at `~/.arc/secrets/audit_key` (mode 0600). |
-| D.4 | **Implement for SwarmGraph adapter** | Integrate audit events into SwarmGraph run lifecycle | 4 hours | SwarmGraph runs emit audit events (run_started, llm_request/response, tool_call/result, run_completed). Integration tests. |
+| D.4 | **Implement for SwarmGraph adapter** | Integrate audit events into SwarmGraph run lifecycle | 4 hours | SwarmGraph runs emit audit events (run_started, tool_call/result, run_completed). **LLM request/response events deferred to Phase 1.5 pending AG-UI schema extension.** Integration tests. |
 
 ### Track E — Test & Schema Hygiene
 
@@ -90,7 +90,7 @@ Phase 1 transforms ARC Studio from "functional alpha" to "polished developer too
 |---|------|-------------|-----------|------------|
 | D.5 | **Add `arc audit verify` CLI command** | CLI command + tests | 4 hours | `arc audit verify <run_id>` recomputes HMACs, checks chain integrity. Reports pass/fail with details. |
 | D.6 | **Add `arc audit export` CLI command** | CLI command + tests | 3 hours | `arc audit export <run_id>` produces signed audit bundle. Bundle can be verified separately. |
-| D.7 | **Extend to LangGraph adapter** | Audit events for LangGraph runs | 3 hours | LangGraph runs emit all required audit events. Integration tests. |
+| D.7 | **Extend to LangGraph adapter** | Audit events for LangGraph runs | 3 hours | LangGraph runs emit lifecycle and tool audit events. **LLM request/response events deferred to Phase 1.5.** Integration tests. |
 
 ### Track E — Test & Schema Hygiene
 
@@ -124,7 +124,7 @@ Phase 1 transforms ARC Studio from "functional alpha" to "polished developer too
 
 | # | Task | Deliverable | Est. Time | Acceptance |
 |---|------|-------------|-----------|------------|
-| D.8 | **Extend to CrewAI adapter** | Audit events for CrewAI runs | 2 hours | CrewAI runs emit audit events. Integration tests. |
+| D.8 | **Extend to CrewAI adapter** | Audit events for CrewAI runs | 2 hours | CrewAI runs emit lifecycle and tool audit events. **LLM request/response events deferred to Phase 1.5.** Integration tests. |
 | D.9 | **Extend to OpenAI Agents adapter** | Audit events for OpenAI Agents runs | 2 hours | OpenAI Agents runs emit audit events. Integration tests. |
 | D.10 | **Add redaction configuration** | `ARC_AUDIT_REDACT_*` env vars | 2 hours | Users can configure message/tool-args/tool-results redaction. Redaction applied before HMAC. |
 | D.11 | **Add OTel audit log exporter** | Optional OTel exporter for audit events | 4 hours | Users with `~/.arc/config.yaml` OTel config can export audit events to their SIEM. No default remote exporter. |
