@@ -6,6 +6,11 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 
 ### Added
 
+- **UI**: DenialModal React component for security gate user confirmation (Phase 23.3)
+- **UI**: useDenialHandler hook for denial event processing and retry API calls (Phase 23.3)
+- **API**: `POST /api/enforcement/retry` endpoint for user approval/decline decisions (Phase 23.3)
+- **Security**: correlation_id field on all 5 denial data models for denial → retry tracking (Phase 23.3)
+- **Security**: `EnforcementContext.generate_correlation_id()` for unique 12-character hex IDs (Phase 23.3)
 - **Security**: Enforcement audit script `scripts/audit-enforcement-surfaces.sh` to detect ungated syscalls (Phase 23.2)
 - **Docs**: Comprehensive enforcement surface inventory at `docs/security/enforcement-surfaces.md` (Phase 23.2)
 - **Security**: Enforcement annotations for all 28 syscall sites in Python source (Phase 23.2)
@@ -19,6 +24,7 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 
 ### Changed
 
+- **Security**: All 4 enforcement helpers now generate and include correlation_id in denial events (Phase 23.3)
 - **Security**: All 4 enforcement helpers now accept optional `ctx` parameter (Phase 23.1)
 - **Security**: Dry-run mode emits denial events with `dry_run=true` flag (Phase 23.1)
 

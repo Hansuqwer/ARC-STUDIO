@@ -820,7 +820,7 @@ bash scripts/check-pr.sh
 ## Phase 23 — Enforced Workspace Trust + Paid-Call Gates
 
 **Roadmap:** R16 — Trust + Paid-Call Enforcement  
-**Status:** In Progress (PR 23.1-23.2 Complete) — EnforcementContext, CLI flags, and audit infrastructure complete; UI confirmation dialogs remain | Evidence: commits 3e6ee8c (foundation), fca4bf2 (PR 23.1), 5a9df47 (PR 23.2) | 1513 Python tests passed, audit script passes (28 syscalls annotated), TypeScript builds green | Notes: Foundation complete with typed denial events, centralized enforcement helpers, EnforcementContext system, CLI flags, and audit infrastructure; remaining work is UI confirmation dialogs with retry bridge (PR 23.3)  
+**Status:** Baseline Complete ✓ — All 3 PRs delivered | Evidence: commits 3e6ee8c (foundation), fca4bf2 (PR 23.1), 5a9df47 (PR 23.2), 09bfbb8 (PR 23.3) | 1518 Python tests passed, audit script passes (28 syscalls annotated), TypeScript builds green | Notes: Complete Phase 23 with typed denial events, centralized enforcement helpers, EnforcementContext system, CLI flags (--allow-paid, --trust-workspace, --dry-run), audit infrastructure, and UI confirmation modal with correlation ID tracking and retry bridge  
 **Depends on:** Phase 22 (needs typed RunEvent for denial events)
 
 ### Progress
@@ -850,8 +850,19 @@ bash scripts/check-pr.sh
 - Verified: Audit script passes (0 ungated violations), all syscalls properly annotated
 - Note: Actual enforcement gating of critical surfaces deferred to future work (requires profile + event emission plumbing)
 
-**Remaining for Phase 23:**
-- PR 23.3: UI confirmation dialogs + correlation IDs + retry bridge + close to Baseline Complete
+#### PR 23.3: UI Confirmation Dialogs + Retry Bridge ✓
+**Commit:** 09bfbb8  
+**Completed:** 2026-05-22
+
+- Added `correlation_id` field to all 5 denial data models (Trust, PaidCall, Shell, Network, Permission)
+- Added `EnforcementContext.generate_correlation_id()` for unique 12-character hex IDs
+- Updated all 4 enforcement helpers to generate and include correlation_id in denial events
+- Created `POST /api/enforcement/retry` endpoint for user approval/decline decisions
+- Implemented `DenialModal` React component with focus trap and keyboard navigation (Escape to decline)
+- Created `useDenialHandler` hook for denial event processing and retry API calls
+- Added 5 e2e tests: correlation_id generation, inclusion in dry-run/trust/paid-call denials
+- Verified: 1,518 Python tests passed (21 skipped), TypeScript build green
+- Note: Retry endpoint integration test skipped in CI (requires fastapi/httpx not in project deps)
 
 ### Implementation
 1. Centralize `TrustState` and `PaidCallPolicy` in protocol package for cross-language use.
