@@ -101,6 +101,12 @@ export interface SchemaInfo {
   source_file?: string;
 }
 
+export interface BudgetVector {
+  tokens?: number;
+  cost_usd?: number;
+  latency_ms?: number;
+}
+
 export interface RunRecord {
   id: string;
   workflow_id: string;
@@ -110,6 +116,8 @@ export interface RunRecord {
   ended_at?: string;
   events: RunEvent[];
   metadata: Record<string, unknown>;
+  audit_path?: string;
+  budget?: BudgetVector;
 }
 
 /** Event schema version constant — mirrors Python CURRENT_SCHEMA_VERSION */
