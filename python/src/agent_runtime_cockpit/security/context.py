@@ -8,6 +8,7 @@ CLI flag overrides.
 
 from __future__ import annotations
 
+import uuid
 from contextvars import ContextVar
 from dataclasses import dataclass
 
@@ -40,6 +41,15 @@ class EnforcementContext:
             trust_workspace=kwargs.get("trust_workspace", self.trust_workspace),
             dry_run=kwargs.get("dry_run", self.dry_run),
         )
+
+    @staticmethod
+    def generate_correlation_id() -> str:
+        """Generate a unique correlation ID for tracking denial → retry flow.
+
+        Returns:
+            12-character hex string from UUID4
+        """
+        return uuid.uuid4().hex[:12]
 
 
 class DryRunAbort(Exception):

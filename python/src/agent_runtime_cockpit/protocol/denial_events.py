@@ -25,6 +25,7 @@ class TrustDenialData(BaseModel):
     trust_level: str  # "untrusted", "partial", "trusted"
     required_trust_level: str = "trusted"
     remediation: str = "Run 'arc workspace trust' to mark this workspace as trusted"
+    correlation_id: str | None = None  # For tracking denial → retry flow
 
 
 class TrustDeniedEvent(BaseModel):
@@ -51,6 +52,7 @@ class PaidCallDenialData(BaseModel):
     profile_id: str
     allow_paid_calls: bool = False
     remediation: str = "Use --allow-paid flag or switch to a profile with allow_paid_calls=true"
+    correlation_id: str | None = None  # For tracking denial → retry flow
 
 
 class PaidCallDeniedEvent(BaseModel):
@@ -76,6 +78,7 @@ class ShellDenialData(BaseModel):
     profile_id: str
     allow_shell: bool = False
     remediation: str = "Use a profile with allow_shell=true or get explicit approval"
+    correlation_id: str | None = None  # For tracking denial → retry flow
 
 
 class ShellDeniedEvent(BaseModel):
@@ -101,6 +104,7 @@ class NetworkDenialData(BaseModel):
     profile_id: str
     allow_network: bool = False
     remediation: str = "Use a profile with allow_network=true"
+    correlation_id: str | None = None  # For tracking denial → retry flow
 
 
 class NetworkDeniedEvent(BaseModel):
@@ -125,6 +129,7 @@ class PermissionDenialData(BaseModel):
     permission_type: str  # "trust", "paid_call", "shell", "network", "secrets", "other"
     context: dict[str, str] | None = None
     remediation: str | None = None
+    correlation_id: str | None = None  # For tracking denial → retry flow
 
 
 class PermissionDeniedEvent(BaseModel):

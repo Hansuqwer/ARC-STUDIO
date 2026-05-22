@@ -89,6 +89,7 @@ def enforce_workspace_trust(
 
     # Dry-run branch: always denies, cannot be bypassed
     if ctx.dry_run:
+        correlation_id = EnforcementContext.generate_correlation_id()
         denial_data = TrustDenialData(
             action=action,
             workspace_path=str(workspace.resolve()),
@@ -96,6 +97,7 @@ def enforce_workspace_trust(
             trust_level="unknown",
             required_trust_level="trusted",
             remediation="Remove --dry-run flag to execute this operation",
+            correlation_id=correlation_id,
         )
 
         denial_event = TrustDeniedEvent(
@@ -128,6 +130,7 @@ def enforce_workspace_trust(
             return
 
         # Create typed denial event
+        correlation_id = EnforcementContext.generate_correlation_id()
         denial_data = TrustDenialData(
             action=action,
             workspace_path=str(workspace.resolve()),
@@ -135,6 +138,7 @@ def enforce_workspace_trust(
             trust_level=resolution.level.value,
             required_trust_level="trusted",
             remediation="Run 'arc workspace trust' to mark this workspace as trusted",
+            correlation_id=correlation_id,
         )
 
         denial_event = TrustDeniedEvent(
@@ -191,6 +195,7 @@ def enforce_paid_call_gate(
 
     # Dry-run branch: always denies, cannot be bypassed
     if ctx.dry_run:
+        correlation_id = EnforcementContext.generate_correlation_id()
         denial_data = PaidCallDenialData(
             action=action,
             provider=provider,
@@ -199,6 +204,7 @@ def enforce_paid_call_gate(
             profile_id=profile.id,
             allow_paid_calls=False,
             remediation="Remove --dry-run flag to execute this operation",
+            correlation_id=correlation_id,
         )
 
         denial_event = PaidCallDeniedEvent(
@@ -225,6 +231,7 @@ def enforce_paid_call_gate(
 
     # If we get here, paid calls are not allowed
     # Create typed denial event
+    correlation_id = EnforcementContext.generate_correlation_id()
     denial_data = PaidCallDenialData(
         action=action,
         provider=provider,
@@ -233,6 +240,7 @@ def enforce_paid_call_gate(
         profile_id=profile.id,
         allow_paid_calls=False,
         remediation="Use --allow-paid flag or switch to a profile with allow_paid_calls=true",
+        correlation_id=correlation_id,
     )
 
     denial_event = PaidCallDeniedEvent(
@@ -287,6 +295,7 @@ def enforce_shell_gate(
 
     # Dry-run branch: always denies, cannot be bypassed
     if ctx.dry_run:
+        correlation_id = EnforcementContext.generate_correlation_id()
         denial_data = ShellDenialData(
             action=action,
             command=command,
@@ -294,6 +303,7 @@ def enforce_shell_gate(
             profile_id=profile.id,
             allow_shell=False,
             remediation="Remove --dry-run flag to execute this operation",
+            correlation_id=correlation_id,
         )
 
         denial_event = ShellDeniedEvent(
@@ -317,6 +327,7 @@ def enforce_shell_gate(
     # Normal shell enforcement
     if not profile.allow_shell:
         # Create typed denial event
+        correlation_id = EnforcementContext.generate_correlation_id()
         denial_data = ShellDenialData(
             action=action,
             command=command,
@@ -324,6 +335,7 @@ def enforce_shell_gate(
             profile_id=profile.id,
             allow_shell=False,
             remediation="Use a profile with allow_shell=true or get explicit approval",
+            correlation_id=correlation_id,
         )
 
         denial_event = ShellDeniedEvent(
@@ -378,6 +390,7 @@ def enforce_network_gate(
 
     # Dry-run branch: always denies, cannot be bypassed
     if ctx.dry_run:
+        correlation_id = EnforcementContext.generate_correlation_id()
         denial_data = NetworkDenialData(
             action=action,
             url=url,
@@ -385,6 +398,7 @@ def enforce_network_gate(
             profile_id=profile.id,
             allow_network=False,
             remediation="Remove --dry-run flag to execute this operation",
+            correlation_id=correlation_id,
         )
 
         denial_event = NetworkDeniedEvent(
@@ -408,6 +422,7 @@ def enforce_network_gate(
     # Normal network enforcement
     if not profile.allow_network:
         # Create typed denial event
+        correlation_id = EnforcementContext.generate_correlation_id()
         denial_data = NetworkDenialData(
             action=action,
             url=url,
@@ -415,6 +430,7 @@ def enforce_network_gate(
             profile_id=profile.id,
             allow_network=False,
             remediation="Use a profile with allow_network=true",
+            correlation_id=correlation_id,
         )
 
         denial_event = NetworkDeniedEvent(

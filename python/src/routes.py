@@ -17,7 +17,7 @@ from security_utils import (
     validate_backend,
     sanitize_error_message,
     validate_workspace_root,
-    SecurityError
+    SecurityError,
 )
 
 app = FastAPI(title="ARC Studio API", version="0.1.0")
@@ -30,11 +30,20 @@ except SecurityError as e:
 
 # Allow-list of environment variables passed to child processes
 _ALLOWED_ENV = {
-    "PATH", "HOME", "USER", "LANG", "LC_ALL", "TZ", "TMPDIR",
+    "PATH",
+    "HOME",
+    "USER",
+    "LANG",
+    "LC_ALL",
+    "TZ",
+    "TMPDIR",
     "ARC_SWARMGRAPH_CLI",
-    "ARC_SWARMGRAPH_RUN_BACKEND", "ARC_SWARMGRAPH_ALLOW_COSTS",
-    "ARC_SWARMGRAPH_GATEWAY_URL", "ARC_SWARMGRAPH_GATEWAY_TOKEN",
+    "ARC_SWARMGRAPH_RUN_BACKEND",
+    "ARC_SWARMGRAPH_ALLOW_COSTS",
+    "ARC_SWARMGRAPH_GATEWAY_URL",
+    "ARC_SWARMGRAPH_GATEWAY_TOKEN",
 }
+
 
 def _allowed_subprocess_env() -> dict[str, str]:
     """Build a filtered environment dict containing only allow-listed vars."""
@@ -75,17 +84,20 @@ async def execute_workflow(request: ExecutionRequest):
         # Validate and sanitize inputs
         sanitized_prompt = sanitize_prompt(request.prompt)
         validated_backend = validate_backend(request.backend)
-        
+
         # Build command with validated backend and cost flags
         cmd = [
-            "swarmgraph", "swarm",
+            "swarmgraph",
+            "swarm",
             "--json",
-            "--backend", validated_backend,
-            "--prompt", sanitized_prompt,
+            "--backend",
+            validated_backend,
+            "--prompt",
+            sanitized_prompt,
         ]
         if not request.cost_allowed:
             cmd.append("--no-cost")
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -93,23 +105,24 @@ async def execute_workflow(request: ExecutionRequest):
             timeout=300,  # 5 minute timeout
             cwd=str(WORKSPACE_ROOT),  # Execute in workspace root
             shell=False,  # Critical: disable shell to prevent command injection
-            env=_allowed_subprocess_env()  # P1: env allow-list
+            env=_allowed_subprocess_env(),  # P1: env allow-list
         )
-        
+
         # Parse run ID from output
         run_id = "unknown"
         if "run-sg-" in result.stdout:
             import re
-            match = re.search(r'run-sg-([a-f0-9]+)', result.stdout)
+
+            match = re.search(r"run-sg-([a-f0-9]+)", result.stdout)
             if match:
                 run_id = f"run-sg-{match.group(1)}"
-        
+
         return ExecutionResponse(
             run_id=run_id,
             status="completed" if result.returncode == 0 else "failed",
             output=result.stdout if result.returncode == 0 else None,
             error="Workflow execution failed" if result.returncode != 0 else None,
-            trace_path=f".arc/traces/{run_id}.jsonl"
+            trace_path=f".arc/traces/{run_id}.jsonl",
         )
     except subprocess.TimeoutExpired:
         raise HTTPException(status_code=408, detail="Execution timeout")
@@ -125,33 +138,35 @@ async def get_traces():
     try:
         # Validate traces directory is within workspace
         validated_traces_dir = validate_file_path(".arc/traces", str(WORKSPACE_ROOT))
-        
+
         if not validated_traces_dir.exists():
             return []
-        
+
         traces = []
         for trace_file in validated_traces_dir.glob("*.jsonl"):
             try:
                 # Additional validation: ensure file is still within traces directory
                 if not str(trace_file.resolve()).startswith(str(validated_traces_dir.resolve())):
                     continue
-                
-                with open(trace_file, 'r') as f:
+
+                with open(trace_file, "r") as f:
                     try:
                         data = json.load(f)
-                        traces.append(TraceInfo(
-                            id=data.get("id", trace_file.stem),
-                            path=str(trace_file),
-                            timestamp=data.get("started_at", ""),
-                            status=data.get("status", "unknown")
-                        ))
+                        traces.append(
+                            TraceInfo(
+                                id=data.get("id", trace_file.stem),
+                                path=str(trace_file),
+                                timestamp=data.get("started_at", ""),
+                                status=data.get("status", "unknown"),
+                            )
+                        )
                     except json.JSONDecodeError:
                         # Skip malformed JSON files
                         continue
             except Exception:
                 # Skip files that can't be read
                 continue
-        
+
         return sorted(traces, key=lambda x: x.timestamp, reverse=True)
     except Exception:
         # Return empty array on error rather than exposing error details
@@ -164,17 +179,17 @@ async def get_trace(trace_id: str):
     try:
         # Validate trace ID to prevent path traversal
         validated_trace_id = validate_trace_id(trace_id)
-        
+
         # Construct path within workspace
         trace_path = WORKSPACE_ROOT / ".arc" / "traces" / f"{validated_trace_id}.jsonl"
-        
+
         # Validate the full path is within workspace
         validated_path = validate_file_path(str(trace_path), str(WORKSPACE_ROOT))
-        
+
         if not validated_path.exists():
             raise HTTPException(status_code=404, detail="Trace not found")
-        
-        with open(validated_path, 'r') as f:
+
+        with open(validated_path, "r") as f:
             return json.load(f)
     except HTTPException:
         raise
@@ -184,6 +199,40 @@ async def get_trace(trace_id: str):
         raise HTTPException(status_code=500, detail=sanitize_error_message(e))
 
 
+# ─── Enforcement Retry Endpoint (Phase 23.3) ────────────────────────────────
+
+
+class RetryRequest(BaseModel):
+    correlation_id: str
+    user_approved: bool = True
+
+
+class RetryResponse(BaseModel):
+    proceed: bool
+    message: str
+
+
+@app.post("/api/enforcement/retry", response_model=RetryResponse)
+async def retry_enforcement(request: RetryRequest):
+    """Handle user approval/decline for a previously denied enforcement gate.
+
+    Accepts a correlation_id (matching a previously emitted denial event) and
+    a user_approved boolean. Returns proceed=True if the user approved,
+    proceed=False if they declined.
+    """
+    if request.user_approved:
+        return RetryResponse(
+            proceed=True,
+            message="User approved, proceeding",
+        )
+    else:
+        return RetryResponse(
+            proceed=False,
+            message="User declined, operation cancelled",
+        )
+
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
