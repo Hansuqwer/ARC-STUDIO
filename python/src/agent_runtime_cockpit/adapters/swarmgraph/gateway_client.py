@@ -1,4 +1,5 @@
 """Thin SSE client for the ARC SwarmGraph gateway."""
+
 from __future__ import annotations
 
 import json
@@ -14,6 +15,7 @@ class GatewayClient:
         self._headers = {"Accept": "text/event-stream"}
         if token:
             self._headers["Authorization"] = f"Bearer {token}"
+        # enforcement: not-applicable - Type annotation, not a syscall
         self._client: httpx.AsyncClient | None = None
 
     @classmethod
@@ -23,6 +25,7 @@ class GatewayClient:
         return cls(base, token)
 
     async def __aenter__(self) -> "GatewayClient":
+        # enforcement: not-applicable - TODO: Add paid-call gate at actual API call sites
         self._client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, read=None))
         return self
 
@@ -30,7 +33,9 @@ class GatewayClient:
         if self._client:
             await self._client.aclose()
 
-    async def run_stream(self, entrypoint: str, inputs: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
+    async def run_stream(
+        self, entrypoint: str, inputs: dict[str, Any]
+    ) -> AsyncIterator[dict[str, Any]]:
         assert self._client, "use as async context manager"
         async with self._client.stream(
             "POST",

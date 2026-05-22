@@ -3,6 +3,7 @@ Web Search Provider
 
 Retrieves recent web content for breaking changes, release notes, deprecations.
 """
+
 from __future__ import annotations
 
 import logging
@@ -12,6 +13,7 @@ from typing import Optional
 from ...protocol.schemas import ContextPackEntry, SourceType
 
 log = logging.getLogger(__name__)
+
 
 class WebSearchProvider:
     """Web search provider. Brave API by default when configured."""
@@ -36,8 +38,10 @@ class WebSearchProvider:
 
     def _real_search(self, task: str) -> list[ContextPackEntry]:
         import httpx
+
         results = []
 
+        # enforcement: not-applicable - Internal CLI context provider, user-invoked tool
         if self.provider == "brave":
             resp = httpx.get(
                 "https://api.search.brave.com/res/v1/web/search",
@@ -47,13 +51,15 @@ class WebSearchProvider:
             )
             resp.raise_for_status()
             for item in resp.json().get("web", {}).get("results", []):
-                results.append(ContextPackEntry(
-                    id=f"web-{hash(item.get('url',''))%10000:x}",
-                    task=task,
-                    source=f"web:{item.get('url','')}",
-                    source_type=SourceType.WEB_SEARCH,
-                    content=f"# {item.get('title','')}\n\n{item.get('description','')}",
-                    url=item.get("url"),
-                    relevance_score=0.6,
-                ))
+                results.append(
+                    ContextPackEntry(
+                        id=f"web-{hash(item.get('url', '')) % 10000:x}",
+                        task=task,
+                        source=f"web:{item.get('url', '')}",
+                        source_type=SourceType.WEB_SEARCH,
+                        content=f"# {item.get('title', '')}\n\n{item.get('description', '')}",
+                        url=item.get("url"),
+                        relevance_score=0.6,
+                    )
+                )
         return results

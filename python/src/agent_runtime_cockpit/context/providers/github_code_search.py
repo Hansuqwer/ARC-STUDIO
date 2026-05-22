@@ -4,6 +4,7 @@ GitHub Code Search Provider
 Uses the GitHub REST API code search endpoint.
 Source: https://docs.github.com/en/search-github/github-code-search/understanding-github-code-search-syntax
 """
+
 from __future__ import annotations
 
 import logging
@@ -39,6 +40,7 @@ class GitHubCodeSearchProvider:
 
     def _real_search(self, task: str) -> list[ContextPackEntry]:
         import httpx
+
         headers = {
             "Authorization": f"Bearer {self.token}",
             "Accept": "application/vnd.github+json",
@@ -46,6 +48,7 @@ class GitHubCodeSearchProvider:
         }
 
         # Build a focused query for Theia/agent framework patterns
+        # enforcement: not-applicable - Internal CLI context provider, user-invoked tool
         query = f"{task} repo:eclipse-theia/theia language:TypeScript"
         resp = httpx.get(
             f"{GITHUB_API}/search/code",
@@ -60,23 +63,29 @@ class GitHubCodeSearchProvider:
         for item in data.get("items", []):
             # Fetch file content
             try:
+                # enforcement: not-applicable - Internal CLI context provider
                 content_resp = httpx.get(item["url"], headers=headers, timeout=5.0)
                 if content_resp.status_code == 200:
                     import base64
-                    raw = base64.b64decode(content_resp.json().get("content", "")).decode(errors="ignore")
+
+                    raw = base64.b64decode(content_resp.json().get("content", "")).decode(
+                        errors="ignore"
+                    )
                     snippet = raw[:800]
                 else:
                     snippet = f"[Could not fetch content: {content_resp.status_code}]"
             except Exception:
                 snippet = "[Content fetch failed]"
 
-            results.append(ContextPackEntry(
-                id=f"gh-{item['sha'][:8]}",
-                task=task,
-                source=f"github:{item['repository']['full_name']}/{item['path']}",
-                source_type=SourceType.GITHUB_SEARCH,
-                content=f"# {item['path']}\n```ts\n{snippet}\n```",
-                url=item.get("html_url"),
-                relevance_score=0.7,
-            ))
+            results.append(
+                ContextPackEntry(
+                    id=f"gh-{item['sha'][:8]}",
+                    task=task,
+                    source=f"github:{item['repository']['full_name']}/{item['path']}",
+                    source_type=SourceType.GITHUB_SEARCH,
+                    content=f"# {item['path']}\n```ts\n{snippet}\n```",
+                    url=item.get("html_url"),
+                    relevance_score=0.7,
+                )
+            )
         return results

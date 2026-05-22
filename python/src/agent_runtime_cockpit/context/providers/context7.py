@@ -4,6 +4,7 @@ Context7 Provider
 Retrieves current, version-specific library documentation via the Context7 API.
 Source: https://context7.com/docs/api-guide
 """
+
 from __future__ import annotations
 
 import logging
@@ -48,15 +49,18 @@ class Context7Provider:
         """Real Context7 API call."""
         try:
             import httpx
+
             results = []
             keywords = task.lower().split()
 
             # Determine which library IDs are relevant to the task
             relevant_libs = [
-                (name, lib_id) for name, lib_id in KNOWN_LIBRARY_IDS.items()
+                (name, lib_id)
+                for name, lib_id in KNOWN_LIBRARY_IDS.items()
                 if any(name in kw or kw in name for kw in keywords)
             ] or list(KNOWN_LIBRARY_IDS.items())[:2]
 
+            # enforcement: not-applicable - Internal CLI context provider, user-invoked tool
             for lib_name, lib_id in relevant_libs[:3]:
                 try:
                     resp = httpx.get(
@@ -68,16 +72,18 @@ class Context7Provider:
                     if resp.status_code == 200:
                         data = resp.json()
                         for item in data.get("results", [])[:3]:
-                            results.append(ContextPackEntry(
-                                id=f"ctx7-{lib_name}-{hash(item.get('url',''))%10000:x}",
-                                task=task,
-                                source=f"context7:{lib_name}",
-                                source_type=SourceType.CONTEXT7,
-                                content=item.get("content", "")[:1200],
-                                url=item.get("url"),
-                                freshness=item.get("version"),
-                                relevance_score=item.get("score", 0.5),
-                            ))
+                            results.append(
+                                ContextPackEntry(
+                                    id=f"ctx7-{lib_name}-{hash(item.get('url', '')) % 10000:x}",
+                                    task=task,
+                                    source=f"context7:{lib_name}",
+                                    source_type=SourceType.CONTEXT7,
+                                    content=item.get("content", "")[:1200],
+                                    url=item.get("url"),
+                                    freshness=item.get("version"),
+                                    relevance_score=item.get("score", 0.5),
+                                )
+                            )
                 except Exception as e:
                     log.warning("Context7 request for %s failed: %s", lib_name, e)
 

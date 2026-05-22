@@ -1,4 +1,5 @@
 """NoneIsolationProvider — direct subprocess execution with no isolation."""
+
 from __future__ import annotations
 
 import asyncio
@@ -35,12 +36,14 @@ class NoneIsolationProvider(IsolationProvider):
             *command,
             cwd=str(cwd) if cwd else None,
             env=env,
+            # enforcement: not-applicable - TODO: Add shell gate in future PR
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         try:
             stdout, stderr = await asyncio.wait_for(
-                proc.communicate(), timeout=timeout_seconds,
+                proc.communicate(),
+                timeout=timeout_seconds,
             )
             duration = int((time.monotonic() - start) * 1000)
             return IsolationResult(

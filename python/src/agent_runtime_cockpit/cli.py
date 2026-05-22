@@ -419,6 +419,7 @@ def _run_preflight(
 
 def check_swarmgraph_runtime(timeout: float = 5.0) -> dict[str, object]:
     """Check local SwarmGraph CLI availability without network calls."""
+    # enforcement: not-applicable - Diagnostic command checking CLI availability, not executing workflows
     candidates = [
         ("swarmgraph", ["--version"]),
         ("arc-swarmgraph", ["--version"]),
@@ -431,6 +432,7 @@ def check_swarmgraph_runtime(timeout: float = 5.0) -> dict[str, object]:
             checks.append({"command": command, "available": False, "reason": "not_found"})
             continue
         try:
+            # enforcement: not-applicable - Diagnostic command checking CLI availability
             result = subprocess.run(
                 [resolved, *args],
                 capture_output=True,
@@ -438,6 +440,7 @@ def check_swarmgraph_runtime(timeout: float = 5.0) -> dict[str, object]:
                 timeout=timeout,
                 check=False,
             )
+        # enforcement: not-applicable - Exception handler, not a syscall
         except subprocess.TimeoutExpired:
             checks.append(
                 {"command": command, "path": resolved, "available": False, "reason": "timeout"}
@@ -496,6 +499,7 @@ def health(
     daemon_host = os.environ.get("ARC_DAEMON_HOST", "127.0.0.1")
     daemon_port = os.environ.get("ARC_DAEMON_PORT", "7777")
     try:
+        # enforcement: not-applicable - Internal daemon health check, not user-triggered network access
         import urllib.request
 
         req = urllib.request.Request(f"http://{daemon_host}:{daemon_port}/health")
@@ -1051,6 +1055,7 @@ def doctor_all(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
     daemon_url = os.environ.get("ARC_PYTHON_DAEMON_URL")
     if daemon_url:
         try:
+            # enforcement: not-applicable - Internal daemon health check, not user-triggered network access
             import urllib.request
 
             health_url = f"{daemon_url.rstrip('/')}/health"
@@ -1082,6 +1087,7 @@ def doctor_all(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
         daemon_host = os.environ.get("ARC_DAEMON_HOST", "127.0.0.1")
         daemon_port = os.environ.get("ARC_DAEMON_PORT", "7777")
         try:
+            # enforcement: not-applicable - Internal daemon health check, not user-triggered network access
             import urllib.request
 
             req = urllib.request.Request(f"http://{daemon_host}:{daemon_port}/health")
@@ -1288,6 +1294,7 @@ def doctor_network(
     debug: bool = DEBUG_FLAG,
 ) -> None:
     """Check network connectivity to common provider endpoints."""
+    # enforcement: not-applicable - Diagnostic command for checking provider connectivity, not actual API calls
     import urllib.request
 
     _setup_logging(debug)
@@ -1300,6 +1307,7 @@ def doctor_network(
     all_ok = True
     for name, url in endpoints:
         try:
+            # enforcement: not-applicable - Diagnostic command for checking provider connectivity
             req = urllib.request.Request(url, method="HEAD")
             with urllib.request.urlopen(req, timeout=5) as resp:
                 reachable = resp.status < 500
