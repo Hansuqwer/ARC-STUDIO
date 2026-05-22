@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "type": "RUN_STARTED",
+  "timestamp": "2026-05-22T07:30:00.000Z",
+  "run_id": "run-abc123",
+  "sequence": 0,
+  "data": {
+    "workflow_id": "workflow-xyz789",
+    "runtime": "swarmgraph",
+    "profile_id": "default",
+    "isolation": "none",
+    "node_id": "swarmgraph.queen",
+    "message_id": "msg_01H8EXAMPLE"
+  }
+}

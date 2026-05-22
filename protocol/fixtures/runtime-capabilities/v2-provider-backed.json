@@ -1,0 +1,10 @@
+{
+  "schema_version": 2,
+  "mode": "provider_backed",
+  "profile_id": "production",
+  "isolation_id": "workspace-abc123",
+  "allow_paid_calls": true,
+  "cost_source_default": "measured",
+  "supports_cancellation": true,
+  "supports_streaming": true
+}

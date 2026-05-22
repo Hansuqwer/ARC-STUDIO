@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "type": "RUN_FAILED",
+  "timestamp": "2026-05-22T07:30:03.000Z",
+  "run_id": "run-abc123",
+  "sequence": 5,
+  "data": {
+    "error": "Tool execution timeout",
+    "error_detail": "Tool 'read_file' exceeded 30s timeout",
+    "error_type": "ToolTimeoutError",
+    "node_id": "swarmgraph.worker-1",
+    "message_id": "msg_01H8EXAMPLE",
+    "evidence_refs": [
+      {
+        "id": "ev_01H8EXAMPLE",
+        "kind": "error_log",
+        "uri": "file://.arc/logs/error-abc123.log"
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": 2,
+  "type": "RUN_COMPLETED",
+  "timestamp": "2026-05-22T07:30:05.000Z",
+  "run_id": "run-abc123",
+  "sequence": 10,
+  "data": {
+    "duration_ms": 5000,
+    "output": "Task completed successfully",
+    "node_id": "swarmgraph.queen",
+    "message_id": "msg_01H8EXAMPLE",
+    "evidence_refs": [
+      {
+        "id": "ev_01H8EXAMPLE",
+        "kind": "run_trace",
+        "uri": "file://.arc/traces/run-abc123.jsonl"
+      }
+    ]
+  }
+}

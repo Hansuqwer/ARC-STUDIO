@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "ok": true,
+  "data": {
+    "message": "Operation completed successfully",
+    "count": 42
+  },
+  "error": null,
+  "meta": {
+    "duration_ms": 123.45,
+    "adapter": "swarmgraph",
+    "workspace": "/Users/test/project",
+    "timestamp": "2026-05-22T07:30:00.000Z"
+  }
+}

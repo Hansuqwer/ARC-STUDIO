@@ -1,0 +1,10 @@
+{
+  "schema_version": 2,
+  "mode": "gated_local",
+  "profile_id": "default",
+  "isolation_id": "none",
+  "allow_paid_calls": false,
+  "cost_source_default": "estimated",
+  "supports_cancellation": true,
+  "supports_streaming": false
+}
