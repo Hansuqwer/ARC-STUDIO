@@ -1,4 +1,5 @@
 """CrewAI runner. Real execution gated; events come from listener."""
+
 from __future__ import annotations
 
 import asyncio
@@ -6,8 +7,9 @@ import pathlib
 import uuid
 from typing import Any
 
-from agent_runtime_cockpit.ag_ui import MappingContext, map_event, AGUIEventType
+from agent_runtime_cockpit.ag_ui import MappingContext, map_event
 from agent_runtime_cockpit.audit.chain import AuditChainWriter
+from agent_runtime_cockpit.audit.runner_integration import log_agui_to_audit
 from agent_runtime_cockpit.audit.session import AuditSession
 from agent_runtime_cockpit.audit.schema import RuntimeMode
 from agent_runtime_cockpit.audit.storage import AuditChainStore
@@ -39,8 +41,11 @@ class CrewAIRunner:
         listener.attach()
 
         crew = resolve_python_entrypoint(self.workspace, entrypoint)
-        runner = crew.kickoff_async(inputs=inputs) if hasattr(crew, "kickoff_async") \
+        runner = (
+            crew.kickoff_async(inputs=inputs)
+            if hasattr(crew, "kickoff_async")
             else asyncio.to_thread(crew.kickoff, inputs=inputs)
+        )
         runner_task = asyncio.create_task(runner)  # type: ignore[arg-type]
 
         async with AuditSession(run_id=run_id, store=self._audit_store) as session:
@@ -55,34 +60,9 @@ class CrewAIRunner:
                     for ag in map_event("crewai", native, ctx):
                         t.write(ag)
                         a.append(ag)
-                        _log_agui_to_audit(session, ag)
+                        log_agui_to_audit(session, ag)
                 await runner_task
 
             session.log_run_completed(runtime="crewai")
 
         return run_id
-
-
-def _log_agui_to_audit(session: Any, agui_event: dict[str, Any]) -> None:
-    event_type = agui_event.get("type", "")
-    if event_type == AGUIEventType.TOOL_CALL_START.value:
-        session.log_tool_call(
-            tool_name=agui_event.get("tool_name", ""),
-            tool_id=agui_event.get("tool_id", ""),
-            arguments=agui_event.get("args", {}),
-            trust_level=agui_event.get("trust_level", "untrusted"),
-        )
-    elif event_type == AGUIEventType.TOOL_CALL_RESULT.value:
-        session.log_tool_result(
-            tool_name=agui_event.get("tool_name", ""),
-            tool_id=agui_event.get("tool_id", ""),
-            result=agui_event.get("result", {}),
-            trust_level=agui_event.get("trust_level", "untrusted"),
-        )
-    elif event_type == AGUIEventType.TOOL_CALL_ERROR.value:
-        session.log_tool_result(
-            tool_name=agui_event.get("tool_name", ""),
-            tool_id=agui_event.get("tool_id", ""),
-            trust_level=agui_event.get("trust_level", "untrusted"),
-            error={"code": "AGUI_TOOL_ERROR", "message": str(agui_event.get("error", ""))},
-        )
