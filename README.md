@@ -4,7 +4,7 @@
 
 ARC Studio combines a Python CLI and loopback daemon with an Eclipse Theia browser interface, giving you a complete local environment for agent runtime experiments, trace inspection, human-in-the-loop workflows, audit verification, replay debugging, and workflow diagnostics. Everything runs on your machine. Your project data stays with you.
 
-**Current Release:** `v1.0.0-alpha`
+**Current Release:** `v0.1.0-alpha`
 
 This is an alpha release. Core functionality is stable and ready for development use, but APIs, UI components, and runtime adapters will continue to evolve as we move toward v1.0 stable. We recommend pinning to a specific version tag or commit SHA for production experiments.
 
@@ -36,9 +36,9 @@ Workspace trust checks, output redaction, paid-call gating, and subprocess/Docke
 **Evaluation Tooling**  
 Save golden traces and run batch evaluations to measure agent performance over time.
 
-## What's Ready in 1.0 Alpha
+## What's Ready in 0.1 Alpha
 
-ARC Studio 1.0 alpha is ready for development use. Core features are functional and tested, but expect continued refinement as we move toward a stable release.
+ARC Studio 0.1 alpha is ready for development use. Core features are functional and tested, but expect continued refinement as we move toward a stable release.
 
 | Component | Status |
 | --- | --- |
@@ -281,7 +281,7 @@ pnpm start:electron
 pnpm package:electron:dir
 ```
 
-Note: Electron support is available for experimentation but is not the primary target for v1.0 alpha.
+Note: Electron support is available for experimentation but is not the primary target for v0.1 alpha.
 
 ## Security
 

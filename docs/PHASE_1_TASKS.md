@@ -61,7 +61,7 @@ Phase 1 transforms ARC Studio from "functional alpha" to "polished developer too
 
 | # | Task | Deliverable | Est. Time | Acceptance |
 |---|------|-------------|-----------|------------|
-| E.1 | **ADR-020 (Deprecation Policy)** | `docs/adr/020-deprecation-policy.md` (rename existing ADR-020? Or create separate ADR?) | 2 hours | Policy defines: how long shims live (one minor + one patch), how breaking changes announced (CHANGELOG + release notes + deprecation warnings), semver promises. |
+| E.1 | **ADR-022 (Deprecation Policy)** ✅ | `docs/adr/022-deprecation-policy.md` (Accepted 2026-05-22) | 2 hours | Policy defines: how long shims live (one minor + one patch), how breaking changes announced (CHANGELOG + release notes + deprecation warnings), semver promises. |
 | E.2 | **Paid test taxonomy setup** | Move paid-smoke tests to `@pytest.mark.paid` | 2 hours | Full `pytest` run requires no `--deselect` flags to pass. CI runs paid taxonomy on schedule. |
 
 **Week 1-2 Total:** ~30-35 hours (5-6 sessions of 6-7 hours each)
@@ -226,7 +226,7 @@ These weeks are buffer for tasks that took longer than estimated, plus additiona
 - [ ] Choose EV certificate vendor (A.3)
 - [ ] Start privacy policy draft (A.4)
 - [ ] Start terms of service draft (A.5)
-- [ ] Draft ADR-020 (Deprecation Policy) (E.1)
+- [x] Draft ADR-022 (Deprecation Policy) (E.1) ✅ Accepted 2026-05-22
 
 **Day 3-4:**
 - [ ] Implement audit event schema (D.1)
@@ -384,7 +384,7 @@ These weeks are buffer for tasks that took longer than estimated, plus additiona
 ## Dependencies
 
 ### Blocking dependencies (must complete before dependent task starts):
-- ADR-020 (Deprecation Policy) ← E.5 (Deprecation enforcement)
+- ADR-022 (Deprecation Policy) ← E.5 (Deprecation enforcement)
 - D.1 (Audit schema) ← D.2 (HMAC), D.3 (Storage), D.4 (SwarmGraph integration)
 - D.4 (SwarmGraph POC) ← D.5-D.7 (Other adapters)
 - E.3 (Schema audit) ← E.4 (Stability tests)
