@@ -746,7 +746,7 @@ bash scripts/check-pr.sh
 ## Phase 21 — Streaming Audit Verification + HMAC Signing
 
 **Roadmap:** R14 — Streaming Audit + HMAC  
-**Status:** Not Started  
+**Status:** Baseline Complete | Evidence: local worktree 2026-05-22 | 1463 Python tests passed (102 audit tests including 21 new streaming tests), TypeScript builds green, PR checks passed | Notes: Streaming verifier handles 100 MB+ traces with bounded memory; SHA-256 backward compatibility preserved; HMAC signing optional with key availability detection  
 **Depends on:** None (standalone foundation work)  
 **Design note:** Current `audit/chain.py` has `verify_audit_signature()` and `verify_hmac_chain()` but both use `read_text().splitlines()` which reads full files into memory. Architecture review requires streaming (line-by-line) verification for large traces (100 MB+).
 

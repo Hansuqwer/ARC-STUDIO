@@ -16,6 +16,7 @@ Commands:
   arc context    — context retrieval commands
   arc adapter    — adapter management and conformance testing
 """
+
 from __future__ import annotations
 
 import logging
@@ -81,6 +82,7 @@ def _arc_default(
         import click as _click
 
         _click.echo(ctx.get_help())
+
 
 context_app = typer.Typer(name="context", help="Context retrieval commands")
 adapter_app = typer.Typer(name="adapter", help="Adapter management commands")
@@ -162,7 +164,9 @@ def _validate_runtime_mode(runtime_mode: str) -> str:
     try:
         mode = RuntimeMode.from_legacy(runtime_mode)
     except (TypeError, ValueError) as exc:
-        raise typer.BadParameter("runtime-mode must be one of: fake, gated_local, provider_backed") from exc
+        raise typer.BadParameter(
+            "runtime-mode must be one of: fake, gated_local, provider_backed"
+        ) from exc
     if mode is RuntimeMode.PROVIDER_BACKED:
         return mode.value
     return "local-real" if mode is RuntimeMode.GATED_LOCAL else "fake/offline"
@@ -182,7 +186,14 @@ def _local_real_gate_state(runtime_mode: str) -> dict[str, object]:
     }
 
 
-def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str, allow_paid_calls: bool, runtime_mode: str) -> dict[str, object]:
+def _run_preflight(
+    workspace: Path,
+    workflow: str,
+    runtime: str,
+    profile_id: str,
+    allow_paid_calls: bool,
+    runtime_mode: str,
+) -> dict[str, object]:
     from .adoption.registry import AdoptionRegistry
     from .security.profiles import ProfileNotFound, enforce_profile, resolve_profile_strict
 
@@ -197,7 +208,9 @@ def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str
         profile = resolve_profile_strict(profile_id)
         profile_payload = _profile_payload(profile)
     except ProfileNotFound:
-        blockers.append({"code": "UNKNOWN_PROFILE", "message": f"Profile '{profile_id}' does not exist"})
+        blockers.append(
+            {"code": "UNKNOWN_PROFILE", "message": f"Profile '{profile_id}' does not exist"}
+        )
         profile = None
 
     if profile is not None:
@@ -206,11 +219,25 @@ def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str
         except GatingError as exc:
             blockers.append({"code": "PROFILE_BLOCKED", "message": str(exc)})
         if paid_required and not profile.allow_paid_calls:
-            blockers.append({"code": "PAID_PROFILE_REQUIRED", "message": f"Runtime '{runtime}' requires a profile with paid calls enabled"})
+            blockers.append(
+                {
+                    "code": "PAID_PROFILE_REQUIRED",
+                    "message": f"Runtime '{runtime}' requires a profile with paid calls enabled",
+                }
+            )
         if paid_required and not allow_paid_calls:
-            blockers.append({"code": "PAID_FLAG_REQUIRED", "message": "Pass --allow-paid-calls after selecting a paid profile"})
+            blockers.append(
+                {
+                    "code": "PAID_FLAG_REQUIRED",
+                    "message": "Pass --allow-paid-calls after selecting a paid profile",
+                }
+            )
 
-    key_ref_status = {"provider": "openai", "env": "OPENAI_API_KEY", "present": bool(os.environ.get("OPENAI_API_KEY"))}
+    key_ref_status = {
+        "provider": "openai",
+        "env": "OPENAI_API_KEY",
+        "present": bool(os.environ.get("OPENAI_API_KEY")),
+    }
     dependency_status: dict[str, object] = {}
     export_target_status: dict[str, object] = {}
     contract_status: dict[str, object] = {
@@ -223,66 +250,135 @@ def _run_preflight(workspace: Path, workflow: str, runtime: str, profile_id: str
 
     if runtime in {"crewai+swarmgraph", "langgraph+swarmgraph"}:
         base_runtime, adoption_mode = AdoptionRegistry.parse_runtime_id(runtime)
-        capability = next((cap for cap in AdoptionRegistry.list_capabilities(workspace) if cap.mode == adoption_mode), None)
+        capability = next(
+            (
+                cap
+                for cap in AdoptionRegistry.list_capabilities(workspace)
+                if cap.mode == adoption_mode
+            ),
+            None,
+        )
         dependency_status = {
             base_runtime: capability.status.value if capability else "unknown",
             "adoption_runner": bool(capability),
         }
         if runtime == "crewai+swarmgraph" and capability:
-            warnings.append("CrewAI + SwarmGraph is fake/offline only; no real provider calls or HMAC audit claims.")
+            warnings.append(
+                "CrewAI + SwarmGraph is fake/offline only; no real provider calls or HMAC audit claims."
+            )
             doctor_actions.extend(capability.doctor_actions)
             export_target = os.environ.get("ARC_CREWAI_EXPORT")
-            export_target_status = {"env": "ARC_CREWAI_EXPORT", "present": bool(export_target), "format": "module:attr"}
+            export_target_status = {
+                "env": "ARC_CREWAI_EXPORT",
+                "present": bool(export_target),
+                "format": "module:attr",
+            }
             if not export_target:
-                blockers.append({"code": "MISSING_CREWAI_EXPORT", "message": "Set ARC_CREWAI_EXPORT=module:attr for CrewAI export discovery"})
+                blockers.append(
+                    {
+                        "code": "MISSING_CREWAI_EXPORT",
+                        "message": "Set ARC_CREWAI_EXPORT=module:attr for CrewAI export discovery",
+                    }
+                )
             elif ":" not in export_target:
-                blockers.append({"code": "INVALID_CREWAI_EXPORT", "message": "ARC_CREWAI_EXPORT must use module:attr format"})
+                blockers.append(
+                    {
+                        "code": "INVALID_CREWAI_EXPORT",
+                        "message": "ARC_CREWAI_EXPORT must use module:attr format",
+                    }
+                )
         elif capability:
             report = runtime_router.LangGraphSwarmGraphFakeAdapter().capability_report(workspace)
             if runtime_mode == "local-real":
-                warnings.append("LangGraph + SwarmGraph local-real is explicit opt-in smoke scope only; no network/provider/paid calls.")
-                export_target_status = {"required": False, "reason": "local-real smoke path uses local runtime only"}
+                warnings.append(
+                    "LangGraph + SwarmGraph local-real is explicit opt-in smoke scope only; no network/provider/paid calls."
+                )
+                export_target_status = {
+                    "required": False,
+                    "reason": "local-real smoke path uses local runtime only",
+                }
                 if not _local_real_gate_open():
-                    blockers.append({
-                        "code": "LOCAL_REAL_GATE_REQUIRED",
-                        "message": (
-                            "Set ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1 "
-                            "to request langgraph+swarmgraph local-real"
-                        ),
-                    })
+                    blockers.append(
+                        {
+                            "code": "LOCAL_REAL_GATE_REQUIRED",
+                            "message": (
+                                "Set ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1 "
+                                "to request langgraph+swarmgraph local-real"
+                            ),
+                        }
+                    )
                 elif not report.can_run:
-                    blockers.append({"code": "MISSING_LANGGRAPH_DEPENDENCY", "message": report.reason or "LangGraph + SwarmGraph local-real dependency missing"})
-                contract_status["state"] = "local_real_available" if report.can_run and _local_real_gate_open() else "local_real_gated"
+                    blockers.append(
+                        {
+                            "code": "MISSING_LANGGRAPH_DEPENDENCY",
+                            "message": report.reason
+                            or "LangGraph + SwarmGraph local-real dependency missing",
+                        }
+                    )
+                contract_status["state"] = (
+                    "local_real_available"
+                    if report.can_run and _local_real_gate_open()
+                    else "local_real_gated"
+                )
             else:
-                warnings.append("LangGraph + SwarmGraph is fake/offline deterministic; no real provider calls or HMAC audit claims; real path gated.")
-                export_target_status = {"required": False, "reason": "fake/offline deterministic path uses an in-process fixture graph"}
+                warnings.append(
+                    "LangGraph + SwarmGraph is fake/offline deterministic; no real provider calls or HMAC audit claims; real path gated."
+                )
+                export_target_status = {
+                    "required": False,
+                    "reason": "fake/offline deterministic path uses an in-process fixture graph",
+                }
                 contract_status["state"] = "fake_offline"
-            dependency_status.update({
-                "availability": report.availability,
-                "detected": report.detected,
-                "can_run": report.can_run,
-                "reason": report.reason,
-                "test_level": report.test_level,
-                "fake_offline_supported": report.fake_offline_supported,
-                "local_real_gated": report.local_real_gated,
-                "local_real_available": report.local_real_available,
-                "provider_backed": report.provider_backed,
-                "required_env": report.required_env,
-            })
+            dependency_status.update(
+                {
+                    "availability": report.availability,
+                    "detected": report.detected,
+                    "can_run": report.can_run,
+                    "reason": report.reason,
+                    "test_level": report.test_level,
+                    "fake_offline_supported": report.fake_offline_supported,
+                    "local_real_gated": report.local_real_gated,
+                    "local_real_available": report.local_real_available,
+                    "provider_backed": report.provider_backed,
+                    "required_env": report.required_env,
+                }
+            )
         elif runtime_mode == "local-real":
-            blockers.append({"code": "LOCAL_REAL_UNSUPPORTED", "message": f"Runtime '{runtime}' does not support local-real mode"})
+            blockers.append(
+                {
+                    "code": "LOCAL_REAL_UNSUPPORTED",
+                    "message": f"Runtime '{runtime}' does not support local-real mode",
+                }
+            )
             contract_status["state"] = "unsupported"
         dependency_status["runtime_mode"] = runtime_mode
         dependency_status["real_provider_call"] = False
-        dependency_status["real_runtime_gated"] = runtime_mode == "fake/offline" or not _local_real_gate_open()
+        dependency_status["real_runtime_gated"] = (
+            runtime_mode == "fake/offline" or not _local_real_gate_open()
+        )
     else:
         try:
-            requested_runtime = [part.strip().lower() for part in runtime.split(",") if part.strip()] if "," in runtime else runtime.lower()
-            routed = runtime_router.resolve(workspace, requested_runtime, allow_paid_calls=allow_paid_calls)
+            requested_runtime = (
+                [part.strip().lower() for part in runtime.split(",") if part.strip()]
+                if "," in runtime
+                else runtime.lower()
+            )
+            routed = runtime_router.resolve(
+                workspace, requested_runtime, allow_paid_calls=allow_paid_calls
+            )
             report = routed.report
-            dependency_status = {"availability": report.availability, "detected": report.detected, "can_run": report.can_run}
+            dependency_status = {
+                "availability": report.availability,
+                "detected": report.detected,
+                "can_run": report.can_run,
+            }
             if report.requires_paid_calls and not allow_paid_calls:
-                blockers.append({"code": "PAID_FLAG_REQUIRED", "message": f"Runtime '{runtime}' requires --allow-paid-calls"})
+                blockers.append(
+                    {
+                        "code": "PAID_FLAG_REQUIRED",
+                        "message": f"Runtime '{runtime}' requires --allow-paid-calls",
+                    }
+                )
         except runtime_router.RuntimeRouterError as exc:
             blockers.append({"code": exc.code, "message": str(exc)})
 
@@ -329,16 +425,20 @@ def check_swarmgraph_runtime(timeout: float = 5.0) -> dict[str, object]:
                 check=False,
             )
         except subprocess.TimeoutExpired:
-            checks.append({"command": command, "path": resolved, "available": False, "reason": "timeout"})
+            checks.append(
+                {"command": command, "path": resolved, "available": False, "reason": "timeout"}
+            )
             continue
         output = (result.stdout or result.stderr).strip().splitlines()
-        checks.append({
-            "command": command,
-            "path": resolved,
-            "available": result.returncode == 0,
-            "exit_code": result.returncode,
-            "version": output[0][:200] if output else "",
-        })
+        checks.append(
+            {
+                "command": command,
+                "path": resolved,
+                "available": result.returncode == 0,
+                "exit_code": result.returncode,
+                "version": output[0][:200] if output else "",
+            }
+        )
     return {"ok": any(bool(check.get("available")) for check in checks), "checks": checks}
 
 
@@ -351,6 +451,7 @@ def version(
 ) -> None:
     """Print ARC version information."""
     import sys
+
     data = {
         "version": arc_version,
         "python": sys.version.split()[0],
@@ -371,6 +472,7 @@ def health(
     import os
     import sys
     import time
+
     t0 = time.time()
 
     checks: list[dict] = []
@@ -381,37 +483,46 @@ def health(
     daemon_port = os.environ.get("ARC_DAEMON_PORT", "7777")
     try:
         import urllib.request
+
         req = urllib.request.Request(f"http://{daemon_host}:{daemon_port}/health")
         with urllib.request.urlopen(req, timeout=2) as resp:
             daemon_ok = resp.status == 200
             if not daemon_ok:
                 all_ok = False
-            checks.append({
-                "check": "daemon",
-                "ok": daemon_ok,
-                "status": resp.status if daemon_ok else "unhealthy",
-            })
+            checks.append(
+                {
+                    "check": "daemon",
+                    "ok": daemon_ok,
+                    "status": resp.status if daemon_ok else "unhealthy",
+                }
+            )
     except Exception as exc:
         all_ok = False
-        checks.append({
-            "check": "daemon",
-            "ok": False,
-            "status": f"unreachable: {type(exc).__name__}",
-        })
+        checks.append(
+            {
+                "check": "daemon",
+                "ok": False,
+                "status": f"unreachable: {type(exc).__name__}",
+            }
+        )
 
     # Check Python environment
-    checks.append({
-        "check": "python",
-        "ok": True,
-        "version": sys.version.split()[0],
-    })
+    checks.append(
+        {
+            "check": "python",
+            "ok": True,
+            "version": sys.version.split()[0],
+        }
+    )
 
     # Check CLI available
-    checks.append({
-        "check": "cli",
-        "ok": True,
-        "version": arc_version,
-    })
+    checks.append(
+        {
+            "check": "cli",
+            "ok": True,
+            "version": arc_version,
+        }
+    )
 
     data = {
         "ok": all_ok,
@@ -432,6 +543,7 @@ def status(
 ) -> None:
     """Show ARC workspace and runtime status overview."""
     import time
+
     _setup_logging(debug)
     ws = _workspace(workspace)
     t0 = time.time()
@@ -444,22 +556,27 @@ def status(
         adapter = registry.get(rt.adapter)
         if adapter is not None:
             report = adapter.capability_report(ws)
-            runtime_list.append({
-                "id": rt.adapter,
-                "detected": True,
-                "can_run": report.can_run,
-                "paid": report.requires_paid_calls,
-            })
+            runtime_list.append(
+                {
+                    "id": rt.adapter,
+                    "detected": True,
+                    "can_run": report.can_run,
+                    "paid": report.requires_paid_calls,
+                }
+            )
         else:
-            runtime_list.append({
-                "id": rt.adapter,
-                "detected": True,
-                "can_run": False,
-                "note": "adapter not found in registry",
-            })
+            runtime_list.append(
+                {
+                    "id": rt.adapter,
+                    "detected": True,
+                    "can_run": False,
+                    "note": "adapter not found in registry",
+                }
+            )
 
     # Trace count
     from .storage.jsonl import JsonlTraceStore
+
     store = JsonlTraceStore(ws / ".arc" / "traces")
     trace_ids = store.list_runs()
 
@@ -479,6 +596,7 @@ def status(
 
 # ─── inspect ──────────────────────────────────────────────────────────────────
 
+
 @app.command()
 def inspect(
     workspace: Optional[str] = WORKSPACE_FLAG,
@@ -488,6 +606,7 @@ def inspect(
     """Inspect a workspace and detect agent runtimes."""
     _setup_logging(debug)
     import time
+
     ws = _workspace(workspace)
     t0 = time.time()
 
@@ -498,6 +617,7 @@ def inspect(
     ts_count = len(iter_workspace_files(ws, (".ts",)))
 
     from .protocol.schemas import WorkspaceInfo
+
     info = WorkspaceInfo(
         path=str(ws),
         runtimes=runtimes,
@@ -505,8 +625,7 @@ def inspect(
         detection_warnings=[] if runtimes else ["No runtimes detected"],
     )
 
-    envelope = ok(info.model_dump(), workspace=str(ws),
-                  duration_ms=(time.time() - t0) * 1000)
+    envelope = ok(info.model_dump(), workspace=str(ws), duration_ms=(time.time() - t0) * 1000)
     _out(envelope, json_output)
 
     if not json_output:
@@ -523,12 +642,19 @@ def inspect(
 
 # ─── runtimes ─────────────────────────────────────────────────────────────────
 
+
 @app.command()
 def runtimes(
     workspace: Optional[str] = WORKSPACE_FLAG,
-    capabilities: bool = typer.Option(False, "--capabilities", help="List all adapter capability reports"),
-    diff_from: Optional[str] = typer.Option(None, "--diff-from", help="Source runtime ID for capability diff"),
-    diff_to: Optional[str] = typer.Option(None, "--diff-to", help="Target runtime ID for capability diff"),
+    capabilities: bool = typer.Option(
+        False, "--capabilities", help="List all adapter capability reports"
+    ),
+    diff_from: Optional[str] = typer.Option(
+        None, "--diff-from", help="Source runtime ID for capability diff"
+    ),
+    diff_to: Optional[str] = typer.Option(
+        None, "--diff-to", help="Target runtime ID for capability diff"
+    ),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
@@ -538,6 +664,7 @@ def runtimes(
 
     if diff_from and diff_to:
         from .protocol.capability_snapshot import diff_capabilities, snapshot_capabilities
+
         registry = default_registry()
         from_adapter = registry.get(diff_from)
         to_adapter = registry.get(diff_to)
@@ -594,6 +721,7 @@ def runtimes(
 
 # ─── workflows ────────────────────────────────────────────────────────────────
 
+
 @app.command()
 def workflows(
     workspace: Optional[str] = WORKSPACE_FLAG,
@@ -616,12 +744,15 @@ def workflows(
                 wfs = adapter.export_workflow(ws)
                 results.extend(w.model_dump() for w in wfs)
             except Exception as e:
-                err_console.print(f"[yellow]Warning: {rt.adapter} workflow export failed: {e}[/yellow]")
+                err_console.print(
+                    f"[yellow]Warning: {rt.adapter} workflow export failed: {e}[/yellow]"
+                )
 
     _out(ok(results, workspace=str(ws)), json_output)
 
 
 # ─── schemas ──────────────────────────────────────────────────────────────────
+
 
 @app.command()
 def schemas(
@@ -645,12 +776,15 @@ def schemas(
                 ss = adapter.export_schemas(ws)
                 results.extend(s.model_dump_api() for s in ss)
             except Exception as e:
-                err_console.print(f"[yellow]Warning: {rt.adapter} schema export failed: {e}[/yellow]")
+                err_console.print(
+                    f"[yellow]Warning: {rt.adapter} schema export failed: {e}[/yellow]"
+                )
 
     _out(ok(results, workspace=str(ws)), json_output)
 
 
 # ─── serve ────────────────────────────────────────────────────────────────────
+
 
 @app.command()
 def serve(
@@ -664,57 +798,99 @@ def serve(
     ws = _workspace(workspace)
     console.print(f"[bold cyan]ARC[/bold cyan] daemon starting on http://{host}:{port}")
     from .web.server import run_server
+
     run_server(host=host, port=port, workspace=ws)
 
 
 # ─── run ──────────────────────────────────────────────────────────────────────
 
+
 @app.command("run")
 def run_workflow(
     workflow: str = typer.Argument("wf-swarmgraph-fixture", help="Workflow ID"),
     workspace: Optional[str] = WORKSPACE_FLAG,
-    runtime: str = typer.Option("auto", "--runtime", "-r", help="Runtime: auto, swarmgraph, langgraph, crewai, lmarena"),
-    runtime_mode: str = typer.Option("fake/offline", "--runtime-mode", help="Runtime mode: fake/offline or local-real"),
-    prompt: Optional[str] = typer.Option(None, "--prompt", help="Prompt passed to runnable adapters"),
-    allow_paid_calls: bool = typer.Option(False, "--allow-paid-calls", help="Allow runtimes to make provider calls"),
+    runtime: str = typer.Option(
+        "auto", "--runtime", "-r", help="Runtime: auto, swarmgraph, langgraph, crewai, lmarena"
+    ),
+    runtime_mode: str = typer.Option(
+        "fake/offline", "--runtime-mode", help="Runtime mode: fake/offline or local-real"
+    ),
+    prompt: Optional[str] = typer.Option(
+        None, "--prompt", help="Prompt passed to runnable adapters"
+    ),
+    allow_paid_calls: bool = typer.Option(
+        False, "--allow-paid-calls", help="Allow runtimes to make provider calls"
+    ),
     profile_id: str = typer.Option("local-safe", "--profile-id", help="Run profile ID"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Inspect run readiness without executing adapters"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Inspect run readiness without executing adapters"
+    ),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
     """Execute a workflow and return the run record."""
     import asyncio
     from .security.profiles import ProfileNotFound, enforce_profile, resolve_profile_strict
+
     _setup_logging(debug)
     ws = _workspace(workspace)
     try:
         runtime_mode = _validate_runtime_mode(runtime_mode)
     except typer.BadParameter as exc:
-        _out(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "INVALID_RUNTIME_MODE"}), json_output)
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "INVALID_RUNTIME_MODE"}),
+            json_output,
+        )
         raise typer.Exit(2)
     if dry_run:
-        payload = _run_preflight(ws, workflow, runtime.lower(), profile_id, allow_paid_calls, runtime_mode)
+        payload = _run_preflight(
+            ws, workflow, runtime.lower(), profile_id, allow_paid_calls, runtime_mode
+        )
         _out(ok(payload), json_output)
         return
-    if runtime.lower() == "langgraph+swarmgraph" and runtime_mode == "local-real" and not _local_real_gate_open():
-        _out(err(
-            ArcErrorCode.INVALID_INPUT,
-            "Set ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1 "
-            "to request langgraph+swarmgraph local-real; no provider calls were made",
-            details={"code": "LOCAL_REAL_GATE_REQUIRED", "required_env": list(LOCAL_REAL_GATE_ENVS)},
-        ), json_output)
+    if (
+        runtime.lower() == "langgraph+swarmgraph"
+        and runtime_mode == "local-real"
+        and not _local_real_gate_open()
+    ):
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                "Set ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1 "
+                "to request langgraph+swarmgraph local-real; no provider calls were made",
+                details={
+                    "code": "LOCAL_REAL_GATE_REQUIRED",
+                    "required_env": list(LOCAL_REAL_GATE_ENVS),
+                },
+            ),
+            json_output,
+        )
         raise typer.Exit(2)
     try:
         profile = resolve_profile_strict(profile_id)
         enforce_profile(profile, runtime.lower())
     except ProfileNotFound:
-        _out(err(ArcErrorCode.INVALID_INPUT, f"Profile '{profile_id}' does not exist", details={"code": "UNKNOWN_PROFILE"}), json_output)
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                f"Profile '{profile_id}' does not exist",
+                details={"code": "UNKNOWN_PROFILE"},
+            ),
+            json_output,
+        )
         raise typer.Exit(2)
     except GatingError as exc:
-        _out(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "PROFILE_BLOCKED"}), json_output)
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "PROFILE_BLOCKED"}),
+            json_output,
+        )
         raise typer.Exit(2)
     try:
-        requested_runtime = [part.strip().lower() for part in runtime.split(",") if part.strip()] if "," in runtime else runtime.lower()
+        requested_runtime = (
+            [part.strip().lower() for part in runtime.split(",") if part.strip()]
+            if "," in runtime
+            else runtime.lower()
+        )
         routed = runtime_router.resolve(ws, requested_runtime, allow_paid_calls=allow_paid_calls)
     except runtime_router.UnknownRuntime as exc:
         _out(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": exc.code}), json_output)
@@ -726,16 +902,25 @@ def run_workflow(
     if not json_output:
         console.print(f"[dim]Runtime:[/dim] {routed.adapter.adapter_id} ({routed.chosen_by})")
 
-    inputs = {"workspace": str(ws), "allow_paid_calls": allow_paid_calls, "profile_id": profile_id, "runtime_mode": runtime_mode}
+    inputs = {
+        "workspace": str(ws),
+        "allow_paid_calls": allow_paid_calls,
+        "profile_id": profile_id,
+        "runtime_mode": runtime_mode,
+    }
     if prompt:
         inputs["prompt"] = prompt
     try:
         run_record = asyncio.run(routed.adapter.run_workflow(workflow, inputs))
     except GatingError as exc:
-        _out(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "DUAL_GATE_REQUIRED"}), json_output)
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "DUAL_GATE_REQUIRED"}),
+            json_output,
+        )
         raise typer.Exit(2)
 
     from .storage.jsonl import JsonlTraceStore
+
     store = JsonlTraceStore(ws / ".arc" / "traces")
     trace_path = store.trace_path(run_record.id)
     run_record.metadata["trace_path"] = str(trace_path)
@@ -743,12 +928,16 @@ def run_workflow(
 
     _out(ok(run_record.model_dump()), json_output)
     if not json_output:
-        console.print(f"[green]Run completed:[/green] {run_record.id} ({len(run_record.events)} events)")
+        console.print(
+            f"[green]Run completed:[/green] {run_record.id} ({len(run_record.events)} events)"
+        )
 
 
 # ─── runs ─────────────────────────────────────────────────────────────────────
 
-runs_app = typer.Typer(name="runs", help="List and manage stored run records", invoke_without_command=True)
+runs_app = typer.Typer(
+    name="runs", help="List and manage stored run records", invoke_without_command=True
+)
 app.add_typer(runs_app)
 
 eval_app = typer.Typer(name="eval", help="Evaluate runs against golden traces")
@@ -763,6 +952,7 @@ def providers_list(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> N
     """List built-in provider definitions. No network calls are made."""
     _setup_logging(debug)
     from .provider_action import PROVIDERS
+
     _out(ok([provider.model_dump() for provider in PROVIDERS]), json_output)
 
 
@@ -771,6 +961,7 @@ def providers_catalog(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -
     """List provider auth catalog entries. No secrets or network calls."""
     _setup_logging(debug)
     from .provider_action import PROVIDERS
+
     _out(ok([provider.model_dump() for provider in PROVIDERS]), json_output)
 
 
@@ -793,24 +984,29 @@ def doctor_all(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
     """
     import os
     import sys
+
     _setup_logging(debug)
 
     checks: list[dict] = []
     all_ok = True
 
     # 1. Python environment
-    checks.append({
-        "check": "python",
-        "ok": True,
-        "version": sys.version.split()[0],
-    })
+    checks.append(
+        {
+            "check": "python",
+            "ok": True,
+            "version": sys.version.split()[0],
+        }
+    )
 
     # 2. Package version
-    checks.append({
-        "check": "cli",
-        "ok": True,
-        "version": arc_version,
-    })
+    checks.append(
+        {
+            "check": "cli",
+            "ok": True,
+            "version": arc_version,
+        }
+    )
 
     # 3. Runtime detection
     try:
@@ -818,19 +1014,23 @@ def doctor_all(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
         registry = default_registry()
         runtimes = registry.detect_all(ws)
         runtime_names = [r.adapter for r in runtimes]
-        checks.append({
-            "check": "runtimes",
-            "ok": True,
-            "detected": runtime_names,
-            "count": len(runtime_names),
-        })
+        checks.append(
+            {
+                "check": "runtimes",
+                "ok": True,
+                "detected": runtime_names,
+                "count": len(runtime_names),
+            }
+        )
     except Exception as e:
         all_ok = False
-        checks.append({
-            "check": "runtimes",
-            "ok": False,
-            "error": str(e),
-        })
+        checks.append(
+            {
+                "check": "runtimes",
+                "ok": False,
+                "error": str(e),
+            }
+        )
 
     # 4. Daemon connectivity (best-effort, non-blocking)
     # Check both ARC_PYTHON_DAEMON_URL and legacy ARC_DAEMON_HOST/PORT
@@ -838,91 +1038,110 @@ def doctor_all(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
     if daemon_url:
         try:
             import urllib.request
+
             health_url = f"{daemon_url.rstrip('/')}/health"
             req = urllib.request.Request(health_url)
             with urllib.request.urlopen(req, timeout=2) as resp:
                 daemon_reachable = resp.status == 200
-                checks.append({
-                    "check": "daemon",
-                    "ok": daemon_reachable,
-                    "reachable": daemon_reachable,
-                    "url": daemon_url,
-                })
+                checks.append(
+                    {
+                        "check": "daemon",
+                        "ok": daemon_reachable,
+                        "reachable": daemon_reachable,
+                        "url": daemon_url,
+                    }
+                )
                 if not daemon_reachable:
                     all_ok = False
         except Exception:
-            checks.append({
-                "check": "daemon",
-                "ok": False,
-                "reachable": False,
-                "url": daemon_url,
-                "note": "daemon not running (offline-first is normal)",
-            })
+            checks.append(
+                {
+                    "check": "daemon",
+                    "ok": False,
+                    "reachable": False,
+                    "url": daemon_url,
+                    "note": "daemon not running (offline-first is normal)",
+                }
+            )
     else:
         # Fallback to legacy ARC_DAEMON_HOST/PORT
         daemon_host = os.environ.get("ARC_DAEMON_HOST", "127.0.0.1")
         daemon_port = os.environ.get("ARC_DAEMON_PORT", "7777")
         try:
             import urllib.request
+
             req = urllib.request.Request(f"http://{daemon_host}:{daemon_port}/health")
             with urllib.request.urlopen(req, timeout=2) as resp:
                 daemon_reachable = resp.status == 200
-                checks.append({
-                    "check": "daemon",
-                    "ok": daemon_reachable,
-                    "reachable": daemon_reachable,
-                    "host": daemon_host,
-                    "port": daemon_port,
-                })
+                checks.append(
+                    {
+                        "check": "daemon",
+                        "ok": daemon_reachable,
+                        "reachable": daemon_reachable,
+                        "host": daemon_host,
+                        "port": daemon_port,
+                    }
+                )
                 if not daemon_reachable:
                     all_ok = False
         except Exception:
-            checks.append({
-                "check": "daemon",
-                "ok": False,
-                "reachable": False,
-                "host": daemon_host,
-                "port": daemon_port,
-                "note": "daemon not running (offline-first is normal)",
-            })
+            checks.append(
+                {
+                    "check": "daemon",
+                    "ok": False,
+                    "reachable": False,
+                    "host": daemon_host,
+                    "port": daemon_port,
+                    "note": "daemon not running (offline-first is normal)",
+                }
+            )
 
     # 5. SwarmGraph CLI availability
     try:
         sg = check_swarmgraph_runtime()
         sg_ok = sg.get("ok", False)
-        checks.append({
-            "check": "swarmgraph_cli",
-            "ok": sg_ok,
-            "details": sg,
-        })
+        checks.append(
+            {
+                "check": "swarmgraph_cli",
+                "ok": sg_ok,
+                "details": sg,
+            }
+        )
         if not sg_ok:
             all_ok = False
     except Exception as e:
         all_ok = False
-        checks.append({
-            "check": "swarmgraph_cli",
-            "ok": False,
-            "error": str(e),
-        })
+        checks.append(
+            {
+                "check": "swarmgraph_cli",
+                "ok": False,
+                "error": str(e),
+            }
+        )
 
     # 6. Provider diagnostics (env presence only, no network calls)
     try:
         from .provider_action import provider_statuses
+
         providers = provider_statuses(os.environ)
         configured_count = sum(1 for p in providers if p.api_key_configured)
-        checks.append({
-            "check": "providers",
-            "ok": True,
-            "total": len(providers),
-            "configured": configured_count,
-            "providers": [p.model_dump() for p in providers],
-        })
+        checks.append(
+            {
+                "check": "providers",
+                "ok": True,
+                "total": len(providers),
+                "configured": configured_count,
+                "providers": [p.model_dump() for p in providers],
+            }
+        )
     except Exception as e:
-        checks.append({
-            "check": "providers",
-            "ok": False,
-            "error": str(e),
-        })
+        checks.append(
+            {
+                "check": "providers",
+                "ok": False,
+                "error": str(e),
+            }
+        )
 
     # 7. Workspace storage (fast checks: dir existence, file count, DB size, index count)
     try:
@@ -931,46 +1150,59 @@ def doctor_all(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
         db_path = ws / ".arc" / "arc.db"
         evals_dir = ws / ".arc" / "evals"
         storage_checks = []
-        storage_checks.append({
-            "check": "traces_dir",
-            "ok": traces_dir.exists(),
-            "path": str(traces_dir),
-            "trace_count": len(list(traces_dir.glob("*.jsonl"))) if traces_dir.exists() else 0,
-        })
-        storage_checks.append({
-            "check": "sqlite_index",
-            "ok": db_path.exists(),
-            "path": str(db_path),
-            "size_bytes": db_path.stat().st_size if db_path.exists() else 0,
-        })
+        storage_checks.append(
+            {
+                "check": "traces_dir",
+                "ok": traces_dir.exists(),
+                "path": str(traces_dir),
+                "trace_count": len(list(traces_dir.glob("*.jsonl"))) if traces_dir.exists() else 0,
+            }
+        )
+        storage_checks.append(
+            {
+                "check": "sqlite_index",
+                "ok": db_path.exists(),
+                "path": str(db_path),
+                "size_bytes": db_path.stat().st_size if db_path.exists() else 0,
+            }
+        )
         if db_path.exists():
             from .storage.sqlite import SqliteStore
+
             store = SqliteStore(db_path)
-            storage_checks.append({
-                "check": "indexed_runs",
-                "ok": True,
-                "count": store.count_runs(),
-            })
-        storage_checks.append({
-            "check": "evals_dir",
-            "ok": evals_dir.exists(),
-            "path": str(evals_dir),
-        })
+            storage_checks.append(
+                {
+                    "check": "indexed_runs",
+                    "ok": True,
+                    "count": store.count_runs(),
+                }
+            )
+        storage_checks.append(
+            {
+                "check": "evals_dir",
+                "ok": evals_dir.exists(),
+                "path": str(evals_dir),
+            }
+        )
         storage_all_ok = all(c["ok"] for c in storage_checks if c["check"] != "evals_dir")
         if not storage_all_ok:
             all_ok = False
-        checks.append({
-            "check": "workspace_storage",
-            "ok": storage_all_ok,
-            "scope": "workspace_storage",
-            "details": storage_checks,
-        })
+        checks.append(
+            {
+                "check": "workspace_storage",
+                "ok": storage_all_ok,
+                "scope": "workspace_storage",
+                "details": storage_checks,
+            }
+        )
     except Exception as e:
-        checks.append({
-            "check": "workspace_storage",
-            "ok": False,
-            "error": str(e),
-        })
+        checks.append(
+            {
+                "check": "workspace_storage",
+                "ok": False,
+                "error": str(e),
+            }
+        )
 
     data = {"ok": all_ok, "checks": checks}
     _out(ok(data), json_output)
@@ -986,39 +1218,52 @@ def doctor_env(
     """Check environment variables and Python configuration."""
     import os
     import sys
+
     _setup_logging(debug)
     checks = []
     all_ok = True
-    checks.append({
-        "check": "python_version",
-        "ok": True,
-        "version": sys.version.split()[0],
-        "executable": sys.executable,
-    })
-    checks.append({
-        "check": "arc_version",
-        "ok": True,
-        "version": arc_version,
-    })
+    checks.append(
+        {
+            "check": "python_version",
+            "ok": True,
+            "version": sys.version.split()[0],
+            "executable": sys.executable,
+        }
+    )
+    checks.append(
+        {
+            "check": "arc_version",
+            "ok": True,
+            "version": arc_version,
+        }
+    )
     key_envs = [
-        "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY",
-        "QWEN_API_KEY", "MOONSHOT_API_KEY", "KIMI_API_KEY",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "OPENROUTER_API_KEY",
+        "QWEN_API_KEY",
+        "MOONSHOT_API_KEY",
+        "KIMI_API_KEY",
     ]
     configured = [name for name in key_envs if os.environ.get(name)]
-    checks.append({
-        "check": "provider_keys",
-        "ok": True,
-        "configured": configured,
-        "count": len(configured),
-        "total": len(key_envs),
-    })
+    checks.append(
+        {
+            "check": "provider_keys",
+            "ok": True,
+            "configured": configured,
+            "count": len(configured),
+            "total": len(key_envs),
+        }
+    )
     arc_envs = {k: v for k, v in os.environ.items() if k.startswith("ARC_")}
-    checks.append({
-        "check": "arc_env_vars",
-        "ok": True,
-        "vars": list(arc_envs.keys()),
-        "count": len(arc_envs),
-    })
+    checks.append(
+        {
+            "check": "arc_env_vars",
+            "ok": True,
+            "vars": list(arc_envs.keys()),
+            "count": len(arc_envs),
+        }
+    )
     data = {"ok": all_ok, "checks": checks}
     _out(ok(data), json_output)
 
@@ -1030,6 +1275,7 @@ def doctor_network(
 ) -> None:
     """Check network connectivity to common provider endpoints."""
     import urllib.request
+
     _setup_logging(debug)
     endpoints = [
         ("openai", "https://api.openai.com"),
@@ -1043,22 +1289,26 @@ def doctor_network(
             req = urllib.request.Request(url, method="HEAD")
             with urllib.request.urlopen(req, timeout=5) as resp:
                 reachable = resp.status < 500
-                checks.append({
-                    "check": name,
-                    "ok": reachable,
-                    "url": url,
-                    "status": resp.status,
-                })
+                checks.append(
+                    {
+                        "check": name,
+                        "ok": reachable,
+                        "url": url,
+                        "status": resp.status,
+                    }
+                )
                 if not reachable:
                     all_ok = False
         except Exception as e:
             all_ok = False
-            checks.append({
-                "check": name,
-                "ok": False,
-                "url": url,
-                "error": str(e),
-            })
+            checks.append(
+                {
+                    "check": name,
+                    "ok": False,
+                    "url": url,
+                    "error": str(e),
+                }
+            )
     data = {"ok": all_ok, "checks": checks}
     _out(ok(data), json_output)
 
@@ -1076,31 +1326,40 @@ def doctor_storage(
     db_path = ws / ".arc" / "arc.db"
     evals_dir = ws / ".arc" / "evals"
     checks = []
-    checks.append({
-        "check": "traces_dir",
-        "ok": traces_dir.exists(),
-        "path": str(traces_dir),
-        "trace_count": len(list(traces_dir.glob("*.jsonl"))) if traces_dir.exists() else 0,
-    })
-    checks.append({
-        "check": "sqlite_index",
-        "ok": db_path.exists(),
-        "path": str(db_path),
-        "size_bytes": db_path.stat().st_size if db_path.exists() else 0,
-    })
+    checks.append(
+        {
+            "check": "traces_dir",
+            "ok": traces_dir.exists(),
+            "path": str(traces_dir),
+            "trace_count": len(list(traces_dir.glob("*.jsonl"))) if traces_dir.exists() else 0,
+        }
+    )
+    checks.append(
+        {
+            "check": "sqlite_index",
+            "ok": db_path.exists(),
+            "path": str(db_path),
+            "size_bytes": db_path.stat().st_size if db_path.exists() else 0,
+        }
+    )
     if db_path.exists():
         from .storage.sqlite import SqliteStore
+
         store = SqliteStore(db_path)
-        checks.append({
-            "check": "indexed_runs",
-            "ok": True,
-            "count": store.count_runs(),
-        })
-    checks.append({
-        "check": "evals_dir",
-        "ok": evals_dir.exists(),
-        "path": str(evals_dir),
-    })
+        checks.append(
+            {
+                "check": "indexed_runs",
+                "ok": True,
+                "count": store.count_runs(),
+            }
+        )
+    checks.append(
+        {
+            "check": "evals_dir",
+            "ok": evals_dir.exists(),
+            "path": str(evals_dir),
+        }
+    )
     all_ok = all(c["ok"] for c in checks if c["check"] != "evals_dir")
     data = {"ok": all_ok, "checks": checks, "workspace": str(ws)}
     _out(ok(data), json_output)
@@ -1119,9 +1378,11 @@ def bug_report(
     """
     import os
     import sys
+
     _setup_logging(debug)
     from .provider_action import redacted_diagnostics
     from .config.loader import load_config
+
     ws = _workspace(workspace)
     config = load_config(workspace=ws)
     traces_dir = ws / ".arc" / "traces"
@@ -1130,6 +1391,7 @@ def bug_report(
     indexed_count = 0
     if db_path.exists():
         from .storage.sqlite import SqliteStore
+
         indexed_count = SqliteStore(db_path).count_runs()
     payload = {
         "arc_version": arc_version,
@@ -1162,8 +1424,10 @@ def bug_report(
 def providers_status(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
     """Return dry-run provider status from environment presence only."""
     import os
+
     _setup_logging(debug)
     from .provider_action import provider_statuses
+
     _out(ok([status.model_dump() for status in provider_statuses(os.environ)]), json_output)
 
 
@@ -1174,18 +1438,30 @@ def providers_diagnostics(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLA
     No network calls are made. All secrets are redacted.
     """
     import os
+
     _setup_logging(debug)
     from .provider_action import redacted_diagnostics
+
     _out(ok(redacted_diagnostics(os.environ)), json_output)
 
 
 @providers_app.command("proxy")
 def providers_proxy(
-    provider: Optional[str] = typer.Option(None, "--provider", help="Provider id (default: routing default)"),
-    model: Optional[str] = typer.Option(None, "--model", help="Model name (default: routing default)"),
+    provider: Optional[str] = typer.Option(
+        None, "--provider", help="Provider id (default: routing default)"
+    ),
+    model: Optional[str] = typer.Option(
+        None, "--model", help="Model name (default: routing default)"
+    ),
     prompt: str = typer.Option("Hello", "--prompt", help="Prompt text for dry-run proxy"),
-    live: bool = typer.Option(False, "--live", help="Request live provider mode; still requires env gate and --allow-paid-calls"),
-    allow_paid_calls: bool = typer.Option(False, "--allow-paid-calls", help="Allow paid provider calls when --live is set"),
+    live: bool = typer.Option(
+        False,
+        "--live",
+        help="Request live provider mode; still requires env gate and --allow-paid-calls",
+    ),
+    allow_paid_calls: bool = typer.Option(
+        False, "--allow-paid-calls", help="Allow paid provider calls when --live is set"
+    ),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
@@ -1199,6 +1475,7 @@ def providers_proxy(
     import os
     from .provider_action import ProviderRequest, check_provider_cost_gate, dry_run_proxy
     from .provider_action import ProviderRoutingStore
+
     routing = ProviderRoutingStore().get()
     req = ProviderRequest(
         provider=provider or routing.default_provider,
@@ -1214,10 +1491,24 @@ def providers_proxy(
                 "live_provider_calls_disabled": "Live provider calls disabled. Set ARC_ALLOW_LIVE_PROVIDER_TESTS=true and pass --live --allow-paid-calls.",
                 "paid_provider_calls_disabled": "Paid provider calls disabled. Pass --allow-paid-calls with --live.",
             }
-            _out(err(ArcErrorCode.INVALID_INPUT, messages.get(gate.reason or "", gate.reason or "Provider cost gate blocked request")), json_output)
+            _out(
+                err(
+                    ArcErrorCode.INVALID_INPUT,
+                    messages.get(
+                        gate.reason or "", gate.reason or "Provider cost gate blocked request"
+                    ),
+                ),
+                json_output,
+            )
             raise typer.Exit(1)
         if live:
-            _out(err(ArcErrorCode.INVALID_INPUT, "Live provider proxy is gated but not implemented in this CLI path; no network call was made."), json_output)
+            _out(
+                err(
+                    ArcErrorCode.INVALID_INPUT,
+                    "Live provider proxy is gated but not implemented in this CLI path; no network call was made.",
+                ),
+                json_output,
+            )
             raise typer.Exit(1)
         resp = dry_run_proxy(req)
         _out(ok(resp.model_dump()), json_output)
@@ -1228,12 +1519,22 @@ def providers_proxy(
 
 @providers_app.command("action")
 def providers_action(
-    provider: Optional[str] = typer.Option(None, "--provider", help="Provider id (default: routing default)"),
-    model: Optional[str] = typer.Option(None, "--model", help="Model name (default: routing default)"),
-    prompt: str = typer.Option("ARC provider action smoke", "--prompt", help="Prompt text for smoke contract"),
+    provider: Optional[str] = typer.Option(
+        None, "--provider", help="Provider id (default: routing default)"
+    ),
+    model: Optional[str] = typer.Option(
+        None, "--model", help="Model name (default: routing default)"
+    ),
+    prompt: str = typer.Option(
+        "ARC provider action smoke", "--prompt", help="Prompt text for smoke contract"
+    ),
     live: bool = typer.Option(False, "--live", help="Request gated live smoke scaffold"),
-    allow_paid_calls: bool = typer.Option(False, "--allow-paid-calls", help="Allow paid provider calls when --live is set"),
-    confirm: Optional[str] = typer.Option(None, "--confirm", help="Required value: RUN_PROVIDER_ACTION:<provider>:<model>"),
+    allow_paid_calls: bool = typer.Option(
+        False, "--allow-paid-calls", help="Allow paid provider calls when --live is set"
+    ),
+    confirm: Optional[str] = typer.Option(
+        None, "--confirm", help="Required value: RUN_PROVIDER_ACTION:<provider>:<model>"
+    ),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
@@ -1241,6 +1542,7 @@ def providers_action(
     _setup_logging(debug)
     import os
     from .provider_action import ProviderActionRequest, ProviderRoutingStore, run_provider_action
+
     routing = ProviderRoutingStore().get()
     req = ProviderActionRequest(
         provider=provider or routing.default_provider,
@@ -1280,8 +1582,10 @@ def providers_key_status(
 ) -> None:
     """Show provider key status from env vars and saved env-ref accounts."""
     import os
+
     _setup_logging(debug)
     from .provider_action import PROVIDERS, ProviderAccountStore, provider_statuses
+
     env_status = {status.provider: status.model_dump() for status in provider_statuses(os.environ)}
     accounts = ProviderAccountStore().list_accounts()
     entries = []
@@ -1290,18 +1594,28 @@ def providers_key_status(
             continue
         matching_accounts = [a for a in accounts if a.provider == definition.id]
         status = env_status.get(definition.id, {})
-        entries.append({
-            "provider": definition.id,
-            "display_name": definition.display_name,
-            "auth_kind": definition.auth_kind.value,
-            "credential_label": definition.credential_label,
-            "status": definition.status,
-            "configured": bool(status.get("api_key_configured")) or any(a.enabled for a in matching_accounts) or definition.auth_kind.value == "local",
-            "source": status.get("api_key_source") and "env" or ("account_ref" if matching_accounts else ("local" if definition.auth_kind.value == "local" else "unset")),
-            "env_key_names": definition.env_key_names,
-            "accounts": [a.model_dump() for a in matching_accounts],
-            "warnings": definition.warnings,
-        })
+        entries.append(
+            {
+                "provider": definition.id,
+                "display_name": definition.display_name,
+                "auth_kind": definition.auth_kind.value,
+                "credential_label": definition.credential_label,
+                "status": definition.status,
+                "configured": bool(status.get("api_key_configured"))
+                or any(a.enabled for a in matching_accounts)
+                or definition.auth_kind.value == "local",
+                "source": status.get("api_key_source")
+                and "env"
+                or (
+                    "account_ref"
+                    if matching_accounts
+                    else ("local" if definition.auth_kind.value == "local" else "unset")
+                ),
+                "env_key_names": definition.env_key_names,
+                "accounts": [a.model_dump() for a in matching_accounts],
+                "warnings": definition.warnings,
+            }
+        )
     _out(ok(entries), json_output)
 
 
@@ -1317,13 +1631,16 @@ def providers_key_set(
     """Save an env-var-backed provider key reference. Never stores raw keys."""
     _setup_logging(debug)
     from .provider_action import PROVIDERS, ProviderAccountStore, validate_env_var_name
+
     provider_ids = {p.id for p in PROVIDERS}
     if provider not in provider_ids:
         _out(err(ArcErrorCode.INVALID_INPUT, f"Unknown provider: {provider}"), json_output)
         raise typer.Exit(2)
     try:
         validate_env_var_name(env_var)
-        account = ProviderAccountStore().add_env_account(provider, label or "default", env_var, model)
+        account = ProviderAccountStore().add_env_account(
+            provider, label or "default", env_var, model
+        )
     except ValueError as exc:
         _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
         raise typer.Exit(2)
@@ -1339,6 +1656,7 @@ def providers_key_unset(
     """Delete saved provider key references. Does not modify environment variables."""
     _setup_logging(debug)
     from .provider_action import ProviderAccountStore
+
     store = ProviderAccountStore()
     accounts = store.list_accounts()
     deleted: list[str] = []
@@ -1354,6 +1672,7 @@ def providers_accounts_list(json_output: bool = JSON_FLAG, debug: bool = DEBUG_F
     """List provider accounts without exposing secrets."""
     _setup_logging(debug)
     from .provider_action import ProviderAccountStore
+
     accounts = ProviderAccountStore().list_accounts()
     _out(ok([account.model_dump() for account in accounts]), json_output)
 
@@ -1362,7 +1681,9 @@ def providers_accounts_list(json_output: bool = JSON_FLAG, debug: bool = DEBUG_F
 def providers_accounts_add(
     provider: str = typer.Option(..., "--provider", help="Provider id"),
     label: str = typer.Option(..., "--label", help="Account label"),
-    api_key_env: str = typer.Option(..., "--api-key-env", help="Environment variable containing the key"),
+    api_key_env: str = typer.Option(
+        ..., "--api-key-env", help="Environment variable containing the key"
+    ),
     default_model: Optional[str] = typer.Option(None, "--model", help="Default model"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
@@ -1370,6 +1691,7 @@ def providers_accounts_add(
     """Add an env-var-backed provider account. The key is never printed."""
     _setup_logging(debug)
     from .provider_action import ProviderAccountStore
+
     account = ProviderAccountStore().add_env_account(provider, label, api_key_env, default_model)
     _out(ok(account.model_dump()), json_output)
 
@@ -1383,9 +1705,13 @@ def providers_accounts_disable(
     """Disable a provider account."""
     _setup_logging(debug)
     from .provider_action import ProviderAccountStore
+
     account = ProviderAccountStore().set_enabled(account_id, False)
     if account is None:
-        _out(err(ArcErrorCode.INVALID_INPUT, f"Provider account not found: {account_id}"), json_output)
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, f"Provider account not found: {account_id}"),
+            json_output,
+        )
         raise typer.Exit(1)
     _out(ok(account.model_dump()), json_output)
 
@@ -1399,6 +1725,7 @@ def providers_accounts_delete(
     """Delete a provider account metadata record."""
     _setup_logging(debug)
     from .provider_action import ProviderAccountStore
+
     deleted = ProviderAccountStore().delete(account_id)
     _out(ok({"deleted": deleted, "account_id": account_id}), json_output)
 
@@ -1416,6 +1743,7 @@ def providers_quota_show(
     """Show today's provider quota usage."""
     _setup_logging(debug)
     from .provider_action import ProviderQuotaStore
+
     store = ProviderQuotaStore()
     usage = store.usage()
     if provider:
@@ -1434,6 +1762,7 @@ def providers_quota_reset(
     """Reset today's local provider quota counters only."""
     _setup_logging(debug)
     from .provider_action import ProviderQuotaStore
+
     store = ProviderQuotaStore()
     store.reset()
     _out(ok({"reset": True, "scope": "local_quota_counters_only"}), json_output)
@@ -1448,6 +1777,7 @@ def providers_routing_get(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLA
     """Return persisted dry-run routing policy."""
     _setup_logging(debug)
     from .provider_action import ProviderRoutingStore
+
     _out(ok(ProviderRoutingStore().get().model_dump()), json_output)
 
 
@@ -1462,6 +1792,7 @@ def providers_routing_set(
     """Persist provider routing policy. Live calls remain gated."""
     _setup_logging(debug)
     from .provider_action import ProviderRoutingPolicy, ProviderRoutingStore
+
     policy = ProviderRoutingPolicy(mode=mode, default_provider=provider, default_model=model)
     _out(ok(ProviderRoutingStore().set(policy).model_dump()), json_output)
 
@@ -1478,6 +1809,7 @@ def runs(
         return
     _setup_logging(debug)
     from .storage.jsonl import JsonlTraceStore
+
     ws = _workspace(workspace)
     store = JsonlTraceStore(ws / ".arc" / "traces")
     run_ids = store.list_runs()
@@ -1489,17 +1821,20 @@ def runs(
 def runs_prune(
     workspace: Optional[str] = WORKSPACE_FLAG,
     keep: int = typer.Option(20, "--keep", min=0, help="Number of newest traces to keep"),
-    older_than: Optional[int] = typer.Option(None, "--older-than", min=1, help="Only delete traces older than N days"),
+    older_than: Optional[int] = typer.Option(
+        None, "--older-than", min=1, help="Only delete traces older than N days"
+    ),
     yes: bool = typer.Option(False, "--yes", help="Delete files instead of dry-run"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
     """Prune oldest workspace trace files beyond --keep.
-    
+
     Use --older-than to only delete traces older than N days.
     """
     _setup_logging(debug)
     from .storage.jsonl import JsonlTraceStore
+
     ws = _workspace(workspace)
     trace_dir = ws / ".arc" / "traces"
     store = JsonlTraceStore(trace_dir)
@@ -1526,6 +1861,7 @@ def runs_get(
     """Load one stored run record."""
     _setup_logging(debug)
     from .storage.jsonl import JsonlTraceStore
+
     ws = _workspace(workspace)
     store = JsonlTraceStore(ws / ".arc" / "traces")
     run_record = store.load(run_id)
@@ -1547,13 +1883,16 @@ def runs_diff(
     _setup_logging(debug)
     from .storage.jsonl import JsonlTraceStore
     from .evals.diff import diff_runs
+
     ws = _workspace(workspace)
     store = JsonlTraceStore(ws / ".arc" / "traces")
     rec_a = store.load(run_a)
     rec_b = store.load(run_b)
     if rec_a is None or rec_b is None:
         missing = [r for r, rec in [(run_a, rec_a), (run_b, rec_b)] if rec is None]
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run(s) not found: {', '.join(missing)}"), json_output)
+        _out(
+            err(ArcErrorCode.RUN_NOT_FOUND, f"Run(s) not found: {', '.join(missing)}"), json_output
+        )
         raise typer.Exit(1)
     result = diff_runs(rec_a, rec_b)
     _out(ok(result.model_dump(), workspace=str(ws)), json_output)
@@ -1570,6 +1909,7 @@ def runs_trace(
     """Return trace file metadata and optional tail lines for one run."""
     _setup_logging(debug)
     from .storage.jsonl import JsonlTraceStore
+
     ws = _workspace(workspace)
     store = JsonlTraceStore(ws / ".arc" / "traces")
     path = store.trace_path(run_id)
@@ -1596,6 +1936,7 @@ def runs_status(
     """Show status of a stored run record."""
     _setup_logging(debug)
     from .storage.indexed_store import IndexedTraceStore
+
     ws = _workspace(workspace)
     store = IndexedTraceStore(
         trace_dir=ws / ".arc" / "traces",
@@ -1628,6 +1969,7 @@ def runs_delete(
     """Delete a stored run record and its trace file."""
     _setup_logging(debug)
     from .storage.indexed_store import IndexedTraceStore
+
     ws = _workspace(workspace)
     store = IndexedTraceStore(
         trace_dir=ws / ".arc" / "traces",
@@ -1656,6 +1998,7 @@ def runs_export(
     """Export a run record as JSON."""
     _setup_logging(debug)
     from .storage.indexed_store import IndexedTraceStore
+
     ws = _workspace(workspace)
     store = IndexedTraceStore(
         trace_dir=ws / ".arc" / "traces",
@@ -1731,6 +2074,7 @@ def runs_backfill(
     """Backfill SQLite index from existing JSONL traces. Idempotent."""
     _setup_logging(debug)
     from .storage.indexed_store import IndexedTraceStore
+
     ws = _workspace(workspace)
     store = IndexedTraceStore(
         trace_dir=ws / ".arc" / "traces",
@@ -1762,10 +2106,16 @@ def runs_search(
     """Search runs using the SQLite index."""
     _setup_logging(debug)
     from .storage.sqlite import SqliteStore
+
     ws = _workspace(workspace)
     db_path = ws / ".arc" / "arc.db"
     if not db_path.exists():
-        _out(err(ArcErrorCode.INVALID_INPUT, "SQLite index not found. Run 'arc runs backfill' first."), json_output)
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT, "SQLite index not found. Run 'arc runs backfill' first."
+            ),
+            json_output,
+        )
         raise typer.Exit(1)
     store = SqliteStore(db_path)
     results = store.list_runs(
@@ -1839,8 +2189,7 @@ def runs_fork(
     # Create fork — new ID, same workflow/runtime, fresh status
     new_id = new_run_id(prefix="fork")
     fork_events = [
-        event for event in source.events
-        if event.type in {"RUN_STARTED", "STEP_STARTED"}
+        event for event in source.events if event.type in {"RUN_STARTED", "STEP_STARTED"}
     ]
     if not fork_events:
         # If no lifecycle events, just copy the first event
@@ -1889,8 +2238,12 @@ def runs_fork(
 @runs_app.command("links")
 def runs_links(
     run_id: str = typer.Argument(..., help="Run ID to get cross-linked event chains for"),
-    filter: Optional[str] = typer.Option(None, "--filter", help="Filter link type (node_id, message_id, tool_call_id, evidence_id)"),
-    stable_id: Optional[str] = typer.Option(None, "--stable-id", help="Specific stable ID to look up"),
+    filter: Optional[str] = typer.Option(
+        None, "--filter", help="Filter link type (node_id, message_id, tool_call_id, evidence_id)"
+    ),
+    stable_id: Optional[str] = typer.Option(
+        None, "--stable-id", help="Specific stable ID to look up"
+    ),
     workspace: Optional[str] = WORKSPACE_FLAG,
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
@@ -1917,9 +2270,15 @@ def runs_links(
     if stable_id:
         # Single stable ID lookup
         node_chain = linker.get_node_chain(stable_id) if filter in (None, "node_id") else []
-        message_chain = linker.get_message_chain(stable_id) if filter in (None, "message_id") else []
-        tool_call_chain = linker.get_tool_call_chain(stable_id) if filter in (None, "tool_call_id") else []
-        evidence_chain = linker.get_evidence_events(stable_id) if filter in (None, "evidence_id") else []
+        message_chain = (
+            linker.get_message_chain(stable_id) if filter in (None, "message_id") else []
+        )
+        tool_call_chain = (
+            linker.get_tool_call_chain(stable_id) if filter in (None, "tool_call_id") else []
+        )
+        evidence_chain = (
+            linker.get_evidence_events(stable_id) if filter in (None, "evidence_id") else []
+        )
         payload = {
             "node_chains": {stable_id: [e.model_dump() for e in node_chain]},
             "message_chains": {stable_id: [e.model_dump() for e in message_chain]},
@@ -1966,6 +2325,7 @@ def runs_links(
 
 # ─── isolation ──────────────────────────────────────────────────────────────────
 
+
 @isolation_app.command("status")
 def isolation_status(
     json_output: bool = JSON_FLAG,
@@ -1984,16 +2344,19 @@ def isolation_status(
     results = []
     for p in providers:
         import asyncio
+
         try:
             healthy = asyncio.run(p.health_check())
         finally:
             close = getattr(p, "close", None)
             if callable(close):
                 close()
-        results.append({
-            "provider_id": p.provider_id,
-            "healthy": healthy,
-        })
+        results.append(
+            {
+                "provider_id": p.provider_id,
+                "healthy": healthy,
+            }
+        )
     _out(ok({"providers": results}), json_output)
 
 
@@ -2015,20 +2378,29 @@ def isolation_doctor(
     }
     if provider != "all":
         if provider not in provider_map:
-            _out(err(ArcErrorCode.INVALID_INPUT, f"Unknown provider: {provider}. Available: {', '.join(provider_map)}"), json_output)
+            _out(
+                err(
+                    ArcErrorCode.INVALID_INPUT,
+                    f"Unknown provider: {provider}. Available: {', '.join(provider_map)}",
+                ),
+                json_output,
+            )
             raise typer.Exit(1)
         provider_map = {provider: provider_map[provider]}
 
     import asyncio
+
     results = []
     for pid, p in provider_map.items():
         try:
             healthy = asyncio.run(p.health_check())
-            results.append({
-                "provider_id": pid,
-                "healthy": healthy,
-                "description": p.describe(),
-            })
+            results.append(
+                {
+                    "provider_id": pid,
+                    "healthy": healthy,
+                    "description": p.describe(),
+                }
+            )
         finally:
             close = getattr(p, "close", None)
             if callable(close):
@@ -2046,7 +2418,11 @@ def isolation_list(
     from .isolation import NoneIsolationProvider, SubprocessIsolationProvider
     from .isolation.docker_provider import DockerIsolationProvider
 
-    provider_objects = [NoneIsolationProvider(), SubprocessIsolationProvider(), DockerIsolationProvider()]
+    provider_objects = [
+        NoneIsolationProvider(),
+        SubprocessIsolationProvider(),
+        DockerIsolationProvider(),
+    ]
     providers = []
     for p in provider_objects:
         try:
@@ -2079,6 +2455,7 @@ def isolation_setup(
     try:
         runtime = docker.detect_runtime()
         import asyncio
+
         healthy = asyncio.run(docker.health_check())
     finally:
         docker.close()
@@ -2099,7 +2476,9 @@ def isolation_setup(
             if runtime.get("error"):
                 console.print(f"  Error: {runtime['error']}")
             console.print("")
-            console.print("[dim]Install Docker Desktop, OrbStack, or Podman to enable container isolation.[/dim]")
+            console.print(
+                "[dim]Install Docker Desktop, OrbStack, or Podman to enable container isolation.[/dim]"
+            )
 
 
 @isolation_app.command("test")
@@ -2119,11 +2498,18 @@ def isolation_test(
         "docker": DockerIsolationProvider(),
     }
     if provider not in provider_map:
-        _out(err(ArcErrorCode.INVALID_INPUT, f"Unknown provider: {provider}. Available: {', '.join(provider_map)}"), json_output)
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                f"Unknown provider: {provider}. Available: {', '.join(provider_map)}",
+            ),
+            json_output,
+        )
         raise typer.Exit(1)
 
     p = provider_map[provider]
     import asyncio
+
     try:
         result = asyncio.run(p.execute(["echo", "ARC isolation test OK"]))
     finally:
@@ -2155,6 +2541,7 @@ def storage_vacuum(
     """Vacuum SQLite index to reclaim space after deletions."""
     _setup_logging(debug)
     import sqlite3
+
     ws = _workspace(workspace)
     db_path = ws / ".arc" / "arc.db"
     if not db_path.exists():
@@ -2198,13 +2585,17 @@ def storage_status(
     db_path = ws / ".arc" / "arc.db"
     goldens_dir = ws / ".arc" / "goldens"
     hitl_dir = ws / ".arc" / "hitl"
-    
+
     trace_count = len(list(traces_dir.glob("*.jsonl"))) if traces_dir.exists() else 0
-    trace_size = sum(p.stat().st_size for p in traces_dir.glob("*.jsonl")) if traces_dir.exists() else 0
+    trace_size = (
+        sum(p.stat().st_size for p in traces_dir.glob("*.jsonl")) if traces_dir.exists() else 0
+    )
     db_size = db_path.stat().st_size if db_path.exists() else 0
     golden_count = len(list(goldens_dir.glob("*.json"))) if goldens_dir.exists() else 0
-    hitl_pending = len(list((hitl_dir / "pending").glob("*.json"))) if (hitl_dir / "pending").exists() else 0
-    
+    hitl_pending = (
+        len(list((hitl_dir / "pending").glob("*.json"))) if (hitl_dir / "pending").exists() else 0
+    )
+
     payload = {
         "workspace": str(ws),
         "traces": {
@@ -2230,12 +2621,15 @@ def storage_status(
     if not json_output:
         console.print(f"[bold]Storage Status[/bold] — {ws}")
         console.print(f"  Traces: {trace_count} files ({trace_size:,} bytes)")
-        console.print(f"  SQLite: {'exists' if db_path.exists() else 'not found'} ({db_size:,} bytes)")
+        console.print(
+            f"  SQLite: {'exists' if db_path.exists() else 'not found'} ({db_size:,} bytes)"
+        )
         console.print(f"  Goldens: {golden_count}")
         console.print(f"  HITL pending: {hitl_pending}")
 
 
 # ─── context pack ─────────────────────────────────────────────────────────────
+
 
 @context_app.command("pack")
 def context_pack(
@@ -2256,6 +2650,7 @@ def context_pack(
 
 # ─── adapter test ─────────────────────────────────────────────────────────────
 
+
 @adapter_app.command("test")
 def adapter_test(
     adapter_id: str = typer.Argument(..., help="Adapter ID: swarmgraph | langgraph"),
@@ -2270,10 +2665,14 @@ def adapter_test(
     adapter = registry.get(adapter_id)
 
     if not adapter:
-        _out(err(ArcErrorCode.ADAPTER_NOT_SUPPORTED, f"Adapter not found: {adapter_id!r}"), json_output)
+        _out(
+            err(ArcErrorCode.ADAPTER_NOT_SUPPORTED, f"Adapter not found: {adapter_id!r}"),
+            json_output,
+        )
         raise typer.Exit(1)
 
     from .adapters.conformance import run_conformance
+
     result = run_conformance(adapter, ws)
 
     summary = {
@@ -2297,7 +2696,9 @@ def adapter_test(
             table.add_row(d["test"], f"[{color}]{d['result']}[/{color}]", d.get("reason", ""))
         console.print(table)
         status = "[green]ALL PASS[/green]" if result.ok else f"[red]{result.failed} FAILED[/red]"
-        console.print(f"Summary: {result.passed} passed · {result.failed} failed · {result.skipped} skipped → {status}")
+        console.print(
+            f"Summary: {result.passed} passed · {result.failed} failed · {result.skipped} skipped → {status}"
+        )
 
     if not result.ok:
         raise typer.Exit(1)
@@ -2321,13 +2722,20 @@ def adapter_list(debug: bool = DEBUG_FLAG) -> None:
 
 # ─── eval ─────────────────────────────────────────────────────────────────────
 
+
 @eval_app.command("run")
 def eval_run(
     run_id: str = typer.Argument(..., help="Run ID to evaluate"),
     golden_id: str = typer.Option("", "--golden", "-g", help="Golden trace ID"),
-    expected_output: str = typer.Option("", "--expected-final-output", help="Expected substring in final output"),
-    expected_event_types: str = typer.Option("", "--expected-event-types", help="Comma-separated expected event types"),
-    expected_status: str = typer.Option("completed", "--expected-status", help="Expected run status"),
+    expected_output: str = typer.Option(
+        "", "--expected-final-output", help="Expected substring in final output"
+    ),
+    expected_event_types: str = typer.Option(
+        "", "--expected-event-types", help="Comma-separated expected event types"
+    ),
+    expected_status: str = typer.Option(
+        "completed", "--expected-status", help="Expected run status"
+    ),
     batch: bool = typer.Option(False, "--batch", "-b", help="Run against all saved golden traces"),
     workspace: Optional[str] = WORKSPACE_FLAG,
     json_output: bool = JSON_FLAG,
@@ -2358,7 +2766,13 @@ def eval_run(
     if batch:
         goldens = list_goldens(ws)
         if not goldens:
-            _out(err(ArcErrorCode.INVALID_INPUT, "No saved golden traces found. Use 'arc eval save' first."), json_output)
+            _out(
+                err(
+                    ArcErrorCode.INVALID_INPUT,
+                    "No saved golden traces found. Use 'arc eval save' first.",
+                ),
+                json_output,
+            )
             raise typer.Exit(1)
         results = []
         for golden in goldens:
@@ -2378,10 +2792,16 @@ def eval_run(
             console.print(f"[bold]Batch Eval:[/bold] {passed}/{len(results)} passed")
             for r in results:
                 color = "green" if r["passed"] else "red"
-                console.print(f"  [{color}]{'PASS' if r['passed'] else 'FAIL'}[/{color}] {r['golden_id']} score={r['score']}")
+                console.print(
+                    f"  [{color}]{'PASS' if r['passed'] else 'FAIL'}[/{color}] {r['golden_id']} score={r['score']}"
+                )
         return
 
-    events = [t.strip() for t in expected_event_types.split(",") if t.strip()] if expected_event_types else []
+    events = (
+        [t.strip() for t in expected_event_types.split(",") if t.strip()]
+        if expected_event_types
+        else []
+    )
 
     golden = load_golden(ws, golden_id) if golden_id else None
     if golden_id and golden is None:
@@ -2399,17 +2819,27 @@ def eval_run(
 
     if not json_output:
         color = "green" if result.passed else "red"
-        console.print(f"Eval [bold {color}]{'PASS' if result.passed else 'FAIL'}[/bold {color}]  score={result.score}")
-        console.print(f"  status_match={result.status_match}  event_type_match={result.event_type_match}  output_contains_match={result.output_contains_match}")
+        console.print(
+            f"Eval [bold {color}]{'PASS' if result.passed else 'FAIL'}[/bold {color}]  score={result.score}"
+        )
+        console.print(
+            f"  status_match={result.status_match}  event_type_match={result.event_type_match}  output_contains_match={result.output_contains_match}"
+        )
 
 
 @eval_app.command("save")
 def eval_save(
     golden_id: str = typer.Argument(..., help="Golden trace ID to save"),
     workflow_id: str = typer.Option("", "--workflow-id", help="Expected workflow id"),
-    expected_output: str = typer.Option("", "--expected-final-output", help="Expected substring in final output"),
-    expected_event_types: str = typer.Option("", "--expected-event-types", help="Comma-separated expected event types"),
-    expected_status: str = typer.Option("completed", "--expected-status", help="Expected run status"),
+    expected_output: str = typer.Option(
+        "", "--expected-final-output", help="Expected substring in final output"
+    ),
+    expected_event_types: str = typer.Option(
+        "", "--expected-event-types", help="Comma-separated expected event types"
+    ),
+    expected_status: str = typer.Option(
+        "completed", "--expected-status", help="Expected run status"
+    ),
     description: str = typer.Option("", "--description", help="Golden description"),
     workspace: Optional[str] = WORKSPACE_FLAG,
     json_output: bool = JSON_FLAG,
@@ -2420,7 +2850,11 @@ def eval_save(
     from .evals.golden import GoldenTrace, save_golden
 
     ws = _workspace(workspace)
-    events = [t.strip() for t in expected_event_types.split(",") if t.strip()] if expected_event_types else []
+    events = (
+        [t.strip() for t in expected_event_types.split(",") if t.strip()]
+        if expected_event_types
+        else []
+    )
     golden = GoldenTrace(
         id=golden_id,
         workflow_id=workflow_id or "*",
@@ -2474,6 +2908,7 @@ def eval_list(
     """List saved golden traces."""
     _setup_logging(debug)
     from .evals.golden import list_goldens
+
     ws = _workspace(workspace)
     goldens = list_goldens(ws)
     _out(ok([g.model_dump() for g in goldens]), json_output)
@@ -2483,7 +2918,11 @@ def eval_list(
         table.add_column("Workflow")
         table.add_column("Expected Output (truncated)")
         for g in goldens:
-            table.add_row(g.id, g.workflow_id, g.expected_final_output_contains[:60] if g.expected_final_output_contains else "")
+            table.add_row(
+                g.id,
+                g.workflow_id,
+                g.expected_final_output_contains[:60] if g.expected_final_output_contains else "",
+            )
         console.print(table)
 
 
@@ -2548,7 +2987,13 @@ def hitl_respond(
         raise typer.Exit(1)
     response = respond(ws, hitl_id, parsed, token=token, notes=notes)
     if response is None:
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"HITL prompt not found, expired, already responded, or token mismatch: {hitl_id}"), json_output)
+        _out(
+            err(
+                ArcErrorCode.RUN_NOT_FOUND,
+                f"HITL prompt not found, expired, already responded, or token mismatch: {hitl_id}",
+            ),
+            json_output,
+        )
         raise typer.Exit(1)
     _out(ok(response.model_dump(), workspace=str(ws)), json_output)
     if not json_output:
@@ -2588,7 +3033,9 @@ def hitl_reject(
 def studio_chat(
     prompt: Optional[str] = typer.Argument(None, help="Initial prompt"),
     session: Optional[str] = typer.Option(None, "--session", "-s", help="Resume session ID"),
-    non_interactive: bool = typer.Option(False, "--non-interactive", "-n", help="Run once and exit"),
+    non_interactive: bool = typer.Option(
+        False, "--non-interactive", "-n", help="Run once and exit"
+    ),
     debug: bool = DEBUG_FLAG,
 ) -> None:
     """Launch the ARC Studio chat REPL with the native SwarmGraph runtime.
@@ -2598,6 +3045,7 @@ def studio_chat(
     """
     _setup_logging(debug)
     from .cli_repl.chat_repl import run_chat_repl
+
     run_chat_repl(
         initial_prompt=prompt,
         session_id=session,
@@ -2614,6 +3062,7 @@ def studio_sessions(
     if ctx.invoked_subcommand is not None:
         return
     from .cli_repl.session import ChatSession
+
     sessions = ChatSession.list_sessions()
     if json_output:
         _out(ok([s.model_dump() for s in sessions]), json_output)
@@ -2632,7 +3081,11 @@ def studio_sessions_migrate(
     json_output: bool = JSON_FLAG,
 ) -> None:
     """Migrate legacy flat sessions to canonical format."""
-    from .cli_repl.session import _get_sessions_dir, _list_legacy_session_ids, migrate_legacy_session
+    from .cli_repl.session import (
+        _get_sessions_dir,
+        _list_legacy_session_ids,
+        migrate_legacy_session,
+    )
 
     legacy_ids = _list_legacy_session_ids()
     newly_migrated: list[str] = []
@@ -2649,23 +3102,25 @@ def studio_sessions_migrate(
             failed.append(sid)
 
     if json_output:
-        _out(ok({
-            "total_legacy": len(legacy_ids),
-            "newly_migrated": len(newly_migrated),
-            "already_migrated": len(legacy_ids) - len(newly_migrated) - len(failed),
-            "failed": len(failed),
-            "session_ids": newly_migrated,
-        }), json_output)
+        _out(
+            ok(
+                {
+                    "total_legacy": len(legacy_ids),
+                    "newly_migrated": len(newly_migrated),
+                    "already_migrated": len(legacy_ids) - len(newly_migrated) - len(failed),
+                    "failed": len(failed),
+                    "session_ids": newly_migrated,
+                }
+            ),
+            json_output,
+        )
         return
 
     if not legacy_ids:
         console.print("[dim]No legacy sessions found to migrate.[/dim]")
         return
 
-    console.print(
-        f"Migration complete: {len(newly_migrated)} migrated, "
-        f"{len(failed)} failed."
-    )
+    console.print(f"Migration complete: {len(newly_migrated)} migrated, {len(failed)} failed.")
     if newly_migrated:
         console.print(f"  Migrated: {', '.join(newly_migrated[:10])}")
     if failed:
@@ -2691,6 +3146,7 @@ def workspace_trust_status(
     """Show workspace trust status used for execution enforcement."""
     _setup_logging(debug)
     from .security.trust import resolve_trust
+
     ws = _workspace(workspace)
     resolution = resolve_trust(ws)
     _out(ok(resolution.model_dump(), workspace=str(ws)), json_output)
@@ -2706,6 +3162,7 @@ def workspace_trust(
     """Mark the workspace as trusted (external DB, outside repo)."""
     _setup_logging(debug)
     from .security.trust import trust_workspace
+
     ws = _workspace(workspace)
     resolution = trust_workspace(ws, note=note)
     _out(ok(resolution.model_dump(), workspace=str(ws)), json_output)
@@ -2720,12 +3177,14 @@ def workspace_untrust(
     """Remove workspace from the external trust database."""
     _setup_logging(debug)
     from .security.trust import untrust_workspace
+
     ws = _workspace(workspace)
     resolution = untrust_workspace(ws)
     _out(ok(resolution.model_dump(), workspace=str(ws)), json_output)
 
 
 # ─── config (ADR-001) ──────────────────────────────────────────────────────────
+
 
 @config_app.command("init")
 def config_init(
@@ -2736,6 +3195,7 @@ def config_init(
     """Generate default .arc/config.yaml in the workspace."""
     _setup_logging(debug)
     from .config import init_config
+
     ws = _workspace(workspace)
     config_path = init_config(ws)
     _out(ok({"config_path": str(config_path), "version": 1}, workspace=str(ws)), json_output)
@@ -2750,6 +3210,7 @@ def config_show(
     """Show resolved ARC configuration for the workspace."""
     _setup_logging(debug)
     from .config import load_config
+
     ws = _workspace(workspace)
     config = load_config(ws)
     _out(ok(config.flatten(), workspace=str(ws)), json_output)
@@ -2767,10 +3228,12 @@ DEFAULT_RECEIPT_KEY = "arc-dev-key-change-in-production"
 def _receipt_key() -> str:
     """Resolve receipt HMAC key: AuditKeyManager → env var → dev key fallback."""
     from .audit.key_manager import AuditKeyManager
+
     key_bytes, status = AuditKeyManager().get_key()
     if status.available and key_bytes is not None:
         return key_bytes.decode("utf-8", errors="ignore")
     import os
+
     return os.environ.get("ARC_RECEIPT_HMAC_KEY", DEFAULT_RECEIPT_KEY)
 
 
@@ -2784,6 +3247,7 @@ def receipt_show(
     """Show a human-readable run receipt for a completed/failed run."""
     _setup_logging(debug)
     from .storage.jsonl import JsonlTraceStore
+
     ws = _workspace(workspace)
     store = JsonlTraceStore(ws / ".arc" / "traces")
     receipt = store.load_receipt(run_id)
@@ -2818,7 +3282,12 @@ def receipt_show(
 def receipt_export(
     run_id: str = typer.Argument(..., help="Run ID to export receipt for"),
     format: str = typer.Option("json", "--format", help="Output format: json, markdown"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path (default: .arc/receipts/{run_id}.receipt.{ext})"),
+    output: Optional[str] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output file path (default: .arc/receipts/{run_id}.receipt.{ext})",
+    ),
     workspace: Optional[str] = WORKSPACE_FLAG,
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
@@ -2826,6 +3295,7 @@ def receipt_export(
     """Export a run receipt to a file (JSON or Markdown)."""
     _setup_logging(debug)
     from .storage.jsonl import JsonlTraceStore
+
     ws = _workspace(workspace)
     store = JsonlTraceStore(ws / ".arc" / "traces")
     receipt = store.load_receipt(run_id)
@@ -2876,7 +3346,9 @@ def receipt_export(
 @receipt_app.command("verify")
 def receipt_verify(
     file: str = typer.Argument(..., help="Path to receipt JSON file"),
-    key: Optional[str] = typer.Option(None, "--key", help="HMAC key (default: ARC_RECEIPT_HMAC_KEY env or dev key)"),
+    key: Optional[str] = typer.Option(
+        None, "--key", help="HMAC key (default: ARC_RECEIPT_HMAC_KEY env or dev key)"
+    ),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
@@ -2884,6 +3356,7 @@ def receipt_verify(
     _setup_logging(debug)
     import json as json_mod
     from .protocol.run_receipt import RunReceipt
+
     path = Path(file).expanduser().resolve()
     if not path.exists():
         _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Receipt file not found: {path}"), json_output)
@@ -2945,6 +3418,7 @@ def runs_contract(
     """Show the run contract for a stored run."""
     _setup_logging(debug)
     from .storage.jsonl import JsonlTraceStore
+
     ws = _workspace(workspace)
     store = JsonlTraceStore(ws / ".arc" / "traces")
     contract = store.load_contract(run_id)
@@ -3007,14 +3481,22 @@ def runs_budget(
         return {"status": "available", "value": raw}
 
     usage_report = {
-        "tokens": dimension(usage, "total_tokens") if isinstance(usage, dict) else {"status": "degraded", "raw": usage, "reason": "malformed_usage"},
-        "cost_usd": dimension(usage, "total_cost") if isinstance(usage, dict) else {"status": "degraded", "raw": usage, "reason": "malformed_usage"},
-        "latency_ms": dimension(usage, "latency_ms") if isinstance(usage, dict) else {"status": "degraded", "raw": usage, "reason": "malformed_usage"},
+        "tokens": dimension(usage, "total_tokens")
+        if isinstance(usage, dict)
+        else {"status": "degraded", "raw": usage, "reason": "malformed_usage"},
+        "cost_usd": dimension(usage, "total_cost")
+        if isinstance(usage, dict)
+        else {"status": "degraded", "raw": usage, "reason": "malformed_usage"},
+        "latency_ms": dimension(usage, "latency_ms")
+        if isinstance(usage, dict)
+        else {"status": "degraded", "raw": usage, "reason": "malformed_usage"},
     }
 
     payload = {
         "run_id": run_id,
-        "budget": budget if isinstance(budget, dict) else {"status": "degraded", "raw": budget, "reason": "malformed_budget"},
+        "budget": budget
+        if isinstance(budget, dict)
+        else {"status": "degraded", "raw": budget, "reason": "malformed_budget"},
         "usage": usage_report,
     }
 
@@ -3022,7 +3504,7 @@ def runs_budget(
 
     if not json_output:
         console.print(f"[bold]Budget & Usage:[/bold] {run_id}")
-        
+
         console.print("\n[bold]Budget:[/bold]")
         if not isinstance(budget, dict):
             console.print(f"  [yellow]degraded: malformed_budget raw={budget!r}[/yellow]")
@@ -3033,23 +3515,30 @@ def runs_budget(
                 console.print(f"  Max Tokens: {budget['max_tokens']}")
             if "max_cost" in budget:
                 console.print(f"  Max Cost:   ${budget['max_cost']:.4f}")
-                
+
         console.print("\n[bold]Usage:[/bold]")
         if not isinstance(usage, dict):
             console.print(f"  [yellow]degraded: malformed_usage raw={usage!r}[/yellow]")
         elif not usage:
             console.print("  [dim]No usage data recorded[/dim]")
         else:
-            for label, name, suffix in [("Total Tokens", "tokens", ""), ("Total Cost", "cost_usd", ""), ("Latency", "latency_ms", "ms")]:
+            for label, name, suffix in [
+                ("Total Tokens", "tokens", ""),
+                ("Total Cost", "cost_usd", ""),
+                ("Latency", "latency_ms", "ms"),
+            ]:
                 entry = usage_report[name]
                 if entry["status"] == "available":
                     value = entry["value"]
                     rendered = f"${value:.4f}" if name == "cost_usd" else f"{value}{suffix}"
                     console.print(f"  {label}: {rendered}")
                 elif entry["status"] == "degraded":
-                    console.print(f"  {label}: [yellow]degraded: {entry['reason']} raw={entry['raw']!r}[/yellow]")
+                    console.print(
+                        f"  {label}: [yellow]degraded: {entry['reason']} raw={entry['raw']!r}[/yellow]"
+                    )
                 else:
                     console.print(f"  {label}: [dim]n/a[/dim]")
+
 
 # ─── autopsy show ─────────────────────────────────────────────────────────────
 
@@ -3064,6 +3553,7 @@ def runs_autopsy(
     """Show failure autopsy for a failed run."""
     _setup_logging(debug)
     from .storage.jsonl import JsonlTraceStore
+
     ws = _workspace(workspace)
     store = JsonlTraceStore(ws / ".arc" / "traces")
     autopsy = store.load_autopsy(run_id)
@@ -3090,7 +3580,9 @@ def runs_autopsy(
         if autopsy.retry_options:
             console.print("  Retry options:")
             for ro in autopsy.retry_options:
-                risk_color = {"low": "green", "medium": "yellow", "high": "red"}.get(ro.risk, "white")
+                risk_color = {"low": "green", "medium": "yellow", "high": "red"}.get(
+                    ro.risk, "white"
+                )
                 console.print(f"    [{risk_color}]{ro.risk}[/{risk_color}] {ro.label}")
                 if ro.command:
                     console.print(f"      Command: {ro.command}")
@@ -3107,34 +3599,75 @@ app.add_typer(audit_app)
 def audit_verify(
     run_id: str = typer.Argument(..., help="Run ID to verify audit chain for"),
     chain_path: str = typer.Option(
-        "", "--chain", "-c", help="Path to audit chain file (default: .arc/audit/{run_id}.audit.jsonl)"
+        "",
+        "--chain",
+        "-c",
+        help="Path to audit chain file (default: .arc/audit/{run_id}.audit.jsonl)",
+    ),
+    mode: str = typer.Option(
+        "auto",
+        "--mode",
+        "-m",
+        help="Verification mode: sha256, hmac, or auto (default: auto-detect)",
+    ),
+    max_memory_mb: int = typer.Option(
+        500,
+        "--max-memory-mb",
+        help="Maximum memory budget for streaming verification in MB (default: 500)",
     ),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
-    """Verify HMAC-SHA256 audit chain integrity for a run.
+    """Verify audit chain integrity with streaming verification (Phase 21).
 
-    Authenticates every record in the chain and checks chain continuity.
-    Requires ARC_AUDIT_HMAC_KEY env var or keychain-stored key.
+    Uses memory-bounded streaming verification to handle large traces (100 MB+).
+    Supports both SHA-256 (legacy) and HMAC-signed audit chains.
 
-    Checks .audit.jsonl (HMAC-signed, new format) first, then falls back
-    to .jsonl (old SHA-256 format) for backward compatibility.
+    Modes:
+      - auto: Auto-detect format from first record (default)
+      - hmac: HMAC-SHA256 verification (requires key)
+      - sha256: SHA-256 hash chain verification (legacy)
+
+    For HMAC mode, requires ARC_AUDIT_HMAC_KEY env var or keychain-stored key.
+    SHA-256 mode works without a key (backward compatible).
+
+    Checks .audit.jsonl (HMAC-signed) first, then falls back to .jsonl (SHA-256).
     """
     _setup_logging(debug)
     from pathlib import Path
     from .audit.key_manager import AuditKeyManager
-    from .audit.hmac_chain import verify_hmac_chain
-    from .audit.storage import AuditChainStore
+    from .audit.streaming_verifier import StreamingAuditVerifier
 
-    mgr = AuditKeyManager()
-    key, status = mgr.get_key()
-    if not status.available:
-        _out(err(ArcErrorCode.INVALID_INPUT, status.warning), json_output)
+    # Validate mode
+    if mode not in ("auto", "sha256", "hmac"):
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT, f"Invalid mode: {mode}. Must be auto, sha256, or hmac."
+            ),
+            json_output,
+        )
         raise typer.Exit(1)
 
+    # Initialize streaming verifier
+    try:
+        verifier = StreamingAuditVerifier(max_memory_mb=max_memory_mb)
+    except ValueError as e:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(e)), json_output)
+        raise typer.Exit(1)
+
+    # Get HMAC key if needed (for hmac or auto mode)
+    key = None
+    key_status = None
+    if mode in ("hmac", "auto"):
+        mgr = AuditKeyManager()
+        key, key_status = mgr.get_key()
+        if mode == "hmac" and not key_status.available:
+            _out(err(ArcErrorCode.INVALID_INPUT, key_status.warning), json_output)
+            raise typer.Exit(1)
+
+    # Resolve chain path
     ws = Path.cwd()
     audit_dir = ws / ".arc" / "audit"
-    chain_fmt = "new" if chain_path else "auto"
 
     if chain_path:
         chain = Path(chain_path)
@@ -3143,10 +3676,8 @@ def audit_verify(
         old_chain = audit_dir / f"{run_id}.jsonl"
         if new_chain.exists():
             chain = new_chain
-            chain_fmt = "hmac"
         elif old_chain.exists():
             chain = old_chain
-            chain_fmt = "legacy"
         else:
             _out(
                 err(ArcErrorCode.RUN_NOT_FOUND, f"Audit chain not found for run {run_id}"),
@@ -3154,31 +3685,50 @@ def audit_verify(
             )
             raise typer.Exit(1)
 
-    if chain_fmt == "hmac":
-        store = AuditChainStore(audit_dir=audit_dir)
-        verified, reason = store.verify_run(run_id)
-    else:
-        verified, reason = verify_hmac_chain(chain, key)
+    # Perform streaming verification
+    if mode == "auto":
+        result = verifier.verify_auto(chain, key)
+    elif mode == "hmac":
+        result = verifier.verify_hmac(chain, key)
+    else:  # sha256
+        result = verifier.verify_sha256(chain)
 
+    # Build stable JSON output
     payload = {
+        "ok": result.ok,
+        "mode": result.mode,
+        "records_checked": result.records_checked,
+        "reason": result.reason,
+        "duration_ms": result.duration_ms,
         "run_id": run_id,
         "chain_path": str(chain),
-        "chain_format": chain_fmt,
-        "verified": verified,
-        "reason": reason,
-        "key_source": status.source,
-        "key_degraded": status.degraded,
     }
+    if result.file_size_bytes is not None:
+        payload["file_size_bytes"] = result.file_size_bytes
+    if key_status is not None:
+        payload["key_source"] = key_status.source
+        payload["key_degraded"] = key_status.degraded
+
     _out(ok(payload), json_output)
+
+    # Human-readable output
     if not json_output:
-        color = "green" if verified else "red"
-        fmt_label = {"hmac": "HMAC", "legacy": "SHA-256", "auto": "custom"}.get(chain_fmt, chain_fmt)
-        console.print(f"Audit chain ({fmt_label}): [bold {color}]{'VERIFIED' if verified else 'FAILED'}[/bold {color}]")
+        color = "green" if result.ok else "red"
+        mode_label = {"hmac": "HMAC-SHA256", "sha256": "SHA-256"}.get(result.mode, result.mode)
+        console.print(
+            f"Audit chain ({mode_label}): [bold {color}]{'VERIFIED' if result.ok else 'FAILED'}[/bold {color}]"
+        )
         console.print(f"  Path: {chain}")
-        console.print(f"  Reason: {reason}")
-        if status.degraded:
-            console.print(f"[yellow]Warning:[/yellow] {status.warning}")
-    if not verified:
+        console.print(f"  Records: {result.records_checked}")
+        console.print(f"  Duration: {result.duration_ms}ms")
+        if result.file_size_bytes is not None:
+            size_mb = result.file_size_bytes / (1024 * 1024)
+            console.print(f"  File size: {size_mb:.2f} MB")
+        console.print(f"  Reason: {result.reason}")
+        if key_status is not None and key_status.degraded:
+            console.print(f"[yellow]Warning:[/yellow] {key_status.warning}")
+
+    if not result.ok:
         raise typer.Exit(1)
 
 
@@ -3186,7 +3736,10 @@ def audit_verify(
 def audit_export(
     run_id: str = typer.Argument(..., help="Run ID to export audit records for"),
     chain_path: str = typer.Option(
-        "", "--chain", "-c", help="Path to audit chain file (default: .arc/audit/{run_id}.audit.jsonl)"
+        "",
+        "--chain",
+        "-c",
+        help="Path to audit chain file (default: .arc/audit/{run_id}.audit.jsonl)",
     ),
     format: str = typer.Option("jsonl", "--format", help="Output format: jsonl, json"),
     json_output: bool = JSON_FLAG,
@@ -3262,7 +3815,9 @@ def audit_key_init(
         if stored:
             console.print("[green]Audit key generated and stored in keychain.[/green]")
         else:
-            console.print("[yellow]Key generated but could not store in keychain. Set via env:[/yellow]")
+            console.print(
+                "[yellow]Key generated but could not store in keychain. Set via env:[/yellow]"
+            )
             console.print(f"  export ARC_AUDIT_HMAC_KEY={new_key}")
 
 
@@ -3322,6 +3877,7 @@ def profiles_list(
     """List available run profiles."""
     _setup_logging(debug)
     from .security.profiles import list_profiles
+
     profiles = [_profile_payload(p) for p in list_profiles().values()]
     _out(ok(profiles), json_output)
     if not json_output:
@@ -3351,10 +3907,18 @@ def profiles_show(
     """Show details for a specific run profile."""
     _setup_logging(debug)
     from .security.profiles import ProfileNotFound, resolve_profile_strict
+
     try:
         profile = resolve_profile_strict(profile_id)
     except ProfileNotFound:
-        _out(err(ArcErrorCode.INVALID_INPUT, f"Profile '{profile_id}' does not exist", details={"code": "UNKNOWN_PROFILE"}), json_output)
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                f"Profile '{profile_id}' does not exist",
+                details={"code": "UNKNOWN_PROFILE"},
+            ),
+            json_output,
+        )
         raise typer.Exit(2)
     payload = _profile_payload(profile)
     _out(ok(payload), json_output)
@@ -3372,12 +3936,18 @@ def profiles_show(
 @profiles_app.command("create")
 def profiles_create(
     profile_id: str = typer.Argument(..., help="Profile id"),
-    allow_paid_calls: bool = typer.Option(False, "--allow-paid-calls", help="Allow paid/provider calls"),
+    allow_paid_calls: bool = typer.Option(
+        False, "--allow-paid-calls", help="Allow paid/provider calls"
+    ),
     allow_network: bool = typer.Option(False, "--allow-network", help="Allow network access"),
     allow_shell: bool = typer.Option(False, "--allow-shell", help="Allow shell/tool execution"),
     allow_secrets: bool = typer.Option(False, "--allow-secrets", help="Allow secret env exposure"),
-    provider: Optional[str] = typer.Option(None, "--provider", help="Default provider metadata only"),
-    default_model: Optional[str] = typer.Option(None, "--default-model", help="Default model metadata only"),
+    provider: Optional[str] = typer.Option(
+        None, "--provider", help="Default provider metadata only"
+    ),
+    default_model: Optional[str] = typer.Option(
+        None, "--default-model", help="Default model metadata only"
+    ),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
@@ -3399,10 +3969,20 @@ def profiles_create(
     try:
         path = save_custom_profile(profile)
     except ValueError as exc:
-        _out(err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "PROFILE_EXISTS"}), json_output)
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "PROFILE_EXISTS"}),
+            json_output,
+        )
         raise typer.Exit(2)
     payload = _profile_payload(profile)
-    payload.update({"path": str(path), "provider": provider, "default_model": default_model, "stores_secrets": False})
+    payload.update(
+        {
+            "path": str(path),
+            "provider": provider,
+            "default_model": default_model,
+            "stores_secrets": False,
+        }
+    )
     _out(ok(payload), json_output)
 
 
@@ -3419,14 +3999,18 @@ def workspace_init(
     """Initialize ARC configuration in a workspace."""
     _setup_logging(debug)
     from .config.loader import init_config
+
     ws = _workspace(workspace)
     config_path = ws / ".arc" / "config.yaml"
     if config_path.exists():
-        _out(err(ArcErrorCode.INVALID_INPUT, f"Config already exists at {config_path}"), json_output)
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, f"Config already exists at {config_path}"), json_output
+        )
         raise typer.Exit(1)
     init_config(ws)
     if name:
         import yaml
+
         data = yaml.safe_load(config_path.read_text()) or {}
         data.setdefault("workspace", {})["name"] = name
         config_path.write_text(yaml.dump(data, default_flow_style=False))
@@ -3446,6 +4030,7 @@ def workspace_info(
     _setup_logging(debug)
     from .config.loader import load_config
     from .security.trust import resolve_trust
+
     ws = _workspace(workspace)
     config = load_config(workspace=ws)
     trust_status = resolve_trust(ws)
@@ -3470,7 +4055,9 @@ def workspace_info(
 @workspace_app.command("config")
 def workspace_config_cmd(
     workspace: Optional[str] = WORKSPACE_FLAG,
-    key: Optional[str] = typer.Option(None, "--key", "-k", help="Config key to set (e.g. runtime.default)"),
+    key: Optional[str] = typer.Option(
+        None, "--key", "-k", help="Config key to set (e.g. runtime.default)"
+    ),
     value: Optional[str] = typer.Option(None, "--value", "-v", help="Config value"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
@@ -3478,13 +4065,21 @@ def workspace_config_cmd(
     """Show or update workspace configuration."""
     _setup_logging(debug)
     from .config.loader import load_config
+
     ws = _workspace(workspace)
     config_path = ws / ".arc" / "config.yaml"
     if key and value:
         if not config_path.exists():
-            _out(err(ArcErrorCode.INVALID_INPUT, "Config file not found. Run 'arc workspace init' first."), json_output)
+            _out(
+                err(
+                    ArcErrorCode.INVALID_INPUT,
+                    "Config file not found. Run 'arc workspace init' first.",
+                ),
+                json_output,
+            )
             raise typer.Exit(1)
         import yaml
+
         data = yaml.safe_load(config_path.read_text()) or {}
         parts = key.split(".")
         target = data
@@ -3545,7 +4140,9 @@ def prompt_optimize(
 
     _out(ok(payload), json_output)
     if not json_output:
-        console.print(f"[dim]Original:[/dim] {result.original_tokens.count} tokens ({result.original_tokens.encoding})")
+        console.print(
+            f"[dim]Original:[/dim] {result.original_tokens.count} tokens ({result.original_tokens.encoding})"
+        )
         console.print(f"[green]Optimized:[/green] {result.optimized_tokens.count} tokens")
         console.print(f"[bold]Saved:[/bold] {result.tokens_saved} tokens")
         if result.changes:
@@ -3554,7 +4151,9 @@ def prompt_optimize(
             console.print("[dim]No changes needed[/dim]")
         if cost is not None:
             console.print(f"[dim]Est. cost before:[/dim] ${payload['estimated_cost_usd']:.6f}")
-            console.print(f"[green]Est. cost after:[/green] ${payload['estimated_cost_after_usd']:.6f}")
+            console.print(
+                f"[green]Est. cost after:[/green] ${payload['estimated_cost_after_usd']:.6f}"
+            )
 
 
 @prompt_app.command("diff")
