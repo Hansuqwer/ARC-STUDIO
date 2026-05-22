@@ -1,0 +1,108 @@
+# ARC Studio Architecture Overview
+
+## Three-Layer Model
+
+ARC Studio is built in three layers that communicate over JSON-RPC and HTTP:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                   BROWSER APP                             │
+│  applications/browser/                                    │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐ │
+│  │ Chat Tab │ │ Runs Tab │ │Workflows │ │ Config Tab   │ │
+│  │          │ │          │ │ Tab      │ │              │ │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────┘ │
+│  ┌──────────┐ ┌──────────────┐ ┌──────────────────────┐  │
+│  │ Timeline │ │ Event Stream │ │ Graph / Adapters /.. │  │
+│  └──────────┘ └──────────────┘ └──────────────────────┘  │
+└──────────────────────┬───────────────────────────────────┘
+                       │ JSON-RPC (Theia connection)
+┌──────────────────────▼───────────────────────────────────┐
+│               THEIA EXTENSION                              │
+│  packages/arc-extension/                                   │
+│  ┌──────────────────┐  ┌────────────────────────────────┐ │
+│  │ Frontend Widgets │  │ Backend Services               │ │
+│  │ ArcStudioWidget  │  │ arc-backend-service.ts         │ │
+│  │ ArcWidget (leg.) │  │ workflow-executor.ts           │ │
+│  │ Components (13)  │  │ trace-parser.ts                │ │
+│  │ Tabs (4)         │  │ run-lifecycle-service.ts       │ │
+│  └──────────────────┘  │ audit-bridge-service.ts        │ │
+│                        └──────────┬─────────────────────┘ │
+└───────────────────────────────────┬───────────────────────┘
+                                    │ HTTP / CLI spawn
+┌───────────────────────────────────▼───────────────────────┐
+│               PYTHON BACKEND                               │
+│  python/src/agent_runtime_cockpit/                         │
+│  ┌────────────┐ ┌──────────────┐ ┌──────────────────────┐ │
+│  │ CLI (arc)  │ │ Daemon (arc  │ │ Orchestration        │ │
+│  │            │ │ serve) + SSE │ │ EventBroker          │ │
+│  │ health     │ │ /api/runs    │ │ JobSupervisor        │ │
+│  │ status     │ │ /api/audit   │ │ RuntimeRouter        │ │
+│  │ run        │ │ /api/hitl    │ └──────────────────────┘ │
+│  │ audit      │ └──────────────┘ ┌──────────────────────┐ │
+│  │ replay     │                  │ Storage              │ │
+│  │ eval       │                  │ JsonlTraceStore      │ │
+│  │ runs       │                  │ SqliteStore          │ │
+│  └────────────┘                  │ IndexedTraceStore    │ │
+│                                  └──────────────────────┘ │
+│  ┌────────────┐ ┌──────────────┐ ┌──────────────────────┐ │
+│  │ Security   │ │ Adapte┴s     │ │ Config / Profiles    │ │
+│  │ Trust      │ │ SwarmGraph   │ │ YAML loader          │ │
+│  │ Redaction  │ │ LangGraph    │ │ 4-level precedence   │ │
+│  │ Isolation  │ │ CrewAI, etc. │ └──────────────────────┘ │
+│  └────────────┘ └──────────────┘                          │
+└───────────────────────────────────────────────────────────┘
+```
+
+## Data Flow
+
+1. **User input** enters through the CLI (`arc run`) or the browser IDE (Chat/Runs tabs).
+2. **Theia extension** receives the request via JSON-RPC and delegates to the Python CLI via `execFileSync` or spawn.
+3. **RuntimeRouter** selects the appropriate adapter (SwarmGraph, LangGraph, etc.) based on workspace detection.
+4. **Adapter** executes the workflow. Events flow through **EventBroker** (bounded queue, pub/sub, SSE).
+5. **Events** are dual-written: canonical JSONL trace files (`.arc/traces/<run_id>.jsonl`) and SQLite metadata index (ADR-003).
+6. **Frontend** receives events via SSE or replay, updating the run timeline, event stream, and graph views in real time.
+
+## Key Subsystems
+
+### Storage Strategy (ADR-003)
+
+Dual-write architecture: JSONL files are the canonical trace storage (human-readable, append-only). A SQLite index provides fast metadata search, run listing, and status queries. The `IndexedTraceStore` coordinates both.
+
+### Run Lifecycle State Machine (ADR-002)
+
+Runs progress through `queued → running → completed/failed/cancelled`. Lifecycle is managed by `JobSupervisor`, which handles cancel, orphan recovery, and timeout.
+
+### Event Schema Versioning (ADR-004)
+
+All events carry a `schema_version` field (currently v2). Additive changes do not increment the version. Breaking changes increment, and readers must support N and N-1. Old traces retain their original version.
+
+### Audit Chain Architecture (ADR-021)
+
+HMAC-SHA256 signed audit chains for all agent runs. Stored as JSONL per run in `~/.arc/audit/<run_id>.audit.jsonl`. Each event is linked to the previous via HMAC chain. Verification is via `arc audit verify <run_id>`. Designed for EU AI Act compliance.
+
+### Security Model
+
+Workspace trust resolver (external DB at `~/.arc/trusted-workspaces.json`), secret redaction in adapter outputs, paid-call gating via `RunProfile`, and subprocess/Docker isolation providers.
+
+### Provider Routing
+
+`RuntimeRouter` supports combo routing (multiple adapters) and adoption routing (scaffolding for non-native runtimes). Provider configuration uses 4-level precedence: environment > workspace > user > defaults.
+
+## Protocol Boundary
+
+Frontend and backend communicate via **JSON-RPC** over Theia's connection infrastructure (JSON-RPC channel). Protocol types are defined in TypeScript at `packages/arc-extension/src/common/arc-protocol.ts` and mirrored in Python at `python/src/agent_runtime_cockpit/protocol/`. The `packages/arc-protocol-ts/` package provides standalone TypeScript types for use outside Theia.
+
+## Related Docs
+
+- [Deep Architecture Analysis](./DEEP_ARCHITECTURE_ANALYSIS.md) — detailed audit of all subsystems
+- [Product Layout](./product-lock.md) — desktop-first product architecture
+- [ADR-000: Execution Core Contract](../adr/000-execution-core-contract.md)
+- [ADR-001: Config Model](../adr/001-config-model.md)
+- [ADR-002: Run Lifecycle State Machine](../adr/002-run-lifecycle-state-machine.md)
+- [ADR-003: Storage Strategy](../adr/003-storage-strategy.md)
+- [ADR-004: Event Schema Versioning](../adr/004-event-schema-versioning.md)
+- [ADR-014: Security Architecture](../adr/ADR-014-security-architecture.md)
+- [ADR-018: Protocol Package as Canonical Schema Home](../adr/ADR-018-protocol-package-as-canonical-schema-home.md)
+- [ADR-021: Audit Chain Architecture](../adr/021-audit-chain-architecture.md)
+- [DEVELOPMENT.md](../DEVELOPMENT.md) — build, test, and contribution guide
