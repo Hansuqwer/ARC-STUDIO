@@ -40,6 +40,7 @@ from .orchestration import runtime_router
 from .protocol.event_envelope import ok, err, ArcEnvelope
 from .protocol.errors import ArcErrorCode
 from .protocol.schemas import RunRecord, RunStatus
+from .security.context import EnforcementContext, DryRunAbort, set_enforcement_context
 from .security.validation import validate_workspace_path
 from .workspace import iter_workspace_files
 
@@ -57,6 +58,11 @@ app = typer.Typer(
 def _arc_default(
     ctx: typer.Context,
     version: bool = typer.Option(False, "--version", help="Show version and exit"),
+    allow_paid: bool = typer.Option(False, "--allow-paid", help="Bypass paid-call gate"),
+    trust_workspace: bool = typer.Option(
+        False, "--trust-workspace", help="Bypass workspace trust gate"
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Deny all operations and log"),
 ) -> None:
     """ARC — Agent Runtime Cockpit CLI.
 
@@ -66,6 +72,14 @@ def _arc_default(
     if version:
         console.print(f"ARC Studio v{arc_version}")
         raise typer.Exit()
+
+    # Set enforcement context from CLI flags
+    enforcement_ctx = EnforcementContext(
+        allow_paid=allow_paid,
+        trust_workspace=trust_workspace,
+        dry_run=dry_run,
+    )
+    set_enforcement_context(enforcement_ctx)
 
     # If a subcommand was invoked, do nothing here
     if ctx.invoked_subcommand is not None:
@@ -4190,5 +4204,14 @@ def prompt_diff(
             console.print("[dim]No differences[/dim]")
 
 
+def main() -> None:
+    """Main entry point for ARC CLI with enforcement error handling."""
+    try:
+        app()
+    except DryRunAbort as e:
+        console.print(f"[yellow]Dry-run:[/yellow] {e}", err=True)
+        _sys.exit(2)
+
+
 if __name__ == "__main__":
-    app()
+    main()

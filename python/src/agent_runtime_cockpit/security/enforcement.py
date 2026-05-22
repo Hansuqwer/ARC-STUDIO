@@ -12,6 +12,7 @@ import datetime as dt
 from pathlib import Path
 from typing import Callable, Optional
 
+from .context import EnforcementContext, DryRunAbort, get_enforcement_context
 from .trust import TrustLevel, resolve_trust, TRUST_DB
 from .profiles import RunProfile
 from ..protocol.denial_events import (
@@ -62,6 +63,7 @@ def enforce_workspace_trust(
     emit_event: Optional[EventEmitter] = None,
     trust_db: Path = TRUST_DB,
     allow_if_no_db: bool = False,
+    ctx: Optional[EnforcementContext] = None,
 ) -> None:
     """
     Enforce workspace trust before allowing an action.
@@ -76,10 +78,49 @@ def enforce_workspace_trust(
         emit_event: Optional callback to emit events (run_id, event_type, data)
         trust_db: Path to the external trust database
         allow_if_no_db: If True, allow execution when no trust DB exists
+        ctx: Optional enforcement context (uses global context if None)
 
     Raises:
         TrustEnforcementError: If the workspace is untrusted
+        DryRunAbort: If dry-run mode is enabled
     """
+    # Get enforcement context
+    ctx = ctx or get_enforcement_context()
+
+    # Dry-run branch: always denies, cannot be bypassed
+    if ctx.dry_run:
+        denial_data = TrustDenialData(
+            action=action,
+            workspace_path=str(workspace.resolve()),
+            reason="dry_run",
+            trust_level="unknown",
+            required_trust_level="trusted",
+            remediation="Remove --dry-run flag to execute this operation",
+        )
+
+        denial_event = TrustDeniedEvent(
+            type="TRUST_DENIED",
+            timestamp=dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+            run_id=run_id,
+            sequence=sequence,
+            data=denial_data,
+        )
+
+        # Emit event if callback provided
+        if emit_event:
+            emit_event(run_id, "TRUST_DENIED", denial_event.model_dump(by_alias=True))
+
+        # Raise DryRunAbort
+        raise DryRunAbort(
+            f"Dry-run: would check workspace trust for '{action}' in {workspace}",
+            denial_event=denial_event.model_dump(by_alias=True),
+        )
+
+    # Bypass gate if trust_workspace flag is set
+    if ctx.trust_workspace:
+        return
+
+    # Normal trust enforcement
     resolution = resolve_trust(workspace, trust_db=trust_db)
 
     if resolution.level == TrustLevel.UNTRUSTED:
@@ -124,6 +165,7 @@ def enforce_paid_call_gate(
     emit_event: Optional[EventEmitter] = None,
     provider: Optional[str] = None,
     model: Optional[str] = None,
+    ctx: Optional[EnforcementContext] = None,
 ) -> None:
     """
     Enforce paid-call gate before allowing provider calls.
@@ -138,20 +180,25 @@ def enforce_paid_call_gate(
         emit_event: Optional callback to emit events
         provider: Optional provider name for context
         model: Optional model name for context
+        ctx: Optional enforcement context (uses global context if None)
 
     Raises:
         PaidCallEnforcementError: If paid calls are not allowed
+        DryRunAbort: If dry-run mode is enabled
     """
-    if not profile.allow_paid_calls:
-        # Create typed denial event
+    # Get enforcement context
+    ctx = ctx or get_enforcement_context()
+
+    # Dry-run branch: always denies, cannot be bypassed
+    if ctx.dry_run:
         denial_data = PaidCallDenialData(
             action=action,
             provider=provider,
             model=model,
-            reason=f"Profile '{profile.id}' does not allow paid calls",
+            reason="dry_run",
             profile_id=profile.id,
             allow_paid_calls=False,
-            remediation="Use --allow-paid flag or switch to a profile with allow_paid_calls=true",
+            remediation="Remove --dry-run flag to execute this operation",
         )
 
         denial_event = PaidCallDeniedEvent(
@@ -166,12 +213,46 @@ def enforce_paid_call_gate(
         if emit_event:
             emit_event(run_id, "PAID_CALL_DENIED", denial_event.model_dump(by_alias=True))
 
-        # Raise enforcement error
-        raise PaidCallEnforcementError(
-            f"Paid calls not allowed by profile '{profile.id}'. "
-            f"Use --allow-paid flag or switch to a profile with allow_paid_calls=true.",
+        # Raise DryRunAbort
+        raise DryRunAbort(
+            f"Dry-run: would check paid-call gate for '{action}'",
             denial_event=denial_event.model_dump(by_alias=True),
         )
+
+    # Bypass gate if allow_paid flag is set OR profile allows paid calls
+    if ctx.allow_paid or profile.allow_paid_calls:
+        return
+
+    # If we get here, paid calls are not allowed
+    # Create typed denial event
+    denial_data = PaidCallDenialData(
+        action=action,
+        provider=provider,
+        model=model,
+        reason=f"Profile '{profile.id}' does not allow paid calls",
+        profile_id=profile.id,
+        allow_paid_calls=False,
+        remediation="Use --allow-paid flag or switch to a profile with allow_paid_calls=true",
+    )
+
+    denial_event = PaidCallDeniedEvent(
+        type="PAID_CALL_DENIED",
+        timestamp=dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+        run_id=run_id,
+        sequence=sequence,
+        data=denial_data,
+    )
+
+    # Emit event if callback provided
+    if emit_event:
+        emit_event(run_id, "PAID_CALL_DENIED", denial_event.model_dump(by_alias=True))
+
+    # Raise enforcement error
+    raise PaidCallEnforcementError(
+        f"Paid calls not allowed by profile '{profile.id}'. "
+        f"Use --allow-paid flag or switch to a profile with allow_paid_calls=true.",
+        denial_event=denial_event.model_dump(by_alias=True),
+    )
 
 
 def enforce_shell_gate(
@@ -181,6 +262,7 @@ def enforce_shell_gate(
     sequence: int,
     emit_event: Optional[EventEmitter] = None,
     command: Optional[str] = None,
+    ctx: Optional[EnforcementContext] = None,
 ) -> None:
     """
     Enforce shell execution gate before allowing shell commands.
@@ -194,10 +276,45 @@ def enforce_shell_gate(
         sequence: Event sequence number
         emit_event: Optional callback to emit events
         command: Optional command string for context
+        ctx: Optional enforcement context (uses global context if None)
 
     Raises:
         ShellEnforcementError: If shell execution is not allowed
+        DryRunAbort: If dry-run mode is enabled
     """
+    # Get enforcement context
+    ctx = ctx or get_enforcement_context()
+
+    # Dry-run branch: always denies, cannot be bypassed
+    if ctx.dry_run:
+        denial_data = ShellDenialData(
+            action=action,
+            command=command,
+            reason="dry_run",
+            profile_id=profile.id,
+            allow_shell=False,
+            remediation="Remove --dry-run flag to execute this operation",
+        )
+
+        denial_event = ShellDeniedEvent(
+            type="SHELL_DENIED",
+            timestamp=dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+            run_id=run_id,
+            sequence=sequence,
+            data=denial_data,
+        )
+
+        # Emit event if callback provided
+        if emit_event:
+            emit_event(run_id, "SHELL_DENIED", denial_event.model_dump(by_alias=True))
+
+        # Raise DryRunAbort
+        raise DryRunAbort(
+            f"Dry-run: would check shell gate for '{action}'",
+            denial_event=denial_event.model_dump(by_alias=True),
+        )
+
+    # Normal shell enforcement
     if not profile.allow_shell:
         # Create typed denial event
         denial_data = ShellDenialData(
@@ -236,6 +353,7 @@ def enforce_network_gate(
     sequence: int,
     emit_event: Optional[EventEmitter] = None,
     url: Optional[str] = None,
+    ctx: Optional[EnforcementContext] = None,
 ) -> None:
     """
     Enforce network access gate before allowing network operations.
@@ -249,10 +367,45 @@ def enforce_network_gate(
         sequence: Event sequence number
         emit_event: Optional callback to emit events
         url: Optional URL for context
+        ctx: Optional enforcement context (uses global context if None)
 
     Raises:
         NetworkEnforcementError: If network access is not allowed
+        DryRunAbort: If dry-run mode is enabled
     """
+    # Get enforcement context
+    ctx = ctx or get_enforcement_context()
+
+    # Dry-run branch: always denies, cannot be bypassed
+    if ctx.dry_run:
+        denial_data = NetworkDenialData(
+            action=action,
+            url=url,
+            reason="dry_run",
+            profile_id=profile.id,
+            allow_network=False,
+            remediation="Remove --dry-run flag to execute this operation",
+        )
+
+        denial_event = NetworkDeniedEvent(
+            type="NETWORK_DENIED",
+            timestamp=dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+            run_id=run_id,
+            sequence=sequence,
+            data=denial_data,
+        )
+
+        # Emit event if callback provided
+        if emit_event:
+            emit_event(run_id, "NETWORK_DENIED", denial_event.model_dump(by_alias=True))
+
+        # Raise DryRunAbort
+        raise DryRunAbort(
+            f"Dry-run: would check network gate for '{action}'",
+            denial_event=denial_event.model_dump(by_alias=True),
+        )
+
+    # Normal network enforcement
     if not profile.allow_network:
         # Create typed denial event
         denial_data = NetworkDenialData(
