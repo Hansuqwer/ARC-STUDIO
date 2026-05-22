@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "type": "AGENT_END",
+  "timestamp": "2026-05-22T10:21:00.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 100,
+  "data": {
+    "agent_name": "coordinator",
+    "output": "Workflow completed successfully",
+    "usage": {
+      "total_tokens": 225,
+      "prompt_tokens": 150,
+      "completion_tokens": 75
+    }
+  }
+}

@@ -34,9 +34,12 @@
     "clean": "pnpm -r clean && rimraf node_modules",
     "download:plugins": "theia download:plugins --rate-limit=15 --parallel=false",
     "lint": "pnpm -r lint",
-    "format": "pnpm -r format"
+    "format": "pnpm -r format",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.5",
     "rimraf": "^5.0.10",
     "typescript": "^5.4.5"
   },

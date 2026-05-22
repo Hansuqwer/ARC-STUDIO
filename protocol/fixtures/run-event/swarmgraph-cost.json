@@ -1,0 +1,18 @@
+{
+  "schema_version": 2,
+  "type": "SWARMGRAPH_COST",
+  "timestamp": "2026-05-22T10:17:00.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 60,
+  "data": {
+    "provider": "openai",
+    "model": "gpt-4",
+    "promptTokens": 150,
+    "completionTokens": 75,
+    "totalTokens": 225,
+    "totalCost": 0.00675,
+    "currency": "USD",
+    "runtime": "swarmgraph",
+    "measured": true
+  }
+}

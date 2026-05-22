@@ -89,3 +89,13 @@ ignore = ["E701", "E702", "E741"]
 python_version = "3.11"
 strict = false
 ignore_missing_imports = true
+
+[tool.coverage.report]
+fail_under = 70
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]

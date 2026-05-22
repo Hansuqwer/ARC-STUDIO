@@ -1,0 +1,19 @@
+{
+  "schema_version": 2,
+  "type": "SWARMGRAPH_TOPOLOGY",
+  "timestamp": "2026-05-22T10:15:00.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 10,
+  "data": {
+    "nodes": [
+      {"id": "agent-1", "type": "coordinator", "name": "Coordinator"},
+      {"id": "agent-2", "type": "worker", "name": "Worker A"},
+      {"id": "agent-3", "type": "worker", "name": "Worker B"}
+    ],
+    "edges": [
+      {"from": "agent-1", "to": "agent-2", "type": "delegates"},
+      {"from": "agent-1", "to": "agent-3", "type": "delegates"}
+    ],
+    "strategy": "consensus"
+  }
+}

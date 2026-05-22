@@ -12,6 +12,9 @@ import { WorkflowExecutor } from './services/workflow-executor';
 import { TraceParser } from './services/trace-parser';
 import { WorkflowDetector } from './services/workflow-detector';
 import { FileManager } from './services/file-manager';
+import { ConfigService } from './services/config-service';
+import { RunLifecycleService } from './services/run-lifecycle-service';
+import { AuditBridgeService } from './services/audit-bridge-service';
 import { ArcServicePath } from '../common/arc-protocol';
 
 export default new ContainerModule(bind => {
@@ -20,6 +23,11 @@ export default new ContainerModule(bind => {
     bind(TraceParser).toSelf().inSingletonScope();
     bind(WorkflowDetector).toSelf().inSingletonScope();
     bind(FileManager).toSelf().inSingletonScope();
+
+    // Bind new domain services (P2 refactoring)
+    bind(ConfigService).toSelf().inSingletonScope();
+    bind(RunLifecycleService).toSelf().inSingletonScope();
+    bind(AuditBridgeService).toSelf().inSingletonScope();
 
     // Bind the backend service with explicit service dependencies.
     bind(ArcBackendService).toDynamicValue(ctx => new ArcBackendService(

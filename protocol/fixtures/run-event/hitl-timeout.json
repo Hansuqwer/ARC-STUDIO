@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "type": "HITL_TIMEOUT",
+  "timestamp": "2026-05-22T10:17:23.481Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 44,
+  "data": {
+    "hitl_id": "hitl_01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+    "timeout_seconds": 60
+  }
+}

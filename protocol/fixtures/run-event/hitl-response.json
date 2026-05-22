@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "type": "HITL_RESPONSE",
+  "timestamp": "2026-05-22T10:16:05.123Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 43,
+  "data": {
+    "hitl_id": "hitl_01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+    "decision": "approve",
+    "operator_id": "user@example.com",
+    "responded_at": "2026-05-22T10:16:05.000Z",
+    "notes": "Approved after review"
+  }
+}

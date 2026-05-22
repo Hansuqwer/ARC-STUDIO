@@ -1,0 +1,18 @@
+{
+  "schema_version": 2,
+  "type": "HITL_PROMPT",
+  "timestamp": "2026-05-22T10:15:23.481Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 42,
+  "data": {
+    "hitl_id": "hitl_01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+    "step_id": "approval-gate",
+    "prompt_text": "Approve production deployment?",
+    "options": ["approve", "reject"],
+    "timeout_seconds": 60,
+    "context": {
+      "deployment_target": "production",
+      "changes": 15
+    }
+  }
+}

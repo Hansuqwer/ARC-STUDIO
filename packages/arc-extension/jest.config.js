@@ -7,6 +7,18 @@ module.exports = {
         '/node_modules/',
         '\\.d\\.ts$'
     ],
+    collectCoverage: true,
+    coverageReporters: ['text-summary', 'lcov'],
+    // Pinned slightly below current baseline. Raise by ~2 points per quarter
+    // OR whenever a patch organically improves coverage. See CONTRIBUTING.md.
+    coverageThreshold: {
+        global: {
+            branches: 22,
+            functions: 21,
+            lines: 30,
+            statements: 29,
+        },
+    },
     collectCoverageFrom: [
         'lib/**/*.js',
         '!lib/**/*.d.ts',

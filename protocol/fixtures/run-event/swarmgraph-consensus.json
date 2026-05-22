@@ -1,0 +1,18 @@
+{
+  "schema_version": 2,
+  "type": "SWARMGRAPH_CONSENSUS",
+  "timestamp": "2026-05-22T10:16:30.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 50,
+  "data": {
+    "votes": {
+      "agent-2": "approve",
+      "agent-3": "approve"
+    },
+    "decision": "approve",
+    "strategy": "majority",
+    "voters": ["agent-2", "agent-3"],
+    "confidence": 0.95,
+    "consensus_reached": true
+  }
+}

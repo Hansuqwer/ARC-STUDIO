@@ -12,6 +12,64 @@ ARC Studio is an Agent Runtime Cockpit IDE for developing, executing, and monito
 
 ---
 
+## System at a glance
+
+```mermaid
+flowchart LR
+    User([Developer]):::actor
+    subgraph Theia["Eclipse Theia"]
+        UI["ARC Widgets<br/>(trace · HITL · cost · audit)"]
+        Ext["arc-extension backend<br/>(Inversify services)"]
+    end
+    subgraph Py["Python cockpit"]
+        Daemon["aiohttp daemon<br/>(SSE + REST)"]
+        Router["Runtime Router"]
+        SG["SwarmGraph"]
+        LG["LangGraph"]
+        CR["CrewAI"]
+        Audit[("Audit JSONL<br/>~/.arc/audit/")]
+    end
+    Providers([LLM Providers])
+
+    User --> UI
+    UI <-->|JSON-RPC| Ext
+    Ext <-->|HTTP + SSE| Daemon
+    Daemon --> Router
+    Router --> SG & LG & CR
+    SG & LG & CR -->|HMAC-chained events| Audit
+    SG & LG & CR -->|cost-tracked calls| Providers
+
+    classDef actor fill:#fef3c7,stroke:#92400e
+```
+
+## Run lifecycle (sequence)
+
+```mermaid
+sequenceDiagram
+    actor Dev as Developer
+    participant Widget as Theia Widget
+    participant Run as RunLifecycleService
+    participant Daemon as Python Daemon
+    participant Adapter as Runtime Adapter
+    participant Audit as AuditSession
+
+    Dev->>Widget: Start run
+    Widget->>Run: startRun(workflowId)
+    Run->>Daemon: POST /runs
+    Daemon->>Adapter: dispatch
+    Adapter->>Audit: open() · run_started
+    loop streaming
+        Adapter-->>Daemon: AG-UI event
+        Daemon-->>Widget: SSE event
+        Adapter->>Audit: tool_call / tool_result
+    end
+    Adapter->>Audit: run_completed · close()
+    Daemon-->>Widget: RUN_COMPLETED
+    Widget-->>Dev: Trace · cost · audit_path
+```
+
+---
+
 ## The Three-Layer Architecture
 
 ARC Studio consists of three layers:

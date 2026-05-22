@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "type": "FAILURE_AUTOPSY_GENERATED",
+  "timestamp": "2026-05-22T10:20:00.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 90,
+  "data": {
+    "autopsy": {
+      "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+      "failure_type": "timeout",
+      "root_cause": "LLM provider timeout after 30s",
+      "affected_steps": ["step-3"],
+      "recovery_suggestions": ["Retry with exponential backoff", "Switch to backup provider"]
+    }
+  }
+}

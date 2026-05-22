@@ -1,0 +1,6 @@
+{
+  "*.ts":   ["pnpm exec eslint --fix", "pnpm exec prettier --write"],
+  "*.tsx":  ["pnpm exec eslint --fix", "pnpm exec prettier --write"],
+  "*.py":   ["uv run --directory python ruff check --fix", "uv run --directory python ruff format"],
+  "*.{md,json,yml,yaml}": ["pnpm exec prettier --write"]
+}

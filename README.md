@@ -8,6 +8,8 @@ ARC Studio combines a Python CLI and loopback daemon with an Eclipse Theia brows
 
 This is an alpha release. Core functionality is stable and ready for development use, but APIs, UI components, and runtime adapters will continue to evolve as we move toward v1.0 stable. We recommend pinning to a specific version tag or commit SHA for production experiments.
 
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, commit conventions, and the PR checklist.
+
 ## Features
 
 **Local-First Execution**  
