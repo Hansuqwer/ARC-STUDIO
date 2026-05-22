@@ -820,8 +820,27 @@ bash scripts/check-pr.sh
 ## Phase 23 — Enforced Workspace Trust + Paid-Call Gates
 
 **Roadmap:** R16 — Trust + Paid-Call Enforcement  
-**Status:** Partial — typed denial events and enforcement helpers complete (Phase 22 integration); CLI flags, UI confirmation, and surface integration remain | Evidence: local worktree 2026-05-22 | 1496 Python tests passed (15 new enforcement tests), TypeScript builds green | Notes: Foundation complete with typed denial events (TRUST_DENIED, PAID_CALL_DENIED, SHELL_DENIED, NETWORK_DENIED, PERMISSION_DENIED) and centralized enforcement helpers; remaining work is CLI flags, UI dialogs, and extending enforcement to all surfaces  
+**Status:** In Progress (PR 23.1 Complete) — EnforcementContext + CLI flags complete; surface integration and UI confirmation remain | Evidence: commits 3e6ee8c (foundation), fca4bf2 (PR 23.1) | 1513 Python tests passed (17 new context tests + 15 enforcement tests), TypeScript builds green | Notes: Foundation complete with typed denial events, centralized enforcement helpers, EnforcementContext system, and CLI flags (--allow-paid, --trust-workspace, --dry-run); remaining work is per-surface enforcement and UI confirmation dialogs  
 **Depends on:** Phase 22 (needs typed RunEvent for denial events)
+
+### Progress
+
+#### PR 23.1: EnforcementContext + CLI Flags ✓
+**Commit:** fca4bf2  
+**Completed:** 2026-05-22
+
+- Created `security/context.py` with EnforcementContext, DryRunAbort, context variable management
+- Updated all 4 enforcement helpers (`enforce_workspace_trust`, `enforce_paid_call_gate`, `enforce_shell_gate`, `enforce_network_gate`) to accept optional `ctx` parameter
+- Added dry-run branch to each helper that emits denial event with `dry_run=true` and raises `DryRunAbort`
+- Implemented bypass logic: `ctx.trust_workspace` bypasses trust gate, `ctx.allow_paid` bypasses paid-call gate
+- Wired `--allow-paid`, `--trust-workspace`, `--dry-run` flags to CLI main callback
+- Added `main()` wrapper to catch `DryRunAbort` and exit with code 2
+- Added 17 comprehensive tests for context propagation, dry-run semantics, bypass flags, and TOCTOU safety
+- Verified: 1,513 Python tests passing (20 skipped), no regressions
+
+**Remaining for Phase 23:**
+- PR 23.2: Per-surface enforcement (5 surfaces) + audit script + surface inventory
+- PR 23.3: UI confirmation dialogs + correlation IDs + retry bridge
 
 ### Implementation
 1. Centralize `TrustState` and `PaidCallPolicy` in protocol package for cross-language use.

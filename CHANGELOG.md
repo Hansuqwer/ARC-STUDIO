@@ -6,10 +6,18 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 
 ### Added
 
+- **Security**: EnforcementContext system for centralized enforcement decisions (Phase 23.1)
+- **CLI**: Global flags `--allow-paid`, `--trust-workspace`, `--dry-run` for security gates (Phase 23.1)
+- **Security**: DryRunAbort exception for dry-run mode (exits with code 2) (Phase 23.1)
 - ADR-023 error-code sync: Python and TypeScript now share the 16 canonical `ArcErrorCode` values.
 - `PERMISSION_DENIED` and `UNKNOWN` in Python `ArcErrorCode`.
 - `canonicalErrorCode()` in TypeScript and `ArcErrorCode.from_legacy()` in Python for read-path legacy normalization.
 - `protocol/fixtures/error-codes/` cross-language fixtures and `docs/guides/error-code-migration.md`.
+
+### Changed
+
+- **Security**: All 4 enforcement helpers now accept optional `ctx` parameter (Phase 23.1)
+- **Security**: Dry-run mode emits denial events with `dry_run=true` flag (Phase 23.1)
 
 ### Deprecated
 
