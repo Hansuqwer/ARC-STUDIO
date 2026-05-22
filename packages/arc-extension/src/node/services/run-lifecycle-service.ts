@@ -516,81 +516,149 @@ export class RunLifecycleService {
             return;
         }
 
-        let streamUrl: URL;
-        try {
-            streamUrl = this.buildPythonDaemonStreamUrl(baseUrl, request.runId);
-        } catch (error) {
-            yield this.activeTraceTerminalChunk(request, 1, 'STREAM_END', 'error', 'Invalid Python web/SSE base URL.');
-            return;
-        }
-        streamUrl.searchParams.set('mode', 'live');
+        const maxRetries = 5;
+        const baseRetryMs = 2000;
+        let lastEventId = 0;
+        let retryCount = 0;
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), timeoutMs);
-        let sequence = 1;
-        try {
-            const response = await fetch(streamUrl, {
-                method: 'GET',
-                headers: { Accept: 'text/event-stream' },
-                signal: controller.signal,
-            });
-            if (!response.ok || !response.body) {
-                yield this.activeTraceTerminalChunk(request, sequence, 'STREAM_END', 'disconnected', `Live SSE proxy degraded; Python daemon returned HTTP ${response.status}.`);
+        while (retryCount <= maxRetries && !cancelToken.cancelled) {
+            if (Date.now() - startedAt > timeoutMs) {
+                yield this.activeTraceTerminalChunk(request, 1, 'STREAM_END', 'error', 'Stream timed out.');
                 return;
             }
-            yield {
-                runId: request.runId,
-                mode: 'live',
-                sequence: sequence++,
-                status: {
+
+            if (retryCount > 0 && lastEventId > 0) {
+                const jitterMs = Math.random() * 1000;
+                const delayMs = Math.min(baseRetryMs * Math.pow(2, retryCount - 1) + jitterMs, 30000);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                yield {
                     runId: request.runId,
                     mode: 'live',
-                    state: 'connected',
-                    message: 'Live SSE stream connected.',
-                    baseUrlConfigured: true,
-                    timestamp: new Date().toISOString(),
-                },
-                done: false,
-            };
+                    sequence: 1,
+                    status: {
+                        runId: request.runId,
+                        mode: 'live',
+                        state: 'reconnecting',
+                        message: `Reconnecting (attempt ${retryCount}/${maxRetries}, last event ${lastEventId})...`,
+                        baseUrlConfigured: true,
+                        timestamp: new Date().toISOString(),
+                    },
+                    done: false,
+                };
+            }
 
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-            while (!cancelToken.cancelled) {
-                if (Date.now() - startedAt > timeoutMs) {
-                    controller.abort();
-                    yield this.activeTraceTerminalChunk(request, sequence, 'STREAM_END', 'error', 'Stream timed out.');
-                    return;
-                }
-                const { done, value } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-                const frames = buffer.split(/\r?\n\r?\n/);
-                buffer = frames.pop() ?? '';
-                for (const frame of frames) {
-                    const event = this.parseSseEvent(frame);
-                    if (!event) continue;
-                    const terminal = this.activeTraceTerminalFromEventType(String(event.type ?? ''));
-                    yield { runId: request.runId, mode: 'live', sequence: sequence++, event, terminal, done: false };
-                    if (terminal) {
-                        yield this.activeTraceTerminalChunk(request, sequence, terminal, 'ended', 'Live SSE stream ended.');
+            let streamUrl: URL;
+            try {
+                streamUrl = this.buildPythonDaemonStreamUrl(baseUrl, request.runId);
+            } catch (error) {
+                yield this.activeTraceTerminalChunk(request, 1, 'STREAM_END', 'error', 'Invalid Python web/SSE base URL.');
+                return;
+            }
+            streamUrl.searchParams.set('mode', 'live');
+            if (lastEventId > 0) {
+                streamUrl.searchParams.set('last_event_id', String(lastEventId));
+            }
+
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), timeoutMs);
+            let sequence = 1;
+            try {
+                const response = await fetch(streamUrl, {
+                    method: 'GET',
+                    headers: { Accept: 'text/event-stream' },
+                    signal: controller.signal,
+                });
+                if (!response.ok || !response.body) {
+                    retryCount += 1;
+                    if (retryCount > maxRetries) {
+                        yield this.activeTraceTerminalChunk(request, sequence, 'STREAM_END', 'disconnected', `Live SSE proxy degraded; Python daemon returned HTTP ${response.status} after ${maxRetries} retries.`);
                         return;
                     }
+                    continue;
                 }
+                retryCount = 0;
+
+                if (lastEventId === 0) {
+                    yield {
+                        runId: request.runId,
+                        mode: 'live',
+                        sequence: sequence++,
+                        status: {
+                            runId: request.runId,
+                            mode: 'live',
+                            state: 'connected',
+                            message: 'Live SSE stream connected.',
+                            baseUrlConfigured: true,
+                            timestamp: new Date().toISOString(),
+                        },
+                        done: false,
+                    };
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let streamEnded = false;
+                while (!cancelToken.cancelled && !streamEnded) {
+                    if (Date.now() - startedAt > timeoutMs) {
+                        controller.abort();
+                        yield this.activeTraceTerminalChunk(request, sequence, 'STREAM_END', 'error', 'Stream timed out.');
+                        return;
+                    }
+                    const { done, value } = await reader.read();
+                    if (done) {
+                        streamEnded = true;
+                        break;
+                    }
+                    buffer += decoder.decode(value, { stream: true });
+                    const frames = buffer.split(/\r?\n\r?\n/);
+                    buffer = frames.pop() ?? '';
+                    for (const frame of frames) {
+                        const event = this.parseSseEvent(frame);
+                        if (!event) continue;
+
+                        const frameEventId = this.parseSseEventId(frame);
+                        if (frameEventId > 0) {
+                            lastEventId = frameEventId;
+                        }
+
+                        const terminal = this.activeTraceTerminalFromEventType(String(event.type ?? ''));
+                        yield { runId: request.runId, mode: 'live', sequence: sequence++, event, terminal, done: false };
+                        if (terminal) {
+                            yield this.activeTraceTerminalChunk(request, sequence, terminal, 'ended', 'Live SSE stream ended.');
+                            return;
+                        }
+                    }
+                }
+                if (streamEnded) {
+                    yield this.activeTraceTerminalChunk(
+                        request,
+                        sequence,
+                        'STREAM_END',
+                        'ended',
+                        'Live SSE stream ended.'
+                    );
+                    return;
+                }
+            } catch (error) {
+                retryCount += 1;
+                if (retryCount > maxRetries) {
+                    yield this.activeTraceTerminalChunk(request, sequence, 'STREAM_END', 'disconnected', `Live SSE proxy degraded; ${error instanceof Error ? error.message : 'Unknown live SSE error'} after ${maxRetries} retries.`);
+                    return;
+                }
+            } finally {
+                clearTimeout(timeout);
+                controller.abort();
             }
-            yield this.activeTraceTerminalChunk(
-                request,
-                sequence,
-                cancelToken.cancelled ? 'RUN_CANCELLED' : 'STREAM_END',
-                cancelToken.cancelled ? 'cancelled' : 'disconnected',
-                cancelToken.cancelled ? 'Stream cancelled.' : 'Live SSE stream disconnected.'
-            );
-        } catch (error) {
-            yield this.activeTraceTerminalChunk(request, sequence, 'STREAM_END', 'disconnected', `Live SSE proxy degraded; ${error instanceof Error ? error.message : 'Unknown live SSE error'}`);
-        } finally {
-            clearTimeout(timeout);
-            controller.abort();
         }
+    }
+
+    private parseSseEventId(frame: string): number {
+        const idMatch = frame.match(/^id:\s*(\d+)/m);
+        if (idMatch) {
+            return parseInt(idMatch[1], 10);
+        }
+        return 0;
     }
 
     private resolvePythonDaemonBaseUrl(request: ActiveTraceStreamRequest): string | undefined {

@@ -6,6 +6,7 @@
   "main": "lib/node/arc-extension-backend-module.js",
   "typings": "lib/node/arc-extension-backend-module.d.ts",
   "dependencies": {
+    "@tanstack/react-virtual": "^3.10.9",
     "@theia/core": "^1.71.0",
     "@theia/filesystem": "^1.71.0",
     "@theia/navigator": "^1.71.0",

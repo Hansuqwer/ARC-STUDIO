@@ -3,6 +3,7 @@ import * as React from 'react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { ArcService, ActiveTraceEventChunk, TraceData, TraceEvent, TraceFile } from '../common/arc-protocol';
+import { VirtualizedEventList } from './components/VirtualizedEventList';
 
 type StreamMode = 'replay-trace' | 'live-available' | 'live-connecting' | 'live' | 'live-disconnected' | 'live-error' | 'live-terminal';
 type LiveArcService = ArcService & { streamActiveTrace?: (request: { runId: string; mode: 'live' }) => Promise<AsyncIterable<ActiveTraceEventChunk>> };
@@ -122,10 +123,21 @@ export class ArcEventStreamWidget extends ReactWidget {
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                     {this.renderToolbar(events)}
                     {this.error && <div style={errorStyle}>{this.error}</div>}
-                    <div style={{ flex: 1, overflow: 'auto', padding: '12px' }}>
-                        {events.map(event => this.renderEvent(event))}
-                        {events.length === 0 && <div style={centerStyle}>No events match current filters</div>}
-                    </div>
+                    <VirtualizedEventList
+                        events={events}
+                        estimateSize={64}
+                        overscan={5}
+                        renderEvent={(event) => (
+                            <div key={`${event.sequence}-${event.type}`} style={eventStyle} onClick={() => { this.selectedEvent = event; this.update(); }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                                    <strong>{event.type}</strong>
+                                    <span style={{ color: 'var(--theia-descriptionForeground)', fontSize: '11px' }}>#{event.sequence}</span>
+                                </div>
+                                <div style={{ color: 'var(--theia-descriptionForeground)', fontSize: '11px' }}>{event.timestamp}</div>
+                                <pre style={compactPreStyle}>{JSON.stringify(event.data, null, 2)}</pre>
+                            </div>
+                        )}
+                    />
                 </div>
                 {this.selectedEvent && this.renderDetails(this.selectedEvent)}
             </div>
@@ -259,5 +271,6 @@ const inputStyle: React.CSSProperties = { backgroundColor: 'var(--theia-input-ba
 const chipStyle: React.CSSProperties = { ...buttonStyle, fontSize: '10px' };
 const statusStyle: React.CSSProperties = { border: '1px solid var(--theia-widget-border)', borderRadius: '999px', color: 'var(--theia-descriptionForeground)', fontSize: '11px', padding: '2px 8px' };
 const errorStyle: React.CSSProperties = { backgroundColor: 'var(--theia-inputValidation-errorBackground)', border: '1px solid var(--theia-inputValidation-errorBorder)', color: 'var(--theia-errorForeground)', margin: '12px', padding: '8px' };
+const eventStyle: React.CSSProperties = { borderLeft: '4px solid #4fc3f7', backgroundColor: 'var(--theia-editor-background)', borderRadius: '4px', marginBottom: '8px', padding: '8px', cursor: 'pointer' };
 const preStyle: React.CSSProperties = { backgroundColor: 'var(--theia-textCodeBlock-background)', fontSize: '11px', overflow: 'auto', padding: '8px', whiteSpace: 'pre-wrap' };
 const compactPreStyle: React.CSSProperties = { ...preStyle, maxHeight: '120px', margin: '6px 0 0 0' };

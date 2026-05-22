@@ -1016,6 +1016,7 @@ export type ActiveTraceTerminalType =
 export type ActiveTraceStreamState =
     | 'connecting'
     | 'connected'
+    | 'reconnecting'
     | 'replaying'
     | 'disconnected'
     | 'error'

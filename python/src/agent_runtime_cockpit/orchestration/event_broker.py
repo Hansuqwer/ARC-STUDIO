@@ -1,10 +1,12 @@
 """
 EventBroker — in-memory event pub/sub with SSE delivery (PR 19).
 
-Uses bounded ``asyncio.Queue`` per subscriber with a documented
-slow-client policy (drop-oldest when queue is full). No external
-SSE dependency — delivers via ``aiohttp.web.StreamResponse``.
+Uses a ring buffer for replay on reconnection and bounded
+``asyncio.Queue`` per subscriber with a documented slow-client
+policy (drop-oldest when queue is full). No external SSE
+dependency — delivers via ``aiohttp.web.StreamResponse``.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -20,15 +22,49 @@ log = logging.getLogger(__name__)
 
 HEARTBEAT_INTERVAL = 15.0
 QUEUE_MAX_SIZE = 1000
+RING_BUFFER_SIZE = 1000
 TERMINAL_EVENT_TYPES = {"RUN_COMPLETED", "RUN_FAILED", "RUN_CANCELLED"}
 DEGRADED_EVENT_TYPE = "STREAM_DEGRADED"
+
+
+class RingBuffer:
+    """Fixed-size ring buffer for replay on SSE reconnection.
+
+    Maintains the last N events per run. Oldest events are overwritten
+    when the buffer is full.
+    """
+
+    def __init__(self, max_size: int = RING_BUFFER_SIZE) -> None:
+        self._max_size = max_size
+        self._buffer: list[dict[str, Any]] = []
+        self._start = 0
+
+    def push(self, event: dict[str, Any]) -> None:
+        if len(self._buffer) < self._max_size:
+            self._buffer.append(event)
+        else:
+            self._buffer[self._start % self._max_size] = event
+            self._start += 1
+
+    def replay_from(self, from_event_id: int) -> list[dict[str, Any]]:
+        """Return all events with event_id > from_event_id, in chronological order."""
+        if not self._buffer:
+            return []
+        return sorted(
+            [e for e in self._buffer if e.get("event_id", 0) > from_event_id],
+            key=lambda e: e.get("event_id", 0),
+        )
+
+    def clear(self) -> None:
+        self._buffer.clear()
+        self._start = 0
 
 
 class EventBroker:
     """In-memory event broker with SSE delivery.
 
     Supports live streaming (from active runs) and replay (from stored traces).
-    Handles heartbeat and reconnection via Last-Event-ID.
+    Handles heartbeat and reconnection via Last-Event-ID with a ring buffer.
     """
 
     def __init__(self, store: JsonlTraceStore) -> None:
@@ -36,6 +72,7 @@ class EventBroker:
         self._subscribers: dict[str, list[asyncio.Queue[Optional[dict[str, Any]]]]] = {}
         self._event_ids: dict[str, int] = {}
         self._active_runs: set[str] = set()
+        self._ring_buffer = RingBuffer(RING_BUFFER_SIZE)
 
     def mark_active(self, run_id: str) -> None:
         """Mark a run as actively publishing live events."""
@@ -54,11 +91,11 @@ class EventBroker:
         event_id = self._event_ids.get(run_id, 0) + 1
         self._event_ids[run_id] = event_id
         event_with_id = {**event, "event_id": event_id}
+        self._ring_buffer.push(event_with_id)
         for queue in self._subscribers.get(run_id, []):
             try:
                 queue.put_nowait(event_with_id)
             except asyncio.QueueFull:
-                # Slow-client policy: drop oldest event, then push new one.
                 try:
                     queue.get_nowait()
                     queue.put_nowait(event_with_id)
@@ -96,11 +133,13 @@ class EventBroker:
         }
 
     async def stream_live(
-        self, run_id: str, last_event_id: int = 0,
+        self,
+        run_id: str,
+        last_event_id: int = 0,
     ) -> AsyncIterator[dict[str, Any]]:
-        """Yield live events for an active run, optionally replaying missed events."""
+        """Yield live events for an active run, replaying missed events from ring buffer."""
         if last_event_id > 0:
-            async for event in self._replay_from(run_id, last_event_id):
+            for event in self._ring_buffer.replay_from(last_event_id):
                 yield event
         queue = self.subscribe(run_id)
         try:
@@ -113,7 +152,9 @@ class EventBroker:
             self.unsubscribe(run_id, queue)
 
     async def _replay_from(
-        self, run_id: str, from_event_id: int,
+        self,
+        run_id: str,
+        from_event_id: int,
     ) -> AsyncIterator[dict[str, Any]]:
         """Replay missed events from stored trace."""
         async for event in self._iter_trace_events(run_id):
@@ -164,15 +205,18 @@ class EventBroker:
             request.query.get("last_event_id") or request.headers.get("Last-Event-ID", "0"),
         )
 
-        response = web.StreamResponse(headers={
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-        })
+        response = web.StreamResponse(
+            headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+            }
+        )
         await response.prepare(request)
 
         try:
             heartbeat_task = asyncio.create_task(
-                self._send_heartbeats(response), name=f"heartbeat-{run_id}",
+                self._send_heartbeats(response),
+                name=f"heartbeat-{run_id}",
             )
             try:
                 if mode == "live":
@@ -196,8 +240,7 @@ class EventBroker:
 
                 await response.write(
                     f"event: stream_end\ndata: "
-                    f'{json.dumps({"type": "STREAM_END", "mode": mode})}\n\n'
-                    .encode()
+                    f"{json.dumps({'type': 'STREAM_END', 'mode': mode})}\n\n".encode()
                 )
             finally:
                 heartbeat_task.cancel()
@@ -215,8 +258,7 @@ class EventBroker:
             try:
                 await response.write(
                     f"event: stream_error\ndata: "
-                    f'{json.dumps({"type": "STREAM_ERROR", "error": str(e)})}\n\n'
-                    .encode()
+                    f"{json.dumps({'type': 'STREAM_ERROR', 'error': str(e)})}\n\n".encode()
                 )
             except ConnectionResetError:
                 log.info("SSE client disconnected while reporting error for run %s", run_id)
