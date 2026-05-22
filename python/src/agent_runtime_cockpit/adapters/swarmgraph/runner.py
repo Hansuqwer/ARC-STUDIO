@@ -7,10 +7,13 @@ import pathlib
 import uuid
 from typing import Any, AsyncIterator
 
-from agent_runtime_cockpit.audit.chain import AuditChainWriter
 from agent_runtime_cockpit.ag_ui import map_event, MappingContext, AGUIEventType
-from agent_runtime_cockpit.tracing.jsonl_writer import JsonlTraceWriter
+from agent_runtime_cockpit.audit.chain import AuditChainWriter
+from agent_runtime_cockpit.audit.session import AuditSession
+from agent_runtime_cockpit.audit.schema import RuntimeMode
+from agent_runtime_cockpit.audit.storage import AuditChainStore
 from agent_runtime_cockpit.gating import require_dual_gate, BackendMode
+from agent_runtime_cockpit.tracing.jsonl_writer import JsonlTraceWriter
 
 import agent_runtime_cockpit.adapters.swarmgraph.mapping  # noqa: F401
 
@@ -24,6 +27,7 @@ class SwarmGraphRunner:
         self.audit_dir = workspace / ".arc" / "audit"
         self.traces_dir.mkdir(parents=True, exist_ok=True)
         self.audit_dir.mkdir(parents=True, exist_ok=True)
+        self._audit_store = AuditChainStore(audit_dir=self.audit_dir)
 
     async def run(self, entrypoint: str, inputs: dict[str, Any]) -> str:
         run_id = uuid.uuid4().hex[:12]
@@ -33,27 +37,33 @@ class SwarmGraphRunner:
         trace_path = self.traces_dir / f"{run_id}.jsonl"
         audit_path = self.audit_dir / f"{run_id}.chain.jsonl"
 
-        with JsonlTraceWriter(trace_path) as trace, AuditChainWriter(audit_path) as audit:
-            ctx = MappingContext(thread_id=thread_id, run_id=run_id, runtime="swarmgraph")
+        async with AuditSession(run_id=run_id, store=self._audit_store) as session:
+            session.log_run_started(runtime="swarmgraph", mode=RuntimeMode.gated_local)
 
-            if backend != BackendMode.STUB and allow_costs:
-                warning = {
-                    "type": AGUIEventType.CUSTOM.value,
-                    "name": "arc.cost_warning",
-                    "value": {
-                        "runtime": "swarmgraph",
-                        "backend": backend.value,
-                        "estimated_provider": os.environ.get("ARC_SWARMGRAPH_PROVIDER", "unknown"),
-                        "gated_at": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
-                    },
-                }
-                trace.write(warning)
-                audit.append(warning)
+            with JsonlTraceWriter(trace_path) as trace, AuditChainWriter(audit_path) as audit:
+                ctx = MappingContext(thread_id=thread_id, run_id=run_id, runtime="swarmgraph")
 
-            async for native in self._produce(backend, entrypoint, inputs):
-                for ag in map_event("swarmgraph", native, ctx):
-                    trace.write(ag)
-                    audit.append(ag)
+                if backend != BackendMode.STUB and allow_costs:
+                    warning = {
+                        "type": AGUIEventType.CUSTOM.value,
+                        "name": "arc.cost_warning",
+                        "value": {
+                            "runtime": "swarmgraph",
+                            "backend": backend.value,
+                            "estimated_provider": os.environ.get("ARC_SWARMGRAPH_PROVIDER", "unknown"),
+                            "gated_at": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+                        },
+                    }
+                    trace.write(warning)
+                    audit.append(warning)
+
+                async for native in self._produce(backend, entrypoint, inputs):
+                    for ag in map_event("swarmgraph", native, ctx):
+                        trace.write(ag)
+                        audit.append(ag)
+                        _log_agui_to_audit(session, ag)
+
+            session.log_run_completed(runtime="swarmgraph")
 
         return run_id
 
@@ -96,3 +106,33 @@ class SwarmGraphRunner:
         async with GatewayClient.from_env() as client:
             async for native in client.run_stream(entrypoint, inputs):
                 yield native
+
+
+def _log_agui_to_audit(session: Any, agui_event: dict[str, Any]) -> None:
+    """Map AG-UI events to typed audit events.
+
+    Runs inline alongside the existing SHA-256 audit chain. Not all AG-UI
+    events have typed equivalents; unrecognized types are silently skipped.
+    """
+    event_type = agui_event.get("type", "")
+    if event_type == AGUIEventType.TOOL_CALL_START.value:
+        session.log_tool_call(
+            tool_name=agui_event.get("tool_name", ""),
+            tool_id=agui_event.get("tool_id", ""),
+            arguments=agui_event.get("args", {}),
+            trust_level=agui_event.get("trust_level", "untrusted"),
+        )
+    elif event_type == AGUIEventType.TOOL_CALL_RESULT.value:
+        session.log_tool_result(
+            tool_name=agui_event.get("tool_name", ""),
+            tool_id=agui_event.get("tool_id", ""),
+            result=agui_event.get("result", {}),
+            trust_level=agui_event.get("trust_level", "untrusted"),
+        )
+    elif event_type == AGUIEventType.TOOL_CALL_ERROR.value:
+        session.log_tool_result(
+            tool_name=agui_event.get("tool_name", ""),
+            tool_id=agui_event.get("tool_id", ""),
+            trust_level=agui_event.get("trust_level", "untrusted"),
+            error={"code": "AGUI_TOOL_ERROR", "message": str(agui_event.get("error", ""))},
+        )
