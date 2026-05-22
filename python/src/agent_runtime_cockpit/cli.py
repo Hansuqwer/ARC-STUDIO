@@ -3107,7 +3107,7 @@ app.add_typer(audit_app)
 def audit_verify(
     run_id: str = typer.Argument(..., help="Run ID to verify audit chain for"),
     chain_path: str = typer.Option(
-        "", "--chain", "-c", help="Path to audit chain file (default: .arc/audit/{run_id}.jsonl)"
+        "", "--chain", "-c", help="Path to audit chain file (default: .arc/audit/{run_id}.audit.jsonl)"
     ),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
@@ -3116,11 +3116,15 @@ def audit_verify(
 
     Authenticates every record in the chain and checks chain continuity.
     Requires ARC_AUDIT_HMAC_KEY env var or keychain-stored key.
+
+    Checks .audit.jsonl (HMAC-signed, new format) first, then falls back
+    to .jsonl (old SHA-256 format) for backward compatibility.
     """
     _setup_logging(debug)
     from pathlib import Path
     from .audit.key_manager import AuditKeyManager
     from .audit.hmac_chain import verify_hmac_chain
+    from .audit.storage import AuditChainStore
 
     mgr = AuditKeyManager()
     key, status = mgr.get_key()
@@ -3129,12 +3133,37 @@ def audit_verify(
         raise typer.Exit(1)
 
     ws = Path.cwd()
-    chain = Path(chain_path) if chain_path else ws / ".arc" / "audit" / f"{run_id}.jsonl"
+    audit_dir = ws / ".arc" / "audit"
+    chain_fmt = "new" if chain_path else "auto"
 
-    verified, reason = verify_hmac_chain(chain, key)
+    if chain_path:
+        chain = Path(chain_path)
+    else:
+        new_chain = audit_dir / f"{run_id}.audit.jsonl"
+        old_chain = audit_dir / f"{run_id}.jsonl"
+        if new_chain.exists():
+            chain = new_chain
+            chain_fmt = "hmac"
+        elif old_chain.exists():
+            chain = old_chain
+            chain_fmt = "legacy"
+        else:
+            _out(
+                err(ArcErrorCode.RUN_NOT_FOUND, f"Audit chain not found for run {run_id}"),
+                json_output,
+            )
+            raise typer.Exit(1)
+
+    if chain_fmt == "hmac":
+        store = AuditChainStore(audit_dir=audit_dir)
+        verified, reason = store.verify_run(run_id)
+    else:
+        verified, reason = verify_hmac_chain(chain, key)
+
     payload = {
         "run_id": run_id,
         "chain_path": str(chain),
+        "chain_format": chain_fmt,
         "verified": verified,
         "reason": reason,
         "key_source": status.source,
@@ -3143,7 +3172,8 @@ def audit_verify(
     _out(ok(payload), json_output)
     if not json_output:
         color = "green" if verified else "red"
-        console.print(f"Audit chain: [bold {color}]{'VERIFIED' if verified else 'FAILED'}[/bold {color}]")
+        fmt_label = {"hmac": "HMAC", "legacy": "SHA-256", "auto": "custom"}.get(chain_fmt, chain_fmt)
+        console.print(f"Audit chain ({fmt_label}): [bold {color}]{'VERIFIED' if verified else 'FAILED'}[/bold {color}]")
         console.print(f"  Path: {chain}")
         console.print(f"  Reason: {reason}")
         if status.degraded:
@@ -3156,25 +3186,39 @@ def audit_verify(
 def audit_export(
     run_id: str = typer.Argument(..., help="Run ID to export audit records for"),
     chain_path: str = typer.Option(
-        "", "--chain", "-c", help="Path to audit chain file (default: .arc/audit/{run_id}.jsonl)"
+        "", "--chain", "-c", help="Path to audit chain file (default: .arc/audit/{run_id}.audit.jsonl)"
     ),
     format: str = typer.Option("jsonl", "--format", help="Output format: jsonl, json"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
-    """Export audit chain records for a run."""
+    """Export audit chain records for a run.
+
+    Checks .audit.jsonl (HMAC-signed, new format) first, then falls back
+    to .jsonl (old SHA-256 format) for backward compatibility.
+    """
     _setup_logging(debug)
     import json as json_mod
     from pathlib import Path
 
     ws = Path.cwd()
-    chain = Path(chain_path) if chain_path else ws / ".arc" / "audit" / f"{run_id}.jsonl"
-    if not chain.exists():
-        _out(
-            err(ArcErrorCode.RUN_NOT_FOUND, f"Audit chain not found: {chain}"),
-            json_output,
-        )
-        raise typer.Exit(1)
+    audit_dir = ws / ".arc" / "audit"
+
+    if chain_path:
+        chain = Path(chain_path)
+    else:
+        new_chain = audit_dir / f"{run_id}.audit.jsonl"
+        old_chain = audit_dir / f"{run_id}.jsonl"
+        if new_chain.exists():
+            chain = new_chain
+        elif old_chain.exists():
+            chain = old_chain
+        else:
+            _out(
+                err(ArcErrorCode.RUN_NOT_FOUND, f"Audit chain not found for run {run_id}"),
+                json_output,
+            )
+            raise typer.Exit(1)
 
     lines = chain.read_text(encoding="utf-8").splitlines()
     records = [json_mod.loads(l) for l in lines if l.strip()]
