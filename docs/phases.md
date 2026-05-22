@@ -820,7 +820,7 @@ bash scripts/check-pr.sh
 ## Phase 23 — Enforced Workspace Trust + Paid-Call Gates
 
 **Roadmap:** R16 — Trust + Paid-Call Enforcement  
-**Status:** Partial — trust infrastructure exists (`security/trust.py`) but enforcement is not uniform across all surfaces  
+**Status:** Partial — typed denial events and enforcement helpers complete (Phase 22 integration); CLI flags, UI confirmation, and surface integration remain | Evidence: local worktree 2026-05-22 | 1496 Python tests passed (15 new enforcement tests), TypeScript builds green | Notes: Foundation complete with typed denial events (TRUST_DENIED, PAID_CALL_DENIED, SHELL_DENIED, NETWORK_DENIED, PERMISSION_DENIED) and centralized enforcement helpers; remaining work is CLI flags, UI dialogs, and extending enforcement to all surfaces  
 **Depends on:** Phase 22 (needs typed RunEvent for denial events)
 
 ### Implementation

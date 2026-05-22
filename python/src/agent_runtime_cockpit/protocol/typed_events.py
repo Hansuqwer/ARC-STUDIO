@@ -15,6 +15,19 @@ from typing import Any, Literal, Union, TypeGuard
 from pydantic import BaseModel, Field
 
 
+# ─── Base Event Model ────────────────────────────────────────────────────────
+
+
+class RunEventBase(BaseModel):
+    """Base model for all run events with common fields."""
+
+    schema_version: int = 2
+    type: str
+    timestamp: str
+    run_id: str
+    sequence: int
+
+
 # ─── Run Lifecycle Events ────────────────────────────────────────────────────
 
 
