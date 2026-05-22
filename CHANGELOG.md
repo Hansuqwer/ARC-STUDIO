@@ -6,6 +6,9 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 
 ### Added
 
+- **Security**: Enforcement audit script `scripts/audit-enforcement-surfaces.sh` to detect ungated syscalls (Phase 23.2)
+- **Docs**: Comprehensive enforcement surface inventory at `docs/security/enforcement-surfaces.md` (Phase 23.2)
+- **Security**: Enforcement annotations for all 28 syscall sites in Python source (Phase 23.2)
 - **Security**: EnforcementContext system for centralized enforcement decisions (Phase 23.1)
 - **CLI**: Global flags `--allow-paid`, `--trust-workspace`, `--dry-run` for security gates (Phase 23.1)
 - **Security**: DryRunAbort exception for dry-run mode (exits with code 2) (Phase 23.1)
