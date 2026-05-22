@@ -34,11 +34,18 @@ class SwarmGraphRunner:
         thread_id = f"th-{run_id}"
         backend, allow_costs = require_dual_gate("SWARMGRAPH")
 
+        # Map backend to RuntimeMode
+        runtime_mode = RuntimeMode.gated_local  # default
+        if backend == BackendMode.STUB:
+            runtime_mode = RuntimeMode.fake
+        elif backend == BackendMode.GATEWAY:
+            runtime_mode = RuntimeMode.provider_backed
+
         trace_path = self.traces_dir / f"{run_id}.jsonl"
         audit_path = self.audit_dir / f"{run_id}.chain.jsonl"
 
         async with AuditSession(run_id=run_id, store=self._audit_store) as session:
-            session.log_run_started(runtime="swarmgraph", mode=RuntimeMode.gated_local)
+            session.log_run_started(runtime="swarmgraph", mode=runtime_mode)
 
             with JsonlTraceWriter(trace_path) as trace, AuditChainWriter(audit_path) as audit:
                 ctx = MappingContext(thread_id=thread_id, run_id=run_id, runtime="swarmgraph")
