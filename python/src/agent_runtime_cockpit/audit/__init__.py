@@ -36,6 +36,7 @@ from .schema import (
     TrustLevel,
     event_from_dict,
 )
+from .session import AuditSession, audit_session
 from .storage import AuditChainStore
 
 __all__ = [
@@ -67,4 +68,6 @@ __all__ = [
     "TrustLevel",
     "event_from_dict",
     "AuditChainStore",
+    "AuditSession",
+    "audit_session",
 ]
