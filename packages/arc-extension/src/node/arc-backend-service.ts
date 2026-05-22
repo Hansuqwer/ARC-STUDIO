@@ -293,371 +293,95 @@ export class ArcBackendService implements ArcService {
         return this.configService.listProfiles();
     }
 
+    /**
+     * @deprecated Use ConfigService.getIsolationStatus() directly. Will be removed in v0.3.0.
+     */
     async getIsolationStatus(): Promise<IsolationStatus> {
-        try {
-            const output = execFileSync('arc', ['isolation', 'status', '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-            const parsed = JSON.parse(output);
-            const data = parsed?.data || parsed || {};
-            return {
-                current: String(data.current || data.provider || data.isolation || 'none'),
-                available: data.available !== false,
-                providers: this.mapIsolationProviders(data.providers || []),
-                message: data.message,
-            };
-        } catch (error) {
-            return {
-                current: 'none',
-                available: true,
-                providers: [{ id: 'none', name: 'None', available: true, active: true }],
-                message: `Isolation status unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            };
-        }
+        return this.configService.getIsolationStatus();
     }
 
+    /**
+     * @deprecated Use ConfigService.listIsolationProviders() directly. Will be removed in v0.3.0.
+     */
     async listIsolationProviders(): Promise<IsolationProviderInfo[]> {
-        try {
-            const output = execFileSync('arc', ['isolation', 'list', '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-            const parsed = JSON.parse(output);
-            const providers = Array.isArray(parsed?.data) ? parsed.data : Array.isArray(parsed?.providers) ? parsed.providers : [];
-            return this.mapIsolationProviders(providers);
-        } catch {
-            return [{ id: 'none', name: 'None', available: true, active: true }];
-        }
+        return this.configService.listIsolationProviders();
     }
 
-    private mapIsolationProviders(providers: any[]): IsolationProviderInfo[] {
-        return providers.map((provider: any) => ({
-            id: String(provider.id || provider.name || 'unknown'),
-            name: String(provider.display_name || provider.name || provider.id || 'Unknown'),
-            available: provider.available !== false,
-            active: !!provider.active,
-            reason: provider.reason || provider.message,
-        }));
-    }
-
+    /**
+     * @deprecated Use ConfigService.getProviderCatalog() directly. Will be removed in v0.3.0.
+     */
     async getProviderCatalog(): Promise<ProviderCatalogEntry[]> {
-        const output = execFileSync('arc', ['providers', 'catalog', '--json'], {
-            timeout: 10000,
-            encoding: 'utf-8',
-            windowsHide: true,
-            env: buildArcCliEnv(),
-        });
-        const parsed = JSON.parse(output);
-        if (parsed.ok && Array.isArray(parsed.data)) {
-            return parsed.data.map((p: any) => ({
-                ...p,
-                displayName: p.display_name,
-                authKind: p.auth_kind,
-                credentialLabel: p.credential_label,
-                envKeyNames: p.env_key_names,
-                defaultBaseUrl: p.default_base_url,
-                docsUrl: p.docs_url,
-            })) as ProviderCatalogEntry[];
-        }
-        return [];
+        return this.configService.getProviderCatalog();
     }
 
+    /**
+     * @deprecated Use ConfigService.getProviderDiagnostics() directly. Will be removed in v0.3.0.
+     */
     async getProviderDiagnostics(): Promise<ProviderDiagnosticsInfo> {
-        try {
-            const output = execFileSync('arc', ['providers', 'diagnostics', '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-            const parsed = JSON.parse(output);
-            if (!parsed.ok) {
-                throw new ArcError(
-                    ArcErrorCode.RUN_FAILED,
-                    parsed?.error?.message || 'Provider diagnostics failed',
-                    { error: parsed?.error }
-                );
-            }
-            return (parsed.data || {}) as ProviderDiagnosticsInfo;
-        } catch (error) {
-            if (error instanceof ArcError) throw error;
-            throw new ArcError(
-                ArcErrorCode.RUN_FAILED,
-                `Provider diagnostics unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        return this.configService.getProviderDiagnostics();
     }
 
+    /**
+     * @deprecated Use ConfigService.getProviderQuota() directly. Will be removed in v0.3.0.
+     */
     async getProviderQuota(provider?: string): Promise<ProviderQuotaInfo> {
-        try {
-            const args = ['providers', 'quota', 'show'];
-            if (provider) {
-                args.push('--provider', provider);
-            }
-            args.push('--json');
-            const output = execFileSync('arc', args, {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-            const parsed = JSON.parse(output);
-            if (!parsed.ok) {
-                throw new ArcError(
-                    ArcErrorCode.RUN_FAILED,
-                    parsed?.error?.message || 'Provider quota failed',
-                    { error: parsed?.error }
-                );
-            }
-            return (parsed.data || {}) as ProviderQuotaInfo;
-        } catch (error) {
-            if (error instanceof ArcError) throw error;
-            throw new ArcError(
-                ArcErrorCode.RUN_FAILED,
-                `Provider quota unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        return this.configService.getProviderQuota(provider);
     }
 
+    /**
+     * @deprecated Use ConfigService.resetProviderQuota() directly. Will be removed in v0.3.0.
+     */
     async resetProviderQuota(): Promise<ProviderQuotaResetResult> {
-        try {
-            const output = execFileSync('arc', ['providers', 'quota', 'reset', '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-            const parsed = JSON.parse(output);
-            if (!parsed.ok) {
-                throw new ArcError(
-                    ArcErrorCode.RUN_FAILED,
-                    parsed?.error?.message || 'Provider quota reset failed',
-                    { error: parsed?.error }
-                );
-            }
-            return {
-                success: true,
-                message:
-                    typeof parsed?.data?.message === 'string'
-                        ? parsed.data.message
-                        : 'Local provider quota counters reset',
-            };
-        } catch (error) {
-            if (error instanceof ArcError) throw error;
-            throw new ArcError(
-                ArcErrorCode.RUN_FAILED,
-                `Provider quota reset unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-        }
+        return this.configService.resetProviderQuota();
     }
 
+    /**
+     * @deprecated Use ConfigService.runGatedProviderAction() directly. Will be removed in v0.3.0.
+     */
     async runGatedProviderAction(request: GatedProviderActionRequest): Promise<GatedProviderActionResult> {
-        const dryRun = request.dryRun !== false;
-        const model = request.model || 'gpt-4o-mini';
-        const args = ['providers', 'action', '--provider', request.provider, '--prompt', request.prompt, '--json'];
-        if (model) {
-            args.push('--model', model);
-        }
-        if (!dryRun) {
-            args.push('--live');
-        }
-        if (request.allowPaidCalls) {
-            args.push('--allow-paid-calls');
-        }
-        if (request.confirmProviderCall) {
-            args.push('--confirm', `RUN_PROVIDER_ACTION:${request.provider}:${model}`);
-        }
-
-        try {
-            const output = execFileSync('arc', args, {
-                timeout: 30000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-            return this.mapGatedProviderActionOutput(output, dryRun, { ...request, model });
-        } catch (error: any) {
-            const output = String(error?.stdout || error?.stderr || '');
-            if (output.trim()) {
-                return this.mapGatedProviderActionOutput(output, dryRun, { ...request, model }, true);
-            }
-            return {
-                success: false,
-                blocked: true,
-                dryRun,
-                providerCall: false,
-                provider: request.provider,
-                model,
-                message: `Provider action unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            };
-        }
+        return this.configService.runGatedProviderAction(request);
     }
 
-    private mapGatedProviderActionOutput(
-        output: string,
-        dryRun: boolean,
-        request: GatedProviderActionRequest,
-        cliFailed = false
-    ): GatedProviderActionResult {
-        try {
-            const parsed = JSON.parse(output);
-            const data = parsed?.data || {};
-            const error = parsed?.error;
-            const ok = parsed?.ok === true && !cliFailed;
-            return {
-                success: ok,
-                blocked: !ok || data.blocked === true,
-                dryRun: data.dry_run ?? dryRun,
-                providerCall: data.provider_call === true,
-                provider: data.provider || request.provider,
-                model: data.model || request.model,
-                message: data.message || error?.message || (ok ? 'Provider action completed.' : 'Provider action blocked.'),
-                quota: data.quota || data.provider_quota,
-                estimatedCost: data.estimated_cost ?? null,
-                data,
-                error,
-            };
-        } catch {
-            return {
-                success: false,
-                blocked: true,
-                dryRun,
-                providerCall: false,
-                provider: request.provider,
-                model: request.model,
-                message: output.trim() || 'Provider action failed.',
-            };
-        }
-    }
-
+    /**
+     * @deprecated Use ConfigService.setProviderKeyRef() directly. Will be removed in v0.3.0.
+     */
     async setProviderKeyRef(request: ProviderKeyRefRequest): Promise<{ success: boolean; message: string }> {
-        if (/sk-|bearer\s+|token[:=]|api[_-]?key[:=]/i.test(request.envVar)) {
-            return { success: false, message: 'Rejected raw key material. Enter an environment variable name only.' };
-        }
-        const args = ['providers', 'key', 'set', request.provider, '--env', request.envVar, '--json'];
-        if (request.label) {
-            args.push('--label', request.label);
-        }
-        if (request.model) {
-            args.push('--model', request.model);
-        }
-        execFileSync('arc', args, {
-            timeout: 10000,
-            encoding: 'utf-8',
-            windowsHide: true,
-            env: buildArcCliEnv(),
-        });
-        return { success: true, message: `Saved ${request.provider} key reference (${request.envVar}).` };
+        return this.configService.setProviderKeyRef(request);
     }
 
+    /**
+     * @deprecated Use ConfigService.unsetProviderKeyRef() directly. Will be removed in v0.3.0.
+     */
     async unsetProviderKeyRef(providerOrAccountId: string): Promise<{ success: boolean; message: string }> {
-        execFileSync('arc', ['providers', 'key', 'unset', providerOrAccountId, '--json'], {
-            timeout: 10000,
-            encoding: 'utf-8',
-            windowsHide: true,
-            env: buildArcCliEnv(),
-        });
-        return { success: true, message: `Removed provider key reference: ${providerOrAccountId}.` };
+        return this.configService.unsetProviderKeyRef(providerOrAccountId);
     }
 
     // ========== Run Links Methods (Session B7) ==========
 
     /**
      * Get cross-linked event chains for a run.
-     * Calls the Python CLI to retrieve linked events by stable ID.
+     * @deprecated Use AuditBridgeService.getRunLinks() directly. Will be removed in v0.3.0.
      */
     async getRunLinks(runId: string, filter?: string, stableId?: string): Promise<RunLinksResponse> {
-        try {
-            const args = ['runs', 'links', runId, '--json'];
-            if (filter) {
-                args.push('--filter', filter);
-            }
-            if (stableId) {
-                args.push('--stable-id', stableId);
-            }
-
-            const output = execFileSync('arc', args, {
-                timeout: 15000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-            const parsed = JSON.parse(output);
-            if (parsed.ok && parsed.data) {
-                const data = parsed.data;
-                return {
-                    nodeChains: data.node_chains || {},
-                    messageChains: data.message_chains || {},
-                    toolCallChains: data.tool_call_chains || {},
-                    evidenceChains: data.evidence_chains || {},
-                    hasStableIds: !!data.has_stable_ids,
-                    stableIdCount: data.stable_id_count || 0,
-                };
-            }
-            throw new ArcError(
-                ArcErrorCode.UNKNOWN,
-                parsed?.error?.message || 'CLI returned no data for run links',
-            );
-        } catch (error) {
-            if (error instanceof ArcError) throw error;
-            throw new ArcError(
-                ArcErrorCode.UNKNOWN,
-                `Failed to get run links: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            );
-        }
+        return this.auditBridgeService.getRunLinks(runId, filter, stableId);
     }
 
     // ========== Run Details (Cockpit Cards) ==========
 
     /**
      * Get run receipt for a completed/failed/cancelled run.
+     * @deprecated Use AuditBridgeService.getRunReceipt() directly. Will be removed in v0.3.0.
      */
     async getRunReceipt(runId: string): Promise<RunReceipt> {
-        try {
-            validateRunId(runId);
-            const receiptPath = path.join(this.workspaceRoot, '.arc', 'receipts', `${runId}.json`);
-            const fs = await import('fs-extra');
-            if (!await fs.pathExists(receiptPath)) {
-                throw new ArcError(ArcErrorCode.RUN_NOT_FOUND, `No receipt found for run: ${runId}`, { runId });
-            }
-            const content = await fs.readFile(receiptPath, 'utf-8');
-            return JSON.parse(content) as RunReceipt;
-        } catch (error) {
-            if (error instanceof ArcError) throw error;
-            throw new ArcError(
-                ArcErrorCode.UNKNOWN,
-                `Failed to read receipt: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                { runId }
-            );
-        }
+        return this.auditBridgeService.getRunReceipt(runId);
     }
 
     /**
      * Get failure autopsy for a failed run. Returns null if no autopsy exists.
+     * @deprecated Use AuditBridgeService.getRunAutopsy() directly. Will be removed in v0.3.0.
      */
     async getRunAutopsy(runId: string): Promise<FailureAutopsy | null> {
-        try {
-            validateRunId(runId);
-            const autopsyPath = path.join(this.workspaceRoot, '.arc', 'autopsies', `${runId}.json`);
-            const fs = await import('fs-extra');
-            if (!await fs.pathExists(autopsyPath)) {
-                return null;
-            }
-            const content = await fs.readFile(autopsyPath, 'utf-8');
-            return JSON.parse(content) as FailureAutopsy;
-        } catch (error) {
-            if (error instanceof ArcError) throw error;
-            throw new ArcError(
-                ArcErrorCode.UNKNOWN,
-                `Failed to read autopsy: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                { runId }
-            );
-        }
+        return this.auditBridgeService.getRunAutopsy(runId);
     }
 
     /**

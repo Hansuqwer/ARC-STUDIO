@@ -307,43 +307,18 @@ describe('Backend Service Extensions (Session B + B7)', () => {
             expect(source).toMatch(/async getConfigStatus\(\)/);
         });
 
-        it('should call arc providers status CLI', () => {
-            expect(source).toMatch(/providers.*status.*--json/);
-        });
-
-        it('should call arc config show CLI', () => {
-            expect(source).toMatch(/config.*show.*--json/);
-        });
-
-        it('should handle unavailable backend gracefully', () => {
-            expect(source).toMatch(/backendAvailable\s*=\s*false/);
-            expect(source).toMatch(/Backend unavailable/);
+        it('should delegate getConfigStatus to ConfigService', () => {
+            expect(source).toMatch(/return this\.configService\.getConfigStatus\(\)/);
+            expect(source).toMatch(/@deprecated.*ConfigService\.getConfigStatus/);
         });
 
         it('should implement saveConfig', () => {
             expect(source).toMatch(/async saveConfig\(update:\s*SafeConfigUpdate\)/);
         });
 
-        it('should validate safe keys before saving', () => {
-            expect(source).toMatch(/safeKeys/);
-            expect(source).toMatch(/SAFE_CONFIG_KEYS/);
-            expect(source).toMatch(/UNSAFE_CONFIG_KEY_PATTERN/);
-            expect(source).toMatch(/Rejected unsafe config field/);
-        });
-
-        it('should allow only non-secret config fields including isolation dryRun paid routing', () => {
-            expect(source).toMatch(/'defaultRuntime'/);
-            expect(source).toMatch(/'mode'/);
-            expect(source).toMatch(/'isolation'/);
-            expect(source).toMatch(/'allowPaidCalls'/);
-            expect(source).toMatch(/'dryRun'/);
-            expect(source).toMatch(/'routingMode'/);
-            expect(source).toMatch(/'selectedProfile'/);
-            expect(source).toMatch(/execution\.isolation/);
-            expect(source).toMatch(/execution\.allow_paid_calls/);
-            expect(source).toMatch(/providers\.dry_run/);
-            expect(source).toMatch(/providers\.routing_mode/);
-            expect(source).toMatch(/profiles\.selected_profile/);
+        it('should delegate saveConfig to ConfigService', () => {
+            expect(source).toMatch(/return this\.configService\.saveConfig\(update\)/);
+            expect(source).toMatch(/@deprecated.*ConfigService\.saveConfig/);
         });
 
         it('should NOT pass raw secret values to CLI', () => {
@@ -354,45 +329,32 @@ describe('Backend Service Extensions (Session B + B7)', () => {
             expect(source).not.toMatch(/rawApiKey/);
         });
 
-        it('should call provider catalog and key-ref CLI commands', () => {
-            expect(source).toMatch(/providers.*catalog.*--json/);
-            expect(source).toMatch(/providers.*key.*set/);
-            expect(source).toMatch(/providers.*key.*unset/);
+        it('should delegate provider catalog and key-ref methods to ConfigService', () => {
+            expect(source).toMatch(/return this\.configService\.getProviderCatalog\(\)/);
+            expect(source).toMatch(/return this\.configService\.setProviderKeyRef\(request\)/);
+            expect(source).toMatch(/return this\.configService\.unsetProviderKeyRef\(providerOrAccountId\)/);
         });
 
-        it('should implement provider diagnostics and quota CLI methods', () => {
-            expect(source).toMatch(/async getProviderDiagnostics\(\)/);
-            expect(source).toMatch(/providers.*diagnostics.*--json/);
-            expect(source).toMatch(/async getProviderQuota\(provider\?:\s*string\)/);
-            expect(source).toMatch(/providers.*quota.*show/);
-            expect(source).toMatch(/async resetProviderQuota\(\)/);
-            expect(source).toMatch(/\['providers', 'quota', 'reset', '--json'\]/);
-            expect(source).toMatch(/--provider/);
-            expect(source).toMatch(/Provider diagnostics unavailable/);
-            expect(source).toMatch(/Provider quota unavailable/);
-            expect(source).toMatch(/Provider quota reset unavailable/);
+        it('should delegate provider diagnostics and quota methods to ConfigService', () => {
+            expect(source).toMatch(/return this\.configService\.getProviderDiagnostics\(\)/);
+            expect(source).toMatch(/return this\.configService\.getProviderQuota\(provider\)/);
+            expect(source).toMatch(/return this\.configService\.resetProviderQuota\(\)/);
         });
 
-        it('should implement dry-run preflight via CLI without provider calls', () => {
-            expect(source).toMatch(/async preflightRun\(request:\s*RunPreflightRequest\)/);
-            expect(source).toMatch(/--dry-run/);
-            expect(source).toMatch(/providerCall:\s*false/);
+        it('should delegate preflightRun to RunLifecycleService', () => {
+            expect(source).toMatch(/return this\.runLifecycleService\.preflightRun\(request\)/);
+            expect(source).toMatch(/@deprecated.*RunLifecycleService\.preflightRun/);
         });
 
-        it('should implement profile and isolation CLI JSON methods with safe fallback', () => {
-            expect(source).toMatch(/async listProfiles\(\)/);
-            expect(source).toMatch(/profiles.*list.*--json/);
-            expect(source).toMatch(/local-safe/);
-            expect(source).toMatch(/async getIsolationStatus\(\)/);
-            expect(source).toMatch(/isolation.*status.*--json/);
-            expect(source).toMatch(/async listIsolationProviders\(\)/);
-            expect(source).toMatch(/isolation.*list.*--json/);
-            expect(source).toMatch(/mapIsolationProviders/);
+        it('should delegate profile and isolation methods to ConfigService', () => {
+            expect(source).toMatch(/return this\.configService\.listProfiles\(\)/);
+            expect(source).toMatch(/return this\.configService\.getIsolationStatus\(\)/);
+            expect(source).toMatch(/return this\.configService\.listIsolationProviders\(\)/);
         });
 
-        it('should implement startRun via CLI JSON output', () => {
-            expect(source).toMatch(/async startRun\(request:\s*StartRunRequest\)/);
-            expect(source).toMatch(/tracePath:\s*data\.metadata\?\.trace_path/);
+        it('should delegate startRun to RunLifecycleService', () => {
+            expect(source).toMatch(/return this\.runLifecycleService\.startRun\(request\)/);
+            expect(source).toMatch(/@deprecated.*RunLifecycleService\.startRun/);
         });
     });
 
@@ -401,20 +363,9 @@ describe('Backend Service Extensions (Session B + B7)', () => {
             expect(source).toMatch(/async getRunLinks\(runId:\s*string/);
         });
 
-        it('should call arc runs links CLI', () => {
-            expect(source).toMatch(/runs.*links/);
-        });
-
-        it('should support filter and stableId params', () => {
-            expect(source).toMatch(/--filter/);
-            expect(source).toMatch(/--stable-id/);
-        });
-
-        it('should map Python snake_case to camelCase', () => {
-            expect(source).toMatch(/node_chains/);
-            expect(source).toMatch(/nodeChains/);
-            expect(source).toMatch(/has_stable_ids/);
-            expect(source).toMatch(/hasStableIds/);
+        it('should delegate to AuditBridgeService.getRunLinks', () => {
+            expect(source).toMatch(/return this\.auditBridgeService\.getRunLinks\(runId, filter, stableId\)/);
+            expect(source).toMatch(/@deprecated.*AuditBridgeService\.getRunLinks/);
         });
     });
 
