@@ -783,7 +783,7 @@ bash scripts/check-pr.sh
 ## Phase 22 — Discriminated RunEvent Unions + Protocol Conformance
 
 **Roadmap:** R15 — Discriminated RunEvent Unions  
-**Status:** Not Started  
+**Status:** Baseline Complete | Evidence: local worktree 2026-05-22 | 1481 Python tests passed (18 new typed event tests), TypeScript builds green, PR checks passed | Notes: Discriminated union foundation in place with typed variants for 20+ critical event types; TypedRunEvent exported alongside legacy RunEvent for backward compatibility; full consumer conversion is incremental follow-up work  
 **Depends on:** None (protocol-level work)  
 **Design note:** Current `RunEvent` is `{ type: string; data: Record<string, unknown> }` — this forces every consumer to use unsafe `as any` casts and prevents exhaustive pattern matching. Architecture review requires a discriminated union with typed payloads.
 

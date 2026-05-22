@@ -1,0 +1,466 @@
+/**
+ * Discriminated RunEvent union types for type-safe event handling (Phase 22).
+ *
+ * Replaces unsafe `data: Record<string, unknown>` with typed payloads for known
+ * event types. Consumers can use type narrowing instead of `as any` casts.
+ *
+ * Architecture: Discriminated union with typed variants for critical event types
+ * plus a generic fallback for events that aren't yet typed. This allows incremental
+ * migration while maintaining backward compatibility.
+ */
+
+/** Base event fields shared by all event types */
+export interface RunEventBase {
+  schema_version: number;
+  timestamp: string;
+  run_id: string;
+  sequence: number;
+}
+
+// ─── Run Lifecycle Events ────────────────────────────────────────────────────
+
+export interface RunStartedEvent extends RunEventBase {
+  type: 'RUN_STARTED';
+  data: {
+    workflow_id: string;
+    runtime: string;
+    profile_id?: string;
+    isolation?: string;
+    node_id?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+export interface RunCompletedEvent extends RunEventBase {
+  type: 'RUN_COMPLETED';
+  data: {
+    duration_ms: number;
+    output?: unknown;
+    node_id?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+export interface RunFailedEvent extends RunEventBase {
+  type: 'RUN_FAILED';
+  data: {
+    error: string;
+    error_detail?: string;
+    error_type?: string;
+    node_id?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+export interface RunCancelledEvent extends RunEventBase {
+  type: 'RUN_CANCELLED';
+  data: {
+    cancel_reason: string;
+    node_id?: string;
+    message_id?: string;
+  };
+}
+
+// ─── Step Lifecycle Events ───────────────────────────────────────────────────
+
+export interface StepStartedEvent extends RunEventBase {
+  type: 'STEP_STARTED';
+  data: {
+    step_id: string;
+    step_name: string;
+    step_type?: string;
+    node_id?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+export interface StepCompletedEvent extends RunEventBase {
+  type: 'STEP_COMPLETED';
+  data: {
+    step_id: string;
+    output?: unknown;
+    duration_ms?: number;
+    node_id?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+export interface StepFailedEvent extends RunEventBase {
+  type: 'STEP_FAILED';
+  data: {
+    step_id: string;
+    error: string;
+    node_id?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+// ─── Tool Call Events ────────────────────────────────────────────────────────
+
+export interface ToolCallEvent extends RunEventBase {
+  type: 'TOOL_CALL';
+  data: {
+    tool_call_id: string;
+    tool_name: string;
+    node_id?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+export interface ToolCallStartEvent extends RunEventBase {
+  type: 'TOOL_CALL_START';
+  data: {
+    tool_call_id: string;
+    tool_name: string;
+    node_id?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+export interface ToolCallResultEvent extends RunEventBase {
+  type: 'TOOL_CALL_RESULT';
+  data: {
+    tool_call_id: string;
+    result: unknown;
+    node_id?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+export interface ToolCallErrorEvent extends RunEventBase {
+  type: 'TOOL_CALL_ERROR';
+  data: {
+    tool_call_id: string;
+    error: string;
+    node_id?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+// ─── HITL Events ─────────────────────────────────────────────────────────────
+
+export interface HitlPromptEvent extends RunEventBase {
+  type: 'HITL_PROMPT';
+  data: {
+    hitl_id: string;
+    step_id: string;
+    prompt_text: string;
+    options: string[];
+    timeout_seconds: number;
+    context?: unknown;
+    created_at?: string;
+    node_id?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+export interface HitlResponseEvent extends RunEventBase {
+  type: 'HITL_RESPONSE';
+  data: {
+    hitl_id: string;
+    decision: string;
+    operator_id: string;
+    responded_at: string;
+    modified_data?: unknown;
+    notes?: string;
+    node_id?: string;
+    message_id?: string;
+  };
+}
+
+export interface HitlTimeoutEvent extends RunEventBase {
+  type: 'HITL_TIMEOUT';
+  data: {
+    hitl_id: string;
+    timeout_seconds: number;
+    node_id?: string;
+    message_id?: string;
+  };
+}
+
+// ─── SwarmGraph Events ───────────────────────────────────────────────────────
+
+export interface SwarmGraphTopologyEvent extends RunEventBase {
+  type: 'SWARMGRAPH_TOPOLOGY';
+  data: {
+    nodes: unknown[];
+    edges: unknown[];
+    task_id?: string;
+    strategy?: string;
+    node_id?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+export interface SwarmGraphConsensusEvent extends RunEventBase {
+  type: 'SWARMGRAPH_CONSENSUS';
+  data: {
+    votes: unknown[];
+    decision?: string;
+    strategy?: string;
+    voters?: string[];
+    confidence?: number;
+    consensus_reached?: boolean;
+    task_id?: string;
+    node_id?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+export interface SwarmGraphCostEvent extends RunEventBase {
+  type: 'SWARMGRAPH_COST';
+  data: {
+    provider?: string;
+    model?: string;
+    promptTokens?: number;
+    completionTokens?: number;
+    totalCost?: number;
+    totalTokens?: number;
+    currency?: string;
+    items?: unknown[];
+    source?: string;
+    runtime?: string;
+    measured?: string;
+    node_id?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+// ─── Message Events ──────────────────────────────────────────────────────────
+
+export interface MessageEvent extends RunEventBase {
+  type: 'MESSAGE';
+  data: {
+    text: string;
+    source?: string;
+    coalesced?: boolean;
+    node_id?: string;
+    message_id?: string;
+    tool_call_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+// ─── Node Events ─────────────────────────────────────────────────────────────
+
+export interface NodeStartedEvent extends RunEventBase {
+  type: 'NODE_STARTED';
+  data: {
+    node_id: string;
+    node_name?: string;
+    node_type?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+export interface NodeFailedEvent extends RunEventBase {
+  type: 'NODE_FAILED';
+  data: {
+    node_id: string;
+    error: string;
+    node_name?: string;
+    message_id?: string;
+    evidence_refs?: string[];
+  };
+}
+
+// ─── Raw/Unknown Events ──────────────────────────────────────────────────────
+
+export interface RawEvent extends RunEventBase {
+  type: 'RAW';
+  data: {
+    raw: unknown;
+    source?: string;
+    node_id?: string;
+    message_id?: string;
+  };
+}
+
+/**
+ * Generic fallback for event types that aren't yet typed.
+ * Allows incremental migration while maintaining backward compatibility.
+ */
+export interface UnknownEvent extends RunEventBase {
+  type: string;
+  data: Record<string, unknown>;
+}
+
+// ─── Discriminated Union ─────────────────────────────────────────────────────
+
+/**
+ * Discriminated union of all known typed event variants.
+ * Use type narrowing with `event.type` to access typed payloads.
+ *
+ * Example:
+ * ```ts
+ * if (event.type === 'RUN_STARTED') {
+ *   // TypeScript knows event.data.workflow_id exists
+ *   console.log(event.data.workflow_id);
+ * }
+ * ```
+ */
+export type KnownRunEvent =
+  | RunStartedEvent
+  | RunCompletedEvent
+  | RunFailedEvent
+  | RunCancelledEvent
+  | StepStartedEvent
+  | StepCompletedEvent
+  | StepFailedEvent
+  | ToolCallEvent
+  | ToolCallStartEvent
+  | ToolCallResultEvent
+  | ToolCallErrorEvent
+  | HitlPromptEvent
+  | HitlResponseEvent
+  | HitlTimeoutEvent
+  | SwarmGraphTopologyEvent
+  | SwarmGraphConsensusEvent
+  | SwarmGraphCostEvent
+  | MessageEvent
+  | NodeStartedEvent
+  | NodeFailedEvent
+  | RawEvent;
+
+/**
+ * Full TypedRunEvent: known typed events + unknown fallback.
+ * This allows handling both typed and untyped events gracefully.
+ * 
+ * Note: The old `RunEvent` interface (from arc-protocol-types.ts) remains
+ * for backward compatibility. New code should use `TypedRunEvent` for
+ * type-safe event handling.
+ */
+export type TypedRunEvent = KnownRunEvent | UnknownEvent;
+
+// ─── Type Guards ─────────────────────────────────────────────────────────────
+
+/**
+ * Type guard to check if an event is of a specific type.
+ * Narrows the event type for type-safe access to data fields.
+ *
+ * Example:
+ * ```ts
+ * if (isEventOfType(event, 'RUN_STARTED')) {
+ *   console.log(event.data.workflow_id); // Type-safe!
+ * }
+ * ```
+ */
+export function isEventOfType<T extends KnownRunEvent['type']>(
+  event: TypedRunEvent,
+  type: T
+): event is Extract<KnownRunEvent, { type: T }> {
+  return event.type === type;
+}
+
+/**
+ * Type guard to check if an event is a known typed event.
+ * Useful for filtering out unknown events.
+ */
+export function isKnownEvent(event: TypedRunEvent): event is KnownRunEvent {
+  const knownTypes = new Set([
+    'RUN_STARTED',
+    'RUN_COMPLETED',
+    'RUN_FAILED',
+    'RUN_CANCELLED',
+    'STEP_STARTED',
+    'STEP_COMPLETED',
+    'STEP_FAILED',
+    'TOOL_CALL',
+    'TOOL_CALL_START',
+    'TOOL_CALL_RESULT',
+    'TOOL_CALL_ERROR',
+    'HITL_PROMPT',
+    'HITL_RESPONSE',
+    'HITL_TIMEOUT',
+    'SWARMGRAPH_TOPOLOGY',
+    'SWARMGRAPH_CONSENSUS',
+    'SWARMGRAPH_COST',
+    'MESSAGE',
+    'NODE_STARTED',
+    'NODE_FAILED',
+    'RAW',
+  ]);
+  return knownTypes.has(event.type);
+}
+
+/**
+ * Exhaustiveness check for switch statements.
+ * Ensures all event types are handled.
+ *
+ * Example:
+ * ```ts
+ * switch (event.type) {
+ *   case 'RUN_STARTED': return handleRunStarted(event);
+ *   case 'RUN_COMPLETED': return handleRunCompleted(event);
+ *   // ... handle all types
+ *   default: return assertNeverEvent(event);
+ * }
+ * ```
+ */
+export function assertNeverEvent(event: never): never {
+  throw new Error(`Unhandled event type: ${(event as TypedRunEvent).type}`);
+}
+
+/**
+ * Parse a raw event object into a TypedRunEvent.
+ * Wraps unknown event types as UnknownEvent for safe handling.
+ *
+ * @param raw - Raw event object from JSON parsing
+ * @returns TypedRunEvent (known or unknown)
+ */
+export function parseRunEvent(raw: unknown): TypedRunEvent {
+  if (typeof raw !== 'object' || raw === null) {
+    throw new Error('Invalid event: not an object');
+  }
+
+  const event = raw as Record<string, unknown>;
+
+  // Validate required base fields
+  if (typeof event.type !== 'string') {
+    throw new Error('Invalid event: missing or invalid type field');
+  }
+  if (typeof event.run_id !== 'string') {
+    throw new Error('Invalid event: missing or invalid run_id field');
+  }
+  if (typeof event.timestamp !== 'string') {
+    throw new Error('Invalid event: missing or invalid timestamp field');
+  }
+  if (typeof event.sequence !== 'number') {
+    throw new Error('Invalid event: missing or invalid sequence field');
+  }
+
+  // Default schema_version to 1 for old traces
+  const schema_version = typeof event.schema_version === 'number' ? event.schema_version : 1;
+
+  // Ensure data is an object
+  const data = typeof event.data === 'object' && event.data !== null
+    ? (event.data as Record<string, unknown>)
+    : {};
+
+  // Construct typed event
+  const typedEvent: TypedRunEvent = {
+    schema_version,
+    type: event.type,
+    timestamp: event.timestamp,
+    run_id: event.run_id,
+    sequence: event.sequence,
+    data,
+  } as TypedRunEvent;
+
+  return typedEvent;
+}
