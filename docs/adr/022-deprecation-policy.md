@@ -1,7 +1,7 @@
 # ADR-022: Deprecation Policy
 
-**Status:** Proposed (draft 2026-05-21)  
-**Context:** Path to 1.0 planning, Phase 1 (Polish)  
+**Status:** Proposed (draft 2026-05-21)
+**Context:** Path to 1.0 planning, Phase 1 (Polish)
 **Related:** ADR-004 (event schema versioning), ADR-020 (desktop-first), ADR-021 (audit chain)
 
 ## Context

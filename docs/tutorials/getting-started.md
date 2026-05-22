@@ -1,7 +1,7 @@
 # Getting Started with ARC Studio
 
-**What you'll build:** Install ARC Studio, run your first agent workflow via CLI, then see the same workflow in the browser IDE.  
-**Time:** Under 5 minutes.  
+**What you'll build:** Install ARC Studio, run your first agent workflow via CLI, then see the same workflow in the browser IDE.
+**Time:** Under 5 minutes.
 **Prerequisites:** `node --version` ≥ 20, `pnpm --version` ≥ 9, `python --version` ≥ 3.11, `git`.
 
 ---

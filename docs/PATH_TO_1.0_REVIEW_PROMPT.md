@@ -1,7 +1,7 @@
 # Path to 1.0 — Phase Review Prompt
 
-**Purpose:** Systematic review gate for each phase (Phase 1-5) in the path to 1.0 roadmap.  
-**Related:** ADR-020 (desktop-first decision), docs/roadmap.md, docs/phases.md  
+**Purpose:** Systematic review gate for each phase (Phase 1-5) in the path to 1.0 roadmap.
+**Related:** ADR-020 (desktop-first decision), docs/roadmap.md, docs/phases.md
 **Last Updated:** 2026-05-21
 
 ## Review Framework

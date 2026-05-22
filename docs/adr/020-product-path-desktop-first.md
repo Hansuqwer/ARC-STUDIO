@@ -1,7 +1,7 @@
 # ADR-020: Product Path — Desktop-First, SaaS-Later
 
-**Status:** Proposed (draft 2026-05-21)  
-**Context:** Path to 1.0 planning, post-v0.1.0-alpha  
+**Status:** Proposed (draft 2026-05-21)
+**Context:** Path to 1.0 planning, post-v0.1.0-alpha
 **Related:** ADR-011 (full-parity framing), ADR-014 (security architecture), the deferred-items list in v0.1.0-alpha
 
 ## Context

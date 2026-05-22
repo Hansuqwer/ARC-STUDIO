@@ -1,8 +1,8 @@
 # Phase 1 — Polish (v0.2-v0.5) Task Breakdown
 
-**Timeline:** ~12 weeks  
-**Target:** End of Phase 1 review (using PATH_TO_1.0_REVIEW_PROMPT.md Phase 1 checks)  
-**Related:** ADR-020 (desktop-first), ADR-021 (audit chain), docs/roadmap.md, docs/phases.md  
+**Timeline:** ~12 weeks
+**Target:** End of Phase 1 review (using PATH_TO_1.0_REVIEW_PROMPT.md Phase 1 checks)
+**Related:** ADR-020 (desktop-first), ADR-021 (audit chain), docs/roadmap.md, docs/phases.md
 **Last Updated:** 2026-05-21
 
 ## Overview
@@ -209,8 +209,8 @@ These weeks are buffer for tasks that took longer than estimated, plus additiona
 | 7-8 | — | C.8-C.11: Degraded costs, screen reader, NO_COLOR, reduced-motion | D.12-D.14: Retention, docs, final tests | E.6-E.7: Full pytest, migration pass | 20-25 |
 | 9-12 | Polish + buffer | Polish + buffer | Polish + buffer | Polish + buffer | ~20 |
 
-**Total estimated hours:** 145-185 (across 12 weeks)  
-**Average weekly hours:** 12-15  
+**Total estimated hours:** 145-185 (across 12 weeks)
+**Average weekly hours:** 12-15
 
 ---
 

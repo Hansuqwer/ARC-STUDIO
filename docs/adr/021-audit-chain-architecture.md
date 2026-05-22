@@ -1,7 +1,7 @@
 # ADR-021: Audit Chain Architecture for EU AI Act Compliance
 
-**Status:** Proposed (draft 2026-05-21)  
-**Context:** EU AI Act enforcement deadline Aug 2, 2026; Phase 1 (Polish) implementation  
+**Status:** Proposed (draft 2026-05-21)
+**Context:** EU AI Act enforcement deadline Aug 2, 2026; Phase 1 (Polish) implementation
 **Related:** ADR-020 (desktop-first), ADR-014 (security architecture), ADR-019 (tool trust boundaries)
 
 ## Context
@@ -206,10 +206,10 @@ Each audit event's HMAC is computed over:
 def compute_hmac(event: dict, prev_hmac: str, key: bytes) -> str:
     # Canonical JSON serialization (sorted keys, no whitespace)
     event_json = json.dumps(event, sort_keys=True, separators=(',', ':'))
-    
+
     # Concatenate event JSON + previous HMAC
     message = event_json.encode('utf-8') + prev_hmac.encode('utf-8')
-    
+
     # Compute HMAC-SHA256
     h = hmac.new(key, message, hashlib.sha256)
     return h.hexdigest()
