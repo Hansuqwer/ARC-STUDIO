@@ -67,6 +67,9 @@ import { WorkflowExecutor } from './services/workflow-executor';
 import { TraceParser } from './services/trace-parser';
 import { WorkflowDetector } from './services/workflow-detector';
 import { FileManager } from './services/file-manager';
+import { ConfigService } from './services/config-service';
+import { RunLifecycleService } from './services/run-lifecycle-service';
+import { AuditBridgeService } from './services/audit-bridge-service';
 
 const ARC_CLI_ENV_ALLOWLIST = ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR'];
 const ARC_PYTHON_DAEMON_URL_ENV = 'ARC_PYTHON_DAEMON_URL';
@@ -99,6 +102,9 @@ export class ArcBackendService implements ArcService {
     private readonly parser: TraceParser;
     private readonly detector: WorkflowDetector;
     private readonly fileManager: FileManager;
+    private readonly configService: ConfigService;
+    private readonly runLifecycleService: RunLifecycleService;
+    private readonly auditBridgeService: AuditBridgeService;
     private readonly activeStreamCancels = new Map<string, { cancelled: boolean }>();
     private workspaceRoot: string;
 
@@ -106,454 +112,156 @@ export class ArcBackendService implements ArcService {
         executor?: WorkflowExecutor,
         parser?: TraceParser,
         detector?: WorkflowDetector,
-        fileManager?: FileManager
+        fileManager?: FileManager,
+        configService?: ConfigService,
+        runLifecycleService?: RunLifecycleService,
+        auditBridgeService?: AuditBridgeService
     ) {
         this.executor = executor ?? new WorkflowExecutor();
         this.parser = parser ?? new TraceParser();
         this.detector = detector ?? new WorkflowDetector();
         this.fileManager = fileManager ?? new FileManager();
         this.workspaceRoot = validateWorkspaceRoot(process.cwd());
+        this.configService = configService ?? new ConfigService(this.workspaceRoot);
+        this.runLifecycleService = runLifecycleService ?? new RunLifecycleService(
+            this.executor,
+            this.parser,
+            this.detector,
+            this.fileManager,
+            this.workspaceRoot
+        );
+        this.auditBridgeService = auditBridgeService ?? new AuditBridgeService(this.workspaceRoot);
     }
 
     // ========== Workflow Execution ==========
 
     /**
      * Execute a SwarmGraph workflow.
-     * Delegates to WorkflowExecutor after ensuring traces directory exists.
+     * @deprecated Use RunLifecycleService.executeWorkflow() directly. Will be removed in v0.3.0.
      */
     async executeWorkflow(
         prompt: string,
         options?: ExecutionOptions
     ): Promise<ExecutionResult> {
-        await this.fileManager.ensureTracesDir(this.workspaceRoot);
-        return this.executor.executeWorkflow(prompt, {
-            ...options,
-            workspaceRoot: this.workspaceRoot
-        });
+        return this.runLifecycleService.executeWorkflow(prompt, options);
     }
 
     /**
      * Cancel a running workflow execution.
+     * @deprecated Use RunLifecycleService.cancelWorkflow() directly. Will be removed in v0.3.0.
      */
     async cancelWorkflow(runId: string): Promise<CancelResult> {
-        return this.executor.cancelWorkflow(runId);
+        return this.runLifecycleService.cancelWorkflow(runId);
     }
 
     // ========== Trace Management ==========
 
     /**
      * Get all trace files from .arc/traces/ directory.
+     * @deprecated Use RunLifecycleService.getTraces() directly. Will be removed in v0.3.0.
      */
     async getTraces(): Promise<TraceFile[]> {
-        return this.fileManager.getTraceFiles(this.workspaceRoot);
+        return this.runLifecycleService.getTraces();
     }
 
     /**
      * Read and parse a specific trace file by ID.
+     * @deprecated Use RunLifecycleService.readTrace() directly. Will be removed in v0.3.0.
      */
     async readTrace(traceId: string): Promise<TraceData> {
-        try {
-            const tracePath = this.fileManager.getTracePath(
-                this.workspaceRoot,
-                traceId
-            );
-
-            const result = await this.parser.parseTrace(tracePath, traceId);
-            if (!result) {
-                throw new ArcError(
-                    ArcErrorCode.INVALID_INPUT,
-                    `Failed to parse trace file: ${traceId}`,
-                    { traceId }
-                );
-            }
-
-            return result;
-        } catch (error) {
-            if (error instanceof ArcError) {
-                throw error;
-            }
-            throw new ArcError(
-                ArcErrorCode.UNKNOWN,
-                `Failed to read trace: ${traceId}`,
-                { error: error instanceof Error ? error.message : 'Unknown error' }
-            );
-        }
+        return this.runLifecycleService.readTrace(traceId);
     }
 
     /**
      * Stream trace events from a trace file as an async iterable.
+     * @deprecated Use RunLifecycleService.streamTrace() directly. Will be removed in v0.3.0.
      */
     async streamTrace(traceId: string): Promise<AsyncIterable<TraceEvent>> {
-        try {
-            validateTraceId(traceId);
-
-            const tracePath = this.fileManager.getTracePath(
-                this.workspaceRoot,
-                traceId
-            );
-
-            // Check file exists before returning iterable
-            const fs = await import('fs-extra');
-            if (!await fs.pathExists(tracePath)) {
-                throw new ArcError(
-                    ArcErrorCode.RUN_NOT_FOUND,
-                    `Trace file not found: ${traceId}`,
-                    { traceId }
-                );
-            }
-
-            return this.parser.streamTrace(tracePath);
-        } catch (error) {
-            if (error instanceof ArcError) {
-                throw error;
-            }
-            throw new ArcError(
-                ArcErrorCode.UNKNOWN,
-                `Failed to stream trace: ${traceId}`,
-                { error: error instanceof Error ? error.message : 'Unknown error' }
-            );
-        }
+        return this.runLifecycleService.streamTrace(traceId);
     }
 
+    /**
+     * @deprecated Use RunLifecycleService.streamActiveTrace() directly. Will be removed in v0.3.0.
+     */
     async streamActiveTrace(request: ActiveTraceStreamRequest): Promise<AsyncIterable<ActiveTraceEventChunk>> {
-        validateRunId(request.runId);
-        if (request.mode !== 'live' && request.mode !== 'replay') {
-            throw new ArcError(ArcErrorCode.INVALID_INPUT, `Unsupported stream mode: ${request.mode}`);
-        }
-        const cancelToken = { cancelled: false };
-        this.activeStreamCancels.set(request.runId, cancelToken);
-        return this.createActiveTraceIterable(request, cancelToken);
+        return this.runLifecycleService.streamActiveTrace(request);
     }
 
+    /**
+     * @deprecated Use RunLifecycleService.readActiveTraceStream() directly. Will be removed in v0.3.0.
+     */
     async readActiveTraceStream(request: ActiveTraceStreamRequest): Promise<ActiveTraceEventChunk[]> {
-        const stream = await this.streamActiveTrace(request);
-        const chunks: ActiveTraceEventChunk[] = [];
-        for await (const chunk of stream) {
-            chunks.push(chunk);
-        }
-        return chunks;
+        return this.runLifecycleService.readActiveTraceStream(request);
     }
 
+    /**
+     * @deprecated Use RunLifecycleService.cancelActiveTraceStream() directly. Will be removed in v0.3.0.
+     */
     async cancelActiveTraceStream(runId: string): Promise<{ success: boolean; message: string }> {
-        validateRunId(runId);
-        const token = this.activeStreamCancels.get(runId);
-        if (!token) {
-            return { success: false, message: `No active stream proxy for run: ${runId}` };
-        }
-        token.cancelled = true;
-        this.activeStreamCancels.delete(runId);
-        return { success: true, message: `Cancelled active stream proxy for run: ${runId}` };
+        return this.runLifecycleService.cancelActiveTraceStream(runId);
     }
 
     /**
      * Validate a trace file format.
      */
+    /**
+     * Validate a trace file format.
+     * @deprecated Use RunLifecycleService.validateTrace() directly. Will be removed in v0.3.0.
+     */
     async validateTrace(traceId: string): Promise<ValidationResult> {
-        const errors: string[] = [];
-        const warnings: string[] = [];
-        let format: 'json' | 'jsonl' | 'unknown' = 'unknown';
-
-        try {
-            validateTraceId(traceId);
-
-            const tracePath = this.fileManager.getTracePath(
-                this.workspaceRoot,
-                traceId
-            );
-
-            if (!await this.fileExists(tracePath)) {
-                errors.push(`Trace file not found: ${traceId}`);
-                return { valid: false, errors, warnings, format };
-            }
-
-            const content = await this.readFileContent(tracePath);
-            const lines = content
-                .split('\n')
-                .map(line => line.trim())
-                .filter(line => line.length > 0);
-
-            const parseErrors = this.parser.validateJsonlStructure(lines);
-
-            // Determine format
-            if (lines.length === 1) {
-                format = 'json';
-            } else if (lines.length > 1) {
-                format = 'jsonl';
-            }
-
-            warnings.push(...parseErrors.warnings);
-
-            const traceData = this.parser.parseJsonlContent(content, traceId);
-
-            if (!traceData && parseErrors.errors.length > 0) {
-                errors.push(...parseErrors.errors);
-                return { valid: false, errors, warnings, format };
-            }
-
-            if (!traceData) {
-                errors.push('Failed to parse trace file');
-                return { valid: false, errors, warnings, format };
-            }
-
-            if (!traceData.id) {
-                errors.push('Missing required field: id');
-            }
-            if (!traceData.workflowId) {
-                warnings.push('Missing field: workflowId');
-            }
-            if (!traceData.runtime) {
-                warnings.push('Missing field: runtime');
-            }
-            if (!traceData.status) {
-                errors.push('Missing required field: status');
-            }
-            if (!traceData.startedAt) {
-                errors.push('Missing required field: startedAt');
-            }
-            if (!traceData.events || !Array.isArray(traceData.events)) {
-                errors.push('Missing or invalid field: events (must be an array)');
-            }
-
-            if (traceData.events && Array.isArray(traceData.events)) {
-                traceData.events.forEach((event, index) => {
-                    if (!event.type) {
-                        errors.push(`Event ${index}: missing type`);
-                    }
-                    if (!event.timestamp) {
-                        errors.push(`Event ${index}: missing timestamp`);
-                    }
-                    if (event.sequence === undefined) {
-                        warnings.push(`Event ${index}: missing sequence number`);
-                    }
-                });
-            }
-
-            return {
-                valid: errors.length === 0,
-                errors,
-                warnings,
-                format
-            };
-        } catch (error) {
-            errors.push(`Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            return { valid: false, errors, warnings, format };
-        }
+        return this.runLifecycleService.validateTrace(traceId);
     }
 
     // ========== Workflow Detection ==========
 
     /**
      * Detect workflows in the workspace.
+     * @deprecated Use RunLifecycleService.detectWorkflows() directly. Will be removed in v0.3.0.
      */
     async detectWorkflows(): Promise<WorkflowInfo[]> {
-        return this.detector.detectWorkflows(this.workspaceRoot);
+        return this.runLifecycleService.detectWorkflows();
     }
 
     // ========== Runtime Capabilities (arc-adapters) ==========
 
     /**
      * List runtime capability reports by calling the Python CLI.
+     * @deprecated Use RunLifecycleService.listRuntimeCapabilities() directly. Will be removed in v0.3.0.
      */
     async listRuntimeCapabilities(): Promise<RuntimeCapabilitiesResponse> {
-        try {
-            const output = execFileSync('arc', [
-                'runtimes',
-                '--capabilities',
-                '--workspace',
-                this.workspaceRoot,
-                '--json',
-            ], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-            const parsed = JSON.parse(output);
-            if (parsed.ok && parsed.data) {
-                return {
-                    ...parsed.data,
-                    runtimes: (parsed.data.runtimes || []).map((runtime: any) => this.mapRuntimeCapability(runtime)),
-                } as RuntimeCapabilitiesResponse;
-            }
-            throw new ArcError(
-                ArcErrorCode.UNKNOWN,
-                parsed?.error?.message || 'CLI returned no data',
-            );
-        } catch (error) {
-            if (error instanceof ArcError) throw error;
-            throw new ArcError(
-                ArcErrorCode.RUN_FAILED,
-                `Failed to list capabilities: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            );
-        }
+        return this.runLifecycleService.listRuntimeCapabilities();
     }
 
+    /**
+     * @deprecated Use RunLifecycleService.preflightRun() directly. Will be removed in v0.3.0.
+     */
     async preflightRun(request: RunPreflightRequest): Promise<RunPreflightResponse> {
-        try {
-            const args = [
-                'run',
-                request.workflow || 'crew.py',
-                '--runtime',
-                request.runtimeId,
-                '--profile-id',
-                request.profileId || 'local-safe',
-                '--workspace',
-                this.workspaceRoot,
-                '--dry-run',
-                '--json',
-            ];
-            if (request.prompt) {
-                args.push('--prompt', request.prompt);
-            }
-            const paidCallAllowed = request.allowPaidCalls === true;
-            if (paidCallAllowed) {
-                args.push('--allow-paid-calls');
-            }
-            const output = execFileSync('arc', args, {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-            const parsed = JSON.parse(output);
-            if (!parsed.ok || !parsed.data) {
-                throw new ArcError(ArcErrorCode.RUN_FAILED, parsed?.error?.message || 'Preflight failed');
-            }
-            const data = parsed.data;
-            const costMetadata = {
-                paidCallRequired: Boolean(data.paid_call_required),
-                paidCallAllowed,
-                providerCall: false as const,
-                dryRun: true,
-                quota: data.quota || data.provider_quota,
-                provider: data.provider,
-                estimatedCost: data.estimated_cost || null,
-            };
-            return {
-                workflow: data.workflow,
-                runtime: data.runtime,
-                profile: data.profile,
-                runnable: Boolean(data.runnable),
-                blockers: data.blockers || [],
-                warnings: data.warnings || [],
-                doctorActions: data.doctor_actions || data.doctorActions || [],
-                paidCallRequired: costMetadata.paidCallRequired,
-                keyRefStatus: data.key_ref_status || {},
-                exportTargetStatus: data.export_target_status || {},
-                dependencyStatus: data.dependency_status || {},
-                dryRun: true,
-                providerCall: false,
-                costMetadata,
-            };
-        } catch (error) {
-            if (error instanceof ArcError) throw error;
-            throw new ArcError(
-                ArcErrorCode.RUN_FAILED,
-                `Failed to preflight run: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            );
-        }
+        return this.runLifecycleService.preflightRun(request);
     }
 
+    /**
+     * @deprecated Use RunLifecycleService.startRun() directly. Will be removed in v0.3.0.
+     */
     async startRun(request: StartRunRequest): Promise<StartRunResponse> {
-        try {
-            const args = [
-                'run',
-                request.workflow || 'crew.py',
-                '--runtime',
-                request.runtimeId,
-                '--profile-id',
-                request.profileId || 'local-safe',
-                '--workspace',
-                this.workspaceRoot,
-                '--json',
-            ];
-            if (request.prompt) {
-                args.push('--prompt', request.prompt);
-            }
-            const paidCallAllowed = request.allowPaidCalls === true;
-            if (paidCallAllowed) {
-                args.push('--allow-paid-calls');
-            }
-            const output = execFileSync('arc', args, {
-                timeout: 120000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-            const parsed = JSON.parse(output);
-            if (!parsed.ok || !parsed.data) {
-                throw new ArcError(ArcErrorCode.RUN_FAILED, parsed?.error?.message || 'Run failed');
-            }
-            const data = parsed.data;
-            return {
-                runId: data.id,
-                status: data.status,
-                runtime: data.runtime,
-                tracePath: data.metadata?.trace_path,
-                metadata: data.metadata || {},
-                costMetadata: {
-                    paidCallRequired: Boolean(data.paid_call_required || data.metadata?.paid_call_required),
-                    paidCallAllowed,
-                    providerCall: false,
-                    dryRun: false,
-                    quota: data.quota || data.provider_quota || data.metadata?.quota,
-                    provider: data.provider || data.metadata?.provider,
-                    estimatedCost: data.estimated_cost || data.metadata?.estimated_cost || null,
-                },
-            };
-        } catch (error) {
-            if (error instanceof ArcError) throw error;
-            throw new ArcError(
-                ArcErrorCode.RUN_FAILED,
-                `Failed to start run: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            );
-        }
+        return this.runLifecycleService.startRun(request);
     }
 
     /**
      * Get provider configuration status by calling the Python CLI.
      */
+    /**
+     * @deprecated Use ConfigService.getProviderStatus() directly. Will be removed in v0.3.0.
+     */
     async getProviderStatus(provider: string, baseUrl?: string): Promise<ProviderStatus> {
-        try {
-            const output = execFileSync('arc', ['providers', 'status', '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-            const parsed = JSON.parse(output);
-            if (parsed.ok && Array.isArray(parsed.data)) {
-                const found = parsed.data.find((p: { provider: string }) => p.provider === provider);
-                if (found) return found as ProviderStatus;
-            }
-            // Return a default status if provider not found
-            return {
-                provider,
-                baseUrlConfigured: !!baseUrl,
-                apiKeyConfigured: false,
-                runtimeAvailable: false,
-                message: 'Provider not configured',
-            };
-        } catch (error) {
-            return {
-                provider,
-                baseUrlConfigured: !!baseUrl,
-                apiKeyConfigured: false,
-                runtimeAvailable: false,
-                message: `Status unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            };
-        }
+        return this.configService.getProviderStatus(provider, baseUrl);
     }
 
     /**
      * Get current workspace status.
+     * @deprecated Use ConfigService.getWorkspaceStatus() directly. Will be removed in v0.3.0.
      */
     async getWorkspaceStatus(): Promise<{ frontendPath: string; backendPath: string; source: string }> {
-        return {
-            frontendPath: this.workspaceRoot,
-            backendPath: this.workspaceRoot,
-            source: 'filesystem',
-        };
+        return this.configService.getWorkspaceStatus();
     }
 
     // ========== Config Tab Methods (Session B) ==========
@@ -563,192 +271,26 @@ export class ArcBackendService implements ArcService {
      * Calls the Python CLI for provider statuses and reads workspace trust state.
      * Gracefully handles unavailable backend by returning degraded state.
      */
+    /**
+     * @deprecated Use ConfigService.getConfigStatus() directly. Will be removed in v0.3.0.
+     */
     async getConfigStatus(): Promise<ConfigStatus> {
-        const trustStatus: TrustStatus = {
-            trusted: false,
-            workspacePath: this.workspaceRoot,
-            trustLevel: 'unknown',
-            reason: 'status_unverified',
-        };
-
-        const runtimeConfig: SafeRuntimeConfig = {
-            defaultRuntime: 'swarmgraph',
-            autoDetect: true,
-            fallback: 'stub',
-            isolation: 'none',
-            timeoutSeconds: 300,
-            allowPaidCalls: false,
-            dryRun: true,
-            routingMode: 'manual',
-        };
-
-        let providers: SafeProviderKeyStatus[] = [];
-        let backendAvailable = true;
-        let backendMessage: string | undefined;
-        let selectedProfile: string | undefined;
-
-        try {
-            const output = execFileSync('arc', ['providers', 'status', '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-            const parsed = JSON.parse(output);
-            if (parsed.ok && Array.isArray(parsed.data)) {
-                providers = parsed.data.map((p: any) => ({
-                    provider: p.provider || 'unknown',
-                    displayName: p.display_name || p.provider || 'Unknown',
-                    configured: !!p.apiKeyConfigured || !!p.api_key_configured,
-                    source: p.apiKeySource || (p.apiKeyConfigured ? 'env' : 'unset'),
-                    defaultModel: p.default_model,
-                    envOverride: p.api_key_env,
-                })) as SafeProviderKeyStatus[];
-            }
-        } catch (error) {
-            backendAvailable = false;
-            backendMessage = `Backend unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`;
-            providers = [
-                { provider: 'openai', displayName: 'OpenAI', configured: false, source: 'unset' },
-                { provider: 'anthropic', displayName: 'Anthropic', configured: false, source: 'unset' },
-                { provider: 'ollama', displayName: 'Ollama', configured: false, source: 'unset' },
-            ];
-        }
-
-        try {
-            const configOutput = execFileSync('arc', ['config', 'show', '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-            const configParsed = JSON.parse(configOutput);
-            if (configParsed.ok && configParsed.data) {
-                const data = configParsed.data;
-                if (data.runtime) {
-                    runtimeConfig.defaultRuntime = data.runtime.default || runtimeConfig.defaultRuntime;
-                    runtimeConfig.autoDetect = data.runtime.auto_detect ?? runtimeConfig.autoDetect;
-                    runtimeConfig.fallback = data.runtime.fallback || runtimeConfig.fallback;
-                }
-                if (data.execution) {
-                    runtimeConfig.isolation = data.execution.isolation || runtimeConfig.isolation;
-                    runtimeConfig.timeoutSeconds = data.execution.timeout_seconds || runtimeConfig.timeoutSeconds;
-                    runtimeConfig.allowPaidCalls = data.execution.allow_paid_calls ?? runtimeConfig.allowPaidCalls;
-                }
-                if (data.providers) {
-                    runtimeConfig.dryRun = data.providers.dry_run ?? runtimeConfig.dryRun;
-                    runtimeConfig.routingMode = data.providers.routing_mode || runtimeConfig.routingMode;
-                }
-                if (data.profiles) {
-                    selectedProfile = data.profiles.selected_profile || data.profiles.selected || data.profiles.default;
-                }
-                if (data.workspace) {
-                    trustStatus.trustLevel = data.workspace.trust_level || trustStatus.trustLevel;
-                    trustStatus.trusted = trustStatus.trustLevel === 'trusted';
-                }
-            }
-        } catch {
-            // Config show failed; keep defaults
-        }
-
-        return {
-            workspace: trustStatus,
-            runtime: runtimeConfig,
-            providers,
-            mode: 'build',
-            selectedProfile,
-            backendAvailable,
-            backendMessage,
-        };
+        return this.configService.getConfigStatus();
     }
 
     /**
      * Save safe config fields only.
-     * Validates that no secret values are included before writing.
+     * @deprecated Use ConfigService.saveConfig() directly. Will be removed in v0.3.0.
      */
     async saveConfig(update: SafeConfigUpdate): Promise<{ success: boolean; message: string }> {
-        const safeKeys = SAFE_CONFIG_KEYS;
-        const updateKeys = Object.keys(update);
-
-        for (const key of updateKeys) {
-            if (!safeKeys.includes(key) || UNSAFE_CONFIG_KEY_PATTERN.test(key)) {
-                return {
-                    success: false,
-                    message: `Rejected unsafe config field: ${key}. Only non-secret fields are allowed.`,
-                };
-            }
-        }
-
-        if (updateKeys.length === 0) {
-            return { success: false, message: 'No config fields to update.' };
-        }
-
-        try {
-            const args = ['config', 'set'];
-            if (update.defaultRuntime) {
-                args.push(`runtime.default=${update.defaultRuntime}`);
-            }
-            if (update.mode) {
-                args.push(`execution.mode=${update.mode}`);
-            }
-            if (update.isolation) {
-                args.push(`execution.isolation=${update.isolation}`);
-            }
-            if (update.allowPaidCalls !== undefined) {
-                args.push(`execution.allow_paid_calls=${update.allowPaidCalls}`);
-            }
-            if (update.dryRun !== undefined) {
-                args.push(`providers.dry_run=${update.dryRun}`);
-            }
-            if (update.routingMode) {
-                args.push(`providers.routing_mode=${update.routingMode}`);
-            }
-            if (update.selectedProfile) {
-                args.push(`profiles.selected_profile=${update.selectedProfile}`);
-            }
-
-            execFileSync('arc', args, {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-
-            return { success: true, message: 'Configuration saved.' };
-        } catch (error) {
-            return {
-                success: false,
-                message: `Failed to save config: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            };
-        }
+        return this.configService.saveConfig(update);
     }
 
+    /**
+     * @deprecated Use ConfigService.listProfiles() directly. Will be removed in v0.3.0.
+     */
     async listProfiles(): Promise<ArcProfileInfo[]> {
-        try {
-            const output = execFileSync('arc', ['profiles', 'list', '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
-            const parsed = JSON.parse(output);
-            const profiles = Array.isArray(parsed?.data) ? parsed.data : Array.isArray(parsed?.profiles) ? parsed.profiles : [];
-            return profiles.map((profile: any) => ({
-                id: String(profile.id || profile.profile_id || profile.name || 'unknown'),
-                name: String(profile.name || profile.id || profile.profile_id || 'Unknown'),
-                mode: profile.mode,
-                description: profile.description,
-                allowPaidCalls: profile.allow_paid_calls ?? profile.allowPaidCalls,
-                dryRun: profile.dry_run ?? profile.dryRun,
-                provider: profile.provider,
-                runtime: profile.runtime,
-            }));
-        } catch {
-            return [
-                { id: 'local-safe', name: 'local-safe', allowPaidCalls: false, dryRun: true },
-                { id: 'local-paid', name: 'local-paid', allowPaidCalls: true, dryRun: false },
-            ];
-        }
+        return this.configService.listProfiles();
     }
 
     async getIsolationStatus(): Promise<IsolationStatus> {

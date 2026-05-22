@@ -18,6 +18,11 @@ import { AuditBridgeService } from './services/audit-bridge-service';
 import { ArcServicePath } from '../common/arc-protocol';
 
 export default new ContainerModule(bind => {
+    // Bind workspace root for service injection
+    bind('WorkspaceRoot').toDynamicValue(() => {
+        return process.cwd();
+    }).inSingletonScope();
+
     // Bind specialized services
     bind(WorkflowExecutor).toSelf().inSingletonScope();
     bind(TraceParser).toSelf().inSingletonScope();
@@ -34,7 +39,10 @@ export default new ContainerModule(bind => {
         ctx.container.get(WorkflowExecutor),
         ctx.container.get(TraceParser),
         ctx.container.get(WorkflowDetector),
-        ctx.container.get(FileManager)
+        ctx.container.get(FileManager),
+        ctx.container.get(ConfigService),
+        ctx.container.get(RunLifecycleService),
+        ctx.container.get(AuditBridgeService)
     )).inSingletonScope();
 
     // Bind the RPC connection handler
