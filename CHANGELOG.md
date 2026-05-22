@@ -4,6 +4,22 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 
 ## [Unreleased]
 
+### Added
+
+- ADR-023 error-code sync: Python and TypeScript now share the 16 canonical `ArcErrorCode` values.
+- `PERMISSION_DENIED` and `UNKNOWN` in Python `ArcErrorCode`.
+- `canonicalErrorCode()` in TypeScript and `ArcErrorCode.from_legacy()` in Python for read-path legacy normalization.
+- `protocol/fixtures/error-codes/` cross-language fixtures and `docs/guides/error-code-migration.md`.
+
+### Deprecated
+
+- TypeScript `ArcErrorCode.TRACE_NOT_FOUND`; use `RUN_NOT_FOUND`.
+- TypeScript `ArcErrorCode.EXECUTION_FAILED`; use `RUN_FAILED`.
+- TypeScript `ArcErrorCode.PARSE_ERROR`; use `INVALID_INPUT`.
+- TypeScript `ArcErrorCode.WORKFLOW_NOT_FOUND`; use `WORKSPACE_NOT_FOUND`.
+
+These deprecated members keep their original wire strings until removal in v0.3.0.
+
 ## [0.1.0-alpha] - 2026-05-21
 
 ### Added

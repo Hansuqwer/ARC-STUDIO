@@ -1,0 +1,9 @@
+{
+  "code": "NO_RUNTIME_DETECTED",
+  "message": "No supported agent runtime detected in workspace",
+  "details": {
+    "workspace": "/home/user/projects/empty",
+    "scanned_files": 12,
+    "candidates_checked": ["swarmgraph", "langgraph", "crewai", "openai-agents", "ag2", "llamaindex"]
+  }
+}

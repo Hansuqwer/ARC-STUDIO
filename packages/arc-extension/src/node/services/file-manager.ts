@@ -73,7 +73,7 @@ export class FileManager {
 
         if (!await fs.pathExists(tracePath)) {
             throw new ArcError(
-                ArcErrorCode.TRACE_NOT_FOUND,
+                ArcErrorCode.RUN_NOT_FOUND,
                 `Trace not found: ${traceId}`,
                 { traceId }
             );

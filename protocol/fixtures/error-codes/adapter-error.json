@@ -1,0 +1,9 @@
+{
+  "code": "ADAPTER_ERROR",
+  "message": "LangGraph adapter failed to import workflow module",
+  "details": {
+    "runtime_id": "langgraph",
+    "export_target": "my_app.graphs:build_graph",
+    "cause": "ModuleNotFoundError: No module named 'my_app.graphs'"
+  }
+}

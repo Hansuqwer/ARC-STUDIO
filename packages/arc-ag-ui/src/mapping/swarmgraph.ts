@@ -21,9 +21,9 @@ export const SwarmGraphMapper: RuntimeEventMapper<SwarmGraphNativeEvent> = {
       case 'run.start':
         return [{ ...base, type: AGUIEventType.RUN_STARTED, threadId: ctx.threadId, runId: ctx.runId } as AGUIBaseEvent];
       case 'run.finish':
-        return [{ ...base, type: AGUIEventType.RUN_FINISHED, threadId: ctx.threadId, runId: ctx.runId } as AGUIBaseEvent];
+        return [{ ...base, type: AGUIEventType.RUN_COMPLETED, threadId: ctx.threadId, runId: ctx.runId } as AGUIBaseEvent];
       case 'run.error':
-        return [{ ...base, type: AGUIEventType.RUN_ERROR, message: native.error?.message ?? 'unknown', code: native.error?.code } as AGUIBaseEvent];
+        return [{ ...base, type: AGUIEventType.RUN_FAILED, message: native.error?.message ?? 'unknown', code: native.error?.code } as AGUIBaseEvent];
       case 'handoff':
         return [{ ...base, type: AGUIEventType.STEP_STARTED, stepName: `handoff:${native.agent ?? '?'}` } as AGUIBaseEvent];
       case 'agent.text': {

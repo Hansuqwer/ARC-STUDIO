@@ -360,7 +360,7 @@ printf '%s' '{"ok":true,"data":{"id":"run-1","status":"completed","runtime":"cre
         it('should throw ArcError for non-existent trace ID', async () => {
             await expect(service.readTrace('run-sg-ff00')).rejects.toThrow(ArcError);
             await expect(service.readTrace('run-sg-ff00')).rejects.toMatchObject({
-                code: ArcErrorCode.TRACE_NOT_FOUND
+                code: ArcErrorCode.RUN_NOT_FOUND
             });
         });
 

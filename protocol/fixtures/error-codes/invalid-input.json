@@ -1,0 +1,9 @@
+{
+  "code": "INVALID_INPUT",
+  "message": "Field 'workflow_id' is required and must be a non-empty string",
+  "details": {
+    "field": "workflow_id",
+    "received": null,
+    "expected_type": "string"
+  }
+}

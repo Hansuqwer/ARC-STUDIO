@@ -71,7 +71,7 @@ export class WorkflowExecutor {
             const cliPath = await this.findExecutable('swarmgraph', workspaceRoot);
             if (!cliPath) {
                 throw new ArcError(
-                    ArcErrorCode.EXECUTION_FAILED,
+                    ArcErrorCode.RUN_FAILED,
                     'SwarmGraph CLI (swarmgraph) not found. Please install SwarmGraph first.',
                     { command: 'swarmgraph' }
                 );
@@ -256,7 +256,7 @@ export class WorkflowExecutor {
                 clearTimeout(timeoutHandle);
                 this.runningProcesses.delete(runId);
                 reject(new ArcError(
-                    ArcErrorCode.EXECUTION_FAILED,
+                    ArcErrorCode.RUN_FAILED,
                     `Failed to execute command: ${command} ${args.join(' ')}`,
                     { error: error.message, command, args }
                 ));

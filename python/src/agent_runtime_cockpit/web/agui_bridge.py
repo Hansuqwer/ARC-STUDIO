@@ -4,9 +4,13 @@ AG-UI Event Bridge
 Maps ARC internal run events to AG-UI protocol-compatible event types.
 Source: https://docs.ag-ui.com/concepts/events
 
+DEPRECATED (v0.2.0): This bridge is being phased out as TypeScript now uses
+the same event names as Python (RUN_COMPLETED/RUN_FAILED/RUN_CANCELLED).
+The mapping is kept for backwards compatibility until v0.3.0.
+
 AG-UI event types used:
   RUN_STARTED   → RunStarted
-  RUN_COMPLETED → RunFinished
+  RUN_COMPLETED → RunFinished (DEPRECATED: now uses RUN_COMPLETED directly)
   NODE_STARTED  → StepStarted
   NODE_COMPLETED→ StepFinished
   MESSAGE       → TextMessageStart / TextMessageContent / TextMessageEnd

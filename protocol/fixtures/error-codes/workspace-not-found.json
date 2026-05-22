@@ -1,0 +1,12 @@
+{
+  "code": "WORKSPACE_NOT_FOUND",
+  "message": "Workspace not found at path: /tmp/missing-workspace",
+  "details": {
+    "path": "/tmp/missing-workspace",
+    "searched_locations": [
+      "/tmp/missing-workspace",
+      "/tmp/missing-workspace/.arc",
+      "/tmp/missing-workspace/.arc/config.toml"
+    ]
+  }
+}

@@ -37,7 +37,7 @@ export class TraceParser {
         try {
             if (!await fs.pathExists(tracePath)) {
                 throw new ArcError(
-                    ArcErrorCode.TRACE_NOT_FOUND,
+                    ArcErrorCode.RUN_NOT_FOUND,
                     `Trace file not found: ${tracePath}`,
                     { tracePath }
                 );
@@ -57,7 +57,7 @@ export class TraceParser {
                 throw error;
             }
             throw new ArcError(
-                ArcErrorCode.PARSE_ERROR,
+                ArcErrorCode.INVALID_INPUT,
                 `Failed to parse trace: ${error instanceof Error ? error.message : 'Unknown error'}`
             );
         }

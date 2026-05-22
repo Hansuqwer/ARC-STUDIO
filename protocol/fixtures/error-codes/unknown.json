@@ -1,0 +1,8 @@
+{
+  "code": "UNKNOWN",
+  "message": "An unrecognized error occurred",
+  "details": {
+    "original_code": "SOMETHING_FROM_THE_FUTURE",
+    "context": "received from upstream adapter on a newer schema version"
+  }
+}

@@ -15,16 +15,52 @@ export const ArcService = Symbol('ArcService');
 
 /**
  * Error codes for ARC protocol operations.
+ *
+ * Canonical list defined by ADR-023 and mirrored in Python's
+ * `agent_runtime_cockpit.protocol.errors.ArcErrorCode`.
  */
 export enum ArcErrorCode {
-    INVALID_INPUT       = 'INVALID_INPUT',
-    TRACE_NOT_FOUND     = 'TRACE_NOT_FOUND',
-    EXECUTION_FAILED    = 'EXECUTION_FAILED',
-    PARSE_ERROR         = 'PARSE_ERROR',
-    WORKFLOW_NOT_FOUND  = 'WORKFLOW_NOT_FOUND',
-    PERMISSION_DENIED   = 'PERMISSION_DENIED',
-    TIMEOUT             = 'TIMEOUT',
-    UNKNOWN             = 'UNKNOWN'
+    WORKSPACE_NOT_FOUND     = 'WORKSPACE_NOT_FOUND',
+    NO_RUNTIME_DETECTED     = 'NO_RUNTIME_DETECTED',
+    ADAPTER_ERROR           = 'ADAPTER_ERROR',
+    ADAPTER_NOT_SUPPORTED   = 'ADAPTER_NOT_SUPPORTED',
+    SCHEMA_EXPORT_FAILED    = 'SCHEMA_EXPORT_FAILED',
+    WORKFLOW_EXPORT_FAILED  = 'WORKFLOW_EXPORT_FAILED',
+    RUN_FAILED              = 'RUN_FAILED',
+    RUN_NOT_FOUND           = 'RUN_NOT_FOUND',
+    CONTEXT_PROVIDER_ERROR  = 'CONTEXT_PROVIDER_ERROR',
+    CONFORMANCE_FAILED      = 'CONFORMANCE_FAILED',
+    INVALID_INPUT           = 'INVALID_INPUT',
+    INTERNAL_ERROR          = 'INTERNAL_ERROR',
+    TIMEOUT                 = 'TIMEOUT',
+    NOT_IMPLEMENTED         = 'NOT_IMPLEMENTED',
+    PERMISSION_DENIED       = 'PERMISSION_DENIED',
+    UNKNOWN                 = 'UNKNOWN',
+
+    /** @deprecated ADR-023: use RUN_NOT_FOUND. Removed in v0.3.0. */
+    TRACE_NOT_FOUND         = 'TRACE_NOT_FOUND',
+    /** @deprecated ADR-023: use RUN_FAILED. Removed in v0.3.0. */
+    EXECUTION_FAILED        = 'EXECUTION_FAILED',
+    /** @deprecated ADR-023: use INVALID_INPUT. Removed in v0.3.0. */
+    PARSE_ERROR             = 'PARSE_ERROR',
+    /** @deprecated ADR-023: use WORKSPACE_NOT_FOUND. Removed in v0.3.0. */
+    WORKFLOW_NOT_FOUND      = 'WORKFLOW_NOT_FOUND'
+}
+
+export function canonicalErrorCode(code: string): ArcErrorCode {
+    const legacy: Record<string, ArcErrorCode> = {
+        TRACE_NOT_FOUND: ArcErrorCode.RUN_NOT_FOUND,
+        EXECUTION_FAILED: ArcErrorCode.RUN_FAILED,
+        PARSE_ERROR: ArcErrorCode.INVALID_INPUT,
+        WORKFLOW_NOT_FOUND: ArcErrorCode.WORKSPACE_NOT_FOUND
+    };
+    if (code in legacy) {
+        return legacy[code];
+    }
+    if ((Object.values(ArcErrorCode) as string[]).includes(code)) {
+        return code as ArcErrorCode;
+    }
+    return ArcErrorCode.UNKNOWN;
 }
 
 // ========== Error Class ==========
@@ -1121,7 +1157,7 @@ export interface ArcService {
      * @param options  - Optional execution configuration
      * @returns Promise resolving to execution result with run ID and trace path
      * @throws {ArcError} INVALID_INPUT if prompt is empty or too long
-     * @throws {ArcError} EXECUTION_FAILED if the CLI is unavailable
+     * @throws {ArcError} RUN_FAILED if the CLI is unavailable
      * @throws {ArcError} TIMEOUT if execution exceeds the configured timeout
      *
      * @example
@@ -1174,8 +1210,8 @@ export interface ArcService {
      * @param traceId - The trace ID (without .jsonl extension)
      * @returns Promise resolving to complete trace data
      * @throws {ArcError} INVALID_INPUT if traceId is malformed
-     * @throws {ArcError} TRACE_NOT_FOUND if the file does not exist
-     * @throws {ArcError} PARSE_ERROR if the file cannot be parsed
+     * @throws {ArcError} RUN_NOT_FOUND if the file does not exist
+     * @throws {ArcError} INVALID_INPUT if the file cannot be parsed
      *
      * @example
      * ```typescript
@@ -1195,8 +1231,8 @@ export interface ArcService {
      * @param traceId - The trace ID (without .jsonl extension)
      * @returns Async iterable of TraceEvent objects
      * @throws {ArcError} INVALID_INPUT if traceId is malformed
-     * @throws {ArcError} TRACE_NOT_FOUND if the file does not exist
-     * @throws {ArcError} PARSE_ERROR if a line cannot be parsed
+     * @throws {ArcError} RUN_NOT_FOUND if the file does not exist
+     * @throws {ArcError} INVALID_INPUT if a line cannot be parsed
      */
     streamTrace(traceId: string): Promise<AsyncIterable<TraceEvent>>;
 

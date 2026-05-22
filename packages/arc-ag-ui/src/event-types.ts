@@ -1,6 +1,11 @@
 // Canonical AG-UI EventType enum mirror, pinned to the @ag-ui/core
 // definition documented in docs/VERIFICATION.md.
 // Source of truth: ag-ui-protocol/ag-ui main @ sdks/typescript/packages/core/src/events.ts
+//
+// BREAKING CHANGE (v0.2.0): Standardized on Python's run lifecycle vocabulary
+// - RUN_COMPLETED/RUN_FAILED/RUN_CANCELLED (more precise than FINISHED/ERROR)
+// - RUN_FINISHED and RUN_ERROR kept as deprecated aliases until v0.3.0
+// - See docs/SCHEMA_AUDIT_REPORT.md Risk 0 for details
 
 export enum AGUIEventType {
   TEXT_MESSAGE_START = 'TEXT_MESSAGE_START',
@@ -19,9 +24,18 @@ export enum AGUIEventType {
   ACTIVITY_DELTA = 'ACTIVITY_DELTA',
   RAW = 'RAW',
   CUSTOM = 'CUSTOM',
+  
+  // Run lifecycle - standardized on Python vocabulary (v0.2.0)
   RUN_STARTED = 'RUN_STARTED',
-  RUN_FINISHED = 'RUN_FINISHED',
-  RUN_ERROR = 'RUN_ERROR',
+  RUN_COMPLETED = 'RUN_COMPLETED',
+  RUN_FAILED = 'RUN_FAILED',
+  RUN_CANCELLED = 'RUN_CANCELLED',
+  
+  /** @deprecated Use RUN_COMPLETED - removed in v0.3.0 */
+  RUN_FINISHED = 'RUN_COMPLETED',
+  /** @deprecated Use RUN_FAILED - removed in v0.3.0 */
+  RUN_ERROR = 'RUN_FAILED',
+  
   STEP_STARTED = 'STEP_STARTED',
   STEP_FINISHED = 'STEP_FINISHED',
   REASONING_START = 'REASONING_START',
@@ -35,6 +49,7 @@ export enum AGUIEventType {
 
 export const RUN_LIFECYCLE_EVENTS = new Set<AGUIEventType>([
   AGUIEventType.RUN_STARTED,
-  AGUIEventType.RUN_FINISHED,
-  AGUIEventType.RUN_ERROR,
+  AGUIEventType.RUN_COMPLETED,
+  AGUIEventType.RUN_FAILED,
+  AGUIEventType.RUN_CANCELLED,
 ]);

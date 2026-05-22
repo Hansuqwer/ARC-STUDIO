@@ -1,0 +1,10 @@
+{
+  "code": "RUN_FAILED",
+  "message": "Run terminated with non-zero exit code",
+  "details": {
+    "run_id": "run-sg-9f3a2e1b",
+    "exit_code": 1,
+    "runtime": "swarmgraph",
+    "duration_ms": 1842
+  }
+}

@@ -41,7 +41,7 @@ export function mapEvent(runtime: string, native: unknown, ctx: MappingContext):
     return mapper.map(native, ctx).map(safeEvent);
   } catch (err) {
     return [safeEvent({
-      type: AGUIEventType.RUN_ERROR,
+      type: AGUIEventType.RUN_FAILED,
       timestamp: Date.now(),
       threadId: ctx.threadId,
       runId: ctx.runId,

@@ -23,7 +23,7 @@ export const LangGraphMapper: RuntimeEventMapper<LangGraphEvent> = {
         return [{ ...base, type: AGUIEventType.STEP_STARTED, stepName: native.name ?? 'step' } as AGUIBaseEvent];
       case 'on_chain_end':
         if (native.name && native.name.toLowerCase() === 'langgraph') {
-          return [{ ...base, type: AGUIEventType.RUN_FINISHED, threadId: ctx.threadId, runId: ctx.runId } as AGUIBaseEvent];
+          return [{ ...base, type: AGUIEventType.RUN_COMPLETED, threadId: ctx.threadId, runId: ctx.runId } as AGUIBaseEvent];
         }
         return [{ ...base, type: AGUIEventType.STEP_FINISHED, stepName: native.name ?? 'step' } as AGUIBaseEvent];
       case 'on_chat_model_stream': {
@@ -47,7 +47,7 @@ export const LangGraphMapper: RuntimeEventMapper<LangGraphEvent> = {
       case 'on_chain_state':
         return [{ ...base, type: AGUIEventType.STATE_SNAPSHOT, snapshot: (native.data ?? {}) as Record<string, unknown> } as AGUIBaseEvent];
       case 'on_error':
-        return [{ ...base, type: AGUIEventType.RUN_ERROR, message: String(native.data?.error ?? 'unknown'), code: 'LANGGRAPH_ERROR' } as AGUIBaseEvent];
+        return [{ ...base, type: AGUIEventType.RUN_FAILED, message: String(native.data?.error ?? 'unknown'), code: 'LANGGRAPH_ERROR' } as AGUIBaseEvent];
       default:
         return [{ ...base, type: AGUIEventType.RAW, event: native, source: 'langgraph' } as AGUIBaseEvent];
     }

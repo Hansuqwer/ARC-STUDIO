@@ -29,6 +29,7 @@ import {
     ReplayResult,
     ReplayEvent,
     ProviderQuotaResetResult,
+    canonicalErrorCode,
 } from '../../common/arc-protocol';
 
 describe('ArcService Proxy Tests', () => {
@@ -432,7 +433,7 @@ describe('ArcService Proxy Tests', () => {
         it('getRunReceipt should handle missing receipt gracefully', async () => {
             const mockService = {
                 getRunReceipt: async (runId: string): Promise<RunReceipt> => {
-                    throw new ArcError(ArcErrorCode.TRACE_NOT_FOUND, `No receipt found for run: ${runId}`);
+                    throw new ArcError(ArcErrorCode.RUN_NOT_FOUND, `No receipt found for run: ${runId}`);
                 },
             };
 
@@ -578,15 +579,20 @@ describe('ArcService Proxy Tests', () => {
 
         describe('Protocol Types', () => {
             it('ArcErrorCode should have all expected codes', () => {
+                expect(ArcErrorCode.RUN_NOT_FOUND).toBe('RUN_NOT_FOUND');
+                expect(ArcErrorCode.RUN_FAILED).toBe('RUN_FAILED');
                 expect(ArcErrorCode.INVALID_INPUT).toBe('INVALID_INPUT');
-            expect(ArcErrorCode.TRACE_NOT_FOUND).toBe('TRACE_NOT_FOUND');
-            expect(ArcErrorCode.EXECUTION_FAILED).toBe('EXECUTION_FAILED');
-            expect(ArcErrorCode.PARSE_ERROR).toBe('PARSE_ERROR');
-            expect(ArcErrorCode.WORKFLOW_NOT_FOUND).toBe('WORKFLOW_NOT_FOUND');
-            expect(ArcErrorCode.PERMISSION_DENIED).toBe('PERMISSION_DENIED');
-            expect(ArcErrorCode.TIMEOUT).toBe('TIMEOUT');
-            expect(ArcErrorCode.UNKNOWN).toBe('UNKNOWN');
-        });
+                expect(ArcErrorCode.PERMISSION_DENIED).toBe('PERMISSION_DENIED');
+                expect(ArcErrorCode.TIMEOUT).toBe('TIMEOUT');
+                expect(ArcErrorCode.UNKNOWN).toBe('UNKNOWN');
+            });
+
+            it('canonicalErrorCode should normalize deprecated wire codes', () => {
+                expect(canonicalErrorCode('TRACE_NOT_FOUND')).toBe(ArcErrorCode.RUN_NOT_FOUND);
+                expect(canonicalErrorCode('EXECUTION_FAILED')).toBe(ArcErrorCode.RUN_FAILED);
+                expect(canonicalErrorCode('PARSE_ERROR')).toBe(ArcErrorCode.INVALID_INPUT);
+                expect(canonicalErrorCode('WORKFLOW_NOT_FOUND')).toBe(ArcErrorCode.WORKSPACE_NOT_FOUND);
+            });
 
         it('ArcError should be instantiable', () => {
             const error = new ArcError(

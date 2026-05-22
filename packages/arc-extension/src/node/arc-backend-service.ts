@@ -161,7 +161,7 @@ export class ArcBackendService implements ArcService {
             const result = await this.parser.parseTrace(tracePath, traceId);
             if (!result) {
                 throw new ArcError(
-                    ArcErrorCode.PARSE_ERROR,
+                    ArcErrorCode.INVALID_INPUT,
                     `Failed to parse trace file: ${traceId}`,
                     { traceId }
                 );
@@ -196,7 +196,7 @@ export class ArcBackendService implements ArcService {
             const fs = await import('fs-extra');
             if (!await fs.pathExists(tracePath)) {
                 throw new ArcError(
-                    ArcErrorCode.TRACE_NOT_FOUND,
+                    ArcErrorCode.RUN_NOT_FOUND,
                     `Trace file not found: ${traceId}`,
                     { traceId }
                 );
@@ -382,7 +382,7 @@ export class ArcBackendService implements ArcService {
         } catch (error) {
             if (error instanceof ArcError) throw error;
             throw new ArcError(
-                ArcErrorCode.EXECUTION_FAILED,
+                ArcErrorCode.RUN_FAILED,
                 `Failed to list capabilities: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
         }
@@ -417,7 +417,7 @@ export class ArcBackendService implements ArcService {
             });
             const parsed = JSON.parse(output);
             if (!parsed.ok || !parsed.data) {
-                throw new ArcError(ArcErrorCode.EXECUTION_FAILED, parsed?.error?.message || 'Preflight failed');
+                throw new ArcError(ArcErrorCode.RUN_FAILED, parsed?.error?.message || 'Preflight failed');
             }
             const data = parsed.data;
             const costMetadata = {
@@ -448,7 +448,7 @@ export class ArcBackendService implements ArcService {
         } catch (error) {
             if (error instanceof ArcError) throw error;
             throw new ArcError(
-                ArcErrorCode.EXECUTION_FAILED,
+                ArcErrorCode.RUN_FAILED,
                 `Failed to preflight run: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
         }
@@ -482,7 +482,7 @@ export class ArcBackendService implements ArcService {
             });
             const parsed = JSON.parse(output);
             if (!parsed.ok || !parsed.data) {
-                throw new ArcError(ArcErrorCode.EXECUTION_FAILED, parsed?.error?.message || 'Run failed');
+                throw new ArcError(ArcErrorCode.RUN_FAILED, parsed?.error?.message || 'Run failed');
             }
             const data = parsed.data;
             return {
@@ -504,7 +504,7 @@ export class ArcBackendService implements ArcService {
         } catch (error) {
             if (error instanceof ArcError) throw error;
             throw new ArcError(
-                ArcErrorCode.EXECUTION_FAILED,
+                ArcErrorCode.RUN_FAILED,
                 `Failed to start run: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
         }
@@ -836,7 +836,7 @@ export class ArcBackendService implements ArcService {
             const parsed = JSON.parse(output);
             if (!parsed.ok) {
                 throw new ArcError(
-                    ArcErrorCode.EXECUTION_FAILED,
+                    ArcErrorCode.RUN_FAILED,
                     parsed?.error?.message || 'Provider diagnostics failed',
                     { error: parsed?.error }
                 );
@@ -845,7 +845,7 @@ export class ArcBackendService implements ArcService {
         } catch (error) {
             if (error instanceof ArcError) throw error;
             throw new ArcError(
-                ArcErrorCode.EXECUTION_FAILED,
+                ArcErrorCode.RUN_FAILED,
                 `Provider diagnostics unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`
             );
         }
@@ -867,7 +867,7 @@ export class ArcBackendService implements ArcService {
             const parsed = JSON.parse(output);
             if (!parsed.ok) {
                 throw new ArcError(
-                    ArcErrorCode.EXECUTION_FAILED,
+                    ArcErrorCode.RUN_FAILED,
                     parsed?.error?.message || 'Provider quota failed',
                     { error: parsed?.error }
                 );
@@ -876,7 +876,7 @@ export class ArcBackendService implements ArcService {
         } catch (error) {
             if (error instanceof ArcError) throw error;
             throw new ArcError(
-                ArcErrorCode.EXECUTION_FAILED,
+                ArcErrorCode.RUN_FAILED,
                 `Provider quota unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`
             );
         }
@@ -893,7 +893,7 @@ export class ArcBackendService implements ArcService {
             const parsed = JSON.parse(output);
             if (!parsed.ok) {
                 throw new ArcError(
-                    ArcErrorCode.EXECUTION_FAILED,
+                    ArcErrorCode.RUN_FAILED,
                     parsed?.error?.message || 'Provider quota reset failed',
                     { error: parsed?.error }
                 );
@@ -908,7 +908,7 @@ export class ArcBackendService implements ArcService {
         } catch (error) {
             if (error instanceof ArcError) throw error;
             throw new ArcError(
-                ArcErrorCode.EXECUTION_FAILED,
+                ArcErrorCode.RUN_FAILED,
                 `Provider quota reset unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`
             );
         }
@@ -1081,7 +1081,7 @@ export class ArcBackendService implements ArcService {
             const receiptPath = path.join(this.workspaceRoot, '.arc', 'receipts', `${runId}.json`);
             const fs = await import('fs-extra');
             if (!await fs.pathExists(receiptPath)) {
-                throw new ArcError(ArcErrorCode.TRACE_NOT_FOUND, `No receipt found for run: ${runId}`, { runId });
+                throw new ArcError(ArcErrorCode.RUN_NOT_FOUND, `No receipt found for run: ${runId}`, { runId });
             }
             const content = await fs.readFile(receiptPath, 'utf-8');
             return JSON.parse(content) as RunReceipt;
@@ -1173,7 +1173,7 @@ export class ArcBackendService implements ArcService {
             return [];
         } catch (error) {
             throw new ArcError(
-                ArcErrorCode.EXECUTION_FAILED,
+                ArcErrorCode.RUN_FAILED,
                 `Failed to list HITL prompts: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
         }
@@ -1210,13 +1210,13 @@ export class ArcBackendService implements ArcService {
                 return { success: true, message: parsed.data?.message || `HITL ${request.decision} for ${request.promptId}` };
             }
             throw new ArcError(
-                ArcErrorCode.EXECUTION_FAILED,
+                ArcErrorCode.RUN_FAILED,
                 parsed?.error?.message || 'HITL respond failed',
             );
         } catch (error) {
             if (error instanceof ArcError) throw error;
             throw new ArcError(
-                ArcErrorCode.EXECUTION_FAILED,
+                ArcErrorCode.RUN_FAILED,
                 `Failed to respond to HITL prompt: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
         }
@@ -1292,7 +1292,7 @@ export class ArcBackendService implements ArcService {
         } catch (error) {
             if (error instanceof ArcError) throw error;
             throw new ArcError(
-                ArcErrorCode.EXECUTION_FAILED,
+                ArcErrorCode.RUN_FAILED,
                 `Failed to get audit chain info: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
         }
@@ -1339,7 +1339,7 @@ export class ArcBackendService implements ArcService {
         } catch (error) {
             if (error instanceof ArcError) throw error;
             throw new ArcError(
-                ArcErrorCode.EXECUTION_FAILED,
+                ArcErrorCode.RUN_FAILED,
                 `Failed to replay run: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
         }
@@ -1384,13 +1384,13 @@ export class ArcBackendService implements ArcService {
                 };
             }
             throw new ArcError(
-                ArcErrorCode.EXECUTION_FAILED,
+                ArcErrorCode.RUN_FAILED,
                 parsed?.error?.message || 'CLI returned no data for run diff',
             );
         } catch (error) {
             if (error instanceof ArcError) throw error;
             throw new ArcError(
-                ArcErrorCode.EXECUTION_FAILED,
+                ArcErrorCode.RUN_FAILED,
                 `Failed to diff runs: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
         }
@@ -1455,7 +1455,7 @@ export class ArcBackendService implements ArcService {
         } catch (error) {
             if (error instanceof ArcError) throw error;
             throw new ArcError(
-                ArcErrorCode.EXECUTION_FAILED,
+                ArcErrorCode.RUN_FAILED,
                 `Failed to get capability diff: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
         }

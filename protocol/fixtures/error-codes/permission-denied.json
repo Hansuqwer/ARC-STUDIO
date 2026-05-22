@@ -1,0 +1,9 @@
+{
+  "code": "PERMISSION_DENIED",
+  "message": "Paid call gate is not enabled for this run",
+  "details": {
+    "gate": "allow_paid_calls",
+    "runtime": "openai-agents",
+    "hint": "Re-run with --allow-paid-calls or set ARC_SWARMGRAPH_ALLOW_COSTS=true"
+  }
+}

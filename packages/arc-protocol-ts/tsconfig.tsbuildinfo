@@ -1,1 +1,1 @@
-{"root":["./src/arc-protocol-types.ts","./src/index.ts"],"version":"5.9.3"}
+{"root":["./src/arc-protocol-types.ts","./src/index.ts","./src/runtime-capability-v2.ts","./src/runtime-mode.ts","./src/fixtures/loader.ts"],"version":"5.9.3"}
