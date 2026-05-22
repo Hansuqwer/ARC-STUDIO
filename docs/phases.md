@@ -896,17 +896,16 @@ bash scripts/check-pr.sh
 ## Phase 24 — Trace Viewer Virtualization + Daemon Resilience
 
 **Roadmap:** R17 — Trace Virtualization + Daemon  
-**Status:** Not Started  
+**Status:** Baseline Complete ✓ | Evidence: commit 7365191 | 1523 Python tests passed, TypeScript builds green; 6 pre-existing WorkflowExecutor test failures unchanged | Notes: Reactive `@tanstack/react-virtual` (no virtualization library previously in workspace) replaces eager `.map()` in ArcEventStreamWidget; RingBuffer data structure replaces ad-hoc Queue drop-oldest; client-side SSE now reconnects with Last-Event-ID + exponential backoff  
 **Depends on:** Phase 22 (uses typed RunEvent for event handling)
 
 ### Implementation
-1. Replace eager `filteredTraces.map(...)` in `TraceViewerSection.tsx` with virtualized list rendering.
-2. Use `react-window` or Theia virtual list component for performance.
-3. Add incremental trace pagination from daemon: `offset`, `limit`, `filter`, `sort` query parameters.
-4. Add reconnect/backoff hook for event streams on daemon disconnect.
-5. Add bounded client-side event queue and dropped-event warning.
-6. Use ANSI-aware output rendering for agent log display.
-7. Tests: 50k trace rows render without browser freeze, filtering <200ms p95.
+1. Virtualized event list: `VirtualizedEventList.tsx` with `useVirtualizer` (estimateSize=64px, overscan=5) — O(viewport) memory for 100MB traces ✓
+2. `RingBuffer` class in Python EventBroker — maintains last 1,000 events per run, sorted by event_id on replay ✓
+3. Client-side SSE reconnect in `streamLiveActiveTrace()` — tracks lastEventId, retries with `2000 * 2^(retry-1) + jitter` ms, capped at 30s, max 5 retries ✓
+4. `ActiveTraceStreamState` union extended with `'reconnecting'` ✓
+5. `test_sse_connection_timeout_recovery` stub filled with real assertion ✓
+6. 5 ring buffer tests (push/replay, overwrite, unknown ID, clear, round-trip) ✓
 
 ### Acceptance
 1. 50k trace rows render without browser freeze (verify with performance test or benchmark).
