@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-19 — SwarmGraph native runtime P1+P2 implemented (Phase 17).  
-**Current evidence anchor:** `phase-3-runtime-semantics` local branch | 1111 Python tests passed, 19 skipped, 1 deselected (`test_providers_action_all_gates_pass_closed_smoke`, pre-existing provider-key smoke); `pnpm -w build` PASS; `pnpm -w test` PASS on rerun; `bash scripts/check-pr.sh` PASS.  
+**Last reality refresh:** 2026-05-22 — Post-v0.1 foundation phases (Phase 21-33) added per architecture review findings.  
+**Current evidence anchor:** local worktree | 1313 Python tests, 762 TS tests passed (pre-v0.1 baseline); Phase 21-33 defined for v0.2 foundation work with dependency graph and execution order.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -730,3 +730,516 @@ bash scripts/check-pr.sh
 ### Known Risks
 - Worker thread approach for nested event loops adds minor overhead but is necessary for async caller compatibility.
 - Canonical migration helper does not deprecate existing `migrate_v1_to_v2()` to preserve backward compatibility.
+
+---
+
+## Post-v0.1 Foundation Work (Architecture Review Phases)
+
+**Source:** `ARC_STUDIO_1.0_ARCHITECTURE_AND_FEATURE_REVIEW.md` (2026-05-22) + `SWARMGRAPH_FEATURE_LIST.md` v2.0
+
+**Context:** Senior staff architecture review identified 7 critical foundation items (P0/P1) missing from the original roadmap. These must be implemented before MCP integration and SwarmGraph differentiators to ensure audit credibility, protocol safety, and trust enforcement.
+
+**Last reality refresh:** 2026-05-22
+
+**Execution order:** Phase 21-24 (foundations) → Phase 25-27 (IDE/CLI/MCP) → Phase 28-29 (replay/eval) → Phase 30-32 (SwarmGraph differentiators) → Phase 33 (research)
+
+## Phase 21 — Streaming Audit Verification + HMAC Signing
+
+**Roadmap:** R14 — Streaming Audit + HMAC  
+**Status:** Not Started  
+**Depends on:** None (standalone foundation work)  
+**Design note:** Current `audit/chain.py` has `verify_audit_signature()` and `verify_hmac_chain()` but both use `read_text().splitlines()` which reads full files into memory. Architecture review requires streaming (line-by-line) verification for large traces (100 MB+).
+
+### Implementation
+1. Create `StreamingAuditVerifier` class with `verify_sha256()` method using file iteration (not `read_text().splitlines()`).
+2. Add memory-bounded verification: process file in configurable chunks (default 8 MB), compute rolling SHA-256.
+3. Add `verify_hmac()` with explicit audit versioning and key availability status.
+4. Add CLI command `arc audit verify <run-id> --mode sha256|hmac|auto --max-memory-mb 500`.
+5. Preserve existing SHA-256 default for backward compatibility with existing traces.
+6. Add signed `.audit.sig` or versioned record fields for new HMAC traces.
+7. Add HMAC signing to supported run paths (when key is available).
+8. Tests: 100 MB synthetic trace verification <30s and <500 MB RSS, old SHA-256 traces verify without migration, HMAC traces fail on content/chain/signature mutation, stable JSON output.
+
+### Acceptance
+1. `arc audit verify` on synthetic 100 MB trace completes in <30s and <500 MB RSS.
+2. Old SHA-256 traces verify without migration or changes.
+3. HMAC traces fail verification when content, chain, or signature is mutated.
+4. CLI emits stable JSON: `{ ok, mode, records_checked, reason, duration_ms }`.
+5. All existing Phase 4/10 audit tests remain green.
+
+### Verification
+```bash
+cd python && uv run pytest tests/audit/ -q
+cd python && uv run pytest -q
+pnpm --filter @arc-studio/protocol build
+pnpm --filter arc-extension build
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- HMAC key management adds operational complexity; keep HMAC optional with SHA-256 as default.
+- Very large traces (>1 GB) may still need external tooling; document this boundary.
+
+## Phase 22 — Discriminated RunEvent Unions + Protocol Conformance
+
+**Roadmap:** R15 — Discriminated RunEvent Unions  
+**Status:** Not Started  
+**Depends on:** None (protocol-level work)  
+**Design note:** Current `RunEvent` is `{ type: string; data: Record<string, unknown> }` — this forces every consumer to use unsafe `as any` casts and prevents exhaustive pattern matching. Architecture review requires a discriminated union with typed payloads.
+
+### Implementation
+1. Define `KnownRunEvent` discriminated union in TypeScript with all known event types.
+2. Typed payloads for: `RUN_STARTED`, `RUN_COMPLETED`, `RUN_FAILED`, `STEP_STARTED`, `STEP_COMPLETED`, `TOOL_CALL`, `TOOL_RESULT`, `HITL_PROMPT`, `HITL_DECISION`, `AUDIT_RECORD`, `TOKEN_USAGE`, `RUNTIME_WARNING`, `RAW`.
+3. Add helpers: `isEventOfType()`, `assertNeverEvent()`, `parseEvent()` for safe narrowing.
+4. Mirror Python schemas in `protocol/events.py` to prevent cross-language drift.
+5. Convert all TypeScript consumers (widgets, mappers, tests) from `any`/`Record<string, unknown>` to typed narrowing.
+6. Convert all Python consumers to use typed `RunEvent` variants.
+7. Add `RAW` fallback for unknown future event types — UI should not crash.
+
+### Acceptance
+1. `pnpm check:pr` and TypeScript strict typecheck pass with no unsafe `RunEvent.data` access.
+2. Unknown future events are represented as `RAW` without crashing UI or breaking parsers.
+3. All protocol fixtures round-trip through Python and TypeScript.
+4. Widget and mapper consumers use typed narrowing (no `as any` casts).
+5. All existing tests remain green.
+
+### Verification
+```bash
+pnpm --filter @arc-studio/protocol build
+pnpm --filter arc-extension build
+pnpm --filter arc-extension test
+cd python && uv run pytest protocol/ -q
+cd python && uv run pytest -q
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- Large refactor across many files; careful incremental approach needed.
+- Python and TypeScript types may diverge; enforce fixture sync tests.
+
+## Phase 23 — Enforced Workspace Trust + Paid-Call Gates
+
+**Roadmap:** R16 — Trust + Paid-Call Enforcement  
+**Status:** Partial — trust infrastructure exists (`security/trust.py`) but enforcement is not uniform across all surfaces  
+**Depends on:** Phase 22 (needs typed RunEvent for denial events)
+
+### Implementation
+1. Centralize `TrustState` and `PaidCallPolicy` in protocol package for cross-language use.
+2. Require explicit trust before: runtime execution, provider-backed calls, MCP server start, workspace prompt loading, shell-command execution.
+3. Add confirmation UI with command descriptions for shell/runtime actions.
+4. Add CLI `--allow-paid`, `--trust-workspace`, `--dry-run` semantics consistently across all run/RPC commands.
+5. Make all blocked actions return typed denial events (using Phase 22 typed RunEvent), not silent no-ops.
+6. Add tests: untrusted workspace blocks each surface with typed reason.
+
+### Acceptance
+1. Untrusted workspace: run, paid calls, MCP serve, workspace prompt load, shell commands are all blocked with typed reasons.
+2. Trusted workspace: actions proceed only after paid-call/shell approval when required.
+3. UI shows trust and paid-call state before execution.
+4. Denied actions produce typed events visible in audit and UI.
+5. All existing Phase 2/6/19 trust tests remain green.
+
+### Verification
+```bash
+cd python && uv run pytest tests/security/ -q
+cd python && uv run pytest -q
+pnpm --filter @arc-studio/protocol build
+pnpm --filter arc-extension build
+pnpm --filter arc-extension test
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- Over-blocking (blocking actions that should be safe) risks user frustration.
+- Under-blocking (missing enforcement surface) risks security gaps. Audit every entry point.
+
+## Phase 24 — Trace Viewer Virtualization + Daemon Resilience
+
+**Roadmap:** R17 — Trace Virtualization + Daemon  
+**Status:** Not Started  
+**Depends on:** Phase 22 (uses typed RunEvent for event handling)
+
+### Implementation
+1. Replace eager `filteredTraces.map(...)` in `TraceViewerSection.tsx` with virtualized list rendering.
+2. Use `react-window` or Theia virtual list component for performance.
+3. Add incremental trace pagination from daemon: `offset`, `limit`, `filter`, `sort` query parameters.
+4. Add reconnect/backoff hook for event streams on daemon disconnect.
+5. Add bounded client-side event queue and dropped-event warning.
+6. Use ANSI-aware output rendering for agent log display.
+7. Tests: 50k trace rows render without browser freeze, filtering <200ms p95.
+
+### Acceptance
+1. 50k trace rows render without browser freeze (verify with performance test or benchmark).
+2. Filtering stays interactive: <200ms p95 for local metadata.
+3. Killing daemon shows reconnecting state within 2s, recovers without page reload.
+4. No unresolved RPC promises after daemon disconnect.
+5. Dropped events show warning in UI.
+6. All existing trace viewer tests remain green.
+
+### Verification
+```bash
+pnpm --filter arc-extension build
+pnpm --filter arc-extension test
+pnpm --filter @arc-studio/browser build
+cd python && uv run pytest -q
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- Virtualization library choice may conflict with Theia widget lifecycle.
+- ANSI parsing adds complexity; start with simple text rendering, add ANSI support as enhancement.
+
+## Phase 25 — CLI Decomposition into Command Modules
+
+**Roadmap:** R18 — CLI Decomposition  
+**Status:** Partial — Phase 18 did consolidation but `cli.py` is still large (3000+ lines)  
+**Depends on:** None (standalone CLI refactoring)
+
+### Implementation
+1. Decompose `cli.py` into command modules: `serve.py`, `run.py`, `runs.py`, `audit.py`, `hitl.py`, `eval.py`, `runtimes.py`, `doctor.py`, `mcp.py`.
+2. Keep existing Typer command names, signatures, and options unchanged for backward compatibility.
+3. Add stable JSON schema snapshots for major CLI outputs (`arc doctor --json`, `arc runs list --json`, etc.).
+4. Make `arc doctor --json` report: versions, daemon status, adapters, trust, isolation, paid-call gates, MCP support, known blockers.
+5. Add JSON output schema tests with snapshot testing.
+6. Verify every documented command still works identically after decomposition.
+
+### Acceptance
+1. Existing documented commands work identically before and after refactoring.
+2. `arc --help` retains same user-facing command structure.
+3. `arc doctor --json` is deterministic and snapshot-tested.
+4. CLI modules each stay below 500-line maintainability threshold.
+5. All existing CLI tests remain green (1318+ tests as of Phase 18).
+
+### Verification
+```bash
+cd python && uv run pytest tests/test_cli_doctor.py tests/test_cli_runs.py tests/test_cli_repl.py tests/test_cli_providers.py -q
+cd python && uv run pytest -q
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- Import circularity risk when splitting; use lazy imports where needed.
+- Snapshot tests require fixture updates when CLI output changes intentionally.
+
+## Phase 26 — MCP Local Control Plane for ARC
+
+**Roadmap:** R19 — MCP Local Control Plane  
+**Status:** Not Started  
+**Depends on:** Phase 23 (trust enforcement required before MCP server activation)
+
+### Implementation
+1. Implement `arc mcp serve --stdio` first (stdio transport, not HTTP — per architecture review).
+2. Add MCP tools: `arc_run`, `arc_run_status`, `arc_trace_search`, `arc_trace_read`, `arc_audit_verify`, `arc_hitl_list`, `arc_hitl_respond`, `arc_runtime_capabilities`, `arc_doctor`.
+3. Add MCP resources: `arc://runs/{run_id}`, `arc://traces/{run_id}`, `arc://audit/{run_id}`, `arc://runtimes/{runtime_id}/capabilities`.
+4. Add SwarmGraph wrappers: `swarmgraph_run`, `swarmgraph_status`, `swarmgraph_audit_verify`.
+5. Disable MCP tools in untrusted workspaces (reuse Phase 23 enforcement).
+6. Add `arc mcp serve --http 127.0.0.1:<port>` later only after auth/trust policy is defined.
+7. Tests: stdio MCP client can list tools and resources, run read-only operations, fail on untrusted workspace.
+
+### Acceptance
+1. `arc mcp serve --stdio` works from Claude Desktop or Codex-style local MCP clients.
+2. MCP tools are disabled in untrusted workspaces with typed error.
+3. MCP resource reads are local-only and redacted where configured.
+4. No HTTP binding beyond loopback without explicit auth decision.
+5. SwarmGraph wrappers work when SwarmGraph runtime is available.
+
+### Verification
+```bash
+cd python && uv run pytest tests/mcp/ -q
+cd python && uv run pytest -q
+pnpm --filter @arc-studio/protocol build
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- MCP protocol is evolving; pin to a specific version.
+- HTTP transport auth design deferred; document clearly that only stdio is productized for v0.2.
+
+## Phase 27 — MCP Tasks for Async Execution
+
+**Roadmap:** R20 — MCP Tasks  
+**Status:** Not Started  
+**Depends on:** Phase 25 (CLI modules needed for task command surface)
+
+### Implementation
+1. Add ARC-level task registry (SQLite-backed, not MCP-specific initially).
+2. Task state machine: `pending` → `running` → `completed`/`failed`/`cancelled`.
+3. Task result storage with run ID, audit chain reference, cost breakdown.
+4. Configurable task expiry (default 24 hours).
+5. Retry policy support (exponential backoff, max 3 retries).
+6. SSE notifications for task state changes.
+7. MCP tool wrappers for async task creation and status polling.
+8. CLI: `arc task create`, `arc task status`, `arc task list`, `arc task cancel`.
+
+### Acceptance
+1. Client creates task and receives task ID immediately.
+2. Client polls task status via CLI, MCP tool, or daemon API.
+3. Task results include run outcome, audit chain, cost breakdown.
+4. Failed tasks retry with exponential backoff.
+5. All operations work via CLI, MCP, and daemon API.
+6. Tasks expire after configured TTL.
+
+### Verification
+```bash
+cd python && uv run pytest tests/tasks/ -q
+cd python && uv run pytest -q
+pnpm --filter @arc-studio/protocol build
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- Task expiry may cause confusion if users expect long-lived tasks.
+- Retry policy must be idempotent-safe (retry should not cause duplicate side effects).
+
+## Phase 28 — LangGraph Durable Execution + Replay Contract
+
+**Roadmap:** R21 — LangGraph Replay Contract  
+**Status:** Not Started  
+**Depends on:** Phase 25 (CLI commands for replay)
+
+### Implementation
+1. Add `ReplayCapability` fields: `can_replay_trace`, `can_resume_checkpoint`, `requires_thread_id`, `side_effects_wrapped`, `determinism_level`.
+2. Detect LangGraph checkpointer/thread configuration when available.
+3. Emit warnings when adapter can inspect but not safely resume.
+4. Add replay report: what was replayed, simulated, skipped, and why.
+5. Add CLI: `arc run replay <run-id> --report` for replay analysis.
+6. Tests: LangGraph projects with checkpointer + thread ID report resumable; projects without durable config report inspect-only.
+
+### Acceptance
+1. LangGraph projects with checkpointer + thread ID report resumable.
+2. Projects without durable config report inspect-only or simulated replay.
+3. Side-effecting steps flagged unless wrapped/declared idempotent.
+4. Replay report clearly states what is exact, simulated, skipped, and unsafe.
+5. All existing LangGraph adapter tests remain green.
+
+### Verification
+```bash
+cd python && uv run pytest tests/adapters/langgraph/ -q
+cd python && uv run pytest -q
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- Cannot inspect LangGraph checkpointer config without SDK access.
+- Determinism guarantees are theoretical without locked runtime snapshots.
+
+## Phase 29 — Persistent HITL + Inspect-Style Eval Artifacts
+
+**Roadmap:** R22 — Persistent HITL + Eval  
+**Status:** Not Started  
+**Depends on:** Phase 25 (CLI commands for HITL), Phase 22 (typed RunEvent for HITL events)
+
+### Implementation
+1. Store HITL prompts and decisions in SQLite with: run ID, timestamp, actor, decision, reason, audit hash.
+2. Add CLI: `arc hitl pending --json`, `arc hitl respond <id> --approve|--reject --reason`.
+3. Define ARC eval artifact schema: `eval_spec`, `dataset_ref`, `runtime_adapter`, `solver_or_workflow`, `scorer`, `samples`, `scores`, `trace_refs`, `audit_refs`.
+4. Add `arc eval run --batch --json` for repeatable evaluation runs.
+5. Optional export to Inspect AI-compatible directory/log shape.
+6. Tests: HITL prompt survives daemon restart and is answerable by CLI or IDE.
+
+### Acceptance
+1. HITL prompt survives daemon restart and is answerable by CLI or IDE.
+2. HITL decisions are audit-linked (Phase 21 HMAC chain).
+3. `arc eval run --batch --json` produces repeatable artifact paths.
+4. Eval reports can compare two runs on same dataset.
+5. All existing Phase 4 HITL tests remain green.
+
+### Verification
+```bash
+cd python && uv run pytest tests/hitl/ tests/eval/ -q
+cd python && uv run pytest -q
+pnpm --filter @arc-studio/protocol build
+pnpm --filter arc-extension build
+pnpm --filter arc-extension test
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- SQLite persistence design must handle concurrent HITL access.
+- Inspect AI export format may change; pin to specific version.
+
+## Phase 30 — Consensus Escrow (Commit-Reveal Voting)
+
+**Roadmap:** R23 — Consensus Escrow  
+**Status:** Not Started  
+**Depends on:** Phase 17 (SwarmGraph native runtime), Phase 21 (audit chain for commit/reveal events)
+
+### Implementation
+1. Define `CommitRevealVote` Pydantic model with `frozen=True`.
+2. Implement `ConsensusEscrow` class: `commit()`, `reveal()`, `verify()`, `tally()`.
+3. Commit phase: `hash(canonical_json(vote) || nonce)` — commit hash, not raw vote.
+4. Reveal phase: vote + nonce → recompute hash → compare with commit.
+5. Opt-in via `--consensus-escrow` flag or adaptive high-risk selection (Phase 31).
+6. Audit chain records commit and reveal events (Phase 21 integration).
+7. Tests: 5 adversarial scenarios (vote change, replay, hash collision, etc.).
+
+### Acceptance
+1. Worker cannot change vote after commit without verification failure.
+2. Audit chain records commit and reveal timestamps.
+3. Existing consensus protocols unchanged when escrow disabled.
+4. Adversarial tests: 5 scenarios all pass.
+5. Performance overhead <10% vs standard consensus.
+
+### Verification
+```bash
+cd python && uv run pytest tests/swarmgraph/test_consensus_escrow.py -q
+cd python && uv run pytest -q
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- Cryptographic overhead for canonical JSON serialization — benchmark before production.
+- Nonce generation must be cryptographically secure.
+
+## Phase 31 — Adaptive Consensus Protocol
+
+**Roadmap:** R24 — Adaptive Consensus  
+**Status:** Not Started  
+**Depends on:** Phase 30 (Consensus Escrow), Phase 23 (trust for risk assessment inputs)
+
+### Implementation
+1. Implement deterministic heuristic risk assessor (not LLM-based — per architecture review).
+2. Risk assessment inputs: task text, workspace trust, file types, target runtime, paid-call status, keywords.
+3. Outputs: risk level, recommended protocol, worker count, HITL requirement, anti-drift setting, cost estimate, rationale.
+4. Protocol selection matrix: Low→Simple Majority, Medium→Raft, High→BFT, Critical→BFT+Escrow.
+5. User confirmation for High/Critical risk levels.
+6. User override with audit record.
+7. Tests: 100 labeled prompt fixtures classify at 90%+ agreement with expected risk.
+
+### Acceptance
+1. 100 labeled prompt fixtures classify at 90%+ agreement with expected risk.
+2. User can override protocol with audit record.
+3. Cost estimate appears before run execution.
+4. Deterministic heuristics only (no LLM dependency).
+5. All existing consensus tests remain green.
+
+### Verification
+```bash
+cd python && uv run pytest tests/swarmgraph/test_adaptive_consensus.py -q
+cd python && uv run pytest -q
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- Keyword-based risk assessment may miss nuanced threats.
+- User override creates audit trail gap if misused.
+
+## Phase 32 — Event-Driven Audit/HITL Notifications
+
+**Roadmap:** R25 — Event-Driven Notifications  
+**Status:** Not Started  
+**Depends on:** Phase 29 (persistent HITL), Phase 21 (audit events)
+
+### Implementation
+1. Add local event bus with event types: `hitl_required`, `hitl_decided`, `audit_verified`, `run_completed`, `run_failed`, `quota_warning`.
+2. Add IDE badges for pending HITL, audit failures, and run failures.
+3. Add CLI watch mode: `arc events watch` for streaming typed events.
+4. Add optional signed webhook endpoints configured per workspace.
+5. Webhook retry with bounded exponential backoff (max 5 retries, 60s cap).
+6. Local dead-letter log for permanent failures.
+7. HMAC-signed webhook payloads for third-party verification.
+
+### Acceptance
+1. HITL badge updates without manual IDE refresh.
+2. `arc events watch` streams typed events.
+3. Webhook payloads are HMAC-signed if configured.
+4. Dead-letter queue captures permanent failures.
+5. Webhook retry respects backoff bounds.
+
+### Verification
+```bash
+cd python && uv run pytest tests/events/ -q
+cd python && uv run pytest -q
+pnpm --filter arc-extension build
+pnpm --filter arc-extension test
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- Webhook security (HMAC signing, TLS) must be required, not optional.
+- Event bus must handle high event volumes without memory leaks.
+
+## Phase 33 — Swarm Memory Graph (Research)
+
+**Roadmap:** R26 — Swarm Memory Graph  
+**Status:** Research — Not Started  
+**Depends on:** None (independent research track)
+
+### Implementation
+1. Design document with memory schema: nodes (concepts, decisions, patterns), edges (derived-from, contradicts, supports), metadata (confidence, frequency, timestamp).
+2. Prototype memory extraction on 10 sample swarm runs.
+3. Evaluation: do memories improve outcomes? Measure quality, cost, speed.
+4. Privacy analysis and tenant isolation design.
+5. Decision: proceed to implementation or pivot.
+
+### Acceptance (Research Phase)
+1. Design document complete with schema, extraction strategies, and evaluation plan.
+2. Prototype extraction works on 10 sample runs.
+3. Evaluation shows memories improve quality by 10%+ or reduce cost by 20%+.
+4. Privacy analysis documents risks and mitigations.
+5. Clear go/no-go decision with rationale.
+
+### Verification
+```bash
+# Research phase — no code verification; design review and prototype demo
+# Design document at docs/research/swarm-memory-graph.md
+```
+
+### Known Risks
+- Memory pollution: low-quality memories poison future swarm behavior.
+- Privacy leakage: cross-tenant memory contamination.
+- Cost: memory graph storage and query overhead may exceed benefits.
+
+## Post-v0.1 Phase Table
+
+### Phase ↔ Roadmap ID
+
+| Plan Phase | Roadmap ID | Scope |
+|---|---|---|
+| **21** | **R14** | **Streaming Audit Verification + HMAC Signing** |
+| **22** | **R15** | **Discriminated RunEvent Unions** |
+| **23** | **R16** | **Enforced Workspace Trust + Paid-Call Gates** |
+| **24** | **R17** | **Trace Viewer Virtualization + Daemon Resilience** |
+| **25** | **R18** | **CLI Decomposition into Command Modules** |
+| **26** | **R19** | **MCP Local Control Plane** |
+| **27** | **R20** | **MCP Tasks for Async Execution** |
+| **28** | **R21** | **LangGraph Durable Execution + Replay Contract** |
+| **29** | **R22** | **Persistent HITL + Inspect-Style Eval Artifacts** |
+| **30** | **R23** | **Consensus Escrow (Commit-Reveal Voting)** |
+| **31** | **R24** | **Adaptive Consensus Protocol** |
+| **32** | **R25** | **Event-Driven Audit/HITL Notifications** |
+| **33** | **R26** | **Swarm Memory Graph (Research)** |
+
+### Dependencies
+
+| Phase | Status | Depends On | Notes |
+|---|---|---|---|
+| 21 Streaming Audit | Not Started | None | Foundations — audit credibility requires streaming |
+| 22 Discriminated RunEvent | Not Started | None | Foundations — protocol safety requires typed unions |
+| 23 Trust Enforcement | Partial | Phase 22 | Foundation/p0-1 — uses typed RunEvent for denial events |
+| 24 Trace Virtualization | Not Started | Phase 22 | P1 — uses typed RunEvent for event handling |
+| 25 CLI Decomposition | Partial | None | P1 — standalone refactoring of existing CLI surface |
+| 26 MCP Local Control Plane | Not Started | Phase 23 | P1 — trust enforcement gates MCP server activation |
+| 27 MCP Tasks | Not Started | Phase 25 | P1 — needs CLI command modules for task surface |
+| 28 LangGraph Replay | Not Started | Phase 25 | P1 — needs CLI for replay commands |
+| 29 Persistent HITL + Eval | Not Started | Phase 25, Phase 22 | P1/P2 — needs CLI + typed HITL events |
+| 30 Consensus Escrow | Not Started | Phase 17, Phase 21 | P2 — unique differentiator |
+| 31 Adaptive Consensus | Not Started | Phase 30, Phase 23 | P2 — major differentiator |
+| 32 Event Notifications | Not Started | Phase 29, Phase 21 | P2 — enterprise compliance |
+| 33 Memory Graph | Research | None | P3 — research, may pivot |
+
+### Critical Path
+
+```
+Phase 21 (Audit) ──→ Phase 23 (Trust) ──→ Phase 26 (MCP) ──→ Phase 27 (MCP Tasks)
+                                                                         │
+Phase 22 (RunEvent) ──→ Phase 24 (Tracing)                                │
+                                                           │
+Phase 25 (CLI Decomp) ──→ Phase 28 (Replay) ──→ Phase 29 (HITL) ──→ Phase 32 (Events)
+                                                                    │
+Phase 17 (SwarmGraph) ──→ Phase 30 (Escrow) ──→ Phase 31 (Adaptive Consensus)
+                                                                    │
+Phase 33 (Memory Graph) ──→ (research, may pivot)
+```
+
+**Execution order:** Phase 21-22 (parallel foundations) → Phase 23-24 (parallel, depend on Phase 22) → Phase 25 (standalone) → Phase 26 (depends on Phase 23) → Phase 27 (depends on Phase 25) → Phase 28 (depends on Phase 25) → Phase 29 (depends on Phase 25 + Phase 22) → Phase 30 (depends on Phase 17 + Phase 21) → Phase 31 (depends on Phase 30 + Phase 23) → Phase 32 (depends on Phase 29 + Phase 21) → Phase 33 (independent research)
+

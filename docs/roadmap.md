@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-19 — SwarmGraph native runtime P1+P2 implemented.  
-**Current evidence anchor:** local worktree | 989 Python tests passed (was 908), 19 skipped; 762 TS tests passed; protocol + extension builds OK; P1-P4 SwarmGraph native runtime, adapter bridge, CLI REPL, and IDE default alignment complete.  
+**Last reality refresh:** 2026-05-22 — Architecture review foundation items (R14-R26) added for post-v0.1 execution plan.  
+**Current evidence anchor:** local worktree | 989 Python tests, 762 TS tests passed (pre-v0.1 baseline); R14-R26 defined for v0.2 foundation work per architecture review.  
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -302,3 +302,353 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 | New adapters | **Done** | `4b0f6b5` — `test_adapter_status.py` (165 lines) | Adapter status tracking infrastructure. |
 | Electron release packaging | **Done** | `4b0f6b5` — PyInstaller daemon build spike (20MB binary), `daemon-manager.ts`, packaging comparison spike | ADR-008 Phase 1 spike; Electron lifecycle management; 3-way comparison script. |
 | Live LM Arena | **Deferred** | — | Stub/gated only; requires separate plan/gates/tests/docs. |
+
+---
+
+## Post-v0.1 Foundation Work (Architecture Review Findings)
+
+**Source:** `ARC_STUDIO_1.0_ARCHITECTURE_AND_FEATURE_REVIEW.md` (2026-05-22) + `SWARMGRAPH_FEATURE_LIST.md` v2.0
+
+**Context:** Senior staff architecture review identified 7 critical foundation items (P0/P1) missing from the original roadmap. These must be implemented before MCP integration and SwarmGraph differentiators to ensure audit credibility, protocol safety, and trust enforcement.
+
+**Key Finding:** The original roadmap jumped to differentiators (MCP, Consensus Escrow, Adaptive Consensus) without fixing foundation issues: audit streaming breaks on large traces, RunEvent protocol is unsafe, trust enforcement is labels not gates, trace viewer freezes on 50k+ rows, and CLI is unmaintainable.
+
+**Implementation Order:** R14-R18 (foundations) → R19-R20 (MCP) → R21-R22 (replay/eval) → R23-R25 (SwarmGraph differentiators) → R26 (research)
+
+## R14 — Streaming Audit Verification + HMAC Signing
+
+**Goal:** Fix audit verification memory usage and implement optional HMAC signing for tamper-evident audit chains.
+
+**Current:** Partial implementation. `audit/chain.py` has `verify_audit_signature()` and `verify_hmac_chain()`, but verification reads full files with `read_text().splitlines()` which breaks on large traces (100 MB+). HMAC signing is modeled but not fully implemented across all run paths.
+
+**Deliverables:**
+- `StreamingAuditVerifier.verify_sha256()` — line-by-line iteration for memory-bounded verification
+- `verify_hmac()` with explicit audit versioning and key availability status
+- CLI: `arc audit verify <run-id> --mode sha256|hmac|auto --max-memory-mb 500`
+- Preserve old SHA-256 default for existing traces
+- Add signed `.audit.sig` or versioned record fields for new HMAC traces
+
+**Acceptance:**
+- `arc audit verify` on synthetic 100 MB trace completes in <30s and <500 MB RSS
+- Old SHA-256 traces verify without migration
+- HMAC traces fail verification on content/chain/signature mutation
+- CLI emits stable JSON: `{ ok, mode, records_checked, reason, duration_ms }`
+
+**Status:** Not Started | Evidence: grep found existing verify functions but no streaming implementation | Notes: Foundation work required before v0.2; audit credibility depends on this.
+
+**Source:** Architecture Review P0-1, Feature List F0.1
+
+## R15 — Discriminated RunEvent Unions + Protocol Conformance
+
+**Goal:** Replace unsafe `RunEvent` type with discriminated unions to enable exhaustive handling and prevent protocol mismatches.
+
+**Current:** Not Started. `arc-protocol-types.ts` defines `RunEvent` as `{ type: string; data: Record<string, unknown> }` which forces unsafe consumers across widgets, adapters, AG-UI mappers, and tests. No exhaustive handling is possible.
+
+**Deliverables:**
+- `KnownRunEvent` discriminated union in TypeScript
+- Typed payloads for: `RUN_STARTED`, `RUN_COMPLETED`, `RUN_FAILED`, `STEP_STARTED`, `STEP_COMPLETED`, `TOOL_CALL`, `TOOL_RESULT`, `HITL_PROMPT`, `HITL_DECISION`, `AUDIT_RECORD`, `TOKEN_USAGE`, `RUNTIME_WARNING`, `RAW`
+- Helpers: `isEventOfType()`, `assertNeverEvent()`, `parseEvent()`
+- Mirror Python schemas to avoid cross-language drift
+- Convert all consumers away from `any` and `Record<string, unknown>`
+
+**Acceptance:**
+- `pnpm check:pr` and TypeScript strict typecheck pass with no unsafe `RunEvent.data` access
+- Unknown future events represented as `RAW` without crashing UI
+- All protocol fixtures round-trip through Python and TypeScript
+- Widget and mapper consumers use typed narrowing
+
+**Status:** Not Started | Evidence: grep confirmed unsafe RunEvent definition | Notes: Critical P0 work; unsafe protocol boundary blocks everything.
+
+**Source:** Architecture Review P0-2, Feature List F0.2
+
+## R16 — Enforced Workspace Trust + Paid-Call Gates
+
+**Goal:** Convert workspace trust and paid-call gating from labels to enforcement points across all surfaces.
+
+**Current:** Partial implementation. `security/trust.py` has extensive trust infrastructure (`ensure_trusted()`, `trust_workspace()`, external DB at `~/.arc/trusted-workspaces.json`, `WorkspaceUntrusted` exception), and `orchestration/supervisor.py` enforces trust. However, enforcement may not be uniform across IDE actions, CLI runs, MCP activation, shell commands, and workspace prompt loading.
+
+**Deliverables:**
+- Centralize `TrustState` and `PaidCallPolicy` in protocol package
+- Require explicit trust for: runtime execution, provider-backed calls, MCP server start, workspace prompt loading, shell-command execution
+- Add confirmation UI with command descriptions for shell/runtime actions
+- Add CLI `--allow-paid`, `--trust-workspace`, `--dry-run` semantics consistently
+- Make all blocked actions return typed denial events, not silent no-ops
+
+**Acceptance:**
+- Untrusted workspace: run, paid calls, MCP serve, workspace prompt load, shell commands are blocked with typed reasons
+- Trusted workspace: actions proceed only after paid-call/shell approval when required
+- UI shows trust and paid-call state before execution
+- Denied actions produce typed events
+
+**Status:** Partial | Evidence: grep found trust infrastructure but needs hardening across all surfaces | Notes: P0/P1 work; safety gates must be enforcement points.
+
+**Source:** Architecture Review P0-3, Feature List F0.3
+
+## R17 — Trace Viewer Virtualization + Daemon Resilience
+
+**Goal:** Fix trace viewer performance on large trace stores and prevent hung promises on daemon disconnect.
+
+**Current:** Not Started. `TraceViewerSection.tsx` performs eager `filteredTraces.map(...)` over all filtered traces, which is unacceptable for large stores. Daemon disconnect causes hung promises.
+
+**Deliverables:**
+- Replace eager list rendering with virtualization (`react-window` or Theia virtual list)
+- Add incremental trace pagination from daemon: `offset`, `limit`, `filter`, `sort`
+- Add reconnect/backoff hook for event streams
+- Add bounded client-side event queue and dropped-event warning
+- Use ANSI-aware output rendering for agent logs
+
+**Acceptance:**
+- 50k trace rows render without browser freeze
+- Filtering stays interactive: <200ms p95 for local metadata
+- Killing daemon shows reconnecting state within 2s, recovers without page reload
+- No unresolved RPC promises after daemon disconnect
+
+**Status:** Not Started | Evidence: grep confirmed eager filtering in TraceViewerSection.tsx | Notes: P1 work; required for large trace stores.
+
+**Source:** Architecture Review P1-4, Feature List F1.1
+
+## R18 — CLI Decomposition + Stable JSON Contracts
+
+**Goal:** Decompose large CLI file into maintainable command modules with stable JSON output contracts.
+
+**Current:** Partial. Phase 18 (CLI Consolidation) did some work: created `cli_repl/commands/` with `CommandRegistry`, merged slash commands, rewrote `cli_studio.py` as thin shim. However, `cli.py` is still large (3000+ lines based on grep line numbers) and needs further decomposition.
+
+**Deliverables:**
+- Create command modules: `serve.py`, `run.py`, `runs.py`, `audit.py`, `hitl.py`, `eval.py`, `runtimes.py`, `doctor.py`, `mcp.py`
+- Keep existing Typer command names and options
+- Add stable JSON schema snapshots for major CLI outputs
+- Make `arc doctor --json` report: versions, daemon, adapters, trust, isolation, paid-call gates, MCP support, known blockers
+
+**Acceptance:**
+- Existing documented commands still work identically
+- `arc --help` retains user-facing command structure
+- `arc doctor --json` is deterministic and snapshot-tested
+- CLI modules each stay below maintainability threshold
+
+**Status:** Partial | Evidence: Phase 18 did consolidation but cli.py still large | Notes: P1 work; required before adding MCP, richer audit, eval commands.
+
+**Source:** Architecture Review P1-5, Feature List F1.2
+
+## R19 — MCP Local Control Plane for ARC
+
+**Goal:** Expose ARC as a local MCP control plane over existing capabilities, with narrow SwarmGraph wrappers.
+
+**Current:** Not Started. No MCP server implementation exists.
+
+**Deliverables:**
+- `arc mcp serve --stdio` first (not HTTP)
+- Add `arc mcp serve --http 127.0.0.1:<port>` later only after auth/trust policy defined
+- MCP tools: `arc_run`, `arc_run_status`, `arc_trace_search`, `arc_trace_read`, `arc_audit_verify`, `arc_hitl_list`, `arc_hitl_respond`, `arc_runtime_capabilities`, `arc_doctor`
+- MCP resources: `arc://runs/{run_id}`, `arc://traces/{run_id}`, `arc://audit/{run_id}`, `arc://runtimes/{runtime_id}/capabilities`
+- SwarmGraph wrappers: `swarmgraph_run`, `swarmgraph_status`, `swarmgraph_audit_verify`
+- Tools disabled in untrusted workspaces
+
+**Acceptance:**
+- `arc mcp serve --stdio` works from Claude Desktop / Codex-style local MCP clients
+- Tools are disabled in untrusted workspaces
+- MCP resource reads are local-only and redacted where configured
+- No HTTP binding beyond loopback without explicit auth decision
+
+**Status:** Not Started | Evidence: no MCP implementation found | Notes: P1 work; MCP is local control plane, not cloud pivot.
+
+**Source:** Architecture Review P1-6, Feature List F2.1
+
+## R20 — MCP Tasks for Async Execution
+
+**Goal:** Implement ARC async task registry for long-running operations.
+
+**Current:** Not Started. No task registry exists.
+
+**Deliverables:**
+- ARC-level task registry (not MCP-specific initially)
+- Task state machine: `pending` → `running` → `completed`/`failed`/`cancelled`
+- Task result storage (SQLite)
+- Configurable task expiry (default 24 hours)
+- Retry policy support (exponential backoff, max 3 retries)
+- SSE notifications for task state changes
+
+**Acceptance:**
+- Client creates task and receives task ID immediately
+- Client polls task status
+- Task results include run outcome, audit chain, cost breakdown
+- Failed tasks retry with exponential backoff
+- Works via CLI, MCP, and daemon API
+
+**Status:** Not Started | Evidence: no task registry found | Notes: P1 work; essential for long-running SwarmGraph consensus.
+
+**Source:** Feature List F2.2
+
+## R21 — LangGraph Durable Execution + Replay Contract
+
+**Goal:** Prevent overclaiming LangGraph replay/resume capabilities without checkpointer/thread-ID verification.
+
+**Current:** Not Started. No replay capability detection exists.
+
+**Deliverables:**
+- Add `ReplayCapability` fields: `can_replay_trace`, `can_resume_checkpoint`, `requires_thread_id`, `side_effects_wrapped`, `determinism_level`
+- Detect LangGraph checkpointer/thread configuration where possible
+- Emit warnings when adapter can inspect but not safely resume
+- Add replay report: what was replayed, simulated, skipped, and why
+
+**Acceptance:**
+- LangGraph projects with checkpointer + thread ID report resumable
+- Projects without durable config report inspect-only or simulated replay
+- Side-effecting steps flagged unless wrapped/declared idempotent
+- Replay report clearly states what is exact, simulated, skipped, unsafe
+
+**Status:** Not Started | Evidence: no replay capability detection found | Notes: P1 work; prevents overclaiming replay.
+
+**Source:** Architecture Review P1-7, Feature List F3.1
+
+## R22 — Persistent HITL + Inspect-Style Eval Artifacts
+
+**Goal:** Convert HITL and eval from transient UI state into persistent, audit-linked evidence.
+
+**Current:** Not Started. HITL state is transient (lost on daemon restart). Eval artifacts are not repeatable.
+
+**Deliverables:**
+- Store HITL prompts and decisions in SQLite with run IDs, timestamps, actor, decision, reason, audit hash
+- Add `arc hitl pending --json`, `arc hitl respond <id> --approve|--reject --reason`
+- Define ARC eval artifact schema: `eval_spec`, `dataset_ref`, `runtime_adapter`, `solver_or_workflow`, `scorer`, `samples`, `scores`, `trace_refs`, `audit_refs`
+- Optional export to Inspect AI-compatible directory/log shape
+
+**Acceptance:**
+- HITL prompt survives daemon restart and is answerable by CLI or IDE
+- HITL decisions are audit-linked
+- `arc eval run --batch --json` produces repeatable artifact paths
+- Eval reports can compare two runs on same dataset
+
+**Status:** Not Started | Evidence: no persistent HITL storage found | Notes: P1/P2 work; converts HITL/eval into repeatable evidence.
+
+**Source:** Architecture Review P1/P2-8, Feature List F3.2
+
+## R23 — Consensus Escrow (Commit-Reveal Voting)
+
+**Goal:** Implement cryptographic commit-reveal voting to prevent vote manipulation in SwarmGraph consensus.
+
+**Current:** Not Started. No commit-reveal protocol exists.
+
+**Deliverables:**
+- `CommitRevealVote` Pydantic model (frozen=True)
+- `ConsensusEscrow` class: commit / reveal / verify / tally
+- Commit: `hash(canonical_json(vote) || nonce)`
+- Reveal: vote + nonce → recompute hash → compare
+- Opt-in via `--consensus-escrow` flag or adaptive high-risk selection
+- Audit chain records commit and reveal events
+
+**Acceptance:**
+- Worker cannot change vote after commit without verification failure
+- Audit chain records commit and reveal timestamps
+- Existing protocols unchanged when escrow disabled
+- Adversarial tests: 5 scenarios all pass
+- Performance overhead <10% vs standard consensus
+
+**Status:** Not Started | Evidence: no commit-reveal implementation found | Notes: P2 work; unique differentiator for regulated environments.
+
+**Source:** Architecture Review P2-9, Feature List F4.1
+
+## R24 — Adaptive Consensus Protocol
+
+**Goal:** Dynamically select consensus protocol based on task risk, automatically balancing safety, cost, and speed.
+
+**Current:** Not Started. No adaptive protocol selection exists.
+
+**Deliverables:**
+- Deterministic heuristic risk assessor (not LLM-based)
+- Inputs: task text, workspace trust, file types, target runtime, paid-call status, keywords
+- Outputs: risk level, recommended protocol, worker count, HITL requirement, anti-drift setting, cost estimate, rationale
+- Protocol selection matrix (Low→Simple Majority, Medium→Raft, High→BFT, Critical→BFT+Escrow)
+- User confirmation for high/critical risk
+- User override with audit record
+
+**Acceptance:**
+- 100 labeled prompt fixtures classify at 90%+ agreement with expected risk
+- User can override protocol with audit record
+- Cost estimate appears before run
+- Deterministic heuristics (no LLM dependency)
+
+**Status:** Not Started | Evidence: no adaptive consensus found | Notes: P2 work; major differentiator.
+
+**Source:** Architecture Review P2-10, Feature List F4.2
+
+## R25 — Event-Driven Audit/HITL Notifications
+
+**Goal:** Implement webhook/callback triggers for audit events, consensus outcomes, and HITL requests.
+
+**Current:** Not Started. No event-driven notification system exists.
+
+**Deliverables:**
+- Local event bus for: `hitl_required`, `hitl_decided`, `audit_verified`, `run_completed`, `run_failed`, `quota_warning`
+- IDE badges and CLI watch mode (`arc events watch`)
+- Optional signed webhook endpoints configured per workspace
+- Retry with bounded exponential backoff and local dead-letter log
+- HMAC-signed payloads for webhook verification
+
+**Acceptance:**
+- HITL badge updates without manual refresh
+- `arc events watch` streams typed events
+- Webhook payloads are HMAC-signed if configured
+- Dead letter queue captures permanent failures
+
+**Status:** Not Started | Evidence: no event notification system found | Notes: P2 work; enables enterprise compliance integration.
+
+**Source:** Architecture Review P2-11, Feature List F5.1
+
+## R26 — Swarm Memory Graph (Research)
+
+**Goal:** Persistent knowledge graph that captures insights across swarm runs for learning.
+
+**Current:** Research Phase. No implementation exists.
+
+**Deliverables:**
+- Design document with memory schema
+- Prototype memory extraction on 10 sample runs
+- Evaluation: do memories improve outcomes? (quality, cost, speed)
+- Privacy analysis and tenant isolation design
+
+**Acceptance (Research Phase):**
+- Design document complete
+- Prototype extraction on 10 runs
+- Evaluation: memories improve quality by 10%+ or reduce cost by 20%+
+- Privacy analysis complete
+- Decision: proceed to implementation or pivot
+
+**Status:** Research | Evidence: no memory graph found | Notes: P3 work; high risk of memory pollution, privacy leakage.
+
+**Source:** Feature List F6.1
+
+## Updated Status Summary
+
+| Roadmap ID | Status | Next Slice |
+|---|---|---|
+| R1 Live Run Streaming | Complete | No v0.1 action |
+| R2 IDE Runtime Setup | Complete | No v0.1 action |
+| R3 Provider/Quota UI | Baseline Complete | No v0.1 action |
+| R4 HITL/Audit UX | Complete | No v0.1 action |
+| R5 SwarmGraph Insight | Complete | No v0.1 action |
+| R6 Real Adoption | Complete | No v0.1 action |
+| R7 Release Ops | Complete | No v0.1 action |
+| R8 IDE Provider/Quota Completion | Baseline Complete | No v0.1 action |
+| R9 IDE Live Stream Polish | Baseline Complete | No v0.1 action |
+| R10 Doctor/Daemon Parity | Baseline Complete | No v0.1 action |
+| R11 SwarmGraph Cost Producer | Baseline Complete | No v0.1 action |
+| R12 Packaging/Optional Features | Baseline Complete | No v0.1 action |
+| R13 SwarmGraph Native Runtime | Baseline Complete | No v0.1 action |
+| **R14 Streaming Audit + HMAC** | **Not Started** | **Phase 21 — implement streaming verifier** |
+| **R15 Discriminated RunEvent Unions** | **Not Started** | **Phase 22 — replace unsafe RunEvent** |
+| **R16 Trust + Paid-Call Enforcement** | **Partial** | **Phase 23 — harden across all surfaces** |
+| **R17 Trace Virtualization + Daemon** | **Not Started** | **Phase 24 — add virtualized list** |
+| **R18 CLI Decomposition** | **Partial** | **Phase 25 — split remaining commands** |
+| **R19 MCP Local Control Plane** | **Not Started** | **Phase 26 — implement stdio server** |
+| **R20 MCP Tasks** | **Not Started** | **Phase 27 — add task registry** |
+| **R21 LangGraph Replay Contract** | **Not Started** | **Phase 28 — add replay capability detection** |
+| **R22 Persistent HITL + Eval** | **Not Started** | **Phase 29 — add SQLite HITL storage** |
+| **R23 Consensus Escrow** | **Not Started** | **Phase 30 — implement commit-reveal** |
+| **R24 Adaptive Consensus** | **Not Started** | **Phase 31 — add risk-based selection** |
+| **R25 Event-Driven Notifications** | **Not Started** | **Phase 32 — add event bus + webhooks** |
+| **R26 Swarm Memory Graph** | **Research** | **Phase 33 — design + prototype** |
+
+**Post-v0.1 Execution Order:** R14-R16 (foundations) → R17-R18 (IDE/CLI) → R19-R20 (MCP) → R21-R22 (replay/eval) → R23-R25 (SwarmGraph differentiators) → R26 (research)
+
+**Critical Path:** Streaming Audit → RunEvent Unions → Trust Enforcement → Trace Virtualization → CLI Decomposition → MCP Server → MCP Tasks → Replay Contract → HITL/Eval → Consensus Escrow → Adaptive Consensus → Event Notifications → Memory Graph
+
