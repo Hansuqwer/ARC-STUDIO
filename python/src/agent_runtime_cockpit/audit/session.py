@@ -14,8 +14,10 @@ Usage in any adapter::
 """
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
-from typing import AsyncIterator, Optional
+from dataclasses import dataclass, field
+from typing import Any, AsyncIterator, Optional
 
 from .schema import (
     AuditEvent,
@@ -34,6 +36,75 @@ from .schema import (
 from .storage import AuditChainStore
 
 
+_REDACT_SENTINEL = "<redacted>"
+
+
+@dataclass
+class RedactionConfig:
+    """Controls which audit event fields are redacted.
+
+    Read from environment variables on instantiation:
+
+    - ``ARC_AUDIT_REDACT_MESSAGES`` → redact LLM messages (default: false)
+    - ``ARC_AUDIT_REDACT_TOOL_ARGS`` → redact tool arguments (default: false)
+    - ``ARC_AUDIT_REDACT_TOOL_RESULTS`` → redact tool results (default: false)
+    """
+
+    redact_messages: bool = False
+    redact_tool_args: bool = False
+    redact_tool_results: bool = False
+
+    @classmethod
+    def from_env(cls) -> RedactionConfig:
+        return cls(
+            redact_messages=os.environ.get("ARC_AUDIT_REDACT_MESSAGES", "").lower() in ("1", "true", "yes"),
+            redact_tool_args=os.environ.get("ARC_AUDIT_REDACT_TOOL_ARGS", "").lower() in ("1", "true", "yes"),
+            redact_tool_results=os.environ.get("ARC_AUDIT_REDACT_TOOL_RESULTS", "").lower() in ("1", "true", "yes"),
+        )
+
+
+def redact_event(event: AuditEvent, config: RedactionConfig) -> AuditEvent:
+    """Return a copy of *event* with sensitive fields replaced.
+
+    Redaction is applied before HMAC signing, so redacted and unredacted
+    chains have different signatures. This is intentional: the audit chain
+    verifies what was logged, not what was executed.
+    """
+    if isinstance(event, LlmRequestEvent):
+        return _redact_llm_request(event, config)
+    if isinstance(event, LlmResponseEvent):
+        return _redact_llm_response(event, config)
+    if isinstance(event, ToolCallEvent):
+        return _redact_tool_call(event, config)
+    if isinstance(event, ToolResultEvent):
+        return _redact_tool_result(event, config)
+    return event
+
+
+def _redact_llm_request(event: LlmRequestEvent, config: RedactionConfig) -> LlmRequestEvent:
+    if config.redact_messages:
+        event = event.model_copy(update={"messages": [_REDACT_SENTINEL]})
+    return event
+
+
+def _redact_llm_response(event: LlmResponseEvent, config: RedactionConfig) -> LlmResponseEvent:
+    if config.redact_messages:
+        event = event.model_copy(update={"content": [_REDACT_SENTINEL]})
+    return event
+
+
+def _redact_tool_call(event: ToolCallEvent, config: RedactionConfig) -> ToolCallEvent:
+    if config.redact_tool_args:
+        event = event.model_copy(update={"arguments": {"__redacted__": _REDACT_SENTINEL}})
+    return event
+
+
+def _redact_tool_result(event: ToolResultEvent, config: RedactionConfig) -> ToolResultEvent:
+    if config.redact_tool_results:
+        event = event.model_copy(update={"result": {"__redacted__": _REDACT_SENTINEL}})
+    return event
+
+
 class AuditSession:
     """Context manager wrapping AuditChainStore for adapter use.
 
@@ -46,10 +117,12 @@ class AuditSession:
         run_id: str,
         session_id: str = "",
         store: Optional[AuditChainStore] = None,
+        redaction: Optional[RedactionConfig] = None,
     ) -> None:
         self.run_id = run_id
         self.session_id = session_id
         self.store = store or AuditChainStore()
+        self._redaction = redaction or RedactionConfig.from_env()
         self._ok = False
         self._msg = ""
 
@@ -177,7 +250,7 @@ class AuditSession:
     # -- Internal --
 
     def _append(self, event: AuditEvent) -> None:
-        result = self.store.append_event(event)
+        result = self.store.append_event(redact_event(event, self._redaction))
         if result is None:
             pass  # no HMAC key available — event still recorded
 
