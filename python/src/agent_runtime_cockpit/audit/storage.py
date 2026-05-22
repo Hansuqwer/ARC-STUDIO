@@ -4,10 +4,10 @@ Wraps ``HmacAuditChainWriter`` and ``key_manager`` to provide per-run
 audit chain lifecycle: create on run start, append events during run,
 verify and export after completion.
 """
+
 from __future__ import annotations
 
 import json
-import shutil
 import tempfile
 from pathlib import Path
 from typing import Any, Optional
@@ -73,9 +73,7 @@ class AuditChainStore:
             return False, "No audit key available. Run 'arc audit key init'."
         return verify_hmac_chain(self._chain_path(run_id), key)
 
-    def export_run(
-        self, run_id: str, output_path: Optional[Path] = None
-    ) -> Optional[Path]:
+    def export_run(self, run_id: str, output_path: Optional[Path] = None) -> Optional[Path]:
         """Export a signed audit bundle for a run.
 
         The bundle includes all events plus verification metadata.
@@ -93,9 +91,9 @@ class AuditChainStore:
         bundle = {
             "version": "1",
             "run_id": run_id,
-            "exported_at": __import__("datetime").datetime.now(
-                __import__("datetime").timezone.utc
-            ).isoformat(),
+            "exported_at": __import__("datetime")
+            .datetime.now(__import__("datetime").timezone.utc)
+            .isoformat(),
             "events": events,
             "verification": {
                 "verified": True,
@@ -107,16 +105,11 @@ class AuditChainStore:
             out = output_path
         else:
             fd = tempfile.NamedTemporaryFile(
-                mode='w',
-                suffix=f".{run_id}.audit.bundle.json",
-                delete=False
+                mode="w", suffix=f".{run_id}.audit.bundle.json", delete=False
             )
             out = Path(fd.name)
             fd.close()
-        out.write_text(
-            json.dumps(bundle, sort_keys=True, separators=(",", ":"))
-            + "\n"
-        )
+        out.write_text(json.dumps(bundle, sort_keys=True, separators=(",", ":")) + "\n")
         return out
 
     def delete_run(self, run_id: str) -> bool:

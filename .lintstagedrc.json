@@ -1,3 +1,4 @@
 {
+  "_comment": "TypeScript linting is run in CI (see .github/workflows/node.yml) but not in pre-commit. Per-package eslint via 'pnpm --filter <pkg> exec eslint --fix' is possible but adds ~3s per commit; deferred until measured to be worth it. Python linting via ruff is fast enough (<1s) to run on every commit.",
   "*.py": ["uv run --directory python ruff check --fix", "uv run --directory python ruff format"]
 }

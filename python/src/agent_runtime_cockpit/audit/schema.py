@@ -3,9 +3,10 @@
 Each event type is a Pydantic model with a ``to_audit_event()`` method
 that returns a dict consumable by ``HmacAuditChainWriter.append()``.
 """
+
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
@@ -61,14 +62,11 @@ class AuditEvent(BaseModel):
 
     run_id: str
     session_id: str = ""
-    timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     @property
     @abstractmethod
-    def event_type(self) -> AuditEventType:
-        ...
+    def event_type(self) -> AuditEventType: ...
 
     @abstractmethod
     def to_audit_event(self) -> dict[str, Any]:

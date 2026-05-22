@@ -12,12 +12,13 @@ Usage in any adapter::
         # ... on completion ...
         session.log_run_completed()
 """
+
 from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Optional
+from dataclasses import dataclass
+from typing import AsyncIterator, Optional
 
 from .schema import (
     AuditEvent,
@@ -57,9 +58,12 @@ class RedactionConfig:
     @classmethod
     def from_env(cls) -> RedactionConfig:
         return cls(
-            redact_messages=os.environ.get("ARC_AUDIT_REDACT_MESSAGES", "").lower() in ("1", "true", "yes"),
-            redact_tool_args=os.environ.get("ARC_AUDIT_REDACT_TOOL_ARGS", "").lower() in ("1", "true", "yes"),
-            redact_tool_results=os.environ.get("ARC_AUDIT_REDACT_TOOL_RESULTS", "").lower() in ("1", "true", "yes"),
+            redact_messages=os.environ.get("ARC_AUDIT_REDACT_MESSAGES", "").lower()
+            in ("1", "true", "yes"),
+            redact_tool_args=os.environ.get("ARC_AUDIT_REDACT_TOOL_ARGS", "").lower()
+            in ("1", "true", "yes"),
+            redact_tool_results=os.environ.get("ARC_AUDIT_REDACT_TOOL_RESULTS", "").lower()
+            in ("1", "true", "yes"),
         )
 
 
@@ -153,7 +157,9 @@ class AuditSession:
 
     def log_run_failed(self, runtime: str = "", reason: str = "") -> None:
         self._append(
-            RunFailedEvent(run_id=self.run_id, session_id=self.session_id, runtime=runtime, reason=reason)
+            RunFailedEvent(
+                run_id=self.run_id, session_id=self.session_id, runtime=runtime, reason=reason
+            )
         )
 
     def log_run_cancelled(self, runtime: str = "", reason: str = "") -> None:
@@ -190,7 +196,11 @@ class AuditSession:
     def log_llm_response(self, provider: str = "", model: str = "", **kwargs) -> None:
         self._append(
             LlmResponseEvent(
-                run_id=self.run_id, session_id=self.session_id, provider=provider, model=model, **kwargs
+                run_id=self.run_id,
+                session_id=self.session_id,
+                provider=provider,
+                model=model,
+                **kwargs,
             )
         )
 
@@ -236,7 +246,9 @@ class AuditSession:
 
     # -- Budget events --
 
-    def log_budget_decision(self, decision: str = "allowed", reason: str = "", budget_state: Optional[dict] = None) -> None:
+    def log_budget_decision(
+        self, decision: str = "allowed", reason: str = "", budget_state: Optional[dict] = None
+    ) -> None:
         self._append(
             BudgetDecisionEvent(
                 run_id=self.run_id,

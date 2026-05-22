@@ -1,4 +1,5 @@
 """Tests for audit chain storage layer (ADR-021)."""
+
 from __future__ import annotations
 
 import json
@@ -7,24 +8,15 @@ from pathlib import Path
 import pytest
 
 from agent_runtime_cockpit.audit.schema import RunStartedEvent, RunCompletedEvent, LlmRequestEvent
-from agent_runtime_cockpit.audit.hmac_chain import GENESIS
 
 
 def _make_store(audit_dir, key_available=True):
     from agent_runtime_cockpit.audit.storage import AuditChainStore
+
     return AuditChainStore(
         audit_dir=audit_dir,
         key_manager=FakeKeyManager(available=key_available),
     )
-
-
-class TestAuditChainStore:
-    def _store(self, audit_dir, key_available=True):
-        return _make_store(audit_dir, key_available)
-
-# Use tempdir via monkeypatch; AuditChainStore is tested in integration
-# because it depends on HMAC keychain access. These tests verify the
-# storage layer's file management logic with a fake key manager.
 
 
 class FakeKeyManager:
@@ -36,10 +28,26 @@ class FakeKeyManager:
     def get_key(self):
         if self._available:
             return b"test-key-32-bytes-long-0123456789abcdef", type(
-                "Status", (), {"available": True, "source": "test", "degraded": True, "warning": "", "key_id": ""}
+                "Status",
+                (),
+                {
+                    "available": True,
+                    "source": "test",
+                    "degraded": True,
+                    "warning": "",
+                    "key_id": "",
+                },
             )()
         return None, type(
-            "Status", (), {"available": False, "source": "none", "degraded": True, "warning": "No key", "key_id": ""}
+            "Status",
+            (),
+            {
+                "available": False,
+                "source": "none",
+                "degraded": True,
+                "warning": "No key",
+                "key_id": "",
+            },
         )()
 
 
@@ -53,6 +61,7 @@ def audit_dir(tmp_path: Path) -> Path:
 class TestAuditChainStore:
     def _store(self, audit_dir, key_available=True):
         from agent_runtime_cockpit.audit.storage import AuditChainStore
+
         return AuditChainStore(
             audit_dir=audit_dir,
             key_manager=FakeKeyManager(available=key_available),
@@ -88,9 +97,7 @@ class TestAuditChainStore:
     def test_append_multiple_events(self, audit_dir):
         store = self._store(audit_dir)
         store.append_event(RunStartedEvent(run_id="run_abc", runtime="swarmgraph"))
-        store.append_event(
-            LlmRequestEvent(run_id="run_abc", provider="anthropic", model="claude")
-        )
+        store.append_event(LlmRequestEvent(run_id="run_abc", provider="anthropic", model="claude"))
         store.append_event(RunCompletedEvent(run_id="run_abc", runtime="swarmgraph"))
         path = audit_dir / "run_abc.audit.jsonl"
         lines = [l for l in path.read_text().splitlines() if l.strip()]
