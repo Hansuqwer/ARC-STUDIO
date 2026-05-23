@@ -11,6 +11,7 @@ class ConsensusProtocol(str, Enum):
     raft = "raft"
     bft = "bft"
     gossip = "gossip"
+    bft_escrow = "bft_escrow"
 
 
 class SwarmStrategy(str, Enum):

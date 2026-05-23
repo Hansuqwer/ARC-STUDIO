@@ -1,26 +1,57 @@
+"""Phase 31/R24 — Adaptive Consensus Protocol node.
+
+Routes each task's consensus request through the deterministic risk assessor
+to select the appropriate protocol. Critical-risk tasks use BFT + escrow.
+"""
+
 from __future__ import annotations
 
-
-from ..consensus import run_consensus
+from ..config import ConsensusProtocol
+from ..consensus import ConsensusResult, run_consensus
+from ..consensus_escrow import ConsensusEscrow
 from ..models import AgentVote, ApprovalDecision, SwarmTask, TaskStatus
+from ..risk_assessment import ProtocolSelection, select_consensus_protocol
 
 
 def run_consensus_round(
     tasks: list[SwarmTask],
     protocol: str = "majority",
     quorum: int | None = None,
+    prompt: str | None = None,
+    escrow: ConsensusEscrow | None = None,
 ) -> list[ApprovalDecision]:
-    from ..config import ConsensusProtocol
+    """Run adaptive consensus on a list of tasks.
+
+    When ``prompt`` is provided, the risk assessor determines the protocol
+    dynamically. Otherwise the legacy ``protocol`` parameter is used.
+
+    Args:
+        tasks: List of swarm tasks to reach consensus on.
+        protocol: Fallback protocol (used when prompt is None).
+        quorum: Optional quorum size for quorum-based protocols.
+        prompt: The original prompt for adaptive risk assessment.
+        escrow: Optional ConsensusEscrow instance for bft_escrow path.
+
+    Returns:
+        List of ApprovalDecision (one per task).
+    """
     proto = ConsensusProtocol(protocol) if isinstance(protocol, str) else protocol
+    selection: ProtocolSelection | None = None
+
+    if prompt is not None:
+        selection = select_consensus_protocol(prompt)
+        proto = selection.protocol
 
     decisions: list[ApprovalDecision] = []
     for task in tasks:
         if task.result is None or task.result.error:
-            decisions.append(ApprovalDecision(
-                approved=False,
-                reason="no result to approve",
-                decided_by="system",
-            ))
+            decisions.append(
+                ApprovalDecision(
+                    approved=False,
+                    reason="no result to approve",
+                    decided_by="system",
+                )
+            )
             continue
 
         votes: list[AgentVote] = []
@@ -35,20 +66,32 @@ def run_consensus_round(
             )
             votes.append(vote)
 
-        consensus = run_consensus(votes, protocol=proto, quorum=quorum)
+        # Run consensus (with escrow for bft_escrow protocol)
+        if proto == ConsensusProtocol.bft_escrow and escrow is not None:
+            consensus = _run_bft_escrow_consensus(votes, task, escrow, quorum)
+        else:
+            consensus = run_consensus(votes, protocol=proto, quorum=quorum)
+
+        # Attach risk assessment audit fields
+        if selection is not None:
+            object.__setattr__(consensus, "risk_level", selection.risk)
+            object.__setattr__(consensus, "risk_score", selection.assessment.score)
+            object.__setattr__(consensus, "risk_signals", selection.assessment.matched_signals)
+            object.__setattr__(consensus, "risk_rationale", selection.assessment.rationale)
+
         task.votes = votes
 
         if consensus.reached:
             decision = ApprovalDecision(
                 approved=True,
-                reason=consensus.details,
+                reason=_format_decision_reason(consensus, selection),
                 decided_by="consensus",
             )
             task.status = TaskStatus.completed
         else:
             decision = ApprovalDecision(
                 approved=False,
-                reason=consensus.details,
+                reason=_format_decision_reason(consensus, selection),
                 decided_by="consensus",
             )
             task.status = TaskStatus.failed
@@ -57,3 +100,45 @@ def run_consensus_round(
         decisions.append(decision)
 
     return decisions
+
+
+def _run_bft_escrow_consensus(
+    votes: list[AgentVote],
+    task: SwarmTask,
+    escrow: ConsensusEscrow,
+    quorum: int | None = None,
+) -> ConsensusResult:
+    """Run BFT consensus wrapped with escrow commit-reveal.
+
+    Generates per-vote nonces, commits each vote to escrow, reveals and
+    verifies, then tallies. Clears commits after completion.
+    """
+    from ..consensus_escrow import _generate_nonce
+
+    revealed_votes = []
+    for vote in votes:
+        nonce = _generate_nonce()
+        commit = escrow.commit(vote, nonce=nonce)
+        revealed = escrow.reveal(vote, nonce=nonce, commit=commit)
+        if escrow.verify(revealed):
+            revealed_votes.append(revealed)
+
+    consensus = escrow.tally(revealed_votes, protocol=ConsensusProtocol.bft, quorum=quorum)
+
+    escrow.clear_commits()
+
+    return consensus
+
+
+def _format_decision_reason(
+    result: ConsensusResult,
+    selection: ProtocolSelection | None,
+) -> str:
+    """Build a decision reason string that includes risk assessment context."""
+    parts = [result.details]
+    if selection is not None:
+        parts.append(
+            f"risk={selection.risk}(score={selection.assessment.score})"
+            f" protocol={selection.protocol.value}"
+        )
+    return " | ".join(parts)

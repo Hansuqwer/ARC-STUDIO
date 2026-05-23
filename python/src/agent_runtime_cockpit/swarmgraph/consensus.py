@@ -19,6 +19,12 @@ class ConsensusResult(BaseModel):
     details: str = Field(default="", max_length=2048)
     votes: list[AgentVote] = Field(default_factory=list)
 
+    # Phase 31/R24 — Adaptive Consensus Protocol audit fields
+    risk_level: str = Field(default="", max_length=16)
+    risk_score: int = Field(default=0, ge=0)
+    risk_signals: list[str] = Field(default_factory=list, max_length=64)
+    risk_rationale: str = Field(default="", max_length=4096)
+
 
 def majority_consensus(
     votes: list[AgentVote],
