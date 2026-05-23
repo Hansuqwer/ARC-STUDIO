@@ -25,7 +25,12 @@ DEFAULT_RECEIPT_KEY = "arc-dev-key-change-in-production"
 
 
 def _receipt_key() -> str:
-    return os.environ.get("ARC_RECEIPT_HMAC_KEY", DEFAULT_RECEIPT_KEY)
+    """Get receipt HMAC key with fallback chain: ARC_RECEIPT_HMAC_KEY → ARC_AUDIT_HMAC_KEY → default."""
+    return (
+        os.environ.get("ARC_RECEIPT_HMAC_KEY")
+        or os.environ.get("ARC_AUDIT_HMAC_KEY")
+        or DEFAULT_RECEIPT_KEY
+    )
 
 
 @receipt_app.command("show")

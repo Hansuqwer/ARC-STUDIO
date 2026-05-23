@@ -380,7 +380,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - UI shows trust and paid-call state before execution
 - Denied actions produce typed events
 
-**Status:** Partial | Evidence: grep found trust infrastructure but needs hardening across all surfaces | Notes: P0/P1 work; safety gates must be enforcement points.
+**Status:** Baseline Complete; hardening remains ongoing | Evidence: commits 3e6ee8c, fca4bf2, 5a9df47, 09bfbb8 | 1518 Python tests passed | Notes: All 3 PRs delivered (EnforcementContext + CLI flags, audit infrastructure + surface annotations, UI confirmation dialogs + retry bridge). Core enforcement infrastructure complete; additional surface hardening continues as needed.
 
 **Source:** Architecture Review P0-3, Feature List F0.3
 
@@ -625,14 +625,14 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 ## R27 — LangChain Adapter (Adapter Phase 26)
 
-**Goal:** Integrate LangChain LCEL pipelines with ARC runtime, enabling detection, export, and live streaming of LangChain workflows.
+**Goal:** Integrate LangChain LCEL pipelines with ARC runtime, enabling detection, export, and event streaming from LangChain workflows.
 
-**Current:** Baseline Complete. Three PRs delivered: T1 (detection), T2 (export), T3 (live streaming).
+**Current:** Baseline Complete. Three PRs delivered: T1 (detection), T2 (export), T3 (event streaming).
 
 **Deliverables:**
 - Detection of LangChain LCEL pipelines
 - Export to ARC trace format
-- Live streaming with ARCCallbackHandler
+- Event streaming with ARCCallbackHandler
 - Provider calls route through ProviderClient registry where recognized
 - Unrecognized LLMs emit POLICY_BYPASS_WARNING
 
@@ -692,12 +692,12 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Goal:** Integrate Pydantic AI framework with ARC runtime.
 
-**Current:** Baseline Complete. Three PRs delivered: PR 29.1 (detection, 19 tests), PR 29.2 (export, 11 tests), PR 29.3 (live streaming, 13 tests). Total: 43 tests.
+**Current:** Baseline Complete. Three PRs delivered: PR 29.1 (detection, 19 tests), PR 29.2 (export, 11 tests), PR 29.3 (event streaming, 13 tests). Total: 43 tests.
 
 **Deliverables:**
 - Detection of Pydantic AI agents via AST-based static analysis (no code execution)
 - Export to ARC trace format with agent/tool/LLM node extraction
-- Live streaming with PydanticAIEventHandler (get_run_run, on_run_error, tool/model events)
+- Event streaming with PydanticAIEventHandler (get_run_run, on_run_error, tool/model events)
 - Sequence-numbered typed events with ISO timestamps
 
 **Acceptance:**
@@ -706,7 +706,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 - Detection, export, and streaming work end-to-end
 - Validation errors surfaced as typed event variant
 
-**Status:** Baseline Complete | Evidence: commits 7680017, c34abb3, 27a33b1; 43 Pydantic AI tests, 253 total adapter tests | Notes: Pydantic-native event model; detection uses AST (matches LangChain pattern); streaming emits AGENT_RUN_START/END/ERROR, TOOL_CALL/RESULT, MODEL_REQUEST/RESPONSE, and VALIDATION_ERROR events.
+**Status:** Baseline Complete | Evidence: commits 7680017, c34abb3, 27a33b1; 43 Pydantic AI tests, 253 total adapter tests | Notes: Pydantic-native event model; detection uses AST (matches LangChain pattern); event streaming emits AGENT_RUN_START/END/ERROR, TOOL_CALL/RESULT, MODEL_REQUEST/RESPONSE, and VALIDATION_ERROR events.
 
 **Source:** Adapter Roadmap Phase 29
 
@@ -778,7 +778,8 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 ### Phase 1: Provider Discovery & Interactive UX (No Dependencies)
 
-**Status:** Not Started (Ready to implement)  
+**Status:** Baseline Complete ✓  
+**Evidence:** commits cd89aab, 8e53f37, 1eb8af6, ca13e6c, 7f2e20b | 73 provider tests passed, 1 skipped | TypeScript build green  
 **Depends on:** None (uses existing provider infrastructure)
 
 **Deliverables:**
@@ -827,7 +828,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 - Audit log records credential access events
 - Tests cover OAuth flow, encrypted storage, environment fallback, trust enforcement
 
-**Status:** Phase 1 Not Started (ready to implement) | Phase 2 Blocked (waiting for Phase 23 + 25) | Evidence: n/a | Notes: Two-phase delivery enables immediate UX improvements without waiting for trust infrastructure. Phase 1 builds on existing provider infrastructure without credential storage complexity.
+**Status:** Phase 1 Baseline Complete (commits cd89aab, 8e53f37, 1eb8af6, ca13e6c, 7f2e20b) | Phase 2 Blocked (waiting for Phase 23 + 25 + 36.1) | Evidence: 73 provider tests passed, 1 skipped; TypeScript build green | Notes: Phase 1 delivered CLI commands and IDE ConfigTab integration; local providers pass tests without API keys; provider test status normalized to UI values. Phase 2 requires Phase 23 trust infrastructure and Phase 25 CLI decomposition.
 
 **Source:** OpenCode provider system research (2026-05-23), Option C (Hybrid) approach approved 2026-05-23
 
@@ -850,7 +851,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | R13 SwarmGraph Native Runtime | Baseline Complete | No v0.1 action |
 | **R14 Streaming Audit + HMAC** | **Not Started** | **Phase 21 — implement streaming verifier** |
 | **R15 Discriminated RunEvent Unions** | **Not Started** | **Phase 22 — replace unsafe RunEvent** |
-| **R16 Trust + Paid-Call Enforcement** | **Partial** | **Phase 23 — harden across all surfaces** |
+| **R16 Trust + Paid-Call Enforcement** | **Baseline Complete** | **Phase 23 — harden across all surfaces (commits 3e6ee8c-09bfbb8)** |
 | **R17 Trace Virtualization + Daemon** | **Not Started** | **Phase 24 — add virtualized list** |
 | **R18 CLI Decomposition** | **Partial** | **Phase 25 — split remaining commands** |
 | **R19 MCP Local Control Plane** | **Not Started** | **Phase 26 — implement stdio server** |
@@ -871,7 +872,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R34 Semantic Kernel Adapter** | **Not Started** | **Adapter Phase 33 — implement Semantic Kernel adapter (T1+T2 only)** |
 | **R35 Google ADK Adapter** | **Not Started** | **Adapter Phase 34 — implement Google ADK adapter** |
 | **R36 MCP Python SDK Adapter** | **Not Started** | **Adapter Phase 35 — implement MCP Python SDK adapter** |
-| **R37 Provider Management (Phase 1)** | **Not Started (Ready)** | **Phase 36.1 — interactive UX without credential storage (no blockers)** |
+| **R37 Provider Management (Phase 1)** | **Baseline Complete** | **Phase 36.1 — interactive UX without credential storage (commits cd89aab-7f2e20b)** |
 | **R37 Provider Management (Phase 2)** | **Blocked** | **Phase 36.2 — credential storage + OAuth (requires Phase 23 + 25 + 36.1)** |
 
 **Post-v0.1 Execution Order:** 

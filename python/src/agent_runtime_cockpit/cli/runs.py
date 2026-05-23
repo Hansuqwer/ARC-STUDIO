@@ -567,6 +567,25 @@ def runs_budget(
             if "max_cost" in budget:
                 console.print(f"  Max Cost:   ${budget['max_cost']:.4f}")
 
+        # Print usage information
+        tokens_info = usage_report["tokens"]
+        if tokens_info["status"] == "available":
+            console.print(f"  Total Tokens: {int(tokens_info['value'])}")
+        else:
+            console.print("  Total Tokens: n/a")
+
+        cost_info = usage_report["cost_usd"]
+        if cost_info["status"] == "available":
+            console.print(f"  Total Cost: ${cost_info['value']:.4f}")
+        else:
+            console.print("  Total Cost: n/a")
+
+        latency_info = usage_report["latency_ms"]
+        if latency_info["status"] == "available":
+            console.print(f"  Latency: {latency_info['value']:.2f}ms")
+        else:
+            console.print("  Latency: n/a")
+
 
 @runs_app.command("autopsy")
 def runs_autopsy(

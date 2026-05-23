@@ -1232,7 +1232,8 @@ bash scripts/check-pr.sh
 ## Phase 36.1 — Provider Discovery & Interactive UX
 
 **Roadmap:** R37 — Provider Management System (Phase 1)  
-**Status:** Not Started (Ready to implement)  
+**Status:** Baseline Complete ✓  
+**Evidence:** commits cd89aab, 8e53f37, 1eb8af6, ca13e6c, 7f2e20b | 73 provider tests passed, 1 skipped | TypeScript build green | Notes: CLI commands (`arc providers catalog`, `arc providers test`, `arc providers models`, `arc providers setup`) and IDE ConfigTab provider status integration implemented; local providers pass tests without API keys; provider test status normalized to UI values  
 **Depends on:** None (uses existing provider infrastructure)  
 **Design note:** Delivers interactive provider discovery and UX improvements without credential storage. Builds on existing `providers/registry.py` and `providers/base.py`. Environment variables remain the only credential source. This phase can be implemented immediately without waiting for Phase 23 (Trust) or Phase 25 (CLI Decomposition).
 

@@ -3,6 +3,7 @@
 Verifies all registered adapters report honest, accurate capability
 statuses and that the CLI integration works for adapter discovery.
 """
+
 from __future__ import annotations
 
 import json
@@ -20,7 +21,16 @@ def test_default_registry_has_expected_adapters():
     """Default registry contains all expected adapters."""
     registry = default_registry()
     adapter_ids = {a.adapter_id for a in registry.all()}
-    expected = {"swarmgraph", "langgraph", "crewai", "openai-agents", "ag2", "llamaindex", "lmarena"}
+    expected = {
+        "swarmgraph",
+        "langgraph",
+        "langchain",
+        "crewai",
+        "openai-agents",
+        "ag2",
+        "llamaindex",
+        "lmarena",
+    }
     assert adapter_ids == expected, f"Got {adapter_ids}, expected {expected}"
 
 
@@ -40,7 +50,9 @@ def test_each_adapter_capabilities_are_honest(tmp_path):
     registry = default_registry()
     for adapter in registry.all():
         caps = adapter.capabilities()
-        assert isinstance(caps, RuntimeCapabilities), f"{adapter.adapter_id} capabilities type: {type(caps)}"
+        assert isinstance(caps, RuntimeCapabilities), (
+            f"{adapter.adapter_id} capabilities type: {type(caps)}"
+        )
         # can_run and can_inspect should not both be False for a registered adapter
         # (except Arena which is gated)
         if adapter.adapter_id != "lmarena":
@@ -58,7 +70,9 @@ def test_each_adapter_detect_returns_consistent_results(tmp_path):
         detected, confidence, evidence = adapter.detect(ws)
         # In an empty workspace, nothing should be detected
         assert isinstance(detected, bool), f"{adapter.adapter_id} detect returned non-bool"
-        assert isinstance(confidence, float), f"{adapter.adapter_id} detect returned non-float confidence"
+        assert isinstance(confidence, float), (
+            f"{adapter.adapter_id} detect returned non-float confidence"
+        )
         assert isinstance(evidence, list), f"{adapter.adapter_id} detect returned non-list evidence"
 
 
@@ -73,7 +87,9 @@ def test_adapter_list_cli(tmp_path):
 
 def test_adapter_test_swarmgraph_conformance(tmp_path):
     """`arc adapter test swarmgraph` runs conformance tests."""
-    result = runner.invoke(app, ["adapter", "test", "swarmgraph", "--workspace", str(tmp_path), "--json"])
+    result = runner.invoke(
+        app, ["adapter", "test", "swarmgraph", "--workspace", str(tmp_path), "--json"]
+    )
     assert result.exit_code == 0, f"exit {result.exit_code}: {result.stdout[:300]}"
     data = json.loads(result.stdout)["data"]
     assert data["adapter"] == "swarmgraph"
@@ -82,7 +98,9 @@ def test_adapter_test_swarmgraph_conformance(tmp_path):
 
 def test_adapter_test_langgraph_conformance(tmp_path):
     """`arc adapter test langgraph` runs conformance tests."""
-    result = runner.invoke(app, ["adapter", "test", "langgraph", "--workspace", str(tmp_path), "--json"])
+    result = runner.invoke(
+        app, ["adapter", "test", "langgraph", "--workspace", str(tmp_path), "--json"]
+    )
     assert result.exit_code == 0, f"exit {result.exit_code}: {result.stdout[:300]}"
     data = json.loads(result.stdout)["data"]
     assert data["adapter"] == "langgraph"
@@ -91,7 +109,9 @@ def test_adapter_test_langgraph_conformance(tmp_path):
 
 def test_adapter_test_unknown_returns_error(tmp_path):
     """`arc adapter test unknown` returns ADAPTER_NOT_SUPPORTED."""
-    result = runner.invoke(app, ["adapter", "test", "nonexistent", "--workspace", str(tmp_path), "--json"])
+    result = runner.invoke(
+        app, ["adapter", "test", "nonexistent", "--workspace", str(tmp_path), "--json"]
+    )
     assert result.exit_code == 1
     data = json.loads(result.stdout)
     assert data["ok"] is False
@@ -105,8 +125,15 @@ def test_adapter_capability_report_includes_test_level(tmp_path):
     ws.mkdir()
     for adapter in registry.all():
         report = adapter.capability_report(ws)
-        assert report.test_level in ("unknown", "fake_offline", "gated_local_real", "provider_backed")
-        assert isinstance(report.fake_offline_supported, bool), f"{adapter.adapter_id} fake_offline_supported"
+        assert report.test_level in (
+            "unknown",
+            "fake_offline",
+            "gated_local_real",
+            "provider_backed",
+        )
+        assert isinstance(report.fake_offline_supported, bool), (
+            f"{adapter.adapter_id} fake_offline_supported"
+        )
         assert isinstance(report.local_real_gated, bool)
         assert isinstance(report.local_real_available, bool)
         assert isinstance(report.provider_backed, bool)
@@ -135,7 +162,7 @@ def test_build_default_is_idempotent():
     registry2 = AdapterRegistry().build_default()
     ids2 = {a.adapter_id for a in registry2.all()}
     assert ids1 == ids2
-    assert len(ids1) == 7  # No duplicates
+    assert len(ids1) == 8  # No duplicates
 
 
 def test_all_adapters_detect_swarmgraph_project(tmp_path):
