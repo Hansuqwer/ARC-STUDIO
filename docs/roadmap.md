@@ -692,9 +692,21 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Goal:** Integrate Pydantic AI framework with ARC runtime.
 
-**Current:** Not Started.
+**Current:** Baseline Complete. Three PRs delivered: PR 29.1 (detection, 19 tests), PR 29.2 (export, 11 tests), PR 29.3 (live streaming, 13 tests). Total: 43 tests.
 
-**Status:** Not Started | Evidence: n/a | Notes: Pydantic-native event model; at 1.99 stable.
+**Deliverables:**
+- Detection of Pydantic AI agents via AST-based static analysis (no code execution)
+- Export to ARC trace format with agent/tool/LLM node extraction
+- Live streaming with PydanticAIEventHandler (get_run_run, on_run_error, tool/model events)
+- Sequence-numbered typed events with ISO timestamps
+
+**Acceptance:**
+- 43 tests passing (detection: 19, export: 11, streaming: 13)
+- All 253 adapter tests passing (no regressions)
+- Detection, export, and streaming work end-to-end
+- Validation errors surfaced as typed event variant
+
+**Status:** Baseline Complete | Evidence: commits 7680017, c34abb3, 27a33b1; 43 Pydantic AI tests, 253 total adapter tests | Notes: Pydantic-native event model; detection uses AST (matches LangChain pattern); streaming emits AGENT_RUN_START/END/ERROR, TOOL_CALL/RESULT, MODEL_REQUEST/RESPONSE, and VALIDATION_ERROR events.
 
 **Source:** Adapter Roadmap Phase 29
 
@@ -758,6 +770,42 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Source:** Adapter Roadmap Phase 35
 
+## R37 — Provider Management System (CLI/IDE)
+
+**Goal:** Implement a unified provider management system for CLI and IDE, enabling users to configure LLM providers, manage API keys, and select models through interactive commands similar to OpenCode's `/connect` and `/provider` system.
+
+**Current:** Not Started. No provider management CLI or IDE interface exists. Provider configuration is currently manual through environment variables and config files.
+
+**Deliverables:**
+- Provider registry system with built-in provider definitions (OpenAI, Anthropic, Google, Azure, local providers)
+- Authentication manager supporting multiple auth methods (OAuth, API key, token, environment variables)
+- Secure credential storage at `~/.local/share/arc-studio/auth.json` with 600 permissions
+- CLI commands: `arc provider add`, `arc provider list`, `arc provider remove`, `arc provider test`
+- CLI command: `arc model` for interactive model selection
+- Configuration schema for provider settings in `arc-studio.json`
+- Interactive provider and auth method selection UI
+- OAuth flow with local callback server (port 8080)
+- Environment variable fallback for credentials
+- Variable substitution in config (`{env:VAR}`, `{file:path}`)
+- IDE ConfigTab integration for provider management
+- Connection testing and validation
+
+**Acceptance:**
+- Users can add providers interactively via `arc provider add` with provider selection menu
+- OAuth flow opens browser and completes authentication for supported providers
+- API keys stored securely with proper file permissions (600)
+- Environment variables work as fallback when no stored credentials exist
+- `arc model` command lists available models from configured providers
+- Provider configuration supports custom base URLs for proxies/self-hosted instances
+- IDE ConfigTab displays configured providers and allows management
+- Connection testing validates credentials before saving
+- No raw secrets in config files (only references to env vars or secure storage)
+- Tests cover OAuth flow, API key storage, environment fallback, and connection validation
+
+**Status:** Not Started | Evidence: n/a | Notes: Inspired by OpenCode's provider management system; requires secure credential storage, OAuth implementation, and CLI/IDE integration.
+
+**Source:** OpenCode provider system research (2026-05-23)
+
 ## Updated Status Summary
 
 | Roadmap ID | Status | Next Slice |
@@ -791,15 +839,16 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R27 LangChain Adapter** | **Baseline Complete** | **Adapter Phase 26 — complete (commits 6beedf8, ea567cf, 7566e60)** |
 | **R28 Anthropic Provider + Registry** | **Baseline Complete** | **Adapter Phase 27 — complete (commit 4a479b7)** |
 | **R29 OpenAI-Compatible Provider** | **Baseline Complete** | **Adapter Phase 28 — complete (commit 6826d8d, 24 tests, 6 vendors)** |
-| **R30 Pydantic AI Adapter** | **Not Started** | **Adapter Phase 29 — implement Pydantic AI adapter** |
+| **R30 Pydantic AI Adapter** | **Baseline Complete** | **Adapter Phase 29 — complete (commits 7680017, c34abb3, 27a33b1 — 43 tests, 3 PRs)** |
 | **R31 DSPy Adapter** | **Not Started** | **Adapter Phase 30 — implement DSPy adapter** |
 | **R32 Haystack Adapter** | **Not Started** | **Adapter Phase 31 — implement Haystack adapter** |
 | **R33 Smolagents Adapter** | **Not Started** | **Adapter Phase 32 — implement Smolagents adapter** |
 | **R34 Semantic Kernel Adapter** | **Not Started** | **Adapter Phase 33 — implement Semantic Kernel adapter (T1+T2 only)** |
 | **R35 Google ADK Adapter** | **Not Started** | **Adapter Phase 34 — implement Google ADK adapter** |
 | **R36 MCP Python SDK Adapter** | **Not Started** | **Adapter Phase 35 — implement MCP Python SDK adapter** |
+| **R37 Provider Management System** | **Not Started** | **Phase 36 — implement provider registry and authentication** |
 
-**Post-v0.1 Execution Order:** R14-R16 (foundations) → R17-R18 (IDE/CLI) → R19-R20 (MCP) → R21-R22 (replay/eval) → R23-R25 (SwarmGraph differentiators) → R26 (research) → R27-R36 (adapter integration)
+**Post-v0.1 Execution Order:** R14-R16 (foundations) → R17-R18 (IDE/CLI) → R19-R20 (MCP) → R21-R22 (replay/eval) → R23-R25 (SwarmGraph differentiators) → R26 (research) → R27-R36 (adapter integration) → R37 (provider management)
 
-**Critical Path:** Streaming Audit → RunEvent Unions → Trust Enforcement → Trace Virtualization → CLI Decomposition → MCP Server → MCP Tasks → Replay Contract → HITL/Eval → Consensus Escrow → Adaptive Consensus → Event Notifications → Memory Graph → Adapter Integration (LangChain, Anthropic, OpenAI-compatible, Pydantic AI, DSPy, Haystack, Smolagents, Semantic Kernel, Google ADK, MCP SDK)
+**Critical Path:** Streaming Audit → RunEvent Unions → Trust Enforcement → Trace Virtualization → CLI Decomposition → MCP Server → MCP Tasks → Replay Contract → HITL/Eval → Consensus Escrow → Adaptive Consensus → Event Notifications → Memory Graph → Adapter Integration (LangChain, Anthropic, OpenAI-compatible, Pydantic AI, DSPy, Haystack, Smolagents, Semantic Kernel, Google ADK, MCP SDK) → Provider Management System
 
