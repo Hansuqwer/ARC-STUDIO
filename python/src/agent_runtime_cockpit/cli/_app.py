@@ -25,6 +25,7 @@ from ._subapps import (
     prompt_app,
     providers_app,
     receipt_app,
+    replay_app,
     runs_app,
     storage_app,
     studio_app,
@@ -62,6 +63,7 @@ app.add_typer(audit_app)
 app.add_typer(profiles_app)
 app.add_typer(mcp_app)
 app.add_typer(task_app)
+app.add_typer(replay_app)
 app.add_typer(prompt_app)
 
 

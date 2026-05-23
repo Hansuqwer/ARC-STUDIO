@@ -485,21 +485,22 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Prevent overclaiming LangGraph replay/resume capabilities without checkpointer/thread-ID verification.
 
-**Current:** Not Started. No replay capability detection exists.
+**Current:** Baseline Complete. Replay capability detection implemented with checkpointer/thread ID detection, warnings, and CLI reporting.
 
 **Deliverables:**
-- Add `ReplayCapability` fields: `can_replay_trace`, `can_resume_checkpoint`, `requires_thread_id`, `side_effects_wrapped`, `determinism_level`
-- Detect LangGraph checkpointer/thread configuration where possible
-- Emit warnings when adapter can inspect but not safely resume
-- Add replay report: what was replayed, simulated, skipped, and why
+- ✅ Add `ReplayCapability` fields: `can_replay_trace`, `can_resume_checkpoint`, `requires_thread_id`, `side_effects_wrapped`, `determinism_level`
+- ✅ Detect LangGraph checkpointer/thread configuration where possible
+- ✅ Emit warnings when adapter can inspect but not safely resume
+- ✅ Add replay report: what was replayed, simulated, skipped, and why
+- ✅ Add CLI: `arc replay <run-id>` for replay analysis
 
 **Acceptance:**
-- LangGraph projects with checkpointer + thread ID report resumable
-- Projects without durable config report inspect-only or simulated replay
-- Side-effecting steps flagged unless wrapped/declared idempotent
-- Replay report clearly states what is exact, simulated, skipped, unsafe
+- ✅ LangGraph projects with checkpointer + thread ID report resumable
+- ✅ Projects without durable config report inspect-only or simulated replay
+- ✅ Side-effecting steps flagged unless wrapped/declared idempotent (conservative - assumes not wrapped)
+- ✅ Replay report clearly states what is exact, simulated, skipped, unsafe
 
-**Status:** Not Started | Evidence: no replay capability detection found | Notes: P1 work; prevents overclaiming replay.
+**Status:** Baseline Complete | Evidence: `python/src/agent_runtime_cockpit/schemas/replay_capability.py`, `python/src/agent_runtime_cockpit/adapters/langgraph/replay_detector.py`, `python/src/agent_runtime_cockpit/cli/replay.py`, 20 tests in `python/tests/adapters/langgraph/test_replay_capability.py` | Notes: Replay capability detection complete. Prevents overclaiming by clearly reporting what can/cannot be replayed. Side effects detection is conservative (assumes not wrapped). CLI command: `arc replay <run-id>`.
 
 **Source:** Architecture Review P1-7, Feature List F3.1
 
