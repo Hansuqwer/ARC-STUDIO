@@ -2,32 +2,53 @@
 
 from __future__ import annotations
 
-from agent_runtime_cockpit.providers.client import (
-    ProviderCapabilities,
+from typing import AsyncIterator
+
+from agent_runtime_cockpit.cli_repl.cancellation import CancellationToken
+from agent_runtime_cockpit.providers.base import (
+    CostRates,
+    ProviderCapability,
     ProviderClient,
-    ProviderMessage,
+    ProviderFeature,
+    ProviderRequest,
+    ProviderResponse,
+    StreamChunk,
+    UsageRecord,
 )
 
 
 class _FakeProviderClient:
-    name = "fake"
-
-    def capabilities(self) -> ProviderCapabilities:
-        return ProviderCapabilities(
-            streaming=True, tool_use=False, prompt_caching=False, vision=False, json_mode=False
+    def capabilities(self) -> ProviderCapability:
+        return ProviderCapability(
+            provider_id="fake",
+            provider_name="Fake Provider",
+            supported_models=["fake-model"],
+            default_model="fake-model",
+            features=[ProviderFeature.STREAMING],
+            max_context_tokens=100_000,
+            cost_rates={"fake-model": CostRates(input_per_million=1.0, output_per_million=2.0)},
         )
 
-    def complete(self, messages, *, model, max_tokens):
-        return ProviderMessage(role="assistant", content="ok")
+    async def complete(
+        self, request: ProviderRequest, *, cancellation_token: CancellationToken
+    ) -> ProviderResponse:
+        return ProviderResponse(
+            call_id=request.call_id,
+            model=request.model,
+            content="ok",
+            finish_reason="stop",
+            usage=UsageRecord(input_tokens=10, output_tokens=5),
+        )
 
-    def stream(self, messages, *, model, max_tokens):
-        yield "ok"
+    async def stream(
+        self, request: ProviderRequest, *, cancellation_token: CancellationToken
+    ) -> AsyncIterator[StreamChunk]:
+        yield StreamChunk(call_id=request.call_id, chunk_type="start")
+        yield StreamChunk(call_id=request.call_id, chunk_type="delta", delta="ok")
+        yield StreamChunk(call_id=request.call_id, chunk_type="stop")
 
-    async def astream(self, messages, *, model, max_tokens):
-        yield "ok"
-
-    def stream_tool_calls(self, messages, tools, *, model):
-        return iter(())
+    async def cancel(self, call_id: str) -> None:
+        pass
 
 
 def test_fake_implements_protocol():
@@ -36,11 +57,12 @@ def test_fake_implements_protocol():
 
 def test_fake_capabilities_round_trip():
     caps = _FakeProviderClient().capabilities()
-    assert caps.streaming is True
-    assert caps.tool_use is False
+    assert caps.provider_id == "fake"
+    assert ProviderFeature.STREAMING in caps.features
 
 
-def test_registry_empty_by_default():
+def test_registry_has_anthropic():
+    """Test that AnthropicClient is auto-registered."""
     from agent_runtime_cockpit.providers.registry import known
 
-    assert known() == []
+    assert "anthropic" in known()

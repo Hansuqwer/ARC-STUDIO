@@ -28,6 +28,7 @@ from .anthropic_estimator import (
     select_estimator,
 )
 from .budget_preflight import preflight_with_estimator
+from .registry import register
 
 __all__ = [
     "AnthropicClient",
@@ -57,3 +58,6 @@ __all__ = [
     "ValidationError",
     "validate_provider_id",
 ]
+
+# Auto-register providers (Phase 27)
+register("anthropic", AnthropicClient)

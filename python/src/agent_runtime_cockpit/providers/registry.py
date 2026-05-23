@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from .client import ProviderClient
+from .base import ProviderClient
 
 _FACTORIES: dict[str, Callable[[], ProviderClient]] = {}
 
