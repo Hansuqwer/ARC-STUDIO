@@ -1,7 +1,10 @@
 """LangChain Runtime Adapter.
 
-Phase 26 T1: Detection only.
-Detects LangChain Runnable/LCEL pipelines in workspace.
+Phase 26 T1: Detection implemented.
+Phase 26 T2: Export implemented (AST-based).
+Phase 26 T3: Live streaming (not yet implemented).
+
+Detects and exports LangChain Runnable/LCEL pipelines in workspace.
 
 Out of scope (per roadmap):
 - AgentExecutor (redirected to LangGraph by upstream)
@@ -17,8 +20,10 @@ from pathlib import Path
 
 from ..base import RuntimeAdapter, CapabilityReport, DoctorAction
 from ...protocol.capabilities import RuntimeCapabilities
+from ...protocol.schemas import WorkflowInfo
 from .capabilities import get_langchain_capabilities
 from .detect import detect_langchain
+from .export import export_langchain_workflows
 
 log = logging.getLogger(__name__)
 
@@ -26,9 +31,9 @@ log = logging.getLogger(__name__)
 class LangChainAdapter(RuntimeAdapter):
     """LangChain adapter for ARC Studio.
 
-    Phase 26 T1: Detection only.
-    Phase 26 T2: Export (planned).
-    Phase 26 T3: Live streaming (planned).
+    Phase 26 T1: Detection implemented.
+    Phase 26 T2: Export implemented (AST-based).
+    Phase 26 T3: Live streaming (not yet implemented).
     """
 
     @property
@@ -58,6 +63,22 @@ class LangChainAdapter(RuntimeAdapter):
         result = detect_langchain(workspace)
         return result.detected, result.confidence, result.evidence
 
+    def export_workflow(self, workspace: Path) -> list[WorkflowInfo]:
+        """Export LangChain workflows from workspace.
+
+        Phase 26 T2: AST-based export of Runnable/LCEL chains.
+
+        Strategy:
+        - AST scan for pipe operator (|) chains
+        - AST scan for RunnableSequence instantiations
+        - No code execution (static analysis only)
+        - Maps chains to WorkflowInfo structure
+
+        Returns:
+            List of WorkflowInfo for detected chains
+        """
+        return export_langchain_workflows(workspace)
+
     def capability_report(self, workspace: Path) -> CapabilityReport:
         """Return detailed capability report for LangChain adapter."""
         detected, confidence, evidence = self.detect(workspace)
@@ -83,13 +104,13 @@ class LangChainAdapter(RuntimeAdapter):
                 ],
             )
 
-        # LangChain detected but not runnable (T1 only)
+        # LangChain detected with export capability
         return CapabilityReport(
             runtime_id=self.adapter_id,
             detected=True,
             can_run=False,
             availability="detected_not_runnable",
-            reason="LangChain detected. Export (T2) and live streaming (T3) not yet implemented.",
+            reason="LangChain detected. Workflow export available (T2). Live streaming (T3) not yet implemented.",
             detected_artifacts=evidence,
             version=result.version,
             doctor_actions=[],
