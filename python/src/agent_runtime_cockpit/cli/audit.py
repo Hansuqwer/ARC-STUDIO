@@ -150,6 +150,82 @@ def audit_export(
                 console.print(json_mod.dumps(r, sort_keys=True))
 
 
+@audit_app.command("query")
+def audit_query(
+    run_id: str = typer.Argument(..., help="Run ID to query audit events for"),
+    kind: str = typer.Option(
+        None, "--kind", help="Filter by event type (e.g., POLICY_BYPASS_WARNING)"
+    ),
+    surface: str = typer.Option(None, "--surface", help="Filter by surface (composes with --kind)"),
+    chain_path: str = typer.Option("", "--chain", "-c", help="Path to audit chain file"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Query audit events with filters (Phase 22.1).
+
+    Filter audit events by type (--kind) and optionally by surface.
+    Filters compose: --kind POLICY_BYPASS_WARNING --surface provider_call
+    returns only bypass warnings from provider calls.
+    """
+    _setup_logging(debug)
+    import json as json_mod
+
+    ws = Path.cwd()
+    audit_dir = ws / ".arc" / "audit"
+    if chain_path:
+        chain = Path(chain_path)
+    else:
+        new_chain = audit_dir / f"{run_id}.audit.jsonl"
+        old_chain = audit_dir / f"{run_id}.jsonl"
+        if new_chain.exists():
+            chain = new_chain
+        elif old_chain.exists():
+            chain = old_chain
+        else:
+            _out(
+                err(ArcErrorCode.RUN_NOT_FOUND, f"Audit chain not found for run {run_id}"),
+                json_output,
+            )
+            raise typer.Exit(1)
+
+    # Read and parse audit records
+    lines = chain.read_text(encoding="utf-8").splitlines()
+    records = [json_mod.loads(l) for l in lines if l.strip()]
+
+    # Filter by kind (event type)
+    if kind:
+        records = [r for r in records if r.get("event", {}).get("type") == kind]
+
+    # Filter by surface (composes with kind filter)
+    if surface:
+        records = [
+            r for r in records if r.get("event", {}).get("data", {}).get("surface") == surface
+        ]
+
+    payload = {
+        "run_id": run_id,
+        "filters": {"kind": kind, "surface": surface},
+        "matched_count": len(records),
+        "events": [r.get("event") for r in records],
+    }
+    _out(ok(payload), json_output)
+
+    if not json_output:
+        from ._app import console
+
+        filter_desc = []
+        if kind:
+            filter_desc.append(f"kind={kind}")
+        if surface:
+            filter_desc.append(f"surface={surface}")
+        filter_str = ", ".join(filter_desc) if filter_desc else "no filters"
+
+        console.print(f"Query results for {run_id} ({filter_str}): {len(records)} events")
+        for r in records:
+            event = r.get("event", {})
+            console.print(json_mod.dumps(event, sort_keys=True, indent=2))
+
+
 @key_app.command("init")
 def audit_key_init(
     json_output: bool = JSON_FLAG,
