@@ -7,7 +7,6 @@ from .config import SwarmGraphConfig
 from .events import (
     SwarmGraphEvent,
     emit_budget_event,
-    emit_consensus_event,
     emit_topology_event,
     emit_worker_event,
 )
@@ -18,7 +17,10 @@ from .models import (
     WorkerResult,
 )
 from .nodes.approval import require_hitl_approval
-from .nodes.consensus import run_consensus_round
+from .nodes.consensus import (
+    emit_consensus_events_for_outcomes,
+    run_consensus_round_with_results,
+)
 from .nodes.queen import queen_assign, queen_decompose, queen_prepare_agents
 from .nodes.worker import process_worker_results, worker_execute
 from .state import SwarmState
@@ -90,9 +92,13 @@ class SwarmGraphRunner:
                 self.events.append(emit_worker_event(self.state, result))
                 if cfg.enable_budget:
                     self.state.accumulated_cost_usd += result.cost_usd
-                    self.events.append(emit_budget_event(
-                        self.state, result.cost_usd, cfg.budget_limit_usd,
-                    ))
+                    self.events.append(
+                        emit_budget_event(
+                            self.state,
+                            result.cost_usd,
+                            cfg.budget_limit_usd,
+                        )
+                    )
 
             if self.state.status == SwarmStatus.cancelled:
                 break
@@ -101,12 +107,17 @@ class SwarmGraphRunner:
 
             if cfg.require_hitl:
                 for task in pending:
-                    if task.status == TaskStatus.completed and task.result and not task.result.error:
+                    if (
+                        task.status == TaskStatus.completed
+                        and task.result
+                        and not task.result.error
+                    ):
                         require_hitl_approval(task)
             else:
-                decisions = run_consensus_round(pending, protocol=cfg.consensus_protocol.value)
-                for task, decision in zip(pending, decisions):
-                    self.events.append(emit_consensus_event(self.state, task.id, decision))
+                outcomes = run_consensus_round_with_results(
+                    pending, protocol=cfg.consensus_protocol.value
+                )
+                self.events.extend(emit_consensus_events_for_outcomes(self.state, outcomes))
 
             if cfg.enable_budget and cfg.budget_limit_usd is not None:
                 if self.state.accumulated_cost_usd >= cfg.budget_limit_usd:
