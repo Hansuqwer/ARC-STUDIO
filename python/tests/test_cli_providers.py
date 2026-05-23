@@ -1,6 +1,7 @@
 """
 Tests: CLI provider commands (list, status, diagnostics, proxy).
 """
+
 from __future__ import annotations
 
 import json
@@ -40,9 +41,21 @@ def test_providers_catalog_required_entries():
     data = json.loads(result.output)["data"]
     by_id = {p["id"]: p for p in data}
     required = {
-        "openai", "anthropic", "google-ai", "xai-grok", "perplexity",
-        "openrouter", "qwen", "kimi", "github", "chatgpt-web",
-        "claude-web", "grok-web", "perplexity-web", "antigravity", "omniroute",
+        "openai",
+        "anthropic",
+        "google-ai",
+        "xai-grok",
+        "perplexity",
+        "openrouter",
+        "qwen",
+        "kimi",
+        "github",
+        "chatgpt-web",
+        "claude-web",
+        "grok-web",
+        "perplexity-web",
+        "antigravity",
+        "omniroute",
     }
     assert required.issubset(by_id)
     assert by_id["chatgpt-web"]["status"] == "research_only"
@@ -55,12 +68,20 @@ def test_providers_key_set_env_ref_only(tmp_path, monkeypatch):
     config_path = tmp_path / "providers.json"
     monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(config_path))
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-should-not-persist")
-    result = CliRunner().invoke(app, [
-        "providers", "key", "set", "openai",
-        "--env", "OPENAI_API_KEY",
-        "--label", "test",
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "providers",
+            "key",
+            "set",
+            "openai",
+            "--env",
+            "OPENAI_API_KEY",
+            "--label",
+            "test",
+            "--json",
+        ],
+    )
     assert result.exit_code == 0, result.output
     saved = config_path.read_text()
     assert "OPENAI_API_KEY" in saved
@@ -70,11 +91,18 @@ def test_providers_key_set_env_ref_only(tmp_path, monkeypatch):
 def test_providers_key_set_rejects_raw_key(tmp_path, monkeypatch):
     """arc providers key set rejects raw key-looking values passed to --env."""
     monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(tmp_path / "providers.json"))
-    result = CliRunner().invoke(app, [
-        "providers", "key", "set", "openai",
-        "--env", "sk-test-raw-key-material",
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "providers",
+            "key",
+            "set",
+            "openai",
+            "--env",
+            "sk-test-raw-key-material",
+            "--json",
+        ],
+    )
     assert result.exit_code == 2
     assert "Expected an environment variable name" in result.output
 
@@ -84,11 +112,18 @@ def test_providers_key_status_json(tmp_path, monkeypatch):
     config_path = tmp_path / "providers.json"
     monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(config_path))
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-should-not-emit")
-    set_result = CliRunner().invoke(app, [
-        "providers", "key", "set", "openai",
-        "--env", "OPENAI_API_KEY",
-        "--json",
-    ])
+    set_result = CliRunner().invoke(
+        app,
+        [
+            "providers",
+            "key",
+            "set",
+            "openai",
+            "--env",
+            "OPENAI_API_KEY",
+            "--json",
+        ],
+    )
     assert set_result.exit_code == 0, set_result.output
     result = CliRunner().invoke(app, ["providers", "key", "status", "openai", "--json"])
     assert result.exit_code == 0, result.output
@@ -112,13 +147,20 @@ def test_providers_diagnostics_json():
 
 def test_providers_proxy_dry_run():
     """arc providers proxy returns dry-run response with no network call."""
-    result = CliRunner().invoke(app, [
-        "providers", "proxy",
-        "--provider", "openai",
-        "--model", "gpt-4.1-mini",
-        "--prompt", "Hello world",
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "providers",
+            "proxy",
+            "--provider",
+            "openai",
+            "--model",
+            "gpt-4.1-mini",
+            "--prompt",
+            "Hello world",
+            "--json",
+        ],
+    )
     assert result.exit_code == 0, result.output
     resp = json.loads(result.output)["data"]
     assert resp["dry_run"] is True
@@ -130,13 +172,18 @@ def test_providers_proxy_dry_run():
 def test_providers_proxy_live_requires_env_gate(monkeypatch):
     """arc providers proxy --live is blocked unless env and paid opt-in are explicit."""
     monkeypatch.delenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", raising=False)
-    result = CliRunner().invoke(app, [
-        "providers", "proxy",
-        "--provider", "openai",
-        "--live",
-        "--allow-paid-calls",
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "providers",
+            "proxy",
+            "--provider",
+            "openai",
+            "--live",
+            "--allow-paid-calls",
+            "--json",
+        ],
+    )
     assert result.exit_code == 1
     assert "ARC_ALLOW_LIVE_PROVIDER_TESTS=true" in result.output
 
@@ -144,12 +191,17 @@ def test_providers_proxy_live_requires_env_gate(monkeypatch):
 def test_providers_proxy_live_requires_paid_flag(monkeypatch):
     """arc providers proxy --live also requires --allow-paid-calls."""
     monkeypatch.setenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", "true")
-    result = CliRunner().invoke(app, [
-        "providers", "proxy",
-        "--provider", "openai",
-        "--live",
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "providers",
+            "proxy",
+            "--provider",
+            "openai",
+            "--live",
+            "--json",
+        ],
+    )
     assert result.exit_code == 1
     assert "--allow-paid-calls" in result.output
 
@@ -157,13 +209,18 @@ def test_providers_proxy_live_requires_paid_flag(monkeypatch):
 def test_providers_proxy_live_explicit_gate_still_no_network(monkeypatch):
     """Explicit live opt-in reaches CLI stub, not network provider execution."""
     monkeypatch.setenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", "true")
-    result = CliRunner().invoke(app, [
-        "providers", "proxy",
-        "--provider", "openai",
-        "--live",
-        "--allow-paid-calls",
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "providers",
+            "proxy",
+            "--provider",
+            "openai",
+            "--live",
+            "--allow-paid-calls",
+            "--json",
+        ],
+    )
     assert result.exit_code == 1
     assert "no network call was made" in result.output
 
@@ -171,12 +228,18 @@ def test_providers_proxy_live_explicit_gate_still_no_network(monkeypatch):
 def test_providers_action_dry_run_default_no_network(tmp_path, monkeypatch):
     """arc providers action defaults to dry-run and records local accounting only."""
     monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
-    result = CliRunner().invoke(app, [
-        "providers", "action",
-        "--provider", "openai",
-        "--model", "gpt-4.1-mini",
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "providers",
+            "action",
+            "--provider",
+            "openai",
+            "--model",
+            "gpt-4.1-mini",
+            "--json",
+        ],
+    )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
     assert data["dry_run"] is True
@@ -189,14 +252,20 @@ def test_providers_action_dry_run_default_no_network(tmp_path, monkeypatch):
 def test_providers_action_live_requires_env_gate(monkeypatch):
     """Live action is blocked without ARC_ALLOW_LIVE_PROVIDER_TESTS=true."""
     monkeypatch.delenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", raising=False)
-    result = CliRunner().invoke(app, [
-        "providers", "action",
-        "--provider", "openai",
-        "--live",
-        "--allow-paid-calls",
-        "--confirm", "RUN_PROVIDER_ACTION:openai:gpt-4.1-mini",
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "providers",
+            "action",
+            "--provider",
+            "openai",
+            "--live",
+            "--allow-paid-calls",
+            "--confirm",
+            "RUN_PROVIDER_ACTION:openai:gpt-4.1-mini",
+            "--json",
+        ],
+    )
     assert result.exit_code == 1
     assert "ARC_ALLOW_LIVE_PROVIDER_TESTS=true" in result.output
 
@@ -204,13 +273,19 @@ def test_providers_action_live_requires_env_gate(monkeypatch):
 def test_providers_action_live_requires_paid_flag(monkeypatch):
     """Live action is blocked without explicit paid opt-in."""
     monkeypatch.setenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", "true")
-    result = CliRunner().invoke(app, [
-        "providers", "action",
-        "--provider", "openai",
-        "--live",
-        "--confirm", "RUN_PROVIDER_ACTION:openai:gpt-4.1-mini",
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "providers",
+            "action",
+            "--provider",
+            "openai",
+            "--live",
+            "--confirm",
+            "RUN_PROVIDER_ACTION:openai:gpt-4.1-mini",
+            "--json",
+        ],
+    )
     assert result.exit_code == 1
     assert "--allow-paid-calls" in result.output
 
@@ -219,14 +294,20 @@ def test_providers_action_live_requires_key_env(monkeypatch):
     """Live action is blocked when provider key env is absent."""
     monkeypatch.setenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", "true")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    result = CliRunner().invoke(app, [
-        "providers", "action",
-        "--provider", "openai",
-        "--live",
-        "--allow-paid-calls",
-        "--confirm", "RUN_PROVIDER_ACTION:openai:gpt-4.1-mini",
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "providers",
+            "action",
+            "--provider",
+            "openai",
+            "--live",
+            "--allow-paid-calls",
+            "--confirm",
+            "RUN_PROVIDER_ACTION:openai:gpt-4.1-mini",
+            "--json",
+        ],
+    )
     assert result.exit_code == 1
     assert "Provider key env var missing" in result.output
 
@@ -235,34 +316,51 @@ def test_providers_action_live_requires_confirmation(monkeypatch):
     """Live action is blocked without exact confirmation string."""
     monkeypatch.setenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", "true")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-should-not-emit")
-    result = CliRunner().invoke(app, [
-        "providers", "action",
-        "--provider", "openai",
-        "--live",
-        "--allow-paid-calls",
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "providers",
+            "action",
+            "--provider",
+            "openai",
+            "--live",
+            "--allow-paid-calls",
+            "--json",
+        ],
+    )
     assert result.exit_code == 1
-    assert "provider_action_confirmation_required:RUN_PROVIDER_ACTION:openai:gpt-4.1-mini" in result.output
+    assert (
+        "provider_action_confirmation_required:RUN_PROVIDER_ACTION:openai:gpt-4.1-mini"
+        in result.output
+    )
     assert "sk-test-should-not-emit" not in result.output
 
 
 def test_providers_action_all_gates_pass_closed_smoke(tmp_path, monkeypatch):
     """All gates pass reaches closed smoke scaffold; still no network call."""
     if os.environ.get("ARC_RUN_PAID_SMOKE") != "1":
-        pytest.skip("paid-smoke taxonomy: set ARC_RUN_PAID_SMOKE=1 to run closed provider-gate smoke")
+        pytest.skip(
+            "paid-smoke taxonomy: set ARC_RUN_PAID_SMOKE=1 to run closed provider-gate smoke"
+        )
     monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
     monkeypatch.setenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", "true")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-should-not-emit")
-    result = CliRunner().invoke(app, [
-        "providers", "action",
-        "--provider", "openai",
-        "--model", "gpt-4.1-mini",
-        "--live",
-        "--allow-paid-calls",
-        "--confirm", "RUN_PROVIDER_ACTION:openai:gpt-4.1-mini",
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "providers",
+            "action",
+            "--provider",
+            "openai",
+            "--model",
+            "gpt-4.1-mini",
+            "--live",
+            "--allow-paid-calls",
+            "--confirm",
+            "RUN_PROVIDER_ACTION:openai:gpt-4.1-mini",
+            "--json",
+        ],
+    )
     assert result.exit_code == 0, result.output
     assert "sk-test-should-not-emit" not in result.output
     data = json.loads(result.output)["data"]
@@ -290,6 +388,7 @@ def test_providers_quota_reset(tmp_path, monkeypatch):
     quota_file = tmp_path / "quota.json"
     monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(quota_file))
     from agent_runtime_cockpit.provider_action import ProviderQuotaStore
+
     store = ProviderQuotaStore(path=quota_file)
     store.reserve("openai", dry_run=True)
     usage_before = store.usage()
@@ -308,14 +407,21 @@ def test_providers_quota_show_filtered(tmp_path, monkeypatch):
     quota_file = tmp_path / "quota.json"
     monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(quota_file))
     from agent_runtime_cockpit.provider_action import ProviderQuotaStore
+
     store = ProviderQuotaStore(path=quota_file)
     store.reserve("openai", dry_run=True)
     store.reserve("anthropic", dry_run=True)
-    result = CliRunner().invoke(app, [
-        "providers", "quota", "show",
-        "--provider", "openai",
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "providers",
+            "quota",
+            "show",
+            "--provider",
+            "openai",
+            "--json",
+        ],
+    )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
     assert data["provider"] == "openai"
@@ -350,11 +456,16 @@ def test_doctor_storage_json(tmp_path, monkeypatch):
     """arc doctor storage returns storage status."""
     traces_dir = tmp_path / ".arc" / "traces"
     traces_dir.mkdir(parents=True)
-    result = CliRunner().invoke(app, [
-        "doctor", "storage",
-        "--workspace", str(tmp_path),
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "doctor",
+            "storage",
+            "--workspace",
+            str(tmp_path),
+            "--json",
+        ],
+    )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
     assert "checks" in data
@@ -365,11 +476,15 @@ def test_doctor_storage_json(tmp_path, monkeypatch):
 
 def test_bug_report_json(tmp_path):
     """arc bug-report returns diagnostic payload."""
-    result = CliRunner().invoke(app, [
-        "bug-report",
-        "--workspace", str(tmp_path),
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "bug-report",
+            "--workspace",
+            str(tmp_path),
+            "--json",
+        ],
+    )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
     assert "arc_version" in data
@@ -382,11 +497,16 @@ def test_bug_report_json(tmp_path):
 
 def test_runs_search_no_index(tmp_path):
     """arc runs search fails gracefully when SQLite index missing."""
-    result = CliRunner().invoke(app, [
-        "runs", "search",
-        "--workspace", str(tmp_path),
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "runs",
+            "search",
+            "--workspace",
+            str(tmp_path),
+            "--json",
+        ],
+    )
     assert result.exit_code == 1
     assert "not found" in result.output
 
@@ -395,6 +515,7 @@ def test_runs_search_with_index(tmp_path):
     """arc runs search returns results from SQLite index."""
     from agent_runtime_cockpit.storage.indexed_store import IndexedTraceStore
     from agent_runtime_cockpit.protocol.schemas import RunRecord, RunStatus
+
     store = IndexedTraceStore(
         trace_dir=tmp_path / ".arc" / "traces",
         db_path=tmp_path / ".arc" / "arc.db",
@@ -408,11 +529,16 @@ def test_runs_search_with_index(tmp_path):
         started_at="2026-05-15T00:00:00Z",
     )
     store.save(record)
-    result = CliRunner().invoke(app, [
-        "runs", "search",
-        "--workspace", str(tmp_path),
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "runs",
+            "search",
+            "--workspace",
+            str(tmp_path),
+            "--json",
+        ],
+    )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
     assert data["count"] >= 1
@@ -425,19 +551,159 @@ def test_runs_search_filtered(tmp_path):
     """arc runs search filters by runtime."""
     from agent_runtime_cockpit.storage.indexed_store import IndexedTraceStore
     from agent_runtime_cockpit.protocol.schemas import RunRecord, RunStatus
+
     store = IndexedTraceStore(
         trace_dir=tmp_path / ".arc" / "traces",
         db_path=tmp_path / ".arc" / "arc.db",
     )
     store.init()
-    store.save(RunRecord(id="run-sg", workflow_id="wf1", runtime="swarmgraph", status=RunStatus.COMPLETED, started_at="2026-05-15T00:00:00Z"))
-    store.save(RunRecord(id="run-lg", workflow_id="wf2", runtime="langgraph", status=RunStatus.COMPLETED, started_at="2026-05-15T00:01:00Z"))
-    result = CliRunner().invoke(app, [
-        "runs", "search",
-        "--runtime", "langgraph",
-        "--workspace", str(tmp_path),
-        "--json",
-    ])
+    store.save(
+        RunRecord(
+            id="run-sg",
+            workflow_id="wf1",
+            runtime="swarmgraph",
+            status=RunStatus.COMPLETED,
+            started_at="2026-05-15T00:00:00Z",
+        )
+    )
+    store.save(
+        RunRecord(
+            id="run-lg",
+            workflow_id="wf2",
+            runtime="langgraph",
+            status=RunStatus.COMPLETED,
+            started_at="2026-05-15T00:01:00Z",
+        )
+    )
+    result = CliRunner().invoke(
+        app,
+        [
+            "runs",
+            "search",
+            "--runtime",
+            "langgraph",
+            "--workspace",
+            str(tmp_path),
+            "--json",
+        ],
+    )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
     assert all(r["runtime"] == "langgraph" for r in data["results"])
+
+
+def test_providers_test_configured_provider(monkeypatch):
+    """arc providers test succeeds when provider env var is set."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key-should-not-emit")
+    result = CliRunner().invoke(app, ["providers", "test", "openai", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert data["provider"] == "openai"
+    assert data["configured"] is True
+    assert data["env_source"] == "OPENAI_API_KEY"
+    assert data["test_result"] == "credentials_present"
+    assert "sk-test-key-should-not-emit" not in result.output
+
+
+def test_providers_test_missing_env_var(monkeypatch):
+    """arc providers test fails when provider env var is not set."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    result = CliRunner().invoke(app, ["providers", "test", "openai", "--json"])
+    assert result.exit_code == 1
+    assert "not configured" in result.output
+    assert "OPENAI_API_KEY" in result.output
+
+
+def test_providers_test_invalid_provider():
+    """arc providers test fails with helpful error for unknown provider."""
+    result = CliRunner().invoke(app, ["providers", "test", "invalid-provider-xyz", "--json"])
+    assert result.exit_code == 1
+    assert "Unknown provider" in result.output
+    assert "arc providers list" in result.output
+
+
+def test_providers_test_shows_provider_details(monkeypatch):
+    """arc providers test shows provider details including docs URL."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-should-not-emit")
+    result = CliRunner().invoke(app, ["providers", "test", "anthropic", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert data["display_name"] == "Anthropic / Claude API"
+    assert data["base_url"] == "https://api.anthropic.com"
+    assert "docs_url" in data
+    assert "sk-ant-test-should-not-emit" not in result.output
+
+
+def test_providers_models_configured_only(monkeypatch):
+    """arc providers models shows models from configured providers only."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    result = CliRunner().invoke(app, ["providers", "models", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert len(data) > 0
+    providers = {m["provider"] for m in data}
+    assert "openai" in providers
+    assert "anthropic" in providers
+    # Check model structure
+    openai_models = [m for m in data if m["provider"] == "openai"]
+    assert len(openai_models) > 0
+    assert "model" in openai_models[0]
+    assert "configured" in openai_models[0]
+    assert openai_models[0]["configured"] is True
+
+
+def test_providers_models_filter_by_provider(monkeypatch):
+    """arc providers models --provider filters to specific provider."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    result = CliRunner().invoke(app, ["providers", "models", "--provider", "openai", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert all(m["provider"] == "openai" for m in data)
+    assert len(data) > 0
+
+
+def test_providers_models_all_flag(monkeypatch):
+    """arc providers models --all shows models from all providers."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    result = CliRunner().invoke(app, ["providers", "models", "--all", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert len(data) > 0
+    # Should include models from unconfigured providers
+    providers = {m["provider"] for m in data}
+    assert len(providers) > 10  # Many providers available
+
+
+def test_providers_models_no_api_keys_shows_local_providers(monkeypatch):
+    """arc providers models shows local providers when no API keys configured."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    # Clear all provider env vars
+    for key in list(os.environ.keys()):
+        if "API_KEY" in key or "TOKEN" in key:
+            monkeypatch.delenv(key, raising=False)
+    result = CliRunner().invoke(app, ["providers", "models", "--json"])
+    # Should succeed because local providers (ollama, lm-studio) don't need API keys
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    # Should show models from local providers
+    assert len(data) > 0
+    # All returned models should be marked as configured
+    assert all(m["configured"] is True for m in data)
+
+
+def test_providers_models_shows_capabilities(monkeypatch):
+    """arc providers models includes provider capabilities."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    result = CliRunner().invoke(app, ["providers", "models", "--provider", "openai", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert len(data) > 0
+    model = data[0]
+    assert "supports_tools" in model
+    assert "supports_chat" in model
+    assert "supports_streaming" in model
+    assert "base_url" in model

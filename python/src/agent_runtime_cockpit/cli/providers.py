@@ -61,6 +61,135 @@ def providers_diagnostics(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLA
     _out(ok(redacted_diagnostics(os.environ)), json_output)
 
 
+@providers_app.command("test")
+def providers_test(
+    provider_id: str = typer.Argument(..., help="Provider id to test"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Test provider connection using environment variables.
+
+    Validates that required environment variables are set and have valid format.
+    No network calls are made. Use 'arc providers action --live' for live testing.
+    """
+    _setup_logging(debug)
+    import os
+    from ..provider_action import PROVIDERS, provider_statuses
+
+    # Find provider definition
+    provider = next((p for p in PROVIDERS if p.id == provider_id), None)
+    if provider is None:
+        available = ", ".join(sorted(p.id for p in PROVIDERS[:10]))
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                f"Unknown provider: {provider_id}. Try: {available}... (use 'arc providers list' for all)",
+            ),
+            json_output,
+        )
+        raise typer.Exit(1)
+
+    # Check environment variables
+    statuses = provider_statuses(os.environ)
+    status = next((s for s in statuses if s.provider == provider_id), None)
+
+    if not status or not status.api_key_configured:
+        missing_vars = (
+            " or ".join(provider.env_key_names) if provider.env_key_names else "credentials"
+        )
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                f"Provider '{provider_id}' not configured. Set environment variable: {missing_vars}",
+            ),
+            json_output,
+        )
+        raise typer.Exit(1)
+
+    # Build success result
+    result = {
+        "provider": provider_id,
+        "display_name": provider.display_name,
+        "configured": True,
+        "env_source": status.api_key_source,
+        "base_url": provider.default_base_url,
+        "status": provider.status,
+        "test_result": "credentials_present",
+        "message": f"✓ Provider '{provider.display_name}' is configured via {status.api_key_source}",
+        "docs_url": provider.docs_url if provider.docs_url else None,
+    }
+
+    _out(ok(result), json_output)
+
+
+@providers_app.command("models")
+def providers_models(
+    provider: Optional[str] = typer.Option(None, "--provider", help="Filter by provider id"),
+    configured_only: bool = typer.Option(
+        True,
+        "--configured-only/--all",
+        help="Show only configured providers (default: configured only)",
+    ),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """List available models from providers.
+
+    By default, shows models from configured providers only (those with env vars set).
+    Use --all to show models from all providers regardless of configuration.
+    """
+    _setup_logging(debug)
+    import os
+    from ..provider_action import PROVIDERS, provider_statuses
+
+    # Get provider statuses to see which are configured
+    statuses = provider_statuses(os.environ)
+    configured_providers = {s.provider for s in statuses if s.api_key_configured}
+
+    # Build model list
+    models = []
+    for p in PROVIDERS:
+        if provider and p.id != provider:
+            continue
+
+        # Check if provider is configured (has env vars or is local)
+        is_configured = p.id in configured_providers or p.auth_kind.value == "local"
+
+        if configured_only and not is_configured:
+            continue
+
+        # Add each model from this provider
+        for model in p.default_models:
+            models.append(
+                {
+                    "provider": p.id,
+                    "provider_name": p.display_name,
+                    "model": model,
+                    "configured": is_configured,
+                    "supports_tools": p.supports_tools,
+                    "supports_chat": p.supports_chat,
+                    "supports_streaming": p.supports_streaming,
+                    "base_url": p.default_base_url,
+                }
+            )
+
+    if not models:
+        if configured_only:
+            _out(
+                err(
+                    ArcErrorCode.INVALID_INPUT,
+                    "No configured providers found. Set provider environment variables or use --all to see all models.",
+                ),
+                json_output,
+            )
+            raise typer.Exit(1)
+        else:
+            _out(ok([]), json_output)
+            return
+
+    _out(ok(models), json_output)
+
+
 @providers_app.command("proxy")
 def providers_proxy(
     provider: Optional[str] = typer.Option(
