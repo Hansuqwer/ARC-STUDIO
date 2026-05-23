@@ -508,21 +508,23 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Convert HITL and eval from transient UI state into persistent, audit-linked evidence.
 
-**Current:** Not Started. HITL state is transient (lost on daemon restart). Eval artifacts are not repeatable.
+**Current:** Baseline Complete (HITL only). HITL prompts and decisions now persist in SQLite with audit linking. Eval artifacts deferred for future work.
 
 **Deliverables:**
-- Store HITL prompts and decisions in SQLite with run IDs, timestamps, actor, decision, reason, audit hash
-- Add `arc hitl pending --json`, `arc hitl respond <id> --approve|--reject --reason`
-- Define ARC eval artifact schema: `eval_spec`, `dataset_ref`, `runtime_adapter`, `solver_or_workflow`, `scorer`, `samples`, `scores`, `trace_refs`, `audit_refs`
-- Optional export to Inspect AI-compatible directory/log shape
+- ✅ Store HITL prompts and decisions in SQLite with run IDs, timestamps, actor, decision, reason, audit hash
+- ✅ Add `arc hitl pending --json`, `arc hitl respond <id> --decision <approve|reject|modify|skip> --reason`
+- ✅ Add `arc hitl show <id>` and `arc hitl prune` commands
+- ⚠️ Define ARC eval artifact schema — deferred for future work
+- ⚠️ Add `arc eval run --batch --json` — deferred for future work
+- ⚠️ Optional export to Inspect AI-compatible directory/log shape — deferred
 
 **Acceptance:**
-- HITL prompt survives daemon restart and is answerable by CLI or IDE
-- HITL decisions are audit-linked
-- `arc eval run --batch --json` produces repeatable artifact paths
-- Eval reports can compare two runs on same dataset
+- ✅ HITL prompt survives daemon restart and is answerable by CLI or IDE (SQLite persistence)
+- ✅ HITL decisions are audit-linked (audit_hash field in responses table)
+- ⚠️ `arc eval run --batch --json` produces repeatable artifact paths — deferred
+- ⚠️ Eval reports can compare two runs on same dataset — deferred
 
-**Status:** Not Started | Evidence: no persistent HITL storage found | Notes: P1/P2 work; converts HITL/eval into repeatable evidence.
+**Status:** Baseline Complete (HITL only) | Evidence: `python/src/agent_runtime_cockpit/audit/hitl_sqlite_store.py`, `python/src/agent_runtime_cockpit/cli/hitl.py`, 20 tests in `python/tests/hitl/test_hitl_sqlite_store.py` | Notes: HITL persistence complete with SQLite storage, CLI commands, and audit linking. Eval artifacts component deferred for separate phase. CLI commands: `arc hitl pending`, `arc hitl respond`, `arc hitl show`, `arc hitl prune`.
 
 **Source:** Architecture Review P1/P2-8, Feature List F3.2
 
