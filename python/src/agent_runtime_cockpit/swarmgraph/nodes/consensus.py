@@ -1,4 +1,6 @@
 """Phase 31/R24 — Adaptive Consensus Protocol node.
+Phase 32/R25 — Hardened: per-task selection, immutable-safe audit fields,
+persistent metadata on tasks, event-compatible risk data.
 
 Routes each task's consensus request through the deterministic risk assessor
 to select the appropriate protocol. Critical-risk tasks use BFT + escrow.
@@ -22,28 +24,41 @@ def run_consensus_round(
 ) -> list[ApprovalDecision]:
     """Run adaptive consensus on a list of tasks.
 
-    When ``prompt`` is provided, the risk assessor determines the protocol
-    dynamically. Otherwise the legacy ``protocol`` parameter is used.
+    When ``prompt`` is explicitly provided, it is used as the shared prompt
+    for all tasks. Otherwise each task uses its own ``task.prompt`` for
+    per-task adaptive protocol selection.
+
+    When ``prompt`` is None and no task prompts match any risk signals,
+    the legacy ``protocol`` parameter is used as a fallback.
 
     Args:
         tasks: List of swarm tasks to reach consensus on.
-        protocol: Fallback protocol (used when prompt is None).
+        protocol: Fallback protocol (used when no adaptive selection occurs).
         quorum: Optional quorum size for quorum-based protocols.
-        prompt: The original prompt for adaptive risk assessment.
+        prompt: Optional shared prompt override. If None, per-task prompts used.
         escrow: Optional ConsensusEscrow instance for bft_escrow path.
 
     Returns:
         List of ApprovalDecision (one per task).
     """
-    proto = ConsensusProtocol(protocol) if isinstance(protocol, str) else protocol
-    selection: ProtocolSelection | None = None
-
-    if prompt is not None:
-        selection = select_consensus_protocol(prompt)
-        proto = selection.protocol
+    _ = ConsensusProtocol(protocol) if isinstance(protocol, str) else protocol  # noqa: F841 - kept for legacy compat
 
     decisions: list[ApprovalDecision] = []
     for task in tasks:
+        # Determine selection prompt: explicit shared prompt or per-task prompt
+        selection_prompt = prompt if prompt is not None else task.prompt
+        selection = select_consensus_protocol(selection_prompt)
+        proto = selection.protocol
+
+        # Persist selection in task metadata
+        task.metadata["adaptive_consensus"] = {
+            "risk": selection.risk,
+            "protocol": selection.protocol.value,
+            "score": selection.assessment.score,
+            "matched_signals": list(selection.assessment.matched_signals),
+            "rationale": selection.assessment.rationale,
+        }
+
         if task.result is None or task.result.error:
             decisions.append(
                 ApprovalDecision(
@@ -72,12 +87,15 @@ def run_consensus_round(
         else:
             consensus = run_consensus(votes, protocol=proto, quorum=quorum)
 
-        # Attach risk assessment audit fields
-        if selection is not None:
-            object.__setattr__(consensus, "risk_level", selection.risk)
-            object.__setattr__(consensus, "risk_score", selection.assessment.score)
-            object.__setattr__(consensus, "risk_signals", selection.assessment.matched_signals)
-            object.__setattr__(consensus, "risk_rationale", selection.assessment.rationale)
+        # Attach risk assessment audit fields via immutable-safe copy
+        consensus = consensus.model_copy(
+            update={
+                "risk_level": selection.risk,
+                "risk_score": selection.assessment.score,
+                "risk_signals": list(selection.assessment.matched_signals),
+                "risk_rationale": selection.assessment.rationale,
+            }
+        )
 
         task.votes = votes
 

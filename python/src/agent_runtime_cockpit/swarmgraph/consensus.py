@@ -97,9 +97,116 @@ def quorum_consensus(
     )
 
 
+def raft_consensus(
+    votes: list[AgentVote],
+    quorum: int | None = None,
+) -> ConsensusResult:
+    """Deterministic raft-style leader-based consensus.
+
+    The leader is deterministically chosen as the agent with the lowest
+    (lexicographically sorted) agent_id. The leader's vote decides approval.
+    All votes are counted for the record.
+
+    Args:
+        votes: Agent votes to process.
+        quorum: Ignored for raft; leader decides.
+
+    Returns:
+        ConsensusResult with raft protocol.
+    """
+    total = len(votes)
+    if total == 0:
+        return ConsensusResult(
+            reached=False,
+            approved=False,
+            total_votes=0,
+            required=1,
+            protocol=ConsensusProtocol.raft,
+            details="raft: no leader vote available",
+        )
+
+    leader_vote = sorted(votes, key=lambda v: v.agent_id)[0]
+    approved_count = sum(1 for v in votes if v.approved)
+    rejected_count = total - approved_count
+
+    return ConsensusResult(
+        reached=True,
+        approved=leader_vote.approved,
+        total_votes=total,
+        approval_count=approved_count,
+        rejection_count=rejected_count,
+        required=1,
+        protocol=ConsensusProtocol.raft,
+        details=(
+            f"raft: leader={leader_vote.agent_id} "
+            f"approved={leader_vote.approved}, "
+            f"{approved_count}/{total} approved"
+        ),
+        votes=votes,
+    )
+
+
+def bft_consensus(
+    votes: list[AgentVote],
+    quorum: int | None = None,
+) -> ConsensusResult:
+    """Deterministic Byzantine Fault Tolerant consensus.
+
+    Requires at least 2/3 supermajority approval. Uses integer math to
+    avoid floating-point precision issues.
+
+    Args:
+        votes: Agent votes to process.
+        quorum: Optional explicit quorum override.
+
+    Returns:
+        ConsensusResult with bft protocol.
+    """
+    total = len(votes)
+    required = quorum if quorum is not None else max(1, (2 * total + 2) // 3)
+
+    if total == 0:
+        return ConsensusResult(
+            reached=False,
+            approved=False,
+            total_votes=0,
+            required=required,
+            protocol=ConsensusProtocol.bft,
+            details=f"bft: no votes cast, {required} required",
+        )
+
+    approved_count = sum(1 for v in votes if v.approved)
+    rejected_count = total - approved_count
+    reached = approved_count >= required
+
+    details = (
+        f"bft: {approved_count}/{required} required, {approved_count}/{total} approved"
+        if reached
+        else (
+            f"bft not reached: {approved_count}/{required} required, "
+            f"{approved_count}/{total} approved"
+        )
+    )
+
+    return ConsensusResult(
+        reached=reached,
+        approved=reached,
+        total_votes=total,
+        approval_count=approved_count,
+        rejection_count=rejected_count,
+        required=required,
+        protocol=ConsensusProtocol.bft,
+        details=details,
+        votes=votes,
+    )
+
+
 CONSENSUS_FUNCS = {
     ConsensusProtocol.majority: majority_consensus,
     ConsensusProtocol.quorum: quorum_consensus,
+    ConsensusProtocol.raft: raft_consensus,
+    ConsensusProtocol.bft: bft_consensus,
+    ConsensusProtocol.bft_escrow: bft_consensus,
 }
 
 
@@ -108,7 +215,29 @@ def run_consensus(
     protocol: ConsensusProtocol = ConsensusProtocol.majority,
     quorum: int | None = None,
 ) -> ConsensusResult:
+    """Run consensus using the specified protocol.
+
+    Dispatches to the appropriate consensus function. For bft_escrow,
+    the protocol field is set to bft_escrow (not bft) to distinguish
+    the escrow-wrapped path.
+
+    Args:
+        votes: Agent votes to process.
+        protocol: Which consensus protocol to use.
+        quorum: Optional quorum override.
+
+    Returns:
+        ConsensusResult with the selected protocol.
+    """
     func = CONSENSUS_FUNCS.get(protocol, majority_consensus)
+
     if protocol == ConsensusProtocol.quorum and quorum is not None:
         return quorum_consensus(votes, quorum=quorum)
+
+    if protocol in (ConsensusProtocol.bft, ConsensusProtocol.bft_escrow):
+        result = bft_consensus(votes, quorum=quorum)
+        if protocol == ConsensusProtocol.bft_escrow:
+            return result.model_copy(update={"protocol": ConsensusProtocol.bft_escrow})
+        return result
+
     return func(votes, quorum=quorum)

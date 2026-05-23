@@ -7,6 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .consensus import ConsensusResult
 from .models import ApprovalDecision, WorkerResult
 from .state import SwarmState
 
@@ -71,7 +72,7 @@ def emit_topology_event(state: SwarmState, topology: Any) -> TopologyEvent:
     event = TopologyEvent(
         kind=SwarmGraphEventKind.topology,
         swarm_id=state.id,
-        data={"topology": topology.to_dict() if hasattr(topology, 'to_dict') else topology},
+        data={"topology": topology.to_dict() if hasattr(topology, "to_dict") else topology},
         round=state.current_round,
     )
     return event
@@ -97,16 +98,48 @@ def emit_consensus_event(
     state: SwarmState,
     task_id: str,
     approval: ApprovalDecision,
+    consensus_result: ConsensusResult | None = None,
 ) -> ConsensusEvent:
+    """Emit a consensus event with optional risk/protocol/vote metadata.
+
+    When ``consensus_result`` is provided, the event data includes protocol,
+    risk level, risk score, matched signals, rationale, and vote counts.
+
+    Args:
+        state: Current swarm state.
+        task_id: The task being decided.
+        approval: The approval decision.
+        consensus_result: Optional ConsensusResult for risk audit data.
+
+    Returns:
+        A ConsensusEvent with the relevant data.
+    """
+    data: dict[str, Any] = {
+        "task_id": task_id,
+        "approved": approval.approved,
+        "reason": approval.reason,
+        "decided_by": approval.decided_by,
+    }
+
+    if consensus_result is not None:
+        data.update(
+            {
+                "protocol": consensus_result.protocol.value,
+                "risk": consensus_result.risk_level,
+                "risk_score": consensus_result.risk_score,
+                "matched_signals": consensus_result.risk_signals,
+                "risk_rationale": consensus_result.risk_rationale,
+                "total_votes": consensus_result.total_votes,
+                "approval_count": consensus_result.approval_count,
+                "rejection_count": consensus_result.rejection_count,
+                "required": consensus_result.required,
+            }
+        )
+
     event = ConsensusEvent(
         kind=SwarmGraphEventKind.consensus,
         swarm_id=state.id,
-        data={
-            "task_id": task_id,
-            "approved": approval.approved,
-            "reason": approval.reason,
-            "decided_by": approval.decided_by,
-        },
+        data=data,
         round=state.current_round,
     )
     return event

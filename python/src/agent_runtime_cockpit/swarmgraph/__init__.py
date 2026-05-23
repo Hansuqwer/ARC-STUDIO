@@ -9,7 +9,14 @@ from .models import (
     QueenDirective,
 )
 from .state import SwarmState, SwarmCheckpoint
-from .consensus import ConsensusResult, majority_consensus, quorum_consensus, run_consensus
+from .consensus import (
+    ConsensusResult,
+    majority_consensus,
+    quorum_consensus,
+    raft_consensus,
+    bft_consensus,
+    run_consensus,
+)
 from .risk_assessment import (
     RiskAssessment,
     ProtocolSelection,
@@ -50,6 +57,8 @@ __all__ = [
     "ConsensusResult",
     "majority_consensus",
     "quorum_consensus",
+    "raft_consensus",
+    "bft_consensus",
     "run_consensus",
     # Phase 31/R24 — Adaptive Consensus Protocol
     "RiskAssessment",
