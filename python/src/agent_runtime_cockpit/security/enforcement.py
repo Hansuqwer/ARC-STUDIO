@@ -15,6 +15,7 @@ from typing import Callable, Optional
 from .context import EnforcementContext, DryRunAbort, get_enforcement_context
 from .trust import TrustLevel, resolve_trust, TRUST_DB
 from .profiles import RunProfile
+from ._bypass_rate_limit import should_emit_warning, mark_warning_emitted
 from ..protocol.denial_events import (
     TrustDeniedEvent,
     TrustDenialData,
@@ -24,6 +25,11 @@ from ..protocol.denial_events import (
     ShellDenialData,
     NetworkDeniedEvent,
     NetworkDenialData,
+)
+from ..protocol._bypass import (
+    PolicyBypassWarning,
+    PolicyBypassWarningData,
+    PolicyBypassReason,
 )
 
 
@@ -451,3 +457,71 @@ def enforce_network_gate(
             f"Use a profile with allow_network=true.",
             denial_event=denial_event.model_dump(by_alias=True),
         )
+
+
+def emit_policy_bypass_warning(
+    run_id: str,
+    sequence: int,
+    policy_id: str,
+    bypass_reason: PolicyBypassReason,
+    surface: str,
+    surface_identifier: str,
+    suggested_remediation: str,
+    parent_run_id: Optional[str] = None,
+    emit_event: Optional[EventEmitter] = None,
+) -> bool:
+    """
+    Emit a policy bypass warning when enforcement cannot be applied.
+
+    Unlike denial events, bypass warnings are non-blocking. They indicate that
+    enforcement could not be applied due to architectural limitations (e.g.,
+    custom HTTP client, uninstrumented tool).
+
+    Rate-limited to one warning per (run_id, surface_identifier) combination
+    to prevent warning spam when the same uninstrumented surface is called
+    repeatedly.
+
+    Args:
+        run_id: Run ID for event emission
+        sequence: Event sequence number
+        policy_id: Policy that was bypassed (e.g., "trust_gate", "network_gate")
+        bypass_reason: Reason code for the bypass
+        surface: Surface type (e.g., "provider_call", "tool_execution")
+        surface_identifier: Specific identifier (e.g., "custom_provider.execute")
+        suggested_remediation: How to fix the bypass
+        parent_run_id: Optional parent run ID
+        emit_event: Optional callback to emit events (run_id, event_type, data)
+
+    Returns:
+        True if warning was emitted, False if suppressed by rate-limiting
+    """
+    # Check rate-limiting: only emit once per (run_id, surface_identifier)
+    if not should_emit_warning(run_id, surface_identifier):
+        return False
+
+    # Create bypass warning event
+    warning_data = PolicyBypassWarningData(
+        policy_id=policy_id,
+        bypass_reason=bypass_reason,
+        surface=surface,
+        surface_identifier=surface_identifier,
+        suggested_remediation=suggested_remediation,
+        parent_run_id=parent_run_id,
+    )
+
+    warning_event = PolicyBypassWarning(
+        type="POLICY_BYPASS_WARNING",
+        timestamp=dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+        run_id=run_id,
+        sequence=sequence,
+        data=warning_data,
+    )
+
+    # Emit event if callback provided
+    if emit_event:
+        emit_event(run_id, "POLICY_BYPASS_WARNING", warning_event.model_dump(by_alias=True))
+
+    # Mark warning as emitted for rate-limiting
+    mark_warning_emitted(run_id, surface_identifier)
+
+    return True
