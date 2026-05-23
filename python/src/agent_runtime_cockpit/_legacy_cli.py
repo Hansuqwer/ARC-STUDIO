@@ -30,10 +30,29 @@ from .adapters.registry import default_registry
 from .context.pack import ContextPackGenerator
 from .protocol.event_envelope import ok, err
 from .protocol.errors import ArcErrorCode
-from .protocol.schemas import RunRecord, RunStatus
 
 # Phase 25: decomposed CLI modules. Re-export for backward compatibility.
 from .cli._app import app, main, console, err_console  # noqa: F401
+from .cli._subapps import (  # noqa: F401
+    accounts_app,
+    adapter_app,
+    config_app,
+    context_app,
+    doctor_app,
+    eval_app,
+    hitl_app,
+    isolation_app,
+    key_app,
+    profiles_app,
+    prompt_app,
+    providers_app,
+    quota_app,
+    routing_app,
+    storage_app,
+    studio_app,
+    studio_sessions_app,
+    workspace_app,
+)
 from .cli._helpers import (  # noqa: F401
     JSON_FLAG,
     WORKSPACE_FLAG,
@@ -50,46 +69,8 @@ from .cli._helpers import (  # noqa: F401
     check_swarmgraph_runtime,
 )
 
-context_app = typer.Typer(name="context", help="Context retrieval commands")
-adapter_app = typer.Typer(name="adapter", help="Adapter management commands")
-doctor_app = typer.Typer(name="doctor", help="ARC diagnostics")
-workspace_app = typer.Typer(name="workspace", help="Workspace configuration and trust management")
-isolation_app = typer.Typer(name="isolation", help="Execution isolation providers")
-config_app = typer.Typer(name="config", help="ARC workspace configuration (ADR-001)")
-hitl_app = typer.Typer(name="hitl", help="Human-in-the-loop approval commands")
-storage_app = typer.Typer(name="storage", help="Storage management commands")
-studio_app = typer.Typer(name="studio", help="ARC Studio — chat REPL, sessions, and IDE tooling")
-studio_sessions_app = typer.Typer(name="sessions", help="ARC Studio chat sessions")
-app.add_typer(context_app)
-app.add_typer(adapter_app)
-app.add_typer(doctor_app)
-app.add_typer(workspace_app)
-app.add_typer(isolation_app)
-app.add_typer(config_app)
-app.add_typer(hitl_app)
-app.add_typer(storage_app)
-app.add_typer(studio_app)
-studio_app.add_typer(studio_sessions_app)
-
 
 # ─── version ──────────────────────────────────────────────────────────────────
-
-
-# ─── runtimes ─────────────────────────────────────────────────────────────────
-
-
-# ─── runs ─────────────────────────────────────────────────────────────────────
-
-runs_app = typer.Typer(
-    name="runs", help="List and manage stored run records", invoke_without_command=True
-)
-app.add_typer(runs_app)
-
-eval_app = typer.Typer(name="eval", help="Evaluate runs against golden traces")
-app.add_typer(eval_app)
-
-providers_app = typer.Typer(name="providers", help="Provider definitions and dry-run routing")
-app.add_typer(providers_app)
 
 
 @providers_app.command("list")
@@ -661,10 +642,7 @@ def providers_action(
     _out(ok(result.model_dump()), json_output)
 
 
-accounts_app = typer.Typer(name="accounts", help="Provider account metadata")
 providers_app.add_typer(accounts_app)
-
-key_app = typer.Typer(name="key", help="Provider key references (env vars only)")
 providers_app.add_typer(key_app)
 
 
@@ -824,7 +802,6 @@ def providers_accounts_delete(
     _out(ok({"deleted": deleted, "account_id": account_id}), json_output)
 
 
-quota_app = typer.Typer(name="quota", help="Provider quota management")
 providers_app.add_typer(quota_app)
 
 
@@ -862,7 +839,6 @@ def providers_quota_reset(
     _out(ok({"reset": True, "scope": "local_quota_counters_only"}), json_output)
 
 
-routing_app = typer.Typer(name="routing", help="Provider routing policy")
 providers_app.add_typer(routing_app)
 
 
@@ -889,532 +865,6 @@ def providers_routing_set(
 
     policy = ProviderRoutingPolicy(mode=mode, default_provider=provider, default_model=model)
     _out(ok(ProviderRoutingStore().set(policy).model_dump()), json_output)
-
-
-@runs_app.callback(invoke_without_command=True)
-def runs(
-    ctx: typer.Context,
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """List stored run records."""
-    if ctx.invoked_subcommand is not None:
-        return
-    _setup_logging(debug)
-    from .storage.jsonl import JsonlTraceStore
-
-    ws = _workspace(workspace)
-    store = JsonlTraceStore(ws / ".arc" / "traces")
-    run_ids = store.list_runs()
-    run_list = [r for rid in run_ids if (r := store.load(rid)) is not None]
-    _out(ok([r.model_dump() for r in run_list]), json_output)
-
-
-@runs_app.command("prune")
-def runs_prune(
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    keep: int = typer.Option(20, "--keep", min=0, help="Number of newest traces to keep"),
-    older_than: Optional[int] = typer.Option(
-        None, "--older-than", min=1, help="Only delete traces older than N days"
-    ),
-    yes: bool = typer.Option(False, "--yes", help="Delete files instead of dry-run"),
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Prune oldest workspace trace files beyond --keep.
-
-    Use --older-than to only delete traces older than N days.
-    """
-    _setup_logging(debug)
-    from .storage.jsonl import JsonlTraceStore
-
-    ws = _workspace(workspace)
-    trace_dir = ws / ".arc" / "traces"
-    store = JsonlTraceStore(trace_dir)
-    victims = store.prune(keep=keep, dry_run=not yes, older_than_days=older_than)
-    payload = {
-        "workspace": str(ws),
-        "trace_dir": str(trace_dir),
-        "keep": keep,
-        "older_than_days": older_than,
-        "dry_run": not yes,
-        "deleted": [] if not yes else [str(path) for path in victims],
-        "would_delete": [str(path) for path in victims] if not yes else [],
-    }
-    _out(ok(payload, workspace=str(ws)), json_output)
-
-
-@runs_app.command("get")
-def runs_get(
-    run_id: str = typer.Argument(..., help="Run ID to load"),
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Load one stored run record."""
-    _setup_logging(debug)
-    from .storage.jsonl import JsonlTraceStore
-
-    ws = _workspace(workspace)
-    store = JsonlTraceStore(ws / ".arc" / "traces")
-    run_record = store.load(run_id)
-    if run_record is None:
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
-        raise typer.Exit(1)
-    _out(ok(run_record.model_dump(), workspace=str(ws)), json_output)
-
-
-@runs_app.command("diff")
-def runs_diff(
-    run_a: str = typer.Argument(..., help="First run ID"),
-    run_b: str = typer.Argument(..., help="Second run ID"),
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Compare two stored run records."""
-    _setup_logging(debug)
-    from .storage.jsonl import JsonlTraceStore
-    from .evals.diff import diff_runs
-
-    ws = _workspace(workspace)
-    store = JsonlTraceStore(ws / ".arc" / "traces")
-    rec_a = store.load(run_a)
-    rec_b = store.load(run_b)
-    if rec_a is None or rec_b is None:
-        missing = [r for r, rec in [(run_a, rec_a), (run_b, rec_b)] if rec is None]
-        _out(
-            err(ArcErrorCode.RUN_NOT_FOUND, f"Run(s) not found: {', '.join(missing)}"), json_output
-        )
-        raise typer.Exit(1)
-    result = diff_runs(rec_a, rec_b)
-    _out(ok(result.model_dump(), workspace=str(ws)), json_output)
-
-
-@runs_app.command("trace")
-def runs_trace(
-    run_id: str = typer.Argument(..., help="Run ID to inspect"),
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    tail: int = typer.Option(20, "--tail", min=0, help="Number of trace lines to return"),
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Return trace file metadata and optional tail lines for one run."""
-    _setup_logging(debug)
-    from .storage.jsonl import JsonlTraceStore
-
-    ws = _workspace(workspace)
-    store = JsonlTraceStore(ws / ".arc" / "traces")
-    path = store.trace_path(run_id)
-    if not path.exists():
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Trace not found: {run_id}"), json_output)
-        raise typer.Exit(1)
-    lines = path.read_text().splitlines()
-    payload = {
-        "run_id": run_id,
-        "trace_path": str(path),
-        "line_count": len(lines),
-        "tail": lines[-tail:] if tail else [],
-    }
-    _out(ok(payload, workspace=str(ws)), json_output)
-
-
-@runs_app.command("status")
-def runs_status(
-    run_id: str = typer.Argument(..., help="Run ID to check"),
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Show status of a stored run record."""
-    _setup_logging(debug)
-    from .storage.indexed_store import IndexedTraceStore
-
-    ws = _workspace(workspace)
-    store = IndexedTraceStore(
-        trace_dir=ws / ".arc" / "traces",
-        db_path=ws / ".arc" / "arc.db",
-    )
-    run_record = store.load(run_id)
-    if run_record is None:
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
-        raise typer.Exit(1)
-    payload = {
-        "run_id": run_record.id,
-        "status": run_record.status.value,
-        "workflow_id": run_record.workflow_id,
-        "runtime": run_record.runtime,
-        "started_at": run_record.started_at,
-        "ended_at": run_record.ended_at,
-        "event_count": len(run_record.events),
-        "audit_path": run_record.audit_path,
-    }
-    _out(ok(payload, workspace=str(ws)), json_output)
-
-
-@runs_app.command("delete")
-def runs_delete(
-    run_id: str = typer.Argument(..., help="Run ID to delete"),
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Delete a stored run record and its trace file."""
-    _setup_logging(debug)
-    from .storage.indexed_store import IndexedTraceStore
-
-    ws = _workspace(workspace)
-    store = IndexedTraceStore(
-        trace_dir=ws / ".arc" / "traces",
-        db_path=ws / ".arc" / "arc.db",
-    )
-    trace_path = store.trace_path(run_id)
-    if not trace_path.exists():
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
-        raise typer.Exit(1)
-    trace_path.unlink()
-    store.sqlite.delete_run(run_id)
-    payload = {
-        "deleted_run_id": run_id,
-        "trace_path": str(trace_path),
-    }
-    _out(ok(payload, workspace=str(ws)), json_output)
-
-
-@runs_app.command("export")
-def runs_export(
-    run_id: str = typer.Argument(..., help="Run ID to export"),
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Export a run record as JSON."""
-    _setup_logging(debug)
-    from .storage.indexed_store import IndexedTraceStore
-
-    ws = _workspace(workspace)
-    store = IndexedTraceStore(
-        trace_dir=ws / ".arc" / "traces",
-        db_path=ws / ".arc" / "arc.db",
-    )
-    run_record = store.load(run_id)
-    if run_record is None:
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
-        raise typer.Exit(1)
-    _out(ok(run_record.model_dump(), workspace=str(ws)), json_output)
-
-
-@runs_app.command("import")
-def runs_import(
-    path: str = typer.Argument(..., help="Path to exported run JSON"),
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Import a run record JSON into the workspace trace store."""
-    _setup_logging(debug)
-    import json
-    from .protocol.schemas import RunRecord
-    from .storage.indexed_store import IndexedTraceStore
-
-    ws = _workspace(workspace)
-    source = Path(path).expanduser().resolve()
-    if not source.exists():
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Import file not found: {source}"), json_output)
-        raise typer.Exit(1)
-    try:
-        run_record = RunRecord.model_validate(json.loads(source.read_text()))
-    except Exception as exc:
-        _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid run export: {exc}"), json_output)
-        raise typer.Exit(1)
-    store = IndexedTraceStore(trace_dir=ws / ".arc" / "traces", db_path=ws / ".arc" / "arc.db")
-    store.init()
-    store.save(run_record)
-    _out(ok({"imported_run_id": run_record.id}, workspace=str(ws)), json_output)
-
-
-@runs_app.command("replay")
-def runs_replay(
-    run_id: str = typer.Argument(..., help="Run ID to replay from stored trace"),
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Replay stored trace events without re-executing the runtime."""
-    _setup_logging(debug)
-    from .storage.jsonl import JsonlTraceStore
-
-    ws = _workspace(workspace)
-    store = JsonlTraceStore(ws / ".arc" / "traces")
-    run_record = store.load(run_id)
-    if run_record is None:
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
-        raise typer.Exit(1)
-    payload = {
-        "run_id": run_record.id,
-        "event_count": len(run_record.events),
-        "events": [event.model_dump() for event in run_record.events],
-    }
-    _out(ok(payload, workspace=str(ws)), json_output)
-
-
-@runs_app.command("backfill")
-def runs_backfill(
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Backfill SQLite index from existing JSONL traces. Idempotent."""
-    _setup_logging(debug)
-    from .storage.indexed_store import IndexedTraceStore
-
-    ws = _workspace(workspace)
-    store = IndexedTraceStore(
-        trace_dir=ws / ".arc" / "traces",
-        db_path=ws / ".arc" / "arc.db",
-    )
-    store.init()
-    indexed, skipped, failed = store.backfill_index()
-    payload = {
-        "indexed": indexed,
-        "skipped": skipped,
-        "failed": failed,
-    }
-    _out(ok(payload, workspace=str(ws)), json_output)
-    if not json_output and failed > 0:
-        err_console.print(f"[yellow]Warning: {failed} trace(s) failed to index[/yellow]")
-
-
-@runs_app.command("search")
-def runs_search(
-    workflow: Optional[str] = typer.Option(None, "--workflow", "-f", help="Filter by workflow ID"),
-    runtime: Optional[str] = typer.Option(None, "--runtime", "-r", help="Filter by runtime"),
-    status: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status"),
-    limit: int = typer.Option(20, "--limit", "-l", help="Maximum results"),
-    offset: int = typer.Option(0, "--offset", "-o", help="Result offset"),
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Search runs using the SQLite index."""
-    _setup_logging(debug)
-    from .storage.sqlite import SqliteStore
-
-    ws = _workspace(workspace)
-    db_path = ws / ".arc" / "arc.db"
-    if not db_path.exists():
-        _out(
-            err(
-                ArcErrorCode.INVALID_INPUT, "SQLite index not found. Run 'arc runs backfill' first."
-            ),
-            json_output,
-        )
-        raise typer.Exit(1)
-    store = SqliteStore(db_path)
-    results = store.list_runs(
-        status=status,
-        runtime=runtime,
-        workflow_id=workflow,
-        limit=limit,
-        offset=offset,
-    )
-    total = store.count_runs()
-    payload = {
-        "results": results,
-        "count": len(results),
-        "total_indexed": total,
-        "filters": {
-            "workflow": workflow,
-            "runtime": runtime,
-            "status": status,
-        },
-    }
-    _out(ok(payload, workspace=str(ws)), json_output)
-    if not json_output:
-        if not results:
-            console.print("[dim]No matching runs found.[/dim]")
-            return
-        table = Table(title=f"Runs ({len(results)} of {total} indexed)")
-        table.add_column("Run ID")
-        table.add_column("Workflow")
-        table.add_column("Runtime")
-        table.add_column("Status")
-        table.add_column("Started")
-        for run in results:
-            table.add_row(
-                run["id"][:12],
-                run.get("workflow_id", "")[:20],
-                run.get("runtime", ""),
-                run.get("status", ""),
-                run.get("started_at", "")[:19],
-            )
-        console.print(table)
-
-
-@runs_app.command("fork")
-def runs_fork(
-    run_id: str = typer.Argument(..., help="Run ID to fork"),
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Fork a stored run by copying its initial state into a new run record.
-
-    Creates a new run with the same workflow_id, runtime, and initial event
-    data (RUN_STARTED + first N events) as the source run. The new run has
-    a fresh ID and status of PENDING — it can be re-executed as a fork of
-    the original.
-
-    This is the CLI foundation for effect-boundary replay / journal-backed
-    fork over stored adapter responses.
-    """
-    _setup_logging(debug)
-    from .storage.jsonl import JsonlTraceStore
-    from .orchestration.events import new_run_id, now
-
-    ws = _workspace(workspace)
-    store = JsonlTraceStore(ws / ".arc" / "traces")
-    source = store.load(run_id)
-    if source is None:
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
-        raise typer.Exit(1)
-
-    # Create fork — new ID, same workflow/runtime, fresh status
-    new_id = new_run_id(prefix="fork")
-    fork_events = [
-        event for event in source.events if event.type in {"RUN_STARTED", "STEP_STARTED"}
-    ]
-    if not fork_events:
-        # If no lifecycle events, just copy the first event
-        fork_events = source.events[:1] if source.events else []
-
-    # Re-create RUN_STARTED with fork metadata
-    fork_record = RunRecord(
-        id=new_id,
-        workflow_id=source.workflow_id,
-        runtime=source.runtime,
-        status=RunStatus.PENDING,
-        started_at=now(),
-        events=fork_events,
-        metadata={
-            **source.metadata,
-            "forked_from": run_id,
-            "forked_at": now(),
-            "original_status": source.status.value,
-        },
-    )
-    store.save(fork_record)
-
-    payload = {
-        "fork_id": new_id,
-        "source_id": run_id,
-        "workflow_id": source.workflow_id,
-        "runtime": source.runtime,
-        "event_count": len(fork_events),
-        "source_event_count": len(source.events),
-        "status": "pending",
-        "metadata": fork_record.metadata,
-    }
-    _out(ok(payload, workspace=str(ws)), json_output)
-    if not json_output:
-        console.print(f"[green]Fork created:[/green] {new_id}")
-        console.print(f"  Source: {run_id} ({source.status.value})")
-        console.print(f"  Workflow: {source.workflow_id}")
-        console.print(f"  Runtime: {source.runtime}")
-        console.print(f"  Events: {len(fork_events)} (of {len(source.events)} source events)")
-
-    # Update source metadata to record the fork
-    source.metadata["forked_to"] = source.metadata.get("forked_to", []) + [new_id]
-    store.save(source)
-
-
-@runs_app.command("links")
-def runs_links(
-    run_id: str = typer.Argument(..., help="Run ID to get cross-linked event chains for"),
-    filter: Optional[str] = typer.Option(
-        None, "--filter", help="Filter link type (node_id, message_id, tool_call_id, evidence_id)"
-    ),
-    stable_id: Optional[str] = typer.Option(
-        None, "--stable-id", help="Specific stable ID to look up"
-    ),
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Get cross-linked event chains for a run by stable ID.
-
-    Uses CrossLinker to build event chains keyed by node, message, tool call,
-    and evidence stable IDs from stored trace events.
-    """
-    _setup_logging(debug)
-    from .storage.jsonl import JsonlTraceStore
-    from .orchestration.cross_linker import CrossLinker
-
-    ws = _workspace(workspace)
-    store = JsonlTraceStore(ws / ".arc" / "traces")
-    run_record = store.load(run_id)
-    if run_record is None:
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
-        raise typer.Exit(1)
-
-    linker = CrossLinker()
-    linker.index_all(run_record.events)
-
-    if stable_id:
-        # Single stable ID lookup
-        node_chain = linker.get_node_chain(stable_id) if filter in (None, "node_id") else []
-        message_chain = (
-            linker.get_message_chain(stable_id) if filter in (None, "message_id") else []
-        )
-        tool_call_chain = (
-            linker.get_tool_call_chain(stable_id) if filter in (None, "tool_call_id") else []
-        )
-        evidence_chain = (
-            linker.get_evidence_events(stable_id) if filter in (None, "evidence_id") else []
-        )
-        payload = {
-            "node_chains": {stable_id: [e.model_dump() for e in node_chain]},
-            "message_chains": {stable_id: [e.model_dump() for e in message_chain]},
-            "tool_call_chains": {stable_id: [e.model_dump() for e in tool_call_chain]},
-            "evidence_chains": {stable_id: [e.model_dump() for e in evidence_chain]},
-            "has_stable_ids": linker.has_stable_ids(),
-            "stable_id_count": 1,
-        }
-    else:
-        # Build all chains
-        ids = linker.get_run_event_ids()
-        node_chains: dict[str, list[dict]] = {}
-        message_chains: dict[str, list[dict]] = {}
-        tool_call_chains: dict[str, list[dict]] = {}
-        evidence_chains: dict[str, list[dict]] = {}
-        for sid in ids:
-            if filter in (None, "node_id"):
-                chain = linker.get_node_chain(sid)
-                if chain:
-                    node_chains[sid] = [e.model_dump() for e in chain]
-            if filter in (None, "message_id"):
-                chain = linker.get_message_chain(sid)
-                if chain:
-                    message_chains[sid] = [e.model_dump() for e in chain]
-            if filter in (None, "tool_call_id"):
-                chain = linker.get_tool_call_chain(sid)
-                if chain:
-                    tool_call_chains[sid] = [e.model_dump() for e in chain]
-            if filter in (None, "evidence_id"):
-                chain = linker.get_evidence_events(sid)
-                if chain:
-                    evidence_chains[sid] = [e.model_dump() for e in chain]
-        payload = {
-            "node_chains": node_chains,
-            "message_chains": message_chains,
-            "tool_call_chains": tool_call_chains,
-            "evidence_chains": evidence_chains,
-            "has_stable_ids": linker.has_stable_ids(),
-            "stable_id_count": len(ids),
-        }
-
-    _out(ok(payload, workspace=str(ws)), json_output)
 
 
 # ─── isolation ──────────────────────────────────────────────────────────────────
@@ -2310,777 +1760,91 @@ def config_show(
     _out(ok(config.flatten(), workspace=str(ws)), json_output)
 
 
-# ─── receipt ──────────────────────────────────────────────────────────────────
-
-
-receipt_app = typer.Typer(name="receipt", help="Run receipt commands (show/export/verify)")
-app.add_typer(receipt_app)
-
-DEFAULT_RECEIPT_KEY = "arc-dev-key-change-in-production"
-
-
-def _receipt_key() -> str:
-    """Resolve receipt HMAC key: AuditKeyManager → env var → dev key fallback."""
-    from .audit.key_manager import AuditKeyManager
-
-    key_bytes, status = AuditKeyManager().get_key()
-    if status.available and key_bytes is not None:
-        return key_bytes.decode("utf-8", errors="ignore")
-    import os
-
-    return os.environ.get("ARC_RECEIPT_HMAC_KEY", DEFAULT_RECEIPT_KEY)
-
-
-@receipt_app.command("show")
-def receipt_show(
-    run_id: str = typer.Argument(..., help="Run ID to show receipt for"),
-    workspace: Optional[str] = WORKSPACE_FLAG,
+@prompt_app.command("optimize")
+def prompt_optimize(
+    prompt: str = typer.Argument(..., help="Prompt text to optimize"),
+    model: str = typer.Option("gpt-4o", "--model", "-m", help="Model for token counting"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
-    """Show a human-readable run receipt for a completed/failed run."""
-    _setup_logging(debug)
-    from .storage.jsonl import JsonlTraceStore
+    """Apply rule-based optimization to a prompt.
 
-    ws = _workspace(workspace)
-    store = JsonlTraceStore(ws / ".arc" / "traces")
-    receipt = store.load_receipt(run_id)
-    if receipt is None:
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Receipt not found for run: {run_id}"), json_output)
-        raise typer.Exit(1)
-    _out(ok(receipt.model_dump(by_alias=True), workspace=str(ws)), json_output)
-    if not json_output:
-        console.print(f"[bold]Run Receipt:[/bold] {receipt.receipt_id}")
-        console.print(f"  Run ID:  {receipt.run_id}")
-        console.print(f"  Status:  {receipt.status}")
-        console.print(f"  Summary: {receipt.summary}")
-        console.print(f"  Cost:    {receipt.cost_usd}")
-        console.print(f"  Created: {receipt.created_at}")
-        if receipt.files_changed:
-            console.print(f"  Files changed ({len(receipt.files_changed)}):")
-            for fc in receipt.files_changed:
-                console.print(f"    {fc.path}  +{fc.added}/-{fc.removed}")
-        if receipt.evidence_refs:
-            console.print(f"  Evidence refs: {len(receipt.evidence_refs)}")
-        if receipt.audit_chain_ref:
-            console.print(f"  Audit chain: {receipt.audit_chain_ref}")
-        sig = receipt.signature or "unsigned"
-        console.print(f"  Signature: {sig[:20]}...")
-        if receipt.unresolved_risks:
-            console.print(f"  [yellow]Unresolved risks:[/yellow] {len(receipt.unresolved_risks)}")
-        if receipt.trust_boundaries_crossed:
-            console.print(f"  Trust boundaries crossed: {len(receipt.trust_boundaries_crossed)}")
-
-
-@receipt_app.command("export")
-def receipt_export(
-    run_id: str = typer.Argument(..., help="Run ID to export receipt for"),
-    format: str = typer.Option("json", "--format", help="Output format: json, markdown"),
-    output: Optional[str] = typer.Option(
-        None,
-        "--output",
-        "-o",
-        help="Output file path (default: .arc/receipts/{run_id}.receipt.{ext})",
-    ),
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Export a run receipt to a file (JSON or Markdown)."""
-    _setup_logging(debug)
-    from .storage.jsonl import JsonlTraceStore
-
-    ws = _workspace(workspace)
-    store = JsonlTraceStore(ws / ".arc" / "traces")
-    receipt = store.load_receipt(run_id)
-    if receipt is None:
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Receipt not found for run: {run_id}"), json_output)
-        raise typer.Exit(1)
-
-    ext = ".md" if format == "markdown" else ".json"
-    out_path = Path(output) if output else ws / ".arc" / "receipts" / f"{run_id}.receipt{ext}"
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    if format == "markdown":
-        md_lines = [
-            f"# Run Receipt: {receipt.receipt_id}",
-            "",
-            f"- **Run ID:** {receipt.run_id}",
-            f"- **Status:** {receipt.status}",
-            f"- **Summary:** {receipt.summary}",
-            f"- **Cost:** {receipt.cost_usd}",
-            f"- **Created:** {receipt.created_at}",
-        ]
-        if receipt.files_changed:
-            md_lines.append("")
-            md_lines.append("## Files Changed")
-            for fc in receipt.files_changed:
-                md_lines.append(f"- `{fc.path}` (+{fc.added}/-{fc.removed})")
-        if receipt.evidence_refs:
-            md_lines.append("")
-            md_lines.append(f"## Evidence ({len(receipt.evidence_refs)} refs)")
-            for er in receipt.evidence_refs:
-                md_lines.append(f"- `{er.evidence_id}`: {er.kind} → {er.target}")
-        if receipt.audit_chain_ref:
-            md_lines.append("")
-            md_lines.append("## Audit Chain")
-            md_lines.append(f"- {receipt.audit_chain_ref}")
-        md_lines.append("")
-        md_lines.append(f"_Signature: {receipt.signature or 'unsigned'}_")
-        out_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
-    else:
-        out_path.write_text(receipt.model_dump_json(indent=2, by_alias=True), encoding="utf-8")
-
-    payload = {"exported": True, "path": str(out_path), "run_id": run_id, "format": format}
-    _out(ok(payload, workspace=str(ws)), json_output)
-    if not json_output:
-        console.print(f"[green]Exported[/green] receipt to {out_path}")
-
-
-@receipt_app.command("verify")
-def receipt_verify(
-    file: str = typer.Argument(..., help="Path to receipt JSON file"),
-    key: Optional[str] = typer.Option(
-        None, "--key", help="HMAC key (default: ARC_RECEIPT_HMAC_KEY env or dev key)"
-    ),
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Verify a receipt file's HMAC signature and integrity."""
-    _setup_logging(debug)
-    import json as json_mod
-    from .protocol.run_receipt import RunReceipt
-
-    path = Path(file).expanduser().resolve()
-    if not path.exists():
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Receipt file not found: {path}"), json_output)
-        raise typer.Exit(1)
-
-    def _try_legacy(r: RunReceipt, k: str) -> bool:
-        try:
-            return r.verify(k)
-        except Exception:
-            return False
-
-    try:
-        data = json_mod.loads(path.read_text(encoding="utf-8"))
-        receipt = RunReceipt.model_validate(data)
-    except Exception as exc:
-        _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid receipt file: {exc}"), json_output)
-        raise typer.Exit(1)
-
-    hmac_key = key or _receipt_key()
-    valid = receipt.verify(hmac_key)
-
-    # Legacy fallback: when --key omitted and AuditKeyManager/env key didn't
-    # match, try the dev key for backwards compatibility with existing receipts
-    if not valid and key is None and hmac_key != DEFAULT_RECEIPT_KEY:
-        valid = _try_legacy(receipt, DEFAULT_RECEIPT_KEY)
-
-    payload = {
-        "file": str(path),
-        "receipt_id": receipt.receipt_id,
-        "run_id": receipt.run_id,
-        "valid": valid,
-        "has_signature": receipt.signature is not None,
-    }
-    _out(ok(payload), json_output)
-    if not json_output:
-        color = "green" if valid else "red"
-        label = "VALID" if valid else "INVALID"
-        console.print(f"Receipt signature: [bold {color}]{label}[/bold {color}]")
-        console.print(f"  Receipt ID: {receipt.receipt_id}")
-        console.print(f"  Run ID: {receipt.run_id}")
-        if receipt.signature:
-            console.print(f"  Signature: {receipt.signature[:20]}...")
-        else:
-            console.print("  [yellow]No signature present[/yellow]")
-    if not valid:
-        raise typer.Exit(1)
-
-
-# ─── contract show ────────────────────────────────────────────────────────────
-
-
-@runs_app.command("contract")
-def runs_contract(
-    run_id: str = typer.Argument(..., help="Run ID to show contract for"),
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Show the run contract for a stored run."""
-    _setup_logging(debug)
-    from .storage.jsonl import JsonlTraceStore
-
-    ws = _workspace(workspace)
-    store = JsonlTraceStore(ws / ".arc" / "traces")
-    contract = store.load_contract(run_id)
-    if contract is None:
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Contract not found for run: {run_id}"), json_output)
-        raise typer.Exit(1)
-    _out(ok(contract.model_dump(), workspace=str(ws)), json_output)
-    if not json_output:
-        console.print(f"[bold]Run Contract:[/bold] {contract.contract_id}")
-        console.print(f"  Status:    {contract.status.value}")
-        console.print(f"  Objective: {contract.objective}")
-        console.print(f"  Runtime:   {contract.runtime}")
-        console.print(f"  Mode:      {contract.mode}")
-        console.print(f"  Allowed tools ({len(contract.allowed_tools)}):")
-        for t in contract.allowed_tools:
-            console.print(f"    - {t}")
-        if contract.write_scope:
-            console.print("  Write scope:")
-            for s in contract.write_scope:
-                console.print(f"    - {s}")
-        if isinstance(contract.cost_ceiling_usd, (int, float)):
-            console.print(f"  Cost ceiling: ${contract.cost_ceiling_usd}")
-        console.print(f"  Created: {contract.created_at}")
-        if contract.accepted_at:
-            console.print(f"  Accepted: {contract.accepted_at}")
-        if contract.fulfilled_at:
-            console.print(f"  Fulfilled: {contract.fulfilled_at}")
-
-
-@runs_app.command("budget")
-def runs_budget(
-    run_id: str = typer.Argument(..., help="Run ID to show budget and usage for"),
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Show budget and usage information for a run."""
-    _setup_logging(debug)
-    from .storage.jsonl import JsonlTraceStore
-
-    ws = _workspace(workspace)
-    store = JsonlTraceStore(ws / ".arc" / "traces")
-    run_record = store.load(run_id)
-
-    if run_record is None:
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {run_id}"), json_output)
-        raise typer.Exit(1)
-
-    budget = run_record.metadata.get("budget", {})
-    usage = run_record.metadata.get("usage", {})
-
-    def dimension(source: dict[str, object], key: str) -> dict[str, object]:
-        if key not in source:
-            return {"status": "absent"}
-        raw = source[key]
-        if not isinstance(raw, (int, float)) or isinstance(raw, bool):
-            return {"status": "degraded", "raw": raw, "reason": "non_numeric"}
-        if raw < 0:
-            return {"status": "degraded", "raw": raw, "reason": "negative_value"}
-        return {"status": "available", "value": raw}
-
-    usage_report = {
-        "tokens": dimension(usage, "total_tokens")
-        if isinstance(usage, dict)
-        else {"status": "degraded", "raw": usage, "reason": "malformed_usage"},
-        "cost_usd": dimension(usage, "total_cost")
-        if isinstance(usage, dict)
-        else {"status": "degraded", "raw": usage, "reason": "malformed_usage"},
-        "latency_ms": dimension(usage, "latency_ms")
-        if isinstance(usage, dict)
-        else {"status": "degraded", "raw": usage, "reason": "malformed_usage"},
-    }
-
-    payload = {
-        "run_id": run_id,
-        "budget": budget
-        if isinstance(budget, dict)
-        else {"status": "degraded", "raw": budget, "reason": "malformed_budget"},
-        "usage": usage_report,
-    }
-
-    _out(ok(payload, workspace=str(ws)), json_output)
-
-    if not json_output:
-        console.print(f"[bold]Budget & Usage:[/bold] {run_id}")
-
-        console.print("\n[bold]Budget:[/bold]")
-        if not isinstance(budget, dict):
-            console.print(f"  [yellow]degraded: malformed_budget raw={budget!r}[/yellow]")
-        elif not budget:
-            console.print("  [dim]No budget constraints recorded[/dim]")
-        else:
-            if "max_tokens" in budget:
-                console.print(f"  Max Tokens: {budget['max_tokens']}")
-            if "max_cost" in budget:
-                console.print(f"  Max Cost:   ${budget['max_cost']:.4f}")
-
-        console.print("\n[bold]Usage:[/bold]")
-        if not isinstance(usage, dict):
-            console.print(f"  [yellow]degraded: malformed_usage raw={usage!r}[/yellow]")
-        elif not usage:
-            console.print("  [dim]No usage data recorded[/dim]")
-        else:
-            for label, name, suffix in [
-                ("Total Tokens", "tokens", ""),
-                ("Total Cost", "cost_usd", ""),
-                ("Latency", "latency_ms", "ms"),
-            ]:
-                entry = usage_report[name]
-                if entry["status"] == "available":
-                    value = entry["value"]
-                    rendered = f"${value:.4f}" if name == "cost_usd" else f"{value}{suffix}"
-                    console.print(f"  {label}: {rendered}")
-                elif entry["status"] == "degraded":
-                    console.print(
-                        f"  {label}: [yellow]degraded: {entry['reason']} raw={entry['raw']!r}[/yellow]"
-                    )
-                else:
-                    console.print(f"  {label}: [dim]n/a[/dim]")
-
-
-# ─── autopsy show ─────────────────────────────────────────────────────────────
-
-
-@runs_app.command("autopsy")
-def runs_autopsy(
-    run_id: str = typer.Argument(..., help="Run ID to show autopsy for"),
-    workspace: Optional[str] = WORKSPACE_FLAG,
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Show failure autopsy for a failed run."""
-    _setup_logging(debug)
-    from .storage.jsonl import JsonlTraceStore
-
-    ws = _workspace(workspace)
-    store = JsonlTraceStore(ws / ".arc" / "traces")
-    autopsy = store.load_autopsy(run_id)
-    if autopsy is None:
-        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Autopsy not found for run: {run_id}"), json_output)
-        raise typer.Exit(1)
-    _out(ok(autopsy.model_dump(by_alias=True), workspace=str(ws)), json_output)
-    if not json_output:
-        console.print(f"[bold]Failure Autopsy:[/bold] {autopsy.run_id}")
-        console.print(f"  Probable cause: {autopsy.probable_cause}")
-        console.print(f"  Confidence:     {autopsy.confidence}")
-        if autopsy.failed_node:
-            console.print(f"  Failed node:    {autopsy.failed_node}")
-        if autopsy.last_safe_state:
-            console.print(f"  Last safe:      {autopsy.last_safe_state}")
-        if autopsy.knows:
-            console.print("  [green]Known:[/green]")
-            for k in autopsy.knows:
-                console.print(f"    ✓ {k}")
-        if autopsy.guesses:
-            console.print("  [yellow]Guesses:[/yellow]")
-            for g in autopsy.guesses:
-                console.print(f"    ? {g}")
-        if autopsy.retry_options:
-            console.print("  Retry options:")
-            for ro in autopsy.retry_options:
-                risk_color = {"low": "green", "medium": "yellow", "high": "red"}.get(
-                    ro.risk, "white"
-                )
-                console.print(f"    [{risk_color}]{ro.risk}[/{risk_color}] {ro.label}")
-                if ro.command:
-                    console.print(f"      Command: {ro.command}")
-
-
-# ─── audit (ADR-005) ─────────────────────────────────────────────────────────
-
-
-audit_app = typer.Typer(name="audit", help="Audit chain verification and key management (ADR-005)")
-app.add_typer(audit_app)
-
-
-@audit_app.command("verify")
-def audit_verify(
-    run_id: str = typer.Argument(..., help="Run ID to verify audit chain for"),
-    chain_path: str = typer.Option(
-        "",
-        "--chain",
-        "-c",
-        help="Path to audit chain file (default: .arc/audit/{run_id}.audit.jsonl)",
-    ),
-    mode: str = typer.Option(
-        "auto",
-        "--mode",
-        "-m",
-        help="Verification mode: sha256, hmac, or auto (default: auto-detect)",
-    ),
-    max_memory_mb: int = typer.Option(
-        500,
-        "--max-memory-mb",
-        help="Maximum memory budget for streaming verification in MB (default: 500)",
-    ),
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Verify audit chain integrity with streaming verification (Phase 21).
-
-    Uses memory-bounded streaming verification to handle large traces (100 MB+).
-    Supports both SHA-256 (legacy) and HMAC-signed audit chains.
-
-    Modes:
-      - auto: Auto-detect format from first record (default)
-      - hmac: HMAC-SHA256 verification (requires key)
-      - sha256: SHA-256 hash chain verification (legacy)
-
-    For HMAC mode, requires ARC_AUDIT_HMAC_KEY env var or keychain-stored key.
-    SHA-256 mode works without a key (backward compatible).
-
-    Checks .audit.jsonl (HMAC-signed) first, then falls back to .jsonl (SHA-256).
+    No provider calls are made. Uses tiktoken for counting (falls back to
+    word estimate if tiktoken is not installed).
     """
     _setup_logging(debug)
-    from pathlib import Path
-    from .audit.key_manager import AuditKeyManager
-    from .audit.streaming_verifier import StreamingAuditVerifier
+    from .optimizer import optimize_prompt, estimate_cost
 
-    # Validate mode
-    if mode not in ("auto", "sha256", "hmac"):
-        _out(
-            err(
-                ArcErrorCode.INVALID_INPUT, f"Invalid mode: {mode}. Must be auto, sha256, or hmac."
-            ),
-            json_output,
-        )
-        raise typer.Exit(1)
-
-    # Initialize streaming verifier
-    try:
-        verifier = StreamingAuditVerifier(max_memory_mb=max_memory_mb)
-    except ValueError as e:
-        _out(err(ArcErrorCode.INVALID_INPUT, str(e)), json_output)
-        raise typer.Exit(1)
-
-    # Get HMAC key if needed (for hmac or auto mode)
-    key = None
-    key_status = None
-    if mode in ("hmac", "auto"):
-        mgr = AuditKeyManager()
-        key, key_status = mgr.get_key()
-        if mode == "hmac" and not key_status.available:
-            _out(err(ArcErrorCode.INVALID_INPUT, key_status.warning), json_output)
-            raise typer.Exit(1)
-
-    # Resolve chain path
-    ws = Path.cwd()
-    audit_dir = ws / ".arc" / "audit"
-
-    if chain_path:
-        chain = Path(chain_path)
-    else:
-        new_chain = audit_dir / f"{run_id}.audit.jsonl"
-        old_chain = audit_dir / f"{run_id}.jsonl"
-        if new_chain.exists():
-            chain = new_chain
-        elif old_chain.exists():
-            chain = old_chain
-        else:
-            _out(
-                err(ArcErrorCode.RUN_NOT_FOUND, f"Audit chain not found for run {run_id}"),
-                json_output,
-            )
-            raise typer.Exit(1)
-
-    # Perform streaming verification
-    if mode == "auto":
-        result = verifier.verify_auto(chain, key)
-    elif mode == "hmac":
-        result = verifier.verify_hmac(chain, key)
-    else:  # sha256
-        result = verifier.verify_sha256(chain)
-
-    # Build stable JSON output
+    result = optimize_prompt(prompt, model=model)
     payload = {
-        "ok": result.ok,
-        "mode": result.mode,
-        "records_checked": result.records_checked,
-        "reason": result.reason,
-        "duration_ms": result.duration_ms,
-        "run_id": run_id,
-        "chain_path": str(chain),
+        "original_length": len(prompt),
+        "optimized_length": len(result.optimized),
+        "original_tokens": result.original_tokens.count,
+        "optimized_tokens": result.optimized_tokens.count,
+        "tokens_saved": result.tokens_saved,
+        "changes": result.changes,
+        "encoding": result.original_tokens.encoding,
     }
-    if result.file_size_bytes is not None:
-        payload["file_size_bytes"] = result.file_size_bytes
-    if key_status is not None:
-        payload["key_source"] = key_status.source
-        payload["key_degraded"] = key_status.degraded
+
+    # Add cost estimate if pricing is known
+    cost = estimate_cost(result.original_tokens.count, model)
+    if cost is not None:
+        payload["estimated_cost_usd"] = round(cost, 6)
+        cost_after = estimate_cost(result.optimized_tokens.count, model)
+        if cost_after is not None:
+            payload["estimated_cost_after_usd"] = round(cost_after, 6)
+            payload["estimated_savings_usd"] = round(cost - cost_after, 6)
 
     _out(ok(payload), json_output)
-
-    # Human-readable output
     if not json_output:
-        color = "green" if result.ok else "red"
-        mode_label = {"hmac": "HMAC-SHA256", "sha256": "SHA-256"}.get(result.mode, result.mode)
         console.print(
-            f"Audit chain ({mode_label}): [bold {color}]{'VERIFIED' if result.ok else 'FAILED'}[/bold {color}]"
+            f"[dim]Original:[/dim] {result.original_tokens.count} tokens ({result.original_tokens.encoding})"
         )
-        console.print(f"  Path: {chain}")
-        console.print(f"  Records: {result.records_checked}")
-        console.print(f"  Duration: {result.duration_ms}ms")
-        if result.file_size_bytes is not None:
-            size_mb = result.file_size_bytes / (1024 * 1024)
-            console.print(f"  File size: {size_mb:.2f} MB")
-        console.print(f"  Reason: {result.reason}")
-        if key_status is not None and key_status.degraded:
-            console.print(f"[yellow]Warning:[/yellow] {key_status.warning}")
-
-    if not result.ok:
-        raise typer.Exit(1)
-
-
-@audit_app.command("export")
-def audit_export(
-    run_id: str = typer.Argument(..., help="Run ID to export audit records for"),
-    chain_path: str = typer.Option(
-        "",
-        "--chain",
-        "-c",
-        help="Path to audit chain file (default: .arc/audit/{run_id}.audit.jsonl)",
-    ),
-    format: str = typer.Option("jsonl", "--format", help="Output format: jsonl, json"),
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Export audit chain records for a run.
-
-    Checks .audit.jsonl (HMAC-signed, new format) first, then falls back
-    to .jsonl (old SHA-256 format) for backward compatibility.
-    """
-    _setup_logging(debug)
-    import json as json_mod
-    from pathlib import Path
-
-    ws = Path.cwd()
-    audit_dir = ws / ".arc" / "audit"
-
-    if chain_path:
-        chain = Path(chain_path)
-    else:
-        new_chain = audit_dir / f"{run_id}.audit.jsonl"
-        old_chain = audit_dir / f"{run_id}.jsonl"
-        if new_chain.exists():
-            chain = new_chain
-        elif old_chain.exists():
-            chain = old_chain
+        console.print(f"[green]Optimized:[/green] {result.optimized_tokens.count} tokens")
+        console.print(f"[bold]Saved:[/bold] {result.tokens_saved} tokens")
+        if result.changes:
+            console.print(f"[dim]Rules applied:[/dim] {', '.join(result.changes)}")
         else:
-            _out(
-                err(ArcErrorCode.RUN_NOT_FOUND, f"Audit chain not found for run {run_id}"),
-                json_output,
+            console.print("[dim]No changes needed[/dim]")
+        if cost is not None:
+            console.print(f"[dim]Est. cost before:[/dim] ${payload['estimated_cost_usd']:.6f}")
+            console.print(
+                f"[green]Est. cost after:[/green] ${payload['estimated_cost_after_usd']:.6f}"
             )
-            raise typer.Exit(1)
-
-    lines = chain.read_text(encoding="utf-8").splitlines()
-    records = [json_mod.loads(l) for l in lines if l.strip()]
-
-    if format == "json":
-        payload = {"run_id": run_id, "record_count": len(records), "records": records}
-    else:
-        payload = {"run_id": run_id, "record_count": len(records), "chain_path": str(chain)}
-
-    _out(ok(payload), json_output)
-    if not json_output:
-        console.print(f"Audit records for {run_id}: {len(records)} records at {chain}")
-        if format == "jsonl":
-            for r in records:
-                console.print(json_mod.dumps(r, sort_keys=True))
 
 
-key_app = typer.Typer(name="key", help="HMAC audit key management")
-audit_app.add_typer(key_app)
-
-
-@key_app.command("init")
-def audit_key_init(
+@prompt_app.command("diff")
+def prompt_diff(
+    prompt_a: str = typer.Argument(..., help="First prompt text"),
+    prompt_b: str = typer.Argument(..., help="Second prompt text"),
+    context_lines: int = typer.Option(3, "--context", "-c", help="Context lines for diff"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
-    """Generate and store a new HMAC audit key in keychain."""
+    """Compare two prompts using unified diff."""
     _setup_logging(debug)
-    from .audit.key_manager import AuditKeyManager
+    from .optimizer import diff_prompts, count_tokens
 
-    mgr = AuditKeyManager()
-    new_key = mgr.generate_key()
-    stored = mgr.set_key(new_key)
+    diff_text = diff_prompts(prompt_a, prompt_b, context_lines=context_lines)
+    tokens_a = count_tokens(prompt_a)
+    tokens_b = count_tokens(prompt_b)
+
     payload = {
-        "generated": True,
-        "stored_to_keychain": stored,
-        "key_hint": new_key[:8] + "..." if stored else new_key,
+        "prompt_a_tokens": tokens_a.count,
+        "prompt_b_tokens": tokens_b.count,
+        "token_diff": tokens_b.count - tokens_a.count,
+        "diff": diff_text,
     }
     _out(ok(payload), json_output)
     if not json_output:
-        if stored:
-            console.print("[green]Audit key generated and stored in keychain.[/green]")
+        console.print(f"Prompt A: {tokens_a.count} tokens")
+        console.print(f"Prompt B: {tokens_b.count} tokens")
+        console.print(f"Token diff: {payload['token_diff']:+d}")
+        console.print("")
+        if diff_text:
+            console.print(diff_text)
         else:
-            console.print(
-                "[yellow]Key generated but could not store in keychain. Set via env:[/yellow]"
-            )
-            console.print(f"  export ARC_AUDIT_HMAC_KEY={new_key}")
-
-
-@key_app.command("show")
-def audit_key_show(
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Show audit key status (key is never printed)."""
-    _setup_logging(debug)
-    from .audit.key_manager import AuditKeyManager
-
-    mgr = AuditKeyManager()
-    key, status = mgr.get_key()
-    payload = status.model_dump()
-    _out(ok(payload), json_output)
-    if not json_output:
-        if status.available:
-            console.print(f"Audit key: [green]available[/green] (source: {status.source})")
-        else:
-            console.print("Audit key: [red]not available[/red]")
-            console.print(f"  {status.warning}")
-
-
-@key_app.command("delete")
-def audit_key_delete(
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Delete the stored HMAC audit key from keychain."""
-    _setup_logging(debug)
-    from .audit.key_manager import AuditKeyManager
-
-    mgr = AuditKeyManager()
-    deleted = mgr.delete_key()
-    payload = {"deleted_from_keychain": deleted}
-    _out(ok(payload), json_output)
-    if not json_output:
-        if deleted:
-            console.print("[green]Audit key deleted from keychain.[/green]")
-        else:
-            console.print("[yellow]No key found in keychain or keychain unavailable.[/yellow]")
-
-
-# ─── run profiles ─────────────────────────────────────────────────────────────
-
-
-profiles_app = typer.Typer(name="profiles", help="Run profile management")
-app.add_typer(profiles_app)
-
-
-@profiles_app.command("list")
-def profiles_list(
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """List available run profiles."""
-    _setup_logging(debug)
-    from .security.profiles import list_profiles
-
-    profiles = [_profile_payload(p) for p in list_profiles().values()]
-    _out(ok(profiles), json_output)
-    if not json_output:
-        table = Table(title="Run Profiles")
-        table.add_column("ID")
-        table.add_column("Name")
-        table.add_column("Backend")
-        table.add_column("Paid")
-        table.add_column("Network")
-        for p in profiles:
-            table.add_row(
-                p["id"],
-                p["name"],
-                p["backend"],
-                "yes" if p["allow_paid_calls"] else "no",
-                "yes" if p["allow_network"] else "no",
-            )
-        console.print(table)
-
-
-@profiles_app.command("show")
-def profiles_show(
-    profile_id: str = typer.Argument(..., help="Profile id"),
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Show details for a specific run profile."""
-    _setup_logging(debug)
-    from .security.profiles import ProfileNotFound, resolve_profile_strict
-
-    try:
-        profile = resolve_profile_strict(profile_id)
-    except ProfileNotFound:
-        _out(
-            err(
-                ArcErrorCode.INVALID_INPUT,
-                f"Profile '{profile_id}' does not exist",
-                details={"code": "UNKNOWN_PROFILE"},
-            ),
-            json_output,
-        )
-        raise typer.Exit(2)
-    payload = _profile_payload(profile)
-    _out(ok(payload), json_output)
-    if not json_output:
-        console.print(f"[bold]{profile.name}[/bold] ({profile.id})")
-        console.print(f"  Backend: {profile.backend.value}")
-        console.print(f"  Paid calls: {'yes' if profile.allow_paid_calls else 'no'}")
-        console.print(f"  Network: {'yes' if profile.allow_network else 'no'}")
-        console.print(f"  Shell: {'yes' if profile.allow_shell else 'no'}")
-        console.print(f"  Secrets: {'yes' if profile.allow_secrets else 'no'}")
-        if profile.env_allowlist:
-            console.print(f"  Env allowlist: {', '.join(profile.env_allowlist)}")
-
-
-@profiles_app.command("create")
-def profiles_create(
-    profile_id: str = typer.Argument(..., help="Profile id"),
-    allow_paid_calls: bool = typer.Option(
-        False, "--allow-paid-calls", help="Allow paid/provider calls"
-    ),
-    allow_network: bool = typer.Option(False, "--allow-network", help="Allow network access"),
-    allow_shell: bool = typer.Option(False, "--allow-shell", help="Allow shell/tool execution"),
-    allow_secrets: bool = typer.Option(False, "--allow-secrets", help="Allow secret env exposure"),
-    provider: Optional[str] = typer.Option(
-        None, "--provider", help="Default provider metadata only"
-    ),
-    default_model: Optional[str] = typer.Option(
-        None, "--default-model", help="Default model metadata only"
-    ),
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Create an external run profile in ~/.arc/profiles.json. No secrets are stored."""
-    _setup_logging(debug)
-    from .gating import BackendMode
-    from .security.profiles import RunProfile, save_custom_profile
-
-    backend = BackendMode.LOCAL if allow_paid_calls or allow_network else BackendMode.STUB
-    profile = RunProfile(
-        id=profile_id,
-        name=profile_id,
-        allow_paid_calls=allow_paid_calls,
-        allow_network=allow_network or allow_paid_calls,
-        allow_shell=allow_shell,
-        allow_secrets=allow_secrets,
-        backend=backend,
-    )
-    try:
-        path = save_custom_profile(profile)
-    except ValueError as exc:
-        _out(
-            err(ArcErrorCode.INVALID_INPUT, str(exc), details={"code": "PROFILE_EXISTS"}),
-            json_output,
-        )
-        raise typer.Exit(2)
-    payload = _profile_payload(profile)
-    payload.update(
-        {
-            "path": str(path),
-            "provider": provider,
-            "default_model": default_model,
-            "stores_secrets": False,
-        }
-    )
-    _out(ok(payload), json_output)
-
-
-# ─── workspace init/info/config ───────────────────────────────────────────────
+            console.print("[dim]No differences[/dim]")
 
 
 @workspace_app.command("init")
@@ -3183,102 +1947,8 @@ def workspace_config_cmd(
         config_path.write_text(yaml.dump(data, default_flow_style=False))
         payload = {"updated": key, "value": value, "config_path": str(config_path)}
         _out(ok(payload), json_output)
-        if not json_output:
-            console.print(f"[green]Updated[/green] {key} = {value}")
+    if not json_output:
+        console.print(f"[green]Updated[/green] {key} = {value}")
     else:
         config = load_config(workspace=ws)
         _out(ok(config.flatten()), json_output)
-
-
-# ─── prompt optimizer ─────────────────────────────────────────────────────────
-
-
-prompt_app = typer.Typer(name="prompt", help="Prompt optimization commands (P1b local)")
-app.add_typer(prompt_app)
-
-
-@prompt_app.command("optimize")
-def prompt_optimize(
-    prompt: str = typer.Argument(..., help="Prompt text to optimize"),
-    model: str = typer.Option("gpt-4o", "--model", "-m", help="Model for token counting"),
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Apply rule-based optimization to a prompt.
-
-    No provider calls are made. Uses tiktoken for counting (falls back to
-    word estimate if tiktoken is not installed).
-    """
-    _setup_logging(debug)
-    from .optimizer import optimize_prompt, estimate_cost
-
-    result = optimize_prompt(prompt, model=model)
-    payload = {
-        "original_length": len(prompt),
-        "optimized_length": len(result.optimized),
-        "original_tokens": result.original_tokens.count,
-        "optimized_tokens": result.optimized_tokens.count,
-        "tokens_saved": result.tokens_saved,
-        "changes": result.changes,
-        "encoding": result.original_tokens.encoding,
-    }
-
-    # Add cost estimate if pricing is known
-    cost = estimate_cost(result.original_tokens.count, model)
-    if cost is not None:
-        payload["estimated_cost_usd"] = round(cost, 6)
-        cost_after = estimate_cost(result.optimized_tokens.count, model)
-        if cost_after is not None:
-            payload["estimated_cost_after_usd"] = round(cost_after, 6)
-            payload["estimated_savings_usd"] = round(cost - cost_after, 6)
-
-    _out(ok(payload), json_output)
-    if not json_output:
-        console.print(
-            f"[dim]Original:[/dim] {result.original_tokens.count} tokens ({result.original_tokens.encoding})"
-        )
-        console.print(f"[green]Optimized:[/green] {result.optimized_tokens.count} tokens")
-        console.print(f"[bold]Saved:[/bold] {result.tokens_saved} tokens")
-        if result.changes:
-            console.print(f"[dim]Rules applied:[/dim] {', '.join(result.changes)}")
-        else:
-            console.print("[dim]No changes needed[/dim]")
-        if cost is not None:
-            console.print(f"[dim]Est. cost before:[/dim] ${payload['estimated_cost_usd']:.6f}")
-            console.print(
-                f"[green]Est. cost after:[/green] ${payload['estimated_cost_after_usd']:.6f}"
-            )
-
-
-@prompt_app.command("diff")
-def prompt_diff(
-    prompt_a: str = typer.Argument(..., help="First prompt text"),
-    prompt_b: str = typer.Argument(..., help="Second prompt text"),
-    context_lines: int = typer.Option(3, "--context", "-c", help="Context lines for diff"),
-    json_output: bool = JSON_FLAG,
-    debug: bool = DEBUG_FLAG,
-) -> None:
-    """Compare two prompts using unified diff."""
-    _setup_logging(debug)
-    from .optimizer import diff_prompts, count_tokens
-
-    diff_text = diff_prompts(prompt_a, prompt_b, context_lines=context_lines)
-    tokens_a = count_tokens(prompt_a)
-    tokens_b = count_tokens(prompt_b)
-
-    payload = {
-        "prompt_a_tokens": tokens_a.count,
-        "prompt_b_tokens": tokens_b.count,
-        "token_diff": tokens_b.count - tokens_a.count,
-        "diff": diff_text,
-    }
-    _out(ok(payload), json_output)
-    if not json_output:
-        console.print(f"Prompt A: {tokens_a.count} tokens")
-        console.print(f"Prompt B: {tokens_b.count} tokens")
-        console.print(f"Token diff: {payload['token_diff']:+d}")
-        console.print("")
-        if diff_text:
-            console.print(diff_text)
-        else:
-            console.print("[dim]No differences[/dim]")

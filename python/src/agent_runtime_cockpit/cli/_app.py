@@ -11,6 +11,26 @@ from rich.console import Console
 from .. import __version__ as arc_version
 from ..security.context import EnforcementContext, DryRunAbort, set_enforcement_context
 
+from ._subapps import (
+    adapter_app,
+    audit_app,
+    config_app,
+    context_app,
+    doctor_app,
+    eval_app,
+    hitl_app,
+    isolation_app,
+    profiles_app,
+    prompt_app,
+    providers_app,
+    receipt_app,
+    runs_app,
+    storage_app,
+    studio_app,
+    studio_sessions_app,
+    workspace_app,
+)
+
 console = Console()
 err_console = Console(stderr=True)
 
@@ -20,6 +40,25 @@ app = typer.Typer(
     no_args_is_help=False,
     add_completion=False,
 )
+
+# Register sub-apps on the root app
+app.add_typer(context_app)
+app.add_typer(adapter_app)
+app.add_typer(doctor_app)
+app.add_typer(workspace_app)
+app.add_typer(isolation_app)
+app.add_typer(config_app)
+app.add_typer(hitl_app)
+app.add_typer(storage_app)
+app.add_typer(studio_app)
+studio_app.add_typer(studio_sessions_app)
+app.add_typer(runs_app)
+app.add_typer(eval_app)
+app.add_typer(providers_app)
+app.add_typer(receipt_app)
+app.add_typer(audit_app)
+app.add_typer(profiles_app)
+app.add_typer(prompt_app)
 
 
 @app.callback(invoke_without_command=True)
