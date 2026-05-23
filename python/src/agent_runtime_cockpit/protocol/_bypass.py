@@ -22,6 +22,17 @@ class PolicyBypassReason(StrEnum):
     UPSTREAM_BYPASSED_BOUNDARY = "upstream_bypassed_boundary"
 
 
+class PolicyBypassWarningData(BaseModel):
+    """Data payload for POLICY_BYPASS_WARNING event."""
+
+    policy_id: str
+    bypass_reason: PolicyBypassReason
+    surface: str  # e.g., "provider_call", "tool_execution", "subprocess_spawn"
+    surface_identifier: str  # e.g., "openai.chat.completions", "custom_http_client"
+    suggested_remediation: str
+    parent_run_id: str | None = None
+
+
 class PolicyBypassWarning(BaseModel):
     """
     POLICY_BYPASS_WARNING event emitted when execution bypasses enforcement.
@@ -35,10 +46,5 @@ class PolicyBypassWarning(BaseModel):
     type: Literal["POLICY_BYPASS_WARNING"]
     timestamp: str
     run_id: str
-    parent_run_id: str | None = None
     sequence: int
-    policy_id: str
-    bypass_reason: PolicyBypassReason
-    surface: str  # e.g., "provider_call", "tool_execution", "subprocess_spawn"
-    surface_identifier: str  # e.g., "openai.chat.completions", "custom_http_client"
-    suggested_remediation: str
+    data: PolicyBypassWarningData
