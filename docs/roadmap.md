@@ -617,6 +617,147 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Source:** Feature List F6.1
 
+---
+
+## Adapter Phases (Post-v0.1 Adapter Integration)
+
+The following roadmap items implement the adapter integration plan from `docs/research/adapter-roadmap.md`. These phases follow a separate numbering sequence (Adapter Phase 26-35) to avoid conflicts with the foundation phases above.
+
+## R27 — LangChain Adapter (Adapter Phase 26)
+
+**Goal:** Integrate LangChain LCEL pipelines with ARC runtime, enabling detection, export, and live streaming of LangChain workflows.
+
+**Current:** Baseline Complete. Three PRs delivered: T1 (detection), T2 (export), T3 (live streaming).
+
+**Deliverables:**
+- Detection of LangChain LCEL pipelines
+- Export to ARC trace format
+- Live streaming with ARCCallbackHandler
+- Provider calls route through ProviderClient registry where recognized
+- Unrecognized LLMs emit POLICY_BYPASS_WARNING
+
+**Acceptance:**
+- 47 tests passing (T1: 15 tests, T2: 15 tests, T3: 17 tests)
+- All 120 adapter tests passing (no regressions)
+- Detection, export, and streaming work end-to-end
+
+**Status:** Baseline Complete | Evidence: commits 6beedf8, ea567cf, 7566e60 | Notes: First adapter delivered; provider routing via ProviderClient where LLM is recognized.
+
+**Source:** Adapter Roadmap Phase 26
+
+## R28 — Anthropic Provider + Registry (Adapter Phase 27)
+
+**Goal:** Register AnthropicClient in provider registry and establish ProviderClient protocol as the standard interface for all provider adapters.
+
+**Current:** Baseline Complete. Registry updated to use base.py ProviderClient protocol; AnthropicClient auto-registered on module import.
+
+**Deliverables:**
+- Update registry to use base.py ProviderClient protocol (full async interface)
+- Auto-register AnthropicClient on module import
+- Comprehensive registry tests (get, known, duplicate registration, protocol conformance)
+- Update contract tests to use base.py protocol
+
+**Acceptance:**
+- 66 provider tests passing (7 new registry tests + 3 updated contract tests + 56 existing Anthropic tests)
+- AnthropicClient retrievable via registry.get("anthropic")
+- registry.known() returns ["anthropic"]
+- No regressions in existing Anthropic functionality
+
+**Status:** Baseline Complete | Evidence: commit 4a479b7 | Notes: First ProviderClient implementation registered; establishes pattern for future provider adapters.
+
+**Source:** Adapter Roadmap Phase 27
+
+## R29 — OpenAI-Compatible Provider (Adapter Phase 28)
+
+**Goal:** Implement OpenAI-compatible provider adapter consolidating OpenAI, Together, Groq, DeepInfra, Fireworks, and local llama.cpp behind a single adapter.
+
+**Current:** Not Started.
+
+**Deliverables:**
+- OpenAICompatibleProviderClient(ProviderClient) with base_url parameter
+- Per-vendor allowlist for supported surfaces (Responses/Chat Completions)
+- Record/replay fixtures per vendor
+- 15-20 tests minimum
+
+**Acceptance:**
+- All vendors work through single adapter
+- Vendor-specific quirks handled via allowlist
+- Tests cover each vendor's fixture
+
+**Status:** Not Started | Evidence: n/a | Notes: Consolidates 5+ vendors into one adapter; second ProviderClient implementation.
+
+**Source:** Adapter Roadmap Phase 28
+
+## R30 — Pydantic AI Adapter (Adapter Phase 29)
+
+**Goal:** Integrate Pydantic AI framework with ARC runtime.
+
+**Current:** Not Started.
+
+**Status:** Not Started | Evidence: n/a | Notes: Pydantic-native event model; at 1.99 stable.
+
+**Source:** Adapter Roadmap Phase 29
+
+## R31 — DSPy Adapter (Adapter Phase 30)
+
+**Goal:** Integrate DSPy framework with ARC runtime.
+
+**Current:** Not Started.
+
+**Status:** Not Started | Evidence: n/a | Notes: Strong research adoption; compile/run lifecycle worth surfacing.
+
+**Source:** Adapter Roadmap Phase 30
+
+## R32 — Haystack Adapter (Adapter Phase 31)
+
+**Goal:** Integrate Haystack framework with ARC runtime.
+
+**Current:** Not Started.
+
+**Status:** Not Started | Evidence: n/a | Notes: Pipeline DAG maps cleanly to ARC run plans.
+
+**Source:** Adapter Roadmap Phase 31
+
+## R33 — Smolagents Adapter (Adapter Phase 32)
+
+**Goal:** Integrate Smolagents framework with ARC runtime.
+
+**Current:** Not Started.
+
+**Status:** Not Started | Evidence: n/a | Notes: Highest risk/reward due to code-execution surface; needs enforcement maturity.
+
+**Source:** Adapter Roadmap Phase 32
+
+## R34 — Semantic Kernel Adapter (Adapter Phase 33)
+
+**Goal:** Integrate Semantic Kernel framework with ARC runtime (T1+T2 only).
+
+**Current:** Not Started.
+
+**Status:** Not Started | Evidence: n/a | Notes: T1+T2 only; Python SDK churn makes T3 uneconomical.
+
+**Source:** Adapter Roadmap Phase 33
+
+## R35 — Google ADK Adapter (Adapter Phase 34)
+
+**Goal:** Integrate Google ADK framework with ARC runtime.
+
+**Current:** Not Started.
+
+**Status:** Not Started | Evidence: n/a | Notes: Strategic importance but 2.0 breaking changes increase risk; sequence after ProviderClient cluster matures.
+
+**Source:** Adapter Roadmap Phase 34
+
+## R36 — MCP Python SDK Adapter (Adapter Phase 35)
+
+**Goal:** Integrate MCP Python SDK with ARC runtime.
+
+**Current:** Not Started.
+
+**Status:** Not Started | Evidence: n/a | Notes: Protocol-level; reserved for last to benefit from lessons learned in earlier phases; trust posture most subtle.
+
+**Source:** Adapter Roadmap Phase 35
+
 ## Updated Status Summary
 
 | Roadmap ID | Status | Next Slice |
@@ -647,8 +788,18 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 | **R24 Adaptive Consensus** | **Not Started** | **Phase 31 — add risk-based selection** |
 | **R25 Event-Driven Notifications** | **Not Started** | **Phase 32 — add event bus + webhooks** |
 | **R26 Swarm Memory Graph** | **Research** | **Phase 33 — design + prototype** |
+| **R27 LangChain Adapter** | **Baseline Complete** | **Adapter Phase 26 — complete (commits 6beedf8, ea567cf, 7566e60)** |
+| **R28 Anthropic Provider + Registry** | **Baseline Complete** | **Adapter Phase 27 — complete (commit 4a479b7)** |
+| **R29 OpenAI-Compatible Provider** | **Not Started** | **Adapter Phase 28 — implement OpenAI-compatible adapter** |
+| **R30 Pydantic AI Adapter** | **Not Started** | **Adapter Phase 29 — implement Pydantic AI adapter** |
+| **R31 DSPy Adapter** | **Not Started** | **Adapter Phase 30 — implement DSPy adapter** |
+| **R32 Haystack Adapter** | **Not Started** | **Adapter Phase 31 — implement Haystack adapter** |
+| **R33 Smolagents Adapter** | **Not Started** | **Adapter Phase 32 — implement Smolagents adapter** |
+| **R34 Semantic Kernel Adapter** | **Not Started** | **Adapter Phase 33 — implement Semantic Kernel adapter (T1+T2 only)** |
+| **R35 Google ADK Adapter** | **Not Started** | **Adapter Phase 34 — implement Google ADK adapter** |
+| **R36 MCP Python SDK Adapter** | **Not Started** | **Adapter Phase 35 — implement MCP Python SDK adapter** |
 
-**Post-v0.1 Execution Order:** R14-R16 (foundations) → R17-R18 (IDE/CLI) → R19-R20 (MCP) → R21-R22 (replay/eval) → R23-R25 (SwarmGraph differentiators) → R26 (research)
+**Post-v0.1 Execution Order:** R14-R16 (foundations) → R17-R18 (IDE/CLI) → R19-R20 (MCP) → R21-R22 (replay/eval) → R23-R25 (SwarmGraph differentiators) → R26 (research) → R27-R36 (adapter integration)
 
-**Critical Path:** Streaming Audit → RunEvent Unions → Trust Enforcement → Trace Virtualization → CLI Decomposition → MCP Server → MCP Tasks → Replay Contract → HITL/Eval → Consensus Escrow → Adaptive Consensus → Event Notifications → Memory Graph
+**Critical Path:** Streaming Audit → RunEvent Unions → Trust Enforcement → Trace Virtualization → CLI Decomposition → MCP Server → MCP Tasks → Replay Contract → HITL/Eval → Consensus Escrow → Adaptive Consensus → Event Notifications → Memory Graph → Adapter Integration (LangChain, Anthropic, OpenAI-compatible, Pydantic AI, DSPy, Haystack, Smolagents, Semantic Kernel, Google ADK, MCP SDK)
 
