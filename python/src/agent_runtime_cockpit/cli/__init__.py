@@ -11,6 +11,10 @@ from ._app import app, main
 # Phase 25.2: extracted info commands
 from . import info  # noqa: F401
 
+# Phase 25.3: extracted discovery and execution commands
+from . import discover  # noqa: F401
+from . import exec  # noqa: F401
+
 # Import legacy command handlers to register them on the app.
 # These will be extracted into per-command modules in Phases 25.2-25.6.
 from .. import _legacy_cli  # noqa: F401
