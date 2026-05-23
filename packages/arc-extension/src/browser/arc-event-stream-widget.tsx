@@ -4,6 +4,7 @@ import { inject, injectable, postConstruct } from '@theia/core/shared/inversify'
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { ArcService, ActiveTraceEventChunk, TraceData, TraceEvent, TraceFile } from '../common/arc-protocol';
 import { VirtualizedEventList } from './components/VirtualizedEventList';
+import { PolicyBypassBanner } from './components/PolicyBypassBanner';
 
 type StreamMode = 'replay-trace' | 'live-available' | 'live-connecting' | 'live' | 'live-disconnected' | 'live-error' | 'live-terminal';
 type LiveArcService = ArcService & { streamActiveTrace?: (request: { runId: string; mode: 'live' }) => Promise<AsyncIterable<ActiveTraceEventChunk>> };
@@ -39,6 +40,7 @@ export class ArcEventStreamWidget extends ReactWidget {
     protected selectedEventTypes = new Set<string>();
     protected loading = false;
     protected error = '';
+    protected dismissedWarnings = new Set<string>(); // Track dismissed warnings per run ID
 
     @postConstruct()
     protected init(): void {
@@ -122,6 +124,15 @@ export class ArcEventStreamWidget extends ReactWidget {
                 {this.renderTraceList()}
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                     {this.renderToolbar(events)}
+                    {this.shouldShowBypassBanner() && this.selectedTrace && (
+                        <div style={{ padding: '0 12px' }}>
+                            <PolicyBypassBanner
+                                runId={this.selectedTrace.id}
+                                warningCount={this.countBypassWarnings()}
+                                onDismiss={() => this.dismissBypassWarning()}
+                            />
+                        </div>
+                    )}
                     {this.error && <div style={errorStyle}>{this.error}</div>}
                     <VirtualizedEventList
                         events={events}
@@ -238,6 +249,24 @@ export class ArcEventStreamWidget extends ReactWidget {
 
     protected getVisibleEvents(): TraceEvent[] {
         return [...(this.selectedTrace?.events ?? []), ...this.liveEvents];
+    }
+
+    protected countBypassWarnings(): number {
+        return this.getVisibleEvents().filter(event => event.type === 'POLICY_BYPASS_WARNING').length;
+    }
+
+    protected shouldShowBypassBanner(): boolean {
+        const runId = this.selectedTrace?.id;
+        if (!runId) return false;
+        const warningCount = this.countBypassWarnings();
+        return warningCount > 0 && !this.dismissedWarnings.has(runId);
+    }
+
+    protected dismissBypassWarning(): void {
+        if (this.selectedTrace?.id) {
+            this.dismissedWarnings.add(this.selectedTrace.id);
+            this.update();
+        }
     }
 
     protected hasLiveStream(): boolean {
