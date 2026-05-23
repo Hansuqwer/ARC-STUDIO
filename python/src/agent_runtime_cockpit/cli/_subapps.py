@@ -29,3 +29,4 @@ receipt_app = typer.Typer(name="receipt", help="Run receipt commands (show/expor
 audit_app = typer.Typer(name="audit", help="Audit chain verification and key management (ADR-005)")
 profiles_app = typer.Typer(name="profiles", help="Run profile management")
 prompt_app = typer.Typer(name="prompt", help="Prompt optimization commands (P1b local)")
+mcp_app = typer.Typer(name="mcp", help="MCP Local Control Plane server (Phase 26 / R19)")

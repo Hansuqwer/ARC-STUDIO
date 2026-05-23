@@ -164,6 +164,7 @@ def test_help_text_contains_commands(update_snapshots):
         "audit",
         "profiles",
         "prompt",
+        "mcp",
     ]
     for cmd in expected_commands:
         assert cmd in output, f"Expected command '{cmd}' not found in --help output"

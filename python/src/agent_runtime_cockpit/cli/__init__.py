@@ -21,6 +21,9 @@ from . import receipt  # noqa: F401
 from . import audit  # noqa: F401
 from . import profiles  # noqa: F401
 
+# Phase 26: extracted MCP commands
+from . import mcp  # noqa: F401
+
 # Phase 25.5: extracted providers, mgmt, studio_workspace, prompt commands
 from . import providers  # noqa: F401
 from . import mgmt  # noqa: F401

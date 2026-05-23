@@ -20,6 +20,7 @@ from ._subapps import (
     eval_app,
     hitl_app,
     isolation_app,
+    mcp_app,
     profiles_app,
     prompt_app,
     providers_app,
@@ -58,6 +59,7 @@ app.add_typer(providers_app)
 app.add_typer(receipt_app)
 app.add_typer(audit_app)
 app.add_typer(profiles_app)
+app.add_typer(mcp_app)
 app.add_typer(prompt_app)
 
 
