@@ -14,6 +14,8 @@ from __future__ import annotations
 from typing import Any, Literal, Union, TypeGuard
 from pydantic import BaseModel, Field
 
+from ._bypass import PolicyBypassWarning
+
 
 # ─── Base Event Model ────────────────────────────────────────────────────────
 
@@ -438,6 +440,7 @@ KnownRunEvent = Union[
     SwarmGraphTopologyEvent,
     SwarmGraphConsensusEvent,
     SwarmGraphCostEvent,
+    PolicyBypassWarning,
     RawEvent,
 ]
 
@@ -478,6 +481,11 @@ def is_hitl_prompt(event: TypedRunEvent) -> TypeGuard[HitlPromptEvent]:
     return event.type == "HITL_PROMPT"
 
 
+def is_policy_bypass_warning(event: TypedRunEvent) -> TypeGuard[PolicyBypassWarning]:
+    """Type guard for POLICY_BYPASS_WARNING events."""
+    return event.type == "POLICY_BYPASS_WARNING"
+
+
 def is_known_event(event: TypedRunEvent) -> TypeGuard[KnownRunEvent]:
     """Type guard to check if an event is a known typed event."""
     known_types = {
@@ -496,6 +504,7 @@ def is_known_event(event: TypedRunEvent) -> TypeGuard[KnownRunEvent]:
         "SWARMGRAPH_TOPOLOGY",
         "SWARMGRAPH_CONSENSUS",
         "SWARMGRAPH_COST",
+        "POLICY_BYPASS_WARNING",
         "RAW",
     }
     return event.type in known_types
