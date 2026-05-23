@@ -1229,81 +1229,139 @@ bash scripts/check-pr.sh
 - Privacy leakage: cross-tenant memory contamination.
 - Cost: memory graph storage and query overhead may exceed benefits.
 
-## Phase 36 — Provider Management System (CLI/IDE)
+## Phase 36.1 — Provider Discovery & Interactive UX
 
-**Roadmap:** R37 — Provider Management System  
-**Status:** Not Started  
-**Depends on:** Phase 25 (CLI Decomposition), Phase 23 (Trust Enforcement)  
-**Design note:** Inspired by OpenCode's `/connect` and provider configuration system. Provides unified provider management for CLI and IDE, enabling users to configure LLM providers, manage API keys, and select models through interactive commands.
+**Roadmap:** R37 — Provider Management System (Phase 1)  
+**Status:** Not Started (Ready to implement)  
+**Depends on:** None (uses existing provider infrastructure)  
+**Design note:** Delivers interactive provider discovery and UX improvements without credential storage. Builds on existing `providers/registry.py` and `providers/base.py`. Environment variables remain the only credential source. This phase can be implemented immediately without waiting for Phase 23 (Trust) or Phase 25 (CLI Decomposition).
 
 ### Implementation
-1. **Provider Registry System** (`providers/registry.py`)
-   - `ProviderDefinition` dataclass with id, name, auth methods, required/optional fields, base URL, models
-   - `ProviderRegistry` class with register/get/list/loadFromConfig methods
-   - Built-in provider definitions: OpenAI, Anthropic, Google, Azure OpenAI, local providers (Ollama, LM Studio)
+1. **Enhanced Provider Registry** (extend existing `providers/registry.py`)
+   - Add `ProviderDefinition` dataclass with id, name, description, required env vars, supported models, base URL templates
+   - Add built-in provider catalog: OpenAI, Anthropic, Google, Azure OpenAI, local providers (Ollama, LM Studio)
+   - Add `list_catalog()` method to enumerate available providers
+   - Add `get_definition(provider_id)` method to retrieve provider details
 
-2. **Authentication Manager** (`auth/manager.py`)
-   - `Credentials` dataclass with provider ID, auth method, data, metadata
-   - `AuthManager` class with save/get/remove/list methods
-   - Secure credential storage at `~/.local/share/arc-studio/auth.json` with 600 permissions
-   - OAuth flow support with local callback server (port 8080)
-   - API key and token storage
-   - Environment variable fallback
+2. **Interactive CLI Commands** (`cli_provider.py` or extend existing CLI)
+   - `arc providers catalog` - List all available providers with descriptions
+   - `arc providers add --interactive` - Interactive provider selection menu (guides env var setup)
+   - `arc providers test <provider-id>` - Test provider connection using env vars
+   - `arc model` - Interactive model selection from configured providers (reads from env vars)
+   - Enhance existing `arc providers list` to show provider status (configured/not configured based on env vars)
 
-3. **OAuth Handler** (`auth/oauth.py`)
-   - `OAuthHandler` class with startFlow/handleCallback methods
-   - Local HTTP server for OAuth callbacks
-   - State management for pending flows
-   - Browser launch integration
-
-4. **Configuration Schema** (`config/provider_schema.py`)
-   - `ArcStudioConfig` with providers section
-   - Provider-specific options: enabled, baseURL, timeout, headers, models
-   - Variable substitution support: `{env:VAR}`, `{file:path}`
-
-5. **CLI Commands** (`cli_provider.py`)
-   - `arc provider add` - Interactive provider selection and authentication
-   - `arc provider list` - List configured providers
-   - `arc provider remove <provider-id>` - Remove provider credentials
-   - `arc provider test <provider-id>` - Test provider connection
-   - `arc model` - Interactive model selection from configured providers
-
-6. **Interactive UI** (`ui/provider_selector.py`)
-   - Provider selection menu
-   - Auth method selection (OAuth, API key, token)
-   - Credential input prompts
+3. **Interactive Selection UI** (`ui/provider_selector.py`)
+   - Provider selection menu with descriptions
+   - Display required environment variables for selected provider
+   - Guide users to set env vars (show example commands for bash/zsh/fish)
    - Connection testing feedback
+   - Model selection menu
 
-7. **IDE Integration** (ConfigTab extension)
-   - Provider management panel in ConfigTab
-   - Display configured providers
-   - Add/remove provider UI
-   - Model selection dropdown
-   - Connection status indicators
+4. **Provider Status Detection**
+   - Check environment variables to determine which providers are configured
+   - Validate env var format (e.g., OpenAI keys start with `sk-`)
+   - Test connections to verify credentials work
 
-8. **Security & Storage**
-   - Secure file permissions (600 for auth.json)
-   - No raw secrets in config files (only env var references)
-   - Credential validation before storage
-   - Connection testing before saving
+5. **IDE Integration** (ConfigTab extension - read-only)
+   - Provider status panel showing configured providers (detected from env vars)
+   - Display which env vars are set (redacted values)
+   - Show available models for each configured provider
+   - Connection status indicators (test via env vars)
+   - Link to CLI commands for configuration
 
 ### Acceptance
-1. Users can run `arc provider add` and see interactive provider selection menu
-2. OAuth flow opens browser and completes authentication for OpenAI/Anthropic
-3. API keys stored securely at `~/.local/share/arc-studio/auth.json` with 600 permissions
-4. Environment variables work as fallback when no stored credentials exist
-5. `arc provider list` shows all configured providers with auth method
-6. `arc provider test <provider-id>` validates credentials and reports success/failure
-7. `arc model` command lists available models from all configured providers
-8. Provider configuration supports custom base URLs for proxies/self-hosted instances
-9. IDE ConfigTab displays configured providers and allows management
-10. No raw secrets appear in `arc-studio.json` (only `{env:VAR}` references)
-11. Connection testing validates credentials before saving
-12. Tests cover OAuth flow, API key storage, environment fallback, connection validation
+1. `arc providers catalog` lists all available providers with descriptions and required env vars
+2. `arc providers add --interactive` shows provider selection menu and guides env var setup
+3. `arc providers test <provider-id>` validates credentials from env vars and reports success/failure
+4. `arc model` command lists available models from all configured providers (detected via env vars)
+5. `arc providers list` shows provider status (configured/not configured) based on env var presence
+6. IDE ConfigTab displays configured providers detected from environment variables
+7. Connection testing works using environment variables only
+8. No credential storage on disk (all credentials from env vars)
+9. Interactive UX guides users through provider setup without manual config file editing
+10. Tests cover provider catalog, interactive selection, connection testing, env var detection
 
 ### Verification
 ```bash
-cd python && uv run pytest tests/auth/ tests/providers/test_registry.py tests/test_cli_provider.py -q
+cd python && uv run pytest tests/providers/test_registry.py tests/providers/test_catalog.py tests/test_cli_provider.py -q
+cd python && uv run pytest -q
+pnpm --filter @arc-studio/protocol build
+pnpm --filter arc-extension build
+pnpm --filter arc-extension test
+bash scripts/check-pr.sh
+bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
+```
+
+### Known Risks
+- Environment variable detection may miss non-standard var names
+- Interactive UX limited without credential storage (can't save selections)
+- Users still need to manually set env vars (but with better guidance)
+- Model lists may be stale if provider APIs change
+
+---
+
+## Phase 36.2 — Credential Storage & OAuth
+
+**Roadmap:** R37 — Provider Management System (Phase 2)  
+**Status:** Blocked (waiting for Phase 23 + Phase 25 + Phase 36.1)  
+**Depends on:** Phase 23 (Trust Enforcement), Phase 25 (CLI Decomposition), Phase 36.1 (Provider Discovery)  
+**Design note:** Adds secure credential storage and OAuth flow on top of Phase 36.1 interactive UX. Requires mature trust infrastructure from Phase 23 and clean CLI structure from Phase 25 before storing credentials on disk.
+
+### Implementation
+1. **Authentication Manager** (`auth/manager.py`)
+   - `Credentials` dataclass with provider ID, auth method, encrypted data, metadata
+   - `AuthManager` class with save/get/remove/list methods
+   - Secure credential storage at `~/.local/share/arc-studio/auth.json` with 600 permissions
+   - Encryption at rest using workspace trust keys from Phase 23
+   - Environment variable fallback (Phase 36.1 behavior)
+
+2. **OAuth Handler** (`auth/oauth.py`)
+   - `OAuthHandler` class with startFlow/handleCallback methods
+   - Local HTTP server for OAuth callbacks (port 8080 with fallback ports)
+   - State management for pending flows
+   - Browser launch integration
+   - Token refresh logic
+
+3. **Configuration Schema** (`config/provider_schema.py`)
+   - `ArcStudioConfig` with providers section
+   - Provider-specific options: enabled, baseURL, timeout, headers, models
+   - Variable substitution support: `{env:VAR}`, `{file:path}`, `{credential:provider-id}`
+
+4. **Enhanced CLI Commands** (extend Phase 36.1 commands)
+   - `arc providers add --oauth` - OAuth flow for supported providers
+   - `arc providers add --api-key` - Store API key securely
+   - `arc providers remove <provider-id>` - Remove stored credentials
+   - Credential storage requires trust enforcement from Phase 23
+
+5. **IDE Integration** (ConfigTab extension - read/write)
+   - Provider management panel with add/remove UI
+   - OAuth flow initiation from IDE
+   - Credential management (view/delete stored credentials)
+   - Model selection dropdown with stored preferences
+
+6. **Security & Storage**
+   - Credentials encrypted at rest using Phase 23 trust infrastructure
+   - Secure file permissions (600 for auth.json)
+   - No raw secrets in config files (only references)
+   - Credential validation before storage
+   - Connection testing before saving
+   - Audit logging for credential access
+
+### Acceptance
+1. OAuth flow opens browser and completes authentication for OpenAI/Anthropic
+2. Credentials stored securely at `~/.local/share/arc-studio/auth.json` with encryption and 600 permissions
+3. Environment variables still work as fallback when no stored credentials exist
+4. `arc providers remove <provider-id>` removes stored credentials
+5. IDE ConfigTab allows adding/removing providers with OAuth or API key
+6. Stored credentials require workspace trust (Phase 23 enforcement)
+7. Token refresh works for OAuth providers
+8. No raw secrets appear in `arc-studio.json` (only references)
+9. Audit log records credential access events
+10. Tests cover OAuth flow, encrypted storage, environment fallback, trust enforcement
+
+### Verification
+```bash
+cd python && uv run pytest tests/auth/ tests/providers/test_oauth.py tests/test_cli_provider.py -q
 cd python && uv run pytest -q
 pnpm --filter @arc-studio/protocol build
 pnpm --filter arc-extension build
@@ -1314,12 +1372,11 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 
 ### Known Risks
 - OAuth callback server port conflicts (8080 may be in use)
-- Credential storage security on shared systems
+- Credential storage security on shared systems (mitigated by encryption)
 - Provider API changes breaking authentication flows
-- Environment variable precedence confusion
-- Custom base URL validation and security
-- Token refresh logic for OAuth providers
+- Token refresh logic complexity
 - Cross-platform file permission handling (Windows vs Unix)
+- Encryption key management tied to Phase 23 trust infrastructure
 
 ---
 
@@ -1342,7 +1399,8 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 | **31** | **R24** | **Adaptive Consensus Protocol** |
 | **32** | **R25** | **Event-Driven Audit/HITL Notifications** |
 | **33** | **R26** | **Swarm Memory Graph (Research)** |
-| **36** | **R37** | **Provider Management System (CLI/IDE)** |
+| **36.1** | **R37** | **Provider Discovery & Interactive UX (Phase 1)** |
+| **36.2** | **R37** | **Credential Storage & OAuth (Phase 2)** |
 
 ### Dependencies
 
@@ -1361,23 +1419,34 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 | 31 Adaptive Consensus | Not Started | Phase 30, Phase 23 | P2 — major differentiator |
 | 32 Event Notifications | Not Started | Phase 29, Phase 21 | P2 — enterprise compliance |
 | 33 Memory Graph | Research | None | P3 — research, may pivot |
-| 36 Provider Management | Not Started | Phase 25, Phase 23 | Standalone — unified provider/credential management for CLI/IDE |
+| 36.1 Provider Discovery | Not Started | None | Standalone — interactive provider UX without credential storage; no blockers |
+| 36.2 Credential Storage | Blocked | Phase 23, Phase 25, Phase 36.1 | Standalone — secure credential storage and OAuth; requires trust infrastructure |
 
 ### Critical Path
 
 ```
 Phase 21 (Audit) ──→ Phase 23 (Trust) ──→ Phase 26 (MCP) ──→ Phase 27 (MCP Tasks)
-                                                                          │
+                            │                                              │
 Phase 22 (RunEvent) ──→ Phase 24 (Tracing)                                │
-                                                            │
+                                                             │
 Phase 25 (CLI Decomp) ──→ Phase 28 (Replay) ──→ Phase 29 (HITL) ──→ Phase 32 (Events)
          │                                                           │
-         └──→ Phase 36 (Provider Mgmt)                              │
+         └──→ Phase 36.2 (Credential Storage)                       │
                                                                      │
 Phase 17 (SwarmGraph) ──→ Phase 30 (Escrow) ──→ Phase 31 (Adaptive Consensus)
                                                                      │
 Phase 33 (Memory Graph) ──→ (research, may pivot)
+         │
+Phase 36.1 (Provider Discovery) ──→ (no dependencies, can start immediately)
 ```
 
-**Execution order:** Phase 21-22 (parallel foundations) → Phase 23-24 (parallel, depend on Phase 22) → Phase 25 (standalone) → Phase 26 (depends on Phase 23) → Phase 27 (depends on Phase 25) → Phase 28 (depends on Phase 25) → Phase 29 (depends on Phase 25 + Phase 22) → Phase 30 (depends on Phase 17 + Phase 21) → Phase 31 (depends on Phase 30 + Phase 23) → Phase 32 (depends on Phase 29 + Phase 21) → Phase 33 (independent research) → Phase 36 (depends on Phase 25 + Phase 23, standalone feature)
+**Execution order:** 
+- **Immediate (no blockers):** Phase 36.1 (Provider Discovery)
+- **Foundations:** Phase 21-22 (parallel) → Phase 23-24 (parallel, depend on Phase 22) → Phase 25 (standalone)
+- **MCP:** Phase 26 (depends on Phase 23) → Phase 27 (depends on Phase 25)
+- **Replay/HITL:** Phase 28 (depends on Phase 25) → Phase 29 (depends on Phase 25 + Phase 22)
+- **SwarmGraph differentiators:** Phase 30 (depends on Phase 17 + Phase 21) → Phase 31 (depends on Phase 30 + Phase 23)
+- **Enterprise:** Phase 32 (depends on Phase 29 + Phase 21)
+- **Research:** Phase 33 (independent)
+- **Provider Management Phase 2:** Phase 36.2 (depends on Phase 25 + Phase 23 + Phase 36.1)
 

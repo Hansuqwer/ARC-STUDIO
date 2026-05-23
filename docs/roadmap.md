@@ -770,41 +770,66 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Source:** Adapter Roadmap Phase 35
 
-## R37 — Provider Management System (CLI/IDE)
+## R37 — Provider Management System (Two-Phase Delivery)
 
-**Goal:** Implement a unified provider management system for CLI and IDE, enabling users to configure LLM providers, manage API keys, and select models through interactive commands similar to OpenCode's `/connect` and `/provider` system.
+**Goal:** Implement a unified provider management system for CLI and IDE, enabling users to configure LLM providers, manage API keys, and select models through interactive commands. Delivered in two phases: Phase 1 (interactive UX without credential storage) can be implemented immediately, Phase 2 (credential storage + OAuth) requires Phase 23 (Trust) and Phase 25 (CLI Decomposition).
 
-**Current:** Not Started. No provider management CLI or IDE interface exists. Provider configuration is currently manual through environment variables and config files.
+**Current:** Not Started. Provider configuration is currently manual through environment variables and config files. Existing `providers/registry.py` and `providers/base.py` provide foundation for Phase 1.
+
+### Phase 1: Provider Discovery & Interactive UX (No Dependencies)
+
+**Status:** Not Started (Ready to implement)  
+**Depends on:** None (uses existing provider infrastructure)
 
 **Deliverables:**
-- Provider registry system with built-in provider definitions (OpenAI, Anthropic, Google, Azure, local providers)
-- Authentication manager supporting multiple auth methods (OAuth, API key, token, environment variables)
-- Secure credential storage at `~/.local/share/arc-studio/auth.json` with 600 permissions
-- CLI commands: `arc provider add`, `arc provider list`, `arc provider remove`, `arc provider test`
-- CLI command: `arc model` for interactive model selection
-- Configuration schema for provider settings in `arc-studio.json`
-- Interactive provider and auth method selection UI
-- OAuth flow with local callback server (port 8080)
-- Environment variable fallback for credentials
-- Variable substitution in config (`{env:VAR}`, `{file:path}`)
-- IDE ConfigTab integration for provider management
-- Connection testing and validation
+- Enhanced provider registry with built-in provider catalog (OpenAI, Anthropic, Google, Azure, local providers)
+- Interactive CLI commands: `arc providers catalog`, `arc providers add --interactive`, `arc providers test`, `arc model`
+- Provider status detection from environment variables
+- Interactive provider selection and setup guidance
+- Connection testing using environment variables
+- IDE ConfigTab integration (read-only, shows providers detected from env vars)
+- No credential storage (environment variables remain the only credential source)
 
 **Acceptance:**
-- Users can add providers interactively via `arc provider add` with provider selection menu
-- OAuth flow opens browser and completes authentication for supported providers
-- API keys stored securely with proper file permissions (600)
-- Environment variables work as fallback when no stored credentials exist
-- `arc model` command lists available models from configured providers
-- Provider configuration supports custom base URLs for proxies/self-hosted instances
-- IDE ConfigTab displays configured providers and allows management
-- Connection testing validates credentials before saving
-- No raw secrets in config files (only references to env vars or secure storage)
-- Tests cover OAuth flow, API key storage, environment fallback, and connection validation
+- Users can run `arc providers catalog` to see all available providers with descriptions
+- `arc providers add --interactive` guides users through provider setup with env var instructions
+- `arc providers test <provider-id>` validates credentials from env vars
+- `arc model` command lists available models from configured providers (detected via env vars)
+- IDE ConfigTab displays configured providers detected from environment variables
+- Connection testing works using environment variables only
+- No credentials stored on disk
+- Interactive UX improves discoverability without requiring credential storage
 
-**Status:** Not Started | Evidence: n/a | Notes: Inspired by OpenCode's provider management system; requires secure credential storage, OAuth implementation, and CLI/IDE integration.
+### Phase 2: Credential Storage & OAuth (Depends on Phase 23 + 25 + 36.1)
 
-**Source:** OpenCode provider system research (2026-05-23)
+**Status:** Blocked (waiting for Phase 23, Phase 25, Phase 36.1)  
+**Depends on:** Phase 23 (Trust Enforcement), Phase 25 (CLI Decomposition), Phase 36.1 (Provider Discovery)
+
+**Deliverables:**
+- Authentication manager with secure credential storage at `~/.local/share/arc-studio/auth.json`
+- Credentials encrypted at rest using Phase 23 trust infrastructure
+- OAuth flow with local callback server (port 8080)
+- CLI commands: `arc providers add --oauth`, `arc providers add --api-key`, `arc providers remove`
+- Configuration schema with variable substitution (`{env:VAR}`, `{credential:provider-id}`)
+- IDE ConfigTab integration (read/write, full provider management)
+- Token refresh logic for OAuth providers
+- Environment variable fallback (Phase 1 behavior preserved)
+
+**Acceptance:**
+- OAuth flow opens browser and completes authentication for OpenAI/Anthropic
+- Credentials stored securely with encryption and 600 permissions
+- Environment variables still work as fallback when no stored credentials exist
+- Stored credentials require workspace trust (Phase 23 enforcement)
+- `arc providers remove <provider-id>` removes stored credentials
+- IDE ConfigTab allows adding/removing providers with OAuth or API key
+- Token refresh works for OAuth providers
+- No raw secrets in config files (only references)
+- Audit log records credential access events
+- Tests cover OAuth flow, encrypted storage, environment fallback, trust enforcement
+
+**Status:** Phase 1 Not Started (ready to implement) | Phase 2 Blocked (waiting for Phase 23 + 25) | Evidence: n/a | Notes: Two-phase delivery enables immediate UX improvements without waiting for trust infrastructure. Phase 1 builds on existing provider infrastructure without credential storage complexity.
+
+**Source:** OpenCode provider system research (2026-05-23), Option C (Hybrid) approach approved 2026-05-23
 
 ## Updated Status Summary
 
@@ -846,9 +871,20 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R34 Semantic Kernel Adapter** | **Not Started** | **Adapter Phase 33 — implement Semantic Kernel adapter (T1+T2 only)** |
 | **R35 Google ADK Adapter** | **Not Started** | **Adapter Phase 34 — implement Google ADK adapter** |
 | **R36 MCP Python SDK Adapter** | **Not Started** | **Adapter Phase 35 — implement MCP Python SDK adapter** |
-| **R37 Provider Management System** | **Not Started** | **Phase 36 — implement provider registry and authentication** |
+| **R37 Provider Management (Phase 1)** | **Not Started (Ready)** | **Phase 36.1 — interactive UX without credential storage (no blockers)** |
+| **R37 Provider Management (Phase 2)** | **Blocked** | **Phase 36.2 — credential storage + OAuth (requires Phase 23 + 25 + 36.1)** |
 
-**Post-v0.1 Execution Order:** R14-R16 (foundations) → R17-R18 (IDE/CLI) → R19-R20 (MCP) → R21-R22 (replay/eval) → R23-R25 (SwarmGraph differentiators) → R26 (research) → R27-R36 (adapter integration) → R37 (provider management)
+**Post-v0.1 Execution Order:** 
+- **Immediate (no blockers):** Phase 36.1 (Provider Discovery & Interactive UX)
+- **Foundations:** R14-R16 (Phase 21-23) → R17-R18 (Phase 24-25)
+- **MCP:** R19-R20 (Phase 26-27)
+- **Replay/Eval:** R21-R22 (Phase 28-29)
+- **SwarmGraph differentiators:** R23-R25 (Phase 30-32)
+- **Research:** R26 (Phase 33)
+- **Adapter integration:** R27-R36 (Adapter Phases 26-35)
+- **Provider Management Phase 2:** R37 Phase 2 (Phase 36.2, after Phase 23 + 25 + 36.1)
 
-**Critical Path:** Streaming Audit → RunEvent Unions → Trust Enforcement → Trace Virtualization → CLI Decomposition → MCP Server → MCP Tasks → Replay Contract → HITL/Eval → Consensus Escrow → Adaptive Consensus → Event Notifications → Memory Graph → Adapter Integration (LangChain, Anthropic, OpenAI-compatible, Pydantic AI, DSPy, Haystack, Smolagents, Semantic Kernel, Google ADK, MCP SDK) → Provider Management System
+**Critical Path:** Streaming Audit → RunEvent Unions → Trust Enforcement → Trace Virtualization → CLI Decomposition → MCP Server → MCP Tasks → Replay Contract → HITL/Eval → Consensus Escrow → Adaptive Consensus → Event Notifications → Memory Graph → Adapter Integration (LangChain, Anthropic, OpenAI-compatible, Pydantic AI, DSPy, Haystack, Smolagents, Semantic Kernel, Google ADK, MCP SDK) → Provider Management Phase 2
+
+**Note:** Phase 36.1 (Provider Discovery) can be implemented immediately without waiting for the critical path, as it has no dependencies and uses existing provider infrastructure.
 
