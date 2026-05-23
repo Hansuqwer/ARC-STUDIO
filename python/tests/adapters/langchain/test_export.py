@@ -264,7 +264,8 @@ def test_capabilities_reflect_export_support():
 
     assert caps.can_export_workflow is True
     assert caps.can_inspect is True
-    assert caps.can_run is False  # T3 not yet implemented
+    assert caps.can_run is True  # T3 implemented
+    assert caps.can_stream_events is True  # T3 implemented
 
 
 # Test 14: Capability report mentions export availability

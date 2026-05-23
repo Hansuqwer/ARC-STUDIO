@@ -221,9 +221,9 @@ def test_langchain_adapter_properties():
 
     caps = adapter.capabilities()
     assert caps.can_inspect is True
-    assert caps.can_run is False  # T3 not yet implemented
+    assert caps.can_run is True  # T3 implemented
     assert caps.can_export_workflow is True  # T2 implemented
-    assert caps.can_stream_events is False  # T3 not yet implemented
+    assert caps.can_stream_events is True  # T3 implemented
 
 
 # Test 11: LangChainAdapter capability report - not detected

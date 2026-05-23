@@ -2,9 +2,9 @@
 
 Phase 26 T1: Detection implemented.
 Phase 26 T2: Export implemented (AST-based).
-Phase 26 T3: Live streaming (not yet implemented).
+Phase 26 T3: Live streaming implemented (BaseCallbackHandler).
 
-Detects and exports LangChain Runnable/LCEL pipelines in workspace.
+Detects, exports, and executes LangChain Runnable/LCEL pipelines.
 
 Out of scope (per roadmap):
 - AgentExecutor (redirected to LangGraph by upstream)
@@ -17,13 +17,15 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from ..base import RuntimeAdapter, CapabilityReport, DoctorAction
 from ...protocol.capabilities import RuntimeCapabilities
-from ...protocol.schemas import WorkflowInfo
+from ...protocol.schemas import WorkflowInfo, RunRecord
 from .capabilities import get_langchain_capabilities
 from .detect import detect_langchain
 from .export import export_langchain_workflows
+from .runner import LangChainRunner
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +35,7 @@ class LangChainAdapter(RuntimeAdapter):
 
     Phase 26 T1: Detection implemented.
     Phase 26 T2: Export implemented (AST-based).
-    Phase 26 T3: Live streaming (not yet implemented).
+    Phase 26 T3: Live streaming implemented (BaseCallbackHandler).
     """
 
     @property
@@ -78,6 +80,29 @@ class LangChainAdapter(RuntimeAdapter):
             List of WorkflowInfo for detected chains
         """
         return export_langchain_workflows(workspace)
+
+    def run_chain(
+        self,
+        workspace: Path,
+        chain: Any,
+        inputs: dict[str, Any],
+        provider_registry: dict | None = None,
+    ) -> RunRecord:
+        """Run a LangChain chain with live event streaming.
+
+        Phase 26 T3: Execute chain with ARCCallbackHandler for live streaming.
+
+        Args:
+            workspace: Workspace path
+            chain: LangChain Runnable to execute
+            inputs: Input dictionary for the chain
+            provider_registry: Optional registry of known providers
+
+        Returns:
+            RunRecord with execution results and events
+        """
+        runner = LangChainRunner(workspace)
+        return runner.run(chain, inputs, provider_registry)
 
     def capability_report(self, workspace: Path) -> CapabilityReport:
         """Return detailed capability report for LangChain adapter."""
