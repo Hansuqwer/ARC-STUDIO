@@ -671,7 +671,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Goal:** Implement OpenAI-compatible provider adapter consolidating OpenAI, Together, Groq, DeepInfra, Fireworks, and local llama.cpp behind a single adapter.
 
-**Current:** Not Started.
+**Current:** Baseline Complete. OpenAICompatibleClient implemented with 6 vendor support, 24 tests passing.
 
 **Deliverables:**
 - OpenAICompatibleProviderClient(ProviderClient) with base_url parameter
@@ -684,7 +684,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 - Vendor-specific quirks handled via allowlist
 - Tests cover each vendor's fixture
 
-**Status:** Not Started | Evidence: n/a | Notes: Consolidates 5+ vendors into one adapter; second ProviderClient implementation.
+**Status:** Baseline Complete | Evidence: commit 6826d8d, 24 tests passing, 90 total provider tests | Notes: Consolidates 6 vendors into one adapter; second ProviderClient implementation. Supports OpenAI, Together, Groq, DeepInfra, Fireworks, and local llama.cpp.
 
 **Source:** Adapter Roadmap Phase 28
 
@@ -790,7 +790,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R26 Swarm Memory Graph** | **Research** | **Phase 33 — design + prototype** |
 | **R27 LangChain Adapter** | **Baseline Complete** | **Adapter Phase 26 — complete (commits 6beedf8, ea567cf, 7566e60)** |
 | **R28 Anthropic Provider + Registry** | **Baseline Complete** | **Adapter Phase 27 — complete (commit 4a479b7)** |
-| **R29 OpenAI-Compatible Provider** | **Not Started** | **Adapter Phase 28 — implement OpenAI-compatible adapter** |
+| **R29 OpenAI-Compatible Provider** | **Baseline Complete** | **Adapter Phase 28 — complete (commit 6826d8d, 24 tests, 6 vendors)** |
 | **R30 Pydantic AI Adapter** | **Not Started** | **Adapter Phase 29 — implement Pydantic AI adapter** |
 | **R31 DSPy Adapter** | **Not Started** | **Adapter Phase 30 — implement DSPy adapter** |
 | **R32 Haystack Adapter** | **Not Started** | **Adapter Phase 31 — implement Haystack adapter** |
