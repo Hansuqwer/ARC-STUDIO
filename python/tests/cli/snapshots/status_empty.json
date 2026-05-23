@@ -1,13 +1,19 @@
 {
   "data": {
     "python_files": 0,
-    "runtime_count": 2,
+    "runtime_count": 3,
     "runtimes": [
       {
         "can_run": false,
         "detected": true,
         "id": "langchain",
         "paid": false
+      },
+      {
+        "can_run": true,
+        "detected": true,
+        "id": "crewai",
+        "paid": true
       },
       {
         "can_run": true,
