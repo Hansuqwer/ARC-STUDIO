@@ -279,6 +279,31 @@ export interface NodeFailedEvent extends RunEventBase {
   };
 }
 
+// ─── Policy Bypass Warning Events ────────────────────────────────────────────
+
+/**
+ * Reason codes for policy bypass warnings.
+ * Indicates why enforcement could not be applied to an operation.
+ */
+export type PolicyBypassReason =
+  | 'unknown_provider_plugin'
+  | 'custom_http_client'
+  | 'custom_subprocess_runner'
+  | 'uninstrumented_tool'
+  | 'upstream_bypassed_boundary';
+
+export interface PolicyBypassWarning extends RunEventBase {
+  type: 'POLICY_BYPASS_WARNING';
+  data: {
+    policy_id: string;
+    bypass_reason: PolicyBypassReason;
+    surface: string;
+    surface_identifier: string;
+    suggested_remediation: string;
+    parent_run_id?: string;
+  };
+}
+
 // ─── Raw/Unknown Events ──────────────────────────────────────────────────────
 
 export interface RawEvent extends RunEventBase {
@@ -335,6 +360,7 @@ export type KnownRunEvent =
   | MessageEvent
   | NodeStartedEvent
   | NodeFailedEvent
+  | PolicyBypassWarning
   | RawEvent;
 
 /**

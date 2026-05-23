@@ -1,6 +1,6 @@
 {
   "name": "@arc-studio/protocol",
-  "version": "0.1.0-alpha",
+  "version": "0.2.0-alpha",
   "description": "ARC protocol TypeScript types — shared between extensions and packages",
   "license": "Apache-2.0",
   "main": "lib/index.js",
