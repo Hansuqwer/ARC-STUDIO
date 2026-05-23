@@ -1,0 +1,31 @@
+{
+  "data": {
+    "checks": [
+      {
+        "check": "daemon",
+        "ok": false,
+        "status": "unreachable: URLError"
+      },
+      {
+        "check": "python",
+        "ok": true,
+        "version": "3.11.15"
+      },
+      {
+        "check": "cli",
+        "ok": true,
+        "version": "0.1.0a0"
+      }
+    ],
+    "ok": false
+  },
+  "error": null,
+  "meta": {
+    "adapter": null,
+    "duration_ms": 3.1549930572509766,
+    "timestamp": "2026-05-23T07:23:12.910061Z",
+    "workspace": null
+  },
+  "ok": true,
+  "version": "1.0"
+}

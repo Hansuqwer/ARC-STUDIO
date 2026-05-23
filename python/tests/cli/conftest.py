@@ -4,6 +4,7 @@ The CLI implementation may be Click, Typer, or argparse. We discover the
 entry point at test-collection time and adapt accordingly. This keeps the
 test file free of hard-coded import paths and survives renames.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -15,6 +16,16 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 import pytest
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--update-snapshots",
+        action="store_true",
+        default=False,
+        help="Regenerate golden snapshot files",
+    )
+
 
 CANDIDATE_MODULES: Iterable[str] = (
     "agent_runtime_cockpit.cli.main",
@@ -61,6 +72,7 @@ def run_cli(cli_app, tmp_path, monkeypatch):
         # Typer (Click underneath)
         if cli_app.__class__.__name__ == "Typer":
             from typer.testing import CliRunner  # type: ignore
+
             runner = CliRunner()
             result = runner.invoke(cli_app, args)
             return CLIResult(result.exit_code, result.stdout, result.stderr or "")
@@ -68,6 +80,7 @@ def run_cli(cli_app, tmp_path, monkeypatch):
         # Click
         if hasattr(cli_app, "main") and hasattr(cli_app, "commands"):
             from click.testing import CliRunner  # type: ignore
+
             runner = CliRunner()
             result = runner.invoke(cli_app, args, catch_exceptions=False)
             return CLIResult(result.exit_code, result.stdout, result.stderr or "")

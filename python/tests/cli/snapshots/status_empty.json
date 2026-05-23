@@ -1,0 +1,25 @@
+{
+  "data": {
+    "python_files": 0,
+    "runtime_count": 1,
+    "runtimes": [
+      {
+        "can_run": true,
+        "detected": true,
+        "id": "lmarena",
+        "paid": false
+      }
+    ],
+    "trace_count": 0,
+    "workspace": "/private/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/pytest-of-hansvilund/pytest-166/test_status_snapshot0"
+  },
+  "error": null,
+  "meta": {
+    "adapter": null,
+    "duration_ms": 14.910221099853516,
+    "timestamp": "2026-05-23T07:23:12.936583Z",
+    "workspace": "/private/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/pytest-of-hansvilund/pytest-166/test_status_snapshot0"
+  },
+  "ok": true,
+  "version": "1.0"
+}

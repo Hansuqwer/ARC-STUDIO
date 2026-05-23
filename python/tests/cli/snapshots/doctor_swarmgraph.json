@@ -1,0 +1,32 @@
+{
+  "data": {
+    "any_available": true,
+    "checks": [
+      {
+        "available": false,
+        "command": "swarmgraph",
+        "reason": "not_found"
+      },
+      {
+        "available": false,
+        "command": "arc-swarmgraph",
+        "reason": "not_found"
+      },
+      {
+        "available": true,
+        "command": "arc",
+        "path": "/Users/hansvilund/HansuQWER/WorkSpace/ARC/arc-theia-studio/python/.venv/bin/arc",
+        "version": "\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f"
+      }
+    ]
+  },
+  "error": null,
+  "meta": {
+    "adapter": null,
+    "duration_ms": null,
+    "timestamp": "2026-05-23T07:23:13.084700Z",
+    "workspace": null
+  },
+  "ok": true,
+  "version": "1.0"
+}

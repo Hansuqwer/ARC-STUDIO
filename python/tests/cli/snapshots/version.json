@@ -1,0 +1,16 @@
+{
+  "data": {
+    "platform": "darwin",
+    "python": "3.11.15",
+    "version": "0.1.0a0"
+  },
+  "error": null,
+  "meta": {
+    "adapter": null,
+    "duration_ms": null,
+    "timestamp": "2026-05-23T07:23:12.895698Z",
+    "workspace": null
+  },
+  "ok": true,
+  "version": "1.0"
+}
