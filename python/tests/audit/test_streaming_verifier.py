@@ -76,7 +76,7 @@ class TestHMACStreamingVerification:
         assert result.ok is True
         assert result.mode == "hmac"
         assert result.records_checked == 3
-        assert "Verified 3 records" in result.reason
+        assert "verified 3 records" in result.reason
         assert result.duration_ms >= 0
         assert result.file_size_bytes > 0
 
@@ -258,7 +258,7 @@ class TestSHA256StreamingVerification:
         assert result.ok is True
         assert result.mode == "sha256"
         assert result.records_checked == 3
-        assert "Verified 3 records" in result.reason
+        assert "verified 3 records" in result.reason
         assert result.duration_ms >= 0
 
     def test_verify_sha256_empty_chain(self, tmp_path: Path):
@@ -469,7 +469,7 @@ class TestVerificationResultModel:
             ok=True,
             mode="hmac",
             records_checked=100,
-            reason="Verified 100 records",
+            reason="verified 100 records",
             duration_ms=1234,
             file_size_bytes=1024000,
         )
@@ -477,7 +477,7 @@ class TestVerificationResultModel:
         assert result.ok is True
         assert result.mode == "hmac"
         assert result.records_checked == 100
-        assert result.reason == "Verified 100 records"
+        assert result.reason == "verified 100 records"
         assert result.duration_ms == 1234
         assert result.file_size_bytes == 1024000
 
@@ -487,7 +487,7 @@ class TestVerificationResultModel:
             ok=True,
             mode="sha256",
             records_checked=50,
-            reason="Verified 50 records",
+            reason="verified 50 records",
             duration_ms=567,
         )
 
@@ -497,7 +497,7 @@ class TestVerificationResultModel:
         assert parsed["ok"] is True
         assert parsed["mode"] == "sha256"
         assert parsed["records_checked"] == 50
-        assert parsed["reason"] == "Verified 50 records"
+        assert parsed["reason"] == "verified 50 records"
         assert parsed["duration_ms"] == 567
         assert "file_size_bytes" in parsed  # Optional field present as null
 

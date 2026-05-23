@@ -6,8 +6,8 @@ import { ArcService, ActiveTraceEventChunk, TraceData, TraceEvent, TraceFile } f
 import { VirtualizedEventList } from './components/VirtualizedEventList';
 import { PolicyBypassBanner } from './components/PolicyBypassBanner';
 
-type StreamMode = 'replay-trace' | 'live-available' | 'live-connecting' | 'live' | 'live-disconnected' | 'live-error' | 'live-terminal';
-type LiveArcService = ArcService & { streamActiveTrace?: (request: { runId: string; mode: 'live' }) => Promise<AsyncIterable<ActiveTraceEventChunk>> };
+type StreamMode = 'replay-trace' | 'live-available' | 'live-connecting' | 'live' | 'reconnecting' | 'live-disconnected' | 'live-error' | 'live-terminal';
+type LiveArcService = ArcService & { streamActiveTrace?: (request: { runId: string; mode: 'live'; lastEventId?: number }) => Promise<AsyncIterable<ActiveTraceEventChunk>> };
 
 const TERMINAL_EVENT_TYPES = new Set(['RUN_COMPLETED', 'RUN_FAILED', 'RUN_CANCELLED', 'STREAM_END']);
 
@@ -35,6 +35,7 @@ export class ArcEventStreamWidget extends ReactWidget {
     protected selectedTrace: TraceData | null = null;
     protected selectedEvent: TraceEvent | null = null;
     protected liveEvents: TraceEvent[] = [];
+    protected lastEventId: number = 0;
     protected streamMode: StreamMode = 'replay-trace';
     protected filter = '';
     protected selectedEventTypes = new Set<string>();
@@ -72,6 +73,7 @@ export class ArcEventStreamWidget extends ReactWidget {
         this.selectedEvent = null;
         this.selectedTrace = await this.arcService.readTrace(trace.id);
         this.liveEvents = [];
+        this.lastEventId = 0;
         this.streamMode = this.hasLiveStream() ? 'live-available' : 'replay-trace';
         this.update();
     }
@@ -81,22 +83,43 @@ export class ArcEventStreamWidget extends ReactWidget {
             return;
         }
         this.liveEvents = [];
+        this.lastEventId = 0;
         this.streamMode = 'live-connecting';
         this.error = '';
         this.update();
+        await this.runLiveStream(0);
+    }
+
+    private maxReconnectAttempts = 5;
+
+    private async runLiveStream(retryCount: number): Promise<void> {
+        if (!this.selectedTrace || !this.hasLiveStream()) {
+            return;
+        }
         try {
-            const stream = await (this.arcService as LiveArcService).streamActiveTrace!({ runId: this.selectedTrace.id, mode: 'live' });
-            this.streamMode = 'live';
+            const request: { runId: string; mode: 'live'; lastEventId?: number } = { runId: this.selectedTrace.id, mode: 'live' };
+            if (this.lastEventId > 0) {
+                request.lastEventId = this.lastEventId;
+            }
+            const stream = await (this.arcService as LiveArcService).streamActiveTrace!(request);
+            if (this.streamMode === 'reconnecting') {
+                this.streamMode = 'live';
+            } else if (this.streamMode !== 'live') {
+                this.streamMode = 'live';
+            }
             this.update();
             for await (const chunk of stream) {
                 if (!chunk.event) {
-                    this.streamMode = chunk.done ? 'live-disconnected' : 'live';
-                    this.update();
-                    if (chunk.done) break;
+                    if (chunk.done) {
+                        this.streamMode = 'live-disconnected';
+                        this.update();
+                        break;
+                    }
                     continue;
                 }
                 const event = chunk.event as TraceEvent;
                 this.liveEvents = [...this.liveEvents, event];
+                this.lastEventId++;
                 this.streamMode = TERMINAL_EVENT_TYPES.has(event.type) || ('done' in chunk && chunk.done) ? 'live-terminal' : 'live';
                 this.update();
                 if (this.streamMode === 'live-terminal') {
@@ -108,9 +131,17 @@ export class ArcEventStreamWidget extends ReactWidget {
                 this.update();
             }
         } catch (error) {
-            this.streamMode = 'live-error';
-            this.error = error instanceof Error ? error.message : String(error);
-            this.update();
+            if (retryCount < this.maxReconnectAttempts) {
+                this.streamMode = 'reconnecting';
+                this.update();
+                const delay = Math.min(2000 * Math.pow(2, retryCount) + Math.random() * 1000, 30000);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                await this.runLiveStream(retryCount + 1);
+            } else {
+                this.streamMode = 'live-error';
+                this.error = error instanceof Error ? error.message : String(error);
+                this.update();
+            }
         }
     }
 
@@ -281,6 +312,8 @@ export class ArcEventStreamWidget extends ReactWidget {
                 return 'Live stream connecting';
             case 'live':
                 return 'Live stream active';
+            case 'reconnecting':
+                return 'Live stream reconnecting...';
             case 'live-disconnected':
                 return 'Live stream disconnected';
             case 'live-error':

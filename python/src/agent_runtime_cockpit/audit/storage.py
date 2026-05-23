@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Optional
 
-from .hmac_chain import HmacAuditChainWriter, verify_hmac_chain
+from .hmac_chain import HmacAuditChainWriter
 from .key_manager import AuditKeyManager
 from .schema import AuditEvent
 
@@ -64,14 +64,19 @@ class AuditChainStore:
         return writer.append(event.to_audit_event())
 
     def verify_run(self, run_id: str) -> tuple[bool, str]:
-        """Verify HMAC chain integrity for a run.
+        """Verify audit chain integrity for a run using streaming verifier.
 
         Returns (ok, message). Requires the HMAC key to be available.
+        Uses memory-bounded StreamingAuditVerifier instead of legacy full-file load.
         """
         key, status = self.key_manager.get_key()
         if key is None:
             return False, "No audit key available. Run 'arc audit key init'."
-        return verify_hmac_chain(self._chain_path(run_id), key)
+        from .streaming_verifier import StreamingAuditVerifier
+
+        verifier = StreamingAuditVerifier()
+        result = verifier.verify_hmac(self._chain_path(run_id), key)
+        return result.ok, result.reason
 
     def export_run(self, run_id: str, output_path: Optional[Path] = None) -> Optional[Path]:
         """Export a signed audit bundle for a run.

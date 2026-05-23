@@ -166,7 +166,7 @@ class StreamingAuditVerifier:
             ok=True,
             mode="hmac",
             records_checked=records_checked,
-            reason=f"Verified {records_checked} records",
+            reason=f"verified {records_checked} records",
             duration_ms=duration_ms,
             file_size_bytes=file_size,
         )
@@ -290,7 +290,7 @@ class StreamingAuditVerifier:
             ok=True,
             mode="sha256",
             records_checked=records_checked,
-            reason=f"Verified {records_checked} records",
+            reason=f"verified {records_checked} records",
             duration_ms=duration_ms,
             file_size_bytes=file_size,
         )

@@ -189,6 +189,28 @@ class StepFailedEvent(BaseModel):
 # ─── Tool Call Events ────────────────────────────────────────────────────────
 
 
+class ToolCallStartData(BaseModel):
+    """Data payload for TOOL_CALL_START event."""
+
+    tool_call_id: str
+    tool_name: str
+    arguments: dict[str, Any] | None = None
+    node_id: str | None = None
+    message_id: str | None = None
+    evidence_refs: list[str] | None = None
+
+
+class ToolCallStartEvent(BaseModel):
+    """TOOL_CALL_START event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["TOOL_CALL_START"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: ToolCallStartData
+
+
 class ToolCallData(BaseModel):
     """Data payload for TOOL_CALL event."""
 
@@ -305,6 +327,27 @@ class HitlResponseEvent(BaseModel):
     data: HitlResponseData
 
 
+class HitlTimeoutData(BaseModel):
+    """Data payload for HITL_TIMEOUT event."""
+
+    hitl_id: str
+    step_id: str
+    timeout_seconds: int
+    node_id: str | None = None
+    message_id: str | None = None
+
+
+class HitlTimeoutEvent(BaseModel):
+    """HITL_TIMEOUT event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["HITL_TIMEOUT"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: HitlTimeoutData
+
+
 # ─── SwarmGraph Events ───────────────────────────────────────────────────────
 
 
@@ -387,6 +430,73 @@ class SwarmGraphCostEvent(BaseModel):
     data: SwarmGraphCostData
 
 
+# ─── Message Events ──────────────────────────────────────────────────────────
+
+
+class MessageData(BaseModel):
+    """Data payload for MESSAGE event."""
+
+    message_id: str
+    role: str
+    content: str
+    node_id: str | None = None
+    evidence_refs: list[str] | None = None
+
+
+class MessageEvent(BaseModel):
+    """MESSAGE event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["MESSAGE"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: MessageData
+
+
+# ─── Node Events ─────────────────────────────────────────────────────────────
+
+
+class NodeStartedData(BaseModel):
+    """Data payload for NODE_STARTED event."""
+
+    node_id: str
+    node_name: str
+    node_type: str | None = None
+    evidence_refs: list[str] | None = None
+
+
+class NodeStartedEvent(BaseModel):
+    """NODE_STARTED event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["NODE_STARTED"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: NodeStartedData
+
+
+class NodeFailedData(BaseModel):
+    """Data payload for NODE_FAILED event."""
+
+    node_id: str
+    error: str
+    node_name: str | None = None
+    evidence_refs: list[str] | None = None
+
+
+class NodeFailedEvent(BaseModel):
+    """NODE_FAILED event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["NODE_FAILED"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: NodeFailedData
+
+
 # ─── Raw/Unknown Events ──────────────────────────────────────────────────────
 
 
@@ -432,11 +542,16 @@ KnownRunEvent = Union[
     StepStartedEvent,
     StepCompletedEvent,
     StepFailedEvent,
+    ToolCallStartEvent,
     ToolCallEvent,
     ToolCallResultEvent,
     ToolCallErrorEvent,
     HitlPromptEvent,
     HitlResponseEvent,
+    HitlTimeoutEvent,
+    MessageEvent,
+    NodeStartedEvent,
+    NodeFailedEvent,
     SwarmGraphTopologyEvent,
     SwarmGraphConsensusEvent,
     SwarmGraphCostEvent,
@@ -496,11 +611,16 @@ def is_known_event(event: TypedRunEvent) -> TypeGuard[KnownRunEvent]:
         "STEP_STARTED",
         "STEP_COMPLETED",
         "STEP_FAILED",
+        "TOOL_CALL_START",
         "TOOL_CALL",
         "TOOL_CALL_RESULT",
         "TOOL_CALL_ERROR",
         "HITL_PROMPT",
         "HITL_RESPONSE",
+        "HITL_TIMEOUT",
+        "MESSAGE",
+        "NODE_STARTED",
+        "NODE_FAILED",
         "SWARMGRAPH_TOPOLOGY",
         "SWARMGRAPH_CONSENSUS",
         "SWARMGRAPH_COST",
@@ -539,11 +659,16 @@ def parse_typed_event(raw: dict[str, Any]) -> TypedRunEvent:
         "STEP_STARTED": StepStartedEvent,
         "STEP_COMPLETED": StepCompletedEvent,
         "STEP_FAILED": StepFailedEvent,
+        "TOOL_CALL_START": ToolCallStartEvent,
         "TOOL_CALL": ToolCallEvent,
         "TOOL_CALL_RESULT": ToolCallResultEvent,
         "TOOL_CALL_ERROR": ToolCallErrorEvent,
         "HITL_PROMPT": HitlPromptEvent,
         "HITL_RESPONSE": HitlResponseEvent,
+        "HITL_TIMEOUT": HitlTimeoutEvent,
+        "MESSAGE": MessageEvent,
+        "NODE_STARTED": NodeStartedEvent,
+        "NODE_FAILED": NodeFailedEvent,
         "SWARMGRAPH_TOPOLOGY": SwarmGraphTopologyEvent,
         "SWARMGRAPH_CONSENSUS": SwarmGraphConsensusEvent,
         "SWARMGRAPH_COST": SwarmGraphCostEvent,

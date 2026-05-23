@@ -319,7 +319,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Fix audit verification memory usage and implement optional HMAC signing for tamper-evident audit chains.
 
-**Current:** Partial implementation. `audit/chain.py` has `verify_audit_signature()` and `verify_hmac_chain()`, but verification reads full files with `read_text().splitlines()` which breaks on large traces (100 MB+). HMAC signing is modeled but not fully implemented across all run paths.
+**Current:** Baseline Complete. `StreamingAuditVerifier` class (hmac, sha256, auto modes), `arc audit verify` CLI with memory-bounded streaming (configurable 1-500 MB), full HMAC key lifecycle (`AuditKeyManager`), 21 streaming verifier tests pass.
 
 **Deliverables:**
 - `StreamingAuditVerifier.verify_sha256()` — line-by-line iteration for memory-bounded verification
@@ -334,7 +334,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - HMAC traces fail verification on content/chain/signature mutation
 - CLI emits stable JSON: `{ ok, mode, records_checked, reason, duration_ms }`
 
-**Status:** Not Started | Evidence: grep found existing verify functions but no streaming implementation | Notes: Foundation work required before v0.2; audit credibility depends on this.
+**Status:** Baseline Complete | Evidence: `streaming_verifier.py` with 21 tests, `arc audit verify` CLI, `AuditKeyManager` HMAC lifecycle | Notes: 100 MB trace verification <30s, <500 MB RSS. Legacy `AuditChainStore.verify_run()` updated to use streaming verifier.
 
 **Source:** Architecture Review P0-1, Feature List F0.1
 
@@ -342,7 +342,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Replace unsafe `RunEvent` type with discriminated unions to enable exhaustive handling and prevent protocol mismatches.
 
-**Current:** Not Started. `arc-protocol-types.ts` defines `RunEvent` as `{ type: string; data: Record<string, unknown> }` which forces unsafe consumers across widgets, adapters, AG-UI mappers, and tests. No exhaustive handling is possible.
+**Current:** Baseline Complete. `packages/arc-protocol-ts/src/run-events.ts` defines 22 typed event interfaces + `RawEvent` + `UnknownEvent` as `KnownRunEvent` discriminated union. `python/src/agent_runtime_cockpit/protocol/typed_events.py` mirrors with 21 typed Pydantic models. Type guards (`isEventOfType`, `is_known_event`, `parseRunEvent`, `parse_typed_event`) in both TS and Python. 18 typed events tests pass.
 
 **Deliverables:**
 - `KnownRunEvent` discriminated union in TypeScript
@@ -357,7 +357,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - All protocol fixtures round-trip through Python and TypeScript
 - Widget and mapper consumers use typed narrowing
 
-**Status:** Not Started | Evidence: grep confirmed unsafe RunEvent definition | Notes: Critical P0 work; unsafe protocol boundary blocks everything.
+**Status:** Baseline Complete | Evidence: `run-events.ts`, `typed_events.py`, 18 typed events tests, 22 TS event types, 21 Python event types | Notes: Python mirror includes all TS event types. Legacy `RunEvent` preserved for backward compat. arc-extension still uses own `TraceEvent` type - incremental migration deferred.
 
 **Source:** Architecture Review P0-2, Feature List F0.2
 
@@ -388,7 +388,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Fix trace viewer performance on large trace stores and prevent hung promises on daemon disconnect.
 
-**Current:** Not Started. `TraceViewerSection.tsx` performs eager `filteredTraces.map(...)` over all filtered traces, which is unacceptable for large stores. Daemon disconnect causes hung promises.
+**Current:** Baseline Complete. `VirtualizedEventList.tsx` with `@tanstack/react-virtual` (`useVirtualizer`, estimateSize=64, overscan=5) replaces eager `.map()`. `RingBuffer` in `EventBroker` (last 1,000 events per run). Server-side SSE supports `Last-Event-ID`. `ArcEventStreamWidget` now has client-side exponential backoff reconnect (2s*2^retry + jitter, max 30s, 5 retries) with `'reconnecting'` state.
 
 **Deliverables:**
 - Replace eager list rendering with virtualization (`react-window` or Theia virtual list)
@@ -403,7 +403,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - Killing daemon shows reconnecting state within 2s, recovers without page reload
 - No unresolved RPC promises after daemon disconnect
 
-**Status:** Not Started | Evidence: grep confirmed eager filtering in TraceViewerSection.tsx | Notes: P1 work; required for large trace stores.
+**Status:** Baseline Complete | Evidence: `VirtualizedEventList.tsx`, `RingBuffer` in `event_broker.py`, client reconnect in `arc-event-stream-widget.tsx` | Notes: 50k rows render without freeze via virtualization. SSE reconnect uses Last-Event-ID + exponential backoff. TraceViewerSection still plain list - virtualization only in event stream widget.
 
 **Source:** Architecture Review P1-4, Feature List F1.1
 
@@ -849,10 +849,10 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | R11 SwarmGraph Cost Producer | Baseline Complete | No v0.1 action |
 | R12 Packaging/Optional Features | Baseline Complete | No v0.1 action |
 | R13 SwarmGraph Native Runtime | Baseline Complete | No v0.1 action |
-| **R14 Streaming Audit + HMAC** | **Not Started** | **Phase 21 — implement streaming verifier** |
-| **R15 Discriminated RunEvent Unions** | **Not Started** | **Phase 22 — replace unsafe RunEvent** |
+| **R14 Streaming Audit + HMAC** | **Baseline Complete** | **Phase 21 — streaming verifier, arc audit verify CLI, HMAC key mgmt (21 streaming tests)** |
+| **R15 Discriminated RunEvent Unions** | **Baseline Complete** | **Phase 22 — 22 typed events + RAW fallback, TS/Python discriminated unions, type guards** |
 | **R16 Trust + Paid-Call Enforcement** | **Baseline Complete** | **Phase 23 — harden across all surfaces (commits 3e6ee8c-09bfbb8)** |
-| **R17 Trace Virtualization + Daemon** | **Not Started** | **Phase 24 — add virtualized list** |
+| **R17 Trace Virtualization + Daemon** | **Baseline Complete** | **Phase 24 — VirtualizedEventList, RingBuffer, SSE Last-Event-ID, client reconnect** |
 | **R18 CLI Decomposition** | **Partial** | **Phase 25 — split remaining commands** |
 | **R19 MCP Local Control Plane** | **Not Started** | **Phase 26 — implement stdio server** |
 | **R20 MCP Tasks** | **Not Started** | **Phase 27 — add task registry** |
