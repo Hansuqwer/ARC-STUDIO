@@ -4,6 +4,7 @@ ARC Adapter Registry
 Discovers adapters, runs detection against a workspace, and routes calls
 to the correct adapter.
 """
+
 from __future__ import annotations
 
 import logging
@@ -64,14 +65,16 @@ class AdapterRegistry:
                 else:
                     conf_level = ConfidenceLevel.LOW
 
-                results.append(RuntimeInfo(
-                    id=f"{adapter.adapter_id}-{hash(str(workspace)) % 10000:04d}",
-                    name=f"{adapter.adapter_name} Project",
-                    adapter=adapter.adapter_id,
-                    confidence=conf_level,
-                    evidence=evidence,
-                    capabilities=adapter.capabilities(),
-                ))
+                results.append(
+                    RuntimeInfo(
+                        id=f"{adapter.adapter_id}-{hash(str(workspace)) % 10000:04d}",
+                        name=f"{adapter.adapter_name} Project",
+                        adapter=adapter.adapter_id,
+                        confidence=conf_level,
+                        evidence=evidence,
+                        capabilities=adapter.capabilities(),
+                    )
+                )
                 log.info("Adapter %s detected (confidence=%.2f)", adapter.adapter_id, confidence)
 
             except Exception as e:
@@ -85,11 +88,14 @@ class AdapterRegistry:
         from .crewai import CrewAIAdapter
         from .swarmgraph import SwarmGraphAdapter
         from .langgraph import LangGraphAdapter
+        from .langchain import LangChainAdapter
         from .llamaindex import LlamaIndexAdapter
         from .lmarena import LmarenaAdapter
         from .openai_agents import OpenAIAgentsAdapter
+
         self.register(SwarmGraphAdapter())
         self.register(LangGraphAdapter())
+        self.register(LangChainAdapter())
         self.register(CrewAIAdapter())
         self.register(OpenAIAgentsAdapter())
         self.register(AG2Adapter())
