@@ -6,6 +6,12 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 
 ### Added
 
+- **Protocol**: PolicyBypassWarning event type for non-blocking enforcement gap alerts (Phase 22.1)
+- **Protocol**: PolicyBypassReason enum with 5 bypass reason codes (Phase 22.1)
+- **Security**: `emit_policy_bypass_warning()` helper with rate-limiting per (run_id, surface_identifier) (Phase 22.1)
+- **CLI**: `arc audit query --kind --surface` command for filtering audit events (Phase 22.1)
+- **Tests**: Audit verifier compatibility test with 100 MB trace containing 10,000 bypass warnings (Phase 22.1)
+- **Docs**: ADR-0022.1 documenting policy bypass warning architecture and design decisions (Phase 22.1)
 - **UI**: DenialModal React component for security gate user confirmation (Phase 23.3)
 - **UI**: useDenialHandler hook for denial event processing and retry API calls (Phase 23.3)
 - **API**: `POST /api/enforcement/retry` endpoint for user approval/decline decisions (Phase 23.3)
