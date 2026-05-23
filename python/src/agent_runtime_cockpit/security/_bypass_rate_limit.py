@@ -26,7 +26,7 @@ def _get_emitted_set() -> set[tuple[str, str]]:
         return _emitted_warnings.get()
     except LookupError:
         # Not set yet, initialize with empty set
-        emitted = set()
+        emitted: set[tuple[str, str]] = set()
         _emitted_warnings.set(emitted)
         return emitted
 
