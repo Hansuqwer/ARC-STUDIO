@@ -63,6 +63,7 @@ markers = [
     "benchmark: marks tests as benchmarks (off-gate, not required for CI)",
     "needs(dep): mark test as requiring a specific CLI subcommand or fixture",
     "real_runtime: opt-in smoke tests for real runtime imports/integration",
+    "slow: marks tests as slow-running (can be skipped with -m 'not slow')",
 ]
 filterwarnings = [
     # Transitive LangGraph warning until upstream resolves allowed_objects default.
