@@ -99,6 +99,59 @@ def test_providers_catalog_shows_setup_instructions():
     assert "OPENAI_API_KEY" in result.output
 
 
+def test_providers_setup_unconfigured_provider(monkeypatch):
+    """arc providers setup shows setup instructions for unconfigured provider."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    result = CliRunner().invoke(app, ["providers", "setup", "openai", "--no-interactive", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert data["provider"] == "openai"
+    assert data["configured"] is False
+    assert "message" in data
+
+
+def test_providers_setup_configured_provider(monkeypatch):
+    """arc providers setup detects already configured provider."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-should-not-emit")
+    result = CliRunner().invoke(app, ["providers", "setup", "openai", "--no-interactive", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert data["provider"] == "openai"
+    assert data["configured"] is True
+    assert data["env_source"] == "OPENAI_API_KEY"
+    assert "sk-test-should-not-emit" not in result.output
+
+
+def test_providers_setup_invalid_provider():
+    """arc providers setup fails gracefully with invalid provider."""
+    result = CliRunner().invoke(
+        app, ["providers", "setup", "invalid-provider-xyz", "--no-interactive", "--json"]
+    )
+    assert result.exit_code == 1
+    assert "Unknown provider" in result.output
+
+
+def test_providers_setup_local_provider():
+    """arc providers setup handles local providers correctly."""
+    result = CliRunner().invoke(app, ["providers", "setup", "ollama", "--no-interactive", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert data["provider"] == "ollama"
+    # Local providers return configured=False with setup message
+    assert "message" in data
+
+
+def test_providers_setup_shows_provider_details(monkeypatch):
+    """arc providers setup shows comprehensive provider details (non-JSON mode)."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    result = CliRunner().invoke(app, ["providers", "setup", "anthropic", "--no-interactive"])
+    assert result.exit_code == 0, result.output
+    # Should show provider details in human-readable format
+    assert "Anthropic" in result.output
+    assert "anthropic" in result.output
+    assert "ANTHROPIC_API_KEY" in result.output
+
+
 def test_providers_key_set_env_ref_only(tmp_path, monkeypatch):
     """arc providers key set stores env var refs, not raw keys."""
     config_path = tmp_path / "providers.json"

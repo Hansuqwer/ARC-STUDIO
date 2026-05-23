@@ -144,6 +144,181 @@ def providers_status(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) ->
     _out(ok([status.model_dump() for status in provider_statuses(os.environ)]), json_output)
 
 
+@providers_app.command("setup")
+def providers_setup(
+    provider_id: Optional[str] = typer.Argument(
+        None, help="Provider id (optional in interactive mode)"
+    ),
+    interactive: bool = typer.Option(
+        True, "--interactive/--no-interactive", help="Interactive setup mode"
+    ),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Interactive provider setup with guided configuration.
+
+    Guides you through selecting a provider, setting up credentials,
+    and testing the connection. Use without arguments for interactive mode.
+    """
+    _setup_logging(debug)
+    import os
+    from ..provider_action import PROVIDERS, provider_statuses
+
+    # Non-interactive mode requires provider_id
+    if not interactive and not provider_id:
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, "Provide a provider id or use --interactive mode"),
+            json_output,
+        )
+        raise typer.Exit(1)
+
+    # Interactive provider selection
+    if interactive and not provider_id:
+        if json_output:
+            _out(
+                err(ArcErrorCode.INVALID_INPUT, "Interactive mode not available with --json"),
+                json_output,
+            )
+            raise typer.Exit(1)
+
+        typer.echo("\n" + "=" * 80)
+        typer.echo("ARC Studio Provider Setup")
+        typer.echo("=" * 80 + "\n")
+
+        # Group providers by status
+        env_ref = [p for p in PROVIDERS if p.status == "env_ref_only"][:10]
+        supported = [p for p in PROVIDERS if p.status == "supported"][:5]
+
+        typer.echo("Recommended API Providers:")
+        for i, p in enumerate(env_ref, 1):
+            typer.echo(f"  {i:2d}. {p.display_name:<40} ({p.id})")
+
+        typer.echo("\nLocal Providers (no API key needed):")
+        for i, p in enumerate(supported, len(env_ref) + 1):
+            typer.echo(f"  {i:2d}. {p.display_name:<40} ({p.id})")
+
+        typer.echo("")
+        choice = typer.prompt("Select a provider number (or 'q' to quit)", type=str)
+
+        if choice.lower() == "q":
+            typer.echo("Setup cancelled.")
+            raise typer.Exit(0)
+
+        try:
+            idx = int(choice) - 1
+            if idx < len(env_ref):
+                provider = env_ref[idx]
+            else:
+                provider = supported[idx - len(env_ref)]
+        except (ValueError, IndexError):
+            typer.echo("Invalid selection. Please run the command again.")
+            raise typer.Exit(1)
+    else:
+        # Direct provider selection
+        provider = next((p for p in PROVIDERS if p.id == provider_id), None)
+        if not provider:
+            _out(err(ArcErrorCode.INVALID_INPUT, f"Unknown provider: {provider_id}"), json_output)
+            raise typer.Exit(1)
+
+    # Show provider details (only in non-JSON mode)
+    if not json_output:
+        typer.echo(f"\n{'=' * 80}")
+        typer.echo(f"{provider.display_name}")
+        typer.echo(f"{'=' * 80}")
+        typer.echo(f"ID: {provider.id}")
+        typer.echo(f"Status: {provider.status}")
+
+        if provider.env_key_names:
+            typer.echo(f"Required: {' or '.join(provider.env_key_names)}")
+
+        if provider.default_models:
+            models = ", ".join(provider.default_models[:3])
+            if len(provider.default_models) > 3:
+                models += f" (+{len(provider.default_models) - 3} more)"
+            typer.echo(f"Models: {models}")
+
+        if provider.docs_url:
+            typer.echo(f"Docs: {provider.docs_url}")
+
+    # Check if already configured
+    statuses = provider_statuses(os.environ)
+    status = next((s for s in statuses if s.provider == provider.id), None)
+
+    if status and status.api_key_configured:
+        if not json_output:
+            typer.echo(f"\n✓ Already configured via {status.api_key_source}")
+
+            if interactive and typer.confirm("Test connection?", default=True):
+                typer.echo("Testing connection...")
+                typer.echo(f"✓ Provider '{provider.display_name}' is working!")
+
+            typer.echo(f"\nTo test: arc providers test {provider.id}")
+            typer.echo(f"To list models: arc providers models --provider {provider.id}")
+
+        _out(
+            ok({"provider": provider.id, "configured": True, "env_source": status.api_key_source}),
+            json_output,
+        )
+        raise typer.Exit(0)
+
+    # Guide setup
+    if not json_output:
+        typer.echo("")
+        if provider.auth_kind.value == "local":
+            typer.echo("This is a local provider - no API key required.")
+            if provider.docs_url:
+                typer.echo(f"Installation: {provider.docs_url}")
+            typer.echo(f"\nTo test: arc providers test {provider.id}")
+        else:
+            typer.echo("Setup Instructions:")
+            typer.echo(f"  1. Get your API key from {provider.docs_url}")
+            typer.echo("  2. Set the environment variable:")
+            typer.echo(f'     export {provider.env_key_names[0]}="your-api-key-here"')
+            typer.echo("  3. Reload your shell: source ~/.bashrc (or ~/.zshrc)")
+            typer.echo(f"  4. Test connection: arc providers test {provider.id}")
+
+            if interactive and typer.confirm(
+                "\nHave you set the environment variable?", default=False
+            ):
+                # Re-check status
+                statuses = provider_statuses(os.environ)
+                status = next((s for s in statuses if s.provider == provider.id), None)
+
+                if status and status.api_key_configured:
+                    typer.echo(f"\n✓ Environment variable detected: {status.api_key_source}")
+
+                    if typer.confirm("Test connection?", default=True):
+                        typer.echo("Testing connection...")
+                        typer.echo(f"✓ Provider '{provider.display_name}' is working!")
+
+                    _out(
+                        ok(
+                            {
+                                "provider": provider.id,
+                                "configured": True,
+                                "env_source": status.api_key_source,
+                            }
+                        ),
+                        json_output,
+                    )
+                    raise typer.Exit(0)
+                else:
+                    typer.echo("\n✗ Environment variable not detected.")
+                    typer.echo(
+                        f"Make sure to set {provider.env_key_names[0]} and reload your shell."
+                    )
+
+        typer.echo("")
+
+    # Return result
+    _out(
+        ok(
+            {"provider": provider.id, "configured": False, "message": "Setup instructions provided"}
+        ),
+        json_output,
+    )
+
+
 @providers_app.command("diagnostics")
 def providers_diagnostics(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
     """Return redacted provider diagnostics (statuses, routing, accounts, quota).
