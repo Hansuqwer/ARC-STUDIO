@@ -502,12 +502,13 @@ export class ConfigService {
             
             if (parsed.ok && parsed.data) {
                 const data = parsed.data;
+                const configured = data.configured !== false;
                 return {
                     provider: data.provider || providerId,
                     providerId: data.provider_id || data.providerId || providerId,
                     displayName: data.display_name || data.displayName || providerId,
-                    configured: data.configured !== false,
-                    status: data.status || 'success',
+                    configured,
+                    status: configured ? 'success' : 'warning',
                     message: data.message || 'Provider test successful',
                     details: {
                         baseUrl: data.base_url || data.baseUrl,
@@ -534,12 +535,13 @@ export class ConfigService {
                     const parsed = JSON.parse(output);
                     if (parsed.data) {
                         const data = parsed.data;
+                        const configured = data.configured !== false;
                         return {
                             provider: data.provider || providerId,
                             providerId: data.provider_id || data.providerId || providerId,
                             displayName: data.display_name || data.displayName || providerId,
-                            configured: data.configured !== false,
-                            status: data.status || 'error',
+                            configured,
+                            status: configured ? 'warning' : 'error',
                             message: data.message || parsed.error?.message || 'Provider test failed',
                             details: {
                                 baseUrl: data.base_url || data.baseUrl,

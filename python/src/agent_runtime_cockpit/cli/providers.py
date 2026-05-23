@@ -365,7 +365,9 @@ def providers_test(
     statuses = provider_statuses(os.environ)
     status = next((s for s in statuses if s.provider == provider_id), None)
 
-    if not status or not status.api_key_configured:
+    is_local_provider = provider.auth_kind.value == "local"
+
+    if not is_local_provider and (not status or not status.api_key_configured):
         missing_vars = (
             " or ".join(provider.env_key_names) if provider.env_key_names else "credentials"
         )
@@ -383,11 +385,15 @@ def providers_test(
         "provider": provider_id,
         "display_name": provider.display_name,
         "configured": True,
-        "env_source": status.api_key_source,
+        "env_source": "local" if is_local_provider else (status.api_key_source if status else None),
         "base_url": provider.default_base_url,
         "status": provider.status,
-        "test_result": "credentials_present",
-        "message": f"✓ Provider '{provider.display_name}' is configured via {status.api_key_source}",
+        "test_result": "local_provider" if is_local_provider else "credentials_present",
+        "message": (
+            f"✓ Provider '{provider.display_name}' is local and does not require credentials"
+            if is_local_provider
+            else f"✓ Provider '{provider.display_name}' is configured via {status.api_key_source if status else 'environment'}"
+        ),
         "docs_url": provider.docs_url if provider.docs_url else None,
     }
 

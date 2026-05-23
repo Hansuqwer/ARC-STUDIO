@@ -723,6 +723,18 @@ def test_providers_test_shows_provider_details(monkeypatch):
     assert "sk-ant-test-should-not-emit" not in result.output
 
 
+def test_providers_test_local_provider_requires_no_api_key(monkeypatch):
+    """arc providers test succeeds for local providers without credentials."""
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+    result = CliRunner().invoke(app, ["providers", "test", "ollama", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert data["provider"] == "ollama"
+    assert data["configured"] is True
+    assert data["env_source"] == "local"
+    assert data["test_result"] == "local_provider"
+
+
 def test_providers_models_configured_only(monkeypatch):
     """arc providers models shows models from configured providers only."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
