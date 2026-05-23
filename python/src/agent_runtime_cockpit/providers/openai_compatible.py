@@ -1,0 +1,338 @@
+"""OpenAI-compatible ProviderClient implementation.
+
+Supports multiple vendors (OpenAI, Together, Groq, DeepInfra, Fireworks, llama.cpp)
+through a single adapter with configurable base_url and per-vendor allowlists.
+
+The client is dependency-injected/testable and imports the OpenAI SDK lazily
+so default test suites never require credentials or make network calls.
+"""
+
+from __future__ import annotations
+
+import os
+from collections.abc import Callable
+from typing import Any, AsyncIterator, Literal
+
+from agent_runtime_cockpit.cli_repl.cancellation import Cancelled, CancellationToken
+
+from .base import (
+    AuthError,
+    CancelledError,
+    CostRates,
+    ModelError,
+    NetworkError,
+    ProviderCapability,
+    ProviderFeature,
+    ProviderRequest,
+    ProviderResponse,
+    RateLimitError,
+    StreamChunk,
+    UsageRecord,
+    ValidationError,
+)
+
+
+# Vendor configuration
+VendorName = Literal["openai", "together", "groq", "deepinfra", "fireworks", "llamacpp"]
+
+VENDOR_CONFIGS = {
+    "openai": {
+        "base_url": "https://api.openai.com/v1",
+        "default_model": "gpt-4o-mini",
+        "supported_models": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
+        "features": [
+            ProviderFeature.STREAMING,
+            ProviderFeature.TOOL_USE,
+            ProviderFeature.VISION,
+            ProviderFeature.JSON_MODE,
+        ],
+        "cost_rates": {
+            "gpt-4o": CostRates(input_per_million=2.50, output_per_million=10.0),
+            "gpt-4o-mini": CostRates(input_per_million=0.15, output_per_million=0.60),
+            "gpt-4-turbo": CostRates(input_per_million=10.0, output_per_million=30.0),
+            "gpt-3.5-turbo": CostRates(input_per_million=0.50, output_per_million=1.50),
+        },
+    },
+    "together": {
+        "base_url": "https://api.together.xyz/v1",
+        "default_model": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+        "supported_models": [
+            "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+            "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
+        ],
+        "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE],
+        "cost_rates": {
+            "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo": CostRates(
+                input_per_million=0.20, output_per_million=0.20
+            ),
+            "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo": CostRates(
+                input_per_million=0.88, output_per_million=0.88
+            ),
+        },
+    },
+    "groq": {
+        "base_url": "https://api.groq.com/openai/v1",
+        "default_model": "llama-3.3-70b-versatile",
+        "supported_models": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
+        "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE],
+        "cost_rates": {
+            "llama-3.3-70b-versatile": CostRates(input_per_million=0.59, output_per_million=0.79),
+            "llama-3.1-8b-instant": CostRates(input_per_million=0.05, output_per_million=0.08),
+        },
+    },
+    "deepinfra": {
+        "base_url": "https://api.deepinfra.com/v1/openai",
+        "default_model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+        "supported_models": ["meta-llama/Meta-Llama-3.1-8B-Instruct"],
+        "features": [ProviderFeature.STREAMING],
+        "cost_rates": {
+            "meta-llama/Meta-Llama-3.1-8B-Instruct": CostRates(
+                input_per_million=0.08, output_per_million=0.08
+            )
+        },
+    },
+    "fireworks": {
+        "base_url": "https://api.fireworks.ai/inference/v1",
+        "default_model": "accounts/fireworks/models/llama-v3p1-8b-instruct",
+        "supported_models": ["accounts/fireworks/models/llama-v3p1-8b-instruct"],
+        "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE],
+        "cost_rates": {
+            "accounts/fireworks/models/llama-v3p1-8b-instruct": CostRates(
+                input_per_million=0.20, output_per_million=0.20
+            )
+        },
+    },
+    "llamacpp": {
+        "base_url": "http://localhost:8080/v1",
+        "default_model": "local-model",
+        "supported_models": ["local-model"],
+        "features": [ProviderFeature.STREAMING],
+        "cost_rates": {"local-model": CostRates(input_per_million=0.0, output_per_million=0.0)},
+    },
+}
+
+
+class OpenAICompatibleClient:
+    """OpenAI-compatible provider client supporting multiple vendors.
+
+    Supports: OpenAI, Together, Groq, DeepInfra, Fireworks, and local llama.cpp
+    servers through configurable base_url.
+    """
+
+    def __init__(
+        self,
+        *,
+        vendor: VendorName = "openai",
+        base_url: str | None = None,
+        sdk_factory: Callable[[], Any] | None = None,
+    ) -> None:
+        """Initialize OpenAI-compatible client.
+
+        Args:
+            vendor: Vendor name (openai, together, groq, deepinfra, fireworks, llamacpp)
+            base_url: Override base URL (defaults to vendor's default)
+            sdk_factory: Optional factory for dependency injection
+        """
+        if vendor not in VENDOR_CONFIGS:
+            raise ValueError(f"Unknown vendor {vendor!r}. Known: {sorted(VENDOR_CONFIGS)}")
+
+        self._vendor = vendor
+        self._vendor_config = VENDOR_CONFIGS[vendor]
+        self._base_url = base_url or self._vendor_config["base_url"]
+        self._sdk_factory = sdk_factory
+        self._client: Any | None = None
+        self._cancelled_calls: set[str] = set()
+
+    def capabilities(self) -> ProviderCapability:
+        """Return provider capabilities for the configured vendor."""
+        config = self._vendor_config
+        model = os.environ.get(f"ARC_{self._vendor.upper()}_DEFAULT_MODEL", config["default_model"])
+        timeout = int(os.environ.get(f"ARC_{self._vendor.upper()}_TIMEOUT_SECONDS", "60"))
+
+        return ProviderCapability(
+            provider_id=f"openai-{self._vendor}",
+            provider_name=f"OpenAI-Compatible ({self._vendor.title()})",
+            supported_models=config["supported_models"],
+            default_model=model,
+            features=config["features"],
+            max_context_tokens=128_000,  # Conservative default
+            cost_rates=config["cost_rates"],
+            timeout_seconds=timeout,
+        )
+
+    async def complete(
+        self, request: ProviderRequest, *, cancellation_token: CancellationToken
+    ) -> ProviderResponse:
+        """Execute a completion request."""
+        try:
+            cancellation_token.raise_if_cancelled()
+            kwargs = self._request_kwargs(request, stream=False)
+            response = self._client_instance().chat.completions.create(**kwargs)
+            cancellation_token.raise_if_cancelled()
+        except Cancelled as exc:
+            raise CancelledError(str(exc)) from exc
+        except Exception as exc:
+            raise self._map_error(exc) from exc
+
+        return ProviderResponse(
+            call_id=request.call_id,
+            model=str(getattr(response, "model", request.model)),
+            content=self._extract_content(response),
+            finish_reason=self._finish_reason(getattr(response, "finish_reason", None)),
+            usage=self._usage_record(getattr(response, "usage", None)),
+            degraded=getattr(response, "usage", None) is None,
+            degraded_reason=(
+                None
+                if getattr(response, "usage", None) is not None
+                else "provider usage data unavailable"
+            ),
+        )
+
+    async def stream(
+        self, request: ProviderRequest, *, cancellation_token: CancellationToken
+    ) -> AsyncIterator[StreamChunk]:
+        """Execute a streaming completion request."""
+        try:
+            cancellation_token.raise_if_cancelled()
+            yield StreamChunk(call_id=request.call_id, chunk_type="start")
+
+            stream = self._client_instance().chat.completions.create(
+                **self._request_kwargs(request, stream=True)
+            )
+
+            usage: UsageRecord | None = None
+            for chunk in stream:
+                cancellation_token.raise_if_cancelled()
+                if hasattr(chunk, "choices") and chunk.choices:
+                    delta = getattr(chunk.choices[0], "delta", None)
+                    if delta and hasattr(delta, "content") and delta.content:
+                        yield StreamChunk(
+                            call_id=request.call_id, chunk_type="delta", delta=str(delta.content)
+                        )
+
+                # Extract usage from final chunk if available
+                if hasattr(chunk, "usage") and chunk.usage:
+                    usage = self._usage_record(chunk.usage)
+
+            yield StreamChunk(
+                call_id=request.call_id,
+                chunk_type="stop",
+                payload={"usage": usage.model_dump(mode="json") if usage else None},
+            )
+        except Cancelled as exc:
+            raise CancelledError(str(exc)) from exc
+        except Exception as exc:
+            yield StreamChunk(
+                call_id=request.call_id,
+                chunk_type="error",
+                payload={"error": str(self._map_error(exc))},
+            )
+
+    async def cancel(self, call_id: str) -> None:
+        """Cancel an in-flight request."""
+        self._cancelled_calls.add(call_id)
+
+    def _client_instance(self) -> Any:
+        """Get or create OpenAI client instance."""
+        if self._client is None:
+            if self._sdk_factory is not None:
+                self._client = self._sdk_factory()
+            else:
+                try:
+                    from openai import OpenAI
+                except ImportError as exc:
+                    raise AuthError("openai SDK is not installed") from exc
+
+                # Determine API key env var based on vendor
+                api_key_var = f"{self._vendor.upper()}_API_KEY"
+                if self._vendor == "openai":
+                    api_key_var = "OPENAI_API_KEY"
+
+                api_key = os.environ.get(api_key_var)
+                if not api_key and self._vendor != "llamacpp":
+                    raise AuthError(f"{api_key_var} environment variable not set")
+
+                self._client = OpenAI(
+                    api_key=api_key or "not-needed",  # llama.cpp doesn't need a key
+                    base_url=self._base_url,
+                    timeout=self.capabilities().timeout_seconds,
+                )
+        return self._client
+
+    def _request_kwargs(self, request: ProviderRequest, *, stream: bool) -> dict[str, Any]:
+        """Build OpenAI API request kwargs."""
+        messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+
+        kwargs: dict[str, Any] = {
+            "model": request.model,
+            "messages": messages,
+            "max_tokens": request.max_tokens,
+            "temperature": request.temperature,
+            "stream": stream,
+        }
+
+        if request.stop_sequences:
+            kwargs["stop"] = request.stop_sequences
+
+        if request.tools:
+            kwargs["tools"] = request.tools
+
+        return kwargs
+
+    @staticmethod
+    def _extract_content(response: Any) -> str:
+        """Extract text content from completion response."""
+        if not hasattr(response, "choices") or not response.choices:
+            return ""
+
+        choice = response.choices[0]
+        message = getattr(choice, "message", None)
+        if message and hasattr(message, "content") and message.content:
+            return str(message.content)
+
+        return ""
+
+    @staticmethod
+    def _usage_record(usage: Any) -> UsageRecord:
+        """Convert OpenAI usage to UsageRecord."""
+        if usage is None:
+            return UsageRecord(available=False, input_tokens=0, output_tokens=0)
+
+        return UsageRecord(
+            input_tokens=int(getattr(usage, "prompt_tokens", 0) or 0),
+            output_tokens=int(getattr(usage, "completion_tokens", 0) or 0),
+            cache_creation_input_tokens=0,  # OpenAI doesn't expose cache metrics
+            cache_read_input_tokens=0,
+        )
+
+    @staticmethod
+    def _finish_reason(reason: Any) -> str:
+        """Map OpenAI finish_reason to ProviderResponse finish_reason."""
+        if reason is None:
+            return "stop"
+
+        reason_str = str(reason)
+        mapping = {
+            "stop": "stop",
+            "length": "length",
+            "tool_calls": "tool_use",
+            "content_filter": "content_filter",
+        }
+        return mapping.get(reason_str, "stop")
+
+    @staticmethod
+    def _map_error(exc: Exception) -> Exception:
+        """Map OpenAI SDK exceptions to ProviderError types."""
+        name = type(exc).__name__.lower()
+        text = str(exc)
+
+        if "rate" in name or "rate" in text.lower() or "429" in text:
+            return RateLimitError(text)
+        if "auth" in name or "401" in text or "api key" in text.lower():
+            return AuthError(text)
+        if "validation" in name or "400" in text:
+            return ValidationError(text)
+        if "connection" in name or "network" in name or "timeout" in name:
+            return NetworkError(text)
+
+        return ModelError(text)

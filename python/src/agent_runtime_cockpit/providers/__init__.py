@@ -28,6 +28,7 @@ from .anthropic_estimator import (
     select_estimator,
 )
 from .budget_preflight import preflight_with_estimator
+from .openai_compatible import OpenAICompatibleClient
 from .registry import register
 
 __all__ = [
@@ -44,6 +45,7 @@ __all__ = [
     "CostRates",
     "ModelError",
     "NetworkError",
+    "OpenAICompatibleClient",
     "ProviderCapability",
     "ProviderClient",
     "ProviderError",
@@ -59,5 +61,13 @@ __all__ = [
     "validate_provider_id",
 ]
 
-# Auto-register providers (Phase 27)
+# Auto-register providers (Phase 27, Phase 28)
 register("anthropic", AnthropicClient)
+
+# Register OpenAI-compatible providers (Phase 28)
+register("openai", lambda: OpenAICompatibleClient(vendor="openai"))
+register("together", lambda: OpenAICompatibleClient(vendor="together"))
+register("groq", lambda: OpenAICompatibleClient(vendor="groq"))
+register("deepinfra", lambda: OpenAICompatibleClient(vendor="deepinfra"))
+register("fireworks", lambda: OpenAICompatibleClient(vendor="fireworks"))
+register("llamacpp", lambda: OpenAICompatibleClient(vendor="llamacpp"))
