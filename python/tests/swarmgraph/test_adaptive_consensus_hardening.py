@@ -16,8 +16,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import pytest
 
-from agent_runtime_cockpit.swarmgraph.config import ConsensusProtocol
+from agent_runtime_cockpit.swarmgraph.config import ConsensusProtocol, SwarmGraphConfig
 from agent_runtime_cockpit.swarmgraph.consensus import (
     ConsensusResult,
     bft_consensus,
@@ -33,9 +34,11 @@ from agent_runtime_cockpit.swarmgraph.models import (
     TaskStatus,
     WorkerResult,
 )
-from agent_runtime_cockpit.swarmgraph.nodes.consensus import run_consensus_round
+from agent_runtime_cockpit.swarmgraph.nodes.consensus import (
+    _run_bft_escrow_consensus,
+    run_consensus_round,
+)
 from agent_runtime_cockpit.swarmgraph.state import SwarmState
-from agent_runtime_cockpit.swarmgraph.config import SwarmGraphConfig
 
 
 # ===========================================================================
@@ -428,6 +431,19 @@ class TestPerTaskSelection:
         assert meta["risk"] == "critical"
         assert meta["protocol"] == "bft_escrow"
 
+    def test_legacy_protocol_argument_still_validates(self) -> None:
+        task = make_task("Explain consensus.", task_id="task-legacy")
+
+        run_consensus_round([task], protocol="majority")
+
+        assert task.metadata["adaptive_consensus"]["protocol"] == "majority"
+
+    def test_invalid_legacy_protocol_argument_fails_closed_by_validation(self) -> None:
+        task = make_task("Explain consensus.", task_id="task-invalid-protocol")
+
+        with pytest.raises(ValueError):
+            run_consensus_round([task], protocol="not-a-protocol")
+
 
 # ===========================================================================
 # Consensus Event Metadata
@@ -544,6 +560,15 @@ class TestRunConsensusRoundIntegration:
         decisions = run_consensus_round([task], escrow=escrow)
         assert len(decisions) == 1
         assert decisions[0].approved is True or decisions[0].approved is False
+
+    def test_bft_escrow_helper_preserves_protocol(self) -> None:
+        result = _run_bft_escrow_consensus(
+            [vote("a", True)],
+            make_task("Delete production database.", task_id="task-bft-escrow"),
+            ConsensusEscrow(),
+        )
+
+        assert result.protocol == ConsensusProtocol.bft_escrow
 
     def test_medium_prompt_uses_raft(self) -> None:
         task = make_task("Update config for staging.")

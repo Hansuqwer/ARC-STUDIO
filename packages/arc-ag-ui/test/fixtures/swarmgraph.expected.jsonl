@@ -8,4 +8,4 @@
 {"type":"TOOL_CALL_RESULT","toolCallId":"t1","messageId":"t1:result","content":"{\"hits\":1}"}
 {"type":"STEP_STARTED","stepName":"handoff:worker-1"}
 {"type":"STATE_SNAPSHOT","snapshot":{"step":2}}
-{"type":"RUN_FINISHED","threadId":"th-1","runId":"r1"}
+{"type":"RUN_COMPLETED","threadId":"th-1","runId":"r1"}

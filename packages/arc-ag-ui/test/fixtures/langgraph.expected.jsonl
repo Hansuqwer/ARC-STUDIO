@@ -6,4 +6,4 @@
 {"type":"TOOL_CALL_END","toolCallId":"tool-1"}
 {"type":"TOOL_CALL_RESULT","toolCallId":"tool-1","messageId":"tool-1:result","content":"{\"hits\":1}"}
 {"type":"STEP_FINISHED","stepName":"router"}
-{"type":"RUN_FINISHED","threadId":"th-1","runId":"r1"}
+{"type":"RUN_COMPLETED","threadId":"th-1","runId":"r1"}

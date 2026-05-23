@@ -23,7 +23,7 @@ export class ArcHealthContribution extends AbstractViewContribution<ArcHealthWid
     async initializeLayout(): Promise<void> {
         const params = new URLSearchParams(window.location.search);
         if (params.get('arc-view') === 'health-monitor') {
-            await this.openView({ activate: true });
+            await this.openView({ activate: true, reveal: true });
         }
     }
 }

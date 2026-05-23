@@ -28,12 +28,12 @@ def run_consensus_round(
     for all tasks. Otherwise each task uses its own ``task.prompt`` for
     per-task adaptive protocol selection.
 
-    When ``prompt`` is None and no task prompts match any risk signals,
-    the legacy ``protocol`` parameter is used as a fallback.
+    The legacy ``protocol`` parameter is retained for API compatibility and
+    validation, but adaptive selection chooses the protocol for each task.
 
     Args:
         tasks: List of swarm tasks to reach consensus on.
-        protocol: Fallback protocol (used when no adaptive selection occurs).
+        protocol: Legacy protocol value retained for API compatibility.
         quorum: Optional quorum size for quorum-based protocols.
         prompt: Optional shared prompt override. If None, per-task prompts used.
         escrow: Optional ConsensusEscrow instance for bft_escrow path.
@@ -41,7 +41,7 @@ def run_consensus_round(
     Returns:
         List of ApprovalDecision (one per task).
     """
-    _ = ConsensusProtocol(protocol) if isinstance(protocol, str) else protocol  # noqa: F841 - kept for legacy compat
+    _legacy_protocol = ConsensusProtocol(protocol) if isinstance(protocol, str) else protocol
 
     decisions: list[ApprovalDecision] = []
     for task in tasks:
@@ -142,6 +142,7 @@ def _run_bft_escrow_consensus(
             revealed_votes.append(revealed)
 
     consensus = escrow.tally(revealed_votes, protocol=ConsensusProtocol.bft, quorum=quorum)
+    consensus = consensus.model_copy(update={"protocol": ConsensusProtocol.bft_escrow})
 
     escrow.clear_commits()
 
