@@ -63,6 +63,9 @@ import {
     RunDiffResult,
     ActiveTraceStreamRequest,
     ActiveTraceEventChunk,
+    BattleRun,
+    BattleDetails,
+    EloRating,
 } from '../common/arc-protocol';
 import { validateWorkspaceRoot, validateTraceId, validateRunId } from './security-utils';
 import { WorkflowExecutor } from './services/workflow-executor';
@@ -72,6 +75,7 @@ import { FileManager } from './services/file-manager';
 import { ConfigService } from './services/config-service';
 import { RunLifecycleService } from './services/run-lifecycle-service';
 import { AuditBridgeService } from './services/audit-bridge-service';
+import { BattleService } from './services/battle-service';
 
 const ARC_CLI_ENV_ALLOWLIST = ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR'];
 const ARC_PYTHON_DAEMON_URL_ENV = 'ARC_PYTHON_DAEMON_URL';
@@ -107,6 +111,7 @@ export class ArcBackendService implements ArcService {
     private readonly configService: ConfigService;
     private readonly runLifecycleService: RunLifecycleService;
     private readonly auditBridgeService: AuditBridgeService;
+    private readonly battleService: BattleService;
     private readonly activeStreamCancels = new Map<string, { cancelled: boolean }>();
     private workspaceRoot: string;
 
@@ -117,7 +122,8 @@ export class ArcBackendService implements ArcService {
         fileManager?: FileManager,
         configService?: ConfigService,
         runLifecycleService?: RunLifecycleService,
-        auditBridgeService?: AuditBridgeService
+        auditBridgeService?: AuditBridgeService,
+        battleService?: BattleService
     ) {
         this.executor = executor ?? new WorkflowExecutor();
         this.parser = parser ?? new TraceParser();
@@ -133,6 +139,7 @@ export class ArcBackendService implements ArcService {
             this.workspaceRoot
         );
         this.auditBridgeService = auditBridgeService ?? new AuditBridgeService(this.workspaceRoot);
+        this.battleService = battleService ?? new BattleService();
     }
 
     // ========== Workflow Execution ==========
@@ -1049,5 +1056,19 @@ export class ArcBackendService implements ArcService {
         } catch {
             return undefined;
         }
+    }
+
+    // ========== Battle Methods (Phase 34.2) ==========
+
+    async listBattles(options?: { status?: string; limit?: number }): Promise<BattleRun[]> {
+        return this.battleService.listBattles(options);
+    }
+
+    async getBattleDetails(battleId: string): Promise<BattleDetails> {
+        return this.battleService.getBattleDetails(battleId);
+    }
+
+    async getLeaderboard(limit?: number): Promise<EloRating[]> {
+        return this.battleService.getLeaderboard(limit);
     }
 }

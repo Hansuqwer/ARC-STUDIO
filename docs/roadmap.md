@@ -636,7 +636,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - `arc battle` CLI group: `run`, `show`, `vote`, `leaderboard`, `config validate`, `export`
 - Offline/fake SwarmGraph battle runner supporting 2-worker and 4-worker flat battles with majority/quorum consensus
 - Stable JSON envelopes under existing ARC `ok(data)` / `err(...)` conventions
-- Battle run records stored in `battles.db`; compatibility with existing `arc runs get/status/trace/replay` is deferred until trace/run-index wiring exists
+- Battle run records stored in `battles.db`; battle runs also create ARC run records in standard run index and JSONL traces for compatibility with `arc runs get/status/trace`
 - Typed battle events: `BATTLE_STARTED`, `BATTLE_CANDIDATE_READY`, `BATTLE_VOTE_COMMITTED`, `BATTLE_VOTE_REVEALED`, `BATTLE_CONSENSUS_REACHED`, `BATTLE_HITL_REQUIRED`, `BATTLE_COMPLETED`
 - Optional `--consensus-escrow` wiring after adaptive/high-risk selection exists
 - HITL judge integration through persistent HITL prompts and CLI/IDE response paths
@@ -646,12 +646,19 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 **Acceptance:**
 - `arc battle run --runtime-mode fake/offline --json` completes without provider/network calls
 - 2-worker and 4-worker battles produce deterministic candidates and stored battle run records
-- Existing `arc runs ...` commands remain unchanged; battle run inspection uses `arc battle show/list/export` until trace/run-index wiring is added
+- Battle runs create ARC run records and JSONL traces; `arc runs get/status/trace` work for battle runs
 - Battle consensus is event-backed; IDE renders absent/degraded states when events/material are missing
 - HITL and audit states are conditional and never imply adapter-wide HMAC coverage
 - Live/provider-backed Arena remains blocked/deferred unless a separate trust-gated provider contract is implemented and tested
 
-**Status:** Baseline Complete (scaffold) | Evidence: 36 local battle/CLI tests passing, `arc battle` CLI commands implemented (run/show/vote/leaderboard/list/config validate/export), offline battle runner for 2-worker and 4-worker flat battles, SQLite battle store, typed battle events in protocol package, ELO rating system | Notes: Offline/fake mode only. No provider-backed/live claims. Battle runs stored independently in battles.db; `arc runs` trace/index compatibility, persistent HITL wiring, IDE Battle tab, and true commit-reveal escrow remain deferred. Deterministic fake voting for testing.
+**Status:** Baseline Complete for run/trace inspection | Evidence: 41 local battle/CLI tests passing (including 5 new run/trace integration tests), `arc battle` CLI commands implemented (run/show/vote/leaderboard/list/config validate/export), offline battle runner for 2-worker and 4-worker flat battles, SQLite battle store, typed battle events in protocol package, ELO rating system, battle runs create ARC run records and JSONL traces | Notes: Offline/fake mode only. No provider-backed/live claims. Battle runs stored in battles.db and also create standard ARC run records in `.arc/arc.db` with JSONL traces in `.arc/traces/`; `arc runs get/status/trace` work for battle runs. Persistent HITL wiring, IDE Battle tab, true commit-reveal escrow, and `arc runs replay` determinism remain deferred. Deterministic fake voting for testing.
+
+**Follow-up Phases:**
+- **Phase 34.2 — IDE Battle Tab**: Implement IDE Battle tab to display battle runs, candidates, votes, outcomes, and ELO leaderboard (Not Started)
+- **Phase 34.3 — Battle Replay Determinism**: Verify and ensure battle runs can be replayed deterministically from stored traces (Not Started)
+- **Phase 34.4 — Persistent HITL Prompt Wiring**: Wire persistent HITL prompts into battle runner for human judge integration (Not Started)
+- **Phase 34.5 — Commit-Reveal Escrow Verification**: Implement true cryptographic commit-reveal voting verification (Not Started)
+- **Phase 34.6 — Provider-Backed Battle Arena**: Enable live provider-backed battle mode (BLOCKED - requires trust gates, paid-call approval, audit trail)
 
 **Source:** Local audit of SwarmGraph Arena Battle Mode plan, 2026-05-23.
 

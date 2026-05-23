@@ -7,9 +7,14 @@ No provider-backed/live claims. Offline/fake mode only.
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
+from ..protocol.events import create_event
+from ..protocol.schemas import RunRecord, RunStatus
+from ..storage.indexed_store import IndexedTraceStore
 from ..swarmgraph.config import ExecutionMode
 from ..swarmgraph.consensus import majority_consensus, quorum_consensus
 from ..swarmgraph.models import AgentVote
@@ -36,8 +41,13 @@ class BattleRunner:
     determines the winner.
     """
 
-    def __init__(self, store: BattleStore | None = None):
+    def __init__(
+        self,
+        store: BattleStore | None = None,
+        workspace: Path | None = None,
+    ):
         self.store = store or BattleStore()
+        self.workspace = workspace or Path.cwd()
         self.events: list[dict[str, Any]] = []
 
     def run_battle(
@@ -174,9 +184,16 @@ class BattleRunner:
                 },
             )
 
+            # Persist battle run as ARC run record (Phase 34.1)
+            run_id, trace_path = self.persist_battle_run_trace(
+                battle, outcome, workspace=self.workspace
+            )
+
             return {
                 "status": "completed",
                 "battle_id": battle.id,
+                "run_id": run_id,
+                "trace_path": str(trace_path),
                 "candidates": [
                     {
                         "id": c.id,
@@ -476,3 +493,123 @@ class BattleRunner:
     def get_events(self) -> list[dict[str, Any]]:
         """Get all emitted events."""
         return self.events
+
+    def persist_battle_run_trace(
+        self,
+        battle: BattleRun,
+        outcome: BattleOutcome | None = None,
+        *,
+        workspace: Path = Path.cwd(),
+    ) -> tuple[str, Path]:
+        """Persist battle run as ARC run record with JSONL trace.
+
+        Creates a RunRecord from battle events and stores it using IndexedTraceStore
+        (dual-writes JSONL + SQLite index). This makes battle runs compatible with
+        existing ARC run/trace surfaces (arc runs get, arc runs trace, etc.).
+
+        Args:
+            battle: Battle run to persist
+            outcome: Battle outcome (if available)
+            workspace: Workspace root path
+
+        Returns:
+            Tuple of (run_id, trace_path)
+        """
+        # Generate new run_id (separate from battle_id)
+        run_id = f"run-{uuid.uuid4().hex[:8]}"
+
+        # Convert battle events to RunEvent objects
+        run_events = []
+        for seq, event in enumerate(self.events):
+            # Add RUN_STARTED as first event
+            if seq == 0:
+                run_events.append(
+                    create_event(
+                        run_id,
+                        0,
+                        "RUN_STARTED",
+                        {
+                            "workflow_id": f"battle:{battle.id}",
+                            "runtime": "swarmgraph-battle",
+                        },
+                    )
+                )
+
+            # Convert battle event to RunEvent
+            run_events.append(
+                create_event(
+                    run_id,
+                    len(run_events),
+                    event["type"],
+                    event["data"],
+                )
+            )
+
+        # Add RUN_COMPLETED as final event
+        if battle.status == BattleStatus.completed:
+            duration_ms = None
+            if battle.started_at and battle.completed_at:
+                duration_ms = int((battle.completed_at - battle.started_at).total_seconds() * 1000)
+            run_events.append(
+                create_event(
+                    run_id,
+                    len(run_events),
+                    "RUN_COMPLETED",
+                    {"duration_ms": duration_ms or 0},
+                )
+            )
+        elif battle.status == BattleStatus.failed:
+            run_events.append(
+                create_event(
+                    run_id,
+                    len(run_events),
+                    "RUN_FAILED",
+                    {"error": battle.error_detail or "Battle failed"},
+                )
+            )
+
+        # Map battle status to RunStatus
+        status_map = {
+            BattleStatus.pending: RunStatus.PENDING,
+            BattleStatus.running: RunStatus.RUNNING,
+            BattleStatus.completed: RunStatus.COMPLETED,
+            BattleStatus.failed: RunStatus.FAILED,
+        }
+        run_status = status_map.get(battle.status, RunStatus.PENDING)
+
+        # Create RunRecord with battle metadata
+        run_record = RunRecord(
+            id=run_id,
+            workflow_id=f"battle:{battle.id}",
+            runtime="swarmgraph-battle",
+            status=run_status,
+            started_at=battle.started_at.isoformat()
+            if battle.started_at
+            else datetime.now(timezone.utc).isoformat(),
+            ended_at=battle.completed_at.isoformat() if battle.completed_at else None,
+            events=run_events,
+            metadata={
+                "kind": "battle",
+                "battle_id": battle.id,
+                "workers": battle.workers,
+                "topology": battle.topology.value,
+                "consensus_protocol": battle.consensus_protocol.value,
+                "runtime_mode": battle.runtime_mode,
+                "battle_db_path": str(self.store.db_path),
+                "outcome_id": outcome.id if outcome else None,
+                "winner_candidate_id": outcome.winner_candidate_id if outcome else None,
+                "consensus_reached": outcome.consensus_reached if outcome else False,
+            },
+        )
+
+        # Use IndexedTraceStore to save (dual-writes JSONL + SQLite)
+        trace_dir = workspace / ".arc" / "traces"
+        db_path = workspace / ".arc" / "arc.db"
+        store = IndexedTraceStore(trace_dir=trace_dir, db_path=db_path)
+        store.init()
+        store.save(run_record)
+
+        trace_path = store.trace_path(run_id)
+        log.info("Persisted battle run as ARC run: %s -> %s", run_id, trace_path)
+
+        return run_id, trace_path

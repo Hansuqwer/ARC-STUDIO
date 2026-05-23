@@ -125,6 +125,8 @@ def battle_run(
             _out(ok(result), json_output)
         else:
             typer.echo(f"\nBattle completed: {battle.id}")
+            typer.echo(f"  Run ID: {result.get('run_id', 'N/A')}")
+            typer.echo(f"  Trace: {result.get('trace_path', 'N/A')}")
             typer.echo(f"  Candidates: {len(result['candidates'])}")
             typer.echo(f"  Votes: {len(result['votes'])}")
             outcome = result["outcome"]

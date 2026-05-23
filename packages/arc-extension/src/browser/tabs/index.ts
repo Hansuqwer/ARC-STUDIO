@@ -19,3 +19,6 @@ export type { AssuranceTabProps } from './AssuranceTab';
 
 export { SwarmGraphInsightTab } from './SwarmGraphInsightTab';
 export type { SwarmGraphInsightTabProps } from './SwarmGraphInsightTab';
+
+export { BattleTab } from './BattleTab';
+export type { BattleTabProps } from './BattleTab';

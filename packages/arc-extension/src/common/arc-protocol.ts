@@ -4,12 +4,18 @@
  * Defines the RPC protocol between frontend and backend.
  */
 
+// Import battle protocol types (Phase 34.2)
+import type { BattleRun, BattleCandidate, BattleVote, BattleOutcome, EloRating, BattleDetails } from './battle-protocol';
+
 export const ArcServicePath = '/services/arc';
 
 /**
  * Symbol for ArcService dependency injection token
  */
 export const ArcService = Symbol('ArcService');
+
+// Re-export battle protocol types (Phase 34.2)
+export type { BattleRun, BattleCandidate, BattleVote, BattleOutcome, EloRating, BattleDetails };
 
 // ========== Enums ==========
 
@@ -1467,4 +1473,36 @@ export interface ArcService {
      * added/removed capabilities with trust boundary analysis.
      */
     getCapabilityDiff(fromRuntime: string, toRuntime: string): Promise<CapabilityDiffResponse>;
+
+    // ========== Battle Methods (Phase 34.2) ==========
+
+    /**
+     * List battle runs with optional filtering.
+     * Calls `arc battle list --json` via the Python CLI.
+     * 
+     * @param options - Optional filters for status and limit
+     * @returns Promise resolving to array of battle runs
+     * @throws {ArcError} UNKNOWN if the battle store cannot be read
+     */
+    listBattles(options?: { status?: string; limit?: number }): Promise<BattleRun[]>;
+
+    /**
+     * Get detailed information about a specific battle.
+     * Calls `arc battle show <battleId> --json` via the Python CLI.
+     * 
+     * @param battleId - The battle ID to retrieve
+     * @returns Promise resolving to battle details with candidates, votes, and outcome
+     * @throws {ArcError} RUN_NOT_FOUND if the battle does not exist
+     */
+    getBattleDetails(battleId: string): Promise<BattleDetails>;
+
+    /**
+     * Get ELO leaderboard rankings for battle models.
+     * Calls `arc battle leaderboard --json` via the Python CLI.
+     * 
+     * @param limit - Optional limit on number of rankings to return
+     * @returns Promise resolving to array of ELO ratings
+     * @throws {ArcError} UNKNOWN if the ELO store cannot be read
+     */
+    getLeaderboard(limit?: number): Promise<EloRating[]>;
 }

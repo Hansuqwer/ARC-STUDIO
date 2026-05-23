@@ -1306,7 +1306,7 @@ bash scripts/check-pr.sh
 ## Phase 34 — ARC Battle Mode (SwarmGraph Arena CLI/IDE)
 
 **Roadmap:** R26A — ARC Battle Mode (SwarmGraph Arena CLI/IDE)  
-**Status:** Baseline Complete (scaffold)  
+**Status:** Baseline Complete for run/trace inspection  
 **Depends on:** Phase 17 (SwarmGraph native runtime), Phase 23 (trust enforcement), Phase 25 (CLI decomposition), Phase 29 (persistent HITL), Phase 30 (consensus escrow), Phase 31 (adaptive consensus for high-risk escrow selection)
 
 ### Implementation
@@ -1318,18 +1318,19 @@ bash scripts/check-pr.sh
 4. ✅ Typed battle events in protocol package: BATTLE_STARTED, BATTLE_CANDIDATE_READY, BATTLE_VOTE_COMMITTED, BATTLE_VOTE_REVEALED, BATTLE_CONSENSUS_REACHED, BATTLE_HITL_REQUIRED, BATTLE_COMPLETED
 5. ✅ CLI commands (`cli/battle.py`): `arc battle run`, `show`, `vote`, `leaderboard`, `list`, `config validate`, `export` with stable JSON envelopes
 6. ✅ ELO rating system: Calculates rating changes, tracks wins/losses/draws, maintains leaderboard
-7. ⚠️ Consensus escrow scaffold: Optional vote hash metadata exists; full commit/reveal phase and verification are deferred
-8. ✅ Comprehensive tests: 36 tests covering models, store, runner, CLI registration/envelopes/config validation (all passing)
+7. ✅ **Phase 34.1: Battle run/trace integration**: Battle runs create ARC run records in SQLite index and JSONL traces; compatible with `arc runs get/status/trace`
+8. ⚠️ Consensus escrow scaffold: Optional vote hash metadata exists; full commit/reveal phase and verification are deferred
+9. ✅ Comprehensive tests: 41 tests covering models, store, runner, CLI registration/envelopes/config validation, and run/trace integration (all passing)
 
 **Files Created:**
 - `python/src/agent_runtime_cockpit/battle/models.py` (220 lines)
 - `python/src/agent_runtime_cockpit/battle/store.py` (450 lines)
-- `python/src/agent_runtime_cockpit/battle/runner.py` (467 lines)
+- `python/src/agent_runtime_cockpit/battle/runner.py` (600 lines) — updated with run/trace integration
 - `python/src/agent_runtime_cockpit/battle/__init__.py` (35 lines)
 - `python/src/agent_runtime_cockpit/cli/battle.py` (450 lines)
 - `python/tests/battle/test_battle_models.py` (180 lines)
 - `python/tests/battle/test_battle_store.py` (150 lines)
-- `python/tests/battle/test_battle_runner.py` (170 lines)
+- `python/tests/battle/test_battle_runner.py` (320 lines) — updated with 5 new run/trace integration tests
 - `python/tests/cli/test_battle_cli.py` (65 lines)
 - `python/tests/battle/__init__.py` (20 lines)
 
@@ -1347,17 +1348,18 @@ bash scripts/check-pr.sh
 2. ✅ 2-worker and 4-worker battles produce deterministic candidates and stored battle run records
 3. ✅ Battle consensus is event-backed with typed events
 4. ✅ ELO ratings updated after each battle with winner/loser tracking
-5. ✅ All 36 battle/CLI tests passing
+5. ✅ All 41 battle/CLI tests passing (including 5 new run/trace integration tests)
 6. ✅ Offline/fake mode only - no provider-backed claims
-7. ✅ Battle runs stored independently in battles.db; `arc runs` trace/index compatibility is deferred
+7. ✅ **Phase 34.1**: Battle runs create ARC run records in `.arc/arc.db` and JSONL traces in `.arc/traces/`; `arc runs get/status/trace` work for battle runs
+8. ✅ Battle CLI returns `run_id` and `trace_path` in JSON output
 
 ### Verification
 ```bash
-cd python && PYTHONPATH=src uv run pytest tests/battle/ -v
-# Result: 31 battle package tests pass; 36 battle/CLI tests pass with tests/cli/test_battle_cli.py
+cd python && PYTHONPATH=src uv run pytest tests/battle/ tests/cli/test_battle_cli.py -q
+# Result: 41 battle/CLI tests pass (14 model tests, 13 runner tests including 5 new integration tests, 9 store tests, 5 CLI tests)
 
 cd python && uv run pytest -q
-# Expected: All tests pass (including 31 new battle tests)
+# Expected: All tests pass (including 41 battle tests)
 
 pnpm --filter @arc-studio/protocol build
 pnpm --filter arc-extension build
@@ -1366,19 +1368,303 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 
 ### Known Risks
 - Fake voting is deterministic (first candidate always wins) for testing - real voting would require actual model evaluation
-- Battle runs stored separately from regular runs - integration with `arc runs` commands deferred
 - IDE Battle tab not implemented (CLI-only for baseline)
 - HITL judge integration exists via CLI but not fully wired in battle runner
 - Live/provider-backed Arena remains blocked - offline/fake mode only
+- `arc runs replay` determinism for battle runs not yet verified (stored trace replay should work, but not tested)
 
 ### Evidence
-- 36 battle/CLI tests passing (14 model tests, 8 runner tests, 9 store tests, 5 CLI tests)
+- 41 battle/CLI tests passing (14 model tests, 13 runner tests including 5 new integration tests, 9 store tests, 5 CLI tests)
 - Battle models with full Pydantic validation
 - SQLite store with foreign key constraints and indexes
 - Offline runner with deterministic voting and ELO updates
 - CLI commands with stable ARC JSON envelopes
 - Typed battle events in protocol package
 - No provider/network calls in fake/offline mode
+- **Phase 34.1**: Battle runs create ARC run records and JSONL traces; compatible with `arc runs get/status/trace`
+
+---
+
+## Phase 34.2 — IDE Battle Tab
+
+**Roadmap:** R26A Follow-up — IDE Battle Tab  
+**Status:** Not Started  
+**Depends on:** Phase 34 (ARC Battle Mode baseline + run/trace integration)
+
+### Goal
+Implement IDE Battle tab to display battle runs, candidates, votes, outcomes, and ELO leaderboard with honest empty/degraded/present states.
+
+### Implementation Plan
+
+**Required Reading:**
+- `docs/roadmap.md` R26A section
+- `docs/phases.md` Phase 34
+- `python/src/agent_runtime_cockpit/battle/` (models, store, runner)
+- `packages/arc-extension/src/browser/tabs/` (existing tab implementations)
+- `packages/arc-extension/src/browser/components/` (reusable components)
+- Existing battle CLI commands for data access patterns
+
+**Research Tasks:**
+- Use Grep/Glob to find existing tab implementations (RunsTab, WorkflowsTab, ConfigTab)
+- Search for battle event rendering patterns in existing SwarmGraph Insight panels
+- Identify reusable components for tables, status badges, progress indicators
+
+**Deliverables:**
+1. **BattleTab Component** (`packages/arc-extension/src/browser/tabs/BattleTab.tsx`)
+   - List view of recent battle runs with status, workers, consensus protocol
+   - Detail view for selected battle showing candidates, votes, outcome
+   - ELO leaderboard panel
+   - Honest empty states when no battles exist
+   - Degraded states when battle data is incomplete
+
+2. **Battle Data Service** (`packages/arc-extension/src/node/services/battle-service.ts`)
+   - Backend service to query battle store via Python CLI bridge
+   - Methods: `listBattles()`, `getBattle(id)`, `getLeaderboard()`
+   - Use existing CLI bridge pattern from workflow-executor
+
+3. **Battle Protocol Types** (`packages/arc-extension/src/common/battle-protocol.ts`)
+   - TypeScript interfaces for battle data (BattleRun, Candidate, Vote, Outcome, EloRating)
+   - Mirror Python battle models
+
+4. **UI Components:**
+   - `BattleRunCard` - Display battle run summary
+   - `CandidateList` - Display candidates with outputs
+   - `VoteTable` - Display votes with voter, candidate, approval status
+   - `OutcomePanel` - Display consensus result and winner
+   - `EloLeaderboard` - Display model rankings
+
+5. **Integration:**
+   - Register BattleTab in `arc-studio-widget.tsx`
+   - Add battle icon to tab bar
+   - Wire up backend service in DI container
+
+**Acceptance:**
+1. IDE Battle tab displays list of battle runs from `.arc/battles.db`
+2. Clicking a battle shows candidates, votes, and outcome
+3. ELO leaderboard displays model rankings
+4. Empty state shown when no battles exist
+5. Degraded state shown when battle data is incomplete
+6. No fabricated data - all data from battle store
+7. Tests cover BattleTab component, battle service, protocol types
+
+**Verification:**
+```bash
+cd packages/arc-extension && pnpm test
+pnpm --filter arc-extension build
+pnpm --filter @arc-studio/browser build
+pnpm --filter @arc-studio/e2e-tests test
+bash scripts/check-pr.sh
+```
+
+**Known Risks:**
+- Battle store queries may be slow for large battle histories
+- Real-time updates not implemented (manual refresh required)
+- No battle run cancellation from IDE (CLI only)
+
+---
+
+## Phase 34.3 — Battle Replay Determinism
+
+**Roadmap:** R26A Follow-up — Battle Replay Determinism  
+**Status:** Not Started  
+**Depends on:** Phase 34.1 (Battle run/trace integration)
+
+### Goal
+Verify and ensure battle runs can be replayed deterministically from stored traces using `arc runs replay`.
+
+### Implementation Plan
+
+**Required Reading:**
+- `docs/phases.md` Phase 34, Phase 34.1
+- `python/src/agent_runtime_cockpit/cli/runs.py` (replay command)
+- `python/src/agent_runtime_cockpit/battle/runner.py`
+- `python/src/agent_runtime_cockpit/storage/indexed_store.py`
+
+**Deliverables:**
+1. **Replay Verification Tests:**
+   - Test that battle run traces can be loaded and replayed
+   - Verify replay produces same events in same order
+   - Test replay with different battle configurations (2-worker, 4-worker, majority, quorum)
+
+2. **Replay Command Support:**
+   - Ensure `arc runs replay <run_id>` works for battle runs
+   - Handle battle-specific metadata during replay
+   - Preserve battle event sequence
+
+3. **Documentation:**
+   - Document replay behavior for battle runs
+   - Note any non-deterministic aspects (timestamps, UUIDs)
+   - Clarify what "deterministic" means for battle replays
+
+**Acceptance:**
+1. `arc runs replay <battle_run_id>` successfully replays battle traces
+2. Replayed events match original event sequence
+3. Tests verify replay determinism for all battle configurations
+4. Documentation clearly explains replay semantics
+
+**Verification:**
+```bash
+cd python && PYTHONPATH=src uv run pytest tests/battle/test_battle_replay.py -v
+cd python && uv run pytest -q
+bash scripts/check-pr.sh
+```
+
+---
+
+## Phase 34.4 — Persistent HITL Prompt Wiring
+
+**Roadmap:** R26A Follow-up — Persistent HITL Prompt Wiring  
+**Status:** Not Started  
+**Depends on:** Phase 29 (Persistent HITL), Phase 34 (ARC Battle Mode)
+
+### Goal
+Wire persistent HITL prompts into battle runner for human judge integration during consensus voting.
+
+### Implementation Plan
+
+**Required Reading:**
+- `docs/phases.md` Phase 29 (Persistent HITL)
+- `python/src/agent_runtime_cockpit/battle/runner.py`
+- `python/src/agent_runtime_cockpit/orchestration/supervisor.py` (HITL flow)
+- `python/src/agent_runtime_cockpit/cli/battle.py` (vote command)
+
+**Research Tasks:**
+- Search for existing HITL prompt patterns: `grep -r "HITL" python/src/`
+- Find persistent HITL storage: `glob "**/*hitl*.py"`
+- Identify HITL event types in protocol
+
+**Deliverables:**
+1. **HITL Integration in Battle Runner:**
+   - Emit `BATTLE_HITL_REQUIRED` event when `require_hitl=True`
+   - Store HITL prompt in persistent store
+   - Wait for human judge response via `arc battle vote` or IDE
+   - Resume battle after HITL response received
+
+2. **HITL Response Handling:**
+   - Update battle runner to accept HITL responses
+   - Integrate HITL votes into consensus calculation
+   - Handle HITL timeout scenarios
+
+3. **CLI/IDE Integration:**
+   - `arc battle vote` command already exists, ensure it triggers HITL response
+   - IDE HITL prompt display (if Battle tab implemented)
+
+4. **Tests:**
+   - Test battle with `require_hitl=True` emits HITL event
+   - Test HITL response integration into consensus
+   - Test HITL timeout handling
+
+**Acceptance:**
+1. Battle runs with `--require-hitl` emit `BATTLE_HITL_REQUIRED` event
+2. Battle runner waits for human judge response
+3. `arc battle vote` provides HITL response
+4. HITL votes integrated into consensus calculation
+5. Tests cover HITL flow end-to-end
+
+**Verification:**
+```bash
+cd python && PYTHONPATH=src uv run pytest tests/battle/test_battle_hitl.py -v
+cd python && uv run pytest -q
+bash scripts/check-pr.sh
+```
+
+---
+
+## Phase 34.5 — Commit-Reveal Escrow Verification
+
+**Roadmap:** R26A Follow-up — Commit-Reveal Escrow Verification  
+**Status:** Not Started  
+**Depends on:** Phase 30 (Consensus Escrow), Phase 34 (ARC Battle Mode)
+
+### Goal
+Implement true cryptographic commit-reveal voting verification for battle consensus escrow.
+
+### Implementation Plan
+
+**Required Reading:**
+- `docs/phases.md` Phase 30 (Consensus Escrow)
+- `python/src/agent_runtime_cockpit/battle/runner.py` (existing commit/reveal scaffold)
+- `python/src/agent_runtime_cockpit/battle/models.py` (BattleVote with commit_hash, reveal_nonce)
+- Cryptographic commit-reveal protocols (research)
+
+**Research Tasks:**
+- Research commit-reveal voting schemes
+- Search for existing escrow patterns: `grep -r "escrow" python/src/`
+- Identify cryptographic libraries available in Python environment
+
+**Deliverables:**
+1. **Commit Phase:**
+   - Generate cryptographic commitment (hash of vote + nonce)
+   - Store commitment without revealing vote
+   - Emit `BATTLE_VOTE_COMMITTED` with commit_hash only
+
+2. **Reveal Phase:**
+   - Reveal vote and nonce after all commitments collected
+   - Verify commitment matches revealed vote + nonce
+   - Emit `BATTLE_VOTE_REVEALED` with vote and nonce
+   - Reject invalid reveals
+
+3. **Verification:**
+   - Verify all commitments before accepting reveals
+   - Detect and handle commitment violations
+   - Ensure no early vote disclosure
+
+4. **Tests:**
+   - Test commit phase stores only hash
+   - Test reveal phase verifies commitments
+   - Test invalid reveal detection
+   - Test commitment violation handling
+
+**Acceptance:**
+1. Battle runs with `--consensus-escrow` use true commit-reveal protocol
+2. Commitments verified cryptographically during reveal phase
+3. Invalid reveals rejected with clear error messages
+4. Tests cover commit-reveal flow and violation scenarios
+5. No vote disclosure before reveal phase
+
+**Verification:**
+```bash
+cd python && PYTHONPATH=src uv run pytest tests/battle/test_battle_escrow.py -v
+cd python && uv run pytest -q
+bash scripts/check-pr.sh
+```
+
+**Known Risks:**
+- Cryptographic implementation requires careful review
+- Timing attacks possible if not implemented carefully
+- Commitment scheme must be collision-resistant
+
+---
+
+## Phase 34.6 — Provider-Backed Battle Arena (BLOCKED)
+
+**Roadmap:** R26A Follow-up — Provider-Backed Battle Arena  
+**Status:** Blocked  
+**Depends on:** Phase 23 (Trust Enforcement), Phase 34 (ARC Battle Mode), Provider trust gates, Paid-call approval flow
+
+### Goal
+Enable live provider-backed battle mode with real model execution and network calls.
+
+**Blocking Conditions:**
+- ❌ No trust-gated provider contract implemented
+- ❌ No paid-call approval flow for battle runs
+- ❌ No provider quota/rate limiting for battles
+- ❌ No audit trail for provider-backed battle runs
+- ❌ No cost estimation for multi-worker battles
+
+**This phase MUST NOT be implemented until:**
+1. Trust-gated provider contract exists with explicit battle approval
+2. Paid-call gates integrated into battle runner
+3. Provider quota/rate limiting implemented
+4. Audit trail for all provider calls in battles
+5. Cost estimation and budget enforcement for battles
+
+**Acceptance:**
+- This phase remains blocked until all blocking conditions are resolved
+- No provider-backed claims in documentation
+- No live Arena product claims
+
+---
 
 ## Phase 36.1 — Provider Discovery & Interactive UX
 
