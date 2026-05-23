@@ -102,10 +102,13 @@ def doctor_all(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
     daemon_url = os.environ.get("ARC_PYTHON_DAEMON_URL")
     if daemon_url:
         try:
+            # enforcement: not-applicable - Internal diagnostic health check, not user-triggered network access
             import urllib.request
 
             health_url = f"{daemon_url.rstrip('/')}/health"
+            # enforcement: not-applicable
             req = urllib.request.Request(health_url)
+            # enforcement: not-applicable
             with urllib.request.urlopen(req, timeout=2) as resp:
                 daemon_reachable = resp.status == 200
                 checks.append(
@@ -132,9 +135,12 @@ def doctor_all(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
         daemon_host = os.environ.get("ARC_DAEMON_HOST", "127.0.0.1")
         daemon_port = os.environ.get("ARC_DAEMON_PORT", "7777")
         try:
+            # enforcement: not-applicable - Internal diagnostic health check, not user-triggered network access
             import urllib.request
 
+            # enforcement: not-applicable
             req = urllib.request.Request(f"http://{daemon_host}:{daemon_port}/health")
+            # enforcement: not-applicable
             with urllib.request.urlopen(req, timeout=2) as resp:
                 daemon_reachable = resp.status == 200
                 checks.append(
@@ -340,6 +346,7 @@ def doctor_network(
     debug: bool = DEBUG_FLAG,
 ) -> None:
     """Check network connectivity to common provider endpoints."""
+    # enforcement: not-applicable - Diagnostic network check, not user-triggered agent execution
     import urllib.request
 
     _setup_logging(debug)
@@ -352,7 +359,9 @@ def doctor_network(
     all_ok = True
     for name, url in endpoints:
         try:
+            # enforcement: not-applicable - Diagnostic network check
             req = urllib.request.Request(url, method="HEAD")
+            # enforcement: not-applicable - Diagnostic network check
             with urllib.request.urlopen(req, timeout=5) as resp:
                 reachable = resp.status < 500
                 checks.append(

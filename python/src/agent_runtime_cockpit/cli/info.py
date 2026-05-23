@@ -52,8 +52,10 @@ def health(
     daemon_host = os.environ.get("ARC_DAEMON_HOST", "127.0.0.1")
     daemon_port = os.environ.get("ARC_DAEMON_PORT", "7777")
     try:
+        # enforcement: not-applicable - Internal daemon health check, not user-triggered network access
         import urllib.request
 
+        # enforcement: not-applicable - Internal daemon health check (same as above)
         req = urllib.request.Request(f"http://{daemon_host}:{daemon_port}/health")
         with urllib.request.urlopen(req, timeout=2) as resp:
             daemon_ok = resp.status == 200
