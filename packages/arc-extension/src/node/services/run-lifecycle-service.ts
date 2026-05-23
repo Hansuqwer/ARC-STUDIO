@@ -518,7 +518,7 @@ export class RunLifecycleService {
 
         const maxRetries = 5;
         const baseRetryMs = 2000;
-        let lastEventId = 0;
+        let lastEventId = request.lastEventId ?? 0;
         let retryCount = 0;
 
         while (retryCount <= maxRetries && !cancelToken.cancelled) {

@@ -1063,6 +1063,8 @@ export interface ActiveTraceStreamRequest {
     baseUrl?: string;
     /** Max stream lifetime in milliseconds. Defaults to backend-safe timeout. */
     timeoutMs?: number;
+    /** Last received SSE event id for reconnect resume. */
+    lastEventId?: number;
 }
 
 export interface ActiveTraceStreamStatus {

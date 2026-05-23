@@ -6,6 +6,7 @@ import {
   PolicyBypassWarning,
   TypedRunEvent,
   isEventOfType,
+  isKnownEvent,
 } from './run-events';
 
 describe('PolicyBypassWarning', () => {
@@ -37,6 +38,25 @@ describe('PolicyBypassWarning', () => {
     } else {
       fail('Type guard should have narrowed to PolicyBypassWarning');
     }
+  });
+
+  it('isKnownEvent recognizes PolicyBypassWarning', () => {
+    const event: TypedRunEvent = {
+      schema_version: 2,
+      type: 'POLICY_BYPASS_WARNING',
+      timestamp: '2026-05-23T08:00:00Z',
+      run_id: 'run_123',
+      sequence: 1,
+      data: {
+        policy_id: 'trust_gate',
+        bypass_reason: 'custom_http_client',
+        surface: 'provider_call',
+        surface_identifier: 'custom_provider.execute',
+        suggested_remediation: 'Instrument the custom provider with enforcement hooks',
+      },
+    };
+
+    expect(isKnownEvent(event)).toBe(true);
   });
 
   it('JSON serialization round-trip preserves all fields', () => {

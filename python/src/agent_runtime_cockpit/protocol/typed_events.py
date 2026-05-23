@@ -672,6 +672,7 @@ def parse_typed_event(raw: dict[str, Any]) -> TypedRunEvent:
         "SWARMGRAPH_TOPOLOGY": SwarmGraphTopologyEvent,
         "SWARMGRAPH_CONSENSUS": SwarmGraphConsensusEvent,
         "SWARMGRAPH_COST": SwarmGraphCostEvent,
+        "POLICY_BYPASS_WARNING": PolicyBypassWarning,
         "RAW": RawEvent,
     }
 

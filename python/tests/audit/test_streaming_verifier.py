@@ -218,7 +218,37 @@ class TestHMACStreamingVerification:
 
         assert result.ok is False
         assert result.mode == "hmac"
-        assert "Signature invalid" in result.reason
+        assert "Record hash invalid" in result.reason
+
+    def test_verify_hmac_tampered_terminal_record_hash(self, tmp_path: Path):
+        """Verify detection when only the terminal record_hash is tampered."""
+        key = b"test-hmac-key-32-bytes-long!!"
+        chain_path = tmp_path / "tampered-hash.jsonl"
+        prev_hash = GENESIS
+        records = []
+        for i in range(2):
+            event = {"seq": i, "action": f"step-{i}"}
+            record_hash, signature = sign_audit_record(event, key, prev_hash)
+            record = {
+                "seq": i,
+                "event": event,
+                "prev_hash": prev_hash,
+                "record_hash": record_hash,
+                "signature": signature,
+            }
+            records.append(record)
+            prev_hash = record_hash
+
+        records[-1]["record_hash"] = "deadbeef"
+        with open(chain_path, "w", encoding="utf-8") as f:
+            for r in records:
+                f.write(json.dumps(r, sort_keys=True, separators=(",", ":")) + "\n")
+
+        result = StreamingAuditVerifier().verify_hmac(chain_path, key)
+
+        assert result.ok is False
+        assert result.mode == "hmac"
+        assert "Record hash invalid" in result.reason
 
 
 class TestSHA256StreamingVerification:

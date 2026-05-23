@@ -419,6 +419,7 @@ export function isKnownEvent(event: TypedRunEvent): event is KnownRunEvent {
     'MESSAGE',
     'NODE_STARTED',
     'NODE_FAILED',
+    'POLICY_BYPASS_WARNING',
     'RAW',
   ]);
   return knownTypes.has(event.type);

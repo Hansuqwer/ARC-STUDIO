@@ -1407,10 +1407,10 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 
 | Phase | Status | Depends On | Notes |
 |---|---|---|---|
-| 21 Streaming Audit | Not Started | None | Foundations — audit credibility requires streaming |
-| 22 Discriminated RunEvent | Not Started | None | Foundations — protocol safety requires typed unions |
-| 23 Trust Enforcement | Partial | Phase 22 | Foundation/p0-1 — uses typed RunEvent for denial events |
-| 24 Trace Virtualization | Not Started | Phase 22 | P1 — uses typed RunEvent for event handling |
+| 21 Streaming Audit | Baseline Complete | None | Foundations — streaming verifier + HMAC checks with record-hash validation |
+| 22 Discriminated RunEvent | Baseline Complete | None | Foundations — typed TS/Python unions; policy bypass warning recognized as known |
+| 23 Trust Enforcement | Baseline Complete | Phase 22 | Foundation/p0-1 — uses typed RunEvent for denial events |
+| 24 Trace Virtualization | Baseline Complete | Phase 22 | P1 — virtualized event list, per-run replay buffer, Last-Event-ID reconnect plumbing |
 | 25 CLI Decomposition | Partial | None | P1 — standalone refactoring of existing CLI surface |
 | 26 MCP Local Control Plane | Not Started | Phase 23 | P1 — trust enforcement gates MCP server activation |
 | 27 MCP Tasks | Not Started | Phase 25 | P1 — needs CLI command modules for task surface |
@@ -1420,7 +1420,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 | 31 Adaptive Consensus | Not Started | Phase 30, Phase 23 | P2 — major differentiator |
 | 32 Event Notifications | Not Started | Phase 29, Phase 21 | P2 — enterprise compliance |
 | 33 Memory Graph | Research | None | P3 — research, may pivot |
-| 36.1 Provider Discovery | Not Started | None | Standalone — interactive provider UX without credential storage; no blockers |
+| 36.1 Provider Discovery | Baseline Complete | None | Standalone — interactive provider UX without credential storage; no blockers |
 | 36.2 Credential Storage | Blocked | Phase 23, Phase 25, Phase 36.1 | Standalone — secure credential storage and OAuth; requires trust infrastructure |
 
 ### Critical Path
@@ -1450,4 +1450,3 @@ Phase 36.1 (Provider Discovery) ──→ (no dependencies, can start immediatel
 - **Enterprise:** Phase 32 (depends on Phase 29 + Phase 21)
 - **Research:** Phase 33 (independent)
 - **Provider Management Phase 2:** Phase 36.2 (depends on Phase 25 + Phase 23 + Phase 36.1)
-

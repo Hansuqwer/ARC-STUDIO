@@ -72,7 +72,10 @@ class EventBroker:
         self._subscribers: dict[str, list[asyncio.Queue[Optional[dict[str, Any]]]]] = {}
         self._event_ids: dict[str, int] = {}
         self._active_runs: set[str] = set()
-        self._ring_buffer = RingBuffer(RING_BUFFER_SIZE)
+        self._ring_buffers: dict[str, RingBuffer] = {}
+
+    def _ring_buffer_for(self, run_id: str) -> RingBuffer:
+        return self._ring_buffers.setdefault(run_id, RingBuffer(RING_BUFFER_SIZE))
 
     def mark_active(self, run_id: str) -> None:
         """Mark a run as actively publishing live events."""
@@ -91,7 +94,7 @@ class EventBroker:
         event_id = self._event_ids.get(run_id, 0) + 1
         self._event_ids[run_id] = event_id
         event_with_id = {**event, "event_id": event_id}
-        self._ring_buffer.push(event_with_id)
+        self._ring_buffer_for(run_id).push(event_with_id)
         for queue in self._subscribers.get(run_id, []):
             try:
                 queue.put_nowait(event_with_id)
@@ -139,7 +142,7 @@ class EventBroker:
     ) -> AsyncIterator[dict[str, Any]]:
         """Yield live events for an active run, replaying missed events from ring buffer."""
         if last_event_id > 0:
-            for event in self._ring_buffer.replay_from(last_event_id):
+            for event in self._ring_buffer_for(run_id).replay_from(last_event_id):
                 yield event
         queue = self.subscribe(run_id)
         try:

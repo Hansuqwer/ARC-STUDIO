@@ -319,7 +319,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Fix audit verification memory usage and implement optional HMAC signing for tamper-evident audit chains.
 
-**Current:** Baseline Complete. `StreamingAuditVerifier` class (hmac, sha256, auto modes), `arc audit verify` CLI with memory-bounded streaming (configurable 1-500 MB), full HMAC key lifecycle (`AuditKeyManager`), 21 streaming verifier tests pass.
+**Current:** Baseline Complete. `StreamingAuditVerifier` class (hmac, sha256, auto modes), `arc audit verify` CLI with memory-bounded streaming (configurable 1-500 MB), full HMAC key lifecycle (`AuditKeyManager`), 22 streaming verifier tests pass including terminal `record_hash` tamper detection.
 
 **Deliverables:**
 - `StreamingAuditVerifier.verify_sha256()` — line-by-line iteration for memory-bounded verification
@@ -334,7 +334,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - HMAC traces fail verification on content/chain/signature mutation
 - CLI emits stable JSON: `{ ok, mode, records_checked, reason, duration_ms }`
 
-**Status:** Baseline Complete | Evidence: `streaming_verifier.py` with 21 tests, `arc audit verify` CLI, `AuditKeyManager` HMAC lifecycle | Notes: 100 MB trace verification <30s, <500 MB RSS. Legacy `AuditChainStore.verify_run()` updated to use streaming verifier.
+**Status:** Baseline Complete | Evidence: `streaming_verifier.py` with 22 tests, `arc audit verify` CLI, `AuditKeyManager` HMAC lifecycle | Notes: 100 MB trace verification <30s, <500 MB RSS. Legacy `AuditChainStore.verify_run()` updated to use streaming verifier; HMAC verification now checks both signature and stored record hash.
 
 **Source:** Architecture Review P0-1, Feature List F0.1
 
@@ -342,11 +342,11 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Replace unsafe `RunEvent` type with discriminated unions to enable exhaustive handling and prevent protocol mismatches.
 
-**Current:** Baseline Complete. `packages/arc-protocol-ts/src/run-events.ts` defines 22 typed event interfaces + `RawEvent` + `UnknownEvent` as `KnownRunEvent` discriminated union. `python/src/agent_runtime_cockpit/protocol/typed_events.py` mirrors with 21 typed Pydantic models. Type guards (`isEventOfType`, `is_known_event`, `parseRunEvent`, `parse_typed_event`) in both TS and Python. 18 typed events tests pass.
+**Current:** Baseline Complete. `packages/arc-protocol-ts/src/run-events.ts` defines typed event interfaces + `RawEvent` + `UnknownEvent` as `KnownRunEvent` discriminated union. `python/src/agent_runtime_cockpit/protocol/typed_events.py` mirrors known event parsing, including `POLICY_BYPASS_WARNING`. Type guards (`isEventOfType`, `isKnownEvent`, `is_known_event`, `parseRunEvent`, `parse_typed_event`) in TS/Python. 19 typed events tests pass.
 
 **Deliverables:**
 - `KnownRunEvent` discriminated union in TypeScript
-- Typed payloads for: `RUN_STARTED`, `RUN_COMPLETED`, `RUN_FAILED`, `STEP_STARTED`, `STEP_COMPLETED`, `TOOL_CALL`, `TOOL_RESULT`, `HITL_PROMPT`, `HITL_DECISION`, `AUDIT_RECORD`, `TOKEN_USAGE`, `RUNTIME_WARNING`, `RAW`
+- Typed payloads for critical lifecycle, step, tool, HITL, SwarmGraph, message, node, policy-bypass warning, and `RAW` fallback events
 - Helpers: `isEventOfType()`, `assertNeverEvent()`, `parseEvent()`
 - Mirror Python schemas to avoid cross-language drift
 - Convert all consumers away from `any` and `Record<string, unknown>`
@@ -357,7 +357,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - All protocol fixtures round-trip through Python and TypeScript
 - Widget and mapper consumers use typed narrowing
 
-**Status:** Baseline Complete | Evidence: `run-events.ts`, `typed_events.py`, 18 typed events tests, 22 TS event types, 21 Python event types | Notes: Python mirror includes all TS event types. Legacy `RunEvent` preserved for backward compat. arc-extension still uses own `TraceEvent` type - incremental migration deferred.
+**Status:** Baseline Complete | Evidence: `run-events.ts`, `typed_events.py`, 19 typed events tests, TS policy-bypass warning test | Notes: Legacy `RunEvent` preserved for backward compat. arc-extension still uses own `TraceEvent` type - incremental migration deferred.
 
 **Source:** Architecture Review P0-2, Feature List F0.2
 
@@ -388,7 +388,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Fix trace viewer performance on large trace stores and prevent hung promises on daemon disconnect.
 
-**Current:** Baseline Complete. `VirtualizedEventList.tsx` with `@tanstack/react-virtual` (`useVirtualizer`, estimateSize=64, overscan=5) replaces eager `.map()`. `RingBuffer` in `EventBroker` (last 1,000 events per run). Server-side SSE supports `Last-Event-ID`. `ArcEventStreamWidget` now has client-side exponential backoff reconnect (2s*2^retry + jitter, max 30s, 5 retries) with `'reconnecting'` state.
+**Current:** Baseline Complete. `VirtualizedEventList.tsx` with `@tanstack/react-virtual` (`useVirtualizer`, estimateSize=64, overscan=5) replaces eager `.map()`. `EventBroker` uses per-run ring buffers (last 1,000 events per run). Server-side SSE supports `Last-Event-ID`. `ArcEventStreamWidget` now has client-side exponential backoff reconnect (2s*2^retry + jitter, max 30s, 5 retries) with `'reconnecting'` state and stale-stream cancellation guards.
 
 **Deliverables:**
 - Replace eager list rendering with virtualization (`react-window` or Theia virtual list)
@@ -403,7 +403,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - Killing daemon shows reconnecting state within 2s, recovers without page reload
 - No unresolved RPC promises after daemon disconnect
 
-**Status:** Baseline Complete | Evidence: `VirtualizedEventList.tsx`, `RingBuffer` in `event_broker.py`, client reconnect in `arc-event-stream-widget.tsx` | Notes: 50k rows render without freeze via virtualization. SSE reconnect uses Last-Event-ID + exponential backoff. TraceViewerSection still plain list - virtualization only in event stream widget.
+**Status:** Baseline Complete | Evidence: `VirtualizedEventList.tsx`, per-run `RingBuffer` in `event_broker.py`, client reconnect in `arc-event-stream-widget.tsx`, SSE resilience tests | Notes: 50k rows render without freeze via virtualization. SSE reconnect uses Last-Event-ID + exponential backoff. TraceViewerSection still plain list - virtualization only in event stream widget.
 
 **Source:** Architecture Review P1-4, Feature List F1.1
 
@@ -888,4 +888,3 @@ The following roadmap items implement the adapter integration plan from `docs/re
 **Critical Path:** Streaming Audit → RunEvent Unions → Trust Enforcement → Trace Virtualization → CLI Decomposition → MCP Server → MCP Tasks → Replay Contract → HITL/Eval → Consensus Escrow → Adaptive Consensus → Event Notifications → Memory Graph → Adapter Integration (LangChain, Anthropic, OpenAI-compatible, Pydantic AI, DSPy, Haystack, Smolagents, Semantic Kernel, Google ADK, MCP SDK) → Provider Management Phase 2
 
 **Note:** Phase 36.1 (Provider Discovery) can be implemented immediately without waiting for the critical path, as it has no dependencies and uses existing provider infrastructure.
-

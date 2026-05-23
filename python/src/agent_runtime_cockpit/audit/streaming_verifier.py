@@ -20,7 +20,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel
 
-from .key_manager import verify_audit_signature
+from .key_manager import sign_audit_record, verify_audit_signature
 
 log = logging.getLogger(__name__)
 
@@ -126,6 +126,17 @@ class StreamingAuditVerifier:
                     # Verify HMAC signature
                     event = record.get("event", {})
                     signature = record.get("signature", "")
+                    expected_hash, _ = sign_audit_record(event, key, prev_hash)
+                    stored_hash = record.get("record_hash", "")
+                    if stored_hash != expected_hash:
+                        return VerificationResult(
+                            ok=False,
+                            mode="hmac",
+                            records_checked=records_checked,
+                            reason=f"Record hash invalid at line {line_num}",
+                            duration_ms=int((time.time() - start_time) * 1000),
+                            file_size_bytes=file_size,
+                        )
                     if not verify_audit_signature(event, signature, key, prev_hash):
                         return VerificationResult(
                             ok=False,
@@ -137,7 +148,7 @@ class StreamingAuditVerifier:
                         )
 
                     # Update state for next record
-                    prev_hash = record.get("record_hash", "")
+                    prev_hash = stored_hash
                     records_checked += 1
 
         except Exception as e:

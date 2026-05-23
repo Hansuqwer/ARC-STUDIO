@@ -11,7 +11,8 @@ import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from agent_runtime_cockpit.orchestration.event_broker import RingBuffer
+from agent_runtime_cockpit.orchestration.event_broker import EventBroker, RingBuffer
+from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
 
 
 class FlakySSEServer:
@@ -261,3 +262,20 @@ class TestRingBuffer:
         replayed = buf.replay_from(0)
         assert len(replayed) == 1
         assert replayed[0]["data"] == "hello"
+
+
+async def test_event_broker_replays_only_requested_run(tmp_path):
+    """Reconnect replay must not leak buffered events across run ids."""
+    broker = EventBroker(JsonlTraceStore(tmp_path / "traces"))
+    broker.publish("run-a", {"type": "A1", "run_id": "run-a"})
+    broker.publish("run-a", {"type": "A2", "run_id": "run-a"})
+    broker.publish("run-b", {"type": "B1", "run_id": "run-b"})
+    broker.publish("run-b", {"type": "B2", "run_id": "run-b"})
+
+    stream = broker.stream_live("run-b", last_event_id=1)
+    event = await anext(stream)
+    await stream.aclose()
+
+    assert event["type"] == "B2"
+    assert event["run_id"] == "run-b"
+    assert event["event_id"] == 2

@@ -13,6 +13,7 @@ from agent_runtime_cockpit.protocol.typed_events import (
     SwarmGraphTopologyEvent,
     RawEvent,
     UnknownEvent,
+    PolicyBypassWarning,
     is_run_started,
     is_run_completed,
     is_tool_call_result,
@@ -224,6 +225,27 @@ class TestEventParsing:
         assert isinstance(event, UnknownEvent)
         assert event.type == "CUSTOM_EVENT"
         assert event.data["custom_field"] == "value"
+
+    def test_parse_policy_bypass_warning(self):
+        """Parse POLICY_BYPASS_WARNING into typed warning event."""
+        raw = {
+            "schema_version": 2,
+            "type": "POLICY_BYPASS_WARNING",
+            "timestamp": "2026-05-22T10:00:00Z",
+            "run_id": "run-001",
+            "sequence": 3,
+            "data": {
+                "policy_id": "provider-gate",
+                "bypass_reason": "custom_http_client",
+                "surface": "provider_call",
+                "surface_identifier": "custom.client",
+                "suggested_remediation": "Route through ProviderClient.",
+            },
+        }
+        event = parse_typed_event(raw)
+        assert isinstance(event, PolicyBypassWarning)
+        assert is_known_event(event) is True
+        assert event.data.bypass_reason == "custom_http_client"
 
     def test_parse_invalid_event(self):
         """Parse invalid event raises ValueError."""
