@@ -70,7 +70,7 @@ Files: `python/src/agent_runtime_cockpit/providers/client.py` defining a `Provid
 
 ## Phase 26 — LangChain
 
-**Composite:** 8/9 (Adoption 3, Ecosystem fit 3, Integration cost 2). **Pinned upstream:** langchain >=0.3,<2.0. **Dependencies:** 25.5. **Status:** T1 Complete (6beedf8), T2 In Progress, T3 Not Started.
+**Composite:** 8/9 (Adoption 3, Ecosystem fit 3, Integration cost 2). **Pinned upstream:** langchain >=0.3,<2.0. **Dependencies:** 25.5. **Status:** ✅ COMPLETE (T1: 6beedf8, T2: ea567cf, T3: 7566e60).
 
 ### Goal
 
@@ -82,13 +82,17 @@ Add `adapters/langchain/{__init__.py,detect.py,capabilities.py}`. Import-only pr
 
 **Status:** Complete (commit 6beedf8). Evidence: 15 tests passing, all adapter tests green (88/88). Detection covers langchain/core/community packages, 9 provider integrations, workspace scanning, confidence scoring.
 
-### PR 26.2 — Export
+### PR 26.2 — Export ✅ COMPLETE
 
 Add `export.py` that AST-walks the workspace for `Runnable` compositions. Static extraction of `|` operator on `Runnable` subclasses. No execution of user code in-process; dynamic-resolution fallback spawns sandboxed subprocess gated by `enforce_shell_gate`. Two fixture projects: trivial chain + retrieval pipeline. 10 tests minimum.
 
-### PR 26.3 — Live streaming
+**Status:** Complete (commit ea567cf). Evidence: 15 tests passing, AST-based chain detection, 2 fixture projects, WorkflowInfo conversion.
+
+### PR 26.3 — Live streaming ✅ COMPLETE
 
 Add `runner.py` with `ARCCallbackHandler(BaseCallbackHandler)` subscribing to `on_chain_start/end`, `on_llm_start/token/end`, `on_tool_start/end`. Provider calls route through `ProviderClient` registry. Unrecognized LLM emits `POLICY_BYPASS_WARNING` with `bypass_reason=UNKNOWN_PROVIDER_PLUGIN`. 12 tests minimum.
+
+**Status:** Complete (commit 7566e60). Evidence: 17 tests passing, callback handler implementation, policy bypass warnings, event streaming.
 
 **Known risk:** LangChain API churn between minor versions — pin floor and re-verify at each PR.
 
