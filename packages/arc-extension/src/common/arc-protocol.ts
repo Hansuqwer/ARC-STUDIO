@@ -494,6 +494,39 @@ export interface ProviderKeyRefRequest {
 }
 
 /**
+ * Provider test result from `arc providers test <id>`.
+ * Shows connection status and configuration details.
+ */
+export interface ProviderTestResult {
+    provider: string;
+    providerId: string;
+    displayName: string;
+    configured: boolean;
+    status: 'success' | 'warning' | 'error';
+    message: string;
+    details?: {
+        baseUrl?: string;
+        docsUrl?: string;
+        envVars?: string[];
+    };
+}
+
+/**
+ * Provider model information from `arc providers models`.
+ * Lists available models and their capabilities.
+ */
+export interface ProviderModel {
+    provider: string;
+    model: string;
+    configured: boolean;
+    capabilities?: {
+        supportsTools?: boolean;
+        supportsChat?: boolean;
+        supportsStreaming?: boolean;
+    };
+}
+
+/**
  * Workspace trust status for Config tab.
  */
 export interface TrustStatus {
@@ -1347,6 +1380,12 @@ export interface ArcService {
 
     /** Remove an env-var provider key reference by provider id or account id. */
     unsetProviderKeyRef(providerOrAccountId: string): Promise<{ success: boolean; message: string }>;
+
+    /** Test provider connection and configuration. Calls `arc providers test <id> --json`. */
+    testProvider(providerId: string): Promise<ProviderTestResult>;
+
+    /** List available models for a provider. Calls `arc providers models [--provider <id>] --json`. */
+    listProviderModels(providerId?: string): Promise<ProviderModel[]>;
 
     // ========== Run Links Methods (Session B7) ==========
 

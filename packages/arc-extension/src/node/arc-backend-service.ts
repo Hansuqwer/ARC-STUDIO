@@ -41,6 +41,8 @@ import {
     ProviderQuotaInfo,
     ProviderQuotaResetResult,
     ProviderKeyRefRequest,
+    ProviderTestResult,
+    ProviderModel,
     GatedProviderActionRequest,
     GatedProviderActionResult,
     RunPreflightRequest,
@@ -354,6 +356,22 @@ export class ArcBackendService implements ArcService {
      */
     async unsetProviderKeyRef(providerOrAccountId: string): Promise<{ success: boolean; message: string }> {
         return this.configService.unsetProviderKeyRef(providerOrAccountId);
+    }
+
+    /**
+     * Test provider connection and configuration.
+     * @deprecated Use ConfigService.testProvider() directly. Will be removed in v0.3.0.
+     */
+    async testProvider(providerId: string): Promise<ProviderTestResult> {
+        return this.configService.testProvider(providerId);
+    }
+
+    /**
+     * List available models for a provider.
+     * @deprecated Use ConfigService.listProviderModels() directly. Will be removed in v0.3.0.
+     */
+    async listProviderModels(providerId?: string): Promise<ProviderModel[]> {
+        return this.configService.listProviderModels(providerId);
     }
 
     // ========== Run Links Methods (Session B7) ==========

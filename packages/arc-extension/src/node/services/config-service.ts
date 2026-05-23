@@ -28,6 +28,8 @@ import {
     TrustStatus,
     SafeRuntimeConfig,
     SafeProviderKeyStatus,
+    ProviderTestResult,
+    ProviderModel,
     ArcError,
     ArcErrorCode,
 } from '../../common/arc-protocol';
@@ -486,6 +488,115 @@ export class ConfigService {
             env: buildArcCliEnv(),
         });
         return { success: true, message: `Removed provider key reference: ${providerOrAccountId}.` };
+    }
+
+    async testProvider(providerId: string): Promise<ProviderTestResult> {
+        try {
+            const output = execFileSync('arc', ['providers', 'test', providerId, '--json'], {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            
+            if (parsed.ok && parsed.data) {
+                const data = parsed.data;
+                return {
+                    provider: data.provider || providerId,
+                    providerId: data.provider_id || data.providerId || providerId,
+                    displayName: data.display_name || data.displayName || providerId,
+                    configured: data.configured !== false,
+                    status: data.status || 'success',
+                    message: data.message || 'Provider test successful',
+                    details: {
+                        baseUrl: data.base_url || data.baseUrl,
+                        docsUrl: data.docs_url || data.docsUrl,
+                        envVars: data.env_vars || data.envVars,
+                    },
+                };
+            }
+            
+            // Handle error response
+            return {
+                provider: providerId,
+                providerId,
+                displayName: providerId,
+                configured: false,
+                status: 'error',
+                message: parsed.error?.message || 'Provider test failed',
+            };
+        } catch (error: any) {
+            // Try to parse error output
+            const output = String(error?.stdout || error?.stderr || '');
+            if (output.trim()) {
+                try {
+                    const parsed = JSON.parse(output);
+                    if (parsed.data) {
+                        const data = parsed.data;
+                        return {
+                            provider: data.provider || providerId,
+                            providerId: data.provider_id || data.providerId || providerId,
+                            displayName: data.display_name || data.displayName || providerId,
+                            configured: data.configured !== false,
+                            status: data.status || 'error',
+                            message: data.message || parsed.error?.message || 'Provider test failed',
+                            details: {
+                                baseUrl: data.base_url || data.baseUrl,
+                                docsUrl: data.docs_url || data.docsUrl,
+                                envVars: data.env_vars || data.envVars,
+                            },
+                        };
+                    }
+                } catch {
+                    // Fall through to default error
+                }
+            }
+            
+            return {
+                provider: providerId,
+                providerId,
+                displayName: providerId,
+                configured: false,
+                status: 'error',
+                message: `Provider test unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            };
+        }
+    }
+
+    async listProviderModels(providerId?: string): Promise<ProviderModel[]> {
+        try {
+            const args = ['providers', 'models', '--json'];
+            if (providerId) {
+                args.push('--provider', providerId);
+            }
+            
+            const output = execFileSync('arc', args, {
+                timeout: 10000,
+                encoding: 'utf-8',
+                windowsHide: true,
+                env: buildArcCliEnv(),
+            });
+            const parsed = JSON.parse(output);
+            
+            if (parsed.ok && Array.isArray(parsed.data)) {
+                return parsed.data.map((model: any) => ({
+                    provider: model.provider || 'unknown',
+                    model: model.model || model.id || 'unknown',
+                    configured: model.configured !== false,
+                    capabilities: {
+                        supportsTools: model.supports_tools ?? model.supportsTools,
+                        supportsChat: model.supports_chat ?? model.supportsChat,
+                        supportsStreaming: model.supports_streaming ?? model.supportsStreaming,
+                    },
+                }));
+            }
+            
+            return [];
+        } catch (error) {
+            // Return empty array on error - graceful degradation
+            return [];
+        }
     }
 
     // ========== Private Helper Methods ==========

@@ -20,6 +20,8 @@ import {
     SafeConfigUpdate,
     RuntimeCapabilityReport,
     GatedProviderActionResult,
+    ProviderTestResult,
+    ProviderModel,
 } from '../../common/arc-protocol';
 import {
     buildLiveProviderGate,
@@ -150,6 +152,10 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
     const [liveProviderConfirmPhrase, setLiveProviderConfirmPhrase] = useState('');
     const [providerActionLaunching, setProviderActionLaunching] = useState(false);
     const [providerActionResult, setProviderActionResult] = useState<GatedProviderActionResult | null>(null);
+    const [providerTestResults, setProviderTestResults] = useState<Map<string, ProviderTestResult>>(new Map());
+    const [providerModels, setProviderModels] = useState<Map<string, ProviderModel[]>>(new Map());
+    const [testingProviders, setTestingProviders] = useState(false);
+    const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
 
     const loadConfig = useCallback(async () => {
         if (!arcService) {
@@ -281,6 +287,64 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
             setSaving(false);
         }
     };
+
+    const testAllProviders = useCallback(async () => {
+        if (!arcService || !config) return;
+        
+        const testProviderMethod = (arcService as any).testProvider;
+        const listModelsMethod = (arcService as any).listProviderModels;
+        
+        if (!testProviderMethod || !listModelsMethod) return;
+        
+        setTestingProviders(true);
+        const newTestResults = new Map<string, ProviderTestResult>();
+        const newModels = new Map<string, ProviderModel[]>();
+        
+        try {
+            // Test each configured provider
+            for (const provider of config.providers) {
+                try {
+                    const testResult = await testProviderMethod.call(arcService, provider.provider);
+                    newTestResults.set(provider.provider, testResult);
+                    
+                    // Load models for this provider
+                    if (testResult.configured && testResult.status === 'success') {
+                        const models = await listModelsMethod.call(arcService, provider.provider);
+                        if (models && models.length > 0) {
+                            newModels.set(provider.provider, models);
+                        }
+                    }
+                } catch (error) {
+                    // Set error result for this provider
+                    newTestResults.set(provider.provider, {
+                        provider: provider.provider,
+                        providerId: provider.provider,
+                        displayName: provider.displayName,
+                        configured: false,
+                        status: 'error',
+                        message: `Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                    });
+                }
+            }
+            
+            setProviderTestResults(newTestResults);
+            setProviderModels(newModels);
+        } finally {
+            setTestingProviders(false);
+        }
+    }, [arcService, config]);
+
+    const toggleProviderExpanded = useCallback((providerId: string) => {
+        setExpandedProviders(prev => {
+            const next = new Set(prev);
+            if (next.has(providerId)) {
+                next.delete(providerId);
+            } else {
+                next.add(providerId);
+            }
+            return next;
+        });
+    }, []);
 
     const runtimeOptionsWithCaps = Object.entries(RUNTIME_DISPLAY).map(([value, meta]) => {
         const cap = capabilities?.find(c => c.runtime_id === value) || null;
@@ -973,45 +1037,182 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
             </div>
 
             <div className='arc-studio-config__section' style={{ padding: '12px 16px', borderBottom: '1px solid var(--theia-widgetBorder)' }}>
-                <h4 style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 600, color: 'var(--theia-descriptionForeground)', textTransform: 'uppercase' }}>Providers</h4>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <h4 style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: 'var(--theia-descriptionForeground)', textTransform: 'uppercase' }}>Providers</h4>
+                    <button
+                        onClick={testAllProviders}
+                        disabled={testingProviders || !arcService}
+                        style={{
+                            padding: '4px 8px',
+                            fontSize: '11px',
+                            borderRadius: '3px',
+                            border: '1px solid var(--theia-button-border)',
+                            backgroundColor: 'var(--theia-button-background)',
+                            color: 'var(--theia-button-foreground)',
+                            cursor: testingProviders ? 'wait' : 'pointer',
+                            opacity: testingProviders ? 0.6 : 1,
+                        }}
+                    >
+                        {testingProviders ? 'Testing...' : 'Test All'}
+                    </button>
+                </div>
                 <p style={{ margin: '0 0 8px', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
                     Keys shown as source/status only — raw values are never displayed.
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {config.providers.map(p => (
-                        <div key={p.provider} className='arc-studio-config__provider' style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '6px 8px',
-                            borderRadius: '4px',
-                            backgroundColor: 'var(--theia-editor-background)',
-                            fontSize: '12px',
-                        }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontWeight: 500 }}>{PROVIDER_DISPLAY[p.provider] || p.displayName || p.provider}</span>
-                                <span style={{
-                                    display: 'inline-block',
-                                    padding: '1px 6px',
-                                    borderRadius: '3px',
-                                    fontSize: '10px',
-                                    fontFamily: 'monospace',
-                                    color: providerSourceColor(p.source),
-                                    border: `1px solid ${providerSourceColor(p.source)}40`,
-                                }}>
-                                    {p.configured ? '✓ ' : '✗ '}{providerSourceBadge(p.source)}
-                                </span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
-                                {p.defaultModel && <span>model: {p.defaultModel}</span>}
-                                {p.envOverride && (
-                                    <span className='arc-studio-config__env-override' style={{ fontFamily: 'monospace', opacity: 0.8 }}>
-                                        env: {p.envOverride}
-                                    </span>
+                    {config.providers.map(p => {
+                        const testResult = providerTestResults.get(p.provider);
+                        const models = providerModels.get(p.provider) || [];
+                        const isExpanded = expandedProviders.has(p.provider);
+                        
+                        // Determine status color
+                        let statusColor = '#999'; // default/unset
+                        let statusIcon = '○';
+                        
+                        if (testResult) {
+                            if (testResult.status === 'success') {
+                                statusColor = '#66bb6a'; // green
+                                statusIcon = '✓';
+                            } else if (testResult.status === 'warning') {
+                                statusColor = '#ffb74d'; // yellow
+                                statusIcon = '⚠';
+                            } else if (testResult.status === 'error') {
+                                statusColor = '#f44336'; // red
+                                statusIcon = '✗';
+                            }
+                        } else if (p.configured) {
+                            statusColor = providerSourceColor(p.source);
+                            statusIcon = '✓';
+                        } else {
+                            statusIcon = '✗';
+                        }
+                        
+                        return (
+                            <div key={p.provider} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <div className='arc-studio-config__provider' style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '6px 8px',
+                                    borderRadius: '4px',
+                                    backgroundColor: 'var(--theia-editor-background)',
+                                    fontSize: '12px',
+                                    cursor: models.length > 0 ? 'pointer' : 'default',
+                                }}
+                                onClick={() => models.length > 0 && toggleProviderExpanded(p.provider)}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ 
+                                            fontWeight: 500,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                        }}>
+                                            <span style={{ color: statusColor, fontSize: '14px' }}>{statusIcon}</span>
+                                            {PROVIDER_DISPLAY[p.provider] || p.displayName || p.provider}
+                                        </span>
+                                        <span style={{
+                                            display: 'inline-block',
+                                            padding: '1px 6px',
+                                            borderRadius: '3px',
+                                            fontSize: '10px',
+                                            fontFamily: 'monospace',
+                                            color: providerSourceColor(p.source),
+                                            border: `1px solid ${providerSourceColor(p.source)}40`,
+                                        }}>
+                                            {providerSourceBadge(p.source)}
+                                        </span>
+                                        {models.length > 0 && (
+                                            <span style={{
+                                                fontSize: '10px',
+                                                color: 'var(--theia-descriptionForeground)',
+                                                fontFamily: 'monospace',
+                                            }}>
+                                                {models.length} model{models.length !== 1 ? 's' : ''}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}>
+                                        {testResult && (
+                                            <span style={{ 
+                                                fontSize: '10px',
+                                                color: statusColor,
+                                                maxWidth: '200px',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap',
+                                            }}>
+                                                {testResult.message}
+                                            </span>
+                                        )}
+                                        {p.defaultModel && <span>model: {p.defaultModel}</span>}
+                                        {p.envOverride && (
+                                            <span className='arc-studio-config__env-override' style={{ fontFamily: 'monospace', opacity: 0.8 }}>
+                                                env: {p.envOverride}
+                                            </span>
+                                        )}
+                                        {models.length > 0 && (
+                                            <span style={{ fontSize: '10px' }}>
+                                                {isExpanded ? '▼' : '▶'}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                {/* Expanded model list */}
+                                {isExpanded && models.length > 0 && (
+                                    <div style={{
+                                        marginLeft: '16px',
+                                        padding: '8px',
+                                        borderRadius: '4px',
+                                        backgroundColor: 'var(--theia-editor-background)',
+                                        fontSize: '11px',
+                                    }}>
+                                        <div style={{ 
+                                            fontWeight: 600, 
+                                            marginBottom: '6px',
+                                            color: 'var(--theia-descriptionForeground)',
+                                            fontSize: '10px',
+                                            textTransform: 'uppercase',
+                                        }}>
+                                            Available Models
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            {models.slice(0, 10).map((model, idx) => (
+                                                <div key={idx} style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    padding: '4px 6px',
+                                                    borderRadius: '3px',
+                                                    backgroundColor: 'var(--theia-input-background)',
+                                                }}>
+                                                    <span style={{ fontFamily: 'monospace', fontSize: '10px' }}>
+                                                        {model.model}
+                                                    </span>
+                                                    <div style={{ display: 'flex', gap: '6px', fontSize: '9px', color: 'var(--theia-descriptionForeground)' }}>
+                                                        {model.capabilities?.supportsChat && <span title="Supports chat">💬</span>}
+                                                        {model.capabilities?.supportsTools && <span title="Supports tools">🔧</span>}
+                                                        {model.capabilities?.supportsStreaming && <span title="Supports streaming">⚡</span>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {models.length > 10 && (
+                                                <div style={{ 
+                                                    fontSize: '10px', 
+                                                    color: 'var(--theia-descriptionForeground)',
+                                                    fontStyle: 'italic',
+                                                    padding: '4px 6px',
+                                                }}>
+                                                    ... and {models.length - 10} more
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 )}
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 
