@@ -374,6 +374,186 @@ def create_mcp_server(
             results.append(entry)
         return json.dumps(results, indent=2, default=str)
 
+    @mcp.tool()
+    def arc_task_create(
+        operation: str,
+        task_type: str = "run",
+        params: str = "{}",
+        max_retries: int = 3,
+    ) -> str:
+        """Create a new async task for execution.
+
+        Args:
+            operation: Operation to execute (e.g., 'run', 'trace', 'audit').
+            task_type: Task type - "run", "trace", or "audit" (default "run").
+            params: JSON string with parameters for the operation (default "{}").
+            max_retries: Maximum retry attempts (default 3).
+
+        Returns:
+            JSON string with task ID and initial status.
+        """
+        from ..tasks import Task, TaskExecutor, TaskStorage, TaskType
+
+        # Validate task type
+        try:
+            task_type_enum = TaskType(task_type)
+        except ValueError:
+            return json.dumps(
+                {"error": f"Invalid task type: {task_type}. Must be run, trace, or audit."}
+            )
+
+        # Parse params
+        try:
+            params_dict = json.loads(params)
+        except json.JSONDecodeError as e:
+            return json.dumps({"error": f"Invalid JSON params: {e}"})
+
+        # Create and submit task
+        try:
+            task = Task(
+                type=task_type_enum,
+                operation=operation,
+                params=params_dict,
+                max_retries=max_retries,
+            )
+            storage = TaskStorage(ws / ".arc" / "tasks.db")
+            executor = TaskExecutor(storage)
+            task_id = executor.submit_task(task)
+
+            return json.dumps(
+                {
+                    "task_id": task_id,
+                    "type": task.type.value,
+                    "operation": task.operation,
+                    "status": task.status.value,
+                    "created_at": task.created_at,
+                    "expires_at": task.expires_at,
+                },
+                indent=2,
+                default=str,
+            )
+        except Exception as e:
+            return json.dumps({"error": f"Failed to create task: {e}"})
+
+    @mcp.tool()
+    def arc_task_status(task_id: str) -> str:
+        """Get the status of a task.
+
+        Args:
+            task_id: The task ID to check.
+
+        Returns:
+            JSON string with task status, metadata, and result if completed.
+        """
+        from ..tasks import TaskExecutor, TaskStorage
+
+        try:
+            storage = TaskStorage(ws / ".arc" / "tasks.db")
+            executor = TaskExecutor(storage)
+            task = executor.get_task_status(task_id)
+
+            if not task:
+                return json.dumps({"error": f"Task not found: {task_id}"})
+
+            return json.dumps(
+                {
+                    "task_id": task.id,
+                    "type": task.type.value,
+                    "operation": task.operation,
+                    "status": task.status.value,
+                    "created_at": task.created_at,
+                    "started_at": task.started_at,
+                    "ended_at": task.ended_at,
+                    "expires_at": task.expires_at,
+                    "retry_count": task.retry_count,
+                    "max_retries": task.max_retries,
+                    "result": task.result,
+                    "error": task.error,
+                },
+                indent=2,
+                default=str,
+            )
+        except Exception as e:
+            return json.dumps({"error": f"Failed to get task status: {e}"})
+
+    @mcp.tool()
+    def arc_task_cancel(task_id: str) -> str:
+        """Cancel a running or pending task.
+
+        Args:
+            task_id: The task ID to cancel.
+
+        Returns:
+            JSON string with cancellation result.
+        """
+        from ..tasks import TaskExecutor, TaskStorage
+
+        try:
+            storage = TaskStorage(ws / ".arc" / "tasks.db")
+            executor = TaskExecutor(storage)
+            cancelled = executor.cancel_task(task_id)
+
+            if not cancelled:
+                task = executor.get_task_status(task_id)
+                if not task:
+                    return json.dumps({"error": f"Task not found: {task_id}"})
+                else:
+                    return json.dumps(
+                        {"error": f"Task cannot be cancelled (status: {task.status.value})"}
+                    )
+
+            return json.dumps(
+                {
+                    "task_id": task_id,
+                    "cancelled": True,
+                },
+                indent=2,
+            )
+        except Exception as e:
+            return json.dumps({"error": f"Failed to cancel task: {e}"})
+
+    @mcp.tool()
+    def arc_task_result(task_id: str) -> str:
+        """Get the result of a completed task.
+
+        Args:
+            task_id: The task ID to get result for.
+
+        Returns:
+            JSON string with task result, or error if not completed.
+        """
+        from ..tasks import TaskExecutor, TaskStorage, TaskStatus
+
+        try:
+            storage = TaskStorage(ws / ".arc" / "tasks.db")
+            executor = TaskExecutor(storage)
+            task = executor.get_task_status(task_id)
+
+            if not task:
+                return json.dumps({"error": f"Task not found: {task_id}"})
+
+            if task.status != TaskStatus.COMPLETED:
+                return json.dumps(
+                    {
+                        "error": f"Task not completed (status: {task.status.value})",
+                        "task_id": task_id,
+                        "status": task.status.value,
+                    }
+                )
+
+            return json.dumps(
+                {
+                    "task_id": task.id,
+                    "status": task.status.value,
+                    "result": task.result,
+                    "ended_at": task.ended_at,
+                },
+                indent=2,
+                default=str,
+            )
+        except Exception as e:
+            return json.dumps({"error": f"Failed to get task result: {e}"})
+
     # ── Resources ──────────────────────────────────────────────────────────
 
     @mcp.resource("arc://runs/{run_id}")

@@ -30,3 +30,4 @@ audit_app = typer.Typer(name="audit", help="Audit chain verification and key man
 profiles_app = typer.Typer(name="profiles", help="Run profile management")
 prompt_app = typer.Typer(name="prompt", help="Prompt optimization commands (P1b local)")
 mcp_app = typer.Typer(name="mcp", help="MCP Local Control Plane server (Phase 26 / R19)")
+task_app = typer.Typer(name="task", help="Async task execution and management (Phase 27 / R20)")

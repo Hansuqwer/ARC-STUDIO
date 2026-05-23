@@ -29,6 +29,7 @@ from ._subapps import (
     storage_app,
     studio_app,
     studio_sessions_app,
+    task_app,
     workspace_app,
 )
 
@@ -60,6 +61,7 @@ app.add_typer(receipt_app)
 app.add_typer(audit_app)
 app.add_typer(profiles_app)
 app.add_typer(mcp_app)
+app.add_typer(task_app)
 app.add_typer(prompt_app)
 
 
