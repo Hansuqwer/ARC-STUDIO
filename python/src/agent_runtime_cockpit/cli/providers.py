@@ -28,12 +28,109 @@ def providers_list(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> N
 
 
 @providers_app.command("catalog")
-def providers_catalog(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
-    """List provider auth catalog entries. No secrets or network calls."""
+def providers_catalog(
+    status: Optional[str] = typer.Option(
+        None,
+        "--status",
+        help="Filter by status (supported, env_ref_only, oauth_planned, research_only)",
+    ),
+    category: Optional[str] = typer.Option(None, "--category", help="Filter by category"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """List provider catalog with setup guidance.
+
+    Shows available providers with setup instructions, required environment variables,
+    and documentation links. Use --status or --category to filter results.
+    """
     _setup_logging(debug)
     from ..provider_action import PROVIDERS
 
-    _out(ok([provider.model_dump() for provider in PROVIDERS]), json_output)
+    # Filter providers
+    providers = PROVIDERS
+    if status:
+        providers = [p for p in providers if p.status == status]
+    if category:
+        providers = [p for p in providers if p.category == category]
+
+    if json_output:
+        # JSON output: raw provider definitions
+        _out(ok([provider.model_dump() for provider in providers]), json_output)
+        return
+
+    # Human-readable output with setup guidance
+    output_lines = []
+    output_lines.append(f"\n{'=' * 80}")
+    output_lines.append(f"ARC Studio Provider Catalog ({len(providers)} providers)")
+    output_lines.append(f"{'=' * 80}\n")
+
+    for provider in providers:
+        output_lines.append(f"Provider: {provider.display_name}")
+        output_lines.append(f"  ID: {provider.id}")
+        output_lines.append(f"  Status: {provider.status}")
+        output_lines.append(f"  Auth: {provider.credential_label}")
+
+        if provider.env_key_names:
+            env_vars = " or ".join(provider.env_key_names)
+            output_lines.append(f"  Required: {env_vars}")
+
+        if provider.default_models:
+            models = ", ".join(provider.default_models[:3])
+            if len(provider.default_models) > 3:
+                models += f" (+{len(provider.default_models) - 3} more)"
+            output_lines.append(f"  Models: {models}")
+
+        # Features
+        features = []
+        if provider.supports_tools:
+            features.append("tools")
+        if provider.supports_chat:
+            features.append("chat")
+        if provider.supports_embeddings:
+            features.append("embeddings")
+        if provider.supports_images:
+            features.append("images")
+        if provider.supports_streaming:
+            features.append("streaming")
+        if features:
+            output_lines.append(f"  Features: {', '.join(features)}")
+
+        if provider.docs_url:
+            output_lines.append(f"  Docs: {provider.docs_url}")
+
+        # Setup instructions
+        if provider.env_key_names and provider.auth_kind.value != "local":
+            output_lines.append("\n  Setup:")
+            if provider.docs_url:
+                output_lines.append(
+                    f"    1. Get {provider.credential_label} from {provider.docs_url}"
+                )
+            output_lines.append(
+                f'    2. Set environment variable: export {provider.env_key_names[0]}="..."'
+            )
+            output_lines.append(f"    3. Test connection: arc providers test {provider.id}")
+        elif provider.auth_kind.value == "local":
+            output_lines.append("\n  Setup:")
+            output_lines.append("    Local provider - no API key required")
+            if provider.docs_url:
+                output_lines.append(f"    See {provider.docs_url} for installation")
+
+        # Warnings
+        if provider.warnings:
+            for warning in provider.warnings:
+                output_lines.append(f"  ⚠️  {warning}")
+
+        output_lines.append("")  # Blank line between providers
+
+    output_lines.append(f"{'=' * 80}")
+    output_lines.append("Commands:")
+    output_lines.append("  arc providers test <provider-id>  - Test provider connection")
+    output_lines.append("  arc providers models              - List available models")
+    output_lines.append("  arc providers status              - Show configured providers")
+    output_lines.append(f"{'=' * 80}\n")
+
+    print("\n".join(output_lines))
+    _out(ok({"count": len(providers)}), True)  # Still output JSON for programmatic use
 
 
 @providers_app.command("status")

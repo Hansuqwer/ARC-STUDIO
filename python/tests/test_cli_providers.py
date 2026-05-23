@@ -63,6 +63,42 @@ def test_providers_catalog_required_entries():
     assert by_id["ollama"]["auth_kind"] == "local"
 
 
+def test_providers_catalog_status_filter():
+    """arc providers catalog --status filters by provider status."""
+    result = CliRunner().invoke(app, ["providers", "catalog", "--status", "supported", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)["data"]
+    assert len(data) > 0
+    assert all(p["status"] == "supported" for p in data)
+
+
+def test_providers_catalog_human_readable_output():
+    """arc providers catalog shows formatted output without --json."""
+    result = CliRunner().invoke(app, ["providers", "catalog", "--status", "supported"])
+    assert result.exit_code == 0, result.output
+    # Check for formatted output elements
+    assert "ARC Studio Provider Catalog" in result.output
+    assert "Provider:" in result.output
+    assert "Setup:" in result.output
+    assert "arc providers test" in result.output
+    # Should show provider details
+    assert "ollama" in result.output.lower()
+
+
+def test_providers_catalog_shows_setup_instructions():
+    """arc providers catalog includes setup instructions for API providers."""
+    result = CliRunner().invoke(app, ["providers", "catalog", "--status", "env_ref_only"])
+    assert result.exit_code == 0, result.output
+    # Should show setup steps
+    assert "1. Get" in result.output
+    assert "2. Set environment variable" in result.output
+    assert "3. Test connection" in result.output
+    assert "export" in result.output
+    # Should show OpenAI as an example
+    assert "openai" in result.output.lower()
+    assert "OPENAI_API_KEY" in result.output
+
+
 def test_providers_key_set_env_ref_only(tmp_path, monkeypatch):
     """arc providers key set stores env var refs, not raw keys."""
     config_path = tmp_path / "providers.json"
