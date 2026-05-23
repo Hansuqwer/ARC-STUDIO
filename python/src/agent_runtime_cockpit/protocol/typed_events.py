@@ -497,6 +497,172 @@ class NodeFailedEvent(BaseModel):
     data: NodeFailedData
 
 
+# ─── Battle Mode Events (Phase 34/R26A) ──────────────────────────────────────
+
+
+class BattleStartedData(BaseModel):
+    """Data payload for BATTLE_STARTED event."""
+
+    battle_id: str
+    prompt: str
+    workers: int
+    topology: str
+    consensus_protocol: str
+    runtime_mode: str | None = None
+    consensus_escrow: bool | None = None
+    require_hitl: bool | None = None
+    node_id: str | None = None
+    message_id: str | None = None
+
+
+class BattleStartedEvent(BaseModel):
+    """BATTLE_STARTED event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["BATTLE_STARTED"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: BattleStartedData
+
+
+class BattleCandidateReadyData(BaseModel):
+    """Data payload for BATTLE_CANDIDATE_READY event."""
+
+    battle_id: str
+    candidate_id: str
+    worker_id: str
+    model_id: str
+    output_preview: str | None = None
+    node_id: str | None = None
+    message_id: str | None = None
+
+
+class BattleCandidateReadyEvent(BaseModel):
+    """BATTLE_CANDIDATE_READY event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["BATTLE_CANDIDATE_READY"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: BattleCandidateReadyData
+
+
+class BattleVoteCommittedData(BaseModel):
+    """Data payload for BATTLE_VOTE_COMMITTED event."""
+
+    battle_id: str
+    vote_id: str
+    commit_hash: str
+    voter: str | None = None
+    node_id: str | None = None
+    message_id: str | None = None
+
+
+class BattleVoteCommittedEvent(BaseModel):
+    """BATTLE_VOTE_COMMITTED event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["BATTLE_VOTE_COMMITTED"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: BattleVoteCommittedData
+
+
+class BattleVoteRevealedData(BaseModel):
+    """Data payload for BATTLE_VOTE_REVEALED event."""
+
+    battle_id: str
+    vote_id: str
+    candidate_id: str
+    approved: bool
+    voter: str | None = None
+    reasoning: str | None = None
+    node_id: str | None = None
+    message_id: str | None = None
+
+
+class BattleVoteRevealedEvent(BaseModel):
+    """BATTLE_VOTE_REVEALED event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["BATTLE_VOTE_REVEALED"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: BattleVoteRevealedData
+
+
+class BattleConsensusReachedData(BaseModel):
+    """Data payload for BATTLE_CONSENSUS_REACHED event."""
+
+    battle_id: str
+    consensus_reached: bool
+    winner_candidate_id: str | None = None
+    consensus_result: dict[str, Any] | None = None
+    node_id: str | None = None
+    message_id: str | None = None
+
+
+class BattleConsensusReachedEvent(BaseModel):
+    """BATTLE_CONSENSUS_REACHED event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["BATTLE_CONSENSUS_REACHED"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: BattleConsensusReachedData
+
+
+class BattleHitlRequiredData(BaseModel):
+    """Data payload for BATTLE_HITL_REQUIRED event."""
+
+    battle_id: str
+    hitl_id: str
+    candidates: list[dict[str, Any]]
+    prompt: str | None = None
+    timeout_seconds: int | None = None
+    node_id: str | None = None
+    message_id: str | None = None
+
+
+class BattleHitlRequiredEvent(BaseModel):
+    """BATTLE_HITL_REQUIRED event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["BATTLE_HITL_REQUIRED"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: BattleHitlRequiredData
+
+
+class BattleCompletedData(BaseModel):
+    """Data payload for BATTLE_COMPLETED event."""
+
+    battle_id: str
+    status: str
+    winner_candidate_id: str | None = None
+    duration_ms: int | None = None
+    error: str | None = None
+    node_id: str | None = None
+    message_id: str | None = None
+
+
+class BattleCompletedEvent(BaseModel):
+    """BATTLE_COMPLETED event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["BATTLE_COMPLETED"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: BattleCompletedData
+
+
 # ─── Raw/Unknown Events ──────────────────────────────────────────────────────
 
 
@@ -556,6 +722,13 @@ KnownRunEvent = Union[
     SwarmGraphConsensusEvent,
     SwarmGraphCostEvent,
     PolicyBypassWarning,
+    BattleStartedEvent,
+    BattleCandidateReadyEvent,
+    BattleVoteCommittedEvent,
+    BattleVoteRevealedEvent,
+    BattleConsensusReachedEvent,
+    BattleHitlRequiredEvent,
+    BattleCompletedEvent,
     RawEvent,
 ]
 
@@ -625,6 +798,13 @@ def is_known_event(event: TypedRunEvent) -> TypeGuard[KnownRunEvent]:
         "SWARMGRAPH_CONSENSUS",
         "SWARMGRAPH_COST",
         "POLICY_BYPASS_WARNING",
+        "BATTLE_STARTED",
+        "BATTLE_CANDIDATE_READY",
+        "BATTLE_VOTE_COMMITTED",
+        "BATTLE_VOTE_REVEALED",
+        "BATTLE_CONSENSUS_REACHED",
+        "BATTLE_HITL_REQUIRED",
+        "BATTLE_COMPLETED",
         "RAW",
     }
     return event.type in known_types
@@ -673,6 +853,13 @@ def parse_typed_event(raw: dict[str, Any]) -> TypedRunEvent:
         "SWARMGRAPH_CONSENSUS": SwarmGraphConsensusEvent,
         "SWARMGRAPH_COST": SwarmGraphCostEvent,
         "POLICY_BYPASS_WARNING": PolicyBypassWarning,
+        "BATTLE_STARTED": BattleStartedEvent,
+        "BATTLE_CANDIDATE_READY": BattleCandidateReadyEvent,
+        "BATTLE_VOTE_COMMITTED": BattleVoteCommittedEvent,
+        "BATTLE_VOTE_REVEALED": BattleVoteRevealedEvent,
+        "BATTLE_CONSENSUS_REACHED": BattleConsensusReachedEvent,
+        "BATTLE_HITL_REQUIRED": BattleHitlRequiredEvent,
+        "BATTLE_COMPLETED": BattleCompletedEvent,
         "RAW": RawEvent,
     }
 

@@ -30,6 +30,9 @@ from . import mgmt  # noqa: F401
 from . import studio_workspace  # noqa: F401
 from . import prompt  # noqa: F401
 
+# Phase 34: battle mode commands
+from . import battle  # noqa: F401
+
 # Legacy re-exports for backward compatibility.
 from .. import _legacy_cli  # noqa: F401
 

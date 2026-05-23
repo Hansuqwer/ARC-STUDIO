@@ -14,6 +14,7 @@ from ..security.context import EnforcementContext, DryRunAbort, set_enforcement_
 from ._subapps import (
     adapter_app,
     audit_app,
+    battle_app,
     config_app,
     context_app,
     doctor_app,
@@ -64,6 +65,7 @@ app.add_typer(profiles_app)
 app.add_typer(mcp_app)
 app.add_typer(task_app)
 app.add_typer(replay_app)
+app.add_typer(battle_app)
 app.add_typer(prompt_app)
 
 

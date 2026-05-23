@@ -32,3 +32,4 @@ prompt_app = typer.Typer(name="prompt", help="Prompt optimization commands (P1b 
 mcp_app = typer.Typer(name="mcp", help="MCP Local Control Plane server (Phase 26 / R19)")
 task_app = typer.Typer(name="task", help="Async task execution and management (Phase 27 / R20)")
 replay_app = typer.Typer(name="replay", help="Replay capability analysis (Phase 28 / R21)")
+battle_app = typer.Typer(name="battle", help="SwarmGraph battle mode (Phase 34 / R26A)")

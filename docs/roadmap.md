@@ -623,6 +623,38 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Source:** Feature List F6.1
 
+## R26A — ARC Battle Mode (SwarmGraph Arena CLI/IDE)
+
+**Goal:** Productize an ARC-native, offline-first SwarmGraph battle mode for CLI and IDE without building on deprecated LM Arena daemon routes or making provider-backed/live claims.
+
+**Current:** Plan accepted after audit. Existing assets include native SwarmGraph, stored runs/traces, HITL persistence, audit infrastructure, SwarmGraph Insight panels, LM Arena stub service/routes, and Consensus Escrow. Missing assets include an ARC-native battle schema/store, `arc battle` CLI group, battle event producers, IDE Battle tab, EloStore, and safe wiring for consensus escrow/HITL in battle workflows.
+
+**Plan Correction:** The downloaded SwarmGraph Arena plan must be revised before implementation. Do not treat `/api/arena/*` as product foundation; those routes are documented as daemon-only-deprecated. Do not use `ai-provider-gateway swarm` as ARC CLI. Do not claim Raft/BFT, provider-backed Arena, adapter-wide keyed audit, or live Arena product readiness. Build through ARC-native CLI, stores, events, trust gates, and existing run/trace surfaces.
+
+**Deliverables:**
+- ARC-native battle models and SQLite-backed store for battle runs, candidates, votes, outcomes, and optional ELO state
+- `arc battle` CLI group: `run`, `show`, `vote`, `leaderboard`, `config validate`, `export`
+- Offline/fake SwarmGraph battle runner supporting 2-worker and 4-worker flat battles with majority/quorum consensus
+- Stable JSON envelopes under existing ARC `ok(data)` / `err(...)` conventions
+- Battle run records stored in `battles.db`; compatibility with existing `arc runs get/status/trace/replay` is deferred until trace/run-index wiring exists
+- Typed battle events: `BATTLE_STARTED`, `BATTLE_CANDIDATE_READY`, `BATTLE_VOTE_COMMITTED`, `BATTLE_VOTE_REVEALED`, `BATTLE_CONSENSUS_REACHED`, `BATTLE_HITL_REQUIRED`, `BATTLE_COMPLETED`
+- Optional `--consensus-escrow` wiring after adaptive/high-risk selection exists
+- HITL judge integration through persistent HITL prompts and CLI/IDE response paths
+- IDE Battle tab with honest empty/degraded/present states; no fabricated candidate, consensus, audit, or leaderboard data
+- EloStore keyed by model ID, not worker role, after battle outcomes are persisted
+
+**Acceptance:**
+- `arc battle run --runtime-mode fake/offline --json` completes without provider/network calls
+- 2-worker and 4-worker battles produce deterministic candidates and stored battle run records
+- Existing `arc runs ...` commands remain unchanged; battle run inspection uses `arc battle show/list/export` until trace/run-index wiring is added
+- Battle consensus is event-backed; IDE renders absent/degraded states when events/material are missing
+- HITL and audit states are conditional and never imply adapter-wide HMAC coverage
+- Live/provider-backed Arena remains blocked/deferred unless a separate trust-gated provider contract is implemented and tested
+
+**Status:** Baseline Complete (scaffold) | Evidence: 36 local battle/CLI tests passing, `arc battle` CLI commands implemented (run/show/vote/leaderboard/list/config validate/export), offline battle runner for 2-worker and 4-worker flat battles, SQLite battle store, typed battle events in protocol package, ELO rating system | Notes: Offline/fake mode only. No provider-backed/live claims. Battle runs stored independently in battles.db; `arc runs` trace/index compatibility, persistent HITL wiring, IDE Battle tab, and true commit-reveal escrow remain deferred. Deterministic fake voting for testing.
+
+**Source:** Local audit of SwarmGraph Arena Battle Mode plan, 2026-05-23.
+
 ---
 
 ## Adapter Phases (Post-v0.1 Adapter Integration)

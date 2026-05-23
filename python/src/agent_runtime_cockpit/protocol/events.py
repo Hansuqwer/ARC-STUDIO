@@ -8,6 +8,7 @@ Provides:
 - ``validate_event_data()`` — standalone field checker
 - ``CURRENT_SCHEMA_VERSION`` — global schema version constant
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -24,6 +25,7 @@ CURRENT_SCHEMA_VERSION = 2
 
 class EventTypeDef(BaseModel):
     """Schema definition for one event type."""
+
     version: int = CURRENT_SCHEMA_VERSION
     required_fields: set[str] = Field(default_factory=set)
     optional_fields: set[str] = Field(default_factory=set)
@@ -51,7 +53,6 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         required_fields={"cancel_reason"},
         optional_fields={"node_id", "message_id"},
     ),
-
     # ── Step lifecycle ───────────────────────────────────────────────────
     "STEP_STARTED": EventTypeDef(
         required_fields={"step_id", "step_name"},
@@ -65,7 +66,6 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         required_fields={"step_id", "error"},
         optional_fields={"node_id", "message_id", "evidence_refs"},
     ),
-
     # ── Agent lifecycle ──────────────────────────────────────────────────
     "AGENT_START": EventTypeDef(
         required_fields={"agent_name"},
@@ -75,7 +75,6 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         required_fields={"agent_name", "output"},
         optional_fields={"usage", "node_id", "message_id"},
     ),
-
     # ── Tool calls ───────────────────────────────────────────────────────
     "TOOL_CALL": EventTypeDef(
         required_fields={"tool_call_id", "tool_name"},
@@ -105,13 +104,11 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         required_fields={"tool_name", "result"},
         optional_fields={"node_id", "message_id", "evidence_refs"},
     ),
-
     # ── Handoffs ─────────────────────────────────────────────────────────
     "HANDOFF": EventTypeDef(
         required_fields={"from_agent", "to_agent"},
         optional_fields={"node_id", "message_id"},
     ),
-
     # ── Node lifecycle ───────────────────────────────────────────────────
     "NODE_STARTED": EventTypeDef(
         required_fields={"node_id"},
@@ -125,11 +122,17 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         required_fields={"node_id", "error"},
         optional_fields={"node_name", "message_id", "evidence_refs"},
     ),
-
     # ── Messages ─────────────────────────────────────────────────────────
     "MESSAGE": EventTypeDef(
         required_fields={"text"},
-        optional_fields={"source", "coalesced", "node_id", "message_id", "tool_call_id", "evidence_refs"},
+        optional_fields={
+            "source",
+            "coalesced",
+            "node_id",
+            "message_id",
+            "tool_call_id",
+            "evidence_refs",
+        },
     ),
     "MESSAGE_CHUNK": EventTypeDef(
         required_fields={"text"},
@@ -151,13 +154,11 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         required_fields={"role", "delta"},
         optional_fields={"node_id", "message_id"},
     ),
-
     # ── State ────────────────────────────────────────────────────────────
     "STATE_SNAPSHOT": EventTypeDef(
         required_fields={"state"},
         optional_fields={"redacted", "node_id"},
     ),
-
     # ── SwarmGraph insight ───────────────────────────────────────────────
     "SWARMGRAPH_TOPOLOGY": EventTypeDef(
         required_fields={"nodes", "edges"},
@@ -166,19 +167,35 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
     "SWARMGRAPH_CONSENSUS": EventTypeDef(
         required_fields={"votes"},
         optional_fields={
-            "decision", "strategy", "voters", "confidence", "consensus_reached", "task_id",
-            "node_id", "message_id", "evidence_refs",
+            "decision",
+            "strategy",
+            "voters",
+            "confidence",
+            "consensus_reached",
+            "task_id",
+            "node_id",
+            "message_id",
+            "evidence_refs",
         },
     ),
     "SWARMGRAPH_COST": EventTypeDef(
         optional_fields={
-            "provider", "model", "promptTokens", "completionTokens",
-            "totalCost", "totalTokens", "currency", "items", "source",
-            "runtime", "measured",
-            "node_id", "message_id", "evidence_refs",
+            "provider",
+            "model",
+            "promptTokens",
+            "completionTokens",
+            "totalCost",
+            "totalTokens",
+            "currency",
+            "items",
+            "source",
+            "runtime",
+            "measured",
+            "node_id",
+            "message_id",
+            "evidence_refs",
         },
     ),
-
     # ── Human-in-the-loop ────────────────────────────────────────────────
     "HITL_PROMPT": EventTypeDef(
         required_fields={"hitl_id", "step_id", "prompt_text", "options", "timeout_seconds"},
@@ -192,7 +209,6 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         required_fields={"hitl_id", "timeout_seconds"},
         optional_fields={"node_id", "message_id"},
     ),
-
     # ── Cockpit contract lifecycle ───────────────────────────────────────
     "CONTRACT_PROPOSED": EventTypeDef(
         required_fields={"contract"},
@@ -222,7 +238,41 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         required_fields={"evidence_ref"},
         optional_fields={"node_id", "message_id"},
     ),
-
+    # ── Battle Mode (Phase 34/R26A) ──────────────────────────────────────
+    "BATTLE_STARTED": EventTypeDef(
+        required_fields={"battle_id", "prompt", "workers", "topology", "consensus_protocol"},
+        optional_fields={
+            "runtime_mode",
+            "consensus_escrow",
+            "require_hitl",
+            "node_id",
+            "message_id",
+        },
+    ),
+    "BATTLE_CANDIDATE_READY": EventTypeDef(
+        required_fields={"battle_id", "candidate_id", "worker_id", "model_id"},
+        optional_fields={"output_preview", "node_id", "message_id"},
+    ),
+    "BATTLE_VOTE_COMMITTED": EventTypeDef(
+        required_fields={"battle_id", "vote_id", "commit_hash"},
+        optional_fields={"voter", "node_id", "message_id"},
+    ),
+    "BATTLE_VOTE_REVEALED": EventTypeDef(
+        required_fields={"battle_id", "vote_id", "candidate_id", "approved"},
+        optional_fields={"voter", "reasoning", "node_id", "message_id"},
+    ),
+    "BATTLE_CONSENSUS_REACHED": EventTypeDef(
+        required_fields={"battle_id", "consensus_reached"},
+        optional_fields={"winner_candidate_id", "consensus_result", "node_id", "message_id"},
+    ),
+    "BATTLE_HITL_REQUIRED": EventTypeDef(
+        required_fields={"battle_id", "hitl_id", "candidates"},
+        optional_fields={"prompt", "timeout_seconds", "node_id", "message_id"},
+    ),
+    "BATTLE_COMPLETED": EventTypeDef(
+        required_fields={"battle_id", "status"},
+        optional_fields={"winner_candidate_id", "duration_ms", "error", "node_id", "message_id"},
+    ),
     # ── Raw / fallback ───────────────────────────────────────────────────
     "RAW": EventTypeDef(
         required_fields={"raw"},
@@ -239,6 +289,7 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
 # Validation helpers
 # ---------------------------------------------------------------------------
 
+
 def validate_event_data(event_type: str, data: dict[str, Any]) -> list[str]:
     """Validate event *data* fields against the registry.
 
@@ -251,9 +302,7 @@ def validate_event_data(event_type: str, data: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     for field in typedef.required_fields:
         if field not in data:
-            errors.append(
-                f"Event {event_type!r} missing required field: {field!r}"
-            )
+            errors.append(f"Event {event_type!r} missing required field: {field!r}")
     return errors
 
 

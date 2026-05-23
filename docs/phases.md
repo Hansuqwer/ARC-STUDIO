@@ -1303,6 +1303,83 @@ bash scripts/check-pr.sh
 - Privacy leakage: cross-tenant memory contamination.
 - Cost: memory graph storage and query overhead may exceed benefits.
 
+## Phase 34 — ARC Battle Mode (SwarmGraph Arena CLI/IDE)
+
+**Roadmap:** R26A — ARC Battle Mode (SwarmGraph Arena CLI/IDE)  
+**Status:** Baseline Complete (scaffold)  
+**Depends on:** Phase 17 (SwarmGraph native runtime), Phase 23 (trust enforcement), Phase 25 (CLI decomposition), Phase 29 (persistent HITL), Phase 30 (consensus escrow), Phase 31 (adaptive consensus for high-risk escrow selection)
+
+### Implementation
+
+**Implemented:**
+1. ✅ Battle models (`battle/models.py`): BattleRun, BattleCandidate, BattleVote, BattleOutcome, EloRating with Pydantic validation
+2. ✅ SQLite battle store (`battle/store.py`): Full CRUD operations for battles, candidates, votes, outcomes, and ELO ratings with foreign key constraints
+3. ✅ Offline battle runner (`battle/runner.py`): Supports 2-worker and 4-worker flat battles with majority/quorum consensus, deterministic fake voting, ELO rating updates
+4. ✅ Typed battle events in protocol package: BATTLE_STARTED, BATTLE_CANDIDATE_READY, BATTLE_VOTE_COMMITTED, BATTLE_VOTE_REVEALED, BATTLE_CONSENSUS_REACHED, BATTLE_HITL_REQUIRED, BATTLE_COMPLETED
+5. ✅ CLI commands (`cli/battle.py`): `arc battle run`, `show`, `vote`, `leaderboard`, `list`, `config validate`, `export` with stable JSON envelopes
+6. ✅ ELO rating system: Calculates rating changes, tracks wins/losses/draws, maintains leaderboard
+7. ⚠️ Consensus escrow scaffold: Optional vote hash metadata exists; full commit/reveal phase and verification are deferred
+8. ✅ Comprehensive tests: 36 tests covering models, store, runner, CLI registration/envelopes/config validation (all passing)
+
+**Files Created:**
+- `python/src/agent_runtime_cockpit/battle/models.py` (220 lines)
+- `python/src/agent_runtime_cockpit/battle/store.py` (450 lines)
+- `python/src/agent_runtime_cockpit/battle/runner.py` (467 lines)
+- `python/src/agent_runtime_cockpit/battle/__init__.py` (35 lines)
+- `python/src/agent_runtime_cockpit/cli/battle.py` (450 lines)
+- `python/tests/battle/test_battle_models.py` (180 lines)
+- `python/tests/battle/test_battle_store.py` (150 lines)
+- `python/tests/battle/test_battle_runner.py` (170 lines)
+- `python/tests/cli/test_battle_cli.py` (65 lines)
+- `python/tests/battle/__init__.py` (20 lines)
+
+**Protocol Updates:**
+- Added 7 battle event types to `protocol/events.py`
+- Added 7 typed battle event classes to `protocol/typed_events.py`
+- Updated KnownRunEvent union, is_known_event, and parse_typed_event
+
+**CLI Integration:**
+- Added battle_app to `cli/_subapps.py`
+- Registered battle_app in `cli/_app.py`
+
+### Acceptance
+1. ✅ `arc battle run --runtime-mode fake/offline --json` completes without provider/network calls
+2. ✅ 2-worker and 4-worker battles produce deterministic candidates and stored battle run records
+3. ✅ Battle consensus is event-backed with typed events
+4. ✅ ELO ratings updated after each battle with winner/loser tracking
+5. ✅ All 36 battle/CLI tests passing
+6. ✅ Offline/fake mode only - no provider-backed claims
+7. ✅ Battle runs stored independently in battles.db; `arc runs` trace/index compatibility is deferred
+
+### Verification
+```bash
+cd python && PYTHONPATH=src uv run pytest tests/battle/ -v
+# Result: 31 battle package tests pass; 36 battle/CLI tests pass with tests/cli/test_battle_cli.py
+
+cd python && uv run pytest -q
+# Expected: All tests pass (including 31 new battle tests)
+
+pnpm --filter @arc-studio/protocol build
+pnpm --filter arc-extension build
+bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
+```
+
+### Known Risks
+- Fake voting is deterministic (first candidate always wins) for testing - real voting would require actual model evaluation
+- Battle runs stored separately from regular runs - integration with `arc runs` commands deferred
+- IDE Battle tab not implemented (CLI-only for baseline)
+- HITL judge integration exists via CLI but not fully wired in battle runner
+- Live/provider-backed Arena remains blocked - offline/fake mode only
+
+### Evidence
+- 36 battle/CLI tests passing (14 model tests, 8 runner tests, 9 store tests, 5 CLI tests)
+- Battle models with full Pydantic validation
+- SQLite store with foreign key constraints and indexes
+- Offline runner with deterministic voting and ELO updates
+- CLI commands with stable ARC JSON envelopes
+- Typed battle events in protocol package
+- No provider/network calls in fake/offline mode
+
 ## Phase 36.1 — Provider Discovery & Interactive UX
 
 **Roadmap:** R37 — Provider Management System (Phase 1)  
@@ -1474,6 +1551,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 | **31** | **R24** | **Adaptive Consensus Protocol** |
 | **32** | **R25** | **Event-Driven Audit/HITL Notifications** |
 | **33** | **R26** | **Swarm Memory Graph (Research)** |
+| **34** | **R26A** | **ARC Battle Mode (SwarmGraph Arena CLI/IDE)** |
 | **36.1** | **R37** | **Provider Discovery & Interactive UX (Phase 1)** |
 | **36.2** | **R37** | **Credential Storage & OAuth (Phase 2)** |
 
@@ -1494,6 +1572,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 | 31 Adaptive Consensus | Not Started | Phase 30, Phase 23 | P2 — major differentiator |
 | 32 Event Notifications | Not Started | Phase 29, Phase 21 | P2 — enterprise compliance |
 | 33 Memory Graph | Research | None | P3 — research, may pivot |
+| 34 ARC Battle Mode | Not Started | Phase 17, Phase 23, Phase 25, Phase 29, Phase 30, Phase 31 | P2/P3 — ARC-native offline battle CLI/IDE, not live LM Arena productization |
 | 36.1 Provider Discovery | Baseline Complete | None | Standalone — interactive provider UX without credential storage; no blockers |
 | 36.2 Credential Storage | Blocked | Phase 23, Phase 25, Phase 36.1 | Standalone — secure credential storage and OAuth; requires trust infrastructure |
 
