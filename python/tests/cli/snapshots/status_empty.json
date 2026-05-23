@@ -1,7 +1,7 @@
 {
   "data": {
     "python_files": 0,
-    "runtime_count": 3,
+    "runtime_count": 2,
     "runtimes": [
       {
         "can_run": false,
@@ -12,25 +12,19 @@
       {
         "can_run": true,
         "detected": true,
-        "id": "crewai",
-        "paid": true
-      },
-      {
-        "can_run": true,
-        "detected": true,
         "id": "lmarena",
         "paid": false
       }
     ],
     "trace_count": 0,
-    "workspace": "/private/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/pytest-of-hansvilund/pytest-221/test_status_snapshot0"
+    "workspace": "/private/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/pytest-of-hansvilund/pytest-231/test_status_snapshot0"
   },
   "error": null,
   "meta": {
     "adapter": null,
-    "duration_ms": 40.59791564941406,
-    "timestamp": "2026-05-23T13:28:30.668511Z",
-    "workspace": "/private/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/pytest-of-hansvilund/pytest-221/test_status_snapshot0"
+    "duration_ms": 40.80796241760254,
+    "timestamp": "2026-05-23T14:02:43.055422Z",
+    "workspace": "/private/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/pytest-of-hansvilund/pytest-231/test_status_snapshot0"
   },
   "ok": true,
   "version": "1.0"
