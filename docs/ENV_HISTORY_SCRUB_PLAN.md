@@ -2,7 +2,7 @@
 
 This is a gated release task. Do not run it during normal development.
 
-**Current status (2026-05-18):** Preparation only. Target release date is 2026-06-01 and latest observed required-ish GitHub `main` workflows are green on `6d3f559`, but no `.env` scrub, history rewrite, force-push, secret rotation, branch deletion, tag, publish, or release action is approved.
+**Current status (2026-05-19):** History scrub completed on 2026-05-18 after explicit approval. Commit `ffc1fd1` records completion; current evidence anchor is `ec36b55`. 4 commits were cleaned with git-filter-repo, backup branch `backup-pre-scrub-2026-05-18` was created, and `main` was force-pushed. No tag, publish, branch deletion, or release action is approved by this document.
 
 ## Trigger
 
@@ -25,7 +25,7 @@ The repository history may contain a deleted `.env`. Public release branches mus
 These checks may be refreshed before the scrub window because they do not rewrite history or publish anything:
 
 - Confirm release date is set and scrub date is at least 7 days before the planned tag.
-- Confirm required GitHub `main` workflows are green; current baseline reference remains last all-green `073238d` until superseded by a newer all-green set.
+- Confirm required GitHub `main` workflows are green; current baseline reference is `ec36b55` until superseded by a newer all-green set.
 - Confirm release owner and maintainer approver names.
 - Confirm backup/private remote strategy and rollback branch name.
 - Confirm all active PR/branch owners know a future rewrite may require rebase or reclone.
