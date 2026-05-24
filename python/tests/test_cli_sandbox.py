@@ -1,7 +1,10 @@
 import json
+import os
 import platform
 import shutil
+import subprocess
 
+import pytest
 from typer.testing import CliRunner
 
 from agent_runtime_cockpit.cli import app
@@ -139,6 +142,34 @@ def test_denial_event_emitted_for_denied_command(tmp_path, monkeypatch):
     assert (tmp_path / "audit" / "sandbox.audit.jsonl").exists()
 
 
+def test_ask_decline_preserves_denial_default(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(
+        app, ["sandbox", "run", "--ask", "--", "curl", "https://example.com"], input="n\n"
+    )
+    assert result.exit_code == 3
+    assert '"allowed": false' in result.output
+    assert '"approval_required": true' in result.output
+
+
+def test_ask_approval_executes_unknown_command(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(app, ["sandbox", "run", "--ask", "--", "true"], input="y\n")
+    assert result.exit_code == 0, result.output
+    assert '"allowed": true' in result.output
+    assert '"approved": true' in result.output
+    assert '"classification": "unknown"' in result.output
+
+
+def test_ask_rejected_with_json_output(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(
+        app, ["sandbox", "run", "--json", "--ask", "--", "curl", "https://example.com"]
+    )
+    assert result.exit_code == 2
+    assert _payload(result)["ok"] is False
+
+
 def test_microvm_doctor_unavailable_gracefully(monkeypatch):
     monkeypatch.setattr(shutil, "which", lambda _name: None)
     result = CliRunner().invoke(app, ["sandbox", "doctor", "--json"])
@@ -162,9 +193,17 @@ def test_macos_microvm_preflight_checks_lima(monkeypatch):
     monkeypatch.setattr(
         shutil, "which", lambda name: "/opt/homebrew/bin/limactl" if name == "limactl" else None
     )
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0, stdout="limactl 1.0", stderr=""
+        ),
+    )
     data = microvm_preflight("Darwin")
     assert data["platform"] == "macos"
     assert data["binary"].endswith("limactl")
+    assert data["limactl_version"]["ok"] is True
 
 
 def test_windows_explicitly_unsupported():
@@ -334,6 +373,7 @@ def test_firecracker_preflight_reports_detail(monkeypatch, tmp_path):
     assert data["jailer"] == "/usr/bin/jailer"
     assert data["cache_ready"] is True
     assert "kvm_rw" in data
+    assert "arch_supported" in data
 
 
 def test_classification_categories():
@@ -341,3 +381,15 @@ def test_classification_categories():
     assert classify_command(["pip", "install", "x"]) == CommandClassification.INSTALL
     assert classify_command(["sudo", "id"]) == CommandClassification.PRIVILEGED
     assert classify_command(["python", "-c", "print('hello')"]) == CommandClassification.READ_ONLY
+
+
+@pytest.mark.skipif(
+    os.environ.get("ARC_MICROVM_INTEGRATION") != "1",
+    reason="requires ARC_MICROVM_INTEGRATION=1 and local microVM runtime",
+)
+def test_microvm_integration_skeleton_doctor_only():
+    result = CliRunner().invoke(app, ["sandbox", "doctor", "--json"])
+    assert result.exit_code == 0
+    providers = _payload(result)["data"]["providers"]
+    microvm = next(provider for provider in providers if provider.get("provider") == "microvm")
+    assert microvm["status"] in {"unavailable", "installed_not_configured", "ready", "blocked"}

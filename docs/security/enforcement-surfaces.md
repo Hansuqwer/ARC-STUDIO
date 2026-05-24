@@ -264,6 +264,7 @@ ARC now has a first-class sandbox CLI foundation:
 
 - `arc policy explain -- <cmd...>` classifies argv and reports policy decision without execution.
 - `arc sandbox run --policy local-safe -- <cmd...>` enforces local-safe policy before subprocess execution.
+- `arc sandbox run --ask -- <cmd...>` can approve only `network`, `install`, and `unknown`; non-interactive default remains deny.
 - `arc sandbox doctor --json` reports subprocess and microVM preflight state.
 - `arc sandbox audit-verify --json` verifies the sandbox audit chain.
 - `arc sandbox audit-list --json` reads persisted sandbox events with filters.
@@ -280,6 +281,7 @@ P0 policy defaults:
 - stdout/stderr are capped and redacted.
 - every allowed/denied sandbox command returns an audit payload.
 - sandbox audit events are persisted to an external hash-chain store by default.
+- sandbox audit events best-effort mirror into the HMAC audit store when an audit key exists; missing keys do not block CLI execution.
 - sandbox audit chain appends continue across CLI invocations and verify against raw events.
 - container execution requires `ARC_ENABLE_CONTAINER_SANDBOX=1`.
 

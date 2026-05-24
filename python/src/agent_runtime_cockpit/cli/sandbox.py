@@ -15,6 +15,7 @@ from ..protocol.event_envelope import err, ok
 from ..security.sandbox import (
     SandboxPolicy,
     SandboxResult,
+    approve_decision,
     build_audit_event,
     decide,
     ensure_workspace_cwd,
@@ -120,6 +121,7 @@ def sandbox_lima_template(
 def sandbox_run(
     ctx: typer.Context,
     policy: str = typer.Option("local-safe", "--policy", help="Sandbox policy profile"),
+    ask: bool = typer.Option(False, "--ask", help="Prompt for network/install/unknown approval"),
     workspace: Optional[str] = WORKSPACE_FLAG,
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
@@ -141,30 +143,43 @@ def sandbox_run(
         _out(err(ArcErrorCode.INVALID_INPUT, "missing command"), json_output)
         raise typer.Exit(2)
     if not decision.allowed:
-        audit = build_audit_event(
-            command=command,
-            cwd=cwd,
-            decision=decision,
-            provider="subprocess",
-            started_at=started_at,
-            ended_at=ended_at,
-            exit_code=None,
-            stdout_truncated=False,
-            stderr_truncated=False,
-            redaction_applied=False,
-        )
-        audit_path = persist_sandbox_audit_event(audit)
-        audit["audit_path"] = str(audit_path)
-        result = SandboxResult(
-            command=command,
-            cwd=str(cwd),
-            classification=decision.classification,
-            decision=decision,
-            provider="subprocess",
-            audit_event=audit,
-        )
-        _out(ok(result.model_dump(mode="json"), workspace=str(ws)), json_output)
-        raise typer.Exit(3)
+        if ask and json_output:
+            _out(err(ArcErrorCode.INVALID_INPUT, "--ask requires non-JSON output"), json_output)
+            raise typer.Exit(2)
+        if (
+            ask
+            and decision.approval_required
+            and typer.confirm(
+                f"Approve {decision.classification.value} command under policy {policy_model.name}?",
+                default=False,
+            )
+        ):
+            decision = approve_decision(decision)
+        else:
+            audit = build_audit_event(
+                command=command,
+                cwd=cwd,
+                decision=decision,
+                provider="subprocess",
+                started_at=started_at,
+                ended_at=ended_at,
+                exit_code=None,
+                stdout_truncated=False,
+                stderr_truncated=False,
+                redaction_applied=False,
+            )
+            audit_path = persist_sandbox_audit_event(audit)
+            audit["audit_path"] = str(audit_path)
+            result = SandboxResult(
+                command=command,
+                cwd=str(cwd),
+                classification=decision.classification,
+                decision=decision,
+                provider="subprocess",
+                audit_event=audit,
+            )
+            _out(ok(result.model_dump(mode="json"), workspace=str(ws)), json_output)
+            raise typer.Exit(3)
 
     provider = SubprocessIsolationProvider(
         safe_env_keys=frozenset(policy_model.env_allowlist),

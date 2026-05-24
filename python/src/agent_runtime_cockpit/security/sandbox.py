@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import subprocess
 import shutil
 from datetime import datetime, timezone
 from enum import Enum
@@ -40,6 +41,7 @@ class SandboxPolicy(BaseModel):
     allow_install: bool = False
     allow_privileged: bool = False
     allow_unknown: bool = False
+    interactive_approval: bool = False
     timeout_seconds: int = 30
     max_output_bytes: int = 65_536
     env_allowlist: tuple[str, ...] = (
@@ -63,6 +65,8 @@ class SandboxDecision(BaseModel):
     classification: CommandClassification
     reason: str
     policy: str
+    approval_required: bool = False
+    approved: bool = False
 
 
 class SandboxResult(BaseModel):
@@ -177,6 +181,7 @@ def decide(command: list[str], policy: SandboxPolicy) -> SandboxDecision:
             classification=classification,
             reason="network policy",
             policy=policy.name,
+            approval_required=not policy.allow_network,
         )
     if classification == CommandClassification.INSTALL:
         return SandboxDecision(
@@ -184,6 +189,7 @@ def decide(command: list[str], policy: SandboxPolicy) -> SandboxDecision:
             classification=classification,
             reason="install policy",
             policy=policy.name,
+            approval_required=not policy.allow_install,
         )
     if classification == CommandClassification.PRIVILEGED:
         return SandboxDecision(
@@ -204,6 +210,27 @@ def decide(command: list[str], policy: SandboxPolicy) -> SandboxDecision:
         classification=classification,
         reason="unknown command policy",
         policy=policy.name,
+        approval_required=not policy.allow_unknown,
+    )
+
+
+def approve_decision(
+    decision: SandboxDecision, reason: str = "interactive approval"
+) -> SandboxDecision:
+    """Return an approved copy for categories allowed by interactive UX."""
+    if decision.classification not in {
+        CommandClassification.NETWORK,
+        CommandClassification.INSTALL,
+        CommandClassification.UNKNOWN,
+    }:
+        return decision
+    return SandboxDecision(
+        allowed=True,
+        classification=decision.classification,
+        reason=reason,
+        policy=decision.policy,
+        approval_required=True,
+        approved=True,
     )
 
 
@@ -261,35 +288,46 @@ def microvm_preflight(system: str | None = None) -> dict[str, Any]:
     """Detect lightweight microVM runtime availability without executing workloads."""
     os_name = system or platform.system()
     if os_name == "Linux":
-        binary = shutil.which("firecracker") or shutil.which("cloud-hypervisor")
+        firecracker = shutil.which("firecracker")
+        cloud_hypervisor = shutil.which("cloud-hypervisor")
+        binary = firecracker or cloud_hypervisor
         jailer = shutil.which("jailer")
         kvm = Path("/dev/kvm")
         kvm_exists = kvm.exists()
         kvm_rw = os.access(kvm, os.R_OK | os.W_OK) if kvm_exists else False
+        machine = platform.machine().lower()
+        arch_supported = machine in {"x86_64", "amd64", "aarch64", "arm64"}
         kernel_cache = os.environ.get("ARC_FIRECRACKER_KERNEL")
         rootfs_cache = os.environ.get("ARC_FIRECRACKER_ROOTFS")
-        cache_ready = bool(
-            kernel_cache
-            and Path(kernel_cache).exists()
-            and rootfs_cache
-            and Path(rootfs_cache).exists()
-        )
-        ready = bool(binary and jailer and kvm_exists and kvm_rw and cache_ready)
+        kernel_exists = bool(kernel_cache and Path(kernel_cache).exists())
+        rootfs_exists = bool(rootfs_cache and Path(rootfs_cache).exists())
+        cache_ready = bool(kernel_exists and rootfs_exists)
+        ready = bool(binary and jailer and kvm_exists and kvm_rw and arch_supported and cache_ready)
         status = "ready" if ready else "installed_not_configured" if binary else "unavailable"
         return {
             "provider": "microvm",
             "platform": "linux",
             "status": status,
             "binary": binary,
+            "firecracker": firecracker,
+            "cloud_hypervisor": cloud_hypervisor,
             "jailer": jailer,
+            "jailer_required_for_firecracker": bool(firecracker),
             "kvm": kvm_exists,
             "kvm_rw": kvm_rw,
+            "machine": machine,
+            "arch_supported": arch_supported,
             "kernel_cache": kernel_cache,
+            "kernel_exists": kernel_exists,
             "rootfs_cache": rootfs_cache,
+            "rootfs_exists": rootfs_exists,
             "cache_ready": cache_ready,
         }
     if os_name == "Darwin":
         limactl = shutil.which("limactl")
+        macos_version = platform.mac_ver()[0]
+        limactl_version = _run_probe([limactl, "--version"]) if limactl else None
+        limactl_list = _run_probe([limactl, "list", "--json"]) if limactl else None
         status = "installed_not_configured" if limactl else "unavailable"
         return {
             "provider": "microvm",
@@ -297,12 +335,42 @@ def microvm_preflight(system: str | None = None) -> dict[str, Any]:
             "status": status,
             "binary": limactl,
             "runtime": "lima-vz",
+            "macos_version": macos_version,
+            "limactl_version": limactl_version,
+            "limactl_list": limactl_list,
+            "execution": "not_implemented",
         }
     return {
         "provider": "microvm",
         "platform": os_name.lower(),
         "status": "blocked",
         "reason": "Windows/unsupported platform skipped",
+    }
+
+
+def _run_probe(argv: list[str | None]) -> dict[str, Any]:
+    """Run bounded runtime probe; never creates VMs."""
+    if not argv[0]:
+        return {"ok": False, "error": "missing binary"}
+    try:
+        result = subprocess.run(
+            [str(part) for part in argv],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception as exc:  # noqa: BLE001 - probe errors must be reported, not raised.
+        return {"ok": False, "error": str(exc)}
+    stdout, stdout_truncated = cap_output(result.stdout, 4096)
+    stderr, stderr_truncated = cap_output(result.stderr, 4096)
+    return {
+        "ok": result.returncode == 0,
+        "exit_code": result.returncode,
+        "stdout": stdout,
+        "stderr": stderr,
+        "stdout_truncated": stdout_truncated,
+        "stderr_truncated": stderr_truncated,
     }
 
 
@@ -449,7 +517,25 @@ def persist_sandbox_audit_event(event: dict[str, Any], audit_dir: Path | None = 
     }
     with chain_path.open("a", encoding="utf-8") as fp:
         fp.write(json.dumps(record, separators=(",", ":")) + "\n")
+    _persist_hmac_sandbox_event(event, target_dir)
     return chain_path
+
+
+def _persist_hmac_sandbox_event(event: dict[str, Any], audit_dir: Path) -> None:
+    """Best-effort HMAC mirror; skipped when no audit key exists."""
+    try:
+        from ..audit.schema import SandboxCommandEvent
+        from ..audit.storage import AuditChainStore
+
+        store = AuditChainStore(audit_dir=audit_dir)
+        hmac_event = SandboxCommandEvent(
+            run_id="sandbox",
+            session_id="sandbox-cli",
+            payload=event,
+        )
+        store.append_event(hmac_event)
+    except Exception:
+        return
 
 
 def verify_sandbox_audit(audit_dir: Path | None = None) -> dict[str, Any]:

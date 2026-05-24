@@ -155,6 +155,7 @@ cd python
 uv run arc sandbox doctor --json
 uv run arc policy explain -- ls -la
 uv run arc sandbox run --policy local-safe -- pwd
+uv run arc sandbox run --policy local-safe --ask -- true
 uv run arc policy list --json
 uv run arc policy validate --json
 uv run arc sandbox audit-verify --json
@@ -167,6 +168,7 @@ Expected defaults:
 - `rm -rf .` is denied as `destructive`.
 - MicroVM doctor may report `unavailable` until Firecracker/Cloud Hypervisor plus `/dev/kvm` exist on Linux, or `limactl` exists on macOS.
 - Sandbox audit logs are written to `~/.arc/audit/` unless `ARC_SANDBOX_AUDIT_DIR` is set.
+- `--ask` only applies to `network`, `install`, and `unknown`; non-interactive runs still deny by default.
 - Named sandbox policies can be loaded from `ARC_SANDBOX_POLICY_CONFIG` or `~/.arc/sandbox-policies.json`.
 - Container execution is disabled unless `ARC_ENABLE_CONTAINER_SANDBOX=1` is set.
 - Lima template rendering requires `ARC_MICROVM_EXPERIMENTAL=1`; it does not execute a VM.

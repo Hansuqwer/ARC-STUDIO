@@ -47,7 +47,11 @@ Real now:
 - sandbox audit chain appends now continue from the previous chain hash across CLI invocations
 - sandbox policy config is schema-versioned and rejects unknown fields
 - experimental Lima template rendering behind `ARC_MICROVM_EXPERIMENTAL=1`
-- Firecracker preflight reports `jailer`, `/dev/kvm` rw, and cached kernel/rootfs readiness
+- `arc sandbox run --ask` can interactively approve only `network`, `install`, and `unknown`; non-interactive defaults still deny
+- Firecracker preflight reports binary choice, `jailer`, `/dev/kvm` rw, arch support, and cached kernel/rootfs readiness
+- macOS Lima preflight reports macOS version plus bounded `limactl --version` / `limactl list --json` probes; it does not create VMs
+- sandbox audit still writes SHA256 chain/raw events and now best-effort mirrors to the existing HMAC audit store when an audit key exists
+- opt-in microVM integration skeleton is gated by `ARC_MICROVM_INTEGRATION=1`; default CI skips it
 
 Design-only now:
 - container provider as production fallback
@@ -109,10 +113,13 @@ Sandbox commands persist audit artifacts outside the workspace by default:
 
 - chain: `~/.arc/audit/sandbox.audit.jsonl`
 - raw events: `~/.arc/audit/sandbox.events.jsonl`
+- optional HMAC mirror: same audit directory through `AuditChainStore` when `arc audit key init` has provided a key
 
 Override directory: `ARC_SANDBOX_AUDIT_DIR`.
 
 The CLI response still includes the event payload for immediate UX and tests.
+
+The HMAC mirror is best-effort and never required for `arc sandbox run` success. Missing audit keys keep the existing SHA256 chain as the stable default.
 
 Verification:
 

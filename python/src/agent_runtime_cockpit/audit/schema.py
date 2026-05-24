@@ -27,6 +27,7 @@ class AuditEventType(str, Enum):
     run_completed = "run_completed"
     run_failed = "run_failed"
     run_cancelled = "run_cancelled"
+    sandbox_command = "sandbox_command"
 
 
 class TrustLevel(str, Enum):
@@ -184,6 +185,23 @@ class ToolResultEvent(AuditEvent):
             "result": self.result,
             "trust_level": self.trust_level.value,
             "error": self.error,
+        }
+
+
+class SandboxCommandEvent(AuditEvent):
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+    @property
+    def event_type(self) -> AuditEventType:
+        return AuditEventType.sandbox_command
+
+    def to_audit_event(self) -> dict[str, Any]:
+        return {
+            "type": self.event_type.value,
+            "run_id": self.run_id,
+            "session_id": self.session_id,
+            "timestamp": self.timestamp,
+            "payload": self.payload,
         }
 
 
