@@ -374,6 +374,32 @@ def test_firecracker_preflight_reports_detail(monkeypatch, tmp_path):
     assert data["cache_ready"] is True
     assert "kvm_rw" in data
     assert "arch_supported" in data
+    assert "version" in data
+    assert "jailer_version" in data
+    assert "kernel_size" in data
+    assert "jail_perms" in data
+
+
+def test_linux_microvm_preflight_deep(monkeypatch, tmp_path):
+    """Test deep Linux preflight diagnostics."""
+    kernel = tmp_path / "vmlinux"
+    rootfs = tmp_path / "rootfs.ext4"
+    kernel.write_text("kernel", encoding="utf-8")
+    rootfs.write_text("rootfs", encoding="utf-8")
+    monkeypatch.setenv("ARC_FIRECRACKER_KERNEL", str(kernel))
+    monkeypatch.setenv("ARC_FIRECRACKER_ROOTFS", str(rootfs))
+    monkeypatch.setattr(
+        shutil,
+        "which",
+        lambda name: f"/usr/bin/{name}" if name in {"firecracker", "jailer"} else None,
+    )
+    data = microvm_preflight("Linux")
+    assert data["kernel_exists"] is True
+    assert data["rootfs_exists"] is True
+    assert data["kernel_size"] is not None
+    assert "jail_perms" in data
+    # jailer_version may be None if version probe fails
+    assert "jailer_version" in data
 
 
 def test_classification_categories():

@@ -320,6 +320,29 @@ def microvm_preflight(system: str | None = None) -> dict[str, Any]:
         kernel_exists = bool(kernel_cache and Path(kernel_cache).exists())
         rootfs_exists = bool(rootfs_cache and Path(rootfs_cache).exists())
         cache_ready = bool(kernel_exists and rootfs_exists)
+
+        # Deep diagnostics
+        if firecracker:
+            version_result = _run_probe([firecracker, "--version"])
+            jail_version_result = _run_probe([jailer, "--version"]) if jailer else None
+        else:
+            version_result = None
+            jail_version_result = None
+
+        # Kernel metadata validation
+        kernel_size = None
+        if kernel_cache:
+            stats = os.stat(kernel_cache)
+            kernel_size = stats.st_size
+
+        # Jail permission validation
+        jail_perms = None
+        if jailer:
+            try:
+                jail_perms = oct(os.stat(jailer).st_mode)
+            except Exception:
+                jail_perms = None
+
         ready = bool(binary and jailer and kvm_exists and kvm_rw and arch_supported and cache_ready)
         status = "ready" if ready else "installed_not_configured" if binary else "unavailable"
         return {
@@ -340,6 +363,10 @@ def microvm_preflight(system: str | None = None) -> dict[str, Any]:
             "rootfs_cache": rootfs_cache,
             "rootfs_exists": rootfs_exists,
             "cache_ready": cache_ready,
+            "version": version_result,
+            "jailer_version": jail_version_result,
+            "kernel_size": kernel_size,
+            "jail_perms": jail_perms,
         }
     if os_name == "Darwin":
         limactl = shutil.which("limactl")
