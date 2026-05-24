@@ -1,16 +1,40 @@
 """HMAC-authenticated audit chain writer and verifier."""
+
 from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Optional
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows unsupported for this phase.
+    fcntl = None  # type: ignore[assignment]
 
 from .key_manager import AuditKeyManager, sign_audit_record, verify_audit_signature
 
 log = logging.getLogger(__name__)
 
 GENESIS = "GENESIS"
+
+
+def _canonical_json(data: dict[str, Any]) -> str:
+    return json.dumps(data, sort_keys=True, separators=(",", ":"))
+
+
+class _FileLock:
+    def __init__(self, file_obj: Any) -> None:
+        self._file = file_obj
+
+    def __enter__(self) -> None:
+        if fcntl is not None:
+            fcntl.flock(self._file.fileno(), fcntl.LOCK_EX)
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        if fcntl is not None:
+            fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
 
 
 class HmacAuditChainWriter:
@@ -43,20 +67,25 @@ class HmacAuditChainWriter:
         if key is None:
             log.warning("No audit key available — skipping HMAC signing for seq %d", self._seq)
             return None
-        record_hash, signature = sign_audit_record(event, key, self._prev_hash)
-        record = {
-            "seq": self._seq,
-            "event": event,
-            "prev_hash": self._prev_hash,
-            "record_hash": record_hash,
-            "signature": signature,
-            "key_source": status.source,
-        }
-        with open(self.path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
-            f.flush()
-        self._prev_hash = record_hash
-        self._seq += 1
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.path, "a+", encoding="utf-8") as f:
+            with _FileLock(f):
+                self._seq, self._prev_hash = self._load_tail_state()
+                record_hash, signature = sign_audit_record(event, key, self._prev_hash)
+                record = {
+                    "seq": self._seq,
+                    "event": event,
+                    "prev_hash": self._prev_hash,
+                    "record_hash": record_hash,
+                    "signature": signature,
+                    "key_source": status.source,
+                }
+                f.seek(0, os.SEEK_END)
+                f.write(_canonical_json(record) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
+                self._prev_hash = record_hash
+                self._seq += 1
         return record
 
 
@@ -68,7 +97,10 @@ def verify_hmac_chain(chain_path: Path, key: bytes) -> tuple[bool, str]:
     """
     if not chain_path.exists():
         return False, f"Chain file not found: {chain_path}"
-    lines = chain_path.read_text(encoding="utf-8").splitlines()
+    content = chain_path.read_text(encoding="utf-8")
+    if content and not content.endswith("\n"):
+        return False, "partial trailing line"
+    lines = content.splitlines()
     if not lines:
         return True, "empty chain"
     prev_hash = GENESIS

@@ -171,7 +171,10 @@ class JobSupervisor:
                 run.status = RunStatus.RUNNING
                 self.store.save(run)
 
-            await executor_fn(run_id, request, self._emit_event)
+            await asyncio.wait_for(
+                executor_fn(run_id, request, self._emit_event),
+                timeout=request.timeout_seconds,
+            )
 
             duration = self._now_ms() - start_ms
             self._emit_event(run_id, "RUN_COMPLETED", {"duration_ms": duration})
@@ -191,6 +194,33 @@ class JobSupervisor:
                 run.ended_at = datetime.now(timezone.utc).isoformat()
                 self.store.save(run)
                 self._finalize_run_artifacts(run_id, request, RunStatus.CANCELLED, duration)
+
+        except TimeoutError as e:
+            duration = self._now_ms() - start_ms
+            self._emit_event(
+                run_id,
+                "RUN_FAILED",
+                {
+                    "error": f"run timed out after {request.timeout_seconds}s",
+                    "error_detail": "TimeoutError",
+                    "timeout_seconds": request.timeout_seconds,
+                },
+            )
+            run = self.store.load(run_id)
+            if run:
+                run.status = RunStatus.FAILED
+                run.ended_at = datetime.now(timezone.utc).isoformat()
+                self.store.save(run)
+                autopsy = self._generate_autopsy(run, e)
+                self.store.save_autopsy(autopsy)
+                self._emit_event(
+                    run_id,
+                    "FAILURE_AUTOPSY_GENERATED",
+                    {
+                        "autopsy": self._redacted(autopsy.model_dump(mode="json", by_alias=True)),
+                    },
+                )
+                self._finalize_run_artifacts(run_id, request, RunStatus.FAILED, duration)
 
         except Exception as e:
             duration = self._now_ms() - start_ms

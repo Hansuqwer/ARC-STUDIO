@@ -77,6 +77,28 @@ class TestStartRun:
         assert supervisor.store.load_receipt(run_id) is not None
 
     @pytest.mark.asyncio
+    async def test_run_timeout_emits_terminal_event_and_cleans_active(
+        self, supervisor: JobSupervisor
+    ):
+        async def slow_executor(run_id, req, emit_event):
+            await asyncio.sleep(10)
+
+        run = await supervisor.start_run(
+            RunRequest(workflow_id="wf-timeout", runtime="swarmgraph", timeout_seconds=1),
+            slow_executor,
+        )
+        await asyncio.sleep(1.3)
+
+        loaded = supervisor.store.load(run.id)
+        assert loaded is not None
+        assert loaded.status == RunStatus.FAILED
+        assert run.id not in supervisor._active_runs
+        types = [event.type for event in loaded.events]
+        assert "RUN_FAILED" in types
+        assert "FAILURE_AUTOPSY_GENERATED" in types
+        assert supervisor.store.load_autopsy(run.id) is not None
+
+    @pytest.mark.asyncio
     async def test_receipt_cost_enforces_contract_ceiling(self, supervisor: JobSupervisor):
         request = RunRequest(
             workflow_id="wf-test",

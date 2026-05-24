@@ -170,6 +170,107 @@ def test_ask_rejected_with_json_output(tmp_path, monkeypatch):
     assert _payload(result)["ok"] is False
 
 
+def test_non_interactive_approval_tokens(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARC_SANDBOX_APPROVAL_STORE", str(tmp_path / ".arc" / "approvals.json"))
+    approve = CliRunner().invoke(
+        app, ["policy", "approve", "--json", "--token", "tok-1", "--", "true"]
+    )
+    assert approve.exit_code == 0, approve.output
+    run = CliRunner().invoke(
+        app, ["sandbox", "run", "--json", "--approval-token", "tok-1", "--", "true"]
+    )
+    assert run.exit_code == 0, run.output
+    decision = _payload(run)["data"]["decision"]
+    assert decision["allowed"] is True
+    assert decision["approved"] is True
+    assert decision["reason"] == "approval token"
+
+
+def test_approval_removal(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARC_SANDBOX_APPROVAL_STORE", str(tmp_path / ".arc" / "approvals.json"))
+    CliRunner().invoke(app, ["policy", "approve", "--json", "--token", "tok-1", "--", "true"])
+    revoke = CliRunner().invoke(app, ["policy", "revoke", "--json", "--token", "tok-1"])
+    assert revoke.exit_code == 0, revoke.output
+    assert _payload(revoke)["data"]["revoked"] == 1
+    run = CliRunner().invoke(
+        app, ["sandbox", "run", "--json", "--approval-token", "tok-1", "--", "true"]
+    )
+    assert run.exit_code == 3
+    assert _payload(run)["data"]["decision"]["allowed"] is False
+
+
+def test_approval_persistence(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    store = tmp_path / ".arc" / "approvals.json"
+    monkeypatch.setenv("ARC_SANDBOX_APPROVAL_STORE", str(store))
+    result = CliRunner().invoke(
+        app, ["policy", "approve", "--json", "--token", "tok-1", "--", "true"]
+    )
+    assert result.exit_code == 0, result.output
+    assert store.exists()
+    data = json.loads(store.read_text(encoding="utf-8"))
+    assert data["version"] == 1
+    assert data["approvals"][0]["policy"] == "local-safe"
+    assert data["approvals"][0]["classification"] == "unknown"
+    assert data["approvals"][0]["workspace_root"] == str(tmp_path.resolve())
+
+
+def test_approval_token_is_hashed_with_ttl_and_private_file_mode(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    store = tmp_path / ".arc" / "approvals.json"
+    monkeypatch.setenv("ARC_SANDBOX_APPROVAL_STORE", str(store))
+    result = CliRunner().invoke(
+        app, ["policy", "approve", "--json", "--token", "tok-secret", "--", "true"]
+    )
+    assert result.exit_code == 0, result.output
+    data = json.loads(store.read_text(encoding="utf-8"))
+    approval = data["approvals"][0]
+    assert approval["token"] == ""
+    assert approval["token_hash"]
+    assert approval["expires_at"]
+    assert "tok-secret" not in store.read_text(encoding="utf-8")
+    assert oct(store.stat().st_mode & 0o777) == "0o600"
+
+
+def test_expired_approval_token_denied(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    store = tmp_path / ".arc" / "approvals.json"
+    monkeypatch.setenv("ARC_SANDBOX_APPROVAL_STORE", str(store))
+    policy_file = tmp_path / "sandbox-policies.json"
+    policy_file.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "policies": [{"version": 1, "name": "short", "approval_ttl_seconds": -1}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ARC_SANDBOX_POLICY_CONFIG", str(policy_file))
+    approve = CliRunner().invoke(
+        app, ["policy", "approve", "--json", "--policy", "short", "--token", "tok-1", "--", "true"]
+    )
+    assert approve.exit_code == 0, approve.output
+    run = CliRunner().invoke(
+        app,
+        [
+            "sandbox",
+            "run",
+            "--json",
+            "--policy",
+            "short",
+            "--approval-token",
+            "tok-1",
+            "--",
+            "true",
+        ],
+    )
+    assert run.exit_code == 3
+    assert _payload(run)["data"]["decision"]["allowed"] is False
+
+
 def test_microvm_doctor_unavailable_gracefully(monkeypatch):
     monkeypatch.setattr(shutil, "which", lambda _name: None)
     result = CliRunner().invoke(app, ["sandbox", "doctor", "--json"])
@@ -407,6 +508,138 @@ def test_classification_categories():
     assert classify_command(["pip", "install", "x"]) == CommandClassification.INSTALL
     assert classify_command(["sudo", "id"]) == CommandClassification.PRIVILEGED
     assert classify_command(["python", "-c", "print('hello')"]) == CommandClassification.READ_ONLY
+
+
+@pytest.mark.parametrize(
+    ("command", "classification"),
+    [
+        (["python", "-c", "open('x', 'w').write('x')"], CommandClassification.WRITES_WORKSPACE),
+        (["python", "-c", "import socket"], CommandClassification.NETWORK),
+        (["python", "-c", "import subprocess"], CommandClassification.NETWORK),
+        (["python", "-m", "pip", "install", "x"], CommandClassification.INSTALL),
+        (["node", "-e", "console.log(1)"], CommandClassification.UNKNOWN),
+        (["ruby", "-e", "puts 1"], CommandClassification.UNKNOWN),
+        (["perl", "-e", "print 1"], CommandClassification.UNKNOWN),
+        (["bash", "-lc", "ls"], CommandClassification.UNKNOWN),
+        (["git", "clean", "-fdx"], CommandClassification.DESTRUCTIVE),
+        (["git", "reset", "--hard"], CommandClassification.DESTRUCTIVE),
+        (["git", "checkout", "--", "file"], CommandClassification.DESTRUCTIVE),
+        (["git", "rm", "file"], CommandClassification.DESTRUCTIVE),
+        (["find", ".", "-delete"], CommandClassification.DESTRUCTIVE),
+        (["find", ".", "-exec", "rm", "{}", ";"], CommandClassification.DESTRUCTIVE),
+        (["tar", "--overwrite", "-xf", "a.tar"], CommandClassification.DESTRUCTIVE),
+        (["rsync", "a", "b"], CommandClassification.NETWORK),
+        (["dd", "if=/dev/zero", "of=x"], CommandClassification.DESTRUCTIVE),
+        (["truncate", "-s", "0", "x"], CommandClassification.DESTRUCTIVE),
+        (["chmod", "600", "x"], CommandClassification.PRIVILEGED),
+        (["chown", "root", "x"], CommandClassification.PRIVILEGED),
+    ],
+)
+def test_adversarial_classification_matrix(command, classification):
+    assert classify_command(command) == classification
+
+
+def test_python_write_outside_workspace_denied_before_execution(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "outside.txt"
+    monkeypatch.chdir(workspace)
+    result = CliRunner().invoke(
+        app,
+        [
+            "sandbox",
+            "run",
+            "--json",
+            "--workspace",
+            str(workspace),
+            "--",
+            "python",
+            "-c",
+            f"open({str(outside)!r}, 'w').write('x')",
+        ],
+    )
+    assert result.exit_code == 2
+    assert outside.exists() is False
+
+
+def test_symlink_path_argument_escape_denied(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    outside = tmp_path / "outside"
+    workspace.mkdir()
+    outside.mkdir()
+    link = workspace / "escape"
+    link.symlink_to(outside, target_is_directory=True)
+    monkeypatch.chdir(workspace)
+    result = CliRunner().invoke(
+        app,
+        [
+            "sandbox",
+            "run",
+            "--json",
+            "--workspace",
+            str(workspace),
+            "--",
+            "python",
+            "-c",
+            f"open({str(link / 'x')!r}, 'w').write('x')",
+        ],
+    )
+    assert result.exit_code == 2
+
+
+def test_absolute_output_path_denied(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.chdir(workspace)
+    result = CliRunner().invoke(
+        app,
+        [
+            "sandbox",
+            "run",
+            "--json",
+            "--workspace",
+            str(workspace),
+            "--",
+            "python",
+            "-c",
+            "open('/tmp/arc-out', 'w').write('x')",
+        ],
+    )
+    assert result.exit_code == 2
+
+
+def test_safe_workspace_relative_output_path_allowed(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.chdir(workspace)
+    result = CliRunner().invoke(
+        app,
+        [
+            "sandbox",
+            "run",
+            "--json",
+            "--workspace",
+            str(workspace),
+            "--",
+            "python",
+            "-c",
+            "open('out.txt', 'w').write('x')",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert (workspace / "out.txt").read_text(encoding="utf-8") == "x"
+
+
+def test_read_only_absolute_path_outside_workspace_denied(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text("secret", encoding="utf-8")
+    monkeypatch.chdir(workspace)
+    result = CliRunner().invoke(
+        app, ["sandbox", "run", "--json", "--workspace", str(workspace), "--", "cat", str(outside)]
+    )
+    assert result.exit_code == 2
 
 
 def test_approval_rules_default_behavior(tmp_path, monkeypatch):

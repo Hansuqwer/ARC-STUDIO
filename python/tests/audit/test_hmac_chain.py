@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,9 +15,18 @@ from agent_runtime_cockpit.audit.hmac_chain import (
 )
 from agent_runtime_cockpit.audit.key_manager import (
     AuditKeyManager,
+    AuditKeyStatus,
     sign_audit_record,
     verify_audit_signature,
 )
+
+
+class StaticAuditKeyManager:
+    def __init__(self, key: bytes) -> None:
+        self._key = key
+
+    def get_key(self) -> tuple[bytes, AuditKeyStatus]:
+        return self._key, AuditKeyStatus(available=True, source="test", degraded=False)
 
 
 def test_sign_and_verify():
@@ -116,6 +126,44 @@ def test_hmac_chain_not_found(tmp_path: Path):
     ok, reason = verify_hmac_chain(tmp_path / "nonexistent.jsonl", key)
     assert ok is False
     assert "not found" in reason
+
+
+def test_hmac_chain_append_fsyncs(tmp_path: Path, monkeypatch):
+    key = b"test-hmac-key-32-bytes-long!!"
+    calls: list[int] = []
+    monkeypatch.setattr(os, "fsync", lambda fd: calls.append(fd))
+    with patch.object(AuditKeyManager, "_try_keychain", return_value=key):
+        writer = HmacAuditChainWriter(tmp_path / "nested" / "audit.jsonl", AuditKeyManager())
+        writer.append({"action": "init"})
+    assert calls
+
+
+def test_hmac_chain_concurrent_append(tmp_path: Path):
+    key = b"test-hmac-key-32-bytes-long!!"
+    chain_path = tmp_path / "audit.jsonl"
+
+    def append_one(index: int) -> None:
+        manager = StaticAuditKeyManager(key)
+        HmacAuditChainWriter(chain_path, manager).append({"index": index})  # type: ignore[arg-type]
+
+    threads = [threading.Thread(target=append_one, args=(i,)) for i in range(10)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    ok, reason = verify_hmac_chain(chain_path, key)
+    assert ok is True, reason
+    records = [json.loads(line) for line in chain_path.read_text(encoding="utf-8").splitlines()]
+    assert [record["seq"] for record in records] == list(range(10))
+
+
+def test_hmac_chain_partial_trailing_line_fails(tmp_path: Path):
+    chain_path = tmp_path / "audit.jsonl"
+    chain_path.write_text('{"seq":0}', encoding="utf-8")
+    ok, reason = verify_hmac_chain(chain_path, b"test-hmac-key-32-bytes-long!!")
+    assert ok is False
+    assert "partial trailing line" in reason
 
 
 def test_key_manager_generate_key():

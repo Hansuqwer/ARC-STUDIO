@@ -15,16 +15,20 @@ from ..protocol.event_envelope import err, ok
 from ..security.sandbox import (
     SandboxPolicy,
     SandboxResult,
+    approve_command_token,
     approve_decision,
+    approve_decision_with_token,
     build_audit_event,
     decide,
     ensure_workspace_cwd,
     list_sandbox_audit_events,
     list_sandbox_policies,
     persist_sandbox_audit_event,
+    revoke_approval_token,
     render_lima_template,
     resolve_sandbox_policy,
     utc_now,
+    validate_command_paths,
     validate_sandbox_policy_config,
     verify_sandbox_audit,
 )
@@ -122,6 +126,9 @@ def sandbox_run(
     ctx: typer.Context,
     policy: str = typer.Option("local-safe", "--policy", help="Sandbox policy profile"),
     ask: bool = typer.Option(False, "--ask", help="Prompt for network/install/unknown approval"),
+    approval_token: Optional[str] = typer.Option(
+        None, "--approval-token", help="Use a scoped non-interactive approval token"
+    ),
     workspace: Optional[str] = WORKSPACE_FLAG,
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
@@ -134,6 +141,9 @@ def sandbox_run(
         policy_model = _policy(policy, ws)
         cwd = ensure_workspace_cwd(Path.cwd(), ws)
         decision = decide(command, policy_model)
+        decision = approve_decision_with_token(
+            token=approval_token, command=command, policy=policy_model, decision=decision
+        )
     except (ValueError, typer.BadParameter) as exc:
         _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
         raise typer.Exit(2)
@@ -141,6 +151,11 @@ def sandbox_run(
     ended_at = started_at
     if not command:
         _out(err(ArcErrorCode.INVALID_INPUT, "missing command"), json_output)
+        raise typer.Exit(2)
+    try:
+        validate_command_paths(command, policy_model)
+    except ValueError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
         raise typer.Exit(2)
     if not decision.allowed:
         if ask and json_output:
@@ -241,10 +256,64 @@ def policy_explain(
     policy_model = _policy(policy, ws)
     command = list(ctx.args)
     decision = decide(command, policy_model)
+    try:
+        validate_command_paths(command, policy_model)
+    except ValueError as exc:
+        decision = decision.model_copy(update={"allowed": False, "reason": str(exc)})
     _out(
         ok({"command": command, "decision": decision.model_dump(mode="json")}, workspace=str(ws)),
         json_output,
     )
+
+
+@policy_app.command(
+    "approve", context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
+)
+def policy_approve(
+    ctx: typer.Context,
+    token: str = typer.Option(..., "--token", help="Approval token to bind"),
+    policy: str = typer.Option("local-safe", "--policy", help="Sandbox policy profile"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Persist scoped approval for a command token."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    command = list(ctx.args)
+    if not command:
+        _out(err(ArcErrorCode.INVALID_INPUT, "missing command"), json_output)
+        raise typer.Exit(2)
+    try:
+        policy_model = _policy(policy, ws)
+        approval = approve_command_token(token=token, command=command, policy=policy_model)
+    except (ValueError, typer.BadParameter) as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(2)
+    _out(
+        ok(
+            {
+                "approved": True,
+                "policy": approval.policy,
+                "classification": approval.classification.value,
+                "command_hash": approval.command_hash,
+                "workspace_root": approval.workspace_root,
+            },
+            workspace=str(ws),
+        ),
+        json_output,
+    )
+
+
+@policy_app.command("revoke")
+def policy_revoke(
+    token: str = typer.Option(..., "--token", help="Approval token to revoke"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Revoke all approvals for a token."""
+    _setup_logging(debug)
+    _out(ok(revoke_approval_token(token)), json_output)
 
 
 @policy_app.command("list")

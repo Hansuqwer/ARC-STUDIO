@@ -237,6 +237,16 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         required_fields={"evidence_ref"},
         optional_fields={"node_id", "message_id"},
     ),
+    "POLICY_BYPASS_WARNING": EventTypeDef(
+        required_fields={
+            "policy_id",
+            "bypass_reason",
+            "surface",
+            "surface_identifier",
+            "suggested_remediation",
+        },
+        optional_fields={"parent_run_id"},
+    ),
     # ── Battle Mode (Phase 34/R26A) ──────────────────────────────────────
     "BATTLE_STARTED": EventTypeDef(
         required_fields={"battle_id", "prompt", "workers", "topology", "consensus_protocol"},

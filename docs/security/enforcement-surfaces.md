@@ -3,7 +3,7 @@
 This document catalogs all security-sensitive surfaces in ARC Studio and their enforcement status. It is the **single source of truth** for every execution surface that routes through the typed enforcement helpers introduced in Phase 23 (and the bypass-warning helper from ADR-0022.1).
 
 **Last updated:** 2026-05-22  
-**Phase:** 23.3 (Baseline Complete) + extended by Phases 25.5, 26, 32, 35  
+**Phase:** 23.3 (Baseline Complete) + extended by Phases 25.5, 26, 32, 35 + sandbox hardening  
 **Audit script:** `scripts/audit-enforcement-surfaces.sh`
 
 If a code path performs a subprocess call, a file read in a user-controlled location, a socket bind, or an HTTP call and is **not** listed here, that is a bug. Either the path needs a row in this document, or it needs a `# enforcement: not-applicable` annotation that the audit script can verify.
@@ -216,6 +216,31 @@ These surfaces are annotated as not-applicable because they are internal CLI too
 5. **Non-interactive mode.** Headless/CI runs deny by default. No dialog is silently auto-accepted.
 6. **Bypass-warning rate limit.** Per ADR-0022.1, at most one `POLICY_BYPASS_WARNING` per `(run_id, surface_identifier)` per run. Dedup state in same `contextvar` as EnforcementContext.
 
+## Sandbox Approval Tokens
+
+`arc policy approve --token <token> -- <cmd...>` stores scoped non-interactive approvals in `~/.arc/approvals.json` (override: `ARC_SANDBOX_APPROVAL_STORE`). `arc sandbox run --approval-token <token> -- <cmd...>` only applies a stored approval when policy, workspace root, classification, and command hash all match. Destructive and privileged classifications remain unapprovable. `arc policy revoke --token <token>` deletes all entries for that token.
+
+New approvals store only a token hash, include `expires_at`, and write the approval file with private user permissions where the platform supports chmod. Legacy plaintext-token approvals remain readable so existing persisted approvals do not fail closed unexpectedly during this alpha phase.
+
+Research note: Context7 Typer docs confirm `CliRunner` command tests and subcommands; Pydantic docs confirm `model_validate`, `model_dump`, and JSON serialization for stable file envelopes. Vercel/Google code search was unavailable in this session due provider 403, so implementation used existing ARC policy patterns only.
+
+## Sandbox Classification And Path Intent
+
+`arc sandbox run` remains real subprocess execution only. It now denies additional adversarial forms before execution:
+
+- interpreter one-liners with unknown side effects default to `unknown`; Python package install/network/write hints classify as `install`, `network`, or `writes_workspace`.
+- destructive VCS/file commands (`git clean`, `git reset --hard`, `git checkout --`, `git rm`, `find -delete`, `find -exec rm`, `tar --overwrite`, `dd`, `truncate`) deny by default.
+- privileged ownership/mode changes (`chmod`, `chown`, `sudo`, etc.) deny and are not approvable.
+- write-class commands with known path args must stay inside the workspace; symlink/outside/absolute escapes deny before subprocess execution.
+- path extraction covers known output/input flags, Python literal `open`/`write_text`/`write_bytes`, `dd of=`, simple `cp`/`mv` destinations, and archive output suffixes.
+- read-only absolute paths outside the workspace deny by default unless a future ADR documents a safe exception.
+
+Limits: this is policy/classifier hardening, not syscall or kernel sandboxing. MicroVM remains preflight/doctor-only; container fallback remains gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`.
+
+## HMAC Audit Append Durability
+
+`HmacAuditChainWriter` now creates parent directories, uses advisory file locking where available, writes stable canonical JSON, flushes, and calls `os.fsync` per append. Verification rejects partial trailing lines clearly. The JSONL record shape is unchanged.
+
 ## Adding Enforcement to New Code
 
 ### Step 1: Identify operation type
@@ -281,7 +306,7 @@ P0 policy defaults:
 - stdout/stderr are capped and redacted.
 - every allowed/denied sandbox command returns an audit payload.
 - sandbox audit events are persisted to an external hash-chain store by default.
-- sandbox audit events best-effort mirror into the HMAC audit store when an audit key exists; missing keys do not block CLI execution.
+- sandbox audit events best-effort mirror into the keyed audit store when an audit key exists; missing keys do not block CLI execution.
 - sandbox audit chain appends continue across CLI invocations and verify against raw events.
 - container execution requires `ARC_ENABLE_CONTAINER_SANDBOX=1`.
 

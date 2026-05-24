@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import platform
 import subprocess
 import shutil
-from datetime import datetime, timezone
+import stat
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Literal
@@ -45,6 +47,7 @@ class SandboxPolicy(BaseModel):
     network_approval_required: bool = True
     install_approval_required: bool = True
     unknown_approval_required: bool = True
+    approval_ttl_seconds: int = 86_400
     timeout_seconds: int = 30
     max_output_bytes: int = 65_536
     env_allowlist: tuple[str, ...] = (
@@ -91,6 +94,26 @@ class SandboxResult(BaseModel):
     audit_event: dict[str, Any]
 
 
+class SandboxApproval(BaseModel):
+    """Persisted non-interactive sandbox approval."""
+
+    token: str = ""
+    token_hash: str = ""
+    policy: str
+    workspace_root: str
+    classification: CommandClassification
+    command_hash: str
+    created_at: str
+    expires_at: str | None = None
+
+
+class SandboxApprovalStore(BaseModel):
+    """Stable JSON approval-store envelope."""
+
+    version: Literal[1] = 1
+    approvals: list[SandboxApproval] = Field(default_factory=list)
+
+
 READ_ONLY_COMMANDS = {
     "cat",
     "find",
@@ -119,11 +142,51 @@ PRIVILEGED_COMMANDS = {
     "systemctl",
 }
 WRITE_SHELL_TOKENS = {">", ">>", "tee"}
+SHELL_COMMANDS = {"sh", "bash", "zsh"}
+INTERPRETERS = {"python", "python3", "node", "ruby", "perl"}
+GIT_DESTRUCTIVE_SUBCOMMANDS = {"clean", "rm"}
+GIT_HARD_RESET = {"reset", "--hard"}
+GIT_CHECKOUT_FORCE = {"checkout", "--"}
+PACKAGE_MANAGER_MODULES = {"pip"}
+NETWORK_HINTS = {"socket", "requests", "urllib", "http.client", "subprocess", "os.system"}
+WRITE_HINTS = {"open", "write_text", "write_bytes", "Path("}
+
+
+class SandboxPathViolation(ValueError):
+    """Raised when command path intent escapes the workspace."""
+
+
+WRITE_PATH_OPTIONS = {
+    "-o",
+    "--output",
+    "--output-document",
+    "--outfile",
+    "--out",
+    "--dest",
+    "--destination",
+}
+READ_PATH_OPTIONS = {"-f", "--file", "--files-from", "--exclude-from", "--include-from"}
+WRITE_PATH_PREFIXES = {
+    "--output=",
+    "--output-document=",
+    "--outfile=",
+    "--out=",
+    "--dest=",
+    "--destination=",
+    "of=",
+}
 
 
 def utc_now() -> str:
     """Return an RFC3339 UTC timestamp."""
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def utc_now_plus(seconds: int) -> str:
+    """Return an RFC3339 UTC timestamp seconds from now."""
+    return (
+        (datetime.now(timezone.utc) + timedelta(seconds=seconds)).isoformat().replace("+00:00", "Z")
+    )
 
 
 def classify_command(command: list[str]) -> CommandClassification:
@@ -134,6 +197,22 @@ def classify_command(command: list[str]) -> CommandClassification:
     args = command[1:]
     if exe in PRIVILEGED_COMMANDS:
         return CommandClassification.PRIVILEGED
+    if exe in SHELL_COMMANDS:
+        return CommandClassification.UNKNOWN
+    if exe == "git":
+        if args and args[0] in GIT_DESTRUCTIVE_SUBCOMMANDS:
+            return CommandClassification.DESTRUCTIVE
+        if args[:1] == ["reset"] and "--hard" in args:
+            return CommandClassification.DESTRUCTIVE
+        if args[:1] == ["checkout"] and "--" in args:
+            return CommandClassification.DESTRUCTIVE
+    if exe == "find":
+        if "-delete" in args or ("-exec" in args and any(Path(a).name == "rm" for a in args)):
+            return CommandClassification.DESTRUCTIVE
+    if exe == "tar" and any(a == "--overwrite" or a.startswith("--overwrite=") for a in args):
+        return CommandClassification.DESTRUCTIVE
+    if exe == "rsync":
+        return CommandClassification.NETWORK
     if exe in DESTRUCTIVE_COMMANDS:
         return CommandClassification.DESTRUCTIVE
     if exe in NETWORK_COMMANDS:
@@ -144,12 +223,22 @@ def classify_command(command: list[str]) -> CommandClassification:
             return CommandClassification.INSTALL
     if any(token in WRITE_SHELL_TOKENS for token in command):
         return CommandClassification.WRITES_WORKSPACE
-    if exe == "python":
+    if exe in {"python", "python3"}:
+        if len(args) >= 2 and args[0] == "-m" and args[1] in PACKAGE_MANAGER_MODULES:
+            return CommandClassification.INSTALL
         code = " ".join(args)
-        if "open(" in code and "w" in code:
+        if any(hint in code for hint in NETWORK_HINTS):
+            return CommandClassification.NETWORK
+        if any(hint in code for hint in WRITE_HINTS) and any(
+            mode in code for mode in ("'w'", '"w"', "'a'", '"a"')
+        ):
             return CommandClassification.WRITES_WORKSPACE
         if "-c" in args and "print(" in code:
             return CommandClassification.READ_ONLY
+        if "-c" in args:
+            return CommandClassification.UNKNOWN
+    if exe in {"node", "ruby", "perl"} and any(a in {"-e", "-c"} for a in args):
+        return CommandClassification.UNKNOWN
     if exe in READ_ONLY_COMMANDS:
         if (
             exe == "git"
@@ -159,6 +248,102 @@ def classify_command(command: list[str]) -> CommandClassification:
             return CommandClassification.UNKNOWN
         return CommandClassification.READ_ONLY
     return CommandClassification.UNKNOWN
+
+
+def validate_command_paths(command: list[str], policy: SandboxPolicy) -> None:
+    """Deny path intents that escape the workspace before execution."""
+    if not command:
+        return
+    classification = classify_command(command)
+    root = policy.workspace_root.resolve()
+    exe = Path(command[0]).name
+    paths = _extract_path_intents(command)
+    if classification == CommandClassification.READ_ONLY:
+        for path in paths:
+            if Path(path).is_absolute() and not _path_within_workspace(path, root):
+                raise SandboxPathViolation(f"read path escapes workspace: {path}")
+        return
+    if classification != CommandClassification.WRITES_WORKSPACE:
+        return
+    if exe in INTERPRETERS and not paths:
+        raise SandboxPathViolation("write-capable interpreter lacks statically validated path")
+    for path in paths:
+        if not _path_within_workspace(path, root):
+            raise SandboxPathViolation(f"write path escapes workspace: {path}")
+
+
+def _path_within_workspace(path: str, root: Path) -> bool:
+    candidate = Path(path)
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    try:
+        resolved = candidate.resolve(strict=False)
+    except OSError:
+        return False
+    if candidate.exists() and candidate.is_symlink():
+        return False
+    return resolved.is_relative_to(root)
+
+
+def _extract_path_intents(command: list[str]) -> list[str]:
+    exe = Path(command[0]).name if command else ""
+    args = command[1:]
+    paths: list[str] = []
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg in WRITE_PATH_OPTIONS | READ_PATH_OPTIONS and i + 1 < len(args):
+            paths.append(args[i + 1])
+            i += 2
+            continue
+        for opt in WRITE_PATH_OPTIONS | READ_PATH_OPTIONS:
+            prefix = opt + "="
+            if arg.startswith(prefix):
+                paths.append(arg[len(prefix) :])
+                break
+        for prefix in WRITE_PATH_PREFIXES:
+            if arg.startswith(prefix):
+                paths.append(arg[len(prefix) :])
+                break
+        i += 1
+    if exe in {"python", "python3"} and "-c" in args:
+        idx = args.index("-c")
+        if idx + 1 < len(args):
+            paths.extend(_extract_python_code_paths(args[idx + 1]))
+    if exe in {"tee", "truncate"}:
+        paths.extend(a for a in args if not a.startswith("-"))
+    if exe == "dd":
+        paths.extend(a[3:] for a in args if a.startswith("of="))
+    if exe in {"cp", "mv"} and len([a for a in args if not a.startswith("-")]) >= 2:
+        paths.append([a for a in args if not a.startswith("-")][-1])
+    if exe in {"tar", "zip"}:
+        paths.extend(a for a in args if a.endswith((".tar", ".tgz", ".zip")))
+    if exe in READ_ONLY_COMMANDS:
+        paths.extend(
+            a for a in args if a and not a.startswith("-") and not _looks_like_git_revision(a)
+        )
+    return paths
+
+
+def _looks_like_git_revision(value: str) -> bool:
+    return ":" in value or value in {"HEAD", "FETCH_HEAD", "ORIG_HEAD"}
+
+
+def _extract_python_code_paths(code: str) -> list[str]:
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return []
+    paths: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", "")
+            if name in {"open", "write_text", "write_bytes"} and node.args:
+                first = node.args[0]
+                if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                    paths.append(first.value)
+    return paths
 
 
 def decide(command: list[str], policy: SandboxPolicy) -> SandboxDecision:
@@ -250,6 +435,138 @@ def approve_decision(
         approval_required=True,
         approved=True,
     )
+
+
+def sandbox_approval_store_path() -> Path:
+    """Return the non-interactive approval store path."""
+    override = os.environ.get("ARC_SANDBOX_APPROVAL_STORE")
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / ".arc" / "approvals.json"
+
+
+def approval_command_hash(command: list[str]) -> str:
+    """Return stable command digest for approval scoping."""
+    return sha256_hex(canonical_dumps(command))
+
+
+def approval_token_hash(token: str) -> str:
+    """Return stable token digest for approval storage."""
+    return sha256_hex(canonical_dumps({"token": token, "purpose": "sandbox-approval"}))
+
+
+def approval_is_expired(approval: SandboxApproval, now: str | None = None) -> bool:
+    """Return True when an approval TTL has elapsed."""
+    if not approval.expires_at:
+        return False
+    return approval.expires_at <= (now or utc_now())
+
+
+def _approval_matches(
+    approval: SandboxApproval,
+    *,
+    token: str,
+    policy: SandboxPolicy,
+    decision: SandboxDecision,
+    command: list[str],
+) -> bool:
+    return (
+        (approval.token_hash == approval_token_hash(token) or approval.token == token)
+        and approval.policy == policy.name
+        and approval.workspace_root == str(policy.workspace_root.resolve())
+        and approval.classification == decision.classification
+        and approval.command_hash == approval_command_hash(command)
+        and not approval_is_expired(approval)
+    )
+
+
+def load_sandbox_approval_store(path: Path | None = None) -> SandboxApprovalStore:
+    """Load approvals; missing file means empty store."""
+    store_path = path or sandbox_approval_store_path()
+    if not store_path.exists():
+        return SandboxApprovalStore()
+    return SandboxApprovalStore.model_validate(json.loads(store_path.read_text(encoding="utf-8")))
+
+
+def save_sandbox_approval_store(store: SandboxApprovalStore, path: Path | None = None) -> Path:
+    """Persist approvals with stable JSON."""
+    store_path = path or sandbox_approval_store_path()
+    store_path.parent.mkdir(parents=True, exist_ok=True)
+    store_path.write_text(store.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    try:
+        store_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    except OSError:
+        pass
+    return store_path
+
+
+def approve_command_token(
+    *,
+    token: str,
+    command: list[str],
+    policy: SandboxPolicy,
+    path: Path | None = None,
+) -> SandboxApproval:
+    """Persist scoped approval for a token and command."""
+    decision = decide(command, policy)
+    approved = approve_decision(decision, reason="approval token")
+    if not approved.allowed or not approved.approved:
+        raise ValueError(f"classification cannot be approved: {decision.classification.value}")
+    store = load_sandbox_approval_store(path)
+    approval = SandboxApproval(
+        token="",
+        token_hash=approval_token_hash(token),
+        policy=policy.name,
+        workspace_root=str(policy.workspace_root.resolve()),
+        classification=decision.classification,
+        command_hash=approval_command_hash(command),
+        created_at=utc_now(),
+        expires_at=utc_now_plus(policy.approval_ttl_seconds),
+    )
+    store.approvals = [
+        item
+        for item in store.approvals
+        if not _approval_matches(
+            item, token=token, policy=policy, decision=decision, command=command
+        )
+    ]
+    store.approvals.append(approval)
+    save_sandbox_approval_store(store, path)
+    return approval
+
+
+def revoke_approval_token(token: str, path: Path | None = None) -> dict[str, Any]:
+    """Remove all approvals for a token."""
+    store = load_sandbox_approval_store(path)
+    before = len(store.approvals)
+    token_hash = approval_token_hash(token)
+    store.approvals = [
+        approval
+        for approval in store.approvals
+        if approval.token != token and approval.token_hash != token_hash
+    ]
+    save_sandbox_approval_store(store, path)
+    return {"revoked": before - len(store.approvals), "remaining": len(store.approvals)}
+
+
+def approve_decision_with_token(
+    *,
+    token: str | None,
+    command: list[str],
+    policy: SandboxPolicy,
+    decision: SandboxDecision,
+    path: Path | None = None,
+) -> SandboxDecision:
+    """Apply matching persisted approval without prompting."""
+    if not token or decision.allowed or not decision.approval_required:
+        return decision
+    store = load_sandbox_approval_store(path)
+    if any(
+        _approval_matches(item, token=token, policy=policy, decision=decision, command=command)
+        for item in store.approvals
+    ):
+        return approve_decision(decision, reason="approval token")
+    return decision
 
 
 def ensure_workspace_cwd(cwd: Path, workspace_root: Path) -> Path:
