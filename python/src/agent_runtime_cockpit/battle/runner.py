@@ -19,6 +19,11 @@ from ..protocol.schemas import RunRecord, RunStatus
 from ..storage.indexed_store import IndexedTraceStore
 from ..swarmgraph.config import ExecutionMode
 from ..swarmgraph.consensus import majority_consensus, quorum_consensus
+from ..swarmgraph.consensus_escrow import (
+    _canonical_json,
+    _compute_hash,
+    _generate_nonce,
+)
 from ..swarmgraph.models import AgentVote
 from ..swarmgraph.nodes.worker import worker_execute
 from .models import (
@@ -376,30 +381,39 @@ class BattleRunner:
                     reasoning=f"Deterministic vote from {voter_candidate.worker_id}",
                 )
 
-                # If consensus escrow is enabled, add commit-reveal fields
                 if battle.consensus_escrow:
-                    import hashlib
-                    import secrets
-
-                    nonce = secrets.token_hex(16)
-                    vote_data = f"{vote.candidate_id}:{vote.approved}:{nonce}"
-                    commit_hash = hashlib.sha256(vote_data.encode()).hexdigest()
-
-                    # Create new vote with commit-reveal fields
-                    vote = BattleVote(
-                        battle_id=vote.battle_id,
-                        candidate_id=vote.candidate_id,
-                        voter=vote.voter,
-                        voter_type=vote.voter_type,
-                        approved=vote.approved,
-                        reasoning=vote.reasoning,
-                        commit_hash=commit_hash,
-                        reveal_nonce=nonce,
-                    )
+                    vote = self._create_verified_escrow_vote(vote)
 
                 votes.append(vote)
 
         return votes
+
+    def _create_verified_escrow_vote(self, vote: BattleVote) -> BattleVote:
+        """Attach commit/reveal fields only after cryptographic verification succeeds."""
+        nonce = _generate_nonce()
+        commit_hash = self._commit_battle_vote(vote, nonce)
+        revealed_vote = vote.model_copy(update={"commit_hash": commit_hash, "reveal_nonce": nonce})
+        self._verify_battle_vote_reveal(revealed_vote)
+        return revealed_vote
+
+    def _commit_battle_vote(self, vote: BattleVote, nonce: str) -> str:
+        """Commit to the canonical pre-reveal battle vote payload plus nonce."""
+        if vote.commit_hash is not None or vote.reveal_nonce is not None:
+            raise ValueError("Cannot commit an already revealed battle vote")
+        return _compute_hash(_canonical_json(vote), nonce)
+
+    def _verify_battle_vote_reveal(self, vote: BattleVote) -> bool:
+        """Verify a revealed battle vote against its commit hash and nonce."""
+        if not vote.commit_hash or len(vote.commit_hash) != 64:
+            raise ValueError("Malformed battle vote commit hash")
+        if not vote.reveal_nonce:
+            raise ValueError("Missing battle vote reveal nonce")
+
+        committed_payload = vote.model_copy(update={"commit_hash": None, "reveal_nonce": None})
+        recomputed_hash = _compute_hash(_canonical_json(committed_payload), vote.reveal_nonce)
+        if recomputed_hash != vote.commit_hash:
+            raise ValueError("Battle vote reveal does not match commitment")
+        return True
 
     def _determine_outcome(
         self,

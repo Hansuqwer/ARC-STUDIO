@@ -10,6 +10,7 @@ Snapshots live in tests/cli/snapshots/<command>.json.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -107,7 +108,16 @@ def test_health_snapshot(update_snapshots):
     os.environ.get("CI") == "true",
     reason="Test has ordering dependency: sees 2 runtimes locally, 3 in CI full suite (crewai registered by earlier test)",
 )
-def test_status_snapshot(tmp_path, update_snapshots):
+def test_status_snapshot(tmp_path, update_snapshots, monkeypatch):
+    original_find_spec = importlib.util.find_spec
+
+    def stable_find_spec(name: str):
+        if name == "crewai":
+            return None
+        return original_find_spec(name)
+
+    monkeypatch.delenv("ARC_CREWAI_EXPORT", raising=False)
+    monkeypatch.setattr(importlib.util, "find_spec", stable_find_spec)
     _check_snapshot(["status", "--workspace", str(tmp_path)], "status_empty", update_snapshots)
 
 

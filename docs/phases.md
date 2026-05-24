@@ -1585,7 +1585,7 @@ bash scripts/check-pr.sh
 ## Phase 34.5 — Commit-Reveal Escrow Verification
 
 **Roadmap:** R26A Follow-up — Commit-Reveal Escrow Verification  
-**Status:** Not Started  
+**Status:** Baseline Complete  
 **Depends on:** Phase 30 (Consensus Escrow), Phase 34 (ARC Battle Mode)
 
 ### Goal
@@ -1627,12 +1627,16 @@ Implement true cryptographic commit-reveal voting verification for battle consen
    - Test invalid reveal detection
    - Test commitment violation handling
 
+### Implementation Notes
+
+Battle consensus escrow now uses the existing SwarmGraph escrow canonical JSON + SHA-256 payload/nonce hashing pattern. Escrow-enabled battle votes are committed from the pre-reveal `BattleVote` payload, reconstructed with `commit_hash` and `reveal_nonce`, verified before storage/event emission, and rejected on malformed commit hash, changed vote payload, or nonce mismatch. Non-escrow battle voting remains unchanged.
+
 **Acceptance:**
-1. Battle runs with `--consensus-escrow` use true commit-reveal protocol
-2. Commitments verified cryptographically during reveal phase
-3. Invalid reveals rejected with clear error messages
-4. Tests cover commit-reveal flow and violation scenarios
-5. No vote disclosure before reveal phase
+1. ✅ Battle runs with `--consensus-escrow` use true commit-reveal protocol
+2. ✅ Commitments verified cryptographically during reveal phase
+3. ✅ Invalid reveals rejected with clear error messages
+4. ✅ Tests cover commit-reveal flow and violation scenarios
+5. ✅ Commit events contain commit hash only; reveal events are emitted only after verification succeeds
 
 **Verification:**
 ```bash
@@ -1640,6 +1644,8 @@ cd python && PYTHONPATH=src uv run pytest tests/battle/test_battle_escrow.py -v
 cd python && uv run pytest -q
 bash scripts/check-pr.sh
 ```
+
+Evidence: `cd python && PYTHONPATH=src uv run pytest tests/battle -q` → 51 passed, including 9 new escrow tests in `tests/battle/test_battle_escrow.py`.
 
 **Known Risks:**
 - Cryptographic implementation requires careful review
