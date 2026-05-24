@@ -8,9 +8,9 @@ import time
 import pytest
 
 from agent_runtime_cockpit.cli_repl.cancellation import (
-    Cancelled,
     CancellationReason,
     CancellationToken,
+    Cancelled,
     never_cancelled,
 )
 
@@ -110,9 +110,11 @@ def test_wait_returns_true_immediately_if_already_cancelled() -> None:
 
 def test_wait_returns_true_when_cancelled_mid_wait() -> None:
     token = CancellationToken()
+
     def _cancel_after_short_delay() -> None:
         time.sleep(0.02)
         token.cancel(CancellationReason.USER, "external")
+
     canceller = threading.Thread(target=_cancel_after_short_delay)
     canceller.start()
     try:
@@ -175,6 +177,7 @@ def test_cancellation_is_observable_across_threads() -> None:
     token = CancellationToken()
     observed: list[bool] = []
     done = threading.Event()
+
     def _worker() -> None:
         deadline = time.monotonic() + 2.0
         while time.monotonic() < deadline:
@@ -185,6 +188,7 @@ def test_cancellation_is_observable_across_threads() -> None:
             time.sleep(0.005)
         observed.append(False)
         done.set()
+
     worker = threading.Thread(target=_worker)
     worker.start()
     try:
@@ -200,6 +204,7 @@ def test_raise_if_cancelled_raises_in_worker_thread() -> None:
     token = CancellationToken()
     captured: list[Cancelled] = []
     done = threading.Event()
+
     def _worker() -> None:
         try:
             for _ in range(200):
@@ -209,6 +214,7 @@ def test_raise_if_cancelled_raises_in_worker_thread() -> None:
             captured.append(exc)
         finally:
             done.set()
+
     worker = threading.Thread(target=_worker)
     worker.start()
     try:

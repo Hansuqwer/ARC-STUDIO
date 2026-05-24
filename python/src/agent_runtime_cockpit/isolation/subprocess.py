@@ -1,30 +1,35 @@
 """SubprocessIsolationProvider — subprocess with env allowlist and path restrictions."""
+
 from __future__ import annotations
 
 import logging
 import os
+import signal
+import subprocess
+import time
 import re
 from pathlib import Path
 from typing import Optional
 
 from .base import IsolationProvider, IsolationResult
-from .none import NoneIsolationProvider
 
 log = logging.getLogger(__name__)
 
-DEFAULT_SAFE_ENV_KEYS: frozenset[str] = frozenset({
-    "PATH",
-    "HOME",
-    "USER",
-    "LANG",
-    "LC_ALL",
-    "TERM",
-    "TMPDIR",
-    "SHELL",
-    "VIRTUAL_ENV",
-    "PYTHONPATH",
-    "PYTHONWARNINGS",
-})
+DEFAULT_SAFE_ENV_KEYS: frozenset[str] = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "USER",
+        "LANG",
+        "LC_ALL",
+        "TERM",
+        "TMPDIR",
+        "SHELL",
+        "VIRTUAL_ENV",
+        "PYTHONPATH",
+        "PYTHONWARNINGS",
+    }
+)
 
 BLOCKED_ENV_PATTERNS: list[re.Pattern] = [
     re.compile(r"(?i).*API_KEY$"),
@@ -59,10 +64,13 @@ OUTPUT_REDACTION_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("aws_key", re.compile(r"AKIA[0-9A-Z]{16}")),
     ("github_token", re.compile(r"gh[ps]_[A-Za-z0-9]{36,}")),
     ("password_url", re.compile(r"(://[^:]+:)[^@]+(@)")),
-    ("generic_secret", re.compile(
-        r"((?:api_key|apikey|secret|password|token|access_token)\s*[:=]\s*['\"]?)([^\s'\",}\]]{8,})(['\"]?)",
-        re.IGNORECASE,
-    )),
+    (
+        "generic_secret",
+        re.compile(
+            r"((?:api_key|apikey|secret|password|token|access_token)\s*[:=]\s*['\"]?)([^\s'\",}\]]{8,})(['\"]?)",
+            re.IGNORECASE,
+        ),
+    ),
 ]
 
 REDACTED = "[REDACTED]"
@@ -93,9 +101,13 @@ class SubprocessIsolationProvider(IsolationProvider):
         self,
         safe_env_keys: frozenset[str] | None = None,
         redact_output: bool = True,
+        workspace_root: Path | None = None,
+        max_output_bytes: int = 65_536,
     ) -> None:
         self._safe_env_keys = safe_env_keys or DEFAULT_SAFE_ENV_KEYS
         self._redact_output = redact_output
+        self._workspace_root = workspace_root
+        self._max_output_bytes = max_output_bytes
 
     @property
     def provider_id(self) -> str:
@@ -113,7 +125,7 @@ class SubprocessIsolationProvider(IsolationProvider):
         Only includes:
         - Variables in ``self._safe_env_keys``
         - Variables explicitly passed in ``extra_env`` (if also in allowlist)
-        
+
         Blocks any key matching secret patterns (*_API_KEY, *_TOKEN, etc.)
         """
         result: dict[str, str] = {}
@@ -137,18 +149,57 @@ class SubprocessIsolationProvider(IsolationProvider):
         env: Optional[dict[str, str]] = None,
         timeout_seconds: int = 300,
     ) -> IsolationResult:
+        if not command:
+            raise ValueError("command must not be empty")
+        if self._workspace_root and cwd:
+            root = self._workspace_root.resolve()
+            resolved = cwd.resolve()
+            if cwd.is_symlink() or not resolved.is_relative_to(root):
+                raise ValueError(f"cwd escapes workspace: {cwd}")
         filtered_env = self.filter_env(env)
-        delegate = NoneIsolationProvider()
-        result = await delegate.execute(
+        start = time.monotonic()
+        proc = subprocess.Popen(
             command,
-            cwd=cwd,
+            cwd=str(cwd) if cwd else None,
             env=filtered_env,
-            timeout_seconds=timeout_seconds,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
         )
-        result.provider = self.provider_id
-        
+        killed = False
+        kill_reason = None
+        try:
+            stdout, stderr = proc.communicate(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired:
+            killed = True
+            kill_reason = "timeout"
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            stdout, stderr = proc.communicate()
+        duration = int((time.monotonic() - start) * 1000)
+        redaction_applied = False
         if self._redact_output:
-            result.stdout = redact_output(result.stdout)
-            result.stderr = redact_output(result.stderr)
-        
-        return result
+            redacted_stdout = redact_output(stdout)
+            redacted_stderr = redact_output(stderr)
+            redaction_applied = redacted_stdout != stdout or redacted_stderr != stderr
+            stdout, stderr = redacted_stdout, redacted_stderr
+        stdout_truncated = len(stdout.encode("utf-8")) > self._max_output_bytes
+        stderr_truncated = len(stderr.encode("utf-8")) > self._max_output_bytes
+        stdout = stdout.encode("utf-8")[: self._max_output_bytes].decode("utf-8", errors="replace")
+        stderr = stderr.encode("utf-8")[: self._max_output_bytes].decode("utf-8", errors="replace")
+        return IsolationResult(
+            exit_code=proc.returncode if proc.returncode is not None else -1,
+            stdout=stdout,
+            stderr=stderr,
+            duration_ms=duration,
+            pid=proc.pid,
+            killed=killed,
+            kill_reason=kill_reason,
+            provider=self.provider_id,
+            stdout_truncated=stdout_truncated,
+            stderr_truncated=stderr_truncated,
+            redaction_applied=redaction_applied,
+        )

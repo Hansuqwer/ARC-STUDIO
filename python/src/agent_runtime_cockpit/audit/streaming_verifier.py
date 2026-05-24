@@ -54,6 +54,7 @@ class StreamingAuditVerifier:
         Args:
             max_memory_mb: Maximum memory budget for buffering (default: 8 MB).
                           Does not enforce hard limit, but guides chunk sizing.
+
         """
         if max_memory_mb < 1 or max_memory_mb > MAX_CHUNK_SIZE_MB:
             raise ValueError(
@@ -76,6 +77,7 @@ class StreamingAuditVerifier:
 
         Returns:
             VerificationResult with ok, mode, records_checked, reason, duration_ms
+
         """
         start_time = time.time()
 
@@ -199,6 +201,7 @@ class StreamingAuditVerifier:
 
         Returns:
             VerificationResult with ok, mode, records_checked, reason, duration_ms
+
         """
         start_time = time.time()
 
@@ -318,6 +321,7 @@ class StreamingAuditVerifier:
 
         Returns:
             VerificationResult with detected mode
+
         """
         start_time = time.time()
 

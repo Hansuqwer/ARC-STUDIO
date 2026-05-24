@@ -1,11 +1,11 @@
-"""
-Tests: OpenAI Agents export target (ARC_OPENAI_AGENTS_EXPORT).
+"""Tests: OpenAI Agents export target (ARC_OPENAI_AGENTS_EXPORT).
 
 Verifies that the adapter:
 1. Loads the Agent from ``ARC_OPENAI_AGENTS_EXPORT=module:attr``.
 2. Refuses targets outside the workspace.
 3. Reports ``missing_export_target`` when unset.
 """
+
 from __future__ import annotations
 
 import os
@@ -15,14 +15,14 @@ from unittest import mock
 import pytest
 
 from agent_runtime_cockpit.adapters.openai_agents import (
+    _EXPORT_ENV,
+    ExportTargetError,
     OpenAIAgentsAdapter,
     _load_exported_agent,
-    ExportTargetError,
-    _EXPORT_ENV,
 )
 
-
 # ---- helpers ---------------------------------------------------------------
+
 
 def _make_fake_agent_class():
     """Return a stub ``Agent`` class so ``from agents import Agent`` works."""
@@ -43,11 +43,20 @@ def _with_fake_agents_module():
     FakeAgentCls = _make_fake_agent_class()
 
     class FakeRunHooks:
-        async def on_agent_start(self, context, agent): pass
-        async def on_agent_end(self, context, agent, output): pass
-        async def on_tool_start(self, context, agent, tool): pass
-        async def on_tool_end(self, context, agent, tool, result): pass
-        async def on_handoff(self, context, from_agent, to_agent): pass
+        async def on_agent_start(self, context, agent):
+            pass
+
+        async def on_agent_end(self, context, agent, output):
+            pass
+
+        async def on_tool_start(self, context, agent, tool):
+            pass
+
+        async def on_tool_end(self, context, agent, tool, result):
+            pass
+
+        async def on_handoff(self, context, from_agent, to_agent):
+            pass
 
     class FakeRunResult:
         final_output = "mock output"
@@ -67,6 +76,7 @@ def _with_fake_agents_module():
 # ---------------------------------------------------------------------------
 # Unit: _load_exported_agent
 # ---------------------------------------------------------------------------
+
 
 class TestLoadExportedAgent:
     """Tests for the lower-level loader function."""
@@ -153,7 +163,8 @@ class TestLoadExportedAgent:
 
     def test_allows_trusted_path_outside_workspace(self, tmp_path):
         """Module outside workspace but on ARC_TRUSTED_PATHS → allowed, then
-        fails on the isinstance check (proving workspace check passed)."""
+        fails on the isinstance check (proving workspace check passed).
+        """
         workspace = tmp_path / "my_project"
         workspace.mkdir()
 
@@ -192,6 +203,7 @@ class TestLoadExportedAgent:
 # ---------------------------------------------------------------------------
 # CapabilityReport: missing_export_target
 # ---------------------------------------------------------------------------
+
 
 class TestCapabilityReportExportTarget:
     """Tests that capability_report returns missing_export_target correctly."""
@@ -236,6 +248,7 @@ class TestCapabilityReportExportTarget:
 # run_workflow: export target integration
 # ---------------------------------------------------------------------------
 
+
 class TestRunWorkflowExport:
     """Tests that run_workflow uses export target (and fails without it)."""
 
@@ -258,10 +271,7 @@ class TestRunWorkflowExport:
 
         run = asyncio.run(_run())
         assert run.status.value == "failed"
-        assert any(
-            _EXPORT_ENV in e.data.get("error", "")
-            for e in run.events
-        )
+        assert any(_EXPORT_ENV in e.data.get("error", "") for e in run.events)
 
     def test_fails_with_bad_export_target(self, tmp_path):
         """Invalid module in ARC_OPENAI_AGENTS_EXPORT → RUN_FAILED record."""

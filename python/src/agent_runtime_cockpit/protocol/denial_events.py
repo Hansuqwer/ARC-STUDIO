@@ -1,5 +1,4 @@
-"""
-Typed denial event types for trust and paid-call enforcement (Phase 23).
+"""Typed denial event types for trust and paid-call enforcement (Phase 23).
 
 Uses Phase 22 discriminated union foundation to provide type-safe denial events
 when actions are blocked by trust or paid-call gates.
@@ -8,10 +7,10 @@ when actions are blocked by trust or paid-call gates.
 from __future__ import annotations
 
 from typing import Literal
+
 from pydantic import BaseModel
 
 from .typed_events import RunEventBase
-
 
 # ─── Trust Denial Events ─────────────────────────────────────────────────────
 

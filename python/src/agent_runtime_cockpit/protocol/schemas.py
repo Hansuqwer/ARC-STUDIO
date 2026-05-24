@@ -1,19 +1,20 @@
-"""
-ARC domain models — workspace, runtimes, workflows, schemas, runs, events, context.
+"""ARC domain models — workspace, runtimes, workflows, schemas, runs, events, context.
 These are the canonical Python data structures; JSON Schema is generated from them.
 """
+
 from __future__ import annotations
 
 from enum import Enum
 from typing import Any, Optional
+
 from pydantic import BaseModel, Field, model_validator
 
 from agent_runtime_cockpit.runtime.mode import RuntimeMode
 
 from .capabilities import RuntimeCapabilities
 
-
 # ─── Runtime ──────────────────────────────────────────────────────────────────
+
 
 class ConfidenceLevel(str, Enum):
     HIGH = "high"
@@ -38,6 +39,7 @@ class WorkspaceInfo(BaseModel):
 
 
 # ─── Workflow ─────────────────────────────────────────────────────────────────
+
 
 class NodeType(str, Enum):
     AGENT = "agent"
@@ -84,6 +86,7 @@ class WorkflowInfo(BaseModel):
 
 # ─── Schema ───────────────────────────────────────────────────────────────────
 
+
 class SchemaInfo(BaseModel):
     id: str
     name: str
@@ -99,6 +102,7 @@ class SchemaInfo(BaseModel):
 
 
 # ─── Run / Events ─────────────────────────────────────────────────────────────
+
 
 class RunStatus(str, Enum):
     PENDING = "pending"
@@ -127,7 +131,9 @@ class RunEvent(BaseModel):
         payload = dict(migrated.get("data") or {})
         if payload.get("runtime_mode") is not None:
             legacy_cli_map = {"fake/offline": "fake", "local-real": "gated_local"}
-            payload["runtime_mode"] = RuntimeMode.from_legacy(legacy_cli_map.get(payload["runtime_mode"], payload["runtime_mode"])).value
+            payload["runtime_mode"] = RuntimeMode.from_legacy(
+                legacy_cli_map.get(payload["runtime_mode"], payload["runtime_mode"])
+            ).value
             payload.setdefault("profile_id", "default")
             payload.setdefault("isolation_id", "none")
             payload.setdefault("source_trust", "workspace")
@@ -156,6 +162,7 @@ class RunRecord(BaseModel):
 
 
 # ─── Context ──────────────────────────────────────────────────────────────────
+
 
 class SourceType(str, Enum):
     LOCAL_REPO = "local_repo"

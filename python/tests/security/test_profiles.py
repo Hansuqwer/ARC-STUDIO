@@ -1,10 +1,11 @@
 """Tests for run profiles."""
+
+from agent_runtime_cockpit.gating import GatingError
 from agent_runtime_cockpit.security.profiles import (
     BUILTIN_PROFILES,
-    resolve_profile,
     enforce_profile,
+    resolve_profile,
 )
-from agent_runtime_cockpit.gating import GatingError
 
 
 def test_builtin_profiles_exist():

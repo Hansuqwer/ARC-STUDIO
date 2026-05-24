@@ -1,5 +1,4 @@
-"""
-Stable ID generation for graph cockpit linkage.
+"""Stable ID generation for graph cockpit linkage.
 
 Provides ULID-based ID generators for all cockpit surfaces:
 - node_id, message_id, tool_call_id, approval_id, decision_id
@@ -8,6 +7,7 @@ Provides ULID-based ID generators for all cockpit surfaces:
 All IDs follow the format: ``{prefix}_{ulid}``.
 Missing IDs degrade safely — consumers treat absent IDs as opaque.
 """
+
 from __future__ import annotations
 
 import re
@@ -19,6 +19,7 @@ from typing import Optional
 # ULID-like generator (no external dependency — 16-char hex fallback)
 # ---------------------------------------------------------------------------
 
+
 def _ulid_like() -> str:
     """Generate a ULID-like string using time + randomness.
 
@@ -28,6 +29,7 @@ def _ulid_like() -> str:
     """
     try:
         from ulid import ULID
+
         return str(ULID())
     except ImportError:
         pass
@@ -35,7 +37,7 @@ def _ulid_like() -> str:
     # Fallback: timestamp-based prefix + random suffix
     # 10 hex chars from time (sortable) + 16 hex chars random
     ts = int(time.time() * 1000)
-    time_part = format(ts, '010x')[-10:]
+    time_part = format(ts, "010x")[-10:]
     rand_part = secrets.token_hex(8)
     return f"01{time_part}{rand_part}"[:26]
 
@@ -49,9 +51,9 @@ ID_PREFIXES = {
     "decision": "dec",
     "approval": "apr",
     "policy_decision": "pd",
-    "node": None,          # node_id uses <workflow>.<node_name> format
+    "node": None,  # node_id uses <workflow>.<node_name> format
     "tool_call": "tc",
-    "edge": None,           # edge_id uses <from>→<to> format
+    "edge": None,  # edge_id uses <from>→<to> format
     "run": "run",
     "contract": "ctr",
     "receipt": "rcpt",
@@ -60,7 +62,9 @@ ID_PREFIXES = {
     "hitl": "hitl",
 }
 
-_NODE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}[-_0-9][A-Za-z0-9_-]*\.[A-Za-z0-9_-]{1,64}$")
+_NODE_ID_RE = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}[-_0-9][A-Za-z0-9_-]*\.[A-Za-z0-9_-]{1,64}$"
+)
 _EDGE_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,128}→[A-Za-z0-9_.-]{1,128}$")
 
 
@@ -76,6 +80,7 @@ def generate_stable_id(kind: str, suffix: Optional[str] = None) -> str:
 
     Raises:
         ValueError: If ``kind`` is not a recognized prefix.
+
     """
     if kind not in ID_PREFIXES:
         raise ValueError(f"Unknown ID kind: {kind!r}. Must be one of {list(ID_PREFIXES.keys())}")
@@ -126,6 +131,7 @@ def parse_stable_id(stable_id: str) -> tuple[str, str]:
 
     Raises:
         ValueError: If the ID format is invalid.
+
     """
     if "_" not in stable_id:
         raise ValueError(f"Invalid stable ID format: {stable_id!r}")
@@ -151,6 +157,7 @@ def is_valid_stable_id(stable_id: str) -> bool:
 # ---------------------------------------------------------------------------
 # Degradation manifest
 # ---------------------------------------------------------------------------
+
 
 class DegradationManifest:
     """Tracks which stable ID fields are missing from events.
@@ -202,7 +209,4 @@ class DegradationManifest:
         }
 
     def __repr__(self) -> str:
-        return (
-            f"DegradationManifest(total={self._total_events}, "
-            f"degraded={self.is_degraded()})"
-        )
+        return f"DegradationManifest(total={self._total_events}, degraded={self.is_degraded()})"

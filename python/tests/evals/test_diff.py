@@ -1,7 +1,9 @@
 """Tests for run diff."""
+
 from datetime import datetime, timezone
+
 from agent_runtime_cockpit.evals.diff import diff_runs
-from agent_runtime_cockpit.protocol.schemas import RunRecord, RunEvent, RunStatus
+from agent_runtime_cockpit.protocol.schemas import RunEvent, RunRecord, RunStatus
 
 
 def _make_run(run_id: str, status: RunStatus, event_types: list[str], runtime: str = "swarmgraph"):
@@ -65,7 +67,9 @@ def test_diff_error_events():
 def test_diff_duration():
     now = datetime.now(timezone.utc)
     a = RunRecord(
-        id="fast", workflow_id="wf", runtime="swarmgraph",
+        id="fast",
+        workflow_id="wf",
+        runtime="swarmgraph",
         status=RunStatus.COMPLETED,
         started_at=now.isoformat(),
         ended_at=now.isoformat(),
@@ -73,7 +77,9 @@ def test_diff_duration():
     )
     later = datetime.now(timezone.utc).isoformat()
     b = RunRecord(
-        id="slow", workflow_id="wf", runtime="swarmgraph",
+        id="slow",
+        workflow_id="wf",
+        runtime="swarmgraph",
         status=RunStatus.COMPLETED,
         started_at=now.isoformat(),
         ended_at=later,

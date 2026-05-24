@@ -1,14 +1,23 @@
 """CrewAI + SwarmGraph adoption runner."""
+
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 from pathlib import Path
 from typing import Any, AsyncIterator
-import importlib.util
 
 from .ag2_runner import AG2AdoptionRunner
 from .langgraph_runner import _setup_swarmgraph_paths
-from .protocol import AdoptionCapability, AdoptionMode, AdoptionRunner, AdoptionSpec, AdoptionStatus, ConsensusResult, WorkerProposal
+from .protocol import (
+    AdoptionCapability,
+    AdoptionMode,
+    AdoptionRunner,
+    AdoptionSpec,
+    AdoptionStatus,
+    ConsensusResult,
+    WorkerProposal,
+)
 
 
 class CrewAIAdoptionRunner(AdoptionRunner):
@@ -32,7 +41,14 @@ class CrewAIAdoptionRunner(AdoptionRunner):
                 mode=self.mode,
                 status=AdoptionStatus.NOT_RUNNABLE,
                 reason="CrewAI not installed",
-                doctor_actions=[{"id": "install_crewai", "label": "Install CrewAI", "description": "pip install crewai", "command": "pip install crewai"}],
+                doctor_actions=[
+                    {
+                        "id": "install_crewai",
+                        "label": "Install CrewAI",
+                        "description": "pip install crewai",
+                        "command": "pip install crewai",
+                    }
+                ],
             )
 
     async def run(self, spec: AdoptionSpec, run_id: str, emit_event) -> ConsensusResult:
@@ -43,10 +59,16 @@ class CrewAIAdoptionRunner(AdoptionRunner):
         emit_event(run_id, "STEP_STARTED", {"step": "crewai_kickoff", "mode": self.mode.value})
         result = await self._kickoff(crew, inputs)
         proposals = self._proposals(result)
-        emit_event(run_id, "STEP_COMPLETED", {"step": "crewai_kickoff", "proposals": len(proposals)})
+        emit_event(
+            run_id, "STEP_COMPLETED", {"step": "crewai_kickoff", "proposals": len(proposals)}
+        )
         emit_event(run_id, "STEP_STARTED", {"step": "consensus", "swarmgraph": True})
         consensus = AG2AdoptionRunner()._consensus(proposals)
-        emit_event(run_id, "STEP_COMPLETED", {"step": "consensus", "swarmgraph": True, "confidence": consensus.confidence})
+        emit_event(
+            run_id,
+            "STEP_COMPLETED",
+            {"step": "consensus", "swarmgraph": True, "confidence": consensus.confidence},
+        )
         return consensus
 
     async def _kickoff(self, crew: Any, inputs: dict[str, Any]) -> Any:
@@ -64,11 +86,31 @@ class CrewAIAdoptionRunner(AdoptionRunner):
         if tasks:
             for index, task in enumerate(tasks):
                 output = getattr(task, "raw", None) or str(task)
-                agent = getattr(task, "agent", None) or getattr(task, "agent_role", None) or f"crew-agent-{index + 1}"
-                proposals.append(WorkerProposal(task_id=f"crew-task-{index + 1}", worker_id=str(agent), output=str(output), confidence=1.0, metadata={"runtime": "crewai", "swarmgraph_role": "coder"}))
+                agent = (
+                    getattr(task, "agent", None)
+                    or getattr(task, "agent_role", None)
+                    or f"crew-agent-{index + 1}"
+                )
+                proposals.append(
+                    WorkerProposal(
+                        task_id=f"crew-task-{index + 1}",
+                        worker_id=str(agent),
+                        output=str(output),
+                        confidence=1.0,
+                        metadata={"runtime": "crewai", "swarmgraph_role": "coder"},
+                    )
+                )
         if not proposals:
             output = getattr(result, "raw", None) or str(result)
-            proposals.append(WorkerProposal(task_id="crew-output", worker_id="crew", output=str(output), confidence=1.0, metadata={"runtime": "crewai", "swarmgraph_role": "coder"}))
+            proposals.append(
+                WorkerProposal(
+                    task_id="crew-output",
+                    worker_id="crew",
+                    output=str(output),
+                    confidence=1.0,
+                    metadata={"runtime": "crewai", "swarmgraph_role": "coder"},
+                )
+            )
         return proposals
 
     async def stream_worker_events(self, run_id: str) -> AsyncIterator[dict[str, Any]]:

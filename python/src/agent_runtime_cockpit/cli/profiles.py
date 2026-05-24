@@ -10,7 +10,6 @@ from rich.table import Table
 from ..gating import BackendMode
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
-
 from ._helpers import (
     DEBUG_FLAG,
     JSON_FLAG,

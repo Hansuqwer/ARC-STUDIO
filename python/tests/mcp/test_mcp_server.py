@@ -19,7 +19,7 @@ from agent_runtime_cockpit.security.trust import trust_workspace
 
 def test_create_mcp_server_untrusted_workspace(tmp_path: Path):
     """Server creation must raise MCPServerError for untrusted workspace."""
-    from agent_runtime_cockpit.mcp.server import create_mcp_server, MCPServerError
+    from agent_runtime_cockpit.mcp.server import MCPServerError, create_mcp_server
 
     with pytest.raises(MCPServerError, match="untrusted"):
         create_mcp_server(workspace=tmp_path)

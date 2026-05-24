@@ -13,7 +13,7 @@ import os
 from collections.abc import Callable
 from typing import Any, AsyncIterator, Literal
 
-from agent_runtime_cockpit.cli_repl.cancellation import Cancelled, CancellationToken
+from agent_runtime_cockpit.cli_repl.cancellation import CancellationToken, Cancelled
 
 from .base import (
     AuthError,
@@ -30,7 +30,6 @@ from .base import (
     UsageRecord,
     ValidationError,
 )
-
 
 # Vendor configuration
 VendorName = Literal["openai", "together", "groq", "deepinfra", "fireworks", "llamacpp"]
@@ -132,6 +131,7 @@ class OpenAICompatibleClient:
             vendor: Vendor name (openai, together, groq, deepinfra, fireworks, llamacpp)
             base_url: Override base URL (defaults to vendor's default)
             sdk_factory: Optional factory for dependency injection
+
         """
         if vendor not in VENDOR_CONFIGS:
             raise ValueError(f"Unknown vendor {vendor!r}. Known: {sorted(VENDOR_CONFIGS)}")

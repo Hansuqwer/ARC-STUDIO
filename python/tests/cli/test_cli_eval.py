@@ -1,7 +1,6 @@
 """Tests for the 'arc eval' CLI commands."""
 
-
-from agent_runtime_cockpit.evals.golden import GoldenTrace, save_golden, list_goldens
+from agent_runtime_cockpit.evals.golden import GoldenTrace, list_goldens, save_golden
 
 
 def test_eval_run_help(run_cli):
@@ -17,14 +16,22 @@ def test_eval_list_help(run_cli):
 
 
 def test_eval_save_delete_report(run_cli, tmp_path):
-    save = run_cli([
-        "eval", "save", "golden-1",
-        "--workspace", str(tmp_path),
-        "--workflow-id", "wf-test",
-        "--expected-final-output", "hello",
-        "--expected-event-types", "RUN_STARTED,RUN_COMPLETED",
-        "--json",
-    ])
+    save = run_cli(
+        [
+            "eval",
+            "save",
+            "golden-1",
+            "--workspace",
+            str(tmp_path),
+            "--workflow-id",
+            "wf-test",
+            "--expected-final-output",
+            "hello",
+            "--expected-event-types",
+            "RUN_STARTED,RUN_COMPLETED",
+            "--json",
+        ]
+    )
     assert save.exit_code == 0, save.stdout + save.stderr
 
     report = run_cli(["eval", "report", "--workspace", str(tmp_path), "--json"])
@@ -74,9 +81,9 @@ def test_list_goldens_skips_invalid_files(tmp_path):
 
 
 def test_eval_batch_no_goldens(run_cli, tmp_path):
-    """arc eval run --batch fails when no goldens saved."""
-    from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
+    """Arc eval run --batch fails when no goldens saved."""
     from agent_runtime_cockpit.protocol.schemas import RunRecord, RunStatus
+    from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
 
     store = JsonlTraceStore(tmp_path / ".arc" / "traces")
     run = RunRecord(
@@ -88,20 +95,25 @@ def test_eval_batch_no_goldens(run_cli, tmp_path):
     )
     store.save(run)
 
-    r = run_cli([
-        "eval", "run", "batch-no-goldens-run",
-        "--batch",
-        "--workspace", str(tmp_path),
-        "--json",
-    ])
+    r = run_cli(
+        [
+            "eval",
+            "run",
+            "batch-no-goldens-run",
+            "--batch",
+            "--workspace",
+            str(tmp_path),
+            "--json",
+        ]
+    )
     assert r.exit_code != 0
     assert "No saved golden traces" in r.stdout or "No saved golden traces" in r.stderr
 
 
 def test_eval_batch_with_goldens(run_cli, tmp_path):
-    """arc eval run --batch runs against all saved goldens."""
+    """Arc eval run --batch runs against all saved goldens."""
+    from agent_runtime_cockpit.protocol.schemas import RunEvent, RunRecord, RunStatus
     from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
-    from agent_runtime_cockpit.protocol.schemas import RunRecord, RunStatus, RunEvent
 
     store = JsonlTraceStore(tmp_path / ".arc" / "traces")
     run = RunRecord(
@@ -111,33 +123,56 @@ def test_eval_batch_with_goldens(run_cli, tmp_path):
         status=RunStatus.COMPLETED,
         started_at="2026-05-15T00:00:00Z",
         events=[
-            RunEvent(run_id="batch-test-run", sequence=1, type="RUN_STARTED", timestamp="2026-05-15T00:00:00Z"),
-            RunEvent(run_id="batch-test-run", sequence=2, type="RUN_COMPLETED", timestamp="2026-05-15T00:00:01Z", data={"output": "hello world"}),
+            RunEvent(
+                run_id="batch-test-run",
+                sequence=1,
+                type="RUN_STARTED",
+                timestamp="2026-05-15T00:00:00Z",
+            ),
+            RunEvent(
+                run_id="batch-test-run",
+                sequence=2,
+                type="RUN_COMPLETED",
+                timestamp="2026-05-15T00:00:01Z",
+                data={"output": "hello world"},
+            ),
         ],
     )
     store.save(run)
 
-    save_golden(tmp_path, GoldenTrace(
-        id="golden-pass",
-        workflow_id="wf-test",
-        expected_status="completed",
-        expected_final_output_contains="hello",
-    ))
-    save_golden(tmp_path, GoldenTrace(
-        id="golden-fail",
-        workflow_id="wf-test",
-        expected_status="failed",
-        expected_final_output_contains="goodbye",
-    ))
+    save_golden(
+        tmp_path,
+        GoldenTrace(
+            id="golden-pass",
+            workflow_id="wf-test",
+            expected_status="completed",
+            expected_final_output_contains="hello",
+        ),
+    )
+    save_golden(
+        tmp_path,
+        GoldenTrace(
+            id="golden-fail",
+            workflow_id="wf-test",
+            expected_status="failed",
+            expected_final_output_contains="goodbye",
+        ),
+    )
 
-    r = run_cli([
-        "eval", "run", "batch-test-run",
-        "--batch",
-        "--workspace", str(tmp_path),
-        "--json",
-    ])
+    r = run_cli(
+        [
+            "eval",
+            "run",
+            "batch-test-run",
+            "--batch",
+            "--workspace",
+            str(tmp_path),
+            "--json",
+        ]
+    )
     assert r.exit_code == 0, r.stdout + r.stderr
     import json
+
     data = json.loads(r.stdout)["data"]
     assert data["batch"] is True
     assert data["total"] == 2

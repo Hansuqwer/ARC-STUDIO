@@ -32,6 +32,7 @@ class PydanticAIEventHandler:
         Args:
             run_id: Run identifier
             emit_event: Callback to emit events (run_id, event_type, data)
+
         """
         self.run_id = run_id
         self.emit_event = emit_event
@@ -159,6 +160,7 @@ def run_agent_with_streaming(
 
     Raises:
         Exception: If agent run fails
+
     """
     handler = PydanticAIEventHandler(run_id, emit_event)
     agent_name = getattr(agent, "name", "unknown_agent")

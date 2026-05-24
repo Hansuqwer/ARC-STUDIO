@@ -1,6 +1,5 @@
-"""
-Tests: CrossLinker — stable ID cross-referencing for graph events.
-"""
+"""Tests: CrossLinker — stable ID cross-referencing for graph events."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -62,9 +61,12 @@ class TestCrossLinkerIndex:
 
     def test_index_evidence_refs(self):
         linker = CrossLinker()
-        ev = _event(3, evidence_refs=[
-            {"evidence_id": "ev_abcdefghijklmnopqrst123456"},
-        ])
+        ev = _event(
+            3,
+            evidence_refs=[
+                {"evidence_id": "ev_abcdefghijklmnopqrst123456"},
+            ],
+        )
         linker.index(ev)
         chain = linker.get_evidence_events("ev_abcdefghijklmnopqrst123456")
         assert len(chain) == 1

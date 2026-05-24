@@ -1,4 +1,5 @@
 """Human-in-the-Loop decision records — audit-signed HITL persistence (ADR-005)."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -17,6 +18,7 @@ class HitlDecision(str, Enum):
 
 class HitlPrompt(BaseModel):
     """A HITL prompt sent to a human operator."""
+
     hitl_id: str
     run_id: str
     step_id: str
@@ -29,6 +31,7 @@ class HitlPrompt(BaseModel):
 
 class HitlResponse(BaseModel):
     """A human operator's response to a HITL prompt."""
+
     hitl_id: str
     run_id: str
     decision: HitlDecision

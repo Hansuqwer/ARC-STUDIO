@@ -1,4 +1,5 @@
 """Permission audit logging — records profile enforcement decisions to the hash-chain audit log."""
+
 from __future__ import annotations
 
 import datetime as dt
@@ -24,6 +25,7 @@ def log_permission_decision(
         decision: ``allow`` | ``deny`` | ``warn``.
         reason: Human-readable explanation.
         details: Optional extra context (env, backend, etc.).
+
     """
     audit_log_dir.mkdir(parents=True, exist_ok=True)
     chain_path = audit_log_dir / "permissions.audit.jsonl"

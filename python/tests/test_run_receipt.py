@@ -3,7 +3,6 @@ import pytest
 from agent_runtime_cockpit.protocol.evidence_refs import EvidenceRef
 from agent_runtime_cockpit.protocol.run_receipt import FileChange, RunReceipt
 
-
 RCPT_ID = "rcpt_01JKLMNOPQRSTUVWXYZ1"
 EV_ID = "ev_01JDEADBEEF1234567890"
 
@@ -43,9 +42,10 @@ def test_receipt_sign_verify_and_tamper():
 
 
 def test_receipt_canonical_deterministic():
-    assert make_receipt(created_at="2026-05-16T00:00:00Z").canonical_bytes() == make_receipt(
-        created_at="2026-05-16T00:00:00Z"
-    ).canonical_bytes()
+    assert (
+        make_receipt(created_at="2026-05-16T00:00:00Z").canonical_bytes()
+        == make_receipt(created_at="2026-05-16T00:00:00Z").canonical_bytes()
+    )
 
 
 def test_receipt_validation():

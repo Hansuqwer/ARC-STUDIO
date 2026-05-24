@@ -32,6 +32,7 @@ def detect_langchain_import() -> tuple[bool, str | None]:
 
     Returns:
         (is_installed, version_string)
+
     """
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore")
@@ -148,6 +149,7 @@ def detect_langchain(workspace: Path) -> LangChainDetectionResult:
 
     Returns:
         LangChainDetectionResult with detection status, confidence, and evidence.
+
     """
     # Check import availability
     has_langchain, version = detect_langchain_import()

@@ -1,5 +1,4 @@
-"""
-Unified slash command registry for ARC Studio CLI REPL.
+"""Unified slash command registry for ARC Studio CLI REPL.
 
 Provides a declarative registry of all slash commands, their aliases,
 categories, required gates, and handler functions. The registry is the

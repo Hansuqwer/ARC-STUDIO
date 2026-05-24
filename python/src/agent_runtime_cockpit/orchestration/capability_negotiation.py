@@ -1,9 +1,9 @@
-"""
-CapabilityNegotiation — pure-function capability matching for runtime selection.
+"""CapabilityNegotiation — pure-function capability matching for runtime selection.
 
 Determines whether a set of ``RuntimeCapabilities`` satisfies a requested
 capability profile. Pure function with no network or side effects.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -41,13 +41,10 @@ class CapabilityNegotiation:
             elif isinstance(expected_value, str):
                 if actual != expected_value:
                     reasons.append(
-                        f"Capability '{key}' mismatch: "
-                        f"expected {expected_value!r}, got {actual!r}"
+                        f"Capability '{key}' mismatch: expected {expected_value!r}, got {actual!r}"
                     )
             elif isinstance(expected_value, (list, set)):
-                if expected_value and not any(
-                    v in actual for v in expected_value
-                ):
+                if expected_value and not any(v in actual for v in expected_value):
                     reasons.append(
                         f"Runtime does not support any of "
                         f"required execution modes: {expected_value}"
@@ -55,8 +52,7 @@ class CapabilityNegotiation:
             else:
                 if actual != expected_value:
                     reasons.append(
-                        f"Capability '{key}' mismatch: "
-                        f"expected {expected_value}, got {actual}"
+                        f"Capability '{key}' mismatch: expected {expected_value}, got {actual}"
                     )
         return len(reasons) == 0, reasons
 

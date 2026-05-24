@@ -1,7 +1,7 @@
 """Simple Pydantic AI agent with structured output."""
 
-from pydantic_ai import Agent
 from pydantic import BaseModel
+from pydantic_ai import Agent
 
 
 class WeatherResponse(BaseModel):

@@ -2,7 +2,6 @@ import pytest
 
 from agent_runtime_cockpit.protocol.trust_diff import TrustDiff
 
-
 TD_ID = "td_01JCAFEBABE0987654321"
 
 

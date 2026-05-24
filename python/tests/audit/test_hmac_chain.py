@@ -1,4 +1,5 @@
 """Tests for HMAC-authenticated audit chain."""
+
 from __future__ import annotations
 
 import json
@@ -6,16 +7,15 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-
+from agent_runtime_cockpit.audit.hmac_chain import (
+    GENESIS,
+    HmacAuditChainWriter,
+    verify_hmac_chain,
+)
 from agent_runtime_cockpit.audit.key_manager import (
     AuditKeyManager,
     sign_audit_record,
     verify_audit_signature,
-)
-from agent_runtime_cockpit.audit.hmac_chain import (
-    HmacAuditChainWriter,
-    verify_hmac_chain,
-    GENESIS,
 )
 
 

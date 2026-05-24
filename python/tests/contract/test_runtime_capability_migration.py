@@ -33,7 +33,6 @@ import pytest
 from agent_runtime_cockpit.protocol.runtime_capability import RuntimeCapability
 from agent_runtime_cockpit.runtime.mode import RuntimeMode
 
-
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "runtime-capability"
 V1_DIR = FIXTURE_ROOT / "v1"
 V2_DIR = FIXTURE_ROOT / "v2"
@@ -74,15 +73,14 @@ def _load(path: Path) -> dict[str, Any]:
 
 def test_v1_fixture_directory_exists():
     """Without v1 fixtures we cannot prove migration works. The Phase 3
-    branch must include at least one v1 fixture before this test passes."""
+    branch must include at least one v1 fixture before this test passes.
+    """
     assert V1_DIR.exists(), (
-        f"Missing v1 fixture directory: {V1_DIR}. "
-        "Phase 3 must preserve Phase 0 baseline fixtures."
+        f"Missing v1 fixture directory: {V1_DIR}. Phase 3 must preserve Phase 0 baseline fixtures."
     )
     fixtures = _v1_fixture_paths()
     assert len(fixtures) > 0, (
-        f"No v1 fixtures in {V1_DIR}. "
-        "Copy the Phase 0 baseline fixture(s) here before migrating."
+        f"No v1 fixtures in {V1_DIR}. Copy the Phase 0 baseline fixture(s) here before migrating."
     )
 
 
@@ -104,8 +102,7 @@ class TestPerFixtureMigration:
     def test_v1_fixture_has_schema_version_1(self, fixture_path):
         payload = _load(fixture_path)
         assert payload.get("schema_version") == 1, (
-            f"{fixture_path.name} is not a v1 fixture; "
-            "move it to the correct directory."
+            f"{fixture_path.name} is not a v1 fixture; move it to the correct directory."
         )
 
     def test_migrate_bumps_schema_version_to_2(self, fixture_path):
@@ -130,7 +127,8 @@ class TestPerFixtureMigration:
 
     def test_no_v1_field_silently_dropped(self, fixture_path):
         """Every key present in v1 must appear in v2 (possibly with a
-        renamed key, but never dropped silently)."""
+        renamed key, but never dropped silently).
+        """
         v1_payload = _load(fixture_path)
         migrated = RuntimeCapability.migrate_v1_to_v2(v1_payload)
 
@@ -139,10 +137,7 @@ class TestPerFixtureMigration:
         for key, value in v1_payload.items():
             if key == "schema_version":
                 continue
-            assert (
-                key in migrated
-                or key in _DOCUMENTED_RENAMES
-            ), (
+            assert key in migrated or key in _DOCUMENTED_RENAMES, (
                 f"v1 field {key!r} dropped during migration of "
                 f"{fixture_path.name}. If this is intentional, add it to "
                 f"_DOCUMENTED_RENAMES with the new field name."
@@ -154,8 +149,7 @@ class TestPerFixtureMigration:
 
         for required in V2_REQUIRED_FIELDS:
             assert required in migrated, (
-                f"v2 field {required!r} missing after migration of "
-                f"{fixture_path.name}"
+                f"v2 field {required!r} missing after migration of {fixture_path.name}"
             )
 
     def test_v2_field_defaults_match_expectations(self, fixture_path):
@@ -178,7 +172,8 @@ class TestPerFixtureMigration:
     def test_allow_paid_calls_consistent_with_mode(self, fixture_path):
         """Invariant: allow_paid_calls=True is only valid when
         mode=PROVIDER_BACKED. Migration must never produce an inconsistent
-        capability."""
+        capability.
+        """
         migrated = RuntimeCapability.migrate_v1_to_v2(_load(fixture_path))
         mode = RuntimeMode(migrated["mode"])
         allow_paid = migrated["allow_paid_calls"]
@@ -190,7 +185,8 @@ class TestPerFixtureMigration:
 
     def test_cost_source_consistent_with_mode(self, fixture_path):
         """Invariant: cost_source_default='measured' is only valid for
-        provider_backed. Other modes must default to 'estimated'."""
+        provider_backed. Other modes must default to 'estimated'.
+        """
         migrated = RuntimeCapability.migrate_v1_to_v2(_load(fixture_path))
         mode = RuntimeMode(migrated["mode"])
         cost_source = migrated["cost_source_default"]
@@ -248,7 +244,8 @@ def test_v2_defaults_are_locked():
 def test_provider_backed_v1_migrates_with_paid_calls_inferred():
     """A v1 fixture whose mode (under any legacy name) maps to
     provider_backed must come out of migration with allow_paid_calls=True
-    and cost_source_default='measured'."""
+    and cost_source_default='measured'.
+    """
     v1 = {"schema_version": 1, "mode": "live"}  # legacy 'live' -> provider_backed
     migrated = RuntimeCapability.migrate_v1_to_v2(v1)
 
@@ -284,7 +281,8 @@ def test_migration_raises_on_missing_schema_version():
 def test_v2_fixture_matches_migrated_v1(v1_path):
     """For every v1 fixture, the corresponding v2 fixture (same stem)
     must equal the migration output. This prevents drift between
-    hand-edited v2 fixtures and the migration function."""
+    hand-edited v2 fixtures and the migration function.
+    """
     v2_path = V2_DIR / v1_path.name
     if not v2_path.exists():
         pytest.skip(

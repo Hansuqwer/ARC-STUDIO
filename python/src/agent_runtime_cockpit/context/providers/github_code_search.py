@@ -1,5 +1,4 @@
-"""
-GitHub Code Search Provider
+"""GitHub Code Search Provider.
 
 Uses the GitHub REST API code search endpoint.
 Source: https://docs.github.com/en/search-github/github-code-search/understanding-github-code-search-syntax
@@ -11,6 +10,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Optional
+
 from ...protocol.schemas import ContextPackEntry, SourceType
 
 log = logging.getLogger(__name__)

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 class ToolRegistrationError(Exception):
     """Raised when tool registration fails validation."""
+
     pass
 
 
@@ -16,9 +17,10 @@ class ToolRegistry:
 
     def register(self, handler: any) -> None:
         """Register a tool handler.
-        
+
         Raises:
             ToolRegistrationError: if handler lacks output_trust_level or declares invalid level
+
         """
         if not hasattr(handler, "output_trust_level"):
             raise ToolRegistrationError(

@@ -1,6 +1,8 @@
 """Exercise the `runs` family if it exists. Each test skips cleanly when
 the corresponding subcommand isn't present, so the suite stays green on
-CLIs that don't (yet) expose every command."""
+CLIs that don't (yet) expose every command.
+"""
+
 import json
 
 import pytest
@@ -47,8 +49,10 @@ def test_runs_with_populated_workspace_lists(run_cli, workspace):
     rid = "aaaaaaaaaaaa"
     p = workspace / ".arc" / "traces" / f"{rid}.jsonl"
     p.write_text(
-        json.dumps({"type": "RUN_STARTED", "runId": rid, "timestamp": 1}) + "\n"
-        + json.dumps({"type": "RUN_FINISHED", "runId": rid, "timestamp": 2}) + "\n"
+        json.dumps({"type": "RUN_STARTED", "runId": rid, "timestamp": 1})
+        + "\n"
+        + json.dumps({"type": "RUN_FINISHED", "runId": rid, "timestamp": 2})
+        + "\n"
     )
     r = run_cli("runs")
     assert r.exit_code == 0

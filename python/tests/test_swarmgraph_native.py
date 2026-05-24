@@ -4,14 +4,14 @@ import pytest
 from pydantic import ValidationError
 
 from agent_runtime_cockpit.swarmgraph import (
-    SwarmGraphRunner,
-    SwarmGraphConfig,
-    SwarmGraphEvent,
-    ConsensusResult,
     AgentSpec,
     AgentVote,
-    SwarmTask,
+    ConsensusResult,
+    SwarmGraphConfig,
+    SwarmGraphEvent,
+    SwarmGraphRunner,
     SwarmState,
+    SwarmTask,
     majority_consensus,
     quorum_consensus,
     run_consensus,
@@ -22,35 +22,39 @@ from agent_runtime_cockpit.swarmgraph.config import (
     ExecutionMode,
     SwarmTopology,
 )
+from agent_runtime_cockpit.swarmgraph.events import (
+    SwarmGraphEventKind,
+    emit_budget_event,
+    emit_consensus_event,
+    emit_topology_event,
+    emit_worker_event,
+)
+from agent_runtime_cockpit.swarmgraph.graph import (
+    GraphEdge,
+    GraphNode,
+    SwarmGraphTopology,
+    build_swarm_graph,
+)
 from agent_runtime_cockpit.swarmgraph.models import (
     AgentRole,
     ApprovalDecision,
     SwarmStatus,
+    TaskPriority,
     TaskStatus,
     WorkerResult,
-    TaskPriority,
 )
-from agent_runtime_cockpit.swarmgraph.graph import (
-    build_swarm_graph,
-    SwarmGraphTopology,
-    GraphNode,
-    GraphEdge,
+from agent_runtime_cockpit.swarmgraph.nodes.approval import (
+    approve_hitl,
+    reject_hitl,
+    require_hitl_approval,
 )
-from agent_runtime_cockpit.swarmgraph.events import (
-    SwarmGraphEventKind,
-    emit_topology_event,
-    emit_worker_event,
-    emit_consensus_event,
-    emit_budget_event,
-)
+from agent_runtime_cockpit.swarmgraph.nodes.consensus import run_consensus_round
 from agent_runtime_cockpit.swarmgraph.nodes.queen import (
-    queen_decompose,
     queen_assign,
+    queen_decompose,
     queen_prepare_agents,
 )
-from agent_runtime_cockpit.swarmgraph.nodes.worker import worker_execute, process_worker_results
-from agent_runtime_cockpit.swarmgraph.nodes.consensus import run_consensus_round
-from agent_runtime_cockpit.swarmgraph.nodes.approval import require_hitl_approval, approve_hitl, reject_hitl
+from agent_runtime_cockpit.swarmgraph.nodes.worker import process_worker_results, worker_execute
 
 
 class TestSwarmGraphConfig:
@@ -145,7 +149,14 @@ class TestConsensus:
         assert result.protocol == ConsensusProtocol.majority
 
     def test_consensus_result_frozen(self):
-        result = ConsensusResult(reached=True, approved=True, total_votes=1, approval_count=1, rejection_count=0, required=1)
+        result = ConsensusResult(
+            reached=True,
+            approved=True,
+            total_votes=1,
+            approval_count=1,
+            rejection_count=0,
+            required=1,
+        )
         with pytest.raises(ValidationError):
             result.reached = False
 
@@ -407,6 +418,7 @@ class TestRunner:
 
     def test_runner_hitl_mode(self):
         from agent_runtime_cockpit.swarmgraph.fixtures import run_hitl_swarm
+
         result, runner = run_hitl_swarm()
         state = runner.get_state()
         assert state is not None
@@ -417,6 +429,7 @@ class TestRunner:
 
     def test_runner_budget_mode(self):
         from agent_runtime_cockpit.swarmgraph.fixtures import run_budget_swarm
+
         result = run_budget_swarm(prompt="budget", budget_limit=100.0)
         assert result["status"] == "completed"
 

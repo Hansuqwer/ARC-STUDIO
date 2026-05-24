@@ -1,8 +1,10 @@
 """Tests: Policy loader — PolicyConfig, ApprovalPolicy, load_policy(), compute_trust_diff()."""
+
 from __future__ import annotations
 
-import yaml
 from pathlib import Path
+
+import yaml
 
 from agent_runtime_cockpit.config.policy import (
     ApprovalRule,
@@ -208,7 +210,10 @@ def test_compute_trust_diff_with_permissive_policy(tmp_path):
     assert "modify_trust_settings" in diff.added_capabilities
     assert diff.before == ["read_only"]
     assert diff.removed_restrictions == [
-        "no_shell_exec", "no_paid_calls", "no_destructive_writes", "no_trust_changes",
+        "no_shell_exec",
+        "no_paid_calls",
+        "no_destructive_writes",
+        "no_trust_changes",
     ]
 
 

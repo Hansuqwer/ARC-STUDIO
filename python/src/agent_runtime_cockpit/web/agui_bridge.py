@@ -1,5 +1,4 @@
-"""
-AG-UI Event Bridge
+"""AG-UI Event Bridge.
 
 Maps ARC internal run events to AG-UI protocol-compatible event types.
 Source: https://docs.ag-ui.com/concepts/events
@@ -17,21 +16,23 @@ AG-UI event types used:
   TOOL_CALL     → ToolCallStart / ToolCallArgs / ToolCallEnd
   STATE_SNAPSHOT→ StateSnapshot (ARC extension)
 """
+
 from __future__ import annotations
 
 from typing import Any
+
 from ..protocol.schemas import RunEvent
 
 # ARC event type → AG-UI event type mapping
 ARC_TO_AGUI: dict[str, str] = {
-    "RUN_STARTED":    "RunStarted",
-    "RUN_COMPLETED":  "RunFinished",
-    "RUN_FAILED":     "RunError",
-    "NODE_STARTED":   "StepStarted",
+    "RUN_STARTED": "RunStarted",
+    "RUN_COMPLETED": "RunFinished",
+    "RUN_FAILED": "RunError",
+    "NODE_STARTED": "StepStarted",
     "NODE_COMPLETED": "StepFinished",
-    "NODE_FAILED":    "StepError",
-    "MESSAGE":        "TextMessageStart",
-    "TOOL_CALL":      "ToolCallStart",
+    "NODE_FAILED": "StepError",
+    "MESSAGE": "TextMessageStart",
+    "TOOL_CALL": "ToolCallStart",
     "STATE_SNAPSHOT": "StateSnapshot",
 }
 
@@ -58,6 +59,9 @@ def from_agui(agui_event: dict[str, Any]) -> RunEvent:
         timestamp=agui_event.get("timestamp", ""),
         run_id=agui_event.get("runId", ""),
         sequence=agui_event.get("sequence", 0),
-        data={k: v for k, v in agui_event.items()
-              if k not in ("type", "timestamp", "runId", "sequence", "_arc_type")},
+        data={
+            k: v
+            for k, v in agui_event.items()
+            if k not in ("type", "timestamp", "runId", "sequence", "_arc_type")
+        },
     )

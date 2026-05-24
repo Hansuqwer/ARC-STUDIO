@@ -1,5 +1,4 @@
-"""
-ARC Adapter Registry
+"""ARC Adapter Registry.
 
 Discovers adapters, runs detection against a workspace, and routes calls
 to the correct adapter.
@@ -7,6 +6,7 @@ to the correct adapter.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from pathlib import Path
 from typing import Optional
@@ -18,8 +18,7 @@ log = logging.getLogger(__name__)
 
 
 class AdapterRegistry:
-    """
-    Central registry for all ARC runtime adapters.
+    """Central registry for all ARC runtime adapters.
 
     Usage:
         registry = AdapterRegistry()
@@ -45,8 +44,7 @@ class AdapterRegistry:
         return list(self._adapters.values())
 
     def detect_all(self, workspace: Path) -> list[RuntimeInfo]:
-        """
-        Run all adapters' detect() against the workspace.
+        """Run all adapters' detect() against the workspace.
         Returns only adapters that were actually detected.
         """
         results: list[RuntimeInfo] = []
@@ -65,9 +63,11 @@ class AdapterRegistry:
                 else:
                     conf_level = ConfidenceLevel.LOW
 
+                # Use deterministic workspace hash for stable runtime IDs
+                workspace_hash = hashlib.sha256(str(workspace).encode()).hexdigest()[:8]
                 results.append(
                     RuntimeInfo(
-                        id=f"{adapter.adapter_id}-{hash(str(workspace)) % 10000:04d}",
+                        id=f"{adapter.adapter_id}-{workspace_hash}",
                         name=f"{adapter.adapter_name} Project",
                         adapter=adapter.adapter_id,
                         confidence=conf_level,
@@ -86,12 +86,12 @@ class AdapterRegistry:
         """Build registry with all built-in adapters."""
         from .ag2_adapter import AG2Adapter
         from .crewai import CrewAIAdapter
-        from .swarmgraph import SwarmGraphAdapter
-        from .langgraph import LangGraphAdapter
         from .langchain import LangChainAdapter
+        from .langgraph import LangGraphAdapter
         from .llamaindex import LlamaIndexAdapter
         from .lmarena import LmarenaAdapter
         from .openai_agents import OpenAIAgentsAdapter
+        from .swarmgraph import SwarmGraphAdapter
 
         self.register(SwarmGraphAdapter())
         self.register(LangGraphAdapter())

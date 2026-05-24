@@ -71,6 +71,7 @@ class BattleRunner:
 
         Returns:
             Result dict with status, candidates, votes, outcome
+
         """
         self.events = []
 
@@ -599,6 +600,7 @@ class BattleRunner:
 
         Returns:
             Tuple of (run_id, trace_path)
+
         """
         # Generate new run_id (separate from battle_id)
         run_id = f"run-{uuid.uuid4().hex[:8]}"

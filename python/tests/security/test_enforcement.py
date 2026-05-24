@@ -2,26 +2,27 @@
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
+
+from agent_runtime_cockpit.protocol.denial_events import (
+    PaidCallDeniedEvent,
+    TrustDeniedEvent,
+)
 from agent_runtime_cockpit.security.enforcement import (
-    enforce_workspace_trust,
-    enforce_paid_call_gate,
-    enforce_shell_gate,
-    enforce_network_gate,
-    TrustEnforcementError,
+    NetworkEnforcementError,
     PaidCallEnforcementError,
     ShellEnforcementError,
-    NetworkEnforcementError,
+    TrustEnforcementError,
+    enforce_network_gate,
+    enforce_paid_call_gate,
+    enforce_shell_gate,
+    enforce_workspace_trust,
 )
-from agent_runtime_cockpit.security.profiles import RunProfile, BackendMode
+from agent_runtime_cockpit.security.profiles import BackendMode, RunProfile
 from agent_runtime_cockpit.security.trust import trust_workspace
-from agent_runtime_cockpit.protocol.denial_events import (
-    TrustDeniedEvent,
-    PaidCallDeniedEvent,
-)
 
 
 class TestTrustEnforcement:

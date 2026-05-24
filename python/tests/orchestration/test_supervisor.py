@@ -1,9 +1,9 @@
-"""
-Tests: JobSupervisor — run lifecycle, cancel, and orphan recovery (PR 20).
+"""Tests: JobSupervisor — run lifecycle, cancel, and orphan recovery (PR 20).
 
 Uses fake executor functions to simulate successful, failing,
 cancelling, and orphaned runs.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -11,18 +11,18 @@ from pathlib import Path
 
 import pytest
 
+from agent_runtime_cockpit.audit.hitl import HitlDecision, HitlPrompt, HitlResponse
+from agent_runtime_cockpit.orchestration.event_broker import EventBroker
 from agent_runtime_cockpit.orchestration.supervisor import (
+    HitlNotFoundError,
     JobSupervisor,
     RunRequest,
-    HitlNotFoundError,
 )
-from agent_runtime_cockpit.orchestration.event_broker import EventBroker
-from agent_runtime_cockpit.audit.hitl import HitlDecision, HitlPrompt, HitlResponse
+from agent_runtime_cockpit.protocol.events import create_event
+from agent_runtime_cockpit.protocol.evidence_refs import EvidenceKind, EvidenceRef
+from agent_runtime_cockpit.protocol.schemas import RunStatus
 from agent_runtime_cockpit.security.trust import WorkspaceUntrusted, trust_workspace
 from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
-from agent_runtime_cockpit.protocol.events import create_event
-from agent_runtime_cockpit.protocol.schemas import RunStatus
-from agent_runtime_cockpit.protocol.evidence_refs import EvidenceKind, EvidenceRef
 
 
 @pytest.fixture
@@ -66,7 +66,10 @@ class TestStartRun:
         assert loaded.status == RunStatus.COMPLETED
         assert loaded.ended_at is not None
         assert [event.type for event in loaded.events] == [
-            "CONTRACT_PROPOSED", "RUN_STARTED", "STEP_STARTED", "RUN_COMPLETED",
+            "CONTRACT_PROPOSED",
+            "RUN_STARTED",
+            "STEP_STARTED",
+            "RUN_COMPLETED",
             "CONTRACT_FULFILLED",
             "RECEIPT_GENERATED",
         ]
@@ -132,7 +135,9 @@ class TestStartRun:
 
     @pytest.mark.asyncio
     async def test_untrusted_workspace_is_blocked(
-        self, supervisor: JobSupervisor, tmp_path: Path,
+        self,
+        supervisor: JobSupervisor,
+        tmp_path: Path,
     ):
         trust_db = tmp_path / "trust-db.json"
         request = RunRequest(
@@ -149,7 +154,9 @@ class TestStartRun:
 
     @pytest.mark.asyncio
     async def test_trusted_workspace_can_start_run(
-        self, supervisor: JobSupervisor, tmp_path: Path,
+        self,
+        supervisor: JobSupervisor,
+        tmp_path: Path,
     ):
         workspace = tmp_path / "workspace"
         workspace.mkdir()
@@ -219,8 +226,9 @@ class TestOrphanRecovery:
     @pytest.mark.asyncio
     async def test_recover_orphans(self, supervisor: JobSupervisor, tmp_path: Path):
         # Manually create a RUNNING run in the store (simulating orphan)
-        from agent_runtime_cockpit.protocol.schemas import RunRecord
         from datetime import datetime, timezone
+
+        from agent_runtime_cockpit.protocol.schemas import RunRecord
 
         orphan = RunRecord(
             id="orphan-001",
@@ -241,8 +249,9 @@ class TestOrphanRecovery:
 
     @pytest.mark.asyncio
     async def test_recover_orphans_skips_completed(self, supervisor: JobSupervisor, tmp_path: Path):
-        from agent_runtime_cockpit.protocol.schemas import RunRecord
         from datetime import datetime, timezone
+
+        from agent_runtime_cockpit.protocol.schemas import RunRecord
 
         completed = RunRecord(
             id="completed-001",
@@ -383,12 +392,14 @@ class TestHitlFlow:
             )
             task = asyncio.create_task(supervisor.request_hitl(prompt))
             await asyncio.sleep(0)
-            supervisor.respond_hitl(HitlResponse(
-                hitl_id="hitl-1",
-                run_id=run_id,
-                decision=HitlDecision.APPROVE,
-                operator_id="tester",
-            ))
+            supervisor.respond_hitl(
+                HitlResponse(
+                    hitl_id="hitl-1",
+                    run_id=run_id,
+                    decision=HitlDecision.APPROVE,
+                    operator_id="tester",
+                )
+            )
             captured.append(await task)
 
         run = await supervisor.start_run(_make_request(), executor)
@@ -398,20 +409,27 @@ class TestHitlFlow:
         loaded = supervisor.store.load(run.id)
         assert loaded is not None
         assert [event.type for event in loaded.events] == [
-            "CONTRACT_PROPOSED", "RUN_STARTED", "HITL_PROMPT", "HITL_RESPONSE",
-            "RUN_COMPLETED", "CONTRACT_FULFILLED", "RECEIPT_GENERATED",
+            "CONTRACT_PROPOSED",
+            "RUN_STARTED",
+            "HITL_PROMPT",
+            "HITL_RESPONSE",
+            "RUN_COMPLETED",
+            "CONTRACT_FULFILLED",
+            "RECEIPT_GENERATED",
         ]
 
     @pytest.mark.asyncio
     async def test_request_hitl_timeout_fails_run(self, supervisor: JobSupervisor):
         async def executor(run_id, req, emit_event):
-            await supervisor.request_hitl(HitlPrompt(
-                hitl_id="hitl-timeout",
-                run_id=run_id,
-                step_id="step-1",
-                prompt_text="Approve?",
-                timeout_seconds=0,
-            ))
+            await supervisor.request_hitl(
+                HitlPrompt(
+                    hitl_id="hitl-timeout",
+                    run_id=run_id,
+                    step_id="step-1",
+                    prompt_text="Approve?",
+                    timeout_seconds=0,
+                )
+            )
 
         run = await supervisor.start_run(_make_request(), executor)
         await asyncio.sleep(0.2)
@@ -426,13 +444,18 @@ class TestHitlFlow:
 class TestCockpitArtifacts:
     @pytest.mark.asyncio
     async def test_failed_run_gets_receipt_autopsy_and_redacted_output(
-        self, supervisor: JobSupervisor,
+        self,
+        supervisor: JobSupervisor,
     ):
         async def executor(run_id, req, emit_event):
-            emit_event(run_id, "TOOL_CALL_ERROR", {
-                "tool_call_id": "tool-1",
-                "error": "api_key=supersecret12345 failed",
-            })
+            emit_event(
+                run_id,
+                "TOOL_CALL_ERROR",
+                {
+                    "tool_call_id": "tool-1",
+                    "error": "api_key=supersecret12345 failed",
+                },
+            )
             raise RuntimeError("password=supersecret12345 failed")
 
         run = await supervisor.start_run(_make_request(), executor)
@@ -456,15 +479,27 @@ class TestCockpitArtifacts:
     @pytest.mark.asyncio
     async def test_invalid_evidence_refs_are_stripped(self, supervisor: JobSupervisor):
         async def executor(run_id, req, emit_event):
-            emit_event(run_id, "TOOL_CALL_RESULT", {
-                "tool_call_id": "tool-1",
-                "result": "ok",
-                "evidence_refs": [
-                    {"evidence_id": "bad", "kind": "file", "target": "x"},
-                    {"evidence_id": "ev_01JDEADBEEF1234567890", "kind": "ledger", "target": "x"},
-                    {"evidence_id": "ev_01JDEADBEEF1234567891", "kind": "file", "target": "a.py"},
-                ],
-            })
+            emit_event(
+                run_id,
+                "TOOL_CALL_RESULT",
+                {
+                    "tool_call_id": "tool-1",
+                    "result": "ok",
+                    "evidence_refs": [
+                        {"evidence_id": "bad", "kind": "file", "target": "x"},
+                        {
+                            "evidence_id": "ev_01JDEADBEEF1234567890",
+                            "kind": "ledger",
+                            "target": "x",
+                        },
+                        {
+                            "evidence_id": "ev_01JDEADBEEF1234567891",
+                            "kind": "file",
+                            "target": "a.py",
+                        },
+                    ],
+                },
+            )
 
         run = await supervisor.start_run(_make_request(), executor)
         await asyncio.sleep(0.2)
@@ -475,8 +510,10 @@ class TestCockpitArtifacts:
 
     def test_respond_hitl_unknown_prompt_raises(self, supervisor: JobSupervisor):
         with pytest.raises(HitlNotFoundError):
-            supervisor.respond_hitl(HitlResponse(
-                hitl_id="missing",
-                run_id="run-missing",
-                decision=HitlDecision.REJECT,
-            ))
+            supervisor.respond_hitl(
+                HitlResponse(
+                    hitl_id="missing",
+                    run_id="run-missing",
+                    decision=HitlDecision.REJECT,
+                )
+            )

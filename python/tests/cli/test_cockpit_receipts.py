@@ -1,4 +1,5 @@
 """CLI tests for receipt/contract/autopsy show, export, verify commands."""
+
 from __future__ import annotations
 
 import json
@@ -6,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from agent_runtime_cockpit.protocol.run_receipt import RunReceipt
-from agent_runtime_cockpit.protocol.run_contract import RunContract
 from agent_runtime_cockpit.protocol.failure_autopsy import FailureAutopsy
+from agent_runtime_cockpit.protocol.run_contract import RunContract
+from agent_runtime_cockpit.protocol.run_receipt import RunReceipt
 
 FIXTURE_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "cockpit"
 
@@ -68,9 +69,7 @@ def _seed_contract(ws: Path) -> RunContract:
     )
     traces_dir = ws / ".arc" / "traces"
     traces_dir.mkdir(parents=True, exist_ok=True)
-    (traces_dir / f"{RUN_ID}.contract.json").write_text(
-        contract.model_dump_json(indent=2)
-    )
+    (traces_dir / f"{RUN_ID}.contract.json").write_text(contract.model_dump_json(indent=2))
     return contract
 
 

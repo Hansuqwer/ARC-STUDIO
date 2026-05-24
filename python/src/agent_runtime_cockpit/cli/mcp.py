@@ -13,7 +13,6 @@ import typer
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err
 from ..security.trust import WorkspaceUntrusted
-
 from ._app import console, err_console
 from ._helpers import DEBUG_FLAG, JSON_FLAG, WORKSPACE_FLAG, _out, _setup_logging, _workspace
 from ._subapps import mcp_app
@@ -36,10 +35,10 @@ def mcp_serve(
     Compatible with Claude Desktop, Codex, and other local MCP clients.
 
     Examples:
-
         arc mcp serve --stdio
 
         ARC_MCP_SERVE_STDIO=1 arc mcp serve
+
     """
     _setup_logging(debug)
     ws = _workspace(workspace)
@@ -57,7 +56,7 @@ def mcp_serve(
 
     # Import and create the MCP server
     try:
-        from ..mcp.server import create_mcp_server, MCPServerError
+        from ..mcp.server import MCPServerError, create_mcp_server
 
         mcp_server = create_mcp_server(workspace=ws)
     except MCPServerError as e:

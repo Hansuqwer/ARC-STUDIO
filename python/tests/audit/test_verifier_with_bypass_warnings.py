@@ -1,5 +1,4 @@
-"""
-Test audit verifier compatibility with PolicyBypassWarning events (Phase 22.1).
+"""Test audit verifier compatibility with PolicyBypassWarning events (Phase 22.1).
 
 Verifies that the streaming audit verifier from Phase 21 can handle large traces
 containing PolicyBypassWarning events without breaking memory budget constraints.
@@ -15,16 +14,15 @@ import pytest
 
 from agent_runtime_cockpit.audit.key_manager import sign_audit_record
 from agent_runtime_cockpit.audit.streaming_verifier import (
-    StreamingAuditVerifier,
     GENESIS,
+    StreamingAuditVerifier,
 )
 from agent_runtime_cockpit.protocol._bypass import PolicyBypassReason
 
 
 @pytest.mark.slow
 def test_verify_100mb_trace_with_bypass_warnings(tmp_path: Path):
-    """
-    Verify 100 MB trace with 10,000 PolicyBypassWarning events.
+    """Verify 100 MB trace with 10,000 PolicyBypassWarning events.
 
     This test ensures the streaming audit verifier from Phase 21 can handle
     traces containing the new PolicyBypassWarning event type without breaking

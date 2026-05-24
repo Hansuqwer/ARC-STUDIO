@@ -113,6 +113,7 @@ def raft_consensus(
 
     Returns:
         ConsensusResult with raft protocol.
+
     """
     total = len(votes)
     if total == 0:
@@ -161,6 +162,7 @@ def bft_consensus(
 
     Returns:
         ConsensusResult with bft protocol.
+
     """
     total = len(votes)
     required = quorum if quorum is not None else max(1, (2 * total + 2) // 3)
@@ -228,6 +230,7 @@ def run_consensus(
 
     Returns:
         ConsensusResult with the selected protocol.
+
     """
     func = CONSENSUS_FUNCS.get(protocol, majority_consensus)
 

@@ -6,17 +6,17 @@ validating a release candidate or nightly CI.
 
 No provider calls are made — only import and availability checks.
 """
+
 from __future__ import annotations
 
-import os
 import importlib.util
+import os
 
 import pytest
 
 from agent_runtime_cockpit.adoption.crewai_runner import CrewAIAdoptionRunner
 from agent_runtime_cockpit.adoption.langgraph_runner import _setup_swarmgraph_paths
 from agent_runtime_cockpit.adoption.protocol import AdoptionStatus
-
 
 pytestmark = pytest.mark.real_runtime
 

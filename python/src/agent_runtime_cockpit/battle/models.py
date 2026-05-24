@@ -174,6 +174,7 @@ def calculate_elo_change(
 
     Returns:
         Tuple of (winner_new_rating, loser_new_rating)
+
     """
     # Expected scores
     expected_winner = 1 / (1 + 10 ** ((loser_rating - winner_rating) / 400))
@@ -204,6 +205,7 @@ def calculate_elo_draw(
 
     Returns:
         Tuple of (new_rating_a, new_rating_b)
+
     """
     # Expected scores
     expected_a = 1 / (1 + 10 ** ((rating_b - rating_a) / 400))

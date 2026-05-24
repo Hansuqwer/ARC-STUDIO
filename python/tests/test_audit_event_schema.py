@@ -3,11 +3,11 @@
 import json
 
 from agent_runtime_cockpit.schemas.audit_events import (
+    AuditChainLink,
+    AuditChainManifest,
     AuditEvent,
     AuditEventSeverity,
     AuditEventType,
-    AuditChainLink,
-    AuditChainManifest,
 )
 
 AUDIT_EVENT_CHAIN_STARTED = AuditEventType.AUDIT_CHAIN_STARTED

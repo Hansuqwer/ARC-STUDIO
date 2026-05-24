@@ -30,6 +30,7 @@ def detect_pydantic_ai_import() -> tuple[bool, str | None]:
 
     Returns:
         (is_installed, version_string)
+
     """
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore")
@@ -128,6 +129,7 @@ def detect_pydantic_ai(workspace: Path) -> PydanticAIDetectionResult:
 
     Returns:
         PydanticAIDetectionResult with detection status, confidence, and evidence.
+
     """
     # Check import availability
     has_pydantic_ai, version = detect_pydantic_ai_import()

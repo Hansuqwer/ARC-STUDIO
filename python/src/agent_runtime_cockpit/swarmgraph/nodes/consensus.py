@@ -58,6 +58,7 @@ def consensus_result_to_metadata(result: ConsensusResult) -> dict[str, object]:
 
     Returns:
         A plain dict suitable for storage in task.metadata.
+
     """
     return {
         "reached": result.reached,
@@ -104,6 +105,7 @@ def emit_consensus_events_for_outcomes(
 
     Returns:
         List of ConsensusEvent instances.
+
     """
     from ..events import emit_consensus_event
 
@@ -152,6 +154,7 @@ def run_consensus_round_with_results(
 
     Returns:
         List of ConsensusRoundOutcome (one per task).
+
     """
     _legacy_protocol = ConsensusProtocol(protocol) if isinstance(protocol, str) else protocol
 
@@ -296,6 +299,7 @@ def run_consensus_round(
 
     Returns:
         List of ApprovalDecision (one per task).
+
     """
     outcomes = run_consensus_round_with_results(
         tasks,

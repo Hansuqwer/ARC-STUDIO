@@ -5,16 +5,16 @@ helpers require an ADR; signature changes to existing helpers require
 an ADR.
 """
 
-from ._typed_run_event_conformance import (
-    TypedRunEventConformance,
-    assert_event_stream_conforms,
+from ._denial_event_assertions import (
+    DenialEventAssertions,
+    assert_denial_event,
 )
 from ._fake_provider_fixture import FakeProviderFixture
 from ._fixture_project_loader import FixtureProjectLoader
 from ._golden_file_compare import GoldenFileCompare
-from ._denial_event_assertions import (
-    DenialEventAssertions,
-    assert_denial_event,
+from ._typed_run_event_conformance import (
+    TypedRunEventConformance,
+    assert_event_stream_conforms,
 )
 
 __all__ = [

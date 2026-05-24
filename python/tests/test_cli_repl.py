@@ -13,12 +13,12 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
+import agent_runtime_cockpit.cli_repl.slash_commands as slash_commands
 from agent_runtime_cockpit.cli import app
 from agent_runtime_cockpit.cli_repl.cancellation import CancellationReason, CancellationToken
 from agent_runtime_cockpit.cli_repl.session import ChatSession
-from agent_runtime_cockpit.providers import ProviderResponse, UsageRecord
-import agent_runtime_cockpit.cli_repl.slash_commands as slash_commands
 from agent_runtime_cockpit.cli_repl.slash_commands import SlashCommandHandler, _build_registry
+from agent_runtime_cockpit.providers import ProviderResponse, UsageRecord
 
 
 @dataclass
@@ -197,7 +197,10 @@ class TestSlashCommands:
         assert result is not None
         assert result.state == "present"
         assert "ok: hello world" in result.output
-        assert any(name == "run.started" and payload["prompt_chars"] == 11 for name, payload in handler.events)
+        assert any(
+            name == "run.started" and payload["prompt_chars"] == 11
+            for name, payload in handler.events
+        )
         assert any(name == "run.completed" for name, _payload in handler.events)
         started = [payload for name, payload in handler.events if name == "run.started"][0]
         assert started["runtime_mode"] == "fake"
@@ -354,7 +357,9 @@ class TestSlashCommands:
 
     def test_provider_backed_run_uses_turn_manager_not_swarmgraph(self, monkeypatch):
         monkeypatch.setenv("ARC_ALLOW_RUN", "1")
-        monkeypatch.setattr(slash_commands, "preflight_with_estimator", lambda *args, **kwargs: None)
+        monkeypatch.setattr(
+            slash_commands, "preflight_with_estimator", lambda *args, **kwargs: None
+        )
 
         def fail_runner(*args: Any, **kwargs: Any) -> Any:
             raise AssertionError("SwarmGraphRunner should not execute provider-backed /run")
@@ -370,7 +375,9 @@ class TestSlashCommands:
 
     def test_provider_backed_run_passes_tool_registry_when_tools_enabled(self, monkeypatch):
         monkeypatch.setenv("ARC_ALLOW_RUN", "1")
-        monkeypatch.setattr(slash_commands, "preflight_with_estimator", lambda *args, **kwargs: None)
+        monkeypatch.setattr(
+            slash_commands, "preflight_with_estimator", lambda *args, **kwargs: None
+        )
         seen: dict[str, Any] = {}
         original = slash_commands.TurnManager
 
@@ -391,15 +398,17 @@ class TestSlashCommands:
     async def test_provider_backed_run_works_in_async_context(self, monkeypatch):
         """Verify provider-backed /run works when called from async context (event loop running)."""
         monkeypatch.setenv("ARC_ALLOW_RUN", "1")
-        monkeypatch.setattr(slash_commands, "preflight_with_estimator", lambda *args, **kwargs: None)
+        monkeypatch.setattr(
+            slash_commands, "preflight_with_estimator", lambda *args, **kwargs: None
+        )
         provider = _StubProviderClient()
         handler = SlashCommandHandler(runner=provider)
         s = ChatSession(runtime_mode="provider_backed", allow_paid_calls=True)
-        
+
         # Call from within async context (event loop is running)
         # The _run_coro_sync wrapper should detect this and use thread pool
         result = handler.handle("/run hello", s)
-        
+
         assert result is not None
         assert result.state == "present"
         assert result.output == "provider ok"
@@ -515,14 +524,13 @@ class TestSlashCommands:
 class TestFormatResult:
     def test_format_completed(self):
         from agent_runtime_cockpit.cli_repl.chat_repl import _format_result
+
         result = {
             "status": "completed",
             "total_tasks": 3,
             "completed_tasks": 3,
             "total_cost_usd": 0.0,
-            "results": [
-                {"task_id": "t1", "output": "done", "status": "completed"}
-            ],
+            "results": [{"task_id": "t1", "output": "done", "status": "completed"}],
         }
         formatted = _format_result(result)
         assert "completed" in formatted
@@ -531,6 +539,7 @@ class TestFormatResult:
 
     def test_format_no_results(self):
         from agent_runtime_cockpit.cli_repl.chat_repl import _format_result
+
         result = {
             "status": "completed",
             "total_tasks": 0,
@@ -603,21 +612,26 @@ class TestMergedSlashCommands:
 
 class TestCommandRegistry:
     def test_register_and_lookup(self):
-        from agent_runtime_cockpit.cli_repl.commands import CommandRegistry, CommandDef
+        from agent_runtime_cockpit.cli_repl.commands import CommandDef, CommandRegistry
 
         registry = CommandRegistry()
-        cmd = CommandDef(name="test", help_text="A test", category="meta", handler=lambda a, s: "ok")
+        cmd = CommandDef(
+            name="test", help_text="A test", category="meta", handler=lambda a, s: "ok"
+        )
         registry.register(cmd)
         assert registry.has("test")
         assert registry.get("test") is cmd
 
     def test_alias_resolution(self):
-        from agent_runtime_cockpit.cli_repl.commands import CommandRegistry, CommandDef
+        from agent_runtime_cockpit.cli_repl.commands import CommandDef, CommandRegistry
 
         registry = CommandRegistry()
         cmd = CommandDef(
-            name="exit", help_text="Exit", category="meta",
-            handler=lambda a, s: "__EXIT__", aliases=["quit"],
+            name="exit",
+            help_text="Exit",
+            category="meta",
+            handler=lambda a, s: "__EXIT__",
+            aliases=["quit"],
         )
         registry.register(cmd)
         assert registry.get("quit") is cmd
@@ -625,7 +639,7 @@ class TestCommandRegistry:
         assert registry.get("EXIT") is cmd
 
     def test_duplicate_detection(self):
-        from agent_runtime_cockpit.cli_repl.commands import CommandRegistry, CommandDef
+        from agent_runtime_cockpit.cli_repl.commands import CommandDef, CommandRegistry
 
         registry = CommandRegistry()
         cmd = CommandDef(name="dup", help_text="First", category="meta", handler=lambda a, s: "1")
@@ -634,26 +648,44 @@ class TestCommandRegistry:
             registry.register(cmd)
 
     def test_duplicate_alias_detection(self):
-        from agent_runtime_cockpit.cli_repl.commands import CommandRegistry, CommandDef
+        from agent_runtime_cockpit.cli_repl.commands import CommandDef, CommandRegistry
 
         registry = CommandRegistry()
-        registry.register(CommandDef(
-            name="first", help_text="First", category="meta",
-            handler=lambda a, s: "1", aliases=["shared"],
-        ))
+        registry.register(
+            CommandDef(
+                name="first",
+                help_text="First",
+                category="meta",
+                handler=lambda a, s: "1",
+                aliases=["shared"],
+            )
+        )
         with pytest.raises(ValueError, match="already registered"):
-            registry.register(CommandDef(
-                name="second", help_text="Second", category="meta",
-                handler=lambda a, s: "2", aliases=["shared"],
-            ))
+            registry.register(
+                CommandDef(
+                    name="second",
+                    help_text="Second",
+                    category="meta",
+                    handler=lambda a, s: "2",
+                    aliases=["shared"],
+                )
+            )
 
     def test_list_by_category(self):
-        from agent_runtime_cockpit.cli_repl.commands import CommandRegistry, CommandDef
+        from agent_runtime_cockpit.cli_repl.commands import CommandDef, CommandRegistry
 
         registry = CommandRegistry()
-        registry.register(CommandDef(name="help", help_text="Help", category="meta", handler=lambda a, s: "h"))
-        registry.register(CommandDef(name="run", help_text="Run", category="runtime", handler=lambda a, s: "r"))
-        registry.register(CommandDef(name="status", help_text="Status", category="workspace", handler=lambda a, s: "s"))
+        registry.register(
+            CommandDef(name="help", help_text="Help", category="meta", handler=lambda a, s: "h")
+        )
+        registry.register(
+            CommandDef(name="run", help_text="Run", category="runtime", handler=lambda a, s: "r")
+        )
+        registry.register(
+            CommandDef(
+                name="status", help_text="Status", category="workspace", handler=lambda a, s: "s"
+            )
+        )
 
         meta_cmds = registry.list_commands("meta")
         assert len(meta_cmds) == 1
@@ -663,11 +695,15 @@ class TestCommandRegistry:
         assert len(all_cmds) == 3
 
     def test_categories(self):
-        from agent_runtime_cockpit.cli_repl.commands import CommandRegistry, CommandDef
+        from agent_runtime_cockpit.cli_repl.commands import CommandDef, CommandRegistry
 
         registry = CommandRegistry()
-        registry.register(CommandDef(name="a", help_text="A", category="meta", handler=lambda a, s: "a"))
-        registry.register(CommandDef(name="b", help_text="B", category="runtime", handler=lambda a, s: "b"))
+        registry.register(
+            CommandDef(name="a", help_text="A", category="meta", handler=lambda a, s: "a")
+        )
+        registry.register(
+            CommandDef(name="b", help_text="B", category="runtime", handler=lambda a, s: "b")
+        )
         cats = registry.categories()
         assert "meta" in cats
         assert "runtime" in cats
@@ -690,6 +726,7 @@ class TestSessionMigration:
     def test_detect_legacy_sessions(self, tmp_path):
         import json
         import os
+
         from agent_runtime_cockpit.cli_repl.session import _detect_legacy_sessions
 
         os.environ["ARC_STUDIO_SESSIONS_DIR"] = str(tmp_path / "migrate_detect")
@@ -714,6 +751,7 @@ class TestSessionMigration:
     def test_detect_skips_latest_symlink(self, tmp_path):
         import json
         import os
+
         from agent_runtime_cockpit.cli_repl.session import _detect_legacy_sessions
 
         os.environ["ARC_STUDIO_SESSIONS_DIR"] = str(tmp_path / "migrate_skip")
@@ -739,6 +777,7 @@ class TestSessionMigration:
     def test_migrate_legacy_session(self, tmp_path):
         import json
         import os
+
         from agent_runtime_cockpit.cli_repl.session import migrate_legacy_session
 
         os.environ["ARC_STUDIO_SESSIONS_DIR"] = str(tmp_path / "migrate_run")
@@ -771,6 +810,7 @@ class TestSessionMigration:
     def test_migrate_all_legacy_sessions(self, tmp_path):
         import json
         import os
+
         from agent_runtime_cockpit.cli_repl.session import migrate_all_legacy_sessions
 
         os.environ["ARC_STUDIO_SESSIONS_DIR"] = str(tmp_path / "migrate_all")
@@ -797,6 +837,7 @@ class TestSessionMigration:
 
     def test_migrate_nonexistent_returns_none(self, tmp_path):
         import os
+
         from agent_runtime_cockpit.cli_repl.session import migrate_legacy_session
 
         os.environ["ARC_STUDIO_SESSIONS_DIR"] = str(tmp_path / "migrate_none")
@@ -809,6 +850,7 @@ class TestSessionMigration:
     def test_list_legacy_session_ids(self, tmp_path):
         import json
         import os
+
         from agent_runtime_cockpit.cli_repl.session import _list_legacy_session_ids
 
         os.environ["ARC_STUDIO_SESSIONS_DIR"] = str(tmp_path / "migrate_ids")
@@ -835,6 +877,7 @@ class TestSessionsMigrate:
 
     def test_migrate_with_legacy(self, monkeypatch, tmp_path):
         import json
+
         monkeypatch.setenv("ARC_STUDIO_SESSIONS_DIR", str(tmp_path / "with_legacy"))
         sess_dir = tmp_path / "with_legacy"
         sess_dir.mkdir(parents=True, exist_ok=True)
@@ -855,6 +898,7 @@ class TestSessionsMigrate:
 
     def test_migrate_twice_idempotent(self, monkeypatch, tmp_path):
         import json
+
         monkeypatch.setenv("ARC_STUDIO_SESSIONS_DIR", str(tmp_path / "idempotent"))
         sess_dir = tmp_path / "idempotent"
         sess_dir.mkdir(parents=True, exist_ok=True)

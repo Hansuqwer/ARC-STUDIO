@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from agent_runtime_cockpit.protocol.runtime_capability import RuntimeCapability
+
 from .mode import RuntimeMode
 
 

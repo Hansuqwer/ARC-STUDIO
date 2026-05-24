@@ -1,4 +1,5 @@
 """Bridge OpenAI Agents SDK streaming events into AG-UI."""
+
 from __future__ import annotations
 
 import json
@@ -6,7 +7,6 @@ import uuid
 from typing import Any, AsyncIterator, Iterable
 
 from agent_runtime_cockpit.ag_ui import AGUIEventType, MappingContext, map_event
-
 
 _NATIVE_RUNTIME = "openai-agents"
 
@@ -42,9 +42,11 @@ def _stream_event_to_native(sdk_event: Any) -> Iterable[dict[str, Any]]:
                 "result": getattr(item, "output", None),
             }
         elif item_cls == "HandoffOutputItem":
-            yield {"kind": "handoff",
-                   "from": getattr(item.source_agent, "name", "?"),
-                   "to": getattr(item.target_agent, "name", "?")}
+            yield {
+                "kind": "handoff",
+                "from": getattr(item.source_agent, "name", "?"),
+                "to": getattr(item.target_agent, "name", "?"),
+            }
         return
 
 
@@ -72,7 +74,8 @@ def _message_text(item: Any) -> str:
 
 
 async def stream_to_ag_ui(
-    run_result_streaming: Any, ctx: MappingContext,
+    run_result_streaming: Any,
+    ctx: MappingContext,
 ) -> AsyncIterator[dict[str, Any]]:
     for event in from_singleton(AGUIEventType.RUN_STARTED, ctx):
         yield event

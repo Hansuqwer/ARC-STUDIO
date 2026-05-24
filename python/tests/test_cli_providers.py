@@ -1,6 +1,4 @@
-"""
-Tests: CLI provider commands (list, status, diagnostics, proxy).
-"""
+"""Tests: CLI provider commands (list, status, diagnostics, proxy)."""
 
 from __future__ import annotations
 
@@ -9,11 +7,12 @@ import os
 
 import pytest
 from typer.testing import CliRunner
+
 from agent_runtime_cockpit.cli import app
 
 
 def test_providers_list_json():
-    """arc providers list returns the provider auth catalog."""
+    """Arc providers list returns the provider auth catalog."""
     result = CliRunner().invoke(app, ["providers", "list", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
@@ -23,7 +22,7 @@ def test_providers_list_json():
 
 
 def test_providers_status_json():
-    """arc providers status returns dry-run provider statuses."""
+    """Arc providers status returns dry-run provider statuses."""
     result = CliRunner().invoke(app, ["providers", "status", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
@@ -35,7 +34,7 @@ def test_providers_status_json():
 
 
 def test_providers_catalog_required_entries():
-    """arc providers catalog includes core API and research-only web providers."""
+    """Arc providers catalog includes core API and research-only web providers."""
     result = CliRunner().invoke(app, ["providers", "catalog", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
@@ -64,7 +63,7 @@ def test_providers_catalog_required_entries():
 
 
 def test_providers_catalog_status_filter():
-    """arc providers catalog --status filters by provider status."""
+    """Arc providers catalog --status filters by provider status."""
     result = CliRunner().invoke(app, ["providers", "catalog", "--status", "supported", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
@@ -73,7 +72,7 @@ def test_providers_catalog_status_filter():
 
 
 def test_providers_catalog_human_readable_output():
-    """arc providers catalog shows formatted output without --json."""
+    """Arc providers catalog shows formatted output without --json."""
     result = CliRunner().invoke(app, ["providers", "catalog", "--status", "supported"])
     assert result.exit_code == 0, result.output
     # Check for formatted output elements
@@ -86,7 +85,7 @@ def test_providers_catalog_human_readable_output():
 
 
 def test_providers_catalog_shows_setup_instructions():
-    """arc providers catalog includes setup instructions for API providers."""
+    """Arc providers catalog includes setup instructions for API providers."""
     result = CliRunner().invoke(app, ["providers", "catalog", "--status", "env_ref_only"])
     assert result.exit_code == 0, result.output
     # Should show setup steps
@@ -100,7 +99,7 @@ def test_providers_catalog_shows_setup_instructions():
 
 
 def test_providers_setup_unconfigured_provider(monkeypatch):
-    """arc providers setup shows setup instructions for unconfigured provider."""
+    """Arc providers setup shows setup instructions for unconfigured provider."""
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     result = CliRunner().invoke(app, ["providers", "setup", "openai", "--no-interactive", "--json"])
     assert result.exit_code == 0, result.output
@@ -111,7 +110,7 @@ def test_providers_setup_unconfigured_provider(monkeypatch):
 
 
 def test_providers_setup_configured_provider(monkeypatch):
-    """arc providers setup detects already configured provider."""
+    """Arc providers setup detects already configured provider."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-should-not-emit")
     result = CliRunner().invoke(app, ["providers", "setup", "openai", "--no-interactive", "--json"])
     assert result.exit_code == 0, result.output
@@ -123,7 +122,7 @@ def test_providers_setup_configured_provider(monkeypatch):
 
 
 def test_providers_setup_invalid_provider():
-    """arc providers setup fails gracefully with invalid provider."""
+    """Arc providers setup fails gracefully with invalid provider."""
     result = CliRunner().invoke(
         app, ["providers", "setup", "invalid-provider-xyz", "--no-interactive", "--json"]
     )
@@ -132,7 +131,7 @@ def test_providers_setup_invalid_provider():
 
 
 def test_providers_setup_local_provider():
-    """arc providers setup handles local providers correctly."""
+    """Arc providers setup handles local providers correctly."""
     result = CliRunner().invoke(app, ["providers", "setup", "ollama", "--no-interactive", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
@@ -142,7 +141,7 @@ def test_providers_setup_local_provider():
 
 
 def test_providers_setup_shows_provider_details(monkeypatch):
-    """arc providers setup shows comprehensive provider details (non-JSON mode)."""
+    """Arc providers setup shows comprehensive provider details (non-JSON mode)."""
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     result = CliRunner().invoke(app, ["providers", "setup", "anthropic", "--no-interactive"])
     assert result.exit_code == 0, result.output
@@ -153,7 +152,7 @@ def test_providers_setup_shows_provider_details(monkeypatch):
 
 
 def test_providers_key_set_env_ref_only(tmp_path, monkeypatch):
-    """arc providers key set stores env var refs, not raw keys."""
+    """Arc providers key set stores env var refs, not raw keys."""
     config_path = tmp_path / "providers.json"
     monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(config_path))
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-should-not-persist")
@@ -178,7 +177,7 @@ def test_providers_key_set_env_ref_only(tmp_path, monkeypatch):
 
 
 def test_providers_key_set_rejects_raw_key(tmp_path, monkeypatch):
-    """arc providers key set rejects raw key-looking values passed to --env."""
+    """Arc providers key set rejects raw key-looking values passed to --env."""
     monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(tmp_path / "providers.json"))
     result = CliRunner().invoke(
         app,
@@ -197,7 +196,7 @@ def test_providers_key_set_rejects_raw_key(tmp_path, monkeypatch):
 
 
 def test_providers_key_status_json(tmp_path, monkeypatch):
-    """arc providers key status emits key-ref status without raw values."""
+    """Arc providers key status emits key-ref status without raw values."""
     config_path = tmp_path / "providers.json"
     monkeypatch.setenv("ARC_PROVIDER_CONFIG", str(config_path))
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-should-not-emit")
@@ -223,7 +222,7 @@ def test_providers_key_status_json(tmp_path, monkeypatch):
 
 
 def test_providers_diagnostics_json():
-    """arc providers diagnostics returns redacted diagnostics payload."""
+    """Arc providers diagnostics returns redacted diagnostics payload."""
     result = CliRunner().invoke(app, ["providers", "diagnostics", "--json"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)["data"]
@@ -235,7 +234,7 @@ def test_providers_diagnostics_json():
 
 
 def test_providers_proxy_dry_run():
-    """arc providers proxy returns dry-run response with no network call."""
+    """Arc providers proxy returns dry-run response with no network call."""
     result = CliRunner().invoke(
         app,
         [
@@ -259,7 +258,7 @@ def test_providers_proxy_dry_run():
 
 
 def test_providers_proxy_live_requires_env_gate(monkeypatch):
-    """arc providers proxy --live is blocked unless env and paid opt-in are explicit."""
+    """Arc providers proxy --live is blocked unless env and paid opt-in are explicit."""
     monkeypatch.delenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", raising=False)
     result = CliRunner().invoke(
         app,
@@ -278,7 +277,7 @@ def test_providers_proxy_live_requires_env_gate(monkeypatch):
 
 
 def test_providers_proxy_live_requires_paid_flag(monkeypatch):
-    """arc providers proxy --live also requires --allow-paid-calls."""
+    """Arc providers proxy --live also requires --allow-paid-calls."""
     monkeypatch.setenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", "true")
     result = CliRunner().invoke(
         app,
@@ -315,7 +314,7 @@ def test_providers_proxy_live_explicit_gate_still_no_network(monkeypatch):
 
 
 def test_providers_action_dry_run_default_no_network(tmp_path, monkeypatch):
-    """arc providers action defaults to dry-run and records local accounting only."""
+    """Arc providers action defaults to dry-run and records local accounting only."""
     monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
     result = CliRunner().invoke(
         app,
@@ -463,7 +462,7 @@ def test_providers_action_all_gates_pass_closed_smoke(tmp_path, monkeypatch):
 
 
 def test_providers_quota_show(tmp_path, monkeypatch):
-    """arc providers quota show returns today's usage."""
+    """Arc providers quota show returns today's usage."""
     monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(tmp_path / "quota.json"))
     result = CliRunner().invoke(app, ["providers", "quota", "show", "--json"])
     assert result.exit_code == 0, result.output
@@ -473,7 +472,7 @@ def test_providers_quota_show(tmp_path, monkeypatch):
 
 
 def test_providers_quota_reset(tmp_path, monkeypatch):
-    """arc providers quota reset clears today's counters."""
+    """Arc providers quota reset clears today's counters."""
     quota_file = tmp_path / "quota.json"
     monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(quota_file))
     from agent_runtime_cockpit.provider_action import ProviderQuotaStore
@@ -492,7 +491,7 @@ def test_providers_quota_reset(tmp_path, monkeypatch):
 
 
 def test_providers_quota_show_filtered(tmp_path, monkeypatch):
-    """arc providers quota show --provider filters counters."""
+    """Arc providers quota show --provider filters counters."""
     quota_file = tmp_path / "quota.json"
     monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(quota_file))
     from agent_runtime_cockpit.provider_action import ProviderQuotaStore
@@ -519,7 +518,7 @@ def test_providers_quota_show_filtered(tmp_path, monkeypatch):
 
 
 def test_doctor_env_json():
-    """arc doctor env returns environment checks."""
+    """Arc doctor env returns environment checks."""
     result = CliRunner().invoke(app, ["doctor", "env", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
@@ -531,7 +530,7 @@ def test_doctor_env_json():
 
 
 def test_doctor_network_json():
-    """arc doctor network returns connectivity checks."""
+    """Arc doctor network returns connectivity checks."""
     result = CliRunner().invoke(app, ["doctor", "network", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
@@ -542,7 +541,7 @@ def test_doctor_network_json():
 
 
 def test_doctor_storage_json(tmp_path, monkeypatch):
-    """arc doctor storage returns storage status."""
+    """Arc doctor storage returns storage status."""
     traces_dir = tmp_path / ".arc" / "traces"
     traces_dir.mkdir(parents=True)
     result = CliRunner().invoke(
@@ -564,7 +563,7 @@ def test_doctor_storage_json(tmp_path, monkeypatch):
 
 
 def test_bug_report_json(tmp_path):
-    """arc bug-report returns diagnostic payload."""
+    """Arc bug-report returns diagnostic payload."""
     result = CliRunner().invoke(
         app,
         [
@@ -585,7 +584,7 @@ def test_bug_report_json(tmp_path):
 
 
 def test_runs_search_no_index(tmp_path):
-    """arc runs search fails gracefully when SQLite index missing."""
+    """Arc runs search fails gracefully when SQLite index missing."""
     result = CliRunner().invoke(
         app,
         [
@@ -601,9 +600,9 @@ def test_runs_search_no_index(tmp_path):
 
 
 def test_runs_search_with_index(tmp_path):
-    """arc runs search returns results from SQLite index."""
-    from agent_runtime_cockpit.storage.indexed_store import IndexedTraceStore
+    """Arc runs search returns results from SQLite index."""
     from agent_runtime_cockpit.protocol.schemas import RunRecord, RunStatus
+    from agent_runtime_cockpit.storage.indexed_store import IndexedTraceStore
 
     store = IndexedTraceStore(
         trace_dir=tmp_path / ".arc" / "traces",
@@ -637,9 +636,9 @@ def test_runs_search_with_index(tmp_path):
 
 
 def test_runs_search_filtered(tmp_path):
-    """arc runs search filters by runtime."""
-    from agent_runtime_cockpit.storage.indexed_store import IndexedTraceStore
+    """Arc runs search filters by runtime."""
     from agent_runtime_cockpit.protocol.schemas import RunRecord, RunStatus
+    from agent_runtime_cockpit.storage.indexed_store import IndexedTraceStore
 
     store = IndexedTraceStore(
         trace_dir=tmp_path / ".arc" / "traces",
@@ -682,7 +681,7 @@ def test_runs_search_filtered(tmp_path):
 
 
 def test_providers_test_configured_provider(monkeypatch):
-    """arc providers test succeeds when provider env var is set."""
+    """Arc providers test succeeds when provider env var is set."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key-should-not-emit")
     result = CliRunner().invoke(app, ["providers", "test", "openai", "--json"])
     assert result.exit_code == 0, result.output
@@ -695,7 +694,7 @@ def test_providers_test_configured_provider(monkeypatch):
 
 
 def test_providers_test_missing_env_var(monkeypatch):
-    """arc providers test fails when provider env var is not set."""
+    """Arc providers test fails when provider env var is not set."""
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     result = CliRunner().invoke(app, ["providers", "test", "openai", "--json"])
     assert result.exit_code == 1
@@ -704,7 +703,7 @@ def test_providers_test_missing_env_var(monkeypatch):
 
 
 def test_providers_test_invalid_provider():
-    """arc providers test fails with helpful error for unknown provider."""
+    """Arc providers test fails with helpful error for unknown provider."""
     result = CliRunner().invoke(app, ["providers", "test", "invalid-provider-xyz", "--json"])
     assert result.exit_code == 1
     assert "Unknown provider" in result.output
@@ -712,7 +711,7 @@ def test_providers_test_invalid_provider():
 
 
 def test_providers_test_shows_provider_details(monkeypatch):
-    """arc providers test shows provider details including docs URL."""
+    """Arc providers test shows provider details including docs URL."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-should-not-emit")
     result = CliRunner().invoke(app, ["providers", "test", "anthropic", "--json"])
     assert result.exit_code == 0, result.output
@@ -724,7 +723,7 @@ def test_providers_test_shows_provider_details(monkeypatch):
 
 
 def test_providers_test_local_provider_requires_no_api_key(monkeypatch):
-    """arc providers test succeeds for local providers without credentials."""
+    """Arc providers test succeeds for local providers without credentials."""
     monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
     result = CliRunner().invoke(app, ["providers", "test", "ollama", "--json"])
     assert result.exit_code == 0, result.output
@@ -736,7 +735,7 @@ def test_providers_test_local_provider_requires_no_api_key(monkeypatch):
 
 
 def test_providers_models_configured_only(monkeypatch):
-    """arc providers models shows models from configured providers only."""
+    """Arc providers models shows models from configured providers only."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
     result = CliRunner().invoke(app, ["providers", "models", "--json"])
@@ -755,7 +754,7 @@ def test_providers_models_configured_only(monkeypatch):
 
 
 def test_providers_models_filter_by_provider(monkeypatch):
-    """arc providers models --provider filters to specific provider."""
+    """Arc providers models --provider filters to specific provider."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
     result = CliRunner().invoke(app, ["providers", "models", "--provider", "openai", "--json"])
@@ -766,7 +765,7 @@ def test_providers_models_filter_by_provider(monkeypatch):
 
 
 def test_providers_models_all_flag(monkeypatch):
-    """arc providers models --all shows models from all providers."""
+    """Arc providers models --all shows models from all providers."""
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     result = CliRunner().invoke(app, ["providers", "models", "--all", "--json"])
@@ -779,7 +778,7 @@ def test_providers_models_all_flag(monkeypatch):
 
 
 def test_providers_models_no_api_keys_shows_local_providers(monkeypatch):
-    """arc providers models shows local providers when no API keys configured."""
+    """Arc providers models shows local providers when no API keys configured."""
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     # Clear all provider env vars
@@ -797,7 +796,7 @@ def test_providers_models_no_api_keys_shows_local_providers(monkeypatch):
 
 
 def test_providers_models_shows_capabilities(monkeypatch):
-    """arc providers models includes provider capabilities."""
+    """Arc providers models includes provider capabilities."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     result = CliRunner().invoke(app, ["providers", "models", "--provider", "openai", "--json"])
     assert result.exit_code == 0, result.output

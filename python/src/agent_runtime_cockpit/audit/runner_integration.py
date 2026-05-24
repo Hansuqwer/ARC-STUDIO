@@ -6,7 +6,7 @@ duplicated across CrewAI, LangGraph, and SwarmGraph adapters.
 
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from agent_runtime_cockpit.ag_ui import AGUIEventType
 
@@ -28,6 +28,7 @@ def log_agui_to_audit(session: AuditSession, agui_event: dict[str, Any]) -> None
         >>> async with AuditSession(run_id="abc123", store=store) as session:
         ...     for agui_event in events:
         ...         log_agui_to_audit(session, agui_event)
+
     """
     event_type = agui_event.get("type", "")
 

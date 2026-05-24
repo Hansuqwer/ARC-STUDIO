@@ -1,13 +1,14 @@
-"""
-Local Repository Context Provider
+"""Local Repository Context Provider.
 
 Scans the workspace for relevant source files matching the task keywords.
 No external API required.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional
+
 from ...protocol.schemas import ContextPackEntry, SourceType
 
 
@@ -32,7 +33,7 @@ class LocalRepoProvider:
 
         # Score and sort files
         scored: list[tuple[float, Path]] = []
-        for f in files[:self.MAX_FILES * 3]:
+        for f in files[: self.MAX_FILES * 3]:
             try:
                 text = f.read_text(errors="ignore").lower()
                 score = sum(text.count(kw) for kw in keywords)
@@ -43,21 +44,23 @@ class LocalRepoProvider:
 
         scored.sort(key=lambda x: -x[0])
 
-        for score, fpath in scored[:self.MAX_FILES]:
+        for score, fpath in scored[: self.MAX_FILES]:
             try:
                 text = fpath.read_text(errors="ignore")
                 # Extract best matching snippet
                 snippet = self._extract_snippet(text, keywords)
                 rel = str(fpath.relative_to(workspace))
-                results.append(ContextPackEntry(
-                    id=f"local-{hash(str(fpath)):x}",
-                    task=task,
-                    source=rel,
-                    source_type=SourceType.LOCAL_REPO,
-                    content=snippet,
-                    url=None,
-                    relevance_score=min(score / 10.0, 1.0),
-                ))
+                results.append(
+                    ContextPackEntry(
+                        id=f"local-{hash(str(fpath)):x}",
+                        task=task,
+                        source=rel,
+                        source_type=SourceType.LOCAL_REPO,
+                        content=snippet,
+                        url=None,
+                        relevance_score=min(score / 10.0, 1.0),
+                    )
+                )
             except Exception:
                 pass
 
@@ -75,5 +78,5 @@ class LocalRepoProvider:
                 best_score = score
                 best_start = max(0, i - 2)
 
-        snippet_lines = lines[best_start:best_start + 15]
-        return "\n".join(snippet_lines)[:self.MAX_SNIPPET_CHARS]
+        snippet_lines = lines[best_start : best_start + 15]
+        return "\n".join(snippet_lines)[: self.MAX_SNIPPET_CHARS]

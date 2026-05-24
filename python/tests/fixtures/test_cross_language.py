@@ -1,9 +1,9 @@
-"""
-Cross-language fixture validation tests.
+"""Cross-language fixture validation tests.
 
 Tests that JSON fixtures in protocol/fixtures/ are valid according to
 Python Pydantic models and can round-trip through serialization.
 """
+
 from __future__ import annotations
 
 import json
@@ -11,18 +11,18 @@ from pathlib import Path
 
 import pytest
 
-from agent_runtime_cockpit.protocol.event_envelope import ArcEnvelope
-from agent_runtime_cockpit.protocol.errors import ArcErrorCode
-from agent_runtime_cockpit.protocol.schemas import RunEvent
-from agent_runtime_cockpit.protocol.runtime_capability import RuntimeCapability
 from agent_runtime_cockpit.protocol.capabilities import RuntimeCapabilities
+from agent_runtime_cockpit.protocol.errors import ArcErrorCode
+from agent_runtime_cockpit.protocol.event_envelope import ArcEnvelope
+from agent_runtime_cockpit.protocol.runtime_capability import RuntimeCapability
+from agent_runtime_cockpit.protocol.schemas import RunEvent
 
 from .loader import (
-    load_fixture,
-    load_and_validate,
-    validate_round_trip,
-    list_fixtures,
     list_categories,
+    list_fixtures,
+    load_and_validate,
+    load_fixture,
+    validate_round_trip,
 )
 
 ERROR_CODE_FIXTURE_DIR = Path(__file__).parents[3] / "protocol" / "fixtures" / "error-codes"
@@ -93,9 +93,7 @@ class TestArcEnvelopeFixtures:
 
     def test_round_trip_success(self):
         """Success envelope round-trips through serialization."""
-        original, serialized, instance = validate_round_trip(
-            "arc-envelope", "success", ArcEnvelope
-        )
+        original, serialized, instance = validate_round_trip("arc-envelope", "success", ArcEnvelope)
         # Core fields must match
         assert original["ok"] == serialized["ok"]
         assert original["version"] == serialized["version"]
@@ -137,9 +135,7 @@ class TestRunEventFixtures:
 
     def test_round_trip_run_completed(self):
         """RUN_COMPLETED event round-trips through serialization."""
-        original, serialized, instance = validate_round_trip(
-            "run-event", "run-completed", RunEvent
-        )
+        original, serialized, instance = validate_round_trip("run-event", "run-completed", RunEvent)
         assert original["type"] == serialized["type"]
         assert original["schema_version"] == serialized["schema_version"]
         assert original["run_id"] == serialized["run_id"]

@@ -1,4 +1,5 @@
 """Workspace-local HITL pending approval persistence with expiry and single-use tokens."""
+
 from __future__ import annotations
 
 import json
@@ -8,7 +9,6 @@ from typing import Optional
 from uuid import uuid4
 
 from .hitl import HitlDecision, HitlPrompt, HitlResponse
-
 
 DEFAULT_EXPIRY_SECONDS = 3600
 

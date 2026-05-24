@@ -13,10 +13,11 @@ from agent_runtime_cockpit.cli_repl.cancellation import CancellationToken
 @dataclass(frozen=True)
 class ToolResult:
     """Result from tool execution.
-    
+
     For mixed-level tools, content must be a dict and trust_overrides maps
     field names to their trust levels.
     """
+
     content: str | dict
     trust_overrides: dict[str, Literal["trusted", "untrusted"]] = field(default_factory=dict)
 
@@ -30,12 +31,13 @@ class ToolResult:
 
 class ToolHandler(Protocol):
     """Protocol for tool handlers per ADR-019.
-    
+
     Every tool must declare output_trust_level:
     - "untrusted" (default): output is wrapped and scanned
     - "trusted": output bypasses scanner (high bar: no user-controlled component)
     - "mixed": structured output with per-field trust (deferred to Phase 7+)
     """
+
     name: str
     description: str
     output_trust_level: Literal["untrusted", "trusted", "mixed"]
@@ -48,9 +50,10 @@ class ToolHandler(Protocol):
         cancellation_token: CancellationToken,
     ) -> ToolResult:
         """Execute the tool with validated args.
-        
+
         Raises:
             ValueError: invalid args
             Cancelled: cancellation requested
+
         """
         ...

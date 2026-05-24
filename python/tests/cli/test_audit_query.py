@@ -1,6 +1,4 @@
-"""
-Tests for arc audit query command (Phase 22.1).
-"""
+"""Tests for arc audit query command (Phase 22.1)."""
 
 from __future__ import annotations
 
@@ -10,19 +8,19 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from agent_runtime_cockpit.cli._app import app
 from agent_runtime_cockpit.audit.key_manager import sign_audit_record
 from agent_runtime_cockpit.audit.streaming_verifier import GENESIS
+from agent_runtime_cockpit.cli._app import app
 from agent_runtime_cockpit.protocol._bypass import PolicyBypassReason
 
 
 @pytest.fixture
 def audit_chain_with_bypass_warnings(tmp_path: Path) -> tuple[Path, str]:
-    """
-    Create a synthetic audit chain with mixed event types including bypass warnings.
+    """Create a synthetic audit chain with mixed event types including bypass warnings.
 
     Returns:
         Tuple of (chain_path, run_id)
+
     """
     run_id = "run_test_query_123"
     chain_path = tmp_path / ".arc" / "audit" / f"{run_id}.audit.jsonl"
@@ -109,8 +107,7 @@ def audit_chain_with_bypass_warnings(tmp_path: Path) -> tuple[Path, str]:
 
 
 def test_audit_query_filter_isolation(audit_chain_with_bypass_warnings, tmp_path):
-    """
-    Test 1: Filter isolation - --kind filter works correctly.
+    """Test 1: Filter isolation - --kind filter works correctly.
 
     Verifies that querying by --kind POLICY_BYPASS_WARNING returns only
     bypass warnings and excludes other event types.
@@ -150,8 +147,7 @@ def test_audit_query_filter_isolation(audit_chain_with_bypass_warnings, tmp_path
 
 
 def test_audit_query_filter_composition(audit_chain_with_bypass_warnings, tmp_path):
-    """
-    Test 2: Filter composition - --kind and --surface filters compose correctly.
+    """Test 2: Filter composition - --kind and --surface filters compose correctly.
 
     Verifies that combining --kind POLICY_BYPASS_WARNING with --surface provider_call
     returns only bypass warnings from provider calls (2 out of 3 bypass warnings).

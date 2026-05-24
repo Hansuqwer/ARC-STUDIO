@@ -258,3 +258,29 @@ To add a new surface: add row under the appropriate phase, update audit script p
 - **Phase 22:** Discriminated RunEvent unions (commit 9977bfb)
 - **ADR-0022.1:** `POLICY_BYPASS_WARNING` (docs/adr/ADR-0022.1.md)
 - **docs/research/adapter-roadmap.md:** Phases 26-35 surface scheduling
+# CLI Sandbox Surface
+
+ARC now has a first-class sandbox CLI foundation:
+
+- `arc policy explain -- <cmd...>` classifies argv and reports policy decision without execution.
+- `arc sandbox run --policy local-safe -- <cmd...>` enforces local-safe policy before subprocess execution.
+- `arc sandbox doctor --json` reports subprocess and microVM preflight state.
+- `arc sandbox audit-verify --json` verifies the sandbox audit chain.
+- `arc sandbox audit-list --json` reads persisted sandbox events with filters.
+- `arc policy list/show/validate` discovers and validates configured sandbox policies.
+
+P0 policy defaults:
+
+- read-only commands are auto-allowed.
+- network, install, privileged, destructive, and unknown commands are denied unless an explicit future policy enables them.
+- subprocess execution uses argv lists only, not shell strings.
+- cwd must resolve inside the workspace.
+- environment is allowlisted and secret-looking variables are stripped.
+- timeout kills the POSIX process group.
+- stdout/stderr are capped and redacted.
+- every allowed/denied sandbox command returns an audit payload.
+- sandbox audit events are persisted to an external hash-chain store by default.
+- sandbox audit chain appends continue across CLI invocations and verify against raw events.
+- container execution requires `ARC_ENABLE_CONTAINER_SANDBOX=1`.
+
+MicroVM status: doctor/preflight only. Linux checks Firecracker/Cloud Hypervisor and `/dev/kvm`. macOS checks Lima/VZ availability. Windows is explicitly unsupported for this phase.

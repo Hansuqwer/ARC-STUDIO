@@ -1,7 +1,9 @@
 """ARC runtime capability model — schema version 1."""
+
 from __future__ import annotations
 
 from enum import Enum
+
 from pydantic import BaseModel, Field
 
 SCHEMA_VERSION = 1
@@ -9,6 +11,7 @@ SCHEMA_VERSION = 1
 
 class SupportLevel(str, Enum):
     """Maturity level of a runtime adapter or feature."""
+
     STABLE = "stable"
     BETA = "beta"
     ALPHA = "alpha"
@@ -18,6 +21,7 @@ class SupportLevel(str, Enum):
 
 class ExecutionMode(str, Enum):
     """Execution mode a runtime supports."""
+
     STANDALONE = "standalone"
     SEQUENCE = "sequence"
     ADOPTION = "adoption"
@@ -25,6 +29,7 @@ class ExecutionMode(str, Enum):
 
 class AuditLevel(str, Enum):
     """Level of audit trail a runtime can produce."""
+
     NONE = "none"
     ARC_SHA256 = "arc_sha256"
     SWARMGRAPH_HMAC = "swarmgraph_hmac"
@@ -32,6 +37,7 @@ class AuditLevel(str, Enum):
 
 class HitlLevel(str, Enum):
     """Level of human-in-the-loop support."""
+
     NONE = "none"
     ADVISORY = "advisory"
     ENFORCED = "enforced"
@@ -39,6 +45,7 @@ class HitlLevel(str, Enum):
 
 class RuntimeCapabilities(BaseModel):
     """Honest self-report of what this adapter supports."""
+
     # Schema versioning
     schema_version: int = SCHEMA_VERSION
 
@@ -46,9 +53,7 @@ class RuntimeCapabilities(BaseModel):
     support_level: SupportLevel = SupportLevel.EXPERIMENTAL
 
     # Execution modes this runtime supports
-    execution_modes: list[ExecutionMode] = Field(
-        default_factory=lambda: [ExecutionMode.STANDALONE]
-    )
+    execution_modes: list[ExecutionMode] = Field(default_factory=lambda: [ExecutionMode.STANDALONE])
 
     # Adoption modes (runtime+swarmgraph) — always empty unless implemented
     adoption_modes: list[str] = Field(default_factory=list)
@@ -87,6 +92,8 @@ class RuntimeCapabilities(BaseModel):
 
     # Permission requirements (reported by adapter, enforced by gating)
     requires_paid_calls: bool = False
-    requires_network: bool = Field(default=False, description="Runtime needs external network access")
+    requires_network: bool = Field(
+        default=False, description="Runtime needs external network access"
+    )
     requires_shell: bool = Field(default=False, description="Runtime spawns subprocesses")
     requires_secrets: bool = Field(default=False, description="Runtime needs API keys or tokens")

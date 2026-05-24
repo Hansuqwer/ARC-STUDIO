@@ -1,10 +1,14 @@
 """Tests: Security — redaction, validation."""
+
 import tempfile
+
 import pytest
 
-from agent_runtime_cockpit.security.redaction import Redactor, REDACT_PLACEHOLDER
+from agent_runtime_cockpit.security.redaction import REDACT_PLACEHOLDER, Redactor
 from agent_runtime_cockpit.security.validation import (
-    validate_workspace_path, validate_run_id, validate_workflow_id
+    validate_run_id,
+    validate_workflow_id,
+    validate_workspace_path,
 )
 
 

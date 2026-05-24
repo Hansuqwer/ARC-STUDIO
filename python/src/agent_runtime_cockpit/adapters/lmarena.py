@@ -1,5 +1,4 @@
-"""
-LM Arena Runtime Adapter
+"""LM Arena Runtime Adapter.
 
 Wraps the Arena service as a standard ARC runtime adapter so that LM Arena
 chat requests can be made through the existing `startRun` flow (CLI or daemon).
@@ -13,12 +12,13 @@ Modes are inferred from the workflow_id:
   - arena-code         → ArenaMode.CODE
   - arena-agent-preview → ArenaMode.AGENT_ARENA_PREVIEW
 """
+
 from __future__ import annotations
 
+import os
 import uuid
 from pathlib import Path
 from typing import Any
-import os
 
 from ..arena.models import ArenaMode, ArenaRequest, PrivacyLevel
 from ..arena.service import arena_request, store_arena_run
@@ -75,7 +75,11 @@ class LmarenaAdapter(RuntimeAdapter):
 
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
         """Always detected — the Arena stub backend is always available."""
-        mode = "live mode" if os.environ.get("ARC_ALLOW_LIVE_ARENA", "").lower() in {"true", "1"} else "stub mode"
+        mode = (
+            "live mode"
+            if os.environ.get("ARC_ALLOW_LIVE_ARENA", "").lower() in {"true", "1"}
+            else "stub mode"
+        )
         return True, 0.5, [f"Arena runtime available ({mode})"]
 
     def capability_report(self, workspace: Path) -> CapabilityReport:
@@ -93,7 +97,9 @@ class LmarenaAdapter(RuntimeAdapter):
             doctor_actions=[],
         )
 
-    async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
+    async def run_workflow(
+        self, workflow_id: str, inputs: dict[str, Any] | None = None
+    ) -> RunRecord:
         """Execute an Arena request and return the run record.
 
         Inputs accepted:

@@ -1,6 +1,6 @@
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from aiohttp import ClientSession
 from aiohttp.web import AppRunner, TCPSite
@@ -15,7 +15,7 @@ def _write_swarmgraph_cli(tools_dir: Path) -> Path:
     cli.parent.mkdir(parents=True, exist_ok=True)
     cli.write_text(
         "#!/usr/bin/env sh\n"
-        "printf '%s\n' '{\"swarm_id\":\"sg-api\",\"status\":\"completed\",\"worker_count\":0,\"final_output\":\"ok\"}'\n"
+        'printf \'%s\n\' \'{"swarm_id":"sg-api","status":"completed","worker_count":0,"final_output":"ok"}\'\n'
     )
     cli.chmod(cli.stat().st_mode | 0o111)
     return cli
@@ -78,7 +78,11 @@ async def test_runs_api_and_sse_events(tmp_path, unused_tcp_port):
             async with session.get(f"{base_url}/api/runs/run-daemon-test/events") as response:
                 body = await response.text()
                 assert response.status == 200
-                lines = [line.removeprefix("data: ") for line in body.splitlines() if line.startswith("data: ")]
+                lines = [
+                    line.removeprefix("data: ")
+                    for line in body.splitlines()
+                    if line.startswith("data: ")
+                ]
                 events = [json.loads(line) for line in lines]
                 assert events[0]["type"] == "RUN_STARTED"
                 assert events[1]["type"] == "RUN_COMPLETED"
@@ -87,7 +91,11 @@ async def test_runs_api_and_sse_events(tmp_path, unused_tcp_port):
             async with session.get(f"{base_url}/api/runs/missing-run/events") as response:
                 body = await response.text()
                 assert response.status == 200
-                lines = [line.removeprefix("data: ") for line in body.splitlines() if line.startswith("data: ")]
+                lines = [
+                    line.removeprefix("data: ")
+                    for line in body.splitlines()
+                    if line.startswith("data: ")
+                ]
                 events = [json.loads(line) for line in lines]
                 assert events[0]["type"] == "RUN_ERROR"
                 assert events[0]["data"]["code"] == "RUN_NOT_FOUND"
@@ -97,7 +105,13 @@ async def test_runs_api_and_sse_events(tmp_path, unused_tcp_port):
                 payload = await response.json()
                 assert response.status == 200
                 assert payload["ok"] is True
-                assert {provider["id"] for provider in payload["data"]} >= {"openai", "anthropic", "openrouter", "qwen", "kimi"}
+                assert {provider["id"] for provider in payload["data"]} >= {
+                    "openai",
+                    "anthropic",
+                    "openrouter",
+                    "qwen",
+                    "kimi",
+                }
 
             async with session.get(f"{base_url}/api/providers/routing") as response:
                 payload = await response.json()
@@ -108,10 +122,17 @@ async def test_runs_api_and_sse_events(tmp_path, unused_tcp_port):
             async with session.get(f"{base_url}/api/runtimes/capabilities") as response:
                 payload = await response.json()
                 assert response.status == 200
-                assert payload["data"]["auto_priority"] == ["swarmgraph", "langgraph", "crewai", "lmarena"]
+                assert payload["data"]["auto_priority"] == [
+                    "swarmgraph",
+                    "langgraph",
+                    "crewai",
+                    "lmarena",
+                ]
                 ids = {runtime["runtime_id"] for runtime in payload["data"]["runtimes"]}
                 assert ids >= {"swarmgraph", "langgraph", "crewai", "lmarena"}
-                assert all("requires_paid_calls" in runtime for runtime in payload["data"]["runtimes"])
+                assert all(
+                    "requires_paid_calls" in runtime for runtime in payload["data"]["runtimes"]
+                )
     finally:
         await runner.cleanup()
 
@@ -133,13 +154,19 @@ async def test_start_run_runtime_body_selects_langgraph(monkeypatch, tmp_path, u
         async with ClientSession() as session:
             async with session.post(
                 f"http://127.0.0.1:{unused_tcp_port}/api/runs/start",
-                json={"workflow_id": "wf-lg", "runtime": "langgraph", "inputs": {"prompt": "hello"}},
+                json={
+                    "workflow_id": "wf-lg",
+                    "runtime": "langgraph",
+                    "inputs": {"prompt": "hello"},
+                },
             ) as response:
                 payload = await response.json()
                 assert response.status == 200
                 assert payload["data"]["runtime"] == "langgraph"
                 assert payload["data"]["runtime_selection"]["runtime"] == "langgraph"
-                assert payload["data"]["events"][-1]["data"]["state"]["messages"] == ["langgraph-ok"]
+                assert payload["data"]["events"][-1]["data"]["state"]["messages"] == [
+                    "langgraph-ok"
+                ]
     finally:
         await runner.cleanup()
 
@@ -185,7 +212,9 @@ async def test_start_run_get_runtime_query_uses_same_router(monkeypatch, tmp_pat
         await runner.cleanup()
 
 
-async def test_start_run_allow_paid_calls_true_does_not_change_swarmgraph_stub(monkeypatch, tmp_path, unused_tcp_port):
+async def test_start_run_allow_paid_calls_true_does_not_change_swarmgraph_stub(
+    monkeypatch, tmp_path, unused_tcp_port
+):
     ws = tmp_path / "ws"
     ws.mkdir()
     cli = _write_swarmgraph_cli(tmp_path / "bin")
@@ -256,7 +285,9 @@ async def test_start_run_runtime_body_omitted_uses_auto(monkeypatch, tmp_path, u
         await runner.cleanup()
 
 
-async def test_start_run_runtime_body_auto_selects_only_langgraph(monkeypatch, tmp_path, unused_tcp_port):
+async def test_start_run_runtime_body_auto_selects_only_langgraph(
+    monkeypatch, tmp_path, unused_tcp_port
+):
     _write_langgraph_export(tmp_path)
     monkeypatch.setenv("ARC_LANGGRAPH_EXPORT", "graph_module:build_graph")
 

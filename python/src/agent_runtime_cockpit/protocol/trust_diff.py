@@ -1,4 +1,5 @@
 """Cockpit trust diff protocol schema."""
+
 from __future__ import annotations
 
 import re
@@ -6,7 +7,6 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
-
 
 DIFF_ID_RE = re.compile(r"^td_[a-zA-Z0-9_-]{20,30}$")
 

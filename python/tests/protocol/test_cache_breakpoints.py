@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 
 from agent_runtime_cockpit.protocol.cache_breakpoints import (
+    MAX_BREAKPOINTS,
     CacheBreakpoint,
     CacheBreakpointInput,
-    MAX_BREAKPOINTS,
     MessageTokenInfo,
     compute_breakpoints,
     estimate_cache_savings,
@@ -20,14 +20,18 @@ class TestComputeBreakpoints:
 
     def test_system_prompt_cached_when_above_threshold(self):
         result = compute_breakpoints(CacheBreakpointInput(system_prompt_tokens=1500))
-        assert [(bp.position, bp.index, bp.estimated_tokens) for bp in result] == [("system", 0, 1500)]
+        assert [(bp.position, bp.index, bp.estimated_tokens) for bp in result] == [
+            ("system", 0, 1500)
+        ]
 
     def test_system_prompt_below_threshold_skipped(self):
         assert compute_breakpoints(CacheBreakpointInput(system_prompt_tokens=100)) == []
 
     def test_tools_cached_when_above_threshold(self):
         result = compute_breakpoints(CacheBreakpointInput(tool_definition_tokens=1200))
-        assert [(bp.position, bp.index, bp.estimated_tokens) for bp in result] == [("tools", 0, 1200)]
+        assert [(bp.position, bp.index, bp.estimated_tokens) for bp in result] == [
+            ("tools", 0, 1200)
+        ]
 
     def test_compute_breakpoints_emits_message_indices(self):
         input_data = CacheBreakpointInput(

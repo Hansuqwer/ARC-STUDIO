@@ -1,10 +1,10 @@
-"""
-Adoption protocol — shared interface for all runtime + SwarmGraph modes (P1b).
+"""Adoption protocol — shared interface for all runtime + SwarmGraph modes (P1b).
 
 Defines the Pydantic models and abstract runner that every adoption adapter
 must implement. Runners may return RUNNABLE status when dependencies and gates
 are satisfied; default behavior is NOT_IMPLEMENTED or NOT_RUNNABLE.
 """
+
 from __future__ import annotations
 
 import abc
@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 class AdoptionMode(str, Enum):
     """Canonical ``<runtime>+swarmgraph`` runtime IDs."""
+
     LANGGRAPH = "langgraph+swarmgraph"
     AG2 = "ag2+swarmgraph"
     CREWAI = "crewai+swarmgraph"
@@ -26,6 +27,7 @@ class AdoptionMode(str, Enum):
 
 class AdoptionSpec(BaseModel):
     """Input specification for an adoption run."""
+
     mode: AdoptionMode
     runtime_config: dict[str, Any] = Field(default_factory=dict)
     swarmgraph_config: dict[str, Any] = Field(default_factory=dict)
@@ -35,6 +37,7 @@ class AdoptionSpec(BaseModel):
 
 class WorkerTask(BaseModel):
     """A single worker task assigned by the SwarmGraph queen."""
+
     task_id: str
     worker_id: str
     input_data: dict[str, Any] = Field(default_factory=dict)
@@ -43,6 +46,7 @@ class WorkerTask(BaseModel):
 
 class WorkerProposal(BaseModel):
     """Output produced by one worker for one task."""
+
     task_id: str
     worker_id: str
     output: str
@@ -52,6 +56,7 @@ class WorkerProposal(BaseModel):
 
 class Vote(BaseModel):
     """A vote cast on a worker proposal."""
+
     task_id: str
     voter_id: str
     proposal_id: str
@@ -61,6 +66,7 @@ class Vote(BaseModel):
 
 class ConsensusResult(BaseModel):
     """Final consensus outcome for one task."""
+
     task_id: str
     winning_proposal: WorkerProposal
     votes: list[Vote] = Field(default_factory=list)
@@ -71,6 +77,7 @@ class ConsensusResult(BaseModel):
 
 class AdoptionStatus(str, Enum):
     """Honest status for adoption runners."""
+
     NOT_IMPLEMENTED = "not_implemented"
     NOT_RUNNABLE = "not_runnable"
     RUNNABLE = "runnable"
@@ -78,6 +85,7 @@ class AdoptionStatus(str, Enum):
 
 class AdoptionCapability(BaseModel):
     """Capability report for one adoption mode."""
+
     mode: AdoptionMode
     status: AdoptionStatus
     reason: str = ""

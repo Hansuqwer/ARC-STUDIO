@@ -1,0 +1,172 @@
+# Bootstrap Guide
+
+This guide provides instructions for bootstrapping a fresh ARC Studio environment from a clean clone.
+
+## Prerequisites
+
+- **Node.js** `20.18.0`
+- **pnpm** `9.15.9`
+- **Python** `3.11.10`
+- **uv** — Python dependency manager ([installation guide](https://github.com/astral-sh/uv))
+- **Git** 
+
+See [`.tool-versions`](../.tool-versions) for exact pinned versions.
+
+## Environment Checks
+
+Before installing, verify your environment:
+
+```bash
+bash scripts/check-env.sh
+```
+
+This script checks:
+- OS compatibility
+- Node version
+- Package manager version
+- Python version
+- uv version
+- Git version
+- Lockfile existence
+- Python environment usability
+- Playwright browsers (if e2e required)
+- SwarmGraph companion repo presence
+- Current git branch
+
+## Quick Start
+
+Get ARC Studio running in three steps:
+
+```bash
+# 1. Checkout correct branch
+git checkout build/no-mockups-handoff
+
+# 2. Check environment
+bash scripts/check-env.sh
+
+# 3. Bootstrap development environment
+bash scripts/bootstrap-dev.sh
+```
+
+## Daemon URL Configuration
+
+The Python daemon can be reached via three fallback methods:
+
+### 1. Explicit Environment Variable (Priority 1)
+
+```bash
+export ARC_PYTHON_DAEMON_URL="http://127.0.0.1:7777"
+```
+
+### 2. Theia Backend Auto-Probe (Priority 2)
+
+The Theia backend automatically probes `http://127.0.0.1:7777` for the daemon.
+This works if the daemon is running with default settings.
+
+### 3. Manual Configuration (Priority 3)
+
+In the IDE Config tab, users can manually enter the daemon URL.
+
+### Starting the Daemon
+
+```bash
+# Default (localhost:7777)
+arc serve
+
+# Custom port
+arc serve --port 8888
+
+# Custom host
+arc serve --host 0.0.0.0 --port 8888
+```
+
+### Verification
+
+```bash
+# Check daemon health
+curl http://127.0.0.1:7777/health
+
+# From Theia, check Config tab for "Daemon Connected" status
+```
+
+## Verification Commands
+
+After bootstrapping, verify everything works:
+
+```bash
+# Python tests
+cd python && uv run pytest -q
+
+# Python linting
+cd python && uv run ruff check src tests
+
+# TypeScript build
+pnpm build
+
+# TypeScript typecheck
+pnpm typecheck
+
+# Run all tests
+pnpm test
+
+# Start browser app
+pnpm start:browser
+```
+
+## Troubleshooting
+
+### Environment Issues
+
+- **Node version mismatch**: Use `nvm` to install correct version
+- **pnpm not found**: Install via `npm install -g pnpm@9.15.9`
+- **uv not found**: Install via `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
+### Daemon Connection Issues
+
+- Check if daemon is running: `ps aux | grep arc serve`
+- Verify daemon URL: `curl http://127.0.0.1:7777/health`
+- Check port availability: `lsof -i :7777`
+
+### Test Failures
+
+- Run Python tests with verbose output: `cd python && uv run pytest -v`
+- Check TypeScript errors: `pnpm typecheck`
+- Review logs: Check `.arc/traces/` for run traces
+
+## Next Steps
+
+After successful bootstrap:
+
+1. Read [DEVELOPMENT.md](./DEVELOPMENT.md) for contribution guidelines
+2. Review [ROADMAP.md](./roadmap.md) for project status
+3. Explore the [ARCHITECTURE](./architecture/overview.md) documentation
+4. Run the quickstart tutorial
+
+---
+
+**Last Updated:** 2026-05-24
+**Status:** Alpha
+# Sandbox Bootstrap
+
+Useful local checks:
+
+```bash
+cd python
+uv run arc sandbox doctor --json
+uv run arc policy explain -- ls -la
+uv run arc sandbox run --policy local-safe -- pwd
+uv run arc policy list --json
+uv run arc policy validate --json
+uv run arc sandbox audit-verify --json
+uv run arc sandbox audit-list --json --limit 20
+```
+
+Expected defaults:
+
+- `curl https://example.com` is denied as `network`.
+- `rm -rf .` is denied as `destructive`.
+- MicroVM doctor may report `unavailable` until Firecracker/Cloud Hypervisor plus `/dev/kvm` exist on Linux, or `limactl` exists on macOS.
+- Sandbox audit logs are written to `~/.arc/audit/` unless `ARC_SANDBOX_AUDIT_DIR` is set.
+- Named sandbox policies can be loaded from `ARC_SANDBOX_POLICY_CONFIG` or `~/.arc/sandbox-policies.json`.
+- Container execution is disabled unless `ARC_ENABLE_CONTAINER_SANDBOX=1` is set.
+- Lima template rendering requires `ARC_MICROVM_EXPERIMENTAL=1`; it does not execute a VM.

@@ -15,9 +15,9 @@ import pytest
 
 from agent_runtime_cockpit.audit.key_manager import sign_audit_record
 from agent_runtime_cockpit.audit.streaming_verifier import (
+    GENESIS,
     StreamingAuditVerifier,
     VerificationResult,
-    GENESIS,
 )
 
 

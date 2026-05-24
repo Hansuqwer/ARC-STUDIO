@@ -1,4 +1,5 @@
 """Cockpit evidence reference protocol schema."""
+
 from __future__ import annotations
 
 import re
@@ -6,7 +7,6 @@ from enum import Enum
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
-
 
 EVIDENCE_ID_RE = re.compile(r"^ev_[a-zA-Z0-9_-]{20,30}$")
 

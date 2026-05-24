@@ -11,13 +11,12 @@ import textwrap
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-
 from agent_runtime_cockpit.adapters.langchain import LangChainAdapter
 from agent_runtime_cockpit.adapters.langchain.detect import (
     detect_langchain,
-    detect_langchain_import,
-    detect_langchain_core,
     detect_langchain_community,
+    detect_langchain_core,
+    detect_langchain_import,
     detect_provider_integrations,
     scan_workspace_for_langchain,
 )

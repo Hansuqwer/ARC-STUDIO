@@ -9,8 +9,7 @@ import typer
 from rich.console import Console
 
 from .. import __version__ as arc_version
-from ..security.context import EnforcementContext, DryRunAbort, set_enforcement_context
-
+from ..security.context import DryRunAbort, EnforcementContext, set_enforcement_context
 from ._subapps import (
     adapter_app,
     audit_app,
@@ -22,12 +21,14 @@ from ._subapps import (
     hitl_app,
     isolation_app,
     mcp_app,
+    policy_app,
     profiles_app,
     prompt_app,
     providers_app,
     receipt_app,
     replay_app,
     runs_app,
+    sandbox_app,
     storage_app,
     studio_app,
     studio_sessions_app,
@@ -51,6 +52,8 @@ app.add_typer(adapter_app)
 app.add_typer(doctor_app)
 app.add_typer(workspace_app)
 app.add_typer(isolation_app)
+app.add_typer(sandbox_app)
+app.add_typer(policy_app)
 app.add_typer(config_app)
 app.add_typer(hitl_app)
 app.add_typer(storage_app)

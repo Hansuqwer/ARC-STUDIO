@@ -1,20 +1,24 @@
 """Pydantic models for ARC workspace configuration (ADR-001)."""
+
 from __future__ import annotations
 
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
+
 from agent_runtime_cockpit.protocol.schemas import BudgetVector
 
 
 class WorkspaceConfig(BaseModel):
     """Workspace identity settings."""
+
     name: Optional[str] = None
     trust_level: str = "auto"
 
 
 class RuntimeConfig(BaseModel):
     """Runtime selection settings."""
+
     default: str = "auto"
     auto_detect: bool = True
     fallback: str = "stub"
@@ -22,6 +26,7 @@ class RuntimeConfig(BaseModel):
 
 class ExecutionConfig(BaseModel):
     """Execution settings."""
+
     isolation: str = "none"
     default_profile: str = "local-safe"
     timeout_seconds: int = 300
@@ -32,6 +37,7 @@ class ExecutionConfig(BaseModel):
 
 class ProviderConfig(BaseModel):
     """Provider routing overrides."""
+
     default_provider: str = "openai"
     default_model: str = "gpt-4.1-mini"
     routing_mode: str = "manual"
@@ -41,6 +47,7 @@ class ProviderConfig(BaseModel):
 
 class SwarmGraphConfig(BaseModel):
     """SwarmGraph-specific settings."""
+
     provider: str = "openai"
     base_url: str = ""
     run_backend: str = "stub"
@@ -49,16 +56,19 @@ class SwarmGraphConfig(BaseModel):
 
 class LangGraphConfig(BaseModel):
     """LangGraph-specific settings."""
+
     export: str = ""
 
 
 class CrewAIConfig(BaseModel):
     """CrewAI-specific settings."""
+
     export: str = ""
 
 
 class ContextConfig(BaseModel):
     """Context provider settings."""
+
     search_provider: str = "brave"
     context7_api_key_env: str = ""
     github_token_env: str = ""
@@ -66,12 +76,14 @@ class ContextConfig(BaseModel):
 
 class TelemetryConfig(BaseModel):
     """Telemetry settings."""
+
     otel_endpoint: str = ""
     otel_genai_experimental: bool = False
 
 
 class UIConfig(BaseModel):
     """UI preference overrides."""
+
     show_mock_warnings: bool = True
     compact_sidebar: bool = False
     auto_open_sidebar: bool = True
@@ -79,6 +91,7 @@ class UIConfig(BaseModel):
 
 class SecurityConfig(BaseModel):
     """Security settings."""
+
     redact_secrets: bool = True
     audit_enabled: bool = False
     audit_secret_env: str = ""
@@ -88,6 +101,7 @@ class SecurityConfig(BaseModel):
 
 class ArcConfig(BaseModel):
     """Top-level ARC workspace configuration (ADR-001)."""
+
     version: int = 1
     workspace: WorkspaceConfig = Field(default_factory=WorkspaceConfig)
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)

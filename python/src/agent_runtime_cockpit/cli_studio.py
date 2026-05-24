@@ -1,5 +1,4 @@
-"""
-ARC Studio — thin CLI shim (≤30 lines) that delegates to `arc studio chat`.
+"""ARC Studio — thin CLI shim (≤30 lines) that delegates to `arc studio chat`.
 
 This module is the `arc-studio` console_scripts entry point. It imports
 the unified cli_repl machinery and delegates all behavior there.
@@ -13,6 +12,7 @@ Legacy StudioSession flat JSON sessions are still readable via the unified
 ChatSession.load() fallback, but never written. Use `arc studio sessions
 migrate` to convert legacy sessions to the canonical format.
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -37,8 +37,7 @@ def main(
     message: Optional[str] = typer.Argument(None, help="One-shot message or slash command"),
     version: bool = typer.Option(False, "--version", help="Show version and exit"),
 ) -> None:
-    """
-    ARC Studio — Run agents. See everything.
+    """ARC Studio — Run agents. See everything.
 
     With no arguments, launches interactive chat. With one argument, runs
     the message as a one-shot command and exits.

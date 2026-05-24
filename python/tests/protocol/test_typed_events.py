@@ -5,19 +5,19 @@ from __future__ import annotations
 import pytest
 
 from agent_runtime_cockpit.protocol.typed_events import (
-    RunStartedEvent,
-    RunCompletedEvent,
-    StepStartedEvent,
-    ToolCallResultEvent,
     HitlPromptEvent,
-    SwarmGraphTopologyEvent,
-    RawEvent,
-    UnknownEvent,
     PolicyBypassWarning,
-    is_run_started,
-    is_run_completed,
-    is_tool_call_result,
+    RawEvent,
+    RunCompletedEvent,
+    RunStartedEvent,
+    StepStartedEvent,
+    SwarmGraphTopologyEvent,
+    ToolCallResultEvent,
+    UnknownEvent,
     is_known_event,
+    is_run_completed,
+    is_run_started,
+    is_tool_call_result,
     parse_typed_event,
 )
 

@@ -1,19 +1,15 @@
-"""
-Tests for emit_policy_bypass_warning helper and rate-limiting (Phase 22.1).
-"""
+"""Tests for emit_policy_bypass_warning helper and rate-limiting (Phase 22.1)."""
 
-from agent_runtime_cockpit.security.enforcement import emit_policy_bypass_warning
-from agent_runtime_cockpit.security._bypass_rate_limit import (
-    reset_warning_state,
-    get_emitted_count,
-)
 from agent_runtime_cockpit.protocol._bypass import PolicyBypassReason
+from agent_runtime_cockpit.security._bypass_rate_limit import (
+    get_emitted_count,
+    reset_warning_state,
+)
+from agent_runtime_cockpit.security.enforcement import emit_policy_bypass_warning
 
 
 def test_rate_limiting_deduplicates_same_surface():
-    """
-    Test that 100 calls with the same (run_id, surface_identifier) emit only 1 event.
-    """
+    """Test that 100 calls with the same (run_id, surface_identifier) emit only 1 event."""
     # Reset state before test
     reset_warning_state()
 
@@ -55,9 +51,7 @@ def test_rate_limiting_deduplicates_same_surface():
 
 
 def test_rate_limiting_allows_distinct_surfaces():
-    """
-    Test that 100 calls with distinct surface_identifiers emit 100 events.
-    """
+    """Test that 100 calls with distinct surface_identifiers emit 100 events."""
     # Reset state before test
     reset_warning_state()
 

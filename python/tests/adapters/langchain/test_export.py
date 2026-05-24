@@ -9,12 +9,11 @@ from __future__ import annotations
 import textwrap
 from pathlib import Path
 
-
 from agent_runtime_cockpit.adapters.langchain import LangChainAdapter
 from agent_runtime_cockpit.adapters.langchain.export import (
-    scan_workspace_for_chains,
     chain_to_workflow_info,
     export_langchain_workflows,
+    scan_workspace_for_chains,
 )
 from agent_runtime_cockpit.protocol.schemas import NodeType
 
@@ -272,8 +271,8 @@ def test_capabilities_reflect_export_support():
 def test_capability_report_mentions_export(tmp_path: Path, monkeypatch):
     """Test capability report mentions export availability."""
     # Mock langchain as installed
-    from unittest.mock import MagicMock
     import importlib.util
+    from unittest.mock import MagicMock
 
     mock_spec = MagicMock()
     mock_langchain = MagicMock()

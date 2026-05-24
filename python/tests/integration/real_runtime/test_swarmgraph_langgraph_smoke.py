@@ -6,11 +6,12 @@ The ``langgraph+swarmgraph`` local-real fixture also requires
 ``ARC_LANGGRAPH_SWARMGRAPH_REAL=1``. It uses an in-process graph, expects
 ``real_provider_call=False``, and must not make paid/provider calls.
 """
+
 from __future__ import annotations
 
-import os
 import asyncio
 import importlib.util
+import os
 
 import pytest
 
@@ -18,9 +19,7 @@ from agent_runtime_cockpit.adoption.langgraph_runner import (
     LangGraphAdoptionRunner,
     _setup_swarmgraph_paths,
 )
-from agent_runtime_cockpit.adoption.protocol import AdoptionStatus
-from agent_runtime_cockpit.adoption.protocol import AdoptionMode, AdoptionSpec
-
+from agent_runtime_cockpit.adoption.protocol import AdoptionMode, AdoptionSpec, AdoptionStatus
 
 pytestmark = pytest.mark.real_runtime
 
@@ -114,23 +113,27 @@ def test_langgraph_swarmgraph_local_real_requires_dual_gate(tmp_path, monkeypatc
         max_workers=1,
     )
 
-    with pytest.raises(PermissionError, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
+    with pytest.raises(
+        PermissionError, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"
+    ):
         asyncio.run(LangGraphAdoptionRunner().run(spec, "local-real-gated", emit_event))
 
-    assert events == [(
-        "RUN_FAILED",
-        {
-            "error": (
-                "LangGraph+SwarmGraph local-real mode requires "
-                "ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1; "
-                "no provider calls were made."
-            ),
-            "mode": "langgraph+swarmgraph",
-            "runtime_mode": "local-real",
-            "real_provider_call": False,
-            "provider_backed": False,
-        },
-    )]
+    assert events == [
+        (
+            "RUN_FAILED",
+            {
+                "error": (
+                    "LangGraph+SwarmGraph local-real mode requires "
+                    "ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1; "
+                    "no provider calls were made."
+                ),
+                "mode": "langgraph+swarmgraph",
+                "runtime_mode": "local-real",
+                "real_provider_call": False,
+                "provider_backed": False,
+            },
+        )
+    ]
 
 
 def test_langgraph_swarmgraph_local_real_requires_both_gate_envs(tmp_path, monkeypatch) -> None:
@@ -148,8 +151,12 @@ def test_langgraph_swarmgraph_local_real_requires_both_gate_envs(tmp_path, monke
         max_workers=1,
     )
 
-    with pytest.raises(PermissionError, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
-        asyncio.run(LangGraphAdoptionRunner().run(spec, "local-real-partial-gate", lambda *args: None))
+    with pytest.raises(
+        PermissionError, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"
+    ):
+        asyncio.run(
+            LangGraphAdoptionRunner().run(spec, "local-real-partial-gate", lambda *args: None)
+        )
 
 
 def test_langgraph_swarmgraph_local_real_fixture_runs_without_provider_calls(tmp_path) -> None:

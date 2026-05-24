@@ -5,7 +5,11 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from agent_runtime_cockpit.protocol.cost_record import CostRecord, migrate_v2_to_v3, migrate_cost_record_to_latest
+from agent_runtime_cockpit.protocol.cost_record import (
+    CostRecord,
+    migrate_cost_record_to_latest,
+    migrate_v2_to_v3,
+)
 
 
 def _record(**overrides):

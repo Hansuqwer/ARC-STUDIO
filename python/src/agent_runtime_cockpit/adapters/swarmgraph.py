@@ -1,5 +1,4 @@
-"""
-SwarmGraph Runtime Adapter
+"""SwarmGraph Runtime Adapter.
 
 Dual-path adapter: uses the native SwarmGraphRunner (internal Python runtime)
 by default. Falls back to external CLI subprocess when ARC_SWARMGRAPH_CLI is
@@ -24,20 +23,20 @@ from ..adapters.base import CapabilityReport, DoctorAction
 from ..gating import require_dual_gate
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import (
+    NodeType,
+    RunEvent,
+    RunRecord,
+    RunStatus,
+    SchemaInfo,
+    WorkflowEdge,
     WorkflowInfo,
     WorkflowNode,
-    WorkflowEdge,
-    SchemaInfo,
-    NodeType,
-    RunRecord,
-    RunEvent,
-    RunStatus,
 )
 from ..security.redaction import Redactor
-from ..workspace import iter_workspace_files
 from ..swarmgraph import SwarmGraphRunner as NativeSwarmGraphRunner
 from ..swarmgraph.config import ExecutionMode, SwarmGraphConfig
 from ..swarmgraph.events import SwarmGraphEvent, SwarmGraphEventKind
+from ..workspace import iter_workspace_files
 from .base import RuntimeAdapter
 
 log = logging.getLogger(__name__)
@@ -243,8 +242,7 @@ class SwarmGraphAdapter(RuntimeAdapter):
         return detected, confidence, evidence
 
     def export_workflow(self, workspace: Path) -> list[WorkflowInfo]:
-        """
-        Export workflow topology.
+        """Export workflow topology.
         Uses AST-based heuristics when SwarmGraph library unavailable.
         """
         try:

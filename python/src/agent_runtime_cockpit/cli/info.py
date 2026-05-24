@@ -11,7 +11,6 @@ from rich.table import Table
 from .. import __version__ as arc_version
 from ..protocol.event_envelope import ok
 from ..workspace import iter_workspace_files
-
 from ._app import app, console
 from ._helpers import (
     DEBUG_FLAG,

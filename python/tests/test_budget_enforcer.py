@@ -1,5 +1,7 @@
 """Tests for BudgetEnforcer — real-time budget enforcement at effect boundaries."""
-from agent_runtime_cockpit.budget.legacy_vector import BudgetVectorEnforcer as BudgetEnforcer, BudgetExceededError
+
+from agent_runtime_cockpit.budget.legacy_vector import BudgetExceededError
+from agent_runtime_cockpit.budget.legacy_vector import BudgetVectorEnforcer as BudgetEnforcer
 from agent_runtime_cockpit.protocol.schemas import BudgetVector
 
 
@@ -76,7 +78,7 @@ def test_enforcer_atomic_check_and_update():
 
 
 def test_enforcer_exhausted_property():
-    """exhausted returns True when any dimension is at or past limit."""
+    """Exhausted returns True when any dimension is at or past limit."""
     enforcer = BudgetEnforcer(BudgetVector(tokens=100, cost_usd=1.0, latency_ms=1000))
     assert enforcer.exhausted is False
 
@@ -89,7 +91,7 @@ def test_enforcer_exhausted_property():
 
 
 def test_enforcer_reset_clears_counters():
-    """reset clears all accumulated usage."""
+    """Reset clears all accumulated usage."""
     enforcer = BudgetEnforcer(BudgetVector(tokens=100))
     enforcer.check_and_update(tokens=50)
     assert enforcer.tokens_used == 50
@@ -112,7 +114,7 @@ def test_enforcer_to_usage_metadata():
 
 
 def test_enforcer_no_budget_exhausted_is_false():
-    """exhausted is False when no budget is configured."""
+    """Exhausted is False when no budget is configured."""
     enforcer = BudgetEnforcer()
     assert enforcer.exhausted is False
     enforcer.check_and_update(tokens=999999)

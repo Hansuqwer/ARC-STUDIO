@@ -1,4 +1,5 @@
 """CrewAI listener that publishes adapter-native events to a queue."""
+
 from __future__ import annotations
 
 import asyncio
@@ -16,12 +17,17 @@ class ArcCrewAIListener:
 
     def attach(self) -> None:
         from crewai.events import (  # type: ignore
-            crewai_event_bus,
-            CrewKickoffStartedEvent, CrewKickoffCompletedEvent, CrewKickoffFailedEvent,
-            AgentExecutionStartedEvent, AgentExecutionCompletedEvent,
-            TaskStartedEvent, TaskCompletedEvent,
-            ToolUsageStartedEvent, ToolUsageFinishedEvent,
+            AgentExecutionCompletedEvent,
+            AgentExecutionStartedEvent,
+            CrewKickoffCompletedEvent,
+            CrewKickoffFailedEvent,
+            CrewKickoffStartedEvent,
             LLMStreamChunkEvent,
+            TaskCompletedEvent,
+            TaskStartedEvent,
+            ToolUsageFinishedEvent,
+            ToolUsageStartedEvent,
+            crewai_event_bus,
         )
 
         @crewai_event_bus.on(CrewKickoffStartedEvent)
@@ -42,9 +48,13 @@ class ArcCrewAIListener:
 
         @crewai_event_bus.on(AgentExecutionCompletedEvent)
         def _on_agent_done(_src: Any, event: Any) -> None:
-            self._emit({"kind": "agent.text",
-                        "agent": getattr(event.agent, "role", "?"),
-                        "text": str(getattr(event, "output", ""))})
+            self._emit(
+                {
+                    "kind": "agent.text",
+                    "agent": getattr(event.agent, "role", "?"),
+                    "text": str(getattr(event, "output", "")),
+                }
+            )
 
         @crewai_event_bus.on(TaskStartedEvent)
         def _on_task_start(_src: Any, event: Any) -> None:
@@ -56,16 +66,26 @@ class ArcCrewAIListener:
 
         @crewai_event_bus.on(ToolUsageStartedEvent)
         def _on_tool_start(_src: Any, event: Any) -> None:
-            self._emit({"kind": "tool.call",
-                        "tool": {"id": f"tool-{int(time.time()*1000)}",
-                                 "name": getattr(event, "tool_name", "tool"),
-                                 "args": getattr(event, "tool_args", {})}})
+            self._emit(
+                {
+                    "kind": "tool.call",
+                    "tool": {
+                        "id": f"tool-{int(time.time() * 1000)}",
+                        "name": getattr(event, "tool_name", "tool"),
+                        "args": getattr(event, "tool_args", {}),
+                    },
+                }
+            )
 
         @crewai_event_bus.on(ToolUsageFinishedEvent)
         def _on_tool_done(_src: Any, event: Any) -> None:
-            self._emit({"kind": "tool.result",
-                        "tool_id": getattr(event, "tool_name", "tool"),
-                        "result": getattr(event, "output", None)})
+            self._emit(
+                {
+                    "kind": "tool.result",
+                    "tool_id": getattr(event, "tool_name", "tool"),
+                    "result": getattr(event, "output", None),
+                }
+            )
 
         @crewai_event_bus.on(LLMStreamChunkEvent)
         def _on_llm_chunk(_src: Any, event: Any) -> None:

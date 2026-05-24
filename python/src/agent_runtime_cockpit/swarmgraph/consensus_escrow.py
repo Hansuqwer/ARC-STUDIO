@@ -90,6 +90,7 @@ def _canonical_json(vote: AgentVote) -> str:
 
     Returns:
         Canonical JSON string with sorted keys and no whitespace
+
     """
     vote_dict = vote.model_dump(mode="json")
     return json.dumps(vote_dict, sort_keys=True, separators=(",", ":"))
@@ -104,6 +105,7 @@ def _compute_hash(canonical_json: str, nonce: str) -> str:
 
     Returns:
         Hex-encoded SHA-256 hash (64 characters)
+
     """
     combined = canonical_json + nonce
     return hashlib.sha256(combined.encode("utf-8")).hexdigest()
@@ -116,6 +118,7 @@ def _generate_nonce() -> str:
 
     Returns:
         Hex-encoded random nonce (64 characters)
+
     """
     return secrets.token_hex(32)
 
@@ -136,6 +139,7 @@ class ConsensusEscrow:
         >>> commit = escrow.commit(vote)
         >>> revealed = escrow.reveal(vote, commit.nonce, commit)
         >>> assert escrow.verify(revealed)
+
     """
 
     def __init__(self, audit_writer: HmacAuditChainWriter | None = None) -> None:
@@ -144,6 +148,7 @@ class ConsensusEscrow:
         Args:
             audit_writer: Optional HMAC audit chain writer for recording
                          commit/reveal events. If None, no audit events are emitted.
+
         """
         self.audit_writer = audit_writer
         self._commits: dict[
@@ -168,6 +173,7 @@ class ConsensusEscrow:
         Side effects:
             - Stores commit in internal registry for verification
             - Emits audit event if audit_writer is configured
+
         """
         if nonce is None:
             nonce = _generate_nonce()
@@ -229,6 +235,7 @@ class ConsensusEscrow:
 
         Side effects:
             - Emits audit event if audit_writer is configured
+
         """
         # Verify vote metadata matches commit
         if vote.agent_id != commit.agent_id:
@@ -289,6 +296,7 @@ class ConsensusEscrow:
 
         Returns:
             True if verification succeeds, False otherwise
+
         """
         try:
             canonical = _canonical_json(revealed_vote.vote)
@@ -316,6 +324,7 @@ class ConsensusEscrow:
 
         Returns:
             ConsensusResult with tally outcome and details
+
         """
         # Extract votes from revealed votes
         votes = [rv.vote for rv in revealed_votes]
@@ -333,6 +342,7 @@ class ConsensusEscrow:
 
         Returns:
             VoteCommit if found, None otherwise
+
         """
         key = (agent_id, task_id, round)
         return self._commits.get(key)

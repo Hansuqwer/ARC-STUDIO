@@ -1,6 +1,8 @@
 """SSE streaming coverage. We verify the framing, the Last-Event-ID resume
 contract, and the [DONE] terminator without sleeping — the daemon's emitter
-is mocked for determinism."""
+is mocked for determinism.
+"""
+
 import asyncio
 import json
 import warnings
@@ -19,11 +21,11 @@ async def _read_sse(response, max_events=10):
     events = []
     try:
         async for line in response.content:
-            line_str = line.decode('utf-8').strip() if isinstance(line, bytes) else line.strip()
+            line_str = line.decode("utf-8").strip() if isinstance(line, bytes) else line.strip()
             if not line_str:
                 continue
             if line_str.startswith("data:"):
-                body = line_str[len("data:"):].strip()
+                body = line_str[len("data:") :].strip()
                 if body == "[DONE]":
                     events.append({"__done__": True})
                     break
@@ -40,7 +42,7 @@ async def _read_sse(response, max_events=10):
                 if not line:
                     continue
                 if line.startswith("data:"):
-                    body = line[len("data:"):].strip()
+                    body = line[len("data:") :].strip()
                     if body == "[DONE]":
                         events.append({"__done__": True})
                         break
@@ -78,11 +80,14 @@ async def test_sse_replays_existing_trace(client, workspace):
     rid = "aaaaaaaaaaaa"
     p = workspace / ".arc" / "traces" / f"{rid}.jsonl"
     p.write_text(
-        json.dumps({"type": "RUN_STARTED", "runId": rid, "timestamp": 1, "seq": 0}) + "\n"
-        + json.dumps({"type": "TEXT_MESSAGE_CHUNK", "delta": "a", "timestamp": 2, "seq": 1}) + "\n"
-        + json.dumps({"type": "RUN_FINISHED", "runId": rid, "timestamp": 3, "seq": 2}) + "\n"
+        json.dumps({"type": "RUN_STARTED", "runId": rid, "timestamp": 1, "seq": 0})
+        + "\n"
+        + json.dumps({"type": "TEXT_MESSAGE_CHUNK", "delta": "a", "timestamp": 2, "seq": 1})
+        + "\n"
+        + json.dumps({"type": "RUN_FINISHED", "runId": rid, "timestamp": 3, "seq": 2})
+        + "\n"
     )
-    
+
     for path in (f"/runs/{rid}/events", f"/api/runs/{rid}/events"):
         try:
             r = await client.get(path)
@@ -115,7 +120,11 @@ async def test_live_sse_streams_active_local_run(client, app, workspace):
     broker = EventBroker(_store(workspace))
     broker.mark_active(run_id)
     with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message="Changing state of started or joined application is deprecated", category=DeprecationWarning)
+        warnings.filterwarnings(
+            "ignore",
+            message="Changing state of started or joined application is deprecated",
+            category=DeprecationWarning,
+        )
         app[EVENT_BROKER_KEY] = broker
 
     request_task = asyncio.create_task(client.get(f"/api/runs/{run_id}/events?mode=live"))

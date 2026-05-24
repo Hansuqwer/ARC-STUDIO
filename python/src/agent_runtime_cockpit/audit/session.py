@@ -36,7 +36,6 @@ from .schema import (
 )
 from .storage import AuditChainStore
 
-
 _REDACT_SENTINEL = "<redacted>"
 
 

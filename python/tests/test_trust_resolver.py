@@ -1,9 +1,9 @@
-"""
-Tests: Workspace trust resolver — ADR-006 trust status + execution enforcement.
+"""Tests: Workspace trust resolver — ADR-006 trust status + execution enforcement.
 
 Tests the external trust database, CLI commands, and the security
 guarantee that a committed .arc/trusted file does not self-authorize.
 """
+
 from __future__ import annotations
 
 import json
@@ -11,16 +11,16 @@ import json
 import pytest
 from typer.testing import CliRunner
 
+from agent_runtime_cockpit.cli import app
 from agent_runtime_cockpit.security.trust import (
+    TrustLevel,
+    WorkspaceUntrusted,
+    ensure_trusted,
+    list_trusted,
     resolve_trust,
     trust_workspace,
     untrust_workspace,
-    list_trusted,
-    ensure_trusted,
-    WorkspaceUntrusted,
-    TrustLevel,
 )
-from agent_runtime_cockpit.cli import app
 
 
 class TestTrustResolver:
@@ -93,55 +93,86 @@ class TestTrustCLI:
     """CLI commands for trust management."""
 
     def test_trust_status_untrusted(self, tmp_path):
-        result = CliRunner().invoke(app, [
-            "workspace", "trust-status",
-            "--workspace", str(tmp_path),
-            "--json",
-        ])
+        result = CliRunner().invoke(
+            app,
+            [
+                "workspace",
+                "trust-status",
+                "--workspace",
+                str(tmp_path),
+                "--json",
+            ],
+        )
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)["data"]
         assert data["level"] == "untrusted"
 
     def test_trust_then_status(self, tmp_path):
         # Mark as trusted
-        trust_result = CliRunner().invoke(app, [
-            "workspace", "trust",
-            "--workspace", str(tmp_path),
-            "--note", "test workspace",
-            "--json",
-        ])
+        trust_result = CliRunner().invoke(
+            app,
+            [
+                "workspace",
+                "trust",
+                "--workspace",
+                str(tmp_path),
+                "--note",
+                "test workspace",
+                "--json",
+            ],
+        )
         assert trust_result.exit_code == 0, trust_result.output
         assert json.loads(trust_result.output)["data"]["level"] == "trusted"
 
         # Check status
-        status_result = CliRunner().invoke(app, [
-            "workspace", "trust-status",
-            "--workspace", str(tmp_path),
-            "--json",
-        ])
+        status_result = CliRunner().invoke(
+            app,
+            [
+                "workspace",
+                "trust-status",
+                "--workspace",
+                str(tmp_path),
+                "--json",
+            ],
+        )
         assert status_result.exit_code == 0, status_result.output
         assert json.loads(status_result.output)["data"]["level"] == "trusted"
 
     def test_untrust(self, tmp_path):
         # Trust first
-        CliRunner().invoke(app, [
-            "workspace", "trust",
-            "--workspace", str(tmp_path),
-            "--json",
-        ])
+        CliRunner().invoke(
+            app,
+            [
+                "workspace",
+                "trust",
+                "--workspace",
+                str(tmp_path),
+                "--json",
+            ],
+        )
         # Then untrust
-        untrust_result = CliRunner().invoke(app, [
-            "workspace", "untrust",
-            "--workspace", str(tmp_path),
-            "--json",
-        ])
+        untrust_result = CliRunner().invoke(
+            app,
+            [
+                "workspace",
+                "untrust",
+                "--workspace",
+                str(tmp_path),
+                "--json",
+            ],
+        )
         assert untrust_result.exit_code == 0, untrust_result.output
         assert json.loads(untrust_result.output)["data"]["level"] == "untrusted"
 
         # Verify untrusted
-        status_result = CliRunner().invoke(app, [
-            "workspace", "trust-status",
-            "--workspace", str(tmp_path),
-            "--json",
-        ])
+        status_result = CliRunner().invoke(
+            app,
+            [
+                "workspace",
+                "trust-status",
+                "--workspace",
+                str(tmp_path),
+                "--json",
+            ],
+        )
         assert json.loads(status_result.output)["data"]["level"] == "untrusted"

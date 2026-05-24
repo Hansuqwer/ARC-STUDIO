@@ -1,10 +1,10 @@
-"""
-Tests: Adoption protocol skeleton (P1b) + LangGraph runner (P2).
+"""Tests: Adoption protocol skeleton (P1b) + LangGraph runner (P2).
 
 Tests the Pydantic models, registry, and runner.
 LangGraph runner is auto-registered and reports RUNNABLE when
 LangGraph is installed.
 """
+
 from __future__ import annotations
 
 import os
@@ -12,15 +12,15 @@ import os
 import pytest
 
 from agent_runtime_cockpit.adoption import (
-    AdoptionMode,
-    AdoptionSpec,
-    WorkerTask,
-    WorkerProposal,
-    Vote,
-    ConsensusResult,
-    AdoptionStatus,
     AdoptionCapability,
+    AdoptionMode,
     AdoptionRegistry,
+    AdoptionSpec,
+    AdoptionStatus,
+    ConsensusResult,
+    Vote,
+    WorkerProposal,
+    WorkerTask,
 )
 
 
@@ -120,8 +120,10 @@ class TestAdoptionRegistry:
         """Non-LangGraph modes should still report NOT_IMPLEMENTED."""
         caps = AdoptionRegistry.list_capabilities(tmp_path)
         other_modes = [
-            c for c in caps
-            if c.mode not in {
+            c
+            for c in caps
+            if c.mode
+            not in {
                 AdoptionMode.LANGGRAPH,
                 AdoptionMode.AG2,
                 AdoptionMode.CREWAI,
@@ -191,6 +193,7 @@ class TestLangGraphRunner:
         from agent_runtime_cockpit.adoption.langgraph_runner import (
             LangGraphAdoptionRunner,
         )
+
         runner = LangGraphAdoptionRunner()
         cap = runner.check_availability(tmp_path)
         assert cap.status == AdoptionStatus.RUNNABLE
@@ -201,6 +204,7 @@ class TestLangGraphRunner:
         from agent_runtime_cockpit.adoption.langgraph_runner import (
             LangGraphAdoptionRunner,
         )
+
         runner = LangGraphAdoptionRunner()
         assert runner.mode == AdoptionMode.LANGGRAPH
 
@@ -229,6 +233,7 @@ class TestLangGraphRunner:
         from agent_runtime_cockpit.adoption.langgraph_runner import (
             LangGraphAdoptionRunner,
         )
+
         runner = LangGraphAdoptionRunner()
 
         events: list[tuple[str, dict]] = []
@@ -261,7 +266,8 @@ class TestLangGraphRunner:
         assert "WORKER_COMPLETED" in event_types
         assert "RUN_COMPLETED" in event_types
         consensus_events = [
-            data for event_type, data in events
+            data
+            for event_type, data in events
             if event_type == "STEP_COMPLETED" and data.get("step") == "consensus"
         ]
         assert consensus_events[-1]["swarmgraph"] is True
@@ -270,6 +276,7 @@ class TestLangGraphRunner:
         from agent_runtime_cockpit.adoption.langgraph_runner import (
             LangGraphAdoptionRunner,
         )
+
         runner = LangGraphAdoptionRunner()
         import asyncio
 
@@ -308,6 +315,7 @@ class TestLangGraphRunner:
         from agent_runtime_cockpit.adoption.langgraph_runner import (
             LangGraphAdoptionRunner,
         )
+
         runner = LangGraphAdoptionRunner()
 
         spec = AdoptionSpec(
@@ -336,20 +344,23 @@ class TestLangGraphRunner:
         runner = LangGraphAdoptionRunner()
 
         def fake_decompose(objective, graph_input, max_workers, run_id):
-            return ([
-                {
-                    "task_id": "task-1",
-                    "worker_id": "worker-1",
-                    "role": "analyst",
-                    "input": {**graph_input, "swarmgraph_task": "analyze"},
-                },
-                {
-                    "task_id": "task-2",
-                    "worker_id": "worker-2",
-                    "role": "reviewer",
-                    "input": {**graph_input, "swarmgraph_task": "review"},
-                },
-            ], object())
+            return (
+                [
+                    {
+                        "task_id": "task-1",
+                        "worker_id": "worker-1",
+                        "role": "analyst",
+                        "input": {**graph_input, "swarmgraph_task": "analyze"},
+                    },
+                    {
+                        "task_id": "task-2",
+                        "worker_id": "worker-2",
+                        "role": "reviewer",
+                        "input": {**graph_input, "swarmgraph_task": "review"},
+                    },
+                ],
+                object(),
+            )
 
         monkeypatch.setattr(runner, "_queen_decompose", fake_decompose)
 
@@ -404,6 +415,7 @@ class TestLangGraphRunner:
     @pytest.mark.asyncio
     async def test_runner_emits_swarmgraph_cost_from_measured_metadata_only(self):
         import re
+
         from agent_runtime_cockpit.adoption.langgraph_runner import (
             LangGraphAdoptionRunner,
         )
@@ -627,7 +639,9 @@ class TestLangGraphRunner:
         monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
         events: list[tuple[str, dict]] = []
 
-        with pytest.raises(PermissionError, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
+        with pytest.raises(
+            PermissionError, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"
+        ):
             await LangGraphAdoptionRunner().run(
                 AdoptionSpec(
                     mode=AdoptionMode.LANGGRAPH,
@@ -637,20 +651,22 @@ class TestLangGraphRunner:
                 lambda run_id, event_type, data: events.append((event_type, data)),
             )
 
-        assert events == [(
-            "RUN_FAILED",
-            {
-                "error": (
-                    "LangGraph+SwarmGraph local-real mode requires "
-                    "ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1; "
-                    "no provider calls were made."
-                ),
-                "mode": "langgraph+swarmgraph",
-                "runtime_mode": "local-real",
-                "real_provider_call": False,
-                "provider_backed": False,
-            },
-        )]
+        assert events == [
+            (
+                "RUN_FAILED",
+                {
+                    "error": (
+                        "LangGraph+SwarmGraph local-real mode requires "
+                        "ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1; "
+                        "no provider calls were made."
+                    ),
+                    "mode": "langgraph+swarmgraph",
+                    "runtime_mode": "local-real",
+                    "real_provider_call": False,
+                    "provider_backed": False,
+                },
+            )
+        ]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -676,7 +692,9 @@ class TestLangGraphRunner:
         else:
             monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", langgraph_swarmgraph_real)
 
-        with pytest.raises(PermissionError, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
+        with pytest.raises(
+            PermissionError, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"
+        ):
             await LangGraphAdoptionRunner().run(
                 AdoptionSpec(
                     mode=AdoptionMode.LANGGRAPH,
@@ -704,12 +722,17 @@ class TestLangGraphRunner:
         monkeypatch.setattr(
             runner,
             "_queen_decompose",
-            lambda objective, graph_input, max_workers, run_id: ([{
-                "task_id": "task-1",
-                "worker_id": "worker-1",
-                "role": "worker",
-                "input": {**graph_input, "swarmgraph_task": "local task"},
-            }], object()),
+            lambda objective, graph_input, max_workers, run_id: (
+                [
+                    {
+                        "task_id": "task-1",
+                        "worker_id": "worker-1",
+                        "role": "worker",
+                        "input": {**graph_input, "swarmgraph_task": "local task"},
+                    }
+                ],
+                object(),
+            ),
         )
         monkeypatch.setattr(
             runner,
@@ -717,13 +740,15 @@ class TestLangGraphRunner:
             lambda swarm_state, proposals: ConsensusResult(
                 task_id=proposals[0].task_id,
                 winning_proposal=proposals[0],
-                votes=[Vote(
-                    task_id=proposals[0].task_id,
-                    voter_id=proposals[0].worker_id,
-                    proposal_id="task-1-worker-1",
-                    score=1.0,
-                    reason="local test vote",
-                )],
+                votes=[
+                    Vote(
+                        task_id=proposals[0].task_id,
+                        voter_id=proposals[0].worker_id,
+                        proposal_id="task-1-worker-1",
+                        score=1.0,
+                        reason="local test vote",
+                    )
+                ],
                 consensus_reached=True,
                 confidence=1.0,
             ),
@@ -749,7 +774,9 @@ class TestLangGraphRunner:
         assert result.winning_proposal.metadata["runtime_mode"] == "local-real"
         assert result.winning_proposal.metadata["real_provider_call"] is False
         assert result.winning_proposal.metadata["provider_backed"] is False
-        consensus = [data for event_type, data in events if event_type == "SWARMGRAPH_CONSENSUS"][-1]
+        consensus = [data for event_type, data in events if event_type == "SWARMGRAPH_CONSENSUS"][
+            -1
+        ]
         completed = [data for event_type, data in events if event_type == "RUN_COMPLETED"][-1]
         assert consensus["runtime_mode"] == "local-real"
         assert consensus["real_provider_call"] is False
@@ -779,12 +806,17 @@ class TestLangGraphRunner:
         monkeypatch.setattr(
             runner,
             "_queen_decompose",
-            lambda objective, graph_input, max_workers, run_id: ([{
-                "task_id": "task-1",
-                "worker_id": "worker-1",
-                "role": "worker",
-                "input": {**graph_input, "swarmgraph_task": "local task"},
-            }], object()),
+            lambda objective, graph_input, max_workers, run_id: (
+                [
+                    {
+                        "task_id": "task-1",
+                        "worker_id": "worker-1",
+                        "role": "worker",
+                        "input": {**graph_input, "swarmgraph_task": "local task"},
+                    }
+                ],
+                object(),
+            ),
         )
 
         def provider_backed_consensus(swarm_state, proposals):
@@ -826,7 +858,9 @@ class TestAG2Runner:
 
         class _Resp:
             def __aiter__(self):
-                self._events = iter([_Event("agent-a", "proposal one"), _Event("agent-b", "proposal one")])
+                self._events = iter(
+                    [_Event("agent-a", "proposal one"), _Event("agent-b", "proposal one")]
+                )
                 return self
 
             async def __anext__(self):
@@ -858,7 +892,11 @@ class TestAG2Runner:
         assert result.confidence > 0
         assert len(result.votes) == 2
         assert result.winning_proposal.output == "proposal one"
-        assert any(data.get("swarmgraph") is True for event_type, data in events if event_type == "STEP_COMPLETED")
+        assert any(
+            data.get("swarmgraph") is True
+            for event_type, data in events
+            if event_type == "STEP_COMPLETED"
+        )
 
     @pytest.mark.asyncio
     async def test_ag2_runner_requires_team(self):
@@ -890,14 +928,20 @@ class TestCrewAIRunner:
 
         events: list[tuple[str, dict]] = []
         result = await CrewAIAdoptionRunner().run(
-            AdoptionSpec(mode=AdoptionMode.CREWAI, runtime_config={"crew": _Crew(), "inputs": {"topic": "x"}}),
+            AdoptionSpec(
+                mode=AdoptionMode.CREWAI, runtime_config={"crew": _Crew(), "inputs": {"topic": "x"}}
+            ),
             "crew-run",
             lambda run_id, event_type, data: events.append((event_type, data)),
         )
 
         assert result.consensus_reached is True
         assert result.winning_proposal.output == "crew task result"
-        assert any(data.get("swarmgraph") is True for event_type, data in events if event_type == "STEP_COMPLETED")
+        assert any(
+            data.get("swarmgraph") is True
+            for event_type, data in events
+            if event_type == "STEP_COMPLETED"
+        )
 
     @pytest.mark.asyncio
     async def test_crewai_runner_requires_crew(self):
@@ -929,14 +973,21 @@ class TestOpenAIAgentsRunner:
 
         events: list[tuple[str, dict]] = []
         result = await OpenAIAgentsAdoptionRunner().run(
-            AdoptionSpec(mode=AdoptionMode.OPENAI_AGENTS, runtime_config={"agent": _Agent(), "prompt": "x", "runner": _Runner}),
+            AdoptionSpec(
+                mode=AdoptionMode.OPENAI_AGENTS,
+                runtime_config={"agent": _Agent(), "prompt": "x", "runner": _Runner},
+            ),
             "oa-run",
             lambda run_id, event_type, data: events.append((event_type, data)),
         )
 
         assert result.consensus_reached is True
         assert result.winning_proposal.output == "agent result"
-        assert any(data.get("swarmgraph") is True for event_type, data in events if event_type == "STEP_COMPLETED")
+        assert any(
+            data.get("swarmgraph") is True
+            for event_type, data in events
+            if event_type == "STEP_COMPLETED"
+        )
 
     @pytest.mark.asyncio
     async def test_openai_agents_runner_requires_agent(self):
@@ -964,14 +1015,21 @@ class TestLlamaIndexRunner:
 
         events: list[tuple[str, dict]] = []
         result = await LlamaIndexAdoptionRunner().run(
-            AdoptionSpec(mode=AdoptionMode.LLAMAINDEX, runtime_config={"query_engine": _QueryEngine(), "query": "x"}),
+            AdoptionSpec(
+                mode=AdoptionMode.LLAMAINDEX,
+                runtime_config={"query_engine": _QueryEngine(), "query": "x"},
+            ),
             "li-run",
             lambda run_id, event_type, data: events.append((event_type, data)),
         )
 
         assert result.consensus_reached is True
         assert result.winning_proposal.output == "llama answer"
-        assert any(data.get("swarmgraph") is True for event_type, data in events if event_type == "STEP_COMPLETED")
+        assert any(
+            data.get("swarmgraph") is True
+            for event_type, data in events
+            if event_type == "STEP_COMPLETED"
+        )
 
     @pytest.mark.asyncio
     async def test_llamaindex_runner_requires_target(self):

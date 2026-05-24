@@ -2,7 +2,6 @@ import pytest
 
 from agent_runtime_cockpit.protocol.evidence_refs import EvidenceKind, EvidenceRef
 
-
 EV_ID = "ev_01JDEADBEEF1234567890"
 
 

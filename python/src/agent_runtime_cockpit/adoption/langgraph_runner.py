@@ -1,14 +1,14 @@
-"""
-LangGraph + SwarmGraph adoption runner baseline (P2).
+"""LangGraph + SwarmGraph adoption runner baseline (P2).
 
 Executes a compiled LangGraph graph as SwarmGraph-decomposed worker tasks,
 then runs vendored SwarmGraph consensus over worker proposals. HMAC audit
 remains separate; this runner does not claim signed adoption audit.
 """
+
 from __future__ import annotations
 
-import logging
 import importlib.util
+import logging
 import os
 import sys
 import time
@@ -18,14 +18,14 @@ from pathlib import Path
 from typing import Any, AsyncIterator
 
 from .protocol import (
-    AdoptionMode,
-    AdoptionSpec,
     AdoptionCapability,
-    AdoptionStatus,
+    AdoptionMode,
     AdoptionRunner,
+    AdoptionSpec,
+    AdoptionStatus,
     ConsensusResult,
-    WorkerProposal,
     Vote,
+    WorkerProposal,
 )
 
 log = logging.getLogger(__name__)
@@ -37,11 +37,17 @@ _LOCAL_REAL_GATE_ENV = "ARC_LANGGRAPH_SWARMGRAPH_REAL"
 # SwarmGraph vendored packages path
 _SWARM_SHARED_PATH = (
     Path(__file__).resolve().parent.parent.parent.parent.parent
-    / "runtimes" / "swarmgraph" / "packages" / "swarm-shared"
+    / "runtimes"
+    / "swarmgraph"
+    / "packages"
+    / "swarm-shared"
 )
 _HIVE_SWARM_PATH = (
     Path(__file__).resolve().parent.parent.parent.parent.parent
-    / "runtimes" / "swarmgraph" / "packages" / "hive-swarm"
+    / "runtimes"
+    / "swarmgraph"
+    / "packages"
+    / "hive-swarm"
 )
 
 
@@ -90,11 +96,13 @@ class LangGraphAdoptionRunner(AdoptionRunner):
                 mode=self.mode,
                 status=AdoptionStatus.NOT_RUNNABLE,
                 reason="LangGraph package not installed.",
-                doctor_actions=[{
-                    "id": "install-langgraph",
-                    "label": "Install LangGraph",
-                    "description": "Install LangGraph with: pip install langgraph",
-                }],
+                doctor_actions=[
+                    {
+                        "id": "install-langgraph",
+                        "label": "Install LangGraph",
+                        "description": "Install LangGraph with: pip install langgraph",
+                    }
+                ],
             )
 
     async def run(
@@ -116,25 +124,28 @@ class LangGraphAdoptionRunner(AdoptionRunner):
         4. Invoke the LangGraph graph once per assigned task.
         5. Use vendored SwarmGraph consensus over worker votes.
         """
-        offline_deterministic = (
-            spec.runtime_config.get("offline_deterministic") is True
-            or (spec.runtime_config.get("offline") is True and spec.runtime_config.get("fake") is True)
+        offline_deterministic = spec.runtime_config.get("offline_deterministic") is True or (
+            spec.runtime_config.get("offline") is True and spec.runtime_config.get("fake") is True
         )
         local_real = self._is_local_real(spec)
         if local_real:
             emit_event = self._local_no_provider_emit(emit_event)
         if local_real and not self._local_real_gate_open():
-            emit_event(run_id, "RUN_FAILED", {
-                "error": (
-                    "LangGraph+SwarmGraph local-real mode requires "
-                    f"{_REAL_RUNTIME_SMOKE_ENV}=1 and {_LOCAL_REAL_GATE_ENV}=1; "
-                    "no provider calls were made."
-                ),
-                "mode": self.mode.value,
-                "runtime_mode": _LOCAL_REAL_MODE,
-                "real_provider_call": False,
-                "provider_backed": False,
-            })
+            emit_event(
+                run_id,
+                "RUN_FAILED",
+                {
+                    "error": (
+                        "LangGraph+SwarmGraph local-real mode requires "
+                        f"{_REAL_RUNTIME_SMOKE_ENV}=1 and {_LOCAL_REAL_GATE_ENV}=1; "
+                        "no provider calls were made."
+                    ),
+                    "mode": self.mode.value,
+                    "runtime_mode": _LOCAL_REAL_MODE,
+                    "real_provider_call": False,
+                    "provider_backed": False,
+                },
+            )
             raise PermissionError(
                 "LangGraph+SwarmGraph local-real mode requires "
                 f"{_REAL_RUNTIME_SMOKE_ENV}=1 and {_LOCAL_REAL_GATE_ENV}=1; "
@@ -142,13 +153,17 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             )
         if not offline_deterministic:
             _setup_swarmgraph_paths()
-        emit_event(run_id, "STEP_STARTED", {
-            "step": "load_graph",
-            "mode": self.mode.value,
-            "runtime_mode": _LOCAL_REAL_MODE if local_real else None,
-            "real_provider_call": False,
-            "provider_backed": False,
-        })
+        emit_event(
+            run_id,
+            "STEP_STARTED",
+            {
+                "step": "load_graph",
+                "mode": self.mode.value,
+                "runtime_mode": _LOCAL_REAL_MODE if local_real else None,
+                "real_provider_call": False,
+                "provider_backed": False,
+            },
+        )
 
         graph = spec.runtime_config.get("graph")
         if graph is None and offline_deterministic:
@@ -158,11 +173,15 @@ class LangGraphAdoptionRunner(AdoptionRunner):
                 or self.mode.value
             )
         if graph is None:
-            emit_event(run_id, "RUN_FAILED", {
-                "error": "No LangGraph graph provided. "
-                         "Pass a compiled graph via spec.runtime_config['graph'].",
-                "mode": self.mode.value,
-            })
+            emit_event(
+                run_id,
+                "RUN_FAILED",
+                {
+                    "error": "No LangGraph graph provided. "
+                    "Pass a compiled graph via spec.runtime_config['graph'].",
+                    "mode": self.mode.value,
+                },
+            )
             raise ValueError(
                 "No LangGraph graph provided. "
                 "Pass a compiled graph via spec.runtime_config['graph']."
@@ -170,17 +189,25 @@ class LangGraphAdoptionRunner(AdoptionRunner):
 
         graph_input = spec.runtime_config.get("input", {})
         max_workers = spec.max_workers
-        emit_event(run_id, "STEP_COMPLETED", {
-            "step": "load_graph",
-            "graph_type": type(graph).__name__,
-            "max_workers": max_workers,
-        })
+        emit_event(
+            run_id,
+            "STEP_COMPLETED",
+            {
+                "step": "load_graph",
+                "graph_type": type(graph).__name__,
+                "max_workers": max_workers,
+            },
+        )
 
         # ── Queen plan ────────────────────────────────────────────────
-        emit_event(run_id, "STEP_STARTED", {
-            "step": "queen_plan",
-            "description": "Using vendored SwarmGraph queen decomposition",
-        })
+        emit_event(
+            run_id,
+            "STEP_STARTED",
+            {
+                "step": "queen_plan",
+                "description": "Using vendored SwarmGraph queen decomposition",
+            },
+        )
 
         objective = str(spec.runtime_config.get("objective") or graph_input or spec.mode.value)
         if offline_deterministic:
@@ -193,19 +220,27 @@ class LangGraphAdoptionRunner(AdoptionRunner):
                 run_id=run_id,
             )
         emit_event(run_id, "SWARMGRAPH_TOPOLOGY", self._topology_payload(tasks))
-        emit_event(run_id, "STEP_COMPLETED", {
-            "step": "queen_plan",
-            "num_tasks": len(tasks),
-            "swarmgraph": True,
-        })
+        emit_event(
+            run_id,
+            "STEP_COMPLETED",
+            {
+                "step": "queen_plan",
+                "num_tasks": len(tasks),
+                "swarmgraph": True,
+            },
+        )
 
         # ── Execute ────────────────────────────────────────────────────
         worker_proposals: list[WorkerProposal] = []
         for task in tasks:
-            emit_event(run_id, "WORKER_RUNNING", {
-                "task_id": task["task_id"],
-                "worker_id": task["worker_id"],
-            })
+            emit_event(
+                run_id,
+                "WORKER_RUNNING",
+                {
+                    "task_id": task["task_id"],
+                    "worker_id": task["worker_id"],
+                },
+            )
 
             worker_output = await self._run_graph(graph, task["input"], run_id, emit_event)
 
@@ -217,25 +252,37 @@ class LangGraphAdoptionRunner(AdoptionRunner):
                 metadata={
                     "runtime": "langgraph",
                     "swarmgraph_role": task.get("role", "worker"),
-                    "runtime_mode": _LOCAL_REAL_MODE if local_real else "fake/offline" if offline_deterministic else "gated",
+                    "runtime_mode": _LOCAL_REAL_MODE
+                    if local_real
+                    else "fake/offline"
+                    if offline_deterministic
+                    else "gated",
                     "real_provider_call": False,
                     "provider_backed": False,
                 },
             )
             worker_proposals.append(proposal)
 
-            emit_event(run_id, "WORKER_COMPLETED", {
-                "task_id": task["task_id"],
-                "worker_id": task["worker_id"],
-                "output_length": len(worker_output),
-            })
+            emit_event(
+                run_id,
+                "WORKER_COMPLETED",
+                {
+                    "task_id": task["task_id"],
+                    "worker_id": task["worker_id"],
+                    "output_length": len(worker_output),
+                },
+            )
 
         # ── SwarmGraph consensus ───────────────────────────────────────
-        emit_event(run_id, "STEP_STARTED", {
-            "step": "consensus",
-            "num_proposals": len(worker_proposals),
-            "swarmgraph": True,
-        })
+        emit_event(
+            run_id,
+            "STEP_STARTED",
+            {
+                "step": "consensus",
+                "num_proposals": len(worker_proposals),
+                "swarmgraph": True,
+            },
+        )
 
         result = (
             self._offline_consensus(worker_proposals)
@@ -249,32 +296,44 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             raise RuntimeError(
                 "LangGraph+SwarmGraph local-real path cannot claim provider-backed calls"
             )
-        result.metadata.update({
-            "runtime_mode": _LOCAL_REAL_MODE if local_real else result.metadata.get("runtime_mode", "gated"),
-            "real_provider_call": False,
-            "provider_backed": False,
-        })
+        result.metadata.update(
+            {
+                "runtime_mode": _LOCAL_REAL_MODE
+                if local_real
+                else result.metadata.get("runtime_mode", "gated"),
+                "real_provider_call": False,
+                "provider_backed": False,
+            }
+        )
         emit_event(run_id, "SWARMGRAPH_CONSENSUS", self._consensus_payload(result))
         cost_payload = self._measured_cost_payload(spec.runtime_config)
         if cost_payload is not None:
             emit_event(run_id, "SWARMGRAPH_COST", cost_payload)
 
-        emit_event(run_id, "STEP_COMPLETED", {
-            "step": "consensus",
-            "consensus_reached": True,
-            "confidence": result.confidence,
-            "votes": len(result.votes),
-            "swarmgraph": True,
-        })
+        emit_event(
+            run_id,
+            "STEP_COMPLETED",
+            {
+                "step": "consensus",
+                "consensus_reached": True,
+                "confidence": result.confidence,
+                "votes": len(result.votes),
+                "swarmgraph": True,
+            },
+        )
 
-        emit_event(run_id, "RUN_COMPLETED", {
-            "task_id": result.task_id,
-            "consensus_reached": result.consensus_reached,
-            "confidence": result.confidence,
-            "runtime_mode": result.metadata.get("runtime_mode"),
-            "real_provider_call": False,
-            "provider_backed": False,
-        })
+        emit_event(
+            run_id,
+            "RUN_COMPLETED",
+            {
+                "task_id": result.task_id,
+                "consensus_reached": result.consensus_reached,
+                "confidence": result.confidence,
+                "runtime_mode": result.metadata.get("runtime_mode"),
+                "real_provider_call": False,
+                "provider_backed": False,
+            },
+        )
 
         return result
 
@@ -316,15 +375,17 @@ class LangGraphAdoptionRunner(AdoptionRunner):
         tasks = []
         for index in range(max(1, max_workers)):
             worker_id = f"worker-{index + 1}"
-            tasks.append({
-                "task_id": f"task-{index + 1}",
-                "worker_id": worker_id,
-                "role": "worker",
-                "input": {
-                    **graph_input,
-                    "swarmgraph_task": f"fake/offline deterministic task {index + 1}: {objective}",
-                },
-            })
+            tasks.append(
+                {
+                    "task_id": f"task-{index + 1}",
+                    "worker_id": worker_id,
+                    "role": "worker",
+                    "input": {
+                        **graph_input,
+                        "swarmgraph_task": f"fake/offline deterministic task {index + 1}: {objective}",
+                    },
+                }
+            )
         return tasks, {"objective": objective, "offline_deterministic": True}
 
     def _offline_consensus(self, proposals: list[WorkerProposal]) -> ConsensusResult:
@@ -345,7 +406,11 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             votes=votes,
             consensus_reached=True,
             confidence=1.0,
-            metadata={"runtime_mode": "fake/offline", "real_provider_call": False, "provider_backed": False},
+            metadata={
+                "runtime_mode": "fake/offline",
+                "real_provider_call": False,
+                "provider_backed": False,
+            },
         )
 
     def _topology_payload(self, tasks: list[dict[str, Any]]) -> dict[str, Any]:
@@ -356,11 +421,13 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             worker_id = str(task["worker_id"])
             if worker_id not in seen_workers:
                 seen_workers.add(worker_id)
-                nodes.append({
-                    "id": worker_id,
-                    "role": str(task.get("role") or "worker"),
-                    "label": worker_id,
-                })
+                nodes.append(
+                    {
+                        "id": worker_id,
+                        "role": str(task.get("role") or "worker"),
+                        "label": worker_id,
+                    }
+                )
                 edges.append({"source": "queen", "target": worker_id, "type": "assignment"})
         return {"nodes": nodes, "edges": edges, "source": "langgraph+swarmgraph"}
 
@@ -430,14 +497,23 @@ class LangGraphAdoptionRunner(AdoptionRunner):
         for task in swarm_state.tasks:
             assigned = task.assigned_to or task.task_id
             agent = next((item for item in swarm_state.agents if item.agent_id == assigned), None)
-            tasks.append({
-                "task_id": task.task_id,
-                "worker_id": assigned,
-                "role": agent.role if agent else "worker",
-                "input": {**graph_input, "swarmgraph_task": task.description},
-            })
+            tasks.append(
+                {
+                    "task_id": task.task_id,
+                    "worker_id": assigned,
+                    "role": agent.role if agent else "worker",
+                    "input": {**graph_input, "swarmgraph_task": task.description},
+                }
+            )
         if not tasks:
-            tasks.append({"task_id": "task-1", "worker_id": "worker-1", "role": "worker", "input": graph_input})
+            tasks.append(
+                {
+                    "task_id": "task-1",
+                    "worker_id": "worker-1",
+                    "role": "worker",
+                    "input": graph_input,
+                }
+            )
         return tasks, swarm_state
 
     def _swarmgraph_consensus(
@@ -451,18 +527,24 @@ class LangGraphAdoptionRunner(AdoptionRunner):
         from swarm.nodes.consensus import consensus_node
 
         for proposal in proposals:
-            swarm_state.pending_votes.append(AgentVote(
-                agent_id=proposal.worker_id,
-                agent_role=proposal.metadata.get("swarmgraph_role", "coder"),
-                proposed_action=proposal.output[:2048] or "No output",
-                confidence=proposal.confidence,
-                rationale="LangGraph adoption worker proposal",
-            ))
+            swarm_state.pending_votes.append(
+                AgentVote(
+                    agent_id=proposal.worker_id,
+                    agent_role=proposal.metadata.get("swarmgraph_role", "coder"),
+                    proposed_action=proposal.output[:2048] or "No output",
+                    confidence=proposal.confidence,
+                    rationale="LangGraph adoption worker proposal",
+                )
+            )
         final = SwarmState.from_json_dict(consensus_node(swarm_state.to_json_dict()))
         winning = proposals[0]
         if final.consensus_result and final.consensus_result.action:
             winning = next(
-                (proposal for proposal in proposals if proposal.output[:2048] == final.consensus_result.action),
+                (
+                    proposal
+                    for proposal in proposals
+                    if proposal.output[:2048] == final.consensus_result.action
+                ),
                 winning,
             )
         votes = [
@@ -476,8 +558,7 @@ class LangGraphAdoptionRunner(AdoptionRunner):
             for proposal in proposals
         ]
         agreement = (
-            final.consensus_result.agreement_fraction
-            if final.consensus_result is not None else 0.0
+            final.consensus_result.agreement_fraction if final.consensus_result is not None else 0.0
         )
         return ConsensusResult(
             task_id=winning.task_id,
@@ -499,15 +580,20 @@ class LangGraphAdoptionRunner(AdoptionRunner):
         Handles both sync and async graphs.  Attempts to use
         ``astream_events`` (v2) when available for fine-grained events.
         """
-        emit_event(run_id, "WORKER_EVENT", {
-            "message": "Invoking LangGraph graph",
-        })
+        emit_event(
+            run_id,
+            "WORKER_EVENT",
+            {
+                "message": "Invoking LangGraph graph",
+            },
+        )
 
         t0 = time.time()
 
         try:
             # Try async invocation first
             import inspect
+
             if inspect.isasyncgenfunction(getattr(graph, "astream_events", None)):
                 output = await self._run_async_stream(graph, input_data, run_id, emit_event)
             elif inspect.iscoroutinefunction(getattr(graph, "ainvoke", None)):
@@ -517,16 +603,24 @@ class LangGraphAdoptionRunner(AdoptionRunner):
                 result = graph.invoke(input_data)
                 output = str(result) if result is not None else ""
         except Exception as exc:
-            emit_event(run_id, "RUN_FAILED", {
-                "error": f"LangGraph execution error: {exc}",
-            })
+            emit_event(
+                run_id,
+                "RUN_FAILED",
+                {
+                    "error": f"LangGraph execution error: {exc}",
+                },
+            )
             raise
 
         elapsed = time.time() - t0
-        emit_event(run_id, "WORKER_EVENT", {
-            "message": f"Graph completed in {elapsed:.2f}s",
-            "output_length": len(output),
-        })
+        emit_event(
+            run_id,
+            "WORKER_EVENT",
+            {
+                "message": f"Graph completed in {elapsed:.2f}s",
+                "output_length": len(output),
+            },
+        )
 
         return output
 
@@ -551,10 +645,14 @@ class LangGraphAdoptionRunner(AdoptionRunner):
                     metadata = event.get("metadata", {})
                     langgraph_node = metadata.get("langgraph_node", "")
                     if langgraph_node:
-                        emit_event(run_id, "WORKER_EVENT", {
-                            "message": f"Node: {langgraph_node}",
-                            "node": langgraph_node,
-                        })
+                        emit_event(
+                            run_id,
+                            "WORKER_EVENT",
+                            {
+                                "message": f"Node: {langgraph_node}",
+                                "node": langgraph_node,
+                            },
+                        )
         except Exception:
             # Fallback to simple invoke if streaming fails
             result = await graph.ainvoke(input_data)

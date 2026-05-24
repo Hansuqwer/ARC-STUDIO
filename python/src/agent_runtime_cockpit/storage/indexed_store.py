@@ -1,4 +1,5 @@
 """Dual-write store: JSONL canonical + SQLite index (ADR-003)."""
+
 from __future__ import annotations
 
 import logging
@@ -8,10 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from ..protocol.schemas import RunRecord
 from ..protocol.failure_autopsy import FailureAutopsy
 from ..protocol.run_contract import RunContract
 from ..protocol.run_receipt import RunReceipt
+from ..protocol.schemas import RunRecord
 from .jsonl import JsonlTraceStore
 from .sqlite import SqliteStore
 

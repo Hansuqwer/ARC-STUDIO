@@ -1,5 +1,4 @@
-"""
-EventBroker — in-memory event pub/sub with SSE delivery (PR 19).
+"""EventBroker — in-memory event pub/sub with SSE delivery (PR 19).
 
 Uses a ring buffer for replay on reconnection and bounded
 ``asyncio.Queue`` per subscriber with a documented slow-client

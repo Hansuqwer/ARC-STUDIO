@@ -1,5 +1,4 @@
-"""
-Context7 Provider
+"""Context7 Provider.
 
 Retrieves current, version-specific library documentation via the Context7 API.
 Source: https://context7.com/docs/api-guide
@@ -9,8 +8,9 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
 from pathlib import Path
+from typing import Optional
+
 from ...protocol.schemas import ContextPackEntry, SourceType
 
 log = logging.getLogger(__name__)

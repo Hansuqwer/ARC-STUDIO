@@ -1,16 +1,18 @@
 """Tests for the Arena service (stub mode)."""
+
 from pathlib import Path
-from agent_runtime_cockpit.arena.service import (
-    list_models,
-    list_tags,
-    arena_request,
-    store_arena_run,
-    adopt_candidate,
-)
+
 from agent_runtime_cockpit.arena.models import (
+    ArenaAdoptRequest,
     ArenaMode,
     ArenaRequest,
-    ArenaAdoptRequest,
+)
+from agent_runtime_cockpit.arena.service import (
+    adopt_candidate,
+    arena_request,
+    list_models,
+    list_tags,
+    store_arena_run,
 )
 from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
 
@@ -106,7 +108,9 @@ def test_live_arena_disabled_by_default():
     assert resp.mode == ArenaMode.DIRECT
     assert len(resp.candidates) == 1
     # Stub responses have a specific format
-    assert "stub" in resp.candidates[0].text.lower() or "response" in resp.candidates[0].text.lower()
+    assert (
+        "stub" in resp.candidates[0].text.lower() or "response" in resp.candidates[0].text.lower()
+    )
 
 
 def test_live_arena_enabled_missing_api_key_returns_warning(monkeypatch):

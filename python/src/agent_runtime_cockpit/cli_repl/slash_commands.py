@@ -1,26 +1,31 @@
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
+import inspect
 import os
 import signal
 import time
-import inspect
-import asyncio
-import concurrent.futures
 from dataclasses import dataclass, field
 from typing import Any, Callable, Coroutine, TypeVar
 
-from ..budget.schema import BudgetConfig, BudgetEnforcer, BudgetExceeded, BudgetState, ConfirmationRequired
+from ..budget.schema import (
+    BudgetConfig,
+    BudgetEnforcer,
+    BudgetExceeded,
+    BudgetState,
+    ConfirmationRequired,
+)
 from ..providers import AnthropicClient, preflight_with_estimator
-from ..tools import default_tool_registry
-from .commands import CommandDef, get_registry
-from .cancellation import Cancelled, CancellationReason, CancellationToken
-from .session import ChatSession
-from ..swarmgraph import SwarmGraphRunner
-from ..swarmgraph.config import SwarmGraphConfig
 from ..runtime.mode import RuntimeMode
 from ..runtime.registry import default_runtime_registry
 from ..runtime.turn_manager import TurnManager
-
+from ..swarmgraph import SwarmGraphRunner
+from ..swarmgraph.config import SwarmGraphConfig
+from ..tools import default_tool_registry
+from .cancellation import CancellationReason, CancellationToken, Cancelled
+from .commands import CommandDef, get_registry
+from .session import ChatSession
 
 T = TypeVar("T")
 
@@ -37,6 +42,7 @@ def _run_coro_sync(coro: Coroutine[Any, Any, T]) -> T:
 
     Returns:
         The result of the coroutine.
+
     """
     try:
         # Check if we're already in an event loop
@@ -69,143 +75,258 @@ def _build_registry():
         return registry  # Already initialized
 
     # ── Meta ──────────────────────────────────────────────────────────────
-    registry.register(CommandDef(
-        name="help",
-        help_text="Show this help message",
-        category="meta",
-        handler=cmd_help,
-        aliases=[],
-        gates_required=[],
-        mode_required=[],
-        renders=["present"],
-        requires_events=[],
-        privileged=False,
-        trust_required="user",
-    ))
-    registry.register(CommandDef(
-        name="version",
-        help_text="Show version info",
-        category="meta",
-        handler=cmd_version,
-        gates_required=[], mode_required=[], renders=["present"], requires_events=[], privileged=False, trust_required="user",
-    ))
-    registry.register(CommandDef(
-        name="exit",
-        help_text="Save session and exit",
-        category="meta",
-        handler=cmd_exit,
-        aliases=["quit"],
-        gates_required=[], mode_required=[], renders=["present"], requires_events=[], privileged=False, trust_required="user",
-    ))
+    registry.register(
+        CommandDef(
+            name="help",
+            help_text="Show this help message",
+            category="meta",
+            handler=cmd_help,
+            aliases=[],
+            gates_required=[],
+            mode_required=[],
+            renders=["present"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="version",
+            help_text="Show version info",
+            category="meta",
+            handler=cmd_version,
+            gates_required=[],
+            mode_required=[],
+            renders=["present"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="exit",
+            help_text="Save session and exit",
+            category="meta",
+            handler=cmd_exit,
+            aliases=["quit"],
+            gates_required=[],
+            mode_required=[],
+            renders=["present"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
 
     # ── Session ───────────────────────────────────────────────────────────
-    registry.register(CommandDef(
-        name="clear",
-        help_text="Clear session history",
-        category="session",
-        handler=cmd_clear,
-        gates_required=[], mode_required=[], renders=["present"], requires_events=[], privileged=False, trust_required="user",
-    ))
-    registry.register(CommandDef(
-        name="summary",
-        help_text="Show session summary",
-        category="session",
-        handler=cmd_summary,
-        gates_required=[], mode_required=[], renders=["present", "absent"], requires_events=[], privileged=False, trust_required="user",
-    ))
-    registry.register(CommandDef(
-        name="sessions",
-        help_text="List saved sessions",
-        category="session",
-        handler=cmd_sessions,
-        gates_required=[], mode_required=[], renders=["present", "absent"], requires_events=[], privileged=False, trust_required="user",
-    ))
-    registry.register(CommandDef(
-        name="history",
-        help_text="Show recent messages",
-        category="session",
-        handler=cmd_history,
-        gates_required=[], mode_required=[], renders=["present", "absent"], requires_events=[], privileged=False, trust_required="user",
-    ))
+    registry.register(
+        CommandDef(
+            name="clear",
+            help_text="Clear session history",
+            category="session",
+            handler=cmd_clear,
+            gates_required=[],
+            mode_required=[],
+            renders=["present"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="summary",
+            help_text="Show session summary",
+            category="session",
+            handler=cmd_summary,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "absent"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="sessions",
+            help_text="List saved sessions",
+            category="session",
+            handler=cmd_sessions,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "absent"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="history",
+            help_text="Show recent messages",
+            category="session",
+            handler=cmd_history,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "absent"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
 
     # ── Runtime ───────────────────────────────────────────────────────────
-    registry.register(CommandDef(
-        name="run",
-        help_text="Execute prompt with SwarmGraph runner",
-        category="runtime",
-        handler=cmd_run,
-        gates_required=[], mode_required=["build", "auto"], renders=["present", "blocked"], requires_events=[], privileged=False, trust_required="user",
-    ))
-    registry.register(CommandDef(
-        name="runtime",
-        help_text="Show or set runtime mode: fake, gated_local, provider_backed",
-        category="runtime",
-        handler=cmd_runtime,
-        gates_required=[], mode_required=[], renders=["present", "blocked"], requires_events=[], privileged=False, trust_required="user",
-    ))
-    registry.register(CommandDef(
-        name="tools",
-        help_text="Manage session tools: /tools list|enable|disable",
-        category="runtime",
-        handler=cmd_tools,
-        gates_required=[], mode_required=[], renders=["present", "blocked"], requires_events=[], privileged=False, trust_required="user",
-    ))
-    registry.register(CommandDef(
-        name="mode",
-        help_text="Alias for /runtime",
-        category="runtime",
-        handler=cmd_runtime,
-        gates_required=[], mode_required=[], renders=["present", "blocked"], requires_events=[], privileged=False, trust_required="user",
-    ))
-    registry.register(CommandDef(
-        name="plan",
-        help_text="Switch to Plan mode (read-only)",
-        category="runtime",
-        handler=cmd_plan,
-        gates_required=[], mode_required=[], renders=["present"], requires_events=[], privileged=False, trust_required="user",
-    ))
-    registry.register(CommandDef(
-        name="build",
-        help_text="Switch to Build mode (can write)",
-        category="runtime",
-        handler=cmd_build,
-        gates_required=[], mode_required=[], renders=["present"], requires_events=[], privileged=False, trust_required="user",
-    ))
-    registry.register(CommandDef(
-        name="auto",
-        help_text="Switch to policy-driven mode",
-        category="runtime",
-        handler=cmd_auto,
-        gates_required=[], mode_required=[], renders=["present", "blocked"], requires_events=[], privileged=False, trust_required="user",
-    ))
+    registry.register(
+        CommandDef(
+            name="run",
+            help_text="Execute prompt with SwarmGraph runner",
+            category="runtime",
+            handler=cmd_run,
+            gates_required=[],
+            mode_required=["build", "auto"],
+            renders=["present", "blocked"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="runtime",
+            help_text="Show or set runtime mode: fake, gated_local, provider_backed",
+            category="runtime",
+            handler=cmd_runtime,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "blocked"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="tools",
+            help_text="Manage session tools: /tools list|enable|disable",
+            category="runtime",
+            handler=cmd_tools,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "blocked"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="mode",
+            help_text="Alias for /runtime",
+            category="runtime",
+            handler=cmd_runtime,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "blocked"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="plan",
+            help_text="Switch to Plan mode (read-only)",
+            category="runtime",
+            handler=cmd_plan,
+            gates_required=[],
+            mode_required=[],
+            renders=["present"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="build",
+            help_text="Switch to Build mode (can write)",
+            category="runtime",
+            handler=cmd_build,
+            gates_required=[],
+            mode_required=[],
+            renders=["present"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="auto",
+            help_text="Switch to policy-driven mode",
+            category="runtime",
+            handler=cmd_auto,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "blocked"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
 
     # ── Workspace ─────────────────────────────────────────────────────────
-    registry.register(CommandDef(
-        name="status",
-        help_text="Show workspace, runtime, and session status",
-        category="workspace",
-        handler=cmd_status,
-        gates_required=[], mode_required=[], renders=["present", "absent"], requires_events=[], privileged=False, trust_required="workspace",
-    ))
-    registry.register(CommandDef(
-        name="doctor",
-        help_text="Run environment diagnostics",
-        category="workspace",
-        handler=cmd_doctor,
-        gates_required=[], mode_required=[], renders=["present", "degraded"], requires_events=[], privileged=False, trust_required="workspace",
-    ))
-    registry.register(CommandDef(
-        name="runs",
-        help_text="List recent run records",
-        category="workspace",
-        handler=cmd_runs,
-        gates_required=[], mode_required=[], renders=["present", "absent"], requires_events=[], privileged=False, trust_required="workspace",
-    ))
+    registry.register(
+        CommandDef(
+            name="status",
+            help_text="Show workspace, runtime, and session status",
+            category="workspace",
+            handler=cmd_status,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "absent"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="doctor",
+            help_text="Run environment diagnostics",
+            category="workspace",
+            handler=cmd_doctor,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "degraded"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="runs",
+            help_text="List recent run records",
+            category="workspace",
+            handler=cmd_runs,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "absent"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+        )
+    )
 
     return registry
 
 
 # ── Command handler implementations ────────────────────────────────────────
+
 
 def cmd_help(_arg: str, _session: ChatSession) -> str:
     registry = get_registry()
@@ -213,7 +334,7 @@ def cmd_help(_arg: str, _session: ChatSession) -> str:
         "Available slash commands:"
         + registry.help_text()
         + "\n\n"
-        + 'Type a message to send a query or use /slash commands above.'
+        + "Type a message to send a query or use /slash commands above."
     )
 
 
@@ -225,7 +346,11 @@ def cmd_clear(_arg: str, session: ChatSession) -> str:
 def cmd_run(arg: Any, session: Any, cancellation_token: Any = None) -> str | CommandResult:
     if isinstance(arg, list):
         return _handle_run_context(arg, session)
-    token = cancellation_token if isinstance(cancellation_token, CancellationToken) else CancellationToken()
+    token = (
+        cancellation_token
+        if isinstance(cancellation_token, CancellationToken)
+        else CancellationToken()
+    )
     return _execute_run(str(arg or ""), session=session, cancellation_token=token)
 
 
@@ -244,7 +369,9 @@ def _provider_budget_config(session: Any) -> BudgetConfig:
 def _preflight_provider_backed_run(session: Any, prompt: str) -> None:
     client = AnthropicClient()
     capability = client.capabilities()
-    model = str((getattr(session, "metadata", {}) or {}).get("provider_model") or capability.default_model)
+    model = str(
+        (getattr(session, "metadata", {}) or {}).get("provider_model") or capability.default_model
+    )
     enforcer = BudgetEnforcer(_provider_budget_config(session), BudgetState())
     preflight_with_estimator(
         enforcer,
@@ -300,7 +427,12 @@ def _make_runner(config: Any, cancellation_token: CancellationToken) -> Any:
     return SwarmGraphRunner(config, **kwargs)
 
 
-def _run_runner(runner: Any, prompt: str, cancellation_token: CancellationToken, on_progress: Callable[[dict[str, Any]], None]) -> Any:
+def _run_runner(
+    runner: Any,
+    prompt: str,
+    cancellation_token: CancellationToken,
+    on_progress: Callable[[dict[str, Any]], None],
+) -> Any:
     parameters = inspect.signature(runner.run).parameters
     kwargs: dict[str, Any] = {}
     if "cancellation_token" in parameters:
@@ -325,8 +457,14 @@ def _run_provider_turn(
     runtime: Any,
 ) -> Any:
     client = _provider_client_for_run(runtime)
-    capability = client.capabilities() if hasattr(client, "capabilities") else AnthropicClient().capabilities()
-    model = str((getattr(session, "metadata", {}) or {}).get("provider_model") or capability.default_model)
+    capability = (
+        client.capabilities()
+        if hasattr(client, "capabilities")
+        else AnthropicClient().capabilities()
+    )
+    model = str(
+        (getattr(session, "metadata", {}) or {}).get("provider_model") or capability.default_model
+    )
     manager = TurnManager(
         client,
         model=model,
@@ -348,7 +486,9 @@ def _execute_run(
     prompt = prompt.strip()
     runtime_mode = RuntimeMode.from_legacy(getattr(session, "runtime_mode", RuntimeMode.FAKE))
     capability = default_runtime_registry().get(runtime_mode)
-    if runtime_mode is RuntimeMode.PROVIDER_BACKED and not getattr(session, "allow_paid_calls", False):
+    if runtime_mode is RuntimeMode.PROVIDER_BACKED and not getattr(
+        session, "allow_paid_calls", False
+    ):
         return CommandResult(
             state="blocked",
             reason="paid_calls_disabled",
@@ -362,7 +502,9 @@ def _execute_run(
             remediation="Set ARC_ALLOW_RUN=1 or enable session allow_run.",
         )
     if not prompt:
-        return CommandResult(state="blocked", reason="missing_prompt", remediation="Usage: /run <prompt>")
+        return CommandResult(
+            state="blocked", reason="missing_prompt", remediation="Usage: /run <prompt>"
+        )
 
     started = time.monotonic()
     previous = signal.getsignal(signal.SIGINT)
@@ -376,19 +518,29 @@ def _execute_run(
 
     signal.signal(signal.SIGINT, _on_sigint)
     try:
-        _emit(event_sink, "run.started", {
-            "prompt_chars": len(prompt),
-            "runtime_mode": runtime_mode.value,
-            "profile_id": getattr(session, "profile_id", "default"),
-            "isolation_id": getattr(session, "isolation_id", "none"),
-        })
+        _emit(
+            event_sink,
+            "run.started",
+            {
+                "prompt_chars": len(prompt),
+                "runtime_mode": runtime_mode.value,
+                "profile_id": getattr(session, "profile_id", "default"),
+                "isolation_id": getattr(session, "isolation_id", "none"),
+            },
+        )
         cancellation_token.raise_if_cancelled()
         if runtime_mode is RuntimeMode.PROVIDER_BACKED:
             try:
                 _preflight_provider_backed_run(session, prompt)
             except (BudgetExceeded, ConfirmationRequired) as exc:
-                _emit(event_sink, "run.blocked.budget", {"reason": type(exc).__name__, "detail": str(exc)})
-                return CommandResult(state="blocked", reason="budget_preflight_failed", remediation=str(exc))
+                _emit(
+                    event_sink,
+                    "run.blocked.budget",
+                    {"reason": type(exc).__name__, "detail": str(exc)},
+                )
+                return CommandResult(
+                    state="blocked", reason="budget_preflight_failed", remediation=str(exc)
+                )
             result = _run_provider_turn(
                 session=session,
                 prompt=prompt,
@@ -396,27 +548,43 @@ def _execute_run(
                 event_sink=event_sink,
                 runtime=runtime,
             )
-            _emit(event_sink, "run.completed", {
-                "elapsed_ms": int((time.monotonic() - started) * 1000),
-                "result_summary": {"type": "provider_turn", "degraded": result.degraded},
-            })
-            return CommandResult(state="degraded" if result.degraded else "present", output=result.content, reason=result.degraded_reason or "")
+            _emit(
+                event_sink,
+                "run.completed",
+                {
+                    "elapsed_ms": int((time.monotonic() - started) * 1000),
+                    "result_summary": {"type": "provider_turn", "degraded": result.degraded},
+                },
+            )
+            return CommandResult(
+                state="degraded" if result.degraded else "present",
+                output=result.content,
+                reason=result.degraded_reason or "",
+            )
         config = runtime if runtime is not None else SwarmGraphConfig(num_workers=3, max_rounds=1)
         runner = _make_runner(config, cancellation_token)
         result = _run_runner(runner, prompt, cancellation_token, _on_progress)
         if hasattr(session, "add_message"):
             session.add_message("user", prompt)
-        _emit(event_sink, "run.completed", {
-            "elapsed_ms": int((time.monotonic() - started) * 1000),
-            "result_summary": _result_summary(result),
-        })
+        _emit(
+            event_sink,
+            "run.completed",
+            {
+                "elapsed_ms": int((time.monotonic() - started) * 1000),
+                "result_summary": _result_summary(result),
+            },
+        )
         return CommandResult(state="present", output=_render_run_result(result))
     except Cancelled as exc:
-        _emit(event_sink, "run.cancelled", {
-            "reason": exc.reason.value,
-            "detail": exc.detail,
-            "elapsed_ms": int((time.monotonic() - started) * 1000),
-        })
+        _emit(
+            event_sink,
+            "run.cancelled",
+            {
+                "reason": exc.reason.value,
+                "detail": exc.detail,
+                "elapsed_ms": int((time.monotonic() - started) * 1000),
+            },
+        )
         return CommandResult(state="degraded", output=str(exc), reason="cancelled")
     finally:
         signal.signal(signal.SIGINT, previous)
@@ -542,6 +710,7 @@ def cmd_tools(arg: str, session: ChatSession) -> str:
 
 def cmd_status(_arg: str, session: ChatSession) -> str:
     from pathlib import Path
+
     ws = Path.cwd().resolve()
     lines = [
         f"Workspace: {ws}",
@@ -558,6 +727,7 @@ def cmd_status(_arg: str, session: ChatSession) -> str:
 
 def cmd_doctor(_arg: str, _session: ChatSession) -> str:
     from pathlib import Path
+
     ws = Path.cwd().resolve()
     checks = [
         ("Workspace exists", ws.exists()),
@@ -571,8 +741,9 @@ def cmd_doctor(_arg: str, _session: ChatSession) -> str:
 
 
 def cmd_runs(_arg: str, _session: ChatSession) -> str:
-    from pathlib import Path
     from datetime import datetime
+    from pathlib import Path
+
     ws = Path.cwd().resolve()
     traces = ws / ".arc" / "traces"
     if not traces.exists():

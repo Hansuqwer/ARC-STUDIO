@@ -7,6 +7,9 @@ from typing import Optional
 import typer
 from rich.table import Table
 
+from .. import __version__ as arc_version
+from ..protocol.errors import ArcErrorCode
+from ..protocol.event_envelope import err, ok
 from ._app import console
 from ._helpers import (
     DEBUG_FLAG,
@@ -18,11 +21,6 @@ from ._helpers import (
     check_swarmgraph_runtime,
 )
 from ._subapps import config_app, doctor_app, eval_app, hitl_app, isolation_app, storage_app
-
-from .. import __version__ as arc_version
-from ..protocol.errors import ArcErrorCode
-from ..protocol.event_envelope import err, ok
-
 
 # ─── doctor ──────────────────────────────────────────────────────────────────
 
@@ -471,9 +469,11 @@ def eval_run(
         uv run arc eval run <run_id> --expected-final-output "hello" --expected-status completed
         uv run arc eval run <run_id> --golden my-golden-id
         uv run arc eval run <run_id> --batch
+
     """
     _setup_logging(debug)
-    from ..evals.golden import GoldenTrace, eval_run as do_eval, load_golden, list_goldens
+    from ..evals.golden import GoldenTrace, list_goldens, load_golden
+    from ..evals.golden import eval_run as do_eval
     from ..storage.jsonl import JsonlTraceStore
 
     ws = _workspace(workspace)

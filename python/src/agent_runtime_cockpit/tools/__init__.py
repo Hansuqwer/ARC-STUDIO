@@ -1,9 +1,9 @@
 """Tool execution framework for Phase 5."""
 
-from .registry import ToolRegistry, ToolRegistrationError
-from .protocol import ToolHandler, ToolResult
-from .wrapping import wrap_tool_result
 from .builtin import GetCurrentTimeTool, ListDirectoryTool, ReadFileTool
+from .protocol import ToolHandler, ToolResult
+from .registry import ToolRegistrationError, ToolRegistry
+from .wrapping import wrap_tool_result
 
 
 def default_tool_registry() -> ToolRegistry:
@@ -12,6 +12,7 @@ def default_tool_registry() -> ToolRegistry:
     registry.register(ListDirectoryTool())
     registry.register(GetCurrentTimeTool())
     return registry
+
 
 __all__ = [
     "ToolHandler",

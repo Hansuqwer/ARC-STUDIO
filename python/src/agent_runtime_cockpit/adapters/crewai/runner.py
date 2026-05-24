@@ -10,15 +10,15 @@ from typing import Any
 from agent_runtime_cockpit.ag_ui import MappingContext, map_event
 from agent_runtime_cockpit.audit.chain import AuditChainWriter
 from agent_runtime_cockpit.audit.runner_integration import log_agui_to_audit
-from agent_runtime_cockpit.audit.session import AuditSession
 from agent_runtime_cockpit.audit.schema import RuntimeMode
+from agent_runtime_cockpit.audit.session import AuditSession
 from agent_runtime_cockpit.audit.storage import AuditChainStore
 from agent_runtime_cockpit.gating import require_dual_gate
 from agent_runtime_cockpit.tracing.jsonl_writer import JsonlTraceWriter
 from agent_runtime_cockpit.workspace.entrypoint import resolve_python_entrypoint
 
-from .listener import ArcCrewAIListener
 from . import mapping  # noqa: F401
+from .listener import ArcCrewAIListener
 
 
 class CrewAIRunner:

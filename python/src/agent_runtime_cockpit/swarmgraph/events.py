@@ -113,6 +113,7 @@ def emit_consensus_event(
 
     Returns:
         A ConsensusEvent with the relevant data.
+
     """
     data: dict[str, Any] = {
         "task_id": task_id,

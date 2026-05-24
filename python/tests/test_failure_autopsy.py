@@ -3,7 +3,6 @@ import pytest
 from agent_runtime_cockpit.protocol.evidence_refs import EvidenceRef
 from agent_runtime_cockpit.protocol.failure_autopsy import FailureAutopsy, RetryOption
 
-
 EV_ID = "ev_01JDEADBEEF1234567890"
 
 

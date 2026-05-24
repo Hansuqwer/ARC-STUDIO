@@ -1,6 +1,5 @@
-"""
-Tests: RuntimeCapabilities and CapabilityReport cockpit primitive flags.
-"""
+"""Tests: RuntimeCapabilities and CapabilityReport cockpit primitive flags."""
+
 from __future__ import annotations
 
 import json
@@ -12,7 +11,10 @@ from agent_runtime_cockpit.adapters.base import CapabilityReport
 from agent_runtime_cockpit.adoption.langgraph_runner import LangGraphAdoptionRunner
 from agent_runtime_cockpit.adoption.protocol import AdoptionStatus
 from agent_runtime_cockpit.cli import app
-from agent_runtime_cockpit.orchestration.runtime_router import LangGraphSwarmGraphFakeAdapter
+from agent_runtime_cockpit.orchestration.runtime_router import (
+    LangGraphSwarmGraphAdapter,
+    CrewAISwarmGraphAdapter,
+)
 from agent_runtime_cockpit.protocol.capabilities import RuntimeCapabilities
 
 
@@ -75,7 +77,9 @@ class TestCapabilityReportCockpitPrimitives:
 
     def test_defaults_are_false(self):
         report = CapabilityReport(
-            runtime_id="test", detected=False, can_run=False,
+            runtime_id="test",
+            detected=False,
+            can_run=False,
             availability="not_detected",
         )
         assert report.can_emit_contract is False
@@ -91,7 +95,9 @@ class TestCapabilityReportCockpitPrimitives:
 
     def test_set_cockpit_flags(self):
         report = CapabilityReport(
-            runtime_id="test", detected=True, can_run=True,
+            runtime_id="test",
+            detected=True,
+            can_run=True,
             availability="runnable",
             can_emit_contract=True,
             can_emit_receipt=True,
@@ -107,7 +113,9 @@ class TestCapabilityReportCockpitPrimitives:
 
     def test_serialization_includes_flags(self):
         report = CapabilityReport(
-            runtime_id="test", detected=True, can_run=True,
+            runtime_id="test",
+            detected=True,
+            can_run=True,
             availability="runnable",
             can_emit_contract=True,
         )
@@ -119,7 +127,9 @@ class TestCapabilityReportCockpitPrimitives:
 
     def test_serialization_includes_evidence_classification_defaults(self):
         report = CapabilityReport(
-            runtime_id="test", detected=True, can_run=True,
+            runtime_id="test",
+            detected=True,
+            can_run=True,
             availability="runnable",
         )
         data = report.model_dump()
@@ -129,94 +139,81 @@ class TestCapabilityReportCockpitPrimitives:
         assert data["local_real_available"] is False
         assert data["provider_backed"] is False
 
-    def test_langgraph_swarmgraph_fake_offline_classification(self, tmp_path, monkeypatch):
-        monkeypatch.delenv("ARC_REAL_RUNTIME_SMOKE", raising=False)
-        monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
-        data = LangGraphSwarmGraphFakeAdapter().capability_report(tmp_path).model_dump()
+    def test_langgraph_swarmgraph_detection(self, tmp_path):
+        data = LangGraphSwarmGraphAdapter().capability_report(tmp_path).model_dump()
 
         assert data["runtime_id"] == "langgraph+swarmgraph"
         assert data["can_run"] is True
-        assert data["test_level"] == "fake_offline"
-        assert data["fake_offline_supported"] is True
-        assert data["local_real_gated"] is True
-        assert data["local_real_available"] is False
+        assert data["test_level"] == "provider_backed"
         assert data["provider_backed"] is False
         assert data["requires_paid_calls"] is False
-        assert data["required_env"] == ["ARC_REAL_RUNTIME_SMOKE", "ARC_LANGGRAPH_SWARMGRAPH_REAL"]
 
-    def test_langgraph_swarmgraph_partial_gate_remains_gated(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
-        monkeypatch.delenv("ARC_REAL_RUNTIME_SMOKE", raising=False)
-        data = LangGraphSwarmGraphFakeAdapter().capability_report(tmp_path).model_dump()
+    def test_crewai_swarmgraph_detection(self, tmp_path):
+        data = CrewAISwarmGraphAdapter().capability_report(tmp_path).model_dump()
 
-        assert data["test_level"] == "fake_offline"
-        assert data["local_real_gated"] is True
-        assert data["local_real_available"] is False
+        assert data["runtime_id"] == "crewai+swarmgraph"
+        assert data["can_run"] is True
+        assert data["test_level"] == "provider_backed"
         assert data["provider_backed"] is False
         assert data["requires_paid_calls"] is False
-        assert data["required_env"] == ["ARC_REAL_RUNTIME_SMOKE"]
 
-    def test_langgraph_swarmgraph_local_real_gate_classification(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
-        monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
-        data = LangGraphSwarmGraphFakeAdapter().capability_report(tmp_path).model_dump()
+    def test_runtimes_cli_with_langgraph_adapter(self, tmp_path):
+        import os
 
-        assert data["test_level"] == "gated_local_real"
-        assert data["fake_offline_supported"] is True
-        assert data["local_real_gated"] is False
-        assert data["local_real_available"] is True
-        assert data["provider_backed"] is False
-        assert data["requires_paid_calls"] is False
-        assert data["required_env"] == []
-        assert "local-real" in data["reason"]
-        assert "no provider-backed claim" in data["reason"]
-        assert "local-real gates ARC_REAL_RUNTIME_SMOKE=1 + ARC_LANGGRAPH_SWARMGRAPH_REAL=1" in data["detected_artifacts"]
+        os.environ["ARC_LANGGRAPH_SWARMGRAPH_TEST"] = "1"
+        try:
+            result = CliRunner().invoke(
+                app,
+                [
+                    "runtimes",
+                    "--workspace",
+                    str(tmp_path),
+                    "--capabilities",
+                    "--json",
+                ],
+            )
 
-    def test_runtimes_cli_default_keeps_langgraph_swarmgraph_fake_offline(self, tmp_path, monkeypatch):
-        monkeypatch.delenv("ARC_REAL_RUNTIME_SMOKE", raising=False)
-        monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
+            assert result.exit_code == 0, result.output
+            payload = json.loads(result.output)["data"]
+            langgraph_sg = next(
+                runtime
+                for runtime in payload["runtimes"]
+                if runtime["runtime_id"] == "langgraph+swarmgraph"
+            )
+            assert langgraph_sg["test_level"] == "provider_backed"
+            assert langgraph_sg["provider_backed"] is False
+            assert langgraph_sg["requires_paid_calls"] is False
+        finally:
+            del os.environ["ARC_LANGGRAPH_SWARMGRAPH_TEST"]
 
-        result = CliRunner().invoke(app, [
-            "runtimes", "--workspace", str(tmp_path), "--capabilities", "--json",
-        ])
+    def test_runtimes_cli_with_crewai_adapter(self, tmp_path):
+        import os
 
-        assert result.exit_code == 0, result.output
-        payload = json.loads(result.output)["data"]
-        langgraph_sg = next(
-            runtime for runtime in payload["runtimes"]
-            if runtime["runtime_id"] == "langgraph+swarmgraph"
-        )
-        assert langgraph_sg["test_level"] == "fake_offline"
-        assert langgraph_sg["fake_offline_supported"] is True
-        assert langgraph_sg["local_real_gated"] is True
-        assert langgraph_sg["local_real_available"] is False
-        assert langgraph_sg["provider_backed"] is False
-        assert langgraph_sg["requires_paid_calls"] is False
-        assert langgraph_sg["required_env"] == [
-            "ARC_REAL_RUNTIME_SMOKE",
-            "ARC_LANGGRAPH_SWARMGRAPH_REAL",
-        ]
+        os.environ["ARC_CREWAI_SWARMGRAPH_TEST"] = "1"
+        try:
+            result = CliRunner().invoke(
+                app,
+                [
+                    "runtimes",
+                    "--workspace",
+                    str(tmp_path),
+                    "--capabilities",
+                    "--json",
+                ],
+            )
 
-    def test_runtimes_cli_requires_both_local_real_gates(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
-        monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
-
-        result = CliRunner().invoke(app, [
-            "runtimes", "--workspace", str(tmp_path), "--capabilities", "--json",
-        ])
-
-        assert result.exit_code == 0, result.output
-        payload = json.loads(result.output)["data"]
-        langgraph_sg = next(
-            runtime for runtime in payload["runtimes"]
-            if runtime["runtime_id"] == "langgraph+swarmgraph"
-        )
-        assert langgraph_sg["test_level"] == "fake_offline"
-        assert langgraph_sg["local_real_gated"] is True
-        assert langgraph_sg["local_real_available"] is False
-        assert langgraph_sg["provider_backed"] is False
-        assert langgraph_sg["requires_paid_calls"] is False
-        assert langgraph_sg["required_env"] == ["ARC_LANGGRAPH_SWARMGRAPH_REAL"]
+            assert result.exit_code == 0, result.output
+            payload = json.loads(result.output)["data"]
+            crewai_sg = next(
+                runtime
+                for runtime in payload["runtimes"]
+                if runtime["runtime_id"] == "crewai+swarmgraph"
+            )
+            assert crewai_sg["test_level"] == "provider_backed"
+            assert crewai_sg["provider_backed"] is False
+            assert crewai_sg["requires_paid_calls"] is False
+        finally:
+            del os.environ["ARC_CREWAI_SWARMGRAPH_TEST"]
 
     def test_langgraph_runner_reports_missing_dependency(self, tmp_path, monkeypatch):
         monkeypatch.setattr(

@@ -8,6 +8,7 @@ Provides:
   - schema.py: Typed audit event models for EU AI Act compliance
   - storage.py: Managed per-run audit chain lifecycle
 """
+
 from __future__ import annotations
 
 from .chain import AuditChainWriter, verify
@@ -36,7 +37,7 @@ from .schema import (
     TrustLevel,
     event_from_dict,
 )
-from .session import AuditSession, audit_session, RedactionConfig, redact_event
+from .session import AuditSession, RedactionConfig, audit_session, redact_event
 from .storage import AuditChainStore
 
 __all__ = [

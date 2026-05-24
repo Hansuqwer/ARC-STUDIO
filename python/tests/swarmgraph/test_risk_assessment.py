@@ -27,13 +27,12 @@ from agent_runtime_cockpit.swarmgraph.nodes.consensus import (
 )
 from agent_runtime_cockpit.swarmgraph.risk_assessment import (
     CONSENSUS_PROTOCOL_BY_RISK,
+    RISK_FIXTURES,
     ProtocolSelection,
     RiskAssessment,
     assess_prompt_risk,
-    RISK_FIXTURES,
     select_consensus_protocol,
 )
-
 
 # ===========================================================================
 # 100 Fixture Tests
@@ -85,25 +84,29 @@ class TestProtocolSelectionMatrix:
 
 class TestMixedSignalPrompts:
     """When a prompt contains signals from multiple classes, the highest
-    risk class wins."""
+    risk class wins.
+    """
 
     def test_low_plus_critical_is_critical(self) -> None:
         """'Explain how to rotate root key' has 'explain' (low) + 'rotate
-        root key' (critical) → critical."""
+        root key' (critical) → critical.
+        """
         selection = select_consensus_protocol("Explain how to rotate root key")
         assert selection.risk == "critical"
         assert selection.protocol == ConsensusProtocol.bft_escrow
 
     def test_low_plus_high_is_high(self) -> None:
         """'Read the secret token' has 'read' (low) + 'secret' +
-        'token' (high) → high."""
+        'token' (high) → high.
+        """
         selection = select_consensus_protocol("Read the secret token")
         assert selection.risk == "high"
         assert selection.protocol == ConsensusProtocol.bft
 
     def test_low_plus_medium_is_medium(self) -> None:
         """'Explain the config for staging' has 'explain' (low) + 'config'
-        + 'staging' (medium) → medium."""
+        + 'staging' (medium) → medium.
+        """
         selection = select_consensus_protocol("Explain the config for staging")
         assert selection.risk == "medium"
         assert selection.protocol == ConsensusProtocol.raft
@@ -204,7 +207,8 @@ class TestFailClosed:
 
     def test_select_protocol_fail_closed(self) -> None:
         """select_consensus_protocol should catch exceptions and
-        fail closed."""
+        fail closed.
+        """
         # We can't easily make assess_prompt_risk fail, but we test the
         # try/except path by checking the function signature handles it.
         result = select_consensus_protocol("normal prompt")
@@ -342,11 +346,13 @@ class TestBftEscrowIntegration:
 
 class TestRunConsensusRoundAdaptive:
     """Integration test for run_consensus_round with adaptive protocol
-    selection."""
+    selection.
+    """
 
     def make_task(self, task_id: str, agent_id: str = "agent-1") -> tuple:
         """Create a simple task and its result for testing."""
         from datetime import datetime, timezone
+
         from agent_runtime_cockpit.swarmgraph.models import (
             SwarmTask,
             TaskStatus,

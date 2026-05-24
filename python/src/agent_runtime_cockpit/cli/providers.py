@@ -8,7 +8,6 @@ import typer
 
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
-
 from ._helpers import (
     DEBUG_FLAG,
     JSON_FLAG,
@@ -162,6 +161,7 @@ def providers_setup(
     """
     _setup_logging(debug)
     import os
+
     from ..provider_action import PROVIDERS, provider_statuses
 
     # Non-interactive mode requires provider_id
@@ -346,6 +346,7 @@ def providers_test(
     """
     _setup_logging(debug)
     import os
+
     from ..provider_action import PROVIDERS, provider_statuses
 
     # Find provider definition
@@ -418,6 +419,7 @@ def providers_models(
     """
     _setup_logging(debug)
     import os
+
     from ..provider_action import PROVIDERS, provider_statuses
 
     # Get provider statuses to see which are configured
@@ -496,6 +498,7 @@ def providers_proxy(
     """
     _setup_logging(debug)
     import os
+
     from ..provider_action import (
         ProviderRequest,
         ProviderRoutingStore,
@@ -568,6 +571,7 @@ def providers_action(
     """Run narrow provider action contract; live path is gated closed smoke scaffold."""
     _setup_logging(debug)
     import os
+
     from ..provider_action import ProviderActionRequest, ProviderRoutingStore, run_provider_action
 
     routing = ProviderRoutingStore().get()

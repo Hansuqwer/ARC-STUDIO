@@ -20,15 +20,13 @@ Adding a fixture:
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from decimal import Decimal
-
 from agent_runtime_cockpit.protocol.cost_record import CostRecord, migrate_v1_to_v2
-
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "cost-record"
 V1_DIR = FIXTURE_ROOT / "v1"
@@ -80,8 +78,7 @@ class TestPerFixtureMigration:
     def test_v1_fixture_has_schema_version_1(self, fixture_path):
         payload = _load(fixture_path)
         assert payload.get("schema_version") == 1, (
-            f"{fixture_path.name} is not a v1 fixture; "
-            "move it to the correct directory."
+            f"{fixture_path.name} is not a v1 fixture; move it to the correct directory."
         )
 
     def test_migrate_bumps_schema_version_to_2(self, fixture_path):
@@ -134,13 +131,9 @@ class TestPerFixtureMigration:
         source = migrated.get("source", "estimated")
         degraded = migrated.get("degraded", False)
         if source == "estimated":
-            assert degraded is True, (
-                f"{fixture_path.name}: source='estimated' but degraded=False"
-            )
+            assert degraded is True, f"{fixture_path.name}: source='estimated' but degraded=False"
         else:
-            assert degraded is False, (
-                f"{fixture_path.name}: source='measured' but degraded=True"
-            )
+            assert degraded is False, f"{fixture_path.name}: source='measured' but degraded=True"
 
     def test_cost_usd_is_decimal_string(self, fixture_path):
         """cost_usd in v2 must be a string (for Decimal round-trip)."""
@@ -173,7 +166,7 @@ def test_migration_raises_on_v0_or_unknown_schema():
 
 
 def test_migration_raises_on_invalid_source():
-    """source must be 'measured' or 'estimated'."""
+    """Source must be 'measured' or 'estimated'."""
     payload = {
         "schema_version": 1,
         "provider": "openai",
@@ -237,16 +230,14 @@ def test_v2_model_validates_decimal_cost():
 def test_v2_fixture_matches_migrated_v1(v1_path):
     """For every v1 fixture, the corresponding v2 fixture (same stem)
     must equal the migration output. This prevents drift between
-    hand-edited v2 fixtures and the migration function."""
+    hand-edited v2 fixtures and the migration function.
+    """
     v2_path = V2_DIR / v1_path.name
     if not v2_path.exists():
         pytest.skip(
-            f"No v2 counterpart for {v1_path.name}. "
-            "Generate it by running the migration function."
+            f"No v2 counterpart for {v1_path.name}. Generate it by running the migration function."
         )
 
     migrated = migrate_v1_to_v2(_load(v1_path))
     expected = _load(v2_path)
-    assert migrated == expected, (
-        f"v2 fixture {v2_path.name} drifted from migration output. "
-    )
+    assert migrated == expected, f"v2 fixture {v2_path.name} drifted from migration output. "

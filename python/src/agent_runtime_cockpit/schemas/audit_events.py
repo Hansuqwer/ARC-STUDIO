@@ -1,5 +1,4 @@
-"""
-ARC Studio audit event schema — Pydantic models for ADR-021 audit chain.
+"""ARC Studio audit event schema — Pydantic models for ADR-021 audit chain.
 
 Mirrors the TypeScript types in packages/arc-protocol-ts/src/audit-events.ts.
 """

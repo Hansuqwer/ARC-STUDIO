@@ -1,10 +1,10 @@
-"""
-ARC HTTP Daemon
+"""ARC HTTP Daemon.
 
 Starts a local aiohttp server on 127.0.0.1:7777.
 All endpoints return ARC protocol envelopes (JSON).
 Optional bearer token auth via ARC_DAEMON_TOKEN env var.
 """
+
 from __future__ import annotations
 
 import hmac
@@ -67,8 +67,7 @@ async def create_app(workspace: Path | None = None) -> web.Application:
     return app
 
 
-def run_server(host: str = "127.0.0.1", port: int = 7777,
-               workspace: Path | None = None) -> None:
+def run_server(host: str = "127.0.0.1", port: int = 7777, workspace: Path | None = None) -> None:
     import asyncio
 
     async def _run() -> None:

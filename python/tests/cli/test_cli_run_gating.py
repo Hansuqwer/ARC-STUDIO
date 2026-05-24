@@ -1,6 +1,9 @@
 """The `run` (or `arc run`) command must enforce dual-gating and never call
 out without explicit consent. We verify the no-live-provider invariant from
-the CLI side."""
+the CLI side.
+"""
+
+
 def _has(cli_app, name: str) -> bool:
     if hasattr(cli_app, "commands"):
         return name in cli_app.commands
@@ -12,6 +15,7 @@ def _has(cli_app, name: str) -> bool:
 def test_run_blocks_non_stub_without_allow_costs(run_cli, cli_app, workspace, monkeypatch):
     if not _has(cli_app, "run"):
         import pytest
+
         pytest.skip("no `run` subcommand")
     tools = workspace.parent / "bin"
     tools.mkdir(parents=True, exist_ok=True)

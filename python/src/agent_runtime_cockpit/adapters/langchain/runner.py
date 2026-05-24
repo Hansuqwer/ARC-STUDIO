@@ -17,9 +17,9 @@ from typing import Any, Callable, Optional
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.outputs import LLMResult
 
-from ...protocol.schemas import RunRecord, RunEvent, RunStatus
-from ...security.enforcement import emit_policy_bypass_warning
 from ...protocol._bypass import PolicyBypassReason
+from ...protocol.schemas import RunEvent, RunRecord, RunStatus
+from ...security.enforcement import emit_policy_bypass_warning
 
 log = logging.getLogger(__name__)
 
@@ -43,6 +43,7 @@ class ARCCallbackHandler(BaseCallbackHandler):
             run_id: Run identifier
             emit_event: Callback to emit events (run_id, event_type, data)
             provider_registry: Optional registry of known providers
+
         """
         super().__init__()
         self.run_id = run_id
@@ -250,6 +251,7 @@ class LangChainRunner:
 
         Args:
             workspace: Workspace path
+
         """
         self.workspace = workspace
         self.events: list[RunEvent] = []
@@ -269,6 +271,7 @@ class LangChainRunner:
 
         Returns:
             RunRecord with execution results and events
+
         """
         run_id = f"langchain-{uuid.uuid4().hex[:12]}"
         started = datetime.now(timezone.utc)
@@ -350,6 +353,7 @@ class LangChainRunner:
             run_id: Run identifier
             event_type: Type of event
             data: Event data
+
         """
         event = RunEvent(
             type=event_type,

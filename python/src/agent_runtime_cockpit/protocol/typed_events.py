@@ -1,5 +1,4 @@
-"""
-Discriminated RunEvent union types for type-safe event handling (Phase 22).
+"""Discriminated RunEvent union types for type-safe event handling (Phase 22).
 
 Replaces unsafe `data: dict[str, Any]` with typed payloads for known event types.
 Consumers can use type narrowing with isinstance() checks instead of unsafe dict access.
@@ -11,11 +10,11 @@ maintaining backward compatibility.
 
 from __future__ import annotations
 
-from typing import Any, Literal, Union, TypeGuard
+from typing import Any, Literal, TypeGuard, Union
+
 from pydantic import BaseModel, Field
 
 from ._bypass import PolicyBypassWarning
-
 
 # ─── Base Event Model ────────────────────────────────────────────────────────
 
@@ -811,8 +810,7 @@ def is_known_event(event: TypedRunEvent) -> TypeGuard[KnownRunEvent]:
 
 
 def parse_typed_event(raw: dict[str, Any]) -> TypedRunEvent:
-    """
-    Parse a raw event dict into a typed RunEvent.
+    """Parse a raw event dict into a typed RunEvent.
 
     Attempts to parse as a known typed event first, falls back to UnknownEvent
     for event types that aren't yet typed.
@@ -825,6 +823,7 @@ def parse_typed_event(raw: dict[str, Any]) -> TypedRunEvent:
 
     Raises:
         ValueError: If the event is malformed
+
     """
     event_type = raw.get("type")
     if not isinstance(event_type, str):

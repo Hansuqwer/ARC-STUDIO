@@ -1,5 +1,4 @@
-"""
-MCP Local Control Plane (Phase 26 / R19).
+"""MCP Local Control Plane (Phase 26 / R19).
 
 Exposes ARC capabilities as a local MCP server via stdio transport.
 All tools are gated by workspace trust enforcement.

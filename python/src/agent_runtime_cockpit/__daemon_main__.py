@@ -1,10 +1,10 @@
-"""
-ARC Daemon — PyInstaller entry point.
+"""ARC Daemon — PyInstaller entry point.
 
 This module serves as the main script for PyInstaller bundling.
 When frozen, it starts the ARC daemon server directly.
 In normal development, users use `arc serve` via the CLI.
 """
+
 from __future__ import annotations
 
 import sys

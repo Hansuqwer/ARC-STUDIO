@@ -10,13 +10,12 @@ from ..gating import GatingError
 from ..orchestration import runtime_router
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
-
 from ._app import app, console
 from ._helpers import (
     DEBUG_FLAG,
     JSON_FLAG,
-    WORKSPACE_FLAG,
     LOCAL_REAL_GATE_ENVS,
+    WORKSPACE_FLAG,
     _local_real_gate_open,
     _out,
     _run_preflight,

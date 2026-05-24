@@ -1,5 +1,4 @@
-"""
-Policy bypass warning event types (Phase 22.1 / ADR-0022.1).
+"""Policy bypass warning event types (Phase 22.1 / ADR-0022.1).
 
 Provides warning events when agent execution bypasses enforcement boundaries
 due to uninstrumented providers, custom clients, or upstream boundary violations.
@@ -9,6 +8,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -34,8 +34,7 @@ class PolicyBypassWarningData(BaseModel):
 
 
 class PolicyBypassWarning(BaseModel):
-    """
-    POLICY_BYPASS_WARNING event emitted when execution bypasses enforcement.
+    """POLICY_BYPASS_WARNING event emitted when execution bypasses enforcement.
 
     Unlike denial events (TRUST_DENIED, PAID_CALL_DENIED), bypass warnings are
     non-blocking. They indicate that enforcement could not be applied due to

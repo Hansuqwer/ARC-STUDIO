@@ -1,13 +1,11 @@
-"""
-Tests for OTLP trace exporter
-"""
+"""Tests for OTLP trace exporter."""
 
+from agent_runtime_cockpit.protocol.schemas import RunRecord
 from agent_runtime_cockpit.telemetry.otlp_exporter import (
-    validate_otlp_endpoint,
     convert_run_to_otlp_spans,
     export_run_to_otlp,
+    validate_otlp_endpoint,
 )
-from agent_runtime_cockpit.protocol.schemas import RunRecord
 
 
 def test_validate_endpoint_empty():
@@ -29,7 +27,7 @@ def test_validate_endpoint_localhost():
     is_valid, warning = validate_otlp_endpoint("http://localhost:4317")
     assert is_valid
     assert warning is None
-    
+
     is_valid, warning = validate_otlp_endpoint("http://127.0.0.1:4317")
     assert is_valid
     assert warning is None
@@ -74,23 +72,23 @@ def test_convert_run_to_spans():
         ],
         metadata={},
     )
-    
+
     spans = convert_run_to_otlp_spans(run)
-    
+
     # Should have root span + 2 event spans
     assert len(spans) == 3
-    
+
     # Check root span
     root = spans[0]
-    assert root['trace_id'] == "test-run-123"
-    assert root['name'] == "run:test-workflow"
-    assert root['attributes']['arc.runtime'] == "swarmgraph"
-    assert root['attributes']['arc.status'] == "completed"
-    
+    assert root["trace_id"] == "test-run-123"
+    assert root["name"] == "run:test-workflow"
+    assert root["attributes"]["arc.runtime"] == "swarmgraph"
+    assert root["attributes"]["arc.status"] == "completed"
+
     # Check event spans
     event_span = spans[1]
-    assert event_span['name'] == "RUN_STARTED"
-    assert event_span['parent_span_id'] == "test-run-123-root"
+    assert event_span["name"] == "RUN_STARTED"
+    assert event_span["parent_span_id"] == "test-run-123-root"
 
 
 def test_convert_run_redacts_secrets():
@@ -116,9 +114,9 @@ def test_convert_run_redacts_secrets():
         ],
         metadata={},
     )
-    
+
     spans = convert_run_to_otlp_spans(run)
-    
+
     # Secrets should be redacted
     # Note: redactValue is called on attributes, so secrets in data won't appear in attributes
     # This test verifies the redaction pipeline is called
@@ -128,7 +126,7 @@ def test_convert_run_redacts_secrets():
 def test_export_run_requires_endpoint():
     """Export should fail without endpoint."""
     import pytest
-    
+
     run = RunRecord(
         id="test-run",
         workflow_id="test",
@@ -138,7 +136,7 @@ def test_export_run_requires_endpoint():
         events=[],
         metadata={},
     )
-    
+
     with pytest.raises(ValueError, match="not configured"):
         export_run_to_otlp(run, "")
 
@@ -146,7 +144,7 @@ def test_export_run_requires_endpoint():
 def test_export_run_validates_endpoint():
     """Export should validate endpoint format."""
     import pytest
-    
+
     run = RunRecord(
         id="test-run",
         workflow_id="test",
@@ -156,7 +154,7 @@ def test_export_run_validates_endpoint():
         events=[],
         metadata={},
     )
-    
+
     with pytest.raises(ValueError, match="Invalid"):
         export_run_to_otlp(run, "invalid-url")
 
@@ -172,7 +170,7 @@ def test_export_run_success():
         events=[],
         metadata={},
     )
-    
+
     success = export_run_to_otlp(run, "http://localhost:4317")
     assert success
 
@@ -188,7 +186,7 @@ def test_export_run_warns_remote():
         events=[],
         metadata={},
     )
-    
+
     # Remote endpoints are valid, warning is returned by validate_otlp_endpoint
     success = export_run_to_otlp(run, "http://example.com:4317")
     assert success

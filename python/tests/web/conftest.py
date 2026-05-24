@@ -1,5 +1,7 @@
 """Web-route test plumbing. Discovers the FastAPI/aiohttp app factory and yields
-an httpx.AsyncClient bound to it via ASGI transport — never the network."""
+an httpx.AsyncClient bound to it via ASGI transport — never the network.
+"""
+
 from __future__ import annotations
 
 import importlib
@@ -44,7 +46,7 @@ def workspace(tmp_path: pathlib.Path) -> pathlib.Path:
 async def app(workspace):
     app_obj = _resolve_app(workspace)
     # If it's a coroutine, await it
-    if hasattr(app_obj, '__await__'):
+    if hasattr(app_obj, "__await__"):
         app_obj = await app_obj
     return app_obj
 
@@ -53,39 +55,41 @@ async def app(workspace):
 async def client(app):
     import httpx
     from aiohttp import web
-    
+
     # Check if it's aiohttp or ASGI
     if isinstance(app, web.Application):
         # aiohttp app - use test client with wrapper
         from aiohttp.test_utils import TestClient, TestServer
-        
+
         class ResponseWrapper:
             """Normalize aiohttp response to httpx-like interface."""
+
             def __init__(self, aiohttp_response):
                 self._resp = aiohttp_response
                 self.status_code = aiohttp_response.status
-            
+
             async def json(self):
                 try:
                     return await self._resp.json()
                 finally:
                     self._resp.release()
-            
+
             async def text(self):
                 try:
                     return await self._resp.text()
                 finally:
                     self._resp.release()
-            
+
             @property
             def content(self):
                 return self._resp.content
-        
+
         class ClientWrapper:
             """Normalize aiohttp TestClient to httpx-like interface."""
+
             def __init__(self, aiohttp_client):
                 self._client = aiohttp_client
-            
+
             async def get(self, path, **kwargs):
                 resp = await self._client.get(path, **kwargs)
                 return ResponseWrapper(resp)
@@ -93,7 +97,7 @@ async def client(app):
             async def post(self, path, **kwargs):
                 resp = await self._client.post(path, **kwargs)
                 return ResponseWrapper(resp)
-        
+
         async with TestServer(app) as server:
             async with TestClient(server) as c:
                 yield ClientWrapper(c)

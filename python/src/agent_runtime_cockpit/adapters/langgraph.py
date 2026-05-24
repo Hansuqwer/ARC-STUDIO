@@ -1,19 +1,19 @@
-"""
-LangGraph Runtime Adapter
+"""LangGraph Runtime Adapter.
 
 Detects and inspects LangGraph-based agent projects.
 Source: https://docs.langchain.com/oss/python/langgraph/
 """
+
 from __future__ import annotations
 
 import ast
-import inspect
 import importlib
+import inspect
 import logging
 import os
 import sys
-import warnings
 import uuid
+import warnings
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,8 +22,14 @@ from typing import Any, Iterator
 from ..adapters.base import CapabilityReport, DoctorAction
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import (
-    WorkflowInfo, WorkflowNode, WorkflowEdge, SchemaInfo,
-    NodeType, RunRecord, RunEvent, RunStatus
+    NodeType,
+    RunEvent,
+    RunRecord,
+    RunStatus,
+    SchemaInfo,
+    WorkflowEdge,
+    WorkflowInfo,
+    WorkflowNode,
 )
 from ..workspace import iter_workspace_files
 from .base import RuntimeAdapter
@@ -43,7 +49,6 @@ LG_INVOKE_FAILED = "LG_INVOKE_FAILED"
 
 
 class LangGraphAdapter(RuntimeAdapter):
-
     @property
     def adapter_id(self) -> str:
         return "langgraph"
@@ -55,7 +60,7 @@ class LangGraphAdapter(RuntimeAdapter):
     def capabilities(self) -> RuntimeCapabilities:
         return RuntimeCapabilities(
             can_inspect=True,
-            can_run=False,          # requires installed library
+            can_run=False,  # requires installed library
             can_trace=False,
             can_replay=False,
             can_export_schema=True,
@@ -114,7 +119,9 @@ class LangGraphAdapter(RuntimeAdapter):
         try:
             exported = self._resolve_export(workspace, target, load_target=True)
             if not callable(exported) and not self._is_graph_like(exported):
-                raise LangGraphRunError(LG_TARGET_INVALID, "LangGraph export must be a graph or factory")
+                raise LangGraphRunError(
+                    LG_TARGET_INVALID, "LangGraph export must be a graph or factory"
+                )
         except LangGraphRunError as exc:
             return CapabilityReport(
                 runtime_id=self.adapter_id,
@@ -157,17 +164,25 @@ class LangGraphAdapter(RuntimeAdapter):
                 id="set-langgraph-export",
                 label="Set ARC_LANGGRAPH_EXPORT",
                 description=f"Set {EXPORT_ENV}=module:function to your compiled LangGraph graph",
-                command=f"export {EXPORT_ENV}=my_graph:graph" if not target else f"export {EXPORT_ENV}={target}",
+                command=f"export {EXPORT_ENV}=my_graph:graph"
+                if not target
+                else f"export {EXPORT_ENV}={target}",
                 safe_to_auto_run=False,
             ),
         ]
 
-    async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
+    async def run_workflow(
+        self, workflow_id: str, inputs: dict[str, Any] | None = None
+    ) -> RunRecord:
         inputs = inputs or {}
         workspace = Path(str(inputs.get("workspace") or ".")).resolve()
         run_id = f"run-lg-{uuid.uuid4().hex[:8]}"
         started = datetime.now(timezone.utc)
-        events = [self._event(run_id, 0, "RUN_STARTED", {"workflow_id": workflow_id, "runtime": self.adapter_id})]
+        events = [
+            self._event(
+                run_id, 0, "RUN_STARTED", {"workflow_id": workflow_id, "runtime": self.adapter_id}
+            )
+        ]
 
         if importlib.util.find_spec("langgraph") is None:
             raise NotImplementedError("Install langgraph in this Python environment.")
@@ -187,10 +202,14 @@ class LangGraphAdapter(RuntimeAdapter):
         except LangGraphRunError as exc:
             return self._failed(workflow_id, run_id, started, events, exc.code, exc.message)
         except Exception as exc:
-            return self._failed(workflow_id, run_id, started, events, LG_INVOKE_FAILED, self._redact(str(exc)))
+            return self._failed(
+                workflow_id, run_id, started, events, LG_INVOKE_FAILED, self._redact(str(exc))
+            )
 
         ended = datetime.now(timezone.utc)
-        payload = {"state": final_state if isinstance(final_state, dict) else {"value": final_state}}
+        payload = {
+            "state": final_state if isinstance(final_state, dict) else {"value": final_state}
+        }
         events.append(self._event(run_id, 1, "RUN_COMPLETED", payload))
         return RunRecord(
             id=run_id,
@@ -203,7 +222,9 @@ class LangGraphAdapter(RuntimeAdapter):
             metadata={"state": payload["state"], "_external_target": target, "streamed": streamed},
         )
 
-    def _stream_graph(self, run_id: str, events: list[RunEvent], graph: Any, inputs: dict[str, Any]) -> dict[str, Any] | None:
+    def _stream_graph(
+        self, run_id: str, events: list[RunEvent], graph: Any, inputs: dict[str, Any]
+    ) -> dict[str, Any] | None:
         if not hasattr(graph, "stream"):
             return None
 
@@ -217,7 +238,11 @@ class LangGraphAdapter(RuntimeAdapter):
                 continue
             update = data if isinstance(data, dict) else {"value": data}
             final_state.update(self._flatten_update(update))
-            events.append(self._event(run_id, len(events), "NODE_UPDATE", {"update": self._redact_value(update)}))
+            events.append(
+                self._event(
+                    run_id, len(events), "NODE_UPDATE", {"update": self._redact_value(update)}
+                )
+            )
         return final_state
 
     def _stream_part(self, part: Any) -> tuple[str | None, Any]:
@@ -308,11 +333,15 @@ class LangGraphAdapter(RuntimeAdapter):
     def _real_export(self, workspace: Path) -> list[WorkflowInfo]:
         """Attempt real LangGraph export using the installed library."""
         with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message=".*default value of `allowed_objects` will change.*")
+            warnings.filterwarnings(
+                "ignore", message=".*default value of `allowed_objects` will change.*"
+            )
             from langgraph.graph import StateGraph  # type: ignore  # noqa: F401
         target = os.environ.get(EXPORT_ENV, "")
         if not target or ":" not in target:
-            raise NotImplementedError("Set ARC_LANGGRAPH_EXPORT=module:function to export a workspace LangGraph")
+            raise NotImplementedError(
+                "Set ARC_LANGGRAPH_EXPORT=module:function to export a workspace LangGraph"
+            )
 
         exported = self._resolve_export(workspace, target, load_target=True)
         graph = exported() if callable(exported) and not self._is_graph_like(exported) else exported
@@ -324,19 +353,26 @@ class LangGraphAdapter(RuntimeAdapter):
         with _workspace_import_path(workspace):
             spec = importlib.util.find_spec(module_name)
             if spec is None:
-                raise LangGraphRunError(LG_EXPORT_NOT_FOUND, f"LangGraph export module not found: {module_name}")
+                raise LangGraphRunError(
+                    LG_EXPORT_NOT_FOUND, f"LangGraph export module not found: {module_name}"
+                )
             origin = Path(str(spec.origin or "")).resolve()
             allowed = [workspace.resolve()]
             src = (workspace / "src").resolve()
             if src.exists():
                 allowed.append(src)
             if not any(origin == base or base in origin.parents for base in allowed):
-                raise LangGraphRunError(LG_TARGET_INVALID, f"LangGraph export module resolves outside workspace: {module_name}")
+                raise LangGraphRunError(
+                    LG_TARGET_INVALID,
+                    f"LangGraph export module resolves outside workspace: {module_name}",
+                )
             if not load_target:
                 return None
             module = importlib.import_module(module_name)
         if not hasattr(module, attr_name):
-            raise LangGraphRunError(LG_EXPORT_NOT_FOUND, f"LangGraph export attribute not found: {target}")
+            raise LangGraphRunError(
+                LG_EXPORT_NOT_FOUND, f"LangGraph export attribute not found: {target}"
+            )
         return getattr(module, attr_name)
 
     def _parse_export_target(self, target: str) -> tuple[str, str]:
@@ -346,7 +382,9 @@ class LangGraphAdapter(RuntimeAdapter):
         if not module_name or not attr_name:
             raise LangGraphRunError(LG_EXPORT_UNSET, f"{EXPORT_ENV} must be module:function")
         if any(part in target for part in ("/", "\\", "..")) or module_name.startswith("."):
-            raise LangGraphRunError(LG_TARGET_INVALID, "LangGraph export target must be a dotted module name")
+            raise LangGraphRunError(
+                LG_TARGET_INVALID, "LangGraph export target must be a dotted module name"
+            )
         return module_name, attr_name
 
     async def _materialize_graph(self, exported: Any) -> Any:
@@ -358,15 +396,32 @@ class LangGraphAdapter(RuntimeAdapter):
         if hasattr(graph, "compile"):
             graph = graph.compile()
         if not hasattr(graph, "invoke"):
-            raise LangGraphRunError(LG_TARGET_INVALID, "LangGraph export must resolve to an object with invoke()")
+            raise LangGraphRunError(
+                LG_TARGET_INVALID, "LangGraph export must resolve to an object with invoke()"
+            )
         return graph
 
     def _is_graph_like(self, value: Any) -> bool:
         return hasattr(value, "compile") or hasattr(value, "invoke")
 
-    def _failed(self, workflow_id: str, run_id: str, started: datetime, events: list[RunEvent], code: str, message: str) -> RunRecord:
+    def _failed(
+        self,
+        workflow_id: str,
+        run_id: str,
+        started: datetime,
+        events: list[RunEvent],
+        code: str,
+        message: str,
+    ) -> RunRecord:
         ended = datetime.now(timezone.utc)
-        events.append(self._event(run_id, 1, "RUN_FAILED", {"error_code": code, "redacted_message": self._redact(message)}))
+        events.append(
+            self._event(
+                run_id,
+                1,
+                "RUN_FAILED",
+                {"error_code": code, "redacted_message": self._redact(message)},
+            )
+        )
         return RunRecord(
             id=run_id,
             workflow_id=workflow_id,
@@ -379,11 +434,19 @@ class LangGraphAdapter(RuntimeAdapter):
         )
 
     def _event(self, run_id: str, sequence: int, event_type: str, data: dict[str, Any]) -> RunEvent:
-        return RunEvent(type=event_type, timestamp=datetime.now(timezone.utc).isoformat(), run_id=run_id, sequence=sequence, data=data)
+        return RunEvent(
+            type=event_type,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            run_id=run_id,
+            sequence=sequence,
+            data=data,
+        )
 
     def _redact(self, text: str, cap: int = 4000) -> str:
         lowered = text.lower()
-        if any(hint in lowered for hint in ("api_key", "authorization", "bearer", "secret", "token=")):
+        if any(
+            hint in lowered for hint in ("api_key", "authorization", "bearer", "secret", "token=")
+        ):
             return "[redacted: message contained possible secret material]"
         return text[:cap]
 
@@ -397,11 +460,27 @@ class LangGraphAdapter(RuntimeAdapter):
         ]
         edges: list[WorkflowEdge] = []
         for index, edge in enumerate(raw_edges):
-            source = getattr(edge, "source", None) or getattr(edge, "start", None) or (edge[0] if isinstance(edge, (tuple, list)) and len(edge) > 1 else None)
-            target_node = getattr(edge, "target", None) or getattr(edge, "end", None) or (edge[1] if isinstance(edge, (tuple, list)) and len(edge) > 1 else None)
+            source = (
+                getattr(edge, "source", None)
+                or getattr(edge, "start", None)
+                or (edge[0] if isinstance(edge, (tuple, list)) and len(edge) > 1 else None)
+            )
+            target_node = (
+                getattr(edge, "target", None)
+                or getattr(edge, "end", None)
+                or (edge[1] if isinstance(edge, (tuple, list)) and len(edge) > 1 else None)
+            )
             if source is None or target_node is None:
                 continue
-            edges.append(WorkflowEdge(id=f"e{index}", from_node=str(source), to_node=str(target_node), conditional=False, metadata={}))
+            edges.append(
+                WorkflowEdge(
+                    id=f"e{index}",
+                    from_node=str(source),
+                    to_node=str(target_node),
+                    conditional=False,
+                    metadata={},
+                )
+            )
         if not nodes:
             raise ValueError("Exported LangGraph has no nodes")
         return WorkflowInfo(
@@ -434,9 +513,11 @@ class LangGraphAdapter(RuntimeAdapter):
                 # Find graph.add_node("name", ...) calls
                 for node in ast.walk(tree):
                     if isinstance(node, ast.Call):
-                        if (isinstance(node.func, ast.Attribute)
-                                and node.func.attr == "add_node"
-                                and node.args):
+                        if (
+                            isinstance(node.func, ast.Attribute)
+                            and node.func.attr == "add_node"
+                            and node.args
+                        ):
                             arg = node.args[0]
                             if isinstance(arg, ast.Constant):
                                 nid = str(arg.value)
@@ -449,17 +530,23 @@ class LangGraphAdapter(RuntimeAdapter):
                 # Find graph.add_edge(from, to) calls
                 for node in ast.walk(tree):
                     if isinstance(node, ast.Call):
-                        if (isinstance(node.func, ast.Attribute)
-                                and node.func.attr in ("add_edge", "add_conditional_edges")
-                                and len(node.args) >= 2):
+                        if (
+                            isinstance(node.func, ast.Attribute)
+                            and node.func.attr in ("add_edge", "add_conditional_edges")
+                            and len(node.args) >= 2
+                        ):
                             a, b = node.args[0], node.args[1]
                             if isinstance(a, ast.Constant) and isinstance(b, ast.Constant):
                                 eid = f"e-{a.value}-{b.value}"
-                                edges.append(WorkflowEdge(
-                                    id=eid, from_node=str(a.value), to_node=str(b.value),
-                                    conditional=node.func.attr == "add_conditional_edges",
-                                    metadata={},
-                                ))
+                                edges.append(
+                                    WorkflowEdge(
+                                        id=eid,
+                                        from_node=str(a.value),
+                                        to_node=str(b.value),
+                                        conditional=node.func.attr == "add_conditional_edges",
+                                        metadata={},
+                                    )
+                                )
                 break
             except Exception:
                 pass
@@ -467,19 +554,23 @@ class LangGraphAdapter(RuntimeAdapter):
         if not nodes:
             return []
 
-        nodes.insert(0, WorkflowNode(id="__start__", label="START", type=NodeType.START, metadata={}))
+        nodes.insert(
+            0, WorkflowNode(id="__start__", label="START", type=NodeType.START, metadata={})
+        )
         nodes.append(WorkflowNode(id="__end__", label="END", type=NodeType.END, metadata={}))
 
-        return [WorkflowInfo(
-            id=f"wf-langgraph-{hash(str(workspace)) % 10000:04d}",
-            name="LangGraph Project",
-            runtime="langgraph",
-            source_file=source_file,
-            nodes=nodes,
-            edges=edges,
-            entry_points=["__start__"],
-            metadata={"_ast_scanned": True},
-        )]
+        return [
+            WorkflowInfo(
+                id=f"wf-langgraph-{hash(str(workspace)) % 10000:04d}",
+                name="LangGraph Project",
+                runtime="langgraph",
+                source_file=source_file,
+                nodes=nodes,
+                edges=edges,
+                entry_points=["__start__"],
+                metadata={"_ast_scanned": True},
+            )
+        ]
 
     def _fixture_workflow(self) -> WorkflowInfo:
         return WorkflowInfo(
@@ -488,37 +579,61 @@ class LangGraphAdapter(RuntimeAdapter):
             runtime="langgraph",
             source_file="examples/sample-langgraph-project/agent.py",
             nodes=[
-                WorkflowNode(id="__start__", label="START",      type=NodeType.START,  metadata={}),
-                WorkflowNode(id="agent",      label="Agent",      type=NodeType.AGENT,  metadata={}),
-                WorkflowNode(id="tools",      label="Tools",      type=NodeType.TOOL,   metadata={}),
-                WorkflowNode(id="__end__",    label="END",        type=NodeType.END,    metadata={}),
+                WorkflowNode(id="__start__", label="START", type=NodeType.START, metadata={}),
+                WorkflowNode(id="agent", label="Agent", type=NodeType.AGENT, metadata={}),
+                WorkflowNode(id="tools", label="Tools", type=NodeType.TOOL, metadata={}),
+                WorkflowNode(id="__end__", label="END", type=NodeType.END, metadata={}),
             ],
             edges=[
-                WorkflowEdge(id="e1", from_node="__start__", to_node="agent",     conditional=False, metadata={}),
-                WorkflowEdge(id="e2", from_node="agent",      to_node="tools",    label="use_tool",  conditional=True, metadata={}),
-                WorkflowEdge(id="e3", from_node="agent",      to_node="__end__",  label="done",      conditional=True, metadata={}),
-                WorkflowEdge(id="e4", from_node="tools",      to_node="agent",    conditional=False, metadata={}),
+                WorkflowEdge(
+                    id="e1", from_node="__start__", to_node="agent", conditional=False, metadata={}
+                ),
+                WorkflowEdge(
+                    id="e2",
+                    from_node="agent",
+                    to_node="tools",
+                    label="use_tool",
+                    conditional=True,
+                    metadata={},
+                ),
+                WorkflowEdge(
+                    id="e3",
+                    from_node="agent",
+                    to_node="__end__",
+                    label="done",
+                    conditional=True,
+                    metadata={},
+                ),
+                WorkflowEdge(
+                    id="e4", from_node="tools", to_node="agent", conditional=False, metadata={}
+                ),
             ],
             entry_points=["__start__"],
             metadata={"_mock": True},
         )
 
     def export_schemas(self, workspace: Path) -> list[SchemaInfo]:
-        return [SchemaInfo(
-            id="schema-langgraph-state-fixture",
-            name="AgentState",
-            runtime="langgraph",
-            schema={
-                "title": "AgentState",
-                "type": "object",
-                "properties": {
-                    "messages": {"type": "array", "items": {"type": "object"}, "description": "Message history"},
-                    "next":     {"type": "string", "description": "Next node to route to"},
+        return [
+            SchemaInfo(
+                id="schema-langgraph-state-fixture",
+                name="AgentState",
+                runtime="langgraph",
+                schema={
+                    "title": "AgentState",
+                    "type": "object",
+                    "properties": {
+                        "messages": {
+                            "type": "array",
+                            "items": {"type": "object"},
+                            "description": "Message history",
+                        },
+                        "next": {"type": "string", "description": "Next node to route to"},
+                    },
+                    "description": "[MOCK] LangGraph fixture schema",
                 },
-                "description": "[MOCK] LangGraph fixture schema",
-            },
-            source_file="examples/sample-langgraph-project/state.py",
-        )]
+                source_file="examples/sample-langgraph-project/state.py",
+            )
+        ]
 
 
 class LangGraphRunError(Exception):

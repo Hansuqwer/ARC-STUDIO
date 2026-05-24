@@ -1,4 +1,5 @@
 """Data models for ARC Arena — LM Arena protocol types."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -10,6 +11,7 @@ from pydantic import BaseModel, Field
 
 class ArenaMode(str, Enum):
     """The four LM Arena interaction modes."""
+
     BATTLE = "battle"
     DIRECT = "direct"
     CODE = "code"
@@ -18,6 +20,7 @@ class ArenaMode(str, Enum):
 
 class PrivacyLevel(str, Enum):
     """Privacy settings for code sent to Arena."""
+
     PRIVATE = "Private"
     DEBUG = "Debug"
     RESEARCH = "Research"
@@ -25,6 +28,7 @@ class PrivacyLevel(str, Enum):
 
 class ArenaModelInfo(BaseModel):
     """Available model information from LM Arena."""
+
     id: str
     name: str
     provider: str
@@ -39,6 +43,7 @@ class ArenaModelInfo(BaseModel):
 
 class ArenaCandidate(BaseModel):
     """A single response candidate from one model in a battle or direct call."""
+
     id: str
     model: str = ""
     text: str = ""
@@ -52,6 +57,7 @@ class ArenaCandidate(BaseModel):
 
 class ArenaRequest(BaseModel):
     """Request payload for LM Arena operations."""
+
     mode: ArenaMode = ArenaMode.BATTLE
     prompt: str = ""
     workspace: str = ""
@@ -66,26 +72,33 @@ class ArenaRequest(BaseModel):
 
 class ArenaResponse(BaseModel):
     """Response payload from LM Arena."""
+
     run_id: str = ""
     mode: ArenaMode = ArenaMode.BATTLE
     candidates: list[ArenaCandidate] = Field(default_factory=list)
     recommended: str = ""
     warnings: list[str] = Field(default_factory=list)
-    generated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"))
+    generated_at: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    )
 
 
 class ArenaVote(BaseModel):
     """A user vote for a battle candidate."""
+
     run_id: str
     winner_candidate_id: str
     loser_candidate_id: str = ""
     profile_id: str = ""
     voter: str = ""
-    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"))
+    timestamp: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    )
 
 
 class ArenaAdoptRequest(BaseModel):
     """Request to adopt a candidate's output."""
+
     run_id: str
     candidate_id: str
     target_file: str = ""
@@ -94,6 +107,7 @@ class ArenaAdoptRequest(BaseModel):
 
 class ArenaAdoptResult(BaseModel):
     """Result of adopting a candidate's output."""
+
     applied: bool = False
     file_changed: str = ""
     patch_lines: int = 0

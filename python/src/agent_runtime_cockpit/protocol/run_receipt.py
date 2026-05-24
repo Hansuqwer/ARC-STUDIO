@@ -1,4 +1,5 @@
 """Cockpit run receipt protocol schema."""
+
 from __future__ import annotations
 
 import hashlib
@@ -11,7 +12,6 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 
 from .evidence_refs import EvidenceRef
-
 
 RECEIPT_ID_RE = re.compile(r"^rcpt_[a-zA-Z0-9_-]{20,30}$")
 

@@ -11,14 +11,14 @@ Required gates:
 This is only a narrow ``arc providers action`` smoke path. It is not provider-backed
 adoption, not SwarmGraph/provider wiring, and not a broad real-provider claim.
 """
+
 from __future__ import annotations
 
+import json
 import os
 import subprocess
-import json
 
 import pytest
-
 
 pytestmark = pytest.mark.real_runtime
 

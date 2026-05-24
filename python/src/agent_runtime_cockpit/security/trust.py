@@ -1,5 +1,4 @@
-"""
-Workspace trust resolver — ADR-006 P2 enforcement mode.
+"""Workspace trust resolver — ADR-006 P2 enforcement mode.
 
 Trust state is stored outside the workspace (``~/.arc/trusted-workspaces.json``).
 A committed ``.arc/trusted`` file is explicitly ignored — the workspace must
@@ -8,6 +7,7 @@ not self-authorize.
 ``ensure_trusted()`` raises ``WorkspaceUntrusted`` for untrusted workspaces,
 blocking execution. Use ``resolve_trust()`` for advisory inspection.
 """
+
 from __future__ import annotations
 
 import json
@@ -29,6 +29,7 @@ class WorkspaceUntrusted(TrustError):
     Attributes:
         workspace_path: Absolute path to the untrusted workspace.
         reason: Human-readable explanation of why it is untrusted.
+
     """
 
     def __init__(
@@ -179,6 +180,7 @@ def ensure_trusted(
 
     Raises:
         WorkspaceUntrusted: If the workspace is untrusted.
+
     """
     resolution = resolve_trust(workspace, trust_db=trust_db)
     if resolution.level == TrustLevel.UNTRUSTED:

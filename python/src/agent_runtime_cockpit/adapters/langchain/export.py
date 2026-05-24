@@ -17,11 +17,11 @@ from pathlib import Path
 from typing import Any
 
 from ...protocol.schemas import (
-    WorkflowInfo,
-    WorkflowNode,
-    WorkflowEdge,
     NodeType,
     SourceLocation,
+    WorkflowEdge,
+    WorkflowInfo,
+    WorkflowNode,
 )
 
 log = logging.getLogger(__name__)
@@ -178,6 +178,7 @@ def chain_to_workflow_info(
 
     Returns:
         WorkflowInfo representing the chain
+
     """
     chain_name = chain["name"]
     components = chain["components"]
@@ -240,6 +241,7 @@ def export_langchain_workflows(workspace: Path) -> list[WorkflowInfo]:
 
     Returns:
         List of WorkflowInfo for detected chains
+
     """
     chains = scan_workspace_for_chains(workspace)
 

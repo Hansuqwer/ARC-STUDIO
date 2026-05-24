@@ -1,9 +1,9 @@
-"""
-JobSupervisor — owns run lifecycle, cancellation, and orphan recovery (ADR-002).
+"""JobSupervisor — owns run lifecycle, cancellation, and orphan recovery (ADR-002).
 
 Wires the EventBroker for live event streaming during execution.
 Enforces workspace trust before starting runs (ADR-006 P2).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -21,11 +21,11 @@ from pydantic import BaseModel, Field
 
 from ..audit.hitl import HitlPrompt, HitlResponse
 from ..audit.key_manager import AuditKeyManager
-from ..protocol.schemas import RunRecord, RunStatus
 from ..protocol.evidence_refs import EvidenceKind, EvidenceRef
 from ..protocol.failure_autopsy import FailureAutopsy, RetryOption
 from ..protocol.run_contract import ContractStatus, RunContract
 from ..protocol.run_receipt import RunReceipt
+from ..protocol.schemas import RunRecord, RunStatus
 from ..security.redaction import Redactor
 from ..security.trust import ensure_trusted
 from ..storage.jsonl import JsonlTraceStore
@@ -39,6 +39,7 @@ ALLOWED_EVIDENCE_KINDS = {EvidenceKind.FILE, EvidenceKind.TOOL_OUTPUT}
 
 class RunRequest(BaseModel):
     """Input for starting a run via the supervisor."""
+
     workflow_id: str
     runtime: Optional[str] = None
     inputs: dict[str, Any] = Field(default_factory=dict)
@@ -59,6 +60,7 @@ class RunRequest(BaseModel):
 @dataclass
 class ActiveRun:
     """A currently-executing run managed by the supervisor."""
+
     run_id: str
     task: Optional[asyncio.Task] = None
     cancelled: bool = False
@@ -149,13 +151,21 @@ class JobSupervisor:
         try:
             contract = self.store.load_contract(run_id)
             if contract:
-                self._emit_event(run_id, "CONTRACT_PROPOSED", {
-                    "contract": self._redacted(contract.model_dump(mode="json")),
-                })
-            self._emit_event(run_id, "RUN_STARTED", {
-                "workflow_id": request.workflow_id,
-                "runtime": request.runtime or "unknown",
-            })
+                self._emit_event(
+                    run_id,
+                    "CONTRACT_PROPOSED",
+                    {
+                        "contract": self._redacted(contract.model_dump(mode="json")),
+                    },
+                )
+            self._emit_event(
+                run_id,
+                "RUN_STARTED",
+                {
+                    "workflow_id": request.workflow_id,
+                    "runtime": request.runtime or "unknown",
+                },
+            )
             run = self.store.load(run_id)
             if run:
                 run.status = RunStatus.RUNNING
@@ -184,10 +194,14 @@ class JobSupervisor:
 
         except Exception as e:
             duration = self._now_ms() - start_ms
-            self._emit_event(run_id, "RUN_FAILED", {
-                "error": self._redactor.redact_string(str(e)),
-                "error_detail": type(e).__name__,
-            })
+            self._emit_event(
+                run_id,
+                "RUN_FAILED",
+                {
+                    "error": self._redactor.redact_string(str(e)),
+                    "error_detail": type(e).__name__,
+                },
+            )
             run = self.store.load(run_id)
             if run:
                 run.status = RunStatus.FAILED
@@ -195,9 +209,13 @@ class JobSupervisor:
                 self.store.save(run)
                 autopsy = self._generate_autopsy(run, e)
                 self.store.save_autopsy(autopsy)
-                self._emit_event(run_id, "FAILURE_AUTOPSY_GENERATED", {
-                    "autopsy": self._redacted(autopsy.model_dump(mode="json", by_alias=True)),
-                })
+                self._emit_event(
+                    run_id,
+                    "FAILURE_AUTOPSY_GENERATED",
+                    {
+                        "autopsy": self._redacted(autopsy.model_dump(mode="json", by_alias=True)),
+                    },
+                )
                 self._finalize_run_artifacts(run_id, request, RunStatus.FAILED, duration)
 
         finally:
@@ -239,7 +257,8 @@ class JobSupervisor:
                 "workflow_id": request.workflow_id,
                 "profile_id": request.profile_id,
                 "workspace_path": str(Path(request.workspace_root).resolve())
-                if request.workspace_root else "unknown",
+                if request.workspace_root
+                else "unknown",
                 "input_hash": self._input_hash(request.inputs),
                 "timeout_seconds": request.timeout_seconds,
             },
@@ -271,26 +290,38 @@ class JobSupervisor:
             contract.status = ContractStatus.FULFILLED
             contract.fulfilled_at = datetime.now(timezone.utc).isoformat()
             self.store.save_contract(contract)
-            self._emit_event(run_id, "CONTRACT_FULFILLED", {
-                "contract_id": contract.contract_id,
-                "run_id": run_id,
-            })
+            self._emit_event(
+                run_id,
+                "CONTRACT_FULFILLED",
+                {
+                    "contract_id": contract.contract_id,
+                    "run_id": run_id,
+                },
+            )
         elif contract and status == RunStatus.COMPLETED:
             contract.status = ContractStatus.VIOLATED
             self.store.save_contract(contract)
-            self._emit_event(run_id, "CONTRACT_VIOLATED", {
-                "contract_id": contract.contract_id,
-                "run_id": run_id,
-                "reason": "contract terms not satisfied",
-            })
+            self._emit_event(
+                run_id,
+                "CONTRACT_VIOLATED",
+                {
+                    "contract_id": contract.contract_id,
+                    "run_id": run_id,
+                    "reason": "contract terms not satisfied",
+                },
+            )
         if run:
             run = self.store.load(run_id)
         if run:
             run.metadata["receipt_id"] = receipt.receipt_id
             self.store.save(run)
-        self._emit_event(run_id, "RECEIPT_GENERATED", {
-            "receipt": self._redacted(receipt.model_dump(mode="json", by_alias=True)),
-        })
+        self._emit_event(
+            run_id,
+            "RECEIPT_GENERATED",
+            {
+                "receipt": self._redacted(receipt.model_dump(mode="json", by_alias=True)),
+            },
+        )
 
     def _generate_autopsy(self, run: RunRecord, error: Exception) -> FailureAutopsy:
         safe_error = self._redactor.redact_string(str(error))
@@ -319,7 +350,9 @@ class JobSupervisor:
             return data
         if event_type in {"TOOL_CALL_RESULT", "TOOL_CALL_ERROR"}:
             data = dict(data)
-            data["evidence_refs"] = [self._tool_evidence(run_id, sequence).model_dump(by_alias=True)]
+            data["evidence_refs"] = [
+                self._tool_evidence(run_id, sequence).model_dump(by_alias=True)
+            ]
         return data
 
     def _run_evidence_refs(self, run: RunRecord) -> list[EvidenceRef]:
@@ -446,22 +479,30 @@ class JobSupervisor:
         loop = asyncio.get_running_loop()
         future: asyncio.Future[HitlResponse] = loop.create_future()
         self._pending_hitl[prompt.hitl_id] = future
-        self._emit_event(prompt.run_id, "HITL_PROMPT", {
-            "hitl_id": prompt.hitl_id,
-            "step_id": prompt.step_id,
-            "prompt_text": prompt.prompt_text,
-            "context": prompt.context,
-            "options": prompt.options,
-            "timeout_seconds": prompt.timeout_seconds,
-            "created_at": prompt.created_at,
-        })
+        self._emit_event(
+            prompt.run_id,
+            "HITL_PROMPT",
+            {
+                "hitl_id": prompt.hitl_id,
+                "step_id": prompt.step_id,
+                "prompt_text": prompt.prompt_text,
+                "context": prompt.context,
+                "options": prompt.options,
+                "timeout_seconds": prompt.timeout_seconds,
+                "created_at": prompt.created_at,
+            },
+        )
         try:
             return await asyncio.wait_for(future, timeout=prompt.timeout_seconds)
         except asyncio.TimeoutError as exc:
-            self._emit_event(prompt.run_id, "HITL_TIMEOUT", {
-                "hitl_id": prompt.hitl_id,
-                "timeout_seconds": prompt.timeout_seconds,
-            })
+            self._emit_event(
+                prompt.run_id,
+                "HITL_TIMEOUT",
+                {
+                    "hitl_id": prompt.hitl_id,
+                    "timeout_seconds": prompt.timeout_seconds,
+                },
+            )
             raise HitlTimeoutError(f"HITL prompt timed out: {prompt.hitl_id}") from exc
         finally:
             self._pending_hitl.pop(prompt.hitl_id, None)
@@ -472,14 +513,18 @@ class JobSupervisor:
         if future is None or future.done():
             raise HitlNotFoundError(response.hitl_id)
         future.set_result(response)
-        self._emit_event(response.run_id, "HITL_RESPONSE", {
-            "hitl_id": response.hitl_id,
-            "decision": response.decision.value,
-            "operator_id": response.operator_id,
-            "modified_data": response.modified_data,
-            "notes": response.notes,
-            "responded_at": response.responded_at,
-        })
+        self._emit_event(
+            response.run_id,
+            "HITL_RESPONSE",
+            {
+                "hitl_id": response.hitl_id,
+                "decision": response.decision.value,
+                "operator_id": response.operator_id,
+                "modified_data": response.modified_data,
+                "notes": response.notes,
+                "responded_at": response.responded_at,
+            },
+        )
 
     def pending_hitl(self, run_id: str | None = None) -> list[dict[str, str]]:
         """Return pending HITL ids. Kept minimal until persistence/CLI lands."""
@@ -493,4 +538,5 @@ class JobSupervisor:
     @staticmethod
     def _now_ms() -> int:
         import time
+
         return int(time.time() * 1000)

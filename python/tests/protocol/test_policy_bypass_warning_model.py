@@ -1,14 +1,13 @@
-"""
-Tests for PolicyBypassWarning model and PolicyBypassReason enum (Phase 22.1).
-"""
+"""Tests for PolicyBypassWarning model and PolicyBypassReason enum (Phase 22.1)."""
 
 import json
-import pytest
 from datetime import datetime, timezone
 
+import pytest
+
 from agent_runtime_cockpit.protocol._bypass import (
-    PolicyBypassWarning,
     PolicyBypassReason,
+    PolicyBypassWarning,
 )
 
 

@@ -1,5 +1,4 @@
-"""
-E2E smoke test for PolicyBypassWarning (Phase 22.1).
+"""E2E smoke test for PolicyBypassWarning (Phase 22.1).
 
 Tests the full end-to-end flow: emit → replay → query.
 """
@@ -11,19 +10,18 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from agent_runtime_cockpit.cli._app import app
-from agent_runtime_cockpit.security.enforcement import emit_policy_bypass_warning
-from agent_runtime_cockpit.protocol._bypass import PolicyBypassReason
 from agent_runtime_cockpit.audit.key_manager import sign_audit_record
 from agent_runtime_cockpit.audit.streaming_verifier import (
-    StreamingAuditVerifier,
     GENESIS,
+    StreamingAuditVerifier,
 )
+from agent_runtime_cockpit.cli._app import app
+from agent_runtime_cockpit.protocol._bypass import PolicyBypassReason
+from agent_runtime_cockpit.security.enforcement import emit_policy_bypass_warning
 
 
 def test_bypass_warning_e2e_emit_replay_query(tmp_path: Path):
-    """
-    E2E smoke test: emit → replay → query.
+    """E2E smoke test: emit → replay → query.
 
     Tests the full end-to-end flow:
     1. Emit a PolicyBypassWarning using emit_policy_bypass_warning()

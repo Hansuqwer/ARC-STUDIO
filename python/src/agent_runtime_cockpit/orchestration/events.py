@@ -3,15 +3,15 @@
 Uses ``protocol.events.create_event()`` for validated event creation
 with schema versioning (ADR-004).
 """
+
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
 from typing import Iterable, Iterator
-import uuid
 
-from ..protocol.schemas import RunEvent
 from ..protocol.events import create_event
-
+from ..protocol.schemas import RunEvent
 
 _EVENT_SEQUENCE = 0
 
@@ -51,7 +51,9 @@ def coalesce_chunks(
         if item.type != "MESSAGE_CHUNK":
             if buffer:
                 yield create_event(
-                    run_id, sequence, "MESSAGE",
+                    run_id,
+                    sequence,
+                    "MESSAGE",
                     {"text": "".join(buffer), "source": source, "coalesced": True},
                 )
                 buffer = []
@@ -61,12 +63,16 @@ def coalesce_chunks(
         buffer.append(str(item.data.get("text") or ""))
         if sum(len(part) for part in buffer) >= max_chars:
             yield create_event(
-                run_id, sequence, "MESSAGE",
+                run_id,
+                sequence,
+                "MESSAGE",
                 {"text": "".join(buffer), "source": source, "coalesced": True},
             )
             buffer = []
     if buffer:
         yield create_event(
-            run_id, sequence + 1, "MESSAGE",
+            run_id,
+            sequence + 1,
+            "MESSAGE",
             {"text": "".join(buffer), "source": source, "coalesced": True},
         )

@@ -2,18 +2,18 @@ from agent_runtime_cockpit.provider_action import (
     DEFAULT_ROUTING,
     PROVIDERS,
     ProviderAccountStore,
+    ProviderActionRequest,
     ProviderQuotaStore,
     ProviderRequest,
-    ProviderActionRequest,
     ProviderRoutingPolicy,
     ProviderRoutingStore,
+    _is_openai_compatible,
     check_provider_cost_gate,
     dry_run_proxy,
     mask_secret,
     provider_statuses,
     redact,
     run_provider_action,
-    _is_openai_compatible,
 )
 
 
@@ -48,7 +48,10 @@ def test_default_routing_blocks_live_calls():
 
 
 def test_redact_removes_keys_from_nested_payload():
-    payload = {"headers": {"authorization": "Bearer abcdefghijklmnopqrstuvwxyz"}, "text": "sk-test-openai-redacted"}
+    payload = {
+        "headers": {"authorization": "Bearer abcdefghijklmnopqrstuvwxyz"},
+        "text": "sk-test-openai-redacted",
+    }
     assert "abcdefghijklmnopqrstuvwxyz" not in str(redact(payload))
     assert "sk-test-openai-redacted" not in str(redact(payload))
 
@@ -75,14 +78,20 @@ def test_account_store_rejects_direct_key(tmp_path):
 
 def test_routing_store_persists_policy(tmp_path):
     store = ProviderRoutingStore(tmp_path / "routing.json")
-    policy = store.set(ProviderRoutingPolicy(mode="manual", default_provider="openai", default_model="gpt-4.1-mini"))
+    policy = store.set(
+        ProviderRoutingPolicy(
+            mode="manual", default_provider="openai", default_model="gpt-4.1-mini"
+        )
+    )
     assert policy.default_provider == "openai"
     assert store.get().default_model == "gpt-4.1-mini"
 
 
 def test_proxy_dry_run_no_network(monkeypatch, tmp_path):
     monkeypatch.setenv("ARC_PROVIDER_ROUTING", str(tmp_path / "routing.json"))
-    response = dry_run_proxy(ProviderRequest(provider="openai", model="gpt-4.1-mini", prompt="hello"))
+    response = dry_run_proxy(
+        ProviderRequest(provider="openai", model="gpt-4.1-mini", prompt="hello")
+    )
     assert response.dry_run is True
     assert "No network call" in response.message
 
@@ -90,7 +99,9 @@ def test_proxy_dry_run_no_network(monkeypatch, tmp_path):
 def test_cost_gate_allows_default_dry_run_without_live_env(monkeypatch, tmp_path):
     monkeypatch.setenv("ARC_PROVIDER_ROUTING", str(tmp_path / "routing.json"))
     monkeypatch.delenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", raising=False)
-    gate = check_provider_cost_gate(ProviderRequest(provider="openai", model="gpt-4.1-mini"), env={})
+    gate = check_provider_cost_gate(
+        ProviderRequest(provider="openai", model="gpt-4.1-mini"), env={}
+    )
     assert gate.allowed is True
     assert gate.dry_run is True
     assert gate.live_enabled is False
@@ -99,7 +110,9 @@ def test_cost_gate_allows_default_dry_run_without_live_env(monkeypatch, tmp_path
 def test_cost_gate_blocks_live_without_env(monkeypatch, tmp_path):
     monkeypatch.setenv("ARC_PROVIDER_ROUTING", str(tmp_path / "routing.json"))
     gate = check_provider_cost_gate(
-        ProviderRequest(provider="openai", model="gpt-4.1-mini", dry_run=False, allow_paid_calls=True),
+        ProviderRequest(
+            provider="openai", model="gpt-4.1-mini", dry_run=False, allow_paid_calls=True
+        ),
         env={},
     )
     assert gate.allowed is False
@@ -122,7 +135,11 @@ def test_proxy_blocked_live_does_not_reserve_quota(monkeypatch, tmp_path):
     monkeypatch.setenv("ARC_PROVIDER_QUOTA", str(quota_path))
     monkeypatch.delenv("ARC_ALLOW_LIVE_PROVIDER_TESTS", raising=False)
     try:
-        dry_run_proxy(ProviderRequest(provider="openai", model="gpt-4.1-mini", dry_run=False, allow_paid_calls=True))
+        dry_run_proxy(
+            ProviderRequest(
+                provider="openai", model="gpt-4.1-mini", dry_run=False, allow_paid_calls=True
+            )
+        )
     except RuntimeError as exc:
         assert "Live provider calls disabled" in str(exc)
     else:
@@ -161,7 +178,10 @@ def test_quota_store_reset_clears_counters(tmp_path):
     store = ProviderQuotaStore(tmp_path / "quota.json")
     store.reserve("openai", account_id="acct", provider_cap=2, account_cap=2)
     store.reset()
-    assert store.remaining("openai", "acct", provider_cap=2, account_cap=2) == {"provider": 2, "account": 2}
+    assert store.remaining("openai", "acct", provider_cap=2, account_cap=2) == {
+        "provider": 2,
+        "account": 2,
+    }
 
 
 def test_9router_live_action_blocks_before_network_without_gates(monkeypatch, tmp_path):
@@ -485,10 +505,7 @@ def test_broad_provider_action_dry_run_makes_no_network_call(monkeypatch, tmp_pa
 
     monkeypatch.setattr("urllib.request.urlopen", fail_urlopen)
 
-    openai_compatible_ids = [
-        p.id for p in PROVIDERS
-        if _is_openai_compatible(p)
-    ]
+    openai_compatible_ids = [p.id for p in PROVIDERS if _is_openai_compatible(p)]
 
     for provider_id in openai_compatible_ids:
         result = run_provider_action(

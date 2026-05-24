@@ -1,9 +1,11 @@
 """Docker isolation provider — container-based execution for untrusted workspaces."""
+
 from __future__ import annotations
 
-import logging
-import time
 import gc
+import logging
+import os
+import time
 from pathlib import Path
 from typing import Any, Optional
 
@@ -16,6 +18,7 @@ log = logging.getLogger(__name__)
 
 class DockerConfig(BaseModel):
     """Configuration for Docker isolation provider."""
+
     image: str = "python:3.12-slim"
     volumes: dict[str, dict[str, str]] = Field(default_factory=dict)
     network_disabled: bool = True
@@ -42,6 +45,8 @@ class DockerIsolationProvider(IsolationProvider):
 
     async def health_check(self) -> bool:
         """Return True if Docker daemon is reachable."""
+        if not container_sandbox_enabled():
+            return False
         try:
             client = self._get_client()
             if client is None:
@@ -63,6 +68,12 @@ class DockerIsolationProvider(IsolationProvider):
         timeout_seconds: int = 300,
     ) -> IsolationResult:
         """Execute a command inside a Docker container."""
+        if not container_sandbox_enabled():
+            return IsolationResult(
+                exit_code=-1,
+                stderr="Container sandbox disabled. Set ARC_ENABLE_CONTAINER_SANDBOX=1 to enable.",
+                provider=self.provider_id,
+            )
         client = self._get_client()
         if client is None:
             return IsolationResult(
@@ -92,26 +103,42 @@ class DockerIsolationProvider(IsolationProvider):
                 container.kill()
                 duration = int((time.monotonic() - start) * 1000)
                 return IsolationResult(
-                    exit_code=-1, stdout="", stderr="container timeout",
-                    duration_ms=duration, killed=True, kill_reason="timeout",
+                    exit_code=-1,
+                    stdout="",
+                    stderr="container timeout",
+                    duration_ms=duration,
+                    killed=True,
+                    kill_reason="timeout",
                     provider=self.provider_id,
                 )
             logs = container.logs(stdout=True, stderr=True).decode("utf-8", errors="replace")
             duration = int((time.monotonic() - start) * 1000)
             return IsolationResult(
-                exit_code=exit_code, stdout=logs, stderr="",
-                duration_ms=duration, provider=self.provider_id,
+                exit_code=exit_code,
+                stdout=logs,
+                stderr="",
+                duration_ms=duration,
+                provider=self.provider_id,
             )
         except Exception as e:
             duration = int((time.monotonic() - start) * 1000)
             log.error("Docker execution failed: %s", e)
             return IsolationResult(
-                exit_code=-1, stdout="", stderr=str(e),
-                duration_ms=duration, provider=self.provider_id,
+                exit_code=-1,
+                stdout="",
+                stderr=str(e),
+                duration_ms=duration,
+                provider=self.provider_id,
             )
 
     def detect_runtime(self) -> dict[str, Any]:
         """Detect which Docker-compatible runtime is available."""
+        if not container_sandbox_enabled():
+            return {
+                "available": False,
+                "runtime": "disabled",
+                "error": "ARC_ENABLE_CONTAINER_SANDBOX not set",
+            }
         if self._runtime_info is not None:
             return self._runtime_info
         info: dict[str, Any] = {"available": False, "runtime": "unknown"}
@@ -165,6 +192,7 @@ class DockerIsolationProvider(IsolationProvider):
             return self._client
         try:
             import docker
+
             self._client = docker.from_env()
             return self._client
         except ImportError:
@@ -173,3 +201,8 @@ class DockerIsolationProvider(IsolationProvider):
         except Exception as e:
             log.warning("Docker client init failed: %s", e)
             return None
+
+
+def container_sandbox_enabled() -> bool:
+    """Return True when container execution is explicitly enabled."""
+    return os.environ.get("ARC_ENABLE_CONTAINER_SANDBOX") == "1"

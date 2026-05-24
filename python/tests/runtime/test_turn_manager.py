@@ -5,7 +5,11 @@ from dataclasses import dataclass
 import pytest
 from pydantic import BaseModel
 
-from agent_runtime_cockpit.cli_repl.cancellation import CancellationReason, CancellationToken, never_cancelled
+from agent_runtime_cockpit.cli_repl.cancellation import (
+    CancellationReason,
+    CancellationToken,
+    never_cancelled,
+)
 from agent_runtime_cockpit.cli_repl.session import ChatSession
 from agent_runtime_cockpit.providers import ProviderResponse, StreamChunk, UsageRecord
 from agent_runtime_cockpit.runtime.turn_manager import TurnManager
@@ -36,7 +40,12 @@ class _Event:
 
 
 class _Provider:
-    def __init__(self, response: ProviderResponse | None = None, chunks: list[StreamChunk] | None = None, responses: list[ProviderResponse] | None = None) -> None:
+    def __init__(
+        self,
+        response: ProviderResponse | None = None,
+        chunks: list[StreamChunk] | None = None,
+        responses: list[ProviderResponse] | None = None,
+    ) -> None:
         self.response = response or ProviderResponse(
             call_id="c1",
             model="claude-test",
@@ -71,6 +80,7 @@ class _Provider:
 def _sink(events: list[_Event]):
     def emit(name: str, payload: dict) -> None:
         events.append(_Event(name, payload))
+
     return emit
 
 
@@ -98,13 +108,19 @@ async def test_run_turn_stream_emits_chunk_events_and_final_history() -> None:
         StreamChunk(call_id="c1", chunk_type="start"),
         StreamChunk(call_id="c1", chunk_type="delta", delta="he"),
         StreamChunk(call_id="c1", chunk_type="delta", delta="llo"),
-        StreamChunk(call_id="c1", chunk_type="stop", payload={"usage": {"input_tokens": 1, "output_tokens": 2}}),
+        StreamChunk(
+            call_id="c1",
+            chunk_type="stop",
+            payload={"usage": {"input_tokens": 1, "output_tokens": 2}},
+        ),
     ]
     provider = _Provider(chunks=chunks)
     manager = TurnManager(provider, model="claude-test", event_sink=_sink(events))
     session = ChatSession()
 
-    result = await manager.run_turn(session, "hello", cancellation_token=never_cancelled(), stream=True)
+    result = await manager.run_turn(
+        session, "hello", cancellation_token=never_cancelled(), stream=True
+    )
 
     assert result.content == "hello"
     assert [event.name for event in events] == [
@@ -142,24 +158,28 @@ async def test_run_turn_executes_single_tool_roundtrip() -> None:
     events: list[_Event] = []
     registry = ToolRegistry()
     registry.register(GetCurrentTimeTool())
-    provider = _Provider(responses=[
-        ProviderResponse(
-            call_id="c1",
-            model="claude-test",
-            content="need time",
-            finish_reason="tool_use",
-            usage=UsageRecord(input_tokens=1, output_tokens=1),
-            tool_calls=[{"name": "get_current_time", "args": {}}],
-        ),
-        ProviderResponse(
-            call_id="c2",
-            model="claude-test",
-            content="done",
-            finish_reason="stop",
-            usage=UsageRecord(input_tokens=2, output_tokens=2),
-        ),
-    ])
-    manager = TurnManager(provider, model="claude-test", event_sink=_sink(events), tool_registry=registry)
+    provider = _Provider(
+        responses=[
+            ProviderResponse(
+                call_id="c1",
+                model="claude-test",
+                content="need time",
+                finish_reason="tool_use",
+                usage=UsageRecord(input_tokens=1, output_tokens=1),
+                tool_calls=[{"name": "get_current_time", "args": {}}],
+            ),
+            ProviderResponse(
+                call_id="c2",
+                model="claude-test",
+                content="done",
+                finish_reason="stop",
+                usage=UsageRecord(input_tokens=2, output_tokens=2),
+            ),
+        ]
+    )
+    manager = TurnManager(
+        provider, model="claude-test", event_sink=_sink(events), tool_registry=registry
+    )
     session = ChatSession(tools_enabled=True)
 
     result = await manager.run_turn(session, "what time", cancellation_token=never_cancelled())
@@ -181,31 +201,42 @@ async def test_run_turn_blocks_tool_not_in_allowlist() -> None:
     events: list[_Event] = []
     registry = ToolRegistry()
     registry.register(GetCurrentTimeTool())
-    provider = _Provider(responses=[
-        ProviderResponse(
-            call_id="c1",
-            model="claude-test",
-            content="need time",
-            finish_reason="tool_use",
-            usage=UsageRecord(input_tokens=1, output_tokens=1),
-            tool_calls=[{"name": "get_current_time", "args": {}}],
-        ),
-        ProviderResponse(
-            call_id="c2",
-            model="claude-test",
-            content="blocked result handled",
-            finish_reason="stop",
-            usage=UsageRecord(input_tokens=2, output_tokens=2),
-        ),
-    ])
-    manager = TurnManager(provider, model="claude-test", event_sink=_sink(events), tool_registry=registry)
+    provider = _Provider(
+        responses=[
+            ProviderResponse(
+                call_id="c1",
+                model="claude-test",
+                content="need time",
+                finish_reason="tool_use",
+                usage=UsageRecord(input_tokens=1, output_tokens=1),
+                tool_calls=[{"name": "get_current_time", "args": {}}],
+            ),
+            ProviderResponse(
+                call_id="c2",
+                model="claude-test",
+                content="blocked result handled",
+                finish_reason="stop",
+                usage=UsageRecord(input_tokens=2, output_tokens=2),
+            ),
+        ]
+    )
+    manager = TurnManager(
+        provider, model="claude-test", event_sink=_sink(events), tool_registry=registry
+    )
     session = ChatSession(tools_enabled=True, available_tools=["read_file"])
 
     result = await manager.run_turn(session, "what time", cancellation_token=never_cancelled())
 
     assert result.content == "blocked result handled"
-    assert session.history[1]["content"] == '<tool_result trust="blocked" tool="get_current_time" reason="tool_not_allowed"/>'
-    assert [event.name for event in events] == ["turn.started", "tool.result.blocked", "turn.completed"]
+    assert (
+        session.history[1]["content"]
+        == '<tool_result trust="blocked" tool="get_current_time" reason="tool_not_allowed"/>'
+    )
+    assert [event.name for event in events] == [
+        "turn.started",
+        "tool.result.blocked",
+        "turn.completed",
+    ]
 
 
 @pytest.mark.asyncio
@@ -237,27 +268,37 @@ async def test_untrusted_tool_result_scanned_before_history() -> None:
     events: list[_Event] = []
     registry = ToolRegistry()
     registry.register(_MaliciousUntrustedTool())
-    provider = _Provider(responses=[
-        ProviderResponse(
-            call_id="c1",
-            model="claude-test",
-            content="need malicious",
-            finish_reason="tool_use",
-            usage=UsageRecord(input_tokens=1, output_tokens=1),
-            tool_calls=[{"name": "malicious", "args": {}}],
-        ),
-        ProviderResponse(
-            call_id="c2",
-            model="claude-test",
-            content="blocked handled",
-            finish_reason="stop",
-            usage=UsageRecord(input_tokens=2, output_tokens=2),
-        ),
-    ])
-    manager = TurnManager(provider, model="claude-test", event_sink=_sink(events), tool_registry=registry)
+    provider = _Provider(
+        responses=[
+            ProviderResponse(
+                call_id="c1",
+                model="claude-test",
+                content="need malicious",
+                finish_reason="tool_use",
+                usage=UsageRecord(input_tokens=1, output_tokens=1),
+                tool_calls=[{"name": "malicious", "args": {}}],
+            ),
+            ProviderResponse(
+                call_id="c2",
+                model="claude-test",
+                content="blocked handled",
+                finish_reason="stop",
+                usage=UsageRecord(input_tokens=2, output_tokens=2),
+            ),
+        ]
+    )
+    manager = TurnManager(
+        provider, model="claude-test", event_sink=_sink(events), tool_registry=registry
+    )
     session = ChatSession(tools_enabled=True)
 
     await manager.run_turn(session, "run malicious", cancellation_token=never_cancelled())
 
-    assert session.history[1]["content"] == '<tool_result trust="blocked" tool="malicious" reason="injection_detected"/>'
-    assert any(event.name == "tool.result.blocked" and event.payload["reason"] == "injection_detected" for event in events)
+    assert (
+        session.history[1]["content"]
+        == '<tool_result trust="blocked" tool="malicious" reason="injection_detected"/>'
+    )
+    assert any(
+        event.name == "tool.result.blocked" and event.payload["reason"] == "injection_detected"
+        for event in events
+    )

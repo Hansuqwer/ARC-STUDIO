@@ -1,5 +1,4 @@
-"""
-ARC CLI — Agent Runtime Cockpit command-line interface.
+"""ARC CLI — Agent Runtime Cockpit command-line interface.
 
 Commands:
   arc version    — print ARC version information
@@ -19,9 +18,23 @@ Commands:
 
 from __future__ import annotations
 
-
 # Phase 25: decomposed CLI modules. Re-export for backward compatibility.
-from .cli._app import app, main, console, err_console  # noqa: F401
+from .cli._app import app, console, err_console, main  # noqa: F401
+from .cli._helpers import (  # noqa: F401
+    DEBUG_FLAG,
+    JSON_FLAG,
+    LOCAL_REAL_GATE_ENVS,
+    WORKSPACE_FLAG,
+    _local_real_gate_open,
+    _local_real_gate_state,
+    _out,
+    _profile_payload,
+    _run_preflight,
+    _setup_logging,
+    _validate_runtime_mode,
+    _workspace,
+    check_swarmgraph_runtime,
+)
 from .cli._subapps import (  # noqa: F401
     accounts_app,
     adapter_app,
@@ -41,21 +54,6 @@ from .cli._subapps import (  # noqa: F401
     studio_app,
     studio_sessions_app,
     workspace_app,
-)
-from .cli._helpers import (  # noqa: F401
-    JSON_FLAG,
-    WORKSPACE_FLAG,
-    DEBUG_FLAG,
-    LOCAL_REAL_GATE_ENVS,
-    _setup_logging,
-    _workspace,
-    _out,
-    _profile_payload,
-    _validate_runtime_mode,
-    _local_real_gate_open,
-    _local_real_gate_state,
-    _run_preflight,
-    check_swarmgraph_runtime,
 )
 
 

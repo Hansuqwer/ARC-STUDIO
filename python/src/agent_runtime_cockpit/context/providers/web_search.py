@@ -1,5 +1,4 @@
-"""
-Web Search Provider
+"""Web Search Provider.
 
 Retrieves recent web content for breaking changes, release notes, deprecations.
 """
@@ -10,6 +9,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Optional
+
 from ...protocol.schemas import ContextPackEntry, SourceType
 
 log = logging.getLogger(__name__)

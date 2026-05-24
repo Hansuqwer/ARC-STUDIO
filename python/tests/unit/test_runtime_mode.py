@@ -8,7 +8,6 @@ import pytest
 
 from agent_runtime_cockpit.runtime.mode import RuntimeMode
 
-
 # ---------------------------------------------------------------------------
 # Enum values are locked
 # ---------------------------------------------------------------------------
@@ -16,7 +15,8 @@ from agent_runtime_cockpit.runtime.mode import RuntimeMode
 
 def test_runtime_mode_has_exactly_three_values():
     """ADR-011 locks three modes. If this fails, an ADR amendment is needed
-    before adding or removing a mode."""
+    before adding or removing a mode.
+    """
     assert {m.value for m in RuntimeMode} == {
         "fake",
         "gated_local",
@@ -26,7 +26,8 @@ def test_runtime_mode_has_exactly_three_values():
 
 def test_gated_local_value_is_snake_case():
     """The on-disk string must remain 'gated_local' for backward
-    compatibility with Phase 0/1/2 session files. Do not rename."""
+    compatibility with Phase 0/1/2 session files. Do not rename.
+    """
     assert RuntimeMode.GATED_LOCAL.value == "gated_local"
 
 
@@ -73,7 +74,8 @@ def test_from_legacy_maps_legacy_strings(legacy, expected):
 
 def test_from_legacy_warning_names_canonical_replacement():
     """The deprecation warning must name the canonical replacement so
-    fixing the offending code site is mechanical."""
+    fixing the offending code site is mechanical.
+    """
     with pytest.warns(DeprecationWarning) as record:
         RuntimeMode.from_legacy("live")
     assert len(record) == 1
@@ -162,7 +164,8 @@ def test_requires_gate_false_only_for_fake():
 
 def test_deprecation_warning_stacklevel_points_at_caller():
     """If stacklevel is wrong, every legacy call looks like it originates
-    from mode.py and migration becomes impossible to drive."""
+    from mode.py and migration becomes impossible to drive.
+    """
     with pytest.warns(DeprecationWarning) as record:
         RuntimeMode.from_legacy("live")  # this line is the caller
 

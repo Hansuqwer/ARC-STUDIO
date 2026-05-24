@@ -41,7 +41,12 @@ class CostRecord(BaseModel):
 
     @property
     def total_tokens(self) -> int:
-        return self.input_tokens + self.output_tokens + self.cache_creation_input_tokens + self.cache_read_input_tokens
+        return (
+            self.input_tokens
+            + self.output_tokens
+            + self.cache_creation_input_tokens
+            + self.cache_read_input_tokens
+        )
 
     @model_validator(mode="after")
     def _check_source_degraded_consistency(self) -> "CostRecord":
@@ -52,9 +57,13 @@ class CostRecord(BaseModel):
                 f"requires degraded={expected_degraded}, got degraded={self.degraded}"
             )
         if self.cost_components:
-            component_sum = sum((component.cost_usd for component in self.cost_components), Decimal("0"))
+            component_sum = sum(
+                (component.cost_usd for component in self.cost_components), Decimal("0")
+            )
             quantum = Decimal("1.00000000")
-            if component_sum.quantize(quantum, rounding=ROUND_HALF_EVEN) != self.cost_usd.quantize(quantum, rounding=ROUND_HALF_EVEN):
+            if component_sum.quantize(quantum, rounding=ROUND_HALF_EVEN) != self.cost_usd.quantize(
+                quantum, rounding=ROUND_HALF_EVEN
+            ):
                 raise ValueError(
                     "CostRecord invariant violation: cost_usd must equal "
                     "sum(cost_components.cost_usd) within 8 decimal places"
@@ -67,7 +76,9 @@ class CostRecord(BaseModel):
         Uses :const:`ROUND_HALF_EVEN` (banker's rounding).
         """
         quantum = Decimal("1." + "0" * places)
-        return self.model_copy(update={"cost_usd": self.cost_usd.quantize(quantum, rounding=ROUND_HALF_EVEN)})
+        return self.model_copy(
+            update={"cost_usd": self.cost_usd.quantize(quantum, rounding=ROUND_HALF_EVEN)}
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -101,14 +112,13 @@ def migrate_v1_to_v2(payload: dict[str, Any]) -> dict[str, Any]:
         ValueError: If the payload has an unsupported ``schema_version``
             or is missing required v1 fields.
         KeyError: If required v1 fields are absent.
+
     """
     sv = payload.get("schema_version", 1)
     if sv == 2:
         return dict(payload)  # already v2, no-op
     if sv != 1:
-        raise ValueError(
-            f"Unsupported schema_version={sv}. Only v1 -> v2 migration is supported."
-        )
+        raise ValueError(f"Unsupported schema_version={sv}. Only v1 -> v2 migration is supported.")
 
     # Check for required v1 source fields
     source = payload.get("source", "estimated")
@@ -123,7 +133,9 @@ def migrate_v1_to_v2(payload: dict[str, Any]) -> dict[str, Any]:
             value = payload[v1_key]
             # Convert totalCost (float) -> cost_usd (Decimal)
             if v2_key == "cost_usd" and value is not None:
-                migrated[v2_key] = str(Decimal(str(value)).quantize(Decimal("1.00000000"), rounding=ROUND_HALF_EVEN))
+                migrated[v2_key] = str(
+                    Decimal(str(value)).quantize(Decimal("1.00000000"), rounding=ROUND_HALF_EVEN)
+                )
             elif value is not None:
                 migrated[v2_key] = value
 
@@ -182,9 +194,10 @@ def migrate_cost_record_to_latest(payload: dict[str, Any]) -> dict[str, Any]:
     Raises:
         ValueError: If the payload has an unsupported ``schema_version``
             or is missing required fields for its declared version.
+
     """
     sv = payload.get("schema_version", 1)
-    
+
     if sv == 3:
         return dict(payload)
     elif sv == 2:
@@ -193,7 +206,4 @@ def migrate_cost_record_to_latest(payload: dict[str, Any]) -> dict[str, Any]:
         v2 = migrate_v1_to_v2(payload)
         return migrate_v2_to_v3(v2)
     else:
-        raise ValueError(
-            f"Unsupported schema_version={sv}. "
-            f"Only v1, v2, and v3 are supported."
-        )
+        raise ValueError(f"Unsupported schema_version={sv}. Only v1, v2, and v3 are supported.")

@@ -7,15 +7,17 @@ import textwrap
 
 import pytest
 
+from agent_runtime_cockpit.adapters.langgraph import LangGraphAdapter
 from agent_runtime_cockpit.adapters.langgraph.loader import (
-    LangGraphLoadError, load_graph,
+    LangGraphLoadError,
+    load_graph,
 )
 from agent_runtime_cockpit.adapters.langgraph.runner import LangGraphRunner
-from agent_runtime_cockpit.adapters.langgraph import LangGraphAdapter
 
 
 def _make_workspace(tmp_path: pathlib.Path) -> pathlib.Path:
-    (tmp_path / "mygraph.py").write_text(textwrap.dedent("""
+    (tmp_path / "mygraph.py").write_text(
+        textwrap.dedent("""
         class FakeGraph:
             async def astream_events(self, inputs, version):
                 assert version == "v2"
@@ -24,10 +26,9 @@ def _make_workspace(tmp_path: pathlib.Path) -> pathlib.Path:
                        "data": {"chunk": {"content": "hello"}}}
                 yield {"event": "on_chain_end", "name": "langgraph", "run_id": "r"}
         graph = FakeGraph()
-    """))
-    (tmp_path / "langgraph.json").write_text(json.dumps({
-        "graphs": {"default": "mygraph:graph"}
-    }))
+    """)
+    )
+    (tmp_path / "langgraph.json").write_text(json.dumps({"graphs": {"default": "mygraph:graph"}}))
     return tmp_path
 
 
@@ -55,13 +56,15 @@ def test_real_streaming_no_mock(tmp_path, monkeypatch):
 
 
 def test_capability_report_runnable_when_langgraph_and_export_available(tmp_path, monkeypatch):
-    (tmp_path / "graph_export.py").write_text(textwrap.dedent("""
+    (tmp_path / "graph_export.py").write_text(
+        textwrap.dedent("""
         class FakeGraph:
             def invoke(self, inputs):
                 return inputs
 
         graph = FakeGraph()
-    """))
+    """)
+    )
     monkeypatch.setenv("ARC_LANGGRAPH_EXPORT", "graph_export:graph")
     original_find_spec = importlib.util.find_spec
 

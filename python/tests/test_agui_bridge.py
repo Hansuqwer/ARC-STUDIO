@@ -1,6 +1,7 @@
 """Tests: AG-UI bridge — event mapping."""
-from agent_runtime_cockpit.web.agui_bridge import to_agui, from_agui, ARC_TO_AGUI
+
 from agent_runtime_cockpit.protocol.schemas import RunEvent
+from agent_runtime_cockpit.web.agui_bridge import ARC_TO_AGUI, from_agui, to_agui
 
 
 class TestAguiBridge:
@@ -45,8 +46,11 @@ class TestAguiBridge:
 
     def test_event_data_preserved(self):
         event = RunEvent(
-            type="NODE_COMPLETED", timestamp="2025-01-01T00:00:00Z",
-            run_id="r1", sequence=2, data={"node": "writer", "output": "draft done"}
+            type="NODE_COMPLETED",
+            timestamp="2025-01-01T00:00:00Z",
+            run_id="r1",
+            sequence=2,
+            data={"node": "writer", "output": "draft done"},
         )
         result = to_agui(event)
         assert result.get("node") == "writer"

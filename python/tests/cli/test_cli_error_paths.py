@@ -1,5 +1,7 @@
 """Error-path coverage. These hit argparse-level failures and the global
-exception handler if one exists."""
+exception handler if one exists.
+"""
+
 import pytest
 
 
@@ -30,6 +32,7 @@ def test_keyboard_interrupt_returns_nonzero(run_cli, cli_app, monkeypatch):
 
     def boom(*_a, **_k):
         raise KeyboardInterrupt
+
     target.callback = boom
     try:
         r = run_cli([target.name])

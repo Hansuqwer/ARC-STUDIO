@@ -1,4 +1,5 @@
 """JSONL trace store — persists RunRecords as newline-delimited JSON."""
+
 from __future__ import annotations
 
 import json
@@ -6,10 +7,11 @@ import logging
 import threading
 from pathlib import Path
 from typing import Optional
-from ..protocol.schemas import RunRecord
+
 from ..protocol.failure_autopsy import FailureAutopsy
 from ..protocol.run_contract import RunContract
 from ..protocol.run_receipt import RunReceipt
+from ..protocol.schemas import RunRecord
 
 log = logging.getLogger(__name__)
 DEFAULT_STORE_PATH = Path(".arc") / "traces"
@@ -101,23 +103,26 @@ class JsonlTraceStore:
         paths = sorted(self.base_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
         return [p.stem for p in paths]
 
-    def prune(self, keep: int, dry_run: bool = True, older_than_days: int | None = None) -> list[Path]:
+    def prune(
+        self, keep: int, dry_run: bool = True, older_than_days: int | None = None
+    ) -> list[Path]:
         """Delete oldest trace files beyond keep count, or return would-delete paths.
-        
+
         If older_than_days is set, only delete files older than that many days.
         """
         import time
+
         if keep < 0:
             raise ValueError("keep must be >= 0")
         if not self.base_dir.exists():
             return []
         root = self.base_dir.resolve()
         paths = sorted(self.base_dir.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
-        
+
         if older_than_days is not None:
             cutoff = time.time() - (older_than_days * 86400)
             paths = [p for p in paths if p.stat().st_mtime < cutoff]
-        
+
         victims = paths[keep:]
         for path in victims:
             resolved = path.resolve()

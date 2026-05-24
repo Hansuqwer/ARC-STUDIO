@@ -1,5 +1,4 @@
-"""
-OpenAI Agents SDK Runtime Adapter
+"""OpenAI Agents SDK Runtime Adapter.
 
 Detects and runs OpenAI Agents SDK-based agent projects.
 Source: https://github.com/openai/openai-agents-python
@@ -16,6 +15,7 @@ ARC_OPENAI_AGENTS_EXPORT environment variable in ``module:attr`` format
 (e.g. ``my_project.agent:agent``). The module must reside inside the
 workspace unless explicitly trusted.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -25,16 +25,19 @@ import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-
-from agent_runtime_cockpit.gating import require_dual_gate, GatingError
 from typing import Any
+
+from agent_runtime_cockpit.gating import GatingError, require_dual_gate
 
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import (
-    WorkflowInfo, RunRecord, RunEvent, RunStatus,
+    RunEvent,
+    RunRecord,
+    RunStatus,
+    WorkflowInfo,
 )
 from ._static import dependency_evidence, import_evidence, static_workflow
-from .base import RuntimeAdapter, CapabilityReport, DoctorAction
+from .base import CapabilityReport, DoctorAction, RuntimeAdapter
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +48,7 @@ _EXPORT_ENV = "ARC_OPENAI_AGENTS_EXPORT"
 # ---------------------------------------------------------------------------
 # Export-target loader
 # ---------------------------------------------------------------------------
+
 
 class ExportTargetError(Exception):
     """Raised when the export target cannot be resolved."""
@@ -67,6 +71,7 @@ def _load_exported_agent(
         If the variable is unset, malformed, points outside the workspace
         (unless explicitly trusted), the module cannot be imported, or the
         exported attribute is not an ``Agent`` instance.
+
     """
     raw = os.environ.get(_EXPORT_ENV)
     if not raw:
@@ -106,9 +111,7 @@ def _load_exported_agent(
 
     # Allow if module is inside workspace OR on an explicit trusted path.
     is_inside_workspace = _is_subpath(module_path, workspace_path)
-    is_on_trusted_path = any(
-        _is_subpath(module_path, tp) for tp in trusted_paths
-    )
+    is_on_trusted_path = any(_is_subpath(module_path, tp) for tp in trusted_paths)
 
     if not is_inside_workspace and not is_on_trusted_path:
         raise ExportTargetError(
@@ -122,15 +125,13 @@ def _load_exported_agent(
         mod = importlib.import_module(module_name)
     except Exception as exc:
         raise ExportTargetError(
-            f"Failed to import module {module_name!r} "
-            f"(from {_EXPORT_ENV}={raw!r}): {exc}"
+            f"Failed to import module {module_name!r} (from {_EXPORT_ENV}={raw!r}): {exc}"
         ) from exc
 
     agent = getattr(mod, attr_name, None)
     if agent is None:
         raise ExportTargetError(
-            f"Module {module_name!r} has no attribute {attr_name!r} "
-            f"(from {_EXPORT_ENV}={raw!r})."
+            f"Module {module_name!r} has no attribute {attr_name!r} (from {_EXPORT_ENV}={raw!r})."
         )
 
     # We import Agent lazily so the adapter module can be imported
@@ -138,14 +139,11 @@ def _load_exported_agent(
     try:
         from agents import Agent as OpenAIAgent
     except ImportError as exc:
-        raise ExportTargetError(
-            "OpenAI Agents SDK is not installed."
-        ) from exc
+        raise ExportTargetError("OpenAI Agents SDK is not installed.") from exc
 
     if not isinstance(agent, OpenAIAgent):
         raise ExportTargetError(
-            f"Export target {raw!r} resolved to {type(agent).__name__}, "
-            "not an Agent instance."
+            f"Export target {raw!r} resolved to {type(agent).__name__}, not an Agent instance."
         )
 
     return agent, raw
@@ -163,6 +161,7 @@ def _is_subpath(child: Path, parent: Path) -> bool:
 # ---------------------------------------------------------------------------
 # Adapter
 # ---------------------------------------------------------------------------
+
 
 class OpenAIAgentsAdapter(RuntimeAdapter):
     @property
@@ -187,7 +186,7 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
     def capability_report(self, workspace: Path) -> CapabilityReport:
         detected, _, evidence = self.detect(workspace)
         caps = self.capabilities()
-        
+
         if not caps.can_run:
             return CapabilityReport(
                 runtime_id=self.adapter_id,
@@ -208,7 +207,7 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                     ),
                 ],
             )
-        
+
         # Check dual gating
         try:
             backend, allow_costs = require_dual_gate("OPENAI")
@@ -220,7 +219,12 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                 availability="paid_calls_blocked",
                 reason=str(exc),
                 detected_artifacts=evidence,
-                required_env=["ARC_OPENAI_RUN_BACKEND", "ARC_OPENAI_ALLOW_COSTS", "OPENAI_API_KEY", _EXPORT_ENV],
+                required_env=[
+                    "ARC_OPENAI_RUN_BACKEND",
+                    "ARC_OPENAI_ALLOW_COSTS",
+                    "OPENAI_API_KEY",
+                    _EXPORT_ENV,
+                ],
                 requires_paid_calls=True,
                 doctor_actions=[
                     DoctorAction(
@@ -232,7 +236,7 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                     ),
                 ],
             )
-        
+
         # Check export target configuration
         export_target = os.environ.get(_EXPORT_ENV)
         if not export_target:
@@ -246,7 +250,12 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                     f"Set {_EXPORT_ENV}=module:attr to specify the Agent to run."
                 ),
                 detected_artifacts=evidence,
-                required_env=["ARC_OPENAI_RUN_BACKEND", "ARC_OPENAI_ALLOW_COSTS", "OPENAI_API_KEY", _EXPORT_ENV],
+                required_env=[
+                    "ARC_OPENAI_RUN_BACKEND",
+                    "ARC_OPENAI_ALLOW_COSTS",
+                    "OPENAI_API_KEY",
+                    _EXPORT_ENV,
+                ],
                 requires_paid_calls=True,
                 doctor_actions=[
                     DoctorAction(
@@ -261,14 +270,19 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                     ),
                 ],
             )
-        
+
         return CapabilityReport(
             runtime_id=self.adapter_id,
             detected=detected,
             can_run=True,
             availability="runnable",
             detected_artifacts=evidence,
-            required_env=["ARC_OPENAI_RUN_BACKEND", "ARC_OPENAI_ALLOW_COSTS", "OPENAI_API_KEY", _EXPORT_ENV],
+            required_env=[
+                "ARC_OPENAI_RUN_BACKEND",
+                "ARC_OPENAI_ALLOW_COSTS",
+                "OPENAI_API_KEY",
+                _EXPORT_ENV,
+            ],
             requires_paid_calls=True,
         )
 
@@ -292,19 +306,17 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
 
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
         dep_score, evidence = dependency_evidence(
-            workspace, 
-            ("openai-agents", "openai_agents", "agents")
+            workspace, ("openai-agents", "openai_agents", "agents")
         )
         import_score, import_hits = import_evidence(
-            workspace, 
-            ("from agents", "import agents", "from agents import")
+            workspace, ("from agents", "import agents", "from agents import")
         )
         evidence.extend(import_hits)
-        
+
         if importlib.util.find_spec("agents") is not None:
             evidence.append("agents package importable")
             dep_score = max(dep_score, 0.4)
-        
+
         score = min(dep_score + import_score, 1.0)
         return score > 0.3, score, evidence
 
@@ -314,34 +326,42 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
             return []
         return static_workflow(self.adapter_id, self.adapter_name, workspace, evidence)
 
-    async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
-        """
-        Execute an OpenAI Agents SDK workflow with dual gating.
-        
+    async def run_workflow(
+        self, workflow_id: str, inputs: dict[str, Any] | None = None
+    ) -> RunRecord:
+        """Execute an OpenAI Agents SDK workflow with dual gating.
+
         The Agent to run is loaded from the ``ARC_OPENAI_AGENTS_EXPORT``
         environment variable (``module:attr`` format).
-        
+
         Dual gating enforced via require_dual_gate("OPENAI"):
         1. ARC_OPENAI_RUN_BACKEND must be set (stub/local/gateway)
         2. ARC_OPENAI_ALLOW_COSTS must be 'true' for non-stub backends
-        
+
         Without both gates, this method raises GatingError.
         """
         inputs = inputs or {}
-        
+
         # Dual gating check
         backend, allow_costs = require_dual_gate("OPENAI")
-        
+
         run_id = f"run-openai-{uuid.uuid4().hex[:8]}"
         started = datetime.now(timezone.utc)
         events: list[RunEvent] = []
-        
+
         # Check SDK availability
         if importlib.util.find_spec("agents") is None:
-            events.append(self._event(run_id, 0, "RUN_FAILED", {
-                "error": "OpenAI Agents SDK not installed. Install with: pip install openai-agents",
-                "workflow_id": workflow_id,
-            }))
+            events.append(
+                self._event(
+                    run_id,
+                    0,
+                    "RUN_FAILED",
+                    {
+                        "error": "OpenAI Agents SDK not installed. Install with: pip install openai-agents",
+                        "workflow_id": workflow_id,
+                    },
+                )
+            )
             return RunRecord(
                 id=run_id,
                 workflow_id=workflow_id,
@@ -352,15 +372,22 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                 events=events,
                 metadata={"error": "SDK not installed"},
             )
-        
+
         # Import SDK (only after gating checks pass)
         try:
-            from agents import Runner, RunHooks
+            from agents import RunHooks, Runner
         except ImportError as exc:
-            events.append(self._event(run_id, 0, "RUN_FAILED", {
-                "error": f"Failed to import OpenAI Agents SDK: {exc}",
-                "workflow_id": workflow_id,
-            }))
+            events.append(
+                self._event(
+                    run_id,
+                    0,
+                    "RUN_FAILED",
+                    {
+                        "error": f"Failed to import OpenAI Agents SDK: {exc}",
+                        "workflow_id": workflow_id,
+                    },
+                )
+            )
             return RunRecord(
                 id=run_id,
                 workflow_id=workflow_id,
@@ -371,15 +398,22 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                 events=events,
                 metadata={"error": str(exc)},
             )
-        
+
         # Load the actual Agent from the export target.
         try:
             agent, export_source = _load_exported_agent(inputs)
         except ExportTargetError as exc:
-            events.append(self._event(run_id, 0, "RUN_FAILED", {
-                "error": str(exc),
-                "workflow_id": workflow_id,
-            }))
+            events.append(
+                self._event(
+                    run_id,
+                    0,
+                    "RUN_FAILED",
+                    {
+                        "error": str(exc),
+                        "workflow_id": workflow_id,
+                    },
+                )
+            )
             return RunRecord(
                 id=run_id,
                 workflow_id=workflow_id,
@@ -390,77 +424,108 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                 events=events,
                 metadata={"export_error": str(exc)},
             )
-        
+
         # Event capture hooks
         class ARCRunHooks(RunHooks):
             def __init__(self, run_id: str, events: list[RunEvent]):
                 self.run_id = run_id
                 self.events = events
                 self.seq = 0
-            
+
             def _add_event(self, event_type: str, data: dict[str, Any]):
-                self.events.append(RunEvent(
-                    type=event_type,
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    run_id=self.run_id,
-                    sequence=self.seq,
-                    data=data,
-                ))
+                self.events.append(
+                    RunEvent(
+                        type=event_type,
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        run_id=self.run_id,
+                        sequence=self.seq,
+                        data=data,
+                    )
+                )
                 self.seq += 1
-            
+
             async def on_agent_start(self, context, agent):
-                self._add_event("AGENT_START", {
-                    "agent_name": agent.name,
-                    "instructions": agent.instructions[:200] if agent.instructions else None,
-                })
-            
+                self._add_event(
+                    "AGENT_START",
+                    {
+                        "agent_name": agent.name,
+                        "instructions": agent.instructions[:200] if agent.instructions else None,
+                    },
+                )
+
             async def on_agent_end(self, context, agent, output):
-                self._add_event("AGENT_END", {
-                    "agent_name": agent.name,
-                    "output": str(output)[:500],
-                    "usage": str(context.usage) if hasattr(context, "usage") else None,
-                })
-            
+                self._add_event(
+                    "AGENT_END",
+                    {
+                        "agent_name": agent.name,
+                        "output": str(output)[:500],
+                        "usage": str(context.usage) if hasattr(context, "usage") else None,
+                    },
+                )
+
             async def on_tool_start(self, context, agent, tool):
-                self._add_event("TOOL_START", {
-                    "agent_name": agent.name,
-                    "tool_name": tool.name,
-                })
-            
+                self._add_event(
+                    "TOOL_START",
+                    {
+                        "agent_name": agent.name,
+                        "tool_name": tool.name,
+                    },
+                )
+
             async def on_tool_end(self, context, agent, tool, result):
-                self._add_event("TOOL_END", {
-                    "agent_name": agent.name,
-                    "tool_name": tool.name,
-                    "result": str(result)[:500],
-                })
-            
+                self._add_event(
+                    "TOOL_END",
+                    {
+                        "agent_name": agent.name,
+                        "tool_name": tool.name,
+                        "result": str(result)[:500],
+                    },
+                )
+
             async def on_handoff(self, context, from_agent, to_agent):
-                self._add_event("HANDOFF", {
-                    "from_agent": from_agent.name,
-                    "to_agent": to_agent.name,
-                })
-        
+                self._add_event(
+                    "HANDOFF",
+                    {
+                        "from_agent": from_agent.name,
+                        "to_agent": to_agent.name,
+                    },
+                )
+
         hooks = ARCRunHooks(run_id, events)
-        events.append(self._event(run_id, 0, "RUN_STARTED", {
-            "workflow_id": workflow_id,
-            "backend": backend,
-            "cost_allowed": allow_costs,
-            "export_target": export_source,
-        }))
-        
+        events.append(
+            self._event(
+                run_id,
+                0,
+                "RUN_STARTED",
+                {
+                    "workflow_id": workflow_id,
+                    "backend": backend,
+                    "cost_allowed": allow_costs,
+                    "export_target": export_source,
+                },
+            )
+        )
+
         prompt = str(inputs.get("prompt", ""))
-        
+
         try:
             result = await Runner.run(
                 agent,
                 prompt,
                 hooks=hooks,
             )
-            
-            events.append(self._event(run_id, len(events), "RUN_COMPLETED", {
-                "final_output": str(result.final_output)[:1000],
-            }))
-            
+
+            events.append(
+                self._event(
+                    run_id,
+                    len(events),
+                    "RUN_COMPLETED",
+                    {
+                        "final_output": str(result.final_output)[:1000],
+                    },
+                )
+            )
+
             return RunRecord(
                 id=run_id,
                 workflow_id=workflow_id,
@@ -476,14 +541,21 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                     "export_target": export_source,
                 },
             )
-        
+
         except Exception as exc:
             log.exception("OpenAI Agents run failed")
-            events.append(self._event(run_id, len(events), "RUN_FAILED", {
-                "error": str(exc),
-                "error_type": type(exc).__name__,
-            }))
-            
+            events.append(
+                self._event(
+                    run_id,
+                    len(events),
+                    "RUN_FAILED",
+                    {
+                        "error": str(exc),
+                        "error_type": type(exc).__name__,
+                    },
+                )
+            )
+
             return RunRecord(
                 id=run_id,
                 workflow_id=workflow_id,
@@ -500,7 +572,7 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
                     "error": str(exc),
                 },
             )
-    
+
     def _event(self, run_id: str, seq: int, event_type: str, data: dict[str, Any]) -> RunEvent:
         """Helper to create a RunEvent."""
         return RunEvent(

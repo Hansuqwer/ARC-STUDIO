@@ -1,13 +1,13 @@
 """Parity tests for SwarmGraph event mapping — Python matches TypeScript output."""
-from agent_runtime_cockpit.ag_ui import AGUIEventType, MappingContext, map_event
-from agent_runtime_cockpit.adapters.swarmgraph import mapping  # noqa: F401 — registers mapper
 
+from agent_runtime_cockpit.adapters.swarmgraph import mapping  # noqa: F401 — registers mapper
+from agent_runtime_cockpit.ag_ui import AGUIEventType, MappingContext, map_event
 
 CTX = MappingContext(thread_id="th-test", run_id="run-test", runtime="swarmgraph")
 
 
 def test_handoff_maps_to_step_started():
-    """handoff event → STEP_STARTED with stepName=handoff:<agent>."""
+    """Handoff event → STEP_STARTED with stepName=handoff:<agent>."""
     events = map_event("swarmgraph", {"kind": "handoff", "agent": "bob", "ts": 100}, CTX)
     assert len(events) == 1
     assert events[0]["type"] == AGUIEventType.STEP_STARTED.value
@@ -16,7 +16,7 @@ def test_handoff_maps_to_step_started():
 
 
 def test_handoff_fallback_agent():
-    """handoff without agent → stepName=handoff:? (matches TS)."""
+    """Handoff without agent → stepName=handoff:? (matches TS)."""
     events = map_event("swarmgraph", {"kind": "handoff", "ts": 200}, CTX)
     assert len(events) == 1
     assert events[0]["type"] == AGUIEventType.STEP_STARTED.value
@@ -24,7 +24,7 @@ def test_handoff_fallback_agent():
 
 
 def test_state_maps_to_state_snapshot():
-    """state event → STATE_SNAPSHOT with snapshot data."""
+    """State event → STATE_SNAPSHOT with snapshot data."""
     events = map_event("swarmgraph", {"kind": "state", "state": {"count": 42}, "ts": 300}, CTX)
     assert len(events) == 1
     assert events[0]["type"] == AGUIEventType.STATE_SNAPSHOT.value
@@ -33,7 +33,7 @@ def test_state_maps_to_state_snapshot():
 
 
 def test_state_fallback_empty():
-    """state without state field → snapshot={} (matches TS)."""
+    """State without state field → snapshot={} (matches TS)."""
     events = map_event("swarmgraph", {"kind": "state", "ts": 400}, CTX)
     assert len(events) == 1
     assert events[0]["type"] == AGUIEventType.STATE_SNAPSHOT.value

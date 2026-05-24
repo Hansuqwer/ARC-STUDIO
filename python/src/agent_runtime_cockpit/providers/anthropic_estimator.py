@@ -28,7 +28,6 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
-
 # ---------------------------------------------------------------------------
 # EstimateFallback protocol
 # ---------------------------------------------------------------------------
@@ -63,13 +62,11 @@ class _CountTokensClient(Protocol):
     """
 
     @property
-    def messages(self) -> _MessagesClient:
-        ...
+    def messages(self) -> _MessagesClient: ...
 
 
 class _MessagesClient(Protocol):
-    def count_tokens(self, *, model: str, messages: list[dict]) -> _CountTokensResult:
-        ...
+    def count_tokens(self, *, model: str, messages: list[dict]) -> _CountTokensResult: ...
 
 
 class _CountTokensResult(Protocol):
@@ -110,8 +107,7 @@ class AnthropicCountTokensEstimator:
         model = getattr(response, "model", None)
         if not model:
             raise ValueError(
-                "AnthropicCountTokensEstimator requires request.model to be set; "
-                "got None or empty"
+                "AnthropicCountTokensEstimator requires request.model to be set; got None or empty"
             )
         result = self.client.messages.count_tokens(model=model, messages=original_messages)
         input_tokens = result.input_tokens

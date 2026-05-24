@@ -1,5 +1,4 @@
-"""
-Centralized enforcement helpers for trust and paid-call gates (Phase 23).
+"""Centralized enforcement helpers for trust and paid-call gates (Phase 23).
 
 Provides enforcement functions that emit typed denial events (Phase 22) when
 actions are blocked by security policies. Integrates with existing trust.py
@@ -12,26 +11,25 @@ import datetime as dt
 from pathlib import Path
 from typing import Callable, Optional
 
-from .context import EnforcementContext, DryRunAbort, get_enforcement_context
-from .trust import TrustLevel, resolve_trust, TRUST_DB
-from .profiles import RunProfile
-from ._bypass_rate_limit import should_emit_warning, mark_warning_emitted
-from ..protocol.denial_events import (
-    TrustDeniedEvent,
-    TrustDenialData,
-    PaidCallDeniedEvent,
-    PaidCallDenialData,
-    ShellDeniedEvent,
-    ShellDenialData,
-    NetworkDeniedEvent,
-    NetworkDenialData,
-)
 from ..protocol._bypass import (
+    PolicyBypassReason,
     PolicyBypassWarning,
     PolicyBypassWarningData,
-    PolicyBypassReason,
 )
-
+from ..protocol.denial_events import (
+    NetworkDenialData,
+    NetworkDeniedEvent,
+    PaidCallDenialData,
+    PaidCallDeniedEvent,
+    ShellDenialData,
+    ShellDeniedEvent,
+    TrustDenialData,
+    TrustDeniedEvent,
+)
+from ._bypass_rate_limit import mark_warning_emitted, should_emit_warning
+from .context import DryRunAbort, EnforcementContext, get_enforcement_context
+from .profiles import RunProfile
+from .trust import TRUST_DB, TrustLevel, resolve_trust
 
 # Type alias for event emission callback
 EventEmitter = Callable[[str, str, dict], None]
@@ -71,8 +69,7 @@ def enforce_workspace_trust(
     allow_if_no_db: bool = False,
     ctx: Optional[EnforcementContext] = None,
 ) -> None:
-    """
-    Enforce workspace trust before allowing an action.
+    """Enforce workspace trust before allowing an action.
 
     Emits TRUST_DENIED event if the workspace is untrusted.
 
@@ -89,6 +86,7 @@ def enforce_workspace_trust(
     Raises:
         TrustEnforcementError: If the workspace is untrusted
         DryRunAbort: If dry-run mode is enabled
+
     """
     # Get enforcement context
     ctx = ctx or get_enforcement_context()
@@ -177,8 +175,7 @@ def enforce_paid_call_gate(
     model: Optional[str] = None,
     ctx: Optional[EnforcementContext] = None,
 ) -> None:
-    """
-    Enforce paid-call gate before allowing provider calls.
+    """Enforce paid-call gate before allowing provider calls.
 
     Emits PAID_CALL_DENIED event if the profile doesn't allow paid calls.
 
@@ -195,6 +192,7 @@ def enforce_paid_call_gate(
     Raises:
         PaidCallEnforcementError: If paid calls are not allowed
         DryRunAbort: If dry-run mode is enabled
+
     """
     # Get enforcement context
     ctx = ctx or get_enforcement_context()
@@ -278,8 +276,7 @@ def enforce_shell_gate(
     command: Optional[str] = None,
     ctx: Optional[EnforcementContext] = None,
 ) -> None:
-    """
-    Enforce shell execution gate before allowing shell commands.
+    """Enforce shell execution gate before allowing shell commands.
 
     Emits SHELL_DENIED event if the profile doesn't allow shell execution.
 
@@ -295,6 +292,7 @@ def enforce_shell_gate(
     Raises:
         ShellEnforcementError: If shell execution is not allowed
         DryRunAbort: If dry-run mode is enabled
+
     """
     # Get enforcement context
     ctx = ctx or get_enforcement_context()
@@ -373,8 +371,7 @@ def enforce_network_gate(
     url: Optional[str] = None,
     ctx: Optional[EnforcementContext] = None,
 ) -> None:
-    """
-    Enforce network access gate before allowing network operations.
+    """Enforce network access gate before allowing network operations.
 
     Emits NETWORK_DENIED event if the profile doesn't allow network access.
 
@@ -390,6 +387,7 @@ def enforce_network_gate(
     Raises:
         NetworkEnforcementError: If network access is not allowed
         DryRunAbort: If dry-run mode is enabled
+
     """
     # Get enforcement context
     ctx = ctx or get_enforcement_context()
@@ -470,8 +468,7 @@ def emit_policy_bypass_warning(
     parent_run_id: Optional[str] = None,
     emit_event: Optional[EventEmitter] = None,
 ) -> bool:
-    """
-    Emit a policy bypass warning when enforcement cannot be applied.
+    """Emit a policy bypass warning when enforcement cannot be applied.
 
     Unlike denial events, bypass warnings are non-blocking. They indicate that
     enforcement could not be applied due to architectural limitations (e.g.,
@@ -494,6 +491,7 @@ def emit_policy_bypass_warning(
 
     Returns:
         True if warning was emitted, False if suppressed by rate-limiting
+
     """
     # Check rate-limiting: only emit once per (run_id, surface_identifier)
     if not should_emit_warning(run_id, surface_identifier):

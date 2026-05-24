@@ -8,11 +8,10 @@ from typing import Optional
 import typer
 from rich.table import Table
 
+from ..orchestration.events import new_run_id, now
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
 from ..protocol.schemas import RunRecord, RunStatus
-from ..orchestration.events import new_run_id, now
-
 from ._app import console, err_console
 from ._helpers import (
     DEBUG_FLAG,
@@ -106,8 +105,8 @@ def runs_diff(
 ) -> None:
     """Compare two stored run records."""
     _setup_logging(debug)
-    from ..storage.jsonl import JsonlTraceStore
     from ..evals.diff import diff_runs
+    from ..storage.jsonl import JsonlTraceStore
 
     ws = _workspace(workspace)
     store = JsonlTraceStore(ws / ".arc" / "traces")
@@ -429,8 +428,8 @@ def runs_links(
 ) -> None:
     """Get cross-linked event chains for a run by stable ID."""
     _setup_logging(debug)
-    from ..storage.jsonl import JsonlTraceStore
     from ..orchestration.cross_linker import CrossLinker
+    from ..storage.jsonl import JsonlTraceStore
 
     ws = _workspace(workspace)
     store = JsonlTraceStore(ws / ".arc" / "traces")

@@ -44,7 +44,8 @@ class CLIResult:
 @pytest.fixture(scope="session")
 def cli_app() -> Any:
     """Returns whatever the CLI entry point exposes: Click group, Typer
-    app, or a callable `main(argv: list[str]) -> int`."""
+    app, or a callable `main(argv: list[str]) -> int`.
+    """
     for name in CANDIDATE_MODULES:
         try:
             mod = importlib.import_module(name)

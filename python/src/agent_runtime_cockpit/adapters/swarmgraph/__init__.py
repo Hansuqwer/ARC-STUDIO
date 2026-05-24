@@ -1,9 +1,9 @@
-"""
-SwarmGraph adapter package.
+"""SwarmGraph adapter package.
 
 The main adapter class is defined in the parent swarmgraph.py module.
 This package contains helper modules for SwarmGraph integration.
 """
+
 from .._compat import load_sibling_adapter
 
 # Export the main classes

@@ -1,11 +1,12 @@
 """Tests for Arena data models."""
+
 from agent_runtime_cockpit.arena.models import (
+    ArenaAdoptResult,
+    ArenaCandidate,
     ArenaMode,
     ArenaRequest,
     ArenaResponse,
-    ArenaCandidate,
     ArenaVote,
-    ArenaAdoptResult,
     PrivacyLevel,
 )
 

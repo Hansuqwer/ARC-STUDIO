@@ -1,5 +1,4 @@
-"""
-Event registry — versioned event type definitions and validation (ADR-004).
+"""Event registry — versioned event type definitions and validation (ADR-004).
 
 Provides:
 - ``EventTypeDef`` — schema definition for a single event type

@@ -17,11 +17,11 @@ from pathlib import Path
 from typing import Any
 
 from ...protocol.schemas import (
-    WorkflowInfo,
-    WorkflowNode,
-    WorkflowEdge,
     NodeType,
     SourceLocation,
+    WorkflowEdge,
+    WorkflowInfo,
+    WorkflowNode,
 )
 
 log = logging.getLogger(__name__)
@@ -142,6 +142,7 @@ def export_pydantic_ai_agents(workspace: Path) -> list[WorkflowInfo]:
 
     Returns:
         List of WorkflowInfo objects, one per detected agent
+
     """
     workflows = []
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 from ..config import SwarmTopology
 from ..models import (
     AgentRole,

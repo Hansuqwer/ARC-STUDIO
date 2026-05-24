@@ -9,7 +9,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import Mock
 
-
 from agent_runtime_cockpit.adapters.langchain import LangChainAdapter
 from agent_runtime_cockpit.adapters.langchain.runner import (
     ARCCallbackHandler,

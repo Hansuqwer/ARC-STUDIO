@@ -9,7 +9,7 @@ from typing import Any, Optional
 from agent_runtime_cockpit.schemas.replay_capability import ReplayCapability
 from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
 
-from .loader import load_graph, LangGraphLoadError
+from .loader import LangGraphLoadError, load_graph
 
 log = logging.getLogger(__name__)
 
@@ -22,6 +22,7 @@ def detect_checkpointer(graph: Any) -> tuple[bool, Optional[str]]:
 
     Returns:
         Tuple of (has_checkpointer, checkpointer_type)
+
     """
     try:
         # Check if graph has a checkpointer attribute
@@ -49,6 +50,7 @@ def detect_thread_id_from_run(run_id: str, workspace: pathlib.Path) -> tuple[boo
 
     Returns:
         Tuple of (thread_id_detected, thread_id)
+
     """
     try:
         # Load run from trace store
@@ -93,6 +95,7 @@ def analyze_run_replay_capability(
 
     Returns:
         ReplayCapability analysis
+
     """
     capability = ReplayCapability(
         run_id=run_id,
@@ -169,6 +172,7 @@ def analyze_graph_replay_capability(
 
     Returns:
         ReplayCapability analysis for the graph
+
     """
     capability = ReplayCapability(
         run_id="N/A",

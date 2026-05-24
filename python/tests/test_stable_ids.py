@@ -1,10 +1,11 @@
 import pytest
+
 from agent_runtime_cockpit.protocol.stable_ids import (
     DegradationManifest,
     ensure_stable_id,
     generate_edge_id,
-    generate_stable_id,
     generate_node_id,
+    generate_stable_id,
     is_valid_stable_id,
     parse_stable_id,
 )
@@ -170,7 +171,9 @@ class TestDegradationManifest:
 
     def test_record_event_with_all_ids(self):
         m = DegradationManifest()
-        m.record_event({"node_id": "n1", "message_id": "m1", "tool_call_id": "tc1", "evidence_refs": []})
+        m.record_event(
+            {"node_id": "n1", "message_id": "m1", "tool_call_id": "tc1", "evidence_refs": []}
+        )
         assert m._total_events == 1
         assert m._missing_node_ids == 0
         assert m._missing_message_ids == 0

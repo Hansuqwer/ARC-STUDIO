@@ -1,10 +1,10 @@
-"""
-Adoption registry — resolves adoption modes to runners (P1b).
+"""Adoption registry — resolves adoption modes to runners (P1b).
 
 Provides ``AdoptionRegistry`` for registering, querying, and listing
 adoption runners. Also provides ``parse_runtime_id()`` for resolving
 ``<runtime>+swarmgraph`` syntax.
 """
+
 from __future__ import annotations
 
 import logging
@@ -12,10 +12,10 @@ from pathlib import Path
 from typing import Optional
 
 from .protocol import (
-    AdoptionMode,
     AdoptionCapability,
-    AdoptionStatus,
+    AdoptionMode,
     AdoptionRunner,
+    AdoptionStatus,
 )
 
 log = logging.getLogger(__name__)
@@ -34,30 +34,35 @@ class AdoptionRegistry:
         # LangGraph runner
         try:
             from .langgraph_runner import LangGraphAdoptionRunner
+
             cls.register(LangGraphAdoptionRunner())
         except ImportError:
             pass
         # LlamaIndex runner
         try:
             from .llamaindex_runner import LlamaIndexAdoptionRunner
+
             cls.register(LlamaIndexAdoptionRunner())
         except ImportError:
             pass
         # OpenAI Agents runner
         try:
             from .openai_agents_runner import OpenAIAgentsAdoptionRunner
+
             cls.register(OpenAIAgentsAdoptionRunner())
         except ImportError:
             pass
         # CrewAI runner
         try:
             from .crewai_runner import CrewAIAdoptionRunner
+
             cls.register(CrewAIAdoptionRunner())
         except ImportError:
             pass
         # AG2 runner
         try:
             from .ag2_runner import AG2AdoptionRunner
+
             cls.register(AG2AdoptionRunner())
         except ImportError:
             pass
@@ -85,16 +90,20 @@ class AdoptionRegistry:
         for mode in AdoptionMode:
             runner = cls._runners.get(mode)
             if runner is None:
-                caps.append(AdoptionCapability(
-                    mode=mode,
-                    status=AdoptionStatus.NOT_IMPLEMENTED,
-                    reason="Adoption runner not yet implemented",
-                    doctor_actions=[{
-                        "id": "implement",
-                        "label": "Implement adoption runner",
-                        "description": f"Implement {mode.value} adoption adapter",
-                    }],
-                ))
+                caps.append(
+                    AdoptionCapability(
+                        mode=mode,
+                        status=AdoptionStatus.NOT_IMPLEMENTED,
+                        reason="Adoption runner not yet implemented",
+                        doctor_actions=[
+                            {
+                                "id": "implement",
+                                "label": "Implement adoption runner",
+                                "description": f"Implement {mode.value} adoption adapter",
+                            }
+                        ],
+                    )
+                )
             else:
                 caps.append(runner.check_availability(workspace))
         return caps

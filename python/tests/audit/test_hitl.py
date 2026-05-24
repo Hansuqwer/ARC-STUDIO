@@ -1,8 +1,9 @@
 """Tests for HITL decision records (ADR-005 audit scaffold)."""
+
 from agent_runtime_cockpit.audit.hitl import (
+    HitlDecision,
     HitlPrompt,
     HitlResponse,
-    HitlDecision,
 )
 
 
@@ -31,7 +32,7 @@ def test_hitl_response_to_audit_event():
 
 
 def test_hitl_store_pending_and_response(tmp_path):
-    from agent_runtime_cockpit.audit.hitl_store import save_prompt, list_prompts, respond, get_token
+    from agent_runtime_cockpit.audit.hitl_store import get_token, list_prompts, respond, save_prompt
 
     prompt = HitlPrompt(
         hitl_id="hitl-store-1",
@@ -56,7 +57,7 @@ def test_hitl_store_pending_and_response(tmp_path):
 
 def test_hitl_single_use_token(tmp_path):
     """HITL response rejects reused tokens."""
-    from agent_runtime_cockpit.audit.hitl_store import save_prompt, respond, get_token
+    from agent_runtime_cockpit.audit.hitl_store import get_token, respond, save_prompt
 
     prompt = HitlPrompt(
         hitl_id="hitl-single-1",
@@ -76,7 +77,7 @@ def test_hitl_single_use_token(tmp_path):
 
 def test_hitl_wrong_token_rejected(tmp_path):
     """HITL response rejects wrong token."""
-    from agent_runtime_cockpit.audit.hitl_store import save_prompt, respond
+    from agent_runtime_cockpit.audit.hitl_store import respond, save_prompt
 
     prompt = HitlPrompt(
         hitl_id="hitl-wrong-1",
@@ -93,7 +94,8 @@ def test_hitl_wrong_token_rejected(tmp_path):
 def test_hitl_expiry(tmp_path):
     """HITL prompts expire after TTL."""
     import time
-    from agent_runtime_cockpit.audit.hitl_store import save_prompt, list_prompts, get_token
+
+    from agent_runtime_cockpit.audit.hitl_store import get_token, list_prompts, save_prompt
 
     prompt = HitlPrompt(
         hitl_id="hitl-expiry-1",
@@ -111,7 +113,8 @@ def test_hitl_expiry(tmp_path):
 def test_hitl_expiry_include_expired(tmp_path):
     """list_prompts(include_expired=True) shows expired prompts."""
     import time
-    from agent_runtime_cockpit.audit.hitl_store import save_prompt, list_prompts
+
+    from agent_runtime_cockpit.audit.hitl_store import list_prompts, save_prompt
 
     prompt = HitlPrompt(
         hitl_id="hitl-expiry-2",
@@ -131,7 +134,8 @@ def test_hitl_expiry_include_expired(tmp_path):
 def test_hitl_prune_expired(tmp_path):
     """prune_expired removes expired prompts."""
     import time
-    from agent_runtime_cockpit.audit.hitl_store import save_prompt, prune_expired
+
+    from agent_runtime_cockpit.audit.hitl_store import prune_expired, save_prompt
 
     prompt1 = HitlPrompt(hitl_id="hitl-prune-1", run_id="run-1", step_id="step-1", prompt_text="A")
     prompt2 = HitlPrompt(hitl_id="hitl-prune-2", run_id="run-1", step_id="step-1", prompt_text="B")

@@ -186,6 +186,7 @@ def assess_prompt_risk(input_str: str) -> RiskAssessment:
     Returns:
         A RiskAssessment with the determined risk level, score, matched signals,
         and rationale.
+
     """
     normalized = _normalize(input_str)
 
@@ -260,6 +261,7 @@ def select_consensus_protocol(
 
     Returns:
         A ProtocolSelection with risk level, chosen protocol, and assessment details.
+
     """
     try:
         assessment = assess_prompt_risk(input_str)

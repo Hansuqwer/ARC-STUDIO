@@ -1,29 +1,37 @@
-"""
-A2UI Extension (Experimental)
+"""A2UI Extension (Experimental).
 
 Detects and validates A2UI declarative UI payloads.
 Source: https://github.com/google/A2UI
 Status: EXPERIMENTAL — disabled by default.
 """
+
 from __future__ import annotations
+
 from pathlib import Path
+
 from .base import ArcExtension
+
 
 class A2UIExtension(ArcExtension):
     """EXPERIMENTAL: A2UI declarative UI payload support."""
 
     @property
-    def extension_id(self) -> str: return "a2ui"
+    def extension_id(self) -> str:
+        return "a2ui"
+
     @property
-    def extension_name(self) -> str: return "A2UI (Experimental)"
+    def extension_name(self) -> str:
+        return "A2UI (Experimental)"
 
     def detect(self, workspace: Path) -> bool:
         # Look for .a2ui files or a2ui.json
-        return any([
-            list(workspace.glob("*.a2ui")),
-            (workspace / "a2ui.json").exists(),
-            (workspace / "a2ui.yaml").exists(),
-        ])
+        return any(
+            [
+                list(workspace.glob("*.a2ui")),
+                (workspace / "a2ui.json").exists(),
+                (workspace / "a2ui.yaml").exists(),
+            ]
+        )
 
     def inspect(self, workspace: Path) -> dict:
         return {

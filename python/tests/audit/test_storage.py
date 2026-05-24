@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_runtime_cockpit.audit.schema import RunStartedEvent, RunCompletedEvent, LlmRequestEvent
+from agent_runtime_cockpit.audit.schema import LlmRequestEvent, RunCompletedEvent, RunStartedEvent
 
 
 def _make_store(audit_dir, key_available=True):

@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-
 from agent_runtime_cockpit.adapters.langgraph.replay_detector import (
     analyze_graph_replay_capability,
     analyze_run_replay_capability,
@@ -12,7 +11,6 @@ from agent_runtime_cockpit.adapters.langgraph.replay_detector import (
     detect_thread_id_from_run,
 )
 from agent_runtime_cockpit.schemas.replay_capability import ReplayCapability
-
 
 # ── ReplayCapability Model Tests ──────────────────────────────────────
 

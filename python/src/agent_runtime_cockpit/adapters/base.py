@@ -1,10 +1,10 @@
-"""
-ARC Runtime Adapter Base Class
+"""ARC Runtime Adapter Base Class.
 
 All runtime adapters (SwarmGraph, LangGraph, CrewAI, etc.) must implement this interface.
 The interface is intentionally minimal and stable — adapters may raise NotImplementedError
 for features they don't support, and must report capabilities honestly.
 """
+
 from __future__ import annotations
 
 import abc
@@ -14,7 +14,12 @@ from typing import Any, AsyncIterator, Literal
 from pydantic import BaseModel, Field
 
 from ..protocol.schemas import (
-    WorkspaceInfo, WorkflowInfo, SchemaInfo, RunRecord, RunEvent, RuntimeCapabilities
+    RunEvent,
+    RunRecord,
+    RuntimeCapabilities,
+    SchemaInfo,
+    WorkflowInfo,
+    WorkspaceInfo,
 )
 
 RuntimeAvailability = Literal[
@@ -31,6 +36,7 @@ CapabilityTestLevel = Literal["unknown", "fake_offline", "gated_local_real", "pr
 
 class DoctorAction(BaseModel):
     """A suggested action to make this runtime runnable."""
+
     id: str
     label: str
     description: str
@@ -67,8 +73,7 @@ class CapabilityReport(BaseModel):
 
 
 class RuntimeAdapter(abc.ABC):
-    """
-    Abstract base for all ARC runtime adapters.
+    """Abstract base for all ARC runtime adapters.
 
     Implementation rules:
     - capabilities() must never lie (no false positives).
@@ -103,7 +108,9 @@ class RuntimeAdapter(abc.ABC):
             runtime_id=self.adapter_id,
             detected=detected,
             can_run=can_run,
-            availability="runnable" if can_run else ("detected_not_runnable" if detected else "not_detected"),
+            availability="runnable"
+            if can_run
+            else ("detected_not_runnable" if detected else "not_detected"),
             reason=None if can_run else "Runtime is detected but does not expose a runnable path.",
             detected_artifacts=evidence,
             doctor_actions=self._doctor_actions(workspace),
@@ -120,8 +127,7 @@ class RuntimeAdapter(abc.ABC):
 
     @abc.abstractmethod
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
-        """
-        Detect whether this adapter's runtime is present in the workspace.
+        """Detect whether this adapter's runtime is present in the workspace.
 
         Returns:
             (detected, confidence_0_to_1, evidence_list)
@@ -130,6 +136,7 @@ class RuntimeAdapter(abc.ABC):
         - confidence must be derived from real evidence, not hardcoded.
         - evidence must list actual file names or config keys found.
         - Never return (True, ...) if no evidence was found.
+
         """
         ...
 
@@ -145,7 +152,9 @@ class RuntimeAdapter(abc.ABC):
         """Export JSON schemas from the workspace."""
         raise NotImplementedError(f"{self.adapter_id} does not implement export_schemas")
 
-    async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
+    async def run_workflow(
+        self, workflow_id: str, inputs: dict[str, Any] | None = None
+    ) -> RunRecord:
         """Execute a workflow and return a run record."""
         raise NotImplementedError(f"{self.adapter_id} does not implement run_workflow")
 

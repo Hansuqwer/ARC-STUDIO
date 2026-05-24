@@ -1,5 +1,4 @@
-"""
-Isolation provider protocol — abstract interface for execution boundary control.
+"""Isolation provider protocol — abstract interface for execution boundary control.
 
 Each provider implements a different isolation strategy:
   - ``none``: direct subprocess execution (trusted workspace only)
@@ -8,6 +7,7 @@ Each provider implements a different isolation strategy:
 
 See ADR-006 for the full isolation provider design.
 """
+
 from __future__ import annotations
 
 import abc
@@ -28,6 +28,9 @@ class IsolationResult(BaseModel):
     killed: bool = False
     kill_reason: Optional[str] = None
     provider: str = "unknown"
+    stdout_truncated: bool = False
+    stderr_truncated: bool = False
+    redaction_applied: bool = False
 
 
 class IsolationProvider(abc.ABC):

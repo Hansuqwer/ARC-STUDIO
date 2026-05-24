@@ -1,5 +1,4 @@
-"""
-Enforcement context for security gates (Phase 23.1).
+"""Enforcement context for security gates (Phase 23.1).
 
 Provides centralized context management for enforcement decisions across
 trust, paid-call, shell, and network gates. Supports dry-run mode and
@@ -21,6 +20,7 @@ class EnforcementContext:
         allow_paid: Bypass paid-call gate (from --allow-paid flag)
         trust_workspace: Bypass workspace trust gate (from --trust-workspace flag)
         dry_run: Deny all operations and log what would be denied (from --dry-run flag)
+
     """
 
     allow_paid: bool = False
@@ -35,6 +35,7 @@ class EnforcementContext:
 
         Returns:
             New EnforcementContext with updated fields
+
         """
         return EnforcementContext(
             allow_paid=kwargs.get("allow_paid", self.allow_paid),
@@ -48,6 +49,7 @@ class EnforcementContext:
 
         Returns:
             12-character hex string from UUID4
+
         """
         return uuid.uuid4().hex[:12]
 
@@ -62,6 +64,7 @@ class DryRunAbort(Exception):
     Attributes:
         message: Human-readable description of what was denied
         denial_event: Full denial event dict for logging/audit
+
     """
 
     def __init__(self, message: str, denial_event: dict):
@@ -83,6 +86,7 @@ def get_enforcement_context() -> EnforcementContext:
 
     Returns:
         Current EnforcementContext
+
     """
     return _enforcement_context.get()
 
@@ -95,5 +99,6 @@ def set_enforcement_context(ctx: EnforcementContext) -> None:
 
     Args:
         ctx: EnforcementContext to set
+
     """
     _enforcement_context.set(ctx)

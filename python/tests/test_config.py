@@ -1,12 +1,13 @@
 """Tests: ARC config model and loader (ADR-001)."""
+
 from __future__ import annotations
 
 from pathlib import Path
 
-
-from agent_runtime_cockpit.config import ArcConfig, load_config, init_config
+from agent_runtime_cockpit.config import ArcConfig, init_config, load_config
 from agent_runtime_cockpit.config.model import (
-    WorkspaceConfig, ExecutionConfig,
+    ExecutionConfig,
+    WorkspaceConfig,
 )
 
 
@@ -147,6 +148,7 @@ class TestCLIConfig:
 
     def test_config_init(self, tmp_path: Path):
         from typer.testing import CliRunner
+
         from agent_runtime_cockpit.cli import app
 
         ws = tmp_path / "ws"
@@ -154,12 +156,14 @@ class TestCLIConfig:
         result = CliRunner().invoke(app, ["config", "init", "--workspace", str(ws), "--json"])
         assert result.exit_code == 0, result.output
         import json
+
         data = json.loads(result.output)["data"]
         assert data["version"] == 1
         assert (ws / ".arc" / "config.yaml").exists()
 
     def test_config_show(self, tmp_path: Path):
         from typer.testing import CliRunner
+
         from agent_runtime_cockpit.cli import app
 
         ws = tmp_path / "ws"
@@ -167,6 +171,7 @@ class TestCLIConfig:
         result = CliRunner().invoke(app, ["config", "show", "--workspace", str(ws), "--json"])
         assert result.exit_code == 0, result.output
         import json
+
         data = json.loads(result.output)["data"]
         assert data["version"] == 1
         assert data["runtime.default"] == "auto"

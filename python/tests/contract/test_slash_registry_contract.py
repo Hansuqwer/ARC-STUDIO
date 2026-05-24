@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from agent_runtime_cockpit.cli_repl.slash_commands import _build_registry
 
-
 PHASE_3_COMMANDS = {
     "help",
     "version",

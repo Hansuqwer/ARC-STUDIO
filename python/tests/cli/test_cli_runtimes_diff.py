@@ -1,9 +1,9 @@
 """Tests for `arc runtimes --diff-from X --diff-to Y`."""
+
 from __future__ import annotations
 
 import json
 import re
-
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -23,13 +23,17 @@ class TestRuntimesDiffCLI:
         assert "--diff-to" in help_text
 
     def test_diff_unknown_from_runtime(self, run_cli):
-        r = run_cli(["runtimes", "--diff-from", "nonexistent_xyz", "--diff-to", "langgraph", "--json"])
+        r = run_cli(
+            ["runtimes", "--diff-from", "nonexistent_xyz", "--diff-to", "langgraph", "--json"]
+        )
         assert r.exit_code == 0
         data = json.loads(r.stdout)
         assert not data.get("ok", True) or data.get("error") is not None
 
     def test_diff_unknown_to_runtime(self, run_cli):
-        r = run_cli(["runtimes", "--diff-from", "langgraph", "--diff-to", "nonexistent_xyz", "--json"])
+        r = run_cli(
+            ["runtimes", "--diff-from", "langgraph", "--diff-to", "nonexistent_xyz", "--json"]
+        )
         assert r.exit_code == 0
         data = json.loads(r.stdout)
         assert not data.get("ok", True) or data.get("error") is not None

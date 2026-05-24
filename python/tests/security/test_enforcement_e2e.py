@@ -1,20 +1,21 @@
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
 
+import pytest
+
 from agent_runtime_cockpit.security.context import (
-    EnforcementContext,
     DryRunAbort,
+    EnforcementContext,
     set_enforcement_context,
 )
 from agent_runtime_cockpit.security.enforcement import (
-    enforce_workspace_trust,
-    enforce_paid_call_gate,
-    TrustEnforcementError,
     PaidCallEnforcementError,
+    TrustEnforcementError,
+    enforce_paid_call_gate,
+    enforce_workspace_trust,
 )
-from agent_runtime_cockpit.security.profiles import RunProfile, BackendMode
+from agent_runtime_cockpit.security.profiles import BackendMode, RunProfile
 
 
 class TestCorrelationIdGeneration:

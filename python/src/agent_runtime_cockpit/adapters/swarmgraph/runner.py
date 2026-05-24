@@ -8,16 +8,15 @@ import pathlib
 import uuid
 from typing import Any, AsyncIterator
 
-from agent_runtime_cockpit.ag_ui import map_event, MappingContext, AGUIEventType
+import agent_runtime_cockpit.adapters.swarmgraph.mapping  # noqa: F401
+from agent_runtime_cockpit.ag_ui import AGUIEventType, MappingContext, map_event
 from agent_runtime_cockpit.audit.chain import AuditChainWriter
 from agent_runtime_cockpit.audit.runner_integration import log_agui_to_audit
-from agent_runtime_cockpit.audit.session import AuditSession
 from agent_runtime_cockpit.audit.schema import RuntimeMode
+from agent_runtime_cockpit.audit.session import AuditSession
 from agent_runtime_cockpit.audit.storage import AuditChainStore
-from agent_runtime_cockpit.gating import require_dual_gate, BackendMode
+from agent_runtime_cockpit.gating import BackendMode, require_dual_gate
 from agent_runtime_cockpit.tracing.jsonl_writer import JsonlTraceWriter
-
-import agent_runtime_cockpit.adapters.swarmgraph.mapping  # noqa: F401
 
 
 class SwarmGraphRunner:

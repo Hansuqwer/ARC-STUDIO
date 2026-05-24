@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import Mock
 
-
 from agent_runtime_cockpit.adapters.pydantic_ai.runner import (
     PydanticAIEventHandler,
     run_agent_with_streaming,

@@ -76,6 +76,7 @@ def battle_run(
 
     Example:
         arc battle run "Write a function to check if a number is prime" --workers 2
+
     """
     # Validate inputs
     if workers not in (2, 4):
@@ -147,6 +148,7 @@ def battle_show(
 
     Example:
         arc battle show battle-abc123
+
     """
     store = BattleStore()
     battle = store.get_battle_run(battle_id)
@@ -229,6 +231,7 @@ def battle_vote(
 
     Example:
         arc battle vote battle-abc123 --candidate candidate-xyz --approve --reason "Best solution"
+
     """
     from ..battle import BattleVote, VoterType
 
@@ -303,6 +306,7 @@ def battle_leaderboard(
 
     Example:
         arc battle leaderboard --limit 10
+
     """
     store = BattleStore()
     ratings = store.list_elo_ratings(limit=limit)
@@ -339,6 +343,7 @@ def battle_list(
 
     Example:
         arc battle list --status completed --limit 10
+
     """
     store = BattleStore()
     battles = store.list_battle_runs(status=status, limit=limit)
@@ -374,6 +379,7 @@ def battle_export(
 
     Example:
         arc battle export battle-abc123 --output battle.json
+
     """
     if format != "json":
         _emit_error("Only JSON format is supported", json_output)

@@ -2,25 +2,26 @@
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
 from unittest.mock import Mock
 
+import pytest
+
 from agent_runtime_cockpit.security.context import (
-    EnforcementContext,
     DryRunAbort,
+    EnforcementContext,
     get_enforcement_context,
     set_enforcement_context,
 )
 from agent_runtime_cockpit.security.enforcement import (
-    enforce_workspace_trust,
+    PaidCallEnforcementError,
+    TrustEnforcementError,
+    enforce_network_gate,
     enforce_paid_call_gate,
     enforce_shell_gate,
-    enforce_network_gate,
-    TrustEnforcementError,
-    PaidCallEnforcementError,
+    enforce_workspace_trust,
 )
-from agent_runtime_cockpit.security.profiles import RunProfile, BackendMode
+from agent_runtime_cockpit.security.profiles import BackendMode, RunProfile
 
 
 class TestEnforcementContext:

@@ -1,12 +1,13 @@
-"""
-ARC Protocol Envelope — standard JSON response wrapper.
+"""ARC Protocol Envelope — standard JSON response wrapper.
 
 All ARC daemon/CLI responses use this envelope.
 Mirrors the TypeScript ArcEnvelope in arc-core/src/common/arc-protocol.ts
 """
+
 from __future__ import annotations
 
 from typing import Any, Generic, Optional, TypeVar
+
 from pydantic import BaseModel, Field
 
 T = TypeVar("T")
@@ -37,10 +38,16 @@ class ArcEnvelope(BaseModel, Generic[T]):
     model_config = {"arbitrary_types_allowed": True}
 
 
-def ok(data: T, *, adapter: str | None = None, workspace: str | None = None,
-       duration_ms: float | None = None) -> ArcEnvelope[T]:
+def ok(
+    data: T,
+    *,
+    adapter: str | None = None,
+    workspace: str | None = None,
+    duration_ms: float | None = None,
+) -> ArcEnvelope[T]:
     """Build a successful ARC envelope."""
     import datetime
+
     return ArcEnvelope(
         ok=True,
         data=data,
@@ -48,7 +55,9 @@ def ok(data: T, *, adapter: str | None = None, workspace: str | None = None,
             adapter=adapter,
             workspace=workspace,
             duration_ms=duration_ms,
-            timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
+            timestamp=datetime.datetime.now(datetime.timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z"),
         ),
     )
 
@@ -56,8 +65,13 @@ def ok(data: T, *, adapter: str | None = None, workspace: str | None = None,
 def err(code: str, message: str, details: dict | None = None) -> ArcEnvelope[None]:
     """Build an error ARC envelope."""
     import datetime
+
     return ArcEnvelope(
         ok=False,
         error=ArcError(code=code, message=message, details=details),
-        meta=ArcMeta(timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")),
+        meta=ArcMeta(
+            timestamp=datetime.datetime.now(datetime.timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z")
+        ),
     )

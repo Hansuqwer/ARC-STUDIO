@@ -1,5 +1,4 @@
-"""
-BudgetVector enforcement — hard runtime budget gating at effect boundaries.
+"""BudgetVector enforcement — hard runtime budget gating at effect boundaries.
 
 Provides ``BudgetEnforcer`` that checks a ``BudgetVector`` against accumulated
 usage before model/tool-call effects are executed. Raises ``BudgetExceededError``
@@ -8,6 +7,7 @@ when any dimension exceeds its configured limit.
 This moves budget from post-hoc accounting (``arc runs budget``) to real-time
 enforcement at adapter effect boundaries.
 """
+
 from __future__ import annotations
 
 from typing import Any

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import typer
 
+from ..protocol.event_envelope import ok
 from ._app import console
 from ._helpers import (
     DEBUG_FLAG,
@@ -12,8 +13,6 @@ from ._helpers import (
     _setup_logging,
 )
 from ._subapps import prompt_app
-
-from ..protocol.event_envelope import ok
 
 
 @prompt_app.command("optimize")

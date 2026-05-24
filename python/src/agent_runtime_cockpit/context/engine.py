@@ -1,16 +1,17 @@
 """ARC Context Engine — orchestrates all providers."""
+
 from __future__ import annotations
 
 import logging
 from pathlib import Path
 from typing import Optional
 
-from .providers.local_repo import LocalRepoProvider
-from .providers.context7 import Context7Provider
-from .providers.vercel_grep import VercelGrepProvider
-from .providers.github_code_search import GitHubCodeSearchProvider
-from .providers.web_search import WebSearchProvider
 from ..protocol.schemas import ContextPackEntry
+from .providers.context7 import Context7Provider
+from .providers.github_code_search import GitHubCodeSearchProvider
+from .providers.local_repo import LocalRepoProvider
+from .providers.vercel_grep import VercelGrepProvider
+from .providers.web_search import WebSearchProvider
 
 log = logging.getLogger(__name__)
 
@@ -27,8 +28,9 @@ class ContextEngine:
             WebSearchProvider(),
         ]
 
-    def retrieve(self, task: str, workspace: Optional[Path] = None,
-                 max_entries: int = 20) -> list[ContextPackEntry]:
+    def retrieve(
+        self, task: str, workspace: Optional[Path] = None, max_entries: int = 20
+    ) -> list[ContextPackEntry]:
         all_entries: list[ContextPackEntry] = []
 
         for provider in self.providers:

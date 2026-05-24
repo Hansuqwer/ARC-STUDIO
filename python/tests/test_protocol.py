@@ -1,11 +1,16 @@
-"""
-Tests: ARC Protocol models — envelope, errors, capabilities, schemas.
-"""
-from agent_runtime_cockpit.protocol.event_envelope import ok, err, ARC_PROTOCOL_VERSION
-from agent_runtime_cockpit.protocol.errors import ArcErrorCode
+"""Tests: ARC Protocol models — envelope, errors, capabilities, schemas."""
+
 from agent_runtime_cockpit.protocol.capabilities import RuntimeCapabilities
+from agent_runtime_cockpit.protocol.errors import ArcErrorCode
+from agent_runtime_cockpit.protocol.event_envelope import ARC_PROTOCOL_VERSION, err, ok
 from agent_runtime_cockpit.protocol.schemas import (
-    WorkspaceInfo, RuntimeInfo, RunRecord, ContextPackEntry, ConfidenceLevel, RunStatus, SourceType
+    ConfidenceLevel,
+    ContextPackEntry,
+    RunRecord,
+    RunStatus,
+    RuntimeInfo,
+    SourceType,
+    WorkspaceInfo,
 )
 
 
@@ -82,15 +87,18 @@ class TestRuntimeCapabilities:
     def test_support_level_default(self):
         caps = RuntimeCapabilities()
         from agent_runtime_cockpit.protocol.capabilities import SupportLevel
+
         assert caps.support_level == SupportLevel.EXPERIMENTAL
 
     def test_support_level_custom(self):
         from agent_runtime_cockpit.protocol.capabilities import SupportLevel
+
         caps = RuntimeCapabilities(support_level=SupportLevel.BETA)
         assert caps.support_level == SupportLevel.BETA
 
     def test_support_level_stable(self):
         from agent_runtime_cockpit.protocol.capabilities import SupportLevel
+
         caps = RuntimeCapabilities(support_level=SupportLevel.STABLE)
         assert caps.support_level == SupportLevel.STABLE
 
@@ -99,12 +107,16 @@ class TestRuntimeCapabilities:
     def test_execution_modes_default(self):
         caps = RuntimeCapabilities()
         from agent_runtime_cockpit.protocol.capabilities import ExecutionMode
+
         assert ExecutionMode.STANDALONE in caps.execution_modes
         assert len(caps.execution_modes) == 1
 
     def test_execution_modes_custom(self):
         from agent_runtime_cockpit.protocol.capabilities import ExecutionMode
-        caps = RuntimeCapabilities(execution_modes=[ExecutionMode.STANDALONE, ExecutionMode.SEQUENCE])
+
+        caps = RuntimeCapabilities(
+            execution_modes=[ExecutionMode.STANDALONE, ExecutionMode.SEQUENCE]
+        )
         assert len(caps.execution_modes) == 2
         assert ExecutionMode.STANDALONE in caps.execution_modes
         assert ExecutionMode.SEQUENCE in caps.execution_modes
@@ -128,11 +140,13 @@ class TestRuntimeCapabilities:
 
     def test_audit_level_default(self):
         from agent_runtime_cockpit.protocol.capabilities import AuditLevel
+
         caps = RuntimeCapabilities()
         assert caps.audit_level == AuditLevel.NONE
 
     def test_audit_level_custom(self):
         from agent_runtime_cockpit.protocol.capabilities import AuditLevel
+
         caps = RuntimeCapabilities(audit_level=AuditLevel.ARC_SHA256)
         assert caps.audit_level == AuditLevel.ARC_SHA256
 
@@ -140,11 +154,13 @@ class TestRuntimeCapabilities:
 
     def test_hitl_level_default(self):
         from agent_runtime_cockpit.protocol.capabilities import HitlLevel
+
         caps = RuntimeCapabilities()
         assert caps.hitl_level == HitlLevel.NONE
 
     def test_hitl_level_custom(self):
         from agent_runtime_cockpit.protocol.capabilities import HitlLevel
+
         caps = RuntimeCapabilities(hitl_level=HitlLevel.ADVISORY)
         assert caps.hitl_level == HitlLevel.ADVISORY
 
@@ -152,8 +168,12 @@ class TestRuntimeCapabilities:
 
     def test_full_serialization_roundtrip(self):
         from agent_runtime_cockpit.protocol.capabilities import (
-            SupportLevel, ExecutionMode, AuditLevel, HitlLevel,
+            AuditLevel,
+            ExecutionMode,
+            HitlLevel,
+            SupportLevel,
         )
+
         caps = RuntimeCapabilities(
             schema_version=1,
             support_level=SupportLevel.ALPHA,
@@ -180,8 +200,11 @@ class TestRuntimeCapabilities:
 class TestDomainModels:
     def test_runtime_info_valid(self):
         from agent_runtime_cockpit.protocol.capabilities import RuntimeCapabilities
+
         rt = RuntimeInfo(
-            id="sg-001", name="SwarmGraph", adapter="swarmgraph",
+            id="sg-001",
+            name="SwarmGraph",
+            adapter="swarmgraph",
             confidence=ConfidenceLevel.HIGH,
             evidence=["graph.py found"],
             capabilities=RuntimeCapabilities(can_inspect=True),
@@ -196,9 +219,13 @@ class TestDomainModels:
 
     def test_run_record_status(self):
         import datetime
+
         run = RunRecord(
-            id="run-001", workflow_id="wf-001", runtime="swarmgraph",
-            status=RunStatus.COMPLETED, started_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            id="run-001",
+            workflow_id="wf-001",
+            runtime="swarmgraph",
+            status=RunStatus.COMPLETED,
+            started_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         )
         assert run.status == RunStatus.COMPLETED
         assert run.events == []
@@ -206,7 +233,11 @@ class TestDomainModels:
     def test_context_pack_entry_source_types(self):
         for st in SourceType:
             e = ContextPackEntry(
-                id=f"test-{st}", task="test", source=st.value,
-                source_type=st, content="test content", relevance_score=0.5,
+                id=f"test-{st}",
+                task="test",
+                source=st.value,
+                source_type=st,
+                content="test content",
+                relevance_score=0.5,
             )
             assert e.source_type == st

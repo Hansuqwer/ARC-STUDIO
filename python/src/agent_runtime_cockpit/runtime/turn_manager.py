@@ -5,12 +5,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from agent_runtime_cockpit.cli_repl.cancellation import Cancelled, CancellationToken
+from agent_runtime_cockpit.cli_repl.cancellation import CancellationToken, Cancelled
 from agent_runtime_cockpit.cli_repl.session import ChatSession
-from agent_runtime_cockpit.providers import ProviderClient, ProviderMessage, ProviderRequest, ProviderResponse, StreamChunk
+from agent_runtime_cockpit.providers import (
+    ProviderClient,
+    ProviderMessage,
+    ProviderRequest,
+    ProviderResponse,
+    StreamChunk,
+)
 from agent_runtime_cockpit.security.injection_patterns import Severity, scan_structured
 from agent_runtime_cockpit.tools import ToolRegistry, wrap_tool_result
-
 
 EventSink = Callable[[str, dict[str, Any]], None]
 
@@ -68,29 +73,51 @@ class TurnManager:
             cancellation_token.raise_if_cancelled()
             if stream:
                 chunks: list[StreamChunk] = []
-                async for chunk in self._provider_client.stream(request, cancellation_token=cancellation_token):
+                async for chunk in self._provider_client.stream(
+                    request, cancellation_token=cancellation_token
+                ):
                     chunks.append(chunk)
                     self._emit("stream.chunk." + chunk.chunk_type, chunk.model_dump(mode="json"))
                     partial += chunk.delta
                 session.add_message("assistant", partial)
-                self._emit("turn.completed", {"session_id": session.id, "content_chars": len(partial)})
+                self._emit(
+                    "turn.completed", {"session_id": session.id, "content_chars": len(partial)}
+                )
                 return TurnResult(content=partial, chunks=chunks)
 
-            response = await self._provider_client.complete(request, cancellation_token=cancellation_token)
+            response = await self._provider_client.complete(
+                request, cancellation_token=cancellation_token
+            )
             if session.tools_enabled:
-                response = await self._run_tool_loop(session, response, cancellation_token=cancellation_token)
+                response = await self._run_tool_loop(
+                    session, response, cancellation_token=cancellation_token
+                )
             session.add_message("assistant", response.content)
-            self._emit("turn.completed", {"session_id": session.id, "content_chars": len(response.content)})
-            return TurnResult(content=response.content, response=response, degraded=response.degraded, degraded_reason=response.degraded_reason)
+            self._emit(
+                "turn.completed", {"session_id": session.id, "content_chars": len(response.content)}
+            )
+            return TurnResult(
+                content=response.content,
+                response=response,
+                degraded=response.degraded,
+                degraded_reason=response.degraded_reason,
+            )
         except Cancelled as exc:
             if partial:
-                session.history.append({
-                    "role": "assistant",
-                    "content": partial,
-                    "partial": "true",
-                })
-            self._emit("turn.cancelled", {"session_id": session.id, "detail": exc.detail, "partial_chars": len(partial)})
-            return TurnResult(content=partial, degraded=True, degraded_reason="cancelled", partial=True)
+                session.history.append(
+                    {
+                        "role": "assistant",
+                        "content": partial,
+                        "partial": "true",
+                    }
+                )
+            self._emit(
+                "turn.cancelled",
+                {"session_id": session.id, "detail": exc.detail, "partial_chars": len(partial)},
+            )
+            return TurnResult(
+                content=partial, degraded=True, degraded_reason="cancelled", partial=True
+            )
 
     def _request_from_session(self, session: ChatSession) -> ProviderRequest:
         messages = [
@@ -116,11 +143,13 @@ class TurnManager:
         current = response
         while current.tool_calls:
             if iteration >= session.max_tool_iterations:
-                return current.model_copy(update={
-                    "degraded": True,
-                    "degraded_reason": "max_tool_iterations_reached",
-                    "finish_reason": "length",
-                })
+                return current.model_copy(
+                    update={
+                        "degraded": True,
+                        "degraded_reason": "max_tool_iterations_reached",
+                        "finish_reason": "length",
+                    }
+                )
             iteration += 1
             for tool_call in current.tool_calls:
                 cancellation_token.raise_if_cancelled()
@@ -128,25 +157,45 @@ class TurnManager:
                 args_payload = tool_call.get("args") or tool_call.get("input") or {}
                 handler = self._tool_registry.get(tool_name)
                 if handler is None:
-                    wrapped = f'<tool_result trust="blocked" tool="{tool_name}" reason="unknown_tool"/>'
+                    wrapped = (
+                        f'<tool_result trust="blocked" tool="{tool_name}" reason="unknown_tool"/>'
+                    )
                     self._emit("tool.result.blocked", {"tool": tool_name, "reason": "unknown_tool"})
                 elif not self._tool_allowed(session, tool_name):
                     wrapped = f'<tool_result trust="blocked" tool="{tool_name}" reason="tool_not_allowed"/>'
-                    self._emit("tool.result.blocked", {"tool": tool_name, "reason": "tool_not_allowed"})
+                    self._emit(
+                        "tool.result.blocked", {"tool": tool_name, "reason": "tool_not_allowed"}
+                    )
                 else:
                     self._emit("tool.requested", {"tool": tool_name, "iteration": iteration})
                     args = handler.args_schema.model_validate(args_payload)
                     result = handler.execute(args, cancellation_token)
-                    detections = scan_structured(result.content) if handler.output_trust_level == "untrusted" else []
+                    detections = (
+                        scan_structured(result.content)
+                        if handler.output_trust_level == "untrusted"
+                        else []
+                    )
                     if any(detection.severity is Severity.BLOCKED for detection in detections):
                         wrapped = f'<tool_result trust="blocked" tool="{tool_name}" reason="injection_detected"/>'
-                        self._emit("tool.result.blocked", {"tool": tool_name, "reason": "injection_detected"})
+                        self._emit(
+                            "tool.result.blocked",
+                            {"tool": tool_name, "reason": "injection_detected"},
+                        )
                     else:
                         wrapped = wrap_tool_result(tool_name, handler.output_trust_level, result)
-                        self._emit("tool.executed", {"tool": tool_name, "iteration": iteration, "trust": handler.output_trust_level})
+                        self._emit(
+                            "tool.executed",
+                            {
+                                "tool": tool_name,
+                                "iteration": iteration,
+                                "trust": handler.output_trust_level,
+                            },
+                        )
                 session.history.append({"role": "tool", "content": wrapped})
             request = self._request_from_session(session)
-            current = await self._provider_client.complete(request, cancellation_token=cancellation_token)
+            current = await self._provider_client.complete(
+                request, cancellation_token=cancellation_token
+            )
         return current
 
     @staticmethod

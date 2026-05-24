@@ -1,4 +1,5 @@
 """Tests for Docker isolation provider."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -43,7 +44,10 @@ async def test_docker_health_check_sdk_missing():
 async def test_docker_health_check_available():
     """Docker health check returns True when daemon reachable."""
     mock_client = _make_mock_client()
-    with patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client):
+    with (
+        patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
+        patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client),
+    ):
         provider = DockerIsolationProvider()
         healthy = await provider.health_check()
         assert healthy is True
@@ -52,7 +56,10 @@ async def test_docker_health_check_available():
 def test_docker_detect_runtime_docker():
     """Docker detect_runtime identifies standard Docker."""
     mock_client = _make_mock_client("24.0.0")
-    with patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client):
+    with (
+        patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
+        patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client),
+    ):
         provider = DockerIsolationProvider()
         info = provider.detect_runtime()
         assert info["available"] is True
@@ -62,7 +69,10 @@ def test_docker_detect_runtime_docker():
 def test_docker_detect_runtime_orbstack():
     """Docker detect_runtime identifies OrbStack."""
     mock_client = _make_mock_client("orbstack-1.0.0")
-    with patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client):
+    with (
+        patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
+        patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client),
+    ):
         provider = DockerIsolationProvider()
         info = provider.detect_runtime()
         assert info["available"] is True
@@ -72,7 +82,10 @@ def test_docker_detect_runtime_orbstack():
 def test_docker_detect_runtime_podman():
     """Docker detect_runtime identifies Podman."""
     mock_client = _make_mock_client("podman-5.0.0")
-    with patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client):
+    with (
+        patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
+        patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client),
+    ):
         provider = DockerIsolationProvider()
         info = provider.detect_runtime()
         assert info["available"] is True
@@ -81,7 +94,10 @@ def test_docker_detect_runtime_podman():
 
 def test_docker_detect_runtime_sdk_missing():
     """Docker detect_runtime reports error when SDK missing."""
-    with patch.object(DockerIsolationProvider, "_get_client", return_value=None):
+    with (
+        patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
+        patch.object(DockerIsolationProvider, "_get_client", return_value=None),
+    ):
         provider = DockerIsolationProvider()
         info = provider.detect_runtime()
         assert info["available"] is False
@@ -96,7 +112,10 @@ async def test_docker_execute_success():
     mock_container.logs.return_value = b"hello world\n"
     mock_client = MagicMock()
     mock_client.containers.run.return_value = mock_container
-    with patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client):
+    with (
+        patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
+        patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client),
+    ):
         provider = DockerIsolationProvider()
         result = await provider.execute(["echo", "hello"])
         assert result.exit_code == 0
@@ -111,7 +130,10 @@ async def test_docker_execute_timeout():
     mock_container.wait.side_effect = Exception("timeout")
     mock_client = MagicMock()
     mock_client.containers.run.return_value = mock_container
-    with patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client):
+    with (
+        patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
+        patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client),
+    ):
         provider = DockerIsolationProvider()
         result = await provider.execute(["sleep", "100"], timeout_seconds=1)
         assert result.exit_code == -1
@@ -123,7 +145,10 @@ async def test_docker_execute_timeout():
 @pytest.mark.asyncio
 async def test_docker_execute_sdk_missing():
     """Docker execute returns error when SDK missing."""
-    with patch.object(DockerIsolationProvider, "_get_client", return_value=None):
+    with (
+        patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
+        patch.object(DockerIsolationProvider, "_get_client", return_value=None),
+    ):
         provider = DockerIsolationProvider()
         result = await provider.execute(["echo", "hello"])
         assert result.exit_code == -1
@@ -133,7 +158,10 @@ async def test_docker_execute_sdk_missing():
 def test_docker_describe():
     """Docker describe returns provider info."""
     mock_client = _make_mock_client("24.0.0")
-    with patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client):
+    with (
+        patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
+        patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client),
+    ):
         provider = DockerIsolationProvider()
         desc = provider.describe()
         assert desc["provider_id"] == "docker"

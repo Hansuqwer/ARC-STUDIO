@@ -19,9 +19,9 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from ..base import RuntimeAdapter, CapabilityReport, DoctorAction
 from ...protocol.capabilities import RuntimeCapabilities
-from ...protocol.schemas import WorkflowInfo, RunRecord
+from ...protocol.schemas import RunRecord, WorkflowInfo
+from ..base import CapabilityReport, DoctorAction, RuntimeAdapter
 from .capabilities import get_langchain_capabilities
 from .detect import detect_langchain
 from .export import export_langchain_workflows
@@ -61,6 +61,7 @@ class LangChainAdapter(RuntimeAdapter):
         - Detect provider integrations (langchain_openai, etc.)
         - Scan workspace for LangChain usage patterns
         - Check requirements.txt, pyproject.toml for langchain dependencies
+
         """
         result = detect_langchain(workspace)
         return result.detected, result.confidence, result.evidence
@@ -78,6 +79,7 @@ class LangChainAdapter(RuntimeAdapter):
 
         Returns:
             List of WorkflowInfo for detected chains
+
         """
         return export_langchain_workflows(workspace)
 
@@ -100,6 +102,7 @@ class LangChainAdapter(RuntimeAdapter):
 
         Returns:
             RunRecord with execution results and events
+
         """
         runner = LangChainRunner(workspace)
         return runner.run(chain, inputs, provider_registry)

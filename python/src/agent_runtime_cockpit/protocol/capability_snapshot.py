@@ -1,5 +1,4 @@
-"""
-Capability snapshot and degradation manifest validation.
+"""Capability snapshot and degradation manifest validation.
 
 Compares runtime capability snapshots across switches and validates
 that cockpit primitives (contracts, receipts, evidence, stable IDs)
@@ -8,9 +7,11 @@ are correctly advertised.
 Produces TrustDiff when capabilities change in ways that affect trust
 boundaries.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
+
 from pydantic import BaseModel, Field
 
 from .capabilities import RuntimeCapabilities
@@ -18,6 +19,7 @@ from .capabilities import RuntimeCapabilities
 
 class CapabilitySnapshot(BaseModel):
     """Frozen snapshot of a runtime's capabilities at a point in time."""
+
     schema_version: int = 1
     runtime_id: str
     snapshot_id: str
@@ -28,6 +30,7 @@ class CapabilitySnapshot(BaseModel):
 
 class CapabilityDiff(BaseModel):
     """Diff between two capability snapshots."""
+
     schema_version: int = 1
     diff_id: str
     runtime_id: str
@@ -42,6 +45,7 @@ class CapabilityDiff(BaseModel):
 
 class DegradationValidation(BaseModel):
     """Validation result for a runtime's capability claims vs actual behavior."""
+
     schema_version: int = 1
     runtime_id: str
     validation_id: str
@@ -78,6 +82,7 @@ TRUST_SENSITIVE_FLAGS = [
 def snapshot_capabilities(runtime_id: str, caps: RuntimeCapabilities) -> CapabilitySnapshot:
     """Create a frozen snapshot of current runtime capabilities."""
     from ..protocol.stable_ids import generate_stable_id
+
     snapshot_id = generate_stable_id("session")
     return CapabilitySnapshot(
         runtime_id=runtime_id,
@@ -117,10 +122,7 @@ def diff_capabilities(
                     removed.append(key)
 
     # Determine if confirmation is needed
-    requires_confirmation = any(
-        flag in added or flag in removed
-        for flag in TRUST_SENSITIVE_FLAGS
-    )
+    requires_confirmation = any(flag in added or flag in removed for flag in TRUST_SENSITIVE_FLAGS)
 
     return CapabilityDiff(
         diff_id=diff_id,
@@ -154,6 +156,7 @@ def validate_capability_claims(
 
     Returns:
         DegradationValidation with validation results.
+
     """
     from ..protocol.stable_ids import generate_stable_id
 

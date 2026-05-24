@@ -79,6 +79,7 @@ def extract_cost(
     Raises:
         CostExtractionError: If the response model is not found in the
             capability's cost rates.
+
     """
     model = response.model
     rates = capability.cost_rates.get(model)

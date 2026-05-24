@@ -3,7 +3,6 @@ import pytest
 from agent_runtime_cockpit.protocol.run_contract import ContractStatus, RunContract
 from agent_runtime_cockpit.protocol.run_receipt import RunReceipt
 
-
 CTR_ID = "ctr_01JABCDEFGHIJKLMNOPQ"
 RCPT_ID = "rcpt_01JKLMNOPQRSTUVWXYZ1"
 

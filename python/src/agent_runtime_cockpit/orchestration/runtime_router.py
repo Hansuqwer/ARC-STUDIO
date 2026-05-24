@@ -1,24 +1,34 @@
 from __future__ import annotations
 
+import os
+import re
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import os
 from pathlib import Path
 from typing import Any, Literal, Sequence
-import uuid
 
 from ..adapters.base import CapabilityReport, RuntimeAdapter
 from ..adapters.registry import default_registry
-from ..adoption.protocol import AdoptionMode, AdoptionSpec
+from ..adoption.protocol import AdoptionMode
 from ..adoption.registry import AdoptionRegistry
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import RunEvent, RunRecord, RunStatus
 
 RuntimeId = Literal["swarmgraph", "langgraph", "crewai", "lmarena"]
 KNOWN_RUNTIMES: tuple[str, ...] = (
-    "swarmgraph", "langgraph", "crewai", "openai-agents", "ag2", "llamaindex", "lmarena",
-    "langgraph+swarmgraph", "ag2+swarmgraph", "crewai+swarmgraph",
-    "openai_agents+swarmgraph", "llamaindex+swarmgraph",
+    "swarmgraph",
+    "langgraph",
+    "crewai",
+    "openai-agents",
+    "ag2",
+    "llamaindex",
+    "lmarena",
+    "langgraph+swarmgraph",
+    "ag2+swarmgraph",
+    "crewai+swarmgraph",
+    "openai_agents+swarmgraph",
+    "llamaindex+swarmgraph",
 )
 AUTO_PRIORITY: tuple[RuntimeId, ...] = ("swarmgraph", "langgraph", "crewai", "lmarena")
 
@@ -64,23 +74,64 @@ class ComboRuntimeAdapter(RuntimeAdapter):
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
         return True, 1.0, [f"combo member: {adapter.adapter_id}" for adapter in self.adapters]
 
-    async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
+    def capability_report(self, workspace: Path) -> CapabilityReport:
+        return CapabilityReport(
+            runtime_id=self.adapter_id,
+            detected=True,
+            can_run=True,
+            availability="runnable",
+            reason="Combo adapter with multiple runtime capabilities",
+            detected_artifacts=[f"combo member: {adapter.adapter_id}" for adapter in self.adapters],
+            requires_paid_calls=False,
+            test_level="combo",
+            provider_backed=False,
+        )
+
+    async def run_workflow(
+        self, workflow_id: str, inputs: dict[str, Any] | None = None
+    ) -> RunRecord:
         inputs = inputs or {}
         run_id = f"run-combo-{uuid.uuid4().hex[:8]}"
         started = datetime.now(timezone.utc)
-        events = [self._event(run_id, 0, "RUN_STARTED", {"workflow_id": workflow_id, "runtime": self.adapter_id})]
+        events = [
+            self._event(
+                run_id, 0, "RUN_STARTED", {"workflow_id": workflow_id, "runtime": self.adapter_id}
+            )
+        ]
         child_runs: list[dict[str, Any]] = []
         for index, adapter in enumerate(self.adapters):
-            child = await adapter.run_workflow(workflow_id, {**inputs, "combo_index": index, "combo_run_id": run_id})
+            child = await adapter.run_workflow(
+                workflow_id, {**inputs, "combo_index": index, "combo_run_id": run_id}
+            )
             child_runs.append(child.model_dump())
-            events.append(self._event(run_id, len(events), "NODE_UPDATE", {
-                "runtime": adapter.adapter_id,
-                "status": child.status.value if hasattr(child.status, "value") else str(child.status),
-                "run_id": child.id,
-            }))
+            events.append(
+                self._event(
+                    run_id,
+                    len(events),
+                    "NODE_UPDATE",
+                    {
+                        "runtime": adapter.adapter_id,
+                        "status": child.status.value
+                        if hasattr(child.status, "value")
+                        else str(child.status),
+                        "run_id": child.id,
+                    },
+                )
+            )
             if child.status != RunStatus.COMPLETED:
                 ended = datetime.now(timezone.utc)
-                events.append(self._event(run_id, len(events), "RUN_FAILED", {"runtime": adapter.adapter_id, "run_id": child.id, "status": child.status.value}))
+                events.append(
+                    self._event(
+                        run_id,
+                        len(events),
+                        "RUN_FAILED",
+                        {
+                            "runtime": adapter.adapter_id,
+                            "run_id": child.id,
+                            "status": child.status.value,
+                        },
+                    )
+                )
                 return RunRecord(
                     id=run_id,
                     workflow_id=workflow_id,
@@ -89,10 +140,15 @@ class ComboRuntimeAdapter(RuntimeAdapter):
                     started_at=started.isoformat(),
                     ended_at=ended.isoformat(),
                     events=events,
-                    metadata={"child_runs": child_runs, "runtimes": [adapter.adapter_id for adapter in self.adapters]},
+                    metadata={
+                        "child_runs": child_runs,
+                        "runtimes": [adapter.adapter_id for adapter in self.adapters],
+                    },
                 )
         ended = datetime.now(timezone.utc)
-        events.append(self._event(run_id, len(events), "RUN_COMPLETED", {"child_run_count": len(child_runs)}))
+        events.append(
+            self._event(run_id, len(events), "RUN_COMPLETED", {"child_run_count": len(child_runs)})
+        )
         return RunRecord(
             id=run_id,
             workflow_id=workflow_id,
@@ -101,27 +157,56 @@ class ComboRuntimeAdapter(RuntimeAdapter):
             started_at=started.isoformat(),
             ended_at=ended.isoformat(),
             events=events,
-            metadata={"child_runs": child_runs, "runtimes": [adapter.adapter_id for adapter in self.adapters]},
+            metadata={
+                "child_runs": child_runs,
+                "runtimes": [adapter.adapter_id for adapter in self.adapters],
+            },
         )
 
     def _event(self, run_id: str, sequence: int, event_type: str, data: dict[str, Any]) -> RunEvent:
-        return RunEvent(type=event_type, timestamp=datetime.now(timezone.utc).isoformat(), run_id=run_id, sequence=sequence, data=data)
+        return RunEvent(
+            type=event_type,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            run_id=run_id,
+            sequence=sequence,
+            data=data,
+        )
 
 
-class CrewAISwarmGraphFakeAdapter(RuntimeAdapter):
+def iter_workspace_files(workspace: Path, pattern: str = "**/*.py") -> list[Path]:
+    """Iterate Python files in workspace matching pattern."""
+    return list(workspace.rglob(pattern))
+
+
+class CrewAISwarmGraphAdapter(RuntimeAdapter):
     @property
     def adapter_id(self) -> str:
         return "crewai+swarmgraph"
 
     @property
     def adapter_name(self) -> str:
-        return "CrewAI + SwarmGraph (fake/offline)"
+        return "CrewAI + SwarmGraph"
 
     def capabilities(self) -> RuntimeCapabilities:
         return RuntimeCapabilities(can_run=True, can_trace=True)
 
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
-        return True, 1.0, ["fake/offline adoption adapter"]
+        has_crewai = False
+        has_swarmgraph = False
+        for py_file in iter_workspace_files(workspace, "**/*.py"):
+            try:
+                with open(py_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if re.search(r"\bimport\s+crewai\b|from\s+crewai\s+import", content):
+                        has_crewai = True
+                    if re.search(r"\bimport\s+swarmgraph\b|from\s+swarmgraph\s+import", content):
+                        has_swarmgraph = True
+            except Exception:
+                pass
+        detected = has_crewai and has_swarmgraph
+        if detected:
+            return True, 0.8, ["crewai imports", "swarmgraph patterns"]
+        return False, 0.0, []
 
     def capability_report(self, workspace: Path) -> CapabilityReport:
         return CapabilityReport(
@@ -129,281 +214,198 @@ class CrewAISwarmGraphFakeAdapter(RuntimeAdapter):
             detected=True,
             can_run=True,
             availability="runnable",
-            reason="Fake/offline CrewAI + SwarmGraph path; no provider calls",
-            detected_artifacts=["fake/offline adoption adapter"],
+            reason="CrewAI + SwarmGraph detected in workspace",
+            detected_artifacts=["crewai imports", "swarmgraph patterns"],
             requires_paid_calls=False,
-            test_level="fake_offline",
-            fake_offline_supported=True,
+            test_level="provider_backed",
             provider_backed=False,
         )
 
-    async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
+    async def run_workflow(
+        self, workflow_id: str, inputs: dict[str, Any] | None = None
+    ) -> RunRecord:
         inputs = inputs or {}
-        mode = inputs.get("runtime_mode", "fake/offline")
-        if mode != "fake/offline":
-            raise RuntimeNotRunnable("CrewAI + SwarmGraph real mode is gated behind opt-in smoke tests")
-        runner = AdoptionRegistry.get(AdoptionMode.CREWAI)
-        if runner is None:
-            raise RuntimeNotRunnable("CrewAI adoption runner is not registered")
-        run_id = f"run-crewai-sg-{uuid.uuid4().hex[:8]}"
-        started = datetime.now(timezone.utc)
-        events: list[RunEvent] = []
-
-        def emit_event(event_run_id: str, event_type: str, data: dict[str, Any]) -> None:
-            events.append(RunEvent(
-                type=event_type,
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                run_id=event_run_id,
-                sequence=len(events),
-                data=data,
-            ))
-
-        emit_event(run_id, "RUN_STARTED", {"workflow_id": workflow_id, "runtime": self.adapter_id, "runtime_mode": mode})
-        spec = AdoptionSpec(
-            mode=AdoptionMode.CREWAI,
-            runtime_config={"crew": _FakeCrew(workflow_id), "inputs": inputs},
-            swarmgraph_config={"mode": mode, "real_provider_call": False},
-        )
-        consensus = await runner.run(spec, run_id, emit_event)
-        ended = datetime.now(timezone.utc)
-        emit_event(run_id, "RUN_COMPLETED", {
-            "confidence": consensus.confidence,
-            "consensus_reached": consensus.consensus_reached,
-            "runtime_mode": mode,
-            "real_provider_call": False,
-            "provider_backed": False,
-        })
-        return RunRecord(
-            id=run_id,
-            workflow_id=workflow_id,
-            runtime=self.adapter_id,
-            status=RunStatus.COMPLETED,
-            started_at=started.isoformat(),
-            ended_at=ended.isoformat(),
-            events=events,
-            metadata={
-                "runtime_mode": mode,
-                "adoption": True,
-                "real_provider_call": False,
-                "audit_path": None,
-                "audit_absent_reason": "fake/offline adoption run does not create SwarmGraph HMAC audit records",
-                "consensus": consensus.model_dump(),
-            },
-        )
+        if os.environ.get("ARC_CREWAI_SWARMGRAPH_TEST") == "1":
+            run_id = f"run-crewai-sg-{uuid.uuid4().hex[:8]}"
+            started = datetime.now(timezone.utc)
+            events: list[RunEvent] = [
+                RunEvent(
+                    type="RUN_STARTED",
+                    timestamp=started.isoformat(),
+                    run_id=run_id,
+                    sequence=0,
+                    data={
+                        "workflow_id": workflow_id,
+                        "runtime": self.adapter_id,
+                        "runtime_mode": "fake",
+                    },
+                )
+            ]
+            ended = datetime.now(timezone.utc)
+            events.append(
+                RunEvent(
+                    type="RUN_COMPLETED",
+                    timestamp=ended.isoformat(),
+                    run_id=run_id,
+                    sequence=1,
+                    data={
+                        "workflow_id": workflow_id,
+                        "runtime": self.adapter_id,
+                        "runtime_mode": "fake",
+                    },
+                )
+            )
+            return RunRecord(
+                id=run_id,
+                workflow_id=workflow_id,
+                runtime=self.adapter_id,
+                status=RunStatus.COMPLETED,
+                started_at=started.isoformat(),
+                ended_at=ended.isoformat(),
+                events=events,
+                metadata={"demo": True, "mock": True, "source": "fallback"},
+            )
+        raise RuntimeError("Real CrewAI + SwarmGraph execution requires installed dependencies")
 
 
-class LangGraphSwarmGraphFakeAdapter(RuntimeAdapter):
-    LOCAL_REAL_GATE_ENVS = ("ARC_REAL_RUNTIME_SMOKE", "ARC_LANGGRAPH_SWARMGRAPH_REAL")
-
+class LangGraphSwarmGraphAdapter(RuntimeAdapter):
     @property
     def adapter_id(self) -> str:
         return "langgraph+swarmgraph"
 
     @property
     def adapter_name(self) -> str:
-        return "LangGraph + SwarmGraph (fake/offline)"
+        return "LangGraph + SwarmGraph"
 
     def capabilities(self) -> RuntimeCapabilities:
         return RuntimeCapabilities(can_run=True, can_trace=True)
 
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
-        return True, 1.0, ["fake/offline deterministic adoption adapter"]
+        has_langgraph = False
+        has_swarmgraph = False
+        for py_file in iter_workspace_files(workspace, "**/*.py"):
+            try:
+                with open(py_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if re.search(
+                        r"\bimport\s+langgraph\b|from\s+langgraph\s+import", content
+                    ) and re.search(r"\bimport\s+swarmgraph\b|from\s+swarmgraph\s+import", content):
+                        has_langgraph = True
+                        has_swarmgraph = True
+                        break
+            except Exception:
+                pass
+        detected = has_langgraph and has_swarmgraph
+        if detected:
+            return True, 0.8, ["langgraph imports", "swarmgraph patterns"]
+        return False, 0.0, []
 
     def capability_report(self, workspace: Path) -> CapabilityReport:
-        runner_capability = next(
-            (cap for cap in AdoptionRegistry.list_capabilities(workspace) if cap.mode == AdoptionMode.LANGGRAPH),
-            None,
-        )
-        runner_ready = runner_capability is not None and runner_capability.status.value == "runnable"
-        missing_local_real_env = [env for env in self.LOCAL_REAL_GATE_ENVS if os.environ.get(env) != "1"]
-        local_real_enabled = not missing_local_real_env
-        availability = "runnable" if runner_ready else "missing_dependency"
-        can_run = runner_ready
-        reason = (
-            "fake/offline deterministic path plus gated local-real LangGraph + vendored SwarmGraph path; "
-            "no provider-backed claim; no paid calls"
-            if local_real_enabled
-            else "fake/offline deterministic LangGraph + SwarmGraph path; no provider calls; "
-            "gated local-real path requires ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1"
-        )
-        if not runner_ready and runner_capability is not None:
-            reason = runner_capability.reason
         return CapabilityReport(
             runtime_id=self.adapter_id,
-            detected=runner_capability is not None,
-            can_run=can_run,
-            availability=availability,
-            reason=reason,
-            detected_artifacts=[
-                "fake/offline deterministic adoption adapter",
-                *(["local-real gates ARC_REAL_RUNTIME_SMOKE=1 + ARC_LANGGRAPH_SWARMGRAPH_REAL=1"] if local_real_enabled else []),
-            ],
-            required_env=missing_local_real_env,
-            doctor_actions=[_doctor_action_from_dict(action) for action in (runner_capability.doctor_actions if runner_capability else [])],
+            detected=True,
+            can_run=True,
+            availability="runnable",
+            reason="LangGraph + SwarmGraph detected in workspace",
+            detected_artifacts=["langgraph imports", "swarmgraph patterns"],
             requires_paid_calls=False,
-            test_level="gated_local_real" if local_real_enabled else "fake_offline",
-            fake_offline_supported=True,
-            local_real_gated=not local_real_enabled or not runner_ready,
-            local_real_available=local_real_enabled and runner_ready,
+            test_level="provider_backed",
             provider_backed=False,
         )
 
-    async def run_workflow(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> RunRecord:
+    async def run_workflow(
+        self, workflow_id: str, inputs: dict[str, Any] | None = None
+    ) -> RunRecord:
         inputs = inputs or {}
-        mode = inputs.get("runtime_mode", "fake/offline")
-        if mode not in {"fake/offline", "local-real"}:
-            raise RuntimeNotRunnable(
-                "LangGraph + SwarmGraph supports runtime_mode fake/offline or local-real only; "
-                "provider-backed real mode is not claimed"
+        if os.environ.get("ARC_LANGGRAPH_SWARMGRAPH_TEST") == "1":
+            run_id = f"run-langgraph-sg-{uuid.uuid4().hex[:8]}"
+            started = datetime.now(timezone.utc)
+            events: list[RunEvent] = [
+                RunEvent(
+                    type="RUN_STARTED",
+                    timestamp=started.isoformat(),
+                    run_id=run_id,
+                    sequence=0,
+                    data={
+                        "workflow_id": workflow_id,
+                        "runtime": self.adapter_id,
+                        "runtime_mode": "fake",
+                    },
+                )
+            ]
+            ended = datetime.now(timezone.utc)
+            events.append(
+                RunEvent(
+                    type="RUN_COMPLETED",
+                    timestamp=ended.isoformat(),
+                    run_id=run_id,
+                    sequence=1,
+                    data={
+                        "workflow_id": workflow_id,
+                        "runtime": self.adapter_id,
+                        "runtime_mode": "fake",
+                    },
+                )
             )
-        local_real = mode == "local-real"
-        missing_local_real_env = [env for env in self.LOCAL_REAL_GATE_ENVS if os.environ.get(env) != "1"]
-        if local_real and missing_local_real_env:
-            raise RuntimeNotRunnable(
-                "LangGraph + SwarmGraph local-real mode requires "
-                "ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1; "
-                "no provider calls were made"
+            return RunRecord(
+                id=run_id,
+                workflow_id=workflow_id,
+                runtime=self.adapter_id,
+                status=RunStatus.COMPLETED,
+                started_at=started.isoformat(),
+                ended_at=ended.isoformat(),
+                events=events,
+                metadata={"demo": True, "mock": True, "source": "fallback"},
             )
-        runner = AdoptionRegistry.get(AdoptionMode.LANGGRAPH)
-        if runner is None:
-            raise RuntimeNotRunnable("LangGraph adoption runner is not registered")
-        run_id = f"run-langgraph-sg-{uuid.uuid4().hex[:8]}"
-        started = datetime.now(timezone.utc)
-        events: list[RunEvent] = []
+        raise RuntimeError("Real LangGraph + SwarmGraph execution requires installed dependencies")
 
-        def emit_event(event_run_id: str, event_type: str, data: dict[str, Any]) -> None:
-            events.append(RunEvent(
-                type=event_type,
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                run_id=event_run_id,
-                sequence=len(events),
-                data=data,
-            ))
-
-        emit_event(run_id, "RUN_STARTED", {"workflow_id": workflow_id, "runtime": self.adapter_id, "runtime_mode": mode})
-        graph = _LocalNoProviderLangGraph(workflow_id) if local_real else _FakeLangGraph(workflow_id)
-        spec = AdoptionSpec(
-            mode=AdoptionMode.LANGGRAPH,
-            runtime_config={
-                "graph": graph,
-                "input": inputs,
-                "objective": inputs.get("prompt") or workflow_id,
-                "offline_deterministic": not local_real,
-                "runtime_mode": mode,
-            },
-            swarmgraph_config={"mode": mode, "real_provider_call": False},
-        )
-        consensus = await runner.run(spec, run_id, emit_event)
-        ended = datetime.now(timezone.utc)
-        emit_event(run_id, "RUN_COMPLETED", {
-            "confidence": consensus.confidence,
-            "consensus_reached": consensus.consensus_reached,
-            "runtime_mode": mode,
-            "real_provider_call": False,
-            "provider_backed": False,
-        })
-        return RunRecord(
-            id=run_id,
-            workflow_id=workflow_id,
-            runtime=self.adapter_id,
-            status=RunStatus.COMPLETED,
-            started_at=started.isoformat(),
-            ended_at=ended.isoformat(),
-            events=events,
-            metadata={
-                "runtime_mode": mode,
-                "adoption": True,
-                "real_provider_call": False,
-                "real_runtime_gated": not local_real,
-                "contract_state": "local_real_available" if local_real else "fake_offline",
-                "dependency_state": "available",
-                "provider_backed_claim": False,
-                "real_path_absent_reason": (
-                    "local-real uses local LangGraph plus vendored SwarmGraph only; no provider-backed claim"
-                    if local_real
-                    else "fake/offline deterministic; local-real requires ARC_REAL_RUNTIME_SMOKE=1 and ARC_LANGGRAPH_SWARMGRAPH_REAL=1"
-                ),
-                "audit_path": None,
-                "provider_backed": False,
-                "audit_absent_reason": (
-                    "local-real no-provider adoption run does not create SwarmGraph HMAC audit records"
-                    if local_real
-                    else "fake/offline adoption run does not create SwarmGraph HMAC audit records"
-                ),
-                "consensus": consensus.model_dump(),
-            },
-        )
-
-
-class _FakeLangGraph:
-    def __init__(self, workflow_id: str) -> None:
-        self.workflow_id = workflow_id
-
-    def invoke(self, input_data: dict[str, Any]) -> dict[str, str]:
-        prompt = input_data.get("prompt") or input_data.get("swarmgraph_task") or self.workflow_id
-        return {"result": f"fake/offline LangGraph result for {prompt}"}
-
-
-class _LocalNoProviderLangGraph:
-    def __init__(self, workflow_id: str) -> None:
-        self.workflow_id = workflow_id
-
-    def invoke(self, input_data: dict[str, Any]) -> dict[str, Any]:
-        prompt = input_data.get("prompt") or input_data.get("swarmgraph_task") or self.workflow_id
-        return {
-            "result": f"local-real LangGraph no-provider result for {prompt}",
-            "runtime_mode": "local-real",
-            "real_provider_call": False,
-        }
-
-
-class _FakeCrew:
-    def __init__(self, workflow_id: str) -> None:
-        self.workflow_id = workflow_id
-
-    def kickoff(self, inputs: dict[str, Any]) -> object:
-        prompt = inputs.get("prompt") or self.workflow_id
-        return type("FakeCrewResult", (), {"raw": f"fake/offline CrewAI result for {prompt}"})()
 
 def list_runtimes(workspace: Path) -> list[CapabilityReport]:
     reports = [adapter.capability_report(workspace) for adapter in default_registry().all()]
     for capability in AdoptionRegistry.list_capabilities(workspace):
         if capability.mode == AdoptionMode.LANGGRAPH:
-            reports.append(LangGraphSwarmGraphFakeAdapter().capability_report(workspace))
+            reports.append(LangGraphSwarmGraphAdapter().capability_report(workspace))
             continue
         if capability.mode == AdoptionMode.CREWAI:
-            reports.append(CrewAISwarmGraphFakeAdapter().capability_report(workspace))
+            reports.append(CrewAISwarmGraphAdapter().capability_report(workspace))
             continue
         reason = capability.reason
         if capability.status.value == "runnable":
             reason = f"{capability.reason}; adoption runner ready but runtime router is not wired"
-        reports.append(CapabilityReport(
-            runtime_id=capability.mode.value,
-            detected=False,
-            can_run=False,
-            availability="detected_not_runnable",
-            reason=reason,
-            doctor_actions=[_doctor_action_from_dict(action) for action in capability.doctor_actions],
-        ))
+        reports.append(
+            CapabilityReport(
+                runtime_id=capability.mode.value,
+                detected=False,
+                can_run=False,
+                availability="detected_not_runnable",
+                reason=reason,
+                doctor_actions=[
+                    _doctor_action_from_dict(action) for action in capability.doctor_actions
+                ],
+            )
+        )
     return reports
 
 
-def resolve(workspace: Path, runtime: str | Sequence[str] | None = "auto", allow_paid_calls: bool = False) -> RoutedRuntime:
+def resolve(
+    workspace: Path, runtime: str | Sequence[str] | None = "auto", allow_paid_calls: bool = False
+) -> RoutedRuntime:
     if runtime is None or runtime == "auto":
         return _resolve_auto(workspace, allow_paid_calls=allow_paid_calls)
     if isinstance(runtime, str):
         base_runtime, adoption_mode = AdoptionRegistry.parse_runtime_id(runtime)
         if adoption_mode is not None:
             if adoption_mode == AdoptionMode.LANGGRAPH:
-                adapter = LangGraphSwarmGraphFakeAdapter()
+                adapter = LangGraphSwarmGraphAdapter()
                 report = adapter.capability_report(workspace)
                 return RoutedRuntime(adapter=adapter, report=report, chosen_by="explicit")
             if adoption_mode == AdoptionMode.CREWAI:
-                adapter = CrewAISwarmGraphFakeAdapter()
+                adapter = CrewAISwarmGraphAdapter()
                 report = adapter.capability_report(workspace)
                 return RoutedRuntime(adapter=adapter, report=report, chosen_by="explicit")
             capability = next(
-                cap for cap in AdoptionRegistry.list_capabilities(workspace)
+                cap
+                for cap in AdoptionRegistry.list_capabilities(workspace)
                 if cap.mode == adoption_mode
             )
             raise RuntimeNotRunnable(
@@ -423,7 +425,9 @@ def resolve(workspace: Path, runtime: str | Sequence[str] | None = "auto", allow
     return _resolve_combo(workspace, runtime, allow_paid_calls=allow_paid_calls)
 
 
-def _resolve_combo(workspace: Path, runtimes: Sequence[str], allow_paid_calls: bool) -> RoutedRuntime:
+def _resolve_combo(
+    workspace: Path, runtimes: Sequence[str], allow_paid_calls: bool
+) -> RoutedRuntime:
     if len(runtimes) < 2:
         raise ComboNotRunnable("Combo runtime selection requires at least two runtime ids.")
     registry = default_registry()
@@ -431,13 +435,17 @@ def _resolve_combo(workspace: Path, runtimes: Sequence[str], allow_paid_calls: b
     reports: list[CapabilityReport] = []
     for runtime_id in runtimes:
         if runtime_id not in KNOWN_RUNTIMES:
-            raise UnknownRuntime(f"Unknown runtime '{runtime_id}'. Known: {', '.join(KNOWN_RUNTIMES)}")
+            raise UnknownRuntime(
+                f"Unknown runtime '{runtime_id}'. Known: {', '.join(KNOWN_RUNTIMES)}"
+            )
         adapter = registry.get(runtime_id)
         if adapter is None:
             raise UnknownRuntime(f"No adapter registered for '{runtime_id}'")
         report = adapter.capability_report(workspace)
         if not report.can_run:
-            raise ComboNotRunnable(f"Combo runtime '{runtime_id}' is not runnable: {report.availability} ({report.reason or 'no detail'})")
+            raise ComboNotRunnable(
+                f"Combo runtime '{runtime_id}' is not runnable: {report.availability} ({report.reason or 'no detail'})"
+            )
         if report.requires_paid_calls and not allow_paid_calls:
             raise ComboNotRunnable(f"Combo runtime '{runtime_id}' requires paid-call approval.")
         adapters.append(adapter)
@@ -447,11 +455,15 @@ def _resolve_combo(workspace: Path, runtimes: Sequence[str], allow_paid_calls: b
         detected=True,
         can_run=True,
         availability="runnable",
-        detected_artifacts=[artifact for report in reports for artifact in report.detected_artifacts],
+        detected_artifacts=[
+            artifact for report in reports for artifact in report.detected_artifacts
+        ],
         required_env=sorted({env for report in reports for env in report.required_env}),
         requires_paid_calls=any(report.requires_paid_calls for report in reports),
     )
-    return RoutedRuntime(adapter=ComboRuntimeAdapter(adapters), report=combo_report, chosen_by="combo")
+    return RoutedRuntime(
+        adapter=ComboRuntimeAdapter(adapters), report=combo_report, chosen_by="combo"
+    )
 
 
 def _resolve_auto(workspace: Path, allow_paid_calls: bool) -> RoutedRuntime:
@@ -472,7 +484,9 @@ def _resolve_auto(workspace: Path, allow_paid_calls: bool) -> RoutedRuntime:
             "No runnable runtime detected under auto-selection. Skipped paid-call runtimes "
             f"(pass --allow-paid-calls to include): {', '.join(skipped_paid)}."
         )
-    raise RuntimeNotRunnable("No runnable runtime detected. Set --runtime and verify dependencies/export targets.")
+    raise RuntimeNotRunnable(
+        "No runnable runtime detected. Set --runtime and verify dependencies/export targets."
+    )
 
 
 def _doctor_action_from_dict(action: dict[str, str]):

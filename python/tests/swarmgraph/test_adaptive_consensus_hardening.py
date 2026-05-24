@@ -40,7 +40,6 @@ from agent_runtime_cockpit.swarmgraph.nodes.consensus import (
 )
 from agent_runtime_cockpit.swarmgraph.state import SwarmState
 
-
 # ===========================================================================
 # Helpers
 # ===========================================================================
@@ -300,7 +299,8 @@ class TestConsensusDispatch:
 
 class TestImmutableRiskFields:
     """ConsensusResult risk fields must be set via model_copy, not
-    object.__setattr__."""
+    object.__setattr__.
+    """
 
     def test_model_copy_sets_risk_fields(self) -> None:
         base = ConsensusResult(
@@ -388,7 +388,8 @@ class TestTaskMetadata:
 
 class TestPerTaskSelection:
     """Each task should use its own prompt for adaptive selection unless
-    a shared prompt is explicitly provided."""
+    a shared prompt is explicitly provided.
+    """
 
     def test_uses_each_task_prompt(self) -> None:
         low_task = make_task("Explain consensus.", task_id="task-low")
@@ -452,7 +453,8 @@ class TestPerTaskSelection:
 
 class TestConsensusEventMetadata:
     """emit_consensus_event must include risk/protocol metadata when
-    consensus_result is provided."""
+    consensus_result is provided.
+    """
 
     def test_event_includes_risk_metadata(self) -> None:
         state = SwarmState(config=SwarmGraphConfig())

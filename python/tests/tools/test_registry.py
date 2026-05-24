@@ -7,8 +7,8 @@ from pydantic import BaseModel
 
 from agent_runtime_cockpit.cli_repl.cancellation import CancellationToken
 from agent_runtime_cockpit.tools import (
-    ToolRegistry,
     ToolRegistrationError,
+    ToolRegistry,
     ToolResult,
     wrap_tool_result,
 )
@@ -120,7 +120,9 @@ def test_registry_rejects_duplicate_registration():
 def test_wrap_trusted_tool_result():
     result = ToolResult(content="2026-05-21T18:00:00Z")
     wrapped = wrap_tool_result("get_time", "trusted", result)
-    assert wrapped == '<tool_result trust="trusted" tool="get_time">2026-05-21T18:00:00Z</tool_result>'
+    assert (
+        wrapped == '<tool_result trust="trusted" tool="get_time">2026-05-21T18:00:00Z</tool_result>'
+    )
 
 
 def test_wrap_untrusted_tool_result():

@@ -1,10 +1,10 @@
-"""
-CrossLinker — indexes graph events by stable ID for cross-referencing.
+"""CrossLinker — indexes graph events by stable ID for cross-referencing.
 
 Maintains per-run in-memory indexes of events keyed by ``node_id``,
 ``message_id``, ``tool_call_id``, and ``evidence_refs``. Queries return
 ordered lists of linked events forming chains.
 """
+
 from __future__ import annotations
 
 from ..protocol.schemas import RunEvent
@@ -112,7 +112,12 @@ class CrossLinker:
 
     def has_stable_ids(self) -> bool:
         """True if any event in this run has stable ID fields."""
-        return bool(self._by_node_id or self._by_message_id or self._by_tool_call_id or self._by_evidence_ref)
+        return bool(
+            self._by_node_id
+            or self._by_message_id
+            or self._by_tool_call_id
+            or self._by_evidence_ref
+        )
 
     def index_all(self, events: list[RunEvent]) -> None:
         """Index multiple events at once."""

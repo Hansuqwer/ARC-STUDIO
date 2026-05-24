@@ -1,5 +1,4 @@
-"""
-Vercel Grep Provider
+"""Vercel Grep Provider.
 
 Searches public GitHub repos via grep.app for real-world usage examples.
 Source: https://grep.app/
@@ -10,6 +9,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Optional
+
 from ...protocol.schemas import ContextPackEntry, SourceType
 
 log = logging.getLogger(__name__)

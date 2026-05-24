@@ -7,6 +7,8 @@ from typing import Optional
 import typer
 from rich.table import Table
 
+from ..protocol.errors import ArcErrorCode
+from ..protocol.event_envelope import err, ok
 from ._app import console
 from ._helpers import (
     DEBUG_FLAG,
@@ -17,10 +19,6 @@ from ._helpers import (
     _workspace,
 )
 from ._subapps import adapter_app, context_app, studio_app, studio_sessions_app, workspace_app
-
-from ..protocol.errors import ArcErrorCode
-from ..protocol.event_envelope import err, ok
-
 
 # ─── context pack ─────────────────────────────────────────────────────────────
 

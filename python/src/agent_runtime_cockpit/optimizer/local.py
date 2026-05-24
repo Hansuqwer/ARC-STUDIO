@@ -18,6 +18,7 @@ P4 gated provider modes:
 Provider modes are gated behind explicit privacy and paid-call gates.
 Silent rewrites of high-assurance prompts are never allowed.
 """
+
 from __future__ import annotations
 
 import difflib
@@ -33,13 +34,14 @@ log = logging.getLogger(__name__)
 
 class OptimizerMode(str):
     """Optimizer mode — controls what optimization is applied.
-    
+
     'off': send prompt unchanged
     'local': rule-based cleanup (default, no provider calls)
     'local-model': local model rewrite (future, gated)
     'provider': paid provider rewrite (future, gated)
     'swarmgraph': consensus optimization (future, gated)
     """
+
     OFF = "off"
     LOCAL = "local"
     LOCAL_MODEL = "local-model"
@@ -130,14 +132,14 @@ def optimize_prompt(prompt: str, model: str = "gpt-4", mode: str = "local") -> O
             tokens_saved=0,
             changes=[],
         )
-    
+
     if mode in ("local-model", "provider", "swarmgraph"):
         raise NotImplementedError(
             f"Optimizer mode '{mode}' is not yet implemented. "
             f"Use 'local' for rule-based optimization or 'off' for no optimization. "
             f"Provider modes require privacy/paid-call gates."
         )
-    
+
     original_tokens = count_tokens(prompt, model)
     optimized = prompt
     changes: list[str] = []

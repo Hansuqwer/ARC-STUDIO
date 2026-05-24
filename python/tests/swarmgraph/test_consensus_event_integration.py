@@ -33,7 +33,6 @@ from agent_runtime_cockpit.swarmgraph.nodes.consensus import (
 )
 from agent_runtime_cockpit.swarmgraph.state import SwarmState
 
-
 # ===========================================================================
 # Helpers
 # ===========================================================================

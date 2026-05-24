@@ -1,16 +1,17 @@
-"""
-Tests: CLI profiles and workspace config commands.
-"""
+"""Tests: CLI profiles and workspace config commands."""
+
 from __future__ import annotations
 
 import json
 from pathlib import Path
+
 from typer.testing import CliRunner
+
 from agent_runtime_cockpit.cli import app
 
 
 def test_profiles_list_json():
-    """arc profiles list returns built-in profiles."""
+    """Arc profiles list returns built-in profiles."""
     result = CliRunner().invoke(app, ["profiles", "list", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
@@ -22,7 +23,7 @@ def test_profiles_list_json():
 
 
 def test_profiles_list_table():
-    """arc profiles list renders a table."""
+    """Arc profiles list renders a table."""
     result = CliRunner().invoke(app, ["profiles", "list"])
     assert result.exit_code == 0, result.output
     assert "Run Profiles" in result.output
@@ -30,7 +31,7 @@ def test_profiles_list_table():
 
 
 def test_profiles_show_stub():
-    """arc profiles show stub returns stub profile details."""
+    """Arc profiles show stub returns stub profile details."""
     result = CliRunner().invoke(app, ["profiles", "show", "stub", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
@@ -40,7 +41,7 @@ def test_profiles_show_stub():
 
 
 def test_profiles_show_paid():
-    """arc profiles show local-paid returns paid profile details."""
+    """Arc profiles show local-paid returns paid profile details."""
     result = CliRunner().invoke(app, ["profiles", "show", "local-paid", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
@@ -50,7 +51,7 @@ def test_profiles_show_paid():
 
 
 def test_profiles_show_unknown_fails_closed():
-    """arc profiles show unknown-id fails closed."""
+    """Arc profiles show unknown-id fails closed."""
     result = CliRunner().invoke(app, ["profiles", "show", "nonexistent", "--json"])
     assert result.exit_code == 2
     data = json.loads(result.output)
@@ -59,18 +60,25 @@ def test_profiles_show_unknown_fails_closed():
 
 
 def test_profiles_create_persists_outside_workspace(monkeypatch, tmp_path: Path):
-    """arc profiles create writes env-ref metadata outside the workspace."""
+    """Arc profiles create writes env-ref metadata outside the workspace."""
     store = tmp_path / "home" / "profiles.json"
     workspace = tmp_path / "ws"
     workspace.mkdir()
     monkeypatch.setenv("ARC_PROFILE_CONFIG", str(store))
-    result = CliRunner().invoke(app, [
-        "profiles", "create", "ci-paid",
-        "--allow-paid-calls",
-        "--provider", "openai",
-        "--default-model", "gpt-test",
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "profiles",
+            "create",
+            "ci-paid",
+            "--allow-paid-calls",
+            "--provider",
+            "openai",
+            "--default-model",
+            "gpt-test",
+            "--json",
+        ],
+    )
     assert result.exit_code == 0, result.output
     assert store.exists()
     assert not (workspace / ".arc" / "profiles.json").exists()
@@ -86,48 +94,65 @@ def test_profiles_create_persists_outside_workspace(monkeypatch, tmp_path: Path)
 
 
 def test_workspace_init_creates_config(tmp_path: Path):
-    """arc workspace init creates .arc/config.yaml."""
-    result = CliRunner().invoke(app, [
-        "workspace", "init",
-        "--workspace", str(tmp_path),
-        "--name", "test-workspace",
-        "--json",
-    ])
+    """Arc workspace init creates .arc/config.yaml."""
+    result = CliRunner().invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--workspace",
+            str(tmp_path),
+            "--name",
+            "test-workspace",
+            "--json",
+        ],
+    )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
     assert data["created"].endswith(".arc/config.yaml")
     config_path = tmp_path / ".arc" / "config.yaml"
     assert config_path.exists()
     import yaml
+
     cfg = yaml.safe_load(config_path.read_text())
     assert cfg["version"] == 1
     assert cfg["workspace"]["name"] == "test-workspace"
 
 
 def test_workspace_init_already_exists(tmp_path: Path):
-    """arc workspace init fails if config already exists."""
+    """Arc workspace init fails if config already exists."""
     config_path = tmp_path / ".arc" / "config.yaml"
     config_path.parent.mkdir(parents=True)
     config_path.write_text("version: 1\n")
-    result = CliRunner().invoke(app, [
-        "workspace", "init",
-        "--workspace", str(tmp_path),
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--workspace",
+            str(tmp_path),
+            "--json",
+        ],
+    )
     assert result.exit_code == 1
     assert "already exists" in result.output
 
 
 def test_workspace_info(tmp_path: Path):
-    """arc workspace info returns workspace metadata."""
+    """Arc workspace info returns workspace metadata."""
     config_path = tmp_path / ".arc" / "config.yaml"
     config_path.parent.mkdir(parents=True)
     config_path.write_text("version: 1\nworkspace:\n  name: my-ws\n")
-    result = CliRunner().invoke(app, [
-        "workspace", "info",
-        "--workspace", str(tmp_path),
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "workspace",
+            "info",
+            "--workspace",
+            str(tmp_path),
+            "--json",
+        ],
+    )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
     assert data["workspace"] == str(tmp_path)
@@ -138,15 +163,20 @@ def test_workspace_info(tmp_path: Path):
 
 
 def test_workspace_config_show(tmp_path: Path):
-    """arc workspace config shows flattened config."""
+    """Arc workspace config shows flattened config."""
     config_path = tmp_path / ".arc" / "config.yaml"
     config_path.parent.mkdir(parents=True)
     config_path.write_text("version: 1\nruntime:\n  default: swarmgraph\n")
-    result = CliRunner().invoke(app, [
-        "workspace", "config",
-        "--workspace", str(tmp_path),
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "workspace",
+            "config",
+            "--workspace",
+            str(tmp_path),
+            "--json",
+        ],
+    )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
     assert data["version"] == 1
@@ -154,34 +184,49 @@ def test_workspace_config_show(tmp_path: Path):
 
 
 def test_workspace_config_set(tmp_path: Path):
-    """arc workspace config --key --value updates config."""
+    """Arc workspace config --key --value updates config."""
     config_path = tmp_path / ".arc" / "config.yaml"
     config_path.parent.mkdir(parents=True)
     config_path.write_text("version: 1\n")
-    result = CliRunner().invoke(app, [
-        "workspace", "config",
-        "--workspace", str(tmp_path),
-        "--key", "runtime.default",
-        "--value", "langgraph",
-        "--json",
-    ])
+    result = CliRunner().invoke(
+        app,
+        [
+            "workspace",
+            "config",
+            "--workspace",
+            str(tmp_path),
+            "--key",
+            "runtime.default",
+            "--value",
+            "langgraph",
+            "--json",
+        ],
+    )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
     assert data["updated"] == "runtime.default"
     assert data["value"] == "langgraph"
     import yaml
+
     cfg = yaml.safe_load(config_path.read_text())
     assert cfg["runtime"]["default"] == "langgraph"
 
 
 def test_workspace_config_set_no_config(tmp_path: Path):
-    """arc workspace config --key fails if no config file exists."""
-    result = CliRunner().invoke(app, [
-        "workspace", "config",
-        "--workspace", str(tmp_path),
-        "--key", "runtime.default",
-        "--value", "langgraph",
-        "--json",
-    ])
+    """Arc workspace config --key fails if no config file exists."""
+    result = CliRunner().invoke(
+        app,
+        [
+            "workspace",
+            "config",
+            "--workspace",
+            str(tmp_path),
+            "--key",
+            "runtime.default",
+            "--value",
+            "langgraph",
+            "--json",
+        ],
+    )
     assert result.exit_code == 1
     assert "not found" in result.output

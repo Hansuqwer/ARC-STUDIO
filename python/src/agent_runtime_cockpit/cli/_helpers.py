@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Optional
 
 import typer
+from rich import print as rprint
 from rich.console import Console
 from rich.json import JSON
-from rich import print as rprint
 
 from ..gating import GatingError
 from ..orchestration import runtime_router
@@ -203,7 +203,7 @@ def _run_preflight(
                     }
                 )
         elif capability:
-            report = runtime_router.LangGraphSwarmGraphFakeAdapter().capability_report(workspace)
+            report = runtime_router.LangGraphSwarmGraphAdapter().capability_report(workspace)
             if runtime_mode == "local-real":
                 warnings.append(
                     "LangGraph + SwarmGraph local-real is explicit opt-in smoke scope only; no network/provider/paid calls."

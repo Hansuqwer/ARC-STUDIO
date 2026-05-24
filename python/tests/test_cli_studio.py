@@ -3,20 +3,21 @@
 The cli_studio.py module is now a thin shim that delegates to cli_repl.
 These tests verify the shim still provides the expected CLI behavior.
 """
+
 from __future__ import annotations
 
 import json
 
 from typer.testing import CliRunner
 
-from agent_runtime_cockpit.cli_studio import app
 from agent_runtime_cockpit.cli_repl.session import (
-    ChatSession,
-    MODE_PLAN,
-    MODE_BUILD,
     MODE_AUTO,
+    MODE_BUILD,
+    MODE_PLAN,
     SESSION_SCHEMA_VERSION,
+    ChatSession,
 )
+from agent_runtime_cockpit.cli_studio import app
 
 runner = CliRunner()
 
@@ -61,16 +62,18 @@ class TestSessionPersistence:
         assert loaded_data["isolation_id"] == "none"
 
     def test_v1_session_migrates_to_v2(self):
-        loaded = ChatSession.model_validate({
-            "version": 1,
-            "id": "s-old",
-            "mode": MODE_BUILD,
-            "runtime_mode": "offline",
-            "created_at": "2026-01-01T00:00:00+00:00",
-            "updated_at": "2026-01-01T00:00:00+00:00",
-            "history": [],
-            "metadata": {},
-        })
+        loaded = ChatSession.model_validate(
+            {
+                "version": 1,
+                "id": "s-old",
+                "mode": MODE_BUILD,
+                "runtime_mode": "offline",
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "updated_at": "2026-01-01T00:00:00+00:00",
+                "history": [],
+                "metadata": {},
+            }
+        )
         assert loaded.version == SESSION_SCHEMA_VERSION
         assert loaded.runtime_mode == "fake"
         assert loaded.profile_id == "default"
@@ -80,16 +83,18 @@ class TestSessionPersistence:
         assert loaded.available_tools is None
 
     def test_v3_session_migrates_to_v4_tool_fields(self):
-        loaded = ChatSession.model_validate({
-            "version": 3,
-            "id": "s-v3",
-            "mode": MODE_BUILD,
-            "runtime_mode": "provider_backed",
-            "created_at": "2026-01-01T00:00:00+00:00",
-            "updated_at": "2026-01-01T00:00:00+00:00",
-            "history": [],
-            "metadata": {},
-        })
+        loaded = ChatSession.model_validate(
+            {
+                "version": 3,
+                "id": "s-v3",
+                "mode": MODE_BUILD,
+                "runtime_mode": "provider_backed",
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "updated_at": "2026-01-01T00:00:00+00:00",
+                "history": [],
+                "metadata": {},
+            }
+        )
         assert loaded.version == SESSION_SCHEMA_VERSION
         assert loaded.runtime_mode == "provider_backed"
         assert loaded.allow_paid_calls is True
@@ -98,19 +103,21 @@ class TestSessionPersistence:
         assert loaded.available_tools is None
 
     def test_v4_session_preserves_tool_allowlist(self):
-        loaded = ChatSession.model_validate({
-            "version": 4,
-            "id": "s-v4",
-            "mode": MODE_BUILD,
-            "runtime_mode": "fake",
-            "tools_enabled": True,
-            "max_tool_iterations": 3,
-            "available_tools": ["get_current_time"],
-            "created_at": "2026-01-01T00:00:00+00:00",
-            "updated_at": "2026-01-01T00:00:00+00:00",
-            "history": [],
-            "metadata": {},
-        })
+        loaded = ChatSession.model_validate(
+            {
+                "version": 4,
+                "id": "s-v4",
+                "mode": MODE_BUILD,
+                "runtime_mode": "fake",
+                "tools_enabled": True,
+                "max_tool_iterations": 3,
+                "available_tools": ["get_current_time"],
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "updated_at": "2026-01-01T00:00:00+00:00",
+                "history": [],
+                "metadata": {},
+            }
+        )
         assert loaded.version == SESSION_SCHEMA_VERSION
         assert loaded.tools_enabled is True
         assert loaded.max_tool_iterations == 3
@@ -123,6 +130,7 @@ class TestSessionPersistence:
         # Use a custom sessions dir via the env var
         custom_dir = tmp_path / "custom_sessions"
         import os
+
         os.environ["ARC_STUDIO_SESSIONS_DIR"] = str(custom_dir)
 
         try:
@@ -144,6 +152,7 @@ class TestSessionPersistence:
     def test_session_list(self, tmp_path):
         """Verify session listing with custom dir."""
         import os
+
         os.environ["ARC_STUDIO_SESSIONS_DIR"] = str(tmp_path / "sessions_list")
         try:
             s1 = ChatSession()
@@ -182,6 +191,7 @@ class TestLegacyReadCompat:
     def test_read_legacy_flat_session(self, tmp_path):
         """Verify legacy flat StudioSession JSON can be read."""
         import os
+
         os.environ["ARC_STUDIO_SESSIONS_DIR"] = str(tmp_path / "legacy_read")
         try:
             sid = "legacy-session-001"
@@ -197,9 +207,7 @@ class TestLegacyReadCompat:
             }
             legacy_dir = tmp_path / "legacy_read"
             legacy_dir.mkdir(parents=True, exist_ok=True)
-            (legacy_dir / f"{sid}.json").write_text(
-                json.dumps(legacy_data), encoding="utf-8"
-            )
+            (legacy_dir / f"{sid}.json").write_text(json.dumps(legacy_data), encoding="utf-8")
 
             loaded = ChatSession.load(sid)
             assert loaded is not None

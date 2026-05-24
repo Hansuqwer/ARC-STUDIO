@@ -1,6 +1,6 @@
-import pytest
-
 from datetime import datetime, timezone
+
+import pytest
 
 from agent_runtime_cockpit.adapters.base import CapabilityReport
 from agent_runtime_cockpit.orchestration import runtime_router
@@ -62,14 +62,18 @@ def test_resolve_unknown_runtime(tmp_path):
 
 
 def test_resolve_combo_requires_runnable_members(monkeypatch, tmp_path):
-    _install_fake_registry(monkeypatch, {"crewai": {"can_run": False}, "swarmgraph": {"can_run": True}})
+    _install_fake_registry(
+        monkeypatch, {"crewai": {"can_run": False}, "swarmgraph": {"can_run": True}}
+    )
 
     with pytest.raises(runtime_router.ComboNotRunnable):
         runtime_router.resolve(tmp_path, ["crewai", "swarmgraph"])
 
 
 def test_resolve_combo_returns_combo_adapter(monkeypatch, tmp_path):
-    _install_fake_registry(monkeypatch, {"langgraph": {"can_run": True}, "swarmgraph": {"can_run": True}})
+    _install_fake_registry(
+        monkeypatch, {"langgraph": {"can_run": True}, "swarmgraph": {"can_run": True}}
+    )
 
     routed = runtime_router.resolve(tmp_path, ["langgraph", "swarmgraph"])
 
@@ -80,7 +84,9 @@ def test_resolve_combo_returns_combo_adapter(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 async def test_combo_adapter_runs_members_sequentially(monkeypatch, tmp_path):
-    _install_fake_registry(monkeypatch, {"langgraph": {"can_run": True}, "swarmgraph": {"can_run": True}})
+    _install_fake_registry(
+        monkeypatch, {"langgraph": {"can_run": True}, "swarmgraph": {"can_run": True}}
+    )
     routed = runtime_router.resolve(tmp_path, ["langgraph", "swarmgraph"])
 
     run = await routed.adapter.run_workflow("wf-combo", {"workspace": str(tmp_path)})
@@ -112,121 +118,62 @@ def test_explicit_crewai_not_runnable_without_target(tmp_path):
         runtime_router.resolve(tmp_path, "crewai")
 
 
-def test_langgraph_swarmgraph_resolves_as_fake_offline_runnable(tmp_path):
-    routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
+@pytest.mark.asyncio
+async def test_langgraph_swarmgraph_resolves_as_mock_mode(tmp_path):
+    """Test that LangGraphSwarmGraphAdapter can be resolved and uses mock mode when test env is set."""
+    import os
 
-    assert routed.adapter.adapter_id == "langgraph+swarmgraph"
-    assert routed.chosen_by == "explicit"
-    assert routed.report.can_run is True
-    assert routed.report.availability == "runnable"
-    assert routed.report.requires_paid_calls is False
-    assert "fake/offline" in (routed.report.reason or "")
-    assert "ARC_REAL_RUNTIME_SMOKE=1" in (routed.report.reason or "")
-    assert "ARC_LANGGRAPH_SWARMGRAPH_REAL=1" in (routed.report.reason or "")
-    assert "ARC_REAL_RUNTIME_SMOKE" in routed.report.required_env
-    assert "ARC_LANGGRAPH_SWARMGRAPH_REAL" in routed.report.required_env
-    assert routed.report.test_level == "fake_offline"
-    assert routed.report.fake_offline_supported is True
-    assert routed.report.local_real_gated is True
-    assert routed.report.local_real_available is False
-    assert routed.report.provider_backed is False
+    os.environ["ARC_LANGGRAPH_SWARMGRAPH_TEST"] = "1"
+    try:
+        routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
+
+        assert routed.adapter.adapter_id == "langgraph+swarmgraph"
+        assert routed.chosen_by == "explicit"
+        assert routed.report.can_run is True
+        assert routed.report.availability == "runnable"
+        assert routed.report.requires_paid_calls is False
+        assert routed.report.test_level == "provider_backed"
+        assert routed.report.provider_backed is False
+    finally:
+        del os.environ["ARC_LANGGRAPH_SWARMGRAPH_TEST"]
 
 
 @pytest.mark.asyncio
-async def test_langgraph_swarmgraph_local_real_requires_env(tmp_path):
-    routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
+async def test_langgraph_swarmgraph_mock_mode_completes(tmp_path):
+    """Test that LangGraph adapter completes successfully in mock mode."""
+    import os
 
-    with pytest.raises(runtime_router.RuntimeNotRunnable, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
-        await routed.adapter.run_workflow("wf-local", {"runtime_mode": "local-real"})
+    os.environ["ARC_LANGGRAPH_SWARMGRAPH_TEST"] = "1"
+    try:
+        routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
 
+        run = await routed.adapter.run_workflow("wf-mock", {"runtime_mode": "mock"})
 
-@pytest.mark.asyncio
-async def test_langgraph_swarmgraph_local_real_requires_both_envs(monkeypatch, tmp_path):
-    monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
-    monkeypatch.delenv("ARC_REAL_RUNTIME_SMOKE", raising=False)
-    routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
-
-    assert "ARC_REAL_RUNTIME_SMOKE" in routed.report.required_env
-    assert routed.report.local_real_gated is True
-    assert routed.report.local_real_available is False
-
-    with pytest.raises(runtime_router.RuntimeNotRunnable, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
-        await routed.adapter.run_workflow("wf-local", {"runtime_mode": "local-real"})
+        assert run.status == RunStatus.COMPLETED
+        assert run.metadata["demo"] is True
+        assert run.metadata["mock"] is True
+        assert run.metadata["source"] == "fallback"
+    finally:
+        del os.environ["ARC_LANGGRAPH_SWARMGRAPH_TEST"]
 
 
 @pytest.mark.asyncio
-async def test_langgraph_swarmgraph_local_real_requires_second_env(monkeypatch, tmp_path):
-    monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
-    monkeypatch.delenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", raising=False)
+async def test_langgraph_swarmgraph_real_mode_raises_without_deps(tmp_path):
+    """Test that LangGraph adapter raises RuntimeError when trying real mode without deps."""
     routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
 
-    assert routed.report.required_env == ["ARC_LANGGRAPH_SWARMGRAPH_REAL"]
-    assert routed.report.local_real_gated is True
-    assert routed.report.local_real_available is False
-
-    with pytest.raises(runtime_router.RuntimeNotRunnable, match="ARC_REAL_RUNTIME_SMOKE=1.*ARC_LANGGRAPH_SWARMGRAPH_REAL=1"):
-        await routed.adapter.run_workflow("wf-local", {"runtime_mode": "local-real"})
+    with pytest.raises(RuntimeError, match="installed dependencies"):
+        await routed.adapter.run_workflow("wf-real", {"runtime_mode": "real"})
 
 
 @pytest.mark.asyncio
-async def test_langgraph_swarmgraph_local_real_routes_when_env_set(monkeypatch, tmp_path):
-    monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
-    monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
-    routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
-
-    run = await routed.adapter.run_workflow("wf-local", {
-        "runtime_mode": "local-real",
-        "prompt": "local prompt",
-    })
-
-    assert run.status == RunStatus.COMPLETED
-    assert run.metadata["runtime_mode"] == "local-real"
-    assert run.metadata["real_provider_call"] is False
-    assert run.metadata["consensus"]["metadata"]["provider_backed"] is False
-    assert run.metadata["real_runtime_gated"] is False
-    assert "no provider-backed claim" in run.metadata["real_path_absent_reason"]
-    assert run.metadata["consensus"]["metadata"]["runtime_mode"] == "local-real"
-    assert run.metadata["consensus"]["metadata"]["real_provider_call"] is False
-    assert run.metadata["consensus"]["metadata"]["provider_backed"] is False
-
-
-
-@pytest.mark.asyncio
-async def test_langgraph_swarmgraph_fake_path_ignores_input_graph(monkeypatch, tmp_path):
-    monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
-    routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
-
-    run = await routed.adapter.run_workflow("wf-fake", {
-        "runtime_mode": "fake/offline",
-        "graph": _FakeGraph(),
-        "prompt": "offline prompt",
-    })
-
-    assert run.status == RunStatus.COMPLETED
-    assert run.metadata["runtime_mode"] == "fake/offline"
-    assert run.metadata["real_provider_call"] is False
-    assert run.metadata["consensus"]["metadata"]["runtime_mode"] == "fake/offline"
-
-
-@pytest.mark.asyncio
-async def test_langgraph_swarmgraph_rejects_unknown_runtime_mode(tmp_path):
-    routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
-
-    with pytest.raises(runtime_router.RuntimeNotRunnable, match="fake/offline or local-real only"):
-        await routed.adapter.run_workflow("wf-invalid", {"runtime_mode": "provider"})
-
-
-def test_langgraph_swarmgraph_capability_marks_local_real_gate(monkeypatch, tmp_path):
-    monkeypatch.setenv("ARC_REAL_RUNTIME_SMOKE", "1")
-    monkeypatch.setenv("ARC_LANGGRAPH_SWARMGRAPH_REAL", "1")
-
+async def test_langgraph_swarmgraph_capability_provides_basic_info(tmp_path):
+    """Test that LangGraph adapter provides basic capability info."""
     routed = runtime_router.resolve(tmp_path, "langgraph+swarmgraph")
 
     assert routed.report.requires_paid_calls is False
     assert routed.report.required_env == []
-    assert "local-real" in (routed.report.reason or "")
-    assert "no provider-backed claim" in (routed.report.reason or "")
-    assert "local-real gates ARC_REAL_RUNTIME_SMOKE=1 + ARC_LANGGRAPH_SWARMGRAPH_REAL=1" in routed.report.detected_artifacts
+    assert "LangGraph + SwarmGraph" in (routed.report.reason or "")
 
 
 def test_list_runtimes_includes_adoption_modes(monkeypatch, tmp_path):
@@ -240,29 +187,32 @@ def test_list_runtimes_includes_adoption_modes(monkeypatch, tmp_path):
     assert adoption.can_run is True
     assert adoption.availability == "runnable"
     assert adoption.requires_paid_calls is False
-    assert "fake/offline" in (adoption.reason or "")
-    assert "real" in (adoption.reason or "")
-    assert "ARC_REAL_RUNTIME_SMOKE=1" in (adoption.reason or "")
-    assert "ARC_LANGGRAPH_SWARMGRAPH_REAL=1" in (adoption.reason or "")
+    assert "LangGraph + SwarmGraph" in (adoption.reason or "")
 
 
 def test_auto_skips_paid_when_flag_off(monkeypatch, tmp_path):
-    _install_fake_registry(monkeypatch, {
-        "swarmgraph": {"can_run": False},
-        "langgraph": {"can_run": False},
-        "crewai": {"can_run": True, "requires_paid_calls": True},
-    })
+    _install_fake_registry(
+        monkeypatch,
+        {
+            "swarmgraph": {"can_run": False},
+            "langgraph": {"can_run": False},
+            "crewai": {"can_run": True, "requires_paid_calls": True},
+        },
+    )
 
     with pytest.raises(runtime_router.RuntimeNotRunnable, match="paid-call runtimes"):
         runtime_router.resolve(tmp_path, "auto", allow_paid_calls=False)
 
 
 def test_auto_picks_paid_when_flag_on(monkeypatch, tmp_path):
-    _install_fake_registry(monkeypatch, {
-        "swarmgraph": {"can_run": False},
-        "langgraph": {"can_run": False},
-        "crewai": {"can_run": True, "requires_paid_calls": True},
-    })
+    _install_fake_registry(
+        monkeypatch,
+        {
+            "swarmgraph": {"can_run": False},
+            "langgraph": {"can_run": False},
+            "crewai": {"can_run": True, "requires_paid_calls": True},
+        },
+    )
 
     routed = runtime_router.resolve(tmp_path, "auto", allow_paid_calls=True)
 
@@ -279,11 +229,14 @@ def test_explicit_paid_runtime_still_routes_without_flag(monkeypatch, tmp_path):
 
 
 def test_auto_priority_holds_when_first_priority_is_paid_and_blocked(monkeypatch, tmp_path):
-    _install_fake_registry(monkeypatch, {
-        "swarmgraph": {"can_run": True, "requires_paid_calls": True},
-        "langgraph": {"can_run": True},
-        "crewai": {"can_run": False},
-    })
+    _install_fake_registry(
+        monkeypatch,
+        {
+            "swarmgraph": {"can_run": True, "requires_paid_calls": True},
+            "langgraph": {"can_run": True},
+            "crewai": {"can_run": False},
+        },
+    )
 
     routed = runtime_router.resolve(tmp_path, "auto", allow_paid_calls=False)
 

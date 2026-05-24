@@ -15,7 +15,6 @@ from agent_runtime_cockpit.providers.anthropic_estimator import (
     select_estimator,
 )
 
-
 # ---------------------------------------------------------------------------
 # Test doubles
 # ---------------------------------------------------------------------------
@@ -156,7 +155,8 @@ class TestTiktokenApproximateEstimator:
     def test_method_name_contains_approximate(self):
         """Audit invariant: estimated records produced by tiktoken must
         carry 'approximate' in the method name so auditors don't confuse
-        them with measured or count_tokens-derived numbers."""
+        them with measured or count_tokens-derived numbers.
+        """
         estimator = TiktokenApproximateEstimator()
         assert "approximate" in estimator.method_name.lower()
 
@@ -192,7 +192,8 @@ class TestSelectEstimator:
 
     def test_explicit_no_sdk_returns_tiktoken_even_with_client(self):
         """Preflight callers pass prefer_sdk=False to avoid the
-        count_tokens chicken-and-egg."""
+        count_tokens chicken-and-egg.
+        """
         client = _ClientStub(returned_tokens=100)
         estimator = select_estimator(prefer_sdk=False, sdk_client=client)
         assert isinstance(estimator, TiktokenApproximateEstimator)
@@ -206,7 +207,12 @@ class TestSelectEstimator:
 class TestBuildEstimateFn:
     def test_returns_callable_that_returns_token_counts(self):
         estimator = TiktokenApproximateEstimator()
-        messages = [{"role": "user", "content": "hello world this is a longer text to produce enough tokens"}]
+        messages = [
+            {
+                "role": "user",
+                "content": "hello world this is a longer text to produce enough tokens",
+            }
+        ]
         fn = build_estimate_fn(estimator, messages, model="claude-sonnet-4-6")
         input_tokens, output_tokens = fn()
         assert input_tokens > 0
@@ -240,10 +246,12 @@ class TestBuildEstimateFn:
         )
         input_tokens, output_tokens = fn()
 
-        assert calls == [{
-            "model": "claude-sonnet-4-6",
-            "messages": [{"role": "user", "content": "hi"}],
-        }]
+        assert calls == [
+            {
+                "model": "claude-sonnet-4-6",
+                "messages": [{"role": "user", "content": "hi"}],
+            }
+        ]
         assert input_tokens == 1234
         assert output_tokens >= 1
 

@@ -4,7 +4,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from agent_runtime_cockpit.cli_repl.cancellation import CancellationReason, CancellationToken, never_cancelled
+from agent_runtime_cockpit.cli_repl.cancellation import (
+    CancellationReason,
+    CancellationToken,
+    never_cancelled,
+)
 from agent_runtime_cockpit.providers import (
     AnthropicClient,
     CancelledError,
@@ -96,7 +100,9 @@ async def test_complete_maps_response_and_usage() -> None:
 
 @pytest.mark.asyncio
 async def test_complete_missing_usage_returns_degraded_response() -> None:
-    response = SimpleNamespace(model="claude-sonnet-4-6", content=[SimpleNamespace(text="ok")], stop_reason="end_turn")
+    response = SimpleNamespace(
+        model="claude-sonnet-4-6", content=[SimpleNamespace(text="ok")], stop_reason="end_turn"
+    )
     client = AnthropicClient(sdk_factory=lambda: _Sdk(_Messages(response=response)))
 
     result = await client.complete(_request(), cancellation_token=never_cancelled())
@@ -108,7 +114,9 @@ async def test_complete_missing_usage_returns_degraded_response() -> None:
 
 @pytest.mark.asyncio
 async def test_degraded_extract_cost_uses_sdk_count_tokens_with_model() -> None:
-    response = SimpleNamespace(model="claude-sonnet-4-6", content=[SimpleNamespace(text="ok")], stop_reason="end_turn")
+    response = SimpleNamespace(
+        model="claude-sonnet-4-6", content=[SimpleNamespace(text="ok")], stop_reason="end_turn"
+    )
     messages = _Messages(response=response)
     client = AnthropicClient(sdk_factory=lambda: _Sdk(messages))
 
@@ -127,12 +135,16 @@ async def test_stream_yields_start_delta_stop() -> None:
     events = [
         SimpleNamespace(type="content_block_delta", delta=SimpleNamespace(text="he")),
         SimpleNamespace(type="content_block_delta", delta=SimpleNamespace(text="llo")),
-        SimpleNamespace(type="message_delta", usage=SimpleNamespace(input_tokens=1, output_tokens=2)),
+        SimpleNamespace(
+            type="message_delta", usage=SimpleNamespace(input_tokens=1, output_tokens=2)
+        ),
     ]
     messages = _Messages(stream=_Stream(events))
     client = AnthropicClient(sdk_factory=lambda: _Sdk(messages))
 
-    chunks = [chunk async for chunk in client.stream(_request(), cancellation_token=never_cancelled())]
+    chunks = [
+        chunk async for chunk in client.stream(_request(), cancellation_token=never_cancelled())
+    ]
 
     assert [chunk.chunk_type for chunk in chunks] == ["start", "delta", "delta", "stop"]
     assert "hello" == chunks[1].delta + chunks[2].delta
@@ -155,7 +167,9 @@ async def test_rate_limit_error_is_mapped() -> None:
     class RateLimitAPIError(Exception):
         pass
 
-    client = AnthropicClient(sdk_factory=lambda: _Sdk(_Messages(error=RateLimitAPIError("rate limit"))))
+    client = AnthropicClient(
+        sdk_factory=lambda: _Sdk(_Messages(error=RateLimitAPIError("rate limit")))
+    )
 
     with pytest.raises(RateLimitError):
         await client.complete(_request(), cancellation_token=never_cancelled())

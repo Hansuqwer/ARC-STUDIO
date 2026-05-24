@@ -1,23 +1,24 @@
-"""
-ARC Studio API Routes
+"""ARC Studio API Routes.
 
 Defines the REST API endpoints for ARC Studio backend.
 """
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import Optional, List
-import subprocess
 import json
 import os
+import subprocess
+from typing import List, Optional
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
 from security_utils import (
-    sanitize_prompt,
-    validate_trace_id,
-    validate_file_path,
-    validate_backend,
-    sanitize_error_message,
-    validate_workspace_root,
     SecurityError,
+    sanitize_error_message,
+    sanitize_prompt,
+    validate_backend,
+    validate_file_path,
+    validate_trace_id,
+    validate_workspace_root,
 )
 
 app = FastAPI(title="ARC Studio API", version="0.1.0")
@@ -73,13 +74,13 @@ class TraceInfo(BaseModel):
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
+    """Health check endpoint."""
     return {"status": "ok", "service": "ARC Studio Backend"}
 
 
 @app.post("/api/execute", response_model=ExecutionResponse)
 async def execute_workflow(request: ExecutionRequest):
-    """Execute a SwarmGraph workflow"""
+    """Execute a SwarmGraph workflow."""
     try:
         # Validate and sanitize inputs
         sanitized_prompt = sanitize_prompt(request.prompt)
@@ -134,7 +135,7 @@ async def execute_workflow(request: ExecutionRequest):
 
 @app.get("/api/traces", response_model=List[TraceInfo])
 async def get_traces():
-    """Get list of trace files"""
+    """Get list of trace files."""
     try:
         # Validate traces directory is within workspace
         validated_traces_dir = validate_file_path(".arc/traces", str(WORKSPACE_ROOT))
@@ -175,7 +176,7 @@ async def get_traces():
 
 @app.get("/api/traces/{trace_id}")
 async def get_trace(trace_id: str):
-    """Get a specific trace file"""
+    """Get a specific trace file."""
     try:
         # Validate trace ID to prevent path traversal
         validated_trace_id = validate_trace_id(trace_id)

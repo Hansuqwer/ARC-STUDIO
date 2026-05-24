@@ -1,10 +1,12 @@
 """Tests for local prompt optimizer."""
+
 import pytest
+
 from agent_runtime_cockpit.optimizer.local import (
     count_tokens,
-    optimize_prompt,
-    estimate_cost,
     diff_prompts,
+    estimate_cost,
+    optimize_prompt,
 )
 
 
@@ -25,7 +27,10 @@ def test_optimize_prompt_strip_trailing():
     prompt = "Hello   \nWorld   \n"
     result = optimize_prompt(prompt)
     assert result.optimized.endswith("World\n")
-    assert "strip_trailing_whitespace" in result.changes or "remove_trailing_newlines" in result.changes
+    assert (
+        "strip_trailing_whitespace" in result.changes
+        or "remove_trailing_newlines" in result.changes
+    )
 
 
 def test_optimize_prompt_no_change():

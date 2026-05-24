@@ -1,5 +1,7 @@
 """Extension registry."""
+
 from .base import ArcExtension
+
 
 class ExtensionRegistry:
     def __init__(self) -> None:

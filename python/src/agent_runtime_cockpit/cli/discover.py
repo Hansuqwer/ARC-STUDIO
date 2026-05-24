@@ -11,7 +11,6 @@ from ..adapters.registry import default_registry
 from ..orchestration import runtime_router
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
-
 from ._app import app, console, err_console
 from ._helpers import (
     DEBUG_FLAG,

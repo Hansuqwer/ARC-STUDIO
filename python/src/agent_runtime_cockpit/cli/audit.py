@@ -8,7 +8,6 @@ import typer
 
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
-
 from ._helpers import (
     DEBUG_FLAG,
     JSON_FLAG,

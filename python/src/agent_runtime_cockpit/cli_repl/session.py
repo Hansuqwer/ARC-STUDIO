@@ -11,7 +11,6 @@ from pydantic import BaseModel, Field
 
 from agent_runtime_cockpit.runtime.mode import RuntimeMode
 
-
 SESSION_SCHEMA_VERSION = 4
 MODE_PLAN = "plan"
 MODE_BUILD = "build"
@@ -101,12 +100,14 @@ def _session_from_legacy(data: dict[str, Any], fallback_id: str) -> ChatSession:
         metadata={"source_trust": "workspace", "source_format": "legacy_studio_session"},
     )
     for msg in data.get("messages", []):
-        session.history.append({
-            "role": msg.get("role", "user"),
-            "content": msg.get("content", ""),
-            "timestamp": msg.get("timestamp", data.get("updated", session.updated_at)),
-            "source_trust": "workspace",
-        })
+        session.history.append(
+            {
+                "role": msg.get("role", "user"),
+                "content": msg.get("content", ""),
+                "timestamp": msg.get("timestamp", data.get("updated", session.updated_at)),
+                "source_trust": "workspace",
+            }
+        )
     return session
 
 
@@ -119,10 +120,14 @@ def _migrate_chat_session(data: dict[str, Any]) -> dict[str, Any]:
         migrated["version"] = SESSION_SCHEMA_VERSION
     else:
         return data
-    migrated["runtime_mode"] = RuntimeMode.from_legacy(migrated.get("runtime_mode", RuntimeMode.FAKE)).value
+    migrated["runtime_mode"] = RuntimeMode.from_legacy(
+        migrated.get("runtime_mode", RuntimeMode.FAKE)
+    ).value
     migrated.setdefault("profile_id", "default")
     migrated.setdefault("isolation_id", "none")
-    migrated.setdefault("allow_paid_calls", RuntimeMode(migrated["runtime_mode"]) is RuntimeMode.PROVIDER_BACKED)
+    migrated.setdefault(
+        "allow_paid_calls", RuntimeMode(migrated["runtime_mode"]) is RuntimeMode.PROVIDER_BACKED
+    )
     migrated.setdefault("tools_enabled", False)
     migrated.setdefault("max_tool_iterations", 10)
     migrated.setdefault("available_tools", None)
@@ -166,7 +171,9 @@ class ChatSession(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
-    def model_validate_json(cls, json_data: str | bytes | bytearray, *args: Any, **kwargs: Any) -> ChatSession:
+    def model_validate_json(
+        cls, json_data: str | bytes | bytearray, *args: Any, **kwargs: Any
+    ) -> ChatSession:
         data = json.loads(json_data)
         return cls.model_validate(_migrate_chat_session(data), *args, **kwargs)
 
@@ -177,11 +184,13 @@ class ChatSession(BaseModel):
         return super().model_validate(obj, *args, **kwargs)
 
     def add_message(self, role: str, content: str) -> None:
-        self.history.append({
-            "role": role,
-            "content": content,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        self.history.append(
+            {
+                "role": role,
+                "content": content,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         self.updated_at = datetime.now(timezone.utc).isoformat()
 
     def set_mode(self, mode: str) -> None:

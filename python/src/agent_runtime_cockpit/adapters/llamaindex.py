@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import importlib.util
 import importlib
+import importlib.util
 import os
 from pathlib import Path
 
@@ -9,7 +9,6 @@ from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import WorkflowInfo
 from ._static import dependency_evidence, import_evidence, static_workflow
 from .base import CapabilityReport, DoctorAction, RuntimeAdapter
-
 
 EXPORT_ENV = "ARC_LLAMAINDEX_EXPORT"
 
@@ -88,7 +87,9 @@ class LlamaIndexAdapter(RuntimeAdapter):
 
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
         dep_score, evidence = dependency_evidence(workspace, ("llama-index", "llama_index"))
-        import_score, import_hits = import_evidence(workspace, ("from llama_index", "import llama_index"))
+        import_score, import_hits = import_evidence(
+            workspace, ("from llama_index", "import llama_index")
+        )
         evidence.extend(import_hits)
         if importlib.util.find_spec("llama_index") is not None:
             evidence.append("llama_index package importable")

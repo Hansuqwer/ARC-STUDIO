@@ -93,6 +93,38 @@ Workspace trust resolver (external DB at `~/.arc/trusted-workspaces.json`), secr
 
 Frontend and backend communicate via **JSON-RPC** over Theia's connection infrastructure (JSON-RPC channel). Protocol types are defined in TypeScript at `packages/arc-extension/src/common/arc-protocol.ts` and mirrored in Python at `python/src/agent_runtime_cockpit/protocol/`. The `packages/arc-protocol-ts/` package provides standalone TypeScript types for use outside Theia.
 
+## Python Daemon Communication
+
+The Python daemon listens on configurable host/port and provides REST API endpoints.
+
+### Default Configuration
+- **Host:** `localhost` (127.0.0.1)
+- **Port:** `7777`
+- **Workspace:** Current working directory (or `--workspace` flag)
+
+### Fallback Chain
+
+The Theia backend connects to the daemon using the following priority:
+
+1. **Explicit `ARC_PYTHON_DAEMON_URL` environment variable**
+2. **Auto-probe `http://127.0.0.1:7777`** (default port)
+3. **Manual configuration** in IDE Config tab
+
+### API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/health` | GET | Health check |
+| `/api/inspect` | GET | Workspace inspection |
+| `/api/runtimes` | GET | List detected runtimes |
+| `/api/workflows` | GET | Export workflows |
+| `/api/schemas` | GET | Export schemas |
+| `/api/runs/start` | POST/GET | Start a run |
+| `/api/runs/{id}` | GET | Get run details |
+| `/api/runs/{id}/events` | GET | SSE stream events |
+
+See `python/src/agent_runtime_cockpit/web/routes.py` for full API documentation.
+
 ## Related Docs
 
 - [Deep Architecture Analysis](./DEEP_ARCHITECTURE_ANALYSIS.md) — detailed audit of all subsystems
@@ -106,3 +138,22 @@ Frontend and backend communicate via **JSON-RPC** over Theia's connection infras
 - [ADR-018: Protocol Package as Canonical Schema Home](../adr/ADR-018-protocol-package-as-canonical-schema-home.md)
 - [ADR-021: Audit Chain Architecture](../adr/021-audit-chain-architecture.md)
 - [DEVELOPMENT.md](../DEVELOPMENT.md) — build, test, and contribution guide
+# Sandbox Architecture
+
+The execution isolation model is now layered:
+
+```text
+IsolationProvider
+├── none
+├── subprocess
+├── container     # design/future unless explicitly wired safely
+└── microvm       # macOS/Linux doctor/preflight now; execution future
+```
+
+The CLI sandbox path separates policy from execution:
+
+```text
+argv -> CommandClassification -> SandboxDecision -> IsolationProvider -> SandboxResult/audit event
+```
+
+`subprocess` is the only real P0 execution provider. `microvm` intentionally performs preflight only and must not report command success until disposable VM execution, workspace mounting, network controls, teardown, and opt-in tests exist.

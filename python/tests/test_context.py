@@ -1,16 +1,17 @@
 """Tests: Context retrieval — engine, providers, ranker, cache, pack."""
+
 import tempfile
 from pathlib import Path
 
-from agent_runtime_cockpit.context.engine import ContextEngine
 from agent_runtime_cockpit.context.cache import ContextCache
-from agent_runtime_cockpit.context.ranker import rank
+from agent_runtime_cockpit.context.engine import ContextEngine
 from agent_runtime_cockpit.context.pack import ContextPackGenerator
-from agent_runtime_cockpit.context.providers.local_repo import LocalRepoProvider
 from agent_runtime_cockpit.context.providers.context7 import Context7Provider
-from agent_runtime_cockpit.context.providers.vercel_grep import VercelGrepProvider
 from agent_runtime_cockpit.context.providers.github_code_search import GitHubCodeSearchProvider
+from agent_runtime_cockpit.context.providers.local_repo import LocalRepoProvider
+from agent_runtime_cockpit.context.providers.vercel_grep import VercelGrepProvider
 from agent_runtime_cockpit.context.providers.web_search import WebSearchProvider
+from agent_runtime_cockpit.context.ranker import rank
 from agent_runtime_cockpit.protocol.schemas import ContextPackEntry, SourceType
 
 
@@ -55,7 +56,9 @@ class TestOfflineProviders:
 
     def test_vercel_grep_unavailable_returns_empty(self, monkeypatch):
         provider = VercelGrepProvider()
-        monkeypatch.setattr(provider, "_scrape", lambda task: (_ for _ in ()).throw(RuntimeError("offline")))
+        monkeypatch.setattr(
+            provider, "_scrape", lambda task: (_ for _ in ()).throw(RuntimeError("offline"))
+        )
         entries = provider.retrieve("theia widget")
         assert entries == []
 
@@ -75,7 +78,12 @@ class TestOfflineProviders:
         monkeypatch.delenv("ARC_CONTEXT7_API_KEY", raising=False)
         monkeypatch.delenv("GITHUB_TOKEN", raising=False)
         monkeypatch.delenv("ARC_SEARCH_API_KEY", raising=False)
-        for ProviderClass in [Context7Provider, VercelGrepProvider, GitHubCodeSearchProvider, WebSearchProvider]:
+        for ProviderClass in [
+            Context7Provider,
+            VercelGrepProvider,
+            GitHubCodeSearchProvider,
+            WebSearchProvider,
+        ]:
             provider = ProviderClass()
             entries = provider.retrieve("test task")
             for e in entries:
@@ -92,8 +100,12 @@ class TestContextCache:
     def test_set_and_get(self):
         cache = ContextCache()
         entry = ContextPackEntry(
-            id="test-1", task="test", source="local", source_type=SourceType.LOCAL_REPO,
-            content="test content", relevance_score=0.8
+            id="test-1",
+            task="test",
+            source="local",
+            source_type=SourceType.LOCAL_REPO,
+            content="test content",
+            relevance_score=0.8,
         )
         cache.set("my task", [entry])
         result = cache.get("my task")
@@ -104,9 +116,14 @@ class TestContextCache:
     def test_cache_expiry(self):
         cache = ContextCache(ttl=0)  # instant expiry
         import time
+
         entry = ContextPackEntry(
-            id="test-2", task="test", source="local", source_type=SourceType.LOCAL_REPO,
-            content="content", relevance_score=0.5
+            id="test-2",
+            task="test",
+            source="local",
+            source_type=SourceType.LOCAL_REPO,
+            content="content",
+            relevance_score=0.5,
         )
         cache.set("task", [entry])
         time.sleep(0.01)
@@ -117,15 +134,43 @@ class TestContextCache:
 class TestRanker:
     def test_ranks_by_relevance_score(self):
         entries = [
-            ContextPackEntry(id="a", task="t", source="x", source_type=SourceType.LOCAL_REPO, content="theia widget", relevance_score=0.3),
-            ContextPackEntry(id="b", task="t", source="x", source_type=SourceType.CONTEXT7, content="theia widget docs", relevance_score=0.9),
+            ContextPackEntry(
+                id="a",
+                task="t",
+                source="x",
+                source_type=SourceType.LOCAL_REPO,
+                content="theia widget",
+                relevance_score=0.3,
+            ),
+            ContextPackEntry(
+                id="b",
+                task="t",
+                source="x",
+                source_type=SourceType.CONTEXT7,
+                content="theia widget docs",
+                relevance_score=0.9,
+            ),
         ]
         ranked = rank(entries, "theia widget")
         assert ranked[0].id == "b"  # higher score first
 
     def test_local_repo_boosted(self):
-        local = ContextPackEntry(id="local", task="t", source="x", source_type=SourceType.LOCAL_REPO, content="agent", relevance_score=0.5)
-        web = ContextPackEntry(id="web", task="t", source="x", source_type=SourceType.WEB_SEARCH, content="agent", relevance_score=0.5)
+        local = ContextPackEntry(
+            id="local",
+            task="t",
+            source="x",
+            source_type=SourceType.LOCAL_REPO,
+            content="agent",
+            relevance_score=0.5,
+        )
+        web = ContextPackEntry(
+            id="web",
+            task="t",
+            source="x",
+            source_type=SourceType.WEB_SEARCH,
+            content="agent",
+            relevance_score=0.5,
+        )
         ranked = rank([web, local], "agent")
         # Local should rank higher than web at same base score
         assert ranked[0].id == "local"

@@ -1,9 +1,11 @@
 """Simple in-memory context cache with TTL."""
+
 from __future__ import annotations
 
 import hashlib
 import time
 from typing import Optional
+
 from ..protocol.schemas import ContextPackEntry
 
 DEFAULT_TTL_SECONDS = 300  # 5 minutes
@@ -27,7 +29,9 @@ class ContextCache:
             del self._store[key]
         return None
 
-    def set(self, task: str, entries: list[ContextPackEntry], workspace: Optional[str] = None) -> None:
+    def set(
+        self, task: str, entries: list[ContextPackEntry], workspace: Optional[str] = None
+    ) -> None:
         key = self._key(task, workspace)
         self._store[key] = (entries, time.time())
 

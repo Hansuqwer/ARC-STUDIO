@@ -1,4 +1,5 @@
 """AG-UI event schema validator."""
+
 from __future__ import annotations
 
 import enum
@@ -53,24 +54,23 @@ EVENT_REQUIRED_FIELDS = {
 
 
 def validate_event(event: dict[str, Any], runtime: str) -> list[str]:
-    """
-    Validate AG-UI event schema.
-    
+    """Validate AG-UI event schema.
+
     Returns list of validation errors (empty if valid).
     """
     errors = []
-    
+
     # Check required fields
     for field in REQUIRED_FIELDS:
         if field not in event:
             errors.append(f"Missing required field: {field}")
-    
+
     # Check event type
     event_type = event.get("type")
     if not event_type:
         errors.append("Missing event type")
         return errors
-    
+
     # Check event-specific fields
     try:
         event_enum = AGUIEventType(event_type)
@@ -80,18 +80,15 @@ def validate_event(event: dict[str, Any], runtime: str) -> list[str]:
                 errors.append(f"Missing required field for {event_type}: {field}")
     except ValueError:
         errors.append(f"Unknown event type: {event_type}")
-    
+
     return errors
 
 
 def validate_events(events: list[dict[str, Any]], runtime: str) -> None:
-    """
-    Validate list of events and log warnings for any issues.
-    """
+    """Validate list of events and log warnings for any issues."""
     for i, event in enumerate(events):
         errors = validate_event(event, runtime)
         if errors:
             log.warning(
-                "Event validation failed for %s event %d: %s",
-                runtime, i, "; ".join(errors)
+                "Event validation failed for %s event %d: %s", runtime, i, "; ".join(errors)
             )

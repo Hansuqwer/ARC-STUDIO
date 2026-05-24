@@ -1,4 +1,5 @@
 """Cockpit run contract protocol schema."""
+
 from __future__ import annotations
 
 import re
@@ -9,7 +10,6 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from .run_receipt import RunReceipt
-
 
 CONTRACT_ID_RE = re.compile(r"^ctr_[a-zA-Z0-9_-]{20,30}$")
 
@@ -69,7 +69,9 @@ class RunContract(BaseModel):
         if receipt.status in ("failed", "cancelled"):
             return False
         if isinstance(self.cost_ceiling_usd, (int, float)):
-            actual = receipt.cost_usd if isinstance(receipt.cost_usd, (int, float)) else float("inf")
+            actual = (
+                receipt.cost_usd if isinstance(receipt.cost_usd, (int, float)) else float("inf")
+            )
             if actual > self.cost_ceiling_usd:
                 return False
         return True

@@ -1,5 +1,4 @@
-"""
-MCP server for ARC Local Control Plane (Phase 26 / R19).
+"""MCP server for ARC Local Control Plane (Phase 26 / R19).
 
 Uses FastMCP with stdio transport. All tools are gated by workspace trust
 enforcement (Phase 23). Exposes safe local read-only tools and resources,
@@ -19,7 +18,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from .. import __version__ as arc_version
-from ..security.trust import ensure_trusted, WorkspaceUntrusted
+from ..security.trust import WorkspaceUntrusted, ensure_trusted
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +46,7 @@ def create_mcp_server(
 
     Raises:
         MCPServerError: If the server cannot be initialized.
+
     """
     ws = workspace or _DEFAULT_WORKSPACE
 
@@ -179,6 +179,7 @@ def create_mcp_server(
 
         Returns:
             JSON string with run status, workflow, runtime, timing, and event count.
+
         """
         from ..storage.jsonl import JsonlTraceStore
 
@@ -215,6 +216,7 @@ def create_mcp_server(
 
         Returns:
             JSON string with matching runs.
+
         """
         from ..storage.sqlite import SqliteStore
 
@@ -246,6 +248,7 @@ def create_mcp_server(
 
         Returns:
             JSON string with run record and events.
+
         """
         from ..storage.jsonl import JsonlTraceStore
 
@@ -276,6 +279,7 @@ def create_mcp_server(
 
         Returns:
             JSON string with verification result.
+
         """
         from ..audit.key_manager import AuditKeyManager
         from ..audit.streaming_verifier import StreamingAuditVerifier
@@ -364,6 +368,7 @@ def create_mcp_server(
 
         Returns:
             JSON string with pending HITL prompts.
+
         """
         from ..audit.hitl_store import list_prompts
 
@@ -391,6 +396,7 @@ def create_mcp_server(
 
         Returns:
             JSON string with task ID and initial status.
+
         """
         from ..tasks import Task, TaskExecutor, TaskStorage, TaskType
 
@@ -444,6 +450,7 @@ def create_mcp_server(
 
         Returns:
             JSON string with task status, metadata, and result if completed.
+
         """
         from ..tasks import TaskExecutor, TaskStorage
 
@@ -485,6 +492,7 @@ def create_mcp_server(
 
         Returns:
             JSON string with cancellation result.
+
         """
         from ..tasks import TaskExecutor, TaskStorage
 
@@ -521,8 +529,9 @@ def create_mcp_server(
 
         Returns:
             JSON string with task result, or error if not completed.
+
         """
-        from ..tasks import TaskExecutor, TaskStorage, TaskStatus
+        from ..tasks import TaskExecutor, TaskStatus, TaskStorage
 
         try:
             storage = TaskStorage(ws / ".arc" / "tasks.db")
@@ -565,6 +574,7 @@ def create_mcp_server(
 
         Returns:
             JSON string with run record summary.
+
         """
         return arc_run_status(run_id)
 
@@ -577,6 +587,7 @@ def create_mcp_server(
 
         Returns:
             JSON string with full trace.
+
         """
         return arc_trace_read(run_id)
 
@@ -589,6 +600,7 @@ def create_mcp_server(
 
         Returns:
             JSON string with audit verification result.
+
         """
         return arc_audit_verify(run_id)
 
