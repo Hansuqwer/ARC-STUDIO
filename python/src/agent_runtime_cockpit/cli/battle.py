@@ -258,6 +258,24 @@ def battle_vote(
     # Store vote
     store.insert_vote(vote)
 
+    # Also satisfy a pending persistent HITL prompt for this battle when present.
+    from ..audit.hitl import HitlDecision
+    from ..audit.hitl_sqlite_store import HitlSqliteStore
+
+    hitl_store = HitlSqliteStore(Path.cwd() / ".arc" / "hitl.db")
+    for prompt in hitl_store.list_prompts():
+        if prompt.context.get("kind") == "battle" and prompt.context.get("battle_id") == battle_id:
+            token = hitl_store.get_token(prompt.hitl_id)
+            if token:
+                hitl_store.respond(
+                    prompt.hitl_id,
+                    HitlDecision.APPROVE if approved else HitlDecision.REJECT,
+                    token,
+                    operator_id=voter,
+                    notes=candidate_id,
+                )
+            break
+
     if json_output:
         _out(
             ok(

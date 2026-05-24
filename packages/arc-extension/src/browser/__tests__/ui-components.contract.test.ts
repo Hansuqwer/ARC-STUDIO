@@ -437,7 +437,8 @@ describe('ArcStatusBarContribution', () => {
     });
 
     it('should use canonical ARC service health', () => {
-        expect(source).toMatch(/@inject\(ArcService\)/);
+        expect(source).toMatch(/WebSocketConnectionProvider/);
+        expect(source).toMatch(/ArcServicePath/);
         expect(source).toMatch(/getConfigStatus/);
     });
 });

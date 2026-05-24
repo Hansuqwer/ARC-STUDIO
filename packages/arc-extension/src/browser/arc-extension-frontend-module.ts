@@ -1,5 +1,6 @@
 import { ContainerModule } from '@theia/core/shared/inversify';
-import { WebSocketConnectionProvider, WidgetFactory, bindViewContribution, FrontendApplicationContribution } from '@theia/core/lib/browser';
+import { WebSocketConnectionProvider, WidgetFactory, bindViewContribution, FrontendApplicationContribution, KeybindingContribution } from '@theia/core/lib/browser';
+import { CommandContribution } from '@theia/core/lib/common';
 import { PreferenceContribution } from '@theia/core/lib/common/preferences/preference-schema';
 import { ArcWidget } from './arc-widget';
 import { ArcWidgetContribution } from './arc-widget-contribution';
@@ -18,6 +19,7 @@ import { ArcWelcomeWidget } from './arc-welcome-widget';
 import { ArcWelcomeContribution } from './arc-welcome-contribution';
 import { ArcStudioWidget } from './arc-studio-widget';
 import { ArcStudioWidgetContribution } from './arc-studio-widget-contribution';
+import { ArcKeybindingContribution } from './arc-keybinding-contribution';
 import { ArcPreferenceSchema } from './arc-preference-schema';
 import { ArcServicePath, ArcService } from '../common/arc-protocol';
 import type { ArcService as IArcService } from '../common/arc-protocol';
@@ -33,6 +35,11 @@ export default new ContainerModule(bind => {
         const connection = ctx.container.get(WebSocketConnectionProvider);
         return connection.createProxy<IArcService>(ArcServicePath);
     }).inSingletonScope();
+
+    // Bind the ARC keybinding and command contribution
+    bind(ArcKeybindingContribution).toSelf().inSingletonScope();
+    bind(CommandContribution).toService(ArcKeybindingContribution);
+    bind(KeybindingContribution).toService(ArcKeybindingContribution);
 
     // Bind the ARC Studio widget (primary/default)
     bind(ArcStudioWidget).toSelf();
@@ -78,7 +85,6 @@ export default new ContainerModule(bind => {
         createWidget: () => ctx.container.get<ArcRunTimelineWidget>(ArcRunTimelineWidget),
     })).inSingletonScope();
     bindViewContribution(bind, ArcRunsContribution);
-    bind(FrontendApplicationContribution).toService(ArcRunsContribution);
 
     // Bind the ARC Event Stream widget (advanced trace — available via command, not default-opened)
     bind(ArcEventStreamWidget).toSelf();
@@ -87,7 +93,6 @@ export default new ContainerModule(bind => {
         createWidget: () => ctx.container.get<ArcEventStreamWidget>(ArcEventStreamWidget),
     })).inSingletonScope();
     bindViewContribution(bind, ArcEventStreamContribution);
-    bind(FrontendApplicationContribution).toService(ArcEventStreamContribution);
 
     // Bind the ARC Health Monitor widget
     bind(ArcHealthWidget).toSelf();

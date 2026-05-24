@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ..audit.hitl import HitlPrompt
+from ..audit.hitl_sqlite_store import HitlSqliteStore
 from ..protocol.events import create_event
 from ..protocol.schemas import RunRecord, RunStatus
 from ..storage.indexed_store import IndexedTraceStore
@@ -121,8 +123,10 @@ class BattleRunner:
                     },
                 )
 
+            hitl_votes = self._collect_hitl_votes(battle, candidates)
+
             # Run consensus voting (automatic for fake/offline mode)
-            votes = self._run_consensus_voting(battle, candidates)
+            votes = self._run_consensus_voting(battle, candidates) + hitl_votes
 
             # Store votes
             for vote in votes:
@@ -278,6 +282,73 @@ class BattleRunner:
             candidates.append(candidate)
 
         return candidates
+
+    def _collect_hitl_votes(
+        self, battle: BattleRun, candidates: list[BattleCandidate]
+    ) -> list[BattleVote]:
+        """Persist HITL prompt and convert existing human responses to battle votes."""
+        if not battle.require_hitl:
+            return []
+
+        hitl_id = str(battle.metadata.get("hitl_id") or f"battle-hitl-{battle.id}")
+        prompt = HitlPrompt(
+            hitl_id=hitl_id,
+            run_id=battle.id,
+            step_id="battle-consensus",
+            prompt_text="Select the best battle candidate for consensus.",
+            context={
+                "kind": "battle",
+                "battle_id": battle.id,
+                "candidates": [
+                    {
+                        "id": candidate.id,
+                        "worker_id": candidate.worker_id,
+                        "model_id": candidate.model_id,
+                        "output": candidate.output,
+                    }
+                    for candidate in candidates
+                ],
+            },
+            options=["approve", "reject", "skip"],
+            timeout_seconds=int(battle.metadata.get("hitl_timeout_seconds") or 300),
+        )
+
+        hitl_store = HitlSqliteStore(self.workspace / ".arc" / "hitl.db")
+        if hitl_store.get_prompt(hitl_id) is None:
+            hitl_store.save_prompt(prompt, expiry_seconds=prompt.timeout_seconds)
+
+        self._emit_event(
+            "BATTLE_HITL_REQUIRED",
+            {
+                "battle_id": battle.id,
+                "hitl_id": hitl_id,
+                "candidates": [candidate.id for candidate in candidates],
+            },
+        )
+
+        response = hitl_store.get_response(hitl_id)
+        if response is None:
+            self._emit_event(
+                "HITL_TIMEOUT",
+                {"hitl_id": hitl_id, "timeout_seconds": prompt.timeout_seconds},
+            )
+            return []
+
+        approved_candidate_id = response.notes.strip()
+        if approved_candidate_id not in {candidate.id for candidate in candidates}:
+            return []
+
+        return [
+            BattleVote(
+                battle_id=battle.id,
+                candidate_id=candidate.id,
+                voter=response.operator_id,
+                voter_type=VoterType.human,
+                approved=candidate.id == approved_candidate_id,
+                reasoning=f"HITL {response.decision.value}: {response.hitl_id}",
+            )
+            for candidate in candidates
+        ]
 
     def _run_consensus_voting(
         self, battle: BattleRun, candidates: list[BattleCandidate]

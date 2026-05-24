@@ -1,7 +1,8 @@
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
-import { FrontendApplicationContribution, StatusBar, StatusBarAlignment } from '@theia/core/lib/browser';
+import { FrontendApplicationContribution, StatusBar, StatusBarAlignment, WebSocketConnectionProvider } from '@theia/core/lib/browser';
 import { PreferenceService } from '@theia/core/lib/common/preferences/preference-service';
-import { ArcService } from '../common/arc-protocol';
+import { ArcServicePath } from '../common/arc-protocol';
+import type { ArcService } from '../common/arc-protocol';
 
 const BACKEND_STATUS_ID = 'arc-backend-status';
 const PROFILE_STATUS_ID = 'arc-profile-status';
@@ -11,13 +12,14 @@ export class ArcStatusBarContribution implements FrontendApplicationContribution
     @inject(StatusBar)
     protected readonly statusBar!: StatusBar;
 
-    @inject(ArcService)
-    protected readonly arcService!: ArcService;
+    @inject(WebSocketConnectionProvider)
+    protected readonly connectionProvider!: WebSocketConnectionProvider;
 
     @inject(PreferenceService)
     protected readonly preferences!: PreferenceService;
 
     protected pollTimer: ReturnType<typeof setInterval> | undefined;
+    protected arcService: ArcService | undefined;
 
     @postConstruct()
     protected init(): void {
@@ -48,6 +50,9 @@ export class ArcStatusBarContribution implements FrontendApplicationContribution
 
     protected async updateBackendStatus(): Promise<void> {
         try {
+            if (!this.arcService) {
+                this.arcService = this.connectionProvider.createProxy<ArcService>(ArcServicePath);
+            }
             const config = await this.arcService.getConfigStatus();
             this.statusBar.setElement(BACKEND_STATUS_ID, {
                 text: config.backendAvailable ? '$(circle-large-filled) ARC' : '$(circle-large-outline) ARC',

@@ -1466,7 +1466,7 @@ bash scripts/check-pr.sh
 ## Phase 34.3 — Battle Replay Determinism
 
 **Roadmap:** R26A Follow-up — Battle Replay Determinism  
-**Status:** Not Started  
+**Status:** Complete  
 **Depends on:** Phase 34.1 (Battle run/trace integration)
 
 ### Goal
@@ -1502,6 +1502,12 @@ Verify and ensure battle runs can be replayed deterministically from stored trac
 3. Tests verify replay determinism for all battle configurations
 4. Documentation clearly explains replay semantics
 
+### Result
+
+Completed in Phase 34.3. Battle replay is inspect-only: `arc runs replay` reloads the stored JSONL trace and emits the exact persisted event objects without re-executing battle workers, recomputing votes, or changing ELO state. Determinism means the replayed event sequence, event payloads, and sequence numbers match the stored trace exactly. Runtime-generated timestamps and IDs are produced during the original battle run and are preserved during replay, not regenerated.
+
+Evidence: `python/tests/battle/test_battle_replay.py` covers 2-worker majority, 4-worker quorum, and battle metadata/sequence preservation.
+
 **Verification:**
 ```bash
 cd python && PYTHONPATH=src uv run pytest tests/battle/test_battle_replay.py -v
@@ -1514,7 +1520,7 @@ bash scripts/check-pr.sh
 ## Phase 34.4 — Persistent HITL Prompt Wiring
 
 **Roadmap:** R26A Follow-up — Persistent HITL Prompt Wiring  
-**Status:** Not Started  
+**Status:** Baseline Complete  
 **Depends on:** Phase 29 (Persistent HITL), Phase 34 (ARC Battle Mode)
 
 ### Goal
@@ -1560,6 +1566,12 @@ Wire persistent HITL prompts into battle runner for human judge integration duri
 3. `arc battle vote` provides HITL response
 4. HITL votes integrated into consensus calculation
 5. Tests cover HITL flow end-to-end
+
+### Result
+
+Baseline complete. Battle runs with `require_hitl=True` persist a HITL prompt in workspace `.arc/hitl.db`, emit `BATTLE_HITL_REQUIRED`, and emit `HITL_TIMEOUT` when no response is available during the offline run. Existing HITL responses for the battle are converted into human `BattleVote` records and folded into consensus voting. `arc battle vote` stores the battle vote and satisfies the pending persistent HITL prompt when one exists. This remains offline/inspectable wiring; it does not block indefinitely or claim live IDE resume behavior.
+
+Evidence: `python/tests/battle/test_battle_hitl.py` covers prompt/event persistence, timeout event emission, and HITL response-to-human-vote integration.
 
 **Verification:**
 ```bash
