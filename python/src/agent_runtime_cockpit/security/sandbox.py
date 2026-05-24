@@ -42,6 +42,9 @@ class SandboxPolicy(BaseModel):
     allow_privileged: bool = False
     allow_unknown: bool = False
     interactive_approval: bool = False
+    network_approval_required: bool = True
+    install_approval_required: bool = True
+    unknown_approval_required: bool = True
     timeout_seconds: int = 30
     max_output_bytes: int = 65_536
     env_allowlist: tuple[str, ...] = (
@@ -176,29 +179,35 @@ def decide(command: list[str], policy: SandboxPolicy) -> SandboxDecision:
             policy=policy.name,
         )
     if classification == CommandClassification.NETWORK:
+        allowed = policy.allow_network
+        approval_required = policy.network_approval_required and not policy.allow_network
         return SandboxDecision(
-            allowed=policy.allow_network,
+            allowed=allowed,
             classification=classification,
             reason="network policy",
             policy=policy.name,
-            approval_required=not policy.allow_network,
+            approval_required=approval_required,
         )
     if classification == CommandClassification.INSTALL:
+        allowed = policy.allow_install
+        approval_required = policy.install_approval_required and not policy.allow_install
         return SandboxDecision(
-            allowed=policy.allow_install,
+            allowed=allowed,
             classification=classification,
             reason="install policy",
             policy=policy.name,
-            approval_required=not policy.allow_install,
+            approval_required=approval_required,
         )
     if classification == CommandClassification.PRIVILEGED:
+        # Privileged commands are always denied by default and cannot be approved
         return SandboxDecision(
-            allowed=policy.allow_privileged,
+            allowed=False,
             classification=classification,
-            reason="privileged policy",
+            reason="privileged commands denied",
             policy=policy.name,
         )
     if classification == CommandClassification.DESTRUCTIVE:
+        # Destructive commands are always denied and cannot be approved
         return SandboxDecision(
             allowed=False,
             classification=classification,
@@ -210,14 +219,23 @@ def decide(command: list[str], policy: SandboxPolicy) -> SandboxDecision:
         classification=classification,
         reason="unknown command policy",
         policy=policy.name,
-        approval_required=not policy.allow_unknown,
+        approval_required=policy.unknown_approval_required and not policy.allow_unknown,
     )
 
 
 def approve_decision(
     decision: SandboxDecision, reason: str = "interactive approval"
 ) -> SandboxDecision:
-    """Return an approved copy for categories allowed by interactive UX."""
+    """Return an approved copy for categories allowed by interactive UX.
+
+    Note: Destructive and privileged commands can never be approved.
+    """
+    # Never allow approval for destructive or privileged commands
+    if decision.classification in {
+        CommandClassification.DESTRUCTIVE,
+        CommandClassification.PRIVILEGED,
+    }:
+        return decision
     if decision.classification not in {
         CommandClassification.NETWORK,
         CommandClassification.INSTALL,

@@ -383,6 +383,116 @@ def test_classification_categories():
     assert classify_command(["python", "-c", "print('hello')"]) == CommandClassification.READ_ONLY
 
 
+def test_approval_rules_default_behavior(tmp_path, monkeypatch):
+    """Test that approval_required is True by default for risky classifications."""
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(
+        app, ["policy", "explain", "--json", "--", "curl", "https://example.com"]
+    )
+    assert result.exit_code == 0
+    data = _payload(result)["data"]
+    assert data["decision"]["approval_required"] is True
+    assert data["decision"]["allowed"] is False
+
+
+def test_approval_rules_allow_policy(tmp_path, monkeypatch):
+    """Test that allow_network=True makes approval_required=False."""
+    monkeypatch.chdir(tmp_path)
+    policy_file = tmp_path / "sandbox-policies.json"
+    policy_file.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "policies": [
+                    {
+                        "version": 1,
+                        "name": "network-ok",
+                        "allow_network": True,
+                        "network_approval_required": False,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ARC_SANDBOX_POLICY_CONFIG", str(policy_file))
+    result = CliRunner().invoke(
+        app,
+        [
+            "policy",
+            "explain",
+            "--json",
+            "--policy",
+            "network-ok",
+            "--",
+            "curl",
+            "https://example.com",
+        ],
+    )
+    assert result.exit_code == 0
+    data = _payload(result)["data"]
+    assert data["decision"]["approval_required"] is False
+    assert data["decision"]["allowed"] is True
+
+
+def test_destructive_commands_cannot_be_approved(tmp_path, monkeypatch):
+    """Test that destructive commands remain denied and cannot be approved."""
+    monkeypatch.chdir(tmp_path)
+    # Create a permissive policy but it shouldn't matter for destructive commands
+    policy_file = tmp_path / "sandbox-policies.json"
+    policy_file.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "policies": [
+                    {
+                        "version": 1,
+                        "name": "permissive",
+                        "allow_network": True,
+                        "allow_install": True,
+                        "allow_unknown": True,
+                        "allow_privileged": True,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ARC_SANDBOX_POLICY_CONFIG", str(policy_file))
+    result = CliRunner().invoke(
+        app, ["policy", "explain", "--json", "--policy", "permissive", "--", "rm", "-rf", "."]
+    )
+    assert result.exit_code == 0
+    data = _payload(result)["data"]
+    assert data["decision"]["allowed"] is False
+    assert "destructive commands denied" in data["decision"]["reason"]
+    # destructive commands should not have approval_required set (they can't be approved)
+
+
+def test_privileged_commands_cannot_be_approved(tmp_path, monkeypatch):
+    """Test that privileged commands remain denied and cannot be approved."""
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(app, ["policy", "explain", "--json", "--", "sudo", "ls"])
+    assert result.exit_code == 0
+    data = _payload(result)["data"]
+    assert data["decision"]["allowed"] is False
+    assert "privileged commands denied" in data["decision"]["reason"]
+    # privileged commands should not have approval_required set (they can't be approved)
+
+
+def test_unknown_commands_approval_required_by_default(tmp_path, monkeypatch):
+    """Test that unknown commands have approval_required=True by default."""
+    monkeypatch.chdir(tmp_path)
+    # Create a workspace and run an unknown command (not in our known lists)
+    # Using a custom command that's not in READ_ONLY_COMMANDS
+    result = CliRunner().invoke(app, ["policy", "explain", "--json", "--", "custom-tool"])
+    assert result.exit_code == 0
+    data = _payload(result)["data"]
+    assert data["decision"]["classification"] == "unknown"
+    assert data["decision"]["approval_required"] is True
+    assert data["decision"]["allowed"] is False
+
+
 @pytest.mark.skipif(
     os.environ.get("ARC_MICROVM_INTEGRATION") != "1",
     reason="requires ARC_MICROVM_INTEGRATION=1 and local microVM runtime",
