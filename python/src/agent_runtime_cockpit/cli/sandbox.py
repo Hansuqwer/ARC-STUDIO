@@ -25,6 +25,7 @@ from ..security.sandbox import (
     list_sandbox_policies,
     persist_sandbox_audit_event,
     revoke_approval_token,
+    prune_expired_approvals,
     render_lima_template,
     resolve_sandbox_policy,
     utc_now,
@@ -314,6 +315,16 @@ def policy_revoke(
     """Revoke all approvals for a token."""
     _setup_logging(debug)
     _out(ok(revoke_approval_token(token)), json_output)
+
+
+@policy_app.command("prune")
+def policy_prune(
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Remove expired approvals from the store."""
+    _setup_logging(debug)
+    _out(ok(prune_expired_approvals()), json_output)
 
 
 @policy_app.command("list")

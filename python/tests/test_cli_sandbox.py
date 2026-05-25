@@ -291,6 +291,51 @@ def test_expired_approval_token_denied(tmp_path, monkeypatch):
     assert _payload(run)["data"]["decision"]["allowed"] is False
 
 
+def test_prune_expired_approvals_removes_stale_entries(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    store = tmp_path / ".arc" / "approvals.json"
+    monkeypatch.setenv("ARC_SANDBOX_APPROVAL_STORE", str(store))
+    policy_file = tmp_path / "sandbox-policies.json"
+    policy_file.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "policies": [{"version": 1, "name": "short", "approval_ttl_seconds": -1}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ARC_SANDBOX_POLICY_CONFIG", str(policy_file))
+    approve = CliRunner().invoke(
+        app, ["policy", "approve", "--json", "--policy", "short", "--token", "tok-1", "--", "true"]
+    )
+    assert approve.exit_code == 0, approve.output
+    data = json.loads(store.read_text(encoding="utf-8"))
+    assert len(data["approvals"]) == 1
+    prune = CliRunner().invoke(app, ["policy", "prune", "--json"])
+    assert prune.exit_code == 0, prune.output
+    result = _payload(prune)["data"]
+    assert result["pruned"] == 1
+    assert result["remaining"] == 0
+    data = json.loads(store.read_text(encoding="utf-8"))
+    assert len(data["approvals"]) == 0
+
+
+def test_prune_keeps_non_expired_approvals(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    store = tmp_path / ".arc" / "approvals.json"
+    monkeypatch.setenv("ARC_SANDBOX_APPROVAL_STORE", str(store))
+    approve = CliRunner().invoke(
+        app, ["policy", "approve", "--json", "--token", "tok-1", "--", "true"]
+    )
+    assert approve.exit_code == 0, approve.output
+    prune = CliRunner().invoke(app, ["policy", "prune", "--json"])
+    assert prune.exit_code == 0, prune.output
+    result = _payload(prune)["data"]
+    assert result["pruned"] == 0
+    assert result["remaining"] == 1
+
+
 def test_microvm_doctor_unavailable_gracefully(monkeypatch):
     monkeypatch.setattr(shutil, "which", lambda _name: None)
     result = CliRunner().invoke(app, ["sandbox", "doctor", "--json"])

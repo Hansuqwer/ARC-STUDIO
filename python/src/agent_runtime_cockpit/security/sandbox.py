@@ -549,6 +549,16 @@ def revoke_approval_token(token: str, path: Path | None = None) -> dict[str, Any
     return {"revoked": before - len(store.approvals), "remaining": len(store.approvals)}
 
 
+def prune_expired_approvals(path: Path | None = None) -> dict[str, Any]:
+    """Remove all expired approvals from the store."""
+    store = load_sandbox_approval_store(path)
+    before = len(store.approvals)
+    now = utc_now()
+    store.approvals = [a for a in store.approvals if not approval_is_expired(a, now)]
+    save_sandbox_approval_store(store, path)
+    return {"pruned": before - len(store.approvals), "remaining": len(store.approvals)}
+
+
 def approve_decision_with_token(
     *,
     token: str | None,
