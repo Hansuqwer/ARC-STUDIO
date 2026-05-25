@@ -1908,9 +1908,12 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Blocked until: rootfs/kernel/Lima template lifecycle, workspace mount policy, network-off proof, teardown, integration gates
 - No fake run success; no production-ready microVM claim
 
-#### Slice 37.7: Container Fallback Tests (Pending)
-- Gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`
-- No production fallback claim
+#### Slice 37.7: Container Fallback Tests (Complete)
+- Added 11 comprehensive tests for DockerIsolationProvider (24 total tests)
+- Tests cover: gating function, workspace volume mount, network disabled enforcement, resource limits, environment merging, execute with cwd/env, close cleanup, describe when disabled
+- All tests gated by `ARC_ENABLE_CONTAINER_SANDBOX=1` environment variable
+- No production fallback claim; container fallback is opt-in only
+- Verified: 2191 Python tests passed; e2e smoke passed 8 passed / 7 skipped
 
 #### Slice 37.8: E2E Routability Follow-Up (Pending)
 - Current e2e skips deep-link shells when Theia app mode does not mount them

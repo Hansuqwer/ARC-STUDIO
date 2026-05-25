@@ -190,3 +190,179 @@ def test_docker_config_custom():
     assert config.network_disabled is False
     assert config.mem_limit == "1g"
     assert config.cpu_quota == 100000
+
+
+def test_container_sandbox_enabled():
+    """container_sandbox_enabled returns True only when env var set to '1'."""
+    from agent_runtime_cockpit.isolation.docker_provider import container_sandbox_enabled
+
+    with patch.dict("os.environ", {}, clear=True):
+        assert container_sandbox_enabled() is False
+
+    with patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "0"}):
+        assert container_sandbox_enabled() is False
+
+    with patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}):
+        assert container_sandbox_enabled() is True
+
+
+def test_docker_health_check_disabled():
+    """Docker health check returns False when sandbox disabled."""
+    with patch.dict("os.environ", {}, clear=True):
+        provider = DockerIsolationProvider()
+        # Should return False without even trying to get client
+        import asyncio
+
+        healthy = asyncio.run(provider.health_check())
+        assert healthy is False
+
+
+@pytest.mark.asyncio
+async def test_docker_execute_disabled():
+    """Docker execute returns error when sandbox disabled."""
+    with patch.dict("os.environ", {}, clear=True):
+        provider = DockerIsolationProvider()
+        result = await provider.execute(["echo", "hello"])
+        assert result.exit_code == -1
+        assert "disabled" in result.stderr.lower()
+
+
+@pytest.mark.asyncio
+async def test_docker_execute_with_cwd():
+    """Docker execute passes cwd as working_dir."""
+    from pathlib import Path
+
+    mock_container = MagicMock()
+    mock_container.wait.return_value = {"StatusCode": 0}
+    mock_container.logs.return_value = b""
+    mock_client = MagicMock()
+    mock_client.containers.run.return_value = mock_container
+    with (
+        patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
+        patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client),
+    ):
+        provider = DockerIsolationProvider()
+        await provider.execute(["ls"], cwd=Path("/workspace/subdir"))
+        # Verify working_dir was passed
+        call_kwargs = mock_client.containers.run.call_args[1]
+        assert call_kwargs["working_dir"] == "/workspace/subdir"
+
+
+@pytest.mark.asyncio
+async def test_docker_execute_with_env():
+    """Docker execute merges env with config environment."""
+    mock_container = MagicMock()
+    mock_container.wait.return_value = {"StatusCode": 0}
+    mock_container.logs.return_value = b""
+    mock_client = MagicMock()
+    mock_client.containers.run.return_value = mock_container
+    config = DockerConfig(environment={"BASE_VAR": "base_value"})
+    with (
+        patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
+        patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client),
+    ):
+        provider = DockerIsolationProvider(config=config)
+        await provider.execute(["env"], env={"EXTRA_VAR": "extra_value"})
+        # Verify environment was merged
+        call_kwargs = mock_client.containers.run.call_args[1]
+        assert call_kwargs["environment"]["BASE_VAR"] == "base_value"
+        assert call_kwargs["environment"]["EXTRA_VAR"] == "extra_value"
+
+
+@pytest.mark.asyncio
+async def test_docker_execute_network_disabled():
+    """Docker execute enforces network_disabled by default."""
+    mock_container = MagicMock()
+    mock_container.wait.return_value = {"StatusCode": 0}
+    mock_container.logs.return_value = b""
+    mock_client = MagicMock()
+    mock_client.containers.run.return_value = mock_container
+    with (
+        patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
+        patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client),
+    ):
+        provider = DockerIsolationProvider()
+        await provider.execute(["echo", "test"])
+        # Verify network_disabled was passed
+        call_kwargs = mock_client.containers.run.call_args[1]
+        assert call_kwargs["network_disabled"] is True
+
+
+@pytest.mark.asyncio
+async def test_docker_execute_resource_limits():
+    """Docker execute enforces mem_limit and cpu_quota."""
+    mock_container = MagicMock()
+    mock_container.wait.return_value = {"StatusCode": 0}
+    mock_container.logs.return_value = b""
+    mock_client = MagicMock()
+    mock_client.containers.run.return_value = mock_container
+    with (
+        patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
+        patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client),
+    ):
+        provider = DockerIsolationProvider()
+        await provider.execute(["echo", "test"])
+        # Verify resource limits were passed
+        call_kwargs = mock_client.containers.run.call_args[1]
+        assert call_kwargs["mem_limit"] == "512m"
+        assert call_kwargs["cpu_quota"] == 50000
+
+
+@pytest.mark.asyncio
+async def test_docker_execute_workspace_volume():
+    """Docker execute mounts workspace volume."""
+    from pathlib import Path
+
+    mock_container = MagicMock()
+    mock_container.wait.return_value = {"StatusCode": 0}
+    mock_container.logs.return_value = b""
+    mock_client = MagicMock()
+    mock_client.containers.run.return_value = mock_container
+    config = DockerConfig(volumes={"/host/workspace": {"bind": "/workspace", "mode": "ro"}})
+    with (
+        patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
+        patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client),
+    ):
+        provider = DockerIsolationProvider(config=config)
+        await provider.execute(["ls"], cwd=Path("/workspace"))
+        # Verify volumes were passed
+        call_kwargs = mock_client.containers.run.call_args[1]
+        assert "/host/workspace" in call_kwargs["volumes"]
+        assert call_kwargs["volumes"]["/host/workspace"]["bind"] == "/workspace"
+        assert call_kwargs["volumes"]["/host/workspace"]["mode"] == "ro"
+
+
+def test_docker_close():
+    """Docker close cleans up client resources."""
+    mock_client = MagicMock()
+    with (
+        patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
+        patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client),
+    ):
+        provider = DockerIsolationProvider()
+        provider._client = mock_client
+        provider.close()
+        # Verify close was called on client
+        mock_client.close.assert_called_once()
+        # Verify client was cleared
+        assert provider._client is None
+
+
+def test_docker_describe_disabled():
+    """Docker describe reports disabled when sandbox not enabled."""
+    with patch.dict("os.environ", {}, clear=True):
+        provider = DockerIsolationProvider()
+        desc = provider.describe()
+        assert desc["provider_id"] == "docker"
+        assert desc["available"] is False
+        assert desc["runtime"] == "disabled"
+
+
+def test_docker_detect_runtime_disabled():
+    """Docker detect_runtime reports disabled when sandbox not enabled."""
+    with patch.dict("os.environ", {}, clear=True):
+        provider = DockerIsolationProvider()
+        info = provider.detect_runtime()
+        assert info["available"] is False
+        assert info["runtime"] == "disabled"
+        assert "not set" in info["error"]
