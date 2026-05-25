@@ -109,6 +109,26 @@ def test_stdout_stderr_capped(tmp_path):
     result = asyncio.run(provider.execute(["python", "-c", code], cwd=tmp_path, timeout_seconds=5))
     assert result.stdout_truncated is True
     assert result.stderr_truncated is True
+    assert len(result.stdout.encode("utf-8")) == 10
+    assert len(result.stderr.encode("utf-8")) == 10
+
+
+def test_stdout_stderr_caps_do_not_buffer_large_output(tmp_path):
+    from agent_runtime_cockpit.isolation.subprocess import SubprocessIsolationProvider
+    import asyncio
+
+    provider = SubprocessIsolationProvider(workspace_root=tmp_path, max_output_bytes=128)
+    code = (
+        "import sys; "
+        "sys.stdout.write('x' * 200000); sys.stdout.flush(); "
+        "sys.stderr.write('y' * 200000); sys.stderr.flush()"
+    )
+    result = asyncio.run(provider.execute(["python", "-c", code], cwd=tmp_path, timeout_seconds=5))
+    assert result.exit_code == 0
+    assert result.stdout_truncated is True
+    assert result.stderr_truncated is True
+    assert len(result.stdout.encode("utf-8")) == 128
+    assert len(result.stderr.encode("utf-8")) == 128
 
 
 def test_json_output_stable(tmp_path, monkeypatch):

@@ -6,6 +6,7 @@ import logging
 import os
 import signal
 import subprocess
+import threading
 import time
 import re
 from pathlib import Path
@@ -74,6 +75,39 @@ OUTPUT_REDACTION_PATTERNS: list[tuple[str, re.Pattern]] = [
 ]
 
 REDACTED = "[REDACTED]"
+
+
+class _BoundedPipeReader:
+    def __init__(self, pipe, max_bytes: int, chunk_size: int = 8192) -> None:
+        self._pipe = pipe
+        self._max_bytes = max_bytes
+        self._chunk_size = chunk_size
+        self._buffer = bytearray()
+        self.truncated = False
+        self._thread = threading.Thread(target=self._read, daemon=True)
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def join(self) -> None:
+        self._thread.join()
+
+    def text(self) -> str:
+        return bytes(self._buffer).decode("utf-8", errors="replace")
+
+    def _read(self) -> None:
+        try:
+            while True:
+                chunk = self._pipe.read(self._chunk_size)
+                if not chunk:
+                    break
+                remaining = self._max_bytes - len(self._buffer)
+                if remaining > 0:
+                    self._buffer.extend(chunk[:remaining])
+                if len(chunk) > remaining:
+                    self.truncated = True
+        finally:
+            self._pipe.close()
 
 
 def redact_output(text: str) -> str:
@@ -164,13 +198,18 @@ class SubprocessIsolationProvider(IsolationProvider):
             env=filtered_env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
             start_new_session=True,
         )
         killed = False
         kill_reason = None
+        assert proc.stdout is not None
+        assert proc.stderr is not None
+        stdout_reader = _BoundedPipeReader(proc.stdout, self._max_output_bytes)
+        stderr_reader = _BoundedPipeReader(proc.stderr, self._max_output_bytes)
+        stdout_reader.start()
+        stderr_reader.start()
         try:
-            stdout, stderr = proc.communicate(timeout=timeout_seconds)
+            proc.wait(timeout=timeout_seconds)
         except subprocess.TimeoutExpired:
             killed = True
             kill_reason = "timeout"
@@ -178,18 +217,20 @@ class SubprocessIsolationProvider(IsolationProvider):
                 os.killpg(proc.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-            stdout, stderr = proc.communicate()
+            proc.wait()
+        stdout_reader.join()
+        stderr_reader.join()
         duration = int((time.monotonic() - start) * 1000)
+        stdout = stdout_reader.text()
+        stderr = stderr_reader.text()
+        stdout_truncated = stdout_reader.truncated
+        stderr_truncated = stderr_reader.truncated
         redaction_applied = False
         if self._redact_output:
             redacted_stdout = redact_output(stdout)
             redacted_stderr = redact_output(stderr)
             redaction_applied = redacted_stdout != stdout or redacted_stderr != stderr
             stdout, stderr = redacted_stdout, redacted_stderr
-        stdout_truncated = len(stdout.encode("utf-8")) > self._max_output_bytes
-        stderr_truncated = len(stderr.encode("utf-8")) > self._max_output_bytes
-        stdout = stdout.encode("utf-8")[: self._max_output_bytes].decode("utf-8", errors="replace")
-        stderr = stderr.encode("utf-8")[: self._max_output_bytes].decode("utf-8", errors="replace")
         return IsolationResult(
             exit_code=proc.returncode if proc.returncode is not None else -1,
             stdout=stdout,

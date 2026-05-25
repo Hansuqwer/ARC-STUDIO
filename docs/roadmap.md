@@ -365,7 +365,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Convert workspace trust and paid-call gating from labels to enforcement points across all surfaces.
 
-**Current:** Partial implementation. `security/trust.py` has extensive trust infrastructure (`ensure_trusted()`, `trust_workspace()`, external DB at `~/.arc/trusted-workspaces.json`, `WorkspaceUntrusted` exception), and `orchestration/supervisor.py` enforces trust. However, enforcement may not be uniform across IDE actions, CLI runs, MCP activation, shell commands, and workspace prompt loading.
+**Current:** Baseline complete with active sandbox hardening. Trust and paid-call gates are enforced through the centralized security helpers, and `arc sandbox run` now provides real subprocess execution with workspace-bound cwd checks, env allowlisting, secret stripping, timeout/process-group kill, bounded stdout/stderr streaming caps, structured JSON results, and audit events. MicroVM execution does not exist; Lima and Firecracker remain preflight/doctor-only. Container fallback remains gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`.
 
 **Deliverables:**
 - Centralize `TrustState` and `PaidCallPolicy` in protocol package
@@ -380,7 +380,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - UI shows trust and paid-call state before execution
 - Denied actions produce typed events
 
-**Status:** Baseline Complete; hardening remains ongoing | Evidence: commits 3e6ee8c, fca4bf2, 5a9df47, 09bfbb8 | 1518 Python tests passed | Notes: All 3 PRs delivered (EnforcementContext + CLI flags, audit infrastructure + surface annotations, UI confirmation dialogs + retry bridge). Core enforcement infrastructure complete; additional surface hardening continues as needed.
+**Status:** Baseline Complete; sandbox hardening active | Evidence: commits 3e6ee8c, fca4bf2, 5a9df47, 09bfbb8, 343d8d6 plus local bounded-streaming slice | 2150 Python tests passed; e2e smoke passed 8/7 skipped | Notes: All 3 enforcement PRs delivered. `arc sandbox run` is real subprocess execution only. Bounded stream readers cap stdout/stderr without `communicate()` full buffering while preserving process-group timeout kill. MicroVM execution remains unimplemented; Lima/Firecracker are preflight-only; container fallback remains opt-in gated.
 
 **Source:** Architecture Review P0-3, Feature List F0.3
 
@@ -896,7 +896,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | R13 SwarmGraph Native Runtime | Baseline Complete | No v0.1 action |
 | **R14 Streaming Audit + HMAC** | **Baseline Complete** | **Phase 21 — streaming verifier, arc audit verify CLI, HMAC key mgmt (21 streaming tests)** |
 | **R15 Discriminated RunEvent Unions** | **Baseline Complete** | **Phase 22 — 22 typed events + RAW fallback, TS/Python discriminated unions, type guards** |
-| **R16 Trust + Paid-Call Enforcement** | **Baseline Complete** | **Phase 23 — harden across all surfaces (commits 3e6ee8c-09bfbb8)** |
+| **R16 Trust + Paid-Call Enforcement** | **Baseline Complete; Active Hardening** | **Phase 23 — enforcement complete; sandbox subprocess caps active; microVM preflight-only** |
 | **R17 Trace Virtualization + Daemon** | **Baseline Complete** | **Phase 24 — VirtualizedEventList, RingBuffer, SSE Last-Event-ID, client reconnect** |
 | **R18 CLI Decomposition** | **Partial** | **Phase 25 — split remaining commands** |
 | **R19 MCP Local Control Plane** | **Not Started** | **Phase 26 — implement stdio server** |

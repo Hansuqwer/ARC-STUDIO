@@ -820,7 +820,7 @@ bash scripts/check-pr.sh
 ## Phase 23 — Enforced Workspace Trust + Paid-Call Gates
 
 **Roadmap:** R16 — Trust + Paid-Call Enforcement  
-**Status:** Baseline Complete ✓ — All 3 PRs delivered | Evidence: commits 3e6ee8c (foundation), fca4bf2 (PR 23.1), 5a9df47 (PR 23.2), 09bfbb8 (PR 23.3) | 1518 Python tests passed, audit script passes (28 syscalls annotated), TypeScript builds green | Notes: Complete Phase 23 with typed denial events, centralized enforcement helpers, EnforcementContext system, CLI flags (--allow-paid, --trust-workspace, --dry-run), audit infrastructure, and UI confirmation modal with correlation ID tracking and retry bridge  
+**Status:** Baseline Complete ✓; active sandbox hardening — All 3 enforcement PRs delivered, plus current subprocess sandbox cap hardening | Evidence: commits 3e6ee8c (foundation), fca4bf2 (PR 23.1), 5a9df47 (PR 23.2), 09bfbb8 (PR 23.3), 343d8d6 (sandbox policy/audit), local bounded-streaming slice | 2150 Python tests passed, e2e smoke passed 8/7 skipped, audit script passes (28 syscalls annotated), TypeScript builds green | Notes: Complete Phase 23 with typed denial events, centralized enforcement helpers, EnforcementContext system, CLI flags (--allow-paid, --trust-workspace, --dry-run), audit infrastructure, and UI confirmation modal with correlation ID tracking and retry bridge. `arc sandbox run` is real subprocess execution only; stdout/stderr now use bounded stream readers instead of `communicate()` full buffering while preserving process-group timeout kill. MicroVM execution does not exist; Lima/Firecracker remain preflight-only; container fallback remains gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`.  
 **Depends on:** Phase 22 (needs typed RunEvent for denial events)
 
 ### Progress
@@ -863,6 +863,16 @@ bash scripts/check-pr.sh
 - Added 5 e2e tests: correlation_id generation, inclusion in dry-run/trust/paid-call denials
 - Verified: 1,518 Python tests passed (21 skipped), TypeScript build green
 - Note: Retry endpoint integration test skipped in CI (requires fastapi/httpx not in project deps)
+
+#### Active Sandbox Hardening: Bounded Subprocess Output ✓
+**Completed:** 2026-05-25
+
+- Replaced subprocess `communicate()` output buffering with bounded stdout/stderr stream readers.
+- Preserved no-shell argv execution, workspace cwd guard, env allowlist/secret stripping, timeout, and process-group kill.
+- Preserved stable `IsolationResult` JSON semantics including truncation flags and timeout kill reason.
+- Added tests for exact cap lengths and large-output truncation without pipe deadlock.
+- Verified: 2150 Python tests passed; e2e smoke passed 8 passed / 7 skipped; TypeScript build/typecheck green.
+- Truth: microVM execution does not exist; Lima/Firecracker are preflight-only; container fallback remains gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`.
 
 ### Implementation
 1. Centralize `TrustState` and `PaidCallPolicy` in protocol package for cross-language use.
@@ -1865,7 +1875,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 |---|---|---|---|
 | 21 Streaming Audit | Baseline Complete | None | Foundations — streaming verifier + HMAC checks with record-hash validation |
 | 22 Discriminated RunEvent | Baseline Complete | None | Foundations — typed TS/Python unions; policy bypass warning recognized as known |
-| 23 Trust Enforcement | Baseline Complete | Phase 22 | Foundation/p0-1 — uses typed RunEvent for denial events |
+| 23 Trust Enforcement | Baseline Complete; Active Hardening | Phase 22 | Foundation/p0-1 — typed denial events; subprocess sandbox bounded stdout/stderr caps active; microVM preflight-only |
 | 24 Trace Virtualization | Baseline Complete | Phase 22 | P1 — virtualized event list, per-run replay buffer, Last-Event-ID reconnect plumbing |
 | 25 CLI Decomposition | Baseline Complete ✓ | None | P1 — fully decomposed into `cli/` modules; unblocks Phase 36.2 |
 | 26 MCP Local Control Plane | Baseline Complete (scaffold) ✓ | Phase 23 | P1 — stdio-only MCP server with trust gate, 7 tools, 3 resources |
