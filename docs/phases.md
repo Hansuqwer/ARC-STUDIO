@@ -972,7 +972,7 @@ bash scripts/check-pr.sh
 ## Phase 26 — MCP Local Control Plane for ARC
 
 **Roadmap:** R19 — MCP Local Control Plane  
-**Status:** Baseline Complete with contract/audit hardening ✓ | Evidence: 29 MCP tests pass; Phase 26 hardening adds per-call trust checks, stable ARC envelopes, ID/path validation, trace pagination, redaction, output caps, task-tool bounds, and best-effort MCP audit events | Notes: Local control plane remains stdio-only. Not yet wired to IDE. SwarmGraph MCP wrappers deferred.  
+**Status:** Baseline Complete with contract/audit hardening ✓ | Evidence: 45 MCP tests pass (29 FastMCP internals + 16 real MCP ClientSession); Phase 26 hardening adds per-call trust checks, stable ARC envelopes, ID/path validation, trace pagination, redaction, output caps, task-tool bounds, best-effort MCP audit events, and real MCP client-session coverage | Notes: Local control plane remains stdio-only. Not yet wired to IDE. SwarmGraph MCP wrappers deferred.  
 **Depends on:** Phase 23 (trust enforcement required before MCP server activation)
 
 ### Implementation
@@ -983,7 +983,7 @@ bash scripts/check-pr.sh
 5. Added `cli/mcp.py` with `arc mcp serve --stdio` CLI command (registered as `mcp_app` sub-app).
 6. Disable MCP tools in untrusted workspaces via `ensure_trusted()` — raises `MCPServerError`.
 7. All tools are read-only local operations: no paid/provider calls, no secret output, no network sockets.
-8. 29 tests: server creation (trusted/untrusted), tool/resource registration, stable ARC envelopes, per-call trust re-check, traversal rejection, trace pagination/redaction, task bounds, and MCP audit emission.
+8. 45 tests: 29 FastMCP internals + 16 real MCP ClientSession tests covering server creation (trusted/untrusted), tool/resource registration, stable ARC envelopes, per-call trust re-check, traversal rejection, trace pagination/redaction, task bounds, MCP audit emission, real client-session tool listing/calling, resource reading, denied error envelopes, structuredContent verification, and audit event emission via in-process memory-stream transport.
 9. Hardened tool/resource calls with stable ARC envelopes, redaction, ID validation, path guards for trace/audit resources, trace pagination, output caps, and typed error envelopes.
 10. Added best-effort local MCP audit JSONL at `.arc/audit/mcp.events.jsonl` recording tool, workspace, redacted args, args hash, decision, error code/reason, timing, transport, and truncation flag without logging full payloads.
 
@@ -992,7 +992,7 @@ bash scripts/check-pr.sh
 2. ✅ MCP tools are disabled in untrusted workspaces with `MCPServerError`.
 3. ✅ MCP resource reads are local-only (file system operations).
 4. ✅ No HTTP binding — stdio only.
-5. ✅ 29 MCP tests passing covering registered tools, resource templates, trust gating, typed error envelopes, trace pagination/redaction, task bounds, allowed/denied audit events, redaction, truncation flagging, and audit write failure tolerance.
+5. ✅ 45 MCP tests passing covering FastMCP internals (29) + real MCP ClientSession tests (16) — tool listing, tool calling, ARC envelope shape, structuredContent, denied error envelopes, resource templates, resource reading, allowed/denied audit events, secret redaction, no HTTP transport, no provider/network calls, and invalid tool/argument handling.
 
 ### Verification
 ```bash

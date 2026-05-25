@@ -118,7 +118,7 @@ records gate).      unless user consents
 - **Where:** `mcp/server.py`, `cli/mcp.py`
 - **Gate:** `ensure_trusted()` at server creation.
 - **Transport:** stdio only; HTTP/listen sockets remain excluded until auth/trust policy is accepted.
-- **Audit coverage:** `python/tests/mcp/test_mcp_server.py` verifies trusted/untrusted creation and unsupported transport behavior through CLI-level tests where present.
+- **Audit coverage:** `python/tests/mcp/test_mcp_server.py` (FastMCP internals) and `python/tests/mcp/test_mcp_client_session.py` (real MCP ClientSession with in-process memory-stream transport) verifies trusted/untrusted creation, tool/resource invocation, ARC envelope shape, denied error envelopes, and unsupported transport behavior.
 
 #### S-26.MCP.2 · MCP tool/resource invocation
 - **What:** Each MCP tool/resource call reads local ARC state (runs, traces, audit, HITL, tasks) or creates/cancels local task records.

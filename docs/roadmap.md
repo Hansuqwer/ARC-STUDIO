@@ -451,8 +451,9 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - ✅ No HTTP binding — stdio only
 - ✅ No paid/provider calls or secret output
 - ✅ 18 MCP tests passing
+- ✅ Real MCP client-session tests covering tool listing, tool calls, ARC envelope shape, denied results, resource reading, audit events, no HTTP transport, and no provider/network calls
 
-**Status:** Baseline Complete with contract/audit hardening | Evidence: 29 MCP tests pass; Phase 26 hardening adds per-call trust checks, stable ARC envelopes, ID/path validation, trace pagination, redaction, output caps, task-tool bounds, and best-effort MCP audit events | Notes: Local stdio control plane only. Not yet wired to IDE. SwarmGraph MCP wrappers deferred. HTTP transport deliberately excluded until auth/trust policy defined.
+**Status:** Baseline Complete with contract/audit hardening | Evidence: 45 MCP tests pass (29 FastMCP internals + 16 real MCP ClientSession tests); Phase 26 hardening adds per-call trust checks, stable ARC envelopes, ID/path validation, trace pagination, redaction, output caps, task-tool bounds, best-effort MCP audit events, and real MCP client-session coverage | Notes: Local stdio control plane only. Not yet wired to IDE. SwarmGraph MCP wrappers deferred. HTTP transport deliberately excluded until auth/trust policy defined.
 
 **Source:** Architecture Review P1-6, Feature List F2.1
 
