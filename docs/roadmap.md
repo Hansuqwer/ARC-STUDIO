@@ -835,9 +835,24 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Goal:** Integrate Google ADK framework with ARC runtime.
 
-**Current:** Not Started.
+**Current:** Baseline Complete. T1 detection (import probe + workspace scanner for LlmAgent, SequentialAgent, ParallelAgent, LoopAgent, FunctionTool, @tool, Runner) and T2 static AST export (WorkflowInfo with sub-agent edges and tool edges) implemented. T3 execution intentionally deferred: google-adk 0.x has active API churn and agent execution requires live Gemini/Google AI provider calls.
 
-**Status:** Not Started | Evidence: n/a | Notes: Strategic importance but 2.0 breaking changes increase risk; sequence after ProviderClient cluster matures.
+**Deliverables:**
+- `google.adk` import probe with `ModuleNotFoundError` guard for missing `google` namespace package
+- Workspace scanner for all four ADK agent types, FunctionTool, @tool decorator, Runner
+- AST-based `GoogleADKVisitor` extracting agents with name/model/instruction/sub_agents/tools
+- `export_google_adk_workflows()` producing `WorkflowInfo` with orchestrates/uses edges
+- `GoogleADKAdapter` registered in default registry
+- 44 tests: 18 detection + 16 export + 10 adapter interface
+
+**Acceptance:**
+- `google_adk` adapter in `default_registry()` ✓
+- T1 detect works without `google-adk` installed ✓
+- T2 export produces correct WorkflowInfo for LlmAgent, SequentialAgent, ParallelAgent, LoopAgent ✓
+- `capability_report` honestly reports `detected_not_runnable` with T3-not-implemented reason ✓
+- 44 tests pass; 2559 total Python tests pass ✓
+
+**Status:** Baseline Complete | Evidence: local verification — 2559 Python tests passed, ruff clean, pnpm build/typecheck green | Notes: T3 deferred until google-adk 1.0 API stabilizes.
 
 **Source:** Adapter Roadmap Phase 34
 
@@ -951,7 +966,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R32 Haystack Adapter** | **Baseline Complete** | **Adapter Phase 31 — T1 detection (19 tests), T2 export (16 tests), T3 gated scaffold (15 tests), adapter (15 tests)** |
 | **R33 Smolagents Adapter** | **Baseline Complete** | **Adapter Phase 32 — T1 detection (11 tests), T2 export (7 tests), T3 gated scaffold (6 tests), adapter (7 tests)** |
 | **R34 Semantic Kernel Adapter** | **Baseline Complete** | **Adapter Phase 33 — T1 detection + T2 static export; no runtime execution claim** |
-| **R35 Google ADK Adapter** | **Not Started** | **Adapter Phase 34 — implement Google ADK adapter** |
+| **R35 Google ADK Adapter** | **Baseline Complete** | **Adapter Phase 34 — T1 detection + T2 static export; T3 deferred (google-adk 0.x churn)** |
 | **R36 MCP Python SDK Adapter** | **Not Started** | **Adapter Phase 35 — implement MCP Python SDK adapter** |
 | **R37 Provider Management (Phase 1)** | **Baseline Complete** | **Phase 36.1 — interactive UX without credential storage (commits cd89aab-7f2e20b)** |
 | **R37 Provider Management (Phase 2)** | **Baseline Complete** | **Phase 36.2 — auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`; token refresh; trust enforcement; audit logging; env var fallback; 57 auth tests** |

@@ -2110,6 +2110,43 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 
 ---
 
+## Phase 38 — Google ADK Adapter
+
+**Roadmap:** R35 — Google ADK Adapter (Adapter Phase 34)
+**Status:** Baseline Complete | Evidence: local verification — 2559 Python tests passed, ruff clean, pnpm build/typecheck green | Notes: T3 deferred until google-adk 1.0 API stabilizes.
+**Depends on:** None
+
+### Acceptance
+1. `google_adk` adapter registered in `default_registry()` ✓
+2. T1 detect works without `google-adk` installed (guards `ModuleNotFoundError` on `google` namespace absence) ✓
+3. Detects `LlmAgent`, `SequentialAgent`, `ParallelAgent`, `LoopAgent`, `FunctionTool`, `@tool` decorator, `Runner` ✓
+4. T2 AST export produces `WorkflowInfo` with orchestrates/uses edges and correct metadata ✓
+5. `capability_report` reports `detected_not_runnable` with explicit T3-not-implemented reason ✓
+6. `run_workflow()` raises `NotImplementedError` ✓
+7. 44 tests in `tests/adapters/google_adk/` all pass ✓
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/adapters/google_adk/ tests/test_adapter_status.py -q
+cd python && uv run pytest tests/ -q
+pnpm build
+pnpm typecheck
+```
+
+### Truth Constraints
+- T1 + T2 only — no live provider calls, no Gemini API, no Runner lifecycle
+- No `google-adk` added to project dependencies; detection is import-probe only
+- T3 deferred: google-adk 0.x has active breaking changes; agent execution requires live provider credentials
+- No fake detection: adapter returns `(False, 0.0, [])` for empty workspaces without `google.adk` installed
+
+### Known Risks
+- `google.adk.agents` API names (`LlmAgent` vs `Agent`) may shift before 1.0; scanner covers both
+- `SequentialAgent`, `ParallelAgent`, `LoopAgent` sub-agent wiring is static-only; dynamic sub-agent construction not captured
+- `@tool` decorator detection fires for any `@tool` usage, not strictly `google.adk.tools.tool`
+
+---
+
 ## Post-v0.1 Phase Table
 
 ### Phase ↔ Roadmap ID
@@ -2133,6 +2170,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 | **36.1** | **R37** | **Provider Discovery & Interactive UX (Phase 1)** |
 | **36.2** | **R37** | **Credential Storage & OAuth (Phase 2)** |
 | **37** | **R38** | **CLI Sandbox Hardening + IDE Integration** |
+| **38** | **R35** | **Google ADK Adapter (T1+T2)** |
 
 ### Dependencies
 
@@ -2155,6 +2193,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 | 36.1 Provider Discovery | Baseline Complete | None | Standalone — interactive provider UX without credential storage; no blockers |
 | 36.2 Credential Storage | Baseline Complete | Phase 23, Phase 25, Phase 36.1 | Auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`, token refresh, trust enforcement, audit logging, env var fallback; 57 auth tests |
 | 37 CLI Sandbox Hardening | Active Hardening | Phase 23 | Subprocess bounded streaming caps + approval prune active; path-intent expansion, protocol parity, microVM preflight, container fallback pending |
+| 38 Google ADK Adapter | Baseline Complete | None | T1 detection + T2 static AST export; T3 deferred (google-adk 0.x churn); 44 tests |
 
 ### Critical Path
 
