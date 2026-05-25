@@ -760,9 +760,20 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Goal:** Integrate DSPy framework with ARC runtime.
 
-**Current:** Not Started.
+**Current:** Baseline Complete. T1 (detection) and T2 (export) implemented via AST-based static analysis. T3 (runner) is gated scaffold only.
 
-**Status:** Not Started | Evidence: n/a | Notes: Strong research adoption; compile/run lifecycle worth surfacing.
+**Deliverables:**
+- T1: AST-based detection of `dspy.Signature`, `dspy.Module`, `dspy.Predict`, `dspy.ChainOfThought`, `dspy.ReAct`, and optimizers
+- T2: AST-based export of DSPy programs to `WorkflowInfo` (signatures, modules, standalone instantiations)
+- T3: Gated runner scaffold (`ARC_DSPY_RUNNER_ENABLED=1`); no live provider calls without explicit gate
+- Honest `CapabilityReport`: T1/T2 available, T3 gated
+
+**Acceptance:**
+- 67 tests passing (detection: 19, export: 16, runner: 17, adapter: 15)
+- All 2386 Python tests passing (no regressions)
+- Detection, export, and capability report work end-to-end
+
+**Status:** Baseline Complete | Evidence: 67 DSPy tests, 2386 total Python tests passed; `pnpm build` and `pnpm typecheck` green; `scripts/check-pr.sh` green | Notes: T3 runner is gated scaffold only; no live provider calls. DSPy compile/run lifecycle worth surfacing in future T3 work.
 
 **Source:** Adapter Roadmap Phase 30
 
@@ -912,7 +923,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R28 Anthropic Provider + Registry** | **Baseline Complete** | **Adapter Phase 27 — complete (commit 4a479b7)** |
 | **R29 OpenAI-Compatible Provider** | **Baseline Complete** | **Adapter Phase 28 — complete (commit 6826d8d, 24 tests, 6 vendors)** |
 | **R30 Pydantic AI Adapter** | **Baseline Complete** | **Adapter Phase 29 — complete (commits 7680017, c34abb3, 27a33b1 — 43 tests, 3 PRs)** |
-| **R31 DSPy Adapter** | **Not Started** | **Adapter Phase 30 — implement DSPy adapter** |
+| **R31 DSPy Adapter** | **Baseline Complete** | **Adapter Phase 30 — T1 detection (19 tests), T2 export (16 tests), T3 gated scaffold (17 tests), adapter (15 tests)** |
 | **R32 Haystack Adapter** | **Not Started** | **Adapter Phase 31 — implement Haystack adapter** |
 | **R33 Smolagents Adapter** | **Not Started** | **Adapter Phase 32 — implement Smolagents adapter** |
 | **R34 Semantic Kernel Adapter** | **Not Started** | **Adapter Phase 33 — implement Semantic Kernel adapter (T1+T2 only)** |

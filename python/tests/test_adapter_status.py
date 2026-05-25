@@ -30,6 +30,7 @@ def test_default_registry_has_expected_adapters():
         "ag2",
         "llamaindex",
         "lmarena",
+        "dspy",
     }
     assert adapter_ids == expected, f"Got {adapter_ids}, expected {expected}"
 
@@ -162,7 +163,7 @@ def test_build_default_is_idempotent():
     registry2 = AdapterRegistry().build_default()
     ids2 = {a.adapter_id for a in registry2.all()}
     assert ids1 == ids2
-    assert len(ids1) == 8  # No duplicates
+    assert len(ids1) == 9  # No duplicates
 
 
 def test_all_adapters_detect_swarmgraph_project(tmp_path):

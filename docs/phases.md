@@ -1228,6 +1228,43 @@ bash scripts/check-pr.sh
 - Nonce generation uses `secrets.token_hex(32)` for cryptographic security.
 - CLI flag `--consensus-escrow` deferred to Phase 31 (adaptive consensus integration).
 
+## Phase 30 — DSPy Adapter (Adapter Phase 30)
+
+**Roadmap:** R31 — DSPy Adapter  
+**Status:** Baseline Complete | Evidence: 67 DSPy tests, 2386 total Python tests passed; `pnpm build` and `pnpm typecheck` green; `scripts/check-pr.sh` green | 2026-05-25  
+**Depends on:** None (standalone adapter)
+
+### Implementation
+1. ✅ T1 Detection (`adapters/dspy/detect.py`): AST scan for `import dspy`, `from dspy`, `dspy.Signature`, `dspy.Module`, `dspy.Predict`, `dspy.ChainOfThought`, `dspy.ReAct`, and optimizers. Checks `requirements.txt`, `pyproject.toml` for `dspy` or `dspy-ai`.
+2. ✅ T2 Export (`adapters/dspy/export.py`): AST-based export of Signature definitions (input/output fields), Module compositions (sub-modules), and standalone instantiations (Predict/ChainOfThought/ReAct chains). Maps to `WorkflowInfo` with nodes and edges.
+3. ✅ T3 Runner (`adapters/dspy/runner.py`): Gated scaffold only. Requires `ARC_DSPY_RUNNER_ENABLED=1`. Emits `DSPY_MODULE_START/END/ERROR`, `DSPY_PREDICT_START/END`, `DSPY_COMPILE_START/END`, `DSPY_TOOL_CALL/RESULT` events. No live provider calls without explicit gate.
+4. ✅ Adapter class (`adapters/dspy/__init__.py`): `DSPyAdapter(RuntimeAdapter)` with honest `CapabilityReport` (T1/T2 available, T3 gated).
+5. ✅ Registration in `adapters/registry.py`.
+6. ✅ Research doc: `docs/research/dspy-adapter.md`.
+
+### Acceptance
+1. ✅ 67 tests passing (detection: 19, export: 16, runner: 17, adapter: 15)
+2. ✅ All 2386 Python tests passing (no regressions)
+3. ✅ Detection, export, and capability report work end-to-end
+4. ✅ T3 runner is gated scaffold; no live provider calls
+5. ✅ Conformance checks pass
+
+### Verification
+```bash
+cd python && uv run pytest tests/adapters/dspy/ -q    # 67 passed
+cd python && uv run pytest -q                          # 2386 passed
+pnpm build                                             # clean
+pnpm typecheck                                         # clean
+bash scripts/check-pr.sh                               # pass
+```
+
+### Known Risks
+- T3 runner requires live LM calls; gated behind env var
+- DSPy API may change between versions; detection patterns may need updates
+- Compile/optimize lifecycle not yet surfaced in events (future T3 work)
+
+---
+
 ## Phase 31 — Adaptive Consensus Protocol
 
 **Roadmap:** R24 — Adaptive Consensus  

@@ -86,6 +86,7 @@ class AdapterRegistry:
         """Build registry with all built-in adapters."""
         from .ag2_adapter import AG2Adapter
         from .crewai import CrewAIAdapter
+        from .dspy import DSPyAdapter
         from .langchain import LangChainAdapter
         from .langgraph import LangGraphAdapter
         from .llamaindex import LlamaIndexAdapter
@@ -101,6 +102,7 @@ class AdapterRegistry:
         self.register(AG2Adapter())
         self.register(LlamaIndexAdapter())
         self.register(LmarenaAdapter())
+        self.register(DSPyAdapter())
         return self
 
 
