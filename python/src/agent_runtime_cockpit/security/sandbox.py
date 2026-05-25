@@ -144,11 +144,16 @@ PRIVILEGED_COMMANDS = {
 WRITE_SHELL_TOKENS = {">", ">>", "tee"}
 SHELL_COMMANDS = {"sh", "bash", "zsh"}
 INTERPRETERS = {"python", "python3", "node", "ruby", "perl"}
+WRITE_COMMANDS = {"touch", "mkdir", "ln", "cp", "unzip", "install"}
 GIT_DESTRUCTIVE_SUBCOMMANDS = {"clean", "rm"}
 GIT_HARD_RESET = {"reset", "--hard"}
 GIT_CHECKOUT_FORCE = {"checkout", "--"}
 PACKAGE_MANAGER_MODULES = {"pip"}
 NETWORK_HINTS = {"socket", "requests", "urllib", "http.client", "subprocess", "os.system"}
+NODE_NETWORK_HINTS = {"http", "https", "net", "dgram", "fetch", "axios", "node-fetch"}
+RUBY_NETWORK_HINTS = {"socket", "net/http", "open-uri", "httparty", "faraday"}
+PERL_NETWORK_HINTS = {"LWP", "HTTP::Tiny", "IO::Socket", "Net::HTTP", "Mojo::UserAgent"}
+SHELL_NETWORK_HINTS = {"curl", "wget", "nc", "ssh", "scp", "rsync", "ping"}
 WRITE_HINTS = {"open", "write_text", "write_bytes", "Path("}
 
 
@@ -197,8 +202,6 @@ def classify_command(command: list[str]) -> CommandClassification:
     args = command[1:]
     if exe in PRIVILEGED_COMMANDS:
         return CommandClassification.PRIVILEGED
-    if exe in SHELL_COMMANDS:
-        return CommandClassification.UNKNOWN
     if exe == "git":
         if args and args[0] in GIT_DESTRUCTIVE_SUBCOMMANDS:
             return CommandClassification.DESTRUCTIVE
@@ -221,6 +224,10 @@ def classify_command(command: list[str]) -> CommandClassification:
         install_markers = {"install", "add", "update", "upgrade", "sync"}
         if exe in {"brew", "apt", "apt-get", "dnf", "yum"} or install_markers.intersection(args):
             return CommandClassification.INSTALL
+    if exe == "install":
+        return CommandClassification.INSTALL
+    if exe in WRITE_COMMANDS:
+        return CommandClassification.WRITES_WORKSPACE
     if any(token in WRITE_SHELL_TOKENS for token in command):
         return CommandClassification.WRITES_WORKSPACE
     if exe in {"python", "python3"}:
@@ -238,6 +245,22 @@ def classify_command(command: list[str]) -> CommandClassification:
         if "-c" in args:
             return CommandClassification.UNKNOWN
     if exe in {"node", "ruby", "perl"} and any(a in {"-e", "-c"} for a in args):
+        code = " ".join(args)
+        if exe == "node" and any(hint in code for hint in NODE_NETWORK_HINTS):
+            return CommandClassification.NETWORK
+        if exe == "ruby" and any(hint in code for hint in RUBY_NETWORK_HINTS):
+            return CommandClassification.NETWORK
+        if exe == "perl" and any(hint in code for hint in PERL_NETWORK_HINTS):
+            return CommandClassification.NETWORK
+        if any(hint in code for hint in NETWORK_HINTS):
+            return CommandClassification.NETWORK
+        return CommandClassification.UNKNOWN
+    if exe in SHELL_COMMANDS and "-c" in args:
+        code = " ".join(args)
+        if any(hint in code for hint in SHELL_NETWORK_HINTS):
+            return CommandClassification.NETWORK
+        if any(hint in code for hint in NETWORK_HINTS):
+            return CommandClassification.NETWORK
         return CommandClassification.UNKNOWN
     if exe in READ_ONLY_COMMANDS:
         if (
@@ -316,8 +339,29 @@ def _extract_path_intents(command: list[str]) -> list[str]:
         paths.extend(a[3:] for a in args if a.startswith("of="))
     if exe in {"cp", "mv"} and len([a for a in args if not a.startswith("-")]) >= 2:
         paths.append([a for a in args if not a.startswith("-")][-1])
-    if exe in {"tar", "zip"}:
+    if exe == "tar":
         paths.extend(a for a in args if a.endswith((".tar", ".tgz", ".zip")))
+        if "-C" in args:
+            idx = args.index("-C")
+            if idx + 1 < len(args):
+                paths.append(args[idx + 1])
+    if exe == "zip":
+        paths.extend(a for a in args if a.endswith((".tar", ".tgz", ".zip")))
+    if exe == "unzip":
+        paths.extend(a for a in args if a.endswith((".tar", ".tgz", ".zip")))
+        if "-d" in args:
+            idx = args.index("-d")
+            if idx + 1 < len(args):
+                paths.append(args[idx + 1])
+    if exe == "ln" and len([a for a in args if not a.startswith("-")]) >= 2:
+        paths.append([a for a in args if not a.startswith("-")][-1])
+    if exe in {"touch", "mkdir"}:
+        paths.extend(a for a in args if not a.startswith("-"))
+    if exe == "install":
+        if "-d" in args:
+            paths.extend(a for a in args if not a.startswith("-"))
+        elif len([a for a in args if not a.startswith("-")]) >= 2:
+            paths.append([a for a in args if not a.startswith("-")][-1])
     if exe in READ_ONLY_COMMANDS:
         paths.extend(
             a for a in args if a and not a.startswith("-") and not _looks_like_git_revision(a)

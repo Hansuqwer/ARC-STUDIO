@@ -598,6 +598,17 @@ def test_classification_categories():
         (["truncate", "-s", "0", "x"], CommandClassification.DESTRUCTIVE),
         (["chmod", "600", "x"], CommandClassification.PRIVILEGED),
         (["chown", "root", "x"], CommandClassification.PRIVILEGED),
+        (["touch", "file.txt"], CommandClassification.WRITES_WORKSPACE),
+        (["mkdir", "newdir"], CommandClassification.WRITES_WORKSPACE),
+        (["ln", "-s", "target", "link"], CommandClassification.WRITES_WORKSPACE),
+        (["cp", "src", "dst"], CommandClassification.WRITES_WORKSPACE),
+        (["unzip", "archive.zip", "-d", "outdir"], CommandClassification.WRITES_WORKSPACE),
+        (["install", "-m", "755", "src", "dst"], CommandClassification.INSTALL),
+        (["install", "-d", "/usr/local/bin"], CommandClassification.INSTALL),
+        (["node", "-e", "require('http')"], CommandClassification.NETWORK),
+        (["ruby", "-e", "require 'socket'"], CommandClassification.NETWORK),
+        (["perl", "-e", "use LWP::Simple"], CommandClassification.NETWORK),
+        (["bash", "-c", "curl http://example.com"], CommandClassification.NETWORK),
     ],
 )
 def test_adversarial_classification_matrix(command, classification):
