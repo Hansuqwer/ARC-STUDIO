@@ -1797,7 +1797,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 ## Phase 36.2 — Credential Storage & OAuth
 
 **Roadmap:** R37 — Provider Management System (Phase 2)  
-**Status:** Blocked (waiting for Phase 23 + Phase 25 + Phase 36.1)  
+**Status:** In Progress (previously blocked by Phase 23 + Phase 25 + Phase 36.1; all now Baseline Complete)  
 **Depends on:** Phase 23 (Trust Enforcement), Phase 25 (CLI Decomposition), Phase 36.1 (Provider Discovery)  
 **Design note:** Adds secure credential storage and OAuth flow on top of Phase 36.1 interactive UX. Requires mature trust infrastructure from Phase 23 and clean CLI structure from Phase 25 before storing credentials on disk.
 
@@ -2024,7 +2024,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 | 33 Memory Graph | Research | None | P3 — research, may pivot |
 | 34 ARC Battle Mode | Baseline Complete | Phase 17, Phase 23, Phase 25, Phase 29, Phase 30, Phase 31 | P2/P3 — ARC-native offline battle CLI/IDE baseline complete; provider-backed battle remains blocked |
 | 36.1 Provider Discovery | Baseline Complete | None | Standalone — interactive provider UX without credential storage; no blockers |
-| 36.2 Credential Storage | Blocked | Phase 23, Phase 25, Phase 36.1 | Standalone — secure credential storage and OAuth; requires trust infrastructure |
+| 36.2 Credential Storage | In Progress | Phase 23, Phase 25, Phase 36.1 | Auth module with Fernet encryption, OAuth handler, CLI `arc providers add --api-key/--oauth`; all blockers now Baseline Complete |
 | 37 CLI Sandbox Hardening | Active Hardening | Phase 23 | Subprocess bounded streaming caps + approval prune active; path-intent expansion, protocol parity, microVM preflight, container fallback pending |
 
 ### Critical Path
@@ -2056,4 +2056,4 @@ Phase 37 (CLI Sandbox Hardening) ──→ (active; depends on Phase 23)
 - **SwarmGraph differentiators:** Phase 30 (depends on Phase 17 + Phase 21) → Phase 31 (depends on Phase 30 + Phase 23)
 - **Enterprise:** Phase 32 (depends on Phase 29 + Phase 21)
 - **Research:** Phase 33 (independent)
-- **Provider Management Phase 2:** Phase 36.2 (blocker Phase 25 now satisfied; still blocked on Phase 23 + Phase 36.1)
+- **Provider Management Phase 2:** Phase 36.2 (In Progress — auth module with Fernet encryption, OAuth handler, CLI `arc providers add --api-key/--oauth`; all blockers now Baseline Complete)

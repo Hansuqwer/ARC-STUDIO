@@ -355,6 +355,126 @@ def providers_setup(
     )
 
 
+@providers_app.command("add")
+def providers_add(
+    provider: str = typer.Option(..., "--provider", help="Provider id"),
+    api_key: Optional[str] = typer.Option(
+        None, "--api-key", help="Store API key (encrypted at rest)"
+    ),
+    oauth: bool = typer.Option(False, "--oauth", help="Start OAuth authorization flow"),
+    label: str = typer.Option("default", "--label", help="Account label"),
+    model: Optional[str] = typer.Option(None, "--model", help="Default model"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Add a provider credential (encrypted API key or OAuth).
+
+    Stores credentials encrypted at rest using Fernet symmetric encryption.
+    Use --api-key to store a raw API key, or --oauth to start an OAuth flow.
+    Environment variable fallback remains active when no stored credential exists.
+    """
+    _setup_logging(debug)
+    from ..provider_action import PROVIDERS
+
+    provider_def = next((p for p in PROVIDERS if p.id == provider), None)
+    if provider_def is None:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Unknown provider: {provider}"), json_output)
+        raise typer.Exit(2)
+
+    if api_key:
+        from ..auth.manager import encrypt_credential, save_credential
+
+        cred = encrypt_credential(provider, api_key)
+        cred.label = label
+        cred.default_model = model
+        save_credential(cred)
+        _out(
+            ok(
+                {
+                    "provider": provider,
+                    "label": label,
+                    "auth_method": "api_key",
+                    "message": f"API key stored securely for {provider_def.display_name}",
+                }
+            ),
+            json_output,
+        )
+    elif oauth:
+        import os as _os
+
+        from ..auth.oauth import (
+            OAuthConfig,
+            start_oauth_flow,
+            store_oauth_credential,
+        )
+
+        if not provider_def.env_key_names:
+            _out(
+                err(
+                    ArcErrorCode.INVALID_INPUT,
+                    f"No OAuth configuration available for {provider_def.display_name}",
+                ),
+                json_output,
+            )
+            raise typer.Exit(2)
+        base_url = provider_def.default_base_url or "https://api.openai.com"
+        config = OAuthConfig(
+            provider_id=provider,
+            client_id=_os.environ.get(f"ARC_OAUTH_CLIENT_ID_{provider.upper()}", ""),
+            client_secret=_os.environ.get(f"ARC_OAUTH_CLIENT_SECRET_{provider.upper()}", ""),
+            auth_url=_os.environ.get(
+                f"ARC_OAUTH_AUTH_URL_{provider.upper()}",
+                f"{base_url}/v1/oauth/authorize",
+            ),
+            token_url=_os.environ.get(
+                f"ARC_OAUTH_TOKEN_URL_{provider.upper()}",
+                f"{base_url}/v1/oauth/token",
+            ),
+        )
+        if not config.client_id:
+            _out(
+                err(
+                    ArcErrorCode.INVALID_INPUT,
+                    f"OAuth not configured for {provider}. "
+                    f"Set ARC_OAUTH_CLIENT_ID_{provider.upper()} and "
+                    f"ARC_OAUTH_CLIENT_SECRET_{provider.upper()}",
+                ),
+                json_output,
+            )
+            raise typer.Exit(2)
+        if not json_output:
+            import typer as _typer
+
+            _typer.echo(f"Starting OAuth flow for {provider_def.display_name}...")
+            _typer.echo("A browser window will open for authorization.")
+        try:
+            token = start_oauth_flow(config)
+            store_oauth_credential(provider, token, label=label)
+            _out(
+                ok(
+                    {
+                        "provider": provider,
+                        "label": label,
+                        "auth_method": "oauth",
+                        "message": f"OAuth authorization complete for {provider_def.display_name}",
+                    }
+                ),
+                json_output,
+            )
+        except (TimeoutError, RuntimeError) as exc:
+            _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+            raise typer.Exit(2)
+    else:
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                "Specify --api-key <key> or --oauth to add credentials",
+            ),
+            json_output,
+        )
+        raise typer.Exit(2)
+
+
 @providers_app.command("diagnostics")
 def providers_diagnostics(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
     """Return redacted provider diagnostics (statuses, routing, accounts, quota).
