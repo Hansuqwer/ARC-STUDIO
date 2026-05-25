@@ -18,6 +18,7 @@ from ._subapps import (
     context_app,
     doctor_app,
     eval_app,
+    events_app,
     hitl_app,
     isolation_app,
     mcp_app,
@@ -69,6 +70,7 @@ app.add_typer(mcp_app)
 app.add_typer(task_app)
 app.add_typer(replay_app)
 app.add_typer(battle_app)
+app.add_typer(events_app)
 app.add_typer(prompt_app)
 
 

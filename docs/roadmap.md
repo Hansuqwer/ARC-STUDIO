@@ -582,7 +582,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Implement webhook/callback triggers for audit events, consensus outcomes, and HITL requests.
 
-**Current:** Not Started. No event-driven notification system exists.
+**Current:** Baseline Complete. Local event bus with 6 typed event types, CLI watch mode, webhook delivery with HMAC-SHA256 signing, bounded retry, and dead-letter log. Event producers wired into HITL store, audit verifier, run supervisor, and budget enforcer. IDE badge protocol types and notification component exist. 36 Python tests + 5 TS tests.
 
 **Deliverables:**
 - Local event bus for: `hitl_required`, `hitl_decided`, `audit_verified`, `run_completed`, `run_failed`, `quota_warning`
@@ -597,7 +597,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - Webhook payloads are HMAC-signed if configured
 - Dead letter queue captures permanent failures
 
-**Status:** Not Started | Evidence: no event notification system found | Notes: P2 work; enables enterprise compliance integration.
+**Status:** Baseline Complete | Evidence: 2254 Python tests, 1554 TS tests, extension builds clean | Notes: Event bus is in-memory only (no persistence across daemon restart). Webhook delivery is best-effort. IDE badges poll CLI, not push. No SSE/WebSocket transport in baseline.
 
 **Source:** Architecture Review P2-11, Feature List F5.1
 

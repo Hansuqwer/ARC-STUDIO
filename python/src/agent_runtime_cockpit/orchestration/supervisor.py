@@ -21,6 +21,8 @@ from pydantic import BaseModel, Field
 
 from ..audit.hitl import HitlPrompt, HitlResponse
 from ..audit.key_manager import AuditKeyManager
+from ..events import get_bus
+from ..events.types import RunCompleted, RunFailed
 from ..protocol.evidence_refs import EvidenceKind, EvidenceRef
 from ..protocol.failure_autopsy import FailureAutopsy, RetryOption
 from ..protocol.run_contract import ContractStatus, RunContract
@@ -184,10 +186,33 @@ class JobSupervisor:
                 run.ended_at = datetime.now(timezone.utc).isoformat()
                 self.store.save(run)
                 self._finalize_run_artifacts(run_id, request, RunStatus.COMPLETED, duration)
+            try:
+                get_bus().publish(
+                    RunCompleted(
+                        run_id=run_id,
+                        workflow_id=request.workflow_id,
+                        duration_ms=duration,
+                        status="completed",
+                    )
+                )
+            except Exception:
+                log.warning("Failed to emit run_completed event", exc_info=True)
 
         except asyncio.CancelledError:
             duration = self._now_ms() - start_ms
             self._emit_event(run_id, "RUN_CANCELLED", {"cancel_reason": "user_requested"})
+            try:
+                get_bus().publish(
+                    RunFailed(
+                        run_id=run_id,
+                        workflow_id=request.workflow_id,
+                        duration_ms=duration,
+                        error="cancelled",
+                        error_detail="CancelledError",
+                    )
+                )
+            except Exception:
+                log.warning("Failed to emit run_failed event", exc_info=True)
             run = self.store.load(run_id)
             if run:
                 run.status = RunStatus.CANCELLED
@@ -221,6 +246,18 @@ class JobSupervisor:
                     },
                 )
                 self._finalize_run_artifacts(run_id, request, RunStatus.FAILED, duration)
+            try:
+                get_bus().publish(
+                    RunFailed(
+                        run_id=run_id,
+                        workflow_id=request.workflow_id,
+                        duration_ms=duration,
+                        error=f"run timed out after {request.timeout_seconds}s",
+                        error_detail="TimeoutError",
+                    )
+                )
+            except Exception:
+                log.warning("Failed to emit run_failed event", exc_info=True)
 
         except Exception as e:
             duration = self._now_ms() - start_ms
@@ -247,6 +284,18 @@ class JobSupervisor:
                     },
                 )
                 self._finalize_run_artifacts(run_id, request, RunStatus.FAILED, duration)
+            try:
+                get_bus().publish(
+                    RunFailed(
+                        run_id=run_id,
+                        workflow_id=request.workflow_id,
+                        duration_ms=duration,
+                        error=self._redactor.redact_string(str(e))[:200],
+                        error_detail=type(e).__name__,
+                    )
+                )
+            except Exception:
+                log.warning("Failed to emit run_failed event", exc_info=True)
 
         finally:
             self.broker.end_run(run_id)

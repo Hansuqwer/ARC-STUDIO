@@ -16,6 +16,8 @@ import { ConfigService } from './services/config-service';
 import { RunLifecycleService } from './services/run-lifecycle-service';
 import { AuditBridgeService } from './services/audit-bridge-service';
 import { BattleService } from './services/battle-service';
+import { NotificationBackendService } from './services/notification-service';
+import { NotificationService, NotificationServicePath } from '../common/notification-protocol';
 import { ArcServicePath } from '../common/arc-protocol';
 
 export default new ContainerModule(bind => {
@@ -50,7 +52,17 @@ export default new ContainerModule(bind => {
         ctx.container.get(BattleService)
     )).inSingletonScope();
 
-    // Bind the RPC connection handler
+    // Bind notification service (Phase 32 / R25 — Slice 32.3)
+    bind(NotificationBackendService).toSelf().inSingletonScope();
+
+    // Bind notification service RPC
+    bind(ConnectionHandler).toDynamicValue(ctx =>
+        new JsonRpcConnectionHandler(NotificationServicePath, () => {
+            return ctx.container.get(NotificationBackendService);
+        })
+    ).inSingletonScope();
+
+    // Bind the main RPC connection handler
     bind(ConnectionHandler).toDynamicValue(ctx =>
         new JsonRpcConnectionHandler(ArcServicePath, () => {
             return ctx.container.get(ArcBackendService);

@@ -11,6 +11,8 @@ from typing import Optional
 from uuid import uuid4
 
 from agent_runtime_cockpit.audit.hitl import HitlDecision, HitlPrompt, HitlResponse
+from agent_runtime_cockpit.events import get_bus
+from agent_runtime_cockpit.events.types import HitlDecided, HitlRequired
 
 log = logging.getLogger(__name__)
 DEFAULT_HITL_DB_PATH = Path(".arc") / "hitl.db"
@@ -120,6 +122,22 @@ class HitlSqliteStore:
                     ),
                 )
             log.info("HITL prompt saved: %s", prompt.hitl_id)
+            # Emit event
+            try:
+                bus = get_bus()
+                bus.publish(
+                    HitlRequired(
+                        run_id=prompt.run_id,
+                        hitl_id=prompt.hitl_id,
+                        step_id=prompt.step_id,
+                        prompt_text=prompt.prompt_text,
+                        context=prompt.context,
+                        options=prompt.options,
+                        timeout_seconds=prompt.timeout_seconds,
+                    )
+                )
+            except Exception:
+                log.warning("Failed to emit hitl_required event", exc_info=True)
             return token
         except Exception as e:
             log.error("Failed to save HITL prompt %s: %s", prompt.hitl_id, e)
@@ -262,6 +280,20 @@ class HitlSqliteStore:
                 )
 
                 log.info("HITL response saved: %s (decision: %s)", hitl_id, decision.value)
+                # Emit event
+                try:
+                    bus = get_bus()
+                    bus.publish(
+                        HitlDecided(
+                            run_id=run_id,
+                            hitl_id=hitl_id,
+                            decision=decision.value,
+                            operator_id=operator_id,
+                            notes=notes,
+                        )
+                    )
+                except Exception:
+                    log.warning("Failed to emit hitl_decided event", exc_info=True)
 
                 return HitlResponse(
                     hitl_id=hitl_id,

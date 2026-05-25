@@ -174,6 +174,27 @@ records gate).      unless user consents
 #### S-32.4 · Unrecognized Model subclass
 - **Bypass-warning conditions:** `POLICY_BYPASS_WARNING` with `bypass_reason=UNKNOWN_PROVIDER_PLUGIN`, `surface="smolagents.model"`, `surface_identifier=<class-name>`.
 
+#### S-32.5 · Event bus publish (Phase 32 / R25)
+- **What:** In-memory typed event bus. Producers (HITL store, audit verifier, supervisor, budget) publish events. Fire-and-forget — never blocks producer.
+- **Where:** `events/bus.py` (`EventBus.publish()`)
+- **Gate:** None (internal instrumentation). Events are typed and do not carry user secrets by default.
+- **Denial event:** N/A — no denial path. Producers log on failure.
+- **Audit coverage:** 14 event bus tests, wiring tests in existing producer test files.
+
+#### S-32.6 · Webhook delivery (Phase 32 / R25)
+- **What:** Optional HMAC-SHA256 signed webhook POST delivery for ARC events. Bounded exponential backoff retry (max 5, 60s cap). Dead-letter log for permanent failures.
+- **Where:** `events/webhooks.py` (`WebhookManager.deliver()`)
+- **Gate:** `httpx.AsyncClient` POST with 5s timeout. No network gate required (webhooks are opt-in per-workspace config).
+- **Denial event:** Dead-letter entry written on permanent failure.
+- **Secrets:** `secret` stored in `.arc/events/webhooks.json` with `0o600` permissions. Warned on `arc events webhook-add`.
+- **Audit coverage:** 17 webhook tests (config CRUD, HMAC sign/verify, dead-letter, retry bounds).
+
+#### S-32.7 · CLI events watch (Phase 32 / R25)
+- **What:** `arc events watch` subscribes to the in-process event bus and prints events to stdout.
+- **Where:** `cli/events.py`
+- **Gate:** None — diagnostic/watch command. Only observes already-published events.
+- **Audit coverage:** 5 CLI events tests.
+
 ---
 
 ### Phase 35 — MCP Client

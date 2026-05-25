@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from enum import StrEnum
 
 from pydantic import BaseModel, Field, model_validator
+
+log = logging.getLogger(__name__)
 
 
 class BudgetScope(StrEnum):
@@ -92,7 +95,9 @@ class BudgetState(BaseModel):
             return entry.amount_usd if entry else Decimal("0")
         raise AssertionError(f"Unknown scope: {scope}")
 
-    def record(self, amount_usd: Decimal, *, provider_id: str, run_active: bool, workflow_active: bool) -> None:
+    def record(
+        self, amount_usd: Decimal, *, provider_id: str, run_active: bool, workflow_active: bool
+    ) -> None:
         self.session.add(amount_usd)
         if run_active and self.current_run is not None:
             self.current_run.add(amount_usd)
@@ -127,20 +132,31 @@ class BudgetState(BaseModel):
 
 
 class BudgetExceeded(Exception):
-    def __init__(self, scope: BudgetScope, cap: Decimal, current: Decimal, proposed: Decimal, provider_id: str | None = None) -> None:
+    def __init__(
+        self,
+        scope: BudgetScope,
+        cap: Decimal,
+        current: Decimal,
+        proposed: Decimal,
+        provider_id: str | None = None,
+    ) -> None:
         self.scope = scope
         self.cap = cap
         self.current = current
         self.proposed = proposed
         self.provider_id = provider_id
         suffix = f" ({provider_id})" if provider_id else ""
-        super().__init__(f"Budget exceeded for scope={scope.value}{suffix}: cap=${cap}, current=${current}, proposed=${proposed}")
+        super().__init__(
+            f"Budget exceeded for scope={scope.value}{suffix}: cap=${cap}, current=${current}, proposed=${proposed}"
+        )
 
 
 class ConfirmationRequired(Exception):
     def __init__(self, proposed_cost: Decimal) -> None:
         self.proposed_cost = proposed_cost
-        super().__init__(f"First provider-backed call requires confirmation (proposed cost ${proposed_cost})")
+        super().__init__(
+            f"First provider-backed call requires confirmation (proposed cost ${proposed_cost})"
+        )
 
 
 class BudgetEnforcer:
@@ -148,10 +164,23 @@ class BudgetEnforcer:
         self._config = config
         self._state = state
 
-    def preflight(self, estimated_cost_usd: Decimal, *, provider_id: str, run_active: bool, workflow_active: bool) -> None:
-        if not self._config.first_launch_confirmed and estimated_cost_usd > self._config.confirmation_required_above_usd:
+    def preflight(
+        self,
+        estimated_cost_usd: Decimal,
+        *,
+        provider_id: str,
+        run_active: bool,
+        workflow_active: bool,
+    ) -> None:
+        if (
+            not self._config.first_launch_confirmed
+            and estimated_cost_usd > self._config.confirmation_required_above_usd
+        ):
             raise ConfirmationRequired(estimated_cost_usd)
-        scopes: list[tuple[BudgetScope, str | None]] = [(BudgetScope.SESSION, None), (BudgetScope.PROVIDER_DAY, provider_id)]
+        scopes: list[tuple[BudgetScope, str | None]] = [
+            (BudgetScope.SESSION, None),
+            (BudgetScope.PROVIDER_DAY, provider_id),
+        ]
         if run_active:
             scopes.insert(0, (BudgetScope.RUN, None))
         if workflow_active:
@@ -163,10 +192,55 @@ class BudgetEnforcer:
             if proposed > cap:
                 raise BudgetExceeded(scope, cap, current, proposed, scoped_provider_id)
 
-    def record(self, measured_cost_usd: Decimal, *, provider_id: str, run_active: bool, workflow_active: bool) -> None:
+    def record(
+        self,
+        measured_cost_usd: Decimal,
+        *,
+        provider_id: str,
+        run_active: bool,
+        workflow_active: bool,
+    ) -> None:
         self._state.record(
             measured_cost_usd,
             provider_id=provider_id,
             run_active=run_active,
             workflow_active=workflow_active,
         )
+
+    def check_and_warn(
+        self,
+        *,
+        provider_id: str | None = None,
+        run_active: bool = False,
+        workflow_active: bool = False,
+    ) -> None:
+        """Check if any scope's spend is above 80% of its cap and emit QuotaWarning events."""
+        from ..events import get_bus
+        from ..events.types import QuotaWarning
+
+        scopes: list[tuple[BudgetScope, str | None]] = [(BudgetScope.SESSION, None)]
+        if run_active:
+            scopes.insert(0, (BudgetScope.RUN, None))
+        if workflow_active:
+            scopes.insert(1 if run_active else 0, (BudgetScope.WORKFLOW, None))
+        if provider_id is not None:
+            scopes.append((BudgetScope.PROVIDER_DAY, provider_id))
+
+        for scope, scoped_provider_id in scopes:
+            cap = self._config.effective_cap(scope, scoped_provider_id)
+            current = self._state.spend_for(scope, scoped_provider_id)
+            if cap > 0:
+                usage_pct = float(current / cap * 100)
+                if usage_pct >= 80:
+                    try:
+                        bus = get_bus()
+                        bus.publish(
+                            QuotaWarning(
+                                dimension=scope.value,
+                                usage_pct=usage_pct,
+                                limit=float(cap),
+                                current=float(current),
+                            )
+                        )
+                    except Exception:
+                        log.warning(f"Failed to emit QuotaWarning for {scope.value}", exc_info=True)

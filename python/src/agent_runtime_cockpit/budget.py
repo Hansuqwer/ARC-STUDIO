@@ -10,9 +10,14 @@ enforcement at adapter effect boundaries.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
+from .events import get_bus
+from .events.types import QuotaWarning
 from .protocol.schemas import BudgetVector
+
+log = logging.getLogger(__name__)
 
 
 class BudgetExceededError(RuntimeError):
@@ -124,6 +129,31 @@ class BudgetEnforcer:
         self._tokens_used = 0
         self._cost_used = 0.0
         self._latency_ms_used = 0
+
+    def check_and_warn(self) -> None:
+        """Check budget usage and emit QuotaWarning if >80% of any dimension is used."""
+        if self._budget is None:
+            return
+        dims = [
+            ("tokens", self._tokens_used, self._budget.tokens),
+            ("cost_usd", self._cost_used, self._budget.cost_usd),
+            ("latency_ms", self._latency_ms_used, self._budget.latency_ms),
+        ]
+        for dim, used, limit in dims:
+            if limit is not None and limit > 0:
+                pct = (used / limit) * 100
+                if pct >= 80:
+                    try:
+                        get_bus().publish(
+                            QuotaWarning(
+                                dimension=dim,
+                                usage_pct=round(pct, 1),
+                                limit=float(limit),
+                                current=float(used),
+                            )
+                        )
+                    except Exception:
+                        log.warning("Failed to emit quota_warning for %s", dim)
 
     def to_usage_metadata(self) -> dict[str, Any]:
         """Export current usage as metadata dict for RunRecord.metadata."""

@@ -20,6 +20,9 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel
 
+from agent_runtime_cockpit.events import get_bus
+from agent_runtime_cockpit.events.types import AuditVerified
+
 from .key_manager import sign_audit_record, verify_audit_signature
 
 log = logging.getLogger(__name__)
@@ -326,12 +329,15 @@ class StreamingAuditVerifier:
         start_time = time.time()
 
         if not file_path.exists():
-            return VerificationResult(
-                ok=False,
-                mode="sha256",  # Default mode for error case
-                records_checked=0,
-                reason=f"Chain file not found: {file_path}",
-                duration_ms=int((time.time() - start_time) * 1000),
+            return self._emit_audit_verified(
+                VerificationResult(
+                    ok=False,
+                    mode="sha256",  # Default mode for error case
+                    records_checked=0,
+                    reason=f"Chain file not found: {file_path}",
+                    duration_ms=int((time.time() - start_time) * 1000),
+                ),
+                file_path,
             )
 
         # Read first non-empty line to detect format
@@ -346,24 +352,34 @@ class StreamingAuditVerifier:
                         # HMAC format has 'signature' field
                         if "signature" in record:
                             if key is None:
-                                return VerificationResult(
-                                    ok=False,
-                                    mode="hmac",
-                                    records_checked=0,
-                                    reason="HMAC format detected but no key provided",
-                                    duration_ms=int((time.time() - start_time) * 1000),
+                                return self._emit_audit_verified(
+                                    VerificationResult(
+                                        ok=False,
+                                        mode="hmac",
+                                        records_checked=0,
+                                        reason="HMAC format detected but no key provided",
+                                        duration_ms=int((time.time() - start_time) * 1000),
+                                    ),
+                                    file_path,
                                 )
-                            return self.verify_hmac(file_path, key)
+                            return self._emit_audit_verified(
+                                self.verify_hmac(file_path, key), file_path
+                            )
                         # SHA-256 format has 'chain_hash' field
                         elif "chain_hash" in record:
-                            return self.verify_sha256(file_path)
+                            return self._emit_audit_verified(
+                                self.verify_sha256(file_path), file_path
+                            )
                         else:
-                            return VerificationResult(
-                                ok=False,
-                                mode="sha256",
-                                records_checked=0,
-                                reason="Unknown audit format (no signature or chain_hash field)",
-                                duration_ms=int((time.time() - start_time) * 1000),
+                            return self._emit_audit_verified(
+                                VerificationResult(
+                                    ok=False,
+                                    mode="sha256",
+                                    records_checked=0,
+                                    reason="Unknown audit format (no signature or chain_hash field)",
+                                    duration_ms=int((time.time() - start_time) * 1000),
+                                ),
+                                file_path,
                             )
                     except json.JSONDecodeError:
                         return VerificationResult(
@@ -375,19 +391,48 @@ class StreamingAuditVerifier:
                         )
 
                 # Empty file
-                return VerificationResult(
-                    ok=True,
-                    mode="sha256",
-                    records_checked=0,
-                    reason="Empty chain",
-                    duration_ms=int((time.time() - start_time) * 1000),
+                return self._emit_audit_verified(
+                    VerificationResult(
+                        ok=True,
+                        mode="sha256",
+                        records_checked=0,
+                        reason="Empty chain",
+                        duration_ms=int((time.time() - start_time) * 1000),
+                    ),
+                    file_path,
                 )
 
         except Exception as e:
-            return VerificationResult(
-                ok=False,
-                mode="sha256",
-                records_checked=0,
-                reason=f"Format detection error: {e}",
-                duration_ms=int((time.time() - start_time) * 1000),
+            return self._emit_audit_verified(
+                VerificationResult(
+                    ok=False,
+                    mode="sha256",
+                    records_checked=0,
+                    reason=f"Format detection error: {e}",
+                    duration_ms=int((time.time() - start_time) * 1000),
+                ),
+                file_path,
             )
+
+    def _emit_audit_verified(
+        self, result: VerificationResult, file_path: Optional[Path] = None
+    ) -> VerificationResult:
+        """Emit audit_verified event and return the result unchanged."""
+        try:
+            bus = get_bus()
+            bus.publish(
+                AuditVerified(
+                    ok=result.ok,
+                    mode=result.mode,
+                    records_checked=result.records_checked,
+                    reason=result.reason,
+                    duration_ms=result.duration_ms,
+                    payload={
+                        "file_path": str(file_path) if file_path else None,
+                        "file_size_bytes": result.file_size_bytes,
+                    },
+                )
+            )
+        except Exception:
+            log.warning("Failed to emit audit_verified event", exc_info=True)
+        return result

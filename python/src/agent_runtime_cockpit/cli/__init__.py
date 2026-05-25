@@ -18,6 +18,7 @@ from . import (
     audit,  # noqa: F401
     battle,  # noqa: F401
     discover,  # noqa: F401
+    events,  # noqa: F401
     exec,  # noqa: F401
     info,  # noqa: F401
     mcp,  # noqa: F401

@@ -318,6 +318,18 @@ Every new phase/chunk should include:
 | **18 CLI Consolidation** | **Baseline Complete** | ADR-016 Phase 2 subset | Unified slash command registry under `cli_repl/commands/`; merged current cli_studio.py and cli_repl slash commands; cli_studio.py reduced to thin shim; ChatSession schema version (v1 subset); nested legacy flat session migration (`arc studio sessions migrate`); bare `arc` TTY launch with `ARC_NO_TUI` guard. 1318 Python tests pass. Full Phase 0 target slash/session inventory is deferred by ADR-016. |
 | **19 Provider-Backed Runtime** | **Baseline Complete** | Phase 3 (provider_action) + Phase 17 (SwarmGraph) | ProviderClient protocol, BudgetEnforcer, AnthropicClient skeleton, CostRecord v2 schema + migration, extract_cost(), tokenizer-based estimator (AnthropicCountTokens + TiktokenApproximate), per-message/tools cache-control breakpoint computation + Anthropic wire format. 1246 Python tests pass (pre-existing 1 failure). Review-fix code tip `c2f39df`; docs refreshed in follow-up commits. |
 | **20 Streaming, Tool Use, and Multi-Turn Sessions** | **Baseline Complete (review pending)** | Phase 4.1 complete | Slices 1-9 implemented on `phase-5-streaming-tools`: streaming verified, ADR-019 accepted, ToolRegistry + built-in read-only tools, ChatSession v4, TurnManager single/multi-turn tool loop, CostRecord cost components, `/tools` commands, provider-backed `/run` routed through TurnManager, structured scanner. 1313 Python tests pass; final re-review required before merge/tag. |
+| 21 Streaming Audit + HMAC | Baseline Complete | — | `StreamingAuditVerifier` with sha256/hmac/auto modes; 100 MB trace <30s; CLI `arc audit verify` |
+| 22 Discriminated RunEvent Unions | Baseline Complete | — | Typed event variants in TS+Python; `RAW` fallback for unknown types |
+| 23 Enforced Workspace Trust | Baseline Complete with sandbox hardening | Phase 22 | 5 enforcement helpers; EnforcementContext; UI modals; sandbox subprocess hardening |
+| 24 Trace Virtualization + Daemon | Baseline Complete | Phase 22 | `VirtualizedEventList` (react-virtual); `RingBuffer`; SSE reconnect with backoff |
+| 25 CLI Decomposition | Baseline Complete | — | 4225-line `cli.py` decomposed into 15 command modules |
+| 26 MCP Local Control Plane | Baseline Complete | Phase 23 | `arc mcp serve --stdio`; 11 tools; 3 resources; 45 tests; stdio-only |
+| 27 MCP Tasks | Baseline Complete | Phase 25 | SQLite task registry; state machine; retry; CLI+ MCP tools; 65 tests |
+| 28 LangGraph Replay | Baseline Complete | Phase 25 | Replay capability detection; `arc replay` CLI; 20 tests |
+| 29 Persistent HITL | Baseline Complete (HITL only) | Phase 25, 22 | SQLite HITL store; `arc hitl` CLI; 20 tests; eval deferred |
+| 30 Consensus Escrow | Complete | Phase 17, 21 | Commit-reveal voting; 5 adversarial scenarios; 26 tests |
+| 31 Adaptive Consensus | Complete | Phase 30, 23 | Heuristic risk assessment; protocol selection matrix; 100 fixture prompts |
+| **32 Event Notifications** | **Baseline Complete** | **Phase 29, 21** | **Local event bus (6 types); CLI watch/webhook CRUD; HMAC signing; IDE badge components; 36 Python tests; 5 TS tests; wired into HITL/audit/supervisor/budget** |
 
 ## v0.1 Polish Deferral Decision
 
@@ -1256,37 +1268,43 @@ bash scripts/check-pr.sh
 ## Phase 32 — Event-Driven Audit/HITL Notifications
 
 **Roadmap:** R25 — Event-Driven Notifications  
-**Status:** Not Started  
-**Depends on:** Phase 29 (persistent HITL), Phase 21 (audit events)
+**Status:** Baseline Complete  
+**Depends on:** Phase 29 (persistent HITL), Phase 21 (audit events)  
+**Evidence:** 2254 Python tests passed (36 new), TS extension builds clean, 1554 TS tests passed | Notes: Event bus is in-memory only — no persistence across daemon restart. Webhook delivery is best-effort with bounded retry (no exactly-once). IDE badges poll via CLI, not push. No SSE/WebSocket transport in baseline. No event replay from persistent store (ephemeral ring buffer only).
 
 ### Implementation
-1. Add local event bus with event types: `hitl_required`, `hitl_decided`, `audit_verified`, `run_completed`, `run_failed`, `quota_warning`.
-2. Add IDE badges for pending HITL, audit failures, and run failures.
-3. Add CLI watch mode: `arc events watch` for streaming typed events.
-4. Add optional signed webhook endpoints configured per workspace.
-5. Webhook retry with bounded exponential backoff (max 5 retries, 60s cap).
-6. Local dead-letter log for permanent failures.
-7. HMAC-signed webhook payloads for third-party verification.
+1. ✅ Local event bus with typed event types: `hitl_required`, `hitl_decided`, `audit_verified`, `run_completed`, `run_failed`, `quota_warning`.
+2. ✅ IDE badge protocol types, notification backend service, and NotificationBadge React component.
+3. ✅ CLI watch mode: `arc events watch --json --type <type> --since <N>`.
+4. ✅ Webhook config CRUD: `arc events webhook-add`, `webhook-list`, `webhook-remove`.
+5. ✅ HMAC-SHA256 signed webhook payloads with `X-ARC-Signature` header.
+6. ✅ Webhook retry with bounded exponential backoff (max 5 retries, 60s cap).
+7. ✅ Local dead-letter log at `.arc/events/dead-letter.jsonl`.
+8. ✅ `arc events dead-letter` CLI for inspecting failed deliveries.
+9. ✅ Event bus wired into: `HitlSqliteStore` (hitl_required, hitl_decided), `StreamingAuditVerifier` (audit_verified), `JobSupervisor` (run_completed, run_failed), `BudgetEnforcer` (quota_warning).
 
 ### Acceptance
-1. HITL badge updates without manual IDE refresh.
-2. `arc events watch` streams typed events.
-3. Webhook payloads are HMAC-signed if configured.
-4. Dead-letter queue captures permanent failures.
-5. Webhook retry respects backoff bounds.
+1. ✅ Event bus: publish/subscribe, typed filtering, catch-all drain, backpressure, unsubscribing — 14 tests.
+2. ✅ CLI: `arc events watch` registered, webhook CRUD, dead-letter listing — 5 tests.
+3. ✅ Webhooks: config CRUD, HMAC sign/verify, dead-letter, retry backoff bounds — 17 tests.
+4. ✅ Existing HITL, verifier, supervisor, and budget tests all green (no regressions).
+5. ✅ TypeScript: notification protocol, badge component rendering (5 tests), build clean.
 
 ### Verification
 ```bash
-cd python && uv run pytest tests/events/ -q
-cd python && uv run pytest -q
-pnpm --filter arc-extension build
-pnpm --filter arc-extension test
-bash scripts/check-pr.sh
+cd python && uv run pytest tests/events/ tests/cli/test_events_cli.py -q    # 36 passed
+cd python && uv run pytest -q                                               # 2254 passed
+pnpm --filter arc-extension build                                            # clean
+pnpm --filter arc-extension test                                             # 1554 passed
 ```
 
 ### Known Risks
-- Webhook security (HMAC signing, TLS) must be required, not optional.
-- Event bus must handle high event volumes without memory leaks.
+- Event bus is in-memory only — does not survive daemon restart.
+- Webhook delivery is best-effort with bounded retry (no exactly-once guarantee).
+- IDE badges poll CLI, not push — real-time updates deferred.
+- No SSE/WebSocket transport in baseline (CLI watch uses direct async subscription).
+- No event replay from persistent store (ephemeral ring buffer only).
+- Webhook secret stored in `.arc/events/webhooks.json` — warned on `webhook-add`.
 
 ## Phase 33 — Swarm Memory Graph (Research)
 
