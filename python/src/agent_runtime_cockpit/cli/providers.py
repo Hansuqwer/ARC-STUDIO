@@ -143,6 +143,42 @@ def providers_status(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) ->
     _out(ok([status.model_dump() for status in provider_statuses(os.environ)]), json_output)
 
 
+@providers_app.command("agentrouter-proxy")
+def providers_agentrouter_proxy(
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Run a local OpenAI-compatible proxy for AgentRouter."""
+    _setup_logging(debug)
+    from ..providers.agentrouter_proxy import (
+        AgentRouterProxyConfig,
+        AgentRouterProxyConfigError,
+        run_agentrouter_proxy,
+    )
+
+    try:
+        config = AgentRouterProxyConfig.from_env()
+    except AgentRouterProxyConfigError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(2) from exc
+    if json_output:
+        _out(
+            ok(
+                {
+                    "provider": "agentrouter",
+                    "proxy": "local",
+                    "bind": f"{config.host}:{config.port}",
+                    "base_url": "http://127.0.0.1:%d/v1" % config.port,
+                    "upstream_base_url": config.base_url,
+                }
+            ),
+            json_output,
+        )
+        return
+    typer.echo(f"Starting AgentRouter proxy on http://{config.host}:{config.port}/v1")
+    run_agentrouter_proxy(config)
+
+
 @providers_app.command("setup")
 def providers_setup(
     provider_id: Optional[str] = typer.Argument(

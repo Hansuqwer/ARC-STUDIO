@@ -6,6 +6,63 @@
         "region": "us-east-1",
         "profile": "default"
       }
+    },
+    "agentrouter-local": {
+      "name": "AgentRouter Local Proxy",
+      "options": {
+        "baseURL": "http://127.0.0.1:8787/v1",
+        "apiKey": "opencode-local-proxy"
+      },
+      "models": {
+        "deepseek-v4-flash": {
+          "id": "deepseek-v4-flash",
+          "name": "AgentRouter DeepSeek V4 Flash",
+          "family": "openai-compatible",
+          "tool_call": true,
+          "reasoning": true,
+          "temperature": true,
+          "limit": {
+            "context": 128000,
+            "output": 8192
+          }
+        },
+        "claude-sonnet-4.6": {
+          "id": "claude-sonnet-4.6",
+          "name": "AgentRouter Claude Sonnet 4.6",
+          "family": "anthropic",
+          "tool_call": true,
+          "reasoning": true,
+          "temperature": true,
+          "limit": {
+            "context": 200000,
+            "output": 8192
+          }
+        },
+        "claude-opus-4.6": {
+          "id": "claude-opus-4.6",
+          "name": "AgentRouter Claude Opus 4.6",
+          "family": "anthropic",
+          "tool_call": true,
+          "reasoning": true,
+          "temperature": true,
+          "limit": {
+            "context": 200000,
+            "output": 8192
+          }
+        },
+        "gpt-5.5-xhigh": {
+          "id": "gpt-5.5-xhigh",
+          "name": "AgentRouter GPT-5.5 xHigh",
+          "family": "openai",
+          "tool_call": true,
+          "reasoning": true,
+          "temperature": true,
+          "limit": {
+            "context": 400000,
+            "output": 32768
+          }
+        }
+      }
     }
   }
 }
