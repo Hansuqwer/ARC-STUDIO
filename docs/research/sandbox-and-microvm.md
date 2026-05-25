@@ -58,11 +58,11 @@ Real now:
 - `arc sandbox run --ask` can interactively approve only `network`, `install`, and `unknown`; non-interactive defaults still deny
 - Firecracker preflight reports binary choice, `jailer`, `/dev/kvm` rw, arch support, and cached kernel/rootfs readiness
 - macOS Lima preflight reports macOS version plus bounded `limactl --version` / `limactl list --json` probes; it does not create VMs
-- sandbox audit still writes SHA256 chain/raw events and now best-effort mirrors to the existing HMAC audit store when an audit key exists
-- HMAC audit append creates parents, locks where portable, writes canonical JSON, flushes and fsyncs, and verification reports partial trailing lines
+- sandbox audit still writes SHA256 chain/raw events and now best-effort mirrors to the keyed audit store when an audit key exists
+- keyed audit append creates parents, locks where portable, writes canonical JSON, flushes and fsyncs, and verification reports partial trailing lines
 - supervisor executor callbacks now have a central timeout wrapper that emits terminal `RUN_FAILED`, autopsy, receipt, and clears active state
 - path-intent extraction covers more common output/input switches (`--output`, `--outfile`, `--dest`, `--files-from`, `of=`), plus simple `cp`/`mv` destination and archive-output suffixes
-- opt-in microVM integration skeleton is gated by `ARC_MICROVM_INTEGRATION=1`; default CI skips it
+- opt-in microVM integration skeleton exists as private code only; public `MicroVMIsolationProvider.execute()` remains disabled until proof exists
 
 Design-only now:
 - container provider as production fallback
@@ -212,6 +212,12 @@ ARC_MICROVM_EXPERIMENTAL=1 arc sandbox lima-template --json
 ```
 
 This renders a template only. It does not create, start, or execute inside a VM.
+
+Public provider guard:
+
+- `MicroVMIsolationProvider.execute()` raises `NotImplementedError` even when `ARC_MICROVM_INTEGRATION=1` is set.
+- `MicroVMIsolationProvider.describe()` reports `gated_unproven` when the gate and `limactl` are present, never `implemented`.
+- Real execution requires a later integration-proof PR covering lifecycle, mount policy, network-off proof, teardown, and opt-in tests.
 
 Network-off proof required before execution can be called real:
 

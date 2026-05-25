@@ -1,7 +1,8 @@
-"""MicroVM provider preflight/doctor support and Lima disposable VM execution.
+"""MicroVM provider preflight/doctor support.
 
-Execution is macOS-only (Lima/VZ) and gated by ``ARC_MICROVM_INTEGRATION=1``.
-On Linux, ``execute()`` still raises ``NotImplementedError`` (Firecracker pending).
+Lima/Firecracker execution remains unproven and is intentionally unreachable from
+the public provider until lifecycle, mount, network-off, teardown, and opt-in
+integration proof are complete.
 """
 
 from __future__ import annotations
@@ -197,21 +198,17 @@ class MicroVMIsolationProvider(IsolationProvider):
         env: Optional[dict[str, str]] = None,
         timeout_seconds: int = 300,
     ) -> IsolationResult:
-        system = platform.system()
-        if system == "Darwin" and _microvm_execution_enabled() and _lima_available():
-            return _execute_lima(command, cwd=cwd, timeout_seconds=timeout_seconds)
-        if system == "Linux":
-            raise NotImplementedError(
-                "Linux microVM (Firecracker/Cloud Hypervisor) execution is not implemented; "
-                "use doctor/preflight only"
-            )
         raise NotImplementedError(
-            "microVM execution is not implemented on this platform; "
-            f"use doctor/preflight only (platform={system})"
+            "microVM execution is not implemented/proven; use doctor/preflight only "
+            f"(platform={platform.system()})"
         )
 
     def describe(self) -> dict[str, object]:
         info = microvm_preflight()
         if _microvm_execution_enabled() and _lima_available():
-            info["execution"] = "implemented"
+            info["execution"] = "gated_unproven"
+            info["reason"] = (
+                "ARC_MICROVM_INTEGRATION=1 is set and limactl is present, but public "
+                "microVM execution remains disabled until integration proof passes"
+            )
         return info

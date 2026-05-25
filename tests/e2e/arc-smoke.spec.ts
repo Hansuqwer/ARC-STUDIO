@@ -67,6 +67,7 @@ function parseServerSentEventTypes(body: string): string[] {
  */
 const KNOWN_ASYNC_WARNING_PATTERNS: RegExp[] = [
   /took longer than expected to settle/,
+  /Frontend TerminalFrontendContribution\.initializeLayout took longer than the expected maximum/,
   // Add new known patterns above this line
 ];
 

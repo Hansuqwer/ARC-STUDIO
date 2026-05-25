@@ -378,6 +378,33 @@ def test_windows_explicitly_unsupported():
     assert "unsupported" in data["reason"].lower()
 
 
+def test_microvm_provider_run_denied_even_with_integration_gate(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+    monkeypatch.setattr(
+        shutil, "which", lambda name: "/usr/bin/limactl" if name == "limactl" else None
+    )
+    monkeypatch.setattr(platform, "system", lambda: "Darwin")
+    result = CliRunner().invoke(
+        app, ["sandbox", "run", "--json", "--provider", "microvm", "--", "pwd"]
+    )
+    assert result.exit_code == 2
+    assert _payload(result)["ok"] is False
+    assert "not implemented/proven" in _payload(result)["error"]["message"]
+
+
+def test_microvm_doctor_never_claims_execution_implemented(monkeypatch):
+    from agent_runtime_cockpit.isolation.microvm import MicroVMIsolationProvider
+
+    monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+    monkeypatch.setattr(
+        shutil, "which", lambda name: "/usr/bin/limactl" if name == "limactl" else None
+    )
+    data = MicroVMIsolationProvider().describe()
+    assert data["execution"] == "gated_unproven"
+    assert data["execution"] != "implemented"
+
+
 def test_custom_sandbox_policy_loaded_from_config(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     policy_file = tmp_path / "sandbox-policies.json"
