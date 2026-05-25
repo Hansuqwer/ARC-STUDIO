@@ -13,7 +13,12 @@ from ..base import CapabilityReport, DoctorAction, RuntimeAdapter
 from .capabilities import get_smolagents_capabilities
 from .detect import SmolagentsDetectionResult, detect_smolagents
 from .export import export_smolagents_workflows
-from .runner import SmolagentsEventHandler, is_runner_enabled, run_smolagents_agent
+from .runner import (
+    SmolagentsEventHandler,
+    is_live_provider_enabled,
+    is_runner_enabled,
+    run_smolagents_agent,
+)
 
 __all__ = [
     "SmolagentsAdapter",
@@ -74,7 +79,9 @@ class SmolagentsAdapter(RuntimeAdapter):
             availability="detected_not_runnable",
             reason=(
                 "Smolagents detected. T1/T2 static analysis available. T3 runner is "
-                "gated by ARC_SMOLAGENTS_RUNNER_ENABLED=1 because CodeAgent can execute code."
+                "gated by ARC_SMOLAGENTS_RUNNER_ENABLED=1 and "
+                "ARC_ALLOW_LIVE_PROVIDER_TESTS=true. CodeAgent also requires explicit "
+                "sandbox configuration and risk confirmation because it can execute generated code."
             ),
             detected_artifacts=result.evidence,
             version=result.version,
@@ -82,6 +89,6 @@ class SmolagentsAdapter(RuntimeAdapter):
             test_level="unknown",
             fake_offline_supported=False,
             local_real_gated=True,
-            local_real_available=False,
+            local_real_available=is_runner_enabled() and is_live_provider_enabled(),
             provider_backed=False,
         )

@@ -68,7 +68,8 @@ def test_capability_report_detected_mentions_gate(tmp_path):
     assert report.detected is True
     assert report.can_run is False
     assert report.local_real_gated is True
-    assert "CodeAgent can execute code" in (report.reason or "")
+    assert "ARC_ALLOW_LIVE_PROVIDER_TESTS=true" in (report.reason or "")
+    assert "CodeAgent" in (report.reason or "")
 
 
 def test_run_workflow_not_implemented():
