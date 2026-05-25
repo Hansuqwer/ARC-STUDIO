@@ -1846,6 +1846,89 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 
 ---
 
+## Phase 37 — CLI Sandbox Hardening + IDE Integration
+
+**Roadmap:** R38 — CLI Sandbox Hardening + IDE Integration  
+**Status:** Active Hardening | Evidence: commits 00057f9 (subprocess caps), 2f47102 (approval prune) | 2152 Python tests passed; e2e smoke passed 8/7 skipped | Notes: Subprocess bounded streaming caps and approval prune CLI active. Remaining slices pending.  
+**Depends on:** Phase 23 (trust enforcement)
+
+### Progress
+
+#### Slice 37.1: Bounded Subprocess Output Caps ✓
+**Commit:** 00057f9  
+**Completed:** 2026-05-25
+
+- Replaced subprocess `communicate()` output buffering with bounded stdout/stderr stream readers.
+- Preserved no-shell argv execution, workspace cwd guard, env allowlist/secret stripping, timeout, and process-group kill.
+- Preserved stable `IsolationResult` JSON semantics including truncation flags and timeout kill reason.
+- Added tests for exact cap lengths and large-output truncation without pipe deadlock.
+- Verified: 2150 Python tests passed; e2e smoke passed 8 passed / 7 skipped; TypeScript build/typecheck green.
+
+#### Slice 37.2: Approval Prune/Expiry Cleanup ✓
+**Commit:** 2f47102  
+**Completed:** 2026-05-25
+
+- Added `prune_expired_approvals()` to remove stale entries from approval store.
+- Added `arc policy prune` CLI command.
+- Added tests for prune removes expired and prune keeps non-expired.
+- Legacy plaintext token backward compatibility preserved (read-only); new entries always hashed.
+- Verified: 2152 Python tests passed; e2e smoke passed 8 passed / 7 skipped; TypeScript build/typecheck green.
+
+#### Slice 37.3: Path-Intent Expansion (Pending)
+- Expand classifier to cover: cp, mv, install, touch, mkdir, ln, tar -C, zip, unzip -d
+- Language runtimes beyond Python literal paths
+- More tool/option coverage for read/write flag detection
+
+#### Slice 37.4: Protocol Parity Expansion (Pending)
+- Move from regex source parsing to generated fixtures/schema if desired
+- TS typed run-event set vs Python registry alignment
+
+#### Slice 37.5: MicroVM Preflight Docs/Tests (Pending)
+- Keep doctor/preflight only unless real VM execution is implemented + opt-in tested
+- Document exact blockers for macOS/Linux microVM execution
+
+#### Slice 37.6: MicroVM Execution (Blocked)
+- Blocked until: rootfs/kernel/Lima template lifecycle, workspace mount policy, network-off proof, teardown, integration gates
+- No fake run success; no production-ready microVM claim
+
+#### Slice 37.7: Container Fallback Tests (Pending)
+- Gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`
+- No production fallback claim
+
+#### Slice 37.8: E2E Routability Follow-Up (Pending)
+- Current e2e skips deep-link shells when Theia app mode does not mount them
+- Product fix would make routed views consistently open instead of skip
+
+#### Slice 37.9: Theia Async Warning/Root Cause (Accepted)
+- Existing Theia async dependency warnings accepted, not fixed
+
+### CLI/IDE Integration Points
+
+- `arc sandbox run --json` — real subprocess execution under sandbox policy; Theia widget can invoke for safe command execution
+- `arc sandbox doctor --json` — preflight-only for microVM providers; Theia can display provider status
+- `arc policy explain --json` — command classification preview without execution; Theia can show decision before running
+- `arc policy prune --json` — remove expired approvals; Theia can expose as maintenance action
+
+### Truth Constraints
+- Real: subprocess bounded streaming caps, approval prune CLI
+- Still true: microVM execution does not exist
+- Still true: Lima/Firecracker preflight only
+- Still true: container fallback gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`
+- No production-ready sandbox claim
+- No microVM execution claim
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/ -q
+pnpm build
+pnpm typecheck
+pnpm --filter @arc-studio/e2e-tests test
+bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
+```
+
+---
+
 ## Post-v0.1 Phase Table
 
 ### Phase ↔ Roadmap ID
@@ -1868,6 +1951,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 | **34** | **R26A** | **ARC Battle Mode (SwarmGraph Arena CLI/IDE)** |
 | **36.1** | **R37** | **Provider Discovery & Interactive UX (Phase 1)** |
 | **36.2** | **R37** | **Credential Storage & OAuth (Phase 2)** |
+| **37** | **R38** | **CLI Sandbox Hardening + IDE Integration** |
 
 ### Dependencies
 
@@ -1889,6 +1973,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 | 34 ARC Battle Mode | Not Started | Phase 17, Phase 23, Phase 25, Phase 29, Phase 30, Phase 31 | P2/P3 — ARC-native offline battle CLI/IDE, not live LM Arena productization |
 | 36.1 Provider Discovery | Baseline Complete | None | Standalone — interactive provider UX without credential storage; no blockers |
 | 36.2 Credential Storage | Blocked | Phase 23, Phase 25, Phase 36.1 | Standalone — secure credential storage and OAuth; requires trust infrastructure |
+| 37 CLI Sandbox Hardening | Active Hardening | Phase 23 | Subprocess bounded streaming caps + approval prune active; path-intent expansion, protocol parity, microVM preflight, container fallback pending |
 
 ### Critical Path
 
@@ -1906,11 +1991,14 @@ Phase 17 (SwarmGraph) ──→ Phase 30 (Escrow) ──→ Phase 31 (Adaptive C
 Phase 33 (Memory Graph) ──→ (research, may pivot)
          │
 Phase 36.1 (Provider Discovery) ──→ (no dependencies, can start immediately)
+
+Phase 37 (CLI Sandbox Hardening) ──→ (active; depends on Phase 23)
 ```
 
 **Execution order:** 
-- **Immediate (no blockers):** Phase 36.1 (Provider Discovery)
+- **Immediate (no blockers):** Phase 36.1 (Provider Discovery), Phase 37 (CLI Sandbox Hardening — active)
 - **Foundations (Complete):** Phase 21-22 (parallel, complete) → Phase 23-24 (parallel, complete) → Phase 25 (complete)
+- **Sandbox:** Phase 37 (active — subprocess caps + approval prune done; path-intent, protocol parity, microVM preflight, container fallback pending)
 - **MCP:** Phase 26 (complete — scaffold) → Phase 27 (depends on Phase 25)
 - **Replay/HITL:** Phase 28 (depends on Phase 25) → Phase 29 (depends on Phase 25 + Phase 22)
 - **SwarmGraph differentiators:** Phase 30 (depends on Phase 17 + Phase 21) → Phase 31 (depends on Phase 30 + Phase 23)
