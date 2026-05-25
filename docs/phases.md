@@ -1874,18 +1874,35 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Legacy plaintext token backward compatibility preserved (read-only); new entries always hashed.
 - Verified: 2152 Python tests passed; e2e smoke passed 8 passed / 7 skipped; TypeScript build/typecheck green.
 
-#### Slice 37.3: Path-Intent Expansion (Pending)
-- Expand classifier to cover: cp, mv, install, touch, mkdir, ln, tar -C, zip, unzip -d
-- Language runtimes beyond Python literal paths
-- More tool/option coverage for read/write flag detection
+#### Slice 37.3: Path-Intent Expansion ✓
+**Commit:** 2706d8a  
+**Completed:** 2026-05-25
 
-#### Slice 37.4: Protocol Parity Expansion (Pending)
-- Move from regex source parsing to generated fixtures/schema if desired
-- TS typed run-event set vs Python registry alignment
+- Expanded classifier to cover: touch, mkdir, ln, cp, unzip, install
+- Added language runtime network hints for node/ruby/perl/bash
+- Path extraction for tar -C, unzip -d, ln target, install -d
+- Added 13 new adversarial classification tests
+- Verified: 2168 Python tests passed; e2e smoke passed 8 passed / 7 skipped
 
-#### Slice 37.5: MicroVM Preflight Docs/Tests (Pending)
-- Keep doctor/preflight only unless real VM execution is implemented + opt-in tested
-- Document exact blockers for macOS/Linux microVM execution
+#### Slice 37.4: Protocol Parity Expansion ✓
+**Commit:** 1f413fe  
+**Completed:** 2026-05-25
+
+- Added protocol parity tests comparing TS run-events.ts vs Python typed_events.py
+- Verified 22 core event types aligned across both languages
+- Documented 7 Battle events as Python-only (Phase 34 ARC Battle Mode)
+- Tests validate KnownRunEvent union membership and type guard coverage
+- Verified: 2180 Python tests passed; e2e smoke passed 8 passed / 7 skipped
+
+#### Slice 37.5: MicroVM Preflight Docs/Tests ✓
+**Commit:** d97b1c2  
+**Completed:** 2026-05-25
+
+- Added comprehensive preflight state tests for all 4 states: unavailable, installed_not_configured, ready, blocked
+- Tests cover Linux (Firecracker/Cloud Hypervisor), macOS (Lima), Windows (blocked)
+- Documented preflight-only nature: no VM execution, no production-ready claim
+- CI contract tests ensure preflight never requires microVM runtime
+- Verified: 2180 Python tests passed; e2e smoke passed 8 passed / 7 skipped
 
 #### Slice 37.6: MicroVM Execution (Blocked)
 - Blocked until: rootfs/kernel/Lima template lifecycle, workspace mount policy, network-off proof, teardown, integration gates

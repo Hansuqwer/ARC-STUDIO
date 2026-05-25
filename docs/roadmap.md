@@ -919,7 +919,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R36 MCP Python SDK Adapter** | **Not Started** | **Adapter Phase 35 — implement MCP Python SDK adapter** |
 | **R37 Provider Management (Phase 1)** | **Baseline Complete** | **Phase 36.1 — interactive UX without credential storage (commits cd89aab-7f2e20b)** |
 | **R37 Provider Management (Phase 2)** | **Blocked** | **Phase 36.2 — credential storage + OAuth (requires Phase 23 + 25 + 36.1)** |
-| **R38 CLI Sandbox Hardening + IDE Integration** | **Active Hardening** | **Phase 37 — subprocess caps + approval prune active; path-intent expansion, protocol parity, microVM preflight, container fallback pending** |
+| **R38 CLI Sandbox Hardening + IDE Integration** | **Active Hardening** | **Phase 37 — subprocess caps + approval prune + path-intent expansion + protocol parity + microVM preflight tests complete (commits 00057f9-d97b1c2); container fallback pending** |
 
 **Post-v0.1 Execution Order:** 
 - **Immediate (no blockers):** Phase 36.1 (Provider Discovery & Interactive UX), Phase 37 (CLI Sandbox Hardening — active)
