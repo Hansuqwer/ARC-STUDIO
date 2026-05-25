@@ -215,11 +215,27 @@ def test_export_workflow_nodes_and_edges(tmp_path):
 
     assert server_nodes[0].type == NodeType.AGENT
     assert tool_nodes[0].type == NodeType.TOOL
-    # resources and prompts mapped to TOOL type (NodeType.RESOURCE not in schema)
-    assert resource_nodes[0].type == NodeType.TOOL
+    assert resource_nodes[0].type == NodeType.RESOURCE
     assert resource_nodes[0].metadata.get("node_kind") == "resource"
-    assert prompt_nodes[0].type == NodeType.TOOL
+    assert prompt_nodes[0].type == NodeType.PROMPT
     assert prompt_nodes[0].metadata.get("node_kind") == "prompt"
+
+
+def test_export_ignores_non_mcp_decorator_when_server_var_known(tmp_path):
+    """Avoid matching app.tool() when app is not the known MCP server instance."""
+    (tmp_path / "server.py").write_text(
+        "from mcp.server.fastmcp import FastMCP\n"
+        "mcp = FastMCP('Demo')\n"
+        "app = object()\n\n"
+        "@app.tool()\n"
+        "def flask_like_tool() -> str: ...\n\n"
+        "@mcp.tool()\n"
+        "def real_tool() -> str: ...\n"
+    )
+    workflows = export_mcp_sdk_workflows(tmp_path)
+    assert len(workflows) == 1
+    tool_nodes = [n for n in workflows[0].nodes if n.id.startswith("tool_")]
+    assert [n.label for n in tool_nodes] == ["real_tool"]
 
 
 def test_export_edge_labels(tmp_path):

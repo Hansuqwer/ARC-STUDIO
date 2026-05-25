@@ -480,6 +480,8 @@ export class ArcWorkflowGraphWidget extends ReactWidget {
             case 'worker':
             case 'agent': return { bg: '#1a2d47', border: '#4fc3f7', text: '#fff' };
             case 'tool': return { bg: '#3d2b1a', border: '#ffb74d', text: '#fff' };
+            case 'resource': return { bg: '#1a3d32', border: '#66bb6a', text: '#fff' };
+            case 'prompt': return { bg: '#2d1a47', border: '#ba68c8', text: '#fff' };
             case 'decision':
             case 'router': return { bg: '#2d2d00', border: '#fff176', text: '#fff' };
             case 'hitl': return { bg: '#1a2d3d', border: '#4dd0e1', text: '#fff' };

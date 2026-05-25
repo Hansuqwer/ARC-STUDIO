@@ -44,6 +44,8 @@ class WorkspaceInfo(BaseModel):
 class NodeType(str, Enum):
     AGENT = "agent"
     TOOL = "tool"
+    RESOURCE = "resource"
+    PROMPT = "prompt"
     ROUTER = "router"
     START = "start"
     END = "end"

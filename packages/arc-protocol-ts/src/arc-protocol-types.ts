@@ -86,7 +86,7 @@ export interface SourceLocation {
 export interface WorkflowNode {
   id: string;
   label: string;
-  type: 'agent' | 'tool' | 'router' | 'start' | 'end' | 'unknown';
+  type: 'agent' | 'tool' | 'resource' | 'prompt' | 'router' | 'start' | 'end' | 'unknown';
   source_location?: SourceLocation;
   metadata: Record<string, unknown>;
 }

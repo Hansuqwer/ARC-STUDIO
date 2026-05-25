@@ -860,17 +860,17 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Goal:** Integrate MCP Python SDK with ARC runtime.
 
-**Current:** Baseline Complete. T1 detection (import probe + workspace scanner for FastMCP, @tool/@resource/@prompt decorators, low-level Server, ClientSession, transport helpers) and T2 static AST export (WorkflowInfo with server/tool/resource/prompt nodes and labeled edges) implemented. T3 execution intentionally deferred: MCP servers require live transport (stdio/HTTP/SSE) and client-session lifecycle management, and have the most subtle trust posture of all adapters (tools/resources may perform privileged operations without user-explicit consent per Phase 23 enforcement).
+**Current:** Baseline Complete. T1 detection (import probe + workspace scanner for FastMCP, @tool/@resource/@prompt decorators, low-level Server, ClientSession, transport helpers) and T2 static AST export (WorkflowInfo with server/tool/resource/prompt nodes and labeled edges) implemented. Resource and prompt nodes now use first-class `NodeType.RESOURCE` / `NodeType.PROMPT`, mirrored in the TypeScript protocol type. Decorator matching now only accepts decorators from known MCP server variables when an explicit `FastMCP(...)`/`Server(...)` assignment exists, reducing false positives while preserving implicit-server fallback. T3 execution intentionally deferred: MCP servers require live transport (stdio/HTTP/SSE) and client-session lifecycle management, and have the most subtle trust posture of all adapters (tools/resources may perform privileged operations without user-explicit consent per Phase 23 enforcement).
 
 **Deliverables:**
 - `adapters/mcp_sdk/` package: detect.py, capabilities.py, export.py, __init__.py
 - MCPSDKAdapter registered in default_registry()
-- 57 tests in tests/adapters/mcp_sdk/ (test_adapter.py, test_detection.py, test_export.py)
+- 58 tests in tests/adapters/mcp_sdk/ (test_adapter.py, test_detection.py, test_export.py)
 - Detects: FastMCP(...), @mcp.tool(), @mcp.resource(...), @mcp.prompt(), low-level Server, ClientSession, StdioServerParameters, stdio_client/sse_client
 - Exports: one WorkflowInfo per FastMCP/Server definition per file; implicit server for files with tools but no explicit server
 - capability_report() returns detected_not_runnable with explicit T3-not-implemented + trust reasoning
 
-**Status:** Baseline Complete | Evidence: local verification — 2616 Python tests passed, ruff clean; T3 deferred | Notes: T1 + T2 only. No live MCP transport, no server execution, no paid calls. Trust posture documented.
+**Status:** Baseline Complete | Evidence: local verification — 2631 Python tests passed, ruff clean, pnpm build/typecheck green | Notes: T1 + T2 only. No live MCP transport, no server execution, no paid calls. Trust posture documented.
 
 **Source:** Adapter Roadmap Phase 35
 

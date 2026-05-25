@@ -270,7 +270,7 @@ def _server_to_workflow(
     for idx, resource in enumerate(resources, start=1):
         resource_node = WorkflowNode(
             id=f"resource_{idx}",
-            type=NodeType.TOOL,  # NodeType.RESOURCE not in current schema; use TOOL
+            type=NodeType.RESOURCE,
             label=resource["name"],
             metadata={
                 "uri": resource.get("uri"),
@@ -292,7 +292,7 @@ def _server_to_workflow(
     for idx, prompt in enumerate(prompts, start=1):
         prompt_node = WorkflowNode(
             id=f"prompt_{idx}",
-            type=NodeType.TOOL,  # NodeType.PROMPT not in current schema; use TOOL
+            type=NodeType.PROMPT,
             label=prompt["name"],
             metadata={
                 "title": prompt.get("title"),
@@ -407,15 +407,10 @@ def _is_mcp_decorator(dec_str: str, method: str, server_var_names: set[str]) -> 
     # Direct match: mcp.tool, server.tool, app.tool, etc.
     if dec_str.endswith(f".{method}"):
         prefix = dec_str[: -(len(method) + 1)]
-        # Any name that is a known server variable, or any short variable name
-        # that could plausibly be an MCP server instance
-        if server_var_names and prefix in server_var_names:
-            return True
+        if server_var_names:
+            return prefix in server_var_names
         # Heuristic: if no server vars found yet (module-level scan), accept
         # any single-identifier prefix that isn't an obvious non-server name
-        if not server_var_names:
-            return _looks_like_mcp_var(prefix)
-        # Even with known vars, accept common MCP variable names
         return _looks_like_mcp_var(prefix)
     return False
 

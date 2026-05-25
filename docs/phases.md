@@ -2150,7 +2150,7 @@ pnpm typecheck
 ## Phase 39 — MCP Python SDK Adapter
 
 **Roadmap:** R36 — MCP Python SDK Adapter (Adapter Phase 35)
-**Status:** Baseline Complete | Evidence: local verification — 2616 Python tests passed, ruff clean | Notes: T3 deferred (trust posture + transport lifecycle).
+**Status:** Baseline Complete | Evidence: local verification — 2631 Python tests passed, ruff clean, pnpm build/typecheck green | Notes: T3 deferred (trust posture + transport lifecycle).
 **Depends on:** None
 
 ### Acceptance
@@ -2160,7 +2160,9 @@ pnpm typecheck
 4. T2 AST export produces `WorkflowInfo` with server/tool/resource/prompt nodes and labeled edges ✓
 5. `capability_report` reports `detected_not_runnable` with explicit T3-not-implemented + trust reason ✓
 6. `run_workflow()` raises `NotImplementedError` ✓
-7. 57 tests in `tests/adapters/mcp_sdk/` all pass ✓
+7. 58 tests in `tests/adapters/mcp_sdk/` all pass ✓
+8. Resource/prompt workflow nodes use first-class `NodeType.RESOURCE` / `NodeType.PROMPT` mirrored in TypeScript ✓
+9. Known-server decorator matching ignores non-MCP `app.tool()` when the file has an explicit MCP server variable ✓
 
 ### Verification
 ```bash
@@ -2178,8 +2180,7 @@ pnpm typecheck
 - No fake detection: adapter returns `(False, 0.0, [])` for empty workspaces without mcp imports
 
 ### Known Risks
-- `@mcp.tool()` heuristic matches any `<var>.tool()` decorator where var looks like an MCP instance; low false-positive risk in practice since we require mcp import markers first
-- Implicit-server export (tools without explicit FastMCP) may generate one workflow per file fragment; acceptable for T2 static analysis
+- Implicit-server export (tools without explicit FastMCP) still uses a conservative variable-name heuristic; acceptable for T2 static analysis because no known MCP server variable exists in that file
 - Low-level `Server(...)` detection may match non-MCP `Server` names if mcp import is present; acceptable given import requirement
 
 ---
@@ -2232,7 +2233,7 @@ pnpm typecheck
 | 36.2 Credential Storage | Baseline Complete | Phase 23, Phase 25, Phase 36.1 | Auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`, token refresh, trust enforcement, audit logging, env var fallback; 57 auth tests |
 | 37 CLI Sandbox Hardening | Active Hardening | Phase 23 | Subprocess bounded streaming caps + approval prune active; path-intent expansion, protocol parity, microVM preflight, container fallback pending |
 | 38 Google ADK Adapter | Baseline Complete | None | T1 detection + T2 static AST export; T3 deferred (google-adk 0.x churn); 44 tests |
-| 39 MCP Python SDK Adapter | Baseline Complete | None | T1 detection + T2 static export; T3 deferred (trust posture + transport lifecycle); 57 tests |
+| 39 MCP Python SDK Adapter | Baseline Complete | None | T1 detection + T2 static export; T3 deferred (trust posture + transport lifecycle); 58 tests |
 
 ### Critical Path
 
