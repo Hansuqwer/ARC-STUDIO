@@ -87,6 +87,7 @@ class AdapterRegistry:
         from .ag2_adapter import AG2Adapter
         from .crewai import CrewAIAdapter
         from .dspy import DSPyAdapter
+        from .haystack import HaystackAdapter
         from .langchain import LangChainAdapter
         from .langgraph import LangGraphAdapter
         from .llamaindex import LlamaIndexAdapter
@@ -103,6 +104,7 @@ class AdapterRegistry:
         self.register(LlamaIndexAdapter())
         self.register(LmarenaAdapter())
         self.register(DSPyAdapter())
+        self.register(HaystackAdapter())
         return self
 
 

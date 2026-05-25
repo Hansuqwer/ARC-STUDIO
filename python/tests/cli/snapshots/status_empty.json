@@ -1,7 +1,7 @@
 {
   "data": {
     "python_files": 0,
-    "runtime_count": 3,
+    "runtime_count": 4,
     "runtimes": [
       {
         "can_run": false,
@@ -19,6 +19,12 @@
         "can_run": false,
         "detected": true,
         "id": "dspy",
+        "paid": false
+      },
+      {
+        "can_run": false,
+        "detected": true,
+        "id": "haystack",
         "paid": false
       }
     ],

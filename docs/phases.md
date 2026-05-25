@@ -1265,6 +1265,44 @@ bash scripts/check-pr.sh                               # pass
 
 ---
 
+## Phase 30B — Haystack Adapter (Adapter Phase 31)
+
+**Roadmap:** R32 — Haystack Adapter  
+**Status:** Baseline Complete | Evidence: 65 Haystack tests, 2451 total Python tests passed; `pnpm build` and `pnpm typecheck` green; `scripts/check-pr.sh` green | 2026-05-25  
+**Depends on:** None (standalone adapter)
+
+### Implementation
+1. ✅ T1 Detection (`adapters/haystack/detect.py`): AST scan for `import haystack`, `from haystack`, `Pipeline()`, `@component`, `add_component()`, `connect()`. Checks `requirements.txt`, `pyproject.toml` for `haystack-ai` or `farm-haystack`. Detects YAML pipeline definitions.
+2. ✅ T2 Export (`adapters/haystack/export.py`): AST-based export of Pipeline DAGs (add_component/connect), @component decorated classes. Maps Pipeline DAG to WorkflowInfo with nodes and edges. Component type classification (retriever, generator, embedder, ranker, router, etc.).
+3. ✅ T3 Runner (`adapters/haystack/runner.py`): Gated scaffold only. Requires `ARC_HAYSTACK_RUNNER_ENABLED=1`. Emits `HAYSTACK_PIPELINE_START/END/ERROR`, `HAYSTACK_COMPONENT_START/END/ERROR` events. No live provider calls without explicit gate.
+4. ✅ Adapter class (`adapters/haystack/__init__.py`): `HaystackAdapter(RuntimeAdapter)` with honest `CapabilityReport` (T1/T2 available, T3 gated).
+5. ✅ Registration in `adapters/registry.py`.
+6. ✅ Research doc: `docs/research/haystack-adapter.md`.
+
+### Acceptance
+1. ✅ 65 tests passing (detection: 19, export: 16, runner: 15, adapter: 15)
+2. ✅ All 2451 Python tests passing (no regressions)
+3. ✅ Detection, export, and capability report work end-to-end
+4. ✅ T3 runner is gated scaffold; no live provider calls
+5. ✅ Conformance checks pass
+6. ✅ Pipeline DAG maps cleanly to ARC run plans
+
+### Verification
+```bash
+cd python && uv run pytest tests/adapters/haystack/ -q    # 65 passed
+cd python && uv run pytest -q                              # 2451 passed
+pnpm build                                                 # clean
+pnpm typecheck                                             # clean
+bash scripts/check-pr.sh                                   # pass
+```
+
+### Known Risks
+- T3 runner requires live LM calls; gated behind env var
+- Haystack API may change between versions; detection patterns may need updates
+- YAML pipeline parsing is best-effort (Python code is primary detection target)
+
+---
+
 ## Phase 31 — Adaptive Consensus Protocol
 
 **Roadmap:** R24 — Adaptive Consensus  

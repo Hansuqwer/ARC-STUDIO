@@ -781,9 +781,21 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Goal:** Integrate Haystack framework with ARC runtime.
 
-**Current:** Not Started.
+**Current:** Baseline Complete. T1 (detection) and T2 (export) implemented via AST-based static analysis. T3 (runner) is gated scaffold only.
 
-**Status:** Not Started | Evidence: n/a | Notes: Pipeline DAG maps cleanly to ARC run plans.
+**Deliverables:**
+- T1: AST-based detection of `Pipeline`, `@component`, `add_component()`, `connect()`, and YAML pipeline definitions
+- T2: AST-based export of Pipeline DAGs to `WorkflowInfo` (components, connections, DAG edges)
+- T3: Gated runner scaffold (`ARC_HAYSTACK_RUNNER_ENABLED=1`); no live provider calls without explicit gate
+- Honest `CapabilityReport`: T1/T2 available, T3 gated
+
+**Acceptance:**
+- 65 tests passing (detection: 19, export: 16, runner: 15, adapter: 15)
+- All 2451 Python tests passing (no regressions)
+- Detection, export, and capability report work end-to-end
+- Pipeline DAG maps cleanly to ARC run plans
+
+**Status:** Baseline Complete | Evidence: 65 Haystack tests, 2451 total Python tests passed; `pnpm build` and `pnpm typecheck` green; `scripts/check-pr.sh` green | Notes: T3 runner is gated scaffold only; no live provider calls. Pipeline DAG maps cleanly to ARC run plans.
 
 **Source:** Adapter Roadmap Phase 31
 
@@ -924,7 +936,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R29 OpenAI-Compatible Provider** | **Baseline Complete** | **Adapter Phase 28 — complete (commit 6826d8d, 24 tests, 6 vendors)** |
 | **R30 Pydantic AI Adapter** | **Baseline Complete** | **Adapter Phase 29 — complete (commits 7680017, c34abb3, 27a33b1 — 43 tests, 3 PRs)** |
 | **R31 DSPy Adapter** | **Baseline Complete** | **Adapter Phase 30 — T1 detection (19 tests), T2 export (16 tests), T3 gated scaffold (17 tests), adapter (15 tests)** |
-| **R32 Haystack Adapter** | **Not Started** | **Adapter Phase 31 — implement Haystack adapter** |
+| **R32 Haystack Adapter** | **Baseline Complete** | **Adapter Phase 31 — T1 detection (19 tests), T2 export (16 tests), T3 gated scaffold (15 tests), adapter (15 tests)** |
 | **R33 Smolagents Adapter** | **Not Started** | **Adapter Phase 32 — implement Smolagents adapter** |
 | **R34 Semantic Kernel Adapter** | **Not Started** | **Adapter Phase 33 — implement Semantic Kernel adapter (T1+T2 only)** |
 | **R35 Google ADK Adapter** | **Not Started** | **Adapter Phase 34 — implement Google ADK adapter** |
