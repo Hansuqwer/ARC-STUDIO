@@ -1007,7 +1007,7 @@ def list_sandbox_audit_events(
 def render_lima_template(workspace_root: Path, instance_name: str = "arc-sandbox") -> str:
     """Render an experimental Lima VZ template; gated by caller."""
     workspace = str(workspace_root.resolve())
-    return f"""# ARC experimental Lima sandbox template. Execution not wired yet.
+    return f"""# ARC experimental Lima sandbox template. Execution gated by ARC_MICROVM_INTEGRATION=1.
 vmType: vz
 images:
   - location: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-$(arch).img

@@ -2000,7 +2000,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 ## Phase 37 — CLI Sandbox Hardening + IDE Integration
 
 **Roadmap:** R38 — CLI Sandbox Hardening + IDE Integration  
-**Status:** Active Hardening | Evidence: commits 00057f9 (subprocess caps), 2f47102 (approval prune), 2706d8a (path-intent), 1f413fe (protocol parity), d97b1c2 (microVM preflight), a959d09 (container fallback) | 2191 Python tests passed; e2e smoke passed 11/4 skipped, 0 failed | Notes: Slices 37.1-37.5, 37.7-37.8 complete. Slice 37.6 (microVM execution) blocked.  
+**Status:** Active Hardening | Evidence: commits 00057f9 (subprocess caps), 2f47102 (approval prune), 2706d8a (path-intent), 1f413fe (protocol parity), d97b1c2 (microVM preflight), a959d09 (container fallback), current (labeling+xfail) | 2515 Python tests passed; e2e smoke passed 11/4 skipped, 0 failed | Notes: Slices 37.1-37.5, 37.7-37.8, 37.10 complete. Slice 37.6 (microVM execution) blocked.  
 **Depends on:** Phase 23 (trust enforcement)
 
 ### Progress
@@ -2077,6 +2077,12 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 #### Slice 37.9: Theia Async Warning/Root Cause (Accepted)
 - Existing Theia async dependency warnings accepted, not fixed
 
+#### Slice 37.10: Lima Template Labeling + xfail Cleanup ✓
+- Fixed `render_lima_template` YAML comment from "Execution not wired yet" to "Execution gated by ARC_MICROVM_INTEGRATION=1" to accurately reflect that Lima execution code exists and is gated, not absent
+- Removed stale `xfail` marker from `test_run_langgraph_swarmgraph_local_real_blocked_without_gate` (test now passes consistently)
+- All truth constraints preserved: no microVM execution claim; Lima requires `ARC_MICROVM_INTEGRATION=1` + local runtime + integration tests to be proven
+- Verified: 2515 Python tests passed, 22 skipped, 3 xfailed (pre-existing); ruff clean; pnpm build/typecheck green
+
 ### CLI/IDE Integration Points
 
 - `arc sandbox run --json` — real subprocess execution under sandbox policy; Theia widget can invoke for safe command execution
@@ -2086,8 +2092,8 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 
 ### Truth Constraints
 - Real: subprocess bounded streaming caps, approval prune CLI, path-intent expansion, protocol parity tests, microVM preflight tests, container fallback tests, E2E deep-link routability
-- Still true: microVM execution does not exist
-- Still true: Lima/Firecracker preflight only
+- Lima execution code exists in `isolation/microvm.py` gated by `ARC_MICROVM_INTEGRATION=1`; macOS preflight reports `installed_not_configured` until runtime is proven with integration tests
+- Still true: microVM execution not proven in CI; Lima/Firecracker preflight-only until `ARC_MICROVM_INTEGRATION=1` integration gate passes
 - Still true: container fallback gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`
 - No production-ready sandbox claim
 - No microVM execution claim

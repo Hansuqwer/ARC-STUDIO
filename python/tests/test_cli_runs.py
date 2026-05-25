@@ -281,9 +281,6 @@ def test_run_dry_run_langgraph_swarmgraph_local_real_ready_with_gate(monkeypatch
     assert not (tmp_path / ".arc" / "traces").exists()
 
 
-@pytest.mark.xfail(
-    reason="exit code mismatch: validation error uses typer.Exit(2) but stderr output format differs from JSON envelope expectation"
-)
 def test_run_langgraph_swarmgraph_local_real_blocked_without_gate(tmp_path):
     result = CliRunner().invoke(
         app,
