@@ -5,9 +5,13 @@ on:
   schedule:
     - cron: '17 3 * * *'
 
+permissions:
+  contents: read
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       # Opt-in local-real smoke only. This workflow must not use paid/provider backends.
       ARC_REAL_RUNTIME_SMOKE: '1'
@@ -16,6 +20,8 @@ jobs:
       ARC_SWARMGRAPH_ALLOW_COSTS: ''
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@v5
 
       - name: Sync dependencies

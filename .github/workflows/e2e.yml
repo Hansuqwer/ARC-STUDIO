@@ -5,11 +5,21 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   playwright:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -18,7 +28,7 @@ jobs:
           version: 9.15.9
       - uses: astral-sh/setup-uv@v5
       - name: Native build dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libx11-dev libxkbfile-dev libsecret-1-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential pkg-config libx11-dev libxkbfile-dev libsecret-1-dev
       - name: Prepare workspace
         run: |
           mkdir -p "${{ runner.temp }}/arc-workspace"

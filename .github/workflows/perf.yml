@@ -5,18 +5,30 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   measure:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     continue-on-error: true   # informational only — flip to false after 2-week baseline
     env:
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: pnpm }
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v5
       - run: pnpm install --frozen-lockfile
       - run: uv sync --project python
       - run: node scripts/measure-perf.mjs build  | tee -a perf-history.jsonl
