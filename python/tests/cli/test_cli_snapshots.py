@@ -110,9 +110,10 @@ def test_health_snapshot(update_snapshots):
 )
 def test_status_snapshot(tmp_path, update_snapshots, monkeypatch):
     original_find_spec = importlib.util.find_spec
+    optional_runtime_imports = {"crewai", "dspy", "haystack", "smolagents", "semantic_kernel"}
 
     def stable_find_spec(name: str):
-        if name == "crewai":
+        if name in optional_runtime_imports:
             return None
         return original_find_spec(name)
 

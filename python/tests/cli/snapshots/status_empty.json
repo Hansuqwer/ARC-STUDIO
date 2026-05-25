@@ -1,7 +1,7 @@
 {
   "data": {
     "python_files": 0,
-    "runtime_count": 5,
+    "runtime_count": 2,
     "runtimes": [
       {
         "can_run": false,
@@ -14,35 +14,17 @@
         "detected": true,
         "id": "lmarena",
         "paid": false
-      },
-      {
-        "can_run": false,
-        "detected": true,
-        "id": "dspy",
-        "paid": false
-      },
-      {
-        "can_run": false,
-        "detected": true,
-        "id": "haystack",
-        "paid": false
-      },
-      {
-        "can_run": false,
-        "detected": true,
-        "id": "smolagents",
-        "paid": false
       }
     ],
     "trace_count": 0,
-    "workspace": "/private/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/pytest-of-hansvilund/pytest-447/test_status_snapshot0"
+    "workspace": "/private/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/pytest-of-hansvilund/pytest-477/test_status_snapshot0"
   },
   "error": null,
   "meta": {
     "adapter": null,
-    "duration_ms": 50.642967224121094,
-    "timestamp": "2026-05-25T14:07:13.380107Z",
-    "workspace": "/private/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/pytest-of-hansvilund/pytest-447/test_status_snapshot0"
+    "duration_ms": 51.5749454498291,
+    "timestamp": "2026-05-25T19:11:12.114800Z",
+    "workspace": "/private/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/pytest-of-hansvilund/pytest-477/test_status_snapshot0"
   },
   "ok": true,
   "version": "1.0"

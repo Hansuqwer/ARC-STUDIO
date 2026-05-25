@@ -1340,6 +1340,37 @@ bash scripts/check-pr.sh                                    # pass
 
 ---
 
+## Phase 30D — Semantic Kernel Adapter (Adapter Phase 33)
+
+**Roadmap:** R34 — Semantic Kernel Adapter  
+**Status:** Baseline Complete | Evidence: 28 Semantic Kernel tests pass; adapter registered in default registry; static export implemented | 2026-05-25  
+**Depends on:** None (standalone adapter)
+
+### Implementation
+1. ✅ T1 Detection (`adapters/semantic_kernel/detect.py`): import/config/static-pattern scan for `semantic_kernel`, `Kernel`, `@kernel_function`, `add_plugin`, agents/orchestrations, and process framework markers.
+2. ✅ T2 Export (`adapters/semantic_kernel/export.py`): AST-only workflow export for Kernel variables, plugins, kernel functions, agents/orchestrations, and `invoke`/`invoke_prompt` calls.
+3. ✅ Adapter class (`adapters/semantic_kernel/__init__.py`): `SemanticKernelAdapter(RuntimeAdapter)` with honest capability report.
+4. ✅ Registration in `adapters/registry.py`.
+5. ✅ Research doc: `docs/research/semantic-kernel-adapter.md`.
+
+### Acceptance
+1. ✅ 28 tests passing (detection, export, adapter, registry inclusion).
+2. ✅ Detection/export work without importing or executing workspace code.
+3. ✅ Capability report clearly states T1/T2 only and no runtime execution.
+4. ✅ No provider calls or Semantic Kernel execution path added.
+
+### Verification
+```bash
+cd python && uv run pytest tests/adapters/semantic_kernel -q
+cd python && uv run ruff check src/agent_runtime_cockpit/adapters/semantic_kernel tests/adapters/semantic_kernel
+```
+
+### Known Risks
+- Semantic Kernel Python APIs are actively evolving; static patterns may need maintenance.
+- Runtime execution remains deliberately out of scope due provider-call and SDK-churn risk.
+
+---
+
 ## Phase 31 — Adaptive Consensus Protocol
 
 **Roadmap:** R24 — Adaptive Consensus  

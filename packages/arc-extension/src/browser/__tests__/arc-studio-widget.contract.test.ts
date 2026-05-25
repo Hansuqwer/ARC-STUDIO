@@ -127,14 +127,15 @@ describe('ArcStudioWidget Contracts', () => {
             expect(widgetSource).toMatch(/role='tabpanel'/);
         });
 
-        it('should have tabs: Chat, Runs, Workflows, Assurance, SwarmGraph Insight, Config', () => {
+        it('should have tabs: Chat, Runs, Workflows, Assurance, SwarmGraph Insight, Battle, Config', () => {
             expect(widgetSource).toMatch(/Chat/);
             expect(widgetSource).toMatch(/Runs/);
             expect(widgetSource).toMatch(/Workflows/);
             expect(widgetSource).toMatch(/Assurance/);
             expect(widgetSource).toMatch(/SwarmGraph Insight/);
+            expect(widgetSource).toMatch(/Battle/);
             expect(widgetSource).toMatch(/Config/);
-            expect(widgetSource).toMatch(/type StudioTabId = 'chat' \| 'runs' \| 'workflows' \| 'assurance' \| 'swarmgraph-insight' \| 'config'/);
+            expect(widgetSource).toMatch(/type StudioTabId = 'chat' \| 'runs' \| 'workflows' \| 'assurance' \| 'swarmgraph-insight' \| 'battle' \| 'config'/);
         });
     });
 

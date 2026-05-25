@@ -93,6 +93,7 @@ class AdapterRegistry:
         from .llamaindex import LlamaIndexAdapter
         from .lmarena import LmarenaAdapter
         from .openai_agents import OpenAIAgentsAdapter
+        from .semantic_kernel import SemanticKernelAdapter
         from .smolagents import SmolagentsAdapter
         from .swarmgraph import SwarmGraphAdapter
 
@@ -107,6 +108,7 @@ class AdapterRegistry:
         self.register(DSPyAdapter())
         self.register(HaystackAdapter())
         self.register(SmolagentsAdapter())
+        self.register(SemanticKernelAdapter())
         return self
 
 

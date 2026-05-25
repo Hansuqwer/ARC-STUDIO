@@ -825,9 +825,9 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Goal:** Integrate Semantic Kernel framework with ARC runtime (T1+T2 only).
 
-**Current:** Not Started.
+**Current:** Baseline Complete. T1 detection and T2 static export are implemented. Runtime execution is not implemented or claimed.
 
-**Status:** Not Started | Evidence: n/a | Notes: T1+T2 only; Python SDK churn makes T3 uneconomical.
+**Status:** Baseline Complete | Evidence: 28 Semantic Kernel tests pass; adapter registered in default registry; static export implemented | Notes: T1+T2 only. No Semantic Kernel execution, event streaming, or provider-backed flow is implemented or claimed.
 
 **Source:** Adapter Roadmap Phase 33
 
@@ -950,7 +950,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R31 DSPy Adapter** | **Baseline Complete** | **Adapter Phase 30 — T1 detection (19 tests), T2 export (16 tests), T3 gated scaffold (17 tests), adapter (15 tests)** |
 | **R32 Haystack Adapter** | **Baseline Complete** | **Adapter Phase 31 — T1 detection (19 tests), T2 export (16 tests), T3 gated scaffold (15 tests), adapter (15 tests)** |
 | **R33 Smolagents Adapter** | **Baseline Complete** | **Adapter Phase 32 — T1 detection (11 tests), T2 export (7 tests), T3 gated scaffold (6 tests), adapter (7 tests)** |
-| **R34 Semantic Kernel Adapter** | **Not Started** | **Adapter Phase 33 — implement Semantic Kernel adapter (T1+T2 only)** |
+| **R34 Semantic Kernel Adapter** | **Baseline Complete** | **Adapter Phase 33 — T1 detection + T2 static export; no runtime execution claim** |
 | **R35 Google ADK Adapter** | **Not Started** | **Adapter Phase 34 — implement Google ADK adapter** |
 | **R36 MCP Python SDK Adapter** | **Not Started** | **Adapter Phase 35 — implement MCP Python SDK adapter** |
 | **R37 Provider Management (Phase 1)** | **Baseline Complete** | **Phase 36.1 — interactive UX without credential storage (commits cd89aab-7f2e20b)** |
