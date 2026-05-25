@@ -78,21 +78,23 @@ export default new ContainerModule(bind => {
     bindViewContribution(bind, ArcWorkflowContribution);
     bind(FrontendApplicationContribution).toService(ArcWorkflowContribution);
 
-    // Bind the ARC Run Timeline widget (advanced trace — available via command, not default-opened)
+    // Bind the ARC Run Timeline widget (advanced trace)
     bind(ArcRunTimelineWidget).toSelf();
     bind(WidgetFactory).toDynamicValue(ctx => ({
         id: ArcRunTimelineWidget.ID,
         createWidget: () => ctx.container.get<ArcRunTimelineWidget>(ArcRunTimelineWidget),
     })).inSingletonScope();
     bindViewContribution(bind, ArcRunsContribution);
+    bind(FrontendApplicationContribution).toService(ArcRunsContribution);
 
-    // Bind the ARC Event Stream widget (advanced trace — available via command, not default-opened)
+    // Bind the ARC Event Stream widget (advanced trace)
     bind(ArcEventStreamWidget).toSelf();
     bind(WidgetFactory).toDynamicValue(ctx => ({
         id: ArcEventStreamWidget.ID,
         createWidget: () => ctx.container.get<ArcEventStreamWidget>(ArcEventStreamWidget),
     })).inSingletonScope();
     bindViewContribution(bind, ArcEventStreamContribution);
+    bind(FrontendApplicationContribution).toService(ArcEventStreamContribution);
 
     // Bind the ARC Health Monitor widget
     bind(ArcHealthWidget).toSelf();

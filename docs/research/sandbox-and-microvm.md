@@ -75,6 +75,45 @@ Blocked:
 - Vercel Grep tool is not exposed in this environment.
 - MicroVM execution requires host runtime, image strategy, mount policy, network-off proof, and opt-in integration tests.
 
+## Phase 37.6 MicroVM Execution Blocker Detail
+
+Status: Blocked. Preflight/doctor only. No microVM execution exists.
+
+### Rootfs/Kernel Lifecycle
+- Firecracker needs a kernel vmlinux binary and a rootfs image. No automated download/cache mechanism exists.
+- Lima VM templates exist as rendered YAML only; no `limactl start/create/delete` lifecycle is implemented.
+- Proposed: manage a local cache dir (`~/.arc/microvm/`) with versioned images. Not implemented.
+
+### Workspace Mount Policy
+- Firecracker: needs virtiofs or block device mapping. No safety analysis for symlink/hardlink escapes in guest mounts.
+- Lima: host-mounted directories are shared via `mounts` in template YAML. `~` and sensitive host paths must be excluded.
+- Proposed: only mount the workspace directory read-only by default; read-write only with explicit policy opt-in. Not implemented.
+
+### Network-Off Proof
+- No test proves the guest has no network access.
+- Firecracker: no TAP/NAT interfaces configured by default, but no script/proof verifies isolation.
+- Lima: guest may have default NAT through `socket_vmnet`. Disabling it requires template config + validation.
+- Proposed: run `curl --connect-timeout 1 http://example.com` in guest and verify failure before user argv. Not implemented.
+
+### Teardown Guarantees
+- Firecracker: VM is destroyed by stopping the Firecracker process. No timeout/safety net for boot-failure hangs.
+- Lima: `limactl delete -f` after run. No cleanup on host crash/reboot.
+- Proposed: use a context timeout + defer block with force-cleanup. Not implemented.
+
+### Integration Gate
+- Tests exist at `python/tests/isolation/test_microvm_preflight.py` — 4 tests covering all 4 preflight states.
+- A skeleton integration test exists at `python/tests/test_cli_sandbox.py::test_microvm_integration_skeleton_doctor_only`, gated by `ARC_MICROVM_INTEGRATION=1`.
+- CI does not set `ARC_MICROVM_INTEGRATION=1` — no microVM runtime in CI.
+
+### Summary
+| Component | Status | What's missing |
+|---|---|---|
+| Preflight/doctor | Real | All 4 states tested: unavailable/installed_not_configured/ready/blocked |
+| Firecracker execution | Not implemented | Kernel/rootfs lifecycle, mount policy, network-off proof, jailer config, teardown |
+| Lima execution | Not implemented | VM create/start/shell/delete cycle, mount policy, network-off proof, teardown |
+| Integration test skeleton | Real (gated) | Tests exist but require local runtime; CI skips |
+| Production-ready claim | Not claimed | Would need full execution + opt-in CI tests + network-off proof |
+
 ## Policy Config
 
 Default path: `~/.arc/sandbox-policies.json`.

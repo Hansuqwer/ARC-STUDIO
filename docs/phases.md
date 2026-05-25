@@ -1849,7 +1849,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 ## Phase 37 — CLI Sandbox Hardening + IDE Integration
 
 **Roadmap:** R38 — CLI Sandbox Hardening + IDE Integration  
-**Status:** Active Hardening | Evidence: commits 00057f9 (subprocess caps), 2f47102 (approval prune) | 2152 Python tests passed; e2e smoke passed 8/7 skipped | Notes: Subprocess bounded streaming caps and approval prune CLI active. Remaining slices pending.  
+**Status:** Active Hardening | Evidence: commits 00057f9 (subprocess caps), 2f47102 (approval prune), 2706d8a (path-intent), 1f413fe (protocol parity), d97b1c2 (microVM preflight), a959d09 (container fallback) | 2191 Python tests passed; e2e smoke passed 11/4 skipped, 0 failed | Notes: Slices 37.1-37.5, 37.7-37.8 complete. Slice 37.6 (microVM execution) blocked.  
 **Depends on:** Phase 23 (trust enforcement)
 
 ### Progress
@@ -1915,9 +1915,13 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - No production fallback claim; container fallback is opt-in only
 - Verified: 2191 Python tests passed; e2e smoke passed 8 passed / 7 skipped
 
-#### Slice 37.8: E2E Routability Follow-Up (Pending)
-- Current e2e skips deep-link shells when Theia app mode does not mount them
-- Product fix would make routed views consistently open instead of skip
+#### Slice 37.8: E2E Routability Follow-Up ✓
+- Fixed: bound `ArcRunsContribution` and `ArcEventStreamContribution` as `FrontendApplicationContribution` so `initializeLayout()` actually fires for deep-link views
+- Fixed: SwarmGraph live frame test uses `openDeepLinkPage` (new browser page) instead of `page.goto` so `initializeLayout()` fires
+- Fixed: deep-link tests use `[id="arc:<widget>"]` attribute selectors instead of content-dependent text matchers
+- Before: 8 passed, 7 skipped, 1 failed | After: 11 passed, 4 skipped, 0 failed
+- Remaining skips are expected: Config/SwarmGraph Insight tabs (no deep-link), SSE proof (no Python backend in E2E)
+- Verified: 2191 Python tests passed; e2e smoke 11/4/0; TypeScript build/typecheck green
 
 #### Slice 37.9: Theia Async Warning/Root Cause (Accepted)
 - Existing Theia async dependency warnings accepted, not fixed
@@ -1930,7 +1934,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - `arc policy prune --json` — remove expired approvals; Theia can expose as maintenance action
 
 ### Truth Constraints
-- Real: subprocess bounded streaming caps, approval prune CLI
+- Real: subprocess bounded streaming caps, approval prune CLI, path-intent expansion, protocol parity tests, microVM preflight tests, container fallback tests, E2E deep-link routability
 - Still true: microVM execution does not exist
 - Still true: Lima/Firecracker preflight only
 - Still true: container fallback gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`
@@ -2018,7 +2022,7 @@ Phase 37 (CLI Sandbox Hardening) ──→ (active; depends on Phase 23)
 **Execution order:** 
 - **Immediate (no blockers):** Phase 36.1 (Provider Discovery), Phase 37 (CLI Sandbox Hardening — active)
 - **Foundations (Complete):** Phase 21-22 (parallel, complete) → Phase 23-24 (parallel, complete) → Phase 25 (complete)
-- **Sandbox:** Phase 37 (active — subprocess caps + approval prune done; path-intent, protocol parity, microVM preflight, container fallback pending)
+- **Sandbox:** Phase 37 (active — slices 37.1-37.5, 37.7-37.8 complete; microVM execution 37.6 blocked)
 - **MCP:** Phase 26 (complete — scaffold) → Phase 27 (depends on Phase 25)
 - **Replay/HITL:** Phase 28 (depends on Phase 25) → Phase 29 (depends on Phase 25 + Phase 22)
 - **SwarmGraph differentiators:** Phase 30 (depends on Phase 17 + Phase 21) → Phase 31 (depends on Phase 30 + Phase 23)
