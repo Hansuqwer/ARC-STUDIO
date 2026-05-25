@@ -21,6 +21,7 @@ from ..arena.models import ArenaAdoptRequest, ArenaMode, ArenaRequest, ArenaVote
 from ..arena.service import (
     adopt_candidate,
     arena_request,
+    get_vote_rankings,
     list_models,
     list_tags,
     store_arena_run,
@@ -728,7 +729,10 @@ async def arena_chat(request: web.Request) -> web.Response:
     except Exception:
         return _json(err(ArcErrorCode.INVALID_INPUT, "Invalid JSON body").model_dump(), 400)
 
-    req = ArenaRequest.model_validate(body)
+    try:
+        req = ArenaRequest.model_validate(body)
+    except Exception as exc:
+        return _json(err(ArcErrorCode.INVALID_INPUT, str(exc)).model_dump(), 400)
     req.workspace = str(workspace)
 
     # Validate mode
@@ -821,6 +825,13 @@ async def arena_adopt(request: web.Request) -> web.Response:
     return _json(ok(result.model_dump()).model_dump())
 
 
+async def arena_rankings(request: web.Request) -> web.Response:
+    """GET /api/arena/rankings — retrieve vote history and model rankings."""
+    store = _trace_store(request)
+    rankings = get_vote_rankings(store)
+    return _json(ok(rankings).model_dump())
+
+
 def setup_routes(app: web.Application) -> None:
     app.router.add_get("/health", health)
     app.router.add_get("/api/inspect", inspect)
@@ -856,3 +867,4 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_post("/api/arena/chat", arena_chat)
     app.router.add_post("/api/arena/vote", arena_vote)
     app.router.add_post("/api/arena/adopt", arena_adopt)
+    app.router.add_get("/api/arena/rankings", arena_rankings)

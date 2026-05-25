@@ -12,6 +12,7 @@ from .. import __version__ as arc_version
 from ..security.context import DryRunAbort, EnforcementContext, set_enforcement_context
 from ._subapps import (
     adapter_app,
+    arena_app,
     audit_app,
     battle_app,
     config_app,
@@ -50,6 +51,7 @@ app = typer.Typer(
 # Register sub-apps on the root app
 app.add_typer(context_app)
 app.add_typer(adapter_app)
+app.add_typer(arena_app)
 app.add_typer(doctor_app)
 app.add_typer(workspace_app)
 app.add_typer(isolation_app)

@@ -29,7 +29,10 @@ def storage(temp_db):
 @pytest.fixture
 def executor(storage):
     """Create a TaskExecutor instance."""
-    return TaskExecutor(storage)
+    executor = TaskExecutor(storage)
+    yield executor
+    executor.stop_worker()
+    executor.wait_for_all(timeout=5.0)
 
 
 def test_executor_creation(executor, storage):

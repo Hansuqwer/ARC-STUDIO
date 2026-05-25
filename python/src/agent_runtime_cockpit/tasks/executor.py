@@ -20,6 +20,7 @@ class TaskExecutor:
         self.storage = storage
         self._running = False
         self._worker_thread: Optional[threading.Thread] = None
+        self._task_threads: dict[str, threading.Thread] = {}
         self._cancel_flags: dict[str, threading.Event] = {}
         self._lock = threading.Lock()
 
@@ -44,6 +45,7 @@ class TaskExecutor:
         self._running = False
         if self._worker_thread:
             self._worker_thread.join(timeout=5.0)
+        self.wait_for_all(timeout=5.0)
         log.info("Task worker stopped")
 
     def _worker_loop(self) -> None:
@@ -78,12 +80,40 @@ class TaskExecutor:
     def _execute_task_async(self, task: Task) -> None:
         """Execute task in background thread."""
         thread = threading.Thread(
-            target=self._execute_task_sync,
+            target=self._execute_task_thread,
             args=(task,),
             daemon=True,
             name=f"Task-{task.id[:8]}",
         )
+        with self._lock:
+            self._task_threads[task.id] = thread
         thread.start()
+
+    def _execute_task_thread(self, task: Task) -> None:
+        """Run one task and unregister the worker thread when done."""
+        try:
+            self._execute_task_sync(task)
+        finally:
+            with self._lock:
+                self._task_threads.pop(task.id, None)
+
+    def wait_for_all(self, timeout: float = 5.0) -> None:
+        """Wait for currently running task threads to finish.
+
+        Used by graceful shutdown and tests to prevent SQLite tempdirs from being
+        deleted while background task threads still hold storage references.
+        """
+        deadline = time.monotonic() + timeout
+        while True:
+            with self._lock:
+                threads = list(self._task_threads.values())
+            if not threads:
+                return
+            remaining = max(0.0, deadline - time.monotonic())
+            if remaining <= 0:
+                return
+            for thread in threads:
+                thread.join(timeout=min(remaining, 0.1))
 
     def _execute_task_sync(self, task: Task) -> None:
         """Execute task synchronously with error handling."""

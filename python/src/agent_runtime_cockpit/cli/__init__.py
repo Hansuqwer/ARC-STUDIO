@@ -15,6 +15,7 @@ from .. import _legacy_cli  # noqa: F401
 # Phase 25.5: extracted providers, mgmt, studio_workspace, prompt commands
 # Phase 34: battle mode commands
 from . import (
+    arena,  # noqa: F401
     audit,  # noqa: F401
     battle,  # noqa: F401
     discover,  # noqa: F401

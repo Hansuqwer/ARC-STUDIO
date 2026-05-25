@@ -8,6 +8,7 @@ import typer
 
 context_app = typer.Typer(name="context", help="Context retrieval commands")
 adapter_app = typer.Typer(name="adapter", help="Adapter management commands")
+arena_app = typer.Typer(name="arena", help="LM Arena model battle and comparison")
 doctor_app = typer.Typer(name="doctor", help="ARC diagnostics")
 workspace_app = typer.Typer(name="workspace", help="Workspace configuration and trust management")
 isolation_app = typer.Typer(name="isolation", help="Execution isolation providers")

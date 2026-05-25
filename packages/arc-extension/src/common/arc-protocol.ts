@@ -789,7 +789,10 @@ export interface GraphNodeData {
     label: string;
     /** Node type for visual styling */
     type: 'queen' | 'worker' | 'agent' | 'tool' | 'decision' | 'hitl' | 'terminal' | 'router' | 'start' | 'end';
-    /** Runtime that owns this node */
+    /** Runtime that owns this node.
+     * 'lmarena' is daemon-only-deferred: the Python backend supports arena runs,
+     * but no active UI renders arena graph nodes. Reserved for future LM Arena UI.
+     */
     runtime: 'swarmgraph' | 'langgraph' | 'crewai' | 'openai-agents' | 'ag2' | 'llamaindex' | 'lmarena';
     /** Current execution state */
     state: 'idle' | 'running' | 'waiting' | 'done' | 'failed';

@@ -1,4 +1,5 @@
 """Core Arena service — handles battle, direct, code, and agent-arena-preview modes."""
+
 from __future__ import annotations
 
 import logging
@@ -26,27 +27,77 @@ log = logging.getLogger(__name__)
 # ── Known Arena models (mirrors Copilot Arena model config) ──────────────
 
 DEFAULT_MODELS: list[ArenaModelInfo] = [
-    ArenaModelInfo(id="gpt-4o-mini-2024-07-18", name="GPT-4o Mini", provider="openai",
-                   tags=["fast", "edit"], supports_battle=True, supports_direct=True,
-                   supports_code=True, input_cost=0.15, output_cost=0.6),
-    ArenaModelInfo(id="gpt-4o-2024-08-06", name="GPT-4o", provider="openai",
-                   tags=["best", "edit"], supports_battle=True, supports_direct=True,
-                   supports_code=True, input_cost=2.5, output_cost=10.0),
-    ArenaModelInfo(id="codestral-2405", name="Codestral", provider="mistral",
-                   tags=["fast", "code"], supports_battle=True, supports_direct=True,
-                   supports_code=True, supports_agent_preview=False),
-    ArenaModelInfo(id="llama-3.1-70b", name="Llama 3.1 70B", provider="meta",
-                   tags=["open", "code"], supports_battle=True, supports_direct=True,
-                   supports_code=True),
-    ArenaModelInfo(id="llama-3.1-405b", name="Llama 3.1 405B", provider="meta",
-                   tags=["best", "open"], supports_battle=True, supports_direct=True,
-                   supports_code=True, input_cost=2.0, output_cost=6.0),
-    ArenaModelInfo(id="claude-sonnet-4-20250514", name="Claude Sonnet 4", provider="anthropic",
-                   tags=["best", "code", "agent"], supports_battle=True, supports_direct=True,
-                   supports_code=True, supports_agent_preview=True),
-    ArenaModelInfo(id="deepseek-coder-v2", name="DeepSeek Coder V2", provider="deepseek",
-                   tags=["code", "open"], supports_battle=True, supports_direct=True,
-                   supports_code=True),
+    ArenaModelInfo(
+        id="gpt-4o-mini-2024-07-18",
+        name="GPT-4o Mini",
+        provider="openai",
+        tags=["fast", "edit"],
+        supports_battle=True,
+        supports_direct=True,
+        supports_code=True,
+        input_cost=0.15,
+        output_cost=0.6,
+    ),
+    ArenaModelInfo(
+        id="gpt-4o-2024-08-06",
+        name="GPT-4o",
+        provider="openai",
+        tags=["best", "edit"],
+        supports_battle=True,
+        supports_direct=True,
+        supports_code=True,
+        input_cost=2.5,
+        output_cost=10.0,
+    ),
+    ArenaModelInfo(
+        id="codestral-2405",
+        name="Codestral",
+        provider="mistral",
+        tags=["fast", "code"],
+        supports_battle=True,
+        supports_direct=True,
+        supports_code=True,
+        supports_agent_preview=False,
+    ),
+    ArenaModelInfo(
+        id="llama-3.1-70b",
+        name="Llama 3.1 70B",
+        provider="meta",
+        tags=["open", "code"],
+        supports_battle=True,
+        supports_direct=True,
+        supports_code=True,
+    ),
+    ArenaModelInfo(
+        id="llama-3.1-405b",
+        name="Llama 3.1 405B",
+        provider="meta",
+        tags=["best", "open"],
+        supports_battle=True,
+        supports_direct=True,
+        supports_code=True,
+        input_cost=2.0,
+        output_cost=6.0,
+    ),
+    ArenaModelInfo(
+        id="claude-sonnet-4-20250514",
+        name="Claude Sonnet 4",
+        provider="anthropic",
+        tags=["best", "code", "agent"],
+        supports_battle=True,
+        supports_direct=True,
+        supports_code=True,
+        supports_agent_preview=True,
+    ),
+    ArenaModelInfo(
+        id="deepseek-coder-v2",
+        name="DeepSeek Coder V2",
+        provider="deepseek",
+        tags=["code", "open"],
+        supports_battle=True,
+        supports_direct=True,
+        supports_code=True,
+    ),
 ]
 
 # ── Model tags for filtering ─────────────────────────────────────────────
@@ -75,27 +126,32 @@ def list_tags() -> dict[str, str]:
 
 # ── Stub response generators (for offline/testing, no real API calls) ───
 
+
 def _stub_battle(ws: Path, prompt: str, model_tags: list[str]) -> ArenaResponse:
     """Generate stub battle responses for offline testing."""
     models = list_models(model_tags) if model_tags else [DEFAULT_MODELS[0], DEFAULT_MODELS[1]]
     run_id = f"arena-battle-{uuid.uuid4().hex[:12]}"
     candidates = []
     for m in models[:2]:
-        candidates.append(ArenaCandidate(
-            id=f"{run_id}-{m.id.split('-')[0]}",
-            model=m.id,
-            text=f"# Response from {m.name}\n\n**Prompt:** {prompt}\n\nThis is a stub response from {m.name}. "
-                 f"In production, this would contain the model's actual output.\n\n```python\ndef hello():\n    "
-                 f'print("Hello from {m.name}")\n```',
-            patch="",
-            diff="",
-        ))
+        candidates.append(
+            ArenaCandidate(
+                id=f"{run_id}-{m.id.split('-')[0]}",
+                model=m.id,
+                text=f"# Response from {m.name}\n\n**Prompt:** {prompt}\n\nThis is a stub response from {m.name}. "
+                f"In production, this would contain the model's actual output.\n\n```python\ndef hello():\n    "
+                f'print("Hello from {m.name}")\n```',
+                patch="",
+                diff="",
+            )
+        )
     return ArenaResponse(
         run_id=run_id,
         mode=ArenaMode.BATTLE,
         candidates=candidates,
         recommended=candidates[0].id if random.random() > 0.5 else "",
-        warnings=["Stub mode: no real API calls. Set ARC_ALLOW_LIVE_ARENA=true for live responses."],
+        warnings=[
+            "Stub mode: no real API calls. Set ARC_ALLOW_LIVE_ARENA=true for live responses."
+        ],
     )
 
 
@@ -107,12 +163,14 @@ def _stub_direct(ws: Path, prompt: str, model: str) -> ArenaResponse:
     return ArenaResponse(
         run_id=run_id,
         mode=ArenaMode.DIRECT,
-        candidates=[ArenaCandidate(
-            id=f"{run_id}-{m.id.split('-')[0]}",
-            model=m.id,
-            text=f"# Response from {m.name}\n\n**Prompt:** {prompt}\n\nThis is a stub direct response from {m.name}.\n\n"
-                 f"```python\ndef solution():\n    return '{m.name} response for: {prompt}'\n```",
-        )],
+        candidates=[
+            ArenaCandidate(
+                id=f"{run_id}-{m.id.split('-')[0]}",
+                model=m.id,
+                text=f"# Response from {m.name}\n\n**Prompt:** {prompt}\n\nThis is a stub direct response from {m.name}.\n\n"
+                f"```python\ndef solution():\n    return '{m.name} response for: {prompt}'\n```",
+            )
+        ],
         warnings=["Stub mode: no real API calls."],
     )
 
@@ -125,15 +183,17 @@ def _stub_code(ws: Path, prompt: str, model: str) -> ArenaResponse:
     return ArenaResponse(
         run_id=run_id,
         mode=ArenaMode.CODE,
-        candidates=[ArenaCandidate(
-            id=f"{run_id}-{m.id.split('-')[0]}",
-            model=m.id,
-            text=f"Code generated by {m.name}",
-            patch=f"--- a/src/example.py\n+++ b/src/example.py\n@@ -0,0 +1,10 @@\n+# Generated by {m.name}\n+def generated_function():\n+    \"\"\"Generated from: {prompt}\"\"\"\n+    return 'implemented'\n+",
-            diff=f"diff --git a/src/example.py b/src/example.py\nnew file mode 100644\n"
-                 f"--- /dev/null\n+++ b/src/example.py\n@@ -0,0 +1,10 @@\n+# Generated by {m.name}\n+def generated_function():\n+    \"\"\"Generated from: {prompt}\"\"\"\n+    return 'implemented'\n+",
-            files_changed=["src/example.py"],
-        )],
+        candidates=[
+            ArenaCandidate(
+                id=f"{run_id}-{m.id.split('-')[0]}",
+                model=m.id,
+                text=f"Code generated by {m.name}",
+                patch=f'--- a/src/example.py\n+++ b/src/example.py\n@@ -0,0 +1,10 @@\n+# Generated by {m.name}\n+def generated_function():\n+    """Generated from: {prompt}"""\n+    return \'implemented\'\n+',
+                diff=f"diff --git a/src/example.py b/src/example.py\nnew file mode 100644\n"
+                f'--- /dev/null\n+++ b/src/example.py\n@@ -0,0 +1,10 @@\n+# Generated by {m.name}\n+def generated_function():\n+    """Generated from: {prompt}"""\n+    return \'implemented\'\n+',
+                files_changed=["src/example.py"],
+            )
+        ],
         warnings=["Stub mode: no real API calls."],
     )
 
@@ -146,17 +206,19 @@ def _stub_agent_preview(ws: Path, prompt: str, model: str) -> ArenaResponse:
     return ArenaResponse(
         run_id=run_id,
         mode=ArenaMode.AGENT_ARENA_PREVIEW,
-        candidates=[ArenaCandidate(
-            id=f"{run_id}-{m.id.split('-')[0]}",
-            model=m.id,
-            text=f"# Agent Plan by {m.name}\n\n## Plan\n1. Analyze requirements\n2. Design solution\n3. Implement changes\n4. Add tests\n\n## Implementation\n```python\ndef solution():\n    pass\n```",
-            plan=f"## Agent Plan\n\n**Objective:** {prompt}\n\n### Steps:\n1. Parse requirements from prompt\n2. Design architecture\n3. Generate implementation\n4. Create tests\n5. Verify correctness\n\n### Files to modify:\n- `src/main.py`\n- `tests/test_main.py`",
-            patch="--- a/src/main.py\n+++ b/src/main.py\n@@ -0,0 +1,20 @@\n+def agent_generated():\n+    pass\n+",
-            diff="diff --git a/src/main.py b/src/main.py\nnew file mode 100644\n...",
-            files_changed=["src/main.py", "tests/test_main.py"],
-            risks=["Stub response — review before adopting"],
-            metadata={"agent_steps": 5, "estimated_effort": "medium"},
-        )],
+        candidates=[
+            ArenaCandidate(
+                id=f"{run_id}-{m.id.split('-')[0]}",
+                model=m.id,
+                text=f"# Agent Plan by {m.name}\n\n## Plan\n1. Analyze requirements\n2. Design solution\n3. Implement changes\n4. Add tests\n\n## Implementation\n```python\ndef solution():\n    pass\n```",
+                plan=f"## Agent Plan\n\n**Objective:** {prompt}\n\n### Steps:\n1. Parse requirements from prompt\n2. Design architecture\n3. Generate implementation\n4. Create tests\n5. Verify correctness\n\n### Files to modify:\n- `src/main.py`\n- `tests/test_main.py`",
+                patch="--- a/src/main.py\n+++ b/src/main.py\n@@ -0,0 +1,20 @@\n+def agent_generated():\n+    pass\n+",
+                diff="diff --git a/src/main.py b/src/main.py\nnew file mode 100644\n...",
+                files_changed=["src/main.py", "tests/test_main.py"],
+                risks=["Stub response — review before adopting"],
+                metadata={"agent_steps": 5, "estimated_effort": "medium"},
+            )
+        ],
         warnings=["Stub mode: no real API calls."],
     )
 
@@ -208,11 +270,10 @@ _LIVE_MODEL_MAP: dict[str, dict[str, str]] = {
 
 
 def _redact_live(text: str) -> str:
-    """Redact sensitive content from log messages."""
-    redacted = text.replace("sk-", "sk-REDACTED")
-    for key_word in ["api_key", "apikey", "API_KEY", "Authorization", "Bearer"]:
-        redacted = redacted.replace(key_word, "REDACTED")
-    return redacted
+    """Redact sensitive content from log messages using the shared Redactor."""
+    from ..security.redaction import Redactor
+
+    return Redactor().redact_string(text)
 
 
 def _live_provider_chat(
@@ -247,7 +308,13 @@ def _live_provider_chat(
     # OpenAI-compatible API
     try:
         from openai import OpenAI
+    except ModuleNotFoundError:
+        raise RuntimeError(
+            "Live arena requires the 'openai' package. Install with: "
+            "pip install 'agent-runtime-cockpit[arena]' or pip install openai"
+        )
 
+    try:
         client = OpenAI(api_key=api_key, base_url=base_url)
         messages: list[dict[str, str]] = []
         if system_prompt:
@@ -275,7 +342,13 @@ def _live_anthropic_chat(
     """Make a live Anthropic API call."""
     try:
         from anthropic import Anthropic
+    except ModuleNotFoundError:
+        raise RuntimeError(
+            "Live arena requires the 'anthropic' package. Install with: "
+            "pip install 'agent-runtime-cockpit[arena]' or pip install anthropic"
+        )
 
+    try:
         client = Anthropic(api_key=api_key)
         kwargs: dict[str, Any] = {
             "model": model_id,
@@ -318,20 +391,23 @@ def _live_response(ws: Path, req: ArenaRequest) -> ArenaResponse:
 
     if req.mode == ArenaMode.BATTLE:
         # For battle, get all supported models (up to 2)
-        battle_models = [
-            m for m in list_models()
-            if m.id in _LIVE_MODEL_MAP and m.supports_battle
-        ][:2]
+        battle_models = [m for m in list_models() if m.id in _LIVE_MODEL_MAP and m.supports_battle][
+            :2
+        ]
         if not battle_models:
-            return ArenaResponse(run_id=run_id, mode=req.mode, warnings=["No live-capable models for battle mode."])
+            return ArenaResponse(
+                run_id=run_id, mode=req.mode, warnings=["No live-capable models for battle mode."]
+            )
         for m in battle_models:
             try:
                 text = _live_provider_chat(m.id, prompt, system_prompt, allow_paid_calls)
-                candidates.append(ArenaCandidate(
-                    id=f"{run_id}-{m.id.split('-')[0]}",
-                    model=m.id,
-                    text=text,
-                ))
+                candidates.append(
+                    ArenaCandidate(
+                        id=f"{run_id}-{m.id.split('-')[0]}",
+                        model=m.id,
+                        text=text,
+                    )
+                )
             except RuntimeError as exc:
                 warnings.append(str(exc))
         if not candidates:
@@ -340,11 +416,13 @@ def _live_response(ws: Path, req: ArenaRequest) -> ArenaResponse:
     elif req.mode == ArenaMode.DIRECT:
         try:
             text = _live_provider_chat(model_id, prompt, system_prompt, allow_paid_calls)
-            candidates.append(ArenaCandidate(
-                id=f"{run_id}-{model_id.split('-')[0]}",
-                model=model_id,
-                text=text,
-            ))
+            candidates.append(
+                ArenaCandidate(
+                    id=f"{run_id}-{model_id.split('-')[0]}",
+                    model=model_id,
+                    text=text,
+                )
+            )
         except RuntimeError as exc:
             warnings.append(str(exc))
             if not candidates:
@@ -354,14 +432,16 @@ def _live_response(ws: Path, req: ArenaRequest) -> ArenaResponse:
         code_prompt = f"{system_prompt}Generate only code for the following request. Return the complete implementation.\n\n{prompt}"
         try:
             text = _live_provider_chat(model_id, code_prompt, "", allow_paid_calls)
-            candidates.append(ArenaCandidate(
-                id=f"{run_id}-{model_id.split('-')[0]}",
-                model=model_id,
-                text=f"Code generated by {model_id}",
-                patch=f"--- a/src/generated.py\n+++ b/src/generated.py\n@@ -0,0 +1,{len(text.splitlines())} @@\n+{text.replace(chr(10), chr(10)+'+')}",
-                diff=f"diff --git a/src/generated.py b/src/generated.py\nnew file mode 100644\n--- /dev/null\n+++ b/src/generated.py\n@@ -0,0 +1,{len(text.splitlines())} @@\n+{text.replace(chr(10), chr(10)+'+')}",
-                files_changed=["src/generated.py"],
-            ))
+            candidates.append(
+                ArenaCandidate(
+                    id=f"{run_id}-{model_id.split('-')[0]}",
+                    model=model_id,
+                    text=f"Code generated by {model_id}",
+                    patch=f"--- a/src/generated.py\n+++ b/src/generated.py\n@@ -0,0 +1,{len(text.splitlines())} @@\n+{text.replace(chr(10), chr(10) + '+')}",
+                    diff=f"diff --git a/src/generated.py b/src/generated.py\nnew file mode 100644\n--- /dev/null\n+++ b/src/generated.py\n@@ -0,0 +1,{len(text.splitlines())} @@\n+{text.replace(chr(10), chr(10) + '+')}",
+                    files_changed=["src/generated.py"],
+                )
+            )
         except RuntimeError as exc:
             warnings.append(str(exc))
             if not candidates:
@@ -374,14 +454,16 @@ def _live_response(ws: Path, req: ArenaRequest) -> ArenaResponse:
         )
         try:
             text = _live_provider_chat(model_id, agent_prompt, "", allow_paid_calls)
-            candidates.append(ArenaCandidate(
-                id=f"{run_id}-{model_id.split('-')[0]}",
-                model=model_id,
-                text=text,
-                plan=text,
-                files_changed=["src/main.py", "tests/test_main.py"],
-                risks=["Review before adopting"],
-            ))
+            candidates.append(
+                ArenaCandidate(
+                    id=f"{run_id}-{model_id.split('-')[0]}",
+                    model=model_id,
+                    text=text,
+                    plan=text,
+                    files_changed=["src/main.py", "tests/test_main.py"],
+                    risks=["Review before adopting"],
+                )
+            )
         except RuntimeError as exc:
             warnings.append(str(exc))
             if not candidates:
@@ -412,7 +494,12 @@ def arena_request(ws: Path, req: ArenaRequest) -> ArenaResponse:
 
     live = os.environ.get("ARC_ALLOW_LIVE_ARENA", "").lower() in {"true", "1"}
 
-    if live and mode in (ArenaMode.BATTLE, ArenaMode.DIRECT, ArenaMode.CODE, ArenaMode.AGENT_ARENA_PREVIEW):
+    if live and mode in (
+        ArenaMode.BATTLE,
+        ArenaMode.DIRECT,
+        ArenaMode.CODE,
+        ArenaMode.AGENT_ARENA_PREVIEW,
+    ):
         if os.environ.get("ARC_LMARENA_ALLOW_COSTS", "").strip().lower() != "true":
             return ArenaResponse(
                 run_id=f"arena-{uuid.uuid4().hex[:12]}",
@@ -437,11 +524,14 @@ def arena_request(ws: Path, req: ArenaRequest) -> ArenaResponse:
         return _stub_agent_preview(ws, prompt, model)
 
     return ArenaResponse(
-        mode=mode, warnings=[f"Unknown mode: {mode}"],
+        mode=mode,
+        warnings=[f"Unknown mode: {mode}"],
     )
 
 
-def store_arena_run(store: JsonlTraceStore, response: ArenaResponse, req: ArenaRequest) -> RunRecord:
+def store_arena_run(
+    store: JsonlTraceStore, response: ArenaResponse, req: ArenaRequest
+) -> RunRecord:
     """Store an Arena response as an ARC run record for traceability."""
     final_output = response.candidates[0].text if response.candidates else ""
     final_patch = response.candidates[0].patch if response.candidates else ""
@@ -485,6 +575,7 @@ def store_arena_run(store: JsonlTraceStore, response: ArenaResponse, req: ArenaR
         ],
         metadata={
             "mode": req.mode.value,
+            "candidates": [c.model_dump() for c in response.candidates],
             "models": [c.model for c in response.candidates],
             "privacy": req.privacy.value,
             "profile_id": req.profile_id,
@@ -497,11 +588,86 @@ def store_arena_run(store: JsonlTraceStore, response: ArenaResponse, req: ArenaR
 
 
 def adopt_candidate(ws: Path, req: ArenaAdoptRequest) -> ArenaAdoptResult:
-    """Adopt a candidate's code patch into the workspace."""
-    # In stub mode, just return success
+    """Adopt a candidate's code patch into the workspace.
+
+    Stub mode: returns applied=False with a clear message.
+    Real patch application requires ARC_ALLOW_LIVE_ARENA=true and a valid patch.
+    """
     return ArenaAdoptResult(
-        applied=True,
-        file_changed=req.target_file or "src/generated.py",
-        patch_lines=5,
-        message="Patch adopted (stub mode). In production, this would apply the diff to the workspace.",
+        applied=False,
+        file_changed=req.target_file or "",
+        patch_lines=0,
+        message="Stub mode: patch adoption is not implemented. "
+        "Set ARC_ALLOW_LIVE_ARENA=true and provide a valid patch to enable real adoption.",
     )
+
+
+def get_vote_rankings(store: JsonlTraceStore) -> dict[str, Any]:
+    """Retrieve vote history and model rankings from stored arena runs.
+
+    Returns a summary of battle votes with per-model win counts.
+    """
+    from collections import defaultdict
+
+    runs = store.list_runs()
+    votes: list[dict[str, Any]] = []
+    model_wins: dict[str, int] = defaultdict(int)
+    model_losses: dict[str, int] = defaultdict(int)
+
+    for run_id in runs:
+        run = store.load(run_id)
+        if not run or run.runtime != "lmarena":
+            continue
+        for event in run.events:
+            if event.type == "LMARENA_VOTE_RECORDED":
+                winner_id = event.data.get("winner_candidate_id", "")
+                loser_id = event.data.get("loser_candidate_id", "")
+                voter = event.data.get("voter", "")
+                votes.append(
+                    {
+                        "run_id": run_id,
+                        "winner_candidate_id": winner_id,
+                        "loser_candidate_id": loser_id,
+                        "voter": voter,
+                        "timestamp": event.timestamp,
+                    }
+                )
+                # Look up model names from the run metadata
+                candidates = run.metadata.get("candidates", [])
+                winner_model = next(
+                    (c.get("model", "unknown") for c in candidates if c.get("id") == winner_id),
+                    "unknown",
+                )
+                loser_model = next(
+                    (c.get("model", "unknown") for c in candidates if c.get("id") == loser_id),
+                    "unknown",
+                )
+                if winner_model != "unknown":
+                    model_wins[winner_model] += 1
+                if loser_model != "unknown":
+                    model_losses[loser_model] += 1
+
+    # Build rankings
+    all_models = set(model_wins.keys()) | set(model_losses.keys())
+    rankings = []
+    for model in sorted(all_models):
+        wins = model_wins.get(model, 0)
+        losses = model_losses.get(model, 0)
+        total = wins + losses
+        win_rate = wins / total if total > 0 else 0.0
+        rankings.append(
+            {
+                "model": model,
+                "wins": wins,
+                "losses": losses,
+                "total_battles": total,
+                "win_rate": round(win_rate, 3),
+            }
+        )
+    rankings.sort(key=lambda r: r["wins"], reverse=True)
+
+    return {
+        "total_votes": len(votes),
+        "votes": votes,
+        "rankings": rankings,
+    }

@@ -87,10 +87,13 @@ def test_store_arena_run(tmp_path):
     assert loaded is not None
 
 
-def test_adopt_candidate(tmp_path):
+def test_adopt_candidate_stub_mode(tmp_path):
+    """Stub mode returns applied=False with a clear message."""
     req = ArenaAdoptRequest(run_id="test", candidate_id="c1", target_file="src/test.py")
     result = adopt_candidate(tmp_path, req)
-    assert result.applied is True
+    assert result.applied is False
+    assert "stub mode" in result.message.lower()
+    assert "not implemented" in result.message.lower()
 
 
 # ── Live arena mode tests (no real API calls) ────────────────────────────
@@ -197,6 +200,16 @@ def test_live_arena_unknown_model_returns_warning(monkeypatch):
 
 def test_live_arena_no_api_key_leakage(monkeypatch):
     """Secrets are not leaked in warnings or candidate text."""
+    # Clear all provider API keys from the environment to isolate the test
+    for key in (
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "MISTRAL_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "OPENROUTER_API_KEY",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
     monkeypatch.setenv("ARC_ALLOW_LIVE_ARENA", "true")
     monkeypatch.setenv("ARC_LMARENA_ALLOW_COSTS", "true")
     # Set a real-looking key so the provider attempts a call but it fails.
