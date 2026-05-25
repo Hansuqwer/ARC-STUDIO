@@ -860,9 +860,17 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Goal:** Integrate MCP Python SDK with ARC runtime.
 
-**Current:** Not Started.
+**Current:** Baseline Complete. T1 detection (import probe + workspace scanner for FastMCP, @tool/@resource/@prompt decorators, low-level Server, ClientSession, transport helpers) and T2 static AST export (WorkflowInfo with server/tool/resource/prompt nodes and labeled edges) implemented. T3 execution intentionally deferred: MCP servers require live transport (stdio/HTTP/SSE) and client-session lifecycle management, and have the most subtle trust posture of all adapters (tools/resources may perform privileged operations without user-explicit consent per Phase 23 enforcement).
 
-**Status:** Not Started | Evidence: n/a | Notes: Protocol-level; reserved for last to benefit from lessons learned in earlier phases; trust posture most subtle.
+**Deliverables:**
+- `adapters/mcp_sdk/` package: detect.py, capabilities.py, export.py, __init__.py
+- MCPSDKAdapter registered in default_registry()
+- 57 tests in tests/adapters/mcp_sdk/ (test_adapter.py, test_detection.py, test_export.py)
+- Detects: FastMCP(...), @mcp.tool(), @mcp.resource(...), @mcp.prompt(), low-level Server, ClientSession, StdioServerParameters, stdio_client/sse_client
+- Exports: one WorkflowInfo per FastMCP/Server definition per file; implicit server for files with tools but no explicit server
+- capability_report() returns detected_not_runnable with explicit T3-not-implemented + trust reasoning
+
+**Status:** Baseline Complete | Evidence: local verification — 2616 Python tests passed, ruff clean; T3 deferred | Notes: T1 + T2 only. No live MCP transport, no server execution, no paid calls. Trust posture documented.
 
 **Source:** Adapter Roadmap Phase 35
 
@@ -967,7 +975,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R33 Smolagents Adapter** | **Baseline Complete** | **Adapter Phase 32 — T1 detection (11 tests), T2 export (7 tests), T3 gated scaffold (6 tests), adapter (7 tests)** |
 | **R34 Semantic Kernel Adapter** | **Baseline Complete** | **Adapter Phase 33 — T1 detection + T2 static export; no runtime execution claim** |
 | **R35 Google ADK Adapter** | **Baseline Complete** | **Adapter Phase 34 — T1 detection + T2 static export; T3 deferred (google-adk 0.x churn)** |
-| **R36 MCP Python SDK Adapter** | **Not Started** | **Adapter Phase 35 — implement MCP Python SDK adapter** |
+| **R36 MCP Python SDK Adapter** | **Baseline Complete** | **Adapter Phase 35 — T1 detection + T2 static export; T3 deferred (trust posture + transport lifecycle)** |
 | **R37 Provider Management (Phase 1)** | **Baseline Complete** | **Phase 36.1 — interactive UX without credential storage (commits cd89aab-7f2e20b)** |
 | **R37 Provider Management (Phase 2)** | **Baseline Complete** | **Phase 36.2 — auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`; token refresh; trust enforcement; audit logging; env var fallback; 57 auth tests** |
 | **R38 CLI Sandbox Hardening + IDE Integration** | **Active Hardening** | **Phase 37 — subprocess caps + approval prune + path-intent expansion + protocol parity + microVM preflight + container fallback tests + e2e routability complete (commits 00057f9-<pending>); microVM execution blocked** |

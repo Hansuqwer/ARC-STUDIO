@@ -2147,6 +2147,43 @@ pnpm typecheck
 
 ---
 
+## Phase 39 — MCP Python SDK Adapter
+
+**Roadmap:** R36 — MCP Python SDK Adapter (Adapter Phase 35)
+**Status:** Baseline Complete | Evidence: local verification — 2616 Python tests passed, ruff clean | Notes: T3 deferred (trust posture + transport lifecycle).
+**Depends on:** None
+
+### Acceptance
+1. `mcp_sdk` adapter registered in `default_registry()` ✓
+2. T1 detect works without `mcp` installed (guards `ModuleNotFoundError` gracefully) ✓
+3. Detects `FastMCP(...)`, `@mcp.tool()`, `@mcp.resource(...)`, `@mcp.prompt()`, low-level `Server(...)`, `ClientSession`, `StdioServerParameters`, `stdio_client`/`sse_client`/`streamablehttp_client` ✓
+4. T2 AST export produces `WorkflowInfo` with server/tool/resource/prompt nodes and labeled edges ✓
+5. `capability_report` reports `detected_not_runnable` with explicit T3-not-implemented + trust reason ✓
+6. `run_workflow()` raises `NotImplementedError` ✓
+7. 57 tests in `tests/adapters/mcp_sdk/` all pass ✓
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/adapters/mcp_sdk/ tests/test_adapter_status.py -q
+cd python && uv run pytest tests/ -q
+pnpm build
+pnpm typecheck
+```
+
+### Truth Constraints
+- T1 + T2 only — no live MCP transport, no server execution, no paid calls
+- No additional `mcp` dependency added (already a project dependency for `arc mcp serve`)
+- T3 deferred: MCP servers require live transport/session lifecycle; trust posture is the most subtle of all adapters (tools/resources may perform privileged operations)
+- No fake detection: adapter returns `(False, 0.0, [])` for empty workspaces without mcp imports
+
+### Known Risks
+- `@mcp.tool()` heuristic matches any `<var>.tool()` decorator where var looks like an MCP instance; low false-positive risk in practice since we require mcp import markers first
+- Implicit-server export (tools without explicit FastMCP) may generate one workflow per file fragment; acceptable for T2 static analysis
+- Low-level `Server(...)` detection may match non-MCP `Server` names if mcp import is present; acceptable given import requirement
+
+---
+
 ## Post-v0.1 Phase Table
 
 ### Phase ↔ Roadmap ID
@@ -2171,6 +2208,7 @@ pnpm typecheck
 | **36.2** | **R37** | **Credential Storage & OAuth (Phase 2)** |
 | **37** | **R38** | **CLI Sandbox Hardening + IDE Integration** |
 | **38** | **R35** | **Google ADK Adapter (T1+T2)** |
+| **39** | **R36** | **MCP Python SDK Adapter (T1+T2)** |
 
 ### Dependencies
 
@@ -2194,6 +2232,7 @@ pnpm typecheck
 | 36.2 Credential Storage | Baseline Complete | Phase 23, Phase 25, Phase 36.1 | Auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`, token refresh, trust enforcement, audit logging, env var fallback; 57 auth tests |
 | 37 CLI Sandbox Hardening | Active Hardening | Phase 23 | Subprocess bounded streaming caps + approval prune active; path-intent expansion, protocol parity, microVM preflight, container fallback pending |
 | 38 Google ADK Adapter | Baseline Complete | None | T1 detection + T2 static AST export; T3 deferred (google-adk 0.x churn); 44 tests |
+| 39 MCP Python SDK Adapter | Baseline Complete | None | T1 detection + T2 static export; T3 deferred (trust posture + transport lifecycle); 57 tests |
 
 ### Critical Path
 

@@ -94,6 +94,7 @@ class AdapterRegistry:
         from .lmarena import LmarenaAdapter
         from .openai_agents import OpenAIAgentsAdapter
         from .google_adk import GoogleADKAdapter
+        from .mcp_sdk import MCPSDKAdapter
         from .semantic_kernel import SemanticKernelAdapter
         from .smolagents import SmolagentsAdapter
         from .swarmgraph import SwarmGraphAdapter
@@ -111,6 +112,7 @@ class AdapterRegistry:
         self.register(SmolagentsAdapter())
         self.register(SemanticKernelAdapter())
         self.register(GoogleADKAdapter())
+        self.register(MCPSDKAdapter())
         return self
 
 

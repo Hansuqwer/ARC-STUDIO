@@ -1,7 +1,7 @@
 {
   "data": {
     "python_files": 0,
-    "runtime_count": 2,
+    "runtime_count": 3,
     "runtimes": [
       {
         "can_run": false,
@@ -14,17 +14,23 @@
         "detected": true,
         "id": "lmarena",
         "paid": false
+      },
+      {
+        "can_run": false,
+        "detected": true,
+        "id": "mcp_sdk",
+        "paid": false
       }
     ],
     "trace_count": 0,
-    "workspace": "/private/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/pytest-of-hansvilund/pytest-477/test_status_snapshot0"
+    "workspace": "/private/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/pytest-of-hansvilund/pytest-502/test_status_snapshot0"
   },
   "error": null,
   "meta": {
     "adapter": null,
-    "duration_ms": 51.5749454498291,
-    "timestamp": "2026-05-25T19:11:12.114800Z",
-    "workspace": "/private/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/pytest-of-hansvilund/pytest-477/test_status_snapshot0"
+    "duration_ms": 196.36988639831543,
+    "timestamp": "2026-05-25T20:30:00.432763Z",
+    "workspace": "/private/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/pytest-of-hansvilund/pytest-502/test_status_snapshot0"
   },
   "ok": true,
   "version": "1.0"
