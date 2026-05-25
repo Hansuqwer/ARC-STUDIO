@@ -1797,7 +1797,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 ## Phase 36.2 — Credential Storage & OAuth
 
 **Roadmap:** R37 — Provider Management System (Phase 2)  
-**Status:** Baseline Complete | Evidence: 41 auth tests, 2303 total Python tests pass, pnpm build/typecheck green | 2026-05-25  
+**Status:** Baseline Complete | Evidence: 57 auth tests, 2319 total Python tests pass, pnpm build/typecheck green | 2026-05-25  
 **Depends on:** Phase 23 (Trust Enforcement), Phase 25 (CLI Decomposition), Phase 36.1 (Provider Discovery)  
 **Design note:** Adds secure credential storage and OAuth flow on top of Phase 36.1 interactive UX. Credentials encrypted at rest with Fernet; workspace trust enforcement via `trust_check` parameter; audit logging to `.arc/audit/auth.events.jsonl`.
 
@@ -1842,15 +1842,15 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 9. ✅ Expired credentials return None: dedicated test
 10. ✅ Secure file permissions: `0o600` enforced
 11. ✅ Multiple providers stored independently
-12. ✅ 41 auth tests + 2303 total Python tests passing
+12. ✅ 57 auth tests + 2319 total Python tests passing
 13. ✅ ruff check passes (0 errors)
 14. ✅ pnpm build + pnpm typecheck green
 
 ### Known Risks
-- OAuth callback server port 8080 may conflict; dynamic port fallback not implemented
+- OAuth callback server uses dynamic localhost port allocation; live provider redirect registration still needs manual/provider-specific validation
 - Trust enforcement via `trust_check` parameter is advisory; full gate at CLI/action layer
 - Audit events are best-effort (failures caught and logged, never raised)
-- macOS Keychain integration deferred
+- macOS Keychain integration is optional via `keyring` and `arc providers add --keychain`; CI uses monkeypatched keyring, real macOS smoke remains manual
 
 ---
 
@@ -2004,7 +2004,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 | 33 Memory Graph | Research | None | P3 — research, may pivot |
 | 34 ARC Battle Mode | Baseline Complete | Phase 17, Phase 23, Phase 25, Phase 29, Phase 30, Phase 31 | P2/P3 — ARC-native offline battle CLI/IDE baseline complete; provider-backed battle remains blocked |
 | 36.1 Provider Discovery | Baseline Complete | None | Standalone — interactive provider UX without credential storage; no blockers |
-| 36.2 Credential Storage | Baseline Complete | Phase 23, Phase 25, Phase 36.1 | Auth module with Fernet encryption, OAuth handler, CLI `arc providers add --api-key/--oauth/remove`, token refresh, trust enforcement, audit logging, env var fallback; 41 auth tests |
+| 36.2 Credential Storage | Baseline Complete | Phase 23, Phase 25, Phase 36.1 | Auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`, token refresh, trust enforcement, audit logging, env var fallback; 57 auth tests |
 | 37 CLI Sandbox Hardening | Active Hardening | Phase 23 | Subprocess bounded streaming caps + approval prune active; path-intent expansion, protocol parity, microVM preflight, container fallback pending |
 
 ### Critical Path
@@ -2036,4 +2036,4 @@ Phase 37 (CLI Sandbox Hardening) ──→ (active; depends on Phase 23)
 - **SwarmGraph differentiators:** Phase 30 (depends on Phase 17 + Phase 21) → Phase 31 (depends on Phase 30 + Phase 23)
 - **Enterprise:** Phase 32 (depends on Phase 29 + Phase 21)
 - **Research:** Phase 33 (independent)
-- **Provider Management Phase 2:** Phase 36.2 (Baseline Complete — auth module with Fernet encryption, OAuth handler, CLI `arc providers add --api-key/--oauth/remove`, token refresh, trust enforcement, audit logging, env var fallback; 41 auth tests)
+- **Provider Management Phase 2:** Phase 36.2 (Baseline Complete — auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`, token refresh, trust enforcement, audit logging, env var fallback; 57 auth tests)

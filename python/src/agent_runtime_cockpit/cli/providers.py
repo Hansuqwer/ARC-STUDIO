@@ -362,15 +362,20 @@ def providers_add(
         None, "--api-key", help="Store API key (encrypted at rest)"
     ),
     oauth: bool = typer.Option(False, "--oauth", help="Start OAuth authorization flow"),
+    keychain: bool = typer.Option(
+        False, "--keychain", help="Store in macOS Keychain instead of file-based encryption"
+    ),
     label: str = typer.Option("default", "--label", help="Account label"),
     model: Optional[str] = typer.Option(None, "--model", help="Default model"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
-    """Add a provider credential (encrypted API key or OAuth).
+    """Add a provider credential (encrypted API key, OAuth, or Keychain).
 
-    Stores credentials encrypted at rest using Fernet symmetric encryption.
-    Use --api-key to store a raw API key, or --oauth to start an OAuth flow.
+    Stores credentials encrypted at rest using Fernet symmetric encryption by
+    default. Use --keychain to store in macOS Keychain instead (requires the
+    ``keyring`` Python package). Use --api-key to store a raw API key, or
+    --oauth to start an OAuth flow.
     Environment variable fallback remains active when no stored credential exists.
     """
     _setup_logging(debug)
@@ -382,23 +387,49 @@ def providers_add(
         raise typer.Exit(2)
 
     if api_key:
-        from ..auth.manager import encrypt_credential, save_credential
+        if keychain:
+            from ..auth.manager import save_to_keyring, _keyring_available
 
-        cred = encrypt_credential(provider, api_key)
-        cred.label = label
-        cred.default_model = model
-        save_credential(cred)
-        _out(
-            ok(
-                {
-                    "provider": provider,
-                    "label": label,
-                    "auth_method": "api_key",
-                    "message": f"API key stored securely for {provider_def.display_name}",
-                }
-            ),
-            json_output,
-        )
+            if not _keyring_available():
+                _out(
+                    err(
+                        ArcErrorCode.INVALID_INPUT,
+                        "macOS Keychain is not available. Install the 'keyring' package "
+                        "or use --api-key without --keychain for file-based encryption.",
+                    ),
+                    json_output,
+                )
+                raise typer.Exit(2)
+            save_to_keyring(provider, api_key)
+            _out(
+                ok(
+                    {
+                        "provider": provider,
+                        "label": label,
+                        "auth_method": "keychain",
+                        "message": f"API key stored in system keychain for {provider_def.display_name}",
+                    }
+                ),
+                json_output,
+            )
+        else:
+            from ..auth.manager import encrypt_credential, save_credential
+
+            cred = encrypt_credential(provider, api_key)
+            cred.label = label
+            cred.default_model = model
+            save_credential(cred)
+            _out(
+                ok(
+                    {
+                        "provider": provider,
+                        "label": label,
+                        "auth_method": "api_key",
+                        "message": f"API key stored securely for {provider_def.display_name}",
+                    }
+                ),
+                json_output,
+            )
     elif oauth:
         import os as _os
 
@@ -526,7 +557,12 @@ def providers_diagnostics(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLA
     _setup_logging(debug)
     from ..provider_action import redacted_diagnostics
 
-    _out(ok(redacted_diagnostics(os.environ)), json_output)
+    diag = redacted_diagnostics(os.environ)
+    # Add keychain availability
+    from ..auth.manager import _keyring_available
+
+    diag["keychain_available"] = _keyring_available()
+    _out(ok(diag), json_output)
 
 
 @providers_app.command("test")

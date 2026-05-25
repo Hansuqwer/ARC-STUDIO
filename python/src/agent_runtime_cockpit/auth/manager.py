@@ -1,7 +1,11 @@
-"""Secure credential storage with Fernet encryption at rest.
+"""Secure credential storage with Fernet encryption at rest and optional
+macOS Keychain integration.
 
 Credentials are stored at ``~/.local/share/arc-studio/auth.json`` with ``0o600``
 permissions and encrypted using a key derived from a local machine secret.
+On macOS, credentials can optionally be stored in the system Keychain via
+the ``keyring`` library.
+
 Environment variable fallback remains the default; stored credentials are
 checked only when no env var is present.
 
@@ -27,6 +31,8 @@ from cryptography.fernet import Fernet, InvalidToken
 from ..protocol.event_envelope import ok
 
 log = logging.getLogger(__name__)
+
+KEYRING_SERVICE = "arc-studio"
 
 
 AUTH_DIR = Path.home() / ".local" / "share" / "arc-studio"
@@ -79,6 +85,93 @@ def _record_credential_audit(
             os.fsync(f.fileno())
     except Exception as exc:
         log.warning("Failed to record credential audit: %s", exc)
+
+
+# ─── Keyring (macOS Keychain) integration ──────────────────────────
+
+
+def _keyring_available() -> bool:
+    """Check if the ``keyring`` library is installed and has a working backend."""
+    try:
+        import keyring as _kr
+
+        backend = _kr.get_keyring()
+        # Keyring returns a null keyring when no backend is available
+        return backend is not None and backend.priority >= 0
+    except (ImportError, AttributeError, Exception):
+        return False
+
+
+def _keyring_get(provider_id: str) -> Optional[str]:
+    """Retrieve a credential from the system keyring.
+
+    Returns the raw secret string, or None if not found.
+    """
+    try:
+        import keyring as _kr
+
+        return _kr.get_password(KEYRING_SERVICE, provider_id)
+    except (ImportError, Exception):
+        return None
+
+
+def _keyring_set(provider_id: str, secret: str) -> bool:
+    """Store a credential in the system keyring.
+
+    Returns True if successful, False on failure.
+    """
+    try:
+        import keyring as _kr
+
+        _kr.set_password(KEYRING_SERVICE, provider_id, secret)
+        return True
+    except (ImportError, Exception):
+        return False
+
+
+def _keyring_delete(provider_id: str) -> bool:
+    """Remove a credential from the system keyring.
+
+    Returns True if successful, False if not found or on failure.
+    """
+    try:
+        import keyring as _kr
+
+        _kr.delete_password(KEYRING_SERVICE, provider_id)
+        return True
+    except (ImportError, Exception):
+        return False
+
+
+def save_to_keyring(provider_id: str, secret: str) -> bool:
+    """Save a raw credential to the system keyring.
+
+    Returns True if the credential was stored in the keyring.
+    Falls back silently if keyring is unavailable.
+    """
+    if not _keyring_available():
+        return False
+    return _keyring_set(provider_id, secret)
+
+
+def get_from_keyring(provider_id: str) -> Optional[str]:
+    """Get a raw credential from the system keyring.
+
+    Returns the secret or None if not found or keyring unavailable.
+    """
+    if not _keyring_available():
+        return None
+    return _keyring_get(provider_id)
+
+
+def remove_from_keyring(provider_id: str) -> bool:
+    """Remove a credential from the system keyring.
+
+    Returns True if removed, False if not found or keyring unavailable.
+    """
+    if not _keyring_available():
+        return False
+    return _keyring_delete(provider_id)
 
 
 @dataclass
@@ -198,17 +291,24 @@ def get_credential(
     provider_id: str,
     path: Optional[Path] = None,
     trust_check: bool = True,
+    auto_refresh: bool = True,
 ) -> Optional[StoredCredential]:
     """Retrieve a stored credential for a provider.
+
+    For expired OAuth credentials with a ``refresh_token``, automatically
+    attempts token refresh if ``auto_refresh`` is True.
 
     Args:
         provider_id: The provider identifier.
         path: Path to the credential store file (defaults to module-level AUTH_PATH).
         trust_check: If True (default), checks workspace trust before returning
             credentials. Set to False only for trust setup flows.
+        auto_refresh: If True (default), automatically refreshes expired OAuth
+            credentials that have a refresh token.
 
     Returns:
-        The stored credential, or None if not found or expired.
+        The stored credential, or None if not found, expired without refresh,
+        or refresh fails.
     """
     resolved = _resolve_path(path)
     if trust_check and not _is_workspace_trusted():
@@ -218,12 +318,100 @@ def get_credential(
     for cred in store.credentials:
         if cred.provider_id == provider_id:
             if cred.expires_at and time.time() > cred.expires_at:
+                if auto_refresh and cred.auth_method == "oauth":
+                    refreshed = _try_refresh_oauth(cred)
+                    if refreshed is not None:
+                        # Replace in store and return refreshed credential
+                        save_credential(refreshed, resolved)
+                        _record_credential_audit(
+                            "get", provider_id, True, "refreshed_expired_token"
+                        )
+                        return refreshed
                 _record_credential_audit("get", provider_id, False, "credential_expired")
                 return None
             _record_credential_audit("get", provider_id, True)
             return cred
     _record_credential_audit("get", provider_id, False, "not_found")
     return None
+
+
+def _try_refresh_oauth(cred: StoredCredential) -> Optional[StoredCredential]:
+    """Attempt to refresh an expired OAuth credential.
+
+    Decrypts the stored OAuth token JSON, extracts the refresh_token,
+    calls the provider's token refresh endpoint, and returns a new
+    ``StoredCredential`` with the refreshed token. Returns None on failure.
+    """
+    try:
+        import json as _json
+
+        raw = decrypt_credential(cred)
+        if raw is None:
+            return None
+        token_data = _json.loads(raw)
+        refresh_token = token_data.get("refresh_token")
+        if not refresh_token:
+            return None
+
+        from .oauth import OAuthConfig, refresh_oauth_token
+
+        config = OAuthConfig(
+            provider_id=cred.provider_id,
+            client_id="",  # Will be populated from env if available
+            client_secret="",
+            auth_url="",
+            token_url="",  # Will be determined from provider definition
+        )
+        # Try to get provider config from environment
+        try:
+            from ..provider_action import PROVIDERS
+
+            provider_def = next((p for p in PROVIDERS if p.id == cred.provider_id), None)
+            if provider_def:
+                import os as _os
+
+                base_url = provider_def.default_base_url or ""
+                config.client_id = _os.environ.get(
+                    f"ARC_OAUTH_CLIENT_ID_{cred.provider_id.upper()}", ""
+                )
+                config.client_secret = _os.environ.get(
+                    f"ARC_OAUTH_CLIENT_SECRET_{cred.provider_id.upper()}", ""
+                )
+                config.token_url = _os.environ.get(
+                    f"ARC_OAUTH_TOKEN_URL_{cred.provider_id.upper()}",
+                    f"{base_url}/v1/oauth/token",
+                )
+        except Exception:
+            pass
+
+        if not config.client_id:
+            return None
+
+        result = refresh_oauth_token(config, refresh_token)
+        # Build new credential with updated token
+        new_payload = _json.dumps(
+            {
+                "access_token": result.access_token,
+                "refresh_token": result.refresh_token,
+                "expires_in": result.expires_in,
+                "token_type": result.token_type,
+            }
+        )
+        # Re-encrypt with the new payload
+        encrypted = _get_fernet().encrypt(new_payload.encode("utf-8")).decode("utf-8")
+        return StoredCredential(
+            provider_id=cred.provider_id,
+            label=cred.label,
+            credential_data=encrypted,
+            auth_method="oauth",
+            default_model=cred.default_model,
+            base_url=cred.base_url,
+            created_at=time.time(),
+            expires_at=time.time() + result.expires_in if result.expires_in else None,
+        )
+    except Exception as exc:
+        log.warning("Failed to auto-refresh OAuth token for %s: %s", cred.provider_id, exc)
+        return None
 
 
 def get_decrypted_api_key(
