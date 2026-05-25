@@ -972,25 +972,27 @@ bash scripts/check-pr.sh
 ## Phase 26 — MCP Local Control Plane for ARC
 
 **Roadmap:** R19 — MCP Local Control Plane  
-**Status:** Baseline Complete (scaffold) ✓ | Evidence: 18 MCP tests pass, 1697 Python tests pass, protocol/extension builds clean, banned-claims OK | Notes: Local control plane scaffold with stdio transport only. Not yet wired to IDE. SwarmGraph MCP wrappers deferred.  
+**Status:** Baseline Complete with contract/audit hardening ✓ | Evidence: 29 MCP tests pass; Phase 26 hardening adds per-call trust checks, stable ARC envelopes, ID/path validation, trace pagination, redaction, output caps, task-tool bounds, and best-effort MCP audit events | Notes: Local control plane remains stdio-only. Not yet wired to IDE. SwarmGraph MCP wrappers deferred.  
 **Depends on:** Phase 23 (trust enforcement required before MCP server activation)
 
 ### Implementation
 1. Added `mcp>=1.0.0` (MCP Python SDK v1.27.1) to Python dependencies.
 2. Created `mcp/server.py` with `create_mcp_server()` using FastMCP, gated by `ensure_trusted()` from Phase 23.
-3. Added 7 MCP tools: `arc_doctor`, `arc_run_status`, `arc_trace_search`, `arc_trace_read`, `arc_audit_verify`, `arc_hitl_list`, `arc_runtime_capabilities`.
+3. Added MCP tools: `arc_doctor`, `arc_run_status`, `arc_trace_search`, `arc_trace_read`, `arc_audit_verify`, `arc_hitl_list`, `arc_runtime_capabilities`, plus task tools `arc_task_create`, `arc_task_status`, `arc_task_cancel`, `arc_task_result`.
 4. Added 3 MCP resources: `arc://runs/{run_id}`, `arc://traces/{run_id}`, `arc://audit/{run_id}`.
 5. Added `cli/mcp.py` with `arc mcp serve --stdio` CLI command (registered as `mcp_app` sub-app).
 6. Disable MCP tools in untrusted workspaces via `ensure_trusted()` — raises `MCPServerError`.
 7. All tools are read-only local operations: no paid/provider calls, no secret output, no network sockets.
-8. 18 tests: server creation (trusted/untrusted), tool registration, resource registration, JSON output checks, error handling.
+8. 29 tests: server creation (trusted/untrusted), tool/resource registration, stable ARC envelopes, per-call trust re-check, traversal rejection, trace pagination/redaction, task bounds, and MCP audit emission.
+9. Hardened tool/resource calls with stable ARC envelopes, redaction, ID validation, path guards for trace/audit resources, trace pagination, output caps, and typed error envelopes.
+10. Added best-effort local MCP audit JSONL at `.arc/audit/mcp.events.jsonl` recording tool, workspace, redacted args, args hash, decision, error code/reason, timing, transport, and truncation flag without logging full payloads.
 
 ### Acceptance
 1. ✅ `arc mcp serve --stdio` works from MCP stdio clients (requires trusted workspace).
 2. ✅ MCP tools are disabled in untrusted workspaces with `MCPServerError`.
 3. ✅ MCP resource reads are local-only (file system operations).
 4. ✅ No HTTP binding — stdio only.
-5. ✅ 18 MCP tests passing covering all tools.
+5. ✅ 29 MCP tests passing covering registered tools, resource templates, trust gating, typed error envelopes, trace pagination/redaction, task bounds, allowed/denied audit events, redaction, truncation flagging, and audit write failure tolerance.
 
 ### Verification
 ```bash
@@ -1217,8 +1219,12 @@ bash scripts/check-pr.sh
 ## Phase 31 — Adaptive Consensus Protocol
 
 **Roadmap:** R24 — Adaptive Consensus  
-**Status:** Not Started  
+**Status:** Complete  
 **Depends on:** Phase 30 (Consensus Escrow), Phase 23 (trust for risk assessment inputs)
+
+### Result
+
+Complete. Adaptive consensus is implemented via deterministic heuristic risk assessment in `swarmgraph/risk_assessment.py`, protocol selection for majority/raft/bft/bft_escrow, BFT+escrow integration, and hardening for raft/BFT dispatch, per-task adaptive metadata, and risk metadata in consensus events. Evidence: commits `83dfe84` and `6d45e06`; tests in `python/tests/swarmgraph/test_risk_assessment.py` and `python/tests/swarmgraph/test_adaptive_consensus_hardening.py`.
 
 ### Implementation
 1. Implement deterministic heuristic risk assessor (not LLM-based — per architecture review).
@@ -1398,8 +1404,12 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 ## Phase 34.2 — IDE Battle Tab
 
 **Roadmap:** R26A Follow-up — IDE Battle Tab  
-**Status:** Not Started  
+**Status:** Complete  
 **Depends on:** Phase 34 (ARC Battle Mode baseline + run/trace integration)
+
+### Result
+
+Complete. IDE Battle tab support exists via `packages/arc-extension/src/browser/tabs/BattleTab.tsx`, `packages/arc-extension/src/node/services/battle-service.ts`, and `packages/arc-extension/src/common/battle-protocol.ts`. Evidence: commit `bd626fd` (`Implement Phase 34.1 + 34.2: Battle Run/Trace Integration + IDE Battle Tab`). Real-time updates and battle cancellation remain known risks/follow-ups; the tab remains data-backed and must not fabricate battle material.
 
 ### Goal
 Implement IDE Battle tab to display battle runs, candidates, votes, outcomes, and ELO leaderboard with honest empty/degraded/present states.
@@ -1987,14 +1997,14 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 | 24 Trace Virtualization | Baseline Complete | Phase 22 | P1 — virtualized event list, per-run replay buffer, Last-Event-ID reconnect plumbing |
 | 25 CLI Decomposition | Baseline Complete ✓ | None | P1 — fully decomposed into `cli/` modules; unblocks Phase 36.2 |
 | 26 MCP Local Control Plane | Baseline Complete (scaffold) ✓ | Phase 23 | P1 — stdio-only MCP server with trust gate, 7 tools, 3 resources |
-| 27 MCP Tasks | Not Started | Phase 25 | P1 — needs CLI command modules for task surface |
-| 28 LangGraph Replay | Not Started | Phase 25 | P1 — needs CLI for replay commands |
-| 29 Persistent HITL + Eval | Not Started | Phase 25, Phase 22 | P1/P2 — needs CLI + typed HITL events |
-| 30 Consensus Escrow | Not Started | Phase 17, Phase 21 | P2 — unique differentiator |
-| 31 Adaptive Consensus | Not Started | Phase 30, Phase 23 | P2 — major differentiator |
+| 27 MCP Tasks | Baseline Complete | Phase 25 | P1 — SQLite task registry, CLI commands, MCP polling tools, retry/expiry support complete |
+| 28 LangGraph Replay | Baseline Complete | Phase 25 | P1 — replay capability detection and inspect/simulated/unsafe reporting complete |
+| 29 Persistent HITL + Eval | Baseline Complete (HITL only) | Phase 25, Phase 22 | P1/P2 — SQLite HITL persistence complete; eval artifact schema/export deferred |
+| 30 Consensus Escrow | Complete | Phase 17, Phase 21 | P2 — commit-reveal voting with adversarial tests complete |
+| 31 Adaptive Consensus | Complete | Phase 30, Phase 23 | P2 — deterministic risk assessment and protocol selection complete |
 | 32 Event Notifications | Not Started | Phase 29, Phase 21 | P2 — enterprise compliance |
 | 33 Memory Graph | Research | None | P3 — research, may pivot |
-| 34 ARC Battle Mode | Not Started | Phase 17, Phase 23, Phase 25, Phase 29, Phase 30, Phase 31 | P2/P3 — ARC-native offline battle CLI/IDE, not live LM Arena productization |
+| 34 ARC Battle Mode | Baseline Complete | Phase 17, Phase 23, Phase 25, Phase 29, Phase 30, Phase 31 | P2/P3 — ARC-native offline battle CLI/IDE baseline complete; provider-backed battle remains blocked |
 | 36.1 Provider Discovery | Baseline Complete | None | Standalone — interactive provider UX without credential storage; no blockers |
 | 36.2 Credential Storage | Blocked | Phase 23, Phase 25, Phase 36.1 | Standalone — secure credential storage and OAuth; requires trust infrastructure |
 | 37 CLI Sandbox Hardening | Active Hardening | Phase 23 | Subprocess bounded streaming caps + approval prune active; path-intent expansion, protocol parity, microVM preflight, container fallback pending |

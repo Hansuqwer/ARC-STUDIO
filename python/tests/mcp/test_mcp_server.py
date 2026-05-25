@@ -119,8 +119,9 @@ def test_arc_doctor_returns_json(tmp_path: Path):
     tool = _get_tool_fn(server, "arc_doctor")
     result = tool()
     parsed = json.loads(result)
-    assert isinstance(parsed, list)
-    assert len(parsed) >= 3
+    assert parsed["ok"] is True
+    assert isinstance(parsed["data"], list)
+    assert len(parsed["data"]) >= 3
 
 
 def test_arc_doctor_includes_mcp_check(tmp_path: Path):
@@ -130,7 +131,7 @@ def test_arc_doctor_includes_mcp_check(tmp_path: Path):
     trust_workspace(tmp_path, note="test")
     server = create_mcp_server(workspace=tmp_path)
     tool = _get_tool_fn(server, "arc_doctor")
-    result = json.loads(tool())
+    result = json.loads(tool())["data"]
     checks_by_name = {c["check"]: c for c in result}
     assert "mcp" in checks_by_name
     assert checks_by_name["mcp"]["ok"] is True
@@ -144,7 +145,7 @@ def test_arc_doctor_includes_trust_check(tmp_path: Path):
     trust_workspace(tmp_path, note="test")
     server = create_mcp_server(workspace=tmp_path)
     tool = _get_tool_fn(server, "arc_doctor")
-    result = json.loads(tool())
+    result = json.loads(tool())["data"]
     checks_by_name = {c["check"]: c for c in result}
     assert "trust" in checks_by_name
     assert checks_by_name["trust"]["level"] == "trusted"
@@ -157,7 +158,7 @@ def test_arc_doctor_includes_python_and_cli(tmp_path: Path):
     trust_workspace(tmp_path, note="test")
     server = create_mcp_server(workspace=tmp_path)
     tool = _get_tool_fn(server, "arc_doctor")
-    result = json.loads(tool())
+    result = json.loads(tool())["data"]
     checks_by_name = {c["check"]: c for c in result}
     assert "python" in checks_by_name
     assert "cli" in checks_by_name
@@ -171,8 +172,8 @@ def test_arc_run_status_returns_error_for_missing_run(tmp_path: Path):
     server = create_mcp_server(workspace=tmp_path)
     tool = _get_tool_fn(server, "arc_run_status")
     result = json.loads(tool(run_id="nonexistent"))
-    assert "error" in result
-    assert "not found" in result["error"]
+    assert result["ok"] is False
+    assert "not found" in result["error"]["message"]
 
 
 def test_arc_trace_search_requires_index(tmp_path: Path):
@@ -183,7 +184,8 @@ def test_arc_trace_search_requires_index(tmp_path: Path):
     server = create_mcp_server(workspace=tmp_path)
     tool = _get_tool_fn(server, "arc_trace_search")
     result = json.loads(tool())
-    assert "error" in result
+    assert result["ok"] is False
+    assert "SQLite index not found" in result["error"]["message"]
 
 
 def test_arc_audit_verify_returns_error_for_missing_run(tmp_path: Path):
@@ -206,7 +208,199 @@ def test_arc_hitl_list_returns_empty_for_no_prompts(tmp_path: Path):
     server = create_mcp_server(workspace=tmp_path)
     tool = _get_tool_fn(server, "arc_hitl_list")
     result = json.loads(tool())
-    assert isinstance(result, list)
+    assert result["ok"] is True
+    assert isinstance(result["data"], list)
+
+
+def test_tool_rechecks_trust_after_server_creation(tmp_path: Path, monkeypatch):
+    """Tool calls must fail closed if trust is revoked after server creation."""
+    from agent_runtime_cockpit.mcp.server import create_mcp_server
+    import agent_runtime_cockpit.mcp.server as mcp_server
+
+    trust_workspace(tmp_path, note="test")
+    server = create_mcp_server(workspace=tmp_path)
+    tool = _get_tool_fn(server, "arc_doctor")
+
+    def deny(_workspace):
+        from agent_runtime_cockpit.security.trust import WorkspaceUntrusted
+
+        raise WorkspaceUntrusted("revoked")
+
+    monkeypatch.setattr(mcp_server, "ensure_trusted", deny)
+    result = json.loads(tool())
+    assert result["ok"] is False
+    assert result["error"]["details"]["code"] == "WORKSPACE_UNTRUSTED"
+
+
+def test_arc_trace_read_rejects_traversal_run_id(tmp_path: Path):
+    from agent_runtime_cockpit.mcp.server import create_mcp_server
+
+    trust_workspace(tmp_path, note="test")
+    server = create_mcp_server(workspace=tmp_path)
+    tool = _get_tool_fn(server, "arc_trace_read")
+    result = json.loads(tool(run_id="../secret"))
+    assert result["ok"] is False
+    assert result["error"]["details"]["code"] == "INVALID_MCP_ARGUMENT"
+
+
+def test_arc_audit_verify_rejects_traversal_run_id(tmp_path: Path):
+    from agent_runtime_cockpit.mcp.server import create_mcp_server
+
+    trust_workspace(tmp_path, note="test")
+    server = create_mcp_server(workspace=tmp_path)
+    tool = _get_tool_fn(server, "arc_audit_verify")
+    result = json.loads(tool(run_id="../secret"))
+    assert result["ok"] is False
+    assert result["error"]["details"]["code"] == "INVALID_MCP_ARGUMENT"
+
+
+def test_arc_trace_read_paginates_and_redacts(tmp_path: Path):
+    from agent_runtime_cockpit.mcp.server import create_mcp_server
+    from agent_runtime_cockpit.protocol.schemas import RunEvent, RunRecord, RunStatus
+    from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
+
+    trust_workspace(tmp_path, note="test")
+    store = JsonlTraceStore(tmp_path / ".arc" / "traces")
+    store.save(
+        RunRecord(
+            id="run-safe",
+            workflow_id="wf",
+            runtime="fake",
+            status=RunStatus.COMPLETED,
+            started_at="2026-01-01T00:00:00Z",
+            events=[
+                RunEvent(
+                    type="A",
+                    timestamp="2026-01-01T00:00:00Z",
+                    run_id="run-safe",
+                    sequence=1,
+                    data={"message": "ok"},
+                ),
+                RunEvent(
+                    type="B",
+                    timestamp="2026-01-01T00:00:01Z",
+                    run_id="run-safe",
+                    sequence=2,
+                    data={"api_key": "sk-" + "a" * 40},
+                ),
+            ],
+        )
+    )
+    server = create_mcp_server(workspace=tmp_path)
+    tool = _get_tool_fn(server, "arc_trace_read")
+    result = json.loads(tool(run_id="run-safe", limit=1, offset=1))
+    assert result["ok"] is True
+    assert result["data"]["event_count"] == 2
+    assert len(result["data"]["events"]) == 1
+    assert result["data"]["events"][0]["data"]["api_key"] == "[REDACTED]"
+
+
+def test_arc_trace_read_rejects_invalid_limit(tmp_path: Path):
+    from agent_runtime_cockpit.mcp.server import create_mcp_server
+
+    trust_workspace(tmp_path, note="test")
+    server = create_mcp_server(workspace=tmp_path)
+    tool = _get_tool_fn(server, "arc_trace_read")
+    result = json.loads(tool(run_id="run-safe", limit=0))
+    assert result["ok"] is False
+    assert "limit must be" in result["error"]["message"]
+
+
+def test_arc_task_create_rejects_excessive_retries(tmp_path: Path):
+    from agent_runtime_cockpit.mcp.server import create_mcp_server
+
+    trust_workspace(tmp_path, note="test")
+    server = create_mcp_server(workspace=tmp_path)
+    tool = _get_tool_fn(server, "arc_task_create")
+    result = json.loads(tool(operation="noop", max_retries=99))
+    assert result["ok"] is False
+    assert "max_retries" in result["error"]["message"]
+
+
+def test_allowed_tool_call_emits_mcp_audit_event(tmp_path: Path):
+    from agent_runtime_cockpit.mcp.server import create_mcp_server
+
+    trust_workspace(tmp_path, note="test")
+    server = create_mcp_server(workspace=tmp_path)
+    tool = _get_tool_fn(server, "arc_doctor")
+    result = json.loads(tool())
+    assert result["ok"] is True
+
+    event = _last_mcp_audit_event(tmp_path)
+    assert event["type"] == "mcp_tool_call"
+    assert event["tool"] == "arc_doctor"
+    assert event["decision"] == "allowed"
+    assert event["transport"] == "stdio"
+    assert event["workspace"] == str(tmp_path)
+    assert "started_at" in event
+    assert "ended_at" in event
+    assert isinstance(event["duration_ms"], float | int)
+
+
+def test_denied_tool_call_emits_mcp_audit_event(tmp_path: Path):
+    from agent_runtime_cockpit.mcp.server import create_mcp_server
+
+    trust_workspace(tmp_path, note="test")
+    server = create_mcp_server(workspace=tmp_path)
+    tool = _get_tool_fn(server, "arc_trace_read")
+    result = json.loads(tool(run_id="../secret"))
+    assert result["ok"] is False
+
+    event = _last_mcp_audit_event(tmp_path)
+    assert event["tool"] == "arc_trace_read"
+    assert event["decision"] == "denied"
+    assert event["error_code"] == "INVALID_MCP_ARGUMENT"
+    assert event["args"]["run_id"] == "../secret"
+
+
+def test_mcp_audit_redacts_args_and_hashes_them(tmp_path: Path):
+    from agent_runtime_cockpit.mcp.server import create_mcp_server
+
+    secret = "sk-" + "b" * 40
+    trust_workspace(tmp_path, note="test")
+    server = create_mcp_server(workspace=tmp_path)
+    tool = _get_tool_fn(server, "arc_task_create")
+    result = json.loads(tool(operation="noop", params=json.dumps({"api_key": secret})))
+    assert result["ok"] is True
+
+    event = _last_mcp_audit_event(tmp_path)
+    serialized = json.dumps(event)
+    assert secret not in serialized
+    assert "[REDACTED]" in serialized
+    assert len(event["args_hash"]) == 64
+
+
+def test_mcp_audit_records_truncation(tmp_path: Path, monkeypatch):
+    from agent_runtime_cockpit.mcp.server import create_mcp_server
+    import agent_runtime_cockpit.mcp.server as mcp_server
+
+    trust_workspace(tmp_path, note="test")
+    server = create_mcp_server(workspace=tmp_path)
+    tool = _get_tool_fn(server, "arc_doctor")
+
+    def capped(_data, *, workspace, max_bytes=mcp_server._MAX_MCP_OUTPUT_BYTES):
+        return json.dumps({"ok": True, "data": {"truncated": True}}), True
+
+    monkeypatch.setattr(mcp_server, "_redacted_json_envelope", capped)
+    result = json.loads(tool())
+    assert result["ok"] is True
+
+    event = _last_mcp_audit_event(tmp_path)
+    assert event["decision"] == "allowed"
+    assert event["truncated"] is True
+
+
+def test_mcp_audit_write_failure_does_not_break_tool_response(tmp_path: Path):
+    from agent_runtime_cockpit.mcp.server import create_mcp_server
+
+    trust_workspace(tmp_path, note="test")
+    (tmp_path / ".arc").mkdir()
+    (tmp_path / ".arc" / "audit").write_text("not a directory", encoding="utf-8")
+    server = create_mcp_server(workspace=tmp_path)
+    tool = _get_tool_fn(server, "arc_doctor")
+
+    result = json.loads(tool())
+    assert result["ok"] is True
 
 
 def test_resources_registered(tmp_path: Path):
@@ -250,3 +444,10 @@ def _get_tool_fn(server, name: str):
         if tool is not None:
             return getattr(tool, "fn", None)
     raise ValueError(f"Tool '{name}' not found")
+
+
+def _last_mcp_audit_event(workspace: Path) -> dict:
+    path = workspace / ".arc" / "audit" / "mcp.events.jsonl"
+    lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert lines
+    return json.loads(lines[-1])

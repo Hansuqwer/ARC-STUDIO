@@ -3,7 +3,7 @@
 This document catalogs all security-sensitive surfaces in ARC Studio and their enforcement status. It is the **single source of truth** for every execution surface that routes through the typed enforcement helpers introduced in Phase 23 (and the bypass-warning helper from ADR-0022.1).
 
 **Last updated:** 2026-05-22  
-**Phase:** 23.3 (Baseline Complete) + extended by Phases 25.5, 26, 32, 35 + sandbox hardening  
+**Phase:** 23.3 (Baseline Complete) + extended by Phases 25.5, 26, 32, 35 + sandbox/MCP hardening  
 **Audit script:** `scripts/audit-enforcement-surfaces.sh`
 
 If a code path performs a subprocess call, a file read in a user-controlled location, a socket bind, or an HTTP call and is **not** listed here, that is a bug. Either the path needs a row in this document, or it needs a `# enforcement: not-applicable` annotation that the audit script can verify.
@@ -108,6 +108,25 @@ records gate).      unless user consents
 - **Where:** All `ProviderClient` implementations
 - **Gate:** `enforce_paid_call_gate`
 - **Denial event:** `PAID_CALL_DENIED` with `{"surface": "provider.<name>"}`
+
+---
+
+### Phase 26 — ARC MCP Local Control Plane
+
+#### S-26.MCP.1 · Local MCP server start
+- **What:** Starting ARC's local MCP control plane over stdio only.
+- **Where:** `mcp/server.py`, `cli/mcp.py`
+- **Gate:** `ensure_trusted()` at server creation.
+- **Transport:** stdio only; HTTP/listen sockets remain excluded until auth/trust policy is accepted.
+- **Audit coverage:** `python/tests/mcp/test_mcp_server.py` verifies trusted/untrusted creation and unsupported transport behavior through CLI-level tests where present.
+
+#### S-26.MCP.2 · MCP tool/resource invocation
+- **What:** Each MCP tool/resource call reads local ARC state (runs, traces, audit, HITL, tasks) or creates/cancels local task records.
+- **Where:** `mcp/server.py`
+- **Gate:** `ensure_trusted()` is re-checked per tool/resource call.
+- **Data controls:** Safe ID validation, trace/audit path guard, trace pagination, output caps, stable ARC envelopes, and redaction before returning or auditing data.
+- **Audit coverage:** Best-effort local JSONL at `.arc/audit/mcp.events.jsonl` records tool/resource name, workspace, redacted args, args hash, decision (`allowed`, `denied`, `error`), error code/reason, timing, transport (`stdio`), and truncation flag. Audit write failure does not fail the tool response.
+- **Bypass-warning conditions:** None. No provider/network/paid calls are made by this local control plane.
 
 ---
 

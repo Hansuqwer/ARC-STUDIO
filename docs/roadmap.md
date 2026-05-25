@@ -433,11 +433,11 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Expose ARC as a local MCP control plane over existing capabilities, with narrow SwarmGraph wrappers.
 
-**Current:** Baseline Complete (scaffold). `arc mcp serve --stdio` implemented using MCP Python SDK (FastMCP) with stdio transport only. Gated by workspace trust enforcement (Phase 23) — untrusted workspaces raise `MCPServerError`. Exposes 7 local tools: `arc_doctor`, `arc_run_status`, `arc_trace_search`, `arc_trace_read`, `arc_audit_verify`, `arc_hitl_list`, `arc_runtime_capabilities`. Exposes 3 local resources: `arc://runs/{run_id}`, `arc://traces/{run_id}`, `arc://audit/{run_id}`. All tools are read-only local operations — no paid/provider calls, no secret output, no network/listen sockets. Tool descriptions are self-documenting for MCP client discovery.
+**Current:** Baseline Complete with MCP contract/audit hardening. `arc mcp serve --stdio` is implemented using MCP Python SDK (FastMCP) with stdio transport only. Gated by workspace trust enforcement (Phase 23) at server creation and re-checked per tool/resource call. Exposes 11 local tools: `arc_doctor`, `arc_run_status`, `arc_trace_search`, `arc_trace_read`, `arc_audit_verify`, `arc_hitl_list`, `arc_runtime_capabilities`, `arc_task_create`, `arc_task_status`, `arc_task_cancel`, `arc_task_result`. Exposes 3 local resources: `arc://runs/{run_id}`, `arc://traces/{run_id}`, `arc://audit/{run_id}`. Tool outputs use stable ARC envelopes, redaction, ID validation, trace pagination, and output caps. MCP tool calls now emit best-effort local JSONL audit events at `.arc/audit/mcp.events.jsonl` with redacted args, args hash, timing, decision, error code/reason, transport, and truncation flag. There is still no HTTP transport, provider call, paid call, or network/listen socket.
 
 **Deliverables:**
 - `arc mcp serve --stdio` implemented (stdio transport only)
-- MCP tools: `arc_doctor`, `arc_run_status`, `arc_trace_search`, `arc_trace_read`, `arc_audit_verify`, `arc_hitl_list`, `arc_runtime_capabilities`
+- MCP tools: `arc_doctor`, `arc_run_status`, `arc_trace_search`, `arc_trace_read`, `arc_audit_verify`, `arc_hitl_list`, `arc_runtime_capabilities`, `arc_task_create`, `arc_task_status`, `arc_task_cancel`, `arc_task_result`
 - MCP resources: `arc://runs/{run_id}`, `arc://traces/{run_id}`, `arc://audit/{run_id}`
 - Tools disabled in untrusted workspaces via `ensure_trusted()` gate
 - SwarmGraph wrappers deferred (not needed for local control plane scaffold)
@@ -452,7 +452,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - ✅ No paid/provider calls or secret output
 - ✅ 18 MCP tests passing
 
-**Status:** Baseline Complete (scaffold) | Evidence: 18 MCP tests pass, 1697 Python tests pass, protocol/extension builds clean | Notes: Local control plane scaffold. Not yet wired to IDE. SwarmGraph MCP wrappers deferred to Phase 28+. HTTP transport deliberately excluded until auth/trust policy defined.
+**Status:** Baseline Complete with contract/audit hardening | Evidence: 29 MCP tests pass; Phase 26 hardening adds per-call trust checks, stable ARC envelopes, ID/path validation, trace pagination, redaction, output caps, task-tool bounds, and best-effort MCP audit events | Notes: Local stdio control plane only. Not yet wired to IDE. SwarmGraph MCP wrappers deferred. HTTP transport deliberately excluded until auth/trust policy defined.
 
 **Source:** Architecture Review P1-6, Feature List F2.1
 
@@ -898,13 +898,13 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R15 Discriminated RunEvent Unions** | **Baseline Complete** | **Phase 22 — 22 typed events + RAW fallback, TS/Python discriminated unions, type guards** |
 | **R16 Trust + Paid-Call Enforcement** | **Baseline Complete; Active Hardening** | **Phase 23 — enforcement complete; sandbox subprocess caps active; microVM preflight-only** |
 | **R17 Trace Virtualization + Daemon** | **Baseline Complete** | **Phase 24 — VirtualizedEventList, RingBuffer, SSE Last-Event-ID, client reconnect** |
-| **R18 CLI Decomposition** | **Partial** | **Phase 25 — split remaining commands** |
-| **R19 MCP Local Control Plane** | **Not Started** | **Phase 26 — implement stdio server** |
-| **R20 MCP Tasks** | **Not Started** | **Phase 27 — add task registry** |
-| **R21 LangGraph Replay Contract** | **Not Started** | **Phase 28 — add replay capability detection** |
-| **R22 Persistent HITL + Eval** | **Not Started** | **Phase 29 — add SQLite HITL storage** |
-| **R23 Consensus Escrow** | **Not Started** | **Phase 30 — implement commit-reveal** |
-| **R24 Adaptive Consensus** | **Not Started** | **Phase 31 — add risk-based selection** |
+| **R18 CLI Decomposition** | **Baseline Complete** | **Phase 25 — complete; CLI decomposed into command modules with stable JSON snapshots** |
+| **R19 MCP Local Control Plane** | **Baseline Complete (scaffold)** | **Phase 26 — complete; stdio-only MCP server with trust gate, 7 tools, 3 resources** |
+| **R20 MCP Tasks** | **Baseline Complete** | **Phase 27 — complete; SQLite task registry, CLI commands, MCP polling tools, retry/expiry support** |
+| **R21 LangGraph Replay Contract** | **Baseline Complete** | **Phase 28 — complete; replay capability detection and inspect/simulated/unsafe reporting** |
+| **R22 Persistent HITL + Eval** | **Baseline Complete (HITL only)** | **Phase 29 — HITL persistence complete; eval artifact schema and Inspect-style export deferred** |
+| **R23 Consensus Escrow** | **Complete** | **Phase 30 — complete; commit-reveal voting with cryptographic verification and adversarial tests** |
+| **R24 Adaptive Consensus** | **Complete** | **Phase 31 — complete; deterministic risk assessment, protocol selection, raft/bft/bft_escrow hardening** |
 | **R25 Event-Driven Notifications** | **Not Started** | **Phase 32 — add event bus + webhooks** |
 | **R26 Swarm Memory Graph** | **Research** | **Phase 33 — design + prototype** |
 | **R27 LangChain Adapter** | **Baseline Complete** | **Adapter Phase 26 — complete (commits 6beedf8, ea567cf, 7566e60)** |

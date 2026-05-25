@@ -12,22 +12,102 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+import time
+from datetime import datetime, timezone
+from hashlib import sha256
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from mcp.server.fastmcp import FastMCP
 
 from .. import __version__ as arc_version
+from ..protocol.errors import ArcErrorCode
+from ..protocol.event_envelope import err, ok
+from ..security.redaction import Redactor
 from ..security.trust import WorkspaceUntrusted, ensure_trusted
 
 log = logging.getLogger(__name__)
 
 # Default workspace path (current working directory)
 _DEFAULT_WORKSPACE = Path.cwd()
+_SAFE_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
+_MAX_MCP_OUTPUT_BYTES = 1_048_576
+_DEFAULT_TRACE_LIMIT = 500
+_MAX_TRACE_LIMIT = 2_000
 
 
 class MCPServerError(Exception):
     """Base exception for MCP server errors."""
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _redacted_json_envelope(
+    data: Any,
+    *,
+    workspace: Path,
+    max_bytes: int = _MAX_MCP_OUTPUT_BYTES,
+) -> tuple[str, bool]:
+    redacted = Redactor().redact_dict(data)
+    envelope = ok(redacted, workspace=str(workspace)).model_dump(mode="json")
+    text = json.dumps(envelope, indent=2, default=str)
+    if len(text.encode("utf-8")) <= max_bytes:
+        return text, False
+    truncated = {
+        "truncated": True,
+        "truncated_reason": "mcp_output_cap_exceeded",
+        "max_bytes": max_bytes,
+    }
+    return json.dumps(
+        ok(truncated, workspace=str(workspace)).model_dump(mode="json"), indent=2
+    ), True
+
+
+def _error_json(
+    code: str,
+    message: str,
+    *,
+    details: dict[str, Any] | None = None,
+) -> str:
+    return json.dumps(err(code, message, details).model_dump(mode="json"), indent=2)
+
+
+def _redacted_args(args: dict[str, Any]) -> dict[str, Any]:
+    return Redactor().redact_dict(args)
+
+
+def _args_hash(args: dict[str, Any]) -> str:
+    raw = json.dumps(_redacted_args(args), sort_keys=True, default=str, separators=(",", ":"))
+    return sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _persist_mcp_audit_event(workspace: Path, event: dict[str, Any]) -> None:
+    """Best-effort MCP audit JSONL writer; never fails a tool call."""
+    try:
+        audit_dir = workspace / ".arc" / "audit"
+        audit_dir.mkdir(parents=True, exist_ok=True)
+        path = audit_dir / "mcp.events.jsonl"
+        with path.open("a", encoding="utf-8") as fp:
+            fp.write(json.dumps(event, sort_keys=True, separators=(",", ":"), default=str) + "\n")
+    except Exception:
+        log.exception("failed to persist MCP audit event")
+
+
+def _safe_id(value: str, field: str) -> str:
+    if not _SAFE_ID_RE.fullmatch(value):
+        raise ValueError(f"invalid {field}: must match {_SAFE_ID_RE.pattern}")
+    return value
+
+
+def _resolve_workspace_child(base: Path, filename: str) -> Path:
+    root = base.resolve()
+    path = (base / filename).resolve()
+    if root != path and root not in path.parents:
+        raise ValueError("path escapes workspace data directory")
+    return path
 
 
 def create_mcp_server(
@@ -60,6 +140,95 @@ def create_mcp_server(
 
     mcp = FastMCP(server_name, json_response=True)
 
+    def _trusted() -> None:
+        ensure_trusted(ws)
+
+    def _tool_result(
+        tool_name: str, callback: Callable[[], Any], args: dict[str, Any] | None = None
+    ) -> str:
+        started = time.perf_counter()
+        started_at = _utc_now()
+        audit_args = args or {}
+        base_audit = {
+            "type": "mcp_tool_call",
+            "tool": tool_name,
+            "workspace": str(ws),
+            "transport": "stdio",
+            "args": _redacted_args(audit_args),
+            "args_hash": _args_hash(audit_args),
+            "started_at": started_at,
+        }
+        try:
+            _trusted()
+            text, truncated = _redacted_json_envelope(callback(), workspace=ws)
+            _persist_mcp_audit_event(
+                ws,
+                {
+                    **base_audit,
+                    "decision": "allowed",
+                    "ended_at": _utc_now(),
+                    "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                    "truncated": truncated,
+                },
+            )
+            return text
+        except WorkspaceUntrusted as e:
+            message = f"MCP tool blocked: {e}"
+            _persist_mcp_audit_event(
+                ws,
+                {
+                    **base_audit,
+                    "decision": "denied",
+                    "error_code": "WORKSPACE_UNTRUSTED",
+                    "error_reason": message,
+                    "ended_at": _utc_now(),
+                    "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                    "truncated": False,
+                },
+            )
+            return _error_json(
+                ArcErrorCode.PERMISSION_DENIED,
+                message,
+                details={"tool": tool_name, "code": "WORKSPACE_UNTRUSTED"},
+            )
+        except ValueError as e:
+            _persist_mcp_audit_event(
+                ws,
+                {
+                    **base_audit,
+                    "decision": "denied",
+                    "error_code": "INVALID_MCP_ARGUMENT",
+                    "error_reason": str(e),
+                    "ended_at": _utc_now(),
+                    "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                    "truncated": False,
+                },
+            )
+            return _error_json(
+                ArcErrorCode.INVALID_INPUT,
+                str(e),
+                details={"tool": tool_name, "code": "INVALID_MCP_ARGUMENT"},
+            )
+        except Exception as e:
+            log.exception("MCP tool failed: %s", tool_name)
+            _persist_mcp_audit_event(
+                ws,
+                {
+                    **base_audit,
+                    "decision": "error",
+                    "error_code": "MCP_TOOL_FAILED",
+                    "error_reason": str(e),
+                    "ended_at": _utc_now(),
+                    "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                    "truncated": False,
+                },
+            )
+            return _error_json(
+                ArcErrorCode.INTERNAL_ERROR,
+                str(e),
+                details={"tool": tool_name, "code": "MCP_TOOL_FAILED"},
+            )
+
     # ── Tools ──────────────────────────────────────────────────────────────
 
     @mcp.tool()
@@ -69,85 +238,66 @@ def create_mcp_server(
         Returns versions, daemon status, adapters, trust, isolation,
         paid-call gates, MCP support, and known blockers.
         """
-        import os
-        import sys
 
-        from ..adapters.registry import default_registry
-        from ..provider_action import provider_statuses
+        def run() -> list[dict[str, Any]]:
+            import os
+            import sys
 
-        checks: list[dict[str, Any]] = []
+            from ..adapters.registry import default_registry
+            from ..provider_action import provider_statuses
 
-        # 1. Python version
-        checks.append(
-            {
-                "check": "python",
-                "ok": True,
-                "version": sys.version.split()[0],
-            }
-        )
+            checks: list[dict[str, Any]] = []
 
-        # 2. CLI version
-        checks.append(
-            {
-                "check": "cli",
-                "ok": True,
-                "version": arc_version,
-            }
-        )
+            checks.append({"check": "python", "ok": True, "version": sys.version.split()[0]})
 
-        # 3. Runtime detection
-        try:
-            registry = default_registry()
-            runtimes = registry.detect_all(ws)
+            checks.append({"check": "cli", "ok": True, "version": arc_version})
+
+            try:
+                registry = default_registry()
+                runtimes = registry.detect_all(ws)
+                checks.append(
+                    {
+                        "check": "runtimes",
+                        "ok": True,
+                        "detected": [r.adapter for r in runtimes],
+                        "count": len(runtimes),
+                    }
+                )
+            except Exception as e:
+                checks.append({"check": "runtimes", "ok": False, "error": str(e)})
+
+            try:
+                providers = provider_statuses(os.environ)
+                checks.append(
+                    {
+                        "check": "providers",
+                        "ok": True,
+                        "total": len(providers),
+                        "configured": sum(1 for p in providers if p.api_key_configured),
+                    }
+                )
+            except Exception as e:
+                checks.append({"check": "providers", "ok": False, "error": str(e)})
+
             checks.append(
                 {
-                    "check": "runtimes",
+                    "check": "mcp",
                     "ok": True,
-                    "detected": [r.adapter for r in runtimes],
-                    "count": len(runtimes),
+                    "version": "1.0.0",
+                    "transport": "stdio",
+                    "status": "active",
                 }
             )
-        except Exception as e:
-            checks.append({"check": "runtimes", "ok": False, "error": str(e)})
 
-        # 4. Provider diagnostics (env presence only)
-        try:
-            providers = provider_statuses(os.environ)
+            from ..security.trust import resolve_trust
+
+            trust = resolve_trust(ws)
             checks.append(
-                {
-                    "check": "providers",
-                    "ok": True,
-                    "total": len(providers),
-                    "configured": sum(1 for p in providers if p.api_key_configured),
-                }
+                {"check": "trust", "ok": trust.level.value == "trusted", "level": trust.level.value}
             )
-        except Exception as e:
-            checks.append({"check": "providers", "ok": False, "error": str(e)})
+            return checks
 
-        # 5. MCP support status
-        checks.append(
-            {
-                "check": "mcp",
-                "ok": True,
-                "version": "1.0.0",
-                "transport": "stdio",
-                "status": "active",
-            }
-        )
-
-        # 6. Workspace trust
-        from ..security.trust import resolve_trust
-
-        trust = resolve_trust(ws)
-        checks.append(
-            {
-                "check": "trust",
-                "ok": trust.level.value == "trusted",
-                "level": trust.level.value,
-            }
-        )
-
-        return json.dumps(checks, indent=2)
+        return _tool_result("arc_doctor", run, {})
 
     @mcp.tool()
     def arc_runtime_capabilities() -> str:
@@ -156,19 +306,22 @@ def create_mcp_server(
         Returns detected runtimes, their availability, and whether
         they require paid calls.
         """
-        from ..adapters.registry import default_registry
-        from ..orchestration import runtime_router
 
-        registry = default_registry()
-        registry.detect_all(ws)
-        reports = runtime_router.list_runtimes(ws)
+        def run() -> dict[str, Any]:
+            from ..adapters.registry import default_registry
+            from ..orchestration import runtime_router
 
-        payload = {
-            "workspace": str(ws),
-            "auto_priority": list(runtime_router.AUTO_PRIORITY),
-            "runtimes": [report.model_dump() for report in reports],
-        }
-        return json.dumps(payload, indent=2, default=str)
+            registry = default_registry()
+            registry.detect_all(ws)
+            reports = runtime_router.list_runtimes(ws)
+
+            return {
+                "workspace": str(ws),
+                "auto_priority": list(runtime_router.AUTO_PRIORITY),
+                "runtimes": [report.model_dump() for report in reports],
+            }
+
+        return _tool_result("arc_runtime_capabilities", run, {})
 
     @mcp.tool()
     def arc_run_status(run_id: str) -> str:
@@ -181,23 +334,29 @@ def create_mcp_server(
             JSON string with run status, workflow, runtime, timing, and event count.
 
         """
-        from ..storage.jsonl import JsonlTraceStore
 
-        store = JsonlTraceStore(ws / ".arc" / "traces")
-        run_record = store.load(run_id)
-        if run_record is None:
-            return json.dumps({"error": f"Run not found: {run_id}"})
+        def run() -> dict[str, Any]:
+            run = _safe_id(run_id, "run_id")
+            trace_dir = ws / ".arc" / "traces"
+            _resolve_workspace_child(trace_dir, f"{run}.jsonl")
+            from ..storage.jsonl import JsonlTraceStore
 
-        payload = {
-            "run_id": run_record.id,
-            "status": run_record.status.value,
-            "workflow_id": run_record.workflow_id,
-            "runtime": run_record.runtime,
-            "started_at": run_record.started_at,
-            "ended_at": run_record.ended_at,
-            "event_count": len(run_record.events),
-        }
-        return json.dumps(payload, indent=2, default=str)
+            store = JsonlTraceStore(trace_dir)
+            run_record = store.load(run)
+            if run_record is None:
+                raise ValueError(f"Run not found: {run}")
+
+            return {
+                "run_id": run_record.id,
+                "status": run_record.status.value,
+                "workflow_id": run_record.workflow_id,
+                "runtime": run_record.runtime,
+                "started_at": run_record.started_at,
+                "ended_at": run_record.ended_at,
+                "event_count": len(run_record.events),
+            }
+
+        return _tool_result("arc_run_status", run, {"run_id": run_id})
 
     @mcp.tool()
     def arc_trace_search(
@@ -218,29 +377,35 @@ def create_mcp_server(
             JSON string with matching runs.
 
         """
-        from ..storage.sqlite import SqliteStore
 
-        db_path = ws / ".arc" / "arc.db"
-        if not db_path.exists():
-            return json.dumps({"error": "SQLite index not found. Run 'arc runs backfill' first."})
+        def run() -> dict[str, Any]:
+            if limit < 1 or limit > 100:
+                raise ValueError("limit must be between 1 and 100")
+            from ..storage.sqlite import SqliteStore
 
-        store = SqliteStore(db_path)
-        results = store.list_runs(
-            status=status, runtime=runtime, workflow_id=workflow, limit=limit, offset=0
-        )
-        total = store.count_runs()
-        return json.dumps(
-            {
+            db_path = ws / ".arc" / "arc.db"
+            if not db_path.exists():
+                raise ValueError("SQLite index not found. Run 'arc runs backfill' first.")
+
+            store = SqliteStore(db_path)
+            results = store.list_runs(
+                status=status, runtime=runtime, workflow_id=workflow, limit=limit, offset=0
+            )
+            total = store.count_runs()
+            return {
                 "results": results,
                 "count": len(results),
                 "total_indexed": total,
-            },
-            indent=2,
-            default=str,
+            }
+
+        return _tool_result(
+            "arc_trace_search",
+            run,
+            {"workflow": workflow, "runtime": runtime, "status": status, "limit": limit},
         )
 
     @mcp.tool()
-    def arc_trace_read(run_id: str) -> str:
+    def arc_trace_read(run_id: str, limit: int = _DEFAULT_TRACE_LIMIT, offset: int = 0) -> str:
         """Read the full trace of a stored run.
 
         Args:
@@ -250,24 +415,41 @@ def create_mcp_server(
             JSON string with run record and events.
 
         """
-        from ..storage.jsonl import JsonlTraceStore
 
-        store = JsonlTraceStore(ws / ".arc" / "traces")
-        run_record = store.load(run_id)
-        if run_record is None:
-            return json.dumps({"error": f"Run not found: {run_id}"})
+        def run() -> dict[str, Any]:
+            safe_run_id = _safe_id(run_id, "run_id")
+            if offset < 0:
+                raise ValueError("offset must be >= 0")
+            if limit < 1 or limit > _MAX_TRACE_LIMIT:
+                raise ValueError(f"limit must be between 1 and {_MAX_TRACE_LIMIT}")
+            trace_dir = ws / ".arc" / "traces"
+            _resolve_workspace_child(trace_dir, f"{safe_run_id}.jsonl")
+            from ..storage.jsonl import JsonlTraceStore
 
-        payload = {
-            "run_id": run_record.id,
-            "status": run_record.status.value,
-            "workflow_id": run_record.workflow_id,
-            "runtime": run_record.runtime,
-            "started_at": run_record.started_at,
-            "ended_at": run_record.ended_at,
-            "event_count": len(run_record.events),
-            "events": [e.model_dump() for e in run_record.events],
-        }
-        return json.dumps(payload, indent=2, default=str)
+            store = JsonlTraceStore(trace_dir)
+            run_record = store.load(safe_run_id)
+            if run_record is None:
+                raise ValueError(f"Run not found: {safe_run_id}")
+            total_events = len(run_record.events)
+            events = run_record.events[offset : offset + limit]
+
+            return {
+                "run_id": run_record.id,
+                "status": run_record.status.value,
+                "workflow_id": run_record.workflow_id,
+                "runtime": run_record.runtime,
+                "started_at": run_record.started_at,
+                "ended_at": run_record.ended_at,
+                "event_count": total_events,
+                "offset": offset,
+                "limit": limit,
+                "truncated": offset + limit < total_events,
+                "events": [e.model_dump() for e in events],
+            }
+
+        return _tool_result(
+            "arc_trace_read", run, {"run_id": run_id, "limit": limit, "offset": offset}
+        )
 
     @mcp.tool()
     def arc_audit_verify(run_id: str, mode: str = "sha256") -> str:
@@ -281,86 +463,49 @@ def create_mcp_server(
             JSON string with verification result.
 
         """
-        from ..audit.key_manager import AuditKeyManager
-        from ..audit.streaming_verifier import StreamingAuditVerifier
 
-        if mode not in ("auto", "sha256", "hmac"):
-            return json.dumps(
-                {
-                    "ok": False,
-                    "error": f"Invalid mode: {mode}. Must be auto, sha256, or hmac.",
-                }
-            )
-        try:
+        def run() -> dict[str, Any]:
+            safe_run_id = _safe_id(run_id, "run_id")
+            from ..audit.key_manager import AuditKeyManager
+            from ..audit.streaming_verifier import StreamingAuditVerifier
+
+            if mode not in ("auto", "sha256", "hmac"):
+                raise ValueError(f"Invalid mode: {mode}. Must be auto, sha256, or hmac.")
             verifier = StreamingAuditVerifier(max_memory_mb=8)
-        except ValueError as e:
-            return json.dumps({"ok": False, "error": str(e)})
 
-        audit_dir = ws / ".arc" / "audit"
-        new_chain = audit_dir / f"{run_id}.audit.jsonl"
-        old_chain = audit_dir / f"{run_id}.jsonl"
-        if new_chain.exists():
-            chain = new_chain
-        elif old_chain.exists():
-            chain = old_chain
-        else:
-            return json.dumps(
-                {
-                    "ok": False,
-                    "run_id": run_id,
-                    "error": f"Audit chain not found for run {run_id}",
-                }
-            )
+            audit_dir = ws / ".arc" / "audit"
+            new_chain = _resolve_workspace_child(audit_dir, f"{safe_run_id}.audit.jsonl")
+            old_chain = _resolve_workspace_child(audit_dir, f"{safe_run_id}.jsonl")
+            if new_chain.exists():
+                chain = new_chain
+            elif old_chain.exists():
+                chain = old_chain
+            else:
+                raise ValueError(f"Audit chain not found for run {safe_run_id}")
 
-        key = None
-        if mode in ("hmac", "auto"):
-            mgr = AuditKeyManager()
-            key, key_status = mgr.get_key()
-            if mode == "hmac" and not key_status.available:
-                return json.dumps(
-                    {
-                        "ok": False,
-                        "run_id": run_id,
-                        "error": key_status.warning,
-                    }
-                )
+            key = None
+            if mode in ("hmac", "auto"):
+                mgr = AuditKeyManager()
+                key, key_status = mgr.get_key()
+                if mode == "hmac" and not key_status.available:
+                    raise ValueError(key_status.warning or "HMAC audit key unavailable")
 
-        try:
             if mode == "auto":
                 result = verifier.verify_auto(chain, key)
             elif mode == "hmac":
                 result = verifier.verify_hmac(chain, key)
             else:
                 result = verifier.verify_sha256(chain)
-            return json.dumps(
-                {
-                    "ok": result.ok,
-                    "mode": result.mode,
-                    "records_checked": result.records_checked,
-                    "reason": result.reason,
-                    "duration_ms": result.duration_ms,
-                },
-                indent=2,
-                default=str,
-            )
-        except Exception as e:
-            return json.dumps(
-                {
-                    "ok": False,
-                    "error": str(e),
-                }
-            )
-            return json.dumps(result, indent=2, default=str)
-        except Exception as e:
-            return json.dumps(
-                {
-                    "ok": False,
-                    "run_id": run_id,
-                    "mode": mode,
-                    "error": str(e),
-                },
-                indent=2,
-            )
+            return {
+                "run_id": safe_run_id,
+                "ok": result.ok,
+                "mode": result.mode,
+                "records_checked": result.records_checked,
+                "reason": result.reason,
+                "duration_ms": result.duration_ms,
+            }
+
+        return _tool_result("arc_audit_verify", run, {"run_id": run_id, "mode": mode})
 
     @mcp.tool()
     def arc_hitl_list() -> str:
@@ -370,14 +515,13 @@ def create_mcp_server(
             JSON string with pending HITL prompts.
 
         """
-        from ..audit.hitl_store import list_prompts
 
-        prompts = list_prompts(ws)
-        results = []
-        for prompt in prompts:
-            entry = prompt.model_dump()
-            results.append(entry)
-        return json.dumps(results, indent=2, default=str)
+        def run() -> list[dict[str, Any]]:
+            from ..audit.hitl_store import list_prompts
+
+            return [prompt.model_dump() for prompt in list_prompts(ws)]
+
+        return _tool_result("arc_hitl_list", run, {})
 
     @mcp.tool()
     def arc_task_create(
@@ -398,24 +542,24 @@ def create_mcp_server(
             JSON string with task ID and initial status.
 
         """
-        from ..tasks import Task, TaskExecutor, TaskStorage, TaskType
 
-        # Validate task type
-        try:
-            task_type_enum = TaskType(task_type)
-        except ValueError:
-            return json.dumps(
-                {"error": f"Invalid task type: {task_type}. Must be run, trace, or audit."}
-            )
+        def run() -> dict[str, Any]:
+            if max_retries < 0 or max_retries > 10:
+                raise ValueError("max_retries must be between 0 and 10")
+            from ..tasks import Task, TaskExecutor, TaskStorage, TaskType
 
-        # Parse params
-        try:
-            params_dict = json.loads(params)
-        except json.JSONDecodeError as e:
-            return json.dumps({"error": f"Invalid JSON params: {e}"})
+            try:
+                task_type_enum = TaskType(task_type)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Invalid task type: {task_type}. Must be run, trace, or audit."
+                ) from exc
 
-        # Create and submit task
-        try:
+            try:
+                params_dict = json.loads(params)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Invalid JSON params: {exc}") from exc
+
             task = Task(
                 type=task_type_enum,
                 operation=operation,
@@ -426,20 +570,25 @@ def create_mcp_server(
             executor = TaskExecutor(storage)
             task_id = executor.submit_task(task)
 
-            return json.dumps(
-                {
-                    "task_id": task_id,
-                    "type": task.type.value,
-                    "operation": task.operation,
-                    "status": task.status.value,
-                    "created_at": task.created_at,
-                    "expires_at": task.expires_at,
-                },
-                indent=2,
-                default=str,
-            )
-        except Exception as e:
-            return json.dumps({"error": f"Failed to create task: {e}"})
+            return {
+                "task_id": task_id,
+                "type": task.type.value,
+                "operation": task.operation,
+                "status": task.status.value,
+                "created_at": task.created_at,
+                "expires_at": task.expires_at,
+            }
+
+        return _tool_result(
+            "arc_task_create",
+            run,
+            {
+                "operation": operation,
+                "task_type": task_type,
+                "params": params,
+                "max_retries": max_retries,
+            },
+        )
 
     @mcp.tool()
     def arc_task_status(task_id: str) -> str:
@@ -452,36 +601,34 @@ def create_mcp_server(
             JSON string with task status, metadata, and result if completed.
 
         """
-        from ..tasks import TaskExecutor, TaskStorage
 
-        try:
+        def run() -> dict[str, Any]:
+            safe_task_id = _safe_id(task_id, "task_id")
+            from ..tasks import TaskExecutor, TaskStorage
+
             storage = TaskStorage(ws / ".arc" / "tasks.db")
             executor = TaskExecutor(storage)
-            task = executor.get_task_status(task_id)
+            task = executor.get_task_status(safe_task_id)
 
             if not task:
-                return json.dumps({"error": f"Task not found: {task_id}"})
+                raise ValueError(f"Task not found: {safe_task_id}")
 
-            return json.dumps(
-                {
-                    "task_id": task.id,
-                    "type": task.type.value,
-                    "operation": task.operation,
-                    "status": task.status.value,
-                    "created_at": task.created_at,
-                    "started_at": task.started_at,
-                    "ended_at": task.ended_at,
-                    "expires_at": task.expires_at,
-                    "retry_count": task.retry_count,
-                    "max_retries": task.max_retries,
-                    "result": task.result,
-                    "error": task.error,
-                },
-                indent=2,
-                default=str,
-            )
-        except Exception as e:
-            return json.dumps({"error": f"Failed to get task status: {e}"})
+            return {
+                "task_id": task.id,
+                "type": task.type.value,
+                "operation": task.operation,
+                "status": task.status.value,
+                "created_at": task.created_at,
+                "started_at": task.started_at,
+                "ended_at": task.ended_at,
+                "expires_at": task.expires_at,
+                "retry_count": task.retry_count,
+                "max_retries": task.max_retries,
+                "result": task.result,
+                "error": task.error,
+            }
+
+        return _tool_result("arc_task_status", run, {"task_id": task_id})
 
     @mcp.tool()
     def arc_task_cancel(task_id: str) -> str:
@@ -494,31 +641,24 @@ def create_mcp_server(
             JSON string with cancellation result.
 
         """
-        from ..tasks import TaskExecutor, TaskStorage
 
-        try:
+        def run() -> dict[str, Any]:
+            safe_task_id = _safe_id(task_id, "task_id")
+            from ..tasks import TaskExecutor, TaskStorage
+
             storage = TaskStorage(ws / ".arc" / "tasks.db")
             executor = TaskExecutor(storage)
-            cancelled = executor.cancel_task(task_id)
+            cancelled = executor.cancel_task(safe_task_id)
 
             if not cancelled:
-                task = executor.get_task_status(task_id)
+                task = executor.get_task_status(safe_task_id)
                 if not task:
-                    return json.dumps({"error": f"Task not found: {task_id}"})
-                else:
-                    return json.dumps(
-                        {"error": f"Task cannot be cancelled (status: {task.status.value})"}
-                    )
+                    raise ValueError(f"Task not found: {safe_task_id}")
+                raise ValueError(f"Task cannot be cancelled (status: {task.status.value})")
 
-            return json.dumps(
-                {
-                    "task_id": task_id,
-                    "cancelled": True,
-                },
-                indent=2,
-            )
-        except Exception as e:
-            return json.dumps({"error": f"Failed to cancel task: {e}"})
+            return {"task_id": safe_task_id, "cancelled": True}
+
+        return _tool_result("arc_task_cancel", run, {"task_id": task_id})
 
     @mcp.tool()
     def arc_task_result(task_id: str) -> str:
@@ -531,37 +671,29 @@ def create_mcp_server(
             JSON string with task result, or error if not completed.
 
         """
-        from ..tasks import TaskExecutor, TaskStatus, TaskStorage
 
-        try:
+        def run() -> dict[str, Any]:
+            safe_task_id = _safe_id(task_id, "task_id")
+            from ..tasks import TaskExecutor, TaskStatus, TaskStorage
+
             storage = TaskStorage(ws / ".arc" / "tasks.db")
             executor = TaskExecutor(storage)
-            task = executor.get_task_status(task_id)
+            task = executor.get_task_status(safe_task_id)
 
             if not task:
-                return json.dumps({"error": f"Task not found: {task_id}"})
+                raise ValueError(f"Task not found: {safe_task_id}")
 
             if task.status != TaskStatus.COMPLETED:
-                return json.dumps(
-                    {
-                        "error": f"Task not completed (status: {task.status.value})",
-                        "task_id": task_id,
-                        "status": task.status.value,
-                    }
-                )
+                raise ValueError(f"Task not completed (status: {task.status.value})")
 
-            return json.dumps(
-                {
-                    "task_id": task.id,
-                    "status": task.status.value,
-                    "result": task.result,
-                    "ended_at": task.ended_at,
-                },
-                indent=2,
-                default=str,
-            )
-        except Exception as e:
-            return json.dumps({"error": f"Failed to get task result: {e}"})
+            return {
+                "task_id": task.id,
+                "status": task.status.value,
+                "result": task.result,
+                "ended_at": task.ended_at,
+            }
+
+        return _tool_result("arc_task_result", run, {"task_id": task_id})
 
     # ── Resources ──────────────────────────────────────────────────────────
 
