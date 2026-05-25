@@ -256,7 +256,10 @@ async def test_docker_execute_with_env():
     mock_container.logs.return_value = b""
     mock_client = MagicMock()
     mock_client.containers.run.return_value = mock_container
-    config = DockerConfig(environment={"BASE_VAR": "base_value"})
+    config = DockerConfig(
+        environment={"BASE_VAR": "base_value"},
+        safe_env_keys=("PATH", "HOME", "USER", "BASE_VAR", "EXTRA_VAR"),
+    )
     with (
         patch.dict("os.environ", {"ARC_ENABLE_CONTAINER_SANDBOX": "1"}),
         patch.object(DockerIsolationProvider, "_get_client", return_value=mock_client),

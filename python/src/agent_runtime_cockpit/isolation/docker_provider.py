@@ -1,4 +1,7 @@
-"""Docker isolation provider — container-based execution for untrusted workspaces."""
+"""Docker isolation provider — container-based execution for untrusted workspaces.
+
+Gated by ``ARC_ENABLE_CONTAINER_SANDBOX=1``.
+"""
 
 from __future__ import annotations
 
@@ -11,7 +14,13 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from ..security.sandbox import cap_output
 from .base import IsolationProvider, IsolationResult
+from .subprocess import (
+    DEFAULT_SAFE_ENV_KEYS,
+    _is_blocked_env_key,
+    redact_output,
+)
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +34,8 @@ class DockerConfig(BaseModel):
     mem_limit: str = "512m"
     cpu_quota: int = 50000
     environment: dict[str, str] = Field(default_factory=dict)
+    max_output_bytes: int = 65_536
+    safe_env_keys: tuple[str, ...] = tuple(DEFAULT_SAFE_ENV_KEYS)
 
 
 class DockerIsolationProvider(IsolationProvider):
@@ -32,12 +43,23 @@ class DockerIsolationProvider(IsolationProvider):
 
     Detects OrbStack, Podman, Colima via DOCKER_HOST or daemon info.
     Falls back gracefully if Docker SDK is not installed or daemon unreachable.
+
+    Hardening mirroring subprocess provider:
+    - env allowlist + secret-key stripping
+    - output redaction
+    - bounded stdout/stderr capture
+    - workspace cwd guard
     """
 
-    def __init__(self, config: Optional[DockerConfig] = None) -> None:
+    def __init__(
+        self,
+        config: Optional[DockerConfig] = None,
+        workspace_root: Optional[Path] = None,
+    ) -> None:
         self.config = config or DockerConfig()
         self._client: Any = None
         self._runtime_info: Optional[dict[str, Any]] = None
+        self._workspace_root = workspace_root
 
     @property
     def provider_id(self) -> str:
@@ -58,6 +80,19 @@ class DockerIsolationProvider(IsolationProvider):
             log.warning("Docker health check failed: %s", e)
             self.close()
             return False
+
+    def _filter_env(self, extra_env: Optional[dict[str, str]] = None) -> dict[str, str]:
+        """Filter env to allowlist + strip secrets, matching subprocess provider."""
+        result: dict[str, str] = {}
+        safe_keys = set(self.config.safe_env_keys)
+        for key in safe_keys:
+            if key in os.environ and not _is_blocked_env_key(key):
+                result[key] = os.environ[key]
+        if extra_env:
+            for key, value in extra_env.items():
+                if key in safe_keys and not _is_blocked_env_key(key):
+                    result[key] = value
+        return result
 
     async def execute(
         self,
@@ -81,7 +116,12 @@ class DockerIsolationProvider(IsolationProvider):
                 stderr="Docker SDK not installed. Install with: pip install docker",
                 provider=self.provider_id,
             )
-        merged_env = {**self.config.environment, **(env or {})}
+        if self._workspace_root and cwd:
+            root = self._workspace_root.resolve()
+            resolved = cwd.resolve()
+            if cwd.is_symlink() or not resolved.is_relative_to(root):
+                raise ValueError(f"cwd escapes workspace: {cwd}")
+        merged_env = {**self.config.environment, **self._filter_env(env)}
         start = time.monotonic()
         try:
             container = client.containers.run(
@@ -100,7 +140,10 @@ class DockerIsolationProvider(IsolationProvider):
                 result = container.wait(timeout=timeout_seconds)
                 exit_code = result.get("StatusCode", -1)
             except Exception:
-                container.kill()
+                try:
+                    container.kill()
+                except Exception:
+                    pass
                 duration = int((time.monotonic() - start) * 1000)
                 return IsolationResult(
                     exit_code=-1,
@@ -111,14 +154,20 @@ class DockerIsolationProvider(IsolationProvider):
                     kill_reason="timeout",
                     provider=self.provider_id,
                 )
-            logs = container.logs(stdout=True, stderr=True).decode("utf-8", errors="replace")
+            max_bytes = self.config.max_output_bytes
+            logs_raw = container.logs(stdout=True, stderr=True).decode("utf-8", errors="replace")
+            stdout, stdout_truncated = cap_output(logs_raw, max_bytes)
+            redacted_stdout = redact_output(stdout)
+            redaction_applied = redacted_stdout != stdout
             duration = int((time.monotonic() - start) * 1000)
             return IsolationResult(
                 exit_code=exit_code,
-                stdout=logs,
+                stdout=redacted_stdout,
                 stderr="",
                 duration_ms=duration,
                 provider=self.provider_id,
+                stdout_truncated=stdout_truncated,
+                redaction_applied=redaction_applied,
             )
         except Exception as e:
             duration = int((time.monotonic() - start) * 1000)

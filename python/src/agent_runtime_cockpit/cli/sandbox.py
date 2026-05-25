@@ -126,6 +126,9 @@ def sandbox_lima_template(
 def sandbox_run(
     ctx: typer.Context,
     policy: str = typer.Option("local-safe", "--policy", help="Sandbox policy profile"),
+    provider: str = typer.Option(
+        "subprocess", "--provider", help="Isolation provider (subprocess, microvm)"
+    ),
     ask: bool = typer.Option(False, "--ask", help="Prompt for network/install/unknown approval"),
     approval_token: Optional[str] = typer.Option(
         None, "--approval-token", help="Use a scoped non-interactive approval token"
@@ -176,7 +179,7 @@ def sandbox_run(
                 command=command,
                 cwd=cwd,
                 decision=decision,
-                provider="subprocess",
+                provider=provider,
                 started_at=started_at,
                 ended_at=ended_at,
                 exit_code=None,
@@ -191,26 +194,27 @@ def sandbox_run(
                 cwd=str(cwd),
                 classification=decision.classification,
                 decision=decision,
-                provider="subprocess",
+                provider=provider,
                 audit_event=audit,
             )
             _out(ok(result.model_dump(mode="json"), workspace=str(ws)), json_output)
             raise typer.Exit(3)
 
-    provider = SubprocessIsolationProvider(
-        safe_env_keys=frozenset(policy_model.env_allowlist),
-        workspace_root=ws,
-        max_output_bytes=policy_model.max_output_bytes,
-    )
-    iso = asyncio.run(
-        provider.execute(command, cwd=cwd, timeout_seconds=policy_model.timeout_seconds)
-    )
+    try:
+        iso = asyncio.run(
+            _build_provider(provider, policy_model, ws).execute(
+                command, cwd=cwd, timeout_seconds=policy_model.timeout_seconds
+            )
+        )
+    except NotImplementedError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(2)
     ended_at = utc_now()
     audit = build_audit_event(
         command=command,
         cwd=cwd,
         decision=decision,
-        provider=provider.provider_id,
+        provider=iso.provider if iso.provider != "unknown" else provider,
         started_at=started_at,
         ended_at=ended_at,
         exit_code=iso.exit_code,
@@ -225,7 +229,7 @@ def sandbox_run(
         cwd=str(cwd),
         classification=decision.classification,
         decision=decision,
-        provider=provider.provider_id,
+        provider=iso.provider if iso.provider != "unknown" else provider,
         exit_code=iso.exit_code,
         stdout=iso.stdout,
         stderr=iso.stderr,
@@ -239,6 +243,18 @@ def sandbox_run(
     _out(ok(result.model_dump(mode="json"), workspace=str(ws)), json_output)
     if iso.exit_code != 0:
         raise typer.Exit(iso.exit_code)
+
+
+def _build_provider(
+    name: str, policy_model: SandboxPolicy, ws: Path
+) -> SubprocessIsolationProvider | MicroVMIsolationProvider:
+    if name == "microvm":
+        return MicroVMIsolationProvider()
+    return SubprocessIsolationProvider(
+        safe_env_keys=frozenset(policy_model.env_allowlist),
+        workspace_root=ws,
+        max_output_bytes=policy_model.max_output_bytes,
+    )
 
 
 @policy_app.command(

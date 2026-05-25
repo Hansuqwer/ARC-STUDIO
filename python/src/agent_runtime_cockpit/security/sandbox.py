@@ -637,7 +637,12 @@ def cap_output(text: str, max_bytes: int) -> tuple[str, bool]:
     data = text.encode("utf-8")
     if len(data) <= max_bytes:
         return text, False
-    return data[:max_bytes].decode("utf-8", errors="replace"), True
+    truncated = data[:max_bytes].decode("utf-8", errors="replace")
+    # The replacement character may exceed max_bytes when re-encoded;
+    # strip it if needed.
+    while truncated and len(truncated.encode("utf-8")) > max_bytes:
+        truncated = truncated[:-1]
+    return truncated, True
 
 
 def build_audit_event(
