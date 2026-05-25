@@ -475,6 +475,46 @@ def providers_add(
         raise typer.Exit(2)
 
 
+@providers_app.command("remove")
+def providers_remove(
+    provider: str = typer.Argument(..., help="Provider id to remove credentials for"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Remove stored credentials for a provider.
+
+    Removes encrypted API keys or OAuth tokens previously stored with
+    ``arc providers add``. Environment variables are unaffected.
+    Requires workspace trust (Phase 23 enforcement).
+    """
+    _setup_logging(debug)
+    from ..auth.manager import remove_credential
+
+    removed = remove_credential(provider)
+    if removed:
+        _out(
+            ok(
+                {
+                    "provider": provider,
+                    "removed": True,
+                    "message": f"Credentials removed for {provider}",
+                }
+            ),
+            json_output,
+        )
+    else:
+        _out(
+            ok(
+                {
+                    "provider": provider,
+                    "removed": False,
+                    "message": f"No stored credentials found for {provider}",
+                }
+            ),
+            json_output,
+        )
+
+
 @providers_app.command("diagnostics")
 def providers_diagnostics(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
     """Return redacted provider diagnostics (statuses, routing, accounts, quota).

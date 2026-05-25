@@ -163,6 +163,47 @@ def _exchange_code_for_token(code: str, config: OAuthConfig) -> OAuthTokenResult
     )
 
 
+def refresh_oauth_token(config: OAuthConfig, refresh_token: str) -> OAuthTokenResult:
+    """Refresh an expired OAuth access token using a refresh token.
+
+    Uses the OAuth provider's token endpoint with ``grant_type=refresh_token``
+    to obtain a new access token without user interaction.
+    """
+    import urllib.request
+    import urllib.error
+
+    data = urlencode(
+        {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": config.client_id,
+            "client_secret": config.client_secret,
+        }
+    ).encode("utf-8")
+
+    req = urllib.request.Request(
+        config.token_url,
+        data=data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"OAuth token refresh failed: {exc.code} {exc.reason}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"OAuth token refresh network error: {exc.reason}") from exc
+
+    return OAuthTokenResult(
+        access_token=body.get("access_token", ""),
+        refresh_token=body.get("refresh_token", refresh_token),
+        expires_in=body.get("expires_in", 3600),
+        token_type=body.get("token_type", "Bearer"),
+        raw=body,
+    )
+
+
 def store_oauth_credential(
     provider_id: str,
     token_result: OAuthTokenResult,

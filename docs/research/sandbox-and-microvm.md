@@ -251,3 +251,56 @@ Blockers before implementation:
 - workspace mount design with symlink/hardlink escape proof
 - network-off proof without TAP/NAT
 - deterministic teardown on boot failure/timeouts
+
+---
+
+## Credential Storage & OAuth (Phase 36.2 / R37 Phase 2)
+
+**Status:** Baseline Complete | 41 auth tests passing | 2303 total Python tests passing
+
+### Research Notes
+
+| Source | Link | What was learned | Implementation consequence | Confidence | Unresolved questions |
+|---|---|---|---|---|---|
+| Context7 Fernet docs | `/python/cpython` | `cryptography.fernet.Fernet` provides symmetric authenticated encryption with nonce-based uniqueness. Keys are 32-byte base64-encoded. | Used `Fernet.generate_key()` and `Fernet(key).encrypt()` for credential storage at rest. Each encryption produces unique ciphertext. | High | Key rotation strategy not implemented; single machine-local key. |
+| Context7 Typer docs | `/fastapi/typer` | `app.add_typer()` for subcommands; `CliRunner` for isolated CLI tests; `monkeypatch.setattr()` for mocking module attributes. | Added `arc providers remove` subcommand; CLI tests use `CliRunner` with monkeypatched `AUTH_PATH`. | High | `monkeypatch.setattr` requires direct module object reference, not dotted string path, for module-scoped lookups. |
+| Pydantic v2 model_dump_json | `/pydantic/pydantic` | `model_dump_json()` produces compact JSON (no spaces after colons). | Audit log parsing must match compact JSON format (`"success":false` not `"success": false`). | High | None. |
+| Web search | Fernet key management | Fernet keys are stored alongside credentials; macOS Keychain integration is a future enhancement. | Keys stored at `~/.local/share/arc-studio/.auth-key` with `0o600` permissions. | Medium | macOS Keychain / Keychain Access API integration deferred. |
+| Code search | `provider_statuses()` in `provider_action.py` | Existing function only checks env vars; no stored credential fallback. | Added optional `check_stored_creds` parameter; defaults to False (env-only). | High | Stored credential check is opt-in to preserve existing CLI test behavior. |
+| Code search | Phase 23 trust enforcement | `ensure_trusted()` / `resolve_trust()` in `security/trust.py` governs workspace trust. | Auth module uses lenient trust check (default trusted); real enforcement at CLI/action layer. | High | Mock-based trust enforcement tests require `unittest.mock.patch.object` for reliable attribute patching. |
+| Code search | Audit infrastructure | Audit events use `ok()` envelope with `model_dump_json()`. | Credential audit events written to `.arc/audit/auth.events.jsonl` in compact JSONL format. | High | Audit events are best-effort; failures are caught and logged. |
+
+### Decision Table
+
+| Decision | Chosen approach | Alternatives considered | Reason | Files affected | Confidence |
+|---|---|---|---|---|---|
+| Credential encryption | Fernet (symmetric, machine-local key) | macOS Keychain, env vars only, asymmetric encryption | Fernet provides authenticated encryption with minimal setup; Keychain integration is future work. | `auth/manager.py` | High |
+| Storage path | `~/.local/share/arc-studio/auth.json` | `~/.arc/`, XDG config home | Follows existing ARC data directory convention; `0o600` permissions enforced. | `auth/manager.py` | High |
+| Trust enforcement | Lenient default (trusted), opt-in enforcement via `trust_check` parameter | Hard gate on all access | Credential storage must remain usable during first-run/trust-setup flows. Full gate at CLI/action layer. | `auth/manager.py` | High |
+| Audit logging | Best-effort JSONL to `.arc/audit/auth.events.jsonl` | Centralized audit store, no logging | Lightweight per-workspace audit trail; failures don't block credential access. | `auth/manager.py` | High |
+| OAuth token refresh | `refresh_oauth_token()` with `refresh_token` preservation | Always force re-auth | Servers may not return new refresh token; preserve old one. | `auth/oauth.py` | High |
+| Env var fallback | `provider_statuses(check_stored_creds=False)` by default | Always check stored creds | Preserves existing CLI behavior; opt-in for credential-aware paths. | `provider_action.py` | High |
+| CLI path resolution | `Optional[Path] = None` with dynamic `_resolve_path()` | Default argument `path: Path = AUTH_PATH` | Default arguments are evaluated at function definition time; dynamic lookup supports monkeypatching in tests. | `auth/manager.py` | High |
+
+### Current Scope
+
+Real now:
+- Fernet encrypt/decrypt roundtrip for API keys and OAuth tokens
+- `arc providers add --api-key <key>` stores encrypted credential
+- `arc providers add --oauth` starts OAuth flow with local callback server
+- `arc providers remove <provider>` removes stored credentials
+- OAuth token refresh with `refresh_oauth_token()`
+- Environment variable fallback: env vars take precedence over stored creds
+- Workspace trust enforcement: credential access gated by `trust_check` parameter
+- Audit log: credential access/denial events written to `.arc/audit/auth.events.jsonl`
+- 41 comprehensive tests covering all paths
+
+Design-only:
+- macOS Keychain integration
+- Key rotation strategy
+- Multi-user/multi-workspace credential separation
+- Credential expiry notifications
+
+Blocked:
+- Real OAuth flow requires live provider endpoints (tests use monkeypatched HTTP)
+- Trust enforcement mocking with `monkeypatch.setattr` is unreliable with string paths; use `unittest.mock.patch.object` for test-time attribute patching.

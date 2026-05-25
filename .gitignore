@@ -4,7 +4,11 @@
 .venv/
 .venv2/
 .arc/traces/
+.arc/audit/
+.arc/events/
 python/.arc/traces/
+python/.arc/audit/
+python/.arc/events/
 node_modules/
 dist/
 lib/

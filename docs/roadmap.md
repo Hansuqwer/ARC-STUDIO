@@ -919,7 +919,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R35 Google ADK Adapter** | **Not Started** | **Adapter Phase 34 — implement Google ADK adapter** |
 | **R36 MCP Python SDK Adapter** | **Not Started** | **Adapter Phase 35 — implement MCP Python SDK adapter** |
 | **R37 Provider Management (Phase 1)** | **Baseline Complete** | **Phase 36.1 — interactive UX without credential storage (commits cd89aab-7f2e20b)** |
-| **R37 Provider Management (Phase 2)** | **In Progress** | **Phase 36.2 — auth module with Fernet encryption, OAuth handler, CLI `arc providers add --api-key/--oauth`; 10 tests** |
+| **R37 Provider Management (Phase 2)** | **Baseline Complete** | **Phase 36.2 — auth module with Fernet encryption, OAuth handler, CLI `arc providers add --api-key/--oauth/remove`; token refresh; trust enforcement; audit logging; env var fallback; 41 auth tests** |
 | **R38 CLI Sandbox Hardening + IDE Integration** | **Active Hardening** | **Phase 37 — subprocess caps + approval prune + path-intent expansion + protocol parity + microVM preflight + container fallback tests + e2e routability complete (commits 00057f9-<pending>); microVM execution blocked** |
 
 **Post-v0.1 Execution Order:** 

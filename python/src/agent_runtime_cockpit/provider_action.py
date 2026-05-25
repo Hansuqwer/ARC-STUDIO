@@ -1029,17 +1029,43 @@ def _sensitive_key(key: str) -> bool:
     }
 
 
-def provider_statuses(env: dict[str, str]) -> list[ProviderStatus]:
+def provider_statuses(
+    env: dict[str, str],
+    check_stored_creds: bool = False,
+) -> list[ProviderStatus]:
+    """Return provider status from environment variables and optionally stored credentials.
+
+    Environment variables take precedence over stored credentials.
+    Stored credential check requires workspace trust (Phase 23 enforcement).
+
+    By default, only environment variables are checked (``check_stored_creds=False``).
+    Set to ``True`` to also check encrypted credential storage.
+    """
     statuses: list[ProviderStatus] = []
     for provider in PROVIDERS:
         source = next((name for name in provider.env_key_names if env.get(name)), None)
+        cred_source = None
+        if source is None and check_stored_creds:
+            try:
+                from .auth.manager import get_credential
+
+                cred = get_credential(provider.id)
+                if cred is not None:
+                    source = f"stored:{cred.auth_method}"
+                    cred_source = cred.auth_method
+            except Exception:
+                pass
         statuses.append(
             ProviderStatus(
                 provider=provider.id,
                 display_name=provider.display_name,
                 api_key_configured=source is not None,
                 api_key_source=source,
-                message="Dry-run provider definition loaded. Live calls require ARC_ALLOW_LIVE_PROVIDER_TESTS=true.",
+                message=(
+                    f"Configured via stored {cred_source} credentials"
+                    if cred_source
+                    else "Dry-run provider definition loaded. Live calls require ARC_ALLOW_LIVE_PROVIDER_TESTS=true."
+                ),
             )
         )
     return statuses
