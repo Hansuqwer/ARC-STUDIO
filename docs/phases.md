@@ -2000,7 +2000,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 ## Phase 37 — CLI Sandbox Hardening + IDE Integration
 
 **Roadmap:** R38 — CLI Sandbox Hardening + IDE Integration  
-**Status:** Active Hardening | Evidence: commits 00057f9 (subprocess caps), 2f47102 (approval prune), 2706d8a (path-intent), 1f413fe (protocol parity), d97b1c2 (microVM preflight), a959d09 (container fallback), current (microVM truth guard) | 2633 Python tests passed, 22 skipped, 3 xfailed; ruff clean; pnpm build/typecheck green | Notes: Slices 37.1-37.5, 37.7-37.8, 37.10-37.11 complete. Slice 37.6 (microVM execution) blocked.  
+**Status:** Active Hardening | Evidence: commits 00057f9 (subprocess caps), 2f47102 (approval prune), 2706d8a (path-intent), 1f413fe (protocol parity), d97b1c2 (microVM preflight), a959d09 (container fallback), 9949388 (microVM truth guard), current (microVM design-proof plan) | 2639 Python tests passed, 22 skipped, 3 xfailed; ruff clean; pnpm lint/test/build/typecheck green; e2e smoke 11/4/0 | Notes: Slices 37.1-37.5, 37.7-37.8, 37.10-37.12 complete. Slice 37.6 (microVM execution) blocked.  
 **Depends on:** Phase 23 (trust enforcement)
 
 ### Progress
@@ -2089,10 +2089,18 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - `arc sandbox doctor` reports `gated_unproven` when the integration gate and `limactl` are present; it never reports microVM execution as implemented.
 - Verified: targeted sandbox/microVM tests 94 passed, 1 skipped; full Python 2633 passed, 22 skipped, 3 xfailed; ruff clean; pnpm build/typecheck green.
 
+#### Slice 37.12: MicroVM Design-Proof Plan ✓
+- Added non-executing `MicroVMRunPlan` / `MicroVMPlanStep` models for Lima and Firecracker.
+- Added `arc sandbox microvm-plan --json --provider lima|firecracker -- <cmd...>` to render lifecycle, mount, network-default-deny, run, teardown, and blocker steps.
+- Plan generation does not call `limactl`, `firecracker`, `cloud-hypervisor`, or `jailer`; it never creates VMs.
+- Public microVM execution remains blocked; `execution_enabled=false` and `execution_status=design_proof_only`.
+- Verified: targeted sandbox/microVM tests 100 passed, 1 skipped; full Python 2639 passed, 22 skipped, 3 xfailed; ruff clean; pnpm lint/test/build/typecheck green; e2e smoke 11 passed, 4 skipped, 0 failed.
+
 ### CLI/IDE Integration Points
 
 - `arc sandbox run --json` — real subprocess execution under sandbox policy; Theia widget can invoke for safe command execution
 - `arc sandbox doctor --json` — preflight-only for microVM providers; Theia can display provider status
+- `arc sandbox microvm-plan --json --provider lima|firecracker -- <cmd...>` — non-executing Phase 37.6 design-proof plan; no VM creation
 - `arc policy explain --json` — command classification preview without execution; Theia can show decision before running
 - `arc policy prune --json` — remove expired approvals; Theia can expose as maintenance action
 

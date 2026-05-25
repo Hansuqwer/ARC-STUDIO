@@ -17,9 +17,39 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
+from pydantic import BaseModel, ConfigDict
+
 from ..security.sandbox import microvm_preflight, cap_output, render_lima_template
 from .base import IsolationProvider, IsolationResult
 from .subprocess import redact_output
+
+
+class MicroVMPlanStep(BaseModel):
+    """A non-executing microVM design-proof step."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    action: str
+    proof_required: str
+    implemented: bool = False
+
+
+class MicroVMRunPlan(BaseModel):
+    """Stable JSON plan for future microVM execution."""
+
+    model_config = ConfigDict(frozen=True)
+
+    provider: str
+    platform: str
+    workspace_root: str
+    guest_workspace: str
+    command: list[str]
+    network_default: str
+    execution_enabled: bool
+    execution_status: str
+    steps: list[MicroVMPlanStep]
+    blockers: list[str]
 
 
 def _microvm_execution_enabled() -> bool:
@@ -28,6 +58,112 @@ def _microvm_execution_enabled() -> bool:
 
 def _lima_available() -> bool:
     return bool(shutil.which("limactl"))
+
+
+def build_microvm_run_plan(
+    provider: str,
+    command: list[str],
+    *,
+    workspace_root: Path,
+    platform_name: str | None = None,
+) -> MicroVMRunPlan:
+    """Build a design-proof run plan without creating or starting a VM."""
+    normalized = provider.lower()
+    if normalized not in {"lima", "firecracker"}:
+        raise ValueError("provider must be lima or firecracker")
+    if not command:
+        raise ValueError("missing command")
+    platform_value = platform_name or platform.system()
+    workspace = str(workspace_root.resolve())
+    if normalized == "lima":
+        steps = [
+            MicroVMPlanStep(
+                name="template",
+                action="render disposable Lima VZ template with only workspace mounted at /workspace",
+                proof_required="template excludes host home/root mounts and port forwards",
+                implemented=True,
+            ),
+            MicroVMPlanStep(
+                name="create_start",
+                action="limactl start --tty=false <template>",
+                proof_required="bounded start timeout and failed-start cleanup",
+            ),
+            MicroVMPlanStep(
+                name="network_off",
+                action="probe guest route/DNS before user argv",
+                proof_required="guest cannot reach network under default policy",
+            ),
+            MicroVMPlanStep(
+                name="run",
+                action="limactl shell --tty=false <instance> --workdir /workspace -- <argv>",
+                proof_required="stdout/stderr caps, env policy, exit-code propagation",
+            ),
+            MicroVMPlanStep(
+                name="teardown",
+                action="limactl delete -f <instance> in finally",
+                proof_required="cleanup happens on success, failure, timeout, and interrupted start",
+            ),
+        ]
+        blockers = [
+            "Lima lifecycle not public-execution wired",
+            "workspace mount escape proof missing",
+            "network-off proof missing",
+            "teardown proof missing",
+            "opt-in integration test not passing on host runtime",
+        ]
+    else:
+        steps = [
+            MicroVMPlanStep(
+                name="preflight",
+                action="check firecracker/cloud-hypervisor, jailer, /dev/kvm, kernel, rootfs",
+                proof_required="doctor reports ready without creating VM",
+                implemented=True,
+            ),
+            MicroVMPlanStep(
+                name="jail",
+                action="create per-run jail directory and API socket",
+                proof_required="non-root jailer permissions and cleanup verified",
+            ),
+            MicroVMPlanStep(
+                name="boot",
+                action="boot cached kernel/rootfs with no TAP/NAT by default",
+                proof_required="pinned image provenance and bounded boot timeout",
+            ),
+            MicroVMPlanStep(
+                name="mount",
+                action="attach workspace through controlled read-only/read-write strategy",
+                proof_required="symlink/hardlink escape proof",
+            ),
+            MicroVMPlanStep(
+                name="run",
+                action="send argv to guest agent via vsock/serial channel",
+                proof_required="stdout/stderr caps, env policy, exit-code propagation",
+            ),
+            MicroVMPlanStep(
+                name="teardown",
+                action="stop Firecracker process and remove jail dir in finally",
+                proof_required="cleanup happens on boot failure, run timeout, and interrupted host process",
+            ),
+        ]
+        blockers = [
+            "kernel/rootfs cache provenance missing",
+            "guest command agent missing",
+            "workspace mount strategy unproven",
+            "network-off proof missing",
+            "jailer/teardown proof missing",
+        ]
+    return MicroVMRunPlan(
+        provider=normalized,
+        platform=platform_value,
+        workspace_root=workspace,
+        guest_workspace="/workspace",
+        command=command,
+        network_default="deny",
+        execution_enabled=False,
+        execution_status="design_proof_only",
+        steps=steps,
+        blockers=blockers,
+    )
 
 
 def _run_limactl(

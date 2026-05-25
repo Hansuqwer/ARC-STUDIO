@@ -17,6 +17,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from agent_runtime_cockpit.isolation.microvm import build_microvm_run_plan
 from agent_runtime_cockpit.security.sandbox import microvm_preflight
 
 
@@ -169,3 +170,48 @@ class TestMicroVMPreflightCI:
         assert "platform" in data
         assert "status" in data
         assert data["provider"] == "microvm"
+
+
+class TestMicroVMRunPlan:
+    """Non-executing Phase 37.6 design-proof plan tests."""
+
+    def test_lima_plan_has_lifecycle_network_and_teardown_steps(self, tmp_path):
+        plan = build_microvm_run_plan(
+            "lima", ["pwd"], workspace_root=tmp_path, platform_name="Darwin"
+        )
+        assert plan.provider == "lima"
+        assert plan.execution_enabled is False
+        assert plan.execution_status == "design_proof_only"
+        assert plan.network_default == "deny"
+        assert [step.name for step in plan.steps] == [
+            "template",
+            "create_start",
+            "network_off",
+            "run",
+            "teardown",
+        ]
+        assert any("network-off proof" in blocker for blocker in plan.blockers)
+
+    def test_firecracker_plan_has_cache_mount_and_jailer_steps(self, tmp_path):
+        plan = build_microvm_run_plan(
+            "firecracker", ["pwd"], workspace_root=tmp_path, platform_name="Linux"
+        )
+        assert plan.provider == "firecracker"
+        assert plan.guest_workspace == "/workspace"
+        assert [step.name for step in plan.steps] == [
+            "preflight",
+            "jail",
+            "boot",
+            "mount",
+            "run",
+            "teardown",
+        ]
+        assert any("kernel/rootfs" in blocker for blocker in plan.blockers)
+
+    def test_plan_rejects_unknown_provider_and_missing_command(self, tmp_path):
+        import pytest
+
+        with pytest.raises(ValueError, match="provider must be"):
+            build_microvm_run_plan("docker", ["pwd"], workspace_root=tmp_path)
+        with pytest.raises(ValueError, match="missing command"):
+            build_microvm_run_plan("lima", [], workspace_root=tmp_path)

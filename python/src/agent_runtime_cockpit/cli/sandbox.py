@@ -8,7 +8,7 @@ from typing import Optional
 
 import typer
 
-from ..isolation.microvm import MicroVMIsolationProvider
+from ..isolation.microvm import MicroVMIsolationProvider, build_microvm_run_plan
 from ..isolation.subprocess import SubprocessIsolationProvider
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
@@ -118,6 +118,31 @@ def sandbox_lima_template(
     ws = _workspace(workspace)
     template = render_lima_template(ws)
     _out(ok({"template": template, "execution": "not_implemented"}, workspace=str(ws)), json_output)
+
+
+@sandbox_app.command(
+    "microvm-plan", context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
+)
+def sandbox_microvm_plan(
+    ctx: typer.Context,
+    provider: str = typer.Option(
+        "lima", "--provider", help="MicroVM plan provider: lima or firecracker"
+    ),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Render a non-executing microVM run plan."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    command = list(ctx.args)
+    try:
+        ensure_workspace_cwd(Path.cwd(), ws)
+        plan = build_microvm_run_plan(provider, command, workspace_root=ws)
+    except ValueError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(2)
+    _out(ok(plan.model_dump(mode="json"), workspace=str(ws)), json_output)
 
 
 @sandbox_app.command(

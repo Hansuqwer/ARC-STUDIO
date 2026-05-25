@@ -79,6 +79,14 @@ Blocked:
 
 Status: Blocked. Preflight/doctor only. No microVM execution exists.
 
+Current design-proof harness:
+
+- `arc sandbox microvm-plan --json --provider lima -- <cmd...>` renders a non-executing Lima run plan.
+- `arc sandbox microvm-plan --json --provider firecracker -- <cmd...>` renders a non-executing Firecracker run plan.
+- Plans include lifecycle, workspace mount, network-default-deny, run, teardown, and blocker fields.
+- Plan generation does not call `limactl`, `firecracker`, `cloud-hypervisor`, or `jailer` and does not create VMs.
+- `execution_enabled` is always `false`; public `MicroVMIsolationProvider.execute()` remains blocked.
+
 ### Rootfs/Kernel Lifecycle
 - Firecracker needs a kernel vmlinux binary and a rootfs image. No automated download/cache mechanism exists.
 - Lima VM templates exist as rendered YAML only; no `limactl start/create/delete` lifecycle is implemented.
@@ -103,12 +111,14 @@ Status: Blocked. Preflight/doctor only. No microVM execution exists.
 ### Integration Gate
 - Tests exist at `python/tests/isolation/test_microvm_preflight.py` — 4 tests covering all 4 preflight states.
 - A skeleton integration test exists at `python/tests/test_cli_sandbox.py::test_microvm_integration_skeleton_doctor_only`, gated by `ARC_MICROVM_INTEGRATION=1`.
+- Design-proof plan tests cover Lima and Firecracker plan shape and assert CLI plan generation does not run subprocess probes.
 - CI does not set `ARC_MICROVM_INTEGRATION=1` — no microVM runtime in CI.
 
 ### Summary
 | Component | Status | What's missing |
 |---|---|---|
 | Preflight/doctor | Real | All 4 states tested: unavailable/installed_not_configured/ready/blocked |
+| Design-proof plan | Real | Non-executing plan only; no VM creation/start/run/delete |
 | Firecracker execution | Not implemented | Kernel/rootfs lifecycle, mount policy, network-off proof, jailer config, teardown |
 | Lima execution | Not implemented | VM create/start/shell/delete cycle, mount policy, network-off proof, teardown |
 | Integration test skeleton | Real (gated) | Tests exist but require local runtime; CI skips |
@@ -163,13 +173,13 @@ Sandbox commands persist audit artifacts outside the workspace by default:
 
 - chain: `~/.arc/audit/sandbox.audit.jsonl`
 - raw events: `~/.arc/audit/sandbox.events.jsonl`
-- optional HMAC mirror: same audit directory through `AuditChainStore` when `arc audit key init` has provided a key
+- optional keyed mirror: same audit directory through `AuditChainStore` when `arc audit key init` has provided a key
 
 Override directory: `ARC_SANDBOX_AUDIT_DIR`.
 
 The CLI response still includes the event payload for immediate UX and tests.
 
-The HMAC mirror is best-effort and never required for `arc sandbox run` success. Missing audit keys keep the existing SHA256 chain as the stable default.
+The keyed mirror is best-effort and never required for `arc sandbox run` success. Missing audit keys keep the existing SHA256 chain as the stable default.
 
 Verification:
 
@@ -212,6 +222,14 @@ ARC_MICROVM_EXPERIMENTAL=1 arc sandbox lima-template --json
 ```
 
 This renders a template only. It does not create, start, or execute inside a VM.
+
+Design-proof plan:
+
+```bash
+arc sandbox microvm-plan --json --provider lima -- pwd
+```
+
+This renders lifecycle/mount/network/run/teardown steps and blockers only. It does not call `limactl`.
 
 Public provider guard:
 

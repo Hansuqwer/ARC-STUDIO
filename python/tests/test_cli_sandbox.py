@@ -539,6 +539,52 @@ def test_lima_template_renders_with_experimental_gate(tmp_path, monkeypatch):
     assert "networks: []" in template
 
 
+def test_microvm_plan_cli_is_design_only_and_does_not_probe_runtime(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    def fail_probe(*_args, **_kwargs):
+        raise AssertionError("microvm-plan must not execute subprocess probes")
+
+    monkeypatch.setattr(subprocess, "run", fail_probe)
+    monkeypatch.setattr(subprocess, "Popen", fail_probe)
+    result = CliRunner().invoke(
+        app, ["sandbox", "microvm-plan", "--json", "--provider", "lima", "--", "pwd"]
+    )
+    assert result.exit_code == 0, result.output
+    plan = _payload(result)["data"]
+    assert plan["provider"] == "lima"
+    assert plan["execution_enabled"] is False
+    assert plan["execution_status"] == "design_proof_only"
+    assert [step["name"] for step in plan["steps"]] == [
+        "template",
+        "create_start",
+        "network_off",
+        "run",
+        "teardown",
+    ]
+
+
+def test_microvm_plan_cli_firecracker_shape(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(
+        app, ["sandbox", "microvm-plan", "--json", "--provider", "firecracker", "--", "pwd"]
+    )
+    assert result.exit_code == 0, result.output
+    plan = _payload(result)["data"]
+    assert plan["provider"] == "firecracker"
+    assert plan["network_default"] == "deny"
+    assert "kernel/rootfs cache provenance missing" in plan["blockers"]
+
+
+def test_microvm_plan_cli_rejects_unknown_provider(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(
+        app, ["sandbox", "microvm-plan", "--json", "--provider", "docker", "--", "pwd"]
+    )
+    assert result.exit_code == 2
+    assert _payload(result)["ok"] is False
+
+
 def test_container_provider_disabled_without_gate(monkeypatch):
     from agent_runtime_cockpit.isolation.docker_provider import DockerIsolationProvider
     import asyncio
