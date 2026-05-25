@@ -803,9 +803,21 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Goal:** Integrate Smolagents framework with ARC runtime.
 
-**Current:** Not Started.
+**Current:** Baseline Complete. T1 (detection) and T2 (export) implemented via AST-based static analysis. T3 (runner) is gated scaffold only because `CodeAgent` can execute generated Python code.
 
-**Status:** Not Started | Evidence: n/a | Notes: Highest risk/reward due to code-execution surface; needs enforcement maturity.
+**Deliverables:**
+- T1: AST-based detection of `CodeAgent`, `ToolCallingAgent`, `ManagedAgent`, tools, model wrappers, and code-execution surfaces
+- T2: AST-based export of agents, tool edges, model bindings, and code-execution metadata to `WorkflowInfo`
+- T3: Gated runner scaffold (`ARC_SMOLAGENTS_RUNNER_ENABLED=1`); no code/provider execution without explicit gate
+- Honest `CapabilityReport`: T1/T2 available, T3 gated due to code-execution risk
+
+**Acceptance:**
+- 31 tests passing (detection: 11, export: 7, runner: 6, adapter: 7)
+- All 2482 Python tests passing (no regressions)
+- Detection, export, and capability report work end-to-end
+- Code-agent execution remains gated and clearly labeled
+
+**Status:** Baseline Complete | Evidence: 31 Smolagents tests, 2482 total Python tests passed; `pnpm build` and `pnpm typecheck` green; `scripts/check-pr.sh` green | Notes: T3 runner is gated scaffold only; no live provider calls or generated-code execution by default.
 
 **Source:** Adapter Roadmap Phase 32
 
@@ -937,7 +949,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R30 Pydantic AI Adapter** | **Baseline Complete** | **Adapter Phase 29 — complete (commits 7680017, c34abb3, 27a33b1 — 43 tests, 3 PRs)** |
 | **R31 DSPy Adapter** | **Baseline Complete** | **Adapter Phase 30 — T1 detection (19 tests), T2 export (16 tests), T3 gated scaffold (17 tests), adapter (15 tests)** |
 | **R32 Haystack Adapter** | **Baseline Complete** | **Adapter Phase 31 — T1 detection (19 tests), T2 export (16 tests), T3 gated scaffold (15 tests), adapter (15 tests)** |
-| **R33 Smolagents Adapter** | **Not Started** | **Adapter Phase 32 — implement Smolagents adapter** |
+| **R33 Smolagents Adapter** | **Baseline Complete** | **Adapter Phase 32 — T1 detection (11 tests), T2 export (7 tests), T3 gated scaffold (6 tests), adapter (7 tests)** |
 | **R34 Semantic Kernel Adapter** | **Not Started** | **Adapter Phase 33 — implement Semantic Kernel adapter (T1+T2 only)** |
 | **R35 Google ADK Adapter** | **Not Started** | **Adapter Phase 34 — implement Google ADK adapter** |
 | **R36 MCP Python SDK Adapter** | **Not Started** | **Adapter Phase 35 — implement MCP Python SDK adapter** |

@@ -1303,6 +1303,43 @@ bash scripts/check-pr.sh                                   # pass
 
 ---
 
+## Phase 30C — Smolagents Adapter (Adapter Phase 32)
+
+**Roadmap:** R33 — Smolagents Adapter  
+**Status:** Baseline Complete | Evidence: 31 Smolagents tests, 2482 total Python tests passed; `pnpm build` and `pnpm typecheck` green; `scripts/check-pr.sh` green | 2026-05-25  
+**Depends on:** None (standalone adapter)
+
+### Implementation
+1. ✅ T1 Detection (`adapters/smolagents/detect.py`): AST scan for `import smolagents`, `CodeAgent`, `ToolCallingAgent`, `ManagedAgent`, tool decorators/classes, model wrappers, and code-execution surfaces. Checks dependency files for `smolagents`.
+2. ✅ T2 Export (`adapters/smolagents/export.py`): AST-based export of agents, tool edges, model binding metadata, and code-execution flags to `WorkflowInfo`.
+3. ✅ T3 Runner (`adapters/smolagents/runner.py`): Gated scaffold only. Requires `ARC_SMOLAGENTS_RUNNER_ENABLED=1`. Emits `SMOLAGENTS_AGENT_START/END/ERROR`, `SMOLAGENTS_TOOL_CALL`, and `SMOLAGENTS_CODE_EXECUTION` events. No generated-code/provider execution without explicit gate.
+4. ✅ Adapter class (`adapters/smolagents/__init__.py`): `SmolagentsAdapter(RuntimeAdapter)` with honest `CapabilityReport` (T1/T2 available, T3 gated due to code-execution risk).
+5. ✅ Registration in `adapters/registry.py`.
+6. ✅ Research doc: `docs/research/smolagents-adapter.md`.
+
+### Acceptance
+1. ✅ 31 tests passing (detection: 11, export: 7, runner: 6, adapter: 7)
+2. ✅ All 2482 Python tests passing (no regressions)
+3. ✅ Detection, export, and capability report work end-to-end
+4. ✅ T3 runner is gated scaffold; no live provider calls or generated-code execution by default
+5. ✅ Code-execution risk is explicitly labeled in report/research docs
+
+### Verification
+```bash
+cd python && uv run pytest tests/adapters/smolagents/ -q    # 31 passed
+cd python && uv run pytest -q                               # 2482 passed
+pnpm build                                                  # clean
+pnpm typecheck                                              # clean
+bash scripts/check-pr.sh                                    # pass
+```
+
+### Known Risks
+- `CodeAgent` can execute generated Python; T3 remains gated only.
+- Future real execution needs ARC sandbox integration and explicit approval UX.
+- Smolagents event hook APIs may require SDK-specific wiring in a future T3 implementation.
+
+---
+
 ## Phase 31 — Adaptive Consensus Protocol
 
 **Roadmap:** R24 — Adaptive Consensus  
