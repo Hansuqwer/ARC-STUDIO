@@ -24,6 +24,7 @@ from ..security.sandbox import (
     cap_output,
     render_lima_template,
     firecracker_doctor,
+    check_workspace_escape,
 )
 from .base import IsolationProvider, IsolationResult
 from .subprocess import redact_output
@@ -155,6 +156,8 @@ class FirecrackerIntegrationHarness:
         instance_name: str | None = None,
         max_bytes: int = 65_536,
     ) -> None:
+        # Check before resolving: reject workspace_root symlinks pointing outside parent.
+        check_workspace_escape(workspace_root, workspace_root.parent)
         self.workspace_root = workspace_root.resolve()
         self.runner = runner
         self.instance_name = instance_name or f"arc-fc-{uuid.uuid4().hex[:12]}"
@@ -437,18 +440,33 @@ def _run_limactl(
 
 
 class LimaIntegrationHarness:
-    """Opt-in disposable Lima lifecycle harness; not wired to public execution."""
+    """Opt-in disposable Lima lifecycle harness; not wired to public execution.
+
+    Network isolation note (2026-05-26):
+      Lima 2.x always provides a default user-mode slirp network (192.168.5.0/24)
+      to the guest. There is no known Lima 2.1.0 template config to fully disable
+      this. The network_proof step checks for a default route — on a real Lima VM
+      this check will report the slirp route exists (network_proof_passed=False).
+      This is a KNOWN LIMITATION: full network-off is not achievable with Lima 2.x
+      default config. P2 (network-off proof) in ADR-024 remains blocked until a
+      Lima config that disables the slirp interface is found or Lima adds support.
+      See docs/research/sandbox-and-microvm.md Step 1–5 research notes.
+    """
 
     def __init__(
         self,
         *,
         workspace_root: Path,
-        runner: Callable[[list[str], int, int], IsolationResult] = _run_limactl,
+        runner: Optional[Callable[[list[str], int, int], IsolationResult]] = None,
         instance_name: str | None = None,
         max_bytes: int = 65_536,
     ) -> None:
+        # Check before resolving: if workspace_root is a symlink pointing outside
+        # its own parent, reject immediately.
+        check_workspace_escape(workspace_root, workspace_root.parent)
         self.workspace_root = workspace_root.resolve()
-        self.runner = runner
+        # runner=None → use the real _run_limactl binary; inject a fake for tests.
+        self.runner = runner if runner is not None else _run_limactl
         self.instance_name = instance_name or f"arc-sandbox-{uuid.uuid4().hex[:12]}"
         self.max_bytes = max_bytes
         self.lifecycle: list[str] = []

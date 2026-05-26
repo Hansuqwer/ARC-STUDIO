@@ -2112,6 +2112,26 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Real Lima execution NOT proven on this host (CI-skipped).
 - Verified: targeted sandbox/microVM tests (including smoke) pass; CI posture confirmed.
 
+#### Slice 37.19: Mount Isolation + Symlink-Escape Guard (ADR-024 P3/P5 code-level) ✓
+- Added `is_path_within_root(path, root) -> bool` to `security/sandbox.py`: uses `os.path.realpath()` to follow all symlinks before comparing; handles dangling symlinks, `..` escapes, prefix collisions.
+- Added `check_workspace_escape(candidate, workspace_root)` to `security/sandbox.py`: raises `ValueError("Path escape detected")` if candidate resolves outside root.
+- Wired `check_workspace_escape` into `LimaIntegrationHarness.__init__` and `FirecrackerIntegrationHarness.__init__` (before `resolve()`).
+- Added `tests/security/test_workspace_escape.py` (19 tests):
+  - `TestIsPathWithinRoot`: 10 tests (inside/equals/outside/dotdot/prefix-collision/symlink-inside-pointing-outside/symlink-chain/dangling/nested/relative).
+  - `TestCheckWorkspaceEscape`: 5 tests (safe/escape/dotdot/symlink/error-message).
+  - `TestHarnessEscapeGuard`: 4 tests (Lima rejects escape/FC rejects escape/safe no-raise/fake-runner proceeds).
+- KNOWN GAP (P3/P5 mount-level): virtiofs passes symlinks through to guest. A symlink INSIDE the workspace pointing outside will be accessible in the guest. Code-level guard at `__init__` only prevents workspace_root itself from being a misdirected symlink. Full mount-level proof requires real guest-side traversal test — documented as pending.
+- All 19 tests pass without Lima or Firecracker.
+
+#### Slice 37.18: Real-Host Lima Lifecycle Proof (Slice 37.18) ✓
+- limactl 2.1.0 confirmed present on this macOS host (`/opt/homebrew/bin/limactl`).
+- Added `TestLimaSmokeRealHost` to `test_lima_smoke.py` gated by `ARC_LIMA_REAL_EXEC=1` (dual gate with `ARC_MICROVM_INTEGRATION=1`).
+- Real-host tests: `test_real_lima_lifecycle_uname` (P1/P4), `test_real_lima_teardown_on_start_failure` (P4), `test_real_lima_workspace_sentinel` (partial P3).
+- `LimaIntegrationHarness.__init__` updated: `runner=None` default → uses real `_run_limactl`; inject fake for tests.
+- KNOWN LIMITATION discovered: Lima 2.x always provides a default slirp route (192.168.5.0/24) to the guest. `network_proof_passed` will be False on real Lima. P2 (network-off) is NOT proven; this is an unresolved ADR-024 blocker.
+- Real-host tests skipped in CI (no `ARC_LIMA_REAL_EXEC=1`); 3 new skip targets verified.
+- Research notes added to `docs/research/sandbox-and-microvm.md`.
+
 #### Slice 37.17: MicroVM Public-Execution Truth Guard ✓
 - Added `MicroVMIsolationProvider.name` property returning `"microvm"`.
 - Added `MicroVMIsolationProvider.status()` → dict with `available: False`, `reason`, `contract_doc`, `lima_harness`, `firecracker_harness`, `unblock_gate`.

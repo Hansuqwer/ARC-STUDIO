@@ -353,3 +353,42 @@ Blocked:
 - Real OAuth flow requires live provider endpoints (tests use monkeypatched HTTP)
 - Real macOS Keychain smoke requires a macOS user session with unlocked Keychain; CI uses monkeypatched `keyring`.
 - Trust enforcement mocking with `monkeypatch.setattr` is unreliable with string paths; use `unittest.mock.patch.object` for test-time attribute patching.
+
+---
+
+## Step 1–5 Research (2026-05-26)
+
+### Host Pre-Check Results
+
+| Tool | Result |
+|---|---|
+| `which limactl` | `/opt/homebrew/bin/limactl` — **present** |
+| `limactl --version` | `limactl version 2.1.0` |
+| `which firecracker` | `firecracker not found` — **absent** |
+| `ls -la /dev/kvm` | `No such file or directory` — **absent** (Darwin/macOS, no KVM) |
+| `uname -sr` | `Darwin 25.4.0` |
+
+Consequence: Step 1 (Lima lifecycle proof) **can proceed** on this host. Steps 4 (Firecracker real-host) is **host-skipped**.
+
+### Research Notes
+
+| Source | Link | What was learned | Implementation consequence | Confidence | Unresolved questions |
+|---|---|---|---|---|---|
+| Context7 Python subprocess | `/python/cpython` | `os.killpg(pgid, sig)` sends signal to entire process group. `start_new_session=True` calls `setsid()` in child before exec. After `TimeoutExpired`, call `proc.kill()` then `proc.communicate()` to drain pipes — do NOT call `wait()` after timeout. | LimaIntegrationHarness already uses `start_new_session=True` + `os.killpg` + drain; pattern is correct. | High | None. |
+| Context7 Python pathlib | `/python/cpython` | `Path.resolve(strict=False)` resolves symlinks and eliminates `..` components; works even for missing paths. `Path.is_symlink()` returns True for broken symlinks. | Use `Path.resolve()` for workspace escape detection; handles dangling symlinks safely. | High | Python 3.13 changed symlink loop handling; project uses 3.11, so `strict=False` resolves as far as possible — safe for our use. |
+| Context7 Python os.path | `/python/cpython` | `os.path.realpath(path, strict=False)` returns canonical path eliminating symlinks; `strict=True` raises OSError for missing or loop. `strict` added in 3.10. | Use `Path.resolve()` (wraps realpath) for escape check; consistent API across 3.11+. | High | None. |
+| Lima network docs | `https://lima-vm.io/docs/config/network/` | Default Lima network is user-mode slirp (192.168.5.0/24). `networks: []` only removes named VMNet networks — it does NOT disable the built-in slirp default route. | **Critical**: our network-off strategy of checking `ip route | grep default` in guest is correct BUT the guest will always have a slirp default route unless we use a Lima version / config that explicitly disables the slirp interface. No known `vmType: vz` config key to disable slirp in Lima 2.1.0. | High | Is there a Lima 2.x config key to disable default slirp networking? Need to check Lima source / issue tracker. Unresolved: cannot claim network isolation until this is proven. |
+| Lima network user-mode docs | `https://lima-vm.io/docs/config/network/user/` | Subnet 192.168.5.0/24 is hard-coded. Guest IP is 192.168.5.15. Host IP (loopback) is 192.168.5.2. DNS is 192.168.5.3. `hostResolver.enabled` controls DNS forwarding. No config key to disable slirp entirely documented. | Network-off via `networks: []` is insufficient. Must either (a) find a Lima 2.x option to disable slirp, or (b) accept that the guest WILL have a default route, and instead prove denial at the policy layer before reaching the VM. This changes our network-off proof strategy. | High | Unresolved: does Lima 2.x support disabling the default slirp interface via any template config? |
+| Lima mount docs | `https://lima-vm.io/docs/config/mount/` | VZ default mount type is virtiofs (Apple Virtualization.Framework shared directory). `followSymlinks` option exists for reverse-sshfs but not for virtiofs. virtiofs passes symlinks through — guest sees host symlinks as symlinks. | Symlinks inside the workspace mount will appear as symlinks in the guest. A symlink inside /workspace pointing to a host path outside workspace will be accessible from the guest via virtiofs. This is the mount escape vector. Must test explicitly. | High | Does virtiofs restrict symlink traversal to the declared mount root? Docs do not state this. Need real host test. |
+| Google web search | blocked | All Google search queries returned 403 PERMISSION_DENIED. | Recorded as tool unavailable. Used direct Lima docs + Context7 instead. | N/A | Retry external web search manually before security-signoff PR. |
+| Vercel Grep / code search | N/A — tool not exposed | No Vercel Grep tool available in this runtime. Attempted web-backed search blocked by 403. | Conservative implementation: use local repo evidence and Lima docs. | Low | Run external Vercel Grep manually when available. |
+
+### Key Implementation Consequences for Steps 1–5
+
+1. **Lima network-off (P2): NOT provable as "network completely off"** — Lima 2.1.0 always gives the guest a slirp default route. The current harness checks `ip route | grep default` and expects exit 1 (no default route). This will FAIL on a real Lima VM because the default route exists. **The network proof strategy must change**: either (a) accept that Lima's default slirp provides outbound network and remove the network-off claim, documenting this as a known limitation, or (b) find a Lima config to disable the slirp interface before claiming P2 satisfied.
+
+2. **Lima mount isolation (P3/P5)**: virtiofs passes symlinks through. The host-side check (`is_path_within_root`) prevents the workspace_root from being a symlink to somewhere dangerous. But a symlink INSIDE the workspace, pointing outside, will be accessible in the guest. Must document this as a known gap.
+
+3. **Step 1 feasibility**: limactl 2.1.0 is present. However, real Lima VM start takes 60–300 seconds for first-time image download + boot. The smoke tests must handle this in CI with very generous timeouts. The network_proof test will need adjustment given finding (1) above.
+
+4. **Firecracker (Step 4)**: absent on this host. Step 4 code and docs can be written but tests will always skip here.

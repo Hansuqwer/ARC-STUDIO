@@ -880,6 +880,56 @@ def firecracker_doctor(system: str | None = None) -> dict[str, Any]:
     }
 
 
+def is_path_within_root(path: Path, root: Path) -> bool:
+    """Return True iff ``path`` resolves to a location inside ``root``.
+
+    Uses ``os.path.realpath()`` to follow all symlinks before comparing,
+    preventing symlink escape attacks where a symlink inside the workspace
+    points to a path outside it.
+
+    Works for non-existent paths and dangling symlinks: ``realpath()`` with
+    strict=False resolves as far as possible without raising.
+
+    Args:
+        path: Candidate path to check.
+        root: Root directory the path must be inside (inclusive).
+
+    Returns:
+        True if the fully resolved ``path`` starts with the fully resolved
+        ``root`` path.  False otherwise.
+    """
+    real_root = os.path.realpath(root)
+    real_path = os.path.realpath(path)
+    # Ensure we compare with a trailing separator to avoid prefix collisions
+    # e.g. /workspace-evil vs /workspace
+    root_str = real_root.rstrip(os.sep) + os.sep
+    path_str = real_path.rstrip(os.sep) + os.sep
+    # Allow exact equality (path == root) or containment (path starts with root/)
+    return path_str == root_str or path_str.startswith(root_str)
+
+
+def check_workspace_escape(candidate: Path, workspace_root: Path) -> None:
+    """Raise ``ValueError`` if ``candidate`` resolves outside ``workspace_root``.
+
+    Used by sandbox harnesses before running any command that references a path,
+    and by mount isolation checks before writing templates or starting VMs.
+
+    Args:
+        candidate: Path to validate.
+        workspace_root: The workspace boundary.
+
+    Raises:
+        ValueError: If the resolved ``candidate`` is outside ``workspace_root``.
+    """
+    if not is_path_within_root(candidate, workspace_root):
+        real = os.path.realpath(candidate)
+        real_root = os.path.realpath(workspace_root)
+        raise ValueError(
+            f"Path escape detected: {candidate!r} resolves to {real!r} "
+            f"which is outside workspace root {real_root!r}"
+        )
+
+
 def stable_json(data: Any) -> str:
     """Dump stable JSON for docs/tests."""
     return json.dumps(data, sort_keys=True, separators=(",", ":"), default=str)
