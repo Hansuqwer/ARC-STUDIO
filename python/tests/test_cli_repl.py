@@ -53,6 +53,11 @@ class _StubRunner:
         token = cancellation_token or self.cancellation_token
         if self.mode == "instant":
             return _StubRunResult(text=f"ok: {prompt}")
+        if self.mode == "progress":
+            if on_progress is not None:
+                on_progress({"stage": "plan"})
+                on_progress({"stage": "execute"})
+            return _StubRunResult(text=f"ok: {prompt}")
         if self.mode == "cancellable":
             deadline = time.monotonic() + 5.0
             while time.monotonic() < deadline:
@@ -220,6 +225,28 @@ class TestSlashCommands:
         started = [payload for name, payload in handler.events if name == "run.started"][0]
         assert started["runtime_mode"] == "fake"
 
+    def test_repl_run_progress_events_are_renderable(self, monkeypatch):
+        monkeypatch.setenv("ARC_ALLOW_RUN", "1")
+        progress: list[tuple[str, dict[str, Any]]] = []
+        factory = _StubRunnerFactory(mode="progress")
+        handler = SlashCommandHandler(
+            progress_sink=lambda name, payload: progress.append((name, payload))
+        )
+        s = ChatSession()
+        with patch("agent_runtime_cockpit.cli_repl.slash_commands.SwarmGraphRunner", factory):
+            result = handler.handle("/run hello progress", s)
+
+        assert result is not None
+        assert result.state == "present"
+        assert result.metadata["progress_event_count"] == 2
+        assert result.metadata["progress_stages"] == ["plan", "execute"]
+        assert [name for name, _payload in progress] == [
+            "run.started",
+            "run.progress.plan",
+            "run.progress.execute",
+            "run.completed",
+        ]
+
     def test_repl_run_succeeds_when_gate_open_via_session(self, monkeypatch):
         monkeypatch.delenv("ARC_ALLOW_RUN", raising=False)
         factory = _StubRunnerFactory(mode="instant")
@@ -252,6 +279,8 @@ class TestSlashCommands:
         assert result is not None
         assert result.state == "degraded"
         assert result.reason == "cancelled"
+        assert result.metadata["progress_event_count"] >= 1
+        assert "execute" in result.metadata["progress_stages"]
         cancelled = [payload for name, payload in handler.events if name == "run.cancelled"]
         assert len(cancelled) == 1
         assert cancelled[0]["reason"] == "user"
@@ -740,6 +769,25 @@ class TestMergedSlashCommands:
         assert result is not None
         assert result.state == "error"
         assert "boom" in result.output
+        assert result.metadata["command"] == "status"
+        assert result.metadata["error_type"] == "RuntimeError"
+
+    def test_chat_repl_formats_progress_events(self):
+        from agent_runtime_cockpit.cli_repl.chat_repl import _format_progress_event
+
+        assert _format_progress_event("run.started", {}) == "[progress] run started"
+        assert (
+            _format_progress_event("run.progress.execute", {"stage": "execute"})
+            == "[progress] execute"
+        )
+        assert (
+            _format_progress_event("run.completed", {"elapsed_ms": 7})
+            == "[progress] run completed in 7ms"
+        )
+        assert (
+            _format_progress_event("run.cancelled", {"reason": "user"})
+            == "[progress] run cancelled: user"
+        )
 
 
 class TestCommandRegistry:

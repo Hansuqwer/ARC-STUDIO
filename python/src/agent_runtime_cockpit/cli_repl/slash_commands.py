@@ -589,12 +589,21 @@ def _execute_run(
 
     started = time.monotonic()
     previous = signal.getsignal(signal.SIGINT)
+    progress_stages: list[str] = []
+
+    def _progress_metadata(elapsed_ms: int) -> dict[str, Any]:
+        return {
+            "elapsed_ms": elapsed_ms,
+            "progress_event_count": len(progress_stages),
+            "progress_stages": list(progress_stages),
+        }
 
     def _on_sigint(signum: int, frame: Any) -> None:  # noqa: ARG001
         cancellation_token.cancel(CancellationReason.USER, "SIGINT")
 
     def _on_progress(payload: dict[str, Any]) -> None:
         stage = str(payload.get("stage", "unknown"))
+        progress_stages.append(stage)
         _emit(event_sink, f"run.progress.{stage}", payload)
 
     signal.signal(signal.SIGINT, _on_sigint)
@@ -619,8 +628,12 @@ def _execute_run(
                     "run.blocked.budget",
                     {"reason": type(exc).__name__, "detail": str(exc)},
                 )
+                elapsed_ms = int((time.monotonic() - started) * 1000)
                 return CommandResult(
-                    state="blocked", reason="budget_preflight_failed", remediation=str(exc)
+                    state="blocked",
+                    reason="budget_preflight_failed",
+                    remediation=str(exc),
+                    metadata=_progress_metadata(elapsed_ms),
                 )
             result = _run_provider_turn(
                 session=session,
@@ -629,11 +642,12 @@ def _execute_run(
                 event_sink=event_sink,
                 runtime=runtime,
             )
+            elapsed_ms = int((time.monotonic() - started) * 1000)
             _emit(
                 event_sink,
                 "run.completed",
                 {
-                    "elapsed_ms": int((time.monotonic() - started) * 1000),
+                    "elapsed_ms": elapsed_ms,
                     "result_summary": {"type": "provider_turn", "degraded": result.degraded},
                 },
             )
@@ -641,32 +655,44 @@ def _execute_run(
                 state="degraded" if result.degraded else "present",
                 output=result.content,
                 reason=result.degraded_reason or "",
+                metadata=_progress_metadata(elapsed_ms),
             )
         config = runtime if runtime is not None else SwarmGraphConfig(num_workers=3, max_rounds=1)
         runner = _make_runner(config, cancellation_token)
         result = _run_runner(runner, prompt, cancellation_token, _on_progress)
         if hasattr(session, "add_message"):
             session.add_message("user", prompt)
+        elapsed_ms = int((time.monotonic() - started) * 1000)
         _emit(
             event_sink,
             "run.completed",
             {
-                "elapsed_ms": int((time.monotonic() - started) * 1000),
+                "elapsed_ms": elapsed_ms,
                 "result_summary": _result_summary(result),
             },
         )
-        return CommandResult(state="present", output=_render_run_result(result))
+        return CommandResult(
+            state="present",
+            output=_render_run_result(result),
+            metadata=_progress_metadata(elapsed_ms),
+        )
     except Cancelled as exc:
+        elapsed_ms = int((time.monotonic() - started) * 1000)
         _emit(
             event_sink,
             "run.cancelled",
             {
                 "reason": exc.reason.value,
                 "detail": exc.detail,
-                "elapsed_ms": int((time.monotonic() - started) * 1000),
+                "elapsed_ms": elapsed_ms,
             },
         )
-        return CommandResult(state="degraded", output=str(exc), reason="cancelled")
+        return CommandResult(
+            state="degraded",
+            output=str(exc),
+            reason="cancelled",
+            metadata=_progress_metadata(elapsed_ms),
+        )
     finally:
         signal.signal(signal.SIGINT, previous)
 
@@ -849,14 +875,23 @@ def cmd_runs(arg: str, _session: ChatSession) -> CommandResult:
 class SlashCommandHandler:
     """Handler that routes slash commands through the unified registry."""
 
-    def __init__(self, runner: Any = None) -> None:
+    def __init__(
+        self, runner: Any = None, progress_sink: Callable[[str, dict[str, Any]], None] | None = None
+    ) -> None:
         self.runner = runner
+        self.progress_sink = progress_sink
         self.cancellation_token: CancellationToken = CancellationToken()
         self.events: list[tuple[str, dict[str, Any]]] = []
         self._registry = _build_registry()
 
     def emit_event(self, name: str, payload: dict[str, Any]) -> None:
-        self.events.append((name, dict(payload)))
+        copied = dict(payload)
+        self.events.append((name, copied))
+        if self.progress_sink and (
+            name.startswith("run.progress.")
+            or name in {"run.started", "run.completed", "run.cancelled"}
+        ):
+            self.progress_sink(name, dict(copied))
 
     def run_token_factory(self) -> CancellationToken:
         return self.cancellation_token.child()
@@ -903,5 +938,8 @@ class SlashCommandHandler:
             Exception
         ) as exc:  # pragma: no cover - exercised by regression tests with monkeypatches
             return CommandResult(
-                state="error", output=f"Error running /{name}: {exc}", reason=type(exc).__name__
+                state="error",
+                output=f"Error running /{name}: {exc}",
+                reason=type(exc).__name__,
+                metadata={"command": name, "error_type": type(exc).__name__},
             )

@@ -32,7 +32,9 @@ def run_chat_repl(
     if not session:
         session = ChatSession()
 
-    handler = SlashCommandHandler()
+    handler = SlashCommandHandler(
+        progress_sink=lambda name, payload: print(_format_progress_event(name, payload))
+    )
 
     if initial_prompt:
         _handle_input(initial_prompt, session, handler, print)
@@ -114,3 +116,16 @@ def _format_result(result: dict[str, Any]) -> str:
         if output_text:
             lines.append(f"  {output_text[:500]}")
     return "\n".join(lines)
+
+
+def _format_progress_event(name: str, payload: dict[str, Any]) -> str:
+    if name == "run.started":
+        return "[progress] run started"
+    if name.startswith("run.progress."):
+        return f"[progress] {payload.get('stage') or name.removeprefix('run.progress.')}"
+    if name == "run.completed":
+        return f"[progress] run completed in {payload.get('elapsed_ms', 0)}ms"
+    if name == "run.cancelled":
+        reason = payload.get("reason", "unknown")
+        return f"[progress] run cancelled: {reason}"
+    return f"[progress] {name}"
