@@ -2,7 +2,7 @@
 
 **Status:** Accepted — implementation blocked (see P1–P7 status below)  
 **Date:** 2026-05-26  
-**Last updated:** 2026-05-26 — Lima P5 symlink-escape proof scaffold added; strict public microVM remains blocked  
+**Last updated:** 2026-05-26 — Lima P5 proof blocked by P2 network gate; strict public microVM remains blocked  
 **Authors:** ARC Studio sandbox team  
 **Related:** Phase 37 (R38), `docs/research/sandbox-and-microvm.md`, `docs/research/microvm-p1-p7-status.md`, ADR-014 (security architecture)
 
@@ -192,7 +192,7 @@ Full detail: `docs/research/microvm-p1-p7-status.md`
 | P2 | Network-off proof | **Design/preflight only** — Lima is low-security/network-present. Firecracker no-NIC config generation exists, but real boot/no-default-route/curl-fails proof has not run. |
 | P3 | Workspace-mount proof | Partial — code-level escape guard added + sentinel test; virtiofs symlink pass-through gap remains |
 | P4 | Teardown proof | Partial — code-level harness teardown proven; real-host teardown pending |
-| P5 | Symlink-escape proof | Partial — code-level `is_path_within_root()` + 19 tests; real-host Lima test `test_real_lima_symlink_escape_blocked` added and skipped unless `ARC_MICROVM_INTEGRATION=1 ARC_LIMA_REAL_EXEC=1`; host result pending |
+| P5 | Symlink-escape proof | Blocked by Lima P2 — code-level `is_path_within_root()` + 19 tests; real-host Lima test `test_real_lima_symlink_escape_blocked` xfails on this host because network proof blocks user argv before symlink traversal can be exercised |
 | P6 | stdout/stderr caps | **Satisfied** — bounded stream readers + cap tests pass |
 | P7 | Audit event emitted | **Satisfied for internal harnesses** — Lima/Firecracker harness attempts persist `MICROVM_COMMAND`/`MICROVM_DENIED`; public provider audit tests still required before execution wiring |
 

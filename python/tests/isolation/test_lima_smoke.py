@@ -349,5 +349,7 @@ class TestLimaSmokeRealHost:
             require_gate=True,
         )
         assert result.teardown_attempted is True
+        if "run" not in result.lifecycle:
+            pytest.xfail("P5 not exercised because Lima network proof blocked user argv")
         if result.result.exit_code == 0:
             assert "root:" not in result.result.stdout
