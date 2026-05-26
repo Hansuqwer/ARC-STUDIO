@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import platform
 import json
+import hashlib
 import shutil
 import signal
 import subprocess
@@ -292,7 +293,42 @@ class FirecrackerGuestProof(BaseModel):
         return self.sentinel_readable and self.symlink_escape_blocked
 
 
+class FirecrackerProofArtifactManifest(BaseModel):
+    """Manifest for ARC-owned Firecracker proof rootfs/init artifacts."""
+
+    model_config = ConfigDict(frozen=True)
+
+    version: int = 1
+    artifact: str = "arc-firecracker-proof-rootfs"
+    init_path: str
+    init_sha256: str
+    rootfs_path: str | None = None
+    rootfs_sha256: str | None = None
+    markers: list[str]
+    build_status: str
+    blockers: list[str] = []
+
+
+class FirecrackerProofArtifactReport(BaseModel):
+    """Result of proof init/manifest generation and optional rootfs build."""
+
+    model_config = ConfigDict(frozen=True)
+
+    manifest_path: str
+    init_path: str
+    rootfs_path: str | None = None
+    built_rootfs: bool = False
+    blockers: list[str] = []
+    manifest: FirecrackerProofArtifactManifest
+
+
 FIRECRACKER_PROOF_MARKER = "ARC_FC_PROOF "
+FIRECRACKER_PROOF_MARKERS = [
+    "no_default_route",
+    "curl_failed",
+    "sentinel_readable",
+    "symlink_escape_blocked",
+]
 
 
 def parse_firecracker_guest_proof(output: str) -> FirecrackerGuestProof:
@@ -344,6 +380,131 @@ reboot -f 2>/dev/null || poweroff -f 2>/dev/null || halt -f
 """
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _write_manifest(path: Path, manifest: FirecrackerProofArtifactManifest) -> None:
+    path.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
+
+
+def generate_firecracker_proof_artifacts(
+    output_dir: Path,
+    *,
+    rootfs_path: Path | None = None,
+    build_rootfs: bool | None = None,
+    rootfs_size_mib: int = 32,
+) -> FirecrackerProofArtifactReport:
+    """Generate deterministic Firecracker proof init + manifest.
+
+    Optional ext4 image creation is host-gated by ``ARC_FC_BUILD_PROOF_ROOTFS=1``
+    and local tools. This never downloads images or runs privileged commands.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    init_path = output_dir / "arc-fc-proof-init.sh"
+    manifest_path = output_dir / "rootfs-manifest.json"
+    init_path.write_text(render_firecracker_guest_proof_init(), encoding="utf-8")
+    init_path.chmod(0o755)
+
+    blockers: list[str] = []
+    requested_build = (
+        os.environ.get("ARC_FC_BUILD_PROOF_ROOTFS") == "1" if build_rootfs is None else build_rootfs
+    )
+    built_rootfs = False
+    final_rootfs_path = rootfs_path or (output_dir / "arc-fc-proof-rootfs.ext4")
+    rootfs_sha256: str | None = None
+
+    if requested_build:
+        tools = {
+            "busybox": shutil.which("busybox"),
+            "mkfs.ext4": shutil.which("mkfs.ext4"),
+            "truncate": shutil.which("truncate"),
+        }
+        missing = [name for name, value in tools.items() if not value]
+        if missing:
+            blockers.extend(f"missing tool: {name}" for name in missing)
+        else:
+            root_dir = output_dir / "rootfs-tree"
+            (root_dir / "bin").mkdir(parents=True, exist_ok=True)
+            (root_dir / "sbin").mkdir(parents=True, exist_ok=True)
+            (root_dir / "proc").mkdir(exist_ok=True)
+            (root_dir / "sys").mkdir(exist_ok=True)
+            (root_dir / "dev").mkdir(exist_ok=True)
+            (root_dir / "tmp").mkdir(exist_ok=True)
+            (root_dir / "workspace").mkdir(exist_ok=True)
+            shutil.copy2(str(tools["busybox"]), root_dir / "bin" / "busybox")
+            (root_dir / "init").write_text(init_path.read_text(encoding="utf-8"), encoding="utf-8")
+            (root_dir / "init").chmod(0o755)
+            for applet in ("sh", "cat", "grep", "ip", "reboot", "poweroff", "halt"):
+                link = root_dir / "bin" / applet
+                if not link.exists():
+                    link.symlink_to("busybox")
+            subprocess.run(
+                [str(tools["truncate"]), "-s", f"{rootfs_size_mib}M", str(final_rootfs_path)],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            subprocess.run(
+                [str(tools["mkfs.ext4"]), "-d", str(root_dir), "-F", str(final_rootfs_path)],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            built_rootfs = True
+            rootfs_sha256 = _sha256_file(final_rootfs_path)
+    else:
+        blockers.append("ARC_FC_BUILD_PROOF_ROOTFS=1 not set; generated init/manifest only")
+
+    manifest = FirecrackerProofArtifactManifest(
+        init_path=str(init_path),
+        init_sha256=_sha256_file(init_path),
+        rootfs_path=str(final_rootfs_path) if built_rootfs else None,
+        rootfs_sha256=rootfs_sha256,
+        markers=FIRECRACKER_PROOF_MARKERS,
+        build_status="built" if built_rootfs else "init_manifest_only",
+        blockers=blockers,
+    )
+    _write_manifest(manifest_path, manifest)
+    return FirecrackerProofArtifactReport(
+        manifest_path=str(manifest_path),
+        init_path=str(init_path),
+        rootfs_path=str(final_rootfs_path) if built_rootfs else None,
+        built_rootfs=built_rootfs,
+        blockers=blockers,
+        manifest=manifest,
+    )
+
+
+def validate_firecracker_proof_manifest(path: Path) -> FirecrackerProofArtifactManifest:
+    """Validate proof manifest and marker init without mounting rootfs."""
+    manifest = FirecrackerProofArtifactManifest.model_validate_json(
+        path.read_text(encoding="utf-8")
+    )
+    init_path = Path(manifest.init_path)
+    if not init_path.exists():
+        raise ValueError("proof init missing")
+    if _sha256_file(init_path) != manifest.init_sha256:
+        raise ValueError("proof init sha256 mismatch")
+    init_text = init_path.read_text(encoding="utf-8")
+    for marker in FIRECRACKER_PROOF_MARKERS:
+        if f"ARC_FC_PROOF {marker}=" not in init_text:
+            raise ValueError(f"proof init missing marker: {marker}")
+    if manifest.rootfs_path:
+        rootfs = Path(manifest.rootfs_path)
+        if not rootfs.exists():
+            raise ValueError("proof rootfs missing")
+        if manifest.rootfs_sha256 and _sha256_file(rootfs) != manifest.rootfs_sha256:
+            raise ValueError("proof rootfs sha256 mismatch")
+    return manifest
+
+
 def _firecracker_binary() -> str | None:
     binary = shutil.which("firecracker")
     return str(binary) if binary else None
@@ -353,8 +514,10 @@ def firecracker_proof_gates() -> dict[str, object]:
     """Return private Firecracker proof-runner gates; never starts a VM."""
     kernel = os.environ.get("ARC_FIRECRACKER_KERNEL")
     rootfs = os.environ.get("ARC_FIRECRACKER_ROOTFS")
+    manifest_env = os.environ.get("ARC_FIRECRACKER_PROOF_ROOTFS_MANIFEST")
     kernel_path = Path(kernel) if kernel else None
     rootfs_path = Path(rootfs) if rootfs else None
+    manifest_path = Path(manifest_env) if manifest_env else None
     kvm_path = Path("/dev/kvm")
     binary = _firecracker_binary()
     gates = {
@@ -368,6 +531,8 @@ def firecracker_proof_gates() -> dict[str, object]:
         "kernel_exists": bool(kernel_path and kernel_path.exists()),
         "rootfs_path": str(rootfs_path) if rootfs_path else None,
         "rootfs_exists": bool(rootfs_path and rootfs_path.exists()),
+        "proof_manifest_path": str(manifest_path) if manifest_path else None,
+        "proof_manifest_valid": False,
     }
     blockers: list[str] = []
     if not gates["linux"]:
@@ -386,6 +551,12 @@ def firecracker_proof_gates() -> dict[str, object]:
         blockers.append("ARC_FIRECRACKER_KERNEL missing/unreadable")
     if not gates["rootfs_exists"]:
         blockers.append("ARC_FIRECRACKER_ROOTFS missing/unreadable")
+    if manifest_path:
+        try:
+            validate_firecracker_proof_manifest(manifest_path)
+            gates["proof_manifest_valid"] = True
+        except Exception as exc:
+            blockers.append(f"ARC_FIRECRACKER_PROOF_ROOTFS_MANIFEST invalid: {exc}")
     gates["ready"] = not blockers
     gates["blockers"] = blockers
     return gates

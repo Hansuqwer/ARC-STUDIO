@@ -28,9 +28,11 @@ import pytest
 from agent_runtime_cockpit.isolation.microvm import (
     FirecrackerIntegrationHarness,
     FirecrackerProofRunner,
+    generate_firecracker_proof_artifacts,
     firecracker_proof_gates,
     parse_firecracker_guest_proof,
     render_firecracker_guest_proof_init,
+    validate_firecracker_proof_manifest,
     build_cloud_hypervisor_no_network_run_plan,
     build_firecracker_no_network_run_plan,
     firecracker_integration_available,
@@ -291,9 +293,42 @@ class TestFirecrackerProofRunner:
     def test_guest_proof_init_snippet_is_proof_only(self):
         snippet = render_firecracker_guest_proof_init()
         assert "ARC_FC_PROOF no_default_route" in snippet
+        assert "ARC_FC_PROOF curl_failed" in snippet
+        assert "ARC_FC_PROOF sentinel_readable" in snippet
+        assert "ARC_FC_PROOF symlink_escape_blocked" in snippet
         assert "curl --connect-timeout 2 https://example.com" in snippet
         assert "/workspace/arc-sentinel.txt" in snippet
         assert "/workspace/arc-host-escape-link" in snippet
+
+    def test_proof_artifact_generator_writes_init_and_manifest_only_by_default(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.delenv("ARC_FC_BUILD_PROOF_ROOTFS", raising=False)
+        report = generate_firecracker_proof_artifacts(tmp_path)
+        assert report.built_rootfs is False
+        assert "ARC_FC_BUILD_PROOF_ROOTFS=1 not set" in "; ".join(report.blockers)
+        init_text = (tmp_path / "arc-fc-proof-init.sh").read_text(encoding="utf-8")
+        assert "ARC_FC_PROOF no_default_route=1" in init_text
+        manifest = validate_firecracker_proof_manifest(tmp_path / "rootfs-manifest.json")
+        assert manifest.build_status == "init_manifest_only"
+        assert manifest.rootfs_path is None
+
+    def test_proof_artifact_builder_reports_missing_tools_gracefully(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("ARC_FC_BUILD_PROOF_ROOTFS", "1")
+        monkeypatch.setattr("agent_runtime_cockpit.isolation.microvm.shutil.which", lambda _: None)
+        report = generate_firecracker_proof_artifacts(tmp_path)
+        assert report.built_rootfs is False
+        assert "missing tool: busybox" in report.blockers
+        assert "missing tool: mkfs.ext4" in report.blockers
+        assert "missing tool: truncate" in report.blockers
+
+    def test_proof_manifest_gate_rejects_invalid_manifest(self, tmp_path, monkeypatch):
+        manifest = tmp_path / "rootfs-manifest.json"
+        manifest.write_text('{"version":1}', encoding="utf-8")
+        monkeypatch.setenv("ARC_FIRECRACKER_PROOF_ROOTFS_MANIFEST", str(manifest))
+        gates = firecracker_proof_gates()
+        assert gates["proof_manifest_valid"] is False
+        assert any("ARC_FIRECRACKER_PROOF_ROOTFS_MANIFEST invalid" in b for b in gates["blockers"])
 
     def test_proof_runner_consumes_guest_markers_without_public_exec(self, tmp_path, monkeypatch):
         kernel = tmp_path / "vmlinux"
