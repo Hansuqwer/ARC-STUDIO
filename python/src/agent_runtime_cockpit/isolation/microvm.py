@@ -114,6 +114,55 @@ class FirecrackerNoNetworkRunPlan(BaseModel):
     real_boot_attempted: bool = False
 
 
+class CloudHypervisorNoNetworkConfig(BaseModel):
+    """Design-proof Cloud Hypervisor argv with no guest NICs configured."""
+
+    model_config = ConfigDict(frozen=True)
+
+    api_socket: str
+    kernel_path: str
+    disk_path: str
+    cmdline: str = "console=hvc0 root=/dev/vda1 rw"
+    cpus: str = "boot=1"
+    memory: str = "size=512M"
+    strict_network_candidate: bool = True
+    strict_network_proof: str = "not_proven"
+    network_interfaces_configured: bool = False
+    workspace_mount_strategy: str = "virtiofs_or_agent_pending"
+
+    def to_cloud_hypervisor_argv(self) -> list[str]:
+        """Return Cloud Hypervisor argv without --net options."""
+        return [
+            "cloud-hypervisor",
+            "--api-socket",
+            self.api_socket,
+            "--cpus",
+            self.cpus,
+            "--memory",
+            self.memory,
+            "--kernel",
+            self.kernel_path,
+            "--cmdline",
+            self.cmdline,
+            "--disk",
+            f"path={self.disk_path}",
+        ]
+
+
+class CloudHypervisorNoNetworkRunPlan(BaseModel):
+    """Non-executing strict no-network proof plan for Cloud Hypervisor."""
+
+    model_config = ConfigDict(frozen=True)
+
+    command: list[str]
+    proof_commands: list[list[str]]
+    config: CloudHypervisorNoNetworkConfig
+    teardown_actions: list[str]
+    host_gates: list[str]
+    execution_status: str = "design_proof_only"
+    real_boot_attempted: bool = False
+
+
 class LimaHarnessResult(BaseModel):
     """Structured opt-in Lima harness result."""
 
@@ -403,8 +452,8 @@ def build_microvm_run_plan(
 ) -> MicroVMRunPlan:
     """Build a design-proof run plan without creating or starting a VM."""
     normalized = provider.lower()
-    if normalized not in {"lima", "firecracker"}:
-        raise ValueError("provider must be lima or firecracker")
+    if normalized not in {"lima", "firecracker", "cloud-hypervisor"}:
+        raise ValueError("provider must be lima, firecracker, or cloud-hypervisor")
     if not command:
         raise ValueError("missing command")
     platform_value = platform_name or platform.system()
@@ -445,7 +494,7 @@ def build_microvm_run_plan(
             "teardown proof missing",
             "opt-in integration test not passing on host runtime",
         ]
-    else:
+    elif normalized == "firecracker":
         steps = [
             MicroVMPlanStep(
                 name="preflight",
@@ -486,6 +535,47 @@ def build_microvm_run_plan(
             "network-off proof missing",
             "jailer/teardown proof missing",
         ]
+    else:
+        steps = [
+            MicroVMPlanStep(
+                name="preflight",
+                action="check cloud-hypervisor, /dev/kvm, kernel, disk image",
+                proof_required="doctor reports ready without creating VM",
+                implemented=True,
+            ),
+            MicroVMPlanStep(
+                name="boot",
+                action="boot cached kernel/disk with no --net options",
+                proof_required="pinned image provenance and bounded boot timeout",
+            ),
+            MicroVMPlanStep(
+                name="mount",
+                action="attach workspace through virtiofs or guest-agent strategy",
+                proof_required="symlink/hardlink escape proof",
+            ),
+            MicroVMPlanStep(
+                name="network_proof",
+                action="run ip route and curl failure probes before user argv",
+                proof_required="guest has no default route and curl fails",
+            ),
+            MicroVMPlanStep(
+                name="run",
+                action="send argv to guest agent via vsock/serial channel",
+                proof_required="stdout/stderr caps, env policy, exit-code propagation",
+            ),
+            MicroVMPlanStep(
+                name="teardown",
+                action="terminate Cloud Hypervisor process group and remove socket/temp dir",
+                proof_required="cleanup happens on boot failure, run timeout, and interrupted host process",
+            ),
+        ]
+        blockers = [
+            "kernel/disk cache provenance missing",
+            "guest command agent missing",
+            "workspace mount strategy unproven",
+            "network-off proof missing",
+            "teardown proof missing",
+        ]
     return MicroVMRunPlan(
         provider=normalized,
         platform=platform_value,
@@ -525,6 +615,8 @@ def build_firecracker_no_network_run_plan(
         proof_commands=[
             ["ip", "route"],
             ["curl", "--connect-timeout", "2", "https://example.com"],
+            ["cat", "/workspace/arc-sentinel.txt"],
+            ["cat", "/workspace/arc-host-escape-link"],
         ],
         config=config,
         teardown_actions=[
@@ -539,6 +631,49 @@ def build_firecracker_no_network_run_plan(
             "ARC_FIRECRACKER_KERNEL",
             "ARC_FIRECRACKER_ROOTFS",
             "firecracker binary",
+            "/dev/kvm read/write",
+        ],
+    )
+
+
+def build_cloud_hypervisor_no_network_run_plan(
+    command: list[str],
+    *,
+    kernel_path: Path,
+    disk_path: Path,
+    work_dir: Path,
+    instance_name: str | None = None,
+) -> CloudHypervisorNoNetworkRunPlan:
+    """Build a non-executing Cloud Hypervisor no-NIC proof plan."""
+    if not command:
+        raise ValueError("missing command")
+    name = instance_name or f"arc-ch-{uuid.uuid4().hex[:12]}"
+    config = CloudHypervisorNoNetworkConfig(
+        api_socket=str(work_dir / f"{name}.sock"),
+        kernel_path=str(kernel_path),
+        disk_path=str(disk_path),
+    )
+    return CloudHypervisorNoNetworkRunPlan(
+        command=command,
+        proof_commands=[
+            ["ip", "route"],
+            ["curl", "--connect-timeout", "2", "https://example.com"],
+            ["cat", "/workspace/arc-sentinel.txt"],
+            ["cat", "/workspace/arc-host-escape-link"],
+        ],
+        config=config,
+        teardown_actions=[
+            "terminate cloud-hypervisor process group",
+            "remove api socket",
+            "remove temporary work directory",
+        ],
+        host_gates=[
+            "Linux",
+            "ARC_MICROVM_INTEGRATION=1",
+            "ARC_CH_REAL_EXEC=1",
+            "ARC_CLOUDHYPERVISOR_KERNEL",
+            "ARC_CLOUDHYPERVISOR_DISK",
+            "cloud-hypervisor binary",
             "/dev/kvm read/write",
         ],
     )

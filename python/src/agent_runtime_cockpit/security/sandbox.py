@@ -752,9 +752,15 @@ def microvm_preflight(system: str | None = None) -> dict[str, Any]:
         arch_supported = machine in {"x86_64", "amd64", "aarch64", "arm64"}
         kernel_cache = os.environ.get("ARC_FIRECRACKER_KERNEL")
         rootfs_cache = os.environ.get("ARC_FIRECRACKER_ROOTFS")
+        ch_kernel_cache = os.environ.get("ARC_CLOUDHYPERVISOR_KERNEL")
+        ch_disk_cache = os.environ.get("ARC_CLOUDHYPERVISOR_DISK")
         kernel_exists = bool(kernel_cache and Path(kernel_cache).exists())
         rootfs_exists = bool(rootfs_cache and Path(rootfs_cache).exists())
-        cache_ready = bool(kernel_exists and rootfs_exists)
+        ch_kernel_exists = bool(ch_kernel_cache and Path(ch_kernel_cache).exists())
+        ch_disk_exists = bool(ch_disk_cache and Path(ch_disk_cache).exists())
+        firecracker_cache_ready = bool(kernel_exists and rootfs_exists)
+        cloud_hypervisor_cache_ready = bool(ch_kernel_exists and ch_disk_exists)
+        cache_ready = firecracker_cache_ready or cloud_hypervisor_cache_ready
 
         # Deep diagnostics
         if firecracker:
@@ -778,8 +784,40 @@ def microvm_preflight(system: str | None = None) -> dict[str, Any]:
             except Exception:
                 jail_perms = None
 
-        ready = bool(binary and jailer and kvm_exists and kvm_rw and arch_supported and cache_ready)
+        firecracker_ready = bool(
+            firecracker
+            and jailer
+            and kvm_exists
+            and kvm_rw
+            and arch_supported
+            and firecracker_cache_ready
+        )
+        cloud_hypervisor_ready = bool(
+            cloud_hypervisor
+            and kvm_exists
+            and kvm_rw
+            and arch_supported
+            and cloud_hypervisor_cache_ready
+        )
+        ready = firecracker_ready or cloud_hypervisor_ready
         status = "ready" if ready else "installed_not_configured" if binary else "unavailable"
+        blockers: list[str] = []
+        if not binary:
+            blockers.append("firecracker or cloud-hypervisor binary missing")
+        if not kvm_exists:
+            blockers.append("/dev/kvm missing")
+        elif not kvm_rw:
+            blockers.append("/dev/kvm is not read/write accessible")
+        if not arch_supported:
+            blockers.append(f"unsupported architecture: {machine}")
+        if firecracker and not jailer:
+            blockers.append("jailer missing for Firecracker proof path")
+        if firecracker and not firecracker_cache_ready:
+            blockers.append("ARC_FIRECRACKER_KERNEL or ARC_FIRECRACKER_ROOTFS missing/unreadable")
+        if cloud_hypervisor and not cloud_hypervisor_cache_ready:
+            blockers.append(
+                "ARC_CLOUDHYPERVISOR_KERNEL or ARC_CLOUDHYPERVISOR_DISK missing/unreadable"
+            )
         return {
             "provider": "microvm",
             "platform": "linux",
@@ -801,6 +839,13 @@ def microvm_preflight(system: str | None = None) -> dict[str, Any]:
             "rootfs_cache": rootfs_cache,
             "rootfs_exists": rootfs_exists,
             "cache_ready": cache_ready,
+            "firecracker_cache_ready": firecracker_cache_ready,
+            "cloud_hypervisor_cache_ready": cloud_hypervisor_cache_ready,
+            "cloud_hypervisor_kernel": ch_kernel_cache,
+            "cloud_hypervisor_kernel_exists": ch_kernel_exists,
+            "cloud_hypervisor_disk": ch_disk_cache,
+            "cloud_hypervisor_disk_exists": ch_disk_exists,
+            "blockers": blockers,
             "version": version_result,
             "jailer_version": jail_version_result,
             "kernel_size": kernel_size,
@@ -889,6 +934,8 @@ def firecracker_doctor(system: str | None = None) -> dict[str, Any]:
 
     kernel_env = os.environ.get("ARC_FIRECRACKER_KERNEL")
     rootfs_env = os.environ.get("ARC_FIRECRACKER_ROOTFS")
+    ch_kernel_env = os.environ.get("ARC_CLOUDHYPERVISOR_KERNEL")
+    ch_disk_env = os.environ.get("ARC_CLOUDHYPERVISOR_DISK")
 
     # Default cache paths if env vars not set
     default_cache = Path.home() / ".cache" / "arc" / "microvm"
@@ -897,7 +944,15 @@ def firecracker_doctor(system: str | None = None) -> dict[str, Any]:
 
     kernel_exists = kernel_path.exists()
     rootfs_exists = rootfs_path.exists()
-    cache_ready = kernel_exists and rootfs_exists
+    ch_kernel_path = (
+        Path(ch_kernel_env) if ch_kernel_env else default_cache / "cloud-hypervisor-vmlinux"
+    )
+    ch_disk_path = Path(ch_disk_env) if ch_disk_env else default_cache / "cloud-hypervisor-disk.raw"
+    ch_kernel_exists = ch_kernel_path.exists()
+    ch_disk_exists = ch_disk_path.exists()
+    firecracker_cache_ready = kernel_exists and rootfs_exists
+    cloud_hypervisor_cache_ready = ch_kernel_exists and ch_disk_exists
+    cache_ready = firecracker_cache_ready or cloud_hypervisor_cache_ready
 
     # Jailer optional — note absence but don't block installed_not_configured
     jailer_present = bool(jailer)
@@ -945,6 +1000,12 @@ def firecracker_doctor(system: str | None = None) -> dict[str, Any]:
         "rootfs_path": str(rootfs_path),
         "rootfs_exists": rootfs_exists,
         "cache_ready": cache_ready,
+        "firecracker_cache_ready": firecracker_cache_ready,
+        "cloud_hypervisor_cache_ready": cloud_hypervisor_cache_ready,
+        "cloud_hypervisor_kernel_path": str(ch_kernel_path),
+        "cloud_hypervisor_kernel_exists": ch_kernel_exists,
+        "cloud_hypervisor_disk_path": str(ch_disk_path),
+        "cloud_hypervisor_disk_exists": ch_disk_exists,
     }
 
 

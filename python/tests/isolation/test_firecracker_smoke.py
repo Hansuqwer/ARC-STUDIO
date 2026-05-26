@@ -27,6 +27,7 @@ import pytest
 
 from agent_runtime_cockpit.isolation.microvm import (
     FirecrackerIntegrationHarness,
+    build_cloud_hypervisor_no_network_run_plan,
     build_firecracker_no_network_run_plan,
     firecracker_integration_available,
     firecracker_real_exec_available,
@@ -138,7 +139,36 @@ class TestFirecrackerNoNetworkDesignProof:
         )
         assert ["ip", "route"] in plan.proof_commands
         assert ["curl", "--connect-timeout", "2", "https://example.com"] in plan.proof_commands
+        assert ["cat", "/workspace/arc-sentinel.txt"] in plan.proof_commands
+        assert ["cat", "/workspace/arc-host-escape-link"] in plan.proof_commands
         assert "ARC_FC_REAL_EXEC=1" in plan.host_gates
+
+    def test_cloud_hypervisor_no_network_argv_omits_net_options(self, tmp_path):
+        plan = build_cloud_hypervisor_no_network_run_plan(
+            ["pwd"],
+            kernel_path=tmp_path / "vmlinux",
+            disk_path=tmp_path / "disk.raw",
+            work_dir=tmp_path,
+            instance_name="arc-ch-test",
+        )
+        argv = plan.config.to_cloud_hypervisor_argv()
+        assert "--net" not in argv
+        assert all(not arg.startswith("net=") for arg in argv)
+        assert plan.config.network_interfaces_configured is False
+        assert plan.config.strict_network_proof == "not_proven"
+
+    def test_cloud_hypervisor_plan_contains_required_guest_proofs(self, tmp_path):
+        plan = build_cloud_hypervisor_no_network_run_plan(
+            ["pwd"],
+            kernel_path=tmp_path / "vmlinux",
+            disk_path=tmp_path / "disk.raw",
+            work_dir=tmp_path,
+        )
+        assert ["ip", "route"] in plan.proof_commands
+        assert ["curl", "--connect-timeout", "2", "https://example.com"] in plan.proof_commands
+        assert ["cat", "/workspace/arc-sentinel.txt"] in plan.proof_commands
+        assert ["cat", "/workspace/arc-host-escape-link"] in plan.proof_commands
+        assert "ARC_CH_REAL_EXEC=1" in plan.host_gates
 
     def test_blocked_real_harness_emits_audit_event(self, tmp_path, monkeypatch):
         monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))

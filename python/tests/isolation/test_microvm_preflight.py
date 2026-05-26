@@ -57,6 +57,7 @@ class TestMicroVMPreflightStates:
         assert data["status"] == "unavailable"
         assert data["platform"] == "linux"
         assert data["binary"] is None
+        assert "firecracker or cloud-hypervisor binary missing" in data["blockers"]
 
     def test_unavailable_no_limactl_macos(self, monkeypatch):
         """macOS with no limactl binary → unavailable."""
@@ -97,6 +98,52 @@ class TestMicroVMPreflightStates:
         data = microvm_preflight("Linux")
         assert data["status"] == "installed_not_configured"
         assert data["cache_ready"] is False
+        assert any("ARC_FIRECRACKER_KERNEL" in blocker for blocker in data["blockers"])
+
+    def test_cloud_hypervisor_installed_not_configured_missing_disk(self, monkeypatch, tmp_path):
+        """Cloud Hypervisor binary without kernel/disk env → installed_not_configured."""
+        kvm_mock = tmp_path / "kvm"
+        kvm_mock.write_text("mock", encoding="utf-8")
+        monkeypatch.setattr(
+            shutil,
+            "which",
+            lambda name: "/usr/bin/cloud-hypervisor" if name == "cloud-hypervisor" else None,
+        )
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.security.sandbox.Path",
+            lambda p: kvm_mock if str(p) == "/dev/kvm" else Path(p),
+        )
+        monkeypatch.delenv("ARC_CLOUDHYPERVISOR_KERNEL", raising=False)
+        monkeypatch.delenv("ARC_CLOUDHYPERVISOR_DISK", raising=False)
+        data = microvm_preflight("Linux")
+        assert data["status"] == "installed_not_configured"
+        assert data["cloud_hypervisor"] == "/usr/bin/cloud-hypervisor"
+        assert data["cloud_hypervisor_cache_ready"] is False
+        assert any("ARC_CLOUDHYPERVISOR_KERNEL" in blocker for blocker in data["blockers"])
+
+    def test_cloud_hypervisor_ready_with_kvm_and_artifacts(self, monkeypatch, tmp_path):
+        """Cloud Hypervisor proof path ready requires KVM rw plus kernel/disk."""
+        kernel = tmp_path / "vmlinux"
+        disk = tmp_path / "disk.raw"
+        kvm_mock = tmp_path / "kvm"
+        kernel.write_text("kernel", encoding="utf-8")
+        disk.write_text("disk", encoding="utf-8")
+        kvm_mock.write_text("mock", encoding="utf-8")
+        monkeypatch.setenv("ARC_CLOUDHYPERVISOR_KERNEL", str(kernel))
+        monkeypatch.setenv("ARC_CLOUDHYPERVISOR_DISK", str(disk))
+        monkeypatch.setattr(
+            shutil,
+            "which",
+            lambda name: "/usr/bin/cloud-hypervisor" if name == "cloud-hypervisor" else None,
+        )
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.security.sandbox.Path",
+            lambda p: kvm_mock if str(p) == "/dev/kvm" else Path(p),
+        )
+        data = microvm_preflight("Linux")
+        assert data["status"] == "ready"
+        assert data["cloud_hypervisor_cache_ready"] is True
+        assert data["cache_ready"] is True
 
     def test_installed_not_configured_macos_with_limactl(self, monkeypatch):
         """macOS with limactl installed → installed_not_configured (execution not implemented)."""
@@ -253,6 +300,22 @@ class TestMicroVMRunPlan:
             "teardown",
         ]
         assert any("kernel/rootfs" in blocker for blocker in plan.blockers)
+
+    def test_cloud_hypervisor_plan_has_no_network_proof_steps(self, tmp_path):
+        plan = build_microvm_run_plan(
+            "cloud-hypervisor", ["pwd"], workspace_root=tmp_path, platform_name="Linux"
+        )
+        assert plan.provider == "cloud-hypervisor"
+        assert plan.execution_enabled is False
+        assert [step.name for step in plan.steps] == [
+            "preflight",
+            "boot",
+            "mount",
+            "network_proof",
+            "run",
+            "teardown",
+        ]
+        assert any("network-off proof" in blocker for blocker in plan.blockers)
 
     def test_plan_rejects_unknown_provider_and_missing_command(self, tmp_path):
         import pytest

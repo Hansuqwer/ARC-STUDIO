@@ -2,7 +2,7 @@
 
 **Status:** Accepted — implementation blocked (see P1–P7 status below)  
 **Date:** 2026-05-26  
-**Last updated:** 2026-05-26 — Lima P5 proof blocked by P2 network gate; strict public microVM remains blocked  
+**Last updated:** 2026-05-26 — Firecracker/Cloud Hypervisor proof path added; strict public microVM remains blocked  
 **Authors:** ARC Studio sandbox team  
 **Related:** Phase 37 (R38), `docs/research/sandbox-and-microvm.md`, `docs/research/microvm-p1-p7-status.md`, ADR-014 (security architecture)
 
@@ -18,7 +18,7 @@ Linux (Firecracker). As of Phase 37.14 the following is true:
 - `MicroVMIsolationProvider.execute()` always raises `NotImplementedError`.
 - `arc sandbox run --provider microvm` is blocked at the provider layer.
 - Lima harness exists as an internal opt-in helper only.
-- Firecracker is preflight/doctor/design-proof only.
+- Firecracker/Cloud Hypervisor are preflight/doctor/design-proof only.
 - No real microVM command execution has been proven in tests.
 
 This ADR defines the precise prerequisites, gate mechanism, platform
@@ -83,7 +83,7 @@ referencing this ADR.
 | Platform | Provider | Status |
 |---|---|---|
 | macOS (≥ 13, Apple Silicon or Intel) | Lima / Apple Virtualization.framework | **Low-security harness only**; Lima default/user-v2 networking is network-present and cannot currently satisfy P2 |
-| Linux (x86_64, aarch64 with KVM) | Firecracker (primary), Cloud Hypervisor (secondary) | Strict no-network target; requires /dev/kvm + binary + ARC_MICROVM_EXEC_ENABLED=1 after P1-P7 proof |
+| Linux (x86_64, aarch64 with KVM) | Firecracker (primary), Cloud Hypervisor (secondary) | Strict no-network target; current support is host-gated proof harness/preflight only; requires /dev/kvm + binary + ARC_MICROVM_EXEC_ENABLED=1 only after P1-P7 proof |
 | Windows | — | **Explicitly unsupported**; emit clear error: "microVM execution is not supported on Windows" |
 | Other (FreeBSD, etc.) | — | Blocked; `microvm_preflight()` returns `status: blocked` |
 
@@ -212,14 +212,18 @@ with no network interface configured is the next candidate for P2 proof. ARC now
 has a no-NIC design/preflight config model, but has not run a real
 boot/no-default-route/curl-fails proof yet.
 
-### Firecracker no-network design/preflight status
+### Firecracker/Cloud Hypervisor no-network design/preflight status
 
 Current implementation emits `strict_network_candidate=true`,
 `strict_network_proof=not_proven`, and `network_interfaces_configured=false`.
 The generated Firecracker config intentionally omits `network-interfaces`.
-Host-gated real proof remains blocked unless all are present:
+The generated Cloud Hypervisor argv intentionally omits `--net` options.
+Host-gated Firecracker real proof remains blocked unless all are present:
 `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, Linux, `/dev/kvm` read/write,
 `firecracker`, `ARC_FIRECRACKER_KERNEL`, and `ARC_FIRECRACKER_ROOTFS`.
+Host-gated Cloud Hypervisor real proof remains blocked unless all are present:
+`ARC_MICROVM_INTEGRATION=1`, `ARC_CH_REAL_EXEC=1`, Linux, `/dev/kvm` read/write,
+`cloud-hypervisor`, `ARC_CLOUDHYPERVISOR_KERNEL`, and `ARC_CLOUDHYPERVISOR_DISK`.
 
 ---
 
