@@ -978,12 +978,12 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R36 MCP Python SDK Adapter** | **Baseline Complete** | **Adapter Phase 35 — T1 detection + T2 static export; T3 deferred (trust posture + transport lifecycle)** |
 | **R37 Provider Management (Phase 1)** | **Baseline Complete** | **Phase 36.1 — interactive UX without credential storage (commits cd89aab-7f2e20b)** |
 | **R37 Provider Management (Phase 2)** | **Baseline Complete** | **Phase 36.2 — auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`; token refresh; trust enforcement; audit logging; env var fallback; 57 auth tests** |
-| **R38 CLI Sandbox Hardening + IDE Integration** | **Active Hardening** | **Phase 37 — subprocess caps + approval prune + path-intent expansion + protocol parity + microVM preflight + container fallback tests + e2e routability + microVM truth guard + design-proof plan + gated Lima harness + opt-in Lima smoke test (CI-skipped; real host execution not yet proven) complete; microVM execution blocked** |
+| **R38 CLI Sandbox Hardening + IDE Integration** | **Active Hardening** | **Phase 37 — subprocess caps + approval prune + path-intent expansion + protocol parity + microVM preflight + container fallback tests + e2e routability + microVM truth guard + design-proof plan + gated Lima harness + opt-in Lima smoke test (CI-skipped) + ADR-024 execution contract complete; microVM execution blocked pending P1–P7 proofs** |
 
 **Post-v0.1 Execution Order:** 
 - **Immediate (no blockers):** Phase 36.1 (Provider Discovery & Interactive UX), Phase 37 (CLI Sandbox Hardening — active)
 - **Foundations:** R14-R16 (Phase 21-23) → R17-R18 (Phase 24-25)
-- **Sandbox:** R38 (Phase 37 — subprocess/approval/path-intent/parity/preflight/container/e2e/truth-guard/design-proof/gated-Lima-harness/Lima-smoke-test complete; microVM execution blocked)
+- **Sandbox:** R38 (Phase 37 — subprocess/approval/path-intent/parity/preflight/container/e2e/truth-guard/design-proof/gated-Lima-harness/Lima-smoke-test/ADR-024-execution-contract complete; microVM execution blocked pending P1–P7 proofs)
 - **MCP:** R19-R20 (Phase 26-27)
 - **Replay/Eval:** R21-R22 (Phase 28-29)
 - **SwarmGraph differentiators:** R23-R25 (Phase 30-32)

@@ -2112,6 +2112,19 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Real Lima execution NOT proven on this host (CI-skipped).
 - Verified: targeted sandbox/microVM tests (including smoke) pass; CI posture confirmed.
 
+#### Slice 37.15: MicroVM Public Execution Contract (ADR-024) ✓
+- Created `docs/adr/ADR-024-microvm-public-execution-contract.md`.
+- Defines: 7 prerequisite proofs (P1–P7: lifecycle, network-off, workspace-mount, teardown, symlink-escape, output-caps, audit-event).
+- Defines: unblock gate `ARC_MICROVM_EXEC_ENABLED=1` (not yet honored by code; contract only).
+- Defines: dual gate requirement (`ARC_MICROVM_EXEC_ENABLED=1` AND `ARC_MICROVM_INTEGRATION=1`).
+- Defines: platform support (macOS/Lima, Linux/Firecracker; Windows explicitly unsupported).
+- Defines: teardown failure handling (surface error, mark result failed, log for cleanup).
+- Defines: stable audit event schema (`version: 1`, all required fields listed).
+- Defines: decision table with rationale for each choice.
+- `MicroVMIsolationProvider.execute()` still raises `NotImplementedError`.
+- `arc sandbox run --provider microvm` still blocked.
+- No code changes in this slice — docs/ADR only.
+
 ### CLI/IDE Integration Points
 
 - `arc sandbox run --json` — real subprocess execution under sandbox policy; Theia widget can invoke for safe command execution
