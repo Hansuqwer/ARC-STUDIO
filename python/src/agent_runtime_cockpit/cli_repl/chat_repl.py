@@ -100,7 +100,18 @@ def _handle_input(
             session.add_message("user", text)
             raise SystemExit(0)
         else:
-            output(result)
+            from .slash_commands import CommandResult
+
+            if isinstance(result, CommandResult):
+                prefix = _render_state_prefix(result.state)
+                if result.output:
+                    output(f"{prefix} {result.output}")
+                elif result.reason:
+                    output(f"{prefix} {result.state}: {result.reason}")
+                else:
+                    output(f"{prefix}")
+            else:
+                output(result)
         return
 
     session.add_message("user", text)
@@ -116,6 +127,21 @@ def _handle_input(
         output(reply)
     except Exception as exc:  # noqa: BLE001
         output(f"[error] runner failed: {exc}")
+
+
+def _render_state_prefix(state: str) -> str:
+    """Return a short prefix indicating the structured result state."""
+    _MAP = {
+        "present": "[ok]",
+        "ok": "[ok]",
+        "absent": "[empty]",
+        "blocked": "[blocked]",
+        "denied": "[denied]",
+        "degraded": "[degraded]",
+        "error": "[error]",
+        "failed": "[error]",
+    }
+    return _MAP.get(state, f"[{state}]")
 
 
 def _format_result(result: dict[str, Any]) -> str:

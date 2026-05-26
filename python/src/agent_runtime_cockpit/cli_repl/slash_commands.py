@@ -26,6 +26,7 @@ from ..swarmgraph.config import SwarmGraphConfig
 from ..tools import default_tool_registry
 from .adapters import (
     SlashAdapterResult,
+    _parse_sandbox_run,
     render_audit_list,
     render_audit_verify,
     render_battle_list,
@@ -1202,14 +1203,141 @@ def cmd_doctor(_arg: str, _session: ChatSession) -> CommandResult:
     return _render_adapter_result(render_doctor_summary())
 
 
-def cmd_sandbox(arg: str, _session: ChatSession) -> CommandResult:
+def cmd_sandbox(
+    arg: str,
+    _session: ChatSession,
+    *,
+    confirm_fn: Any = None,
+) -> CommandResult:
+    """Handle /sandbox subcommands.
+
+    confirm_fn: callable(prompt: str) -> bool — injectable for tests.
+    Defaults to a stdin y/n prompt.  Only used for approval_required decisions
+    that are not DESTRUCTIVE/PRIVILEGED.  Destructive and privileged commands
+    remain hard-denied regardless of any confirmation.
+    """
     parts = arg.strip().split(maxsplit=1)
     subcommand = parts[0] if parts else "doctor"
     if subcommand == "doctor":
         return _render_adapter_result(render_sandbox_doctor())
     if subcommand == "run":
-        return _render_adapter_result(render_sandbox_run(arg))
-    return CommandResult(state="blocked", output="Usage: /sandbox doctor", reason="invalid_usage")
+        return _sandbox_run_with_approval(arg, confirm_fn=confirm_fn)
+    return CommandResult(
+        state="blocked", output="Usage: /sandbox doctor|run -- <cmd...>", reason="invalid_usage"
+    )
+
+
+def _sandbox_run_with_approval(
+    arg: str,
+    *,
+    confirm_fn: Any = None,
+) -> CommandResult:
+    """Run sandbox command with optional interactive approval for approval_required decisions.
+
+    DESTRUCTIVE and PRIVILEGED are always hard-denied — approve_decision() enforces this.
+    NETWORK, INSTALL, UNKNOWN: prompt via confirm_fn when approval_required.
+    """
+    from pathlib import Path as _Path
+    from ..security.sandbox import (
+        CommandClassification,
+        decide,
+        resolve_sandbox_policy,
+    )
+
+    try:
+        policy_name, _provider, command = _parse_sandbox_run(arg)
+    except Exception as exc:
+        return CommandResult(state="blocked", output=f"Blocked: {exc}", reason="parse_error")
+
+    if not command:
+        return CommandResult(
+            state="blocked",
+            output="Usage: /sandbox run [--policy NAME] -- <cmd...>",
+            reason="invalid_usage",
+        )
+
+    try:
+        ws = _Path.cwd()
+        policy = resolve_sandbox_policy(policy_name, ws)
+        decision = decide(command, policy)
+    except (KeyError, ValueError) as exc:
+        return CommandResult(state="blocked", output=f"Blocked: {exc}", reason="policy_error")
+
+    _APPROVABLE = {
+        CommandClassification.NETWORK,
+        CommandClassification.INSTALL,
+        CommandClassification.UNKNOWN,
+    }
+
+    pre_approved = False
+    if (
+        not decision.allowed
+        and decision.approval_required
+        and decision.classification in _APPROVABLE
+    ):
+        cmd_display = " ".join(command)
+        prompt_text = (
+            f"Command requires approval: {cmd_display}\n"
+            f"Classification: {decision.classification.value}\n"
+            "Approve? [y/N] "
+        )
+        if confirm_fn is not None:
+            confirmed = bool(confirm_fn(prompt_text))
+        elif os.isatty(0):  # pragma: no cover — live interactive path
+            try:
+                answer = input(prompt_text).strip().lower()
+                confirmed = answer == "y"
+            except (EOFError, KeyboardInterrupt):
+                confirmed = False
+        else:
+            # Non-interactive (no TTY): delegate denial to the adapter
+            # which emits the structured audit event with Classification info.
+            return _render_adapter_result(render_sandbox_run(arg, pre_approved=False))
+
+        if not confirmed:
+            # Emit audit event for the denied-approval path via the adapter
+            from ..security.sandbox import (
+                build_audit_event,
+                ensure_workspace_cwd,
+                persist_sandbox_audit_event,
+            )
+
+            try:
+                _cwd = ensure_workspace_cwd(_Path.cwd(), policy.workspace_root)
+                _started = _ended = (
+                    __import__("datetime")
+                    .datetime.now(__import__("datetime").timezone.utc)
+                    .isoformat()
+                )
+                audit = build_audit_event(
+                    command=command,
+                    cwd=_cwd,
+                    decision=decision,
+                    provider=_provider,
+                    started_at=_started,
+                    ended_at=_ended,
+                    exit_code=None,
+                    stdout_truncated=False,
+                    stderr_truncated=False,
+                    redaction_applied=False,
+                )
+                audit_path = persist_sandbox_audit_event(audit)
+                audit["audit_path"] = str(audit_path)
+            except Exception:  # noqa: BLE001
+                audit = {}
+            return CommandResult(
+                state="denied",
+                output=f"Sandbox denied (not approved): {cmd_display}",
+                reason="approval_declined",
+                metadata={
+                    "classification": decision.classification.value,
+                    "command": list(command),
+                    "audit_event": audit,
+                },
+            )
+        pre_approved = True
+
+    return _render_adapter_result(render_sandbox_run(arg, pre_approved=pre_approved))
 
 
 def cmd_policy(arg: str, _session: ChatSession) -> CommandResult:

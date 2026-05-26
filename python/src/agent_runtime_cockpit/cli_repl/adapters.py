@@ -369,7 +369,9 @@ def _parse_sandbox_run(arg: str) -> tuple[str, str, list[str]]:
     return policy, provider, command
 
 
-def render_sandbox_run(arg: str, workspace: Path | None = None) -> SlashAdapterResult:
+def render_sandbox_run(
+    arg: str, workspace: Path | None = None, *, pre_approved: bool = False
+) -> SlashAdapterResult:
     ws = _workspace(workspace)
     try:
         policy_name, provider, command = _parse_sandbox_run(arg)
@@ -382,6 +384,10 @@ def render_sandbox_run(arg: str, workspace: Path | None = None) -> SlashAdapterR
         policy = resolve_sandbox_policy(policy_name, ws)
         cwd = ensure_workspace_cwd(Path.cwd(), policy.workspace_root)
         decision = decide(command, policy)
+        if pre_approved and decision.approval_required:
+            from ..security.sandbox import approve_decision
+
+            decision = approve_decision(decision, reason="repl_interactive_approval")
         validate_command_paths(command, policy)
     except (KeyError, ValueError) as exc:
         return SlashAdapterResult(state="blocked", text=f"Blocked: {exc}", exit_code=2)
