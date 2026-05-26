@@ -1497,3 +1497,110 @@ class TestPhase416Sessions:
         result = SlashCommandHandler().handle("/history search absent", session)
 
         assert "No matching history" in str(result)
+
+
+class TestPhase42InteractiveFoundations:
+    def test_pipeline_and_runs_second_segment(self):
+        handler = SlashCommandHandler()
+        session = ChatSession()
+
+        result = handler.handle("/version && /history", session)
+
+        assert "ARC Studio" in str(result)
+        assert "No messages" in str(result)
+
+    def test_pipeline_and_short_circuits_on_failure(self):
+        handler = SlashCommandHandler()
+        session = ChatSession()
+
+        result = handler.handle("/unknown && /version", session)
+
+        assert "Unknown slash command" in str(result)
+        assert "Skipped after &&" in str(result)
+
+    def test_pipeline_or_runs_after_failure(self):
+        handler = SlashCommandHandler()
+        session = ChatSession()
+
+        result = handler.handle("/unknown || /version", session)
+
+        assert "Unknown slash command" in str(result)
+        assert "ARC Studio" in str(result)
+
+    def test_pipeline_pipe_forwards_text(self):
+        handler = SlashCommandHandler()
+        session = ChatSession()
+
+        result = handler.handle("hello | /history search hello", session)
+
+        assert "hello" in str(result)
+
+    def test_pipeline_parse_error(self):
+        result = SlashCommandHandler().handle("/version &&", ChatSession())
+
+        assert "Pipeline parse error" in str(result)
+
+    def test_pipeline_does_not_shell_execute(self, tmp_path):
+        marker = tmp_path / "marker"
+        result = SlashCommandHandler().handle(f"plain > {marker}", ChatSession())
+
+        assert result is None
+        assert not marker.exists()
+
+    def test_dashboard_slash_command(self):
+        result = SlashCommandHandler().handle("/dashboard", ChatSession())
+
+        assert "ARC Dashboard" in str(result)
+        assert "sandbox" in str(result)
+
+    def test_dashboard_cli_command(self):
+        result = CliRunner().invoke(app, ["dashboard"])
+
+        assert result.exit_code == 0, result.output
+        assert "ARC Dashboard" in result.output
+
+    def test_alias_lifecycle_and_visible_expansion(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("ARC_STUDIO_ALIASES_FILE", str(tmp_path / "aliases.json"))
+        handler = SlashCommandHandler()
+        session = ChatSession()
+
+        set_result = handler.handle("/alias set v /version", session)
+        run_result = handler.handle("/alias run v", session)
+
+        assert "Alias set" in str(set_result)
+        assert "Alias expansion: v -> /version" in str(run_result)
+        assert "ARC Studio" in str(run_result)
+
+    def test_alias_workspace_precedence(self, monkeypatch, tmp_path):
+        from agent_runtime_cockpit.cli_repl.aliases import get_alias, set_alias
+
+        monkeypatch.setenv("ARC_STUDIO_ALIASES_FILE", str(tmp_path / "user-aliases.json"))
+        set_alias("demo", "/version", scope="user", workspace=tmp_path)
+        set_alias("demo", "/history", scope="workspace", workspace=tmp_path)
+
+        record = get_alias("demo", workspace=tmp_path)
+
+        assert record is not None
+        assert record.scope == "workspace"
+        assert record.command == "/history"
+
+    def test_alias_recursion_guard(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("ARC_STUDIO_ALIASES_FILE", str(tmp_path / "aliases.json"))
+        handler = SlashCommandHandler()
+        session = ChatSession()
+        handler.handle("/alias set loop /alias run loop", session)
+
+        result = handler.handle("/alias run loop", session)
+
+        assert "alias expansion depth exceeded" in str(result)
+
+    def test_alias_expanded_sandbox_still_policy_gated(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("ARC_STUDIO_ALIASES_FILE", str(tmp_path / "aliases.json"))
+        handler = SlashCommandHandler()
+        session = ChatSession()
+        handler.handle("/alias set danger /sandbox run -- rm -rf .", session)
+
+        result = handler.handle("/alias run danger", session)
+
+        assert "Alias expansion" in str(result)
+        assert "Sandbox denied" in str(result)

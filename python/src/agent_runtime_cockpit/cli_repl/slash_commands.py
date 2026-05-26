@@ -5,6 +5,7 @@ import concurrent.futures
 import inspect
 import os
 import signal
+import shlex
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Coroutine, TypeVar
@@ -32,6 +33,7 @@ from .adapters import (
     render_config_show,
     render_config_validate,
     render_context_pack,
+    render_dashboard,
     render_doctor_summary,
     render_events_watch,
     render_hitl_pending,
@@ -54,8 +56,10 @@ from .adapters import (
     render_task_status,
     render_workspace_trust_status,
 )
+from .aliases import get_alias, list_aliases, remove_alias, set_alias
 from .cancellation import CancellationReason, CancellationToken, Cancelled
 from .commands import CommandDef, get_registry
+from .pipeline import ChainOperator, has_chain_operator, parse_command_chain
 from .session import ChatSession
 
 T = TypeVar("T")
@@ -498,6 +502,37 @@ def _build_registry():
     )
     registry.register(
         CommandDef(
+            name="dashboard",
+            help_text="Show local ARC dashboard",
+            category="workspace",
+            handler=cmd_dashboard,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "degraded"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/dashboard",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="alias",
+            help_text="Manage REPL aliases: /alias list|show|set|remove|run",
+            category="session",
+            handler=cmd_alias,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "absent", "blocked"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+            usage="/alias list|show <name>|set <name> <command>|remove <name>|run <name>",
+            subcommands=["list", "show", "set", "remove", "run"],
+        )
+    )
+    registry.register(
+        CommandDef(
             name="hitl",
             help_text="Human approvals: /hitl pending|respond <id> <decision>",
             category="compliance",
@@ -617,7 +652,7 @@ def _build_registry():
 def cmd_help(_arg: str, _session: ChatSession) -> str:
     registry = get_registry()
     groups = {
-        "session": ["help", "clear", "summary", "sessions", "history", "exit"],
+        "session": ["help", "clear", "summary", "sessions", "history", "alias", "exit"],
         "run": [
             "run",
             "runtime",
@@ -632,7 +667,16 @@ def cmd_help(_arg: str, _session: ChatSession) -> str:
         ],
         "sandbox": ["sandbox"],
         "policy": ["policy"],
-        "workspace": ["status", "doctor", "read", "search", "context", "workspace", "config"],
+        "workspace": [
+            "status",
+            "doctor",
+            "dashboard",
+            "read",
+            "search",
+            "context",
+            "workspace",
+            "config",
+        ],
         "providers": ["providers"],
         "tools": ["tools"],
         "audit": ["audit", "hitl"],
@@ -1129,6 +1173,21 @@ def _render_adapter_result(result: SlashAdapterResult) -> CommandResult:
     )
 
 
+def _command_succeeded(result: str | CommandResult | None) -> bool:
+    if result is None:
+        return False
+    if isinstance(result, CommandResult):
+        return result.state in {"present", "absent"} and result.reason not in {
+            "invalid_usage",
+            "gate_closed",
+        }
+    return not str(result).lower().startswith(("blocked", "error", "unknown"))
+
+
+def _result_text(result: str | CommandResult | None) -> str:
+    return str(result or "")
+
+
 def cmd_status(_arg: str, session: ChatSession) -> CommandResult:
     return _render_adapter_result(render_status(session))
 
@@ -1231,6 +1290,53 @@ def cmd_providers_status(arg: str, _session: ChatSession) -> CommandResult:
 
 def cmd_mcp_status(arg: str, _session: ChatSession) -> CommandResult:
     return _render_adapter_result(render_mcp_status())
+
+
+def cmd_dashboard(arg: str, session: ChatSession) -> CommandResult:
+    return _render_adapter_result(render_dashboard(session))
+
+
+def cmd_alias(arg: str, _session: ChatSession) -> CommandResult:
+    parts = arg.strip().split(maxsplit=2)
+    subcommand = parts[0] if parts else "list"
+    if subcommand == "list":
+        aliases = list_aliases()
+        if not aliases:
+            return CommandResult(state="absent", output="No aliases configured.")
+        lines = ["Aliases:"]
+        for item in aliases:
+            lines.append(f"  {item.name} ({item.scope}) -> {item.command}")
+        return CommandResult(state="present", output="\n".join(lines))
+    if subcommand == "show" and len(parts) >= 2:
+        item = get_alias(parts[1])
+        if item is None:
+            return CommandResult(state="absent", output=f"Alias not found: {parts[1]}")
+        return CommandResult(
+            state="present", output=f"{item.name} ({item.scope}) -> {item.command}"
+        )
+    if subcommand == "set" and len(parts) >= 3:
+        item = set_alias(parts[1], parts[2])
+        return CommandResult(state="present", output=f"Alias set: {item.name} -> {item.command}")
+    if subcommand in {"remove", "delete"} and len(parts) >= 2:
+        removed = remove_alias(parts[1])
+        return CommandResult(
+            state="present" if removed else "absent",
+            output=f"Alias {'removed' if removed else 'not found'}: {parts[1]}",
+        )
+    if subcommand == "run" and len(parts) >= 2:
+        item = get_alias(parts[1])
+        if item is None:
+            return CommandResult(state="absent", output=f"Alias not found: {parts[1]}")
+        return CommandResult(
+            state="present",
+            output=f"Alias expansion: {item.name} -> {item.command}",
+            metadata={"alias_expansion": item.command, "alias_name": item.name},
+        )
+    return CommandResult(
+        state="blocked",
+        output="Usage: /alias list|show <name>|set <name> <command>|remove <name>|run <name>",
+        reason="invalid_usage",
+    )
 
 
 def cmd_hitl(arg: str, _session: ChatSession) -> CommandResult:
@@ -1343,6 +1449,7 @@ class SlashCommandHandler:
         self.cancellation_token: CancellationToken = CancellationToken()
         self.events: list[tuple[str, dict[str, Any]]] = []
         self._registry = _build_registry()
+        self._alias_depth = 0
 
     def emit_event(self, name: str, payload: dict[str, Any]) -> None:
         copied = dict(payload)
@@ -1358,6 +1465,8 @@ class SlashCommandHandler:
 
     def handle(self, command: str, session: ChatSession) -> str | CommandResult | None:
         cmd = command.strip()
+        if has_chain_operator(cmd):
+            return self._handle_chain(cmd, session)
         parts = cmd.split(maxsplit=1)
         name = parts[0].lstrip("/").lower()
         arg = parts[1] if len(parts) > 1 else ""
@@ -1382,6 +1491,25 @@ class SlashCommandHandler:
             )
         try:
             result = defn.handler(arg, session)
+            if name == "alias" and isinstance(result, CommandResult):
+                expansion = result.metadata.get("alias_expansion")
+                if isinstance(expansion, str):
+                    if self._alias_depth >= 5:
+                        return CommandResult(
+                            state="blocked",
+                            output="Blocked: alias expansion depth exceeded",
+                            reason="alias_recursion",
+                        )
+                    self._alias_depth += 1
+                    try:
+                        expanded = self.handle(expansion, session)
+                    finally:
+                        self._alias_depth -= 1
+                    return CommandResult(
+                        state=expanded.state if isinstance(expanded, CommandResult) else "present",
+                        output=f"{result.output}\n{_result_text(expanded)}",
+                        metadata={"alias_expansion": expansion},
+                    )
             if name == "sandbox" and isinstance(result, CommandResult):
                 audit = (
                     result.metadata.get("audit_event")
@@ -1403,3 +1531,37 @@ class SlashCommandHandler:
                 reason=type(exc).__name__,
                 metadata={"command": name, "error_type": type(exc).__name__},
             )
+
+    def _handle_chain(self, command: str, session: ChatSession) -> CommandResult:
+        try:
+            segments = parse_command_chain(command)
+        except ValueError as exc:
+            return CommandResult(
+                state="blocked", output=f"Pipeline parse error: {exc}", reason="parse_error"
+            )
+        outputs: list[str] = []
+        previous: str | CommandResult | None = None
+        for segment in segments:
+            previous_ok = _command_succeeded(previous) if previous is not None else True
+            if segment.operator_before is ChainOperator.AND and not previous_ok:
+                outputs.append(f"Skipped after &&: {segment.command}")
+                continue
+            if segment.operator_before is ChainOperator.OR and previous_ok:
+                outputs.append(f"Skipped after ||: {segment.command}")
+                continue
+            current = segment.command
+            if segment.operator_before is ChainOperator.PIPE:
+                current = f"{current} {shlex.quote(_result_text(previous))}"
+            result = (
+                self.handle(current, session)
+                if current.startswith("/")
+                else CommandResult(state="present", output=current)
+            )
+            previous = result
+            outputs.append(_result_text(result))
+        final_state = previous.state if isinstance(previous, CommandResult) else "present"
+        return CommandResult(
+            state=final_state,
+            output="\n".join(part for part in outputs if part),
+            metadata={"pipeline_segments": len(segments)},
+        )

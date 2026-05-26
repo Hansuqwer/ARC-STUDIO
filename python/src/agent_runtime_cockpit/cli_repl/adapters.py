@@ -1111,3 +1111,31 @@ def render_events_watch(since: int = 20, event_type: str | None = None) -> Slash
         text="\n".join(lines) + "\nLive watch is available in non-REPL CLI only.",
         data={"events": [e.model_dump(mode="json") for e in events], "live_watch": False},
     )
+
+
+def render_dashboard(
+    session: Any | None = None, workspace: Path | None = None
+) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    sections = [
+        ("system", render_status(session or object(), ws)),
+        ("runs", render_runs_list(ws, limit=5)),
+        ("sandbox", render_sandbox_doctor(ws)),
+        ("providers", render_providers_status()),
+        ("mcp", render_mcp_status(ws)),
+        ("tasks", render_task_list(workspace=ws, limit=5)),
+        ("audit", render_audit_list(workspace=ws, limit=5)),
+    ]
+    lines = ["ARC Dashboard:"]
+    data: dict[str, Any] = {"workspace": str(ws), "sections": {}}
+    for name, result in sections:
+        lines.append(f"\n{name}: {result.state}")
+        summary = result.text.splitlines()[0] if result.text else result.state
+        lines.append(f"  {summary}")
+        data["sections"][name] = {"state": result.state, "data": result.data}
+    degraded = any(result.state in {"degraded", "error"} for _, result in sections)
+    return SlashAdapterResult(
+        state="degraded" if degraded else "present",
+        text="\n".join(lines),
+        data=data,
+    )

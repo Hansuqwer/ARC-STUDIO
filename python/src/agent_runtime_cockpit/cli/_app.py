@@ -76,6 +76,23 @@ app.add_typer(events_app)
 app.add_typer(prompt_app)
 
 
+@app.command("dashboard")
+def dashboard(
+    json_output: bool = typer.Option(False, "--json", help="Emit JSON dashboard data"),
+) -> None:
+    """Show local ARC dashboard from real local producers only."""
+    from ..cli_repl.adapters import render_dashboard
+    from ..cli_repl.session import ChatSession
+
+    result = render_dashboard(ChatSession())
+    if json_output:
+        import json
+
+        console.print(json.dumps(result.data, indent=2, default=str))
+        return
+    console.print(result.text)
+
+
 @app.callback(invoke_without_command=True)
 def _arc_default(
     ctx: typer.Context,

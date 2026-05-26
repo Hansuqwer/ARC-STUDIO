@@ -35,6 +35,8 @@ PHASE_41_COMMANDS = {
     "replay",
     "battle",
     "events",
+    "dashboard",
+    "alias",
 }
 
 
