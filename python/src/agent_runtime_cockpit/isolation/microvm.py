@@ -15,7 +15,7 @@ import tempfile
 import time
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -52,12 +52,29 @@ class MicroVMRunPlan(BaseModel):
     blockers: list[str]
 
 
+class LimaHarnessResult(BaseModel):
+    """Structured opt-in Lima harness result."""
+
+    command: list[str]
+    instance_name: str
+    template_path: str | None = None
+    result: IsolationResult
+    lifecycle: list[str]
+    network_proof_passed: bool = False
+    teardown_attempted: bool = False
+
+
 def _microvm_execution_enabled() -> bool:
     return os.environ.get("ARC_MICROVM_INTEGRATION") == "1"
 
 
 def _lima_available() -> bool:
     return bool(shutil.which("limactl"))
+
+
+def lima_integration_available() -> bool:
+    """Return True only when the opt-in Lima integration harness may run."""
+    return platform.system() == "Darwin" and _microvm_execution_enabled() and _lima_available()
 
 
 def build_microvm_run_plan(
@@ -220,6 +237,130 @@ def _run_limactl(
             stderr=str(exc),
             duration_ms=duration,
             provider="microvm",
+        )
+
+
+class LimaIntegrationHarness:
+    """Opt-in disposable Lima lifecycle harness; not wired to public execution."""
+
+    def __init__(
+        self,
+        *,
+        workspace_root: Path,
+        runner: Callable[[list[str], int, int], IsolationResult] = _run_limactl,
+        instance_name: str | None = None,
+        max_bytes: int = 65_536,
+    ) -> None:
+        self.workspace_root = workspace_root.resolve()
+        self.runner = runner
+        self.instance_name = instance_name or f"arc-sandbox-{uuid.uuid4().hex[:12]}"
+        self.max_bytes = max_bytes
+        self.lifecycle: list[str] = []
+        self.template_path: Path | None = None
+
+    def run(
+        self,
+        command: list[str],
+        *,
+        timeout_seconds: int = 300,
+        require_gate: bool = True,
+    ) -> LimaHarnessResult:
+        """Run the gated Lima harness lifecycle with mandatory network proof."""
+        if require_gate and not lima_integration_available():
+            raise RuntimeError("ARC_MICROVM_INTEGRATION=1, macOS, and limactl are required")
+        if not command:
+            raise ValueError("missing command")
+        tmp_path = self._write_template()
+        network_proof_passed = False
+        teardown_attempted = False
+        result = IsolationResult(exit_code=-1, stderr="not started", provider="microvm")
+        try:
+            start = self._limactl(["start", "--tty=false", str(tmp_path)], timeout_seconds)
+            self.lifecycle.append("start")
+            if start.exit_code != 0:
+                result = IsolationResult(
+                    exit_code=-1,
+                    stderr=f"lima start failed: {start.stderr.strip()}",
+                    provider="microvm",
+                )
+            else:
+                network = self._limactl(
+                    [
+                        "shell",
+                        "--tty=false",
+                        self.instance_name,
+                        "--",
+                        "sh",
+                        "-lc",
+                        "ip route | grep -q '^default' && exit 1 || exit 0",
+                    ],
+                    min(timeout_seconds, 10),
+                )
+                self.lifecycle.append("network_proof")
+                network_proof_passed = network.exit_code == 0
+                if not network_proof_passed:
+                    result = IsolationResult(
+                        exit_code=-1,
+                        stderr="network-off proof failed: guest has a default route",
+                        provider="microvm",
+                    )
+                else:
+                    result = self._limactl(
+                        [
+                            "shell",
+                            "--tty=false",
+                            self.instance_name,
+                            "--workdir",
+                            "/workspace",
+                            "--",
+                            *command,
+                        ],
+                        timeout_seconds,
+                    )
+                    self.lifecycle.append("run")
+        finally:
+            teardown_attempted = True
+            self._limactl(["delete", "-f", self.instance_name], min(timeout_seconds, 60))
+            self.lifecycle.append("teardown")
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        return self._result(command, result, network_proof_passed, teardown_attempted)
+
+    def _write_template(self) -> Path:
+        yaml = render_lima_template(self.workspace_root, self.instance_name)
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".yaml",
+            prefix=f"{self.instance_name}-",
+            delete=False,
+        )
+        tmp_path = Path(tmp.name)
+        tmp.write(yaml)
+        tmp.close()
+        self.template_path = tmp_path
+        self.lifecycle.append("template")
+        return tmp_path
+
+    def _limactl(self, args: list[str], timeout_seconds: int) -> IsolationResult:
+        return self.runner(["limactl", *args], timeout_seconds, self.max_bytes)
+
+    def _result(
+        self,
+        command: list[str],
+        result: IsolationResult,
+        network_proof_passed: bool,
+        teardown_attempted: bool,
+    ) -> LimaHarnessResult:
+        return LimaHarnessResult(
+            command=command,
+            instance_name=self.instance_name,
+            template_path=str(self.template_path) if self.template_path else None,
+            result=result,
+            lifecycle=list(self.lifecycle),
+            network_proof_passed=network_proof_passed,
+            teardown_attempted=teardown_attempted,
         )
 
 

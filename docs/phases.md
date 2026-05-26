@@ -2000,7 +2000,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 ## Phase 37 — CLI Sandbox Hardening + IDE Integration
 
 **Roadmap:** R38 — CLI Sandbox Hardening + IDE Integration  
-**Status:** Active Hardening | Evidence: commits 00057f9 (subprocess caps), 2f47102 (approval prune), 2706d8a (path-intent), 1f413fe (protocol parity), d97b1c2 (microVM preflight), a959d09 (container fallback), 9949388 (microVM truth guard), current (microVM design-proof plan) | 2639 Python tests passed, 22 skipped, 3 xfailed; ruff clean; pnpm lint/test/build/typecheck green; e2e smoke 11/4/0 | Notes: Slices 37.1-37.5, 37.7-37.8, 37.10-37.12 complete. Slice 37.6 (microVM execution) blocked.  
+**Status:** Active Hardening | Evidence: commits 00057f9 (subprocess caps), 2f47102 (approval prune), 2706d8a (path-intent), 1f413fe (protocol parity), d97b1c2 (microVM preflight), a959d09 (container fallback), 9949388 (microVM truth guard), 1f4c2ac (microVM design-proof plan), current (gated Lima harness) | 2644 Python tests passed, 22 skipped, 3 xfailed; targeted sandbox/microVM tests 105 passed, 1 skipped; ruff clean; pnpm lint/test/build/typecheck green; e2e smoke 11/4/0 | Notes: Slices 37.1-37.5, 37.7-37.8, 37.10-37.13 complete. Slice 37.6 (microVM execution) blocked.
 **Depends on:** Phase 23 (trust enforcement)
 
 ### Progress
@@ -2096,6 +2096,13 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Public microVM execution remains blocked; `execution_enabled=false` and `execution_status=design_proof_only`.
 - Verified: targeted sandbox/microVM tests 100 passed, 1 skipped; full Python 2639 passed, 22 skipped, 3 xfailed; ruff clean; pnpm lint/test/build/typecheck green; e2e smoke 11 passed, 4 skipped, 0 failed.
 
+#### Slice 37.13: Gated Lima Integration Harness ✓
+- Added internal `LimaIntegrationHarness`; it is not wired to public `MicroVMIsolationProvider.execute()` or `arc sandbox run --provider microvm`.
+- Harness requires `ARC_MICROVM_INTEGRATION=1`, macOS, and `limactl` by default.
+- Fake-runner tests prove lifecycle order, mandatory network proof before user argv, failed network proof blocks user argv, and `limactl delete -f` teardown after start failure.
+- Real Lima execution remains unproven until a host opt-in integration test passes.
+- Verified: targeted sandbox/microVM tests 105 passed, 1 skipped; full Python 2644 passed, 22 skipped, 3 xfailed; ruff clean; pnpm lint/test/build/typecheck green; e2e smoke 11 passed, 4 skipped, 0 failed.
+
 ### CLI/IDE Integration Points
 
 - `arc sandbox run --json` — real subprocess execution under sandbox policy; Theia widget can invoke for safe command execution
@@ -2107,6 +2114,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 ### Truth Constraints
 - Real: subprocess bounded streaming caps, approval prune CLI, path-intent expansion, protocol parity tests, microVM preflight tests, container fallback tests, E2E deep-link routability
 - Lima lifecycle sketch exists in `isolation/microvm.py`, but public provider execution always raises `NotImplementedError`; macOS preflight reports `installed_not_configured` until runtime is proven with integration tests
+- Internal Lima harness exists behind an explicit integration gate, but no public microVM execution is wired or claimed
 - Still true: microVM execution not proven in CI; Lima/Firecracker preflight-only until `ARC_MICROVM_INTEGRATION=1` integration gate passes
 - Still true: container fallback gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`
 - No production-ready sandbox claim

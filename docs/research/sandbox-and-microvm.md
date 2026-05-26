@@ -17,6 +17,12 @@ Status: research complete for P0 sandbox foundation. MicroVM is preflight/doctor
 | Cloud Hypervisor docs | https://www.cloudhypervisor.org/docs/ | Cloud Hypervisor is a lightweight Linux hypervisor with CLI docs. | Linux doctor accepts `cloud-hypervisor` as secondary candidate. | Medium | Workspace mount and network-off templates not implemented. |
 | Kata Containers | https://katacontainers.io/ | Kata provides VM-backed container runtime, stronger isolation, integrates with containerd, Firecracker, Cloud Hypervisor. | Treat Kata as later container-runtime integration, not local P0 CLI default. | Medium | Operational overhead for local CLI unclear. |
 | macOS sandbox-exec manpage | https://keith.github.io/xcode-man-pages/sandbox-exec.1.html | `sandbox-exec` is deprecated; Apple recommends App Sandbox for apps. | Do not build ARC P0 on `sandbox-exec`; prefer policy/subprocess now and Lima/VZ later. | High | Seatbelt private profile stability remains unsuitable. |
+| Context7 Python subprocess docs | `/python/cpython` | Timeout cleanup must kill child/process, then drain pipes; POSIX `start_new_session` creates a process group/session. | Lima command runner keeps process-group kill and bounded capture behavior. | High | Windows skipped for microVM. |
+| Context7 Typer docs | `/fastapi/typer` | `CliRunner` supports CLI tests; nested Typer commands and options are standard. | Keep experimental surfaces testable via existing CLI pattern without shelling out. | High | None. |
+| Context7 Pydantic docs | `/pydantic/pydantic` | `ConfigDict(frozen=True)` and `model_dump(mode="json")` support stable immutable envelopes. | Harness/result models use Pydantic envelopes for stable JSON/testing. | High | None. |
+| Lima limactl docs | https://lima-vm.io/docs/reference/limactl/ | `limactl` supports `start`, `shell`, `delete`; `--tty=false`/`--yes` are automation-oriented. | Harness command sequence uses `limactl start --tty=false`, `limactl shell --tty=false`, and `limactl delete -f`. | High | Exact behavior depends on installed Lima version. |
+| Lima network docs | https://lima-vm.io/docs/config/network/ | Lima has default/user/VMNet networking and named networks can be attached via `networks`. | Harness requires an in-guest default-route proof before user argv; template still needs stronger network-off config proof. | Medium | Need real host validation that `networks: []` disables default route for chosen Lima/VZ version. |
+| Lima mount docs | https://lima-vm.io/docs/config/mount/ | Lima mount behavior varies by mount type; VZ uses virtiofs on modern Lima/macOS, with caveats. | Harness keeps workspace-only `/workspace` mount, but still treats symlink/hardlink escape proof as blocker. | High | Need real mount escape tests with symlinks/hardlinks in a guest. |
 | Web/code search | Query: `Vercel Grep code search sandbox command classification deny matrix path traversal audit JSONL fsync file lock asyncio supervisor timeout protocol parity TypeScript Python Pydantic` | Tool returned `403 PERMISSION_DENIED Verify your account to continue.` | Recorded blocker; used Context7 and local repo evidence. | Low | Retry external Vercel Grep/code search manually before a security-signoff PR. |
 | Vercel Grep/code search | Required topics: sandbox command deny matrices, path traversal guards, JSONL fsync/file lock, asyncio timeout/cancellation, TS/Python parity | No dedicated Vercel Grep tool exposed in this runtime; web-backed attempt blocked by 403. | Local implementation uses conservative deny-by-default classification and table tests; confidence lower than with corpus examples. | Low | Run external Vercel Grep manually when available. |
 
@@ -87,6 +93,13 @@ Current design-proof harness:
 - Plan generation does not call `limactl`, `firecracker`, `cloud-hypervisor`, or `jailer` and does not create VMs.
 - `execution_enabled` is always `false`; public `MicroVMIsolationProvider.execute()` remains blocked.
 
+Current opt-in Lima harness:
+
+- `LimaIntegrationHarness` exists as an internal helper only; it is not wired to `arc sandbox run --provider microvm`.
+- It requires `ARC_MICROVM_INTEGRATION=1`, macOS, and `limactl` by default; unit tests pass `require_gate=False` with a fake runner.
+- Fake-runner tests prove lifecycle order, mandatory network proof before user argv, no user command after failed network proof, and `limactl delete -f` teardown after start failure.
+- Real Lima execution remains unproven until host opt-in tests are run against a local Lima/VZ install.
+
 ### Rootfs/Kernel Lifecycle
 - Firecracker needs a kernel vmlinux binary and a rootfs image. No automated download/cache mechanism exists.
 - Lima VM templates exist as rendered YAML only; no `limactl start/create/delete` lifecycle is implemented.
@@ -119,6 +132,7 @@ Current design-proof harness:
 |---|---|---|
 | Preflight/doctor | Real | All 4 states tested: unavailable/installed_not_configured/ready/blocked |
 | Design-proof plan | Real | Non-executing plan only; no VM creation/start/run/delete |
+| Opt-in Lima harness | Internal helper only | Fake-runner lifecycle tests pass; real host runtime proof still missing |
 | Firecracker execution | Not implemented | Kernel/rootfs lifecycle, mount policy, network-off proof, jailer config, teardown |
 | Lima execution | Not implemented | VM create/start/shell/delete cycle, mount policy, network-off proof, teardown |
 | Integration test skeleton | Real (gated) | Tests exist but require local runtime; CI skips |

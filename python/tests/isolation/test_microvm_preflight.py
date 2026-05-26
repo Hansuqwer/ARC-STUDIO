@@ -17,7 +17,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from agent_runtime_cockpit.isolation.microvm import build_microvm_run_plan
+from agent_runtime_cockpit.isolation.base import IsolationResult
+from agent_runtime_cockpit.isolation.microvm import LimaIntegrationHarness, build_microvm_run_plan
 from agent_runtime_cockpit.security.sandbox import microvm_preflight
 
 
@@ -215,3 +216,98 @@ class TestMicroVMRunPlan:
             build_microvm_run_plan("docker", ["pwd"], workspace_root=tmp_path)
         with pytest.raises(ValueError, match="missing command"):
             build_microvm_run_plan("lima", [], workspace_root=tmp_path)
+
+
+class TestLimaIntegrationHarness:
+    """Gated harness tests with fake limactl runner; no VM is created."""
+
+    def test_harness_requires_explicit_gate(self, tmp_path, monkeypatch):
+        import pytest
+
+        monkeypatch.delenv("ARC_MICROVM_INTEGRATION", raising=False)
+        harness = LimaIntegrationHarness(workspace_root=tmp_path, runner=lambda *_: None)
+        with pytest.raises(RuntimeError, match="ARC_MICROVM_INTEGRATION=1"):
+            harness.run(["pwd"])
+
+    def test_harness_runs_lifecycle_after_network_proof(self, tmp_path):
+        calls: list[list[str]] = []
+
+        def runner(argv: list[str], _timeout: int, _max_bytes: int) -> IsolationResult:
+            calls.append(argv)
+            return IsolationResult(exit_code=0, stdout="ok", provider="microvm")
+
+        harness = LimaIntegrationHarness(
+            workspace_root=tmp_path,
+            runner=runner,
+            instance_name="arc-test",
+        )
+        result = harness.run(["python", "-c", "print('hello')"], require_gate=False)
+        assert result.network_proof_passed is True
+        assert result.teardown_attempted is True
+        assert result.lifecycle == ["template", "start", "network_proof", "run", "teardown"]
+        assert calls[0][:3] == ["limactl", "start", "--tty=false"]
+        assert calls[1] == [
+            "limactl",
+            "shell",
+            "--tty=false",
+            "arc-test",
+            "--",
+            "sh",
+            "-lc",
+            "ip route | grep -q '^default' && exit 1 || exit 0",
+        ]
+        assert calls[2] == [
+            "limactl",
+            "shell",
+            "--tty=false",
+            "arc-test",
+            "--workdir",
+            "/workspace",
+            "--",
+            "python",
+            "-c",
+            "print('hello')",
+        ]
+        assert calls[3] == ["limactl", "delete", "-f", "arc-test"]
+
+    def test_harness_blocks_user_command_when_network_proof_fails(self, tmp_path):
+        calls: list[list[str]] = []
+
+        def runner(argv: list[str], _timeout: int, _max_bytes: int) -> IsolationResult:
+            calls.append(argv)
+            if any("ip route" in part for part in argv):
+                return IsolationResult(exit_code=1, provider="microvm")
+            return IsolationResult(exit_code=0, provider="microvm")
+
+        harness = LimaIntegrationHarness(
+            workspace_root=tmp_path, runner=runner, instance_name="arc-test"
+        )
+        result = harness.run(["pwd"], require_gate=False)
+        assert result.network_proof_passed is False
+        assert "network-off proof failed" in result.result.stderr
+        assert not any("--workdir" in call for call in calls)
+        assert calls[-1] == ["limactl", "delete", "-f", "arc-test"]
+
+    def test_harness_teardown_runs_when_start_fails(self, tmp_path):
+        calls: list[list[str]] = []
+
+        def runner(argv: list[str], _timeout: int, _max_bytes: int) -> IsolationResult:
+            calls.append(argv)
+            if "start" in argv:
+                return IsolationResult(exit_code=1, stderr="start failed", provider="microvm")
+            return IsolationResult(exit_code=0, provider="microvm")
+
+        harness = LimaIntegrationHarness(
+            workspace_root=tmp_path, runner=runner, instance_name="arc-test"
+        )
+        result = harness.run(["pwd"], require_gate=False)
+        assert "lima start failed" in result.result.stderr
+        assert result.teardown_attempted is True
+        assert calls[-1] == ["limactl", "delete", "-f", "arc-test"]
+
+    def test_harness_rejects_missing_command(self, tmp_path):
+        import pytest
+
+        harness = LimaIntegrationHarness(workspace_root=tmp_path, runner=lambda *_: None)
+        with pytest.raises(ValueError, match="missing command"):
+            harness.run([], require_gate=False)
