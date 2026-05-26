@@ -210,7 +210,7 @@ class ChatSession(BaseModel):
         sess_dir = _get_sessions_dir() / self.id
         sess_dir.mkdir(parents=True, exist_ok=True)
         path = sess_dir / "session.json"
-        write_text_atomic(path, self.model_dump_json(indent=2) + "\n")
+        write_text_atomic(path, self.model_dump_json(indent=2) + "\n", lock=True)
 
         # Update latest symlink
         latest = _get_sessions_dir() / "latest"

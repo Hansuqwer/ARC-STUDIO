@@ -47,7 +47,7 @@ def _read_aliases(path: Path) -> dict[str, str]:
 
 def _write_aliases(path: Path, aliases: dict[str, str]) -> None:
     payload = {"version": 1, "aliases": dict(sorted(aliases.items()))}
-    write_text_atomic(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    write_text_atomic(path, json.dumps(payload, indent=2, sort_keys=True) + "\n", lock=True)
 
 
 def validate_alias(name: str, command: str | None = None) -> None:

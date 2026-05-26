@@ -1181,6 +1181,35 @@ export interface StartRunResponse {
 
 // ========== Service Interface ==========
 
+// ========== Session Bridge Types (Phase 43) ==========
+
+/**
+ * Summary view of a local chat session (read-only, redacted).
+ * Returned by listChatSessions().
+ */
+export interface ChatSessionSummary {
+    id: string;
+    mode: string;
+    runtime_mode: string;
+    updated_at: string;
+    message_count: number;
+}
+
+/**
+ * Detailed view of a local chat session (read-only, redacted).
+ * Returned by getChatSession().
+ */
+export interface ChatSessionDetail {
+    id: string;
+    mode: string;
+    runtime_mode: string;
+    profile_id: string;
+    isolation_id: string;
+    created_at: string;
+    updated_at: string;
+    history: Array<Record<string, string>>;
+}
+
 /**
  * Main service interface for ARC Studio backend operations.
  *
@@ -1508,4 +1537,23 @@ export interface ArcService {
      * @throws {ArcError} UNKNOWN if the ELO store cannot be read
      */
     getLeaderboard(limit?: number): Promise<EloRating[]>;
+
+    // ========== Session Bridge Methods (Phase 43 — read-only) ==========
+
+    /**
+     * List local chat sessions (read-only, redacted).
+     * Delegates to SessionBridgeService which calls `arc studio sessions --json`.
+     * Returns empty array if no sessions exist or CLI is unavailable.
+     * IDE write/import is deferred until advisory locking is verified.
+     */
+    listChatSessions(): Promise<ChatSessionSummary[]>;
+
+    /**
+     * Get a single chat session by ID (read-only, redacted).
+     * Delegates to SessionBridgeService which calls
+     * `arc studio sessions show <id> --json`.
+     * @throws {ArcError} RUN_NOT_FOUND if session does not exist.
+     * @throws {ArcError} INVALID_INPUT if sessionId contains unsafe characters.
+     */
+    getChatSession(sessionId: string): Promise<ChatSessionDetail>;
 }

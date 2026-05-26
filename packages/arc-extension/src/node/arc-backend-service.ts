@@ -66,6 +66,8 @@ import {
     BattleRun,
     BattleDetails,
     EloRating,
+    ChatSessionSummary,
+    ChatSessionDetail,
 } from '../common/arc-protocol';
 import { validateWorkspaceRoot, validateTraceId, validateRunId } from './security-utils';
 import { WorkflowExecutor } from './services/workflow-executor';
@@ -76,6 +78,7 @@ import { ConfigService } from './services/config-service';
 import { RunLifecycleService } from './services/run-lifecycle-service';
 import { AuditBridgeService } from './services/audit-bridge-service';
 import { BattleService } from './services/battle-service';
+import { SessionBridgeService } from './services/session-bridge-service';
 
 const ARC_CLI_ENV_ALLOWLIST = ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR'];
 const ARC_PYTHON_DAEMON_URL_ENV = 'ARC_PYTHON_DAEMON_URL';
@@ -112,6 +115,7 @@ export class ArcBackendService implements ArcService {
     private readonly runLifecycleService: RunLifecycleService;
     private readonly auditBridgeService: AuditBridgeService;
     private readonly battleService: BattleService;
+    private readonly sessionBridgeService: SessionBridgeService;
     private readonly activeStreamCancels = new Map<string, { cancelled: boolean }>();
     private workspaceRoot: string;
 
@@ -123,7 +127,8 @@ export class ArcBackendService implements ArcService {
         configService?: ConfigService,
         runLifecycleService?: RunLifecycleService,
         auditBridgeService?: AuditBridgeService,
-        battleService?: BattleService
+        battleService?: BattleService,
+        sessionBridgeService?: SessionBridgeService
     ) {
         this.executor = executor ?? new WorkflowExecutor();
         this.parser = parser ?? new TraceParser();
@@ -140,6 +145,7 @@ export class ArcBackendService implements ArcService {
         );
         this.auditBridgeService = auditBridgeService ?? new AuditBridgeService(this.workspaceRoot);
         this.battleService = battleService ?? new BattleService();
+        this.sessionBridgeService = sessionBridgeService ?? new SessionBridgeService(this.workspaceRoot);
     }
 
     // ========== Workflow Execution ==========
@@ -1070,5 +1076,15 @@ export class ArcBackendService implements ArcService {
 
     async getLeaderboard(limit?: number): Promise<EloRating[]> {
         return this.battleService.getLeaderboard(limit);
+    }
+
+    // ========== Session Bridge (Phase 43 — read-only) ==========
+
+    async listChatSessions(): Promise<ChatSessionSummary[]> {
+        return this.sessionBridgeService.listChatSessions();
+    }
+
+    async getChatSession(sessionId: string): Promise<ChatSessionDetail> {
+        return this.sessionBridgeService.getChatSession(sessionId);
     }
 }

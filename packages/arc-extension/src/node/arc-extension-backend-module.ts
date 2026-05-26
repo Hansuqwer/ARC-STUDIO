@@ -16,6 +16,7 @@ import { ConfigService } from './services/config-service';
 import { RunLifecycleService } from './services/run-lifecycle-service';
 import { AuditBridgeService } from './services/audit-bridge-service';
 import { BattleService } from './services/battle-service';
+import { SessionBridgeService } from './services/session-bridge-service';
 import { NotificationBackendService } from './services/notification-service';
 import { NotificationService, NotificationServicePath } from '../common/notification-protocol';
 import { ArcServicePath } from '../common/arc-protocol';
@@ -40,6 +41,9 @@ export default new ContainerModule(bind => {
     // Bind Battle service (Phase 34.2)
     bind(BattleService).toSelf().inSingletonScope();
 
+    // Bind Session bridge service (Phase 43 — read-only)
+    bind(SessionBridgeService).toSelf().inSingletonScope();
+
     // Bind the backend service with explicit service dependencies.
     bind(ArcBackendService).toDynamicValue(ctx => new ArcBackendService(
         ctx.container.get(WorkflowExecutor),
@@ -49,7 +53,8 @@ export default new ContainerModule(bind => {
         ctx.container.get(ConfigService),
         ctx.container.get(RunLifecycleService),
         ctx.container.get(AuditBridgeService),
-        ctx.container.get(BattleService)
+        ctx.container.get(BattleService),
+        ctx.container.get(SessionBridgeService)
     )).inSingletonScope();
 
     // Bind notification service (Phase 32 / R25 — Slice 32.3)

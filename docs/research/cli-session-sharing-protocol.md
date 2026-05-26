@@ -2,7 +2,7 @@
 
 ## Status
 
-CLI session bundle export/import implemented for Phase 42.5. IDE write sharing remains design-only. No IDE daemon, shared server, tenant sync, or cross-device claims are implemented here.
+Phase 43: Advisory locking implemented for session and alias writes. Read-only IDE session bridge implemented via `SessionBridgeService` (delegates to `arc studio sessions --json` / `show --json`; no daemon; no writes from IDE). IDE write sharing remains explicitly deferred. No IDE daemon, shared server, tenant sync, or cross-device claims are implemented here.
 
 ## Goal
 
@@ -37,7 +37,7 @@ Unresolved questions:
 | Record | `<session_id>/session.json`. |
 | Schema | `version: 4` required; readers may migrate older versions through `ChatSession.model_validate`. |
 | Writes | CLI session writes use atomic temp-file write plus rename. |
-| Locking | Future `session.lock` advisory lock before concurrent IDE/CLI writes. Not implemented. |
+| Locking | `session.json.lock` advisory lock (`fcntl.flock` on POSIX; documented no-op on Windows single-writer assumption). Implemented for `ChatSession.save()` and `_write_aliases()`. |
 | Trust | Session content is user-local state, not workspace trust. Execution still requires normal trust/sandbox gates. |
 | Secrets | Session JSON must not contain raw provider keys or tokens. |
 | Identity | `id`, `created_at`, `updated_at` remain source of truth. |
@@ -57,10 +57,17 @@ Unresolved questions:
 - No remote sync.
 - No shared-server or multi-tenant coordination.
 - No bypass of run/sandbox/HITL policy.
-- No IDE writes/imports until advisory locking is implemented.
+- No IDE writes/imports. Advisory locking is implemented for CLI writes; IDE write path remains deferred pending cross-platform lock verification.
+
+## Implemented In Phase 43
+
+- `storage/advisory_lock.py`: POSIX `fcntl.flock` advisory lock with spin-wait; Windows documented no-op.
+- `ChatSession.save()` and `_write_aliases()` use `lock=True` via `write_text_atomic`.
+- `SessionBridgeService` (TypeScript, read-only): `listChatSessions()` and `getChatSession(id)` via `arc studio sessions --json` / `show`. No shell=true. No IDE writes.
+- `ArcService` protocol: `listChatSessions()` and `getChatSession()` methods added.
 
 ## Next Steps
 
-1. Add advisory lock semantics for IDE/CLI concurrent writes.
-2. Define session change event envelope for IDE UI refresh.
-3. Implement IDE read-only session browser against `arc studio sessions` commands.
+1. Define session change event envelope for IDE UI refresh.
+2. IDE write/import bridge requires cross-platform lock verification before implementation.
+3. Windows lock parity: evaluate `LockFileEx` via native addon if needed.
