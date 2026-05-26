@@ -27,12 +27,21 @@ from .adapters import (
     SlashAdapterResult,
     render_audit_list,
     render_audit_verify,
+    render_battle_list,
+    render_battle_show,
+    render_config_show,
+    render_config_validate,
+    render_context_pack,
     render_doctor_summary,
+    render_events_watch,
+    render_hitl_pending,
+    render_hitl_respond,
     render_mcp_status,
     render_policy_explain,
     render_policy_list,
     render_policy_show,
     render_providers_status,
+    render_replay,
     render_run_show,
     render_run_status,
     render_runs_list,
@@ -43,6 +52,7 @@ from .adapters import (
     render_status,
     render_task_list,
     render_task_status,
+    render_workspace_trust_status,
 )
 from .cancellation import CancellationReason, CancellationToken, Cancelled
 from .commands import CommandDef, get_registry
@@ -482,6 +492,117 @@ def _build_registry():
             subcommands=["status"],
         )
     )
+    registry.register(
+        CommandDef(
+            name="hitl",
+            help_text="Human approvals: /hitl pending|respond <id> <decision>",
+            category="compliance",
+            handler=cmd_hitl,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "absent", "blocked"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/hitl pending|respond <id> <approve|reject|modify|skip>",
+            subcommands=["pending", "respond"],
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="context",
+            help_text="Context utilities: /context pack <task>",
+            category="workspace",
+            handler=cmd_context,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "absent", "blocked"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/context pack <task>",
+            subcommands=["pack"],
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="workspace",
+            help_text="Workspace utilities: /workspace trust-status",
+            category="workspace",
+            handler=cmd_workspace,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "degraded"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/workspace trust-status",
+            subcommands=["trust-status", "status"],
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="config",
+            help_text="Configuration: /config show|validate",
+            category="workspace",
+            handler=cmd_config,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "error"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/config show|validate",
+            subcommands=["show", "validate"],
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="replay",
+            help_text="Analyze replay capability: /replay <run_id>",
+            category="runtime",
+            handler=cmd_replay,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "degraded", "blocked"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/replay <run_id>",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="battle",
+            help_text="Battle runs: /battle list|show <id>",
+            category="runtime",
+            handler=cmd_battle,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "absent", "blocked"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/battle list|show <id>",
+            subcommands=["list", "show"],
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="events",
+            help_text="Event buffer: /events watch [--since N] [--type T]",
+            category="runtime",
+            handler=cmd_events,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "absent", "degraded"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/events watch [--since N] [--type T]",
+            subcommands=["watch"],
+        )
+    )
 
     return registry
 
@@ -493,13 +614,24 @@ def cmd_help(_arg: str, _session: ChatSession) -> str:
     registry = get_registry()
     groups = {
         "session": ["help", "clear", "summary", "sessions", "history", "exit"],
-        "run": ["run", "runtime", "mode", "plan", "build", "auto", "runs"],
+        "run": [
+            "run",
+            "runtime",
+            "mode",
+            "plan",
+            "build",
+            "auto",
+            "runs",
+            "replay",
+            "battle",
+            "events",
+        ],
         "sandbox": ["sandbox"],
         "policy": ["policy"],
-        "workspace": ["status", "doctor", "read", "search"],
+        "workspace": ["status", "doctor", "read", "search", "context", "workspace", "config"],
         "providers": ["providers"],
         "tools": ["tools"],
-        "audit": ["audit"],
+        "audit": ["audit", "hitl"],
         "tasks": ["task"],
         "MCP": ["mcp"],
     }
@@ -1028,6 +1160,105 @@ def cmd_providers_status(arg: str, _session: ChatSession) -> CommandResult:
 
 def cmd_mcp_status(arg: str, _session: ChatSession) -> CommandResult:
     return _render_adapter_result(render_mcp_status())
+
+
+def cmd_hitl(arg: str, _session: ChatSession) -> CommandResult:
+    parts = arg.strip().split(maxsplit=1)
+    subcommand = parts[0] if parts else "pending"
+    rest = parts[1] if len(parts) > 1 else ""
+    if subcommand == "pending":
+        return _render_adapter_result(
+            render_hitl_pending(include_expired="--include-expired" in rest)
+        )
+    if subcommand == "respond":
+        return _render_adapter_result(render_hitl_respond(rest))
+    return CommandResult(
+        state="blocked",
+        output="Usage: /hitl pending|respond <id> <decision>",
+        reason="invalid_usage",
+    )
+
+
+def cmd_context(arg: str, _session: ChatSession) -> CommandResult:
+    parts = arg.strip().split(maxsplit=1)
+    if parts and parts[0] == "pack":
+        return _render_adapter_result(render_context_pack(parts[1] if len(parts) > 1 else ""))
+    return CommandResult(
+        state="blocked", output="Usage: /context pack <task>", reason="invalid_usage"
+    )
+
+
+def cmd_workspace(arg: str, _session: ChatSession) -> CommandResult:
+    subcommand = arg.strip() or "trust-status"
+    if subcommand in {"trust-status", "status"}:
+        return _render_adapter_result(render_workspace_trust_status())
+    return CommandResult(
+        state="blocked", output="Usage: /workspace trust-status", reason="invalid_usage"
+    )
+
+
+def cmd_config(arg: str, _session: ChatSession) -> CommandResult:
+    subcommand = arg.strip() or "show"
+    if subcommand == "show":
+        return _render_adapter_result(render_config_show())
+    if subcommand == "validate":
+        return _render_adapter_result(render_config_validate())
+    return CommandResult(
+        state="blocked", output="Usage: /config show|validate", reason="invalid_usage"
+    )
+
+
+def cmd_replay(arg: str, _session: ChatSession) -> CommandResult:
+    return _render_adapter_result(render_replay(arg))
+
+
+def cmd_battle(arg: str, _session: ChatSession) -> CommandResult:
+    parts = arg.strip().split(maxsplit=1)
+    subcommand = parts[0] if parts else "list"
+    rest = parts[1] if len(parts) > 1 else ""
+    if subcommand == "list":
+        return _render_adapter_result(render_battle_list(limit=int(rest) if rest.isdigit() else 20))
+    if subcommand == "show":
+        return _render_adapter_result(render_battle_show(rest))
+    return CommandResult(
+        state="blocked", output="Usage: /battle list|show <id>", reason="invalid_usage"
+    )
+
+
+def cmd_events(arg: str, _session: ChatSession) -> CommandResult:
+    parts = arg.strip().split()
+    if parts[:1] and parts[0] != "watch":
+        return CommandResult(
+            state="blocked",
+            output="Usage: /events watch [--since N] [--type T]",
+            reason="invalid_usage",
+        )
+    since = 20
+    event_type = None
+    index = 1 if parts[:1] == ["watch"] else 0
+    while index < len(parts):
+        if parts[index] == "--since" and index + 1 < len(parts):
+            since = int(parts[index + 1])
+            index += 2
+            continue
+        if parts[index].startswith("--since="):
+            since = int(parts[index].split("=", 1)[1])
+            index += 1
+            continue
+        if parts[index] == "--type" and index + 1 < len(parts):
+            event_type = parts[index + 1]
+            index += 2
+            continue
+        if parts[index].startswith("--type="):
+            event_type = parts[index].split("=", 1)[1]
+            index += 1
+            continue
+        return CommandResult(
+            state="blocked",
+            output="Usage: /events watch [--since N] [--type T]",
+            reason="invalid_usage",
+        )
+    return _render_adapter_result(render_events_watch(since=since, event_type=event_type))
 
 
 class SlashCommandHandler:

@@ -875,3 +875,239 @@ def render_mcp_status(workspace: Path | None = None) -> SlashAdapterResult:
         text="\n".join(lines),
         data=data,
     )
+
+
+def render_hitl_pending(
+    include_expired: bool = False, workspace: Path | None = None
+) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    from ..audit.hitl_sqlite_store import HitlSqliteStore
+
+    prompts = HitlSqliteStore(ws / ".arc" / "hitl.db").list_prompts(include_expired=include_expired)
+    if not prompts:
+        return SlashAdapterResult(
+            state="absent", text="No pending HITL prompts.", data={"prompts": []}
+        )
+    lines = ["Pending HITL prompts:"]
+    for prompt in prompts:
+        lines.append(f"  {prompt.hitl_id[:12]}  run={prompt.run_id}  step={prompt.step_id}")
+        lines.append(f"    {prompt.prompt_text[:160]}")
+    return SlashAdapterResult(
+        state="present",
+        text="\n".join(lines),
+        data={"count": len(prompts), "prompts": [p.model_dump() for p in prompts]},
+    )
+
+
+def render_hitl_respond(arg: str, workspace: Path | None = None) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    parts = shlex.split(arg)
+    if len(parts) < 2:
+        return SlashAdapterResult(
+            state="blocked",
+            text="Usage: /hitl respond <id> <approve|reject|modify|skip>",
+            exit_code=2,
+        )
+    hitl_id, decision = parts[0], parts[1].lower()
+    reason = " ".join(parts[2:])
+    try:
+        from ..audit.hitl import HitlDecision
+        from ..audit.hitl_sqlite_store import HitlSqliteStore
+
+        decision_enum = HitlDecision(decision)
+        store = HitlSqliteStore(ws / ".arc" / "hitl.db")
+        token = os.environ.get("HITL_TOKEN") or store.get_token(hitl_id)
+        if not token:
+            return SlashAdapterResult(
+                state="blocked",
+                text=f"Blocked: HITL prompt not found or token missing: {hitl_id}",
+                exit_code=2,
+            )
+        response = store.respond(
+            hitl_id=hitl_id,
+            decision=decision_enum,
+            token=token,
+            operator_id="repl-user",
+            notes=reason,
+            audit_hash=None,
+        )
+    except ValueError as exc:
+        return SlashAdapterResult(state="blocked", text=f"Blocked: {exc}", exit_code=2)
+    if response is None:
+        return SlashAdapterResult(
+            state="blocked",
+            text=f"Blocked: failed to respond to HITL prompt: {hitl_id}",
+            exit_code=2,
+        )
+    return SlashAdapterResult(
+        state="present",
+        text=f"HITL response recorded: {response.hitl_id}\nDecision: {response.decision.value}",
+        data={"response": response.model_dump()},
+    )
+
+
+def render_context_pack(task: str, workspace: Path | None = None) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    clean = task.strip()
+    if not clean:
+        return SlashAdapterResult(state="blocked", text="Usage: /context pack <task>", exit_code=2)
+    from ..context.pack import ContextPackGenerator
+
+    entries = ContextPackGenerator().generate(clean, ws, save=True)
+    lines = [f"Context pack: {len(entries)} entries"]
+    for entry in entries[:10]:
+        title = getattr(entry, "title", None) or getattr(entry, "source", "entry")
+        lines.append(f"  {title}")
+    return SlashAdapterResult(
+        state="present" if entries else "absent",
+        text="\n".join(lines),
+        data={"count": len(entries), "entries": [e.model_dump() for e in entries]},
+    )
+
+
+def render_workspace_trust_status(workspace: Path | None = None) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    from ..security.trust import resolve_trust
+
+    resolution = resolve_trust(ws)
+    lines = [f"Workspace: {ws}", f"Trust: {resolution.level.value}", f"Reason: {resolution.reason}"]
+    if resolution.warning:
+        lines.append(f"Warning: {resolution.warning}")
+    return SlashAdapterResult(
+        state="present" if resolution.level.value == "trusted" else "degraded",
+        text="\n".join(lines),
+        data=resolution.model_dump(mode="json") | {"workspace": str(ws)},
+    )
+
+
+def render_config_show(workspace: Path | None = None) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    from ..config.loader import load_config
+
+    config = load_config(workspace=ws)
+    flattened = config.flatten()
+    lines = ["Config:"]
+    for key, value in sorted(flattened.items()):
+        lines.append(f"  {key}: {value}")
+    return SlashAdapterResult(state="present", text="\n".join(lines), data={"config": flattened})
+
+
+def render_config_validate(workspace: Path | None = None) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    try:
+        from ..config.loader import load_config
+
+        config = load_config(workspace=ws)
+    except Exception as exc:
+        return SlashAdapterResult(state="error", text=f"Config invalid: {exc}", exit_code=1)
+    return SlashAdapterResult(
+        state="present",
+        text="Config valid.",
+        data={"valid": True, "version": config.version, "workspace": str(ws)},
+    )
+
+
+def render_replay(run_id: str, workspace: Path | None = None) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    clean = run_id.strip()
+    if not clean:
+        return SlashAdapterResult(state="blocked", text="Usage: /replay <run_id>", exit_code=2)
+    try:
+        from ..adapters.langgraph.replay_detector import analyze_run_replay_capability
+
+        capability = analyze_run_replay_capability(clean, ws, None)
+    except Exception as exc:
+        return SlashAdapterResult(
+            state="degraded", text=f"Replay analysis unavailable: {exc}", exit_code=1
+        )
+    return SlashAdapterResult(
+        state="present",
+        text=f"Replay: {clean}\nSummary: {capability.get_capability_summary()}",
+        data={
+            "run_id": capability.run_id,
+            "runtime": capability.runtime,
+            "can_replay_trace": capability.can_replay_trace,
+            "can_resume_checkpoint": capability.can_resume_checkpoint,
+            "determinism_level": capability.determinism_level,
+            "warnings": capability.warnings,
+        },
+    )
+
+
+def render_battle_list(limit: int = 20, workspace: Path | None = None) -> SlashAdapterResult:
+    from ..battle import BattleStore
+
+    ws = _workspace(workspace)
+    battles = BattleStore(ws / ".arc" / "battles.db").list_battle_runs(limit=limit)
+    if not battles:
+        return SlashAdapterResult(state="absent", text="No battles found.", data={"battles": []})
+    lines = ["Battles:"]
+    for battle in battles:
+        lines.append(
+            f"  {battle.id[:12]}  {battle.status.value:10s}  workers={battle.workers}  {battle.prompt[:80]}"
+        )
+    return SlashAdapterResult(
+        state="present",
+        text="\n".join(lines),
+        data={"count": len(battles), "battles": [b.model_dump(mode="json") for b in battles]},
+    )
+
+
+def render_battle_show(battle_id: str, workspace: Path | None = None) -> SlashAdapterResult:
+    clean = battle_id.strip()
+    if not clean:
+        return SlashAdapterResult(
+            state="blocked", text="Usage: /battle show <battle_id>", exit_code=2
+        )
+    from ..battle import BattleStore
+
+    ws = _workspace(workspace)
+    store = BattleStore(ws / ".arc" / "battles.db")
+    battle = store.get_battle_run(clean)
+    if battle is None:
+        return SlashAdapterResult(state="absent", text=f"Battle not found: {clean}", exit_code=2)
+    candidates = store.get_candidates(clean)
+    votes = store.get_votes(clean)
+    outcome = store.get_outcome(clean)
+    lines = [
+        f"Battle: {battle.id}",
+        f"Status: {battle.status.value}",
+        f"Workers: {battle.workers}",
+        f"Prompt: {battle.prompt}",
+        f"Candidates: {len(candidates)}",
+        f"Votes: {len(votes)}",
+    ]
+    return SlashAdapterResult(
+        state="present",
+        text="\n".join(lines),
+        data={
+            "battle": battle.model_dump(mode="json"),
+            "candidates": [c.model_dump(mode="json") for c in candidates],
+            "votes": [v.model_dump(mode="json") for v in votes],
+            "outcome": outcome.model_dump(mode="json") if outcome else None,
+        },
+    )
+
+
+def render_events_watch(since: int = 20, event_type: str | None = None) -> SlashAdapterResult:
+    from ..events.bus import get_bus
+
+    bus = get_bus()
+    start = max(0, len(bus._ring_buffer) - max(0, since))
+    events = bus._replay_since(start)
+    if event_type:
+        events = [event for event in events if event.event_type == event_type]
+    if not events:
+        return SlashAdapterResult(
+            state="absent",
+            text="No buffered events. Live watch is available in non-REPL CLI only.",
+            data={"events": [], "live_watch": False},
+        )
+    lines = ["Buffered events:"]
+    for event in events:
+        lines.append(f"  {event.event_type}  run={getattr(event, 'run_id', '')}")
+    return SlashAdapterResult(
+        state="degraded",
+        text="\n".join(lines) + "\nLive watch is available in non-REPL CLI only.",
+        data={"events": [e.model_dump(mode="json") for e in events], "live_watch": False},
+    )

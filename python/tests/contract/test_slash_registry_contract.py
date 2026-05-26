@@ -28,6 +28,13 @@ PHASE_41_COMMANDS = {
     "task",
     "providers",
     "mcp",
+    "hitl",
+    "context",
+    "workspace",
+    "config",
+    "replay",
+    "battle",
+    "events",
 }
 
 

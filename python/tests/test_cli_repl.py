@@ -1374,3 +1374,73 @@ class TestPhase41P1Adapters:
         handler = SlashCommandHandler()
         result = handler.handle("/help", ChatSession())
         assert "mcp" in str(result).lower()
+
+
+class TestPhase41RemainingAdapters:
+    def test_hitl_pending_empty(self, tmp_path):
+        from agent_runtime_cockpit.cli_repl.adapters import render_hitl_pending
+
+        result = render_hitl_pending(workspace=tmp_path)
+        assert result.state == "absent"
+        assert "No pending HITL" in result.text
+
+    def test_context_pack_missing_task_blocked(self, tmp_path):
+        from agent_runtime_cockpit.cli_repl.adapters import render_context_pack
+
+        result = render_context_pack("", workspace=tmp_path)
+        assert result.state == "blocked"
+
+    def test_workspace_trust_status(self, tmp_path):
+        from agent_runtime_cockpit.cli_repl.adapters import render_workspace_trust_status
+
+        result = render_workspace_trust_status(workspace=tmp_path)
+        assert result.state in {"present", "degraded"}
+        assert "Trust:" in result.text
+
+    def test_config_show_and_validate(self, tmp_path):
+        from agent_runtime_cockpit.cli_repl.adapters import (
+            render_config_show,
+            render_config_validate,
+        )
+
+        show = render_config_show(workspace=tmp_path)
+        validate = render_config_validate(workspace=tmp_path)
+        assert show.state == "present"
+        assert validate.state == "present"
+
+    def test_replay_missing_run_degrades(self, tmp_path):
+        from agent_runtime_cockpit.cli_repl.adapters import render_replay
+
+        result = render_replay("missing-run", workspace=tmp_path)
+        assert result.state in {"present", "degraded"}
+
+    def test_battle_list_empty(self, monkeypatch, tmp_path):
+        from agent_runtime_cockpit.cli_repl import adapters
+
+        result = adapters.render_battle_list(workspace=tmp_path)
+        assert result.state == "absent"
+
+    def test_events_watch_empty(self):
+        from agent_runtime_cockpit.cli_repl.adapters import render_events_watch
+        from agent_runtime_cockpit.events.bus import reset_bus
+
+        reset_bus()
+        result = render_events_watch()
+        assert result.state == "absent"
+        assert "Live watch" in result.text
+
+    def test_slash_remaining_commands_route(self):
+        handler = SlashCommandHandler()
+        session = ChatSession()
+        commands = [
+            "/hitl pending",
+            "/context pack",
+            "/workspace trust-status",
+            "/config validate",
+            "/replay missing-run",
+            "/battle list",
+            "/events watch",
+        ]
+        for command in commands:
+            result = handler.handle(command, session)
+            assert result is not None, command
