@@ -25,16 +25,24 @@ from ..swarmgraph.config import SwarmGraphConfig
 from ..tools import default_tool_registry
 from .adapters import (
     SlashAdapterResult,
+    render_audit_list,
+    render_audit_verify,
     render_doctor_summary,
+    render_mcp_status,
     render_policy_explain,
     render_policy_list,
     render_policy_show,
+    render_providers_status,
     render_run_show,
     render_run_status,
     render_runs_list,
     render_sandbox_doctor,
     render_sandbox_run,
+    render_read,
+    render_search,
     render_status,
+    render_task_list,
+    render_task_status,
 )
 from .cancellation import CancellationReason, CancellationToken, Cancelled
 from .commands import CommandDef, get_registry
@@ -350,6 +358,36 @@ def _build_registry():
     )
     registry.register(
         CommandDef(
+            name="read",
+            help_text="Read a workspace file: /read [--offset N] [--limit N] <path>",
+            category="workspace",
+            handler=cmd_read,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "absent", "blocked", "degraded"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/read [--offset N] [--limit N] <path>",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="search",
+            help_text="Search workspace text: /search <regex> [--include GLOB] [--path PATH]",
+            category="workspace",
+            handler=cmd_search,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "absent", "blocked", "degraded"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/search <regex> [--include GLOB] [--path PATH]",
+        )
+    )
+    registry.register(
+        CommandDef(
             name="sandbox",
             help_text="Sandbox tools: /sandbox doctor|run -- <cmd...>",
             category="workspace",
@@ -380,6 +418,70 @@ def _build_registry():
             subcommands=["explain", "list", "show"],
         )
     )
+    registry.register(
+        CommandDef(
+            name="audit",
+            help_text="Audit events: /audit [list [limit]]|verify <run_id>",
+            category="audit",
+            handler=cmd_audit,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "absent", "denied", "degraded"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/audit [list [limit]]|verify <run_id>",
+            subcommands=["list", "verify"],
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="task",
+            help_text="Task management: /task [list [--status S] [--limit N]]|status <id>",
+            category="tasks",
+            handler=cmd_task,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "absent", "error"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/task [list [--status S] [--limit N]]|status <task_id>",
+            subcommands=["list", "status"],
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="providers",
+            help_text="Show provider statuses",
+            category="providers",
+            handler=cmd_providers_status,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "degraded"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/providers",
+            subcommands=["status"],
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="mcp",
+            help_text="Show MCP server status",
+            category="MCP",
+            handler=cmd_mcp_status,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "degraded"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/mcp",
+            subcommands=["status"],
+        )
+    )
 
     return registry
 
@@ -394,12 +496,12 @@ def cmd_help(_arg: str, _session: ChatSession) -> str:
         "run": ["run", "runtime", "mode", "plan", "build", "auto", "runs"],
         "sandbox": ["sandbox"],
         "policy": ["policy"],
-        "workspace": ["status", "doctor"],
-        "providers": ["runtime"],
+        "workspace": ["status", "doctor", "read", "search"],
+        "providers": ["providers"],
         "tools": ["tools"],
-        "audit": [],
-        "tasks": [],
-        "MCP": [],
+        "audit": ["audit"],
+        "tasks": ["task"],
+        "MCP": ["mcp"],
     }
     lines = ["Available slash commands:"]
     for group, names in groups.items():
@@ -870,6 +972,62 @@ def cmd_runs(arg: str, _session: ChatSession) -> CommandResult:
     if subcommand == "status":
         return _render_adapter_result(render_run_status(rest))
     return _render_adapter_result(render_run_show(arg))
+
+
+def cmd_read(arg: str, _session: ChatSession) -> CommandResult:
+    return _render_adapter_result(render_read(arg))
+
+
+def cmd_search(arg: str, _session: ChatSession) -> CommandResult:
+    return _render_adapter_result(render_search(arg))
+
+
+def cmd_audit(arg: str, _session: ChatSession) -> CommandResult:
+    parts = arg.strip().split(maxsplit=1)
+    subcommand = parts[0] if parts else "list"
+    rest = parts[1] if len(parts) > 1 else ""
+    if subcommand == "list":
+        limit = 20
+        if rest and rest.isdigit():
+            limit = int(rest)
+        return _render_adapter_result(render_audit_list(limit=limit))
+    if subcommand == "verify":
+        return _render_adapter_result(render_audit_verify(rest))
+    return CommandResult(
+        state="blocked",
+        output="Usage: /audit [list [limit]]|verify <run_id>",
+        reason="invalid_usage",
+    )
+
+
+def cmd_task(arg: str, _session: ChatSession) -> CommandResult:
+    parts = arg.strip().split(maxsplit=1)
+    subcommand = parts[0] if parts else "list"
+    rest = parts[1] if len(parts) > 1 else ""
+    if subcommand == "list":
+        status_filter = None
+        limit = 50
+        for token in rest.split():
+            if token.startswith("--status="):
+                status_filter = token.split("=", 1)[1]
+            elif token.startswith("--limit="):
+                limit = int(token.split("=", 1)[1])
+        return _render_adapter_result(render_task_list(status_filter=status_filter, limit=limit))
+    if subcommand == "status":
+        return _render_adapter_result(render_task_status(rest))
+    return CommandResult(
+        state="blocked",
+        output="Usage: /task [list [--status S] [--limit N]]|status <task_id>",
+        reason="invalid_usage",
+    )
+
+
+def cmd_providers_status(arg: str, _session: ChatSession) -> CommandResult:
+    return _render_adapter_result(render_providers_status())
+
+
+def cmd_mcp_status(arg: str, _session: ChatSession) -> CommandResult:
+    return _render_adapter_result(render_mcp_status())
 
 
 class SlashCommandHandler:

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import json
-import shlex
 import asyncio
+import json
+import os
+import re
+import shlex
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -18,12 +20,33 @@ from ..security.sandbox import (
     build_audit_event,
     decide,
     ensure_workspace_cwd,
+    list_sandbox_audit_events,
     list_sandbox_policies,
     persist_sandbox_audit_event,
     resolve_sandbox_policy,
     utc_now,
     validate_command_paths,
+    verify_sandbox_audit,
 )
+
+READ_MAX_BYTES = 64_000
+READ_DEFAULT_LIMIT = 200
+SEARCH_MAX_FILE_BYTES = 256_000
+SEARCH_MAX_FILES = 500
+SEARCH_MAX_MATCHES = 50
+SEARCH_MAX_LINE_CHARS = 240
+SEARCH_SKIP_DIRS = {
+    ".arc",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "__pycache__",
+    "dist",
+    "lib",
+    "node_modules",
+}
 
 
 @dataclass(frozen=True)
@@ -42,6 +65,198 @@ def _workspace(workspace: Path | None = None) -> Path:
 
 def _format_bool(value: bool) -> str:
     return "yes" if value else "no"
+
+
+def _workspace_path(value: str, workspace: Path) -> Path:
+    if not value:
+        raise ValueError("missing path")
+    raw = Path(value).expanduser()
+    candidate = raw if raw.is_absolute() else workspace / raw
+    resolved = candidate.resolve(strict=False)
+    if candidate.exists() and candidate.is_symlink():
+        raise ValueError(f"path is a symlink: {value}")
+    if not resolved.is_relative_to(workspace):
+        raise ValueError(f"path escapes workspace: {value}")
+    return resolved
+
+
+def _is_text_sample(data: bytes) -> bool:
+    return b"\x00" not in data
+
+
+def _parse_read_args(arg: str) -> tuple[str, int, int]:
+    parts = shlex.split(arg)
+    offset = 1
+    limit = READ_DEFAULT_LIMIT
+    path = ""
+    index = 0
+    while index < len(parts):
+        part = parts[index]
+        if part == "--offset" and index + 1 < len(parts):
+            offset = int(parts[index + 1])
+            index += 2
+            continue
+        if part == "--limit" and index + 1 < len(parts):
+            limit = int(parts[index + 1])
+            index += 2
+            continue
+        if not path:
+            path = part
+            index += 1
+            continue
+        raise ValueError("Usage: /read [--offset N] [--limit N] <path>")
+    if offset < 1 or limit < 1:
+        raise ValueError("offset and limit must be positive")
+    return path, offset, min(limit, READ_DEFAULT_LIMIT)
+
+
+def render_read(arg: str, workspace: Path | None = None) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    try:
+        path_arg, offset, limit = _parse_read_args(arg)
+        path = _workspace_path(path_arg, ws)
+    except (OSError, ValueError) as exc:
+        return SlashAdapterResult(state="blocked", text=f"Blocked: {exc}", exit_code=2)
+    if not path.exists():
+        return SlashAdapterResult(state="absent", text=f"File not found: {path_arg}", exit_code=2)
+    if not path.is_file():
+        return SlashAdapterResult(
+            state="blocked", text=f"Blocked: not a file: {path_arg}", exit_code=2
+        )
+    data = path.read_bytes()[: READ_MAX_BYTES + 1]
+    if not _is_text_sample(data):
+        return SlashAdapterResult(
+            state="blocked", text=f"Blocked: binary file: {path_arg}", exit_code=2
+        )
+    truncated = len(data) > READ_MAX_BYTES
+    text = data[:READ_MAX_BYTES].decode("utf-8", errors="replace")
+    lines = text.splitlines()
+    start = offset - 1
+    selected = lines[start : start + limit]
+    output = "\n".join(f"{start + index + 1}: {line}" for index, line in enumerate(selected))
+    if not output:
+        output = f"No lines at offset {offset}."
+    if truncated:
+        output += "\n[truncated]"
+    return SlashAdapterResult(
+        state="degraded" if truncated else "present",
+        text=output,
+        data={
+            "path": str(path),
+            "offset": offset,
+            "limit": limit,
+            "lines_returned": len(selected),
+            "truncated": truncated,
+        },
+    )
+
+
+def _parse_search_args(arg: str) -> tuple[str, str, str]:
+    parts = shlex.split(arg)
+    pattern = ""
+    include = "*"
+    path = "."
+    index = 0
+    while index < len(parts):
+        part = parts[index]
+        if part == "--include" and index + 1 < len(parts):
+            include = parts[index + 1]
+            index += 2
+            continue
+        if part == "--path" and index + 1 < len(parts):
+            path = parts[index + 1]
+            index += 2
+            continue
+        if not pattern:
+            pattern = part
+            index += 1
+            continue
+        raise ValueError('Usage: /search <regex> [--include "*.py"] [--path subdir]')
+    if not pattern:
+        raise ValueError('Usage: /search <regex> [--include "*.py"] [--path subdir]')
+    return pattern, include, path
+
+
+def _iter_search_files(root: Path, include: str) -> list[Path]:
+    files: list[Path] = []
+    for path in root.rglob(include):
+        if len(files) >= SEARCH_MAX_FILES:
+            break
+        if any(part in SEARCH_SKIP_DIRS for part in path.parts):
+            continue
+        if path.is_symlink() or not path.is_file():
+            continue
+        files.append(path)
+    return files
+
+
+def render_search(arg: str, workspace: Path | None = None) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    try:
+        pattern, include, path_arg = _parse_search_args(arg)
+        root = _workspace_path(path_arg, ws)
+        regex = re.compile(pattern)
+    except (OSError, re.error, ValueError) as exc:
+        return SlashAdapterResult(state="blocked", text=f"Blocked: {exc}", exit_code=2)
+    if not root.exists():
+        return SlashAdapterResult(
+            state="absent", text=f"Search path not found: {path_arg}", exit_code=2
+        )
+    if root.is_file():
+        candidates = [root]
+    elif root.is_dir():
+        candidates = _iter_search_files(root, include)
+    else:
+        return SlashAdapterResult(
+            state="blocked", text=f"Blocked: not searchable: {path_arg}", exit_code=2
+        )
+
+    matches: list[dict[str, Any]] = []
+    truncated = False
+    files_scanned = 0
+    for file_path in candidates:
+        if len(matches) >= SEARCH_MAX_MATCHES:
+            truncated = True
+            break
+        try:
+            data = file_path.read_bytes()[: SEARCH_MAX_FILE_BYTES + 1]
+        except OSError:
+            continue
+        if len(data) > SEARCH_MAX_FILE_BYTES:
+            truncated = True
+        if not _is_text_sample(data):
+            continue
+        files_scanned += 1
+        text = data[:SEARCH_MAX_FILE_BYTES].decode("utf-8", errors="replace")
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            if regex.search(line):
+                matches.append(
+                    {
+                        "path": str(file_path.relative_to(ws)),
+                        "line": line_number,
+                        "text": line[:SEARCH_MAX_LINE_CHARS],
+                    }
+                )
+                if len(matches) >= SEARCH_MAX_MATCHES:
+                    truncated = True
+                    break
+
+    if not matches:
+        return SlashAdapterResult(
+            state="absent",
+            text="No matches.",
+            data={"matches": [], "files_scanned": files_scanned, "truncated": truncated},
+        )
+    lines = ["Search matches:"]
+    for item in matches:
+        lines.append(f"  {item['path']}:{item['line']}: {item['text']}")
+    if truncated:
+        lines.append("[truncated]")
+    return SlashAdapterResult(
+        state="degraded" if truncated else "present",
+        text="\n".join(lines),
+        data={"matches": matches, "files_scanned": files_scanned, "truncated": truncated},
+    )
 
 
 def render_status(session: Any, workspace: Path | None = None) -> SlashAdapterResult:
@@ -444,4 +659,219 @@ def render_run_status(run_id: str, workspace: Path | None = None) -> SlashAdapte
         state="present",
         text=f"Run: {result.data['run_id']}\nStatus: {status}\nEvents: {result.data['event_count']}",
         data={**result.data, "status": status},
+    )
+
+
+# ── Phase 41 P1: audit, task, providers, mcp adapters ──────────────────
+
+
+def render_audit_list(
+    limit: int = 20,
+    workspace: Path | None = None,
+) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    try:
+        events = list_sandbox_audit_events(audit_dir=ws / ".arc" / "audit", limit=limit)
+    except (OSError, ValueError) as exc:
+        return SlashAdapterResult(state="degraded", text=f"Degraded: {exc}", exit_code=1)
+    if not events.get("events"):
+        return SlashAdapterResult(state="absent", text="No audit events found.", data=events)
+    lines = ["Audit events:"]
+    for event in events["events"]:
+        cmd = " ".join(event.get("command", []))
+        classification = event.get("classification", "unknown")
+        allowed = event.get("allowed")
+        decision = "allowed" if allowed else "denied"
+        lines.append(
+            f"  {event.get('event_id', '?')[:12]}  {decision:7s}  {classification:12s}  {cmd}"
+        )
+    return SlashAdapterResult(
+        state="present",
+        text="\n".join(lines),
+        data=events,
+    )
+
+
+def render_audit_verify(run_id: str, workspace: Path | None = None) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    clean = run_id.strip()
+    if not clean:
+        return SlashAdapterResult(
+            state="blocked",
+            text="Usage: /audit verify <run_id>",
+            exit_code=2,
+        )
+    try:
+        result = verify_sandbox_audit(audit_dir=ws / ".arc" / "audit")
+    except Exception as exc:
+        return SlashAdapterResult(
+            state="error",
+            text=f"Error verifying audit: {exc}",
+            exit_code=1,
+        )
+    ok = result.get("ok")
+    lines = [
+        f"Run: {clean}",
+        f"Audit chain: {'VERIFIED' if ok else 'FAILED'}",
+        f"Chain: {result.get('chain', 'unknown')}",
+        f"Events: {result.get('events', 'unknown')}",
+    ]
+    if result.get("reason"):
+        lines.append(f"Reason: {result['reason']}")
+    return SlashAdapterResult(
+        state="present" if ok else "denied",
+        text="\n".join(lines),
+        data=result,
+    )
+
+
+def render_task_list(
+    status_filter: str | None = None,
+    limit: int = 50,
+    workspace: Path | None = None,
+) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    try:
+        from ..tasks import TaskExecutor, TaskStorage
+
+        storage = TaskStorage(ws / ".arc" / "tasks.db")
+        executor = TaskExecutor(storage)
+        status_enum = None
+        if status_filter:
+            from ..tasks.models import TaskStatus
+
+            try:
+                status_enum = TaskStatus(status_filter)
+            except ValueError:
+                return SlashAdapterResult(
+                    state="blocked",
+                    text=f"Blocked: invalid status filter: {status_filter}",
+                    exit_code=2,
+                )
+        tasks = executor.list_tasks(status=status_enum, limit=limit)
+    except Exception as exc:
+        return SlashAdapterResult(
+            state="degraded",
+            text=f"Degraded: {exc}",
+            exit_code=1,
+        )
+    if not tasks:
+        return SlashAdapterResult(state="absent", text="No tasks found.", data={"tasks": []})
+    lines = ["Tasks:"]
+    for t in tasks:
+        lines.append(f"  {t.id[:12]}  {t.status.value:10s}  {t.type.value:5s}  {t.operation}")
+    return SlashAdapterResult(
+        state="present",
+        text="\n".join(lines),
+        data={"tasks": [t.model_dump() for t in tasks], "count": len(tasks)},
+    )
+
+
+def render_task_status(task_id: str, workspace: Path | None = None) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    clean = task_id.strip()
+    if not clean:
+        return SlashAdapterResult(
+            state="blocked",
+            text="Usage: /task status <task_id>",
+            exit_code=2,
+        )
+    try:
+        from ..tasks import TaskExecutor, TaskStorage
+
+        storage = TaskStorage(ws / ".arc" / "tasks.db")
+        executor = TaskExecutor(storage)
+        task = executor.get_task_status(clean)
+    except Exception as exc:
+        return SlashAdapterResult(
+            state="error",
+            text=f"Error: {exc}",
+            exit_code=1,
+        )
+    if not task:
+        return SlashAdapterResult(
+            state="absent",
+            text=f"Task not found: {clean}",
+            exit_code=2,
+        )
+    lines = [
+        f"Task: {task.id}",
+        f"Type: {task.type.value}",
+        f"Operation: {task.operation}",
+        f"Status: {task.status.value.upper()}",
+        f"Created: {task.created_at}",
+    ]
+    if task.started_at:
+        lines.append(f"Started: {task.started_at}")
+    if task.ended_at:
+        lines.append(f"Ended: {task.ended_at}")
+    if task.retry_count > 0:
+        lines.append(f"Retries: {task.retry_count}/{task.max_retries}")
+    if task.error:
+        lines.append(f"Error: {task.error}")
+    if task.result:
+        lines.append(f"Result: {json.dumps(task.result, default=str)}")
+    return SlashAdapterResult(
+        state="present",
+        text="\n".join(lines),
+        data={"task": task.model_dump()},
+    )
+
+
+def render_providers_status() -> SlashAdapterResult:
+    try:
+        from ..provider_action import provider_statuses
+
+        statuses = provider_statuses(os.environ)
+    except Exception as exc:
+        return SlashAdapterResult(
+            state="error",
+            text=f"Error: {exc}",
+            exit_code=1,
+        )
+    lines = ["Provider statuses:"]
+    for status in statuses:
+        configured = "yes" if status.api_key_configured else "no"
+        lines.append(
+            f"  {status.provider:20s}  configured={configured:3s}  source={status.api_key_source}"
+        )
+    return SlashAdapterResult(
+        state="present",
+        text="\n".join(lines),
+        data={"providers": [s.model_dump() for s in statuses], "count": len(statuses)},
+    )
+
+
+def render_mcp_status(workspace: Path | None = None) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    try:
+        from ..security.trust import ensure_trusted
+
+        ensure_trusted(ws)
+        trust_ok = True
+    except Exception:
+        trust_ok = False
+    mcp_available = False
+    try:
+        import importlib.util
+
+        spec = importlib.util.find_spec("agent_runtime_cockpit.mcp.server")
+        mcp_available = spec is not None
+    except (ImportError, ValueError):
+        mcp_available = False
+    lines = ["MCP status:"]
+    lines.append(f"  Workspace trusted: {_format_bool(trust_ok)}")
+    lines.append(f"  MCP server available: {_format_bool(mcp_available)}")
+    if not trust_ok:
+        lines.append("  Note: MCP tools are gated by workspace trust")
+    data = {
+        "workspace_trusted": trust_ok,
+        "mcp_available": mcp_available,
+        "workspace": str(ws),
+    }
+    state = "present" if trust_ok and mcp_available else "degraded"
+    return SlashAdapterResult(
+        state=state,
+        text="\n".join(lines),
+        data=data,
     )

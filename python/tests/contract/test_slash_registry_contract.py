@@ -19,9 +19,15 @@ PHASE_41_COMMANDS = {
     "status",
     "doctor",
     "runs",
+    "read",
+    "search",
     "tools",
     "sandbox",
     "policy",
+    "audit",
+    "task",
+    "providers",
+    "mcp",
 }
 
 

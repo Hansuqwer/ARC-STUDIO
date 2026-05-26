@@ -756,6 +756,112 @@ class TestMergedSlashCommands:
         assert "Events: 2" in shown.output
         assert "Status: RUN_COMPLETED" in status.output
 
+    def test_read_workspace_file(self, monkeypatch, tmp_path):
+        (tmp_path / "hello.txt").write_text("one\ntwo\nthree\n", encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+        handler = SlashCommandHandler()
+        result = handler.handle("/read --offset 2 --limit 1 hello.txt", ChatSession())
+        assert result is not None
+        assert result.state == "present"
+        assert result.output == "2: two"
+        assert result.metadata["lines_returned"] == 1
+
+    def test_read_missing_file_is_absent(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        handler = SlashCommandHandler()
+        result = handler.handle("/read missing.txt", ChatSession())
+        assert result is not None
+        assert result.state == "absent"
+
+    def test_read_path_escape_blocked(self, monkeypatch, tmp_path):
+        outside = tmp_path / "outside.txt"
+        outside.write_text("secret", encoding="utf-8")
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        monkeypatch.chdir(workspace)
+        handler = SlashCommandHandler()
+        result = handler.handle("/read ../outside.txt", ChatSession())
+        assert result is not None
+        assert result.state == "blocked"
+        assert "escapes workspace" in result.output
+
+    def test_read_symlink_escape_blocked(self, monkeypatch, tmp_path):
+        outside = tmp_path / "outside.txt"
+        outside.write_text("secret", encoding="utf-8")
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        (workspace / "link.txt").symlink_to(outside)
+        monkeypatch.chdir(workspace)
+        handler = SlashCommandHandler()
+        result = handler.handle("/read link.txt", ChatSession())
+        assert result is not None
+        assert result.state == "blocked"
+
+    def test_read_binary_file_blocked(self, monkeypatch, tmp_path):
+        (tmp_path / "data.bin").write_bytes(b"abc\x00def")
+        monkeypatch.chdir(tmp_path)
+        handler = SlashCommandHandler()
+        result = handler.handle("/read data.bin", ChatSession())
+        assert result is not None
+        assert result.state == "blocked"
+        assert "binary" in result.output
+
+    def test_search_workspace_text(self, monkeypatch, tmp_path):
+        (tmp_path / "a.txt").write_text("hello\nbye\n", encoding="utf-8")
+        (tmp_path / "b.py").write_text("print('hello')\n", encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+        handler = SlashCommandHandler()
+        result = handler.handle('/search hello --include "*.py"', ChatSession())
+        assert result is not None
+        assert result.state == "present"
+        assert "b.py:1" in result.output
+        assert "a.txt" not in result.output
+        assert result.metadata["matches"][0]["path"] == "b.py"
+
+    def test_search_path_scope_and_absent(self, monkeypatch, tmp_path):
+        subdir = tmp_path / "subdir"
+        subdir.mkdir()
+        (subdir / "a.txt").write_text("needle\n", encoding="utf-8")
+        (tmp_path / "b.txt").write_text("needle\n", encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+        handler = SlashCommandHandler()
+        result = handler.handle("/search needle --path subdir", ChatSession())
+        assert result is not None
+        assert result.state == "present"
+        assert "subdir/a.txt:1" in result.output
+        assert "b.txt" not in result.output
+        no_match = handler.handle("/search absent --path subdir", ChatSession())
+        assert no_match is not None
+        assert no_match.state == "absent"
+
+    def test_search_path_escape_blocked(self, monkeypatch, tmp_path):
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        monkeypatch.chdir(workspace)
+        handler = SlashCommandHandler()
+        result = handler.handle("/search secret --path ../outside", ChatSession())
+        assert result is not None
+        assert result.state == "blocked"
+
+    def test_search_caps_matches(self, monkeypatch, tmp_path):
+        (tmp_path / "many.txt").write_text("\n".join("hit" for _ in range(80)), encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+        handler = SlashCommandHandler()
+        result = handler.handle("/search hit", ChatSession())
+        assert result is not None
+        assert result.state == "degraded"
+        assert result.metadata["truncated"] is True
+        assert len(result.metadata["matches"]) == 50
+
+    def test_help_includes_read_and_search(self):
+        handler = SlashCommandHandler()
+        result = handler.handle("/help", ChatSession())
+        assert result is not None
+        assert "/read" in result
+        assert "/search" in result
+
     def test_slash_command_exception_boundary(self, monkeypatch):
         handler = SlashCommandHandler()
         s = ChatSession()
@@ -1147,3 +1253,124 @@ class TestStudioCli:
         payload = json.loads(result.output)
         assert payload["ok"] is True
         assert payload["data"][0]["id"] == session.id
+
+
+class TestPhase41P1Adapters:
+    """Tests for Phase 41 P1 slash-command adapters: audit, task, providers, mcp."""
+
+    def test_audit_list_empty(self, monkeypatch, tmp_path):
+        from agent_runtime_cockpit.cli_repl.adapters import render_audit_list
+
+        monkeypatch.setenv("ARC_STUDIO_AUDIT_DIR", str(tmp_path / ".arc" / "audit"))
+        result = render_audit_list(workspace=tmp_path)
+        assert result.state == "absent"
+        assert "No audit events" in result.text
+
+    def test_audit_list_with_events(self, tmp_path):
+        from agent_runtime_cockpit.cli_repl.adapters import render_audit_list
+
+        events_path = tmp_path / ".arc" / "audit" / "sandbox.events.jsonl"
+        events_path.parent.mkdir(parents=True, exist_ok=True)
+        events_path.write_text(
+            '{"command":["ls","-la"],"classification":"read_only","allowed":true,"event_id":"evt-001"}\n'
+            '{"command":["curl","http://x"],"classification":"network","allowed":false,"event_id":"evt-002"}\n',
+            encoding="utf-8",
+        )
+        result = render_audit_list(
+            workspace=tmp_path,
+            limit=10,
+        )
+        assert result.state == "present"
+        assert "evt-001" in result.text
+        assert "evt-002" in result.text
+        assert result.data["count"] == 2
+
+    def test_audit_verify_ok(self, tmp_path):
+        from agent_runtime_cockpit.cli_repl.adapters import render_audit_verify
+
+        events_path = tmp_path / "sandbox.events.jsonl"
+        chain_path = tmp_path / "sandbox.audit.jsonl"
+        events_path.write_text(
+            '{"command":["ls","-la"],"classification":"read_only","allowed":true}\n',
+            encoding="utf-8",
+        )
+        chain_path.write_text(
+            '{"cmd":"ls -la","ok":true}\n',
+            encoding="utf-8",
+        )
+        result = render_audit_verify("test-run", workspace=tmp_path)
+        assert result.state in {"present", "denied"}
+
+    def test_audit_verify_missing(self, tmp_path):
+        from agent_runtime_cockpit.cli_repl.adapters import render_audit_verify
+
+        result = render_audit_verify("missing-run", workspace=tmp_path)
+        assert result.state == "denied"
+
+    def test_task_list_empty(self, monkeypatch, tmp_path):
+        from agent_runtime_cockpit.cli_repl.adapters import render_task_list
+
+        monkeypatch.setenv("ARC_STUDIO_TASKS_DB", str(tmp_path / "tasks.db"))
+        result = render_task_list(workspace=tmp_path)
+        assert result.state in {"absent", "degraded"}
+
+    def test_task_status_not_found(self, tmp_path):
+        from agent_runtime_cockpit.cli_repl.adapters import render_task_status
+
+        result = render_task_status("nonexistent-id", workspace=tmp_path)
+        assert result.state == "absent"
+
+    def test_providers_status(self):
+        from agent_runtime_cockpit.cli_repl.adapters import render_providers_status
+
+        result = render_providers_status()
+        assert result.state == "present"
+        assert "Provider statuses:" in result.text
+
+    def test_mcp_status(self, tmp_path):
+        from agent_runtime_cockpit.cli_repl.adapters import render_mcp_status
+
+        result = render_mcp_status(workspace=tmp_path)
+        assert result.state in {"present", "degraded"}
+        assert "MCP status:" in result.text
+
+    def test_slash_audit_command(self):
+        handler = SlashCommandHandler()
+        result = handler.handle("/audit list", ChatSession())
+        assert result is not None
+        assert "Audit" in str(result) or "audit" in str(result).lower()
+
+    def test_slash_task_list_command(self):
+        handler = SlashCommandHandler()
+        result = handler.handle("/task list", ChatSession())
+        assert result is not None
+
+    def test_slash_providers_status_command(self):
+        handler = SlashCommandHandler()
+        result = handler.handle("/providers", ChatSession())
+        assert result is not None
+
+    def test_slash_mcp_status_command(self):
+        handler = SlashCommandHandler()
+        result = handler.handle("/mcp", ChatSession())
+        assert result is not None
+
+    def test_help_includes_audit(self):
+        handler = SlashCommandHandler()
+        result = handler.handle("/help", ChatSession())
+        assert "audit" in str(result).lower()
+
+    def test_help_includes_tasks(self):
+        handler = SlashCommandHandler()
+        result = handler.handle("/help", ChatSession())
+        assert "task" in str(result).lower()
+
+    def test_help_includes_providers(self):
+        handler = SlashCommandHandler()
+        result = handler.handle("/help", ChatSession())
+        assert "provider" in str(result).lower()
+
+    def test_help_includes_mcp(self):
+        handler = SlashCommandHandler()
+        result = handler.handle("/help", ChatSession())
+        assert "mcp" in str(result).lower()
