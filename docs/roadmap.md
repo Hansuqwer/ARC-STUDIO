@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-22 — Architecture review foundation items (R14-R26) added for post-v0.1 execution plan.  
-**Current evidence anchor:** local worktree | 989 Python tests, 762 TS tests passed (pre-v0.1 baseline); R14-R26 defined for v0.2 foundation work per architecture review.  
+**Last reality refresh:** 2026-05-26 — Phases 43–45 implemented; R39/R40 Baseline Complete; R41–R43 added; execution gate cleared.  
+**Current evidence anchor:** local worktree | 2846 Python tests pass (commit 7fdba99); TS build + typecheck green; R39 Phase 41 execution gate lifted.  
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -31,6 +31,7 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 
 ## Non-Negotiable Scope Boundaries
 
+- Priority 1 until complete: CLI + interactive CLI foundation (`R39` / `Phase 41`). Do not advance product roadmap execution to later phases until Phase 41 acceptance is complete and verified. Security/sandbox fixes that unblock Phase 41 are allowed; unrelated feature phases are deferred behind it.
 - No broad live/provider-backed SwarmGraph adoption claim until real provider-backed adoption paths are implemented and tested.
 - No adapter-wide keyed audit claim until every claimed run path writes/verifies keyed audit material.
 - No production/concurrent-user/tenant isolation claim.
@@ -605,7 +606,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Persistent knowledge graph that captures insights across swarm runs for learning.
 
-**Current:** Research Phase. No implementation exists.
+**Current:** P0 CLI foundation implemented for pipelines, dashboard, aliases, batch mode, and session bundle export/import. IDE daemon/shared-session bridge remains deferred.
 
 **Deliverables:**
 - Design document with memory schema
@@ -978,14 +979,18 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R36 MCP Python SDK Adapter** | **Baseline Complete** | **Adapter Phase 35 — T1 detection + T2 static export; T3 deferred (trust posture + transport lifecycle)** |
 | **R37 Provider Management (Phase 1)** | **Baseline Complete** | **Phase 36.1 — interactive UX without credential storage (commits cd89aab-7f2e20b)** |
 | **R37 Provider Management (Phase 2)** | **Baseline Complete** | **Phase 36.2 — auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`; token refresh; trust enforcement; audit logging; env var fallback; 57 auth tests** |
-| **R38 CLI Sandbox Hardening + IDE Integration** | **Active Hardening** | **Phase 37 — subprocess caps + approval prune + path-intent expansion + protocol parity + microVM preflight + container fallback tests + e2e routability + microVM truth guard + design-proof plan + gated Lima harness + Lima smoke test + ADR-024 contract + Firecracker gated harness + firecracker_doctor() + public-execution truth guard + real-host Lima lifecycle tests (CI-skipped; P2 network-off blocked by Lima 2.x slirp) + symlink-escape guard + Firecracker CI-skip structure complete; microVM execution blocked pending P1–P7 proofs** |
-| **R39 Interactive CLI/UX Foundation** | **Not Started** | **Phase 39 — REPL hardening, CLI-REPL integration, sandbox/policy slash commands, structured output, progress feedback, error recovery, history search** |
-| **R40 CLI/UX Polish & Advanced Features** | **Not Started** | **Phase 40 — pipelines, dashboard, aliases, batch mode, session export/import** |
+| **R38 CLI Sandbox Hardening + IDE Integration** | **Active Hardening** | **Phase 37 — subprocess caps + approval prune + path-intent expansion + protocol parity + microVM preflight + container fallback tests + e2e routability + microVM truth guard + design-proof plan + gated Lima low-security developer harness + Lima mount-proof mode (CI-skipped real-host symlink evidence) + ADR-024 contract + Firecracker gated harness + firecracker_doctor() + public-execution truth guard + real-host Lima lifecycle tests (CI-skipped; P2 network-off blocked by Lima 2.x slirp) + symlink-escape guard + Firecracker CI-skip structure complete; microVM execution blocked pending P1–P7 proofs** |
+| **R39 Interactive CLI/UX Foundation** | **Baseline Complete** | **Phases 41–45 — slash command registry, approval UX, progress rendering, REPL error boundary, advisory locking, read-only IDE session bridge; 2846 Python tests; OpenCode/Claude Code parity remains a target, not claimed** |
+| **R40 CLI/UX Polish & Advanced Features** | **Baseline Complete** | **Phase 42 — P0 CLI foundation (pipelines, aliases, batch mode foundation); IDE write bridge deferred pending advisory lock integration** |
+| **R41 Advisory Locking + IDE Read-Only Session Bridge** | **Baseline Complete** | **Phase 43 — POSIX fcntl.flock spin-wait advisory lock; atomic writes for ChatSession.save()/aliases; read-only SessionBridgeService (TypeScript); 2808 Python tests; IDE write bridge deferred** |
+| **R42 Slash Registry Expansion + REPL Error Boundary** | **Baseline Complete** | **Phase 44 — /help rebuilt as grouped palette (SESSION/RUN/SANDBOX/POLICY/WORKSPACE/PROVIDERS/AUDIT/TASKS/MCP); per-command error boundary; all P0/P1 commands verified; 2828 Python tests** |
+| **R43 Approval + Progress + Error UX** | **Baseline Complete** | **Phase 45 — render-state prefixes ([ok]/[denied]/[blocked]/[empty]/[error]); interactive y/N prompt for NETWORK/INSTALL/UNKNOWN; TTY-aware; DESTRUCTIVE/PRIVILEGED hard-denied; audit events for all deny paths; 2846 Python tests** |
 
 **Post-v0.1 Execution Order:** 
-- **Immediate (no blockers):** Phase 36.1 (Provider Discovery & Interactive UX), Phase 37 (CLI Sandbox Hardening — active)
+- **Priority 1 stop-the-line:** R39 / Phase 41 (Interactive CLI/UX Foundation). **Baseline Complete** as of Phases 41–45 (commits 37fd92b–7fdba99). Gate lifted; product work may advance. Next: R44 (Phase 46 — IDE write bridge / daemon protocol); continue sandbox hardening for Phase 37 microVM feasibility decision.
+- **Already active foundation:** Phase 37 (CLI Sandbox Hardening — active) may continue only where it supports CLI/interactive CLI safety, policy, audit, or execution UX.
 - **Foundations:** R14-R16 (Phase 21-23) → R17-R18 (Phase 24-25)
-- **Sandbox:** R38 (Phase 37 — subprocess/approval/path-intent/parity/preflight/container/e2e/truth-guard/design-proof/gated-Lima-harness/Lima-smoke-test/ADR-024-execution-contract complete; microVM execution blocked pending P1–P7 proofs)
+- **Sandbox:** R38 (Phase 37 — subprocess/approval/path-intent/parity/preflight/container/e2e/truth-guard/design-proof/gated-Lima-low-security-harness/Lima-mount-proof-mode/ADR-024-execution-contract complete; microVM execution blocked pending P1–P7 proofs)
 - **MCP:** R19-R20 (Phase 26-27)
 - **Replay/Eval:** R21-R22 (Phase 28-29)
 - **SwarmGraph differentiators:** R23-R25 (Phase 30-32)
@@ -993,43 +998,42 @@ The following roadmap items implement the adapter integration plan from `docs/re
 - **Adapter integration:** R27-R36 (Adapter Phases 26-35)
 - **Provider Management Phase 2:** R37 Phase 2 (Phase 36.2, after Phase 23 + 25 + 36.1)
 
-**Critical Path:** Streaming Audit → RunEvent Unions → Trust Enforcement → Trace Virtualization → CLI Decomposition → MCP Server → MCP Tasks → Replay Contract → HITL/Eval → Consensus Escrow → Adaptive Consensus → Event Notifications → Memory Graph → Adapter Integration (LangChain, Anthropic, OpenAI-compatible, Pydantic AI, DSPy, Haystack, Smolagents, Semantic Kernel, Google ADK, MCP SDK) → Provider Management Phase 2
+**Critical Path:** ~~Interactive CLI/UX Foundation (R39 / Phase 41)~~ ✓ → IDE Write Bridge / Daemon Protocol (R44 / Phase 46) → Streaming Audit → RunEvent Unions → Trust Enforcement → Trace Virtualization → CLI Decomposition → MCP Server → MCP Tasks → Replay Contract → HITL/Eval → Consensus Escrow → Adaptive Consensus → Event Notifications → Memory Graph → Adapter Integration (LangChain, Anthropic, OpenAI-compatible, Pydantic AI, DSPy, Haystack, Smolagents, Semantic Kernel, Google ADK, MCP SDK) → Provider Management Phase 2
 
-**Note:** Phase 36.1 (Provider Discovery) can be implemented immediately without waiting for the critical path, as it has no dependencies and uses existing provider infrastructure.
+**Note:** R39 (Phase 41) execution gate is cleared as of 2026-05-26 (commit 7fdba99). Product work may advance to R44/Phase 46 and beyond.
 
 ## R39 — Interactive CLI/UX Foundation
 
-**Goal:** Make the ARC CLI and REPL production-useful, connected, and polished. Currently the REPL is SwarmGraph-specific, CLI commands are batch-only, and the REPL has no integration with sandbox/policy/audit/task features.
+**Goal:** Make `arc studio chat` a first-class OpenCode/Claude Code style ARC agent shell without claiming parity before it exists. The shell must expose core ARC capabilities through `/` commands, reuse existing trust/sandbox gates, render progress/errors clearly, and support the agent workflow loop: inspect context, explain policy, approve safe actions, run tools, show diffs, run tests, and persist/resume sessions.
 
-**Current:** CLI has 40+ commands across 23 Typer sub-apps. REPL has 17 slash commands but hardcodes `SwarmGraphRunner` for non-slash input. Sandbox/policy/audit features are CLI-only with no REPL integration. IDE and CLI REPL are completely disconnected. No colored/structured output in REPL. No progress feedback during execution. No command history search. No error recovery in REPL loop.
+**Current:** CLI has 40+ commands across 23 Typer sub-apps. REPL has 17 slash commands, but they are manually registered in a separate `cli_repl` registry and do not wrap the broad Typer command surface. Slash commands exist only inside `arc studio chat`; they are not first-class adapters over ARC's mature CLI features. Non-slash input still uses a SwarmGraph-specific path. Sandbox/policy/audit/task/provider/MCP features are mostly top-level CLI-only with no REPL integration. No command palette, structured command adapter layer, approval renderer, diff/apply/test loop, live progress renderer, history search, or robust per-command error boundary exists.
 
 **Deliverables:**
-1. REPL `/run` uses provider-backed runtime by default (not SwarmGraph fake_offline)
-2. Interactive approval flow for sandbox commands from REPL
-3. Progress updates during REPL execution
-4. Error handling to prevent REPL crashes
-5. `/sandbox`, `/policy`, `/audit`, `/tasks` slash commands in REPL
-6. Enhanced `/doctor` showing daemon health, trust, isolation status
-7. Colored/structured output for all REPL commands
-8. Command history search (Ctrl+R)
-9. Shared session state between IDE and CLI
-10. Interactive dashboard (`arc dashboard`) for terminal monitoring
-11. `arc studio status` or `arc status` top-level command
-12. CLI default TTY behavior documented and configurable
+1. Canonical interactive shell framing for `arc studio chat` and bare-`arc` TTY behavior.
+2. Shared command adapter contract for REPL slash commands that can call service-layer helpers without shelling out to `arc`.
+3. P0 slash commands: `/sandbox doctor`, `/sandbox run -- <cmd...>`, `/policy explain -- <cmd...>`, `/runs list`, `/runs show <id>`, `/doctor`, `/status`.
+4. P1 slash commands: `/audit verify`, `/audit list`, `/task list`, `/task status`, `/providers status`, `/provider`, `/model`, `/mcp status`, `/hitl pending`, `/context pack`.
+5. Interactive approval UX for sandbox/shell/network/install/write commands.
+6. Live progress and cancellation rendering for `/run` and long-running commands.
+7. Structured/rich rendering for command results, errors, denials, and remediation.
+8. REPL error boundary so one failed command does not crash the shell.
+9. Agent workflow command design: `/read`, `/search`, `/diff`, `/apply`, `/test` with trust/sandbox gates.
+   Current implementation evidence: `/read` and `/search` are read-only REPL commands with workspace bounds, symlink/path-escape guards, text-only output, and output caps; `/diff`, `/apply`, and `/test` remain design-only/gated future work.
+10. Session resume/search and eventual IDE/CLI session sharing.
 
 **Acceptance:**
-- REPL `/run` works with provider-backed runtime without SwarmGraph dependency
-- Sandbox commands from REPL show interactive approval prompts
-- Execution shows progress updates (spinner, step-by-step)
-- REPL survives errors without crashing
-- All major CLI features accessible from REPL via slash commands
-- `/doctor` shows daemon health, trust state, isolation provider status
-- REPL output uses rich formatting (tables, trees, colors)
-- Command history search works with Ctrl+R
-- Session state shared between IDE and CLI
-- `arc dashboard` shows live system monitoring
+- `/help` lists a product-meaningful command palette, not only the current narrow SwarmGraph/session subset.
+- P0 slash commands are implemented and tested without broad shell-out wrappers.
+- `/sandbox run -- <cmd...>` applies existing sandbox policy and approval behavior from inside the REPL.
+- `/policy explain -- <cmd...>` explains command risk without execution.
+- `/doctor` shows daemon health, workspace trust, sandbox/isolation status, provider status, and MCP status where available.
+- REPL renders blocked/denied/error states without crashing.
+- `/run` renders live start/progress/completion/cancellation events.
+- Docs explicitly state that OpenCode/Claude Code parity is a target, not current behavior.
 
-**Status:** Not Started | Evidence: `docs/research/interactive-cli-audit.md` | Notes: 12 UX gaps identified, prioritized P0-P3
+**Status:** Baseline Complete | Evidence: commits 37fd92b (Phase 42 foundations), 563a1ad (Phase 43 advisory lock + IDE bridge), b3e1471 (Phase 44 slash registry), 7fdba99 (Phase 45 approval UX); 2846 Python tests pass; TS build + typecheck green | Notes: All Phase 41 acceptance criteria met across Phases 41–45. P0/P1 slash commands implemented and tested. REPL error boundary live. Approval UX wired for NETWORK/INSTALL/UNKNOWN. DESTRUCTIVE/PRIVILEGED hard-denied. Advisory locking on all session/alias writes. Read-only IDE session bridge implemented. OpenCode/Claude Code parity remains a stated target, not claimed parity.
+
+**Execution gate cleared** as of 2026-05-26 (commit 7fdba99). Product work may advance.
 
 **Source:** Interactive CLI/UX Audit, 2026-05-26
 
@@ -1037,24 +1041,79 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Goal:** Advanced CLI features: multi-command pipelines, interactive dashboard, command aliases, batch mode, session export/import.
 
-**Current:** Research Phase. No implementation exists.
+**Current:** P0 CLI foundation implemented. IDE write bridge and daemon/shared-session bridge remain deferred.
 
 **Deliverables:**
 - Multi-command pipeline support (`|` pipe, `&&` / `||` chaining)
 - Interactive dashboard (`arc dashboard`)
 - Command aliases and snippets
-- Batch mode (`arc run -f commands.txt`)
-- Session export/import between IDE and CLI
-- CLI can connect to running IDE daemon
+- Batch mode (`arc batch plan|run <file>`)
+- Session export/import bundles for CLI sessions
+- Read-only IDE bridge protocol documented; daemon/shared-server bridge deferred
 
 **Acceptance:**
 - Pipelines work in REPL and batch mode
-- Dashboard shows live system monitoring
-- Aliases are workspace-persisted
+- Dashboard shows local producer snapshot without fabricated data
+- Aliases are workspace/user-persisted with atomic writes
 - Batch mode processes command files
 - Session export/import preserves all state
-- CLI connects to IDE daemon for remote sessions
+- IDE daemon/shared-server connection remains deferred
 
-**Status:** Research | Evidence: `docs/research/interactive-cli-audit.md` | Notes: P3 features; requires significant UX design
+**Status:** Baseline Complete | Evidence: commit 37fd92b (Phase 42 foundations), advisory lock + IDE bridge in 563a1ad | Notes: Aliases use atomic writes + advisory lock; IDE write bridge deferred; no daemon/remote sync claims.
 
 **Source:** Interactive CLI/UX Audit, 2026-05-26
+
+---
+
+## R41 — Advisory Locking + IDE Read-Only Session Bridge
+
+**Goal:** Prevent concurrent write corruption for session/alias files; expose read-only session list to IDE without daemon.
+
+**Current:** Baseline Complete.
+
+**Deliverables:**
+- `storage/advisory_lock.py` — POSIX `fcntl.flock` with spin-wait; Windows documented no-op
+- `write_text_atomic(lock=True)` — wraps temp-write with advisory lock
+- `ChatSession.save()` and `_write_aliases()` use `lock=True`
+- `SessionBridgeService` (TypeScript) — `listChatSessions()` / `getChatSession(id)` via `arc studio sessions --json`; no `shell=True`; read-only only
+- `ArcService` protocol extended with `listChatSessions()` / `getChatSession()` methods
+- DI module wired
+
+**Status:** Baseline Complete | Evidence: commit 563a1ad; 7 advisory-lock tests pass; 2808 Python tests pass; TS build + typecheck green | Notes: IDE write/import bridge, Windows native lock, and session change events remain deferred.
+
+---
+
+## R42 — Slash Registry Expansion + REPL Error Boundary
+
+**Goal:** Make `/help` a useful grouped command palette; harden REPL against per-command crashes.
+
+**Current:** Baseline Complete.
+
+**Deliverables:**
+- `/help` rebuilt as grouped uppercase palette (SESSION/RUN/SANDBOX/POLICY/WORKSPACE/PROVIDERS/AUDIT/TASKS/MCP) with parity disclaimer
+- REPL error boundary in `_handle_input` — no slash command or runner exception propagates to the REPL loop
+- All P0 commands verified: `/status`, `/doctor`, `/runs`, `/sandbox doctor`, `/policy explain`
+- All P1 commands verified: `/audit`, `/task`, `/providers`, `/mcp`, `/hitl`, `/context`
+- 20 new tests
+
+**Status:** Baseline Complete | Evidence: commit b3e1471; 2828 Python tests pass; TS build + typecheck green | Notes: All P0/P1 commands were already wired; this phase adds palette, error boundary, and test coverage.
+
+---
+
+## R43 — Approval + Progress + Error UX
+
+**Goal:** Surface sandbox decision states clearly; require explicit interactive approval for risky (non-destructive/non-privileged) commands.
+
+**Current:** Baseline Complete.
+
+**Deliverables:**
+- `_render_state_prefix()` in `chat_repl.py` — `[ok]`, `[denied]`, `[blocked]`, `[empty]`, `[error]` prefixes on `CommandResult` output
+- `cmd_sandbox` extended with `confirm_fn` parameter + `_sandbox_run_with_approval()`: interactive y/N prompt for NETWORK/INSTALL/UNKNOWN approval-required commands; TTY-aware (non-TTY delegates to adapter deny path)
+- `render_sandbox_run(pre_approved=True)` path — calls `approve_decision()` before executing
+- DESTRUCTIVE/PRIVILEGED remain hard-denied regardless of confirmation
+- Audit events emitted for all deny paths including approval-declined
+- 18 new tests
+
+**Deferred:** No live daemon/remote sync/microVM broadening.
+
+**Status:** Baseline Complete | Evidence: commit 7fdba99; 2846 Python tests pass; TS build + typecheck green | Notes: Production-ready subprocess sandbox foundation. MicroVM execution remains unimplemented (preflight/doctor only).

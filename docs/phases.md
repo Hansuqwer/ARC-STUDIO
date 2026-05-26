@@ -2,13 +2,15 @@
 
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-22 — Post-v0.1 foundation phases (Phase 21-33) added per architecture review findings.  
-**Current evidence anchor:** local worktree | 1313 Python tests, 762 TS tests passed (pre-v0.1 baseline); Phase 21-33 defined for v0.2 foundation work with dependency graph and execution order.  
+**Last reality refresh:** 2026-05-26 — Phases 43–45 added (advisory lock, slash registry, approval UX); Phase 41/42 updated to Baseline Complete; execution gate cleared.  
+**Current evidence anchor:** local worktree | 2846 Python tests pass (commit 7fdba99); TS build + typecheck green; Phase 41–45 Baseline Complete.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
 
 Prefer larger coherent implementation chunks over tiny slices. A chunk may include multiple listed slices when they share files/tests and can be completed safely in one session. Keep the no-destructive-actions, no-secret-commits, preserve-unrelated-work, and green-verification rules.
+
+~~Priority 1 stop-the-line: Phase 41 (Interactive CLI/UX Foundation).~~ **Gate cleared 2026-05-26** — Phases 41–45 Baseline Complete (commit 7fdba99; 2846 Python tests). Product work may advance to Phase 46 (IDE write bridge / daemon protocol) and beyond.
 
 ## Verification Baseline For Every Slice
 
@@ -2141,6 +2143,12 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Manifest validation now rejects missing proc/sysfs mount setup, missing boot entrypoints, and missing device metadata.
 - Public `MicroVMIsolationProvider.execute()` still raises; no real Firecracker boot/no-default-route proof ran on this macOS host.
 
+#### Slice 37.25: Lima Mount-Proof Harness Hardening ✓
+- Added `LimaIntegrationHarness.run(..., proof_mode="mount")` for evidence collection only. It bypasses only Lima's known-failed network proof so guest-side `/workspace` mount/symlink behavior can be tested.
+- Added fake-runner tests proving failed network proof still records `network_proof_passed=false`, appends `mount_proof_network_bypass`, runs the mount proof command, and still tears down.
+- Updated host-gated Lima symlink proof to run `cat /workspace/arc-host-passwd-link` in mount-proof mode. If host `/etc/passwd` is readable, Lima P5 is blocked permanently for strict sandbox use.
+- Wording remains: Lima low-security developer harness, not strict microVM sandbox. `ARC_MICROVM_EXEC_ENABLED` remains unwired; no strict network isolation claim.
+
 #### Slice 37.20: P1–P7 Evaluation + ARC_MICROVM_EXEC_ENABLED Wiring Decision ✓
 - Evaluated all 7 ADR-024 prerequisites against current codebase and research findings.
 - Created `docs/research/microvm-p1-p7-status.md` with per-prerequisite status table.
@@ -2385,7 +2393,7 @@ Phase 37 (CLI Sandbox Hardening) ──→ (active; depends on Phase 23)
 ```
 
 **Execution order:** 
-- **Immediate (no blockers):** Phase 36.1 (Provider Discovery), Phase 36.2 (Credential Storage — Baseline Complete), Phase 37 (CLI Sandbox Hardening — active)
+- **Priority 1 stop-the-line CLEARED:** Phase 41–45 (Interactive CLI/UX Foundation) Baseline Complete as of 2026-05-26 (commit 7fdba99). Product work may advance.
 - **Foundations (Complete):** Phase 21-22 (parallel, complete) → Phase 23-24 (parallel, complete) → Phase 25 (complete)
 - **Sandbox:** Phase 37 (active — slices 37.1-37.5, 37.7-37.8 complete; microVM execution 37.6 blocked)
 - **MCP:** Phase 26 (complete — scaffold) → Phase 27 (depends on Phase 25)
@@ -2394,16 +2402,26 @@ Phase 37 (CLI Sandbox Hardening) ──→ (active; depends on Phase 23)
 - **Enterprise:** Phase 32 (depends on Phase 29 + Phase 21)
 - **Research:** Phase 33 (independent)
 - **Provider Management Phase 2:** Phase 36.2 (Baseline Complete — auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`, token refresh, trust enforcement, audit logging, env var fallback; 57 auth tests)
-- **Interactive CLI/UX:** Phase 39 (Not Started — REPL hardening, CLI-REPL integration, structured output)
-- **Advanced CLI:** Phase 40 (Not Started — pipelines, dashboard, aliases, batch mode)
+- **Interactive CLI/UX:** Phases 41–45 (Baseline Complete — slash registry, approval UX, progress/error rendering, advisory locking, IDE read-only session bridge)
+- **Advanced CLI:** Phase 42 (Baseline Complete — P0 CLI foundation); Phases 43/44/45 complete; Phase 46 (IDE write bridge) is next
 ---
 
-## Phase 39 — Interactive CLI/UX Foundation
+## Phase 41 — Interactive CLI/UX Foundation
 
 **Roadmap:** R39 — Interactive CLI/UX Foundation  
-**Status:** Not Started  
+**Status:** Baseline Complete | Evidence: commits 37fd92b (Phase 42), 563a1ad (Phase 43), b3e1471 (Phase 44), 7fdba99 (Phase 45); 2846 Python tests pass; TS build + typecheck green  
 **Depends on:** None (uses existing CLI/REPL/sandbox/policy infrastructure)  
-**Evidence:** `docs/research/interactive-cli-audit.md` — 12 UX gaps identified, prioritized P0-P3
+**Evidence:** All Phase 41 acceptance criteria met across Phases 41–45. `/help` grouped palette, all P0/P1 slash commands, REPL error boundary, approval UX, render-state prefixes, advisory locking, read-only IDE session bridge.
+
+**Execution gate:** Cleared 2026-05-26 (commit 7fdba99). Product work may advance to Phase 46 and beyond.
+
+### Resume Prompt
+
+```text
+Continue ARC Studio Priority 1: Phase 41 Interactive CLI/UX Foundation. First read docs/roadmap.md, docs/phases.md, docs/research/interactive-cli-audit.md, docs/research/parallel-cli-sessions-plan.md, and relevant ADRs. Do not advance unrelated phases. Implement the largest coherent Phase 41 chunk that can be completed safely, starting with slash-command registry expansion and shared command adapters for arc studio chat. Required P0 commands: /sandbox doctor, /sandbox run -- <cmd...>, /policy explain -- <cmd...>, /runs list, /runs show <id>, /doctor, /status. Reuse service/helper logic instead of shelling out to arc by default. Preserve existing Typer CLI behavior. Wire sandbox/policy commands through existing SandboxPolicy, SandboxDecision, approvals, subprocess provider, and audit events. Keep destructive/privileged denied by default. Keep microVM execution blocked/design-only. Add tests, run cd python && uv run pytest tests/test_cli_repl.py -q, cd python && uv run pytest -q, pnpm --filter @arc-studio/protocol build, pnpm --filter arc-extension build, and bash scripts/check-pr.sh. Fix failures in scope. Update docs/roadmap.md and docs/phases.md only when status/evidence genuinely changes. Do not claim OpenCode/Claude Code parity until acceptance proves it.
+```
+
+**Parallel session plan:** `docs/research/parallel-cli-sessions-plan.md` splits the next work into Session 1 (`cli/session-1-slash-foundation`), Session 2 (`cli/session-2-approval-progress`), and Session 3 (`roadmap/session-3-memory-graph-research`). Merge Session 1 before Session 2; Session 3 may run in parallel if it avoids CLI files.
 
 ### Gap Summary
 
@@ -2421,56 +2439,64 @@ Phase 37 (CLI Sandbox Hardening) ──→ (active; depends on Phase 23)
 | 10 | P2 | No `arc status` top-level command |
 | 11 | P2 | Sandbox audit is CLI-only, not REPL-integrated |
 | 12 | P3 | No interactive dashboard |
+| 13 | P0 | No shared adapter layer from Typer commands to REPL slash commands |
+| 14 | P0 | No file inspect → diff → approve/apply → test agent loop |
+| 15 | P1 | `/help` is a simple list, not a command palette/discovery UX |
 
 ### Implementation Plan
 
-#### Chunk 39.1: REPL Runtime Generalization (P0)
-- Replace hardcoded `SwarmGraphRunner` with provider-backed runtime by default
-- Add `/run` command that routes through `TurnManager` (not SwarmGraph)
-- Keep SwarmGraph as explicit mode: `/run --runtime swarmgraph`
-- Add `ARC_ALLOW_RUN` gate to `/run` in REPL (same as CLI)
+#### Chunk 41.1: Slash Command Registry Expansion (P0)
+- Make `arc studio chat` the canonical interactive shell in docs and help text.
+- Expand `/help` into a command palette grouped by session, run, sandbox, policy, workspace, providers, tools, audit, tasks, and MCP.
+- Add P0 slash commands: `/sandbox doctor`, `/sandbox run -- <cmd...>`, `/policy explain -- <cmd...>`, `/runs list`, `/runs show <id>`, `/doctor`, `/status`.
+- Add P1 command stubs only when they can render honest "not wired" states.
 
-#### Chunk 39.2: REPL Sandbox/Policy Integration (P0)
-- Add `/sandbox run -- <cmd>` slash command
-- Add `/policy explain -- <cmd>` slash command
-- Add `/audit list` slash command
-- Add `/tasks list` slash command
-- Show interactive approval prompts for sandbox commands
+#### Chunk 41.2: Shared Command Adapters (P0)
+- Do not shell out to `arc` from the REPL by default.
+- Extract service/helper functions from Typer commands where needed so both Typer and REPL can call the same logic.
+- Add a shared result contract for `present`, `blocked`, `denied`, `degraded`, `error`, and `absent` states.
+- Preserve existing top-level CLI behavior.
 
-#### Chunk 39.3: Structured Output (P1)
-- Replace `print()` with rich formatting (tables, trees, progress bars)
-- Add colored output for `/doctor`, `/status`, `/runs`
-- Add spinner/progress indicator during execution
-- Add error recovery (try/except around REPL loop)
+#### Chunk 41.3: Approval UX (P0)
+- Add reusable approval renderer for sandbox/shell/network/install/write commands.
+- Wire `/sandbox run -- <cmd...>` through existing `SandboxPolicy`, `SandboxDecision`, approvals, subprocess provider, and audit events.
+- Keep destructive/privileged denied by default.
+- Keep microVM execution unimplemented; `/sandbox doctor` and `/sandbox microvm-plan` remain preflight/design-only.
 
-#### Chunk 39.4: History & Search (P2)
-- Add `Ctrl+R` reverse search for command history
-- Add global history file (not just per-session)
-- Add history filtering by command type
+#### Chunk 41.4: Progress, Cancellation, Error UX (P1)
+- Render `/run` lifecycle events from `SlashCommandHandler.events` live instead of only storing them.
+- Add spinner/progress summary for long-running commands.
+- Add per-command exception boundaries so the REPL does not crash.
+- Preserve Ctrl-C cancellation semantics.
 
-#### Chunk 39.5: IDE-CLI Session Sharing (P2)
-- Add session export/import between IDE and CLI
-- Shared session state via `~/.arc/sessions/`
-- CLI can connect to running IDE daemon
+#### Chunk 41.5: Diff/Apply/Test Loop Design (P1)
+- Design `/read`, `/search`, `/diff`, `/apply`, and `/test` command flow.
+- `/read` and `/search` are the first read-only implementation slice: workspace-bound, symlink/path-escape guarded, text-only, output-capped, and tested in the REPL.
+- `/diff` remains preview-only design: future implementation may show capped workspace diffs but must not mutate files.
+- `/apply` remains design-only: future writes require workspace trust, sandbox policy approval, explicit diff preview, and a stable diff hash before mutation.
+- `/test` remains design-only: future test execution must route through sandbox policy, use argv-only execution, and deny network/install/destructive commands by default.
+- Gate writes through workspace trust and sandbox policy.
+- Do not implement broad code editing until approval + diff semantics are specified and tested.
+- Document that OpenCode/Claude Code parity remains a target, not current behavior.
 
-#### Chunk 39.6: Enhanced Doctor (P1)
-- `/doctor` shows daemon health, trust state, isolation provider status
-- `/doctor --json` for structured output
-- Show provider status, MCP status, sandbox status
+#### Chunk 41.6: History, Sessions, IDE Bridge (P2)
+- Add searchable global command history.
+- Add `/sessions resume`, `/sessions search`.
+- Define IDE/CLI session sharing protocol; implement only after schema review.
 
 ### Acceptance
-1. REPL `/run` works with provider-backed runtime without SwarmGraph dependency
-2. Sandbox commands from REPL show interactive approval prompts
-3. Execution shows progress updates (spinner, step-by-step)
-4. REPL survives errors without crashing
-5. All major CLI features accessible from REPL via slash commands
-6. `/doctor` shows daemon health, trust state, isolation provider status
-7. REPL output uses rich formatting (tables, trees, colors)
-8. Command history search works with Ctrl+R
+1. `/help` lists a command palette that covers P0 slash commands and labels missing/deferred commands honestly.
+2. `/sandbox doctor`, `/sandbox run -- <cmd...>`, `/policy explain -- <cmd...>`, `/runs list`, `/runs show <id>`, `/doctor`, and `/status` are implemented and tested.
+3. Sandbox commands from REPL show interactive approval prompts and persist audit events.
+4. `/policy explain -- <cmd...>` never executes the command.
+5. Execution shows progress updates for `/run` where events exist.
+6. REPL survives command exceptions without crashing.
+7. Output uses structured render states: present, absent, degraded, blocked, denied, error.
+8. Docs explicitly state ARC does not yet have OpenCode/Claude Code parity.
 
 ### Verification
 ```bash
-cd python && uv run pytest tests/cli_repl/ -q
+cd python && uv run pytest tests/test_cli_repl.py -q
 cd python && uv run pytest -q
 pnpm --filter @arc-studio/protocol build
 pnpm --filter arc-extension build
@@ -2478,35 +2504,36 @@ bash scripts/check-pr.sh
 ```
 
 ### Known Risks
-- REPL is currently a simple `input()` loop — significant rework needed for production quality
+- REPL is currently a simple `input()` loop; command palette/history may need prompt-toolkit or another line editor.
 - Provider-backed `/run` requires `ARC_ALLOW_RUN=1` gate — may need REPL-specific gate
 - Rich formatting adds dependency on `rich` library (already present)
 - IDE-CLI session sharing requires daemon protocol changes
+- Phase number note: earlier adapter docs already use "Phase 39 — MCP Python SDK Adapter"; this interactive CLI work uses Phase 41 to avoid a duplicate heading.
 
 ---
 
-## Phase 40 — Advanced CLI Features
+## Phase 42 — Advanced CLI Features
 
 **Roadmap:** R40 — CLI/UX Polish & Advanced Features  
-**Status:** Not Started  
-**Depends on:** Phase 39 (Interactive CLI/UX Foundation)  
-**Evidence:** `docs/research/interactive-cli-audit.md` — P3 features
+**Status:** Baseline Complete | Evidence: commit 37fd92b; advisory lock + aliases atomic writes in 563a1ad; IDE daemon/shared-session bridge deferred  
+**Depends on:** Phase 41 (Interactive CLI/UX Foundation)  
+**Evidence:** `docs/research/interactive-cli-audit.md` — P3 features; P0 foundation complete
 
 ### Deliverables
 1. Multi-command pipeline support (`|` pipe, `&&` / `||` chaining)
 2. Interactive dashboard (`arc dashboard`)
 3. Command aliases and snippets
-4. Batch mode (`arc run -f commands.txt`)
-5. Session export/import between IDE and CLI
-6. CLI can connect to running IDE daemon
+4. Batch mode (`arc batch plan|run <file>`)
+5. Session export/import bundles for CLI sessions
+6. Read-only IDE bridge protocol documented; daemon/shared-session bridge deferred
 
 ### Acceptance
 1. Pipelines work in REPL and batch mode
-2. Dashboard shows live system monitoring
-3. Aliases are workspace-persisted
+2. Dashboard shows local producer snapshot without fabricated data
+3. Aliases are workspace/user-persisted with atomic writes
 4. Batch mode processes command files
 5. Session export/import preserves all state
-6. CLI connects to IDE daemon for remote sessions
+6. IDE daemon/shared-server connection remains deferred
 
 ### Verification
 ```bash
@@ -2516,6 +2543,116 @@ bash scripts/check-pr.sh
 ```
 
 ### Known Risks
-- Pipeline support requires significant REPL rework
-- Dashboard requires terminal UI framework (e.g., `textual`)
-- Session export/import requires daemon protocol changes
+- Pipe support is argv-append only, not stdin or shell pipe
+- Advisory locking implemented in Phase 43; IDE write sharing remains deferred
+- IDE daemon, remote sync, shared-server, and tenant collaboration are not implemented
+
+---
+
+## Phase 43 — Advisory Locking + IDE Read-Only Session Bridge
+
+**Roadmap:** R41 — Advisory Locking + IDE Read-Only Session Bridge  
+**Status:** Baseline Complete | Evidence: commit 563a1ad; 2808 Python tests pass; TS build + typecheck green  
+**Depends on:** Phase 42 (Advanced CLI Features)
+
+### Deliverables
+1. `storage/advisory_lock.py` — POSIX `fcntl.flock` with spin-wait; Windows documented no-op
+2. `write_text_atomic(lock=True)` — wraps temp-write with advisory lock
+3. `ChatSession.save()` and `_write_aliases()` use `lock=True`
+4. `SessionBridgeService` (TypeScript) — `listChatSessions()` / `getChatSession(id)` via `arc studio sessions --json`; no `shell=True`; read-only only
+5. `ArcService` protocol extended with `listChatSessions()` / `getChatSession()` methods
+6. DI module wired
+
+### Deferred
+- IDE write/import bridge
+- Windows native lock
+- Session change events
+
+### Acceptance
+1. POSIX advisory lock prevents concurrent write corruption on session and alias files.
+2. `ChatSession.save()` and alias writes use `lock=True`.
+3. `SessionBridgeService` exposes read-only session list to TypeScript IDE without daemon.
+4. No `shell=True` in bridge service.
+5. 7 Python lock tests pass.
+
+### Verification
+```bash
+cd python && uv run pytest tests/test_advisory_lock.py -q
+cd python && uv run pytest -q
+pnpm --filter arc-extension build
+pnpm typecheck
+```
+
+### Known Risks
+- Windows `fcntl` unavailable; documented no-op is acceptable for this phase.
+- IDE write bridge requires daemon protocol design; deferred to Phase 46.
+
+---
+
+## Phase 44 — Slash Registry Expansion + REPL Error Boundary
+
+**Roadmap:** R42 — Slash Registry Expansion + REPL Error Boundary  
+**Status:** Baseline Complete | Evidence: commit b3e1471; 2828 Python tests pass; TS build + typecheck green  
+**Depends on:** Phase 43
+
+### Deliverables
+1. `/help` rebuilt as grouped uppercase palette (SESSION/RUN/SANDBOX/POLICY/WORKSPACE/PROVIDERS/AUDIT/TASKS/MCP) with parity disclaimer
+2. REPL error boundary in `_handle_input` — no slash command or runner exception propagates to the REPL loop
+3. All P0 commands verified: `/status`, `/doctor`, `/runs`, `/sandbox doctor`, `/policy explain`
+4. All P1 commands verified: `/audit`, `/task`, `/providers`, `/mcp`, `/hitl`, `/context`
+5. 20 new tests
+
+### Acceptance
+1. `/help` output contains all nine palette groups.
+2. Single-command exceptions do not crash the REPL.
+3. All P0/P1 commands return structured results or honest degraded states.
+4. 20 new tests pass.
+
+### Verification
+```bash
+cd python && uv run pytest tests/test_phase44_slash_expansion.py -q
+cd python && uv run pytest -q
+pnpm --filter arc-extension build
+```
+
+### Known Risks
+- Palette parity disclaimer must remain until OpenCode/Claude Code parity is verified.
+
+---
+
+## Phase 45 — Approval + Progress + Error UX
+
+**Roadmap:** R43 — Approval + Progress + Error UX  
+**Status:** Baseline Complete | Evidence: commit 7fdba99; 2846 Python tests pass; TS build + typecheck green  
+**Depends on:** Phase 44
+
+### Deliverables
+1. `_render_state_prefix()` in `chat_repl.py` — `[ok]`, `[denied]`, `[blocked]`, `[empty]`, `[error]` prefixes on `CommandResult` output
+2. `cmd_sandbox` extended with `confirm_fn` parameter + `_sandbox_run_with_approval()`: interactive y/N prompt for NETWORK/INSTALL/UNKNOWN; TTY-aware (non-TTY delegates to adapter deny path)
+3. `render_sandbox_run(pre_approved=True)` path — calls `approve_decision()` before executing
+4. DESTRUCTIVE/PRIVILEGED remain hard-denied regardless of confirmation
+5. Audit events emitted for all deny paths including approval-declined
+6. 18 new tests
+
+### Deferred
+- Live daemon/remote sync/microVM broadening
+
+### Acceptance
+1. NETWORK/INSTALL/UNKNOWN commands prompt y/N in TTY; denied on non-TTY without prompt.
+2. DESTRUCTIVE/PRIVILEGED denied immediately with no prompt.
+3. Approval-declined emits audit event.
+4. All deny paths emit audit events.
+5. Render-state prefixes appear on all `CommandResult` output.
+6. 18 new tests pass.
+
+### Verification
+```bash
+cd python && uv run pytest tests/test_phase45_approval_progress.py -q
+cd python && uv run pytest -q
+pnpm --filter arc-extension build
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- TTY detection depends on `sys.stdin.isatty()`; CI/test harnesses must use monkeypatch.
+- MicroVM execution remains unimplemented (preflight/doctor only); no change to Phase 37 microVM status.
