@@ -76,12 +76,24 @@ def _handle_input(
     handler: SlashCommandHandler,
     output: Any,
 ) -> None:
+    """Route one line of REPL input with a per-command exception boundary.
+
+    No unhandled exception from a slash command or the SwarmGraph runner is
+    allowed to propagate to the REPL loop.  Each command failure renders an
+    error state and returns.
+    """
     text = text.strip()
     if not text:
         return
 
     if text.startswith("/"):
-        result = handler.handle(text, session)
+        try:
+            result = handler.handle(text, session)
+        except SystemExit:
+            raise  # /exit must propagate
+        except Exception as exc:  # noqa: BLE001
+            output(f"[error] command failed: {exc}")
+            return
         if result is None:
             output(f"Unknown command: {text}")
         elif result == "__EXIT__":
@@ -92,15 +104,18 @@ def _handle_input(
         return
 
     session.add_message("user", text)
-    from ..swarmgraph import SwarmGraphRunner
-    from ..swarmgraph.config import SwarmGraphConfig
+    try:
+        from ..swarmgraph import SwarmGraphRunner
+        from ..swarmgraph.config import SwarmGraphConfig
 
-    cfg = SwarmGraphConfig(num_workers=3, max_rounds=1)
-    runner = SwarmGraphRunner(config=cfg)
-    result = runner.run(prompt=text)
-    reply = _format_result(result)
-    session.add_message("assistant", reply)
-    output(reply)
+        cfg = SwarmGraphConfig(num_workers=3, max_rounds=1)
+        runner = SwarmGraphRunner(config=cfg)
+        result = runner.run(prompt=text)
+        reply = _format_result(result)
+        session.add_message("assistant", reply)
+        output(reply)
+    except Exception as exc:  # noqa: BLE001
+        output(f"[error] runner failed: {exc}")
 
 
 def _format_result(result: dict[str, Any]) -> str:

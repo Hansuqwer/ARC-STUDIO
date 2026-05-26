@@ -163,19 +163,20 @@ class TestSlashCommands:
         assert "/help" in result
         assert "/sandbox" in result
         assert "/policy" in result
+        # Groups now appear as uppercase headers in the palette
+        result_lower = str(result).lower()
         for group in [
-            "session:",
-            "run:",
-            "sandbox:",
-            "policy:",
-            "workspace:",
-            "providers:",
-            "tools:",
-            "audit:",
-            "tasks:",
-            "MCP:",
+            "session",
+            "run",
+            "sandbox",
+            "policy",
+            "workspace",
+            "providers",
+            "audit",
+            "tasks",
+            "mcp",
         ]:
-            assert group in result
+            assert group in result_lower, f"Group missing from /help output: {group}"
 
     def test_clear(self):
         handler = SlashCommandHandler()

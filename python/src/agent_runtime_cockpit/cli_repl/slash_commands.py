@@ -651,8 +651,10 @@ def _build_registry():
 
 def cmd_help(_arg: str, _session: ChatSession) -> str:
     registry = get_registry()
-    groups = {
-        "session": ["help", "clear", "summary", "sessions", "history", "alias", "exit"],
+    # Ordered command palette grouped by surface area.
+    # All entries are implemented; none are deferred or design-only in this list.
+    groups: dict[str, list[str]] = {
+        "session": ["help", "version", "clear", "summary", "sessions", "history", "alias", "exit"],
         "run": [
             "run",
             "runtime",
@@ -681,23 +683,27 @@ def cmd_help(_arg: str, _session: ChatSession) -> str:
         "tools": ["tools"],
         "audit": ["audit", "hitl"],
         "tasks": ["task"],
-        "MCP": ["mcp"],
+        "mcp": ["mcp"],
     }
-    lines = ["Available slash commands:"]
+    lines = [
+        "ARC Studio — slash command palette",
+        "━" * 48,
+    ]
     for group, names in groups.items():
-        lines.append(f"\n{group}:")
-        if not names:
-            lines.append("  deferred: not implemented in REPL yet")
-            continue
+        lines.append(f"\n  {group.upper()}")
         for name in names:
             cmd = registry.get(name)
             if cmd is None:
-                lines.append(f"  /{name} (absent)")
                 continue
             usage = cmd.usage or f"/{cmd.name}"
-            states = ",".join(cmd.renders)
-            lines.append(f"  {usage} - {cmd.help_text} [{states}]")
-    lines.append("\nType a message to send a query or use /slash commands above.")
+            lines.append(f"    {usage}")
+            lines.append(f"      {cmd.help_text}")
+    lines += [
+        "",
+        "━" * 48,
+        "Type a message to query the SwarmGraph runner.",
+        "Note: OpenCode/Claude Code style agent parity is a target, not yet achieved.",
+    ]
     return "\n".join(lines)
 
 
