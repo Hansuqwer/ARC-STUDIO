@@ -108,14 +108,14 @@ Real now:
 - Lima/Firecracker harness attempts emit persisted `MICROVM_COMMAND`/`MICROVM_DENIED` sandbox audit events with `public_execution_enabled=false`
 - Private Firecracker proof runner now gates on Linux, `/dev/kvm` rw, `firecracker`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, `ARC_FIRECRACKER_KERNEL`, and `ARC_FIRECRACKER_ROOTFS`; it writes a no-NIC config file, starts Firecracker as a bounded process-group subprocess, records lifecycle/audit, and tears down the process group.
 - Firecracker guest proof marker parser and proof-only init snippet exist for `ARC_FC_PROOF no_default_route`, `curl_failed`, `sentinel_readable`, and `symlink_escape_blocked` markers.
-- Firecracker proof rootfs/init artifact tooling exists: `generate_firecracker_proof_artifacts()` writes `arc-fc-proof-init.sh` and `rootfs-manifest.json`; optional ext4 build is opt-in via `ARC_FC_BUILD_PROOF_ROOTFS=1` and local `busybox`, `mkfs.ext4`, and `truncate` only.
+- Firecracker proof rootfs/init artifact tooling exists: `generate_firecracker_proof_artifacts()` writes `arc-fc-proof-init.sh` and `rootfs-manifest.json`; optional ext4 build is opt-in via `ARC_FC_BUILD_PROOF_ROOTFS=1` and local `busybox`, `mkfs.ext4`, and `truncate` only. The scaffold now includes `/init`, `/sbin/init`, `/dev/console`, `/dev/null`, and proc/sysfs mount checks in manifest validation.
 
 Design-only now:
 - container provider as production fallback
 - real microVM execution
 - real Firecracker boot/no-default-route/curl-fails proof
 - Real Firecracker guest proof remains blocked until ARC owns a rootfs/init image that emits the proof markers over serial/stdout.
-- Firecracker proof rootfs/init artifact ext4 build remains unproven on this macOS host; normal CI validates manifest/init generation and missing-tool blockers only.
+- Firecracker proof rootfs/init artifact ext4 build remains unproven on this macOS host; normal CI validates manifest/init generation, boot-entrypoint/device metadata, proc/sysfs mount checks, and missing-tool blockers only.
 - real Cloud Hypervisor boot/no-default-route/curl-fails proof
 - Lima disposable VM session templates as low-security harness only
 - Firecracker jailer/rootfs/kernel lifecycle

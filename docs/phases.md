@@ -2134,6 +2134,13 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Added status/template truth guards: Lima preflight reports `strict_network_isolation=false` and `security_posture=low_security_network_present`; rendered template states strict network isolation is not proven.
 - Public `MicroVMIsolationProvider.execute()` still raises; `ARC_MICROVM_EXEC_ENABLED` remains unwired. Strict P2 now points to Firecracker/Cloud Hypervisor no-network proof.
 
+#### Slice 37.24: Firecracker Proof Rootfs Hardening ✓
+- Hardened the proof-only Firecracker rootfs/init scaffold without enabling public microVM execution.
+- Proof init now attempts proc/sysfs mounts before marker checks.
+- Optional rootfs build now includes both `/init` and `/sbin/init` entrypoints plus `/dev/console` and `/dev/null` placeholders.
+- Manifest validation now rejects missing proc/sysfs mount setup, missing boot entrypoints, and missing device metadata.
+- Public `MicroVMIsolationProvider.execute()` still raises; no real Firecracker boot/no-default-route proof ran on this macOS host.
+
 #### Slice 37.20: P1–P7 Evaluation + ARC_MICROVM_EXEC_ENABLED Wiring Decision ✓
 - Evaluated all 7 ADR-024 prerequisites against current codebase and research findings.
 - Created `docs/research/microvm-p1-p7-status.md` with per-prerequisite status table.

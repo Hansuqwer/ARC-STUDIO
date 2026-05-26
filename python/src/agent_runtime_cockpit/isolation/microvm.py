@@ -305,6 +305,8 @@ class FirecrackerProofArtifactManifest(BaseModel):
     rootfs_path: str | None = None
     rootfs_sha256: str | None = None
     markers: list[str]
+    init_entrypoints: list[str] = []
+    device_nodes: list[str] = []
     build_status: str
     blockers: list[str] = []
 
@@ -356,6 +358,8 @@ def render_firecracker_guest_proof_init() -> str:
     """Return proof-only init snippet expected inside a dedicated ARC rootfs."""
     return """#!/bin/sh
 set +e
+mount -t proc proc /proc 2>/dev/null || true
+mount -t sysfs sysfs /sys 2>/dev/null || true
 if ip route 2>/dev/null | grep -q '^default'; then
   echo 'ARC_FC_PROOF no_default_route=0'
 else
@@ -437,9 +441,14 @@ def generate_firecracker_proof_artifacts(
             (root_dir / "tmp").mkdir(exist_ok=True)
             (root_dir / "workspace").mkdir(exist_ok=True)
             shutil.copy2(str(tools["busybox"]), root_dir / "bin" / "busybox")
-            (root_dir / "init").write_text(init_path.read_text(encoding="utf-8"), encoding="utf-8")
+            init_text = init_path.read_text(encoding="utf-8")
+            (root_dir / "init").write_text(init_text, encoding="utf-8")
             (root_dir / "init").chmod(0o755)
-            for applet in ("sh", "cat", "grep", "ip", "reboot", "poweroff", "halt"):
+            (root_dir / "sbin" / "init").write_text(init_text, encoding="utf-8")
+            (root_dir / "sbin" / "init").chmod(0o755)
+            (root_dir / "dev" / "console").touch(mode=0o600, exist_ok=True)
+            (root_dir / "dev" / "null").touch(mode=0o666, exist_ok=True)
+            for applet in ("sh", "cat", "grep", "ip", "mount", "reboot", "poweroff", "halt"):
                 link = root_dir / "bin" / applet
                 if not link.exists():
                     link.symlink_to("busybox")
@@ -468,6 +477,8 @@ def generate_firecracker_proof_artifacts(
         rootfs_path=str(final_rootfs_path) if built_rootfs else None,
         rootfs_sha256=rootfs_sha256,
         markers=FIRECRACKER_PROOF_MARKERS,
+        init_entrypoints=["/init", "/sbin/init"] if built_rootfs else ["arc-fc-proof-init.sh"],
+        device_nodes=["/dev/console", "/dev/null"] if built_rootfs else [],
         build_status="built" if built_rootfs else "init_manifest_only",
         blockers=blockers,
     )
@@ -496,6 +507,17 @@ def validate_firecracker_proof_manifest(path: Path) -> FirecrackerProofArtifactM
     for marker in FIRECRACKER_PROOF_MARKERS:
         if f"ARC_FC_PROOF {marker}=" not in init_text:
             raise ValueError(f"proof init missing marker: {marker}")
+    if "mount -t proc proc /proc" not in init_text:
+        raise ValueError("proof init missing proc mount")
+    if "mount -t sysfs sysfs /sys" not in init_text:
+        raise ValueError("proof init missing sysfs mount")
+    if manifest.build_status == "built":
+        required_entrypoints = {"/init", "/sbin/init"}
+        if not required_entrypoints.issubset(set(manifest.init_entrypoints)):
+            raise ValueError("proof manifest missing init entrypoints")
+        required_devices = {"/dev/console", "/dev/null"}
+        if not required_devices.issubset(set(manifest.device_nodes)):
+            raise ValueError("proof manifest missing device nodes")
     if manifest.rootfs_path:
         rootfs = Path(manifest.rootfs_path)
         if not rootfs.exists():

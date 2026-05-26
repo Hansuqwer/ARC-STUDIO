@@ -292,6 +292,8 @@ class TestFirecrackerProofRunner:
 
     def test_guest_proof_init_snippet_is_proof_only(self):
         snippet = render_firecracker_guest_proof_init()
+        assert "mount -t proc proc /proc" in snippet
+        assert "mount -t sysfs sysfs /sys" in snippet
         assert "ARC_FC_PROOF no_default_route" in snippet
         assert "ARC_FC_PROOF curl_failed" in snippet
         assert "ARC_FC_PROOF sentinel_readable" in snippet
@@ -312,6 +314,64 @@ class TestFirecrackerProofRunner:
         manifest = validate_firecracker_proof_manifest(tmp_path / "rootfs-manifest.json")
         assert manifest.build_status == "init_manifest_only"
         assert manifest.rootfs_path is None
+        assert manifest.init_entrypoints == ["arc-fc-proof-init.sh"]
+        assert manifest.device_nodes == []
+
+    def test_proof_manifest_requires_proc_and_sysfs_mounts(self, tmp_path):
+        init_path = tmp_path / "arc-fc-proof-init.sh"
+        init_path.write_text(
+            "#!/bin/sh\n"
+            "ARC_FC_PROOF no_default_route=1\n"
+            "ARC_FC_PROOF curl_failed=1\n"
+            "ARC_FC_PROOF sentinel_readable=1\n"
+            "ARC_FC_PROOF symlink_escape_blocked=1\n",
+            encoding="utf-8",
+        )
+        manifest = tmp_path / "rootfs-manifest.json"
+        import hashlib
+
+        manifest.write_text(
+            __import__("json").dumps(
+                {
+                    "version": 1,
+                    "artifact": "arc-firecracker-proof-rootfs",
+                    "init_path": str(init_path),
+                    "init_sha256": hashlib.sha256(init_path.read_bytes()).hexdigest(),
+                    "rootfs_path": None,
+                    "rootfs_sha256": None,
+                    "markers": [
+                        "no_default_route",
+                        "curl_failed",
+                        "sentinel_readable",
+                        "symlink_escape_blocked",
+                    ],
+                    "init_entrypoints": ["arc-fc-proof-init.sh"],
+                    "device_nodes": [],
+                    "build_status": "init_manifest_only",
+                    "blockers": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="proc mount"):
+            validate_firecracker_proof_manifest(manifest)
+
+    def test_built_manifest_requires_boot_entrypoints_and_devices(self, tmp_path):
+        report = generate_firecracker_proof_artifacts(tmp_path, build_rootfs=False)
+        manifest = report.manifest.model_copy(
+            update={
+                "build_status": "built",
+                "rootfs_path": str(tmp_path / "rootfs.ext4"),
+                "rootfs_sha256": None,
+                "init_entrypoints": ["/init"],
+                "device_nodes": ["/dev/console"],
+            }
+        )
+        (tmp_path / "rootfs.ext4").write_text("rootfs", encoding="utf-8")
+        manifest_path = tmp_path / "rootfs-manifest.json"
+        manifest_path.write_text(manifest.model_dump_json(), encoding="utf-8")
+        with pytest.raises(ValueError, match="init entrypoints"):
+            validate_firecracker_proof_manifest(manifest_path)
 
     def test_proof_artifact_builder_reports_missing_tools_gracefully(self, tmp_path, monkeypatch):
         monkeypatch.setenv("ARC_FC_BUILD_PROOF_ROOTFS", "1")

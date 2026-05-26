@@ -2,7 +2,7 @@
 
 **Status:** Accepted — implementation blocked (see P1–P7 status below)  
 **Date:** 2026-05-26  
-**Last updated:** 2026-05-26 — Firecracker proof rootfs/init artifact scaffold added; strict public microVM remains blocked  
+**Last updated:** 2026-05-26 — Firecracker proof rootfs/init artifact scaffold hardened; strict public microVM remains blocked  
 **Authors:** ARC Studio sandbox team  
 **Related:** Phase 37 (R38), `docs/research/sandbox-and-microvm.md`, `docs/research/microvm-p1-p7-status.md`, ADR-014 (security architecture)
 
@@ -168,7 +168,7 @@ are mandatory. Missing any of these fields is a schema violation.
 - `arc sandbox run --provider microvm` still produces a blocked result.
 - `ARC_MICROVM_EXEC_ENABLED` is not yet read by any code.
 - Lima harness is still internal / not wired to public execution.
-- Firecracker is still blocked for public execution; only a private host-gated proof harness and proof rootfs/init artifact scaffold exist.
+- Firecracker is still blocked for public execution; only a private host-gated proof harness and proof rootfs/init artifact scaffold exist. The scaffold validates proof markers plus boot entrypoint/device metadata, but no real Linux/KVM boot proof has run.
 
 ### What must be done before unblocking
 
@@ -188,8 +188,8 @@ Full detail: `docs/research/microvm-p1-p7-status.md`
 
 | P# | Description | Status |
 |---|---|---|
-| P1 | Lifecycle proof | Partial — fake tests pass; private Firecracker proof runner can start/teardown behind Linux/KVM gates and parse proof markers, but real host proof is not proven |
-| P2 | Network-off proof | **Host-gated proof harness only** — Lima is low-security/network-present. Firecracker no-NIC config generation, proof-marker parser, and proof rootfs/init artifact scaffold exist, but real guest no-default-route/curl-fails proof has not run. |
+| P1 | Lifecycle proof | Partial — fake tests pass; private Firecracker proof runner can start/teardown behind Linux/KVM gates and parse proof markers, and proof rootfs metadata now includes `/init`, `/sbin/init`, `/dev/console`, `/dev/null`, proc/sysfs setup checks; real host proof is not proven |
+| P2 | Network-off proof | **Host-gated proof harness only** — Lima is low-security/network-present. Firecracker no-NIC config generation, proof-marker parser, and hardened proof rootfs/init artifact scaffold exist, but real guest no-default-route/curl-fails proof has not run. |
 | P3 | Workspace-mount proof | Partial — code-level escape guard added + sentinel test; virtiofs symlink pass-through gap remains |
 | P4 | Teardown proof | Partial — code-level harness teardown proven; real-host teardown pending |
 | P5 | Symlink-escape proof | Blocked by Lima P2 — code-level `is_path_within_root()` + 19 tests; real-host Lima test `test_real_lima_symlink_escape_blocked` xfails on this host because network proof blocks user argv before symlink traversal can be exercised |
