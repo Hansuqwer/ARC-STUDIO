@@ -6,6 +6,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from agent_runtime_cockpit.storage.atomic import write_text_atomic
+
 ALIAS_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.:-]{0,63}$")
 
 
@@ -44,9 +46,8 @@ def _read_aliases(path: Path) -> dict[str, str]:
 
 
 def _write_aliases(path: Path, aliases: dict[str, str]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
     payload = {"version": 1, "aliases": dict(sorted(aliases.items()))}
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_text_atomic(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
 def validate_alias(name: str, command: str | None = None) -> None:

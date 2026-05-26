@@ -1297,10 +1297,25 @@ def cmd_dashboard(arg: str, session: ChatSession) -> CommandResult:
 
 
 def cmd_alias(arg: str, _session: ChatSession) -> CommandResult:
-    parts = arg.strip().split(maxsplit=2)
+    try:
+        tokens = shlex.split(arg.strip())
+    except ValueError as exc:
+        return CommandResult(state="blocked", output=f"Invalid alias syntax: {exc}")
+    scope = "workspace"
+    filtered: list[str] = []
+    for token in tokens:
+        if token == "--user":
+            scope = "user"
+        elif token == "--workspace":
+            scope = "workspace"
+        else:
+            filtered.append(token)
+    parts = filtered
     subcommand = parts[0] if parts else "list"
     if subcommand == "list":
-        aliases = list_aliases()
+        aliases = (
+            [item for item in list_aliases() if item.scope == scope] if tokens else list_aliases()
+        )
         if not aliases:
             return CommandResult(state="absent", output="No aliases configured.")
         lines = ["Aliases:"]
@@ -1315,10 +1330,12 @@ def cmd_alias(arg: str, _session: ChatSession) -> CommandResult:
             state="present", output=f"{item.name} ({item.scope}) -> {item.command}"
         )
     if subcommand == "set" and len(parts) >= 3:
-        item = set_alias(parts[1], parts[2])
+        command = arg.split(parts[1], 1)[1].strip()
+        command = command.replace("--user", "", 1).replace("--workspace", "", 1).strip()
+        item = set_alias(parts[1], command, scope=scope)
         return CommandResult(state="present", output=f"Alias set: {item.name} -> {item.command}")
     if subcommand in {"remove", "delete"} and len(parts) >= 2:
-        removed = remove_alias(parts[1])
+        removed = remove_alias(parts[1], scope=scope)
         return CommandResult(
             state="present" if removed else "absent",
             output=f"Alias {'removed' if removed else 'not found'}: {parts[1]}",
@@ -1334,7 +1351,7 @@ def cmd_alias(arg: str, _session: ChatSession) -> CommandResult:
         )
     return CommandResult(
         state="blocked",
-        output="Usage: /alias list|show <name>|set <name> <command>|remove <name>|run <name>",
+        output="Usage: /alias [--user|--workspace] list|show <name>|set <name> <command>|remove <name>|run <name>",
         reason="invalid_usage",
     )
 
@@ -1551,6 +1568,16 @@ class SlashCommandHandler:
                 continue
             current = segment.command
             if segment.operator_before is ChainOperator.PIPE:
+                pipe_name = current.split(maxsplit=1)[0].lstrip("/").lower()
+                if pipe_name not in {"search", "read", "status", "history"}:
+                    blocked = CommandResult(
+                        state="blocked",
+                        output=f"Pipeline target blocked by adapter pipe contract: {current}",
+                        reason="pipe_contract_denied",
+                    )
+                    previous = blocked
+                    outputs.append(blocked.output)
+                    continue
                 current = f"{current} {shlex.quote(_result_text(previous))}"
             result = (
                 self.handle(current, session)

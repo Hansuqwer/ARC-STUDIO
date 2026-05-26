@@ -36,6 +36,7 @@ mcp_app = typer.Typer(name="mcp", help="MCP Local Control Plane server (Phase 26
 task_app = typer.Typer(name="task", help="Async task execution and management (Phase 27 / R20)")
 replay_app = typer.Typer(name="replay", help="Replay capability analysis (Phase 28 / R21)")
 battle_app = typer.Typer(name="battle", help="SwarmGraph battle mode (Phase 34 / R26A)")
+batch_app = typer.Typer(name="batch", help="Deterministic Phase 42 batch command execution")
 events_app = typer.Typer(
     name="events", help="Event notifications, watch, and webhooks (Phase 32 / R25)"
 )

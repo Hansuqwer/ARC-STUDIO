@@ -7,6 +7,7 @@ import sys as _sys
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 from .. import __version__ as arc_version
 from ..security.context import DryRunAbort, EnforcementContext, set_enforcement_context
@@ -14,6 +15,7 @@ from ._subapps import (
     adapter_app,
     arena_app,
     audit_app,
+    batch_app,
     battle_app,
     config_app,
     context_app,
@@ -72,6 +74,7 @@ app.add_typer(mcp_app)
 app.add_typer(task_app)
 app.add_typer(replay_app)
 app.add_typer(battle_app)
+app.add_typer(batch_app)
 app.add_typer(events_app)
 app.add_typer(prompt_app)
 
@@ -89,6 +92,21 @@ def dashboard(
         import json
 
         console.print(json.dumps(result.data, indent=2, default=str))
+        return
+    if isinstance(result.data, dict) and isinstance(result.data.get("sections"), dict):
+        table = Table(title="ARC Dashboard")
+        table.add_column("Section")
+        table.add_column("State")
+        table.add_column("Summary")
+        for name, section in result.data["sections"].items():
+            state = str(section.get("state", "unknown"))
+            color = "green" if state in {"present", "ok"} else "yellow"
+            if state in {"blocked", "error", "denied"}:
+                color = "red"
+            table.add_row(
+                str(name), f"[{color}]{state}[/{color}]", str(section.get("data", ""))[:160]
+            )
+        console.print(table)
         return
     console.print(result.text)
 

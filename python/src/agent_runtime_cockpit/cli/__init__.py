@@ -17,6 +17,7 @@ from .. import _legacy_cli  # noqa: F401
 from . import (
     arena,  # noqa: F401
     audit,  # noqa: F401
+    batch,  # noqa: F401
     battle,  # noqa: F401
     discover,  # noqa: F401
     events,  # noqa: F401

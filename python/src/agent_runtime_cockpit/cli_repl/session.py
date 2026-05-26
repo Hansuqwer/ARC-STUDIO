@@ -10,12 +10,19 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from agent_runtime_cockpit.runtime.mode import RuntimeMode
+from agent_runtime_cockpit.storage.atomic import write_text_atomic
 
 SESSION_SCHEMA_VERSION = 4
 MODE_PLAN = "plan"
 MODE_BUILD = "build"
 MODE_AUTO = "auto"
 VALID_MODES = {MODE_PLAN, MODE_BUILD, MODE_AUTO}
+
+
+def is_safe_session_id(session_id: str) -> bool:
+    return (
+        bool(session_id) and "/" not in session_id and "\\" not in session_id and session_id != ".."
+    )
 
 
 def _get_sessions_dir() -> Path:
@@ -198,10 +205,12 @@ class ChatSession(BaseModel):
             self.mode = mode
 
     def save(self) -> Path:
+        if not is_safe_session_id(self.id):
+            raise ValueError("unsafe session id")
         sess_dir = _get_sessions_dir() / self.id
         sess_dir.mkdir(parents=True, exist_ok=True)
         path = sess_dir / "session.json"
-        path.write_text(self.model_dump_json(indent=2))
+        write_text_atomic(path, self.model_dump_json(indent=2) + "\n")
 
         # Update latest symlink
         latest = _get_sessions_dir() / "latest"

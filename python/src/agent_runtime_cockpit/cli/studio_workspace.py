@@ -217,6 +217,75 @@ def studio_sessions_migrate(
         console.print(f"[yellow]  Failed: {', '.join(failed[:5])}[/yellow]")
 
 
+@studio_sessions_app.command("show")
+def studio_sessions_show(
+    session_id: str = typer.Argument(..., help="Session ID"),
+    json_output: bool = JSON_FLAG,
+) -> None:
+    """Show a saved session without modifying it."""
+    from ..cli_repl.session import ChatSession
+    from ..cli_repl.session_bundle import export_session_bundle
+
+    session = ChatSession.load(session_id)
+    if session is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Session not found: {session_id}"), json_output)
+        raise typer.Exit(1)
+    data = export_session_bundle(session).session
+    if json_output:
+        _out(ok(data), True)
+        return
+    console.print(f"Session: {data['id']}")
+    console.print(f"Mode: {data['mode']} Runtime: {data['runtime_mode']}")
+    console.print(f"Messages: {len(data.get('history', []))}")
+
+
+@studio_sessions_app.command("export")
+def studio_sessions_export(
+    session_id: str = typer.Argument(..., help="Session ID"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output path, or stdout"),
+    json_output: bool = JSON_FLAG,
+) -> None:
+    """Export a redacted session bundle."""
+    from pathlib import Path
+
+    from ..cli_repl.session import ChatSession
+    from ..cli_repl.session_bundle import export_session_bundle, write_session_bundle
+
+    session = ChatSession.load(session_id)
+    if session is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Session not found: {session_id}"), json_output)
+        raise typer.Exit(1)
+    bundle = export_session_bundle(session)
+    if output:
+        path = Path(output).expanduser()
+        write_session_bundle(path, bundle)
+        _out(ok({"path": str(path), "session_id": session.id}), json_output)
+        return
+    console.print(bundle.model_dump_json(indent=2))
+
+
+@studio_sessions_app.command("import")
+def studio_sessions_import(
+    bundle_path: str = typer.Argument(..., help="Session bundle path"),
+    new_id: bool = typer.Option(False, "--new-id", help="Assign a new session ID"),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Overwrite existing session"),
+    json_output: bool = JSON_FLAG,
+) -> None:
+    """Validate and import a session bundle atomically."""
+    from pathlib import Path
+
+    from ..cli_repl.session_bundle import import_session_bundle
+
+    try:
+        session = import_session_bundle(
+            Path(bundle_path).expanduser(), new_id=new_id, overwrite=overwrite
+        )
+    except ValueError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(1) from exc
+    _out(ok({"session_id": session.id, "messages": len(session.history)}), json_output)
+
+
 @studio_app.command("sessions-migrate")
 def studio_sessions_migrate_deprecated(
     json_output: bool = JSON_FLAG,
