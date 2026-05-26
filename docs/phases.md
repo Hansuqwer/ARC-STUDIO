@@ -2112,6 +2112,14 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Real Lima execution NOT proven on this host (CI-skipped).
 - Verified: targeted sandbox/microVM tests (including smoke) pass; CI posture confirmed.
 
+#### Slice 37.21: Firecracker Real-Host Smoke Structure (HOST-SKIPPED) ✓
+- Pre-check: `which firecracker` → not found; `/dev/kvm` → absent (Darwin 25.4.0).
+- Added `python/tests/isolation/test_firecracker_smoke.py`:
+  - `TestFirecrackerSmokeSkipBehaviour` (3 always-run tests): confirms unavailable on this host.
+  - `TestFirecrackerSmokeRealHost` (1 test, skipped): requires Linux + /dev/kvm + binary + `ARC_FC_REAL_EXEC=1`.
+- Step 4 cannot be proven on this macOS host. All `TestFirecrackerSmokeRealHost` tests skip cleanly.
+- Firecracker execution remains preflight/doctor only; `MicroVMIsolationProvider.execute()` still raises.
+
 #### Slice 37.20: P1–P7 Evaluation + ARC_MICROVM_EXEC_ENABLED Wiring Decision ✓
 - Evaluated all 7 ADR-024 prerequisites against current codebase and research findings.
 - Created `docs/research/microvm-p1-p7-status.md` with per-prerequisite status table.
