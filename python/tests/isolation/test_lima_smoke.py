@@ -328,3 +328,26 @@ class TestLimaSmokeRealHost:
         # If the VM started and ran the command, sentinel content appears in stdout
         if result.result.exit_code == 0:
             assert "arc-workspace-mount-proof" in result.result.stdout
+
+    def test_real_lima_symlink_escape_blocked(self, tmp_path):
+        """Guest must not read host files through workspace symlink escapes.
+
+        This is the P5 proof gate from ADR-024. It is skipped in normal CI and
+        intentionally fails on hosts where Lima exposes host symlink targets
+        through the /workspace mount.
+        """
+        escape_link = tmp_path / "arc-host-passwd-link"
+        escape_link.symlink_to("/etc/passwd")
+
+        harness = LimaIntegrationHarness(
+            workspace_root=tmp_path,
+            instance_name="arc-smoke-real-symlink",
+        )
+        result: LimaHarnessResult = harness.run(
+            ["cat", "/workspace/arc-host-passwd-link"],
+            timeout_seconds=600,
+            require_gate=True,
+        )
+        assert result.teardown_attempted is True
+        if result.result.exit_code == 0:
+            assert "root:" not in result.result.stdout
