@@ -158,6 +158,19 @@ class TestSlashCommands:
         assert "/help" in result
         assert "/sandbox" in result
         assert "/policy" in result
+        for group in [
+            "session:",
+            "run:",
+            "sandbox:",
+            "policy:",
+            "workspace:",
+            "providers:",
+            "tools:",
+            "audit:",
+            "tasks:",
+            "MCP:",
+        ]:
+            assert group in result
 
     def test_clear(self):
         handler = SlashCommandHandler()
@@ -621,6 +634,50 @@ class TestMergedSlashCommands:
         assert "Sandbox providers" in result.output
         assert "subprocess" in result.output
         assert "microvm" in result.output
+
+    def test_sandbox_run_read_only_allowed_and_audited(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        result = handler.handle("/sandbox run -- pwd", s)
+        assert result is not None
+        assert result.state == "present"
+        assert "Classification: read_only" in result.output
+        assert result.metadata["decision"]["allowed"] is True
+        assert result.metadata["audit_event"]["type"] == "SANDBOX_COMMAND"
+        assert any(name == "sandbox.command" for name, _payload in handler.events)
+
+    def test_sandbox_run_network_denied_and_audited(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        result = handler.handle("/sandbox run -- curl https://example.com", s)
+        assert result is not None
+        assert result.state == "denied"
+        assert "Classification: network" in result.output
+        assert result.metadata["decision"]["allowed"] is False
+        assert result.metadata["audit_event"]["type"] == "SANDBOX_DENIED"
+        assert any(name == "sandbox.denied" for name, _payload in handler.events)
+
+    def test_sandbox_run_destructive_denied(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        result = handler.handle("/sandbox run -- rm -rf .", s)
+        assert result is not None
+        assert result.state == "denied"
+        assert result.metadata["classification"] == "destructive"
+
+    def test_sandbox_run_microvm_blocked(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        result = handler.handle("/sandbox run --provider microvm -- pwd", s)
+        assert result is not None
+        assert result.state == "blocked"
+        assert "microVM execution not yet available" in result.output
 
     def test_policy_explain_read_only_allowed(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)

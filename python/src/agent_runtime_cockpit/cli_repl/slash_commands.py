@@ -33,6 +33,7 @@ from .adapters import (
     render_run_status,
     render_runs_list,
     render_sandbox_doctor,
+    render_sandbox_run,
     render_status,
 )
 from .cancellation import CancellationReason, CancellationToken, Cancelled
@@ -350,7 +351,7 @@ def _build_registry():
     registry.register(
         CommandDef(
             name="sandbox",
-            help_text="Sandbox tools: /sandbox doctor",
+            help_text="Sandbox tools: /sandbox doctor|run -- <cmd...>",
             category="workspace",
             handler=cmd_sandbox,
             gates_required=[],
@@ -359,8 +360,8 @@ def _build_registry():
             requires_events=[],
             privileged=False,
             trust_required="workspace",
-            usage="/sandbox doctor",
-            subcommands=["doctor"],
+            usage="/sandbox doctor|run [--policy NAME] -- <cmd...>",
+            subcommands=["doctor", "run"],
         )
     )
     registry.register(
@@ -388,12 +389,34 @@ def _build_registry():
 
 def cmd_help(_arg: str, _session: ChatSession) -> str:
     registry = get_registry()
-    return (
-        "Available slash commands:"
-        + registry.help_text()
-        + "\n\n"
-        + "Type a message to send a query or use /slash commands above."
-    )
+    groups = {
+        "session": ["help", "clear", "summary", "sessions", "history", "exit"],
+        "run": ["run", "runtime", "mode", "plan", "build", "auto", "runs"],
+        "sandbox": ["sandbox"],
+        "policy": ["policy"],
+        "workspace": ["status", "doctor"],
+        "providers": ["runtime"],
+        "tools": ["tools"],
+        "audit": [],
+        "tasks": [],
+        "MCP": [],
+    }
+    lines = ["Available slash commands:"]
+    for group, names in groups.items():
+        lines.append(f"\n{group}:")
+        if not names:
+            lines.append("  deferred: not implemented in REPL yet")
+            continue
+        for name in names:
+            cmd = registry.get(name)
+            if cmd is None:
+                lines.append(f"  /{name} (absent)")
+                continue
+            usage = cmd.usage or f"/{cmd.name}"
+            states = ",".join(cmd.renders)
+            lines.append(f"  {usage} - {cmd.help_text} [{states}]")
+    lines.append("\nType a message to send a query or use /slash commands above.")
+    return "\n".join(lines)
 
 
 def cmd_clear(_arg: str, session: ChatSession) -> str:
@@ -788,6 +811,8 @@ def cmd_sandbox(arg: str, _session: ChatSession) -> CommandResult:
     subcommand = parts[0] if parts else "doctor"
     if subcommand == "doctor":
         return _render_adapter_result(render_sandbox_doctor())
+    if subcommand == "run":
+        return _render_adapter_result(render_sandbox_run(arg))
     return CommandResult(state="blocked", output="Usage: /sandbox doctor", reason="invalid_usage")
 
 
@@ -861,7 +886,19 @@ class SlashCommandHandler:
                 runtime=self.runner,
             )
         try:
-            return defn.handler(arg, session)
+            result = defn.handler(arg, session)
+            if name == "sandbox" and isinstance(result, CommandResult):
+                audit = (
+                    result.metadata.get("audit_event")
+                    if isinstance(result.metadata, dict)
+                    else None
+                )
+                if isinstance(audit, dict):
+                    self.emit_event(
+                        "sandbox.denied" if result.state == "denied" else "sandbox.command",
+                        audit,
+                    )
+            return result
         except (
             Exception
         ) as exc:  # pragma: no cover - exercised by regression tests with monkeypatches

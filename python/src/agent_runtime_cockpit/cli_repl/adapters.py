@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shlex
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -13,9 +14,14 @@ from ..isolation.microvm import MicroVMIsolationProvider
 from ..isolation.subprocess import SubprocessIsolationProvider
 from ..runtime.mode import RuntimeMode
 from ..security.sandbox import (
+    SandboxResult,
+    build_audit_event,
     decide,
+    ensure_workspace_cwd,
     list_sandbox_policies,
+    persist_sandbox_audit_event,
     resolve_sandbox_policy,
+    utc_now,
     validate_command_paths,
 )
 
@@ -112,6 +118,162 @@ def _parse_policy_explain(arg: str) -> tuple[str, list[str]]:
         if parts[:1] == ["--"]:
             parts = parts[1:]
     return policy, parts
+
+
+def _parse_sandbox_run(arg: str) -> tuple[str, str, list[str]]:
+    parts = shlex.split(arg)
+    if parts[:1] == ["run"]:
+        parts = parts[1:]
+    policy = "local-safe"
+    provider = "subprocess"
+    command: list[str] = []
+    index = 0
+    while index < len(parts):
+        part = parts[index]
+        if part == "--":
+            command = parts[index + 1 :]
+            break
+        if part == "--policy" and index + 1 < len(parts):
+            policy = parts[index + 1]
+            index += 2
+            continue
+        if part.startswith("--policy="):
+            policy = part.split("=", 1)[1]
+            index += 1
+            continue
+        if part == "--provider" and index + 1 < len(parts):
+            provider = parts[index + 1]
+            index += 2
+            continue
+        if part.startswith("--provider="):
+            provider = part.split("=", 1)[1]
+            index += 1
+            continue
+        command = parts[index:]
+        break
+    return policy, provider, command
+
+
+def render_sandbox_run(arg: str, workspace: Path | None = None) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    try:
+        policy_name, provider, command = _parse_sandbox_run(arg)
+        if not command:
+            return SlashAdapterResult(
+                state="blocked",
+                text="Usage: /sandbox run [--policy NAME] [--provider subprocess] -- <cmd...>",
+                exit_code=2,
+            )
+        policy = resolve_sandbox_policy(policy_name, ws)
+        cwd = ensure_workspace_cwd(Path.cwd(), policy.workspace_root)
+        decision = decide(command, policy)
+        validate_command_paths(command, policy)
+    except (KeyError, ValueError) as exc:
+        return SlashAdapterResult(state="blocked", text=f"Blocked: {exc}", exit_code=2)
+
+    started_at = utc_now()
+    ended_at = started_at
+    if not decision.allowed:
+        audit = build_audit_event(
+            command=command,
+            cwd=cwd,
+            decision=decision,
+            provider=provider,
+            started_at=started_at,
+            ended_at=ended_at,
+            exit_code=None,
+            stdout_truncated=False,
+            stderr_truncated=False,
+            redaction_applied=False,
+        )
+        audit_path = persist_sandbox_audit_event(audit)
+        audit["audit_path"] = str(audit_path)
+        result = SandboxResult(
+            command=command,
+            cwd=str(cwd),
+            classification=decision.classification,
+            decision=decision,
+            provider=provider,
+            audit_event=audit,
+        )
+        return SlashAdapterResult(
+            state="denied",
+            text=(
+                f"Sandbox denied: {' '.join(command)}\n"
+                f"Classification: {decision.classification.value}\nReason: {decision.reason}"
+            ),
+            data=result.model_dump(mode="json"),
+            exit_code=3,
+        )
+
+    if provider == "microvm":
+        return SlashAdapterResult(
+            state="blocked",
+            text="Blocked: microVM execution not yet available through REPL sandbox run",
+            data={"provider": provider, "reason": "microvm_execution_unavailable"},
+            exit_code=2,
+        )
+    if provider != "subprocess":
+        return SlashAdapterResult(
+            state="blocked",
+            text=f"Blocked: unsupported sandbox provider: {provider}",
+            data={"provider": provider, "reason": "unsupported_provider"},
+            exit_code=2,
+        )
+
+    iso = asyncio.run(
+        SubprocessIsolationProvider(
+            safe_env_keys=frozenset(policy.env_allowlist),
+            workspace_root=ws,
+            max_output_bytes=policy.max_output_bytes,
+        ).execute(command, cwd=cwd, timeout_seconds=policy.timeout_seconds)
+    )
+    ended_at = utc_now()
+    audit = build_audit_event(
+        command=command,
+        cwd=cwd,
+        decision=decision,
+        provider=iso.provider,
+        started_at=started_at,
+        ended_at=ended_at,
+        exit_code=iso.exit_code,
+        stdout_truncated=iso.stdout_truncated,
+        stderr_truncated=iso.stderr_truncated,
+        redaction_applied=iso.redaction_applied,
+    )
+    audit_path = persist_sandbox_audit_event(audit)
+    audit["audit_path"] = str(audit_path)
+    result = SandboxResult(
+        command=command,
+        cwd=str(cwd),
+        classification=decision.classification,
+        decision=decision,
+        provider=iso.provider,
+        exit_code=iso.exit_code,
+        stdout=iso.stdout,
+        stderr=iso.stderr,
+        duration_ms=iso.duration_ms,
+        timed_out=iso.killed and iso.kill_reason == "timeout",
+        stdout_truncated=iso.stdout_truncated,
+        stderr_truncated=iso.stderr_truncated,
+        redaction_applied=iso.redaction_applied,
+        audit_event=audit,
+    )
+    lines = [
+        f"Sandbox allowed: {' '.join(command)}",
+        f"Classification: {decision.classification.value}",
+        f"Exit code: {iso.exit_code}",
+    ]
+    if iso.stdout:
+        lines.extend(["stdout:", iso.stdout.rstrip()])
+    if iso.stderr:
+        lines.extend(["stderr:", iso.stderr.rstrip()])
+    return SlashAdapterResult(
+        state="present" if iso.exit_code == 0 else "error",
+        text="\n".join(lines),
+        data=result.model_dump(mode="json"),
+        exit_code=iso.exit_code,
+    )
 
 
 def render_policy_explain(arg: str, workspace: Path | None = None) -> SlashAdapterResult:
