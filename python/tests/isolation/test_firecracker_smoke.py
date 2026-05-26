@@ -27,6 +27,8 @@ import pytest
 
 from agent_runtime_cockpit.isolation.microvm import (
     FirecrackerIntegrationHarness,
+    FirecrackerProofRunner,
+    firecracker_proof_gates,
     build_cloud_hypervisor_no_network_run_plan,
     build_firecracker_no_network_run_plan,
     firecracker_integration_available,
@@ -178,6 +180,92 @@ class TestFirecrackerNoNetworkDesignProof:
         ):
             harness.run(["uname", "-a"], require_gate=False)
         assert (tmp_path / "audit" / "sandbox.events.jsonl").exists()
+
+
+class TestFirecrackerProofRunner:
+    """Always-run private proof-runner tests; no real VM required."""
+
+    def test_proof_gates_block_without_linux_kvm_binary_env(self, monkeypatch):
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm.platform.system", lambda: "Darwin"
+        )
+        monkeypatch.setattr("agent_runtime_cockpit.isolation.microvm.shutil.which", lambda _: None)
+        monkeypatch.delenv("ARC_MICROVM_INTEGRATION", raising=False)
+        gates = firecracker_proof_gates()
+        assert gates["ready"] is False
+        assert "Linux required" in gates["blockers"]
+        assert "firecracker binary missing" in gates["blockers"]
+
+    def test_proof_runner_blocked_attempt_emits_audit(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm.platform.system", lambda: "Linux"
+        )
+        monkeypatch.setattr("agent_runtime_cockpit.isolation.microvm.shutil.which", lambda _: None)
+        runner = FirecrackerProofRunner(workspace_root=tmp_path, instance_name="arc-fc-proof")
+        with pytest.raises(Exception, match="firecracker binary missing"):
+            runner.run(["ip", "route"])
+        events = (tmp_path / "audit" / "sandbox.events.jsonl").read_text(encoding="utf-8")
+        assert '"runtime":"firecracker"' in events
+        assert '"public_execution_enabled":false' in events
+
+    def test_proof_runner_generates_lifecycle_and_teardown_with_fake_start(
+        self, tmp_path, monkeypatch
+    ):
+        kernel = tmp_path / "vmlinux"
+        rootfs = tmp_path / "rootfs.ext4"
+        kernel.write_text("kernel", encoding="utf-8")
+        rootfs.write_text("rootfs", encoding="utf-8")
+        monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+        monkeypatch.setenv("ARC_FC_REAL_EXEC", "1")
+        monkeypatch.setenv("ARC_FIRECRACKER_KERNEL", str(kernel))
+        monkeypatch.setenv("ARC_FIRECRACKER_ROOTFS", str(rootfs))
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm.platform.system", lambda: "Linux"
+        )
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm._firecracker_binary",
+            lambda: "/usr/bin/firecracker",
+        )
+        original_exists = __import__("pathlib", fromlist=["Path"]).Path.exists
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm.Path.exists",
+            lambda self: True if str(self) == "/dev/kvm" else original_exists(self),
+        )
+        monkeypatch.setattr("agent_runtime_cockpit.isolation.microvm.os.access", lambda *_: True)
+
+        def fake_run(argv, *, timeout_seconds, max_bytes):
+            assert "--config-file" in argv
+            return (
+                __import__(
+                    "agent_runtime_cockpit.isolation.base", fromlist=["IsolationResult"]
+                ).IsolationResult(
+                    exit_code=0,
+                    stdout="x" * (max_bytes + 10),
+                    stderr="",
+                    provider="microvm",
+                    stdout_truncated=True,
+                ),
+                None,
+            )
+
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm._run_firecracker_process", fake_run
+        )
+        runner = FirecrackerProofRunner(workspace_root=tmp_path, instance_name="arc-fc-proof")
+        result = runner.run(["ip", "route"])
+        assert result.teardown_attempted is True
+        assert result.lifecycle == [
+            "preflight",
+            "create_config",
+            "start_vm",
+            "proof_blocked",
+            "teardown",
+        ]
+        assert result.network_interfaces_configured is False
+        assert result.public_execution_enabled is False
+        assert result.result.stdout_truncated is True
+        assert "guest command channel" in result.proof_blocker
 
 
 # ---------------------------------------------------------------------------

@@ -47,6 +47,25 @@ class TestMicroVMExecuteAlwaysRaises:
 
             asyncio.run(provider.execute(["echo", "hello"], cwd=tmp_path))
 
+    def test_microvm_execute_raises_with_all_firecracker_proof_gates_set(
+        self, monkeypatch, tmp_path
+    ):
+        """Private proof gates must not unblock public execute()."""
+        kernel = tmp_path / "vmlinux"
+        rootfs = tmp_path / "rootfs.ext4"
+        kernel.write_text("kernel", encoding="utf-8")
+        rootfs.write_text("rootfs", encoding="utf-8")
+        monkeypatch.setenv("ARC_MICROVM_EXEC_ENABLED", "1")
+        monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+        monkeypatch.setenv("ARC_FC_REAL_EXEC", "1")
+        monkeypatch.setenv("ARC_FIRECRACKER_KERNEL", str(kernel))
+        monkeypatch.setenv("ARC_FIRECRACKER_ROOTFS", str(rootfs))
+        provider = MicroVMIsolationProvider()
+        with pytest.raises(NotImplementedError, match="microVM execution not yet available"):
+            import asyncio
+
+            asyncio.run(provider.execute(["ip", "route"], cwd=tmp_path))
+
     def test_microvm_execute_error_message_references_adr(self, tmp_path):
         """execute() error message must reference ADR-024."""
         provider = MicroVMIsolationProvider()

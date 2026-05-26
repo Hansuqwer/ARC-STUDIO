@@ -2,7 +2,7 @@
 
 **Status:** Accepted — implementation blocked (see P1–P7 status below)  
 **Date:** 2026-05-26  
-**Last updated:** 2026-05-26 — Firecracker/Cloud Hypervisor proof path added; strict public microVM remains blocked  
+**Last updated:** 2026-05-26 — private Firecracker proof runner added; strict public microVM remains blocked  
 **Authors:** ARC Studio sandbox team  
 **Related:** Phase 37 (R38), `docs/research/sandbox-and-microvm.md`, `docs/research/microvm-p1-p7-status.md`, ADR-014 (security architecture)
 
@@ -18,7 +18,7 @@ Linux (Firecracker). As of Phase 37.14 the following is true:
 - `MicroVMIsolationProvider.execute()` always raises `NotImplementedError`.
 - `arc sandbox run --provider microvm` is blocked at the provider layer.
 - Lima harness exists as an internal opt-in helper only.
-- Firecracker/Cloud Hypervisor are preflight/doctor/design-proof only.
+- Firecracker has a private Linux/KVM host-gated proof harness; Cloud Hypervisor remains scaffold/preflight only.
 - No real microVM command execution has been proven in tests.
 
 This ADR defines the precise prerequisites, gate mechanism, platform
@@ -83,7 +83,7 @@ referencing this ADR.
 | Platform | Provider | Status |
 |---|---|---|
 | macOS (≥ 13, Apple Silicon or Intel) | Lima / Apple Virtualization.framework | **Low-security harness only**; Lima default/user-v2 networking is network-present and cannot currently satisfy P2 |
-| Linux (x86_64, aarch64 with KVM) | Firecracker (primary), Cloud Hypervisor (secondary) | Strict no-network target; current support is host-gated proof harness/preflight only; requires /dev/kvm + binary + ARC_MICROVM_EXEC_ENABLED=1 only after P1-P7 proof |
+| Linux (x86_64, aarch64 with KVM) | Firecracker (primary), Cloud Hypervisor (secondary) | Strict no-network target; current support is private host-gated Firecracker proof harness + preflight only; public execution requires /dev/kvm + binary + ARC_MICROVM_EXEC_ENABLED=1 only after P1-P7 proof |
 | Windows | — | **Explicitly unsupported**; emit clear error: "microVM execution is not supported on Windows" |
 | Other (FreeBSD, etc.) | — | Blocked; `microvm_preflight()` returns `status: blocked` |
 
@@ -168,7 +168,7 @@ are mandatory. Missing any of these fields is a schema violation.
 - `arc sandbox run --provider microvm` still produces a blocked result.
 - `ARC_MICROVM_EXEC_ENABLED` is not yet read by any code.
 - Lima harness is still internal / not wired to public execution.
-- Firecracker is still preflight/doctor only.
+- Firecracker is still blocked for public execution; only a private host-gated proof harness exists.
 
 ### What must be done before unblocking
 
@@ -188,8 +188,8 @@ Full detail: `docs/research/microvm-p1-p7-status.md`
 
 | P# | Description | Status |
 |---|---|---|
-| P1 | Lifecycle proof | Partial — fake tests pass; real host tests added but `ARC_LIMA_REAL_EXEC=1` not yet run end-to-end |
-| P2 | Network-off proof | **Design/preflight only** — Lima is low-security/network-present. Firecracker no-NIC config generation exists, but real boot/no-default-route/curl-fails proof has not run. |
+| P1 | Lifecycle proof | Partial — fake tests pass; private Firecracker proof runner can start/teardown behind Linux/KVM gates, but real host proof and guest exec are not proven |
+| P2 | Network-off proof | **Host-gated proof harness only** — Lima is low-security/network-present. Firecracker no-NIC config generation exists, but real guest no-default-route/curl-fails proof has not run because command channel/rootfs agent is missing. |
 | P3 | Workspace-mount proof | Partial — code-level escape guard added + sentinel test; virtiofs symlink pass-through gap remains |
 | P4 | Teardown proof | Partial — code-level harness teardown proven; real-host teardown pending |
 | P5 | Symlink-escape proof | Blocked by Lima P2 — code-level `is_path_within_root()` + 19 tests; real-host Lima test `test_real_lima_symlink_escape_blocked` xfails on this host because network proof blocks user argv before symlink traversal can be exercised |

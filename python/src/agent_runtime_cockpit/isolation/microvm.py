@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import os
 import platform
+import json
 import shutil
+import signal
 import subprocess
 import tempfile
 import time
@@ -190,6 +192,8 @@ class FirecrackerHarnessResult(BaseModel):
     network_interfaces_configured: bool = False
     kvm_available: bool = False
     teardown_attempted: bool = False
+    public_execution_enabled: bool = False
+    proof_blocker: str | None = None
 
 
 class FirecrackerHarnessError(RuntimeError):
@@ -244,6 +248,300 @@ def firecracker_real_exec_available() -> bool:
 # Type alias for an injectable fake Firecracker runner used in tests.
 # Signature: (argv: list[str], timeout_seconds: int, max_bytes: int) -> IsolationResult
 _FirecrackerFakeRunner = Callable[[list[str], int, int], IsolationResult]
+
+
+class FirecrackerProofRunResult(BaseModel):
+    """Private host-gated Firecracker proof runner result."""
+
+    model_config = ConfigDict(frozen=True)
+
+    command: list[str]
+    instance_name: str
+    temp_dir: str
+    api_socket: str
+    config_path: str
+    result: IsolationResult
+    lifecycle: list[str]
+    network_proof_passed: bool = False
+    workspace_sentinel_readable: bool = False
+    symlink_escape_blocked: bool = False
+    teardown_attempted: bool = False
+    network_interfaces_configured: bool = False
+    public_execution_enabled: bool = False
+    proof_blocker: str | None = None
+
+
+def _firecracker_binary() -> str | None:
+    binary = shutil.which("firecracker")
+    return str(binary) if binary else None
+
+
+def firecracker_proof_gates() -> dict[str, object]:
+    """Return private Firecracker proof-runner gates; never starts a VM."""
+    kernel = os.environ.get("ARC_FIRECRACKER_KERNEL")
+    rootfs = os.environ.get("ARC_FIRECRACKER_ROOTFS")
+    kernel_path = Path(kernel) if kernel else None
+    rootfs_path = Path(rootfs) if rootfs else None
+    kvm_path = Path("/dev/kvm")
+    binary = _firecracker_binary()
+    gates = {
+        "linux": platform.system() == "Linux",
+        "kvm_exists": kvm_path.exists(),
+        "kvm_rw": kvm_path.exists() and os.access(kvm_path, os.R_OK | os.W_OK),
+        "firecracker_binary": binary,
+        "integration_gate": os.environ.get("ARC_MICROVM_INTEGRATION") == "1",
+        "real_exec_gate": os.environ.get("ARC_FC_REAL_EXEC") == "1",
+        "kernel_path": str(kernel_path) if kernel_path else None,
+        "kernel_exists": bool(kernel_path and kernel_path.exists()),
+        "rootfs_path": str(rootfs_path) if rootfs_path else None,
+        "rootfs_exists": bool(rootfs_path and rootfs_path.exists()),
+    }
+    blockers: list[str] = []
+    if not gates["linux"]:
+        blockers.append("Linux required")
+    if not gates["kvm_exists"]:
+        blockers.append("/dev/kvm missing")
+    elif not gates["kvm_rw"]:
+        blockers.append("/dev/kvm not read/write accessible")
+    if not binary:
+        blockers.append("firecracker binary missing")
+    if not gates["integration_gate"]:
+        blockers.append("ARC_MICROVM_INTEGRATION=1 required")
+    if not gates["real_exec_gate"]:
+        blockers.append("ARC_FC_REAL_EXEC=1 required")
+    if not gates["kernel_exists"]:
+        blockers.append("ARC_FIRECRACKER_KERNEL missing/unreadable")
+    if not gates["rootfs_exists"]:
+        blockers.append("ARC_FIRECRACKER_ROOTFS missing/unreadable")
+    gates["ready"] = not blockers
+    gates["blockers"] = blockers
+    return gates
+
+
+def _terminate_process_group(proc: subprocess.Popen[str] | None) -> None:
+    if proc is None or proc.poll() is not None:
+        return
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+        proc.wait(timeout=5)
+    except Exception:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except Exception:
+            pass
+
+
+def _run_firecracker_process(
+    argv: list[str], *, timeout_seconds: int, max_bytes: int
+) -> tuple[IsolationResult, subprocess.Popen[str] | None]:
+    """Start Firecracker with process-group isolation and bounded pipe drain."""
+    start = time.monotonic()
+    proc: subprocess.Popen[str] | None = None
+    try:
+        proc = subprocess.Popen(
+            argv,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+        )
+        try:
+            stdout_raw, stderr_raw = proc.communicate(timeout=timeout_seconds)
+            killed = False
+            kill_reason = None
+        except subprocess.TimeoutExpired:
+            killed = True
+            kill_reason = "timeout"
+            _terminate_process_group(proc)
+            stdout_raw, stderr_raw = proc.communicate()
+        stdout, stdout_truncated = cap_output(stdout_raw or "", max_bytes)
+        stderr, stderr_truncated = cap_output(stderr_raw or "", max_bytes)
+        redacted_stdout = redact_output(stdout)
+        redacted_stderr = redact_output(stderr)
+        return (
+            IsolationResult(
+                exit_code=proc.returncode if proc.returncode is not None else -1,
+                stdout=redacted_stdout,
+                stderr=redacted_stderr,
+                duration_ms=int((time.monotonic() - start) * 1000),
+                pid=proc.pid,
+                killed=killed,
+                kill_reason=kill_reason,
+                provider="microvm",
+                stdout_truncated=stdout_truncated,
+                stderr_truncated=stderr_truncated,
+                redaction_applied=redacted_stdout != stdout or redacted_stderr != stderr,
+            ),
+            proc,
+        )
+    except Exception as exc:
+        _terminate_process_group(proc)
+        return (
+            IsolationResult(
+                exit_code=-1,
+                stderr=str(exc),
+                duration_ms=int((time.monotonic() - start) * 1000),
+                provider="microvm",
+            ),
+            proc,
+        )
+
+
+class FirecrackerProofRunner:
+    """Private Linux/KVM host-gated Firecracker proof runner.
+
+    This is a proof harness, not public microVM execution. It starts only when
+    all proof gates are present. Guest command-channel proof remains blocked
+    until ARC owns a rootfs/init/vsock/serial agent.
+    """
+
+    def __init__(
+        self,
+        *,
+        workspace_root: Path,
+        instance_name: str | None = None,
+        max_bytes: int = 65_536,
+    ) -> None:
+        check_workspace_escape(workspace_root, workspace_root.parent)
+        self.workspace_root = workspace_root.resolve()
+        self.instance_name = instance_name or f"arc-fc-proof-{uuid.uuid4().hex[:12]}"
+        self.max_bytes = max_bytes
+
+    def run(self, command: list[str], *, timeout_seconds: int = 300) -> FirecrackerProofRunResult:
+        if not command:
+            raise ValueError("missing command")
+        started_at = utc_now()
+        gates = firecracker_proof_gates()
+        if not gates["ready"]:
+            message = "; ".join(gates["blockers"])
+            result = self._blocked_result(command, message, started_at, utc_now())
+            raise FirecrackerHarnessError(result.result.stderr)
+
+        lifecycle: list[str] = ["preflight"]
+        teardown_attempted = False
+        proc: subprocess.Popen[str] | None = None
+        result = IsolationResult(exit_code=-1, stderr="not started", provider="microvm")
+        proof_blocker = "guest command channel requires ARC-owned rootfs/init/vsock/serial agent"
+        with tempfile.TemporaryDirectory(prefix="arc-firecracker-proof-") as tmp:
+            temp_dir = Path(tmp)
+            api_socket = temp_dir / f"{self.instance_name}.socket"
+            config_path = temp_dir / "firecracker.json"
+            sentinel = self.workspace_root / "arc-sentinel.txt"
+            escape = self.workspace_root / "arc-host-escape-link"
+            sentinel.write_text("arc-firecracker-proof\n", encoding="utf-8")
+            try:
+                if not escape.exists():
+                    escape.symlink_to(Path("/etc/passwd"))
+            except OSError:
+                pass
+            plan = build_firecracker_no_network_run_plan(
+                command,
+                kernel_path=Path(str(gates["kernel_path"])),
+                rootfs_path=Path(str(gates["rootfs_path"])),
+                work_dir=temp_dir,
+                instance_name=self.instance_name,
+            )
+            config_path.write_text(
+                json.dumps(plan.config.to_firecracker_config(), sort_keys=True), encoding="utf-8"
+            )
+            lifecycle.append("create_config")
+            argv = [
+                str(gates["firecracker_binary"]),
+                "--api-sock",
+                str(api_socket),
+                "--config-file",
+                str(config_path),
+            ]
+            result, proc = _run_firecracker_process(
+                argv, timeout_seconds=min(timeout_seconds, 30), max_bytes=self.max_bytes
+            )
+            lifecycle.append("start_vm")
+            lifecycle.append("proof_blocked")
+            teardown_attempted = True
+            _terminate_process_group(proc)
+            lifecycle.append("teardown")
+            harness_result = FirecrackerProofRunResult(
+                command=command,
+                instance_name=self.instance_name,
+                temp_dir=str(temp_dir),
+                api_socket=str(api_socket),
+                config_path=str(config_path),
+                result=IsolationResult(
+                    exit_code=-1,
+                    stdout=result.stdout,
+                    stderr=proof_blocker,
+                    provider="microvm",
+                    stdout_truncated=result.stdout_truncated,
+                    stderr_truncated=result.stderr_truncated,
+                    redaction_applied=result.redaction_applied,
+                ),
+                lifecycle=lifecycle,
+                teardown_attempted=True,
+                proof_blocker=proof_blocker,
+            )
+            self._persist_audit(
+                command=command,
+                lifecycle=lifecycle,
+                result=result,
+                network_proof_passed=False,
+                teardown_attempted=teardown_attempted,
+                started_at=started_at,
+                ended_at=utc_now(),
+            )
+            return harness_result
+
+    def _blocked_result(
+        self, command: list[str], reason: str, started_at: str, ended_at: str
+    ) -> FirecrackerProofRunResult:
+        result = FirecrackerProofRunResult(
+            command=command,
+            instance_name=self.instance_name,
+            temp_dir="",
+            api_socket="",
+            config_path="",
+            result=IsolationResult(exit_code=-1, stderr=reason, provider="microvm"),
+            lifecycle=["preflight"],
+            teardown_attempted=False,
+            proof_blocker=reason,
+        )
+        self._persist_audit(
+            command=command,
+            lifecycle=result.lifecycle,
+            result=result.result,
+            network_proof_passed=False,
+            teardown_attempted=False,
+            started_at=started_at,
+            ended_at=ended_at,
+        )
+        return result
+
+    def _persist_audit(
+        self,
+        *,
+        command: list[str],
+        lifecycle: list[str],
+        result: IsolationResult,
+        network_proof_passed: bool,
+        teardown_attempted: bool,
+        started_at: str,
+        ended_at: str,
+    ) -> None:
+        event = build_microvm_audit_event(
+            command=command,
+            workspace_root=self.workspace_root,
+            provider_runtime="firecracker",
+            instance_name=self.instance_name,
+            lifecycle=lifecycle,
+            network_proof_passed=network_proof_passed,
+            teardown_attempted=teardown_attempted,
+            started_at=started_at,
+            ended_at=ended_at,
+            exit_code=result.exit_code,
+            stdout_truncated=result.stdout_truncated,
+            stderr_truncated=result.stderr_truncated,
+            redaction_applied=result.redaction_applied,
+        )
+        persist_sandbox_audit_event(event)
 
 
 class FirecrackerIntegrationHarness:
