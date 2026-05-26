@@ -2103,6 +2103,15 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Real Lima execution remains unproven until a host opt-in integration test passes.
 - Verified: targeted sandbox/microVM tests 105 passed, 1 skipped; full Python 2644 passed, 22 skipped, 3 xfailed; ruff clean; pnpm lint/test/build/typecheck green; e2e smoke 11 passed, 4 skipped, 0 failed.
 
+#### Slice 37.14: Opt-In Lima Smoke Test (CI-skip) ✓
+- Added `python/tests/isolation/test_lima_smoke.py` with `@pytest.mark.skipif(not lima_integration_available(), ...)`.
+- Smoke test covers: full lifecycle (template→start→network_proof→run→teardown), network_proof_passed, teardown_attempted, exit_code == 0, instance_name in result, teardown-on-start-failure.
+- Uses fake runner — does NOT start a real Lima VM; real host execution is a follow-up once a developer with Lima proves the lifecycle end-to-end.
+- CI does not set `ARC_MICROVM_INTEGRATION=1`; all smoke tests skipped in CI cleanly.
+- Always-run skip-safety tests confirm `lima_integration_available()` returns False without gate/binary.
+- Real Lima execution NOT proven on this host (CI-skipped).
+- Verified: targeted sandbox/microVM tests (including smoke) pass; CI posture confirmed.
+
 ### CLI/IDE Integration Points
 
 - `arc sandbox run --json` — real subprocess execution under sandbox policy; Theia widget can invoke for safe command execution
