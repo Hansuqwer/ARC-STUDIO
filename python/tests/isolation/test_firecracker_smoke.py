@@ -29,6 +29,8 @@ from agent_runtime_cockpit.isolation.microvm import (
     FirecrackerIntegrationHarness,
     FirecrackerProofRunner,
     firecracker_proof_gates,
+    parse_firecracker_guest_proof,
+    render_firecracker_guest_proof_init,
     build_cloud_hypervisor_no_network_run_plan,
     build_firecracker_no_network_run_plan,
     firecracker_integration_available,
@@ -266,6 +268,85 @@ class TestFirecrackerProofRunner:
         assert result.public_execution_enabled is False
         assert result.result.stdout_truncated is True
         assert "guest command channel" in result.proof_blocker
+
+    def test_guest_proof_marker_parser_accepts_success_markers(self):
+        proof = parse_firecracker_guest_proof(
+            "boot\n"
+            "ARC_FC_PROOF no_default_route=1\n"
+            "ARC_FC_PROOF curl_failed=1\n"
+            "ARC_FC_PROOF sentinel_readable=1\n"
+            "ARC_FC_PROOF symlink_escape_blocked=1\n"
+        )
+        assert proof.marker_seen is True
+        assert proof.network_proof_passed is True
+        assert proof.workspace_proof_passed is True
+
+    def test_guest_proof_marker_parser_rejects_default_route(self):
+        proof = parse_firecracker_guest_proof(
+            "ARC_FC_PROOF no_default_route=0\nARC_FC_PROOF curl_failed=1\n"
+        )
+        assert proof.marker_seen is True
+        assert proof.network_proof_passed is False
+
+    def test_guest_proof_init_snippet_is_proof_only(self):
+        snippet = render_firecracker_guest_proof_init()
+        assert "ARC_FC_PROOF no_default_route" in snippet
+        assert "curl --connect-timeout 2 https://example.com" in snippet
+        assert "/workspace/arc-sentinel.txt" in snippet
+        assert "/workspace/arc-host-escape-link" in snippet
+
+    def test_proof_runner_consumes_guest_markers_without_public_exec(self, tmp_path, monkeypatch):
+        kernel = tmp_path / "vmlinux"
+        rootfs = tmp_path / "rootfs.ext4"
+        kernel.write_text("kernel", encoding="utf-8")
+        rootfs.write_text("rootfs", encoding="utf-8")
+        monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+        monkeypatch.setenv("ARC_FC_REAL_EXEC", "1")
+        monkeypatch.setenv("ARC_FIRECRACKER_KERNEL", str(kernel))
+        monkeypatch.setenv("ARC_FIRECRACKER_ROOTFS", str(rootfs))
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm.platform.system", lambda: "Linux"
+        )
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm._firecracker_binary",
+            lambda: "/usr/bin/firecracker",
+        )
+        original_exists = __import__("pathlib", fromlist=["Path"]).Path.exists
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm.Path.exists",
+            lambda self: True if str(self) == "/dev/kvm" else original_exists(self),
+        )
+        monkeypatch.setattr("agent_runtime_cockpit.isolation.microvm.os.access", lambda *_: True)
+
+        def fake_run(argv, *, timeout_seconds, max_bytes):
+            assert "--config-file" in argv
+            return (
+                __import__(
+                    "agent_runtime_cockpit.isolation.base", fromlist=["IsolationResult"]
+                ).IsolationResult(
+                    exit_code=0,
+                    stdout=(
+                        "ARC_FC_PROOF no_default_route=1\n"
+                        "ARC_FC_PROOF curl_failed=1\n"
+                        "ARC_FC_PROOF sentinel_readable=1\n"
+                        "ARC_FC_PROOF symlink_escape_blocked=1\n"
+                    ),
+                    provider="microvm",
+                ),
+                None,
+            )
+
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm._run_firecracker_process", fake_run
+        )
+        runner = FirecrackerProofRunner(workspace_root=tmp_path, instance_name="arc-fc-proof")
+        result = runner.run(["ip", "route"])
+        assert "guest_proof" in result.lifecycle
+        assert result.network_proof_passed is True
+        assert result.workspace_sentinel_readable is True
+        assert result.symlink_escape_blocked is True
+        assert result.proof_blocker is None
+        assert result.public_execution_enabled is False
 
 
 # ---------------------------------------------------------------------------

@@ -271,6 +271,79 @@ class FirecrackerProofRunResult(BaseModel):
     proof_blocker: str | None = None
 
 
+class FirecrackerGuestProof(BaseModel):
+    """Proof-only guest marker results parsed from serial/stdout output."""
+
+    model_config = ConfigDict(frozen=True)
+
+    marker_seen: bool = False
+    no_default_route: bool = False
+    curl_failed: bool = False
+    sentinel_readable: bool = False
+    symlink_escape_blocked: bool = False
+    raw: dict[str, str] = {}
+
+    @property
+    def network_proof_passed(self) -> bool:
+        return self.no_default_route and self.curl_failed
+
+    @property
+    def workspace_proof_passed(self) -> bool:
+        return self.sentinel_readable and self.symlink_escape_blocked
+
+
+FIRECRACKER_PROOF_MARKER = "ARC_FC_PROOF "
+
+
+def parse_firecracker_guest_proof(output: str) -> FirecrackerGuestProof:
+    """Parse proof-only guest markers emitted by ARC rootfs/init agents."""
+    raw: dict[str, str] = {}
+    for line in output.splitlines():
+        if not line.startswith(FIRECRACKER_PROOF_MARKER):
+            continue
+        payload = line.removeprefix(FIRECRACKER_PROOF_MARKER).strip()
+        if "=" not in payload:
+            continue
+        key, value = payload.split("=", 1)
+        raw[key.strip()] = value.strip()
+    return FirecrackerGuestProof(
+        marker_seen=bool(raw),
+        no_default_route=raw.get("no_default_route") == "1",
+        curl_failed=raw.get("curl_failed") == "1",
+        sentinel_readable=raw.get("sentinel_readable") == "1",
+        symlink_escape_blocked=raw.get("symlink_escape_blocked") == "1",
+        raw=raw,
+    )
+
+
+def render_firecracker_guest_proof_init() -> str:
+    """Return proof-only init snippet expected inside a dedicated ARC rootfs."""
+    return """#!/bin/sh
+set +e
+if ip route 2>/dev/null | grep -q '^default'; then
+  echo 'ARC_FC_PROOF no_default_route=0'
+else
+  echo 'ARC_FC_PROOF no_default_route=1'
+fi
+if curl --connect-timeout 2 https://example.com >/tmp/arc-curl.out 2>/tmp/arc-curl.err; then
+  echo 'ARC_FC_PROOF curl_failed=0'
+else
+  echo 'ARC_FC_PROOF curl_failed=1'
+fi
+if cat /workspace/arc-sentinel.txt >/dev/null 2>&1; then
+  echo 'ARC_FC_PROOF sentinel_readable=1'
+else
+  echo 'ARC_FC_PROOF sentinel_readable=0'
+fi
+if cat /workspace/arc-host-escape-link >/tmp/arc-escape.out 2>/tmp/arc-escape.err; then
+  echo 'ARC_FC_PROOF symlink_escape_blocked=0'
+else
+  echo 'ARC_FC_PROOF symlink_escape_blocked=1'
+fi
+reboot -f 2>/dev/null || poweroff -f 2>/dev/null || halt -f
+"""
+
+
 def _firecracker_binary() -> str | None:
     binary = shutil.which("firecracker")
     return str(binary) if binary else None
@@ -456,7 +529,12 @@ class FirecrackerProofRunner:
                 argv, timeout_seconds=min(timeout_seconds, 30), max_bytes=self.max_bytes
             )
             lifecycle.append("start_vm")
-            lifecycle.append("proof_blocked")
+            guest_proof = parse_firecracker_guest_proof(f"{result.stdout}\n{result.stderr}")
+            if guest_proof.marker_seen:
+                lifecycle.append("guest_proof")
+                proof_blocker = None
+            else:
+                lifecycle.append("proof_blocked")
             teardown_attempted = True
             _terminate_process_group(proc)
             lifecycle.append("teardown")
@@ -469,13 +547,16 @@ class FirecrackerProofRunner:
                 result=IsolationResult(
                     exit_code=-1,
                     stdout=result.stdout,
-                    stderr=proof_blocker,
+                    stderr=proof_blocker or result.stderr,
                     provider="microvm",
                     stdout_truncated=result.stdout_truncated,
                     stderr_truncated=result.stderr_truncated,
                     redaction_applied=result.redaction_applied,
                 ),
                 lifecycle=lifecycle,
+                network_proof_passed=guest_proof.network_proof_passed,
+                workspace_sentinel_readable=guest_proof.sentinel_readable,
+                symlink_escape_blocked=guest_proof.symlink_escape_blocked,
                 teardown_attempted=True,
                 proof_blocker=proof_blocker,
             )
@@ -483,7 +564,7 @@ class FirecrackerProofRunner:
                 command=command,
                 lifecycle=lifecycle,
                 result=result,
-                network_proof_passed=False,
+                network_proof_passed=guest_proof.network_proof_passed,
                 teardown_attempted=teardown_attempted,
                 started_at=started_at,
                 ended_at=utc_now(),
