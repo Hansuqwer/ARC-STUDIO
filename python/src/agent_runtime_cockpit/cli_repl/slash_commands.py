@@ -193,7 +193,7 @@ def _build_registry():
     registry.register(
         CommandDef(
             name="sessions",
-            help_text="List saved sessions",
+            help_text="List, resume, or search saved sessions",
             category="session",
             handler=cmd_sessions,
             gates_required=[],
@@ -202,12 +202,14 @@ def _build_registry():
             requires_events=[],
             privileged=False,
             trust_required="user",
+            usage="/sessions [list]|resume <session_id>|search <query>",
+            subcommands=["list", "resume", "search"],
         )
     )
     registry.register(
         CommandDef(
             name="history",
-            help_text="Show recent messages",
+            help_text="Show or search recent messages",
             category="session",
             handler=cmd_history,
             gates_required=[],
@@ -216,6 +218,8 @@ def _build_registry():
             requires_events=[],
             privileged=False,
             trust_required="user",
+            usage="/history [N]|search <query>",
+            subcommands=["search"],
         )
     )
 
@@ -950,6 +954,15 @@ def cmd_summary(_arg: str, session: ChatSession) -> str:
 
 
 def cmd_sessions(_arg: str, _session: ChatSession) -> str:
+    parts = _arg.strip().split(maxsplit=1)
+    subcommand = parts[0] if parts else "list"
+    rest = parts[1] if len(parts) > 1 else ""
+    if subcommand == "resume":
+        return _cmd_sessions_resume(rest, _session)
+    if subcommand == "search":
+        return _cmd_sessions_search(rest)
+    if subcommand not in {"list", ""}:
+        return "Usage: /sessions [list]|resume <session_id>|search <query>"
     sessions = ChatSession.list_sessions()
     if not sessions:
         return "No saved sessions."
@@ -960,7 +973,50 @@ def cmd_sessions(_arg: str, _session: ChatSession) -> str:
     return "\n".join(lines)
 
 
+def _cmd_sessions_resume(session_id: str, session: ChatSession) -> str:
+    clean = session_id.strip()
+    if not clean:
+        return "Usage: /sessions resume <session_id>"
+    loaded = ChatSession.load(clean)
+    if loaded is None:
+        return f"Session not found: {clean}"
+    session.id = loaded.id
+    session.mode = loaded.mode
+    session.runtime_mode = loaded.runtime_mode
+    session.profile_id = loaded.profile_id
+    session.isolation_id = loaded.isolation_id
+    session.allow_paid_calls = loaded.allow_paid_calls
+    session.tools_enabled = loaded.tools_enabled
+    session.max_tool_iterations = loaded.max_tool_iterations
+    session.available_tools = loaded.available_tools
+    session.created_at = loaded.created_at
+    session.updated_at = loaded.updated_at
+    session.history = list(loaded.history)
+    session.metadata = dict(loaded.metadata)
+    return f"Resumed session {session.id}: {len(session.history)} messages."
+
+
+def _cmd_sessions_search(query: str) -> str:
+    needle = query.strip().lower()
+    if not needle:
+        return "Usage: /sessions search <query>"
+    matches: list[str] = []
+    for saved in ChatSession.list_sessions():
+        for message in saved.history:
+            content = message.get("content", "")
+            if needle in content.lower():
+                role = message.get("role", "?")
+                matches.append(f"  {saved.id[:16]}  [{role}] {content[:160]}")
+                break
+    if not matches:
+        return "No matching sessions."
+    return "Session matches:\n" + "\n".join(matches[:20])
+
+
 def cmd_history(arg: str, session: ChatSession) -> str:
+    parts = arg.strip().split(maxsplit=1)
+    if parts[:1] == ["search"]:
+        return _cmd_history_search(parts[1] if len(parts) > 1 else "", session)
     n = int(arg) if arg.isdigit() else 10
     recent = session.history[-n:]
     if not recent:
@@ -971,6 +1027,21 @@ def cmd_history(arg: str, session: ChatSession) -> str:
         content = msg.get("content", "")[:200]
         lines.append(f"[{role}] {content}")
     return "\n".join(lines)
+
+
+def _cmd_history_search(query: str, session: ChatSession) -> str:
+    needle = query.strip().lower()
+    if not needle:
+        return "Usage: /history search <query>"
+    matches: list[str] = []
+    for index, msg in enumerate(session.history, start=1):
+        content = msg.get("content", "")
+        if needle in content.lower():
+            role = msg.get("role", "?")
+            matches.append(f"{index}: [{role}] {content[:200]}")
+    if not matches:
+        return "No matching history messages."
+    return "History matches:\n" + "\n".join(matches[:20])
 
 
 def cmd_version(_arg: str, _session: ChatSession) -> str:

@@ -1444,3 +1444,56 @@ class TestPhase41RemainingAdapters:
         for command in commands:
             result = handler.handle(command, session)
             assert result is not None, command
+
+
+class TestPhase416Sessions:
+    def test_sessions_resume_loads_saved_session(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("ARC_STUDIO_SESSIONS_DIR", str(tmp_path / "sessions_resume"))
+        saved = ChatSession(id="resume-me", mode="plan")
+        saved.add_message("user", "remember this")
+        saved.save()
+        current = ChatSession(id="current")
+
+        result = SlashCommandHandler().handle("/sessions resume resume-me", current)
+
+        assert "Resumed session resume-me" in str(result)
+        assert current.id == "resume-me"
+        assert current.mode == "plan"
+        assert current.history[0]["content"] == "remember this"
+
+    def test_sessions_resume_missing(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("ARC_STUDIO_SESSIONS_DIR", str(tmp_path / "sessions_missing"))
+        current = ChatSession(id="current")
+
+        result = SlashCommandHandler().handle("/sessions resume missing", current)
+
+        assert "Session not found" in str(result)
+        assert current.id == "current"
+
+    def test_sessions_search_saved_messages(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("ARC_STUDIO_SESSIONS_DIR", str(tmp_path / "sessions_search"))
+        saved = ChatSession(id="search-me")
+        saved.add_message("user", "needle phrase")
+        saved.save()
+
+        result = SlashCommandHandler().handle("/sessions search needle", ChatSession())
+
+        assert "Session matches" in str(result)
+        assert "search-me" in str(result)
+
+    def test_history_search_active_session(self):
+        session = ChatSession()
+        session.add_message("user", "find this local message")
+
+        result = SlashCommandHandler().handle("/history search local", session)
+
+        assert "History matches" in str(result)
+        assert "find this local message" in str(result)
+
+    def test_history_search_no_match(self):
+        session = ChatSession()
+        session.add_message("user", "unrelated")
+
+        result = SlashCommandHandler().handle("/history search absent", session)
+
+        assert "No matching history" in str(result)
