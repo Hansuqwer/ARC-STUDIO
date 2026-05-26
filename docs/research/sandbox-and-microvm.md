@@ -69,6 +69,7 @@ Real now:
 - supervisor executor callbacks now have a central timeout wrapper that emits terminal `RUN_FAILED`, autopsy, receipt, and clears active state
 - path-intent extraction covers more common output/input switches (`--output`, `--outfile`, `--dest`, `--files-from`, `of=`), plus simple `cp`/`mv` destination and archive-output suffixes
 - opt-in microVM integration skeleton exists as private code only; public `MicroVMIsolationProvider.execute()` remains disabled until proof exists
+- Lima/Firecracker harness attempts emit persisted `MICROVM_COMMAND`/`MICROVM_DENIED` sandbox audit events with `public_execution_enabled=false`
 
 Design-only now:
 - container provider as production fallback
@@ -139,6 +140,7 @@ Current opt-in Lima harness:
 | Firecracker execution | Not implemented | Kernel/rootfs lifecycle, mount policy, network-off proof, jailer config, teardown |
 | Lima execution | Not implemented | VM create/start/shell/delete cycle, mount policy, network-off proof, teardown |
 | Integration test skeleton | Real (gated) | Tests exist but require local runtime; CI skips |
+| Harness audit events | Real for internal harnesses | `MICROVM_COMMAND`/`MICROVM_DENIED` persisted for Lima/Firecracker harness attempts; public execution remains blocked |
 | Production-ready claim | Not claimed | Would need full execution + opt-in CI tests + network-off proof |
 
 ## Policy Config

@@ -19,15 +19,16 @@ prerequisites are Satisfied (not Partial or Missing).
 | P4 | Teardown proof: cleanup on success/failure/timeout/SIGINT | **Partial** | `LimaIntegrationHarness.run()` calls `limactl delete -f` in `finally` block. 4+ fake-runner tests verify teardown fires on start failure, network proof failure, and success. `test_real_lima_teardown_on_start_failure` added (real limactl, short timeout). Real teardown skipped until `ARC_LIMA_REAL_EXEC=1`. SIGINT/host-crash teardown not proven. | Run real-host teardown tests. Add SIGINT simulation test: send SIGINT to harness parent process and verify Lima VM is subsequently listed as deleted by `limactl list`. |
 | P5 | Symlink/path-traversal escape denied in guest mount | **Partial** | Code-level: `is_path_within_root()` correctly denies dangling, chained, and cross-parent symlinks (19 tests). Lima virtiofs passes symlinks through: a symlink inside workspace pointing to `/etc/passwd` WILL be readable in the guest at `/workspace/link`. Code-level guard in `__init__` only prevents the workspace_root itself from being misdirected. | Add a real-host test: (1) create a symlink inside tmp_path pointing to `/etc/passwd`, (2) start Lima VM, (3) run `cat /workspace/symlink-to-etc-passwd`, (4) assert it fails with permission denied or is not accessible. This requires real Lima VM and is the highest-risk remaining blocker. |
 | P6 | stdout/stderr caps enforced without full buffering | **Satisfied** | `SubprocessIsolationProvider` uses bounded stream readers (replaced `communicate()`). `LimaIntegrationHarness._limactl()` uses `_run_limactl()` which calls `cap_output()` with 65_536 byte cap and returns `stdout_truncated` flag. Existing bounded-output tests pass. | None for code-level. Verify on real Lima VM that large output is truncated without pipe deadlock — can be done with `ARC_LIMA_REAL_EXEC=1`. |
-| P7 | Audit event emitted for every execution | **Missing** | `LimaIntegrationHarness.run()` does not emit any audit event. `MicroVMIsolationProvider.execute()` does not call any audit helper because it always raises. The audit event schema is defined in ADR-024 but not implemented. | Implement `_emit_microvm_audit_event()` helper in `security/sandbox.py` or `isolation/microvm.py`. Call it from `LimaIntegrationHarness.run()` at end of lifecycle (both allowed and denied). Add test verifying the event is emitted with required fields. |
+| P7 | Audit event emitted for every execution | **Satisfied for internal harnesses; public execution still blocked** | `build_microvm_audit_event()` records Lima/Firecracker harness command, workspace, runtime, instance, lifecycle, network proof, teardown, timestamps, exit code, truncation flags, and `public_execution_enabled=false`. Harness runs persist through `persist_sandbox_audit_event()`. Tests cover Lima allowed/denied and Firecracker allowed audit events. `MicroVMIsolationProvider.execute()` still always raises and therefore has no public execution event path. | Keep P7 as satisfied only for opt-in harnesses. If public execution is ever wired, add end-to-end CLI/provider audit tests before enabling `ARC_MICROVM_EXEC_ENABLED`. |
 
 ## Decision: ARC_MICROVM_EXEC_ENABLED wiring
 
 **Status: BLOCKED — do NOT wire.**
 
-Prerequisites P2 (network-off) and P7 (audit event) are not satisfied.
+Prerequisite P2 (network-off) is not satisfied.
 P1, P3, P4, P5 are partially satisfied (code-level proofs exist; real-host
-proofs are pending `ARC_LIMA_REAL_EXEC=1`).
+proofs are pending `ARC_LIMA_REAL_EXEC=1`). P7 is satisfied for internal
+Lima/Firecracker harness attempts only; public execution remains blocked.
 
 `ARC_MICROVM_EXEC_ENABLED` remains defined in ADR-024 only. It is NOT
 read by any code. `MicroVMIsolationProvider.execute()` still always raises
@@ -39,7 +40,7 @@ read by any code. `MicroVMIsolationProvider.execute()` still always raises
    - Find a Lima config to disable slirp (preferred).
    - Accept network-present context and remove P2 requirement (requires explicit decision in ADR-024 revision).
    - Implement in-guest firewall rule and prove it with curl-fails test.
-2. **P7**: Implement audit event emission in `LimaIntegrationHarness.run()`.
+2. **P7**: If public microVM execution is wired, add provider/CLI audit tests for that path.
 3. **P1, P3, P4, P5**: Run with `ARC_LIMA_REAL_EXEC=1` on a host with Lima + network access for image download.
 4. **P5 mount-level**: Add real-host symlink escape test inside Lima guest.
 5. Update this document and ADR-024 with real-host evidence.

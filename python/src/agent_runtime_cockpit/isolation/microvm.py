@@ -20,11 +20,14 @@ from typing import Callable, Optional
 from pydantic import BaseModel, ConfigDict
 
 from ..security.sandbox import (
+    build_microvm_audit_event,
     microvm_preflight,
     cap_output,
     render_lima_template,
     firecracker_doctor,
     check_workspace_escape,
+    persist_sandbox_audit_event,
+    utc_now,
 )
 from .base import IsolationProvider, IsolationResult
 from .subprocess import redact_output
@@ -197,6 +200,7 @@ class FirecrackerIntegrationHarness:
         network_proof_passed = False
         teardown_attempted = False
         result = IsolationResult(exit_code=-1, stderr="not started", provider="microvm")
+        started_at = utc_now()
 
         try:
             # Phase: preflight
@@ -254,7 +258,7 @@ class FirecrackerIntegrationHarness:
             self._run(["rm", "-rf", f"/tmp/{self.instance_name}.sock"], min(timeout_seconds, 10))
             self.lifecycle.append("teardown")
 
-        return FirecrackerHarnessResult(
+        harness_result = FirecrackerHarnessResult(
             command=command,
             instance_name=self.instance_name,
             kernel_path=str(kernel_path) if kernel_path else None,
@@ -265,6 +269,8 @@ class FirecrackerIntegrationHarness:
             kvm_available=kvm_available,
             teardown_attempted=teardown_attempted,
         )
+        self._persist_audit_event(harness_result, started_at, utc_now())
+        return harness_result
 
     def _run(self, argv: list[str], timeout_seconds: int) -> IsolationResult:
         if self.runner is not None:
@@ -274,6 +280,26 @@ class FirecrackerIntegrationHarness:
             "No runner injected and real Firecracker execution is not implemented "
             "(ADR-024); use a fake runner for tests"
         )
+
+    def _persist_audit_event(
+        self, result: FirecrackerHarnessResult, started_at: str, ended_at: str
+    ) -> None:
+        event = build_microvm_audit_event(
+            command=result.command,
+            workspace_root=self.workspace_root,
+            provider_runtime="firecracker",
+            instance_name=result.instance_name,
+            lifecycle=result.lifecycle,
+            network_proof_passed=result.network_proof_passed,
+            teardown_attempted=result.teardown_attempted,
+            started_at=started_at,
+            ended_at=ended_at,
+            exit_code=result.result.exit_code,
+            stdout_truncated=result.result.stdout_truncated,
+            stderr_truncated=result.result.stderr_truncated,
+            redaction_applied=result.result.redaction_applied,
+        )
+        persist_sandbox_audit_event(event)
 
 
 def build_microvm_run_plan(
@@ -488,6 +514,7 @@ class LimaIntegrationHarness:
         network_proof_passed = False
         teardown_attempted = False
         result = IsolationResult(exit_code=-1, stderr="not started", provider="microvm")
+        started_at = utc_now()
         try:
             start = self._limactl(["start", "--tty=false", str(tmp_path)], timeout_seconds)
             self.lifecycle.append("start")
@@ -540,7 +567,9 @@ class LimaIntegrationHarness:
                 tmp_path.unlink(missing_ok=True)
             except OSError:
                 pass
-        return self._result(command, result, network_proof_passed, teardown_attempted)
+        harness_result = self._result(command, result, network_proof_passed, teardown_attempted)
+        self._persist_audit_event(harness_result, started_at, utc_now())
+        return harness_result
 
     def _write_template(self) -> Path:
         yaml = render_lima_template(self.workspace_root, self.instance_name)
@@ -576,6 +605,26 @@ class LimaIntegrationHarness:
             network_proof_passed=network_proof_passed,
             teardown_attempted=teardown_attempted,
         )
+
+    def _persist_audit_event(
+        self, result: LimaHarnessResult, started_at: str, ended_at: str
+    ) -> None:
+        event = build_microvm_audit_event(
+            command=result.command,
+            workspace_root=self.workspace_root,
+            provider_runtime="lima",
+            instance_name=result.instance_name,
+            lifecycle=result.lifecycle,
+            network_proof_passed=result.network_proof_passed,
+            teardown_attempted=result.teardown_attempted,
+            started_at=started_at,
+            ended_at=ended_at,
+            exit_code=result.result.exit_code,
+            stdout_truncated=result.result.stdout_truncated,
+            stderr_truncated=result.result.stderr_truncated,
+            redaction_applied=result.result.redaction_applied,
+        )
+        persist_sandbox_audit_event(event)
 
 
 def _execute_lima(

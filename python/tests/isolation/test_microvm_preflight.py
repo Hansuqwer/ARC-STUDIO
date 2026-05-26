@@ -285,6 +285,27 @@ class TestLimaIntegrationHarness:
         ]
         assert calls[3] == ["limactl", "delete", "-f", "arc-test"]
 
+    def test_lima_harness_persists_microvm_audit_event(self, tmp_path, monkeypatch):
+        audit_dir = tmp_path / "audit"
+        monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(audit_dir))
+
+        def runner(argv: list[str], _timeout: int, _max_bytes: int) -> IsolationResult:
+            if any("ip route" in part for part in argv):
+                return IsolationResult(exit_code=0, provider="microvm")
+            return IsolationResult(exit_code=0, stdout="ok", provider="microvm")
+
+        harness = LimaIntegrationHarness(
+            workspace_root=tmp_path,
+            runner=runner,
+            instance_name="arc-audit-lima",
+        )
+        harness.run(["pwd"], require_gate=False)
+
+        events = (audit_dir / "sandbox.events.jsonl").read_text(encoding="utf-8")
+        assert '"type":"MICROVM_COMMAND"' in events
+        assert '"runtime":"lima"' in events
+        assert '"public_execution_enabled":false' in events
+
     def test_harness_blocks_user_command_when_network_proof_fails(self, tmp_path):
         calls: list[list[str]] = []
 
@@ -319,6 +340,26 @@ class TestLimaIntegrationHarness:
         assert "lima start failed" in result.result.stderr
         assert result.teardown_attempted is True
         assert calls[-1] == ["limactl", "delete", "-f", "arc-test"]
+
+    def test_lima_harness_persists_denied_audit_event(self, tmp_path, monkeypatch):
+        audit_dir = tmp_path / "audit"
+        monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(audit_dir))
+
+        def runner(argv: list[str], _timeout: int, _max_bytes: int) -> IsolationResult:
+            if any("ip route" in part for part in argv):
+                return IsolationResult(exit_code=1, provider="microvm")
+            return IsolationResult(exit_code=0, provider="microvm")
+
+        harness = LimaIntegrationHarness(
+            workspace_root=tmp_path,
+            runner=runner,
+            instance_name="arc-audit-lima-denied",
+        )
+        harness.run(["pwd"], require_gate=False)
+
+        events = (audit_dir / "sandbox.events.jsonl").read_text(encoding="utf-8")
+        assert '"type":"MICROVM_DENIED"' in events
+        assert '"network_proof_passed":false' in events
 
     def test_harness_rejects_missing_command(self, tmp_path):
         import pytest
@@ -468,6 +509,22 @@ class TestFirecrackerHarness:
         # All 7 lifecycle phases must be present
         for phase in FirecrackerIntegrationHarness.LIFECYCLE_PHASES:
             assert phase in result.lifecycle, f"Missing lifecycle phase: {phase}"
+
+    def test_firecracker_harness_persists_microvm_audit_event(self, tmp_path, monkeypatch):
+        audit_dir = tmp_path / "audit"
+        monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(audit_dir))
+        _, runner = self._ok_runner()
+        harness = FirecrackerIntegrationHarness(
+            workspace_root=tmp_path,
+            runner=runner,
+            instance_name="arc-audit-fc",
+        )
+        harness.run(["uname"], require_gate=False)
+
+        events = (audit_dir / "sandbox.events.jsonl").read_text(encoding="utf-8")
+        assert '"type":"MICROVM_COMMAND"' in events
+        assert '"runtime":"firecracker"' in events
+        assert '"lifecycle"' in events
 
     def test_firecracker_harness_blocks_command_when_network_proof_fails(self, tmp_path):
         calls: list[list[str]] = []

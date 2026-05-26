@@ -2120,6 +2120,13 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Step 4 cannot be proven on this macOS host. All `TestFirecrackerSmokeRealHost` tests skip cleanly.
 - Firecracker execution remains preflight/doctor only; `MicroVMIsolationProvider.execute()` still raises.
 
+#### Slice 37.22: MicroVM Harness Audit Events ✓
+- Closed ADR-024 P7 for internal opt-in harness attempts without enabling public microVM execution.
+- Added stable `MICROVM_COMMAND` / `MICROVM_DENIED` audit event builder with command, workspace, runtime, instance, lifecycle, network proof, teardown, timestamps, exit code, truncation flags, and `public_execution_enabled=false`.
+- Lima and Firecracker harness completions now persist through the existing sandbox audit hash-chain store.
+- Tests cover Lima allowed audit, Lima denied audit, and Firecracker allowed audit using fake runners; no VM runtime required.
+- Public `MicroVMIsolationProvider.execute()` still raises `NotImplementedError`; `ARC_MICROVM_EXEC_ENABLED` remains unwired because P2 network-off is still blocked.
+
 #### Slice 37.20: P1–P7 Evaluation + ARC_MICROVM_EXEC_ENABLED Wiring Decision ✓
 - Evaluated all 7 ADR-024 prerequisites against current codebase and research findings.
 - Created `docs/research/microvm-p1-p7-status.md` with per-prerequisite status table.

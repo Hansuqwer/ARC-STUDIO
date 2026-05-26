@@ -678,6 +678,62 @@ def build_audit_event(
     }
 
 
+def build_microvm_audit_event(
+    *,
+    command: list[str],
+    workspace_root: Path,
+    provider_runtime: str,
+    instance_name: str,
+    lifecycle: list[str],
+    network_proof_passed: bool,
+    teardown_attempted: bool,
+    started_at: str,
+    ended_at: str,
+    exit_code: int | None,
+    stdout_truncated: bool,
+    stderr_truncated: bool,
+    redaction_applied: bool = False,
+) -> dict[str, Any]:
+    """Build the ADR-024 microVM harness audit event.
+
+    This records internal opt-in harness attempts only; it does not imply that
+    public ``MicroVMIsolationProvider.execute()`` is available.
+    """
+    allowed = exit_code == 0 and network_proof_passed
+    return {
+        "type": "MICROVM_COMMAND" if allowed else "MICROVM_DENIED",
+        "command": command,
+        "cwd": str(workspace_root),
+        "classification": "microvm_harness",
+        "decision": {
+            "allowed": allowed,
+            "classification": "microvm_harness",
+            "reason": "network-off proof passed"
+            if allowed
+            else "microVM harness blocked or failed",
+            "policy": "microvm-integration-harness",
+            "approval_required": False,
+            "approved": False,
+        },
+        "policy": "microvm-integration-harness",
+        "provider": "microvm",
+        "runtime": provider_runtime,
+        "instance_name": instance_name,
+        "allowed": allowed,
+        "reason": "network-off proof passed" if allowed else "microVM harness blocked or failed",
+        "lifecycle": lifecycle,
+        "network_proof_passed": network_proof_passed,
+        "teardown_attempted": teardown_attempted,
+        "started_at": started_at,
+        "ended_at": ended_at,
+        "exit_code": exit_code,
+        "stdout_truncated": stdout_truncated,
+        "stderr_truncated": stderr_truncated,
+        "redaction_applied": redaction_applied,
+        "public_execution_enabled": False,
+    }
+
+
 def microvm_preflight(system: str | None = None) -> dict[str, Any]:
     """Detect lightweight microVM runtime availability without executing workloads."""
     os_name = system or platform.system()
