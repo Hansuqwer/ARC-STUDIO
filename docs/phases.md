@@ -2112,6 +2112,13 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Real Lima execution NOT proven on this host (CI-skipped).
 - Verified: targeted sandbox/microVM tests (including smoke) pass; CI posture confirmed.
 
+#### Slice 37.20: P1–P7 Evaluation + ARC_MICROVM_EXEC_ENABLED Wiring Decision ✓
+- Evaluated all 7 ADR-024 prerequisites against current codebase and research findings.
+- Created `docs/research/microvm-p1-p7-status.md` with per-prerequisite status table.
+- Updated `docs/adr/ADR-024-microvm-public-execution-contract.md` status to "Accepted — implementation blocked".
+- **Decision: ARC_MICROVM_EXEC_ENABLED NOT wired.** P2 (network-off — Lima slirp always present) and P7 (audit event — not implemented) are unsatisfied. P1/P3/P4/P5 are partially satisfied (code-level); P6 is satisfied.
+- No code changes: `MicroVMIsolationProvider.execute()` still raises `NotImplementedError`.
+
 #### Slice 37.19: Mount Isolation + Symlink-Escape Guard (ADR-024 P3/P5 code-level) ✓
 - Added `is_path_within_root(path, root) -> bool` to `security/sandbox.py`: uses `os.path.realpath()` to follow all symlinks before comparing; handles dangling symlinks, `..` escapes, prefix collisions.
 - Added `check_workspace_escape(candidate, workspace_root)` to `security/sandbox.py`: raises `ValueError("Path escape detected")` if candidate resolves outside root.

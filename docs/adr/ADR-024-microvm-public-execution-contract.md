@@ -1,9 +1,10 @@
 # ADR-024 — MicroVM Public Execution Contract
 
-**Status:** Accepted  
+**Status:** Accepted — implementation blocked (see P1–P7 status below)  
 **Date:** 2026-05-26  
+**Last updated:** 2026-05-26 — P1–P7 evaluation complete; P2 (network-off) and P7 (audit) block wiring  
 **Authors:** ARC Studio sandbox team  
-**Related:** Phase 37 (R38), `docs/research/sandbox-and-microvm.md`, ADR-014 (security architecture)
+**Related:** Phase 37 (R38), `docs/research/sandbox-and-microvm.md`, `docs/research/microvm-p1-p7-status.md`, ADR-014 (security architecture)
 
 ---
 
@@ -177,8 +178,25 @@ are mandatory. Missing any of these fields is a schema violation.
 4. Wire `ARC_MICROVM_EXEC_ENABLED` in `MicroVMIsolationProvider.execute()`.
 5. Add audit event emission in the harness.
 6. Add CI opt-in smoke with host runners that have Lima/Firecracker installed.
-7. Update this ADR status from "Accepted (not yet implemented)" to
-   "Implemented" with evidence links.
+7. Update this ADR status from "Accepted" to "Implemented" with evidence links.
+
+---
+
+## Current P1–P7 Status (2026-05-26 evaluation)
+
+Full detail: `docs/research/microvm-p1-p7-status.md`
+
+| P# | Description | Status |
+|---|---|---|
+| P1 | Lifecycle proof | Partial — fake tests pass; real host tests added but `ARC_LIMA_REAL_EXEC=1` not yet run end-to-end |
+| P2 | Network-off proof | **BLOCKED** — Lima 2.x always has slirp route; no config to disable it found |
+| P3 | Workspace-mount proof | Partial — code-level escape guard added + sentinel test; virtiofs symlink pass-through gap remains |
+| P4 | Teardown proof | Partial — code-level harness teardown proven; real-host teardown pending |
+| P5 | Symlink-escape proof | Partial — code-level `is_path_within_root()` + 19 tests; mount-level virtiofs pass-through unproven |
+| P6 | stdout/stderr caps | **Satisfied** — bounded stream readers + cap tests pass |
+| P7 | Audit event emitted | **Missing** — no audit event emitted by harness yet |
+
+**ARC_MICROVM_EXEC_ENABLED wiring: BLOCKED — P2 and P7 must be resolved first.**
 
 ---
 
