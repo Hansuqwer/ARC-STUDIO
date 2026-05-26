@@ -1,10 +1,17 @@
-"""MicroVM preflight state tests (Phase 37 Slice 37.5).
+"""MicroVM preflight state tests (Phase 37 Slices 37.5, 37.16).
 
 Tests the four preflight states returned by microvm_preflight():
 - unavailable: no microVM binary found on the system
 - installed_not_configured: binary found but missing kernel/rootfs/KVM/etc.
 - ready: fully configured and ready (Linux only; execution still not implemented)
 - blocked: unsupported platform (Windows, etc.)
+
+Also covers FirecrackerIntegrationHarness (Slice 37.16):
+- availability checks (no binary / no KVM / wrong platform)
+- lifecycle with fake runner (7 lifecycle phases)
+- network proof blocks user command
+- teardown attempted on error
+- raises when no runner and no binary
 
 Truth constraints:
 - microVM execution does NOT exist
@@ -17,9 +24,17 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from agent_runtime_cockpit.isolation.base import IsolationResult
-from agent_runtime_cockpit.isolation.microvm import LimaIntegrationHarness, build_microvm_run_plan
-from agent_runtime_cockpit.security.sandbox import microvm_preflight
+from agent_runtime_cockpit.isolation.microvm import (
+    FirecrackerHarnessError,
+    FirecrackerIntegrationHarness,
+    LimaIntegrationHarness,
+    build_microvm_run_plan,
+    firecracker_integration_available,
+)
+from agent_runtime_cockpit.security.sandbox import firecracker_doctor, microvm_preflight
 
 
 class TestMicroVMPreflightStates:
@@ -311,3 +326,217 @@ class TestLimaIntegrationHarness:
         harness = LimaIntegrationHarness(workspace_root=tmp_path, runner=lambda *_: None)
         with pytest.raises(ValueError, match="missing command"):
             harness.run([], require_gate=False)
+
+
+# ---------------------------------------------------------------------------
+# Firecracker doctor preflight (Slice 37.16)
+# ---------------------------------------------------------------------------
+
+
+class TestFirecrackerDoctorPreflight:
+    """Firecracker doctor covers unavailable / installed_not_configured / missing_kvm states."""
+
+    def test_firecracker_doctor_unavailable_no_binary(self, monkeypatch):
+        """No firecracker/cloud-hypervisor binary → unavailable."""
+        monkeypatch.setattr(shutil, "which", lambda _name: None)
+        data = firecracker_doctor("Linux")
+        assert data["status"] == "unavailable"
+        assert data["binary"] is None
+        assert data["kvm"] is False
+
+    def test_firecracker_doctor_installed_not_configured_no_kvm(self, monkeypatch, tmp_path):
+        """Firecracker binary present but no /dev/kvm → installed_not_configured."""
+        monkeypatch.setattr(
+            shutil, "which", lambda name: "/usr/bin/firecracker" if name == "firecracker" else None
+        )
+        data = firecracker_doctor("Linux")
+        assert data["status"] == "installed_not_configured"
+        assert data["binary"] == "/usr/bin/firecracker"
+        assert data["kvm"] is False
+
+    def test_firecracker_doctor_installed_not_configured_no_cache(self, monkeypatch, tmp_path):
+        """Binary + KVM but kernel/rootfs env vars point to non-existent files → installed_not_configured."""
+        monkeypatch.setattr(
+            shutil,
+            "which",
+            lambda name: f"/usr/bin/{name}" if name in {"firecracker", "jailer"} else None,
+        )
+        # Point env vars to non-existent paths so cache_ready is False
+        monkeypatch.setenv("ARC_FIRECRACKER_KERNEL", str(tmp_path / "vmlinux-missing"))
+        monkeypatch.setenv("ARC_FIRECRACKER_ROOTFS", str(tmp_path / "rootfs-missing.ext4"))
+        data = firecracker_doctor("Linux")
+        assert data["status"] == "installed_not_configured"
+        assert data["cache_ready"] is False
+
+    def test_firecracker_doctor_blocked_on_macos(self):
+        """macOS → blocked."""
+        data = firecracker_doctor("Darwin")
+        assert data["status"] == "blocked"
+        assert "Linux" in data["reason"]
+
+    def test_firecracker_doctor_returns_stable_schema(self, monkeypatch):
+        """Always returns required schema keys regardless of state."""
+        monkeypatch.setattr(shutil, "which", lambda _name: None)
+        data = firecracker_doctor("Linux")
+        for key in ("provider", "platform", "status", "binary", "kvm", "cache_ready"):
+            assert key in data, f"Missing key: {key}"
+        assert data["provider"] == "firecracker"
+
+    def test_firecracker_doctor_reports_jailer_presence(self, monkeypatch):
+        """Jailer presence is reported even when KVM/cache is missing."""
+        monkeypatch.setattr(
+            shutil,
+            "which",
+            lambda name: f"/usr/bin/{name}" if name in {"firecracker", "jailer"} else None,
+        )
+        data = firecracker_doctor("Linux")
+        assert data["jailer"] == "/usr/bin/jailer"
+        assert data["jailer_present"] is True
+
+
+# ---------------------------------------------------------------------------
+# Firecracker integration harness (Slice 37.16)
+# ---------------------------------------------------------------------------
+
+
+class TestFirecrackerHarness:
+    """Firecracker harness tests with fake runner; no real VM is created."""
+
+    # ------------------------------------------------------------------
+    # Availability checks
+    # ------------------------------------------------------------------
+
+    def test_firecracker_integration_available_false_when_no_binary(self, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda _name: None)
+        monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm.platform.system", lambda: "Linux"
+        )
+        assert firecracker_integration_available() is False
+
+    def test_firecracker_integration_available_false_when_no_kvm(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            shutil, "which", lambda name: "/usr/bin/firecracker" if name == "firecracker" else None
+        )
+        monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm.platform.system", lambda: "Linux"
+        )
+        # /dev/kvm does not exist in test env → _kvm_available() returns False
+        assert firecracker_integration_available() is False
+
+    def test_firecracker_integration_available_false_on_macos(self, monkeypatch):
+        monkeypatch.setattr(
+            shutil,
+            "which",
+            lambda name: "/usr/local/bin/firecracker" if name == "firecracker" else None,
+        )
+        monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm.platform.system", lambda: "Darwin"
+        )
+        assert firecracker_integration_available() is False
+
+    # ------------------------------------------------------------------
+    # Lifecycle with fake runner
+    # ------------------------------------------------------------------
+
+    def _ok_runner(self) -> "list[list[str]]":
+        """Return a fake runner that records calls and always succeeds."""
+        calls: list[list[str]] = []
+
+        def runner(argv: list[str], _timeout: int, _max_bytes: int) -> IsolationResult:
+            calls.append(argv)
+            # Simulate ip route returning empty (no default route → network isolated)
+            if argv[:2] == ["ip", "route"]:
+                return IsolationResult(exit_code=0, stdout="", provider="microvm")
+            return IsolationResult(exit_code=0, stdout="ok", provider="microvm")
+
+        return calls, runner
+
+    def test_firecracker_harness_runs_lifecycle_with_fake_runner(self, tmp_path):
+        calls, runner = self._ok_runner()
+        harness = FirecrackerIntegrationHarness(
+            workspace_root=tmp_path,
+            runner=runner,
+            instance_name="arc-fc-test",
+        )
+        result = harness.run(["echo", "hello"], require_gate=False)
+        assert result.teardown_attempted is True
+        assert result.network_proof_passed is True
+        assert result.result.exit_code == 0
+        # All 7 lifecycle phases must be present
+        for phase in FirecrackerIntegrationHarness.LIFECYCLE_PHASES:
+            assert phase in result.lifecycle, f"Missing lifecycle phase: {phase}"
+
+    def test_firecracker_harness_blocks_command_when_network_proof_fails(self, tmp_path):
+        calls: list[list[str]] = []
+
+        def runner(argv: list[str], _timeout: int, _max_bytes: int) -> IsolationResult:
+            calls.append(argv)
+            if argv[:2] == ["ip", "route"]:
+                # Simulate a default route → network NOT isolated
+                return IsolationResult(
+                    exit_code=0, stdout="default via 10.0.2.2", provider="microvm"
+                )
+            return IsolationResult(exit_code=0, provider="microvm")
+
+        harness = FirecrackerIntegrationHarness(
+            workspace_root=tmp_path, runner=runner, instance_name="arc-fc-netfail"
+        )
+        result = harness.run(["pwd"], require_gate=False)
+        assert result.network_proof_passed is False
+        assert "network-off proof failed" in result.result.stderr
+        # exec phase must NOT be in lifecycle
+        assert "exec" not in result.lifecycle
+        # teardown must still happen
+        assert result.teardown_attempted is True
+
+    def test_firecracker_harness_teardown_attempted_on_error(self, tmp_path):
+        calls: list[list[str]] = []
+
+        def runner(argv: list[str], _timeout: int, _max_bytes: int) -> IsolationResult:
+            calls.append(argv)
+            # create_vm fails
+            if "--api-sock" in argv:
+                return IsolationResult(exit_code=1, stderr="create failed", provider="microvm")
+            return IsolationResult(exit_code=0, provider="microvm")
+
+        harness = FirecrackerIntegrationHarness(
+            workspace_root=tmp_path, runner=runner, instance_name="arc-fc-errtest"
+        )
+        result = harness.run(["pwd"], require_gate=False)
+        assert result.teardown_attempted is True
+        assert "stop_vm" in result.lifecycle
+        assert "teardown" in result.lifecycle
+
+    def test_firecracker_harness_raises_when_no_runner_and_no_binary(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(shutil, "which", lambda _name: None)
+        harness = FirecrackerIntegrationHarness(workspace_root=tmp_path, runner=None)
+        with pytest.raises(FirecrackerHarnessError, match="No Firecracker runner"):
+            harness.run(["pwd"], require_gate=False)
+
+    def test_firecracker_harness_requires_explicit_gate(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("ARC_MICROVM_INTEGRATION", raising=False)
+        harness = FirecrackerIntegrationHarness(
+            workspace_root=tmp_path,
+            runner=lambda *_: IsolationResult(exit_code=0, provider="microvm"),
+        )
+        with pytest.raises(FirecrackerHarnessError, match="ARC_MICROVM_INTEGRATION=1"):
+            harness.run(["pwd"])
+
+    def test_firecracker_harness_rejects_missing_command(self, tmp_path):
+        harness = FirecrackerIntegrationHarness(
+            workspace_root=tmp_path,
+            runner=lambda *_: IsolationResult(exit_code=0, provider="microvm"),
+        )
+        with pytest.raises(ValueError, match="missing command"):
+            harness.run([], require_gate=False)
+
+    def test_firecracker_harness_result_contains_instance_name(self, tmp_path):
+        _, runner = self._ok_runner()
+        harness = FirecrackerIntegrationHarness(
+            workspace_root=tmp_path, runner=runner, instance_name="arc-fc-namecheck"
+        )
+        result = harness.run(["uname"], require_gate=False)
+        assert result.instance_name == "arc-fc-namecheck"

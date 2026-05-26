@@ -2112,6 +2112,16 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Real Lima execution NOT proven on this host (CI-skipped).
 - Verified: targeted sandbox/microVM tests (including smoke) pass; CI posture confirmed.
 
+#### Slice 37.16: Firecracker Gated Harness + Preflight Expansion ✓
+- Added `FirecrackerHarnessResult`, `FirecrackerHarnessError`, `firecracker_integration_available()`, `_FirecrackerFakeRunner`, and `FirecrackerIntegrationHarness` to `isolation/microvm.py`.
+- Harness lifecycle: preflight → create_vm → mount_workspace → exec → network_proof → stop_vm → teardown (7 phases).
+- Network proof: runs `ip route` in guest; if output contains "default", harness blocks user command.
+- runner= injection allows fake runners in tests; no real Firecracker execution needed.
+- Added `firecracker_doctor()` to `security/sandbox.py`: checks binary, KVM rw, jailer (optional), kernel/rootfs cache paths with default `~/.cache/arc/microvm/vmlinux` and `rootfs.ext4`.
+- Added `TestFirecrackerDoctorPreflight` (6 tests) and `TestFirecrackerHarness` (8 tests) to `test_microvm_preflight.py`.
+- `MicroVMIsolationProvider.execute()` still raises `NotImplementedError`.
+- No real Firecracker execution; all tests use fakes/monkeypatches.
+
 #### Slice 37.15: MicroVM Public Execution Contract (ADR-024) ✓
 - Created `docs/adr/ADR-024-microvm-public-execution-contract.md`.
 - Defines: 7 prerequisite proofs (P1–P7: lifecycle, network-off, workspace-mount, teardown, symlink-escape, output-caps, audit-event).

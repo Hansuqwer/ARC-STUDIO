@@ -795,6 +795,91 @@ def _run_probe(argv: list[str | None]) -> dict[str, Any]:
     }
 
 
+def firecracker_doctor(system: str | None = None) -> dict[str, Any]:
+    """Expanded Firecracker preflight — checks binary, KVM, jailer, kernel/rootfs cache.
+
+    Returns a stable dict that can be emitted as JSON.  Never creates VMs.
+    """
+    os_name = system or platform.system()
+    if os_name != "Linux":
+        return {
+            "provider": "firecracker",
+            "platform": os_name.lower(),
+            "status": "blocked",
+            "reason": f"Firecracker requires Linux; platform={os_name}",
+            "binary": None,
+            "kvm": False,
+            "jailer": None,
+            "cache_ready": False,
+        }
+
+    firecracker = shutil.which("firecracker")
+    cloud_hypervisor = shutil.which("cloud-hypervisor")
+    binary = firecracker or cloud_hypervisor
+    jailer = shutil.which("jailer")
+
+    kvm_path = Path("/dev/kvm")
+    kvm_exists = kvm_path.exists()
+    kvm_rw = os.access(kvm_path, os.R_OK | os.W_OK) if kvm_exists else False
+
+    kernel_env = os.environ.get("ARC_FIRECRACKER_KERNEL")
+    rootfs_env = os.environ.get("ARC_FIRECRACKER_ROOTFS")
+
+    # Default cache paths if env vars not set
+    default_cache = Path.home() / ".cache" / "arc" / "microvm"
+    kernel_path = Path(kernel_env) if kernel_env else default_cache / "vmlinux"
+    rootfs_path = Path(rootfs_env) if rootfs_env else default_cache / "rootfs.ext4"
+
+    kernel_exists = kernel_path.exists()
+    rootfs_exists = rootfs_path.exists()
+    cache_ready = kernel_exists and rootfs_exists
+
+    # Jailer optional — note absence but don't block installed_not_configured
+    jailer_present = bool(jailer)
+    jailer_perms: str | None = None
+    if jailer:
+        try:
+            jailer_perms = oct(os.stat(jailer).st_mode)
+        except Exception:
+            jailer_perms = None
+
+    # Kernel size (diagnostic only)
+    kernel_size: int | None = None
+    if kernel_exists:
+        try:
+            kernel_size = kernel_path.stat().st_size
+        except Exception:
+            pass
+
+    ready = bool(binary and kvm_exists and kvm_rw and cache_ready)
+    if ready:
+        status = "ready"
+    elif binary:
+        status = "installed_not_configured"
+    else:
+        status = "unavailable"
+
+    return {
+        "provider": "firecracker",
+        "platform": "linux",
+        "status": status,
+        "binary": binary,
+        "firecracker": firecracker,
+        "cloud_hypervisor": cloud_hypervisor,
+        "jailer": jailer,
+        "jailer_present": jailer_present,
+        "jailer_perms": jailer_perms,
+        "kvm": kvm_exists,
+        "kvm_rw": kvm_rw,
+        "kernel_path": str(kernel_path),
+        "kernel_exists": kernel_exists,
+        "kernel_size": kernel_size,
+        "rootfs_path": str(rootfs_path),
+        "rootfs_exists": rootfs_exists,
+        "cache_ready": cache_ready,
+    }
+
+
 def stable_json(data: Any) -> str:
     """Dump stable JSON for docs/tests."""
     return json.dumps(data, sort_keys=True, separators=(",", ":"), default=str)

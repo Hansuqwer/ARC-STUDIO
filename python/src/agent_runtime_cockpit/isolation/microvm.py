@@ -19,7 +19,12 @@ from typing import Callable, Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from ..security.sandbox import microvm_preflight, cap_output, render_lima_template
+from ..security.sandbox import (
+    microvm_preflight,
+    cap_output,
+    render_lima_template,
+    firecracker_doctor,
+)
 from .base import IsolationProvider, IsolationResult
 from .subprocess import redact_output
 
@@ -64,6 +69,24 @@ class LimaHarnessResult(BaseModel):
     teardown_attempted: bool = False
 
 
+class FirecrackerHarnessResult(BaseModel):
+    """Structured opt-in Firecracker harness result (design/preflight only)."""
+
+    command: list[str]
+    instance_name: str
+    kernel_path: str | None = None
+    rootfs_path: str | None = None
+    result: IsolationResult
+    lifecycle: list[str]
+    network_proof_passed: bool = False
+    kvm_available: bool = False
+    teardown_attempted: bool = False
+
+
+class FirecrackerHarnessError(RuntimeError):
+    """Raised when the Firecracker harness cannot proceed."""
+
+
 def _microvm_execution_enabled() -> bool:
     return os.environ.get("ARC_MICROVM_INTEGRATION") == "1"
 
@@ -75,6 +98,179 @@ def _lima_available() -> bool:
 def lima_integration_available() -> bool:
     """Return True only when the opt-in Lima integration harness may run."""
     return platform.system() == "Darwin" and _microvm_execution_enabled() and _lima_available()
+
+
+def _firecracker_available() -> bool:
+    return bool(shutil.which("firecracker") or shutil.which("cloud-hypervisor"))
+
+
+def _kvm_available() -> bool:
+    kvm = Path("/dev/kvm")
+    return kvm.exists() and os.access(kvm, os.R_OK | os.W_OK)
+
+
+def firecracker_integration_available() -> bool:
+    """Return True only when the opt-in Firecracker integration harness may run.
+
+    Requires: Linux + ARC_MICROVM_INTEGRATION=1 + firecracker binary + /dev/kvm.
+    """
+    return (
+        platform.system() == "Linux"
+        and _microvm_execution_enabled()
+        and _firecracker_available()
+        and _kvm_available()
+    )
+
+
+# Type alias for an injectable fake Firecracker runner used in tests.
+# Signature: (argv: list[str], timeout_seconds: int, max_bytes: int) -> IsolationResult
+_FirecrackerFakeRunner = Callable[[list[str], int, int], IsolationResult]
+
+
+class FirecrackerIntegrationHarness:
+    """Opt-in Firecracker lifecycle harness; design/preflight only.
+
+    Not wired to public MicroVMIsolationProvider.execute().
+    Accepts an optional ``runner`` for fake injection in tests — real
+    Firecracker execution is not implemented here and requires a follow-up PR
+    once the full lifecycle, mount policy, network-off proof, teardown proof,
+    and opt-in integration tests are complete (ADR-024).
+    """
+
+    LIFECYCLE_PHASES = [
+        "preflight",
+        "create_vm",
+        "mount_workspace",
+        "exec",
+        "network_proof",
+        "stop_vm",
+        "teardown",
+    ]
+
+    def __init__(
+        self,
+        *,
+        workspace_root: Path,
+        runner: Optional[_FirecrackerFakeRunner] = None,
+        instance_name: str | None = None,
+        max_bytes: int = 65_536,
+    ) -> None:
+        self.workspace_root = workspace_root.resolve()
+        self.runner = runner
+        self.instance_name = instance_name or f"arc-fc-{uuid.uuid4().hex[:12]}"
+        self.max_bytes = max_bytes
+        self.lifecycle: list[str] = []
+
+    def run(
+        self,
+        command: list[str],
+        *,
+        timeout_seconds: int = 300,
+        require_gate: bool = True,
+    ) -> FirecrackerHarnessResult:
+        """Run the gated Firecracker harness lifecycle with mandatory network proof.
+
+        Uses the injected runner for all subprocess calls so tests can run
+        without a real Firecracker binary.  If no runner is injected and
+        Firecracker is not available, raises FirecrackerHarnessError.
+        """
+        if require_gate and not firecracker_integration_available():
+            raise FirecrackerHarnessError(
+                "ARC_MICROVM_INTEGRATION=1, Linux, firecracker binary, and /dev/kvm are required"
+            )
+        if self.runner is None and not _firecracker_available():
+            raise FirecrackerHarnessError(
+                "No Firecracker runner injected and no firecracker binary found; "
+                "cannot run harness without a real binary or a fake runner"
+            )
+        if not command:
+            raise ValueError("missing command")
+
+        doctor = firecracker_doctor()
+        kvm_available = bool(doctor.get("kvm"))
+        kernel_path = doctor.get("kernel_path")
+        rootfs_path = doctor.get("rootfs_path")
+
+        network_proof_passed = False
+        teardown_attempted = False
+        result = IsolationResult(exit_code=-1, stderr="not started", provider="microvm")
+
+        try:
+            # Phase: preflight
+            self.lifecycle.append("preflight")
+
+            # Phase: create_vm (fake or real)
+            create_result = self._run(
+                [
+                    "firecracker",
+                    "--id",
+                    self.instance_name,
+                    "--api-sock",
+                    f"/tmp/{self.instance_name}.sock",
+                ],
+                timeout_seconds,
+            )
+            self.lifecycle.append("create_vm")
+
+            if create_result.exit_code != 0:
+                result = IsolationResult(
+                    exit_code=-1,
+                    stderr=f"firecracker create failed: {create_result.stderr.strip()}",
+                    provider="microvm",
+                )
+            else:
+                # Phase: mount_workspace
+                self.lifecycle.append("mount_workspace")
+
+                # Phase: network_proof — check guest routing table
+                network_result = self._run(["ip", "route"], min(timeout_seconds, 10))
+                self.lifecycle.append("network_proof")
+                # If ip route returns any output that looks like a default route, deny
+                has_default_route = any(
+                    "default" in part for part in (network_result.stdout or "").splitlines()
+                )
+                network_proof_passed = network_result.exit_code == 0 and not has_default_route
+
+                if not network_proof_passed:
+                    result = IsolationResult(
+                        exit_code=-1,
+                        stderr="network-off proof failed: guest routing table not empty or check failed",
+                        provider="microvm",
+                    )
+                else:
+                    # Phase: exec
+                    result = self._run(command, timeout_seconds)
+                    self.lifecycle.append("exec")
+
+        finally:
+            # Phase: stop_vm
+            self._run(["firecracker", "--stop", self.instance_name], min(timeout_seconds, 30))
+            self.lifecycle.append("stop_vm")
+            # Phase: teardown
+            teardown_attempted = True
+            self._run(["rm", "-rf", f"/tmp/{self.instance_name}.sock"], min(timeout_seconds, 10))
+            self.lifecycle.append("teardown")
+
+        return FirecrackerHarnessResult(
+            command=command,
+            instance_name=self.instance_name,
+            kernel_path=str(kernel_path) if kernel_path else None,
+            rootfs_path=str(rootfs_path) if rootfs_path else None,
+            result=result,
+            lifecycle=list(self.lifecycle),
+            network_proof_passed=network_proof_passed,
+            kvm_available=kvm_available,
+            teardown_attempted=teardown_attempted,
+        )
+
+    def _run(self, argv: list[str], timeout_seconds: int) -> IsolationResult:
+        if self.runner is not None:
+            return self.runner(argv, timeout_seconds, self.max_bytes)
+        # No real Firecracker execution implemented yet (ADR-024).
+        raise FirecrackerHarnessError(
+            "No runner injected and real Firecracker execution is not implemented "
+            "(ADR-024); use a fake runner for tests"
+        )
 
 
 def build_microvm_run_plan(

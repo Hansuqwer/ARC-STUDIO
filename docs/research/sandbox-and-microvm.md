@@ -134,6 +134,7 @@ Current opt-in Lima harness:
 | Design-proof plan | Real | Non-executing plan only; no VM creation/start/run/delete |
 | Opt-in Lima harness | Internal helper only | Fake-runner lifecycle tests pass; Lima smoke test added (CI-skipped; real host proof pending) |
 | Lima smoke test | Added (CI-skip) | `python/tests/isolation/test_lima_smoke.py`; skipped unless macOS + limactl + ARC_MICROVM_INTEGRATION=1; CI does not set gate; real Lima execution NOT claimed on this host |
+| Firecracker harness | Design/preflight only | `FirecrackerIntegrationHarness` added with fake-runner tests; no real Firecracker execution; `firecracker_doctor()` expanded with jailer/cache/kvm fields |
 | Firecracker execution | Not implemented | Kernel/rootfs lifecycle, mount policy, network-off proof, jailer config, teardown |
 | Lima execution | Not implemented | VM create/start/shell/delete cycle, mount policy, network-off proof, teardown |
 | Integration test skeleton | Real (gated) | Tests exist but require local runtime; CI skips |
