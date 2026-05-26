@@ -149,6 +149,9 @@ class TestMicroVMPreflightLinuxDeep:
         assert data["cache_ready"] is True
         assert data["binary"] == "/usr/bin/firecracker"
         assert data["jailer"] == "/usr/bin/jailer"
+        assert data["strict_network_candidate"] is True
+        assert data["strict_network_proof"] == "not_proven"
+        assert data["network_interfaces_configured"] is False
 
     def test_kernel_size_reported(self, monkeypatch, tmp_path):
         """Kernel file size is reported in preflight."""
@@ -597,7 +600,7 @@ class TestFirecrackerHarness:
     def test_firecracker_harness_raises_when_no_runner_and_no_binary(self, monkeypatch, tmp_path):
         monkeypatch.setattr(shutil, "which", lambda _name: None)
         harness = FirecrackerIntegrationHarness(workspace_root=tmp_path, runner=None)
-        with pytest.raises(FirecrackerHarnessError, match="No Firecracker runner"):
+        with pytest.raises(FirecrackerHarnessError, match="real Firecracker run is blocked"):
             harness.run(["pwd"], require_gate=False)
 
     def test_firecracker_harness_requires_explicit_gate(self, monkeypatch, tmp_path):

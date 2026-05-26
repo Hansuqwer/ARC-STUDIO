@@ -27,7 +27,9 @@ import pytest
 
 from agent_runtime_cockpit.isolation.microvm import (
     FirecrackerIntegrationHarness,
+    build_firecracker_no_network_run_plan,
     firecracker_integration_available,
+    firecracker_real_exec_available,
 )
 
 # ---------------------------------------------------------------------------
@@ -96,6 +98,56 @@ class TestFirecrackerSmokeSkipBehaviour:
             "agent_runtime_cockpit.isolation.microvm.platform.system", lambda: "Darwin"
         )
         assert firecracker_integration_available() is False
+
+    def test_firecracker_real_exec_available_requires_dual_gate_and_artifacts(self, monkeypatch):
+        monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+        monkeypatch.setenv("ARC_FC_REAL_EXEC", "1")
+        monkeypatch.setenv("ARC_FIRECRACKER_KERNEL", "/tmp/vmlinux")
+        monkeypatch.setenv("ARC_FIRECRACKER_ROOTFS", "/tmp/rootfs.ext4")
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm.firecracker_integration_available",
+            lambda: False,
+        )
+        assert firecracker_real_exec_available() is False
+
+
+class TestFirecrackerNoNetworkDesignProof:
+    """Always-run no-NIC design-proof tests."""
+
+    def test_no_network_config_omits_network_interfaces(self, tmp_path):
+        plan = build_firecracker_no_network_run_plan(
+            ["uname", "-a"],
+            kernel_path=tmp_path / "vmlinux",
+            rootfs_path=tmp_path / "rootfs.ext4",
+            work_dir=tmp_path,
+            instance_name="arc-fc-test",
+        )
+        config = plan.config.to_firecracker_config()
+        assert "network-interfaces" not in config
+        assert plan.config.network_interfaces_configured is False
+        assert plan.config.strict_network_candidate is True
+        assert plan.config.strict_network_proof == "not_proven"
+        assert plan.real_boot_attempted is False
+
+    def test_no_network_plan_contains_required_guest_proofs(self, tmp_path):
+        plan = build_firecracker_no_network_run_plan(
+            ["pwd"],
+            kernel_path=tmp_path / "vmlinux",
+            rootfs_path=tmp_path / "rootfs.ext4",
+            work_dir=tmp_path,
+        )
+        assert ["ip", "route"] in plan.proof_commands
+        assert ["curl", "--connect-timeout", "2", "https://example.com"] in plan.proof_commands
+        assert "ARC_FC_REAL_EXEC=1" in plan.host_gates
+
+    def test_blocked_real_harness_emits_audit_event(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
+        harness = FirecrackerIntegrationHarness(workspace_root=tmp_path, runner=None)
+        with pytest.raises(
+            Exception, match="real Firecracker run is blocked|ARC_MICROVM_INTEGRATION"
+        ):
+            harness.run(["uname", "-a"], require_gate=False)
+        assert (tmp_path / "audit" / "sandbox.events.jsonl").exists()
 
 
 # ---------------------------------------------------------------------------

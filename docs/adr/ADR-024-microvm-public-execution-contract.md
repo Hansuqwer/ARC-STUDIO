@@ -2,7 +2,7 @@
 
 **Status:** Accepted — implementation blocked (see P1–P7 status below)  
 **Date:** 2026-05-26  
-**Last updated:** 2026-05-26 — P2 revised: Lima is low-security network-present harness only; strict public microVM remains blocked  
+**Last updated:** 2026-05-26 — Firecracker no-network design/preflight added; strict public microVM remains blocked  
 **Authors:** ARC Studio sandbox team  
 **Related:** Phase 37 (R38), `docs/research/sandbox-and-microvm.md`, `docs/research/microvm-p1-p7-status.md`, ADR-014 (security architecture)
 
@@ -18,7 +18,7 @@ Linux (Firecracker). As of Phase 37.14 the following is true:
 - `MicroVMIsolationProvider.execute()` always raises `NotImplementedError`.
 - `arc sandbox run --provider microvm` is blocked at the provider layer.
 - Lima harness exists as an internal opt-in helper only.
-- Firecracker is preflight/doctor only.
+- Firecracker is preflight/doctor/design-proof only.
 - No real microVM command execution has been proven in tests.
 
 This ADR defines the precise prerequisites, gate mechanism, platform
@@ -189,7 +189,7 @@ Full detail: `docs/research/microvm-p1-p7-status.md`
 | P# | Description | Status |
 |---|---|---|
 | P1 | Lifecycle proof | Partial — fake tests pass; real host tests added but `ARC_LIMA_REAL_EXEC=1` not yet run end-to-end |
-| P2 | Network-off proof | **ADR-revised** — Lima is low-security/network-present only; strict no-network remains blocked for public `microvm` until Firecracker/Cloud Hypervisor or another provider proves no network |
+| P2 | Network-off proof | **Design/preflight only** — Lima is low-security/network-present. Firecracker no-NIC config generation exists, but real boot/no-default-route/curl-fails proof has not run. |
 | P3 | Workspace-mount proof | Partial — code-level escape guard added + sentinel test; virtiofs symlink pass-through gap remains |
 | P4 | Teardown proof | Partial — code-level harness teardown proven; real-host teardown pending |
 | P5 | Symlink-escape proof | Partial — code-level `is_path_within_root()` + 19 tests; mount-level virtiofs pass-through unproven |
@@ -208,8 +208,18 @@ not the strict public `microvm` sandbox provider.
 
 Firecracker remains the preferred strict Linux path because its documented
 network setup requires explicit TAP/NAT/bridge configuration. A Firecracker VM
-with no network interface configured is the next candidate for P2 proof, but
-ARC has not implemented or proven that lifecycle yet.
+with no network interface configured is the next candidate for P2 proof. ARC now
+has a no-NIC design/preflight config model, but has not run a real
+boot/no-default-route/curl-fails proof yet.
+
+### Firecracker no-network design/preflight status
+
+Current implementation emits `strict_network_candidate=true`,
+`strict_network_proof=not_proven`, and `network_interfaces_configured=false`.
+The generated Firecracker config intentionally omits `network-interfaces`.
+Host-gated real proof remains blocked unless all are present:
+`ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, Linux, `/dev/kvm` read/write,
+`firecracker`, `ARC_FIRECRACKER_KERNEL`, and `ARC_FIRECRACKER_ROOTFS`.
 
 ---
 

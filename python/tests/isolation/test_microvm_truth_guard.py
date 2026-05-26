@@ -98,6 +98,13 @@ class TestMicroVMStatus:
         assert status["strict_network_isolation"] is False
         assert status["lima_security_posture"] == "low_security_network_present"
 
+    def test_microvm_execute_still_blocked_after_firecracker_design_proof(self, tmp_path):
+        provider = MicroVMIsolationProvider()
+        with pytest.raises(NotImplementedError, match="ADR-024"):
+            import asyncio
+
+            asyncio.run(provider.execute(["curl", "https://example.com"], cwd=tmp_path))
+
     def test_microvm_name_property(self):
         """name property returns 'microvm'."""
         provider = MicroVMIsolationProvider()

@@ -30,6 +30,10 @@ Status: research complete for P0 sandbox foundation. MicroVM is preflight/doctor
 | Lima user-v2 network docs | https://lima-vm.io/docs/config/network/user-v2/ | `user-v2` disables the default user-mode network but provides another user-mode network and VM-to-VM communication. | Do not use `user-v2` as network-off proof. | High | None for current decision. |
 | Firecracker network docs | https://github.com/firecracker-microvm/firecracker/blob/main/docs/network-setup.md | Firecracker networking requires explicit TAP device plus NAT/bridge/namespaced NAT setup; guest default route is configured by setup steps. | Firecracker/Cloud Hypervisor remain better strict no-network candidates because omitting network configuration can be proven. | Medium | Need real boot/rootfs implementation to prove guest has no NIC/default route. |
 | Google web search | Required topics: Lima no-network, Apple VZ no-network, Firecracker no-network | Tool returned `403 PERMISSION_DENIED Verify your account to continue.` | Recorded blocker; used Context7 and direct docs URLs. | Low | Retry Google search externally before security sign-off. |
+| Context7 Firecracker docs | `/firecracker-microvm/firecracker` | Firecracker config files require boot source and drives; `network-interfaces` is an explicit optional resource. | Added a design-proof no-NIC config model that omits `network-interfaces` entirely and marks proof `not_proven`. | High | Need a Linux/KVM host plus kernel/rootfs to boot and verify guest route/curl behavior. |
+| Firecracker getting started | https://github.com/firecracker-microvm/firecracker/blob/main/docs/getting-started.md | Firecracker requires Linux, supported arch, `/dev/kvm` rw, binary, kernel image, and rootfs; config-file boot can start a VM from JSON. | Host-gated real proof requires `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, `ARC_FIRECRACKER_KERNEL`, `ARC_FIRECRACKER_ROOTFS`, Linux, Firecracker, and `/dev/kvm`. | High | No guest command channel implemented yet for route/curl proof capture. |
+| Firecracker jailer docs | https://github.com/firecracker-microvm/firecracker/blob/main/docs/jailer.md | Jailer creates chroot/cgroup/devices, cleans env, and needs explicit cleanup; daemonized jailer PID handling is subtle. | This phase does not enable jailer execution; teardown remains design-plan plus blocked harness audit. | High | Need a follow-up jailer lifecycle implementation before public execution. |
+| Cloud Hypervisor docs | https://www.cloudhypervisor.org/docs/ | Cloud Hypervisor remains a lightweight Linux alternative but would require separate CLI/config/proof semantics. | No pivot; Firecracker remains primary for ADR-024 P2 unless a new ADR changes it. | Medium | Direct no-NIC run pattern still unimplemented for ARC. |
 
 ## Decision Table
 
@@ -39,6 +43,7 @@ Status: research complete for P0 sandbox foundation. MicroVM is preflight/doctor
 | MicroVM phase | Doctor/preflight only | Real Firecracker/Lima runs | Real execution needs images, mounts, network controls, cleanup, opt-in integration tests. | `python/src/agent_runtime_cockpit/isolation/microvm.py` | High |
 | macOS lightweight VM | Lima/VZ as low-security harness only | Docker Desktop, deprecated `sandbox-exec`, public strict microVM | Lima maps to Apple Virtualization.framework but currently exposes user-mode networking; it cannot satisfy strict P2. | `docs/adr/ADR-024-microvm-public-execution-contract.md`, `python/src/agent_runtime_cockpit/security/sandbox.py` | High |
 | Linux lightweight VM | Firecracker primary, Cloud Hypervisor secondary | Kata as P0 | Firecracker/Cloud Hypervisor are direct hypervisors; Kata is container-runtime integration. | `python/src/agent_runtime_cockpit/security/sandbox.py` | Medium |
+| Firecracker strict no-network proof | Add no-NIC design/preflight config + host-gated test scaffold; do not wire public execute | Immediate public microVM execution; Cloud Hypervisor pivot | Current host lacks Linux/KVM/rootfs. Config omission can be tested safely now; real proof requires explicit host gates. | `python/src/agent_runtime_cockpit/isolation/microvm.py`, `python/tests/isolation/test_firecracker_smoke.py` | High |
 | Policy UX | `arc sandbox run`, `arc policy explain` | Reuse existing `isolation` command only | User-facing Codex/Claude-style policy explanation and execution are distinct from provider diagnostics. | `python/src/agent_runtime_cockpit/cli/sandbox.py` | High |
 | Adversarial command policy | Conservative deny matrix plus path-intent validation before subprocess execution | Shell/runtime monitoring, syscall sandbox, broad AST evaluator | P0 must not fake syscall containment; deny known risky interpreters/subcommands and block write/read path escapes before execution. | `python/src/agent_runtime_cockpit/security/sandbox.py`, `python/src/agent_runtime_cockpit/cli/sandbox.py` | Medium |
 | HMAC audit durability | Parent creation, advisory file lock where available, append flush + `os.fsync`, partial-line verification failure | Atomic rename per append, SQLite ledger, external audit daemon | Preserve existing JSONL chain format while hardening local append semantics. | `python/src/agent_runtime_cockpit/audit/hmac_chain.py` | Medium |
@@ -68,6 +73,7 @@ Real now:
 - experimental Lima template rendering behind `ARC_MICROVM_EXPERIMENTAL=1`
 - `arc sandbox run --ask` can interactively approve only `network`, `install`, and `unknown`; non-interactive defaults still deny
 - Firecracker preflight reports binary choice, `jailer`, `/dev/kvm` rw, arch support, and cached kernel/rootfs readiness
+- Firecracker no-network design/preflight support emits a config-plan with `strict_network_candidate=true`, `strict_network_proof=not_proven`, and `network_interfaces_configured=false`
 - macOS Lima preflight reports macOS version plus bounded `limactl --version` / `limactl list --json` probes; it does not create VMs
 - macOS Lima preflight reports `strict_network_isolation=false` and `security_posture=low_security_network_present`
 - sandbox audit still writes SHA256 chain/raw events and now best-effort mirrors to the keyed audit store when an audit key exists
@@ -80,6 +86,7 @@ Real now:
 Design-only now:
 - container provider as production fallback
 - real microVM execution
+- real Firecracker boot/no-default-route/curl-fails proof
 - Lima disposable VM session templates as low-security harness only
 - Firecracker jailer/rootfs/kernel lifecycle
 
@@ -122,6 +129,7 @@ Current opt-in Lima harness:
 - Firecracker: no TAP/NAT interfaces configured by default, but no boot/proof verifies guest isolation yet.
 - Lima: default slirp/user-mode networking is documented; `user-v2` is also user-mode networking. ARC treats Lima as low-security/network-present, not strict P2 evidence.
 - Proposed strict proof: boot Firecracker/Cloud Hypervisor without guest NIC/default route, then verify `ip route` has no default route and `curl --connect-timeout 1 http://example.com` fails before user argv.
+- Current strict proof status: design/preflight only. `build_firecracker_no_network_run_plan()` emits a Firecracker config dictionary with no `network-interfaces` key and the required proof commands (`ip route`, `curl --connect-timeout 2 https://example.com`). No real boot was executed on this macOS host.
 
 ### Teardown Guarantees
 - Firecracker: VM is destroyed by stopping the Firecracker process. No timeout/safety net for boot-failure hangs.

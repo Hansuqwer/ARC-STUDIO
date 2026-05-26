@@ -61,6 +61,59 @@ class MicroVMRunPlan(BaseModel):
     blockers: list[str]
 
 
+class FirecrackerNoNetworkConfig(BaseModel):
+    """Design-proof Firecracker config with no guest NICs configured."""
+
+    model_config = ConfigDict(frozen=True)
+
+    api_socket: str
+    config_path: str
+    kernel_image_path: str
+    rootfs_path: str
+    boot_args: str = "console=ttyS0 reboot=k panic=1 pci=off"
+    vcpu_count: int = 1
+    mem_size_mib: int = 256
+    strict_network_candidate: bool = True
+    strict_network_proof: str = "not_proven"
+    network_interfaces_configured: bool = False
+
+    def to_firecracker_config(self) -> dict[str, object]:
+        """Return Firecracker config-file JSON without network interfaces."""
+        return {
+            "boot-source": {
+                "kernel_image_path": self.kernel_image_path,
+                "boot_args": self.boot_args,
+            },
+            "drives": [
+                {
+                    "drive_id": "rootfs",
+                    "path_on_host": self.rootfs_path,
+                    "is_root_device": True,
+                    "is_read_only": False,
+                }
+            ],
+            "machine-config": {
+                "vcpu_count": self.vcpu_count,
+                "mem_size_mib": self.mem_size_mib,
+                "smt": False,
+            },
+        }
+
+
+class FirecrackerNoNetworkRunPlan(BaseModel):
+    """Non-executing strict no-network proof plan for Firecracker."""
+
+    model_config = ConfigDict(frozen=True)
+
+    command: list[str]
+    proof_commands: list[list[str]]
+    config: FirecrackerNoNetworkConfig
+    teardown_actions: list[str]
+    host_gates: list[str]
+    execution_status: str = "design_proof_only"
+    real_boot_attempted: bool = False
+
+
 class LimaHarnessResult(BaseModel):
     """Structured opt-in Lima harness result."""
 
@@ -83,6 +136,9 @@ class FirecrackerHarnessResult(BaseModel):
     result: IsolationResult
     lifecycle: list[str]
     network_proof_passed: bool = False
+    strict_network_candidate: bool = True
+    strict_network_proof: str = "not_proven"
+    network_interfaces_configured: bool = False
     kvm_available: bool = False
     teardown_attempted: bool = False
 
@@ -123,6 +179,16 @@ def firecracker_integration_available() -> bool:
         and _microvm_execution_enabled()
         and _firecracker_available()
         and _kvm_available()
+    )
+
+
+def firecracker_real_exec_available() -> bool:
+    """Return True only when the host-gated real Firecracker proof may run."""
+    return (
+        firecracker_integration_available()
+        and os.environ.get("ARC_FC_REAL_EXEC") == "1"
+        and bool(os.environ.get("ARC_FIRECRACKER_KERNEL"))
+        and bool(os.environ.get("ARC_FIRECRACKER_ROOTFS"))
     )
 
 
@@ -180,15 +246,40 @@ class FirecrackerIntegrationHarness:
         without a real Firecracker binary.  If no runner is injected and
         Firecracker is not available, raises FirecrackerHarnessError.
         """
+        started_at = utc_now()
         if require_gate and not firecracker_integration_available():
-            raise FirecrackerHarnessError(
-                "ARC_MICROVM_INTEGRATION=1, Linux, firecracker binary, and /dev/kvm are required"
+            result = FirecrackerHarnessResult(
+                command=command,
+                instance_name=self.instance_name,
+                result=IsolationResult(
+                    exit_code=-1,
+                    stderr=(
+                        "ARC_MICROVM_INTEGRATION=1, Linux, firecracker binary, "
+                        "and /dev/kvm are required"
+                    ),
+                    provider="microvm",
+                ),
+                lifecycle=["preflight"],
             )
-        if self.runner is None and not _firecracker_available():
-            raise FirecrackerHarnessError(
-                "No Firecracker runner injected and no firecracker binary found; "
-                "cannot run harness without a real binary or a fake runner"
+            self._persist_audit_event(result, started_at, utc_now())
+            raise FirecrackerHarnessError(result.result.stderr)
+        if self.runner is None and not firecracker_real_exec_available():
+            result = FirecrackerHarnessResult(
+                command=command,
+                instance_name=self.instance_name,
+                result=IsolationResult(
+                    exit_code=-1,
+                    stderr=(
+                        "real Firecracker run is blocked until ARC_MICROVM_INTEGRATION=1, "
+                        "ARC_FC_REAL_EXEC=1, Linux, /dev/kvm, firecracker, kernel, and rootfs "
+                        "are present; public microVM execution remains disabled (ADR-024)"
+                    ),
+                    provider="microvm",
+                ),
+                lifecycle=["preflight"],
             )
+            self._persist_audit_event(result, started_at, utc_now())
+            raise FirecrackerHarnessError(result.result.stderr)
         if not command:
             raise ValueError("missing command")
 
@@ -200,8 +291,6 @@ class FirecrackerIntegrationHarness:
         network_proof_passed = False
         teardown_attempted = False
         result = IsolationResult(exit_code=-1, stderr="not started", provider="microvm")
-        started_at = utc_now()
-
         try:
             # Phase: preflight
             self.lifecycle.append("preflight")
@@ -266,6 +355,9 @@ class FirecrackerIntegrationHarness:
             result=result,
             lifecycle=list(self.lifecycle),
             network_proof_passed=network_proof_passed,
+            strict_network_candidate=True,
+            strict_network_proof="host_gated" if self.runner is None else "not_proven",
+            network_interfaces_configured=False,
             kvm_available=kvm_available,
             teardown_attempted=teardown_attempted,
         )
@@ -405,6 +497,50 @@ def build_microvm_run_plan(
         execution_status="design_proof_only",
         steps=steps,
         blockers=blockers,
+    )
+
+
+def build_firecracker_no_network_run_plan(
+    command: list[str],
+    *,
+    kernel_path: Path,
+    rootfs_path: Path,
+    work_dir: Path,
+    instance_name: str | None = None,
+) -> FirecrackerNoNetworkRunPlan:
+    """Build a non-executing Firecracker no-NIC proof plan."""
+    if not command:
+        raise ValueError("missing command")
+    name = instance_name or f"arc-fc-{uuid.uuid4().hex[:12]}"
+    api_socket = work_dir / f"{name}.socket"
+    config_path = work_dir / f"{name}.json"
+    config = FirecrackerNoNetworkConfig(
+        api_socket=str(api_socket),
+        config_path=str(config_path),
+        kernel_image_path=str(kernel_path),
+        rootfs_path=str(rootfs_path),
+    )
+    return FirecrackerNoNetworkRunPlan(
+        command=command,
+        proof_commands=[
+            ["ip", "route"],
+            ["curl", "--connect-timeout", "2", "https://example.com"],
+        ],
+        config=config,
+        teardown_actions=[
+            "terminate firecracker process group",
+            "remove api socket",
+            "remove temporary work directory",
+        ],
+        host_gates=[
+            "Linux",
+            "ARC_MICROVM_INTEGRATION=1",
+            "ARC_FC_REAL_EXEC=1",
+            "ARC_FIRECRACKER_KERNEL",
+            "ARC_FIRECRACKER_ROOTFS",
+            "firecracker binary",
+            "/dev/kvm read/write",
+        ],
     )
 
 
