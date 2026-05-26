@@ -34,7 +34,17 @@ from agent_runtime_cockpit.isolation.microvm import (
     build_microvm_run_plan,
     firecracker_integration_available,
 )
-from agent_runtime_cockpit.security.sandbox import firecracker_doctor, microvm_preflight
+from agent_runtime_cockpit.security.sandbox import (
+    firecracker_doctor,
+    microvm_preflight,
+    render_lima_template,
+)
+
+
+class _FakeCompletedProcess:
+    returncode = 0
+    stdout = "ok"
+    stderr = ""
 
 
 class TestMicroVMPreflightStates:
@@ -186,6 +196,23 @@ class TestMicroVMPreflightCI:
         assert "platform" in data
         assert "status" in data
         assert data["provider"] == "microvm"
+
+    def test_macos_lima_reports_low_security_network_posture(self, monkeypatch):
+        monkeypatch.setattr(
+            shutil, "which", lambda name: "/opt/homebrew/bin/limactl" if name == "limactl" else None
+        )
+        monkeypatch.setattr(subprocess, "run", lambda *_, **__: _FakeCompletedProcess())
+        data = microvm_preflight("Darwin")
+        assert data["runtime"] == "lima-vz"
+        assert data["strict_network_isolation"] is False
+        assert data["security_posture"] == "low_security_network_present"
+        assert "network" in data["network_reason"]
+
+    def test_lima_template_labels_low_security_network_posture(self, tmp_path):
+        template = render_lima_template(tmp_path, "arc-test")
+        assert "Low-security harness only" in template
+        assert "strict network isolation is not proven" in template
+        assert "Does not prove no default Lima user-mode/slirp route" in template
 
 
 class TestMicroVMRunPlan:

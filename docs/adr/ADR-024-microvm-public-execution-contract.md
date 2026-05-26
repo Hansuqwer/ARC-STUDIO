@@ -2,7 +2,7 @@
 
 **Status:** Accepted — implementation blocked (see P1–P7 status below)  
 **Date:** 2026-05-26  
-**Last updated:** 2026-05-26 — P1–P7 evaluation complete; P2 (network-off) and P7 (audit) block wiring  
+**Last updated:** 2026-05-26 — P2 revised: Lima is low-security network-present harness only; strict public microVM remains blocked  
 **Authors:** ARC Studio sandbox team  
 **Related:** Phase 37 (R38), `docs/research/sandbox-and-microvm.md`, `docs/research/microvm-p1-p7-status.md`, ADR-014 (security architecture)
 
@@ -82,8 +82,8 @@ referencing this ADR.
 
 | Platform | Provider | Status |
 |---|---|---|
-| macOS (≥ 13, Apple Silicon or Intel) | Lima / Apple Virtualization.framework | Target; requires limactl + ARC_MICROVM_EXEC_ENABLED=1 |
-| Linux (x86_64, aarch64 with KVM) | Firecracker (primary), Cloud Hypervisor (secondary) | Target; requires /dev/kvm + binary + ARC_MICROVM_EXEC_ENABLED=1 |
+| macOS (≥ 13, Apple Silicon or Intel) | Lima / Apple Virtualization.framework | **Low-security harness only**; Lima default/user-v2 networking is network-present and cannot currently satisfy P2 |
+| Linux (x86_64, aarch64 with KVM) | Firecracker (primary), Cloud Hypervisor (secondary) | Strict no-network target; requires /dev/kvm + binary + ARC_MICROVM_EXEC_ENABLED=1 after P1-P7 proof |
 | Windows | — | **Explicitly unsupported**; emit clear error: "microVM execution is not supported on Windows" |
 | Other (FreeBSD, etc.) | — | Blocked; `microvm_preflight()` returns `status: blocked` |
 
@@ -176,7 +176,7 @@ are mandatory. Missing any of these fields is a schema violation.
 2. Complete P1–P7 proofs on a real host with Firecracker + `/dev/kvm` (Linux).
 3. Add mount escape tests (P3, P5) — these are the highest-risk blockers.
 4. Wire `ARC_MICROVM_EXEC_ENABLED` in `MicroVMIsolationProvider.execute()`.
-5. Add audit event emission in the harness.
+5. Audit event emission exists for internal harness attempts; add public provider audit tests if execution is ever wired.
 6. Add CI opt-in smoke with host runners that have Lima/Firecracker installed.
 7. Update this ADR status from "Accepted" to "Implemented" with evidence links.
 
@@ -189,14 +189,27 @@ Full detail: `docs/research/microvm-p1-p7-status.md`
 | P# | Description | Status |
 |---|---|---|
 | P1 | Lifecycle proof | Partial — fake tests pass; real host tests added but `ARC_LIMA_REAL_EXEC=1` not yet run end-to-end |
-| P2 | Network-off proof | **BLOCKED** — Lima 2.x always has slirp route; no config to disable it found |
+| P2 | Network-off proof | **ADR-revised** — Lima is low-security/network-present only; strict no-network remains blocked for public `microvm` until Firecracker/Cloud Hypervisor or another provider proves no network |
 | P3 | Workspace-mount proof | Partial — code-level escape guard added + sentinel test; virtiofs symlink pass-through gap remains |
 | P4 | Teardown proof | Partial — code-level harness teardown proven; real-host teardown pending |
 | P5 | Symlink-escape proof | Partial — code-level `is_path_within_root()` + 19 tests; mount-level virtiofs pass-through unproven |
 | P6 | stdout/stderr caps | **Satisfied** — bounded stream readers + cap tests pass |
-| P7 | Audit event emitted | **Missing** — no audit event emitted by harness yet |
+| P7 | Audit event emitted | **Satisfied for internal harnesses** — Lima/Firecracker harness attempts persist `MICROVM_COMMAND`/`MICROVM_DENIED`; public provider audit tests still required before execution wiring |
 
-**ARC_MICROVM_EXEC_ENABLED wiring: BLOCKED — P2 and P7 must be resolved first.**
+**ARC_MICROVM_EXEC_ENABLED wiring: BLOCKED — strict P2 is unresolved for any public provider.**
+
+### P2 Lima posture decision
+
+Context7 and Lima docs confirm default Lima networking is user-mode/slirp with
+hard-coded `192.168.5.0/24`. Lima `user-v2` disables the default user-mode
+network but replaces it with another user-mode network; it is not a no-network
+configuration. Therefore ARC treats Lima as a low-security developer harness,
+not the strict public `microvm` sandbox provider.
+
+Firecracker remains the preferred strict Linux path because its documented
+network setup requires explicit TAP/NAT/bridge configuration. A Firecracker VM
+with no network interface configured is the next candidate for P2 proof, but
+ARC has not implemented or proven that lifecycle yet.
 
 ---
 

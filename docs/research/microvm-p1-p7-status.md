@@ -14,7 +14,7 @@ prerequisites are Satisfied (not Partial or Missing).
 | P# | Description | Status | Evidence | Remaining |
 |---|---|---|---|---|
 | P1 | Lifecycle proof: create→start→exec→stop/delete completes | **Partial** | `test_lima_smoke.py::TestLimaSmokeRealHost` added; uses real `_run_limactl` when `ARC_LIMA_REAL_EXEC=1`; code-level lifecycle state machine verified with fake runner (105+ tests). Real VM lifecycle not yet run end-to-end on this host. | Run `ARC_MICROVM_INTEGRATION=1 ARC_LIMA_REAL_EXEC=1 pytest tests/isolation/test_lima_smoke.py::TestLimaSmokeRealHost -v` on a host with limactl + sufficient network for first-run image download. Verify all lifecycle phases complete and exit_code == 0. |
-| P2 | Network-off proof: guest has no default route before user argv | **BLOCKED** | Lima 2.x always provides a default user-mode slirp network (192.168.5.0/24) to the guest. No Lima 2.x template config key to disable the default slirp interface was found in Lima docs or source. `LimaIntegrationHarness.run()` checks `ip route \| grep default` — this will ALWAYS fail on Lima 2.x (exit 1 = default route found). `network_proof_passed` will always be `False`. | Find a Lima config or CLI flag to disable the default slirp interface, OR accept Lima as a "low-security" execution context (network present) and remove P2 as a gate. OR build an in-guest iptables/nftables rule that drops all external traffic and prove it via a curl-fails test. Unresolved. |
+| P2 | Network-off proof: guest has no default route before user argv | **ADR-revised: Lima low-security; strict public microVM still BLOCKED** | Context7 and Lima docs confirm default Lima networking is user-mode/slirp on `192.168.5.0/24`. Lima `user-v2` disables default user-mode networking but replaces it with another user-mode network, not no-network. `LimaIntegrationHarness.run()` still checks `ip route \| grep default` and blocks user argv when a route exists. | Treat Lima as low-security developer harness only. Prove strict P2 through Firecracker/Cloud Hypervisor or another provider with no guest NIC/default route and curl-fails proof. Do not wire `ARC_MICROVM_EXEC_ENABLED`. |
 | P3 | Workspace-mount proof: only workspace accessible, not host home/root | **Partial** | Code-level: `is_path_within_root()` and `check_workspace_escape()` added to `sandbox.py`. `LimaIntegrationHarness.__init__` rejects workspace_root symlinks pointing outside parent. 19 code-level tests pass. Real-host mount proof: `test_real_lima_workspace_sentinel` added (reads `/workspace/arc-sentinel.txt` inside Lima); skipped until `ARC_LIMA_REAL_EXEC=1`. Mount-level gap: virtiofs passes symlinks through to guest — a symlink inside workspace pointing outside will be accessible in the guest. | Run `ARC_LIMA_REAL_EXEC=1` sentinel test to prove workspace is mounted at `/workspace`. Add a guest-side test: create a symlink inside workspace pointing to `/etc/passwd` and verify it is NOT accessible at `/workspace/escape-link` in the guest. This requires a real Lima VM. |
 | P4 | Teardown proof: cleanup on success/failure/timeout/SIGINT | **Partial** | `LimaIntegrationHarness.run()` calls `limactl delete -f` in `finally` block. 4+ fake-runner tests verify teardown fires on start failure, network proof failure, and success. `test_real_lima_teardown_on_start_failure` added (real limactl, short timeout). Real teardown skipped until `ARC_LIMA_REAL_EXEC=1`. SIGINT/host-crash teardown not proven. | Run real-host teardown tests. Add SIGINT simulation test: send SIGINT to harness parent process and verify Lima VM is subsequently listed as deleted by `limactl list`. |
 | P5 | Symlink/path-traversal escape denied in guest mount | **Partial** | Code-level: `is_path_within_root()` correctly denies dangling, chained, and cross-parent symlinks (19 tests). Lima virtiofs passes symlinks through: a symlink inside workspace pointing to `/etc/passwd` WILL be readable in the guest at `/workspace/link`. Code-level guard in `__init__` only prevents the workspace_root itself from being misdirected. | Add a real-host test: (1) create a symlink inside tmp_path pointing to `/etc/passwd`, (2) start Lima VM, (3) run `cat /workspace/symlink-to-etc-passwd`, (4) assert it fails with permission denied or is not accessible. This requires real Lima VM and is the highest-risk remaining blocker. |
@@ -25,7 +25,7 @@ prerequisites are Satisfied (not Partial or Missing).
 
 **Status: BLOCKED — do NOT wire.**
 
-Prerequisite P2 (network-off) is not satisfied.
+Strict prerequisite P2 (network-off) is not satisfied for any public provider.
 P1, P3, P4, P5 are partially satisfied (code-level proofs exist; real-host
 proofs are pending `ARC_LIMA_REAL_EXEC=1`). P7 is satisfied for internal
 Lima/Firecracker harness attempts only; public execution remains blocked.
@@ -36,10 +36,7 @@ read by any code. `MicroVMIsolationProvider.execute()` still always raises
 
 ## What must happen before wiring
 
-1. **P2**: Resolve Lima network isolation. Options:
-   - Find a Lima config to disable slirp (preferred).
-   - Accept network-present context and remove P2 requirement (requires explicit decision in ADR-024 revision).
-   - Implement in-guest firewall rule and prove it with curl-fails test.
+1. **P2**: Prove strict network-off with Firecracker/Cloud Hypervisor or another provider. Lima is now explicitly low-security/network-present only.
 2. **P7**: If public microVM execution is wired, add provider/CLI audit tests for that path.
 3. **P1, P3, P4, P5**: Run with `ARC_LIMA_REAL_EXEC=1` on a host with Lima + network access for image download.
 4. **P5 mount-level**: Add real-host symlink escape test inside Lima guest.

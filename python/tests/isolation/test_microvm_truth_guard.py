@@ -92,6 +92,12 @@ class TestMicroVMStatus:
         assert "ARC_MICROVM_EXEC_ENABLED" in gate
         assert "not yet honored" in gate
 
+    def test_microvm_status_marks_strict_network_isolation_unavailable(self):
+        provider = MicroVMIsolationProvider()
+        status = provider.status()
+        assert status["strict_network_isolation"] is False
+        assert status["lima_security_posture"] == "low_security_network_present"
+
     def test_microvm_name_property(self):
         """name property returns 'microvm'."""
         provider = MicroVMIsolationProvider()

@@ -757,6 +757,8 @@ class MicroVMIsolationProvider(IsolationProvider):
             "available": False,
             "reason": "execution_not_implemented",
             "contract_doc": "docs/adr/ADR-024-microvm-public-execution-contract.md",
+            "strict_network_isolation": False,
+            "lima_security_posture": "low_security_network_present",
             "lima_harness": lima_integration_available(),
             "firecracker_harness": firecracker_integration_available(),
             "unblock_gate": "ARC_MICROVM_EXEC_ENABLED=1 (not yet honored)",

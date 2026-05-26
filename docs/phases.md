@@ -2127,6 +2127,13 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Tests cover Lima allowed audit, Lima denied audit, and Firecracker allowed audit using fake runners; no VM runtime required.
 - Public `MicroVMIsolationProvider.execute()` still raises `NotImplementedError`; `ARC_MICROVM_EXEC_ENABLED` remains unwired because P2 network-off is still blocked.
 
+#### Slice 37.23: Lima P2 Network Posture Decision ✓
+- Researched Lima network docs via Context7/direct docs. Google web search remained blocked by account verification; Vercel Grep is not exposed in this runtime.
+- ADR-024 P2 revised: Lima/VZ is a low-security network-present developer harness only, not strict public `microvm` sandbox evidence.
+- Context: Lima default networking is user-mode/slirp on `192.168.5.0/24`; `user-v2` disables default user-mode networking but replaces it with another user-mode network.
+- Added status/template truth guards: Lima preflight reports `strict_network_isolation=false` and `security_posture=low_security_network_present`; rendered template states strict network isolation is not proven.
+- Public `MicroVMIsolationProvider.execute()` still raises; `ARC_MICROVM_EXEC_ENABLED` remains unwired. Strict P2 now points to Firecracker/Cloud Hypervisor no-network proof.
+
 #### Slice 37.20: P1–P7 Evaluation + ARC_MICROVM_EXEC_ENABLED Wiring Decision ✓
 - Evaluated all 7 ADR-024 prerequisites against current codebase and research findings.
 - Created `docs/research/microvm-p1-p7-status.md` with per-prerequisite status table.

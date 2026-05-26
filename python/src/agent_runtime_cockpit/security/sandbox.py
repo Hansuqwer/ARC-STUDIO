@@ -812,6 +812,9 @@ def microvm_preflight(system: str | None = None) -> dict[str, Any]:
             "status": status,
             "binary": limactl,
             "runtime": "lima-vz",
+            "strict_network_isolation": False,
+            "security_posture": "low_security_network_present",
+            "network_reason": "Lima default/user-v2 networking provides guest network access",
             "macos_version": macos_version,
             "limactl_version": limactl_version,
             "limactl_list": limactl_list,
@@ -1196,9 +1199,15 @@ def list_sandbox_audit_events(
 
 
 def render_lima_template(workspace_root: Path, instance_name: str = "arc-sandbox") -> str:
-    """Render an experimental Lima VZ template; gated by caller."""
+    """Render an experimental Lima VZ template; gated by caller.
+
+    Lima is a low-security harness for ARC until a real no-network template is
+    found. `networks: []` does not prove absence of Lima's default user-mode
+    network, so the harness still performs an in-guest route proof before argv.
+    """
     workspace = str(workspace_root.resolve())
-    return f"""# ARC experimental Lima sandbox template. Execution gated by ARC_MICROVM_INTEGRATION=1.
+    return f"""# ARC experimental Lima VM template. Low-security harness only; strict network isolation is not proven.
+# Execution gated by ARC_MICROVM_INTEGRATION=1 and blocked unless the in-guest network proof passes.
 vmType: vz
 images:
   - location: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-$(arch).img
@@ -1206,7 +1215,7 @@ mounts:
   - location: {workspace}
     mountPoint: /workspace
     writable: true
-networks: []
+networks: [] # Does not prove no default Lima user-mode/slirp route.
 portForwards: []
 provision:
   - mode: system
