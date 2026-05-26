@@ -390,7 +390,7 @@ def test_microvm_provider_run_denied_even_with_integration_gate(tmp_path, monkey
     )
     assert result.exit_code == 2
     assert _payload(result)["ok"] is False
-    assert "not implemented/proven" in _payload(result)["error"]["message"]
+    assert "microVM execution not yet available" in _payload(result)["error"]["message"]
 
 
 def test_microvm_doctor_never_claims_execution_implemented(monkeypatch):
@@ -911,3 +911,39 @@ def test_microvm_integration_skeleton_doctor_only():
     providers = _payload(result)["data"]["providers"]
     microvm = next(provider for provider in providers if provider.get("provider") == "microvm")
     assert microvm["status"] in {"unavailable", "installed_not_configured", "ready", "blocked"}
+
+
+def test_sandbox_run_provider_microvm_blocked(tmp_path, monkeypatch):
+    """arc sandbox run --provider microvm must never silently execute a command.
+
+    The public execution path must be blocked regardless of env var state.
+    The CLI must return a non-zero exit code OR output must contain a clear
+    message that execution is not implemented/not available.
+    """
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(
+        app,
+        ["sandbox", "run", "--json", "--provider", "microvm", "--", "uname"],
+        catch_exceptions=False,
+    )
+    # Must NOT silently succeed with exit_code 0 AND decision.allowed True
+    output = result.output or ""
+    if result.exit_code == 0:
+        # If exit code is 0, the decision must be denied/blocked
+        try:
+            data = _payload(result).get("data", {})
+            decision = data.get("decision", {})
+            # Must not be allowed
+            assert decision.get("allowed") is not True, (
+                "arc sandbox run --provider microvm must not allow execution"
+            )
+        except (ValueError, KeyError):
+            # Non-JSON output with exit_code 0 is only acceptable if it
+            # contains a clear blocking message
+            assert any(
+                kw in output.lower()
+                for kw in ("not", "blocked", "error", "unavailable", "implement")
+            ), f"Unexpected exit_code=0 with no blocking message: {output}"
+    else:
+        # Non-zero exit code — blocked correctly
+        assert result.exit_code != 0

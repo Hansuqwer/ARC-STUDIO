@@ -651,13 +651,19 @@ def _execute_lima(
 class MicroVMIsolationProvider(IsolationProvider):
     """MicroVM provider for macOS/Linux.
 
-    On macOS with Lima installed and ``ARC_MICROVM_INTEGRATION=1``, ``execute()``
-    creates a disposable Lima VZ VM, runs the command inside, and destroys the VM.
-    On Linux, ``execute()`` still raises ``NotImplementedError``.
+    Public execution (execute()) always raises NotImplementedError until all
+    prerequisites in ADR-024 (docs/adr/ADR-024-microvm-public-execution-contract.md)
+    are satisfied and ARC_MICROVM_EXEC_ENABLED=1 is set.
+
+    Use doctor/preflight/harness surfaces instead.
     """
 
     @property
     def provider_id(self) -> str:
+        return "microvm"
+
+    @property
+    def name(self) -> str:
         return "microvm"
 
     async def health_check(self) -> bool:
@@ -672,9 +678,22 @@ class MicroVMIsolationProvider(IsolationProvider):
         timeout_seconds: int = 300,
     ) -> IsolationResult:
         raise NotImplementedError(
-            "microVM execution is not implemented/proven; use doctor/preflight only "
+            "microVM execution not yet available — prerequisites P1–P7 in "
+            "docs/adr/ADR-024-microvm-public-execution-contract.md must be satisfied "
+            "and ARC_MICROVM_EXEC_ENABLED=1 must be set before this path is enabled "
             f"(platform={platform.system()})"
         )
+
+    def status(self) -> dict[str, object]:
+        """Return structured status dict for truth-guard checks and CLI output."""
+        return {
+            "available": False,
+            "reason": "execution_not_implemented",
+            "contract_doc": "docs/adr/ADR-024-microvm-public-execution-contract.md",
+            "lima_harness": lima_integration_available(),
+            "firecracker_harness": firecracker_integration_available(),
+            "unblock_gate": "ARC_MICROVM_EXEC_ENABLED=1 (not yet honored)",
+        }
 
     def describe(self) -> dict[str, object]:
         info = microvm_preflight()
@@ -682,6 +701,6 @@ class MicroVMIsolationProvider(IsolationProvider):
             info["execution"] = "gated_unproven"
             info["reason"] = (
                 "ARC_MICROVM_INTEGRATION=1 is set and limactl is present, but public "
-                "microVM execution remains disabled until integration proof passes"
+                "microVM execution remains disabled until ADR-024 prerequisites are met"
             )
         return info

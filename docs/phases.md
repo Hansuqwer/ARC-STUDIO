@@ -2112,6 +2112,25 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Real Lima execution NOT proven on this host (CI-skipped).
 - Verified: targeted sandbox/microVM tests (including smoke) pass; CI posture confirmed.
 
+#### Slice 37.17: MicroVM Public-Execution Truth Guard ✓
+- Added `MicroVMIsolationProvider.name` property returning `"microvm"`.
+- Added `MicroVMIsolationProvider.status()` → dict with `available: False`, `reason`, `contract_doc`, `lima_harness`, `firecracker_harness`, `unblock_gate`.
+- Updated `execute()` error message to reference ADR-024 and P1–P7 prerequisites.
+- Added `python/tests/isolation/test_microvm_truth_guard.py` (10 tests):
+  - `test_microvm_execute_always_raises` — raises NotImplementedError unconditionally.
+  - `test_microvm_execute_raises_with_arc_microvm_exec_enabled_set` — gate not yet honored; still raises.
+  - `test_microvm_execute_raises_with_both_gates_set` — both gates set; still raises.
+  - `test_microvm_execute_error_message_references_adr` — message contains "ADR-024".
+  - `test_microvm_status_available_false` — available is always False.
+  - `test_microvm_status_contains_contract_ref` — contract_doc references ADR-024.
+  - `test_microvm_status_harness_fields_present` — lima_harness and firecracker_harness keys present.
+  - `test_microvm_status_reason_execution_not_implemented` — reason is "execution_not_implemented".
+  - `test_microvm_status_unblock_gate_present` — unblock_gate contains "ARC_MICROVM_EXEC_ENABLED" and "not yet honored".
+  - `test_microvm_name_property` — name returns "microvm".
+- Added `test_sandbox_run_provider_microvm_blocked` to `test_cli_sandbox.py` — CLI must not silently succeed.
+- Updated pre-existing error message assertion to match new ADR-024 reference.
+- `ARC_MICROVM_EXEC_ENABLED` defined in contract (ADR-024); NOT yet wired in code.
+
 #### Slice 37.16: Firecracker Gated Harness + Preflight Expansion ✓
 - Added `FirecrackerHarnessResult`, `FirecrackerHarnessError`, `firecracker_integration_available()`, `_FirecrackerFakeRunner`, and `FirecrackerIntegrationHarness` to `isolation/microvm.py`.
 - Harness lifecycle: preflight → create_vm → mount_workspace → exec → network_proof → stop_vm → teardown (7 phases).
