@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from agent_runtime_cockpit.cli_repl.slash_commands import _build_registry
 
-PHASE_3_COMMANDS = {
+PHASE_41_COMMANDS = {
     "help",
     "version",
     "exit",
@@ -20,12 +20,14 @@ PHASE_3_COMMANDS = {
     "doctor",
     "runs",
     "tools",
+    "sandbox",
+    "policy",
 }
 
 
-def test_phase_3_registry_command_set_is_exact() -> None:
+def test_phase_41_registry_command_set_is_exact() -> None:
     registry = _build_registry()
-    assert set(registry.commands) == PHASE_3_COMMANDS
+    assert set(registry.commands) == PHASE_41_COMMANDS
 
 
 def test_phase_2_registry_metadata_is_explicit() -> None:

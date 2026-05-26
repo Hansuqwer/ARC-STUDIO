@@ -28,6 +28,9 @@ class CommandDef:
     requires_events: list[str] = field(default_factory=list)
     privileged: bool = False
     trust_required: str = "user"  # system | user | workspace
+    usage: str = ""
+    examples: list[str] = field(default_factory=list)
+    subcommands: list[str] = field(default_factory=list)
 
 
 class CommandRegistry:
@@ -100,6 +103,8 @@ class CommandRegistry:
                 if c.aliases:
                     alias_str = f" ({', '.join('/' + a for a in c.aliases)})"
                 lines.append(f"    /{c.name}{alias_str}  {c.help_text}")
+                if c.usage:
+                    lines.append(f"      usage: {c.usage}")
         return "\n".join(lines)
 
 

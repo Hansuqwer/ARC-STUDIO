@@ -156,6 +156,8 @@ class TestSlashCommands:
         result = handler.handle("/help", s)
         assert result is not None
         assert "/help" in result
+        assert "/sandbox" in result
+        assert "/policy" in result
 
     def test_clear(self):
         handler = SlashCommandHandler()
@@ -608,6 +610,79 @@ class TestMergedSlashCommands:
         result = handler.handle("/status", s)
         assert result is not None
         assert "PLAN" in result
+
+    def test_sandbox_doctor_reports_providers(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        result = handler.handle("/sandbox doctor", s)
+        assert result is not None
+        assert result.state == "present"
+        assert "Sandbox providers" in result.output
+        assert "subprocess" in result.output
+        assert "microvm" in result.output
+
+    def test_policy_explain_read_only_allowed(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        result = handler.handle("/policy explain -- ls -la", s)
+        assert result is not None
+        assert result.state == "present"
+        assert "Classification: read_only" in result.output
+        assert "Decision: allow" in result.output
+
+    def test_policy_explain_network_denied(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        result = handler.handle("/policy explain -- curl https://example.com", s)
+        assert result is not None
+        assert result.state == "denied"
+        assert "Classification: network" in result.output
+        assert "Decision: deny" in result.output
+
+    def test_policy_list_and_show(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        policy_list = handler.handle("/policy list", s)
+        policy_show = handler.handle("/policy show local-safe", s)
+        assert policy_list is not None
+        assert policy_show is not None
+        assert "local-safe" in policy_list.output
+        assert "Allow network: no" in policy_show.output
+
+    def test_runs_show_and_status(self, monkeypatch, tmp_path):
+        traces = tmp_path / ".arc" / "traces"
+        traces.mkdir(parents=True)
+        (traces / "run-1.jsonl").write_text(
+            '{"type":"RUN_STARTED"}\n{"type":"RUN_COMPLETED"}\n', encoding="utf-8"
+        )
+        monkeypatch.chdir(tmp_path)
+        handler = SlashCommandHandler()
+        s = ChatSession()
+        shown = handler.handle("/runs show run-1", s)
+        status = handler.handle("/runs status run-1", s)
+        assert shown is not None
+        assert status is not None
+        assert shown.state == "present"
+        assert "Events: 2" in shown.output
+        assert "Status: RUN_COMPLETED" in status.output
+
+    def test_slash_command_exception_boundary(self, monkeypatch):
+        handler = SlashCommandHandler()
+        s = ChatSession()
+
+        def boom(_arg, _session):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(slash_commands, "cmd_status", boom)
+        handler._registry.get("status").handler = boom
+        result = handler.handle("/status", s)
+        assert result is not None
+        assert result.state == "error"
+        assert "boom" in result.output
 
 
 class TestCommandRegistry:

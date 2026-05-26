@@ -23,6 +23,18 @@ from ..runtime.turn_manager import TurnManager
 from ..swarmgraph import SwarmGraphRunner
 from ..swarmgraph.config import SwarmGraphConfig
 from ..tools import default_tool_registry
+from .adapters import (
+    SlashAdapterResult,
+    render_doctor_summary,
+    render_policy_explain,
+    render_policy_list,
+    render_policy_show,
+    render_run_show,
+    render_run_status,
+    render_runs_list,
+    render_sandbox_doctor,
+    render_status,
+)
 from .cancellation import CancellationReason, CancellationToken, Cancelled
 from .commands import CommandDef, get_registry
 from .session import ChatSession
@@ -63,6 +75,16 @@ class CommandResult:
     reason: str = ""
     remediation: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __str__(self) -> str:
+        if self.output:
+            return self.output
+        if self.reason:
+            return f"{self.state}: {self.reason}"
+        return self.state
+
+    def __contains__(self, value: str) -> bool:
+        return value in str(self)
 
 
 def _build_registry():
@@ -291,6 +313,7 @@ def _build_registry():
             requires_events=[],
             privileged=False,
             trust_required="workspace",
+            usage="/status",
         )
     )
     registry.register(
@@ -305,12 +328,13 @@ def _build_registry():
             requires_events=[],
             privileged=False,
             trust_required="workspace",
+            usage="/doctor",
         )
     )
     registry.register(
         CommandDef(
             name="runs",
-            help_text="List recent run records",
+            help_text="List/show run records: /runs [list|show|status]",
             category="workspace",
             handler=cmd_runs,
             gates_required=[],
@@ -319,6 +343,40 @@ def _build_registry():
             requires_events=[],
             privileged=False,
             trust_required="workspace",
+            usage="/runs [list|show|status] [run_id]",
+            subcommands=["list", "show", "status"],
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="sandbox",
+            help_text="Sandbox tools: /sandbox doctor",
+            category="workspace",
+            handler=cmd_sandbox,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "degraded", "blocked"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/sandbox doctor",
+            subcommands=["doctor"],
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="policy",
+            help_text="Explain/list sandbox policies",
+            category="compliance",
+            handler=cmd_policy,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "denied", "blocked", "absent"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/policy explain [--policy NAME] -- <cmd...>",
+            subcommands=["explain", "list", "show"],
         )
     )
 
@@ -708,54 +766,59 @@ def cmd_tools(arg: str, session: ChatSession) -> str:
     return "Usage: /tools list|enable [tool ...]|disable [tool ...]"
 
 
-def cmd_status(_arg: str, session: ChatSession) -> str:
-    from pathlib import Path
-
-    ws = Path.cwd().resolve()
-    lines = [
-        f"Workspace: {ws}",
-        f"Mode: {session.mode.upper()}",
-        f"Runtime: {RuntimeMode.from_legacy(session.runtime_mode).value}",
-        f"Session: {session.id[:12]}",
-        f"Messages: {len(session.history)}",
-    ]
-    runtime_dir = ws / ".arc" / "traces"
-    run_count = len(list(runtime_dir.glob("*.jsonl"))) if runtime_dir.exists() else 0
-    lines.append(f"Stored runs: {run_count}")
-    return "\n".join(lines)
+def _render_adapter_result(result: SlashAdapterResult) -> CommandResult:
+    return CommandResult(
+        state=result.state,
+        output=result.text,
+        reason=result.data.get("reason", "") if isinstance(result.data, dict) else "",
+        metadata=result.data,
+    )
 
 
-def cmd_doctor(_arg: str, _session: ChatSession) -> str:
-    from pathlib import Path
-
-    ws = Path.cwd().resolve()
-    checks = [
-        ("Workspace exists", ws.exists()),
-        ("ARC dir exists", (ws / ".arc").exists()),
-    ]
-    results = []
-    for label, ok in checks:
-        glyph = "✓" if ok else "✗"
-        results.append(f"  {glyph} {label}")
-    return "\n".join(results)
+def cmd_status(_arg: str, session: ChatSession) -> CommandResult:
+    return _render_adapter_result(render_status(session))
 
 
-def cmd_runs(_arg: str, _session: ChatSession) -> str:
-    from datetime import datetime
-    from pathlib import Path
+def cmd_doctor(_arg: str, _session: ChatSession) -> CommandResult:
+    return _render_adapter_result(render_doctor_summary())
 
-    ws = Path.cwd().resolve()
-    traces = ws / ".arc" / "traces"
-    if not traces.exists():
-        return "No runs stored."
-    run_files = sorted(traces.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if not run_files:
-        return "No runs stored."
-    lines = [f"Runs ({len(run_files)}):"]
-    for f in run_files[:10]:
-        mtime = datetime.fromtimestamp(f.stat().st_mtime).strftime("%H:%M:%S")
-        lines.append(f"  {f.stem[:16]}  {f.stat().st_size}B  {mtime}")
-    return "\n".join(lines)
+
+def cmd_sandbox(arg: str, _session: ChatSession) -> CommandResult:
+    parts = arg.strip().split(maxsplit=1)
+    subcommand = parts[0] if parts else "doctor"
+    if subcommand == "doctor":
+        return _render_adapter_result(render_sandbox_doctor())
+    return CommandResult(state="blocked", output="Usage: /sandbox doctor", reason="invalid_usage")
+
+
+def cmd_policy(arg: str, _session: ChatSession) -> CommandResult:
+    parts = arg.strip().split(maxsplit=1)
+    subcommand = parts[0] if parts else "list"
+    rest = parts[1] if len(parts) > 1 else ""
+    if subcommand == "explain":
+        return _render_adapter_result(render_policy_explain(rest))
+    if subcommand == "list":
+        return _render_adapter_result(render_policy_list())
+    if subcommand == "show":
+        return _render_adapter_result(render_policy_show(rest))
+    return CommandResult(
+        state="blocked",
+        output="Usage: /policy explain [--policy NAME] -- <cmd...>|list|show <name>",
+        reason="invalid_usage",
+    )
+
+
+def cmd_runs(arg: str, _session: ChatSession) -> CommandResult:
+    parts = arg.strip().split(maxsplit=1)
+    subcommand = parts[0] if parts else "list"
+    rest = parts[1] if len(parts) > 1 else ""
+    if subcommand == "list":
+        return _render_adapter_result(render_runs_list())
+    if subcommand in {"show", "get"}:
+        return _render_adapter_result(render_run_show(rest))
+    if subcommand == "status":
+        return _render_adapter_result(render_run_status(rest))
+    return _render_adapter_result(render_run_show(arg))
 
 
 class SlashCommandHandler:
@@ -773,7 +836,7 @@ class SlashCommandHandler:
     def run_token_factory(self) -> CancellationToken:
         return self.cancellation_token.child()
 
-    def handle(self, command: str, session: ChatSession) -> str | None:
+    def handle(self, command: str, session: ChatSession) -> str | CommandResult | None:
         cmd = command.strip()
         parts = cmd.split(maxsplit=1)
         name = parts[0].lstrip("/").lower()
@@ -797,4 +860,11 @@ class SlashCommandHandler:
                 event_sink=self,
                 runtime=self.runner,
             )
-        return defn.handler(arg, session)
+        try:
+            return defn.handler(arg, session)
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - exercised by regression tests with monkeypatches
+            return CommandResult(
+                state="error", output=f"Error running /{name}: {exc}", reason=type(exc).__name__
+            )
