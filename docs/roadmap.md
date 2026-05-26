@@ -979,6 +979,8 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R37 Provider Management (Phase 1)** | **Baseline Complete** | **Phase 36.1 — interactive UX without credential storage (commits cd89aab-7f2e20b)** |
 | **R37 Provider Management (Phase 2)** | **Baseline Complete** | **Phase 36.2 — auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`; token refresh; trust enforcement; audit logging; env var fallback; 57 auth tests** |
 | **R38 CLI Sandbox Hardening + IDE Integration** | **Active Hardening** | **Phase 37 — subprocess caps + approval prune + path-intent expansion + protocol parity + microVM preflight + container fallback tests + e2e routability + microVM truth guard + design-proof plan + gated Lima harness + Lima smoke test + ADR-024 contract + Firecracker gated harness + firecracker_doctor() + public-execution truth guard + real-host Lima lifecycle tests (CI-skipped; P2 network-off blocked by Lima 2.x slirp) + symlink-escape guard + Firecracker CI-skip structure complete; microVM execution blocked pending P1–P7 proofs** |
+| **R39 Interactive CLI/UX Foundation** | **Not Started** | **Phase 39 — REPL hardening, CLI-REPL integration, sandbox/policy slash commands, structured output, progress feedback, error recovery, history search** |
+| **R40 CLI/UX Polish & Advanced Features** | **Not Started** | **Phase 40 — pipelines, dashboard, aliases, batch mode, session export/import** |
 
 **Post-v0.1 Execution Order:** 
 - **Immediate (no blockers):** Phase 36.1 (Provider Discovery & Interactive UX), Phase 37 (CLI Sandbox Hardening — active)
@@ -994,3 +996,65 @@ The following roadmap items implement the adapter integration plan from `docs/re
 **Critical Path:** Streaming Audit → RunEvent Unions → Trust Enforcement → Trace Virtualization → CLI Decomposition → MCP Server → MCP Tasks → Replay Contract → HITL/Eval → Consensus Escrow → Adaptive Consensus → Event Notifications → Memory Graph → Adapter Integration (LangChain, Anthropic, OpenAI-compatible, Pydantic AI, DSPy, Haystack, Smolagents, Semantic Kernel, Google ADK, MCP SDK) → Provider Management Phase 2
 
 **Note:** Phase 36.1 (Provider Discovery) can be implemented immediately without waiting for the critical path, as it has no dependencies and uses existing provider infrastructure.
+
+## R39 — Interactive CLI/UX Foundation
+
+**Goal:** Make the ARC CLI and REPL production-useful, connected, and polished. Currently the REPL is SwarmGraph-specific, CLI commands are batch-only, and the REPL has no integration with sandbox/policy/audit/task features.
+
+**Current:** CLI has 40+ commands across 23 Typer sub-apps. REPL has 17 slash commands but hardcodes `SwarmGraphRunner` for non-slash input. Sandbox/policy/audit features are CLI-only with no REPL integration. IDE and CLI REPL are completely disconnected. No colored/structured output in REPL. No progress feedback during execution. No command history search. No error recovery in REPL loop.
+
+**Deliverables:**
+1. REPL `/run` uses provider-backed runtime by default (not SwarmGraph fake_offline)
+2. Interactive approval flow for sandbox commands from REPL
+3. Progress updates during REPL execution
+4. Error handling to prevent REPL crashes
+5. `/sandbox`, `/policy`, `/audit`, `/tasks` slash commands in REPL
+6. Enhanced `/doctor` showing daemon health, trust, isolation status
+7. Colored/structured output for all REPL commands
+8. Command history search (Ctrl+R)
+9. Shared session state between IDE and CLI
+10. Interactive dashboard (`arc dashboard`) for terminal monitoring
+11. `arc studio status` or `arc status` top-level command
+12. CLI default TTY behavior documented and configurable
+
+**Acceptance:**
+- REPL `/run` works with provider-backed runtime without SwarmGraph dependency
+- Sandbox commands from REPL show interactive approval prompts
+- Execution shows progress updates (spinner, step-by-step)
+- REPL survives errors without crashing
+- All major CLI features accessible from REPL via slash commands
+- `/doctor` shows daemon health, trust state, isolation provider status
+- REPL output uses rich formatting (tables, trees, colors)
+- Command history search works with Ctrl+R
+- Session state shared between IDE and CLI
+- `arc dashboard` shows live system monitoring
+
+**Status:** Not Started | Evidence: `docs/research/interactive-cli-audit.md` | Notes: 12 UX gaps identified, prioritized P0-P3
+
+**Source:** Interactive CLI/UX Audit, 2026-05-26
+
+## R40 — CLI/UX Polish & Advanced Features
+
+**Goal:** Advanced CLI features: multi-command pipelines, interactive dashboard, command aliases, batch mode, session export/import.
+
+**Current:** Research Phase. No implementation exists.
+
+**Deliverables:**
+- Multi-command pipeline support (`|` pipe, `&&` / `||` chaining)
+- Interactive dashboard (`arc dashboard`)
+- Command aliases and snippets
+- Batch mode (`arc run -f commands.txt`)
+- Session export/import between IDE and CLI
+- CLI can connect to running IDE daemon
+
+**Acceptance:**
+- Pipelines work in REPL and batch mode
+- Dashboard shows live system monitoring
+- Aliases are workspace-persisted
+- Batch mode processes command files
+- Session export/import preserves all state
+- CLI connects to IDE daemon for remote sessions
+
+**Status:** Research | Evidence: `docs/research/interactive-cli-audit.md` | Notes: P3 features; requires significant UX design
+
+**Source:** Interactive CLI/UX Audit, 2026-05-26

@@ -2387,3 +2387,128 @@ Phase 37 (CLI Sandbox Hardening) ──→ (active; depends on Phase 23)
 - **Enterprise:** Phase 32 (depends on Phase 29 + Phase 21)
 - **Research:** Phase 33 (independent)
 - **Provider Management Phase 2:** Phase 36.2 (Baseline Complete — auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`, token refresh, trust enforcement, audit logging, env var fallback; 57 auth tests)
+- **Interactive CLI/UX:** Phase 39 (Not Started — REPL hardening, CLI-REPL integration, structured output)
+- **Advanced CLI:** Phase 40 (Not Started — pipelines, dashboard, aliases, batch mode)
+---
+
+## Phase 39 — Interactive CLI/UX Foundation
+
+**Roadmap:** R39 — Interactive CLI/UX Foundation  
+**Status:** Not Started  
+**Depends on:** None (uses existing CLI/REPL/sandbox/policy infrastructure)  
+**Evidence:** `docs/research/interactive-cli-audit.md` — 12 UX gaps identified, prioritized P0-P3
+
+### Gap Summary
+
+| Gap | Severity | Description |
+|-----|----------|-------------|
+| 1 | P0 | REPL hardcodes `SwarmGraphRunner` — not general-purpose |
+| 2 | P0 | `arc sandbox run` is batch-only, no interactive mode |
+| 3 | P0 | No REPL integration with sandbox/policy/audit features |
+| 4 | P1 | No progress/feedback during REPL execution |
+| 5 | P1 | IDE and CLI REPL are disconnected |
+| 6 | P1 | No colored/structured output in REPL |
+| 7 | P2 | No command history search |
+| 8 | P2 | No error recovery in REPL loop |
+| 9 | P2 | No multi-command or pipeline support |
+| 10 | P2 | No `arc status` top-level command |
+| 11 | P2 | Sandbox audit is CLI-only, not REPL-integrated |
+| 12 | P3 | No interactive dashboard |
+
+### Implementation Plan
+
+#### Chunk 39.1: REPL Runtime Generalization (P0)
+- Replace hardcoded `SwarmGraphRunner` with provider-backed runtime by default
+- Add `/run` command that routes through `TurnManager` (not SwarmGraph)
+- Keep SwarmGraph as explicit mode: `/run --runtime swarmgraph`
+- Add `ARC_ALLOW_RUN` gate to `/run` in REPL (same as CLI)
+
+#### Chunk 39.2: REPL Sandbox/Policy Integration (P0)
+- Add `/sandbox run -- <cmd>` slash command
+- Add `/policy explain -- <cmd>` slash command
+- Add `/audit list` slash command
+- Add `/tasks list` slash command
+- Show interactive approval prompts for sandbox commands
+
+#### Chunk 39.3: Structured Output (P1)
+- Replace `print()` with rich formatting (tables, trees, progress bars)
+- Add colored output for `/doctor`, `/status`, `/runs`
+- Add spinner/progress indicator during execution
+- Add error recovery (try/except around REPL loop)
+
+#### Chunk 39.4: History & Search (P2)
+- Add `Ctrl+R` reverse search for command history
+- Add global history file (not just per-session)
+- Add history filtering by command type
+
+#### Chunk 39.5: IDE-CLI Session Sharing (P2)
+- Add session export/import between IDE and CLI
+- Shared session state via `~/.arc/sessions/`
+- CLI can connect to running IDE daemon
+
+#### Chunk 39.6: Enhanced Doctor (P1)
+- `/doctor` shows daemon health, trust state, isolation provider status
+- `/doctor --json` for structured output
+- Show provider status, MCP status, sandbox status
+
+### Acceptance
+1. REPL `/run` works with provider-backed runtime without SwarmGraph dependency
+2. Sandbox commands from REPL show interactive approval prompts
+3. Execution shows progress updates (spinner, step-by-step)
+4. REPL survives errors without crashing
+5. All major CLI features accessible from REPL via slash commands
+6. `/doctor` shows daemon health, trust state, isolation provider status
+7. REPL output uses rich formatting (tables, trees, colors)
+8. Command history search works with Ctrl+R
+
+### Verification
+```bash
+cd python && uv run pytest tests/cli_repl/ -q
+cd python && uv run pytest -q
+pnpm --filter @arc-studio/protocol build
+pnpm --filter arc-extension build
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- REPL is currently a simple `input()` loop — significant rework needed for production quality
+- Provider-backed `/run` requires `ARC_ALLOW_RUN=1` gate — may need REPL-specific gate
+- Rich formatting adds dependency on `rich` library (already present)
+- IDE-CLI session sharing requires daemon protocol changes
+
+---
+
+## Phase 40 — Advanced CLI Features
+
+**Roadmap:** R40 — CLI/UX Polish & Advanced Features  
+**Status:** Not Started  
+**Depends on:** Phase 39 (Interactive CLI/UX Foundation)  
+**Evidence:** `docs/research/interactive-cli-audit.md` — P3 features
+
+### Deliverables
+1. Multi-command pipeline support (`|` pipe, `&&` / `||` chaining)
+2. Interactive dashboard (`arc dashboard`)
+3. Command aliases and snippets
+4. Batch mode (`arc run -f commands.txt`)
+5. Session export/import between IDE and CLI
+6. CLI can connect to running IDE daemon
+
+### Acceptance
+1. Pipelines work in REPL and batch mode
+2. Dashboard shows live system monitoring
+3. Aliases are workspace-persisted
+4. Batch mode processes command files
+5. Session export/import preserves all state
+6. CLI connects to IDE daemon for remote sessions
+
+### Verification
+```bash
+cd python && uv run pytest tests/cli/ -q
+cd python && uv run pytest -q
+bash scripts/check-pr.sh
+```
+
+### Known Risks
+- Pipeline support requires significant REPL rework
+- Dashboard requires terminal UI framework (e.g., `textual`)
+- Session export/import requires daemon protocol changes
