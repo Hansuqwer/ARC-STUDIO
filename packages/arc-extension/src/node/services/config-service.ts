@@ -11,6 +11,9 @@
 
 import { injectable, inject } from '@theia/core/shared/inversify';
 import { execFileSync } from 'child_process';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import {
     ProviderStatus,
     ConfigStatus,
@@ -30,6 +33,8 @@ import {
     SafeProviderKeyStatus,
     ProviderTestResult,
     ProviderModel,
+    ProviderAccountInfo,
+    ProviderAccountUpdate,
     ArcError,
     ArcErrorCode,
 } from '../../common/arc-protocol';
@@ -647,6 +652,68 @@ export class ConfigService {
                 model: request.model,
                 message: output.trim() || 'Provider action failed.',
             };
+        }
+    }
+
+    async getProviderAccount(accountId: string): Promise<ProviderAccountInfo> {
+        const daemonUrl = process.env.ARC_PYTHON_DAEMON_URL;
+        if (daemonUrl) {
+            const res = await fetch(`${daemonUrl.replace(/\/$/, '')}/api/providers/accounts/${encodeURIComponent(accountId)}`);
+            const parsed = await res.json();
+            if (res.ok && parsed.ok && parsed.data) {
+                return parsed.data as ProviderAccountInfo;
+            }
+            throw new ArcError(ArcErrorCode.RUN_NOT_FOUND, parsed.error?.message || `Provider account not found: ${accountId}`);
+        }
+        const accounts = this.readProviderAccounts();
+        const found = accounts.find(account => account.id === accountId);
+        if (!found) {
+            throw new ArcError(ArcErrorCode.RUN_NOT_FOUND, `Provider account not found: ${accountId}`);
+        }
+        return found;
+    }
+
+    async updateProviderAccount(accountId: string, update: ProviderAccountUpdate): Promise<ProviderAccountInfo> {
+        const daemonUrl = process.env.ARC_PYTHON_DAEMON_URL;
+        if (daemonUrl) {
+            const res = await fetch(`${daemonUrl.replace(/\/$/, '')}/api/providers/accounts/${encodeURIComponent(accountId)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-ARC-Workspace': this.workspaceRoot },
+                body: JSON.stringify(update),
+            });
+            const parsed = await res.json();
+            if (res.ok && parsed.ok && parsed.data) {
+                return parsed.data as ProviderAccountInfo;
+            }
+            throw new ArcError(ArcErrorCode.UNKNOWN, parsed.error?.message || `Provider account update failed: ${accountId}`);
+        }
+        const filePath = this.providerConfigPath();
+        const accounts = this.readProviderAccounts();
+        const index = accounts.findIndex(account => account.id === accountId);
+        if (index < 0) {
+            throw new ArcError(ArcErrorCode.RUN_NOT_FOUND, `Provider account not found: ${accountId}`);
+        }
+        const updated = { ...accounts[index], ...update };
+        accounts[index] = updated;
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        fs.writeFileSync(filePath, JSON.stringify({ version: 1, accounts }, null, 2));
+        return updated;
+    }
+
+    private providerConfigPath(): string {
+        return process.env.ARC_PROVIDER_CONFIG || path.join(os.homedir(), '.arc', 'providers.json');
+    }
+
+    private readProviderAccounts(): ProviderAccountInfo[] {
+        const filePath = this.providerConfigPath();
+        if (!fs.existsSync(filePath)) {
+            return [];
+        }
+        try {
+            const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+            return Array.isArray(parsed.accounts) ? parsed.accounts as ProviderAccountInfo[] : [];
+        } catch {
+            return [];
         }
     }
 }

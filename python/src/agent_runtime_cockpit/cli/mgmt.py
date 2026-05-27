@@ -698,6 +698,7 @@ def eval_report(
 def eval_run_new(
     run_id: str = typer.Argument(None, help="Run ID to evaluate (defaults to --run-id)"),
     golden_file: str = typer.Option("", "--golden-file", "-f", help="Path to golden JSON file"),
+    golden_dir: str = typer.Option("", "--golden-dir", "-d", help="Directory of golden JSON files"),
     golden_id: str = typer.Option("", "--golden", "-g", help="Golden trace ID"),
     expected_output: str = typer.Option(
         "", "--expected-final-output", help="Expected substring in final output"
@@ -720,12 +721,14 @@ def eval_run_new(
     --expected-final-output/--expected-status/--expected-event-types inline.
 
     Use --golden-file <path> to batch-evaluate from a golden JSON file (list or single GoldenTrace).
+    Use --golden-dir <dir> to batch-evaluate from a directory of golden JSON files.
     Use --batch to evaluate against all saved golden traces.
 
     Example:
         uv run arc eval run <run_id> --expected-final-output "hello"
         uv run arc eval run <run_id> --golden my-golden-id
         uv run arc eval run --golden-file goldens.json --run-id my-run
+        uv run arc eval run --golden-dir goldens/ --run-id my-run
         uv run arc eval run <run_id> --batch
 
     """
@@ -805,6 +808,79 @@ def eval_run_new(
         _out(ok(payload, workspace=str(ws)), json_output)
         if not json_output:
             console.print(f"[bold]Batch Eval:[/bold] {passed}/{len(all_results)} passed")
+            for r in all_results:
+                color = "green" if r.get("passed") else "red"
+                console.print(
+                    f"  [{color}]{'PASS' if r.get('passed') else 'FAIL'}[/{color}] {r.get('golden_id', '?')} score={r.get('score', 0)}"
+                )
+        return
+
+    # --golden-dir batch mode
+    if golden_dir:
+        gd_path = Path(golden_dir)
+        if not gd_path.is_dir():
+            _out(
+                err(ArcErrorCode.INVALID_INPUT, f"Golden directory not found: {golden_dir}"),
+                json_output,
+            )
+            raise typer.Exit(1)
+
+        if not rid:
+            _out(
+                err(ArcErrorCode.INVALID_INPUT, "--run-id is required when using --golden-dir"),
+                json_output,
+            )
+            raise typer.Exit(1)
+
+        run = store.load(rid)
+        if run is None:
+            _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {rid}"), json_output)
+            raise typer.Exit(1)
+
+        # Load all .json files from directory as GoldenTraces
+        goldens_list = []
+        for gf in sorted(gd_path.glob("*.json")):
+            try:
+                raw = _json.loads(gf.read_text())
+                if isinstance(raw, dict):
+                    goldens_list.append(GoldenTrace.model_validate(raw))
+                elif isinstance(raw, list):
+                    for item in raw:
+                        goldens_list.append(GoldenTrace.model_validate(item))
+            except Exception:
+                continue
+
+        if not goldens_list:
+            _out(
+                err(ArcErrorCode.INVALID_INPUT, f"No valid golden traces found in {golden_dir}"),
+                json_output,
+            )
+            raise typer.Exit(1)
+
+        art_store = EvalArtifactStore(ws)
+        all_results = []
+        for golden in goldens_list:
+            result = do_eval(run, golden)
+            all_results.append(result.model_dump())
+            art_store.write(build_artifact(rid, golden.id, [result.model_dump()]))
+
+        passed = sum(1 for r in all_results if r.get("passed"))
+        failed = len(all_results) - passed
+        artifacts = [
+            build_artifact(rid, r.get("golden_id", "?"), [r]).model_dump() for r in all_results
+        ]
+        payload = {
+            "source": "golden_dir",
+            "golden_dir": str(gd_path),
+            "golden_count": len(goldens_list),
+            "passed": passed,
+            "failed": failed,
+            "total": len(all_results),
+            "artifacts": artifacts,
+        }
+        _out(ok(payload, workspace=str(ws)), json_output)
+        if not json_output:
+            console.print(f"[bold]Batch Eval (dir):[/bold] {passed}/{len(all_results)} passed")
             for r in all_results:
                 color = "green" if r.get("passed") else "red"
                 console.print(
@@ -996,7 +1072,9 @@ def eval_list(
     goldens = list_goldens(ws)
     _out(ok([g.model_dump() for g in goldens]), json_output)
     if not json_output:
-        table = Table(title="Golden Traces")
+        from ._app import console
+
+        table = __import__("rich").table.Table(title="Golden Traces")
         table.add_column("ID")
         table.add_column("Workflow")
         table.add_column("Expected Output (truncated)")
@@ -1007,6 +1085,110 @@ def eval_list(
                 g.expected_final_output_contains[:60] if g.expected_final_output_contains else "",
             )
         console.print(table)
+
+
+@eval_app.command("trending")
+def eval_trending(
+    run_ids: str = typer.Option("", "--run-ids", help="Comma-separated eval run IDs"),
+    baseline: str = typer.Option("", "--baseline", help="Baseline run ID for delta"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Compute cross-session eval trending data."""
+    _setup_logging(debug)
+    from ..evals.artifact import EvalArtifactStore, compute_trending
+
+    ws = _workspace(workspace)
+    store = EvalArtifactStore(ws)
+
+    if not run_ids:
+        # Default: all runs
+        all_run_ids = store.list_run_ids()
+    else:
+        all_run_ids = [rid.strip() for rid in run_ids.split(",") if rid.strip()]
+
+    if not all_run_ids:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, "No eval runs found."), json_output)
+        raise typer.Exit(1)
+
+    artifacts_by_run: dict[str, list] = {}
+    for rid in all_run_ids:
+        artifacts = store.list_by_run(rid)
+        if artifacts:
+            artifacts_by_run[rid] = artifacts
+
+    trending = compute_trending(artifacts_by_run, baseline_run_id=baseline or None)
+    _out(ok(trending.model_dump(), workspace=str(ws)), json_output)
+
+    if not json_output:
+        from ._app import console
+
+        console.print(f"[bold]Eval Trending:[/bold] {len(trending.run_ids)} runs")
+        for i, rid in enumerate(trending.run_ids):
+            console.print(
+                f"  {rid[:16]}  pass_rate={trending.pass_rates[i]:.2%}  "
+                f"({trending.timestamps[i][:19]})"
+            )
+        if baseline:
+            console.print(f"  Delta from baseline: {trending.delta_from_baseline:+.4f}")
+
+
+@eval_app.command("dashboard")
+def eval_dashboard(
+    last: int = typer.Option(10, "--last", "-n", help="Number of recent eval runs to show"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show eval dashboard with latest run summaries."""
+    _setup_logging(debug)
+    from ..evals.artifact import EvalArtifactStore
+
+    ws = _workspace(workspace)
+    store = EvalArtifactStore(ws)
+    all_run_ids = store.list_run_ids()
+
+    if not all_run_ids:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, "No eval runs found."), json_output)
+        raise typer.Exit(1)
+
+    recent = all_run_ids[-last:]
+    runs_data = []
+    for rid in recent:
+        artifacts = store.list_by_run(rid)
+        if artifacts:
+            total = sum(a.total for a in artifacts)
+            passed = sum(a.pass_count for a in artifacts)
+            pass_rate = round(passed / total, 4) if total > 0 else 0.0
+            runs_data.append(
+                {
+                    "run_id": rid,
+                    "pass_rate": pass_rate,
+                    "total": total,
+                    "passed": passed,
+                    "golden_count": len(artifacts),
+                    "timestamp": artifacts[0].eval_timestamp,
+                }
+            )
+
+    payload = {"count": len(runs_data), "runs": runs_data}
+    _out(ok(payload, workspace=str(ws)), json_output)
+
+    if not json_output:
+        from ._app import console
+
+        console.print(f"[bold]Eval Dashboard:[/bold] last {len(runs_data)} runs")
+        for r in runs_data:
+            color = (
+                "green" if r["pass_rate"] >= 0.8 else "yellow" if r["pass_rate"] >= 0.5 else "red"
+            )
+            console.print(
+                f"  [{color}]{r['run_id'][:16]}[/{color}]  "
+                f"pass_rate={r['pass_rate']:.2%}  "
+                f"goldens={r['golden_count']}  "
+                f"({r['timestamp'][:19]})"
+            )
 
 
 # ─── hitl ──────────────────────────────────────────────────────────────────────

@@ -1274,6 +1274,7 @@ _SSE_PUSH_EVENT_TYPES = frozenset(
         "task_state_changed",
         "task_completed",
         "task_failed",
+        "eval_completed",
     }
 )
 

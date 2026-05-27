@@ -135,6 +135,66 @@ def build_artifact(
     )
 
 
+class EvalTrending(BaseModel):
+    """Trending data across multiple eval runs."""
+
+    run_ids: list[str] = Field(default_factory=list)
+    pass_rates: list[float] = Field(default_factory=list)
+    timestamps: list[str] = Field(default_factory=list)
+    delta_from_baseline: float = 0.0
+
+
+def compute_trending(
+    artifacts_by_run: dict[str, list[EvalArtifact]],
+    baseline_run_id: str | None = None,
+) -> EvalTrending:
+    """Compute trending data from eval artifacts grouped by run ID.
+
+    Args:
+        artifacts_by_run: dict mapping run_id to list of EvalArtifacts.
+        baseline_run_id: optional run_id to use as baseline for delta.
+
+    Returns:
+        EvalTrending with per-run aggregated pass rates.
+    """
+    run_ids: list[str] = []
+    pass_rates: list[float] = []
+    timestamps: list[str] = []
+
+    # Sort runs by the first artifact timestamp
+    sorted_runs = sorted(
+        artifacts_by_run.items(),
+        key=lambda kv: kv[1][0].eval_timestamp if kv[1] else "",
+    )
+
+    for run_id, artifacts in sorted_runs:
+        if not artifacts:
+            continue
+        total = sum(a.total for a in artifacts)
+        passed = sum(a.pass_count for a in artifacts)
+        pass_rate = round(passed / total, 4) if total > 0 else 0.0
+        run_ids.append(run_id)
+        pass_rates.append(pass_rate)
+        timestamps.append(artifacts[0].eval_timestamp)
+
+    delta = 0.0
+    if baseline_run_id and baseline_run_id in artifacts_by_run:
+        baseline_artifacts = artifacts_by_run[baseline_run_id]
+        if baseline_artifacts:
+            bl_total = sum(a.total for a in baseline_artifacts)
+            bl_passed = sum(a.pass_count for a in baseline_artifacts)
+            bl_rate = round(bl_passed / bl_total, 4) if bl_total > 0 else 0.0
+            latest_rate = pass_rates[-1] if pass_rates else 0.0
+            delta = round(latest_rate - bl_rate, 4)
+
+    return EvalTrending(
+        run_ids=run_ids,
+        pass_rates=pass_rates,
+        timestamps=timestamps,
+        delta_from_baseline=delta,
+    )
+
+
 def build_inspect_export(run_id: str, artifacts: list[EvalArtifact]) -> dict[str, Any]:
     """Build an Inspect-AI-compatible export shape from eval artifacts."""
     samples: list[dict[str, Any]] = []

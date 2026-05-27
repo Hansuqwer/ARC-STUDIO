@@ -267,6 +267,7 @@ def test_sse_push_event_types_allowlist() -> None:
         "task_state_changed",
         "task_completed",
         "task_failed",
+        "eval_completed",
     }
     assert required == _SSE_PUSH_EVENT_TYPES
 

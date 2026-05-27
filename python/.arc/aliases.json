@@ -1,8 +1,0 @@
-{
-  "aliases": {
-    "danger": "/sandbox run -- rm -rf .",
-    "loop": "/alias run loop",
-    "v": "/version"
-  },
-  "version": 1
-}

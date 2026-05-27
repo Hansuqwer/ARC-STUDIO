@@ -216,6 +216,9 @@ class TaskExecutor:
     def _execute_operation(self, task: Task) -> dict[str, Any]:
         """Execute the task operation based on type."""
         if task.type == TaskType.RUN:
+            # Check if this is an eval operation
+            if task.operation == "eval":
+                return self._execute_eval(task)
             return self._execute_run(task)
         elif task.type == TaskType.TRACE:
             return self._execute_trace(task)
@@ -331,6 +334,91 @@ class TaskExecutor:
             "records_checked": result.records_checked,
             "reason": result.reason,
             "duration_ms": result.duration_ms,
+        }
+
+    def _execute_eval(self, task: Task) -> dict[str, Any]:
+        """Execute an eval task: load goldens, run eval, save artifacts, publish event."""
+        from pathlib import Path
+
+        from ..evals.artifact import EvalArtifactStore, build_artifact
+        from ..evals.golden import GoldenTrace, eval_run as do_eval
+        from ..storage.jsonl import JsonlTraceStore
+
+        log.info("Executing eval task: %s", task.operation)
+        workspace = Path(task.params.get("workspace", "."))
+        run_id = task.params.get("run_id", task.operation)
+        golden_dir = task.params.get("golden_dir", "")
+
+        store = JsonlTraceStore(workspace / ".arc" / "traces")
+        run = store.load(run_id)
+
+        if run is None:
+            return {"run_id": run_id, "status": "not_found", "eval_completed": False}
+
+        # Load goldens
+        goldens: list[GoldenTrace] = []
+        if golden_dir:
+            import json as _json_mod
+
+            gd = Path(golden_dir)
+            if gd.is_dir():
+                for gf in sorted(gd.glob("*.json")):
+                    try:
+                        raw = _json_mod.loads(gf.read_text())
+                        if isinstance(raw, dict):
+                            goldens.append(GoldenTrace.model_validate(raw))
+                        elif isinstance(raw, list):
+                            for item in raw:
+                                goldens.append(GoldenTrace.model_validate(item))
+                    except Exception:
+                        continue
+
+        if not goldens:
+            from ..evals.golden import list_goldens
+
+            goldens = list_goldens(workspace)
+
+        if not goldens:
+            return {"run_id": run_id, "status": "no_goldens", "eval_completed": False}
+
+        art_store = EvalArtifactStore(workspace)
+        all_results = []
+        for golden in goldens:
+            result = do_eval(run, golden)
+            all_results.append(result.model_dump())
+            art_store.write(build_artifact(run_id, golden.id, [result.model_dump()]))
+
+        passed = sum(1 for r in all_results if r.get("passed"))
+        total = len(all_results)
+        pass_rate = round(passed / total, 4) if total > 0 else 0.0
+        failures_count = total - passed
+
+        # Publish EvalCompleted event
+        try:
+            from ..events.bus import get_bus
+            from ..events.types import EvalCompleted
+
+            bus = get_bus()
+            bus.publish(
+                EvalCompleted(
+                    run_id=run_id,
+                    pass_rate=pass_rate,
+                    total=total,
+                    failures_count=failures_count,
+                )
+            )
+        except Exception:
+            log.warning("Failed to publish EvalCompleted event", exc_info=True)
+
+        return {
+            "run_id": run_id,
+            "status": "completed",
+            "eval_completed": True,
+            "passed": passed,
+            "total": total,
+            "pass_rate": pass_rate,
+            "failures_count": failures_count,
+            "artifacts_saved": len(all_results),
         }
 
     def cancel_task(self, task_id: str) -> bool:

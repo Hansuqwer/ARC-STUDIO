@@ -43,6 +43,8 @@ import {
     ProviderKeyRefRequest,
     ProviderTestResult,
     ProviderModel,
+    ProviderAccountInfo,
+    ProviderAccountUpdate,
     GatedProviderActionRequest,
     GatedProviderActionResult,
     RunPreflightRequest,
@@ -385,6 +387,20 @@ export class ArcBackendService implements ArcService {
      */
     async listProviderModels(providerId?: string): Promise<ProviderModel[]> {
         return this.configService.listProviderModels(providerId);
+    }
+
+    /**
+     * @deprecated Use ConfigService.getProviderAccount() directly. Will be removed in v0.3.0.
+     */
+    async getProviderAccount(accountId: string): Promise<ProviderAccountInfo> {
+        return this.configService.getProviderAccount(accountId);
+    }
+
+    /**
+     * @deprecated Use ConfigService.updateProviderAccount() directly. Will be removed in v0.3.0.
+     */
+    async updateProviderAccount(accountId: string, update: ProviderAccountUpdate): Promise<ProviderAccountInfo> {
+        return this.configService.updateProviderAccount(accountId, update);
     }
 
     // ========== Run Links Methods (Session B7) ==========

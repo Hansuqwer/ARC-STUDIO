@@ -130,6 +130,16 @@ class TaskFailed(ArcEvent):
     duration_ms: int = 0
 
 
+class EvalCompleted(ArcEvent):
+    """Emitted when an eval completes (Phase 58)."""
+
+    event_type: Literal["eval_completed"] = "eval_completed"
+    run_id: str
+    pass_rate: float = 0.0
+    total: int = 0
+    failures_count: int = 0
+
+
 EVENT_TYPE_MAP: dict[str, type[ArcEvent]] = {
     "hitl_required": HitlRequired,
     "hitl_decided": HitlDecided,
@@ -142,6 +152,7 @@ EVENT_TYPE_MAP: dict[str, type[ArcEvent]] = {
     "task_state_changed": TaskStateChanged,
     "task_completed": TaskCompleted,
     "task_failed": TaskFailed,
+    "eval_completed": EvalCompleted,
 }
 
 
