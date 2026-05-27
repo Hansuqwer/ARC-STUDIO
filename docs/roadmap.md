@@ -3,7 +3,7 @@
 **Status:** Locked source of truth for remaining product work.  
 **Created:** 2026-05-17  
 **Last reality refresh:** 2026-05-27 — Phase 40–49 review hardening patch applied after Phase 49 Baseline Complete.  
-**Current evidence anchor:** local worktree | Phase 40–49 review verification pass: Python 2900 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped; TS protocol tests 61 passed; Python ruff, protocol build, extension build, workspace typecheck, PR hygiene, and banned-claims checks pass.  
+**Current evidence anchor:** local worktree | Phases 53-55 verification pass: Python 2976 passed / 34 skipped / 3 xfailed (37 new tests); ruff OK; protocol build OK; extension build OK.  
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary

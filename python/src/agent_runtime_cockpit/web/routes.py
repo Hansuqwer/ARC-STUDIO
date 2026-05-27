@@ -512,6 +512,11 @@ async def providers_status(request: web.Request) -> web.Response:
 async def providers_routing(request: web.Request) -> web.Response:
     store = ProviderRoutingStore()
     if request.method == "PUT":
+        workspace = _workspace(request)
+        try:
+            enforce_workspace_trust(workspace, "providers_routing", "daemon-providers-routing", 0)
+        except TrustEnforcementError as exc:
+            return _session_error(exc, 500)
         body = await request.json()
         policy = ProviderRoutingPolicy.model_validate(body)
         return _json(ok(store.set(policy).model_dump()).model_dump())
@@ -521,6 +526,11 @@ async def providers_routing(request: web.Request) -> web.Response:
 async def providers_accounts(request: web.Request) -> web.Response:
     store = ProviderAccountStore()
     if request.method == "POST":
+        workspace = _workspace(request)
+        try:
+            enforce_workspace_trust(workspace, "providers_accounts", "daemon-providers-accounts", 0)
+        except TrustEnforcementError as exc:
+            return _session_error(exc, 500)
         body = await request.json()
         if body.get("api_key"):
             return _json(
@@ -544,6 +554,17 @@ async def providers_accounts(request: web.Request) -> web.Response:
 async def providers_account(request: web.Request) -> web.Response:
     store = ProviderAccountStore()
     account_id = request.match_info["account_id"]
+
+    if request.method in ("PATCH", "DELETE"):
+        workspace = _workspace(request)
+        action = (
+            "providers_account_patch" if request.method == "PATCH" else "providers_account_delete"
+        )
+        try:
+            enforce_workspace_trust(workspace, action, f"daemon-{action}", 0)
+        except TrustEnforcementError as exc:
+            return _session_error(exc, 500)
+
     if request.method == "DELETE":
         return _json(
             ok({"deleted": store.delete(account_id), "account_id": account_id}).model_dump()
@@ -1052,6 +1073,123 @@ async def arena_rankings(request: web.Request) -> web.Response:
     return _json(ok(rankings).model_dump())
 
 
+# ─── Task daemon routes (Phase 54) ──────────────────────────────────────────
+
+
+def _get_task_executor(request: web.Request):
+    """Get or create the TaskExecutor bound to this workspace."""
+    from ..tasks.executor import TaskExecutor
+    from ..tasks.storage import TaskStorage
+
+    workspace = _workspace(request)
+    db_path = workspace / ".arc" / "tasks.db"
+    storage = TaskStorage(db_path)
+    executor = TaskExecutor(storage)
+    return executor
+
+
+async def tasks_list(request: web.Request) -> web.Response:
+    """GET /api/tasks — list tasks with optional status/type filters."""
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "tasks_list", "daemon-tasks-list", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
+
+    from ..tasks.models import TaskStatus, TaskType
+
+    status_raw = request.query.get("status")
+    task_type_raw = request.query.get("type")
+    limit_raw = request.query.get("limit", "100")
+
+    status = (
+        TaskStatus(status_raw)
+        if status_raw and status_raw in {s.value for s in TaskStatus}
+        else None
+    )
+    task_type = (
+        TaskType(task_type_raw)
+        if task_type_raw and task_type_raw in {t.value for t in TaskType}
+        else None
+    )
+    try:
+        limit = max(1, min(int(limit_raw), 500))
+    except ValueError:
+        limit = 100
+
+    executor = _get_task_executor(request)
+    tasks = executor.list_tasks(status=status, task_type=task_type, limit=limit)
+    return _json(ok([t.to_dict() for t in tasks]).model_dump())
+
+
+async def tasks_create(request: web.Request) -> web.Response:
+    """POST /api/tasks — create and submit a new task."""
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "tasks_create", "daemon-tasks-create", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
+
+    from ..tasks.models import Task, TaskType
+
+    body = await request.json()
+    task_type_raw = body.get("type", "run")
+    try:
+        task_type = TaskType(task_type_raw)
+    except ValueError:
+        return _json(
+            err(ArcErrorCode.INVALID_INPUT, f"Invalid task type: {task_type_raw}").model_dump(), 400
+        )
+
+    task = Task(
+        type=task_type,
+        operation=body.get("operation", ""),
+        params=body.get("params", {}),
+    )
+    executor = _get_task_executor(request)
+    task_id = executor.submit_task(task)
+    return _json(ok({"task_id": task_id, "status": task.status.value}).model_dump())
+
+
+async def tasks_get(request: web.Request) -> web.Response:
+    """GET /api/tasks/{task_id} — get task status."""
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "tasks_get", "daemon-tasks-get", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
+
+    task_id = request.match_info["task_id"]
+    executor = _get_task_executor(request)
+    task = executor.get_task_status(task_id)
+    if task is None:
+        return _json(
+            err(ArcErrorCode.RUN_NOT_FOUND, f"Task not found: {task_id}").model_dump(), 404
+        )
+    return _json(ok(task.to_dict()).model_dump())
+
+
+async def tasks_delete(request: web.Request) -> web.Response:
+    """DELETE /api/tasks/{task_id} — cancel a task."""
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "tasks_delete", "daemon-tasks-delete", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
+
+    task_id = request.match_info["task_id"]
+    executor = _get_task_executor(request)
+    cancelled = executor.cancel_task(task_id)
+    if not cancelled:
+        return _json(
+            err(
+                ArcErrorCode.RUN_NOT_FOUND, f"Task not found or already terminal: {task_id}"
+            ).model_dump(),
+            404,
+        )
+    return _json(ok({"task_id": task_id, "cancelled": True}).model_dump())
+
+
 _SSE_PUSH_EVENT_TYPES = frozenset(
     {
         "session_changed",
@@ -1060,6 +1198,9 @@ _SSE_PUSH_EVENT_TYPES = frozenset(
         "run_completed",
         "run_failed",
         "quota_warning",
+        "task_state_changed",
+        "task_completed",
+        "task_failed",
     }
 )
 
@@ -1192,6 +1333,10 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_post("/api/providers/diagnostics/redacted", providers_diagnostics)
     app.router.add_get("/api/runs/diff", runs_diff)
     app.router.add_post("/api/evals/run", runs_eval)
+    app.router.add_get("/api/tasks", tasks_list)
+    app.router.add_post("/api/tasks", tasks_create)
+    app.router.add_get("/api/tasks/{task_id}", tasks_get)
+    app.router.add_delete("/api/tasks/{task_id}", tasks_delete)
     app.router.add_get("/api/arena/models", arena_models)
     app.router.add_get("/api/arena/tags", arena_tags)
     app.router.add_post("/api/arena/chat", arena_chat)

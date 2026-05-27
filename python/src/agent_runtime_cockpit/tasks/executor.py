@@ -7,6 +7,8 @@ import threading
 import time
 from typing import Any, Optional
 
+from agent_runtime_cockpit.events.bus import get_bus
+from agent_runtime_cockpit.events.types import TaskCompleted, TaskFailed, TaskStateChanged
 from agent_runtime_cockpit.tasks.models import Task, TaskStatus, TaskType
 from agent_runtime_cockpit.tasks.storage import TaskStorage
 
@@ -115,6 +117,51 @@ class TaskExecutor:
             for thread in threads:
                 thread.join(timeout=min(remaining, 0.1))
 
+    def _publish_task_event(self, task: Task, event_type: str, extra: dict | None = None) -> None:
+        """Publish a task lifecycle event to the event bus."""
+        bus = get_bus()
+        started = getattr(task, "started_at", None) or ""
+        ended = getattr(task, "ended_at", None) or ""
+        duration_ms = 0
+        if started and ended:
+            try:
+                from datetime import datetime
+
+                s = datetime.fromisoformat(started)
+                e = datetime.fromisoformat(ended)
+                duration_ms = int((e - s).total_seconds() * 1000)
+            except Exception:
+                pass
+        if event_type == "task_state_changed":
+            bus.publish(
+                TaskStateChanged(
+                    task_id=task.id,
+                    task_type=task.type.value,
+                    operation=task.operation,
+                    old_status="pending",
+                    new_status=task.status.value,
+                )
+            )
+        elif event_type == "task_completed":
+            bus.publish(
+                TaskCompleted(
+                    task_id=task.id,
+                    task_type=task.type.value,
+                    operation=task.operation,
+                    duration_ms=duration_ms,
+                )
+            )
+        elif event_type == "task_failed":
+            bus.publish(
+                TaskFailed(
+                    task_id=task.id,
+                    task_type=task.type.value,
+                    operation=task.operation,
+                    error=task.error or "",
+                    duration_ms=duration_ms,
+                )
+            )
+
     def _execute_task_sync(self, task: Task) -> None:
         """Execute task synchronously with error handling."""
         try:
@@ -126,6 +173,7 @@ class TaskExecutor:
             # Transition to running
             task.transition_to(TaskStatus.RUNNING)
             self.storage.update_task(task)
+            self._publish_task_event(task, "task_state_changed")
 
             # Execute the task operation
             result = self._execute_operation(task)
@@ -135,6 +183,7 @@ class TaskExecutor:
                 task.transition_to(TaskStatus.CANCELLED)
                 self.storage.update_task(task)
                 log.info("Task %s cancelled during execution", task.id)
+                self._publish_task_event(task, "task_state_changed")
                 return
 
             # Mark as completed
@@ -142,6 +191,7 @@ class TaskExecutor:
             task.transition_to(TaskStatus.COMPLETED)
             self.storage.update_task(task)
             log.info("Task %s completed successfully", task.id)
+            self._publish_task_event(task, "task_completed")
 
         except Exception as e:
             log.error("Task %s failed: %s", task.id, e)
@@ -161,6 +211,7 @@ class TaskExecutor:
                 )
 
             self.storage.update_task(task)
+            self._publish_task_event(task, "task_failed")
 
     def _execute_operation(self, task: Task) -> dict[str, Any]:
         """Execute the task operation based on type."""
@@ -174,47 +225,112 @@ class TaskExecutor:
             raise ValueError(f"Unknown task type: {task.type}")
 
     def _execute_run(self, task: Task) -> dict[str, Any]:
-        """Execute a run task."""
-        # TODO: Integrate with actual run execution
-        # For now, return a placeholder result
+        """Execute a run task using runtime routing."""
+        import asyncio
+        from pathlib import Path
+
+        from ..orchestration import runtime_router
+        from ..storage.jsonl import JsonlTraceStore
+
         log.info("Executing run task: %s", task.operation)
 
-        # Simulate work
-        time.sleep(1.0)
+        workflow_id = task.params.get("workflow_id", task.operation)
+        workspace = Path(task.params.get("workspace", "."))
+        runtime = task.params.get("runtime", "auto")
+        allow_paid_calls = task.params.get("allow_paid_calls", False)
+
+        routed = runtime_router.resolve(workspace, runtime, allow_paid_calls=allow_paid_calls)
+        coro = routed.adapter.run_workflow(workflow_id, task.params)
+
+        # Adapter.run_workflow is async; run in a fresh event loop in this thread
+        run = asyncio.run(coro)
+
+        store = JsonlTraceStore(workspace / ".arc" / "traces")
+        store.save(run)
 
         return {
-            "run_id": f"run_{task.id[:8]}",
-            "status": "completed",
-            "audit_chain_ref": None,
-            "cost_breakdown": {"total": 0.0},
+            "run_id": run.id,
+            "status": run.status.value,
+            "workflow_id": run.workflow_id,
+            "event_count": len(run.events),
         }
 
     def _execute_trace(self, task: Task) -> dict[str, Any]:
-        """Execute a trace task."""
-        # TODO: Integrate with actual trace execution
+        """Execute a trace task — load an existing run and return stats."""
+        from pathlib import Path
+
+        from ..storage.jsonl import JsonlTraceStore
+
         log.info("Executing trace task: %s", task.operation)
 
-        # Simulate work
-        time.sleep(0.5)
+        workspace = Path(task.params.get("workspace", "."))
+        run_id = task.params.get("run_id", task.operation)
+        store = JsonlTraceStore(workspace / ".arc" / "traces")
+        run = store.load(run_id)
+
+        if run is None:
+            return {
+                "run_id": run_id,
+                "status": "not_found",
+                "events_count": 0,
+                "first_event": None,
+                "last_event": None,
+            }
+
+        events = run.events
+        first_event = events[0].timestamp if events else None
+        last_event = events[-1].timestamp if events else None
 
         return {
-            "trace_id": f"trace_{task.id[:8]}",
-            "status": "completed",
-            "events_count": 0,
+            "run_id": run_id,
+            "status": run.status.value,
+            "events_count": len(events),
+            "first_event": first_event,
+            "last_event": last_event,
         }
 
     def _execute_audit(self, task: Task) -> dict[str, Any]:
-        """Execute an audit task."""
-        # TODO: Integrate with actual audit execution
+        """Execute an audit task — verify audit chain on an existing run."""
+        from pathlib import Path
+
+        from ..audit.streaming_verifier import StreamingAuditVerifier
+        from ..storage.jsonl import JsonlTraceStore
+
         log.info("Executing audit task: %s", task.operation)
 
-        # Simulate work
-        time.sleep(0.5)
+        workspace = Path(task.params.get("workspace", "."))
+        run_id = task.params.get("run_id", task.operation)
+        store = JsonlTraceStore(workspace / ".arc" / "traces")
+        run = store.load(run_id)
+
+        if run is None:
+            return {
+                "run_id": run_id,
+                "status": "not_found",
+                "verified": False,
+                "records_checked": 0,
+            }
+
+        audit_path = run.audit_path
+        if not audit_path:
+            return {
+                "run_id": run_id,
+                "status": "no_audit_chain",
+                "verified": False,
+                "records_checked": 0,
+            }
+
+        verifier = StreamingAuditVerifier()
+        result = verifier.verify_auto(Path(audit_path))
 
         return {
-            "audit_id": f"audit_{task.id[:8]}",
+            "run_id": run_id,
             "status": "completed",
-            "verified": True,
+            "verified": result.ok,
+            "mode": result.mode,
+            "records_checked": result.records_checked,
+            "reason": result.reason,
+            "duration_ms": result.duration_ms,
         }
 
     def cancel_task(self, task_id: str) -> bool:

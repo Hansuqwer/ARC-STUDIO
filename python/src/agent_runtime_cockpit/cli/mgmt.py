@@ -619,6 +619,294 @@ def eval_report(
     _out(ok(data, workspace=str(ws)), json_output)
 
 
+@eval_app.command("run")
+def eval_run_new(
+    run_id: str = typer.Argument(None, help="Run ID to evaluate (defaults to --run-id)"),
+    golden_file: str = typer.Option("", "--golden-file", "-f", help="Path to golden JSON file"),
+    golden_id: str = typer.Option("", "--golden", "-g", help="Golden trace ID"),
+    expected_output: str = typer.Option(
+        "", "--expected-final-output", help="Expected substring in final output"
+    ),
+    expected_event_types: str = typer.Option(
+        "", "--expected-event-types", help="Comma-separated expected event types"
+    ),
+    expected_status: str = typer.Option(
+        "completed", "--expected-status", help="Expected run status"
+    ),
+    batch: bool = typer.Option(False, "--batch", "-b", help="Run against all saved golden traces"),
+    run_id_opt: str = typer.Option("", "--run-id", help="Run ID (alternative to positional arg)"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Evaluate a run against a golden trace.
+
+    Provide --golden to load a saved golden trace, or specify
+    --expected-final-output/--expected-status/--expected-event-types inline.
+
+    Use --golden-file <path> to batch-evaluate from a golden JSON file (list or single GoldenTrace).
+    Use --batch to evaluate against all saved golden traces.
+
+    Example:
+        uv run arc eval run <run_id> --expected-final-output "hello"
+        uv run arc eval run <run_id> --golden my-golden-id
+        uv run arc eval run --golden-file goldens.json --run-id my-run
+        uv run arc eval run <run_id> --batch
+
+    """
+    _setup_logging(debug)
+    import json as _json
+    from pathlib import Path
+
+    from ..evals.artifact import EvalArtifactStore, build_artifact
+    from ..evals.golden import GoldenTrace, list_goldens, load_golden
+    from ..evals.golden import eval_run as do_eval
+    from ..storage.jsonl import JsonlTraceStore
+
+    ws = _workspace(workspace)
+    rid = run_id or run_id_opt or ""
+
+    # Resolve store
+    store = JsonlTraceStore(ws / ".arc" / "traces")
+
+    # --golden-file batch mode
+    if golden_file:
+        gf_path = Path(golden_file)
+        if not gf_path.exists():
+            _out(
+                err(ArcErrorCode.INVALID_INPUT, f"Golden file not found: {golden_file}"),
+                json_output,
+            )
+            raise typer.Exit(1)
+        try:
+            raw = _json.loads(gf_path.read_text())
+        except Exception as e:
+            _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid golden JSON: {e}"), json_output)
+            raise typer.Exit(1)
+        if isinstance(raw, dict):
+            goldens_list = [GoldenTrace.model_validate(raw)]
+        elif isinstance(raw, list):
+            goldens_list = [GoldenTrace.model_validate(g) for g in raw]
+        else:
+            _out(
+                err(
+                    ArcErrorCode.INVALID_INPUT,
+                    "Golden file must contain a GoldenTrace object or list",
+                ),
+                json_output,
+            )
+            raise typer.Exit(1)
+
+        if not rid:
+            _out(
+                err(ArcErrorCode.INVALID_INPUT, "--run-id is required when using --golden-file"),
+                json_output,
+            )
+            raise typer.Exit(1)
+
+        run = store.load(rid)
+        if run is None:
+            _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {rid}"), json_output)
+            raise typer.Exit(1)
+
+        art_store = EvalArtifactStore(ws)
+        all_results = []
+        for golden in goldens_list:
+            result = do_eval(run, golden)
+            all_results.append(result.model_dump())
+            art_store.write(build_artifact(rid, golden.id, [result.model_dump()]))
+
+        passed = sum(1 for r in all_results if r.get("passed"))
+        failed = len(all_results) - passed
+        artifacts = [
+            build_artifact(rid, r.get("golden_id", "?"), [r]).model_dump() for r in all_results
+        ]
+        payload = {
+            "passed": passed,
+            "failed": failed,
+            "total": len(all_results),
+            "artifacts": artifacts,
+        }
+        _out(ok(payload, workspace=str(ws)), json_output)
+        if not json_output:
+            console.print(f"[bold]Batch Eval:[/bold] {passed}/{len(all_results)} passed")
+            for r in all_results:
+                color = "green" if r.get("passed") else "red"
+                console.print(
+                    f"  [{color}]{'PASS' if r.get('passed') else 'FAIL'}[/{color}] {r.get('golden_id', '?')} score={r.get('score', 0)}"
+                )
+        return
+
+    if not rid:
+        _out(err(ArcErrorCode.INVALID_INPUT, "Run ID is required"), json_output)
+        raise typer.Exit(1)
+
+    run = store.load(rid)
+    if run is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Run not found: {rid}"), json_output)
+        raise typer.Exit(1)
+
+    if batch:
+        goldens = list_goldens(ws)
+        if not goldens:
+            _out(
+                err(
+                    ArcErrorCode.INVALID_INPUT,
+                    "No saved golden traces found. Use 'arc eval save' first.",
+                ),
+                json_output,
+            )
+            raise typer.Exit(1)
+        results = []
+        for golden in goldens:
+            result = do_eval(run, golden)
+            results.append(result.model_dump())
+        passed = sum(1 for r in results if r["passed"])
+        payload = {
+            "run_id": rid,
+            "batch": True,
+            "total": len(results),
+            "passed": passed,
+            "failed": len(results) - passed,
+            "results": results,
+        }
+        _out(ok(payload, workspace=str(ws)), json_output)
+        if not json_output:
+            console.print(f"[bold]Batch Eval:[/bold] {passed}/{len(results)} passed")
+            for r in results:
+                color = "green" if r["passed"] else "red"
+                console.print(
+                    f"  [{color}]{'PASS' if r['passed'] else 'FAIL'}[/{color}] {r['golden_id']} score={r['score']}"
+                )
+        return
+
+    events = (
+        [t.strip() for t in expected_event_types.split(",") if t.strip()]
+        if expected_event_types
+        else []
+    )
+
+    golden = load_golden(ws, golden_id) if golden_id else None
+    if golden_id and golden is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Golden not found: {golden_id}"), json_output)
+        raise typer.Exit(1)
+    golden = golden or GoldenTrace(
+        id=f"cli-{rid}",
+        workflow_id=run.workflow_id,
+        expected_status=expected_status,
+        expected_event_types=events,
+        expected_final_output_contains=expected_output,
+    )
+    result = do_eval(run, golden)
+    _out(ok(result.model_dump(), workspace=str(ws)), json_output)
+
+    if not json_output:
+        color = "green" if result.passed else "red"
+        console.print(
+            f"Eval [bold {color}]{'PASS' if result.passed else 'FAIL'}[/bold {color}]  score={result.score}"
+        )
+        console.print(
+            f"  status_match={result.status_match}  event_type_match={result.event_type_match}  output_contains_match={result.output_contains_match}"
+        )
+
+
+@eval_app.command("compare")
+def eval_compare(
+    run_a: str = typer.Option("", "--run-a", help="First eval run ID"),
+    run_b: str = typer.Option("", "--run-b", help="Second eval run ID"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Compare two eval runs and report delta."""
+    _setup_logging(debug)
+    from ..evals.artifact import EvalArtifactStore
+
+    ws = _workspace(workspace)
+    store = EvalArtifactStore(ws)
+
+    artifacts_a = store.list_by_run(run_a)
+    artifacts_b = store.list_by_run(run_b)
+
+    if not artifacts_a:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"No eval artifacts for run: {run_a}"), json_output)
+        raise typer.Exit(1)
+    if not artifacts_b:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"No eval artifacts for run: {run_b}"), json_output)
+        raise typer.Exit(1)
+
+    a_map = {a.golden_id: a for a in artifacts_a}
+    b_map = {b.golden_id: b for b in artifacts_b}
+    all_ids = set(a_map.keys()) | set(b_map.keys())
+
+    a_total = sum(a.total for a in artifacts_a)
+    a_passed = sum(a.pass_count for a in artifacts_a)
+    b_total = sum(b.total for b in artifacts_b)
+    b_passed = sum(b.pass_count for b in artifacts_b)
+    a_pass_rate = round(a_passed / a_total, 4) if a_total > 0 else 0.0
+    b_pass_rate = round(b_passed / b_total, 4) if b_total > 0 else 0.0
+
+    new_failures = []
+    fixed_failures = []
+    for gid in sorted(all_ids):
+        a_failed = gid in a_map and a_map[gid].fail_count > 0
+        b_failed = gid in b_map and b_map[gid].fail_count > 0
+        if not a_failed and b_failed:
+            new_failures.append(gid)
+        elif a_failed and not b_failed:
+            fixed_failures.append(gid)
+
+    delta = round(b_pass_rate - a_pass_rate, 4)
+    payload = {
+        "delta_pass_rate": delta,
+        "run_a_pass_rate": a_pass_rate,
+        "run_b_pass_rate": b_pass_rate,
+        "new_failures": new_failures,
+        "fixed_failures": fixed_failures,
+        "total_goldens_run_a": len(artifacts_a),
+        "total_goldens_run_b": len(artifacts_b),
+    }
+    _out(ok(payload, workspace=str(ws)), json_output)
+
+
+@eval_app.command("export")
+def eval_export(
+    run_id: str = typer.Argument(..., help="Eval run ID to export"),
+    format: str = typer.Option("inspect", "--format", help="Export format (inspect)"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Export eval artifacts in Inspect-AI-compatible format."""
+    _setup_logging(debug)
+    from ..evals.artifact import EvalArtifactStore, build_inspect_export
+
+    ws = _workspace(workspace)
+    store = EvalArtifactStore(ws)
+    artifacts = store.list_by_run(run_id)
+
+    if not artifacts:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"No eval artifacts for run: {run_id}"), json_output)
+        raise typer.Exit(1)
+
+    if format == "inspect":
+        export = build_inspect_export(run_id, artifacts)
+        export_path = ws / ".arc" / "evals" / run_id / "inspect-export.json"
+        export_path.parent.mkdir(parents=True, exist_ok=True)
+        import json as _json
+
+        export_path.write_text(_json.dumps(export, indent=2))
+        payload = {
+            "format": "inspect",
+            "path": str(export_path),
+            "sample_count": len(artifacts),
+        }
+        _out(ok(payload, workspace=str(ws)), json_output)
+    else:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Unsupported export format: {format}"), json_output)
+        raise typer.Exit(1)
+
+
 @eval_app.command("list")
 def eval_list(
     workspace: Optional[str] = WORKSPACE_FLAG,

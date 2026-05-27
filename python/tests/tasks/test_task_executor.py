@@ -293,8 +293,9 @@ def test_execute_trace_operation(executor):
     result = executor._execute_trace(task)
 
     assert result is not None
-    assert "trace_id" in result
+    assert "run_id" in result
     assert "status" in result
+    assert "events_count" in result
 
 
 def test_execute_audit_operation(executor):
@@ -303,8 +304,10 @@ def test_execute_audit_operation(executor):
     result = executor._execute_audit(task)
 
     assert result is not None
-    assert "audit_id" in result
+    assert "run_id" in result
     assert "status" in result
+    assert "verified" in result
+    assert "records_checked" in result
 
 
 def test_execute_unknown_operation(executor):

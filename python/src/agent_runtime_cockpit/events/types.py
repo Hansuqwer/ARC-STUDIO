@@ -98,6 +98,38 @@ class AuditOverrideEvent(ArcEvent):
     context: dict = {}  # type: ignore[assignment]
 
 
+class TaskStateChanged(ArcEvent):
+    """Emitted when a task transitions to a new state (Phase 54)."""
+
+    event_type: Literal["task_state_changed"] = "task_state_changed"
+    task_id: str
+    task_type: str = ""
+    operation: str = ""
+    old_status: str = ""
+    new_status: str = ""
+
+
+class TaskCompleted(ArcEvent):
+    """Emitted when a task completes successfully (Phase 54)."""
+
+    event_type: Literal["task_completed"] = "task_completed"
+    task_id: str
+    task_type: str = ""
+    operation: str = ""
+    duration_ms: int = 0
+
+
+class TaskFailed(ArcEvent):
+    """Emitted when a task fails (Phase 54)."""
+
+    event_type: Literal["task_failed"] = "task_failed"
+    task_id: str
+    task_type: str = ""
+    operation: str = ""
+    error: str = ""
+    duration_ms: int = 0
+
+
 EVENT_TYPE_MAP: dict[str, type[ArcEvent]] = {
     "hitl_required": HitlRequired,
     "hitl_decided": HitlDecided,
@@ -107,6 +139,9 @@ EVENT_TYPE_MAP: dict[str, type[ArcEvent]] = {
     "quota_warning": QuotaWarning,
     "session_changed": SessionChanged,
     "audit_override": AuditOverrideEvent,
+    "task_state_changed": TaskStateChanged,
+    "task_completed": TaskCompleted,
+    "task_failed": TaskFailed,
 }
 
 

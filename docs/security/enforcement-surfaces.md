@@ -2,8 +2,8 @@
 
 This document catalogs all security-sensitive surfaces in ARC Studio and their enforcement status. It is the **single source of truth** for every execution surface that routes through the typed enforcement helpers introduced in Phase 23 (and the bypass-warning helper from ADR-0022.1).
 
-**Last updated:** 2026-05-22  
-**Phase:** 23.3 (Baseline Complete) + extended by Phases 25.5, 26, 32, 35 + sandbox/MCP hardening  
+**Last updated:** 2026-05-27  
+**Phase:** 23.3 (Baseline Complete) + extended by Phases 25.5, 26, 32, 35, 50, 52, 55 + sandbox/MCP hardening  
 **Audit script:** `scripts/audit-enforcement-surfaces.sh`
 
 If a code path performs a subprocess call, a file read in a user-controlled location, a socket bind, or an HTTP call and is **not** listed here, that is a bug. Either the path needs a row in this document, or it needs a `# enforcement: not-applicable` annotation that the audit script can verify.
@@ -411,10 +411,29 @@ Pre-Phase 50 gap: eleven routes in `web/routes.py` read workspace-local data (tr
 - **Gate:** Redactor applied before `DeadLetterEntry` construction. No plaintext secrets in DLQ.
 - **Audit coverage:** `python/tests/events/test_phase52_sse_push.py::test_dead_letter_payload_is_redacted`
 
-#### Remaining known gaps (not in scope for P50)
+---
+
+### Phase 55 — Provider Workspace Isolation
+
+**Last updated:** 2026-05-27  
+**Status:** Baseline Complete  
+**Scope:** Provider routing and account mutation surfaces now enforce workspace trust.
+
+#### Phase 55 Surface Table
+
+| Surface | Route/Method | Trust checked | Order (before/after mutation) | Test | Gap status |
+|---------|-------------|---------------|------------------------------|------|------------|
+| `providers_routing` | `PUT /api/providers/routing` | `enforce_workspace_trust` | before routing policy write | `test_phase55_provider_trust.py::test_providers_routing_put_untrusted` | **closed P55** |
+| `providers_accounts_create` | `POST /api/providers/accounts` | `enforce_workspace_trust` | before account creation | `test_phase55_provider_trust.py::test_providers_accounts_post_untrusted` | **closed P55** |
+| `providers_account_update` | `PATCH /api/providers/accounts/{id}` | `enforce_workspace_trust` | before account mutation | `test_phase55_provider_trust.py::test_providers_account_patch_untrusted` | **closed P55** |
+| `providers_account_delete` | `DELETE /api/providers/accounts/{id}` | `enforce_workspace_trust` | before account deletion | `test_phase55_provider_trust.py::test_providers_account_delete_untrusted` | **closed P55** |
+
+All surfaces return HTTP 403 + `ArcErrorCode.PERMISSION_DENIED` on untrusted workspace.
+
+#### Remaining known gaps (not in scope for P50/P55)
 
 - `/health`, `/api/inspect`, `/api/runtimes`, `/api/runtimes/capabilities`, `/api/workflows`, `/api/schemas` — diagnostic/detection endpoints; no workspace-private data exposed. Annotated not-applicable.
-- `/api/providers/*` — provider account/routing config; not workspace-scoped. Future ADR may add workspace-level provider isolation.
+- `GET /api/providers/*` — read-only provider metadata; no mutation. Read surfaces do not require trust.
 - `/api/arena/models`, `/api/arena/tags`, `/api/arena/rankings` — read-only model metadata, not workspace-private data.
 - `run_events_sse` (`GET /api/runs/{run_id}/events`) — per-run SSE endpoint; trust check deferred pending future ADR (no workspace-private data served that isn't already trust-checked on run creation).
 - `events_stream` (`GET /api/events/stream`) — added in Phase 52; trust checked at connect time before any event data is sent. See Phase 52 SSE surface below.

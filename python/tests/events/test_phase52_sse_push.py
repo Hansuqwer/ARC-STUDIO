@@ -254,8 +254,7 @@ def test_persistence_writer_replay_from_last_seen(tmp_path: Path) -> None:
 
 
 def test_sse_push_event_types_allowlist() -> None:
-    """Only session_changed, hitl_required, audit_verified, run_completed,
-    run_failed, quota_warning are in the SSE push allowlist."""
+    """SSE push allowlist includes session, run, audit, quota, and task events."""
     from agent_runtime_cockpit.web.routes import _SSE_PUSH_EVENT_TYPES
 
     required = {
@@ -265,6 +264,9 @@ def test_sse_push_event_types_allowlist() -> None:
         "run_completed",
         "run_failed",
         "quota_warning",
+        "task_state_changed",
+        "task_completed",
+        "task_failed",
     }
     assert required == _SSE_PUSH_EVENT_TYPES
 

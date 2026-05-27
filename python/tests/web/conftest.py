@@ -116,6 +116,18 @@ async def client(app, trust_allowed):
                 resp = await self._client.post(path, **kwargs)
                 return ResponseWrapper(resp)
 
+            async def put(self, path, **kwargs):
+                resp = await self._client.put(path, **kwargs)
+                return ResponseWrapper(resp)
+
+            async def delete(self, path, **kwargs):
+                resp = await self._client.delete(path, **kwargs)
+                return ResponseWrapper(resp)
+
+            async def patch(self, path, **kwargs):
+                resp = await self._client.patch(path, **kwargs)
+                return ResponseWrapper(resp)
+
         async with TestServer(app) as server:
             async with TestClient(server) as c:
                 yield ClientWrapper(c)

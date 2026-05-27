@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-27 — Phase 50 Baseline Complete.  
-**Current evidence anchor:** local worktree | Phase 50 verification pass: 84 web tests passed (13 new Phase 50 tests); all security/mcp/web/swarmgraph/events tests pass; ruff OK.  
+**Last reality refresh:** 2026-05-27 — Phases 53-55 Baseline Complete.  
+**Current evidence anchor:** local worktree | Phases 53-55 verification pass: 2976 Python tests passed (37 new tests); ruff OK; protocol build OK; extension build OK.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -2327,7 +2327,7 @@ pnpm typecheck
 ### Phase ↔ Roadmap ID
 
 | Plan Phase | Roadmap ID | Scope |
-|---|---|---|
+|---|---|---|---|
 | **21** | **R14** | **Streaming Audit Verification + HMAC Signing** |
 | **22** | **R15** | **Discriminated RunEvent Unions** |
 | **23** | **R16** | **Enforced Workspace Trust + Paid-Call Gates** |
@@ -2347,6 +2347,9 @@ pnpm typecheck
 | **37** | **R38** | **CLI Sandbox Hardening + IDE Integration** |
 | **38** | **R35** | **Google ADK Adapter (T1+T2)** |
 | **39** | **R36** | **MCP Python SDK Adapter (T1+T2)** |
+| **53** | **R22 residual** | **Eval Artifact Schema + Batch Eval CLI** |
+| **54** | **R20 residual** | **Task Daemon Integration + SSE Notifications** |
+| **55** | **P52 known-risk** | **Event Log Rotation + Provider Workspace Isolation** |
 
 ### Dependencies
 
@@ -2358,9 +2361,9 @@ pnpm typecheck
 | 24 Trace Virtualization | Baseline Complete | Phase 22 | P1 — virtualized event list, per-run replay buffer, Last-Event-ID reconnect plumbing |
 | 25 CLI Decomposition | Baseline Complete ✓ | None | P1 — fully decomposed into `cli/` modules; unblocks Phase 36.2 |
 | 26 MCP Local Control Plane | Baseline Complete (scaffold) ✓ | Phase 23 | P1 — stdio-only MCP server with trust gate, 7 tools, 3 resources |
-| 27 MCP Tasks | Baseline Complete | Phase 25 | P1 — SQLite task registry, CLI commands, MCP polling tools, retry/expiry support complete |
+| 27 MCP Tasks | Baseline Complete | Phase 25 | P1 — SQLite task registry, CLI commands, MCP polling tools, retry/expiry support complete; task daemon integration and SSE notifications Baseline Complete (Phase 54) |
 | 28 LangGraph Replay | Baseline Complete | Phase 25 | P1 — replay capability detection and inspect/simulated/unsafe reporting complete |
-| 29 Persistent HITL + Eval | Baseline Complete (HITL only) | Phase 25, Phase 22 | P1/P2 — SQLite HITL persistence complete; eval artifact schema/export deferred |
+| 29 Persistent HITL + Eval | Baseline Complete | Phase 25, Phase 22 | P1/P2 — SQLite HITL persistence complete; eval artifact schema/export Baseline Complete (Phase 53) |
 | 30 Consensus Escrow | Complete | Phase 17, Phase 21 | P2 — commit-reveal voting with adversarial tests complete |
 | 31 Adaptive Consensus | Complete | Phase 30, Phase 23 | P2 — deterministic risk assessment and protocol selection complete |
 | 32 Event Notifications | Not Started | Phase 29, Phase 21 | P2 — enterprise compliance |
@@ -2371,6 +2374,9 @@ pnpm typecheck
 | 37 CLI Sandbox Hardening | Active Hardening | Phase 23 | Subprocess bounded streaming caps + approval prune active; path-intent expansion, protocol parity, microVM preflight, container fallback pending |
 | 38 Google ADK Adapter | Baseline Complete | None | T1 detection + T2 static AST export; T3 deferred (google-adk 0.x churn); 44 tests |
 | 39 MCP Python SDK Adapter | Baseline Complete | None | T1 detection + T2 static export; T3 deferred (trust posture + transport lifecycle); 58 tests |
+| 53 Eval Artifact Schema | Baseline Complete | Phase 52, Phase 29 | EvalArtifact model, store, deterministic paths, batch CLI, compare, inspect export; 16 tests |
+| 54 Task Daemon Integration | Baseline Complete | Phase 53, Phase 52 | Wired TaskExecutor operations, daemon task HTTP routes, task SSE events; 10 tests |
+| 55 Event Log Rotation | Baseline Complete | Phase 54, Phase 50 | EventPersistenceWriter compact(), provider workspace trust; 11 tests |
 
 ### Critical Path
 
@@ -2957,5 +2963,96 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md docs/security
 
 ### Known Risks
 - `run_events_sse` (per-run SSE) still lacks trust check; Phase 50 gap documented in enforcement-surfaces.md.
-- EventPersistenceWriter has no file rotation or compaction; log grows unboundedly. Future ADR needed.
 - FetchSSEEventSource requires Node.js fetch (available Node 18+); no polyfill for older Node.
+
+---
+
+## Phase 53 — Eval Artifact Schema + Batch Eval CLI
+
+**Roadmap:** R22 residual (Eval Artifacts component)  
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/evals/test_eval_artifacts.py -q` (16 passed); `cd python && uv run pytest tests/cli/test_cli_eval.py tests/evals/ -q` (30 passed); ruff OK  
+**Depends on:** Phase 52 (Baseline Complete), Phase 29 (HITL persistence complete)
+
+### Deliverables
+1. `python/src/agent_runtime_cockpit/evals/artifact.py` — `EvalArtifact` Pydantic model (run_id, golden_id, eval_timestamp, pass_count, fail_count, total, pass_rate, failures), `EvalArtifactStore` (write/load/list_by_run/list_run_ids/prune), deterministic artifact paths: `<workspace>/.arc/evals/<run_id>/<sha256(golden_id)[:12]>.json`.
+2. `eval_run_new` in `cli/mgmt.py` — `arc eval run --golden-file <path> --run-id <id>` for batch eval from golden JSON file (single or list), saves EvalArtifact per evaluation, returns `ok({passed, failed, total, artifacts})`.
+3. `arc eval compare --run-a <id> --run-b <id>` — loads both eval run artifacts, computes delta_pass_rate, new_failures, fixed_failures.
+4. `arc eval export <run_id> --format inspect` — writes Inspect-AI-compatible export shape to `.arc/evals/<run_id>/inspect-export.json`.
+5. `build_artifact` and `build_inspect_export` utility functions.
+6. 16 tests in `tests/evals/test_eval_artifacts.py`.
+
+### Acceptance
+1. EvalArtifact model validates and serializes.
+2. EvalArtifactStore write/load/list/prune work correctly.
+3. Artifact path is deterministic for same run_id + golden_id.
+4. `arc eval run --golden-file` with single trace returns ok envelope.
+5. `arc eval run --golden-file` with list returns ok envelope with all artifacts.
+6. `arc eval compare` detects delta correctly.
+7. `arc eval export` produces inspect shape.
+8. No live provider calls in any test.
+
+---
+
+## Phase 54 — Task Daemon Integration + SSE Notifications
+
+**Roadmap:** R20 residual (task execution uses real operations; SSE notifications deferred)  
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/web/test_phase54_task_daemon_routes.py tests/tasks/test_task_sse_events.py -q` (10 passed); ruff OK  
+**Depends on:** Phase 53 (Baseline Complete), Phase 52 (SSE push baseline complete)
+
+### Deliverables
+1. Wired TaskExecutor operations:
+   - `run`: calls `runtime_router.resolve()` + `adapter.run_workflow()`, saves RunRecord, returns run_id
+   - `audit`: calls `StreamingAuditVerifier.verify_auto()` on existing run
+   - `trace`: loads `JsonlTraceStore` and returns event count + first/last timestamps
+2. Daemon HTTP endpoints in `web/routes.py`:
+   - `GET /api/tasks` — list tasks (status/type/limit query params); trust-checked
+   - `POST /api/tasks` — create task; trust-checked
+   - `GET /api/tasks/{task_id}` — get task; trust-checked before existence check
+   - `DELETE /api/tasks/{task_id}` — cancel task; trust-checked before existence check
+3. SSE event types in `events/types.py`:
+   - `TaskStateChanged`, `TaskCompleted`, `TaskFailed` added to `EVENT_TYPE_MAP`
+   - Added to `_SSE_PUSH_EVENT_TYPES` allowlist
+   - TaskExecutor publishes events via `get_bus().publish()` on state transitions
+4. Tests: 5 daemon route tests + 5 SSE event tests.
+
+### Acceptance
+1. GET /api/tasks untrusted returns 403.
+2. POST /api/tasks creates task and returns ok envelope.
+3. GET /api/tasks/{id} untrusted returns 403 before existence check.
+4. DELETE /api/tasks/{id} cancels task.
+5. TaskExecutor publishes TaskStateChanged on transition.
+6. task_state_changed/task_completed/task_failed in _SSE_PUSH_EVENT_TYPES and EVENT_TYPE_MAP.
+
+### Known Risks
+- `_execute_run` uses `asyncio.run()` for the async adapter call; fine in worker threads but not nestable in running event loops.
+
+---
+
+## Phase 55 — Event Log Rotation + Provider Workspace Isolation
+
+**Roadmap:** Phase 52 known-risk backlog + Phase 50 remaining gap  
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/events/test_phase55_log_rotation.py tests/web/test_phase55_provider_trust.py -q` (11 passed); ruff OK  
+**Depends on:** Phase 54 (Baseline Complete), Phase 50 (trust surface audit complete)
+
+### Deliverables
+1. Event log rotation in `events/persistence.py`:
+   - `max_entries` (default 2000) and `max_age_days` (default 7) on `EventPersistenceWriter`.
+   - `compact()`: reads all lines, drops those older than max_age_days, bounds to max_entries tail, writes atomically (tmp + rename).
+   - `compact()` called on `writer.write()` every 200th write (amortized).
+   - Best-effort; never raises; logs on error.
+2. Provider workspace isolation:
+   - `enforce_workspace_trust()` added to `providers_routing` PUT (writes routing policy).
+   - `enforce_workspace_trust()` added to `providers_accounts` POST (creates account).
+   - `enforce_workspace_trust()` added to `providers_account` PATCH/DELETE (mutates/deletes account).
+   - All return 403 PERMISSION_DENIED on untrusted workspace.
+3. Tests: 5 log rotation tests + 6 provider trust tests.
+
+### Acceptance
+1. compact() drops old entries by age.
+2. compact() bounds by max_entries.
+3. Concurrent write does not corrupt.
+4. PUT /api/providers/routing untrusted returns 403.
+5. POST /api/providers/accounts untrusted returns 403.
+6. PATCH /api/providers/accounts/{id} untrusted returns 403.
+7. DELETE /api/providers/accounts/{id} untrusted returns 403.
+8. All return PERMISSION_DENIED code.
