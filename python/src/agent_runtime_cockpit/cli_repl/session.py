@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,6 +14,10 @@ from agent_runtime_cockpit.runtime.mode import RuntimeMode
 from agent_runtime_cockpit.storage.atomic import write_text_atomic
 
 SESSION_SCHEMA_VERSION = 4
+
+# Strict session ID regex shared between Python CLI and TypeScript IDE bridge.
+# Mirrors the pattern used in SessionBridgeService.getChatSession().
+SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
 MODE_PLAN = "plan"
 MODE_BUILD = "build"
 MODE_AUTO = "auto"

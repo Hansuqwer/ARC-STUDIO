@@ -2,7 +2,7 @@
 
 **Status:** Accepted — implementation blocked (see P1–P7 status below)  
 **Date:** 2026-05-26  
-**Last updated:** 2026-05-26 — Firecracker proof rootfs/init artifact scaffold hardened; strict public microVM remains blocked  
+**Last updated:** 2026-05-26 — Lima mount-proof bypass added for evidence only; strict public microVM remains blocked  
 **Authors:** ARC Studio sandbox team  
 **Related:** Phase 37 (R38), `docs/research/sandbox-and-microvm.md`, `docs/research/microvm-p1-p7-status.md`, ADR-014 (security architecture)
 
@@ -190,9 +190,9 @@ Full detail: `docs/research/microvm-p1-p7-status.md`
 |---|---|---|
 | P1 | Lifecycle proof | Partial — fake tests pass; private Firecracker proof runner can start/teardown behind Linux/KVM gates and parse proof markers, and proof rootfs metadata now includes `/init`, `/sbin/init`, `/dev/console`, `/dev/null`, proc/sysfs setup checks; real host proof is not proven |
 | P2 | Network-off proof | **Host-gated proof harness only** — Lima is low-security/network-present. Firecracker no-NIC config generation, proof-marker parser, and hardened proof rootfs/init artifact scaffold exist, but real guest no-default-route/curl-fails proof has not run. |
-| P3 | Workspace-mount proof | Partial — code-level escape guard added + sentinel test; virtiofs symlink pass-through gap remains |
+| P3 | Workspace-mount proof | Partial — code-level escape guard added + sentinel test; Lima mount-proof mode can collect guest-side evidence while bypassing only known-failed network proof |
 | P4 | Teardown proof | Partial — code-level harness teardown proven; real-host teardown pending |
-| P5 | Symlink-escape proof | Blocked by Lima P2 — code-level `is_path_within_root()` + 19 tests; real-host Lima test `test_real_lima_symlink_escape_blocked` xfails on this host because network proof blocks user argv before symlink traversal can be exercised |
+| P5 | Symlink-escape proof | Evidence pending — code-level `is_path_within_root()` + 19 tests; host-gated Lima mount-proof test now runs guest-side `cat /workspace/arc-host-passwd-link` with `proof_mode="mount"`, bypassing only the known-failed network proof |
 | P6 | stdout/stderr caps | **Satisfied** — bounded stream readers + cap tests pass |
 | P7 | Audit event emitted | **Satisfied for internal harnesses** — Lima/Firecracker harness attempts persist `MICROVM_COMMAND`/`MICROVM_DENIED`; public provider audit tests still required before execution wiring |
 
@@ -211,6 +211,20 @@ network setup requires explicit TAP/NAT/bridge configuration. A Firecracker VM
 with no network interface configured is the next candidate for P2 proof. ARC now
 has a no-NIC design/preflight config model, but has not run a real
 boot/no-default-route/curl-fails proof yet.
+
+### Lima mount-proof mode decision
+
+ARC now treats Lima as a **low-security developer harness**, not a strict
+microVM sandbox candidate. `LimaIntegrationHarness.run(..., proof_mode="mount")`
+exists only to collect guest-side mount evidence when Lima's known slirp default
+route would otherwise block user argv. This mode bypasses only the network proof;
+it does not wire `ARC_MICROVM_EXEC_ENABLED`, does not claim strict network
+isolation, and does not enable `arc sandbox run --provider microvm`.
+
+If the host-gated Lima symlink proof can read host `/etc/passwd` through a
+symlink inside `/workspace`, ADR-024 P5 is permanently blocked for Lima strict
+sandbox use. Lima may remain useful as a low-security developer harness, but not
+as the strict public `microvm` provider.
 
 ### Firecracker/Cloud Hypervisor no-network design/preflight status
 

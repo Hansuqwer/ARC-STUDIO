@@ -41,6 +41,14 @@ export enum ArcErrorCode {
     TIMEOUT                 = 'TIMEOUT',
     NOT_IMPLEMENTED         = 'NOT_IMPLEMENTED',
     PERMISSION_DENIED       = 'PERMISSION_DENIED',
+    /**
+     * Returned when a concurrent session write is attempted while another write
+     * is in progress. The TypeScript-side write mutex serializes IDE writes;
+     * this code surfaces when the queue is rejected (e.g. already 1 pending).
+     * The Python-side advisory lock (fcntl.flock) is the authoritative
+     * data-safety lock and also propagates this code on timeout.
+     */
+    LOCK_CONTENTION         = 'LOCK_CONTENTION',
     UNKNOWN                 = 'UNKNOWN',
 
     /** @deprecated ADR-023: use RUN_NOT_FOUND. Removed in v0.3.0. */
@@ -1210,6 +1218,13 @@ export interface ChatSessionDetail {
     history: Array<Record<string, string>>;
 }
 
+export interface DaemonWriteResult {
+    ok: boolean;
+    session_id?: string;
+    operation?: 'write' | 'delete' | 'update';
+    message?: string;
+}
+
 /**
  * Main service interface for ARC Studio backend operations.
  *
@@ -1556,4 +1571,45 @@ export interface ArcService {
      * @throws {ArcError} INVALID_INPUT if sessionId contains unsafe characters.
      */
     getChatSession(sessionId: string): Promise<ChatSessionDetail>;
+
+    // ========== Session Write Bridge Methods (Phase 46) ==========
+
+    /**
+     * Import (create or overwrite) a session from the IDE.
+     * Pipes the validated payload to `arc studio sessions write --json` via stdin.
+     * History is truncated to the last 200 entries before sending.
+     * Payload size is capped at 512 KB on the Python side.
+     * Writes are serialized through a per-workspace TS mutex (LOCK_CONTENTION
+     * on concurrent attempt) and the Python-side advisory lock (fcntl.flock).
+     *
+     * @throws {ArcError} INVALID_INPUT if sessionId is unsafe or payload is invalid.
+     * @throws {ArcError} PERMISSION_DENIED if workspace is untrusted.
+     * @throws {ArcError} LOCK_CONTENTION if a write is already in progress.
+     */
+    importSession(payload: ChatSessionDetail): Promise<{ ok: boolean; id: string; message: string }>;
+
+    /**
+     * Delete a session by ID from the IDE.
+     * Calls `arc studio sessions delete <id> --json`.
+     * Requires workspace trust.
+     *
+     * @throws {ArcError} INVALID_INPUT if sessionId is unsafe.
+     * @throws {ArcError} RUN_NOT_FOUND if session does not exist.
+     * @throws {ArcError} PERMISSION_DENIED if workspace is untrusted.
+     * @throws {ArcError} LOCK_CONTENTION if advisory lock cannot be acquired.
+     */
+    deleteSession(sessionId: string): Promise<{ ok: boolean; message: string }>;
+
+    /**
+     * Update a single safe field on a session from the IDE.
+     * Allowed fields: mode, runtime_mode, profile_id, isolation_id.
+     * Calls `arc studio sessions update <id> --field <field> --value <value> --json`.
+     * Requires workspace trust.
+     *
+     * @throws {ArcError} INVALID_INPUT if sessionId, field, or value is unsafe.
+     * @throws {ArcError} RUN_NOT_FOUND if session does not exist.
+     * @throws {ArcError} PERMISSION_DENIED if workspace is untrusted.
+     * @throws {ArcError} LOCK_CONTENTION if advisory lock cannot be acquired.
+     */
+    updateSessionField(sessionId: string, field: string, value: string): Promise<{ ok: boolean; message: string }>;
 }

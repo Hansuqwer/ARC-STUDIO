@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-26 — Phases 43–45 implemented; R39/R40 Baseline Complete; R41–R43 added; execution gate cleared.  
-**Current evidence anchor:** local worktree | 2846 Python tests pass (commit 7fdba99); TS build + typecheck green; R39 Phase 41 execution gate lifted.  
+**Last reality refresh:** 2026-05-26 — Phases 43–47 implemented; R39/R40 Baseline Complete; R41–R44 added/updated; Phase 47 daemon HTTP write protocol Baseline Complete.  
+**Current evidence anchor:** local worktree | Phase 47 full verification pass: Python 2890 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped.  
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -982,12 +982,13 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R38 CLI Sandbox Hardening + IDE Integration** | **Active Hardening** | **Phase 37 — subprocess caps + approval prune + path-intent expansion + protocol parity + microVM preflight + container fallback tests + e2e routability + microVM truth guard + design-proof plan + gated Lima low-security developer harness + Lima mount-proof mode (CI-skipped real-host symlink evidence) + ADR-024 contract + Firecracker gated harness + firecracker_doctor() + public-execution truth guard + real-host Lima lifecycle tests (CI-skipped; P2 network-off blocked by Lima 2.x slirp) + symlink-escape guard + Firecracker CI-skip structure complete; microVM execution blocked pending P1–P7 proofs** |
 | **R39 Interactive CLI/UX Foundation** | **Baseline Complete** | **Phases 41–45 — slash command registry, approval UX, progress rendering, REPL error boundary, advisory locking, read-only IDE session bridge; 2846 Python tests; OpenCode/Claude Code parity remains a target, not claimed** |
 | **R40 CLI/UX Polish & Advanced Features** | **Baseline Complete** | **Phase 42 — P0 CLI foundation (pipelines, aliases, batch mode foundation); IDE write bridge deferred pending advisory lock integration** |
-| **R41 Advisory Locking + IDE Read-Only Session Bridge** | **Baseline Complete** | **Phase 43 — POSIX fcntl.flock spin-wait advisory lock; atomic writes for ChatSession.save()/aliases; read-only SessionBridgeService (TypeScript); 2808 Python tests; IDE write bridge deferred** |
+| **R41 Advisory Locking + IDE Session Bridge** | **Baseline Complete** | **Phase 43 (read-only bridge) + Phase 46 (CLI write bridge) + Phase 47 (daemon HTTP write bridge) — POSIX fcntl.flock; atomic writes; daemon-first session writes with CLI fallback; session_changed event; LOCK_CONTENTION error code; Windows remains single-writer best-effort** |
 | **R42 Slash Registry Expansion + REPL Error Boundary** | **Baseline Complete** | **Phase 44 — /help rebuilt as grouped palette (SESSION/RUN/SANDBOX/POLICY/WORKSPACE/PROVIDERS/AUDIT/TASKS/MCP); per-command error boundary; all P0/P1 commands verified; 2828 Python tests** |
 | **R43 Approval + Progress + Error UX** | **Baseline Complete** | **Phase 45 — render-state prefixes ([ok]/[denied]/[blocked]/[empty]/[error]); interactive y/N prompt for NETWORK/INSTALL/UNKNOWN; TTY-aware; DESTRUCTIVE/PRIVILEGED hard-denied; audit events for all deny paths; 2846 Python tests** |
+| **R44 IDE Write Bridge / Daemon Protocol** | **Baseline Complete** | **Phase 46 CLI bridge + Phase 47 daemon HTTP bridge — arc studio sessions write/delete/update fallback; daemon POST/DELETE/PATCH /api/sessions; daemon-first TS bridge with CLI fallback; session_changed event; ADR-025 Windows lock posture** |
 
 **Post-v0.1 Execution Order:** 
-- **Priority 1 stop-the-line:** R39 / Phase 41 (Interactive CLI/UX Foundation). **Baseline Complete** as of Phases 41–45 (commits 37fd92b–7fdba99). Gate lifted; product work may advance. Next: R44 (Phase 46 — IDE write bridge / daemon protocol); continue sandbox hardening for Phase 37 microVM feasibility decision.
+- **Priority 1 stop-the-line:** R39 / Phase 41 (Interactive CLI/UX Foundation). **Baseline Complete** as of Phases 41–45 (commits 37fd92b–7fdba99). Gate lifted. R44 (Phase 46 CLI write bridge + Phase 47 daemon HTTP write bridge) is now Baseline Complete. Continue sandbox hardening for Phase 37 microVM feasibility decision.
 - **Already active foundation:** Phase 37 (CLI Sandbox Hardening — active) may continue only where it supports CLI/interactive CLI safety, policy, audit, or execution UX.
 - **Foundations:** R14-R16 (Phase 21-23) → R17-R18 (Phase 24-25)
 - **Sandbox:** R38 (Phase 37 — subprocess/approval/path-intent/parity/preflight/container/e2e/truth-guard/design-proof/gated-Lima-low-security-harness/Lima-mount-proof-mode/ADR-024-execution-contract complete; microVM execution blocked pending P1–P7 proofs)
@@ -998,9 +999,9 @@ The following roadmap items implement the adapter integration plan from `docs/re
 - **Adapter integration:** R27-R36 (Adapter Phases 26-35)
 - **Provider Management Phase 2:** R37 Phase 2 (Phase 36.2, after Phase 23 + 25 + 36.1)
 
-**Critical Path:** ~~Interactive CLI/UX Foundation (R39 / Phase 41)~~ ✓ → IDE Write Bridge / Daemon Protocol (R44 / Phase 46) → Streaming Audit → RunEvent Unions → Trust Enforcement → Trace Virtualization → CLI Decomposition → MCP Server → MCP Tasks → Replay Contract → HITL/Eval → Consensus Escrow → Adaptive Consensus → Event Notifications → Memory Graph → Adapter Integration (LangChain, Anthropic, OpenAI-compatible, Pydantic AI, DSPy, Haystack, Smolagents, Semantic Kernel, Google ADK, MCP SDK) → Provider Management Phase 2
+**Critical Path:** ~~Interactive CLI/UX Foundation (R39 / Phase 41)~~ ✓ → ~~IDE Write Bridge (R44 / Phase 46)~~ ✓ → Streaming Audit → RunEvent Unions → Trust Enforcement → Trace Virtualization → CLI Decomposition → MCP Server → MCP Tasks → Replay Contract → HITL/Eval → Consensus Escrow → Adaptive Consensus → Event Notifications → Memory Graph → Adapter Integration (LangChain, Anthropic, OpenAI-compatible, Pydantic AI, DSPy, Haystack, Smolagents, Semantic Kernel, Google ADK, MCP SDK) → Provider Management Phase 2
 
-**Note:** R39 (Phase 41) execution gate is cleared as of 2026-05-26 (commit 7fdba99). Product work may advance to R44/Phase 46 and beyond.
+**Note:** R39 (Phase 41) execution gate is cleared as of 2026-05-26 (commit 7fdba99). R44 (Phase 46 CLI bridge + Phase 47 daemon HTTP bridge) is Baseline Complete. Product work may advance to Phase 48 and beyond.
 
 ## R39 — Interactive CLI/UX Foundation
 
@@ -1065,21 +1066,27 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 ---
 
-## R41 — Advisory Locking + IDE Read-Only Session Bridge
+## R41 — Advisory Locking + IDE Session Bridge
 
-**Goal:** Prevent concurrent write corruption for session/alias files; expose read-only session list to IDE without daemon.
+**Goal:** Prevent concurrent write corruption for session/alias files; expose read and write session operations to IDE through CLI fallback and local daemon HTTP.
 
-**Current:** Baseline Complete.
+**Current:** Baseline Complete (Phase 43 + Phase 46 + Phase 47).
 
 **Deliverables:**
 - `storage/advisory_lock.py` — POSIX `fcntl.flock` with spin-wait; Windows documented no-op
 - `write_text_atomic(lock=True)` — wraps temp-write with advisory lock
 - `ChatSession.save()` and `_write_aliases()` use `lock=True`
-- `SessionBridgeService` (TypeScript) — `listChatSessions()` / `getChatSession(id)` via `arc studio sessions --json`; no `shell=True`; read-only only
-- `ArcService` protocol extended with `listChatSessions()` / `getChatSession()` methods
+- `SessionBridgeService` (TypeScript) — read-only: `listChatSessions()` / `getChatSession(id)`; write bridge: `importSession()` / `deleteSession()` / `updateSessionField()` with per-instance TS mutex; no `shell=True`
+- `ArcService` protocol extended with all session methods
+- `ArcErrorCode.LOCK_CONTENTION` added to Python + TypeScript error codes
 - DI module wired
+- Python: `arc studio sessions write` (stdin JSON, advisory lock, trust check, 200-entry cap, 512 KB limit); `arc studio sessions delete`; `arc studio sessions update` (mode/runtime_mode/profile_id/isolation_id only)
+- Python daemon: `POST /api/sessions/write`, `DELETE /api/sessions/{id}`, `PATCH /api/sessions/{id}` with same lock/trust/validation contract
+- Python event bus: ephemeral `session_changed` events after daemon write/delete/update success
+- TypeScript: daemon-first write bridge with CLI fallback only when daemon is unavailable
+- `SESSION_ID_RE = /^[A-Za-z0-9_-]{1,80}$/` shared between Python and TypeScript
 
-**Status:** Baseline Complete | Evidence: commit 563a1ad; 7 advisory-lock tests pass; 2808 Python tests pass; TS build + typecheck green | Notes: IDE write/import bridge, Windows native lock, and session change events remain deferred.
+**Status:** Baseline Complete | Evidence: Phase 43 commit 563a1ad + Phase 46 local + Phase 47 local; Python daemon route tests pass (17); TS session bridge tests pass (33); full Python tests pass (2890 passed, 34 skipped, 3 xfailed); full arc-extension tests pass (814 passed, 3 skipped) | Notes: WebSocket/IPC push auto-refresh, Windows native lock, and persisted session-change replay remain deferred.
 
 ---
 
@@ -1117,3 +1124,39 @@ The following roadmap items implement the adapter integration plan from `docs/re
 **Deferred:** No live daemon/remote sync/microVM broadening.
 
 **Status:** Baseline Complete | Evidence: commit 7fdba99; 2846 Python tests pass; TS build + typecheck green | Notes: Production-ready subprocess sandbox foundation. MicroVM execution remains unimplemented (preflight/doctor only).
+
+---
+
+## R44 — IDE Write Bridge / Daemon Protocol (Advisory Lock Integration)
+
+**Goal:** Extend the IDE session bridge from read-only to read-write, integrating Python advisory locking through CLI fallback and local daemon HTTP.
+
+**Current:** Baseline Complete.
+
+**Deliverables:**
+- Python: `arc studio sessions write` (stdin JSON payload, advisory lock, workspace trust check, 200-entry history cap, 512 KB payload cap, secret rejection, SESSION_ID_RE validation, `LOCK_CONTENTION` on lock timeout)
+- Python: `arc studio sessions delete` (ID validation, advisory lock, workspace trust check, `LOCK_CONTENTION` / `RUN_NOT_FOUND` / `PERMISSION_DENIED` err envelopes)
+- Python: `arc studio sessions update` (safe field allowlist: mode/runtime_mode/profile_id/isolation_id; no history mutation from IDE; secret value rejection; advisory lock; workspace trust check)
+- `ArcErrorCode.LOCK_CONTENTION` added to Python `protocol/errors.py` and TypeScript `arc-protocol.ts`
+- TypeScript `SessionBridgeService.importSession()` / `deleteSession()` / `updateSessionField()` — argv-only, no shell=True, env via buildArcCliEnv(), TS write mutex (second-layer defense; Python fcntl.flock is authoritative)
+- `ArcService` protocol extended with three write methods
+- `ArcBackendService` delegates to SessionBridgeService
+- Python daemon routes: `POST /api/sessions/write`, `DELETE /api/sessions/{session_id}`, `PATCH /api/sessions/{session_id}`
+- TypeScript daemon-first write path with CLI fallback only for daemon unavailable / HTTP 503 / HTTP 504
+- `session_changed` event emitted after daemon write/delete/update success
+- ADR-025 records Windows single-writer best-effort lock posture
+
+**Acceptance:**
+- All 27 Python write bridge tests pass
+- All 33 TypeScript write bridge tests pass
+- All 17 daemon session route tests pass
+- `LOCK_CONTENTION` propagated from Python CLI → TypeScript for all write commands
+- `PERMISSION_DENIED` propagated for untrusted workspace
+- No shell=True in any write path
+- Advisory lock prevents concurrent write corruption (threaded simulation test)
+- TS mutex rejects when pendingWriteCount >= 1
+- Full verification passed: Python 2890 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped
+
+**Status:** Baseline Complete | Evidence: local worktree; targeted Phase 47 route tests pass (17); session bridge TS tests pass (33); full Python tests pass (2890 passed, 34 skipped, 3 xfailed); full arc-extension tests pass (814 passed, 3 skipped) | Notes: Daemon write protocol is local HTTP, not remote sync/shared server; Windows advisory lock remains documented no-op; WebSocket/push auto-refresh remains deferred.
+
+**Source:** Phase 46 execution, 2026-05-26

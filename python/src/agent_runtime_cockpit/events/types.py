@@ -75,6 +75,13 @@ class QuotaWarning(ArcEvent):
     current: float = 0.0
 
 
+class SessionChanged(ArcEvent):
+    event_type: Literal["session_changed"] = "session_changed"
+    session_id: str
+    operation: Literal["write", "delete", "update"]
+    workspace: str
+
+
 EVENT_TYPE_MAP: dict[str, type[ArcEvent]] = {
     "hitl_required": HitlRequired,
     "hitl_decided": HitlDecided,
@@ -82,6 +89,7 @@ EVENT_TYPE_MAP: dict[str, type[ArcEvent]] = {
     "run_completed": RunCompleted,
     "run_failed": RunFailed,
     "quota_warning": QuotaWarning,
+    "session_changed": SessionChanged,
 }
 
 

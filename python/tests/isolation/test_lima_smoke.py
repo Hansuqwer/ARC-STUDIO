@@ -155,6 +155,45 @@ class TestLimaSmoke:
         result = harness.run(["pwd"], require_gate=False)
         assert result.instance_name == "arc-smoke-name-check"
 
+    def test_mount_proof_mode_bypasses_only_failed_network_proof(self, tmp_path):
+        """Mount proof can run on Lima even when the known slirp route exists."""
+        calls: list[list[str]] = []
+
+        def runner(argv: list[str], _timeout: int, _max_bytes: int) -> IsolationResult:
+            calls.append(argv)
+            if "shell" in argv and "ip route | grep" in " ".join(argv):
+                return IsolationResult(exit_code=1, stderr="default route", provider="microvm")
+            return IsolationResult(exit_code=0, stdout="mount-proof-ok", provider="microvm")
+
+        harness = LimaIntegrationHarness(
+            workspace_root=tmp_path,
+            runner=runner,
+            instance_name="arc-smoke-mount-proof",
+        )
+        result = harness.run(["cat", "/workspace/sentinel"], require_gate=False, proof_mode="mount")
+
+        assert result.network_proof_passed is False
+        assert result.lifecycle == [
+            "template",
+            "start",
+            "network_proof",
+            "mount_proof_network_bypass",
+            "run",
+            "teardown",
+        ]
+        assert result.result.exit_code == 0
+        assert any("/workspace/sentinel" in call for call in calls)
+
+    def test_invalid_proof_mode_rejected(self, tmp_path):
+        harness = LimaIntegrationHarness(
+            workspace_root=tmp_path,
+            runner=_fake_runner,
+            instance_name="arc-smoke-bad-proof-mode",
+        )
+
+        with pytest.raises(ValueError, match="proof_mode"):
+            harness.run(["pwd"], require_gate=False, proof_mode="exec")
+
 
 # ---------------------------------------------------------------------------
 # CI-safety test — always runs, confirms skip behaviour
@@ -329,12 +368,13 @@ class TestLimaSmokeRealHost:
         if result.result.exit_code == 0:
             assert "arc-workspace-mount-proof" in result.result.stdout
 
-    def test_real_lima_symlink_escape_blocked(self, tmp_path):
-        """Guest must not read host files through workspace symlink escapes.
+    def test_real_lima_mount_proof_symlink_escape(self, tmp_path):
+        """Guest-side evidence: can Lima read host files through workspace symlinks?
 
-        This is the P5 proof gate from ADR-024. It is skipped in normal CI and
-        intentionally fails on hosts where Lima exposes host symlink targets
-        through the /workspace mount.
+        This uses proof_mode="mount" to bypass only Lima's known failed network
+        proof. If `/workspace` symlinks can read `/etc/passwd`, Lima is blocked
+        permanently for strict sandbox use and remains only a low-security
+        developer harness.
         """
         escape_link = tmp_path / "arc-host-passwd-link"
         escape_link.symlink_to("/etc/passwd")
@@ -347,9 +387,13 @@ class TestLimaSmokeRealHost:
             ["cat", "/workspace/arc-host-passwd-link"],
             timeout_seconds=600,
             require_gate=True,
+            proof_mode="mount",
         )
         assert result.teardown_attempted is True
-        if "run" not in result.lifecycle:
-            pytest.xfail("P5 not exercised because Lima network proof blocked user argv")
+        assert "mount_proof_network_bypass" in result.lifecycle or result.network_proof_passed
+        assert "run" in result.lifecycle
         if result.result.exit_code == 0:
-            assert "root:" not in result.result.stdout
+            pytest.fail(
+                "Lima /workspace symlink escape readable: host /etc/passwd visible in guest. "
+                "Mark ADR-024 P5 blocked permanently for strict sandbox use."
+            )

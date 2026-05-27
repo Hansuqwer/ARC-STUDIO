@@ -28,6 +28,8 @@ from ..arena.service import (
 )
 from ..context.pack import ContextPackGenerator
 from ..evals.diff import diff_runs
+from ..events.bus import get_bus
+from ..events.types import SessionChanged
 from ..gating import GatingError
 from ..orchestration import runtime_router
 from ..orchestration.cross_linker import CrossLinker
@@ -48,6 +50,8 @@ from ..provider_action import (
 from ..security.profiles import enforce_profile, resolve_profile
 from ..security.redaction import Redactor
 from ..security.validation import validate_workspace_path
+from ..security.enforcement import TrustEnforcementError, enforce_workspace_trust
+from ..storage.advisory_lock import AdvisoryLockUnavailable, advisory_lock
 from ..storage.jsonl import JsonlTraceStore
 from ..telemetry.otlp_exporter import export_run_to_otlp, validate_otlp_endpoint
 from ..workspace import iter_workspace_files
@@ -61,7 +65,7 @@ START_TIME = time.time()
 
 
 def _workspace(request: web.Request) -> Path:
-    ws = request.query.get("workspace", "")
+    ws = request.headers.get("X-ARC-Workspace", "") or request.query.get("workspace", "")
     if not ws:
         return request.app[WORKSPACE_KEY]
     try:
@@ -85,6 +89,158 @@ def _cors_origin() -> str:
 
 def _trace_store(request: web.Request) -> JsonlTraceStore:
     return JsonlTraceStore(_workspace(request) / ".arc" / "traces")
+
+
+SESSION_WRITE_PAYLOAD_LIMIT_BYTES = 512 * 1024
+SESSION_HISTORY_LIMIT = 200
+SESSION_UPDATE_ALLOWED_FIELDS = frozenset({"mode", "runtime_mode", "profile_id", "isolation_id"})
+
+
+def _session_error(exc: Exception, status: int) -> web.Response:
+    if isinstance(exc, TrustEnforcementError):
+        return _json(err(ArcErrorCode.PERMISSION_DENIED, str(exc)).model_dump(), 403)
+    if isinstance(exc, AdvisoryLockUnavailable):
+        return _json(err(ArcErrorCode.LOCK_CONTENTION, str(exc)).model_dump(), 429)
+    return _json(err(ArcErrorCode.INTERNAL_ERROR, str(exc)).model_dump(), status)
+
+
+def _emit_session_changed(session_id: str, operation: str, workspace: Path) -> None:
+    get_bus().publish(
+        SessionChanged(
+            session_id=session_id,
+            operation=operation,  # type: ignore[arg-type]
+            workspace=str(workspace),
+            payload={"session_id": session_id, "operation": operation, "workspace": str(workspace)},
+        )
+    )
+
+
+async def sessions_write(request: web.Request) -> web.Response:
+    """POST /api/sessions/write — daemon write bridge for IDE session import."""
+    from ..cli_repl.session import SESSION_ID_RE, ChatSession, is_safe_session_id
+    from ..cli_repl.session_bundle import _contains_secret
+
+    workspace = _workspace(request)
+    raw = await request.text()
+    if len(raw.encode("utf-8")) > SESSION_WRITE_PAYLOAD_LIMIT_BYTES:
+        return _json(
+            err(ArcErrorCode.INVALID_INPUT, "payload exceeds 512 KB limit").model_dump(), 400
+        )
+    try:
+        body = json.loads(raw)
+    except Exception:
+        return _json(err(ArcErrorCode.INVALID_INPUT, "Invalid JSON body").model_dump(), 400)
+    if not isinstance(body, dict):
+        return _json(
+            err(ArcErrorCode.INVALID_INPUT, "Session payload must be an object").model_dump(), 400
+        )
+    if _contains_secret(body):
+        return _json(
+            err(ArcErrorCode.INVALID_INPUT, "payload contains secret-looking data").model_dump(),
+            400,
+        )
+    if isinstance(body.get("history"), list) and len(body["history"]) > SESSION_HISTORY_LIMIT:
+        body["history"] = body["history"][-SESSION_HISTORY_LIMIT:]
+    try:
+        session = ChatSession.model_validate(body)
+    except Exception as exc:
+        return _json(
+            err(ArcErrorCode.INVALID_INPUT, f"invalid session payload: {exc}").model_dump(), 400
+        )
+    if not is_safe_session_id(session.id) or not SESSION_ID_RE.match(session.id):
+        return _json(
+            err(ArcErrorCode.INVALID_INPUT, f"unsafe session id: {session.id!r}").model_dump(), 400
+        )
+    try:
+        enforce_workspace_trust(workspace, "session_write", "daemon-session-write", 0)
+        session.save()
+    except (TrustEnforcementError, AdvisoryLockUnavailable) as exc:
+        return _session_error(exc, 500)
+    except Exception as exc:
+        return _json(err(ArcErrorCode.INTERNAL_ERROR, str(exc)).model_dump(), 500)
+    _emit_session_changed(session.id, "write", workspace)
+    return _json(ok({"session_id": session.id, "messages": len(session.history)}).model_dump())
+
+
+async def sessions_delete(request: web.Request) -> web.Response:
+    """DELETE /api/sessions/{session_id} — daemon delete bridge for IDE sessions."""
+    from ..cli_repl.session import SESSION_ID_RE, _get_sessions_dir, is_safe_session_id
+
+    workspace = _workspace(request)
+    session_id = request.match_info["session_id"]
+    if not is_safe_session_id(session_id) or not SESSION_ID_RE.match(session_id):
+        return _json(
+            err(ArcErrorCode.INVALID_INPUT, f"unsafe session id: {session_id!r}").model_dump(), 400
+        )
+    session_path = _get_sessions_dir() / session_id / "session.json"
+    if not session_path.exists():
+        return _json(
+            err(ArcErrorCode.RUN_NOT_FOUND, f"session not found: {session_id}").model_dump(), 404
+        )
+    try:
+        enforce_workspace_trust(workspace, "session_delete", "daemon-session-delete", 0)
+        with advisory_lock(session_path):
+            session_path.unlink(missing_ok=True)
+            try:
+                session_path.parent.rmdir()
+            except OSError:
+                pass
+    except (TrustEnforcementError, AdvisoryLockUnavailable) as exc:
+        return _session_error(exc, 500)
+    except Exception as exc:
+        return _json(err(ArcErrorCode.INTERNAL_ERROR, str(exc)).model_dump(), 500)
+    _emit_session_changed(session_id, "delete", workspace)
+    return _json(ok({"session_id": session_id, "deleted": True}).model_dump())
+
+
+async def sessions_update(request: web.Request) -> web.Response:
+    """PATCH /api/sessions/{session_id} — daemon safe-field update bridge."""
+    from ..cli_repl.session import SESSION_ID_RE, ChatSession, is_safe_session_id
+    from ..cli_repl.session_bundle import _contains_secret
+
+    workspace = _workspace(request)
+    session_id = request.match_info["session_id"]
+    if not is_safe_session_id(session_id) or not SESSION_ID_RE.match(session_id):
+        return _json(
+            err(ArcErrorCode.INVALID_INPUT, f"unsafe session id: {session_id!r}").model_dump(), 400
+        )
+    try:
+        body = await request.json()
+    except Exception:
+        return _json(err(ArcErrorCode.INVALID_INPUT, "Invalid JSON body").model_dump(), 400)
+    field = str(body.get("field", "")) if isinstance(body, dict) else ""
+    value = body.get("value") if isinstance(body, dict) else None
+    if field not in SESSION_UPDATE_ALLOWED_FIELDS:
+        return _json(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                f"field {field!r} is not updatable via daemon bridge; allowed: {sorted(SESSION_UPDATE_ALLOWED_FIELDS)}",
+            ).model_dump(),
+            400,
+        )
+    if _contains_secret(value):
+        return _json(
+            err(ArcErrorCode.INVALID_INPUT, "value contains secret-looking data").model_dump(), 400
+        )
+    session = ChatSession.load(session_id)
+    if session is None:
+        return _json(
+            err(ArcErrorCode.RUN_NOT_FOUND, f"session not found: {session_id}").model_dump(), 404
+        )
+    try:
+        enforce_workspace_trust(workspace, "session_update", "daemon-session-update", 0)
+        data = session.model_dump(mode="json")
+        data[field] = str(value)
+        updated = ChatSession.model_validate(data)
+        updated.save()
+    except (TrustEnforcementError, AdvisoryLockUnavailable) as exc:
+        return _session_error(exc, 500)
+    except ValueError as exc:
+        return _json(err(ArcErrorCode.INVALID_INPUT, str(exc)).model_dump(), 400)
+    except Exception as exc:
+        return _json(err(ArcErrorCode.INTERNAL_ERROR, str(exc)).model_dump(), 500)
+    _emit_session_changed(session_id, "update", workspace)
+    return _json(ok({"session_id": session_id, "field": field, "updated": True}).model_dump())
 
 
 async def health(request: web.Request) -> web.Response:
@@ -845,6 +1001,9 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_get("/api/runs/{run_id}", get_run)
     app.router.add_get("/api/runs/{run_id}/events", run_events_sse)
     app.router.add_get("/api/runs/{run_id}/links", run_links)
+    app.router.add_post("/api/sessions/write", sessions_write)
+    app.router.add_delete("/api/sessions/{session_id}", sessions_delete)
+    app.router.add_patch("/api/sessions/{session_id}", sessions_update)
     app.router.add_get("/api/sse/proof", sse_proof)
     app.router.add_post("/api/telemetry/export/{run_id}", export_trace)
     app.router.add_get("/api/context/pack", context_pack)

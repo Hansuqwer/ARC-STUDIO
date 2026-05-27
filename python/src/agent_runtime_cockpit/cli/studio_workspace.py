@@ -286,6 +286,243 @@ def studio_sessions_import(
     _out(ok({"session_id": session.id, "messages": len(session.history)}), json_output)
 
 
+@studio_sessions_app.command("write")
+def studio_sessions_write(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Import a session payload from stdin (IDE write bridge).
+
+    Reads a JSON session payload from stdin, validates it against the
+    ChatSession schema, strips secret-looking fields, and writes atomically
+    via write_text_atomic(lock=True). Requires workspace trust.
+
+    The payload must be a valid ChatSession JSON object.
+    History is capped at 200 entries. Payload size is capped at 512 KB.
+    Returns a stable ok/err JSON envelope.
+    """
+    import sys
+
+    _setup_logging(debug)
+
+    from ..cli_repl.session import (
+        SESSION_ID_RE,
+        ChatSession,
+        is_safe_session_id,
+    )
+    from ..cli_repl.session_bundle import _contains_secret
+    from ..protocol.errors import ArcErrorCode
+    from ..security.enforcement import TrustEnforcementError, enforce_workspace_trust
+    from ..storage.advisory_lock import AdvisoryLockUnavailable
+
+    ws = _workspace(workspace)
+
+    # Workspace trust check
+    try:
+        enforce_workspace_trust(ws, "session_write", "ide-bridge", 0)
+    except TrustEnforcementError as exc:
+        _out(err(ArcErrorCode.PERMISSION_DENIED, str(exc)), json_output)
+        raise typer.Exit(1) from exc
+
+    # Read payload from stdin
+    raw = sys.stdin.read()
+    if len(raw.encode("utf-8")) > 512 * 1024:
+        _out(err(ArcErrorCode.INVALID_INPUT, "payload exceeds 512 KB limit"), json_output)
+        raise typer.Exit(1)
+
+    try:
+        import json as _json
+
+        data = _json.loads(raw)
+    except (ValueError, TypeError) as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"invalid JSON: {exc}"), json_output)
+        raise typer.Exit(1) from exc
+
+    # Secret scan on raw payload
+    if _contains_secret(data):
+        _out(err(ArcErrorCode.INVALID_INPUT, "payload contains secret-looking data"), json_output)
+        raise typer.Exit(1)
+
+    # Cap history
+    if isinstance(data.get("history"), list) and len(data["history"]) > 200:
+        data["history"] = data["history"][-200:]
+
+    # Validate ChatSession schema
+    try:
+        session = ChatSession.model_validate(data)
+    except Exception as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"invalid session payload: {exc}"), json_output)
+        raise typer.Exit(1) from exc
+
+    # ID validation
+    if not is_safe_session_id(session.id) or not SESSION_ID_RE.match(session.id):
+        _out(err(ArcErrorCode.INVALID_INPUT, f"unsafe session id: {session.id!r}"), json_output)
+        raise typer.Exit(1)
+
+    # Write atomically under advisory lock
+    try:
+        session.save()
+    except AdvisoryLockUnavailable as exc:
+        _out(err(ArcErrorCode.LOCK_CONTENTION, str(exc)), json_output)
+        raise typer.Exit(1) from exc
+    except Exception as exc:
+        _out(err(ArcErrorCode.INTERNAL_ERROR, str(exc)), json_output)
+        raise typer.Exit(1) from exc
+
+    _out(ok({"session_id": session.id, "messages": len(session.history)}), json_output)
+
+
+@studio_sessions_app.command("delete")
+def studio_sessions_delete(
+    session_id: str = typer.Argument(..., help="Session ID to delete"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Delete a session by ID (IDE write bridge).
+
+    Validates the session ID, deletes the session file (and directory if empty)
+    under advisory lock. Requires workspace trust.
+    Returns a stable ok/err JSON envelope.
+    """
+    _setup_logging(debug)
+
+    from ..cli_repl.session import SESSION_ID_RE, _get_sessions_dir, is_safe_session_id
+    from ..protocol.errors import ArcErrorCode
+    from ..security.enforcement import TrustEnforcementError, enforce_workspace_trust
+    from ..storage.advisory_lock import AdvisoryLockUnavailable, advisory_lock
+
+    ws = _workspace(workspace)
+
+    # ID validation
+    if not is_safe_session_id(session_id) or not SESSION_ID_RE.match(session_id):
+        _out(err(ArcErrorCode.INVALID_INPUT, f"unsafe session id: {session_id!r}"), json_output)
+        raise typer.Exit(1)
+
+    # Workspace trust check
+    try:
+        enforce_workspace_trust(ws, "session_delete", "ide-bridge", 0)
+    except TrustEnforcementError as exc:
+        _out(err(ArcErrorCode.PERMISSION_DENIED, str(exc)), json_output)
+        raise typer.Exit(1) from exc
+
+    sess_dir = _get_sessions_dir()
+    session_path = sess_dir / session_id / "session.json"
+
+    if not session_path.exists():
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"session not found: {session_id}"), json_output)
+        raise typer.Exit(1)
+
+    try:
+        with advisory_lock(session_path):
+            session_path.unlink(missing_ok=True)
+            # Remove empty parent dir
+            parent = session_path.parent
+            try:
+                parent.rmdir()
+            except OSError:
+                pass  # Directory not empty or already gone — non-critical
+    except AdvisoryLockUnavailable as exc:
+        _out(err(ArcErrorCode.LOCK_CONTENTION, str(exc)), json_output)
+        raise typer.Exit(1) from exc
+    except Exception as exc:
+        _out(err(ArcErrorCode.INTERNAL_ERROR, str(exc)), json_output)
+        raise typer.Exit(1) from exc
+
+    _out(ok({"session_id": session_id, "deleted": True}), json_output)
+
+
+# Allowed safe fields for IDE-initiated session updates.
+# History mutation and secret fields are deliberately excluded.
+_SESSION_UPDATE_ALLOWED_FIELDS = frozenset({"mode", "runtime_mode", "profile_id", "isolation_id"})
+
+
+@studio_sessions_app.command("update")
+def studio_sessions_update(
+    session_id: str = typer.Argument(..., help="Session ID"),
+    field: str = typer.Option(..., "--field", help="Field to update"),
+    value: str = typer.Option(..., "--value", help="New value"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Update a single safe field on a session (IDE write bridge).
+
+    Allowed fields: mode, runtime_mode, profile_id, isolation_id.
+    History mutation and secret fields are rejected.
+    Loads, validates, and re-saves the session atomically under advisory lock.
+    Requires workspace trust.
+    Returns a stable ok/err JSON envelope.
+    """
+    _setup_logging(debug)
+
+    from ..cli_repl.session import SESSION_ID_RE, ChatSession, is_safe_session_id
+    from ..cli_repl.session_bundle import _contains_secret
+    from ..protocol.errors import ArcErrorCode
+    from ..security.enforcement import TrustEnforcementError, enforce_workspace_trust
+    from ..storage.advisory_lock import AdvisoryLockUnavailable
+
+    ws = _workspace(workspace)
+
+    # ID validation
+    if not is_safe_session_id(session_id) or not SESSION_ID_RE.match(session_id):
+        _out(err(ArcErrorCode.INVALID_INPUT, f"unsafe session id: {session_id!r}"), json_output)
+        raise typer.Exit(1)
+
+    # Field allowlist check
+    if field not in _SESSION_UPDATE_ALLOWED_FIELDS:
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                f"field {field!r} is not updatable via IDE bridge; "
+                f"allowed: {sorted(_SESSION_UPDATE_ALLOWED_FIELDS)}",
+            ),
+            json_output,
+        )
+        raise typer.Exit(1)
+
+    # Secret scan on value
+    if _contains_secret(value):
+        _out(err(ArcErrorCode.INVALID_INPUT, "value contains secret-looking data"), json_output)
+        raise typer.Exit(1)
+
+    # Workspace trust check
+    try:
+        enforce_workspace_trust(ws, "session_update", "ide-bridge", 0)
+    except TrustEnforcementError as exc:
+        _out(err(ArcErrorCode.PERMISSION_DENIED, str(exc)), json_output)
+        raise typer.Exit(1) from exc
+
+    # Load existing session
+    session = ChatSession.load(session_id)
+    if session is None:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"session not found: {session_id}"), json_output)
+        raise typer.Exit(1)
+
+    # Apply field update
+    try:
+        # Validate by constructing updated dict and re-validating
+        data = session.model_dump(mode="json")
+        data[field] = value
+        updated = ChatSession.model_validate(data)
+    except Exception as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"invalid value for {field!r}: {exc}"), json_output)
+        raise typer.Exit(1) from exc
+
+    # Save atomically
+    try:
+        updated.save()
+    except AdvisoryLockUnavailable as exc:
+        _out(err(ArcErrorCode.LOCK_CONTENTION, str(exc)), json_output)
+        raise typer.Exit(1) from exc
+    except Exception as exc:
+        _out(err(ArcErrorCode.INTERNAL_ERROR, str(exc)), json_output)
+        raise typer.Exit(1) from exc
+
+    _out(ok({"session_id": session_id, "field": field, "updated": True}), json_output)
+
+
 @studio_app.command("sessions-migrate")
 def studio_sessions_migrate_deprecated(
     json_output: bool = JSON_FLAG,

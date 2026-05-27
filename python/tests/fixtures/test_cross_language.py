@@ -232,6 +232,7 @@ class TestErrorCodeFixtures:
             "TIMEOUT",
             "NOT_IMPLEMENTED",
             "PERMISSION_DENIED",
+            "LOCK_CONTENTION",
             "UNKNOWN",
         }
         assert {code.name for code in ArcErrorCode} == expected

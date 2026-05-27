@@ -2,15 +2,15 @@
 
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-26 — Phases 43–45 added (advisory lock, slash registry, approval UX); Phase 41/42 updated to Baseline Complete; execution gate cleared.  
-**Current evidence anchor:** local worktree | 2846 Python tests pass (commit 7fdba99); TS build + typecheck green; Phase 41–45 Baseline Complete.  
+**Last reality refresh:** 2026-05-26 — Phases 43–47 added/updated; Phase 47 (daemon HTTP write protocol) Baseline Complete.  
+**Current evidence anchor:** local worktree | Phase 47 full verification pass: Python 2890 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
 
 Prefer larger coherent implementation chunks over tiny slices. A chunk may include multiple listed slices when they share files/tests and can be completed safely in one session. Keep the no-destructive-actions, no-secret-commits, preserve-unrelated-work, and green-verification rules.
 
-~~Priority 1 stop-the-line: Phase 41 (Interactive CLI/UX Foundation).~~ **Gate cleared 2026-05-26** — Phases 41–45 Baseline Complete (commit 7fdba99; 2846 Python tests). Product work may advance to Phase 46 (IDE write bridge / daemon protocol) and beyond.
+~~Priority 1 stop-the-line: Phase 41 (Interactive CLI/UX Foundation).~~ **Gate cleared 2026-05-26** — Phases 41–47 Baseline Complete. Phase 47 (daemon HTTP write protocol) is Baseline Complete. Product work may advance to Phase 48 and beyond.
 
 ## Verification Baseline For Every Slice
 
@@ -2403,7 +2403,7 @@ Phase 37 (CLI Sandbox Hardening) ──→ (active; depends on Phase 23)
 - **Research:** Phase 33 (independent)
 - **Provider Management Phase 2:** Phase 36.2 (Baseline Complete — auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`, token refresh, trust enforcement, audit logging, env var fallback; 57 auth tests)
 - **Interactive CLI/UX:** Phases 41–45 (Baseline Complete — slash registry, approval UX, progress/error rendering, advisory locking, IDE read-only session bridge)
-- **Advanced CLI:** Phase 42 (Baseline Complete — P0 CLI foundation); Phases 43/44/45 complete; Phase 46 (IDE write bridge) is next
+- **Advanced CLI:** Phase 42 (Baseline Complete — P0 CLI foundation); Phases 43/44/45/46 complete; Phase 47 (daemon IPC write protocol) is next
 ---
 
 ## Phase 41 — Interactive CLI/UX Foundation
@@ -2656,3 +2656,103 @@ bash scripts/check-pr.sh
 ### Known Risks
 - TTY detection depends on `sys.stdin.isatty()`; CI/test harnesses must use monkeypatch.
 - MicroVM execution remains unimplemented (preflight/doctor only); no change to Phase 37 microVM status.
+
+---
+
+## Phase 46 — IDE Write Bridge / Advisory Lock Integration for Session Writes
+
+**Roadmap:** R44 — IDE Write Bridge / Advisory Lock Integration  
+**Status:** Baseline Complete | Evidence: local worktree; 2873 Python tests pass (27 new); 806 TS tests pass (25 new); TS build + typecheck green; check-pr.sh pass; banned-claims pass  
+**Depends on:** Phase 43 (advisory lock + read-only session bridge)
+
+### Deliverables
+1. Python CLI: `arc studio sessions write` — accepts session JSON on stdin; validates ChatSession schema; strips/rejects secret-looking fields; caps history at 200 entries; rejects payload > 512 KB; writes atomically via `write_text_atomic(lock=True)`; requires workspace trust; propagates `LOCK_CONTENTION` on `AdvisoryLockUnavailable`; `SESSION_ID_RE = ^[A-Za-z0-9_-]{1,80}$` enforced.
+2. Python CLI: `arc studio sessions delete <id>` — ID regex validation; advisory lock; workspace trust; `RUN_NOT_FOUND` / `LOCK_CONTENTION` / `PERMISSION_DENIED` err envelopes.
+3. Python CLI: `arc studio sessions update <id> --field <field> --value <value>` — field allowlist: `mode`, `runtime_mode`, `profile_id`, `isolation_id` only; no history mutation from IDE; secret value rejection; advisory lock; workspace trust.
+4. `ArcErrorCode.LOCK_CONTENTION` added to Python `protocol/errors.py` and TypeScript `arc-protocol.ts`; cross-language fixture test updated.
+5. TypeScript `SessionBridgeService` extended with `importSession()`, `deleteSession()`, `updateSessionField()` — argv-only (no `shell=True`); env via `buildArcCliEnv()`; per-instance Promise-chain mutex (second-layer defense; Python `fcntl.flock` is authoritative).
+6. `ArcService` protocol extended with three write method signatures + JSDoc.
+7. `ArcBackendService` delegates to `SessionBridgeService` for all three write methods.
+8. `docs/research/cli-session-sharing-protocol.md` created with write path contract, lock layers, deferred daemon upgrade path, and known Windows limitation.
+
+### Deferred
+- Daemon IPC/WebSocket write protocol (Phase 47)
+- Windows native lock (advisory_lock is documented no-op on Windows)
+- Session change events (push/WebSocket push to IDE)
+
+### Acceptance
+1. ✅ `arc studio sessions write --json` with valid JSON imports session atomically under advisory lock.
+2. ✅ Untrusted workspace returns `PERMISSION_DENIED` err envelope.
+3. ✅ Secret payload returns `INVALID_INPUT` err envelope.
+4. ✅ Advisory lock timeout returns `LOCK_CONTENTION` err envelope.
+5. ✅ `arc studio sessions delete <id> --json` deletes session file; `RUN_NOT_FOUND` for missing; `INVALID_INPUT` for unsafe ID.
+6. ✅ `arc studio sessions update <id> --field mode --value plan --json` updates mode; disallowed fields rejected.
+7. ✅ TypeScript `importSession` calls `arc studio sessions write --json` with stdin payload; history truncated to 200.
+8. ✅ TypeScript `deleteSession`/`updateSessionField` validate ID/field before CLI call.
+9. ✅ TS mutex rejects with `LOCK_CONTENTION` when `pendingWriteCount >= 1`.
+10. ✅ 27 Python tests pass + 25 TypeScript tests pass.
+11. ✅ Full test suites green (2873 Python, 806 TS); builds clean.
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/test_phase46_session_write_bridge.py -q
+cd python && uv run pytest tests/ -q
+pnpm --filter @arc-studio/protocol build
+pnpm --filter arc-extension build
+pnpm --filter arc-extension test
+bash scripts/check-pr.sh
+bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
+```
+
+### Known Risks
+- Windows advisory lock is documented no-op; single-writer CLI assumption is the only Windows safety guarantee.
+- Daemon IPC write protocol (Phase 47) may require schema evolution for the write bridge payload.
+- TS mutex rejects third concurrent write; this is intentional UX design (single-writer assumption for IDE session writes).
+
+---
+
+## Phase 47 — Daemon HTTP Write Protocol for IDE Session Writes
+
+**Roadmap:** R44 — IDE Write Bridge / Daemon Protocol  
+**Status:** Baseline Complete | Evidence: local worktree; targeted Python daemon route tests pass (17); targeted TypeScript session bridge tests pass (33); full Python tests pass (2890 passed, 34 skipped, 3 xfailed); full arc-extension tests pass (814 passed, 3 skipped)  
+**Depends on:** Phase 46 (CLI write bridge + advisory lock integration)
+
+### Deliverables
+1. Python daemon routes: `POST /api/sessions/write`, `DELETE /api/sessions/{session_id}`, `PATCH /api/sessions/{session_id}`.
+2. All daemon write routes enforce `SESSION_ID_RE`, workspace trust, secret scanning, 200-entry history cap, 512 KB payload cap for write, and advisory `fcntl.flock` via existing `ChatSession.save()` / explicit delete lock.
+3. HTTP status mapping: `400 INVALID_INPUT`, `403 PERMISSION_DENIED`, `404 RUN_NOT_FOUND`, `429 LOCK_CONTENTION`, `500 INTERNAL_ERROR`.
+4. TypeScript `SessionBridgeService` now tries daemon HTTP first when `ARC_PYTHON_DAEMON_URL` or loopback discovery succeeds, then falls back to CLI only when daemon is unavailable.
+5. No CLI fallback for daemon `400`, `403`, `404`, or `429`.
+6. Daemon discovery uses `ARC_PYTHON_DAEMON_URL` or default loopback `/health`, cached for 30 seconds.
+7. `session_changed` event added to Python in-memory event bus and emitted after successful daemon write/delete/update only.
+8. `SessionBridgeService.onSessionChanged` callback fires after successful daemon writes only; CLI fallback does not fire it.
+9. ADR-025 records Windows lock posture: POSIX `fcntl.flock` remains authoritative; Windows remains documented single-writer best-effort; no `LockFileEx` in Phase 47.
+
+### Acceptance
+1. Daemon session write/delete/update routes exist and return stable ARC envelopes.
+2. Valid write/delete/update succeed via daemon.
+3. Invalid JSON, secret content, unsafe IDs, bad fields, missing sessions, untrusted workspace, and lock timeout map to expected HTTP/error codes.
+4. `session_changed` emitted on successful daemon mutations and not emitted on failed writes.
+5. TypeScript uses daemon path when configured/available.
+6. TypeScript falls back to CLI on daemon unavailable / 503 / 504.
+7. TypeScript does not fall back on daemon `400`, `403`, `404`, `429`.
+8. Daemon discovery cache prevents repeated health probes within 30 seconds.
+9. Existing Phase 46 CLI fallback behavior remains covered.
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/web/test_session_daemon_routes.py tests/test_phase46_session_write_bridge.py -q
+cd python && uv run pytest tests/ -q
+pnpm --filter @arc-studio/protocol build
+pnpm --filter arc-extension build
+pnpm --filter arc-extension test
+bash scripts/check-pr.sh
+bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
+```
+
+### Known Risks
+- No WebSocket/IPC push auto-refresh yet; `session_changed` is in-memory only.
+- Daemon write protocol is local HTTP, not a shared-server or remote-sync protocol.
+- Windows OS-level interprocess lock remains unimplemented; ADR-025 documents this.

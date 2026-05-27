@@ -1087,4 +1087,16 @@ export class ArcBackendService implements ArcService {
     async getChatSession(sessionId: string): Promise<ChatSessionDetail> {
         return this.sessionBridgeService.getChatSession(sessionId);
     }
+
+    async importSession(payload: ChatSessionDetail): Promise<{ ok: boolean; id: string; message: string }> {
+        return this.sessionBridgeService.importSession(payload);
+    }
+
+    async deleteSession(sessionId: string): Promise<{ ok: boolean; message: string }> {
+        return this.sessionBridgeService.deleteSession(sessionId);
+    }
+
+    async updateSessionField(sessionId: string, field: string, value: string): Promise<{ ok: boolean; message: string }> {
+        return this.sessionBridgeService.updateSessionField(sessionId, field, value);
+    }
 }

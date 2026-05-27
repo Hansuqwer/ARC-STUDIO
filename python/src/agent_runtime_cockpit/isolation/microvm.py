@@ -1347,12 +1347,21 @@ class LimaIntegrationHarness:
         *,
         timeout_seconds: int = 300,
         require_gate: bool = True,
+        proof_mode: str = "strict",
     ) -> LimaHarnessResult:
-        """Run the gated Lima harness lifecycle with mandatory network proof."""
+        """Run the gated Lima low-security developer harness lifecycle.
+
+        ``proof_mode="mount"`` bypasses only the network gate so a developer can
+        collect guest-side /workspace mount and symlink evidence on Lima, whose
+        default networking is known network-present. It is not strict sandbox
+        execution and is never wired to public microVM execution.
+        """
         if require_gate and not lima_integration_available():
             raise RuntimeError("ARC_MICROVM_INTEGRATION=1, macOS, and limactl are required")
         if not command:
             raise ValueError("missing command")
+        if proof_mode not in {"strict", "mount"}:
+            raise ValueError("proof_mode must be 'strict' or 'mount'")
         tmp_path = self._write_template()
         network_proof_passed = False
         teardown_attempted = False
@@ -1382,13 +1391,15 @@ class LimaIntegrationHarness:
                 )
                 self.lifecycle.append("network_proof")
                 network_proof_passed = network.exit_code == 0
-                if not network_proof_passed:
+                if not network_proof_passed and proof_mode == "strict":
                     result = IsolationResult(
                         exit_code=-1,
                         stderr="network-off proof failed: guest has a default route",
                         provider="microvm",
                     )
                 else:
+                    if proof_mode == "mount" and not network_proof_passed:
+                        self.lifecycle.append("mount_proof_network_bypass")
                     result = self._limactl(
                         [
                             "shell",

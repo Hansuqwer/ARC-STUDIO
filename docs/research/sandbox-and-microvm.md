@@ -143,7 +143,8 @@ Current opt-in Lima harness:
 - `LimaIntegrationHarness` exists as an internal helper only; it is not wired to `arc sandbox run --provider microvm`.
 - It requires `ARC_MICROVM_INTEGRATION=1`, macOS, and `limactl` by default; unit tests pass `require_gate=False` with a fake runner.
 - Fake-runner tests prove lifecycle order, mandatory network proof before user argv, no user command after failed network proof, and `limactl delete -f` teardown after start failure.
-- Real Lima execution remains unproven until host opt-in tests are run against a local Lima/VZ install.
+- `proof_mode="mount"` can bypass only the known-failed Lima network proof so developers can collect `/workspace` mount/symlink evidence. This is Lima low-security developer harness behavior, not strict microVM sandbox execution.
+- Host-gated symlink proof now tests whether `/workspace` symlinks can read host paths; if readable, Lima P5 is permanently blocked for strict sandbox use.
 
 ### Rootfs/Kernel Lifecycle
 - Firecracker needs a kernel vmlinux binary and a rootfs image. No automated download/cache mechanism exists.
@@ -178,8 +179,8 @@ Current opt-in Lima harness:
 |---|---|---|
 | Preflight/doctor | Real | All 4 states tested: unavailable/installed_not_configured/ready/blocked |
 | Design-proof plan | Real | Non-executing plan only; no VM creation/start/run/delete |
-| Opt-in Lima harness | Internal helper only | Fake-runner lifecycle tests pass; Lima smoke test added (CI-skipped; real host proof pending) |
-| Lima smoke test | Added (CI-skip) | `python/tests/isolation/test_lima_smoke.py`; skipped unless macOS + limactl + ARC_MICROVM_INTEGRATION=1; CI does not set gate; real Lima execution NOT claimed on this host |
+| Opt-in Lima harness | Internal low-security developer harness only | Fake-runner lifecycle tests pass; mount-proof mode can bypass only network proof for evidence collection; not wired to public microVM execution |
+| Lima smoke/mount proof | Added (CI-skip) | `python/tests/isolation/test_lima_smoke.py`; real-host tests skipped unless macOS + limactl + ARC_MICROVM_INTEGRATION=1 + ARC_LIMA_REAL_EXEC=1; symlink escape proof records whether host paths are readable through `/workspace` symlinks |
 | MicroVM truth guard | Added | `test_microvm_truth_guard.py` (10 tests): execute() always raises, both gates set still raises, status()["available"]=False, contract_doc references ADR-024, CLI run blocked; arc sandbox run --provider microvm: blocked |
 | Firecracker harness | Design/preflight only | `FirecrackerIntegrationHarness` added with fake-runner tests; no real Firecracker execution; `firecracker_doctor()` expanded with jailer/cache/kvm fields |
 | Firecracker execution | Not implemented | Kernel/rootfs lifecycle, mount policy, network-off proof, jailer config, teardown |

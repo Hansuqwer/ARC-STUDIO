@@ -3,6 +3,7 @@
 Canonical list defined by ADR-023. Keep this enum in sync with
 ``packages/arc-extension/src/common/arc-protocol.ts``.
 """
+
 from enum import Enum
 
 
@@ -33,6 +34,7 @@ class ArcErrorCode(str, Enum):
     TIMEOUT = "TIMEOUT"
     NOT_IMPLEMENTED = "NOT_IMPLEMENTED"
     PERMISSION_DENIED = "PERMISSION_DENIED"
+    LOCK_CONTENTION = "LOCK_CONTENTION"
 
     # Fallback
     UNKNOWN = "UNKNOWN"
