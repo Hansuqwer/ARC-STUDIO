@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-27 — Phase 49 RunEvent union hardening + cross-language protocol evidence Baseline Complete.  
-**Current evidence anchor:** local worktree | Phase 49 full verification pass: Python 2895 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped; TS protocol tests 61 passed; Python ruff, protocol build, extension build, workspace typecheck, PR hygiene, and banned-claims checks pass.  
+**Last reality refresh:** 2026-05-27 — Phase 40–49 review hardening patch applied after Phase 49 Baseline Complete.  
+**Current evidence anchor:** local worktree | Phase 40–49 review verification pass: Python 2900 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped; TS protocol tests 61 passed; Python ruff, protocol build, extension build, workspace typecheck, PR hygiene, and banned-claims checks pass.  
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -1001,7 +1001,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Critical Path:** ~~Interactive CLI/UX Foundation (R39 / Phase 41)~~ ✓ → ~~IDE Write Bridge (R44 / Phase 46)~~ ✓ → Streaming Audit → RunEvent Unions → Trust Enforcement → Trace Virtualization → CLI Decomposition → MCP Server → MCP Tasks → Replay Contract → HITL/Eval → Consensus Escrow → Adaptive Consensus → Event Notifications → Memory Graph → Adapter Integration (LangChain, Anthropic, OpenAI-compatible, Pydantic AI, DSPy, Haystack, Smolagents, Semantic Kernel, Google ADK, MCP SDK) → Provider Management Phase 2
 
-**Note:** R39 (Phase 41) execution gate is cleared as of 2026-05-26 (commit 7fdba99). R44 (Phase 46 CLI bridge + Phase 47 daemon HTTP bridge) is Baseline Complete. Product work may advance to Phase 48 and beyond.
+**Note:** R39 (Phase 41) execution gate is cleared as of 2026-05-26 (commit 7fdba99). R44 (Phase 46 CLI bridge + Phase 47 daemon HTTP bridge), Phase 48, and Phase 49 are Baseline Complete. Product work may advance to Phase 50 and beyond.
 
 ## R39 — Interactive CLI/UX Foundation
 

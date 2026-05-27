@@ -153,6 +153,16 @@ class TestChatSession:
         loaded = ChatSession.load("nonexistent-id")
         assert loaded is None
 
+    def test_save_rejects_invalid_session_ids(self):
+        for session_id in (".", "latest", "bad id", "../x", ""):
+            s = ChatSession(id=session_id)
+            with pytest.raises(ValueError, match="unsafe session id"):
+                s.save()
+
+    def test_load_rejects_invalid_session_ids(self):
+        for session_id in (".", "latest", "bad id", "../x", ""):
+            assert ChatSession.load(session_id) is None
+
 
 class TestSlashCommands:
     def test_help(self):

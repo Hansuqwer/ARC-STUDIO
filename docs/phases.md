@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-27 — Phase 49 RunEvent union hardening + cross-language protocol evidence Baseline Complete.  
-**Current evidence anchor:** local worktree | Phase 49 full verification pass: Python 2895 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped; TS protocol tests 61 passed; Python ruff, protocol build, extension build, workspace typecheck, PR hygiene, and banned-claims checks pass.  
+**Last reality refresh:** 2026-05-27 — Phase 40–49 review hardening patch applied after Phase 49 Baseline Complete.  
+**Current evidence anchor:** local worktree | Phase 40–49 review verification pass: Python 2900 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped; TS protocol tests 61 passed; Python ruff, protocol build, extension build, workspace typecheck, PR hygiene, and banned-claims checks pass.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -2403,7 +2403,7 @@ Phase 37 (CLI Sandbox Hardening) ──→ (active; depends on Phase 23)
 - **Research:** Phase 33 (independent)
 - **Provider Management Phase 2:** Phase 36.2 (Baseline Complete — auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`, token refresh, trust enforcement, audit logging, env var fallback; 57 auth tests)
 - **Interactive CLI/UX:** Phases 41–45 (Baseline Complete — slash registry, approval UX, progress/error rendering, advisory locking, IDE read-only session bridge)
-- **Advanced CLI:** Phase 42 (Baseline Complete — P0 CLI foundation); Phases 43/44/45/46 complete; Phase 47 (daemon IPC write protocol) is next
+- **Advanced CLI:** Phase 42 (Baseline Complete — P0 CLI foundation); Phases 43–49 complete; Phase 50 is next unless sandbox Phase 37 hardening is prioritized.
 ---
 
 ## Phase 41 — Interactive CLI/UX Foundation

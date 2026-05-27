@@ -124,7 +124,7 @@ def _emit_session_changed(session_id: str, operation: str, workspace: Path) -> N
 
 async def sessions_write(request: web.Request) -> web.Response:
     """POST /api/sessions/write — daemon write bridge for IDE session import."""
-    from ..cli_repl.session import SESSION_ID_RE, ChatSession, is_safe_session_id
+    from ..cli_repl.session import ChatSession, is_valid_session_id
     from ..cli_repl.session_bundle import _contains_secret
 
     workspace = _workspace(request)
@@ -154,7 +154,7 @@ async def sessions_write(request: web.Request) -> web.Response:
         return _json(
             err(ArcErrorCode.INVALID_INPUT, f"invalid session payload: {exc}").model_dump(), 400
         )
-    if not is_safe_session_id(session.id) or not SESSION_ID_RE.match(session.id):
+    if not is_valid_session_id(session.id):
         return _json(
             err(ArcErrorCode.INVALID_INPUT, f"unsafe session id: {session.id!r}").model_dump(), 400
         )
@@ -171,21 +171,24 @@ async def sessions_write(request: web.Request) -> web.Response:
 
 async def sessions_delete(request: web.Request) -> web.Response:
     """DELETE /api/sessions/{session_id} — daemon delete bridge for IDE sessions."""
-    from ..cli_repl.session import SESSION_ID_RE, _get_sessions_dir, is_safe_session_id
+    from ..cli_repl.session import _get_sessions_dir, is_valid_session_id
 
     workspace = _workspace(request)
     session_id = request.match_info["session_id"]
-    if not is_safe_session_id(session_id) or not SESSION_ID_RE.match(session_id):
+    if not is_valid_session_id(session_id):
         return _json(
             err(ArcErrorCode.INVALID_INPUT, f"unsafe session id: {session_id!r}").model_dump(), 400
         )
+    try:
+        enforce_workspace_trust(workspace, "session_delete", "daemon-session-delete", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
     session_path = _get_sessions_dir() / session_id / "session.json"
     if not session_path.exists():
         return _json(
             err(ArcErrorCode.RUN_NOT_FOUND, f"session not found: {session_id}").model_dump(), 404
         )
     try:
-        enforce_workspace_trust(workspace, "session_delete", "daemon-session-delete", 0)
         with advisory_lock(session_path):
             session_path.unlink(missing_ok=True)
             try:
@@ -202,12 +205,12 @@ async def sessions_delete(request: web.Request) -> web.Response:
 
 async def sessions_update(request: web.Request) -> web.Response:
     """PATCH /api/sessions/{session_id} — daemon safe-field update bridge."""
-    from ..cli_repl.session import SESSION_ID_RE, ChatSession, is_safe_session_id
+    from ..cli_repl.session import ChatSession, is_valid_session_id
     from ..cli_repl.session_bundle import _contains_secret
 
     workspace = _workspace(request)
     session_id = request.match_info["session_id"]
-    if not is_safe_session_id(session_id) or not SESSION_ID_RE.match(session_id):
+    if not is_valid_session_id(session_id):
         return _json(
             err(ArcErrorCode.INVALID_INPUT, f"unsafe session id: {session_id!r}").model_dump(), 400
         )
@@ -229,13 +232,16 @@ async def sessions_update(request: web.Request) -> web.Response:
         return _json(
             err(ArcErrorCode.INVALID_INPUT, "value contains secret-looking data").model_dump(), 400
         )
+    try:
+        enforce_workspace_trust(workspace, "session_update", "daemon-session-update", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
     session = ChatSession.load(session_id)
     if session is None:
         return _json(
             err(ArcErrorCode.RUN_NOT_FOUND, f"session not found: {session_id}").model_dump(), 404
         )
     try:
-        enforce_workspace_trust(workspace, "session_update", "daemon-session-update", 0)
         data = session.model_dump(mode="json")
         data[field] = str(value)
         updated = ChatSession.model_validate(data)

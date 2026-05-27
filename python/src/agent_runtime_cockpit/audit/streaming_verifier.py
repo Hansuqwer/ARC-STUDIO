@@ -146,6 +146,17 @@ class StreamingAuditVerifier:
                             file_size_bytes=file_size,
                         )
 
+                    seq = record.get("seq")
+                    if seq is not None and seq != records_checked:
+                        return VerificationResult(
+                            ok=False,
+                            mode="hmac",
+                            records_checked=records_checked,
+                            reason=f"Sequence mismatch at line {line_num}: expected {records_checked}, got {seq}",
+                            duration_ms=int((time.time() - start_time) * 1000),
+                            file_size_bytes=file_size,
+                        )
+
                     # Verify HMAC signature
                     event = record.get("event", {})
                     signature = record.get("signature", "")

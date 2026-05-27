@@ -30,6 +30,14 @@ def is_safe_session_id(session_id: str) -> bool:
     )
 
 
+def is_valid_session_id(session_id: str) -> bool:
+    return (
+        session_id != "latest"
+        and is_safe_session_id(session_id)
+        and bool(SESSION_ID_RE.fullmatch(session_id))
+    )
+
+
 def _get_sessions_dir() -> Path:
     override = os.environ.get("ARC_STUDIO_SESSIONS_DIR")
     base = Path(override).expanduser() if override else Path.home() / ".arc" / "sessions"
@@ -210,7 +218,7 @@ class ChatSession(BaseModel):
             self.mode = mode
 
     def save(self) -> Path:
-        if not is_safe_session_id(self.id):
+        if not is_valid_session_id(self.id):
             raise ValueError("unsafe session id")
         sess_dir = _get_sessions_dir() / self.id
         sess_dir.mkdir(parents=True, exist_ok=True)
@@ -231,6 +239,8 @@ class ChatSession(BaseModel):
     @classmethod
     def load(cls, session_id: str) -> ChatSession | None:
         """Load a canonical session. Falls back to legacy flat format."""
+        if not is_valid_session_id(session_id):
+            return None
         # Try canonical first (subdirectory with session.json)
         path = _get_sessions_dir() / session_id / "session.json"
         if path.exists():

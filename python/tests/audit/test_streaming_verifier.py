@@ -266,6 +266,26 @@ class TestHMACStreamingVerification:
         assert result.mode == "hmac"
         assert "Record hash invalid" in result.reason
 
+    def test_verify_hmac_tampered_sequence_fails(self, tmp_path: Path):
+        key = b"test-hmac-key-32-bytes-long!!"
+        chain_path = tmp_path / "tampered-seq.jsonl"
+        events = [{"seq": i, "action": f"step-{i}"} for i in range(2)]
+        self._write_hmac_chain(chain_path, key, events)
+        records = [json.loads(line) for line in chain_path.read_text().splitlines()]
+        records[1]["seq"] = 7
+        chain_path.write_text(
+            "\n".join(
+                json.dumps(record, sort_keys=True, separators=(",", ":")) for record in records
+            )
+            + "\n"
+        )
+
+        result = StreamingAuditVerifier().verify_hmac(chain_path, key)
+
+        assert result.ok is False
+        assert result.mode == "hmac"
+        assert "Sequence mismatch" in result.reason
+
     def test_verify_hmac_accepts_mixed_event_payload_shapes(self, tmp_path: Path):
         """Verifier checks chain envelope integrity, not one payload schema."""
         key = b"test-hmac-key-32-bytes-long!!"

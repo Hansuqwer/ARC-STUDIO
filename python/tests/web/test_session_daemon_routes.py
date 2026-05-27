@@ -184,6 +184,25 @@ async def test_sessions_delete_unsafe_id(tmp_path: Path) -> None:
     assert body["error"]["code"] == "INVALID_INPUT"
 
 
+async def test_sessions_delete_untrusted_workspace_checks_trust_before_existence(
+    tmp_path: Path,
+) -> None:
+    from agent_runtime_cockpit.security.enforcement import TrustEnforcementError
+
+    client = await _client(tmp_path)
+    try:
+        with (
+            patch(SESSIONS_DIR, return_value=tmp_path),
+            patch(TRUST, side_effect=TrustEnforcementError("untrusted")),
+        ):
+            resp = await client.delete("/api/sessions/s-missing")
+            body = await resp.json()
+    finally:
+        await client.close()
+    assert resp.status == 403
+    assert body["error"]["code"] == "PERMISSION_DENIED"
+
+
 async def test_sessions_delete_lock_timeout(tmp_path: Path) -> None:
     s = ChatSession(id="s-del-lock")
     with patch(SESSIONS_DIR, return_value=tmp_path):
@@ -261,6 +280,27 @@ async def test_sessions_update_missing(tmp_path: Path) -> None:
         await client.close()
     assert resp.status == 404
     assert body["error"]["code"] == "RUN_NOT_FOUND"
+
+
+async def test_sessions_update_untrusted_workspace_checks_trust_before_load(
+    tmp_path: Path,
+) -> None:
+    from agent_runtime_cockpit.security.enforcement import TrustEnforcementError
+
+    client = await _client(tmp_path)
+    try:
+        with (
+            patch(SESSIONS_DIR, return_value=tmp_path),
+            patch(TRUST, side_effect=TrustEnforcementError("untrusted")),
+        ):
+            resp = await client.patch(
+                "/api/sessions/s-missing", json={"field": "mode", "value": "plan"}
+            )
+            body = await resp.json()
+    finally:
+        await client.close()
+    assert resp.status == 403
+    assert body["error"]["code"] == "PERMISSION_DENIED"
 
 
 async def test_session_changed_emitted_on_success_and_not_error(tmp_path: Path) -> None:
