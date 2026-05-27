@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-27 — Phase 40–49 review hardening patch applied after Phase 49 Baseline Complete.  
-**Current evidence anchor:** local worktree | Phase 40–49 review verification pass: Python 2900 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped; TS protocol tests 61 passed; Python ruff, protocol build, extension build, workspace typecheck, PR hygiene, and banned-claims checks pass.  
+**Last reality refresh:** 2026-05-27 — Phase 50 Baseline Complete.  
+**Current evidence anchor:** local worktree | Phase 50 verification pass: 84 web tests passed (13 new Phase 50 tests); all security/mcp/web/swarmgraph/events tests pass; ruff OK.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -2403,7 +2403,7 @@ Phase 37 (CLI Sandbox Hardening) ──→ (active; depends on Phase 23)
 - **Research:** Phase 33 (independent)
 - **Provider Management Phase 2:** Phase 36.2 (Baseline Complete — auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`, token refresh, trust enforcement, audit logging, env var fallback; 57 auth tests)
 - **Interactive CLI/UX:** Phases 41–45 (Baseline Complete — slash registry, approval UX, progress/error rendering, advisory locking, IDE read-only session bridge)
-- **Advanced CLI:** Phase 42 (Baseline Complete — P0 CLI foundation); Phases 43–49 complete; Phase 50 is next unless sandbox Phase 37 hardening is prioritized.
+- **Advanced CLI:** Phase 42 (Baseline Complete — P0 CLI foundation); Phases 43–49 complete; Phase 50 Baseline Complete; Phases 51–52 in progress.
 ---
 
 ## Phase 41 — Interactive CLI/UX Foundation
@@ -2837,3 +2837,39 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md docs/schemas/
 - TypeScript still intentionally lacks typed variants for several canonical Python events; tests now make that debt explicit.
 - `arc-extension` still has extension-local trace/event consumer types; full consumer migration remains deferred.
 - `docs/schemas/RunEvent.json` remains broad for legacy compatibility and is not the typed-union authority.
+
+---
+
+## Phase 50 — Trust Enforcement Surface Audit + Daemon Write Policy Consistency
+
+**Roadmap:** R16 derivative  
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/web -q` (84 passed); `cd python && uv run pytest tests/security tests/mcp -q` (all passed); `cd python && uv run ruff check src tests` (OK)  
+**Depends on:** Phases 47–49 (Baseline Complete)
+
+### Deliverables
+1. Audited all workspace-sensitive surfaces in `web/routes.py`, `mcp/server.py`, `cli/`.
+2. Found 11 routes without `enforce_workspace_trust`: `start_run`, `list_runs`, `get_run`, `context_pack`, `run_links`, `export_trace`, `runs_diff`, `runs_eval`, `arena_chat`, `arena_vote`, `arena_adopt`.
+3. Added `enforce_workspace_trust` before first data read in all 11 routes (trust-before-existence pattern).
+4. Added 13 tests in `python/tests/web/test_phase50_trust_surface_audit.py` covering all surfaces.
+5. Parity test confirms all 11 hardened surfaces return HTTP 403 + `PERMISSION_DENIED`.
+6. Updated `docs/security/enforcement-surfaces.md` with Phase 50 surface table.
+7. Fixed existing web test fixtures to patch trust (conftest + `test_daemon_auth.py`).
+
+### Acceptance
+1. All 14 workspace-sensitive daemon surfaces enforce trust before reading data.
+2. Untrusted workspace returns 403 PERMISSION_DENIED, not 404/500/silent pass.
+3. Trust check precedes existence check on all routes (oracle-leak guard).
+4. CLI and daemon return the same PERMISSION_DENIED code for the same operation.
+5. `enforcement-surfaces.md` table updated with Phase 50 findings.
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/security tests/web tests/mcp -q
+cd python && uv run pytest tests/ -q
+bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md docs/security/enforcement-surfaces.md
+```
+
+### Known Risks
+- `run_events_sse` endpoint trust check deferred to Phase 52 SSE hardening (trust at connect time).
+- Provider/routing/account endpoints not yet workspace-scoped; no workspace data exposed.

@@ -351,3 +351,50 @@ P0 policy defaults:
 - container execution requires `ARC_ENABLE_CONTAINER_SANDBOX=1`.
 
 MicroVM status: doctor/preflight only. Linux checks Firecracker/Cloud Hypervisor and `/dev/kvm`. macOS checks Lima/VZ availability. Windows is explicitly unsupported for this phase.
+
+---
+
+### Phase 50 — Trust Enforcement Surface Audit (R16 derivative)
+
+**Last updated:** 2026-05-27  
+**Status:** Baseline Complete  
+**Audit scope:** All workspace-sensitive HTTP routes in `web/routes.py` + MCP tool/resource handlers.
+
+#### Audit findings and gap closure
+
+Pre-Phase 50 gap: eleven routes in `web/routes.py` read workspace-local data (traces, context, arena runs) without first calling `enforce_workspace_trust`. An untrusted workspace could oracle-probe run IDs and leak trace contents via 404 vs 500 distinction. All gaps are now closed.
+
+#### Phase 50 Surface Table
+
+| Surface | Route/Command | Trust checked | Order (before/after read) | Test | Gap status |
+|---------|---------------|---------------|--------------------------|------|------------|
+| `sessions_write` | `POST /api/sessions/write` | `enforce_workspace_trust` | before session save | `test_session_daemon_routes.py::test_sessions_write_untrusted_workspace` | closed pre-P50 |
+| `sessions_delete` | `DELETE /api/sessions/{id}` | `enforce_workspace_trust` | before existence check | `test_session_daemon_routes.py::test_sessions_delete_untrusted_workspace_checks_trust_before_existence` | closed pre-P50 |
+| `sessions_update` | `PATCH /api/sessions/{id}` | `enforce_workspace_trust` | before session load | `test_session_daemon_routes.py::test_sessions_update_untrusted_workspace_checks_trust_before_load` | closed pre-P50 |
+| `start_run` | `POST/GET /api/runs/start` | `enforce_workspace_trust` | before runtime resolution | `test_phase50_trust_surface_audit.py::test_start_run_post_untrusted_returns_403` | **closed P50** |
+| `list_runs` | `GET /api/runs` | `enforce_workspace_trust` | before trace store read | `test_phase50_trust_surface_audit.py::test_list_runs_untrusted_returns_403` | **closed P50** |
+| `get_run` | `GET /api/runs/{run_id}` | `enforce_workspace_trust` | before trace load (oracle-leak guard) | `test_phase50_trust_surface_audit.py::test_get_run_untrusted_returns_403_not_404` | **closed P50** |
+| `context_pack` | `GET /api/context/pack` | `enforce_workspace_trust` | before workspace file scan | `test_phase50_trust_surface_audit.py::test_context_pack_untrusted_returns_403` | **closed P50** |
+| `run_links` | `GET /api/runs/{run_id}/links` | `enforce_workspace_trust` | before trace load (oracle-leak guard) | `test_phase50_trust_surface_audit.py::test_run_links_untrusted_returns_403_not_404` | **closed P50** |
+| `export_trace` | `POST /api/telemetry/export/{run_id}` | `enforce_workspace_trust` | before trace load (oracle-leak guard) | `test_phase50_trust_surface_audit.py::test_export_trace_untrusted_returns_403_not_404` | **closed P50** |
+| `runs_diff` | `GET /api/runs/diff` | `enforce_workspace_trust` | before both trace loads | `test_phase50_trust_surface_audit.py::test_runs_diff_untrusted_returns_403` | **closed P50** |
+| `runs_eval` | `POST /api/evals/run` | `enforce_workspace_trust` | before trace load (oracle-leak guard) | `test_phase50_trust_surface_audit.py::test_runs_eval_untrusted_returns_403_not_404` | **closed P50** |
+| `arena_chat` | `POST /api/arena/chat` | `enforce_workspace_trust` | before arena request processing | `test_phase50_trust_surface_audit.py::test_arena_chat_untrusted_returns_403` | **closed P50** |
+| `arena_vote` | `POST /api/arena/vote` | `enforce_workspace_trust` | before run existence check (oracle-leak guard) | `test_phase50_trust_surface_audit.py::test_arena_vote_untrusted_returns_403_not_404` | **closed P50** |
+| `arena_adopt` | `POST /api/arena/adopt` | `enforce_workspace_trust` | before workspace patch apply | `test_phase50_trust_surface_audit.py::test_arena_adopt_untrusted_returns_403` | **closed P50** |
+| MCP tool/resource handlers | all `@mcp.tool()` / `@mcp.resource()` | `ensure_trusted()` per call via `_tool_result()` | before callback execution | `tests/mcp/test_mcp_server.py` | closed pre-P50 |
+
+#### Consistency verification
+
+- All 14 surfaces return HTTP 403 + `ArcErrorCode.PERMISSION_DENIED` on untrusted workspace.
+- No surface leaks existence (oracle-leak pattern): trust check precedes the first data read in all cases.
+- CLI and daemon paths use the same `_session_error(exc, 500)` handler which maps `TrustEnforcementError` → 403 PERMISSION_DENIED.
+- MCP path uses `ensure_trusted()` → `WorkspaceUntrusted` → `_error_json(PERMISSION_DENIED, ...)`.
+- Parity test: `test_trust_enforcement_error_code_consistent_across_surfaces` verifies all 11 newly-hardened routes return the same code.
+
+#### Remaining known gaps (not in scope for P50)
+
+- `/health`, `/api/inspect`, `/api/runtimes`, `/api/runtimes/capabilities`, `/api/workflows`, `/api/schemas` — diagnostic/detection endpoints; no workspace-private data exposed. Annotated not-applicable.
+- `/api/providers/*` — provider account/routing config; not workspace-scoped. Future ADR may add workspace-level provider isolation.
+- `/api/arena/models`, `/api/arena/tags`, `/api/arena/rankings` — read-only model metadata, not workspace-private data.
+- `run_events_sse` (`GET /api/runs/{run_id}/events`) — SSE endpoint; trust check deferred pending Phase 52 SSE hardening which adds trust at connect time.

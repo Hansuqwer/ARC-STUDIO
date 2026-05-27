@@ -1,5 +1,9 @@
 """Web-route test plumbing. Discovers the FastAPI/aiohttp app factory and yields
 an httpx.AsyncClient bound to it via ASGI transport — never the network.
+
+Phase 50 note: enforce_workspace_trust is patched to a no-op for all tests that
+use the conftest ``client`` fixture. Tests in test_phase50_trust_surface_audit.py
+and test_session_daemon_routes.py manage trust patching explicitly per test.
 """
 
 from __future__ import annotations
@@ -7,8 +11,11 @@ from __future__ import annotations
 import importlib
 import pathlib
 from typing import Any
+from unittest.mock import patch
 
 import pytest
+
+_TRUST_PATH = "agent_runtime_cockpit.web.routes.enforce_workspace_trust"
 
 
 def _resolve_app(workspace: pathlib.Path) -> Any:
@@ -52,7 +59,18 @@ async def app(workspace):
 
 
 @pytest.fixture
-async def client(app):
+def trust_allowed():
+    """Autouse-eligible fixture: patches enforce_workspace_trust to a no-op.
+
+    Import and use this fixture in individual tests to bypass trust checks,
+    or see the ``client`` fixture below which uses it automatically.
+    """
+    with patch(_TRUST_PATH) as mock_trust:
+        yield mock_trust
+
+
+@pytest.fixture
+async def client(app, trust_allowed):
     import httpx
     from aiohttp import web
 

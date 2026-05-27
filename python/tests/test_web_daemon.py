@@ -1,13 +1,29 @@
 import json
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
+import pytest
 from aiohttp import ClientSession
 from aiohttp.web import AppRunner, TCPSite
 
 from agent_runtime_cockpit.protocol.schemas import RunEvent, RunRecord, RunStatus
 from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
 from agent_runtime_cockpit.web.server import create_app
+
+_TRUST = "agent_runtime_cockpit.web.routes.enforce_workspace_trust"
+
+
+@pytest.fixture(autouse=True)
+def _bypass_trust_for_daemon_integration_tests():
+    """Phase 50: patch trust for all daemon integration tests.
+
+    These tests exercise runtime routing, SSE, and run lifecycle behavior —
+    not workspace trust enforcement. Trust is explicitly tested in
+    tests/web/test_phase50_trust_surface_audit.py.
+    """
+    with patch(_TRUST):
+        yield
 
 
 def _write_swarmgraph_cli(tools_dir: Path) -> Path:

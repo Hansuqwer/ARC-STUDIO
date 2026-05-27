@@ -367,6 +367,11 @@ async def schemas(request: web.Request) -> web.Response:
 async def start_run(request: web.Request) -> web.Response:
     """Start a run. GET is legacy; POST JSON is canonical. Both share runtime routing."""
     t0 = time.time()
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "start_run", "daemon-start-run", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
     body: dict = {}
     if request.method == "POST":
         try:
@@ -390,7 +395,6 @@ async def start_run(request: web.Request) -> web.Response:
     runtime_ids = runtime if isinstance(runtime, list) else [runtime]
     if any(runtime_id not in RUNTIME_IDS for runtime_id in runtime_ids):
         return _json(err("invalid_runtime", f"Invalid runtime: {runtime}").model_dump(), 400)
-    workspace = _workspace(request)
     allow_paid_calls = bool(body.get("allow_paid_calls")) or request.query.get(
         "allow_paid_calls", ""
     ).lower() in {"1", "true", "yes"}
@@ -456,6 +460,11 @@ async def start_run(request: web.Request) -> web.Response:
 
 
 async def get_run(request: web.Request) -> web.Response:
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "get_run", "daemon-get-run", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
     run_id = request.match_info["run_id"]
     run = _trace_store(request).load(run_id)
     if not run:
@@ -464,6 +473,11 @@ async def get_run(request: web.Request) -> web.Response:
 
 
 async def list_runs(request: web.Request) -> web.Response:
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "list_runs", "daemon-list-runs", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
     store = _trace_store(request)
     run_ids = store.list_runs()
     runs = [r for rid in run_ids if (r := store.load(rid)) is not None]
@@ -474,8 +488,12 @@ async def list_runs(request: web.Request) -> web.Response:
 
 
 async def context_pack(request: web.Request) -> web.Response:
-    task = request.query.get("task", "agent runtime inspection")
     workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "context_pack", "daemon-context-pack", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
+    task = request.query.get("task", "agent runtime inspection")
     entries = ctx_gen.generate(task, workspace, save=True)
     # Redact before sending to frontend
     safe = [redactor.redact_dict(e.model_dump()) for e in entries]
@@ -742,6 +760,11 @@ async def run_links(request: web.Request) -> web.Response:
         by the chosen stable ID type.
       - ``stable_id``: optional single ID to narrow results.
     """
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "run_links", "daemon-run-links", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
     run_id = request.match_info["run_id"]
     run = _trace_store(request).load(run_id)
     if not run:
@@ -804,6 +827,11 @@ async def run_links(request: web.Request) -> web.Response:
 
 async def export_trace(request: web.Request) -> web.Response:
     """Export run trace to OTLP endpoint."""
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "export_trace", "daemon-export-trace", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
     run_id = request.match_info["run_id"]
 
     try:
@@ -841,6 +869,11 @@ async def export_trace(request: web.Request) -> web.Response:
 
 async def runs_diff(request: web.Request) -> web.Response:
     """Compare two runs by run IDs: GET /api/runs/diff?run_a=...&run_b=..."""
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "runs_diff", "daemon-runs-diff", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
     run_a_id = request.query.get("run_a", "")
     run_b_id = request.query.get("run_b", "")
     if not run_a_id or not run_b_id:
@@ -856,6 +889,11 @@ async def runs_diff(request: web.Request) -> web.Response:
 
 async def runs_eval(request: web.Request) -> web.Response:
     """Evaluate a run against a golden trace: POST /api/evals/run."""
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "runs_eval", "daemon-runs-eval", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
     from ..evals.golden import GoldenTrace, eval_run
 
     body = await request.json()
@@ -893,6 +931,10 @@ async def arena_chat(request: web.Request) -> web.Response:
     """
     t0 = time.time()
     workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "arena_chat", "daemon-arena-chat", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
     try:
         body = await request.json()
     except Exception:
@@ -944,6 +986,11 @@ async def arena_chat(request: web.Request) -> web.Response:
 
 async def arena_vote(request: web.Request) -> web.Response:
     """POST /api/arena/vote — record a vote for a battle candidate."""
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "arena_vote", "daemon-arena-vote", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
     try:
         body = await request.json()
     except Exception:
@@ -982,12 +1029,15 @@ async def arena_vote(request: web.Request) -> web.Response:
 
 async def arena_adopt(request: web.Request) -> web.Response:
     """POST /api/arena/adopt — adopt a candidate's code patch."""
+    ws = _workspace(request)
+    try:
+        enforce_workspace_trust(ws, "arena_adopt", "daemon-arena-adopt", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
     try:
         body = await request.json()
     except Exception:
         return _json(err(ArcErrorCode.INVALID_INPUT, "Invalid JSON body").model_dump(), 400)
-
-    ws = _workspace(request)
     req = ArenaAdoptRequest.model_validate(body)
     req.workspace = str(ws)
     result = adopt_candidate(ws, req)

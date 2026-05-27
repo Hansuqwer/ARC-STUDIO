@@ -3,11 +3,15 @@
 These tests verify the middleware in python/src/agent_runtime_cockpit/web/server.py.
 See docs/SECURITY_AUDIT_REPORT.md R-6 for design details.
 """
+
 from __future__ import annotations
 
 import os
+from unittest.mock import patch
 
 import pytest
+
+_TRUST = "agent_runtime_cockpit.web.routes.enforce_workspace_trust"
 
 pytestmark = pytest.mark.asyncio
 
@@ -62,10 +66,11 @@ async def test_request_with_correct_token_succeeds(app):
 
     os.environ["ARC_DAEMON_TOKEN"] = "correct-token"
     try:
-        async with TestServer(app) as server:
-            async with TestClient(server) as c:
-                r = await c.get("/api/runs", headers={"Authorization": "Bearer correct-token"})
-                assert r.status == 200
+        with patch(_TRUST):
+            async with TestServer(app) as server:
+                async with TestClient(server) as c:
+                    r = await c.get("/api/runs", headers={"Authorization": "Bearer correct-token"})
+                    assert r.status == 200
     finally:
         os.environ.pop("ARC_DAEMON_TOKEN", None)
 
