@@ -9,6 +9,7 @@ import platform
 import subprocess
 import shutil
 import stat
+import uuid
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
@@ -128,7 +129,19 @@ READ_ONLY_COMMANDS = {
     "wc",
 }
 NETWORK_COMMANDS = {"curl", "wget", "ssh", "scp", "rsync", "nc", "telnet", "ping"}
-INSTALL_COMMANDS = {"pip", "uv", "npm", "pnpm", "yarn", "brew", "apt", "apt-get", "dnf", "yum"}
+INSTALL_COMMANDS = {
+    "pip",
+    "pip3",
+    "uv",
+    "npm",
+    "pnpm",
+    "yarn",
+    "brew",
+    "apt",
+    "apt-get",
+    "dnf",
+    "yum",
+}
 DESTRUCTIVE_COMMANDS = {"rm", "rmdir", "mv", "dd", "mkfs", "truncate", "shred"}
 PRIVILEGED_COMMANDS = {
     "sudo",
@@ -144,8 +157,9 @@ PRIVILEGED_COMMANDS = {
 WRITE_SHELL_TOKENS = {">", ">>", "tee"}
 SHELL_COMMANDS = {"sh", "bash", "zsh"}
 INTERPRETERS = {"python", "python3", "node", "ruby", "perl"}
-WRITE_COMMANDS = {"touch", "mkdir", "ln", "cp", "unzip", "install"}
-GIT_DESTRUCTIVE_SUBCOMMANDS = {"clean", "rm"}
+WRITE_COMMANDS = {"touch", "mkdir", "ln", "cp", "tee", "unzip", "install"}
+GIT_DESTRUCTIVE_SUBCOMMANDS = {"branch", "clean", "checkout", "restore", "rm", "switch", "worktree"}
+GIT_NETWORK_SUBCOMMANDS = {"clone", "fetch", "pull", "push", "remote", "submodule"}
 GIT_HARD_RESET = {"reset", "--hard"}
 GIT_CHECKOUT_FORCE = {"checkout", "--"}
 PACKAGE_MANAGER_MODULES = {"pip"}
@@ -154,6 +168,8 @@ NODE_NETWORK_HINTS = {"http", "https", "net", "dgram", "fetch", "axios", "node-f
 RUBY_NETWORK_HINTS = {"socket", "net/http", "open-uri", "httparty", "faraday"}
 PERL_NETWORK_HINTS = {"LWP", "HTTP::Tiny", "IO::Socket", "Net::HTTP", "Mojo::UserAgent"}
 SHELL_NETWORK_HINTS = {"curl", "wget", "nc", "ssh", "scp", "rsync", "ping"}
+SHELL_PRIVILEGED_HINTS = {"sudo", "su ", "doas", "chmod", "chown", "mount", "umount"}
+SHELL_DESTRUCTIVE_HINTS = {"rm ", "rm -", "rmdir", "dd ", "mkfs", "truncate", "shred"}
 WRITE_HINTS = {"open", "write_text", "write_bytes", "Path("}
 
 
@@ -203,11 +219,19 @@ def classify_command(command: list[str]) -> CommandClassification:
     if exe in PRIVILEGED_COMMANDS:
         return CommandClassification.PRIVILEGED
     if exe == "git":
-        if args and args[0] in GIT_DESTRUCTIVE_SUBCOMMANDS:
+        if args and args[0] in GIT_NETWORK_SUBCOMMANDS:
+            return CommandClassification.NETWORK
+        if args and args[0] in {"clean", "rm", "worktree"}:
             return CommandClassification.DESTRUCTIVE
         if args[:1] == ["reset"] and "--hard" in args:
             return CommandClassification.DESTRUCTIVE
-        if args[:1] == ["checkout"] and "--" in args:
+        if args[:1] == ["checkout"] and ("--" in args or "-f" in args or "--force" in args):
+            return CommandClassification.DESTRUCTIVE
+        if args[:1] == ["restore"] and ({"--worktree", "--staged"} & set(args)):
+            return CommandClassification.DESTRUCTIVE
+        if args[:1] == ["switch"] and ("-f" in args or "--force" in args):
+            return CommandClassification.DESTRUCTIVE
+        if args[:1] == ["branch"] and ("-D" in args or "--delete" in args):
             return CommandClassification.DESTRUCTIVE
     if exe == "find":
         if "-delete" in args or ("-exec" in args and any(Path(a).name == "rm" for a in args)):
@@ -221,7 +245,7 @@ def classify_command(command: list[str]) -> CommandClassification:
     if exe in NETWORK_COMMANDS:
         return CommandClassification.NETWORK
     if exe in INSTALL_COMMANDS:
-        install_markers = {"install", "add", "update", "upgrade", "sync"}
+        install_markers = {"i", "install", "add", "update", "upgrade", "sync"}
         if exe in {"brew", "apt", "apt-get", "dnf", "yum"} or install_markers.intersection(args):
             return CommandClassification.INSTALL
     if exe == "install":
@@ -233,11 +257,15 @@ def classify_command(command: list[str]) -> CommandClassification:
     if exe in {"python", "python3"}:
         if len(args) >= 2 and args[0] == "-m" and args[1] in PACKAGE_MANAGER_MODULES:
             return CommandClassification.INSTALL
+        if len(args) >= 4 and args[:3] == ["-m", "uv", "pip"] and args[3] in {"install", "sync"}:
+            return CommandClassification.INSTALL
         code = " ".join(args)
         if any(hint in code for hint in NETWORK_HINTS):
             return CommandClassification.NETWORK
-        if any(hint in code for hint in WRITE_HINTS) and any(
-            mode in code for mode in ("'w'", '"w"', "'a'", '"a"')
+        if any(hint in code for hint in WRITE_HINTS) and (
+            any(mode in code for mode in ("'w'", '"w"', "'a'", '"a"', "'wb'", '"wb"'))
+            or "write_text" in code
+            or "write_bytes" in code
         ):
             return CommandClassification.WRITES_WORKSPACE
         if "-c" in args and "print(" in code:
@@ -255,8 +283,12 @@ def classify_command(command: list[str]) -> CommandClassification:
         if any(hint in code for hint in NETWORK_HINTS):
             return CommandClassification.NETWORK
         return CommandClassification.UNKNOWN
-    if exe in SHELL_COMMANDS and "-c" in args:
+    if exe in SHELL_COMMANDS and any(arg in {"-c", "-lc"} for arg in args):
         code = " ".join(args)
+        if any(hint in code for hint in SHELL_PRIVILEGED_HINTS):
+            return CommandClassification.PRIVILEGED
+        if any(hint in code for hint in SHELL_DESTRUCTIVE_HINTS):
+            return CommandClassification.DESTRUCTIVE
         if any(hint in code for hint in SHELL_NETWORK_HINTS):
             return CommandClassification.NETWORK
         if any(hint in code for hint in NETWORK_HINTS):
@@ -283,7 +315,7 @@ def validate_command_paths(command: list[str], policy: SandboxPolicy) -> None:
     paths = _extract_path_intents(command)
     if classification == CommandClassification.READ_ONLY:
         for path in paths:
-            if Path(path).is_absolute() and not _path_within_workspace(path, root):
+            if not _path_within_workspace(path, root):
                 raise SandboxPathViolation(f"read path escapes workspace: {path}")
         return
     if classification != CommandClassification.WRITES_WORKSPACE:
@@ -387,6 +419,16 @@ def _extract_python_code_paths(code: str) -> list[str]:
                 first = node.args[0]
                 if isinstance(first, ast.Constant) and isinstance(first.value, str):
                     paths.append(first.value)
+            if name in {"write_text", "write_bytes"} and isinstance(func, ast.Attribute):
+                target = func.value
+                if (
+                    isinstance(target, ast.Call)
+                    and getattr(target.func, "id", "") == "Path"
+                    and target.args
+                ):
+                    first = target.args[0]
+                    if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                        paths.append(first.value)
     return paths
 
 
@@ -659,7 +701,9 @@ def build_audit_event(
     redaction_applied: bool,
 ) -> dict[str, Any]:
     """Build a stable sandbox audit event payload."""
+    audit_id = f"sandbox-{uuid.uuid4().hex}"
     return {
+        "audit_id": audit_id,
         "type": "SANDBOX_COMMAND" if decision.allowed else "SANDBOX_DENIED",
         "command": command,
         "cwd": str(cwd),
@@ -700,7 +744,9 @@ def build_microvm_audit_event(
     public ``MicroVMIsolationProvider.execute()`` is available.
     """
     allowed = exit_code == 0 and network_proof_passed
+    audit_id = f"microvm-{uuid.uuid4().hex}"
     return {
+        "audit_id": audit_id,
         "type": "MICROVM_COMMAND" if allowed else "MICROVM_DENIED",
         "command": command,
         "cwd": str(workspace_root),
@@ -1203,7 +1249,42 @@ def persist_sandbox_audit_event(event: dict[str, Any], audit_dir: Path | None = 
     with chain_path.open("a", encoding="utf-8") as fp:
         fp.write(json.dumps(record, separators=(",", ":")) + "\n")
     _persist_hmac_sandbox_event(event, target_dir)
+    _persist_local_event_log_sandbox_event(event)
     return chain_path
+
+
+def _persist_local_event_log_sandbox_event(event: dict[str, Any]) -> None:
+    """Best-effort mirror into the local/recent ARC event log."""
+    try:
+        from ..events.persistence import get_writer
+        from ..events.types import ArcEvent
+
+        get_writer().write(
+            ArcEvent(
+                event_type="sandbox_command",
+                payload={
+                    "audit_id": event.get("audit_id"),
+                    "sandbox_type": event.get("type"),
+                    "command": event.get("command", []),
+                    "cwd": event.get("cwd"),
+                    "classification": event.get("classification"),
+                    "decision": event.get("decision", {}),
+                    "policy": event.get("policy"),
+                    "provider": event.get("provider"),
+                    "runtime": event.get("runtime"),
+                    "allowed": event.get("allowed"),
+                    "reason": event.get("reason"),
+                    "started_at": event.get("started_at"),
+                    "ended_at": event.get("ended_at"),
+                    "exit_code": event.get("exit_code"),
+                    "stdout_truncated": event.get("stdout_truncated", False),
+                    "stderr_truncated": event.get("stderr_truncated", False),
+                    "redaction_applied": event.get("redaction_applied", False),
+                },
+            )
+        )
+    except Exception:
+        return
 
 
 def _persist_hmac_sandbox_event(event: dict[str, Any], audit_dir: Path) -> None:
@@ -1235,7 +1316,15 @@ def verify_sandbox_audit(audit_dir: Path | None = None) -> dict[str, Any]:
             "events": str(events_path),
             "reason": "sandbox audit files not found",
         }
-    ok, reason = verify(chain_path, events_path)
+    try:
+        ok, reason = verify(chain_path, events_path)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "chain": str(chain_path),
+            "events": str(events_path),
+            "reason": f"malformed sandbox audit log: {exc}",
+        }
     return {"ok": ok, "chain": str(chain_path), "events": str(events_path), "reason": reason}
 
 
@@ -1245,27 +1334,75 @@ def list_sandbox_audit_events(
     allowed: bool | None = None,
     classification: str | None = None,
     provider: str | None = None,
+    command_contains: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
     limit: int = 50,
 ) -> dict[str, Any]:
     """List sandbox audit events with simple filters."""
     target_dir = audit_dir or sandbox_audit_dir()
     events_path = target_dir / "sandbox.events.jsonl"
     if not events_path.exists():
-        return {"events": [], "path": str(events_path), "count": 0}
-    events = [
-        json.loads(line)
-        for line in events_path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+        return _sandbox_audit_list_result([], events_path, malformed=0)
+    events: list[dict[str, Any]] = []
+    malformed = 0
+    for line in events_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            malformed += 1
+            continue
+        if isinstance(parsed, dict):
+            events.append(parsed)
+        else:
+            malformed += 1
     if allowed is not None:
         events = [event for event in events if event.get("allowed") is allowed]
     if classification:
         events = [event for event in events if event.get("classification") == classification]
     if provider:
         events = [event for event in events if event.get("provider") == provider]
+    if command_contains:
+        events = [event for event in events if command_contains in _audit_command_text(event)]
+    if since:
+        events = [event for event in events if str(event.get("started_at", "")) >= since]
+    if until:
+        events = [event for event in events if str(event.get("started_at", "")) <= until]
     if limit >= 0:
         events = events[-limit:]
-    return {"events": events, "path": str(events_path), "count": len(events)}
+    return _sandbox_audit_list_result(events, events_path, malformed=malformed)
+
+
+def _audit_command_text(event: dict[str, Any]) -> str:
+    command = event.get("command", [])
+    if isinstance(command, list):
+        return " ".join(str(part) for part in command)
+    return str(command)
+
+
+def _sandbox_audit_list_result(
+    events: list[dict[str, Any]], events_path: Path, *, malformed: int
+) -> dict[str, Any]:
+    return {
+        "events": events,
+        "path": str(events_path),
+        "count": len(events),
+        "source": "local_sandbox_audit",
+        "summary_semantics": "local_recent_derived_not_global",
+        "degraded": malformed > 0,
+        "malformed": malformed,
+    }
+
+
+def get_sandbox_audit_event(audit_id: str, audit_dir: Path | None = None) -> dict[str, Any]:
+    """Return a single sandbox audit event by ID."""
+    result = list_sandbox_audit_events(audit_dir, limit=-1)
+    for event in result["events"]:
+        if event.get("audit_id") == audit_id:
+            return {"event": event, "path": result["path"], "found": True}
+    return {"event": None, "path": result["path"], "found": False}
 
 
 def render_lima_template(workspace_root: Path, instance_name: str = "arc-sandbox") -> str:

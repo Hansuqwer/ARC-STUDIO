@@ -2676,6 +2676,123 @@ pnpm typecheck
 ### Blocker
 - No reviewed real sample dataset was provided or present in the repository.
 
+## Phase 68 — Firecracker Proof Runner Hardening
+
+**Roadmap:** R38 / ADR-024 host proof  
+**Status:** Baseline Complete | Evidence: local unit/fake tests only; real Linux/KVM proof remains host-gated and skipped on macOS  
+**Depends on:** Phase 62, Phase 66
+
+### Deliverables
+1. Firecracker proof runner now treats proof success as all guest markers passing: no default route, network failure, sentinel read, and symlink escape blocked.
+2. Proof runner cleans temporary workspace sentinel/symlink files after attempts.
+3. Public `MicroVMIsolationProvider.execute()` remains blocked; this is not public microVM execution.
+
+### Acceptance
+1. Normal CI/macOS tests do not require Firecracker, `/dev/kvm`, kernel, or rootfs.
+2. Fake-process tests cover full marker success and partial-marker failure.
+3. Real-host proof remains gated by Linux, `/dev/kvm`, `firecracker`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, and explicit kernel/rootfs paths.
+
+### Known Risks
+- Real Firecracker proof execution still requires an external Linux/KVM host and bootable proof rootfs; this environment cannot provide that evidence.
+
+## Phase 69 — Sandbox Audit Trail Hardening
+
+**Roadmap:** R38 sandbox audit foundation  
+**Status:** Baseline Complete | Evidence: local CLI tests for audit IDs, event-log mirror, command filter, and show command  
+**Depends on:** Phase 63, Phase 65
+
+### Deliverables
+1. Sandbox audit events include `audit_id` for allowed, denied, and microVM harness events.
+2. Sandbox audit persistence best-effort mirrors a typed `sandbox_command` event into the local/recent `.arc/events/event-log.jsonl` stream.
+3. `arc sandbox audit-list` supports command/time filters.
+4. `arc sandbox audit-show <audit_id>` returns one local event.
+
+### Acceptance
+1. Hash-chain sandbox audit remains intact.
+2. Event-log mirror is best-effort and local/recent; it is not canonical global audit state.
+3. CLI JSON remains stable for list/show.
+
+### Known Risks
+- Audit mirror does not imply shared-server, remote sync, or complete audit coverage.
+
+## Phase 70 — Reviewed Memory Evidence Pack Gate
+
+**Roadmap:** R26 memory evidence follow-up  
+**Status:** Blocked | Evidence: repository scan still found no reviewed real fixture pack  
+**Depends on:** Phase 64, Phase 67
+
+### Deliverables
+1. No synthetic reviewed fixture pack was added.
+2. Existing evaluator/CLI remain available for a future real reviewed pack.
+3. Runtime memory prompt wiring remains disabled.
+
+### Acceptance
+1. Phase remains blocked until a reviewed real sample dataset exists.
+2. Evidence pack `proceed` remains a research-gate result only.
+3. Docs preserve local-only/offline memory status.
+
+### Blocker
+- No reviewed real memory evidence dataset exists in the repository or was supplied for this phase.
+
+## Phase 71 — Sandbox Audit Query UX And Stability
+
+**Roadmap:** R38 sandbox audit foundation  
+**Status:** Baseline Complete | Evidence: local CLI tests for nested audit list/show/verify, malformed-log degradation, and missing-ID behavior  
+**Depends on:** Phase 69
+
+### Deliverables
+1. Added nested aliases: `arc sandbox audit list`, `arc sandbox audit show <audit_id>`, and `arc sandbox audit verify`.
+2. Kept flat compatibility commands: `audit-list`, `audit-show`, and `audit-verify`.
+3. Audit list returns local/degraded metadata: `source`, `summary_semantics`, `degraded`, and `malformed`.
+4. Malformed raw audit event lines degrade list output instead of crashing.
+
+### Acceptance
+1. Flat and nested commands both work.
+2. Missing `audit_id` returns `found=false` and nonzero exit.
+3. Hash-chain verification behavior remains unchanged except malformed logs now return stable failure data.
+
+### Known Risks
+- Sandbox audit query UX is local-only and does not imply global, remote, or complete audit coverage.
+
+## Phase 72 — Firecracker Proof Artifact Builder Hardening
+
+**Roadmap:** R38 / ADR-024 proof artifacts  
+**Status:** Baseline Complete | Evidence: local artifact-generation/validation tests; no Firecracker/KVM required  
+**Depends on:** Phase 68
+
+### Deliverables
+1. Firecracker proof manifests now record generator version, marker contract version, generated timestamp, host OS/arch, proof commands, no-network flag, rootfs size, and tool paths.
+2. Manifest validation rejects network-interface configuration, missing marker/proof metadata, and unsafe init content such as package install or user-argv hooks.
+3. Added `arc sandbox firecracker-artifacts --output <dir> --json` to generate init/manifest only by default.
+
+### Acceptance
+1. Artifact generation works on macOS/no-KVM without Firecracker.
+2. Optional rootfs build remains gated by `ARC_FC_BUILD_PROOF_ROOTFS=1` and local tools only.
+3. No VM is booted and public microVM execution remains blocked.
+
+### Known Risks
+- Real Firecracker boot/rootfs proof still requires Linux/KVM and explicit kernel/rootfs artifacts.
+
+## Phase 73 — Subprocess Sandbox Regression/Fuzz Suite
+
+**Roadmap:** R38 classifier/path-intent hardening  
+**Status:** Baseline Complete | Evidence: local classifier/path regression tests and Hypothesis never-crash tests  
+**Depends on:** Phase 37, Phase 69
+
+### Deliverables
+1. Fixed read-only relative path escapes (`cat ../file`, `find ..`, etc.) by validating all extracted read paths against the workspace.
+2. Expanded classifier coverage for shell network/destructive/privileged hints, Git network/destructive forms, package-manager aliases, and `tee` writes.
+3. Added Python path-write extraction for `Path('/tmp/x').write_text(...)` / `write_bytes(...)` style calls.
+4. Added Hypothesis never-crash coverage for `classify_command` and `validate_command_paths`.
+
+### Acceptance
+1. Known dangerous command forms deny or classify consistently.
+2. Safe read-only basics remain allowed inside the workspace.
+3. This is classifier/path-intent hardening only, not syscall/kernel sandboxing.
+
+### Known Risks
+- Static classification is conservative and incomplete by design; unknown commands remain denied unless explicit policy/approval allows them.
+
 ### Critical Path
 
 ```

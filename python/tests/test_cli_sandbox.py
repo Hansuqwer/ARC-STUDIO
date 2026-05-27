@@ -145,9 +145,12 @@ def test_audit_event_emitted_for_allowed_command(tmp_path, monkeypatch):
     result = CliRunner().invoke(app, ["sandbox", "run", "--json", "--", "pwd"])
     event = _payload(result)["data"]["audit_event"]
     assert event["type"] == "SANDBOX_COMMAND"
+    assert event["audit_id"].startswith("sandbox-")
     assert event["allowed"] is True
     assert (tmp_path / "audit" / "sandbox.audit.jsonl").exists()
     assert (tmp_path / "audit" / "sandbox.events.jsonl").exists()
+    event_log = tmp_path / ".arc" / "events" / "event-log.jsonl"
+    assert '"event_type":"sandbox_command"' in event_log.read_text(encoding="utf-8")
 
 
 def test_denial_event_emitted_for_denied_command(tmp_path, monkeypatch):
@@ -158,6 +161,7 @@ def test_denial_event_emitted_for_denied_command(tmp_path, monkeypatch):
     )
     event = _payload(result)["data"]["audit_event"]
     assert event["type"] == "SANDBOX_DENIED"
+    assert event["audit_id"].startswith("sandbox-")
     assert event["allowed"] is False
     assert (tmp_path / "audit" / "sandbox.audit.jsonl").exists()
 
@@ -522,6 +526,77 @@ def test_sandbox_audit_list_filters(tmp_path, monkeypatch):
     assert data["events"][0]["allowed"] is False
 
 
+def test_sandbox_audit_list_command_filter_and_show(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
+    CliRunner().invoke(app, ["sandbox", "run", "--json", "--", "pwd"])
+    CliRunner().invoke(app, ["sandbox", "run", "--json", "--", "curl", "https://example.com"])
+    result = CliRunner().invoke(
+        app,
+        [
+            "sandbox",
+            "audit-list",
+            "--json",
+            "--audit-dir",
+            str(tmp_path / "audit"),
+            "--command-contains",
+            "curl",
+        ],
+    )
+    assert result.exit_code == 0
+    events = _payload(result)["data"]["events"]
+    assert len(events) == 1
+    audit_id = events[0]["audit_id"]
+    show = CliRunner().invoke(
+        app,
+        ["sandbox", "audit-show", audit_id, "--json", "--audit-dir", str(tmp_path / "audit")],
+    )
+    assert show.exit_code == 0
+    assert _payload(show)["data"]["event"]["audit_id"] == audit_id
+
+
+def test_sandbox_audit_nested_commands_and_malformed_log_degrade(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
+    CliRunner().invoke(app, ["sandbox", "run", "--json", "--", "pwd"])
+    events_path = tmp_path / "audit" / "sandbox.events.jsonl"
+    events_path.write_text(events_path.read_text(encoding="utf-8") + "not-json\n", encoding="utf-8")
+    result = CliRunner().invoke(
+        app,
+        ["sandbox", "audit", "list", "--json", "--audit-dir", str(tmp_path / "audit")],
+    )
+    assert result.exit_code == 0
+    data = _payload(result)["data"]
+    assert data["source"] == "local_sandbox_audit"
+    assert data["summary_semantics"] == "local_recent_derived_not_global"
+    assert data["degraded"] is True
+    assert data["malformed"] == 1
+    audit_id = data["events"][0]["audit_id"]
+    show = CliRunner().invoke(
+        app,
+        ["sandbox", "audit", "show", audit_id, "--json", "--audit-dir", str(tmp_path / "audit")],
+    )
+    assert show.exit_code == 0
+    verify = CliRunner().invoke(
+        app,
+        ["sandbox", "audit", "verify", "--json", "--audit-dir", str(tmp_path / "audit")],
+    )
+    assert verify.exit_code == 1
+    assert _payload(verify)["data"]["ok"] is False
+
+
+def test_sandbox_audit_nested_show_missing_id(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
+    CliRunner().invoke(app, ["sandbox", "run", "--json", "--", "pwd"])
+    result = CliRunner().invoke(
+        app,
+        ["sandbox", "audit", "show", "missing", "--json", "--audit-dir", str(tmp_path / "audit")],
+    )
+    assert result.exit_code == 4
+    assert _payload(result)["data"]["found"] is False
+
+
 def test_lima_template_requires_experimental_gate(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("ARC_MICROVM_EXPERIMENTAL", raising=False)
@@ -682,6 +757,17 @@ def test_classification_categories():
         (["ruby", "-e", "require 'socket'"], CommandClassification.NETWORK),
         (["perl", "-e", "use LWP::Simple"], CommandClassification.NETWORK),
         (["bash", "-c", "curl http://example.com"], CommandClassification.NETWORK),
+        (["bash", "-lc", "curl http://example.com"], CommandClassification.NETWORK),
+        (["bash", "-c", "rm -rf ."], CommandClassification.DESTRUCTIVE),
+        (["sh", "-c", "sudo id"], CommandClassification.PRIVILEGED),
+        (["git", "clone", "https://example.com/repo"], CommandClassification.NETWORK),
+        (["git", "pull"], CommandClassification.NETWORK),
+        (["git", "push"], CommandClassification.NETWORK),
+        (["git", "checkout", "-f"], CommandClassification.DESTRUCTIVE),
+        (["git", "restore", "--worktree", "."], CommandClassification.DESTRUCTIVE),
+        (["npm", "i", "x"], CommandClassification.INSTALL),
+        (["pip3", "install", "x"], CommandClassification.INSTALL),
+        (["python", "-m", "uv", "pip", "install", "x"], CommandClassification.INSTALL),
     ],
 )
 def test_adversarial_classification_matrix(command, classification):
@@ -791,6 +877,70 @@ def test_read_only_absolute_path_outside_workspace_denied(tmp_path, monkeypatch)
     assert result.exit_code == 2
 
 
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["cat", "../outside.txt"],
+        ["ls", ".."],
+        ["find", ".."],
+        ["sed", "-n", "1p", "../outside.txt"],
+    ],
+)
+def test_read_only_relative_path_outside_workspace_denied(command, tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (tmp_path / "outside.txt").write_text("secret", encoding="utf-8")
+    monkeypatch.chdir(workspace)
+    result = CliRunner().invoke(
+        app,
+        ["sandbox", "run", "--json", "--workspace", str(workspace), "--", *command],
+    )
+    assert result.exit_code == 2
+
+
+@pytest.mark.parametrize(
+    ("command", "exit_code"),
+    [
+        (["tee", "../outside.txt"], 2),
+        (["truncate", "-s", "0", "../outside.txt"], 3),
+        (["dd", "if=/dev/zero", "of=../outside.txt"], 3),
+        (["cp", "in.txt", "../outside.txt"], 2),
+        (["mkdir", "../outside-dir"], 2),
+        (["touch", "../outside.txt"], 2),
+    ],
+)
+def test_write_command_relative_escape_denied(command, exit_code, tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "in.txt").write_text("in", encoding="utf-8")
+    monkeypatch.chdir(workspace)
+    result = CliRunner().invoke(
+        app,
+        ["sandbox", "run", "--json", "--workspace", str(workspace), "--", *command],
+    )
+    assert result.exit_code == exit_code
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "open('../outside.txt','w').write('x')",
+        "open('/tmp/arc-out','wb').write(b'x')",
+        "from pathlib import Path; Path('/tmp/arc-out').write_text('x')",
+        "p='/tmp/arc-out'; open(p,'w').write('x')",
+    ],
+)
+def test_python_write_escape_variants_denied(code, tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.chdir(workspace)
+    result = CliRunner().invoke(
+        app,
+        ["sandbox", "run", "--json", "--workspace", str(workspace), "--", "python", "-c", code],
+    )
+    assert result.exit_code == 2
+
+
 def test_approval_rules_default_behavior(tmp_path, monkeypatch):
     """Test that approval_required is True by default for risky classifications."""
     monkeypatch.chdir(tmp_path)
@@ -798,9 +948,20 @@ def test_approval_rules_default_behavior(tmp_path, monkeypatch):
         app, ["policy", "explain", "--json", "--", "curl", "https://example.com"]
     )
     assert result.exit_code == 0
+
+
+def test_firecracker_artifacts_cli_generates_manifest_without_kvm(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    output = tmp_path / "fc-artifacts"
+    result = CliRunner().invoke(
+        app, ["sandbox", "firecracker-artifacts", "--json", "--output", str(output)]
+    )
+    assert result.exit_code == 0, result.output
     data = _payload(result)["data"]
-    assert data["decision"]["approval_required"] is True
-    assert data["decision"]["allowed"] is False
+    assert data["built_rootfs"] is False
+    assert (output / "arc-fc-proof-init.sh").exists()
+    assert (output / "rootfs-manifest.json").exists()
+    assert data["manifest"]["network_interfaces_configured"] is False
 
 
 def test_approval_rules_allow_policy(tmp_path, monkeypatch):

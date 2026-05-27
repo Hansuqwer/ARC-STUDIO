@@ -140,6 +140,12 @@ class EvalCompleted(ArcEvent):
     failures_count: int = 0
 
 
+class SandboxCommandEvent(ArcEvent):
+    """Local/recent mirror of a sandbox audit event."""
+
+    event_type: Literal["sandbox_command"] = "sandbox_command"
+
+
 EVENT_TYPE_MAP: dict[str, type[ArcEvent]] = {
     "hitl_required": HitlRequired,
     "hitl_decided": HitlDecided,
@@ -153,6 +159,7 @@ EVENT_TYPE_MAP: dict[str, type[ArcEvent]] = {
     "task_completed": TaskCompleted,
     "task_failed": TaskFailed,
     "eval_completed": EvalCompleted,
+    "sandbox_command": SandboxCommandEvent,
 }
 
 

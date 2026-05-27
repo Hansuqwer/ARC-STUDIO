@@ -1,14 +1,17 @@
 """Property-based tests for sandbox policy ``decide()`` and related functions."""
 
 from pathlib import Path
+import tempfile
 
 from hypothesis import assume, given, strategies as st
 
 from agent_runtime_cockpit.security.sandbox import (
     SandboxPolicy,
     CommandClassification,
+    classify_command,
     decide,
     cap_output,
+    validate_command_paths,
 )
 
 
@@ -39,3 +42,19 @@ def test_cap_output_never_raises(text: str, max_bytes: int):
     else:
         assert truncated is True
         assert len(capped.encode("utf-8")) <= max_bytes
+
+
+@given(st.lists(st.text(max_size=32), max_size=8))
+def test_classify_command_never_raises(command: list[str]):
+    result = classify_command(command)
+    assert isinstance(result, CommandClassification)
+
+
+@given(command=st.lists(st.text(max_size=32), max_size=8))
+def test_validate_command_paths_never_crashes(command: list[str]):
+    with tempfile.TemporaryDirectory() as tmp:
+        policy = SandboxPolicy(workspace_root=Path(tmp))
+        try:
+            validate_command_paths(command, policy)
+        except ValueError as exc:
+            assert str(exc)

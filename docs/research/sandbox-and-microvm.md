@@ -101,7 +101,8 @@ Real now:
 - Cloud Hypervisor proof scaffold emits no-`--net` argv/config, kernel/disk env diagnostics, and host gates; no VM is started by normal tests
 - macOS Lima preflight reports macOS version plus bounded `limactl --version` / `limactl list --json` probes; it does not create VMs
 - macOS Lima preflight reports `strict_network_isolation=false` and `security_posture=low_security_network_present`
-- sandbox audit still writes SHA256 chain/raw events and now best-effort mirrors to the keyed audit store when an audit key exists
+- sandbox audit still writes SHA256 chain/raw events, includes `audit_id`, best-effort mirrors a typed local/recent `sandbox_command` event to `.arc/events/event-log.jsonl`, and best-effort mirrors to the keyed audit store when an audit key exists
+- sandbox audit now has nested query aliases (`arc sandbox audit list/show/verify`) while flat commands remain compatible; malformed raw event lines degrade list output instead of crashing
 - keyed audit append creates parents, locks where portable, writes canonical JSON, flushes and fsyncs, and verification reports partial trailing lines
 - supervisor executor callbacks now have a central timeout wrapper that emits terminal `RUN_FAILED`, autopsy, receipt, and clears active state
 - path-intent extraction covers more common output/input switches (`--output`, `--outfile`, `--dest`, `--files-from`, `of=`), plus simple `cp`/`mv` destination and archive-output suffixes
@@ -109,7 +110,10 @@ Real now:
 - Lima/Firecracker harness attempts emit persisted `MICROVM_COMMAND`/`MICROVM_DENIED` sandbox audit events with `public_execution_enabled=false`
 - Private Firecracker proof runner now gates on Linux, `/dev/kvm` rw, `firecracker`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, `ARC_FIRECRACKER_KERNEL`, and `ARC_FIRECRACKER_ROOTFS`; it writes a no-NIC config file, starts Firecracker as a bounded process-group subprocess, records lifecycle/audit, and tears down the process group.
 - Firecracker guest proof marker parser and proof-only init snippet exist for stable `ARC_FC_PROOF no-default-route`, `network-failure`, `sentinel-read`, and `symlink-escape-blocked` markers. The parser accepts legacy underscore aliases where safe.
+- Phase 68 hardens the private proof runner so proof success requires both network and workspace markers and temporary sentinel/symlink files are cleaned after the attempt.
 - Firecracker proof rootfs/init artifact tooling exists: `generate_firecracker_proof_artifacts()` writes `arc-fc-proof-init.sh` and `rootfs-manifest.json`; optional ext4 build is opt-in via `ARC_FC_BUILD_PROOF_ROOTFS=1` and local `busybox`, `mkfs.ext4`, and `truncate` only. The scaffold now includes `/init`, `/sbin/init`, `/dev/console`, `/dev/null`, and proc/sysfs mount checks in manifest validation.
+- Firecracker proof manifests now include generator/marker contract metadata, host OS/arch, proof commands, no-network metadata, rootfs size, and tool paths. Static validation rejects unsafe init content and network-interface metadata.
+- Sandbox classifier/path-intent hardening now denies read-only relative path escapes and adds regressions for shell/Git/package/Python write variants. This remains static policy enforcement, not a syscall sandbox.
 
 Design-only now:
 - container provider as production fallback

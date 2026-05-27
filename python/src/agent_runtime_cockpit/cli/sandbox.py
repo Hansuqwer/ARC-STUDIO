@@ -8,7 +8,11 @@ from typing import Optional
 
 import typer
 
-from ..isolation.microvm import MicroVMIsolationProvider, build_microvm_run_plan
+from ..isolation.microvm import (
+    MicroVMIsolationProvider,
+    build_microvm_run_plan,
+    generate_firecracker_proof_artifacts,
+)
 from ..isolation.subprocess import SubprocessIsolationProvider
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
@@ -21,6 +25,7 @@ from ..security.sandbox import (
     build_audit_event,
     decide,
     ensure_workspace_cwd,
+    get_sandbox_audit_event,
     list_sandbox_audit_events,
     list_sandbox_policies,
     persist_sandbox_audit_event,
@@ -34,7 +39,7 @@ from ..security.sandbox import (
     verify_sandbox_audit,
 )
 from ._helpers import DEBUG_FLAG, JSON_FLAG, WORKSPACE_FLAG, _out, _setup_logging, _workspace
-from ._subapps import policy_app, sandbox_app
+from ._subapps import policy_app, sandbox_app, sandbox_audit_app
 
 
 def _policy(name: str, workspace: Path) -> SandboxPolicy:
@@ -66,6 +71,20 @@ def sandbox_audit_verify(
     debug: bool = DEBUG_FLAG,
 ) -> None:
     """Verify sandbox audit hash-chain against raw events."""
+    _sandbox_audit_verify_impl(audit_dir, json_output, debug)
+
+
+@sandbox_audit_app.command("verify")
+def sandbox_audit_verify_nested(
+    audit_dir: Optional[str] = typer.Option(None, "--audit-dir", help="Sandbox audit directory"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Verify sandbox audit hash-chain against raw events."""
+    _sandbox_audit_verify_impl(audit_dir, json_output, debug)
+
+
+def _sandbox_audit_verify_impl(audit_dir: Optional[str], json_output: bool, debug: bool) -> None:
     _setup_logging(debug)
     result = verify_sandbox_audit(Path(audit_dir).expanduser() if audit_dir else None)
     _out(ok(result), json_output)
@@ -83,20 +102,123 @@ def sandbox_audit_list(
         None, "--classification", help="Filter by classification"
     ),
     provider: Optional[str] = typer.Option(None, "--provider", help="Filter by provider"),
+    command_contains: Optional[str] = typer.Option(
+        None, "--command-contains", help="Filter by argv substring"
+    ),
+    since: Optional[str] = typer.Option(None, "--since", help="Filter started_at >= value"),
+    until: Optional[str] = typer.Option(None, "--until", help="Filter started_at <= value"),
     limit: int = typer.Option(50, "--limit", help="Maximum events to return"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
     """List sandbox audit events with optional filters."""
+    _sandbox_audit_list_impl(
+        audit_dir,
+        allowed,
+        classification,
+        provider,
+        command_contains,
+        since,
+        until,
+        limit,
+        json_output,
+        debug,
+    )
+
+
+@sandbox_audit_app.command("list")
+def sandbox_audit_list_nested(
+    audit_dir: Optional[str] = typer.Option(None, "--audit-dir", help="Sandbox audit directory"),
+    allowed: Optional[bool] = typer.Option(
+        None, "--allowed/--denied", help="Filter allowed or denied events"
+    ),
+    classification: Optional[str] = typer.Option(
+        None, "--classification", help="Filter by classification"
+    ),
+    provider: Optional[str] = typer.Option(None, "--provider", help="Filter by provider"),
+    command_contains: Optional[str] = typer.Option(
+        None, "--command-contains", help="Filter by argv substring"
+    ),
+    since: Optional[str] = typer.Option(None, "--since", help="Filter started_at >= value"),
+    until: Optional[str] = typer.Option(None, "--until", help="Filter started_at <= value"),
+    limit: int = typer.Option(50, "--limit", help="Maximum events to return"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """List sandbox audit events with optional filters."""
+    _sandbox_audit_list_impl(
+        audit_dir,
+        allowed,
+        classification,
+        provider,
+        command_contains,
+        since,
+        until,
+        limit,
+        json_output,
+        debug,
+    )
+
+
+def _sandbox_audit_list_impl(
+    audit_dir: Optional[str],
+    allowed: Optional[bool],
+    classification: Optional[str],
+    provider: Optional[str],
+    command_contains: Optional[str],
+    since: Optional[str],
+    until: Optional[str],
+    limit: int,
+    json_output: bool,
+    debug: bool,
+) -> None:
     _setup_logging(debug)
     result = list_sandbox_audit_events(
         Path(audit_dir).expanduser() if audit_dir else None,
         allowed=allowed,
         classification=classification,
         provider=provider,
+        command_contains=command_contains,
+        since=since,
+        until=until,
         limit=limit,
     )
     _out(ok(result), json_output)
+
+
+@sandbox_app.command("audit-show")
+def sandbox_audit_show(
+    audit_id: str = typer.Argument(..., help="Sandbox audit event ID"),
+    audit_dir: Optional[str] = typer.Option(None, "--audit-dir", help="Sandbox audit directory"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show one sandbox audit event by ID."""
+    _sandbox_audit_show_impl(audit_id, audit_dir, json_output, debug)
+
+
+@sandbox_audit_app.command("show")
+def sandbox_audit_show_nested(
+    audit_id: str = typer.Argument(..., help="Sandbox audit event ID"),
+    audit_dir: Optional[str] = typer.Option(None, "--audit-dir", help="Sandbox audit directory"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show one sandbox audit event by ID."""
+    _sandbox_audit_show_impl(audit_id, audit_dir, json_output, debug)
+
+
+def _sandbox_audit_show_impl(
+    audit_id: str, audit_dir: Optional[str], json_output: bool, debug: bool
+) -> None:
+    _setup_logging(debug)
+    result = get_sandbox_audit_event(
+        audit_id,
+        Path(audit_dir).expanduser() if audit_dir else None,
+    )
+    _out(ok(result), json_output)
+    if not result["found"]:
+        raise typer.Exit(4)
 
 
 @sandbox_app.command("lima-template")
@@ -143,6 +265,20 @@ def sandbox_microvm_plan(
         _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
         raise typer.Exit(2)
     _out(ok(plan.model_dump(mode="json"), workspace=str(ws)), json_output)
+
+
+@sandbox_app.command("firecracker-artifacts")
+def sandbox_firecracker_artifacts(
+    output: str = typer.Option(..., "--output", help="Output directory for proof artifacts"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Generate Firecracker proof init/manifest artifacts; does not boot a VM."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    report = generate_firecracker_proof_artifacts(Path(output).expanduser())
+    _out(ok(report.model_dump(mode="json"), workspace=str(ws)), json_output)
 
 
 @sandbox_app.command(

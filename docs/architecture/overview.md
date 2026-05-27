@@ -153,7 +153,9 @@ IsolationProvider
 The CLI sandbox path separates policy from execution:
 
 ```text
-argv -> CommandClassification -> SandboxDecision -> IsolationProvider -> SandboxResult/audit event
+argv -> CommandClassification -> SandboxDecision -> IsolationProvider -> SandboxResult/audit event -> local event-log mirror
 ```
 
-`subprocess` is the only real P0 execution provider. `microvm` intentionally performs preflight only and must not report command success until disposable VM execution, workspace mounting, network controls, teardown, and opt-in tests exist.
+`subprocess` is the only real P0 execution provider. `microvm` intentionally keeps public execution blocked; private Firecracker proof-runner code is host-gated for Linux/KVM proof collection only and must not report public command success until disposable VM execution, workspace mounting, network controls, teardown, and opt-in tests exist.
+
+Firecracker proof artifact generation is available as a local CLI utility for init/manifest review. It does not boot a VM and does not change the public microVM execution contract.

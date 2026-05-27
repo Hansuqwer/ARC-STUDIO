@@ -36,6 +36,8 @@ Phase 64 adds offline evidence packs:
 
 Evidence packs require `memory_runtime_injection=false`, privacy review, redaction applied, and at least 10 valid samples. `proceed` means research gate only; it does not enable runtime memory injection or productized memory.
 
+Phase 70 scan result: no reviewed real evidence pack exists in the repository. Existing tests use synthetic temporary fixtures to validate evaluator behavior only. Do not mark the reviewed-pack gate complete until a real reviewed dataset with provenance is supplied.
+
 ## Privacy Analysis
 
 - Memory is workspace-local only.

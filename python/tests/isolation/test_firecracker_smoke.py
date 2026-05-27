@@ -313,6 +313,14 @@ class TestFirecrackerProofRunner:
         assert "ARC_FC_PROOF no-default-route=1" in init_text
         manifest = validate_firecracker_proof_manifest(tmp_path / "rootfs-manifest.json")
         assert manifest.build_status == "init_manifest_only"
+        assert manifest.generator_version == "arc-firecracker-proof-v1"
+        assert manifest.marker_contract_version == 1
+        assert manifest.generated_at
+        assert manifest.host_os
+        assert manifest.host_arch
+        assert manifest.network_interfaces_configured is False
+        assert manifest.rootfs_size_mib == 32
+        assert ["ip", "route"] in manifest.proof_commands
         assert manifest.rootfs_path is None
         assert manifest.init_entrypoints == ["arc-fc-proof-init.sh"]
         assert manifest.device_nodes == []
@@ -334,7 +342,12 @@ class TestFirecrackerProofRunner:
             __import__("json").dumps(
                 {
                     "version": 1,
+                    "generator_version": "arc-firecracker-proof-v1",
+                    "marker_contract_version": 1,
                     "artifact": "arc-firecracker-proof-rootfs",
+                    "generated_at": "2026-05-27T00:00:00Z",
+                    "host_os": "Linux",
+                    "host_arch": "x86_64",
                     "init_path": str(init_path),
                     "init_sha256": hashlib.sha256(init_path.read_bytes()).hexdigest(),
                     "rootfs_path": None,
@@ -347,6 +360,10 @@ class TestFirecrackerProofRunner:
                     ],
                     "init_entrypoints": ["arc-fc-proof-init.sh"],
                     "device_nodes": [],
+                    "proof_commands": [["ip", "route"]],
+                    "network_interfaces_configured": False,
+                    "rootfs_size_mib": 32,
+                    "tools": {},
                     "build_status": "init_manifest_only",
                     "blockers": [],
                 }
@@ -381,6 +398,28 @@ class TestFirecrackerProofRunner:
         assert "missing tool: busybox" in report.blockers
         assert "missing tool: mkfs.ext4" in report.blockers
         assert "missing tool: truncate" in report.blockers
+
+    def test_proof_manifest_rejects_network_interface_flag(self, tmp_path):
+        report = generate_firecracker_proof_artifacts(tmp_path, build_rootfs=False)
+        manifest = report.manifest.model_copy(update={"network_interfaces_configured": True})
+        manifest_path = tmp_path / "rootfs-manifest.json"
+        manifest_path.write_text(manifest.model_dump_json(), encoding="utf-8")
+        with pytest.raises(ValueError, match="network interfaces"):
+            validate_firecracker_proof_manifest(manifest_path)
+
+    def test_proof_manifest_rejects_unsafe_init(self, tmp_path):
+        report = generate_firecracker_proof_artifacts(tmp_path, build_rootfs=False)
+        init_path = tmp_path / "arc-fc-proof-init.sh"
+        init_path.write_text(
+            init_path.read_text(encoding="utf-8") + "\napk add curl\n", encoding="utf-8"
+        )
+        manifest = report.manifest.model_copy(
+            update={"init_sha256": __import__("hashlib").sha256(init_path.read_bytes()).hexdigest()}
+        )
+        manifest_path = tmp_path / "rootfs-manifest.json"
+        manifest_path.write_text(manifest.model_dump_json(), encoding="utf-8")
+        with pytest.raises(ValueError, match="safety blockers"):
+            validate_firecracker_proof_manifest(manifest_path)
 
     def test_proof_manifest_gate_rejects_invalid_manifest(self, tmp_path, monkeypatch):
         manifest = tmp_path / "rootfs-manifest.json"
@@ -443,7 +482,53 @@ class TestFirecrackerProofRunner:
         assert result.workspace_sentinel_readable is True
         assert result.symlink_escape_blocked is True
         assert result.proof_blocker is None
+        assert result.result.exit_code == 0
         assert result.public_execution_enabled is False
+        assert not (tmp_path / "arc-sentinel.txt").exists()
+        assert not (tmp_path / "arc-host-escape-link").exists()
+
+    def test_proof_runner_requires_all_guest_markers_for_success(self, tmp_path, monkeypatch):
+        kernel = tmp_path / "vmlinux"
+        rootfs = tmp_path / "rootfs.ext4"
+        kernel.write_text("kernel", encoding="utf-8")
+        rootfs.write_text("rootfs", encoding="utf-8")
+        monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+        monkeypatch.setenv("ARC_FC_REAL_EXEC", "1")
+        monkeypatch.setenv("ARC_FIRECRACKER_KERNEL", str(kernel))
+        monkeypatch.setenv("ARC_FIRECRACKER_ROOTFS", str(rootfs))
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm.platform.system", lambda: "Linux"
+        )
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm._firecracker_binary",
+            lambda: "/usr/bin/firecracker",
+        )
+        original_exists = __import__("pathlib", fromlist=["Path"]).Path.exists
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm.Path.exists",
+            lambda self: True if str(self) == "/dev/kvm" else original_exists(self),
+        )
+        monkeypatch.setattr("agent_runtime_cockpit.isolation.microvm.os.access", lambda *_: True)
+
+        def fake_run(argv, *, timeout_seconds, max_bytes):
+            return (
+                __import__(
+                    "agent_runtime_cockpit.isolation.base", fromlist=["IsolationResult"]
+                ).IsolationResult(
+                    exit_code=0,
+                    stdout="ARC_FC_PROOF no-default-route=1\nARC_FC_PROOF network-failure=1\n",
+                    provider="microvm",
+                ),
+                None,
+            )
+
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm._run_firecracker_process", fake_run
+        )
+        result = FirecrackerProofRunner(workspace_root=tmp_path).run(["ip", "route"])
+        assert "guest_proof_failed" in result.lifecycle
+        assert result.result.exit_code == -1
+        assert "did not satisfy" in result.proof_blocker
 
 
 # ---------------------------------------------------------------------------

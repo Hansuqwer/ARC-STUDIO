@@ -287,7 +287,8 @@ Research note: Context7 Typer docs confirm `CliRunner` command tests and subcomm
 - privileged ownership/mode changes (`chmod`, `chown`, `sudo`, etc.) deny and are not approvable.
 - write-class commands with known path args must stay inside the workspace; symlink/outside/absolute escapes deny before subprocess execution.
 - path extraction covers known output/input flags, Python literal `open`/`write_text`/`write_bytes`, `dd of=`, simple `cp`/`mv` destinations, and archive output suffixes.
-- read-only absolute paths outside the workspace deny by default unless a future ADR documents a safe exception.
+- read-only absolute and relative paths outside the workspace deny by default unless a future ADR documents a safe exception.
+- shell, Git, package-manager, and Python write forms have regression coverage for known adversarial argv patterns.
 
 Limits: this is policy/classifier hardening, not syscall or kernel sandboxing. MicroVM remains preflight/doctor-only; container fallback remains gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`.
 
@@ -347,6 +348,9 @@ ARC now has a first-class sandbox CLI foundation:
 - `arc sandbox doctor --json` reports subprocess and microVM preflight state.
 - `arc sandbox audit-verify --json` verifies the sandbox audit chain.
 - `arc sandbox audit-list --json` reads persisted sandbox events with filters.
+- `arc sandbox audit-show <audit_id> --json` reads one local sandbox audit event.
+- `arc sandbox audit verify|list|show` are nested aliases for the same local audit operations.
+- `arc sandbox firecracker-artifacts --output <dir> --json` generates Firecracker proof init/manifest artifacts without booting a VM.
 - `arc policy list/show/validate` discovers and validates configured sandbox policies.
 
 P0 policy defaults:
@@ -359,8 +363,11 @@ P0 policy defaults:
 - timeout kills the POSIX process group.
 - stdout/stderr are capped and redacted.
 - every allowed/denied sandbox command returns an audit payload.
+- sandbox audit events include an `audit_id` correlation key.
 - sandbox audit events are persisted to an external hash-chain store by default.
+- sandbox audit events best-effort mirror a typed `sandbox_command` event into `.arc/events/event-log.jsonl`; this mirror is local/recent/derived and not canonical global audit state.
 - sandbox audit events best-effort mirror into the keyed audit store when an audit key exists; missing keys do not block CLI execution.
+- Firecracker artifact generation validates static proof-init safety and manifest no-network metadata, but does not prove VM execution.
 - sandbox audit chain appends continue across CLI invocations and verify against raw events.
 - container execution requires `ARC_ENABLE_CONTAINER_SANDBOX=1`.
 

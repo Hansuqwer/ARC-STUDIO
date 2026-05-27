@@ -17,6 +17,7 @@ import subprocess
 import tempfile
 import time
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -304,7 +305,12 @@ class FirecrackerProofArtifactManifest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     version: int = 1
+    generator_version: str = "arc-firecracker-proof-v1"
+    marker_contract_version: int = 1
     artifact: str = "arc-firecracker-proof-rootfs"
+    generated_at: str = ""
+    host_os: str = ""
+    host_arch: str = ""
     init_path: str
     init_sha256: str
     rootfs_path: str | None = None
@@ -312,6 +318,10 @@ class FirecrackerProofArtifactManifest(BaseModel):
     markers: list[str]
     init_entrypoints: list[str] = []
     device_nodes: list[str] = []
+    proof_commands: list[list[str]] = []
+    network_interfaces_configured: bool = False
+    rootfs_size_mib: int = 32
+    tools: dict[str, str | None] = {}
     build_status: str
     blockers: list[str] = []
 
@@ -417,6 +427,32 @@ def _write_manifest(path: Path, manifest: FirecrackerProofArtifactManifest) -> N
     path.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
 
 
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _firecracker_init_safety_blockers(init_text: str) -> list[str]:
+    blockers: list[str] = []
+    forbidden = {
+        "apk add": "package install command present",
+        "apt-get": "package install command present",
+        "apt ": "package install command present",
+        "dnf ": "package install command present",
+        "yum ": "package install command present",
+        "pip install": "package install command present",
+        "ARC_USER_ARGV": "user argv execution hook present",
+        'exec "$@"': "user argv execution hook present",
+        "ifconfig ": "network enablement command present",
+        "ip link set": "network enablement command present",
+        "udhcpc": "network enablement command present",
+        "dhclient": "network enablement command present",
+    }
+    for needle, reason in forbidden.items():
+        if needle in init_text:
+            blockers.append(reason)
+    return sorted(set(blockers))
+
+
 def generate_firecracker_proof_artifacts(
     output_dir: Path,
     *,
@@ -436,6 +472,8 @@ def generate_firecracker_proof_artifacts(
     init_path.chmod(0o755)
 
     blockers: list[str] = []
+    init_text = init_path.read_text(encoding="utf-8")
+    blockers.extend(_firecracker_init_safety_blockers(init_text))
     requested_build = (
         os.environ.get("ARC_FC_BUILD_PROOF_ROOTFS") == "1" if build_rootfs is None else build_rootfs
     )
@@ -469,7 +507,8 @@ def generate_firecracker_proof_artifacts(
             (root_dir / "sbin" / "init").chmod(0o755)
             (root_dir / "dev" / "console").touch(mode=0o600, exist_ok=True)
             (root_dir / "dev" / "null").touch(mode=0o666, exist_ok=True)
-            for applet in ("sh", "cat", "grep", "ip", "mount", "reboot", "poweroff", "halt"):
+            required_applets = ("sh", "cat", "grep", "ip", "mount", "reboot", "poweroff", "halt")
+            for applet in required_applets:
                 link = root_dir / "bin" / applet
                 if not link.exists():
                     link.symlink_to("busybox")
@@ -493,6 +532,9 @@ def generate_firecracker_proof_artifacts(
         blockers.append("ARC_FC_BUILD_PROOF_ROOTFS=1 not set; generated init/manifest only")
 
     manifest = FirecrackerProofArtifactManifest(
+        generated_at=_utc_now(),
+        host_os=platform.system(),
+        host_arch=platform.machine(),
         init_path=str(init_path),
         init_sha256=_sha256_file(init_path),
         rootfs_path=str(final_rootfs_path) if built_rootfs else None,
@@ -500,6 +542,20 @@ def generate_firecracker_proof_artifacts(
         markers=FIRECRACKER_PROOF_MARKERS,
         init_entrypoints=["/init", "/sbin/init"] if built_rootfs else ["arc-fc-proof-init.sh"],
         device_nodes=["/dev/console", "/dev/null"] if built_rootfs else [],
+        proof_commands=[
+            ["ip", "route"],
+            ["curl", "--connect-timeout", "2", "https://example.com"],
+            ["cat", "/workspace/arc-sentinel.txt"],
+            ["cat", "/workspace/arc-host-escape-link"],
+        ],
+        network_interfaces_configured=False,
+        rootfs_size_mib=rootfs_size_mib,
+        tools={
+            "busybox": shutil.which("busybox"),
+            "mkfs.ext4": shutil.which("mkfs.ext4"),
+            "truncate": shutil.which("truncate"),
+            "curl": shutil.which("curl"),
+        },
         build_status="built" if built_rootfs else "init_manifest_only",
         blockers=blockers,
     )
@@ -525,6 +581,17 @@ def validate_firecracker_proof_manifest(path: Path) -> FirecrackerProofArtifactM
     if _sha256_file(init_path) != manifest.init_sha256:
         raise ValueError("proof init sha256 mismatch")
     init_text = init_path.read_text(encoding="utf-8")
+    safety_blockers = _firecracker_init_safety_blockers(init_text)
+    if safety_blockers:
+        raise ValueError(f"proof init safety blockers: {', '.join(safety_blockers)}")
+    if manifest.marker_contract_version != 1:
+        raise ValueError("unsupported proof marker contract version")
+    if set(manifest.markers) != set(FIRECRACKER_PROOF_MARKERS):
+        raise ValueError("proof manifest marker list mismatch")
+    if manifest.network_interfaces_configured:
+        raise ValueError("proof manifest must not configure network interfaces")
+    if not manifest.proof_commands:
+        raise ValueError("proof manifest missing proof commands")
     for marker in FIRECRACKER_PROOF_MARKERS:
         hyphenated = FIRECRACKER_PROOF_MARKER_KEYS.get(marker, marker.replace("_", "-"))
         if (
@@ -719,76 +786,91 @@ class FirecrackerProofRunner:
             config_path = temp_dir / "firecracker.json"
             sentinel = self.workspace_root / "arc-sentinel.txt"
             escape = self.workspace_root / "arc-host-escape-link"
+            created_escape = False
             sentinel.write_text("arc-firecracker-proof\n", encoding="utf-8")
             try:
                 if not escape.exists():
                     escape.symlink_to(Path("/etc/passwd"))
+                    created_escape = True
             except OSError:
                 pass
-            plan = build_firecracker_no_network_run_plan(
-                command,
-                kernel_path=Path(str(gates["kernel_path"])),
-                rootfs_path=Path(str(gates["rootfs_path"])),
-                work_dir=temp_dir,
-                instance_name=self.instance_name,
-            )
-            config_path.write_text(
-                json.dumps(plan.config.to_firecracker_config(), sort_keys=True), encoding="utf-8"
-            )
-            lifecycle.append("create_config")
-            argv = [
-                str(gates["firecracker_binary"]),
-                "--api-sock",
-                str(api_socket),
-                "--config-file",
-                str(config_path),
-            ]
-            result, proc = _run_firecracker_process(
-                argv, timeout_seconds=min(timeout_seconds, 30), max_bytes=self.max_bytes
-            )
-            lifecycle.append("start_vm")
-            guest_proof = parse_firecracker_guest_proof(f"{result.stdout}\n{result.stderr}")
-            if guest_proof.marker_seen:
-                lifecycle.append("guest_proof")
-                proof_blocker = None
-            else:
-                lifecycle.append("proof_blocked")
-            teardown_attempted = True
-            _terminate_process_group(proc)
-            lifecycle.append("teardown")
-            harness_result = FirecrackerProofRunResult(
-                command=command,
-                instance_name=self.instance_name,
-                temp_dir=str(temp_dir),
-                api_socket=str(api_socket),
-                config_path=str(config_path),
-                result=IsolationResult(
-                    exit_code=-1,
-                    stdout=result.stdout,
-                    stderr=proof_blocker or result.stderr,
-                    provider="microvm",
-                    stdout_truncated=result.stdout_truncated,
-                    stderr_truncated=result.stderr_truncated,
-                    redaction_applied=result.redaction_applied,
-                ),
-                lifecycle=lifecycle,
-                no_default_route=guest_proof.no_default_route,
-                network_failure=guest_proof.network_failure,
-                workspace_sentinel_readable=guest_proof.sentinel_readable,
-                symlink_escape_blocked=guest_proof.symlink_escape_blocked,
-                teardown_attempted=True,
-                proof_blocker=proof_blocker,
-            )
-            self._persist_audit(
-                command=command,
-                lifecycle=lifecycle,
-                result=result,
-                network_proof_passed=guest_proof.network_proof_passed,
-                teardown_attempted=teardown_attempted,
-                started_at=started_at,
-                ended_at=utc_now(),
-            )
-            return harness_result
+            try:
+                plan = build_firecracker_no_network_run_plan(
+                    command,
+                    kernel_path=Path(str(gates["kernel_path"])),
+                    rootfs_path=Path(str(gates["rootfs_path"])),
+                    work_dir=temp_dir,
+                    instance_name=self.instance_name,
+                )
+                config_path.write_text(
+                    json.dumps(plan.config.to_firecracker_config(), sort_keys=True),
+                    encoding="utf-8",
+                )
+                lifecycle.append("create_config")
+                argv = [
+                    str(gates["firecracker_binary"]),
+                    "--api-sock",
+                    str(api_socket),
+                    "--config-file",
+                    str(config_path),
+                ]
+                result, proc = _run_firecracker_process(
+                    argv, timeout_seconds=min(timeout_seconds, 30), max_bytes=self.max_bytes
+                )
+                lifecycle.append("start_vm")
+                guest_proof = parse_firecracker_guest_proof(f"{result.stdout}\n{result.stderr}")
+                proof_succeeded = (
+                    guest_proof.network_proof_passed and guest_proof.workspace_proof_passed
+                )
+                if proof_succeeded:
+                    lifecycle.append("guest_proof")
+                    proof_blocker = None
+                elif guest_proof.marker_seen:
+                    lifecycle.append("guest_proof_failed")
+                    proof_blocker = "guest proof markers did not satisfy network/workspace checks"
+                else:
+                    lifecycle.append("proof_blocked")
+                teardown_attempted = True
+                _terminate_process_group(proc)
+                lifecycle.append("teardown")
+                proof_exit_code = result.exit_code if proof_succeeded else -1
+                harness_result = FirecrackerProofRunResult(
+                    command=command,
+                    instance_name=self.instance_name,
+                    temp_dir=str(temp_dir),
+                    api_socket=str(api_socket),
+                    config_path=str(config_path),
+                    result=IsolationResult(
+                        exit_code=proof_exit_code,
+                        stdout=result.stdout,
+                        stderr=proof_blocker or result.stderr,
+                        provider="microvm",
+                        stdout_truncated=result.stdout_truncated,
+                        stderr_truncated=result.stderr_truncated,
+                        redaction_applied=result.redaction_applied,
+                    ),
+                    lifecycle=lifecycle,
+                    no_default_route=guest_proof.no_default_route,
+                    network_failure=guest_proof.network_failure,
+                    workspace_sentinel_readable=guest_proof.sentinel_readable,
+                    symlink_escape_blocked=guest_proof.symlink_escape_blocked,
+                    teardown_attempted=True,
+                    proof_blocker=proof_blocker,
+                )
+                self._persist_audit(
+                    command=command,
+                    lifecycle=lifecycle,
+                    result=harness_result.result,
+                    network_proof_passed=guest_proof.network_proof_passed,
+                    teardown_attempted=teardown_attempted,
+                    started_at=started_at,
+                    ended_at=utc_now(),
+                )
+                return harness_result
+            finally:
+                sentinel.unlink(missing_ok=True)
+                if created_escape:
+                    escape.unlink(missing_ok=True)
 
     def _blocked_result(
         self, command: list[str], reason: str, started_at: str, ended_at: str
