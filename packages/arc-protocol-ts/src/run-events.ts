@@ -373,6 +373,33 @@ export type KnownRunEvent =
  */
 export type TypedRunEvent = KnownRunEvent | UnknownEvent;
 
+export const KNOWN_RUN_EVENT_TYPES = [
+  'RUN_STARTED',
+  'RUN_COMPLETED',
+  'RUN_FAILED',
+  'RUN_CANCELLED',
+  'STEP_STARTED',
+  'STEP_COMPLETED',
+  'STEP_FAILED',
+  'TOOL_CALL',
+  'TOOL_CALL_START',
+  'TOOL_CALL_RESULT',
+  'TOOL_CALL_ERROR',
+  'HITL_PROMPT',
+  'HITL_RESPONSE',
+  'HITL_TIMEOUT',
+  'SWARMGRAPH_TOPOLOGY',
+  'SWARMGRAPH_CONSENSUS',
+  'SWARMGRAPH_COST',
+  'MESSAGE',
+  'NODE_STARTED',
+  'NODE_FAILED',
+  'POLICY_BYPASS_WARNING',
+  'RAW',
+] as const satisfies readonly KnownRunEvent['type'][];
+
+const knownRunEventTypeSet = new Set<string>(KNOWN_RUN_EVENT_TYPES);
+
 // ─── Type Guards ─────────────────────────────────────────────────────────────
 
 /**
@@ -398,31 +425,7 @@ export function isEventOfType<T extends KnownRunEvent['type']>(
  * Useful for filtering out unknown events.
  */
 export function isKnownEvent(event: TypedRunEvent): event is KnownRunEvent {
-  const knownTypes = new Set([
-    'RUN_STARTED',
-    'RUN_COMPLETED',
-    'RUN_FAILED',
-    'RUN_CANCELLED',
-    'STEP_STARTED',
-    'STEP_COMPLETED',
-    'STEP_FAILED',
-    'TOOL_CALL',
-    'TOOL_CALL_START',
-    'TOOL_CALL_RESULT',
-    'TOOL_CALL_ERROR',
-    'HITL_PROMPT',
-    'HITL_RESPONSE',
-    'HITL_TIMEOUT',
-    'SWARMGRAPH_TOPOLOGY',
-    'SWARMGRAPH_CONSENSUS',
-    'SWARMGRAPH_COST',
-    'MESSAGE',
-    'NODE_STARTED',
-    'NODE_FAILED',
-    'POLICY_BYPASS_WARNING',
-    'RAW',
-  ]);
-  return knownTypes.has(event.type);
+  return knownRunEventTypeSet.has(event.type);
 }
 
 /**

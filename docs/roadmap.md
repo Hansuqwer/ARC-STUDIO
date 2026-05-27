@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-27 — Phase 48 streaming audit refresh + HMAC evidence tightening Baseline Complete.  
-**Current evidence anchor:** local worktree | Phase 48 full verification pass: Python 2893 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped; protocol and extension builds pass; PR hygiene and banned-claims checks pass.  
+**Last reality refresh:** 2026-05-27 — Phase 49 RunEvent union hardening + cross-language protocol evidence Baseline Complete.  
+**Current evidence anchor:** local worktree | Phase 49 full verification pass: Python 2895 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped; TS protocol tests 61 passed; Python ruff, protocol build, extension build, workspace typecheck, PR hygiene, and banned-claims checks pass.  
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -343,7 +343,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Replace unsafe `RunEvent` type with discriminated unions to enable exhaustive handling and prevent protocol mismatches.
 
-**Current:** Baseline Complete. `packages/arc-protocol-ts/src/run-events.ts` defines typed event interfaces + `RawEvent` + `UnknownEvent` as `KnownRunEvent` discriminated union. `python/src/agent_runtime_cockpit/protocol/typed_events.py` mirrors known event parsing, including `POLICY_BYPASS_WARNING`. Type guards (`isEventOfType`, `isKnownEvent`, `is_known_event`, `parseRunEvent`, `parse_typed_event`) in TS/Python. 19 typed events tests pass.
+**Current:** Baseline Complete. `packages/arc-protocol-ts/src/run-events.ts` defines typed event interfaces + `RawEvent` + `UnknownEvent` as `KnownRunEvent` discriminated union. `python/src/agent_runtime_cockpit/protocol/typed_events.py` mirrors known event parsing, including `POLICY_BYPASS_WARNING`. `protocol/fixtures/run-event-registry.json` is the cross-language registry evidence anchor, and parity tests now require each canonical Python event to be either typed in TS or explicitly listed as intentionally untyped follow-up debt.
 
 **Deliverables:**
 - `KnownRunEvent` discriminated union in TypeScript
@@ -358,7 +358,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - All protocol fixtures round-trip through Python and TypeScript
 - Widget and mapper consumers use typed narrowing
 
-**Status:** Baseline Complete | Evidence: `run-events.ts`, `typed_events.py`, 19 typed events tests, TS policy-bypass warning test | Notes: Legacy `RunEvent` preserved for backward compat. arc-extension still uses own `TraceEvent` type - incremental migration deferred.
+**Status:** Baseline Complete | Evidence: `run-events.ts`, `typed_events.py`, `protocol/fixtures/run-event-registry.json`, Python protocol tests (68 passed), TS protocol tests (61 passed), full Python tests (2895 passed / 34 skipped / 3 xfailed), arc-extension tests (814 passed / 3 skipped), protocol build and workspace typecheck pass | Notes: Legacy `RunEvent` preserved for backward compat. arc-extension still uses own `TraceEvent` type; full consumer migration remains incremental follow-up and is not claimed complete.
 
 **Source:** Architecture Review P0-2, Feature List F0.2
 

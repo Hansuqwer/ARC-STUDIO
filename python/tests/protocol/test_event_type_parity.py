@@ -32,7 +32,7 @@ def test_every_fixture_event_type_is_a_known_python_event_type() -> None:
 
 def test_typed_ts_run_event_types_are_known_python_event_types() -> None:
     source = (TS_PROTOCOL_SRC / "run-events.ts").read_text(encoding="utf-8")
-    block = re.search(r"const knownTypes = new Set\(\[(.*?)\]\);", source, re.S)
+    block = re.search(r"export const KNOWN_RUN_EVENT_TYPES = \[(.*?)\] as const", source, re.S)
     assert block is not None
     ts_types = set(re.findall(r"'([A-Z_]+)'", block.group(1)))
     py_types = set(EVENT_TYPES)

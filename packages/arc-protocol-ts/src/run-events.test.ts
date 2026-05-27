@@ -1,13 +1,47 @@
 import { describe, expect, it } from '@jest/globals';
+import * as fs from 'fs';
+import * as path from 'path';
 
 import * as protocol from './index';
 import {
   assertNeverEvent,
   isEventOfType,
   isKnownEvent,
+  KNOWN_RUN_EVENT_TYPES,
   parseRunEvent,
   TypedRunEvent,
 } from './run-events';
+
+const intentionallyUntypedCanonicalTypes = [
+  'AGENT_START',
+  'AGENT_END',
+  'TOOL_CALL_ARGS',
+  'TOOL_CALL_END',
+  'TOOL_END',
+  'HANDOFF',
+  'NODE_UPDATE',
+  'MESSAGE_CHUNK',
+  'TEXT_MESSAGE_START',
+  'TEXT_MESSAGE_CONTENT',
+  'TEXT_MESSAGE_END',
+  'TEXT_MESSAGE_CHUNK',
+  'STATE_SNAPSHOT',
+  'CONTRACT_PROPOSED',
+  'CONTRACT_ACCEPTED',
+  'CONTRACT_FULFILLED',
+  'CONTRACT_VIOLATED',
+  'RECEIPT_GENERATED',
+  'FAILURE_AUTOPSY_GENERATED',
+  'EVIDENCE_REF_CREATED',
+  'BATTLE_STARTED',
+  'BATTLE_CANDIDATE_READY',
+  'BATTLE_VOTE_COMMITTED',
+  'BATTLE_VOTE_REVEALED',
+  'BATTLE_CONSENSUS_REACHED',
+  'BATTLE_HITL_REQUIRED',
+  'BATTLE_COMPLETED',
+  'CUSTOM',
+] as const;
 
 const baseEvent = {
   schema_version: 2,
@@ -83,5 +117,26 @@ describe('run-events helpers', () => {
 
     expect(isKnownEvent(raw)).toBe(true);
     expect(isKnownEvent(warning)).toBe(true);
+  });
+
+  it('exports the single known event type source used by guards', () => {
+    expect(KNOWN_RUN_EVENT_TYPES).toContain('RUN_STARTED');
+    expect(KNOWN_RUN_EVENT_TYPES).toContain('POLICY_BYPASS_WARNING');
+    expect(KNOWN_RUN_EVENT_TYPES).toContain('RAW');
+    expect(new Set(KNOWN_RUN_EVENT_TYPES).size).toBe(KNOWN_RUN_EVENT_TYPES.length);
+  });
+
+  it('accounts for every canonical Python registry event as typed or intentionally untyped', () => {
+    const registryPath = path.resolve(__dirname, '../../../protocol/fixtures/run-event-registry.json');
+    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8')) as {
+      eventTypes: Array<{ type: string }>;
+    };
+    const canonicalTypes = registry.eventTypes.map((entry) => entry.type).sort();
+    const accountedTypes = [
+      ...KNOWN_RUN_EVENT_TYPES,
+      ...intentionallyUntypedCanonicalTypes,
+    ].sort();
+
+    expect(accountedTypes).toEqual(canonicalTypes);
   });
 });

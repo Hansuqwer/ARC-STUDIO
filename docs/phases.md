@@ -2,15 +2,15 @@
 
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-27 — Phase 48 streaming audit refresh + HMAC evidence tightening Baseline Complete.  
-**Current evidence anchor:** local worktree | Phase 48 full verification pass: Python 2893 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped; protocol and extension builds pass; PR hygiene and banned-claims checks pass.  
+**Last reality refresh:** 2026-05-27 — Phase 49 RunEvent union hardening + cross-language protocol evidence Baseline Complete.  
+**Current evidence anchor:** local worktree | Phase 49 full verification pass: Python 2895 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped; TS protocol tests 61 passed; Python ruff, protocol build, extension build, workspace typecheck, PR hygiene, and banned-claims checks pass.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
 
 Prefer larger coherent implementation chunks over tiny slices. A chunk may include multiple listed slices when they share files/tests and can be completed safely in one session. Keep the no-destructive-actions, no-secret-commits, preserve-unrelated-work, and green-verification rules.
 
-~~Priority 1 stop-the-line: Phase 41 (Interactive CLI/UX Foundation).~~ **Gate cleared 2026-05-26** — Phases 41–48 Baseline Complete. Product work may advance to Phase 49 and beyond.
+~~Priority 1 stop-the-line: Phase 41 (Interactive CLI/UX Foundation).~~ **Gate cleared 2026-05-26** — Phases 41–49 Baseline Complete. Product work may advance to Phase 50 and beyond.
 
 ## Verification Baseline For Every Slice
 
@@ -2796,3 +2796,44 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - This phase does not add adapter-wide keyed audit coverage.
 - This phase does not persist daemon `session_changed` events into per-run audit chains.
 - Full verification commands beyond the targeted Python tests and ruff must be run before broad release evidence is claimed.
+
+---
+
+## Phase 49 — RunEvent Union Hardening + Cross-Language Protocol Evidence
+
+**Roadmap:** R15 — Discriminated RunEvent Unions + Protocol Conformance  
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/protocol/ -q` (68 passed); `cd python && uv run pytest tests/ -q` (2895 passed / 34 skipped / 3 xfailed); `pnpm --filter @arc-studio/protocol test -- --runInBand` (61 passed); `pnpm --filter arc-extension test` (814 passed / 3 skipped); `cd python && uv run ruff check src tests` (OK); `pnpm --filter @arc-studio/protocol build` (OK); `pnpm --filter arc-extension build` (OK); `pnpm typecheck` (OK); `bash scripts/check-pr.sh` (OK); `bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md docs/schemas/README.md` (OK)  
+**Depends on:** Phase 48
+
+### Deliverables
+1. Added `protocol/fixtures/run-event-registry.json` as the machine-readable evidence anchor for Python canonical `EVENT_TYPES`.
+2. Exported `KNOWN_RUN_EVENT_TYPES` from `packages/arc-protocol-ts/src/run-events.ts` and derived `isKnownEvent()` from that single source.
+3. Added Python parity tests that require the registry fixture to match Python `EVENT_TYPES` versions, required fields, and optional fields.
+4. Added Python and TypeScript tests that require every canonical event to be either typed in TS or explicitly acknowledged as intentionally untyped migration debt.
+5. Added `docs/schemas/README.md` to clarify that generated JSON Schema snapshots are compatibility docs, not the canonical typed RunEvent union source.
+
+### Acceptance
+1. New Python canonical RunEvent types cannot be added silently without updating cross-language evidence.
+2. TS known-event guards use one exported source of truth instead of an inline local set.
+3. Cross-language protocol tests prove typed coverage and known migration debt explicitly.
+4. Legacy `RunEvent` compatibility remains intact.
+5. Full extension consumer migration is not claimed complete.
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/protocol/ -q
+cd python && uv run pytest tests/ -q
+pnpm --filter @arc-studio/protocol test -- --runInBand
+pnpm --filter @arc-studio/protocol build
+pnpm --filter arc-extension build
+pnpm --filter arc-extension test
+pnpm typecheck
+bash scripts/check-pr.sh
+bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md docs/schemas/README.md
+```
+
+### Known Risks
+- TypeScript still intentionally lacks typed variants for several canonical Python events; tests now make that debt explicit.
+- `arc-extension` still has extension-local trace/event consumer types; full consumer migration remains deferred.
+- `docs/schemas/RunEvent.json` remains broad for legacy compatibility and is not the typed-union authority.

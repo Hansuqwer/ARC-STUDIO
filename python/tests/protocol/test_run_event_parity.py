@@ -6,6 +6,7 @@ and Python (typed_events.py) remain aligned. Battle events are Python-only by de
 """
 
 import re
+import json
 from pathlib import Path
 
 import pytest
@@ -48,16 +49,44 @@ PYTHON_ONLY_EVENT_TYPES = {
     "BATTLE_COMPLETED",
 }
 
+INTENTIONALLY_UNTYPED_TS_EVENT_TYPES = {
+    "AGENT_START",
+    "AGENT_END",
+    "TOOL_CALL_ARGS",
+    "TOOL_CALL_END",
+    "TOOL_END",
+    "HANDOFF",
+    "NODE_UPDATE",
+    "MESSAGE_CHUNK",
+    "TEXT_MESSAGE_START",
+    "TEXT_MESSAGE_CONTENT",
+    "TEXT_MESSAGE_END",
+    "TEXT_MESSAGE_CHUNK",
+    "STATE_SNAPSHOT",
+    "CONTRACT_PROPOSED",
+    "CONTRACT_ACCEPTED",
+    "CONTRACT_FULFILLED",
+    "CONTRACT_VIOLATED",
+    "RECEIPT_GENERATED",
+    "FAILURE_AUTOPSY_GENERATED",
+    "EVIDENCE_REF_CREATED",
+    "CUSTOM",
+} | PYTHON_ONLY_EVENT_TYPES
+
+
+def _repo_root() -> Path:
+    return Path(__file__).parents[3]
+
+
+def _registry_fixture() -> dict:
+    return json.loads(
+        (_repo_root() / "protocol" / "fixtures" / "run-event-registry.json").read_text()
+    )
+
 
 def _extract_ts_event_types() -> set[str]:
     """Extract event type literals from run-events.ts interface definitions."""
-    ts_file = (
-        Path(__file__).parent.parent.parent.parent
-        / "packages"
-        / "arc-protocol-ts"
-        / "src"
-        / "run-events.ts"
-    )
+    ts_file = _repo_root() / "packages" / "arc-protocol-ts" / "src" / "run-events.ts"
     if not ts_file.exists():
         pytest.skip(f"TS protocol file not found: {ts_file}")
 
@@ -92,6 +121,36 @@ def _extract_py_event_types() -> set[str]:
                         event_types.add(arg)
 
     return event_types
+
+
+def _python_registry_event_types() -> set[str]:
+    from agent_runtime_cockpit.protocol.events import EVENT_TYPES
+
+    return set(EVENT_TYPES)
+
+
+def test_python_registry_matches_cross_language_fixture():
+    """Fixture is the machine-readable evidence anchor for Python canonical events."""
+    from agent_runtime_cockpit.protocol.events import EVENT_TYPES
+
+    registry = _registry_fixture()
+    fixture_entries = {entry["type"]: entry for entry in registry["eventTypes"]}
+
+    assert set(fixture_entries) == set(EVENT_TYPES)
+    for event_type, typedef in EVENT_TYPES.items():
+        entry = fixture_entries[event_type]
+        assert entry["version"] == typedef.version
+        assert entry["requiredFields"] == sorted(typedef.required_fields)
+        assert entry["optionalFields"] == sorted(typedef.optional_fields)
+
+
+def test_typescript_known_and_intentionally_untyped_events_cover_registry():
+    """New canonical events must be typed in TS or acknowledged as follow-up debt."""
+    ts_types = _extract_ts_event_types()
+    registry_types = {entry["type"] for entry in _registry_fixture()["eventTypes"]}
+
+    assert ts_types | INTENTIONALLY_UNTYPED_TS_EVENT_TYPES == registry_types
+    assert ts_types & INTENTIONALLY_UNTYPED_TS_EVENT_TYPES == set()
 
 
 def test_core_event_types_exist_in_python():
