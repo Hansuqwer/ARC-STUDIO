@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 from agent_runtime_cockpit.cli._app import app
 from agent_runtime_cockpit.memory_graph.models import MemoryGraphSnapshot, MemoryNode
 from agent_runtime_cockpit.memory_graph.store import MemoryGraphStore, extract_memories_from_runs
+from agent_runtime_cockpit.memory_graph.store import evaluate_memory_graph
 
 
 def test_memory_models_serialize() -> None:
@@ -170,3 +171,52 @@ def test_cli_memory_forget_run_json(tmp_path: Path) -> None:
         assert payload["nodes_remaining"] == 0
     finally:
         os.chdir(old)
+
+
+def test_evaluate_memory_graph_requires_evidence() -> None:
+    report = evaluate_memory_graph(MemoryGraphSnapshot())
+    assert report.decision == "insufficient_evidence"
+    assert "no measured quality or cost delta supplied" in report.reasons
+
+
+def test_evaluate_memory_graph_proceed_threshold() -> None:
+    snapshot = MemoryGraphSnapshot(
+        nodes=[
+            MemoryNode(
+                id=f"node-{i}",
+                type="concept",
+                text=f"memory-{i}",
+                confidence=0.5,
+                source_run_ids=[f"r{i}"],
+            )
+            for i in range(10)
+        ]
+    )
+    report = evaluate_memory_graph(snapshot, quality_delta=0.12)
+    assert report.decision == "proceed"
+    assert report.sample_run_count == 10
+
+
+def test_cli_memory_evaluate_json(tmp_path: Path) -> None:
+    store = MemoryGraphStore(tmp_path / ".arc" / "memory" / "graph.json")
+    store.save(
+        MemoryGraphSnapshot(
+            nodes=[
+                MemoryNode(
+                    id="a",
+                    type="concept",
+                    text="sandbox",
+                    confidence=0.5,
+                    source_run_ids=["r1"],
+                )
+            ]
+        )
+    )
+    result = CliRunner().invoke(
+        app,
+        ["memory", "evaluate", "--workspace", str(tmp_path), "--quality-delta", "0.01", "--json"],
+    )
+    assert result.exit_code == 0, result.stderr
+    payload = json.loads(result.stdout)["data"]
+    assert payload["decision"] == "no_go"
+    assert payload["sample_run_count"] == 1

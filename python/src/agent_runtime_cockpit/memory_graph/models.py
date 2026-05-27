@@ -44,3 +44,15 @@ class MemoryGraphSnapshot(BaseModel):
     privacy_mode: Literal["local_workspace_only"] = "local_workspace_only"
     tenant_isolation: Literal["not_claimed"] = "not_claimed"
     redaction_applied: bool = True
+
+
+class MemoryEvaluationReport(BaseModel):
+    """Research gate report for deciding whether memory can influence runs."""
+
+    sample_run_count: int = 0
+    node_count: int = 0
+    edge_count: int = 0
+    quality_delta: float | None = None
+    cost_delta: float | None = None
+    decision: Literal["proceed", "no_go", "insufficient_evidence"] = "insufficient_evidence"
+    reasons: list[str] = Field(default_factory=list)

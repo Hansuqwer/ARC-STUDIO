@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Iterable
 
 from ..security.redaction import REDACT_PLACEHOLDER, Redactor
-from .models import MemoryEdge, MemoryGraphSnapshot, MemoryNode, utc_now
+from .models import MemoryEdge, MemoryEvaluationReport, MemoryGraphSnapshot, MemoryNode, utc_now
 
 DEFAULT_MEMORY_GRAPH_PATH = Path(".arc") / "memory" / "graph.json"
 TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9_+-]{2,}")
@@ -141,6 +141,43 @@ def extract_memories_from_runs(trace_dir: Path, limit: int = 10) -> MemoryGraphS
                     ),
                 )
     return MemoryGraphSnapshot(nodes=list(nodes.values()), edges=list(edges.values()))
+
+
+def evaluate_memory_graph(
+    snapshot: MemoryGraphSnapshot,
+    *,
+    min_runs: int = 10,
+    quality_delta: float | None = None,
+    cost_delta: float | None = None,
+) -> MemoryEvaluationReport:
+    source_runs = sorted({run_id for node in snapshot.nodes for run_id in node.source_run_ids})
+    reasons: list[str] = []
+    if len(source_runs) < min_runs:
+        reasons.append(f"requires at least {min_runs} sample runs; found {len(source_runs)}")
+    if not snapshot.redaction_applied:
+        reasons.append("redaction guardrail not recorded")
+    if snapshot.tenant_isolation != "not_claimed":
+        reasons.append("unexpected tenant isolation claim")
+    lift_ok = quality_delta is not None and quality_delta >= 0.10
+    cost_ok = cost_delta is not None and cost_delta <= -0.20
+    if quality_delta is None and cost_delta is None:
+        reasons.append("no measured quality or cost delta supplied")
+    elif not (lift_ok or cost_ok):
+        reasons.append("quality/cost thresholds not met")
+
+    if reasons:
+        decision = "insufficient_evidence" if "no measured" in " ".join(reasons) else "no_go"
+    else:
+        decision = "proceed"
+    return MemoryEvaluationReport(
+        sample_run_count=len(source_runs),
+        node_count=len(snapshot.nodes),
+        edge_count=len(snapshot.edges),
+        quality_delta=quality_delta,
+        cost_delta=cost_delta,
+        decision=decision,
+        reasons=reasons,
+    )
 
 
 def _trace_paths(trace_dir: Path, limit: int) -> Iterable[Path]:

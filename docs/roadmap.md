@@ -606,7 +606,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Persistent knowledge graph that captures insights across swarm runs for learning.
 
-**Current:** Research prototype baseline implemented. Local-only memory schema/store plus `arc memory extract/query/show` can extract deterministic keyword/phrase memories from stored JSONL traces. Phase 60 adds redaction-before-extraction and `arc memory forget-run` deletion semantics. No runtime prompt wiring, cross-tenant memory, remote sync, or measured quality/cost lift is claimed.
+**Current:** Research prototype baseline implemented. Local-only memory schema/store plus `arc memory extract/query/show` can extract deterministic keyword/phrase memories from stored JSONL traces. Phase 60 adds redaction-before-extraction and `arc memory forget-run` deletion semantics. Phase 61 adds `arc memory evaluate` with explicit proceed/no-go/insufficient-evidence decisions. No runtime prompt wiring, cross-tenant memory, remote sync, or measured quality/cost lift is claimed.
 
 **Deliverables:**
 - Design document with memory schema
@@ -621,7 +621,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - Privacy analysis complete
 - Decision: proceed to implementation or pivot
 
-**Status:** Baseline Complete (research prototype + privacy guardrails) | Evidence: Phase 60 local verification — 9 memory graph tests pass; ruff OK; `docs/research/swarm-memory-graph.md` | Notes: Research-only. Memory graph persistence is workspace-local at `.arc/memory/graph.json`. No runtime memory injection or quality/cost improvement claim. Redaction is pattern-based, not a complete privacy proof. Tenant isolation remains unresolved.
+**Status:** Baseline Complete (research prototype + privacy/evaluation gates) | Evidence: Phase 61 local verification — 12 memory graph tests pass; full Python suite 3029 passed / 34 skipped / 3 xfailed; ruff OK; protocol build OK; extension build OK; `pnpm typecheck` OK; `docs/research/swarm-memory-graph.md` | Notes: Research-only. Memory graph persistence is workspace-local at `.arc/memory/graph.json`. Runtime memory injection remains blocked unless `arc memory evaluate` returns `proceed` on fixed sample-set evidence. Redaction is pattern-based, not a complete privacy proof. Tenant isolation remains unresolved.
 
 **Source:** Feature List F6.1
 
@@ -966,7 +966,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R23 Consensus Escrow** | **Complete** | **Phase 30 — complete; commit-reveal voting with cryptographic verification and adversarial tests** |
 | **R24 Adaptive Consensus** | **Complete** | **Phase 31 — complete; deterministic risk assessment, protocol selection, raft/bft/bft_escrow hardening** |
 | **R25 Event-Driven Notifications** | **Not Started** | **Phase 32 — add event bus + webhooks** |
-| **R26 Swarm Memory Graph** | **Baseline Complete (research prototype + privacy guardrails)** | **Phases 59-60 — local-only schema/store/extract/query, redaction-before-extraction, forget-run; evaluation and runtime wiring deferred** |
+| **R26 Swarm Memory Graph** | **Baseline Complete (research prototype + privacy/evaluation gates)** | **Phases 59-61 — local-only schema/store/extract/query, redaction-before-extraction, forget-run, evaluate; runtime wiring deferred** |
 | **R27 LangChain Adapter** | **Baseline Complete** | **Adapter Phase 26 — complete (commits 6beedf8, ea567cf, 7566e60)** |
 | **R28 Anthropic Provider + Registry** | **Baseline Complete** | **Adapter Phase 27 — complete (commit 4a479b7)** |
 | **R29 OpenAI-Compatible Provider** | **Baseline Complete** | **Adapter Phase 28 — complete (commit 6826d8d, 24 tests, 6 vendors)** |

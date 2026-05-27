@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-27 — Phases 56-60 Baseline Complete.  
-**Current evidence anchor:** local worktree | Phases 56-58 verification pass: 3017 Python tests passed; ruff OK; protocol build OK; extension build OK. Phase 60 targeted verification: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/memory_graph/test_phase59_memory_graph.py -q` 9 passed.  
+**Last reality refresh:** 2026-05-27 — Phases 56-61 Baseline Complete.  
+**Current evidence anchor:** local worktree | Phase 61 verification: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/memory_graph/test_phase59_memory_graph.py -q` 12 passed; `cd python && uv run pytest tests/ -q` 3029 passed / 34 skipped / 3 xfailed; protocol build OK; extension build OK; `pnpm typecheck` OK.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -2355,6 +2355,7 @@ pnpm typecheck
 | **58** | **R22 residual** | **Cross-session eval workflow + trend tracking** |
 | **59** | **R26** | **Swarm Memory Graph research prototype** |
 | **60** | **R26** | **Memory graph privacy guardrails + run deletion semantics** |
+| **61** | **R26** | **Memory graph evaluation gate + go/no-go report** |
 
 ### Dependencies
 
@@ -2387,6 +2388,7 @@ pnpm typecheck
 | 58 Eval Trend Tracking | Baseline Complete | Phase 53, Phase 56 | Golden-dir eval run, eval_completed event, trending/dashboard CLI |
 | 59 Memory Graph Research | Baseline Complete (research prototype) | R26 | Local-only memory schema/store/extract/query CLI; no runtime prompt wiring or claimed lift |
 | 60 Memory Privacy Guardrails | Baseline Complete | Phase 59 | Redaction-before-extraction, snapshot redaction flag, `arc memory forget-run` source deletion semantics |
+| 61 Memory Evaluation Gate | Baseline Complete | Phase 60 | `arc memory evaluate` go/no-go report requiring 10 sample runs plus measured quality/cost threshold |
 
 ---
 
@@ -2481,6 +2483,28 @@ pnpm typecheck
 - Redaction is pattern-based and not proof of complete privacy removal.
 - No cross-workspace deletion index exists because cross-workspace memory remains unsupported.
 - Runtime prompt injection remains deferred.
+
+## Phase 61 — Memory Graph Evaluation Gate and Go/No-Go Report
+
+**Roadmap:** R26 evaluation decision  
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/memory_graph/test_phase59_memory_graph.py -q` 12 passed; `cd python && uv run pytest tests/ -q` 3029 passed / 34 skipped / 3 xfailed; protocol build OK; extension build OK; `pnpm typecheck` OK  
+
+### Deliverables
+1. `MemoryEvaluationReport` model.
+2. `evaluate_memory_graph()` gate requiring at least 10 source runs.
+3. Proceed threshold: `quality_delta >= 0.10` or `cost_delta <= -0.20`.
+4. `arc memory evaluate` CLI returns `proceed`, `no_go`, or `insufficient_evidence`.
+5. Research docs updated to require the gate before runtime prompt wiring.
+
+### Acceptance
+1. Empty/no-metric graph returns `insufficient_evidence`.
+2. One-run graph with weak metric returns `no_go`.
+3. Ten-run graph with quality lift returns `proceed`.
+4. CLI returns stable ARC envelope.
+
+### Known Risks
+- Quality/cost deltas are user-supplied metrics; no automated task benchmark runner exists yet.
+- Runtime prompt wiring remains blocked until fixed sample-set evidence is generated and reviewed.
 
 ### Critical Path
 

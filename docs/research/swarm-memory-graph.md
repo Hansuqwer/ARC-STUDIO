@@ -25,6 +25,8 @@ Required before productizing memory-assisted runs:
 4. Measure quality delta, cost delta, latency delta.
 5. Proceed only if quality improves by 10%+ or cost drops by 20%+ without privacy regressions.
 
+`arc memory evaluate` records this gate. Without measured `--quality-delta >= 0.10` or `--cost-delta <= -0.20` across at least 10 source runs, the decision is `insufficient_evidence` or `no_go`.
+
 ## Privacy Analysis
 
 - Memory is workspace-local only.
@@ -35,4 +37,4 @@ Required before productizing memory-assisted runs:
 
 ## Decision
 
-Continue research prototype only. Do not wire memory into runtime prompts until evaluation passes and privacy controls exist.
+Current decision: continue research prototype only. Do not wire memory into runtime prompts until `arc memory evaluate` returns `proceed` on a fixed sample set and privacy controls are reviewed.

@@ -85,3 +85,27 @@ def memory_forget_run(
         ),
         json_output,
     )
+
+
+@memory_app.command("evaluate")
+def memory_evaluate(
+    workspace: str | None = WORKSPACE_FLAG,
+    min_runs: int = typer.Option(10, "--min-runs", help="Minimum sample runs required"),
+    quality_delta: float | None = typer.Option(
+        None, "--quality-delta", help="Measured quality delta"
+    ),
+    cost_delta: float | None = typer.Option(None, "--cost-delta", help="Measured cost delta"),
+    json_output: bool = JSON_FLAG,
+) -> None:
+    """Evaluate the research gate for using memory in runtime prompts."""
+    from ..memory_graph.store import MemoryGraphStore, evaluate_memory_graph
+
+    ws = _workspace(workspace)
+    snapshot = MemoryGraphStore(ws / ".arc" / "memory" / "graph.json").load()
+    report = evaluate_memory_graph(
+        snapshot,
+        min_runs=min_runs,
+        quality_delta=quality_delta,
+        cost_delta=cost_delta,
+    )
+    _out(ok(report.model_dump(), workspace=str(ws)), json_output)
