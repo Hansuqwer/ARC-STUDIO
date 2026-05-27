@@ -1,4 +1,4 @@
-"""CLI commands for the event system: watch, webhook management (Phase 32 / R25)."""
+"""CLI commands for the event system: query, watch, webhook management (Phase 32 / Phase 56)."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import asyncio
 import json
 import signal
 import sys
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -16,10 +17,112 @@ from rich.json import JSON
 from ..events.bus import get_bus
 from ..events.models import WebhookConfig
 from ..events.webhooks import WebhookManager
-from ._helpers import _setup_logging
+from ..protocol.errors import ArcErrorCode
+from ..protocol.event_envelope import err, ok
+from ._helpers import DEBUG_FLAG, JSON_FLAG, _out, _setup_logging
 from ._subapps import events_app
 
 err_console = Console(stderr=True)
+
+
+@events_app.command("query")
+def events_query(
+    event_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by event type"),
+    since: Optional[str] = typer.Option(None, "--since", help="ISO timestamp start filter"),
+    until: Optional[str] = typer.Option(None, "--until", help="ISO timestamp end filter"),
+    limit: int = typer.Option(100, "--limit", "-n", help="Max events to return"),
+    stats: bool = typer.Option(False, "--stats", help="Return event type counts instead of events"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Query the event log for stored events.
+
+    Reads directly from the JSONL event log (not via daemon).
+    Use --type to filter by event type, --since/--until for time range.
+    Use --stats for event type counts instead of raw events.
+    """
+    _setup_logging(debug)
+
+    from ..events.persistence import DEFAULT_EVENT_LOG_PATH
+
+    log_path = Path.cwd() / DEFAULT_EVENT_LOG_PATH
+
+    if not log_path.exists():
+        _out(
+            err(ArcErrorCode.RUN_NOT_FOUND, "Event log not found. No events have been persisted."),
+            json_output,
+        )
+        raise typer.Exit(1)
+
+    lines = log_path.read_text(encoding="utf-8").splitlines()
+    events_list: list[dict] = []
+    type_counts: dict[str, int] = {}
+    oldest_ts: Optional[str] = None
+    newest_ts: Optional[str] = None
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            data = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        # Pop internal seq
+        data.pop("seq", None)
+
+        ts = data.get("timestamp", "")
+        ev_type = data.get("event_type", "")
+
+        # Track stats
+        type_counts[ev_type] = type_counts.get(ev_type, 0) + 1
+        if ts:
+            if oldest_ts is None or ts < oldest_ts:
+                oldest_ts = ts
+            if newest_ts is None or ts > newest_ts:
+                newest_ts = ts
+
+        # Filter by type
+        if event_type and ev_type != event_type:
+            continue
+
+        # Filter by since
+        if since and ts and ts < since:
+            continue
+
+        # Filter by until
+        if until and ts and ts > until:
+            continue
+
+        events_list.append(data)
+
+    if stats:
+        payload = {
+            "total": len(lines),
+            "filtered_count": len(events_list),
+            "event_types": type_counts,
+            "oldest_timestamp": oldest_ts,
+            "newest_timestamp": newest_ts,
+        }
+        _out(ok(payload), json_output)
+        return
+
+    # Apply limit
+    if limit > 0:
+        events_list = events_list[-limit:]
+
+    payload = {
+        "count": len(events_list),
+        "filters": {
+            "type": event_type,
+            "since": since,
+            "until": until,
+            "limit": limit,
+        },
+        "events": events_list,
+    }
+    _out(ok(payload), json_output)
 
 
 @events_app.command("watch")

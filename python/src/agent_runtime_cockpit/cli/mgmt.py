@@ -274,6 +274,81 @@ def doctor_all(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
             }
         )
 
+    # 8. Event log health check
+    try:
+        import json as _json
+
+        from ..events.persistence import DEFAULT_EVENT_LOG_PATH
+
+        event_log_path = ws / DEFAULT_EVENT_LOG_PATH
+        event_log_ok = True
+        event_log_details: list[dict] = []
+        event_log_details.append(
+            {
+                "check": "event_log_exists",
+                "ok": event_log_path.exists(),
+                "path": str(event_log_path),
+            }
+        )
+        if event_log_path.exists():
+            try:
+                event_lines = event_log_path.read_text(encoding="utf-8").splitlines()
+                valid_lines = sum(1 for l in event_lines if l.strip())
+                corrupted = 0
+                for line in event_lines:
+                    line = line.strip()
+                    if line:
+                        try:
+                            _json.loads(line)
+                        except _json.JSONDecodeError:
+                            corrupted += 1
+                event_log_ok = corrupted == 0
+                event_log_details.append(
+                    {
+                        "check": "event_log_not_corrupted",
+                        "ok": event_log_ok,
+                        "total_lines": len(event_lines),
+                        "valid_lines": valid_lines,
+                        "corrupted_lines": corrupted,
+                    }
+                )
+                # Check max_entries
+                max_entries = 2000  # Default from EventPersistenceWriter
+                event_log_details.append(
+                    {
+                        "check": "event_log_within_max_entries",
+                        "ok": len(event_lines) <= max_entries,
+                        "current_count": len(event_lines),
+                        "max_entries": max_entries,
+                    }
+                )
+            except Exception as exc:
+                event_log_ok = False
+                event_log_details.append(
+                    {
+                        "check": "event_log_read_error",
+                        "ok": False,
+                        "error": str(exc),
+                    }
+                )
+        if not event_log_ok:
+            all_ok = False
+        checks.append(
+            {
+                "check": "event_log",
+                "ok": event_log_ok,
+                "details": event_log_details,
+            }
+        )
+    except Exception as e:
+        checks.append(
+            {
+                "check": "event_log",
+                "ok": False,
+                "error": str(e),
+            }
+        )
+
     data = {"ok": all_ok, "checks": checks}
     _out(ok(data), json_output)
     if not all_ok:

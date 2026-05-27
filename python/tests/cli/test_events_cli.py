@@ -1,9 +1,12 @@
-"""Tests for the events CLI commands (Phase 32 / R25, Slice 32.2)."""
+"""Tests for the events CLI commands (Phase 32 / R25, Slice 32.2 + Phase 56)."""
 
 from __future__ import annotations
 
 import json
-from typing import Any
+import os
+import tempfile
+from pathlib import Path
+from typing import Any, Generator
 
 import pytest
 from typer.testing import CliRunner
@@ -121,3 +124,132 @@ def test_event_types_created():
         event = parse_event(payload)
         dump = json.loads(event.model_dump_json())
         assert dump["event_type"] == payload["event_type"]
+
+
+# --- Phase 56: Event Query ---
+
+
+@pytest.fixture
+def tmp_workspace() -> Generator[Path, None, None]:
+    """Create a temp workspace without event log."""
+    with tempfile.TemporaryDirectory() as td:
+        cwd = Path(td)
+        old = Path.cwd()
+        os.chdir(str(cwd))
+        yield cwd
+        os.chdir(str(old))
+
+
+@pytest.fixture
+def tmp_events_log() -> Generator[Path, None, None]:
+    """Create a temp dir with a seeded events JSONL log."""
+    with tempfile.TemporaryDirectory() as td:
+        cwd = Path(td)
+        old = Path.cwd()
+        os.chdir(str(cwd))
+        # Create event log with some events
+        log_dir = cwd / ".arc" / "events"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / "event-log.jsonl"
+
+        import json as _json
+
+        events = [
+            {
+                "seq": 1,
+                "event_type": "run_completed",
+                "run_id": "r1",
+                "timestamp": "2026-01-01T00:00:00",
+            },
+            {
+                "seq": 2,
+                "event_type": "hitl_required",
+                "run_id": "r1",
+                "hitl_id": "h1",
+                "timestamp": "2026-01-01T01:00:00",
+            },
+            {
+                "seq": 3,
+                "event_type": "run_failed",
+                "run_id": "r2",
+                "timestamp": "2026-01-02T00:00:00",
+            },
+            {
+                "seq": 4,
+                "event_type": "run_completed",
+                "run_id": "r3",
+                "timestamp": "2026-01-03T00:00:00",
+            },
+        ]
+        with log_path.open("w") as f:
+            for ev in events:
+                f.write(_json.dumps(ev, separators=(",", ":")) + "\n")
+
+        yield cwd
+        os.chdir(str(old))
+
+
+def test_events_query_registered():
+    """arc events --help shows query subcommand."""
+    result = runner.invoke(app, ["events", "--help"])
+    assert result.exit_code == 0
+    assert "query" in result.stdout
+
+
+def test_events_query_json(tmp_events_log: Path):
+    """arc events query --json returns filtered events."""
+    result = runner.invoke(app, ["events", "query", "--json"])
+    assert result.exit_code == 0, f"Got exit {result.exit_code}: stderr={result.stderr}"
+    data = json.loads(result.stdout)
+    payload = data.get("data", data)
+    assert payload.get("count") == 4
+    assert len(payload.get("events", [])) == 4
+
+
+def test_events_query_filter_type(tmp_events_log: Path):
+    """arc events query --type run_completed --json filters correctly."""
+    result = runner.invoke(app, ["events", "query", "--type", "run_completed", "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)
+    payload = data.get("data", data)
+    events = payload.get("events", [])
+    assert payload.get("count") == 2
+    assert all(e["event_type"] == "run_completed" for e in events)
+
+
+def test_events_query_limit(tmp_events_log: Path):
+    """arc events query --limit 2 --json limits results."""
+    result = runner.invoke(app, ["events", "query", "--limit", "2", "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)
+    payload = data.get("data", data)
+    assert payload.get("count") == 2
+
+
+def test_events_query_stats(tmp_events_log: Path):
+    """arc events query --stats --json returns type counts."""
+    result = runner.invoke(app, ["events", "query", "--stats", "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)
+    payload = data.get("data", data)
+    assert "event_types" in payload
+    assert payload["event_types"]["run_completed"] == 2
+    assert payload["event_types"]["hitl_required"] == 1
+    assert payload["event_types"]["run_failed"] == 1
+
+
+def test_events_query_since(tmp_events_log: Path):
+    """arc events query --since 2026-01-02 --json filters by timestamp."""
+    result = runner.invoke(app, ["events", "query", "--since", "2026-01-02T00:00:00", "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)
+    payload = data.get("data", data)
+    assert payload.get("count") == 2  # r2 and r3 events
+
+
+def test_events_query_no_log(tmp_workspace: Path):
+    """arc events query --json with no event log returns error."""
+    result = runner.invoke(app, ["events", "query", "--json"])
+    assert result.exit_code == 1
+    data = json.loads(result.stdout)
+    assert data.get("ok") is False

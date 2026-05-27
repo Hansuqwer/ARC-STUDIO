@@ -1,9 +1,11 @@
-"""Task commands: create, status, list, cancel (Phase 27)."""
+"""Task commands: create, status, list, cancel (Phase 27 / Phase 56)."""
 
 from __future__ import annotations
 
+import json as json_mod
+import os
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import typer
 
@@ -11,6 +13,73 @@ from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
 from ._helpers import DEBUG_FLAG, JSON_FLAG, _out, _setup_logging
 from ._subapps import task_app
+
+
+def _daemon_base_url() -> Optional[str]:
+    """Get daemon base URL from env, or None."""
+    return os.environ.get("ARC_PYTHON_DAEMON_URL") or None
+
+
+def _try_daemon_get(path: str) -> Optional[dict[str, Any]]:
+    """Try to GET from daemon. Returns parsed JSON or None on failure."""
+    base = _daemon_base_url()
+    if not base:
+        return None
+    try:
+        import httpx
+
+        resp = httpx.get(f"{base.rstrip('/')}{path}", timeout=5.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            if isinstance(data, dict) and data.get("ok"):
+                return data.get("data") or data
+        return None
+    except Exception:
+        return None
+
+
+def _try_daemon_delete(path: str) -> Optional[dict[str, Any]]:
+    """Try to DELETE from daemon. Returns parsed JSON or None on failure."""
+    base = _daemon_base_url()
+    if not base:
+        return None
+    try:
+        import httpx
+
+        resp = httpx.delete(f"{base.rstrip('/')}{path}", timeout=5.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            if isinstance(data, dict) and data.get("ok"):
+                return data.get("data") or data
+        return None
+    except Exception:
+        return None
+
+
+def _get_local_executor() -> Any:
+    """Get local TaskExecutor."""
+    from ..tasks import TaskExecutor, TaskStorage
+
+    storage = TaskStorage(Path.cwd() / ".arc" / "tasks.db")
+    return TaskExecutor(storage)
+
+
+def _task_to_payload(task: Any) -> dict[str, Any]:
+    """Convert a Task to a dict payload."""
+    return {
+        "task_id": task["id"] if isinstance(task, dict) else task.id,
+        "type": task["type"] if isinstance(task, dict) else task.type.value,
+        "operation": task["operation"] if isinstance(task, dict) else task.operation,
+        "status": task["status"] if isinstance(task, dict) else task.status.value,
+        "created_at": task["created_at"] if isinstance(task, dict) else task.created_at,
+        "started_at": task.get("started_at") if isinstance(task, dict) else task.started_at,
+        "ended_at": task.get("ended_at") if isinstance(task, dict) else task.ended_at,
+        "expires_at": task["expires_at"] if isinstance(task, dict) else task.expires_at,
+        "retry_count": task.get("retry_count", 0) if isinstance(task, dict) else task.retry_count,
+        "max_retries": task.get("max_retries", 3) if isinstance(task, dict) else task.max_retries,
+        "result": task.get("result") if isinstance(task, dict) else task.result,
+        "error": task.get("error") if isinstance(task, dict) else task.error,
+    }
 
 
 @task_app.command("create")
@@ -26,7 +95,6 @@ def task_create(
 ) -> None:
     """Create a new async task for execution."""
     _setup_logging(debug)
-    import json as json_mod
 
     from ..tasks import Task, TaskExecutor, TaskStorage, TaskType
 
@@ -90,13 +158,48 @@ def task_status(
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
-    """Get status of a task."""
+    """Get status of a task.
+
+    Tries daemon HTTP API first; falls back to local TaskStorage.
+    """
     _setup_logging(debug)
 
-    from ..tasks import TaskExecutor, TaskStorage
+    # Try daemon first
+    daemon_result = _try_daemon_get(f"/api/tasks/{task_id}")
+    if daemon_result is not None:
+        task_data = daemon_result.get("data") or daemon_result
+        payload = _task_to_payload(task_data)
+        _out(ok(payload), json_output)
+        if not json_output:
+            from ._app import console
 
-    storage = TaskStorage(Path.cwd() / ".arc" / "tasks.db")
-    executor = TaskExecutor(storage)
+            status_color = {
+                "pending": "yellow",
+                "running": "blue",
+                "completed": "green",
+                "failed": "red",
+                "cancelled": "gray",
+            }.get(payload["status"], "white")
+            console.print(f"Task: [bold]{payload['task_id']}[/bold]")
+            console.print(f"Type: {payload['type']}, Operation: {payload['operation']}")
+            console.print(
+                f"Status: [bold {status_color}]{payload['status'].upper()}[/bold {status_color}]"
+            )
+            console.print(f"Created: {payload['created_at']}")
+            if payload.get("started_at"):
+                console.print(f"Started: {payload['started_at']}")
+            if payload.get("ended_at"):
+                console.print(f"Ended: {payload['ended_at']}")
+            if payload.get("retry_count", 0) > 0:
+                console.print(f"Retries: {payload['retry_count']}/{payload['max_retries']}")
+            if payload.get("result"):
+                console.print(f"Result: {payload['result']}")
+            if payload.get("error"):
+                console.print(f"[red]Error: {payload['error']}[/red]")
+        return
+
+    # Fallback: local storage
+    executor = _get_local_executor()
     task = executor.get_task_status(task_id)
 
     if not task:
@@ -106,20 +209,7 @@ def task_status(
         )
         raise typer.Exit(1)
 
-    payload = {
-        "task_id": task.id,
-        "type": task.type.value,
-        "operation": task.operation,
-        "status": task.status.value,
-        "created_at": task.created_at,
-        "started_at": task.started_at,
-        "ended_at": task.ended_at,
-        "expires_at": task.expires_at,
-        "retry_count": task.retry_count,
-        "max_retries": task.max_retries,
-        "result": task.result,
-        "error": task.error,
-    }
+    payload = _task_to_payload(task)
     _out(ok(payload), json_output)
 
     if not json_output:
@@ -131,24 +221,24 @@ def task_status(
             "completed": "green",
             "failed": "red",
             "cancelled": "gray",
-        }.get(task.status.value, "white")
+        }.get(payload["status"], "white")
 
-        console.print(f"Task: [bold]{task.id}[/bold]")
-        console.print(f"Type: {task.type.value}, Operation: {task.operation}")
+        console.print(f"Task: [bold]{payload['task_id']}[/bold]")
+        console.print(f"Type: {payload['type']}, Operation: {payload['operation']}")
         console.print(
-            f"Status: [bold {status_color}]{task.status.value.upper()}[/bold {status_color}]"
+            f"Status: [bold {status_color}]{payload['status'].upper()}[/bold {status_color}]"
         )
-        console.print(f"Created: {task.created_at}")
-        if task.started_at:
-            console.print(f"Started: {task.started_at}")
-        if task.ended_at:
-            console.print(f"Ended: {task.ended_at}")
-        if task.retry_count > 0:
-            console.print(f"Retries: {task.retry_count}/{task.max_retries}")
-        if task.result:
-            console.print(f"Result: {task.result}")
-        if task.error:
-            console.print(f"[red]Error: {task.error}[/red]")
+        console.print(f"Created: {payload['created_at']}")
+        if payload.get("started_at"):
+            console.print(f"Started: {payload['started_at']}")
+        if payload.get("ended_at"):
+            console.print(f"Ended: {payload['ended_at']}")
+        if payload.get("retry_count", 0) > 0:
+            console.print(f"Retries: {payload['retry_count']}/{payload['max_retries']}")
+        if payload.get("result"):
+            console.print(f"Result: {payload['result']}")
+        if payload.get("error"):
+            console.print(f"[red]Error: {payload['error']}[/red]")
 
 
 @task_app.command("list")
@@ -159,16 +249,20 @@ def task_list(
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
-    """List tasks with optional filters."""
+    """List tasks with optional filters.
+
+    Tries daemon HTTP API first; falls back to local TaskStorage.
+    """
     _setup_logging(debug)
 
-    from ..tasks import TaskExecutor, TaskStatus, TaskStorage, TaskType
+    from ..tasks import TaskStatus, TaskType
 
     # Validate filters
-    status_enum = None
+    status_val = None
+    type_val = None
     if status:
         try:
-            status_enum = TaskStatus(status)
+            status_val = TaskStatus(status).value
         except ValueError:
             _out(
                 err(
@@ -179,10 +273,9 @@ def task_list(
             )
             raise typer.Exit(1)
 
-    type_enum = None
     if task_type:
         try:
-            type_enum = TaskType(task_type)
+            type_val = TaskType(task_type).value
         except ValueError:
             _out(
                 err(
@@ -193,27 +286,37 @@ def task_list(
             )
             raise typer.Exit(1)
 
-    # List tasks
-    storage = TaskStorage(Path.cwd() / ".arc" / "tasks.db")
-    executor = TaskExecutor(storage)
-    tasks = executor.list_tasks(status=status_enum, task_type=type_enum, limit=limit)
+    # Try daemon first
+    params = []
+    if status_val:
+        params.append(f"status={status_val}")
+    if type_val:
+        params.append(f"type={type_val}")
+    params.append(f"limit={limit}")
+    qs = "&".join(params)
+    daemon_result = _try_daemon_get(f"/api/tasks?{qs}")
+
+    if daemon_result is not None:
+        raw_tasks = daemon_result.get("data") or daemon_result
+        if isinstance(raw_tasks, list):
+            tasks_data = raw_tasks
+        elif isinstance(raw_tasks, dict) and "tasks" in raw_tasks:
+            tasks_data = raw_tasks["tasks"]
+        elif isinstance(raw_tasks, dict):
+            tasks_data = [raw_tasks]
+        else:
+            tasks_data = []
+    else:
+        # Fallback: local storage
+        executor = _get_local_executor()
+        status_enum = TaskStatus(status_val) if status_val else None
+        type_enum = TaskType(type_val) if type_val else None
+        tasks_data = executor.list_tasks(status=status_enum, task_type=type_enum, limit=limit)
 
     payload = {
-        "count": len(tasks),
+        "count": len(tasks_data),
         "filters": {"status": status, "type": task_type, "limit": limit},
-        "tasks": [
-            {
-                "task_id": t.id,
-                "type": t.type.value,
-                "operation": t.operation,
-                "status": t.status.value,
-                "created_at": t.created_at,
-                "started_at": t.started_at,
-                "ended_at": t.ended_at,
-                "retry_count": t.retry_count,
-            }
-            for t in tasks
-        ],
+        "tasks": [_task_to_payload(t) if not isinstance(t, dict) else t for t in tasks_data],
     }
     _out(ok(payload), json_output)
 
@@ -227,19 +330,20 @@ def task_list(
             filter_desc.append(f"type={task_type}")
         filter_str = f" ({', '.join(filter_desc)})" if filter_desc else ""
 
-        console.print(f"Tasks{filter_str}: {len(tasks)} found")
-        for t in tasks:
+        console.print(f"Tasks{filter_str}: {len(tasks_data)} found")
+        for t in tasks_data:
+            tinfo = t if isinstance(t, dict) else _task_to_payload(t)
             status_color = {
                 "pending": "yellow",
                 "running": "blue",
                 "completed": "green",
                 "failed": "red",
                 "cancelled": "gray",
-            }.get(t.status.value, "white")
+            }.get(tinfo["status"], "white")
             console.print(
-                f"  [{status_color}]{t.status.value:10}[/{status_color}] "
-                f"{t.id[:8]}... {t.type.value:5} {t.operation:20} "
-                f"(created: {t.created_at})"
+                f"  [{status_color}]{tinfo['status']:10}[/{status_color}] "
+                f"{tinfo['task_id'][:8]}... {tinfo['type']:5} {tinfo['operation']:20} "
+                f"(created: {tinfo['created_at']})"
             )
 
 
@@ -249,13 +353,27 @@ def task_cancel(
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
-    """Cancel a running or pending task."""
+    """Cancel a running or pending task.
+
+    Tries daemon HTTP API first; falls back to local TaskStorage.
+    """
     _setup_logging(debug)
 
-    from ..tasks import TaskExecutor, TaskStorage
+    # Try daemon first
+    daemon_result = _try_daemon_delete(f"/api/tasks/{task_id}")
+    if daemon_result is not None:
+        cancelled = daemon_result.get("cancelled", True)
+        if cancelled:
+            payload = {"task_id": task_id, "cancelled": True}
+            _out(ok(payload), json_output)
+            if not json_output:
+                from ._app import console
 
-    storage = TaskStorage(Path.cwd() / ".arc" / "tasks.db")
-    executor = TaskExecutor(storage)
+                console.print(f"Task cancelled: [bold]{task_id}[/bold]")
+            return
+
+    # Fallback: local storage
+    executor = _get_local_executor()
     cancelled = executor.cancel_task(task_id)
 
     if not cancelled:
