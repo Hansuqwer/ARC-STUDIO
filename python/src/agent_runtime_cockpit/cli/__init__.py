@@ -32,6 +32,7 @@ from . import (
     runs,  # noqa: F401
     sandbox,  # noqa: F401
     studio_workspace,  # noqa: F401
+    swarmgraph,  # noqa: F401 — Phase 51: arc swarmgraph assess-risk
 )
 from ._app import app, main
 

@@ -40,3 +40,7 @@ batch_app = typer.Typer(name="batch", help="Deterministic Phase 42 batch command
 events_app = typer.Typer(
     name="events", help="Event notifications, watch, and webhooks (Phase 32 / R25)"
 )
+swarmgraph_app = typer.Typer(
+    name="swarmgraph",
+    help="SwarmGraph commands — risk assessment, consensus protocol (Phase 51 / R24)",
+)

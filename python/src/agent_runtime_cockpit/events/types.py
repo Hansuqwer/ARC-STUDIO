@@ -82,6 +82,22 @@ class SessionChanged(ArcEvent):
     workspace: str
 
 
+class AuditOverrideEvent(ArcEvent):
+    """Emitted when a user overrides an automated protocol/risk decision.
+
+    Phase 51: records operator overrides for the adaptive consensus protocol
+    so they can be audited and reviewed.
+    """
+
+    event_type: Literal["audit_override"] = "audit_override"
+    override_type: str  # e.g. "protocol_override"
+    original_value: str  # e.g. "bft_escrow"
+    override_value: str  # e.g. "raft"
+    operator_id: str = "cli"
+    reason: str = ""
+    context: dict = {}  # type: ignore[assignment]
+
+
 EVENT_TYPE_MAP: dict[str, type[ArcEvent]] = {
     "hitl_required": HitlRequired,
     "hitl_decided": HitlDecided,
@@ -90,6 +106,7 @@ EVENT_TYPE_MAP: dict[str, type[ArcEvent]] = {
     "run_failed": RunFailed,
     "quota_warning": QuotaWarning,
     "session_changed": SessionChanged,
+    "audit_override": AuditOverrideEvent,
 }
 
 

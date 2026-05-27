@@ -2873,3 +2873,43 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md docs/security
 ### Known Risks
 - `run_events_sse` endpoint trust check deferred to Phase 52 SSE hardening (trust at connect time).
 - Provider/routing/account endpoints not yet workspace-scoped; no workspace data exposed.
+
+---
+
+## Phase 51 — Adaptive Consensus Protocol
+
+**Roadmap:** R24  
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/swarmgraph/test_adaptive_consensus.py -q` (15 passed); `cd python && uv run ruff check src tests` (OK); `cd python && uv run pytest tests/ -q` (2928 passed / 34 skipped / 3 xfailed)  
+**Depends on:** Phase 50 (Baseline Complete), Phase 30 (Consensus Escrow, complete)
+
+### Deliverables
+1. `python/src/agent_runtime_cockpit/swarmgraph/adaptive_consensus.py` — `AdaptiveRiskAssessment` model and `assess_risk()` with workspace-trust, file-type, runtime, and keyword context escalation. Wraps Phase 31 `assess_prompt_risk` heuristic. No LLM dependency.
+2. `cli/swarmgraph.py` — `arc swarmgraph assess-risk` command with `--task`, `--runtime`, `--override-protocol`, `--json` flags.
+3. `cli/_subapps.py` + `cli/_app.py` — `swarmgraph_app` Typer subapp registered.
+4. `events/types.py` — `AuditOverrideEvent` typed event for operator overrides.
+5. `tests/swarmgraph/test_adaptive_consensus.py` — 15 tests covering 100-fixture accuracy gate (90%+), protocol mapping, override audit, no-LLM structural check, context escalation signals, CLI JSON output.
+
+### Accuracy
+- 100 fixtures (25 low, 25 medium, 25 high, 25 critical) from Phase 31 `RISK_FIXTURES`.
+- `assess_risk()` achieves 100/100 on trusted-workspace no-context path.
+- Context escalation tests verify untrusted workspace → high, production runtime → high, .env file type → high.
+
+### Protocol selection matrix
+| Risk | Protocol |
+|------|----------|
+| low | simple_majority |
+| medium | raft |
+| high | bft |
+| critical | bft_escrow (uses ConsensusEscrow) |
+
+### Acceptance
+1. `assess_risk()` classifies ≥90/100 fixtures correctly.
+2. Each protocol mapping tested.
+3. Override recorded in AuditOverrideEvent on event bus.
+4. No LLM dependency (structural test).
+5. Context signals escalate risk.
+6. CLI returns ok(result) JSON envelope.
+
+### Known Risks
+- ConsensusEscrow integration is protocol-level only; full escrow execution remains Phase 30 scope.
+- `paid_call_allowed` parameter is accepted but not used for risk calculation (forward-compatible slot).
