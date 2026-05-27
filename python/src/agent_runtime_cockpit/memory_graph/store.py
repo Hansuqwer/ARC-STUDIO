@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 from typing import Iterable
 
+from ..security.redaction import REDACT_PLACEHOLDER, Redactor
 from .models import MemoryEdge, MemoryGraphSnapshot, MemoryNode, utc_now
 
 DEFAULT_MEMORY_GRAPH_PATH = Path(".arc") / "memory" / "graph.json"
@@ -80,6 +81,27 @@ class MemoryGraphStore:
             ]
         return sorted(nodes, key=lambda n: (-n.frequency, -n.confidence, n.text))[:limit]
 
+    def forget_run(self, run_id: str) -> MemoryGraphSnapshot:
+        snapshot = self.load()
+        nodes: list[MemoryNode] = []
+        removed_ids: set[str] = set()
+        for node in snapshot.nodes:
+            node.source_run_ids = [source for source in node.source_run_ids if source != run_id]
+            if node.source_run_ids:
+                node.frequency = max(1, min(node.frequency, len(node.source_run_ids)))
+                node.updated_at = utc_now()
+                nodes.append(node)
+            else:
+                removed_ids.add(node.id)
+        edges = [
+            edge
+            for edge in snapshot.edges
+            if edge.source_id not in removed_ids and edge.target_id not in removed_ids
+        ]
+        updated = MemoryGraphSnapshot(nodes=nodes, edges=edges)
+        self.save(updated)
+        return updated
+
 
 def extract_memories_from_runs(trace_dir: Path, limit: int = 10) -> MemoryGraphSnapshot:
     """Extract deterministic local-only memories from stored JSONL run/event traces."""
@@ -130,12 +152,13 @@ def _trace_paths(trace_dir: Path, limit: int) -> Iterable[Path]:
 
 def _trace_text(path: Path) -> str:
     chunks: list[str] = []
+    redactor = Redactor()
     for line in path.read_text(encoding="utf-8").splitlines():
         try:
             data = json.loads(line)
         except json.JSONDecodeError:
             continue
-        chunks.extend(_strings(data))
+        chunks.extend(_strings(redactor.redact_dict(data)))
     return " ".join(chunks)
 
 
@@ -162,6 +185,8 @@ def _candidate_memories(text: str) -> list[tuple[str, str, float]]:
     for token in TOKEN_RE.findall(text):
         norm = token.lower()
         if norm not in STOPWORDS and len(norm) >= 4:
+            if norm == REDACT_PLACEHOLDER.lower().strip("[]"):
+                continue
             candidates.append(("concept", norm, 0.45))
     unique: dict[tuple[str, str], tuple[str, str, float]] = {}
     for item in candidates:

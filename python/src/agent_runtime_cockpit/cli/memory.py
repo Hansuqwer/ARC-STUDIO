@@ -61,3 +61,27 @@ def memory_show(
     ws = _workspace(workspace)
     snapshot = MemoryGraphStore(ws / ".arc" / "memory" / "graph.json").load()
     _out(ok(snapshot.model_dump(), workspace=str(ws)), json_output)
+
+
+@memory_app.command("forget-run")
+def memory_forget_run(
+    run_id: str = typer.Argument(..., help="Run ID to remove from memory source links"),
+    workspace: str | None = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+) -> None:
+    """Remove memories sourced only from a specific run."""
+    from ..memory_graph.store import MemoryGraphStore
+
+    ws = _workspace(workspace)
+    snapshot = MemoryGraphStore(ws / ".arc" / "memory" / "graph.json").forget_run(run_id)
+    _out(
+        ok(
+            {
+                "run_id": run_id,
+                "nodes_remaining": len(snapshot.nodes),
+                "edges_remaining": len(snapshot.edges),
+            },
+            workspace=str(ws),
+        ),
+        json_output,
+    )

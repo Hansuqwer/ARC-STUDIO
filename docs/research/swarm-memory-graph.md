@@ -13,7 +13,7 @@
 
 ## Extraction Prototype
 
-`arc memory extract` scans up to 10 local JSONL traces by default and extracts deterministic keyword/phrase memories. It does not call providers or execute trace content.
+`arc memory extract` scans up to 10 local JSONL traces by default and extracts deterministic keyword/phrase memories. It does not call providers or execute trace content. Phase 60 applies existing ARC redaction before extraction and records `redaction_applied=true` in the snapshot.
 
 ## Evaluation Plan
 
@@ -29,7 +29,8 @@ Required before productizing memory-assisted runs:
 
 - Memory is workspace-local only.
 - Source run IDs are retained for deletion/audit traceability.
-- Raw secret scanning is not yet integrated; do not ingest arbitrary private traces into shared memory.
+- Phase 60 applies ARC redaction before extraction. This is a guardrail, not proof that all private data is removed.
+- `arc memory forget-run <run_id>` removes source links and drops memories sourced only from that run.
 - Cross-workspace or tenant memory is blocked until tenant isolation and deletion semantics are designed/tested.
 
 ## Decision

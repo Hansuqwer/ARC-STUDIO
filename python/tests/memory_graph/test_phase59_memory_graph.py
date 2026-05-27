@@ -101,3 +101,72 @@ def test_cli_memory_show_empty_json(tmp_path: Path) -> None:
     payload = json.loads(result.stdout)["data"]
     assert payload["nodes"] == []
     assert payload["tenant_isolation"] == "not_claimed"
+
+
+def test_extraction_redacts_secret_values(tmp_path: Path) -> None:
+    traces = tmp_path / ".arc" / "traces"
+    traces.mkdir(parents=True)
+    (traces / "r-secret.jsonl").write_text(
+        json.dumps(
+            {"api_key": "sk-secret123456789012345678901234567890", "message": "sandbox risk"}
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    snapshot = extract_memories_from_runs(traces)
+    raw = snapshot.model_dump_json()
+    assert "sk-secret" not in raw
+    assert snapshot.redaction_applied is True
+
+
+def test_store_forget_run_removes_source_only_nodes(tmp_path: Path) -> None:
+    store = MemoryGraphStore(tmp_path / "graph.json")
+    store.save(
+        MemoryGraphSnapshot(
+            nodes=[
+                MemoryNode(
+                    id="a",
+                    type="concept",
+                    text="sandbox",
+                    confidence=0.5,
+                    source_run_ids=["r1"],
+                ),
+                MemoryNode(
+                    id="b",
+                    type="concept",
+                    text="policy",
+                    confidence=0.5,
+                    source_run_ids=["r1", "r2"],
+                ),
+            ]
+        )
+    )
+    snapshot = store.forget_run("r1")
+    assert [node.id for node in snapshot.nodes] == ["b"]
+    assert snapshot.nodes[0].source_run_ids == ["r2"]
+
+
+def test_cli_memory_forget_run_json(tmp_path: Path) -> None:
+    old = Path.cwd()
+    os.chdir(tmp_path)
+    try:
+        store = MemoryGraphStore(tmp_path / ".arc" / "memory" / "graph.json")
+        store.save(
+            MemoryGraphSnapshot(
+                nodes=[
+                    MemoryNode(
+                        id="a",
+                        type="concept",
+                        text="sandbox",
+                        confidence=0.5,
+                        source_run_ids=["r1"],
+                    )
+                ]
+            )
+        )
+        result = CliRunner().invoke(app, ["memory", "forget-run", "r1", "--json"])
+        assert result.exit_code == 0, result.stderr
+        payload = json.loads(result.stdout)["data"]
+        assert payload["nodes_remaining"] == 0
+    finally:
+        os.chdir(old)

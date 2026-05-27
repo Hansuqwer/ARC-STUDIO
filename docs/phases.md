@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-27 — Phases 56-59 Baseline Complete.  
-**Current evidence anchor:** local worktree | Phases 56-58 verification pass: 3017 Python tests passed; ruff OK; protocol build OK; extension build OK. Phase 59 targeted verification: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/memory_graph/test_phase59_memory_graph.py -q` 6 passed.  
+**Last reality refresh:** 2026-05-27 — Phases 56-60 Baseline Complete.  
+**Current evidence anchor:** local worktree | Phases 56-58 verification pass: 3017 Python tests passed; ruff OK; protocol build OK; extension build OK. Phase 60 targeted verification: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/memory_graph/test_phase59_memory_graph.py -q` 9 passed.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -2354,6 +2354,7 @@ pnpm typecheck
 | **57** | **R37 residual** | **Provider config IDE bridge + REPL integration** |
 | **58** | **R22 residual** | **Cross-session eval workflow + trend tracking** |
 | **59** | **R26** | **Swarm Memory Graph research prototype** |
+| **60** | **R26** | **Memory graph privacy guardrails + run deletion semantics** |
 
 ### Dependencies
 
@@ -2385,6 +2386,7 @@ pnpm typecheck
 | 57 Provider Config Bridge | Baseline Complete | Phase 55, R37 | Provider account daemon routes, REPL provider commands, TS config service bridge |
 | 58 Eval Trend Tracking | Baseline Complete | Phase 53, Phase 56 | Golden-dir eval run, eval_completed event, trending/dashboard CLI |
 | 59 Memory Graph Research | Baseline Complete (research prototype) | R26 | Local-only memory schema/store/extract/query CLI; no runtime prompt wiring or claimed lift |
+| 60 Memory Privacy Guardrails | Baseline Complete | Phase 59 | Redaction-before-extraction, snapshot redaction flag, `arc memory forget-run` source deletion semantics |
 
 ---
 
@@ -2456,6 +2458,29 @@ pnpm typecheck
 - Extraction is keyword/phrase based; no quality/cost lift demonstrated.
 - Secret redaction is not integrated into memory ingestion yet.
 - Cross-workspace/tenant memory remains blocked.
+
+## Phase 60 — Memory Graph Privacy Guardrails and Run Deletion Semantics
+
+**Roadmap:** R26 privacy analysis follow-up  
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/memory_graph/test_phase59_memory_graph.py -q` 9 passed  
+
+### Deliverables
+1. Memory extraction applies existing ARC `Redactor` before candidate generation.
+2. `MemoryGraphSnapshot.redaction_applied` records the guardrail state.
+3. `MemoryGraphStore.forget_run(run_id)` removes source links and drops source-only memories/edges.
+4. `arc memory forget-run <run_id>` exposes deletion semantics.
+5. Research docs updated with privacy/deletion posture.
+
+### Acceptance
+1. Secret-like trace values are not persisted into extracted memories in tests.
+2. Run deletion removes source-only memory nodes.
+3. CLI returns stable envelope for `forget-run`.
+4. Docs avoid tenant-isolation or complete-redaction claims.
+
+### Known Risks
+- Redaction is pattern-based and not proof of complete privacy removal.
+- No cross-workspace deletion index exists because cross-workspace memory remains unsupported.
+- Runtime prompt injection remains deferred.
 
 ### Critical Path
 

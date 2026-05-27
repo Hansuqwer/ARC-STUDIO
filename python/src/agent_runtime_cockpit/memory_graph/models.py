@@ -43,3 +43,4 @@ class MemoryGraphSnapshot(BaseModel):
     edges: list[MemoryEdge] = Field(default_factory=list)
     privacy_mode: Literal["local_workspace_only"] = "local_workspace_only"
     tenant_isolation: Literal["not_claimed"] = "not_claimed"
+    redaction_applied: bool = True
