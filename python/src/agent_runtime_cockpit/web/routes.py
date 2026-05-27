@@ -29,7 +29,8 @@ from ..arena.service import (
 from ..context.pack import ContextPackGenerator
 from ..evals.diff import diff_runs
 from ..events.bus import get_bus
-from ..events.types import SessionChanged
+from ..events.persistence import get_writer
+from ..events.types import ArcEvent, SessionChanged
 from ..gating import GatingError
 from ..orchestration import runtime_router
 from ..orchestration.cross_linker import CrossLinker
@@ -1051,6 +1052,112 @@ async def arena_rankings(request: web.Request) -> web.Response:
     return _json(ok(rankings).model_dump())
 
 
+_SSE_PUSH_EVENT_TYPES = frozenset(
+    {
+        "session_changed",
+        "hitl_required",
+        "audit_verified",
+        "run_completed",
+        "run_failed",
+        "quota_warning",
+    }
+)
+
+
+async def events_stream(request: web.Request) -> web.StreamResponse:
+    """GET /api/events/stream — local SSE push for session/run/audit events.
+
+    Pushes: session_changed, hitl_required, audit_verified, run_completed,
+    run_failed, quota_warning.
+
+    Requires workspace trust at connect time (returns 403 before streaming).
+
+    Supports ``Last-Event-ID`` header: client sends the last event_id it saw;
+    persisted events with seq > last_seen_id are replayed first.
+
+    No WebSocket. No shared-server. No remote-sync. Local daemon only.
+    """
+    import asyncio
+
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "events_stream", "daemon-events-stream", 0)
+    except TrustEnforcementError as exc:
+        return _json(err(ArcErrorCode.PERMISSION_DENIED, str(exc)).model_dump(), 403)
+
+    response = web.StreamResponse(
+        headers={
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": _cors_origin(),
+        }
+    )
+    await response.prepare(request)
+
+    # Parse Last-Event-ID for resume
+    last_seen_raw = request.headers.get("Last-Event-ID", "").strip()
+    last_seen_id: int | None = None
+    if last_seen_raw:
+        try:
+            last_seen_id = int(last_seen_raw)
+        except ValueError:
+            pass
+
+    # Replay persisted events first (within last 500)
+    log_path = workspace / ".arc" / "events" / "event-log.jsonl"
+    writer = get_writer(log_path)
+    for seq, event in writer.replay_from(last_seen_id):
+        if event.event_type not in _SSE_PUSH_EVENT_TYPES:
+            continue
+        payload = json.dumps(event.model_dump(mode="json"), default=str)
+        await response.write(f"id: {seq}\nevent: {event.event_type}\ndata: {payload}\n\n".encode())
+
+    # Subscribe to live events
+    bus = get_bus()
+    queue = bus.stream("*")
+
+    # Also subscribe to bus to persist new events
+    def _persist_and_publish(ev: "ArcEvent") -> None:  # noqa: F821
+        writer.write(ev)
+
+    bus.subscribe_all(_persist_and_publish)
+
+    try:
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=30.0)
+            except asyncio.TimeoutError:
+                # Send heartbeat to keep connection alive
+                await response.write(b": heartbeat\n\n")
+                if response.task is None or response.task.done():
+                    break
+                continue
+
+            if event is None:
+                # Bus closed
+                break
+
+            if event.event_type not in _SSE_PUSH_EVENT_TYPES:
+                continue
+
+            # Get seq from writer (written by _persist_and_publish)
+            payload = json.dumps(event.model_dump(mode="json"), default=str)
+            await response.write(f"event: {event.event_type}\ndata: {payload}\n\n".encode())
+
+            # Check if client disconnected
+            if response.task is not None and response.task.done():
+                break
+
+    except (ConnectionResetError, asyncio.CancelledError):
+        pass
+    finally:
+        bus.close_stream("*", queue)
+        bus.unsubscribe_all(_persist_and_publish)
+
+    return response
+
+
 def setup_routes(app: web.Application) -> None:
     app.router.add_get("/health", health)
     app.router.add_get("/api/inspect", inspect)
@@ -1068,6 +1175,7 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_delete("/api/sessions/{session_id}", sessions_delete)
     app.router.add_patch("/api/sessions/{session_id}", sessions_update)
     app.router.add_get("/api/sse/proof", sse_proof)
+    app.router.add_get("/api/events/stream", events_stream)
     app.router.add_post("/api/telemetry/export/{run_id}", export_trace)
     app.router.add_get("/api/context/pack", context_pack)
     app.router.add_get("/api/providers", providers)

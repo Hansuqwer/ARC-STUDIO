@@ -1,10 +1,16 @@
 /**
- * SessionBridgeService — Read/Write Local Session Bridge (Phase 43 + Phase 46)
+ * SessionBridgeService — Read/Write Local Session Bridge (Phase 43 + Phase 46 + Phase 52)
  *
  * Provides read-only access to local ARC Studio chat sessions by shelling
  * out to `arc studio sessions --json` and `arc studio sessions show <id> --json`.
  *
  * Phase 46 adds write methods: importSession(), deleteSession(), updateSessionField().
+ *
+ * Phase 52 adds SSE push for session_changed events:
+ * - If daemon available: subscribes to GET /api/events/stream (SSE, local daemon only).
+ *   Calls onSessionChanged when a session_changed event arrives.
+ * - CLI polling remains as fallback if SSE is not available.
+ * - No WebSocket. No shared-server. No remote-sync. SSE is local daemon only.
  *
  * CONSTRAINTS:
  * - Uses argv-only execFileSync / execFileSyncWithStdin; shell option is NEVER set to true.
@@ -12,10 +18,6 @@
  * - Write methods are serialized via a per-instance Promise-chain mutex.
  *   This is a second-layer defense to reduce contention against the authoritative
  *   Python-side advisory lock (fcntl.flock in storage/advisory_lock.py).
- * - Daemon write protocol is deliberately deferred.
- *   TODO(Phase 47): upgrade to daemon IPC/WebSocket write protocol once
- *   the daemon wire format and session-change events are designed and tested.
- *   See docs/research/cli-session-sharing-protocol.md.
  *
  * Allowed fields for updateSessionField(): mode, runtime_mode, profile_id, isolation_id.
  * History mutation from the IDE is intentionally blocked.
@@ -57,6 +59,97 @@ function canonicalDaemonErrorCode(code: string): ArcErrorCode {
     return ArcErrorCode.UNKNOWN;
 }
 
+/**
+ * EventSource-like interface for testability.
+ * In production this is the global EventSource (or a Node.js polyfill).
+ * In tests it is replaced with a mock.
+ */
+export interface IEventSourceFactory {
+    create(url: string): IEventSource;
+}
+
+export interface IEventSource {
+    onmessage: ((event: { data: string; lastEventId?: string }) => void) | null;
+    onerror: ((event: unknown) => void) | null;
+    addEventListener(type: string, listener: (event: { data: string; lastEventId?: string }) => void): void;
+    close(): void;
+}
+
+/** Default factory using Node.js fetch-based SSE (no native EventSource in Node). */
+class FetchSSEEventSource implements IEventSource {
+    onmessage: ((event: { data: string; lastEventId?: string }) => void) | null = null;
+    onerror: ((event: unknown) => void) | null = null;
+    private _abortController = new AbortController();
+    private _listeners: Map<string, ((e: { data: string; lastEventId?: string }) => void)[]> = new Map();
+
+    constructor(url: string) {
+        this._connect(url);
+    }
+
+    addEventListener(type: string, listener: (event: { data: string; lastEventId?: string }) => void): void {
+        const existing = this._listeners.get(type) ?? [];
+        this._listeners.set(type, [...existing, listener]);
+    }
+
+    close(): void {
+        this._abortController.abort();
+    }
+
+    private async _connect(url: string): Promise<void> {
+        try {
+            const response = await fetch(url, {
+                signal: this._abortController.signal,
+                headers: { Accept: 'text/event-stream' },
+            });
+            if (!response.ok || !response.body) {
+                this.onerror?.({ type: 'error', status: response.status });
+                return;
+            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let eventType = 'message';
+            let lastEventId = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() ?? '';
+
+                for (const line of lines) {
+                    if (line.startsWith('event: ')) {
+                        eventType = line.slice(7).trim();
+                    } else if (line.startsWith('id: ')) {
+                        lastEventId = line.slice(4).trim();
+                    } else if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        const ev = { data, lastEventId };
+                        if (eventType === 'message') {
+                            this.onmessage?.(ev);
+                        }
+                        const listeners = this._listeners.get(eventType) ?? [];
+                        listeners.forEach(l => l(ev));
+                        // Reset for next event
+                        eventType = 'message';
+                    }
+                }
+            }
+        } catch (err: unknown) {
+            if (!(err instanceof Error && err.name === 'AbortError')) {
+                this.onerror?.(err);
+            }
+        }
+    }
+}
+
+class DefaultEventSourceFactory implements IEventSourceFactory {
+    create(url: string): IEventSource {
+        return new FetchSSEEventSource(url);
+    }
+}
+
 @injectable()
 export class SessionBridgeService {
     /**
@@ -67,6 +160,15 @@ export class SessionBridgeService {
     private _writeMutex: Promise<void> = Promise.resolve();
     private _daemonCache?: { url?: string; expiresAt: number };
     onSessionChanged?: (sessionId: string, operation: SessionOperation) => void;
+
+    /**
+     * Phase 52: SSE event source for session_changed push notifications.
+     * No WebSocket. No shared-server. No remote-sync. Local daemon only.
+     */
+    private _sseEventSource?: IEventSource;
+    private _sseConnected = false;
+    /** Injectable for testing; defaults to fetch-based SSE. */
+    eventSourceFactory: IEventSourceFactory = new DefaultEventSourceFactory();
 
     constructor(
         @inject('WorkspaceRoot') private readonly workspaceRoot: string
@@ -223,6 +325,76 @@ export class SessionBridgeService {
                 return this._updateSessionFieldViaCli(sessionId, field, value);
             }
         });
+    }
+
+    // ── Phase 52: SSE session_changed subscription ────────────────────────────
+
+    /**
+     * Subscribe to daemon SSE stream for session_changed events.
+     *
+     * If daemon is available, opens GET /api/events/stream and calls
+     * onSessionChanged when a session_changed event arrives.
+     * Falls back to CLI polling if SSE is not available.
+     *
+     * No WebSocket. No shared-server. No remote-sync. Local daemon only.
+     *
+     * @param workspaceRoot - Workspace root for X-ARC-Workspace header.
+     * @returns true if SSE was successfully started, false if falling back to CLI polling.
+     */
+    async startSessionChangedSSE(workspaceRoot?: string): Promise<boolean> {
+        if (this._sseConnected) {
+            return true;
+        }
+        const baseUrl = await this._daemonBaseUrl();
+        if (!baseUrl) {
+            // Daemon unavailable — caller should use CLI polling fallback
+            return false;
+        }
+        try {
+            const streamUrl = new URL('/api/events/stream', baseUrl).toString();
+            const es = this.eventSourceFactory.create(streamUrl);
+            this._sseEventSource = es;
+
+            es.addEventListener('session_changed', (event) => {
+                try {
+                    const data = JSON.parse(event.data) as Record<string, unknown>;
+                    const sessionId = String(data['session_id'] ?? '');
+                    const operation = String(data['operation'] ?? 'write') as SessionOperation;
+                    if (sessionId) {
+                        this.onSessionChanged?.(sessionId, operation);
+                    }
+                } catch {
+                    // malformed event — ignore
+                }
+            });
+
+            es.onerror = () => {
+                this._sseConnected = false;
+                this._sseEventSource = undefined;
+                // Error logged by caller; SSE falls back to CLI polling
+            };
+
+            this._sseConnected = true;
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Disconnect SSE session_changed subscription.
+     */
+    stopSessionChangedSSE(): void {
+        this._sseEventSource?.close();
+        this._sseEventSource = undefined;
+        this._sseConnected = false;
+    }
+
+    /**
+     * Whether SSE session_changed subscription is active.
+     */
+    get isSSEConnected(): boolean {
+        return this._sseConnected;
     }
 
     private async _daemonBaseUrl(): Promise<string | undefined> {

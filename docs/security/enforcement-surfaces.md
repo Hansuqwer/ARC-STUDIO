@@ -392,9 +392,29 @@ Pre-Phase 50 gap: eleven routes in `web/routes.py` read workspace-local data (tr
 - MCP path uses `ensure_trusted()` → `WorkspaceUntrusted` → `_error_json(PERMISSION_DENIED, ...)`.
 - Parity test: `test_trust_enforcement_error_code_consistent_across_surfaces` verifies all 11 newly-hardened routes return the same code.
 
+---
+
+### Phase 52 — SSE Push and Event Persistence
+
+#### S-52.1 · SSE event stream connect
+- **What:** Client connects to `GET /api/events/stream` for local push events.
+- **Where:** `web/routes.py` `events_stream()`
+- **Gate:** `enforce_workspace_trust` at connect time — returns 403 before streaming.
+- **Transport:** SSE only. No WebSocket. No shared-server. No remote-sync. Local daemon only.
+- **Event types pushed:** session_changed, hitl_required, audit_verified, run_completed, run_failed, quota_warning.
+- **Last-Event-ID:** Resume replay from persisted event log after daemon restart.
+- **Audit coverage:** `python/tests/events/test_phase52_sse_push.py::test_sse_stream_untrusted_returns_403_not_mid_stream`
+
+#### S-52.2 · Dead-letter log redaction
+- **What:** Failed webhook deliveries write to DLQ. Payload must be redacted before write.
+- **Where:** `events/webhooks.py`, `events/models.py`
+- **Gate:** Redactor applied before `DeadLetterEntry` construction. No plaintext secrets in DLQ.
+- **Audit coverage:** `python/tests/events/test_phase52_sse_push.py::test_dead_letter_payload_is_redacted`
+
 #### Remaining known gaps (not in scope for P50)
 
 - `/health`, `/api/inspect`, `/api/runtimes`, `/api/runtimes/capabilities`, `/api/workflows`, `/api/schemas` — diagnostic/detection endpoints; no workspace-private data exposed. Annotated not-applicable.
 - `/api/providers/*` — provider account/routing config; not workspace-scoped. Future ADR may add workspace-level provider isolation.
 - `/api/arena/models`, `/api/arena/tags`, `/api/arena/rankings` — read-only model metadata, not workspace-private data.
-- `run_events_sse` (`GET /api/runs/{run_id}/events`) — SSE endpoint; trust check deferred pending Phase 52 SSE hardening which adds trust at connect time.
+- `run_events_sse` (`GET /api/runs/{run_id}/events`) — per-run SSE endpoint; trust check deferred pending future ADR (no workspace-private data served that isn't already trust-checked on run creation).
+- `events_stream` (`GET /api/events/stream`) — added in Phase 52; trust checked at connect time before any event data is sent. See Phase 52 SSE surface below.

@@ -15,9 +15,12 @@ import stat
 from pathlib import Path
 from typing import Optional
 
+from ..security.redaction import Redactor
 from .bus import EventBus, get_bus
 from .models import DeadLetterEntry, WebhookConfig
 from .types import ArcEvent
+
+_redactor = Redactor()
 
 log = logging.getLogger(__name__)
 
@@ -157,14 +160,16 @@ class WebhookManager:
                     )
                     await asyncio.sleep(delay)
 
-        # All retries exhausted — dead letter
+        # All retries exhausted — dead letter (Phase 52: redact payload, add attempt_count)
+        redacted_payload = _redactor.redact_dict(payload_dict)
         self._write_dead_letter(
             DeadLetterEntry(
                 webhook_id=config.id,
                 url=config.url,
                 event_type=event.event_type,
-                payload=payload_dict,
+                payload=redacted_payload,
                 error=f"Failed after {config.retry_max} attempts",
+                attempt_count=config.retry_max,
             )
         )
 

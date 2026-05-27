@@ -2913,3 +2913,49 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md docs/security
 ### Known Risks
 - ConsensusEscrow integration is protocol-level only; full escrow execution remains Phase 30 scope.
 - `paid_call_allowed` parameter is accepted but not used for risk calculation (forward-compatible slot).
+
+---
+
+## Phase 52 — Event Notification Hardening (SSE Push Upgrade)
+
+**Roadmap:** R25 follow-up  
+**Status:** Baseline Complete | Evidence: local worktree; Python 2939 passed / 34 skipped / 3 xfailed; arc-extension 22 test suites / 8 new SSE tests; ruff OK; protocol build OK; extension build OK  
+**Depends on:** Phase 51 (Baseline Complete), Phase 32 (event bus baseline complete)
+
+**No WebSocket transport. No shared-server. No remote-sync. SSE is local daemon only.**
+
+### Deliverables
+1. `GET /api/events/stream` SSE endpoint in `web/routes.py`:
+   - Requires workspace trust at connect time (returns 403 before streaming).
+   - Pushes: session_changed, hitl_required, audit_verified, run_completed, run_failed, quota_warning.
+   - Supports `Last-Event-ID` header for resume after daemon restart.
+   - Replays persisted events (up to 500) on connect.
+   - Clean disconnect on client close (no resource leak).
+2. `events/persistence.py` — `EventPersistenceWriter`:
+   - Appends published events to `.arc/events/event-log.jsonl`.
+   - `replay_from(last_seen_id)` returns bounded tail (MAX_REPLAY=500).
+3. `events/models.py` — `DeadLetterEntry` hardened:
+   - Added `attempt_count`, `payload_hash` (SHA-256 of redacted payload), `last_error`, `failed_at`.
+   - `webhooks.py` now redacts payload before constructing DLQ entry.
+4. TS `SessionBridgeService` Phase 52 SSE upgrade:
+   - `startSessionChangedSSE()` — subscribes to `/api/events/stream` via SSE.
+   - `stopSessionChangedSSE()` — clean disconnect.
+   - `isSSEConnected` — connection state.
+   - Injectable `eventSourceFactory` for testability.
+   - Falls back gracefully if daemon unavailable (CLI polling remains).
+5. Tests:
+   - Python: 11 tests in `tests/events/test_phase52_sse_push.py`.
+   - TS: 8 tests in `session-bridge-sse.test.ts`.
+
+### Acceptance
+1. SSE endpoint streams events from EventBus with trust check at connect time.
+2. Untrusted workspace returns 403 before any stream data.
+3. Last-Event-ID header resumes from correct position.
+4. Dead-letter entry has attempt_count, payload_hash, last_error, failed_at.
+5. DLQ payload is redacted before write.
+6. TS SessionBridgeService uses SSE when daemon available; falls back to CLI polling.
+
+### Known Risks
+- `run_events_sse` (per-run SSE) still lacks trust check; Phase 50 gap documented in enforcement-surfaces.md.
+- EventPersistenceWriter has no file rotation or compaction; log grows unboundedly. Future ADR needed.
+- FetchSSEEventSource requires Node.js fetch (available Node 18+); no polyfill for older Node.
