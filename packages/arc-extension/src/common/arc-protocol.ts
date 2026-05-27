@@ -508,6 +508,32 @@ export interface ProviderKeyRefRequest {
 }
 
 /**
+ * Provider account info returned by getProviderAccount.
+ */
+export interface ProviderAccountInfo {
+    id: string;
+    provider: string;
+    label: string;
+    enabled: boolean;
+    key_env_var: string | null;
+    key_fingerprint: string | null;
+    masked_key: string | null;
+    base_url: string | null;
+    default_model: string | null;
+    created_at: string;
+}
+
+/**
+ * Provider account update fields.
+ */
+export interface ProviderAccountUpdate {
+    label?: string;
+    default_model?: string;
+    base_url?: string;
+    enabled?: boolean;
+}
+
+/**
  * Provider test result from `arc providers test <id>`.
  * Shows connection status and configuration details.
  */
@@ -1441,6 +1467,12 @@ export interface ArcService {
 
     /** List available models for a provider. Calls `arc providers models [--provider <id>] --json`. */
     listProviderModels(providerId?: string): Promise<ProviderModel[]>;
+
+    /** Get a single provider account by ID. Delegates to daemon HTTP when available. */
+    getProviderAccount(accountId: string): Promise<ProviderAccountInfo>;
+
+    /** Update provider account fields (label, default_model, base_url, enabled). Trust-checked. */
+    updateProviderAccount(accountId: string, update: ProviderAccountUpdate): Promise<ProviderAccountInfo>;
 
     // ========== Run Links Methods (Session B7) ==========
 

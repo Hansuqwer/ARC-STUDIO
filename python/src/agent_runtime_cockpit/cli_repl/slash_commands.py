@@ -43,7 +43,11 @@ from .adapters import (
     render_policy_explain,
     render_policy_list,
     render_policy_show,
-    render_providers_status,
+    render_providers_add,
+    render_providers_list,
+    render_providers_remove,
+    render_providers_summary,
+    render_providers_test,
     render_replay,
     render_run_show,
     render_run_status,
@@ -472,17 +476,17 @@ def _build_registry():
     registry.register(
         CommandDef(
             name="providers",
-            help_text="Show provider statuses",
+            help_text="Provider management: status, list, add, remove, test",
             category="providers",
-            handler=cmd_providers_status,
+            handler=cmd_providers,
             gates_required=[],
             mode_required=[],
-            renders=["present", "degraded"],
+            renders=["present", "degraded", "absent", "error"],
             requires_events=[],
             privileged=False,
             trust_required="workspace",
-            usage="/providers",
-            subcommands=["status"],
+            usage="/providers [list|add|remove|test]",
+            subcommands=["list", "add", "remove", "test"],
         )
     )
     registry.register(
@@ -1418,8 +1422,52 @@ def cmd_task(arg: str, _session: ChatSession) -> CommandResult:
     )
 
 
-def cmd_providers_status(arg: str, _session: ChatSession) -> CommandResult:
-    return _render_adapter_result(render_providers_status())
+def cmd_providers(arg: str, _session: ChatSession) -> CommandResult:
+    """Handle /providers subcommands: list, add, remove, test, or default status."""
+    parts = arg.strip().split(maxsplit=1)
+    subcommand = parts[0] if parts else ""
+    rest = parts[1] if len(parts) > 1 else ""
+    if subcommand == "list":
+        return _render_adapter_result(render_providers_list())
+    if subcommand == "add":
+        # Parse --provider and --api-key-env flags
+        tokens = rest.split()
+        provider = ""
+        api_key_env = ""
+        for i, token in enumerate(tokens):
+            if token == "--provider" and i + 1 < len(tokens):
+                provider = tokens[i + 1]
+            elif token == "--api-key-env" and i + 1 < len(tokens):
+                api_key_env = tokens[i + 1]
+            elif token.startswith("--provider="):
+                provider = token.split("=", 1)[1]
+            elif token.startswith("--api-key-env="):
+                api_key_env = token.split("=", 1)[1]
+        if not provider or not api_key_env:
+            return CommandResult(
+                state="blocked",
+                output="Usage: /providers add --provider <name> --api-key-env <env>",
+                reason="invalid_usage",
+            )
+        return _render_adapter_result(render_providers_add(provider, api_key_env))
+    if subcommand == "remove":
+        if not rest:
+            return CommandResult(
+                state="blocked",
+                output="Usage: /providers remove <account_id>",
+                reason="invalid_usage",
+            )
+        return _render_adapter_result(render_providers_remove(rest.strip()))
+    if subcommand == "test":
+        if not rest:
+            return CommandResult(
+                state="blocked",
+                output="Usage: /providers test <account_id>",
+                reason="invalid_usage",
+            )
+        return _render_adapter_result(render_providers_test(rest.strip()))
+    # Default: show status summary
+    return _render_adapter_result(render_providers_summary())
 
 
 def cmd_mcp_status(arg: str, _session: ChatSession) -> CommandResult:

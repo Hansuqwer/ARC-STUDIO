@@ -555,10 +555,28 @@ async def providers_account(request: web.Request) -> web.Response:
     store = ProviderAccountStore()
     account_id = request.match_info["account_id"]
 
-    if request.method in ("PATCH", "DELETE"):
+    # GET: return single account
+    if request.method == "GET":
+        accounts = store.list_accounts()
+        for acc in accounts:
+            if acc.id == account_id:
+                return _json(ok(acc.model_dump()).model_dump())
+        return _json(
+            err(
+                ArcErrorCode.RUN_NOT_FOUND, f"Provider account not found: {account_id}"
+            ).model_dump(),
+            404,
+        )
+
+    # PUT/PATCH/DELETE require trust
+    if request.method in ("PUT", "PATCH", "DELETE"):
         workspace = _workspace(request)
         action = (
-            "providers_account_patch" if request.method == "PATCH" else "providers_account_delete"
+            "providers_account_put"
+            if request.method == "PUT"
+            else "providers_account_patch"
+            if request.method == "PATCH"
+            else "providers_account_delete"
         )
         try:
             enforce_workspace_trust(workspace, action, f"daemon-{action}", 0)
@@ -569,34 +587,89 @@ async def providers_account(request: web.Request) -> web.Response:
         return _json(
             ok({"deleted": store.delete(account_id), "account_id": account_id}).model_dump()
         )
+
+    # PUT/PATCH: update account fields
     body = await request.json()
-    if "enabled" in body:
-        account = store.set_enabled(account_id, bool(body["enabled"]))
-        if account:
-            return _json(ok(account.model_dump()).model_dump())
+    accounts = store.list_accounts()
+    updated = None
+    for i, acc in enumerate(accounts):
+        if acc.id == account_id:
+            updates = {}
+            ALLOWED_UPDATES = {"label", "default_model", "base_url", "enabled"}
+            for key in ALLOWED_UPDATES:
+                if key in body:
+                    updates[key] = body[key]
+            if updates:
+                updated = acc.model_copy(update=updates)
+                accounts[i] = updated
+                store._save(accounts)
+            else:
+                updated = acc
+            break
+
+    if updated:
+        return _json(ok(updated.model_dump()).model_dump())
     return _json(
-        err(ArcErrorCode.INVALID_INPUT, f"Provider account not found: {account_id}").model_dump(),
+        err(ArcErrorCode.RUN_NOT_FOUND, f"Provider account not found: {account_id}").model_dump(),
         404,
     )
 
 
 async def providers_account_test(request: web.Request) -> web.Response:
-    if os.environ.get("ARC_ALLOW_LIVE_PROVIDER_TESTS") != "true":
+    store = ProviderAccountStore()
+    account_id = request.match_info["account_id"]
+
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(
+            workspace, "providers_account_test", "daemon-providers-account-test", 0
+        )
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
+
+    # Find the account
+    accounts = store.list_accounts()
+    account = None
+    for acc in accounts:
+        if acc.id == account_id:
+            account = acc
+            break
+
+    if account is None:
+        return _json(
+            err(
+                ArcErrorCode.RUN_NOT_FOUND, f"Provider account not found: {account_id}"
+            ).model_dump(),
+            404,
+        )
+
+    # Dry-run test: check env var presence and return structured result
+    key_configured = account.key_env_var and bool(os.environ.get(account.key_env_var))
+    if not key_configured:
         return _json(
             ok(
                 {
-                    "account_id": request.match_info["account_id"],
+                    "account_id": account_id,
+                    "provider": account.provider,
+                    "label": account.label,
                     "dry_run": True,
-                    "status": "not_checked",
-                    "message": "Live provider tests disabled.",
+                    "status": "env_missing",
+                    "message": f"Environment variable {account.key_env_var} not set.",
                 }
             ).model_dump()
         )
+
     return _json(
-        err(
-            ArcErrorCode.NOT_IMPLEMENTED, "Live provider health checks are not implemented yet."
-        ).model_dump(),
-        501,
+        ok(
+            {
+                "account_id": account_id,
+                "provider": account.provider,
+                "label": account.label,
+                "dry_run": True,
+                "status": "configured",
+                "message": f"Provider {account.provider} ({account.label}) configured. Live test requires ARC_ALLOW_LIVE_PROVIDER_TESTS=true.",
+            }
+        ).model_dump()
     )
 
 
@@ -1323,6 +1396,8 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_get("/api/providers/status", providers_status)
     app.router.add_get("/api/providers/accounts", providers_accounts)
     app.router.add_post("/api/providers/accounts", providers_accounts)
+    app.router.add_get("/api/providers/accounts/{account_id}", providers_account)
+    app.router.add_put("/api/providers/accounts/{account_id}", providers_account)
     app.router.add_patch("/api/providers/accounts/{account_id}", providers_account)
     app.router.add_delete("/api/providers/accounts/{account_id}", providers_account)
     app.router.add_post("/api/providers/accounts/{account_id}/test", providers_account_test)

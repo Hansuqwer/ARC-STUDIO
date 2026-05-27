@@ -1338,6 +1338,81 @@ class TestPhase41P1Adapters:
         assert result.state == "present"
         assert "Provider statuses:" in result.text
 
+    def test_providers_summary(self):
+        from agent_runtime_cockpit.cli_repl.adapters import render_providers_summary
+
+        result = render_providers_summary()
+        assert result.state == "present"
+        assert "Provider accounts:" in result.text
+
+    def test_providers_list_empty(self):
+        from agent_runtime_cockpit.cli_repl.adapters import render_providers_list
+
+        result = render_providers_list()
+        assert result.state == "absent"
+        assert "No provider accounts" in result.text
+
+    def test_providers_add_and_remove(self, tmp_path):
+        import os
+        from unittest.mock import patch
+
+        from agent_runtime_cockpit.cli_repl.adapters import (
+            render_providers_add,
+            render_providers_list,
+            render_providers_remove,
+        )
+
+        # Use a temp config path
+        config_dir = tmp_path / ".arc"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        config_file = config_dir / "providers.json"
+
+        UNIQUE_ENV = "TEST_UNIQUE_KEY_12345"
+
+        with patch.dict(os.environ, {"ARC_PROVIDER_CONFIG": str(config_file)}):
+            result = render_providers_add("openai", UNIQUE_ENV, "test-openai")
+            assert result.state == "present"
+            assert "Provider account added" in result.text
+
+            result = render_providers_list()
+            assert result.state == "present"
+            assert "openai" in result.text
+
+            account_id = result.data.get("accounts", [{}])[0].get("id", "")
+            result = render_providers_remove(account_id)
+            assert result.state == "present"
+            assert "removed" in result.text
+
+    def test_providers_test(self, tmp_path):
+        import os
+        from unittest.mock import patch
+
+        from agent_runtime_cockpit.cli_repl.adapters import (
+            render_providers_add,
+            render_providers_test,
+        )
+
+        config_dir = tmp_path / ".arc"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        config_file = config_dir / "providers.json"
+        UNIQUE_ENV = "TEST_UNIQUE_PROVIDER_KEY_98765"
+
+        with patch.dict(os.environ, {"ARC_PROVIDER_CONFIG": str(config_file)}):
+            result = render_providers_add("openai", UNIQUE_ENV, "test")
+            assert result.state == "present"
+            account_id = result.data.get("id", "")
+
+            # Test without env var - should show degraded
+            result = render_providers_test(account_id)
+            assert result.state == "degraded"
+            assert "not set" in result.text
+
+            # Test with env var - should show configured
+            with patch.dict(os.environ, {UNIQUE_ENV: "sk-test"}):
+                result = render_providers_test(account_id)
+                assert result.state == "present"
+                assert "configured" in result.text
+
     def test_mcp_status(self, tmp_path):
         from agent_runtime_cockpit.cli_repl.adapters import render_mcp_status
 

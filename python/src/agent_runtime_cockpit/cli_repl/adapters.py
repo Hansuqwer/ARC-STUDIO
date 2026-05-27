@@ -848,6 +848,133 @@ def render_providers_status() -> SlashAdapterResult:
     )
 
 
+def render_providers_summary() -> SlashAdapterResult:
+    """Show provider status summary with account count and routing policy."""
+    try:
+        from ..provider_action import ProviderAccountStore, ProviderRoutingStore, provider_statuses
+
+        store = ProviderAccountStore()
+        accounts = store.list_accounts()
+        routing = ProviderRoutingStore().get()
+        statuses = provider_statuses(os.environ)
+        configured_env = sum(1 for s in statuses if s.api_key_configured)
+        total_env = len(statuses)
+        enabled_accounts = sum(1 for a in accounts if a.enabled)
+        lines = [
+            f"Provider accounts: {len(accounts)} ({enabled_accounts} enabled)",
+            f"Environment keys: {configured_env}/{total_env} configured",
+            f"Routing: {routing.mode} (default: {routing.default_provider}/{routing.default_model})",
+        ]
+        return SlashAdapterResult(
+            state="present",
+            text="\n".join(lines),
+            data={
+                "account_count": len(accounts),
+                "enabled_accounts": enabled_accounts,
+                "routing": routing.model_dump(),
+            },
+        )
+    except Exception as exc:
+        return SlashAdapterResult(state="error", text=f"Error: {exc}", exit_code=1)
+
+
+def render_providers_list() -> SlashAdapterResult:
+    """List all configured provider accounts with status."""
+    try:
+        from ..provider_action import ProviderAccountStore
+
+        store = ProviderAccountStore()
+        accounts = store.list_accounts()
+        if not accounts:
+            return SlashAdapterResult(state="absent", text="No provider accounts configured.")
+        lines = ["Provider accounts:"]
+        for acc in accounts:
+            env_configured = (
+                "key_ok" if acc.key_env_var and os.environ.get(acc.key_env_var) else "key_missing"
+            )
+            status = "enabled" if acc.enabled else "disabled"
+            lines.append(
+                f"  {acc.id[:12]}  {acc.provider:15s} {status:9s} {env_configured:10s}  {acc.label}"
+            )
+        return SlashAdapterResult(
+            state="present",
+            text="\n".join(lines),
+            data={"accounts": [a.model_dump() for a in accounts], "count": len(accounts)},
+        )
+    except Exception as exc:
+        return SlashAdapterResult(state="error", text=f"Error: {exc}", exit_code=1)
+
+
+def render_providers_add(provider: str, api_key_env: str, label: str = "") -> SlashAdapterResult:
+    """Add a new provider account."""
+    try:
+        from ..provider_action import ProviderAccountStore
+
+        store = ProviderAccountStore()
+        account = store.add_env_account(
+            provider=provider,
+            label=label or f"{provider} account",
+            api_key_env=api_key_env,
+        )
+        return SlashAdapterResult(
+            state="present",
+            text=f"Provider account added: {account.id[:12]} ({account.provider} - {account.label})",
+            data=account.model_dump(),
+        )
+    except Exception as exc:
+        return SlashAdapterResult(state="error", text=f"Error: {exc}", exit_code=1)
+
+
+def render_providers_remove(account_id: str) -> SlashAdapterResult:
+    """Remove a provider account by ID."""
+    try:
+        from ..provider_action import ProviderAccountStore
+
+        store = ProviderAccountStore()
+        deleted = store.delete(account_id)
+        if deleted:
+            return SlashAdapterResult(
+                state="present", text=f"Provider account removed: {account_id[:12]}"
+            )
+        return SlashAdapterResult(
+            state="absent", text=f"Provider account not found: {account_id[:12]}"
+        )
+    except Exception as exc:
+        return SlashAdapterResult(state="error", text=f"Error: {exc}", exit_code=1)
+
+
+def render_providers_test(account_id: str) -> SlashAdapterResult:
+    """Test provider account connectivity (dry-run)."""
+    try:
+        from ..provider_action import ProviderAccountStore
+
+        store = ProviderAccountStore()
+        accounts = store.list_accounts()
+        account = None
+        for acc in accounts:
+            if acc.id == account_id:
+                account = acc
+                break
+        if account is None:
+            return SlashAdapterResult(
+                state="absent", text=f"Provider account not found: {account_id[:12]}"
+            )
+        key_configured = account.key_env_var and bool(os.environ.get(account.key_env_var))
+        if key_configured:
+            return SlashAdapterResult(
+                state="present",
+                text=f"Provider {account.provider} ({account.label}): configured. Live test requires ARC_ALLOW_LIVE_PROVIDER_TESTS=true.",
+                data={"account_id": account_id, "status": "configured", "dry_run": True},
+            )
+        return SlashAdapterResult(
+            state="degraded",
+            text=f"Provider {account.provider} ({account.label}): env var {account.key_env_var} not set.",
+            data={"account_id": account_id, "status": "env_missing", "dry_run": True},
+        )
+    except Exception as exc:
+        return SlashAdapterResult(state="error", text=f"Error: {exc}", exit_code=1)
+
+
 def render_mcp_status(workspace: Path | None = None) -> SlashAdapterResult:
     ws = _workspace(workspace)
     try:
