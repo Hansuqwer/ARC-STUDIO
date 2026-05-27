@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-26 — Phases 43–47 implemented; R39/R40 Baseline Complete; R41–R44 added/updated; Phase 47 daemon HTTP write protocol Baseline Complete.  
-**Current evidence anchor:** local worktree | Phase 47 full verification pass: Python 2890 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped.  
+**Last reality refresh:** 2026-05-27 — Phase 48 streaming audit refresh + HMAC evidence tightening Baseline Complete.  
+**Current evidence anchor:** local worktree | Phase 48 full verification pass: Python 2893 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped; protocol and extension builds pass; PR hygiene and banned-claims checks pass.  
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -320,7 +320,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Fix audit verification memory usage and implement optional HMAC signing for tamper-evident audit chains.
 
-**Current:** Baseline Complete. `StreamingAuditVerifier` class (hmac, sha256, auto modes), `arc audit verify` CLI with memory-bounded streaming (configurable 1-500 MB), full HMAC key lifecycle (`AuditKeyManager`), 22 streaming verifier tests pass including terminal `record_hash` tamper detection.
+**Current:** Baseline Complete. `StreamingAuditVerifier` class (hmac, sha256, auto modes), `arc audit verify` CLI with memory-bounded streaming (configurable 1-500 MB), full HMAC key lifecycle (`AuditKeyManager`), and mixed payload-shape support inside signed chain records. Daemon `session_changed` events are explicitly classified as ephemeral and excluded from per-run audit-chain coverage unless a future run path persists them inside chain records.
 
 **Deliverables:**
 - `StreamingAuditVerifier.verify_sha256()` — line-by-line iteration for memory-bounded verification
@@ -335,7 +335,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - HMAC traces fail verification on content/chain/signature mutation
 - CLI emits stable JSON: `{ ok, mode, records_checked, reason, duration_ms }`
 
-**Status:** Baseline Complete | Evidence: `streaming_verifier.py` with 22 tests, `arc audit verify` CLI, `AuditKeyManager` HMAC lifecycle | Notes: 100 MB trace verification <30s, <500 MB RSS. Legacy `AuditChainStore.verify_run()` updated to use streaming verifier; HMAC verification now checks both signature and stored record hash.
+**Status:** Baseline Complete | Evidence: `streaming_verifier.py` with 25 tests, `arc audit verify` CLI, `AuditKeyManager` HMAC lifecycle; Phase 48 targeted local verification `cd python && uv run pytest tests/audit/test_streaming_verifier.py tests/web/test_session_daemon_routes.py -q` (42 passed) and `cd python && uv run ruff check src tests` (OK) | Notes: 100 MB trace verification <30s, <500 MB RSS. Legacy `AuditChainStore.verify_run()` updated to use streaming verifier; HMAC verification checks both signature and stored record hash. ARC does not claim adapter-wide keyed audit coverage.
 
 **Source:** Architecture Review P0-1, Feature List F0.1
 

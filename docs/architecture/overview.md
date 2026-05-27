@@ -79,7 +79,7 @@ All events carry a `schema_version` field (currently v2). Additive changes do no
 
 ### Audit Chain Architecture (ADR-021)
 
-HMAC-SHA256 signed audit chains for all agent runs. Stored as JSONL per run in `~/.arc/audit/<run_id>.audit.jsonl`. Each event is linked to the previous via HMAC chain. Verification is via `arc audit verify <run_id>`. Designed for EU AI Act compliance.
+Audit chains support memory-bounded SHA-256 verification and optional HMAC-SHA256 verification where a run path writes keyed audit material. Stored as JSONL per run in `~/.arc/audit/<run_id>.audit.jsonl`. Each covered record is linked to the previous record. Verification is via `arc audit verify <run_id>`. ARC does not claim adapter-wide keyed audit coverage.
 
 ### Security Model
 

@@ -147,11 +147,14 @@ Daemon writes emit an in-memory `session_changed` event through the existing eve
   "event_type": "session_changed",
   "session_id": "s-...",
   "operation": "write|delete|update",
-  "workspace": "/path/to/workspace"
+  "workspace": "/path/to/workspace",
+  "coverage_class": "session_lifecycle_ephemeral",
+  "audit_persistence": "excluded",
+  "exclusion_reason": "in-memory event bus only; not part of per-run audit chain"
 }
 ```
 
-The event is ephemeral and not persisted. TypeScript `SessionBridgeService.onSessionChanged` fires only after successful daemon writes, not after CLI fallback.
+The event is ephemeral and not persisted. TypeScript `SessionBridgeService.onSessionChanged` fires only after successful daemon writes, not after CLI fallback. Phase 48 explicitly classifies these daemon session mutation notifications as audit-excluded; if a future run path embeds one inside an audit chain record, `arc audit verify` may verify the surrounding chain envelope, but this phase does not add persisted session-event audit coverage.
 
 ### Windows Decision
 

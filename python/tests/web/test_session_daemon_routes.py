@@ -280,3 +280,6 @@ async def test_session_changed_emitted_on_success_and_not_error(tmp_path: Path) 
     assert len(session_events) == 1
     assert session_events[0].session_id == "s-event"
     assert session_events[0].operation == "write"
+    assert session_events[0].payload["coverage_class"] == "session_lifecycle_ephemeral"
+    assert session_events[0].payload["audit_persistence"] == "excluded"
+    assert "not part of per-run audit chain" in session_events[0].payload["exclusion_reason"]

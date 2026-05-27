@@ -30,6 +30,7 @@ log = logging.getLogger(__name__)
 GENESIS = "GENESIS"
 DEFAULT_CHUNK_SIZE_MB = 8
 MAX_CHUNK_SIZE_MB = 500
+AuditRecordFormat = Literal["hmac", "sha256", "event_bus", "audit_event_schema", "unknown"]
 
 
 class VerificationResult(BaseModel):
@@ -65,6 +66,23 @@ class StreamingAuditVerifier:
             )
         self.max_memory_mb = max_memory_mb
         self._buffer_size = max_memory_mb * 1024 * 1024  # Convert to bytes
+
+    @staticmethod
+    def _classify_record(record: dict) -> AuditRecordFormat:
+        """Classify record envelopes without treating payload event keys as chain metadata."""
+        if {"signature", "record_hash", "prev_hash"}.issubset(record):
+            return "hmac"
+        if {"chain_hash", "event_hash", "prev_hash"}.issubset(record):
+            return "sha256"
+        if "event_type" in record:
+            return "event_bus"
+        if "eventType" in record:
+            return "audit_event_schema"
+        return "unknown"
+
+    @staticmethod
+    def _record_keys(record: dict) -> str:
+        return ", ".join(sorted(str(key) for key in record.keys()))
 
     def verify_hmac(self, file_path: Path, key: bytes) -> VerificationResult:
         """Verify HMAC-signed audit chain with streaming processing.
@@ -349,8 +367,8 @@ class StreamingAuditVerifier:
                         continue
                     try:
                         record = json.loads(line)
-                        # HMAC format has 'signature' field
-                        if "signature" in record:
+                        record_format = self._classify_record(record)
+                        if record_format == "hmac":
                             if key is None:
                                 return self._emit_audit_verified(
                                     VerificationResult(
@@ -365,22 +383,24 @@ class StreamingAuditVerifier:
                             return self._emit_audit_verified(
                                 self.verify_hmac(file_path, key), file_path
                             )
-                        # SHA-256 format has 'chain_hash' field
-                        elif "chain_hash" in record:
+                        if record_format == "sha256":
                             return self._emit_audit_verified(
                                 self.verify_sha256(file_path), file_path
                             )
-                        else:
-                            return self._emit_audit_verified(
-                                VerificationResult(
-                                    ok=False,
-                                    mode="sha256",
-                                    records_checked=0,
-                                    reason="Unknown audit format (no signature or chain_hash field)",
-                                    duration_ms=int((time.time() - start_time) * 1000),
+                        return self._emit_audit_verified(
+                            VerificationResult(
+                                ok=False,
+                                mode="sha256",
+                                records_checked=0,
+                                reason=(
+                                    "Unknown audit format: expected HMAC or SHA-256 chain "
+                                    f"envelope, got {record_format} record with keys: "
+                                    f"{self._record_keys(record)}"
                                 ),
-                                file_path,
-                            )
+                                duration_ms=int((time.time() - start_time) * 1000),
+                            ),
+                            file_path,
+                        )
                     except json.JSONDecodeError:
                         return VerificationResult(
                             ok=False,

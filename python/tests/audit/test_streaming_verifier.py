@@ -44,6 +44,22 @@ class TestStreamingVerifierInit:
 class TestHMACStreamingVerification:
     """Test HMAC-signed audit chain streaming verification."""
 
+    @staticmethod
+    def _write_hmac_chain(chain_path: Path, key: bytes, events: list[dict]) -> None:
+        prev_hash = GENESIS
+        with open(chain_path, "w", encoding="utf-8") as f:
+            for i, event in enumerate(events):
+                record_hash, signature = sign_audit_record(event, key, prev_hash)
+                record = {
+                    "seq": i,
+                    "event": event,
+                    "prev_hash": prev_hash,
+                    "record_hash": record_hash,
+                    "signature": signature,
+                }
+                f.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+                prev_hash = record_hash
+
     def test_verify_hmac_small_chain(self, tmp_path: Path):
         """Verify a small HMAC chain with 3 records."""
         key = b"test-hmac-key-32-bytes-long!!"
@@ -250,6 +266,27 @@ class TestHMACStreamingVerification:
         assert result.mode == "hmac"
         assert "Record hash invalid" in result.reason
 
+    def test_verify_hmac_accepts_mixed_event_payload_shapes(self, tmp_path: Path):
+        """Verifier checks chain envelope integrity, not one payload schema."""
+        key = b"test-hmac-key-32-bytes-long!!"
+        chain_path = tmp_path / "mixed.audit.jsonl"
+        events = [
+            {
+                "event_type": "session_changed",
+                "session_id": "s-1",
+                "audit_persistence": "excluded",
+            },
+            {"eventType": "AUDIT_CHAIN_VERIFIED", "runId": "run-1", "ok": True},
+            {"seq": 2, "action": "legacy"},
+        ]
+        self._write_hmac_chain(chain_path, key, events)
+
+        result = StreamingAuditVerifier().verify_hmac(chain_path, key)
+
+        assert result.ok is True
+        assert result.mode == "hmac"
+        assert result.records_checked == 3
+
 
 class TestSHA256StreamingVerification:
     """Test SHA-256 hash-chained audit log streaming verification."""
@@ -368,6 +405,27 @@ class TestAutoDetection:
         assert result.mode == "hmac"
         assert result.records_checked == 1
 
+    def test_auto_detect_hmac_despite_event_type_payload(self, tmp_path: Path):
+        """Payload event_type must not mask the signed HMAC record envelope."""
+        key = b"test-hmac-key-32-bytes-long!!"
+        chain_path = tmp_path / "hmac-event-type.jsonl"
+        event = {"event_type": "session_changed", "session_id": "s-1"}
+        record_hash, signature = sign_audit_record(event, key, GENESIS)
+        record = {
+            "seq": 0,
+            "event": event,
+            "prev_hash": GENESIS,
+            "record_hash": record_hash,
+            "signature": signature,
+        }
+        chain_path.write_text(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+
+        result = StreamingAuditVerifier().verify_auto(chain_path, key)
+
+        assert result.ok is True
+        assert result.mode == "hmac"
+        assert result.records_checked == 1
+
     def test_auto_detect_sha256(self, tmp_path: Path):
         """Auto-detect SHA-256 format from chain_hash field."""
         import hashlib
@@ -421,6 +479,19 @@ class TestAutoDetection:
         assert result.ok is False
         assert result.mode == "hmac"
         assert "no key provided" in result.reason
+
+    def test_auto_detect_unknown_record_reports_format_and_keys(self, tmp_path: Path):
+        chain_path = tmp_path / "raw-event.jsonl"
+        chain_path.write_text(json.dumps({"event_type": "session_changed", "session_id": "s-1"}))
+
+        result = StreamingAuditVerifier().verify_auto(chain_path)
+
+        assert result.ok is False
+        assert result.mode == "sha256"
+        assert "Unknown audit format" in result.reason
+        assert "event_bus" in result.reason
+        assert "event_type" in result.reason
+        assert "session_id" in result.reason
 
 
 class TestLargeFilePerformance:

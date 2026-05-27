@@ -2,15 +2,15 @@
 
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-26 — Phases 43–47 added/updated; Phase 47 (daemon HTTP write protocol) Baseline Complete.  
-**Current evidence anchor:** local worktree | Phase 47 full verification pass: Python 2890 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped.  
+**Last reality refresh:** 2026-05-27 — Phase 48 streaming audit refresh + HMAC evidence tightening Baseline Complete.  
+**Current evidence anchor:** local worktree | Phase 48 full verification pass: Python 2893 passed / 34 skipped / 3 xfailed; arc-extension 814 passed / 3 skipped; protocol and extension builds pass; PR hygiene and banned-claims checks pass.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
 
 Prefer larger coherent implementation chunks over tiny slices. A chunk may include multiple listed slices when they share files/tests and can be completed safely in one session. Keep the no-destructive-actions, no-secret-commits, preserve-unrelated-work, and green-verification rules.
 
-~~Priority 1 stop-the-line: Phase 41 (Interactive CLI/UX Foundation).~~ **Gate cleared 2026-05-26** — Phases 41–47 Baseline Complete. Phase 47 (daemon HTTP write protocol) is Baseline Complete. Product work may advance to Phase 48 and beyond.
+~~Priority 1 stop-the-line: Phase 41 (Interactive CLI/UX Foundation).~~ **Gate cleared 2026-05-26** — Phases 41–48 Baseline Complete. Product work may advance to Phase 49 and beyond.
 
 ## Verification Baseline For Every Slice
 
@@ -2756,3 +2756,43 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - No WebSocket/IPC push auto-refresh yet; `session_changed` is in-memory only.
 - Daemon write protocol is local HTTP, not a shared-server or remote-sync protocol.
 - Windows OS-level interprocess lock remains unimplemented; ADR-025 documents this.
+
+---
+
+## Phase 48 — Streaming Audit Refresh + HMAC Evidence Tightening
+
+**Roadmap:** R14 — Streaming Audit + HMAC  
+**Status:** Baseline Complete (targeted) | Evidence: local worktree; `cd python && uv run pytest tests/audit/test_streaming_verifier.py tests/web/test_session_daemon_routes.py -q` (42 passed); `cd python && uv run ruff check src tests` (OK)  
+**Depends on:** Phase 47
+
+### Deliverables
+1. Streaming verifier format detection now classifies record envelopes separately from payload event shapes.
+2. HMAC verification accepts mixed payload shapes inside signed chain records, including event-bus `event_type`, audit-schema `eventType`, and legacy payloads.
+3. Raw event-bus lines without SHA-256/HMAC chain fields remain rejected by `arc audit verify` with actionable format/key details.
+4. Daemon `session_changed` events carry explicit audit coverage metadata: `coverage_class=session_lifecycle_ephemeral`, `audit_persistence=excluded`, and an exclusion reason.
+5. ADR-021 and session sharing docs now state HMAC coverage boundaries and session-event exclusion without claiming adapter-wide keyed audit.
+
+### Acceptance
+1. `arc audit verify` behavior for existing HMAC/SHA-256 chain records remains unchanged.
+2. Streaming verifier handles current mixed event payload shapes when they are inside signed chain records.
+3. Session daemon events do not break audit verification and are explicitly classified as audit-excluded ephemeral notifications.
+4. Docs state which event classes are HMAC-covered, SHA-256-covered, inspect-only, or out-of-scope.
+5. Banned claims remain avoided: no adapter-wide HMAC claim and no unsupported cryptographic coverage claim.
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/audit/test_streaming_verifier.py tests/web/test_session_daemon_routes.py -q
+cd python && uv run pytest tests/audit tests/events tests/web/test_session_daemon_routes.py -q
+cd python && uv run pytest tests/ -q
+pnpm --filter @arc-studio/protocol build
+pnpm --filter arc-extension build
+pnpm --filter arc-extension test
+bash scripts/check-pr.sh
+bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
+```
+
+### Known Risks
+- This phase does not add adapter-wide keyed audit coverage.
+- This phase does not persist daemon `session_changed` events into per-run audit chains.
+- Full verification commands beyond the targeted Python tests and ruff must be run before broad release evidence is claimed.

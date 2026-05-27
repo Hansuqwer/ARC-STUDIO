@@ -23,7 +23,7 @@ The audit chain is not a blockchain. It's a cryptographically-signed append-only
 
 ## Decision
 
-ARC Studio implements a **HMAC-SHA256 signed audit chain** for all agent runs. Every material action (LLM request/response, tool call, HITL prompt/response, budget decision, error/cancellation) is logged as an audit event with:
+ARC Studio implements audit chains with SHA-256 compatibility and optional **HMAC-SHA256** keyed verification where a run path writes keyed audit material. Material agent actions should be logged by covered run paths with:
 - Event type and timestamp (ISO 8601 UTC)
 - Principal identifier (default `"local"` for desktop 1.0)
 - Run ID and session ID
@@ -32,7 +32,18 @@ ARC Studio implements a **HMAC-SHA256 signed audit chain** for all agent runs. E
 
 The audit chain is stored as a JSONL file per run (`~/.arc/audit/<run_id>.audit.jsonl`) alongside the existing trace file. The HMAC key is derived from a per-installation secret stored in `~/.arc/secrets/audit_key` (created on first run, 256-bit random). The key derivation is parameterizable so future per-tenant or per-session keys don't require schema changes.
 
-Verification is a CLI command (`arc audit verify <run_id>`) that recomputes HMAC signatures and checks chain integrity. Export is a CLI command (`arc audit export <run_id>`) that produces a signed audit bundle (audit chain + verification metadata) suitable for external review or SIEM ingestion.
+Verification is a CLI command (`arc audit verify <run_id>`) that recomputes SHA-256 or HMAC signatures and checks chain integrity for persisted audit material. Export is a CLI command (`arc audit export <run_id>`) that produces an audit bundle (audit chain + verification metadata) suitable for external review or SIEM ingestion where material exists.
+
+## Audit Coverage Classification
+
+| Event/source | Persisted audit chain | Verifier support | Coverage class | Reason |
+| --- | --- | --- | --- | --- |
+| HMAC audit records | Yes, when written by the run path | Yes | HMAC-covered | Per-run keyed chain record with `signature`, `record_hash`, and `prev_hash`. |
+| Legacy SHA-256 records | Yes, when written by the run path | Yes | SHA-256-covered | Backward-compatible chain record with `chain_hash`, `event_hash`, and `prev_hash`. |
+| `AUDIT_*` schema payloads | Only when embedded in a chain record | Yes | Payload-supported | The verifier accepts the payload shape but verifies the enclosing chain record. |
+| Event-bus `session_changed` | No | N/A unless embedded later | Inspect-only / excluded ephemeral | In-memory daemon notification, not persisted as per-run audit material in Phase 48. |
+| Failed daemon session mutations | No | N/A | Out-of-scope | No successful state change; no `session_changed` event emitted. |
+| Raw event-bus lines without chain fields | No | Rejected by `arc audit verify` | Out-of-scope | Missing SHA-256/HMAC chain envelope. |
 
 SIEM integration is via OpenTelemetry: audit events are emitted as OTel log records with `gen_ai.*` semantic conventions plus custom `arc.audit.*` attributes. Users who want centralized audit logging configure an OTel exporter; the desktop product does not ship with a default remote exporter.
 

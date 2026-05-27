@@ -110,7 +110,14 @@ def _emit_session_changed(session_id: str, operation: str, workspace: Path) -> N
             session_id=session_id,
             operation=operation,  # type: ignore[arg-type]
             workspace=str(workspace),
-            payload={"session_id": session_id, "operation": operation, "workspace": str(workspace)},
+            payload={
+                "session_id": session_id,
+                "operation": operation,
+                "workspace": str(workspace),
+                "coverage_class": "session_lifecycle_ephemeral",
+                "audit_persistence": "excluded",
+                "exclusion_reason": "in-memory event bus only; not part of per-run audit chain",
+            },
         )
     )
 
