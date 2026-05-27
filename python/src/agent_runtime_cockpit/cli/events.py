@@ -25,6 +25,69 @@ from ._subapps import events_app
 err_console = Console(stderr=True)
 
 
+@events_app.command("summary")
+def events_summary(
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Summarize the local/recent event log."""
+    _setup_logging(debug)
+    from ..events.persistence import DEFAULT_EVENT_LOG_PATH
+
+    log_path = Path.cwd() / DEFAULT_EVENT_LOG_PATH
+    counts = {
+        "hitl": 0,
+        "runFailures": 0,
+        "auditAlerts": 0,
+        "taskFailures": 0,
+        "evalFailures": 0,
+    }
+    malformed = 0
+    unmatched_hitl_decisions = 0
+    total = 0
+    if log_path.exists():
+        for line in log_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                malformed += 1
+                continue
+            total += 1
+            event_type = event.get("event_type")
+            if event_type == "hitl_required":
+                counts["hitl"] += 1
+            elif event_type == "hitl_decided" and counts["hitl"] > 0:
+                counts["hitl"] -= 1
+            elif event_type == "hitl_decided":
+                unmatched_hitl_decisions += 1
+            elif event_type == "run_failed":
+                counts["runFailures"] += 1
+            elif event_type == "audit_verified" and event.get("ok") is False:
+                counts["auditAlerts"] += 1
+            elif event_type == "task_failed":
+                counts["taskFailures"] += 1
+            elif event_type == "eval_completed" and int(event.get("failures_count", 0) or 0) > 0:
+                counts["evalFailures"] += 1
+    _out(
+        ok(
+            {
+                **counts,
+                "source": "local_event_log_recent",
+                "protocol": "sse",
+                "degraded": malformed > 0 or unmatched_hitl_decisions > 0,
+                "malformed": malformed,
+                "unmatched_hitl_decisions": unmatched_hitl_decisions,
+                "summary_semantics": "local_recent_derived_compaction_may_drop_pairs",
+                "total": total,
+                "path": str(log_path),
+            }
+        ),
+        json_output,
+    )
+
+
 @events_app.command("query")
 def events_query(
     event_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by event type"),

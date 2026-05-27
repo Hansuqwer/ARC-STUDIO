@@ -5,6 +5,7 @@
  */
 
 import { injectable } from '@theia/core/shared/inversify';
+import { spawn } from 'child_process';
 import type { NotificationCounts } from '../../common/notification-protocol';
 
 @injectable()
@@ -15,65 +16,52 @@ export class NotificationBackendService implements NotificationCounts {
 
     async getCounts(): Promise<NotificationCounts> {
         try {
-            const [hitlResult, runsResult] = await Promise.allSettled([
-                this.#execCli(['hitl', 'pending', '--json']),
-                this.#execCli(['runs', 'list', '--json']),
-            ]);
-
-            const hitl = hitlResult.status === 'fulfilled'
-                ? this.#countHitlPending(hitlResult.value)
-                : 0;
-
-            const runFailures = runsResult.status === 'fulfilled'
-                ? this.#countRunFailures(runsResult.value)
-                : 0;
-
-            const auditAlerts = 0; // TODO: wire audit alert detection when event bus query is available
-
-            return { hitl, runFailures, auditAlerts };
+            const output = await this.#execCli(['events', 'summary', '--json']);
+            return this.#parseSummary(output);
         } catch {
-            return { hitl: 0, runFailures: 0, auditAlerts: 0 };
+            return { hitl: 0, runFailures: 0, auditAlerts: 0, source: 'cli_fallback', degraded: true };
         }
     }
 
     async #execCli(args: string[]): Promise<string> {
-        const { exec } = require('child_process');
         return new Promise<string>((resolve, reject) => {
-            exec(`arc ${args.join(' ')}`, {
-                timeout: 5000,
-                maxBuffer: 1024 * 64,
-            }, (err: Error | null, stdout: string) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(stdout);
-                }
+            const child = spawn('arc', args, { shell: false });
+            const chunks: Buffer[] = [];
+            const timer = setTimeout(() => {
+                child.kill('SIGTERM');
+                reject(new Error('arc events summary timed out'));
+            }, 5000);
+            child.stdout.on('data', chunk => {
+                chunks.push(Buffer.from(chunk));
+            });
+            child.on('error', err => {
+                clearTimeout(timer);
+                reject(err);
+            });
+            child.on('close', code => {
+                clearTimeout(timer);
+                const output = Buffer.concat(chunks).toString('utf8').slice(0, 64 * 1024);
+                code === 0 ? resolve(output) : reject(new Error(`arc exited ${code}`));
             });
         });
     }
 
-    #countHitlPending(output: string): number {
+    #parseSummary(output: string): NotificationCounts {
         try {
             const parsed = JSON.parse(output);
-            if (Array.isArray(parsed)) {
-                return parsed.length;
-            }
-            if (parsed.data && Array.isArray(parsed.data)) {
-                return parsed.data.length;
-            }
-            return 0;
+            const data = parsed.data || parsed;
+            return {
+                hitl: Number(data.hitl || 0),
+                runFailures: Number(data.runFailures || 0),
+                auditAlerts: Number(data.auditAlerts || 0),
+                taskFailures: Number(data.taskFailures || 0),
+                evalFailures: Number(data.evalFailures || 0),
+                protocol: data.protocol === 'sse' ? 'sse' : undefined,
+                source: data.source === 'local_event_log_recent' ? 'local_event_log_recent' : 'cli_fallback',
+                degraded: Boolean(data.degraded),
+            };
         } catch {
-            return 0;
-        }
-    }
-
-    #countRunFailures(output: string): number {
-        try {
-            const parsed = JSON.parse(output);
-            const runs = Array.isArray(parsed) ? parsed : (parsed.data || []);
-            return runs.filter((r: any) => r?.status === 'failed').length;
-        } catch {
-            return 0;
+            return { hitl: 0, runFailures: 0, auditAlerts: 0, source: 'cli_fallback', degraded: true };
         }
     }
 }

@@ -195,6 +195,20 @@ records gate).      unless user consents
 - **Gate:** None — diagnostic/watch command. Only observes already-published events.
 - **Audit coverage:** 5 CLI events tests.
 
+#### S-63.1 · Local event-log persistence and summary
+- **What:** `EventBus.publish()` writes typed events to local `.arc/events/event-log.jsonl` before delivering to active SSE clients; `arc events summary --json` derives local/recent notification counts from that log.
+- **Where:** `events/bus.py`, `events/persistence.py`, `cli/events.py`, `web/routes.py`
+- **Gate:** Workspace trust at `GET /api/events/stream` connect time. CLI summary reads only the local workspace event log.
+- **Summary semantics:** `arc events summary --json` is local/recent/derived. If compaction leaves a `hitl_decided` event without its matching `hitl_required`, the summary reports `degraded=true`, `unmatched_hitl_decisions`, and `summary_semantics=local_recent_derived_compaction_may_drop_pairs` instead of implying canonical HITL state.
+- **Transport:** SSE only. No WebSocket, shared-server, remote sync, or complete audit coverage claim.
+- **Audit coverage:** `python/tests/events/`, `python/tests/cli/test_events_cli.py` cover event persistence/query behavior and CLI contracts.
+
+#### S-63.2 · IDE notification badge CLI bridge
+- **What:** The Theia backend notification service invokes `arc events summary --json` using argv-only `spawn('arc', ['events', 'summary', '--json'], { shell: false })`.
+- **Where:** `packages/arc-extension/src/node/services/notification-service.ts`
+- **Gate:** No shell-string execution; output capped in-process and failures degrade counts to zero with `source: cli_fallback`.
+- **Audit coverage:** `packages/arc-extension/src/node/services/__tests__/notification-service.test.ts` asserts argv-only spawn and summary parsing.
+
 ---
 
 ### Phase 35 — MCP Client
@@ -350,7 +364,7 @@ P0 policy defaults:
 - sandbox audit chain appends continue across CLI invocations and verify against raw events.
 - container execution requires `ARC_ENABLE_CONTAINER_SANDBOX=1`.
 
-MicroVM status: doctor/preflight only. Linux checks Firecracker/Cloud Hypervisor and `/dev/kvm`. macOS checks Lima/VZ availability. Windows is explicitly unsupported for this phase.
+MicroVM status: doctor/preflight/proof-harness only. Linux checks Firecracker/Cloud Hypervisor and `/dev/kvm`; private Firecracker proof paths stay gated behind Linux, `/dev/kvm`, `firecracker`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, and explicit kernel/rootfs paths. macOS checks Lima/VZ availability and remains a low-security developer harness. Windows is explicitly unsupported. Public `MicroVMIsolationProvider.execute()` and `arc sandbox run --provider microvm` remain blocked.
 
 ---
 

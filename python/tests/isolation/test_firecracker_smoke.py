@@ -274,10 +274,10 @@ class TestFirecrackerProofRunner:
     def test_guest_proof_marker_parser_accepts_success_markers(self):
         proof = parse_firecracker_guest_proof(
             "boot\n"
-            "ARC_FC_PROOF no_default_route=1\n"
-            "ARC_FC_PROOF curl_failed=1\n"
-            "ARC_FC_PROOF sentinel_readable=1\n"
-            "ARC_FC_PROOF symlink_escape_blocked=1\n"
+            "ARC_FC_PROOF no-default-route=1\n"
+            "ARC_FC_PROOF network-failure=1\n"
+            "ARC_FC_PROOF sentinel-read=1\n"
+            "ARC_FC_PROOF symlink-escape-blocked=1\n"
         )
         assert proof.marker_seen is True
         assert proof.network_proof_passed is True
@@ -285,7 +285,7 @@ class TestFirecrackerProofRunner:
 
     def test_guest_proof_marker_parser_rejects_default_route(self):
         proof = parse_firecracker_guest_proof(
-            "ARC_FC_PROOF no_default_route=0\nARC_FC_PROOF curl_failed=1\n"
+            "ARC_FC_PROOF no-default-route=0\nARC_FC_PROOF network-failure=1\n"
         )
         assert proof.marker_seen is True
         assert proof.network_proof_passed is False
@@ -294,10 +294,10 @@ class TestFirecrackerProofRunner:
         snippet = render_firecracker_guest_proof_init()
         assert "mount -t proc proc /proc" in snippet
         assert "mount -t sysfs sysfs /sys" in snippet
-        assert "ARC_FC_PROOF no_default_route" in snippet
-        assert "ARC_FC_PROOF curl_failed" in snippet
-        assert "ARC_FC_PROOF sentinel_readable" in snippet
-        assert "ARC_FC_PROOF symlink_escape_blocked" in snippet
+        assert "ARC_FC_PROOF no-default-route" in snippet
+        assert "ARC_FC_PROOF network-failure" in snippet
+        assert "ARC_FC_PROOF sentinel-read" in snippet
+        assert "ARC_FC_PROOF symlink-escape-blocked" in snippet
         assert "curl --connect-timeout 2 https://example.com" in snippet
         assert "/workspace/arc-sentinel.txt" in snippet
         assert "/workspace/arc-host-escape-link" in snippet
@@ -310,7 +310,7 @@ class TestFirecrackerProofRunner:
         assert report.built_rootfs is False
         assert "ARC_FC_BUILD_PROOF_ROOTFS=1 not set" in "; ".join(report.blockers)
         init_text = (tmp_path / "arc-fc-proof-init.sh").read_text(encoding="utf-8")
-        assert "ARC_FC_PROOF no_default_route=1" in init_text
+        assert "ARC_FC_PROOF no-default-route=1" in init_text
         manifest = validate_firecracker_proof_manifest(tmp_path / "rootfs-manifest.json")
         assert manifest.build_status == "init_manifest_only"
         assert manifest.rootfs_path is None
@@ -321,10 +321,10 @@ class TestFirecrackerProofRunner:
         init_path = tmp_path / "arc-fc-proof-init.sh"
         init_path.write_text(
             "#!/bin/sh\n"
-            "ARC_FC_PROOF no_default_route=1\n"
-            "ARC_FC_PROOF curl_failed=1\n"
-            "ARC_FC_PROOF sentinel_readable=1\n"
-            "ARC_FC_PROOF symlink_escape_blocked=1\n",
+            "ARC_FC_PROOF no-default-route=1\n"
+            "ARC_FC_PROOF network-failure=1\n"
+            "ARC_FC_PROOF sentinel-read=1\n"
+            "ARC_FC_PROOF symlink-escape-blocked=1\n",
             encoding="utf-8",
         )
         manifest = tmp_path / "rootfs-manifest.json"
@@ -341,7 +341,7 @@ class TestFirecrackerProofRunner:
                     "rootfs_sha256": None,
                     "markers": [
                         "no_default_route",
-                        "curl_failed",
+                        "network_failure",
                         "sentinel_readable",
                         "symlink_escape_blocked",
                     ],
@@ -421,10 +421,10 @@ class TestFirecrackerProofRunner:
                 ).IsolationResult(
                     exit_code=0,
                     stdout=(
-                        "ARC_FC_PROOF no_default_route=1\n"
-                        "ARC_FC_PROOF curl_failed=1\n"
-                        "ARC_FC_PROOF sentinel_readable=1\n"
-                        "ARC_FC_PROOF symlink_escape_blocked=1\n"
+                        "ARC_FC_PROOF no-default-route=1\n"
+                        "ARC_FC_PROOF network-failure=1\n"
+                        "ARC_FC_PROOF sentinel-read=1\n"
+                        "ARC_FC_PROOF symlink-escape-blocked=1\n"
                     ),
                     provider="microvm",
                 ),
@@ -438,6 +438,8 @@ class TestFirecrackerProofRunner:
         result = runner.run(["ip", "route"])
         assert "guest_proof" in result.lifecycle
         assert result.network_proof_passed is True
+        assert result.no_default_route is True
+        assert result.network_failure is True
         assert result.workspace_sentinel_readable is True
         assert result.symlink_escape_blocked is True
         assert result.proof_blocker is None

@@ -57,7 +57,7 @@ class EventPersistenceWriter:
         self._max_age_days = max_age_days
         self._sequence = 0
 
-    def write(self, event: ArcEvent) -> None:
+    def write(self, event: ArcEvent) -> int | None:
         """Append a single event to the log. Best-effort; never raises."""
         try:
             self._log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -70,8 +70,10 @@ class EventPersistenceWriter:
                 fp.write(json.dumps(record, separators=(",", ":"), default=str) + "\n")
             if self._sequence % COMPACT_INTERVAL == 0:
                 self.compact()
+            return self._sequence
         except Exception:
             log.warning("EventPersistenceWriter: failed to write event", exc_info=True)
+            return None
 
     def compact(self) -> None:
         """Rolling compaction: drops lines beyond max_age_days or past max_entries.

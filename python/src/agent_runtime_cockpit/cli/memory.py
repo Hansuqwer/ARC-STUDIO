@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import typer
+from pathlib import Path
 
 from ..protocol.event_envelope import ok
 from ._helpers import JSON_FLAG, WORKSPACE_FLAG, _out, _workspace
@@ -90,6 +91,7 @@ def memory_forget_run(
 @memory_app.command("evaluate")
 def memory_evaluate(
     workspace: str | None = WORKSPACE_FLAG,
+    evidence_pack: str | None = typer.Option(None, "--evidence-pack", help="Offline evidence pack"),
     min_runs: int = typer.Option(10, "--min-runs", help="Minimum sample runs required"),
     quality_delta: float | None = typer.Option(
         None, "--quality-delta", help="Measured quality delta"
@@ -98,6 +100,12 @@ def memory_evaluate(
     json_output: bool = JSON_FLAG,
 ) -> None:
     """Evaluate the research gate for using memory in runtime prompts."""
+    if evidence_pack:
+        from ..memory_graph.evidence import evaluate_evidence_pack
+
+        report = evaluate_evidence_pack(Path(evidence_pack), min_samples=min_runs)
+        _out(ok(report.model_dump(), workspace=str(_workspace(workspace))), json_output)
+        return
     from ..memory_graph.store import MemoryGraphStore, evaluate_memory_graph
 
     ws = _workspace(workspace)
@@ -109,3 +117,51 @@ def memory_evaluate(
         cost_delta=cost_delta,
     )
     _out(ok(report.model_dump(), workspace=str(ws)), json_output)
+
+
+evidence_app = typer.Typer(help="Offline memory evidence-pack commands")
+memory_app.add_typer(evidence_app, name="evidence")
+
+
+@evidence_app.command("create")
+def memory_evidence_create(
+    samples: str = typer.Option(..., "--samples", help="Local JSON samples file"),
+    output: str = typer.Option(..., "--output", help="Output evidence pack path"),
+    pack_id: str = typer.Option("local-pack", "--pack-id", help="Evidence pack ID"),
+    workspace: str | None = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+) -> None:
+    """Create an offline evidence pack from local fixtures only."""
+    from ..memory_graph.evidence import create_evidence_pack
+
+    ws = _workspace(workspace)
+    pack = create_evidence_pack(Path(samples), Path(output), pack_id=pack_id)
+    _out(ok(pack.model_dump(), workspace=str(ws)), json_output)
+
+
+@evidence_app.command("evaluate")
+def memory_evidence_evaluate(
+    pack: str = typer.Argument(..., help="Evidence pack path"),
+    min_samples: int = typer.Option(10, "--min-samples", help="Minimum valid samples"),
+    workspace: str | None = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+) -> None:
+    """Evaluate an offline evidence pack."""
+    from ..memory_graph.evidence import evaluate_evidence_pack
+
+    ws = _workspace(workspace)
+    report = evaluate_evidence_pack(Path(pack), min_samples=min_samples)
+    _out(ok(report.model_dump(), workspace=str(ws)), json_output)
+
+
+@evidence_app.command("show")
+def memory_evidence_show(
+    pack: str = typer.Argument(..., help="Evidence pack path"),
+    workspace: str | None = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+) -> None:
+    """Show an offline evidence pack."""
+    from ..memory_graph.evidence import load_evidence_pack
+
+    ws = _workspace(workspace)
+    _out(ok(load_evidence_pack(Path(pack)).model_dump(), workspace=str(ws)), json_output)

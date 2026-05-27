@@ -11,6 +11,7 @@ import logging
 from typing import Callable, Optional
 
 from .types import ArcEvent
+from .persistence import get_writer
 
 log = logging.getLogger(__name__)
 
@@ -44,6 +45,9 @@ class EventBus:
 
     def publish(self, event: ArcEvent) -> None:
         """Publish an event to all matching subscribers. Fire-and-forget."""
+        seq = get_writer().write(event)
+        if seq is not None:
+            event.payload["persisted_seq"] = seq
         self._push_ring(event)
         et = event.event_type
         for handler in self._handlers.get(et, []):

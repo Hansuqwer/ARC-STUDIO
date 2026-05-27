@@ -177,6 +177,8 @@ def evaluate_memory_graph(
         cost_delta=cost_delta,
         decision=decision,
         reasons=reasons,
+        memory_runtime_injection=False,
+        evidence_source="manual_metrics",
     )
 
 

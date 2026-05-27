@@ -1,6 +1,6 @@
 # Swarm Memory Graph Research
 
-**Status:** Phase 59 research prototype. Local-only extraction from stored traces exists. No cross-tenant memory, no remote sync, no claimed quality/cost lift yet.
+**Status:** Phase 64 research prototype. Local-only extraction from stored traces and offline evidence-pack evaluation exist. No runtime prompt wiring, no cross-tenant memory, no remote sync, no provider/network evaluation calls.
 
 ## Schema
 
@@ -27,6 +27,15 @@ Required before productizing memory-assisted runs:
 
 `arc memory evaluate` records this gate. Without measured `--quality-delta >= 0.10` or `--cost-delta <= -0.20` across at least 10 source runs, the decision is `insufficient_evidence` or `no_go`.
 
+Phase 64 adds offline evidence packs:
+
+- `arc memory evidence create --samples <local-fixture.json> --output <pack.json>` creates a local pack.
+- `arc memory evidence evaluate <pack.json>` evaluates baseline/candidate metrics from local fixtures only.
+- `arc memory evidence show <pack.json>` prints the pack.
+- `arc memory evaluate --evidence-pack <pack.json>` uses evidence-pack metrics instead of manual deltas.
+
+Evidence packs require `memory_runtime_injection=false`, privacy review, redaction applied, and at least 10 valid samples. `proceed` means research gate only; it does not enable runtime memory injection or productized memory.
+
 ## Privacy Analysis
 
 - Memory is workspace-local only.
@@ -37,4 +46,4 @@ Required before productizing memory-assisted runs:
 
 ## Decision
 
-Current decision: continue research prototype only. Do not wire memory into runtime prompts until `arc memory evaluate` returns `proceed` on a fixed sample set and privacy controls are reviewed.
+Current decision: continue research prototype only. Do not wire memory into runtime prompts until an offline evidence pack returns `proceed` on a fixed reviewed sample set, privacy controls are reviewed, and a separate implementation phase explicitly wires runtime behavior.

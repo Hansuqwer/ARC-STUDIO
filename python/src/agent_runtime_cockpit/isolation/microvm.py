@@ -263,13 +263,18 @@ class FirecrackerProofRunResult(BaseModel):
     config_path: str
     result: IsolationResult
     lifecycle: list[str]
-    network_proof_passed: bool = False
+    no_default_route: bool = False
+    network_failure: bool = False
     workspace_sentinel_readable: bool = False
     symlink_escape_blocked: bool = False
     teardown_attempted: bool = False
     network_interfaces_configured: bool = False
     public_execution_enabled: bool = False
     proof_blocker: str | None = None
+
+    @property
+    def network_proof_passed(self) -> bool:
+        return self.no_default_route and self.network_failure
 
 
 class FirecrackerGuestProof(BaseModel):
@@ -279,14 +284,14 @@ class FirecrackerGuestProof(BaseModel):
 
     marker_seen: bool = False
     no_default_route: bool = False
-    curl_failed: bool = False
+    network_failure: bool = False
     sentinel_readable: bool = False
     symlink_escape_blocked: bool = False
     raw: dict[str, str] = {}
 
     @property
     def network_proof_passed(self) -> bool:
-        return self.no_default_route and self.curl_failed
+        return self.no_default_route and self.network_failure
 
     @property
     def workspace_proof_passed(self) -> bool:
@@ -327,10 +332,25 @@ class FirecrackerProofArtifactReport(BaseModel):
 FIRECRACKER_PROOF_MARKER = "ARC_FC_PROOF "
 FIRECRACKER_PROOF_MARKERS = [
     "no_default_route",
-    "curl_failed",
+    "network_failure",
     "sentinel_readable",
     "symlink_escape_blocked",
 ]
+
+FIRECRACKER_PROOF_MARKER_KEYS = {
+    "no_default_route": "no-default-route",
+    "network_failure": "network-failure",
+    "sentinel_readable": "sentinel-read",
+    "symlink_escape_blocked": "symlink-escape-blocked",
+}
+
+_FIRECRACKER_PROOF_ALIASES = {
+    "no-default-route": "no_default_route",
+    "network-failure": "network_failure",
+    "sentinel-read": "sentinel_readable",
+    "symlink-escape-blocked": "symlink_escape_blocked",
+    "curl_failed": "network_failure",
+}
 
 
 def parse_firecracker_guest_proof(output: str) -> FirecrackerGuestProof:
@@ -343,11 +363,12 @@ def parse_firecracker_guest_proof(output: str) -> FirecrackerGuestProof:
         if "=" not in payload:
             continue
         key, value = payload.split("=", 1)
-        raw[key.strip()] = value.strip()
+        normalized_key = _FIRECRACKER_PROOF_ALIASES.get(key.strip(), key.strip())
+        raw[normalized_key] = value.strip()
     return FirecrackerGuestProof(
         marker_seen=bool(raw),
         no_default_route=raw.get("no_default_route") == "1",
-        curl_failed=raw.get("curl_failed") == "1",
+        network_failure=raw.get("network_failure") == "1",
         sentinel_readable=raw.get("sentinel_readable") == "1",
         symlink_escape_blocked=raw.get("symlink_escape_blocked") == "1",
         raw=raw,
@@ -361,24 +382,24 @@ set +e
 mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sysfs /sys 2>/dev/null || true
 if ip route 2>/dev/null | grep -q '^default'; then
-  echo 'ARC_FC_PROOF no_default_route=0'
+  echo 'ARC_FC_PROOF no-default-route=0'
 else
-  echo 'ARC_FC_PROOF no_default_route=1'
+  echo 'ARC_FC_PROOF no-default-route=1'
 fi
 if curl --connect-timeout 2 https://example.com >/tmp/arc-curl.out 2>/tmp/arc-curl.err; then
-  echo 'ARC_FC_PROOF curl_failed=0'
+  echo 'ARC_FC_PROOF network-failure=0'
 else
-  echo 'ARC_FC_PROOF curl_failed=1'
+  echo 'ARC_FC_PROOF network-failure=1'
 fi
 if cat /workspace/arc-sentinel.txt >/dev/null 2>&1; then
-  echo 'ARC_FC_PROOF sentinel_readable=1'
+  echo 'ARC_FC_PROOF sentinel-read=1'
 else
-  echo 'ARC_FC_PROOF sentinel_readable=0'
+  echo 'ARC_FC_PROOF sentinel-read=0'
 fi
 if cat /workspace/arc-host-escape-link >/tmp/arc-escape.out 2>/tmp/arc-escape.err; then
-  echo 'ARC_FC_PROOF symlink_escape_blocked=0'
+  echo 'ARC_FC_PROOF symlink-escape-blocked=0'
 else
-  echo 'ARC_FC_PROOF symlink_escape_blocked=1'
+  echo 'ARC_FC_PROOF symlink-escape-blocked=1'
 fi
 reboot -f 2>/dev/null || poweroff -f 2>/dev/null || halt -f
 """
@@ -505,7 +526,11 @@ def validate_firecracker_proof_manifest(path: Path) -> FirecrackerProofArtifactM
         raise ValueError("proof init sha256 mismatch")
     init_text = init_path.read_text(encoding="utf-8")
     for marker in FIRECRACKER_PROOF_MARKERS:
-        if f"ARC_FC_PROOF {marker}=" not in init_text:
+        hyphenated = FIRECRACKER_PROOF_MARKER_KEYS.get(marker, marker.replace("_", "-"))
+        if (
+            f"ARC_FC_PROOF {marker}=" not in init_text
+            and f"ARC_FC_PROOF {hyphenated}=" not in init_text
+        ):
             raise ValueError(f"proof init missing marker: {marker}")
     if "mount -t proc proc /proc" not in init_text:
         raise ValueError("proof init missing proc mount")
@@ -747,7 +772,8 @@ class FirecrackerProofRunner:
                     redaction_applied=result.redaction_applied,
                 ),
                 lifecycle=lifecycle,
-                network_proof_passed=guest_proof.network_proof_passed,
+                no_default_route=guest_proof.no_default_route,
+                network_failure=guest_proof.network_failure,
                 workspace_sentinel_readable=guest_proof.sentinel_readable,
                 symlink_escape_blocked=guest_proof.symlink_escape_blocked,
                 teardown_attempted=True,
@@ -1479,94 +1505,6 @@ class LimaIntegrationHarness:
             redaction_applied=result.result.redaction_applied,
         )
         persist_sandbox_audit_event(event)
-
-
-def _execute_lima(
-    command: list[str],
-    *,
-    cwd: Optional[Path] = None,
-    timeout_seconds: int = 300,
-) -> IsolationResult:
-    """Create a disposable Lima VM, run command, collect result, destroy VM."""
-    instance_name = f"arc-sandbox-{uuid.uuid4().hex[:12]}"
-    workspace_root = (cwd or Path.cwd()).resolve()
-    yaml = render_lima_template(workspace_root, instance_name)
-
-    tmp = tempfile.NamedTemporaryFile(
-        mode="w",
-        suffix=".yaml",
-        prefix=f"{instance_name}-",
-        delete=False,
-    )
-    tmp_path = Path(tmp.name)
-    try:
-        tmp.write(yaml)
-        tmp.close()
-
-        # 1. Start VM
-        start_result = _run_limactl(
-            ["limactl", "start", "--tty=false", str(tmp_path)],
-            timeout=min(timeout_seconds, 600),
-        )
-        if start_result.exit_code != 0:
-            _run_limactl(["limactl", "delete", "-f", instance_name], timeout=30)
-            return IsolationResult(
-                exit_code=-1,
-                stderr=f"lima start failed: {start_result.stderr.strip()}",
-                provider="microvm",
-            )
-
-        try:
-            # 2. Network-off proof
-            net_check = _run_limactl(
-                [
-                    "limactl",
-                    "shell",
-                    "--tty=false",
-                    instance_name,
-                    "--",
-                    "curl",
-                    "--connect-timeout",
-                    "2",
-                    "http://example.com",
-                ],
-                timeout=10,
-            )
-            if net_check.exit_code == 0:
-                _run_limactl(["limactl", "delete", "-f", instance_name], timeout=30)
-                return IsolationResult(
-                    exit_code=-1,
-                    stderr="network-off proof failed: guest has network access",
-                    provider="microvm",
-                )
-
-            # 3. Run command via limactl shell
-            shell_argv = [
-                "limactl",
-                "shell",
-                "--tty=false",
-                instance_name,
-            ]
-            if cwd:
-                shell_argv.extend(["--workdir", "/workspace"])
-            shell_argv.append("--")
-            shell_argv.extend(command)
-            return _run_limactl(shell_argv, timeout=timeout_seconds)
-        finally:
-            # 4. Destroy VM
-            _run_limactl(["limactl", "delete", "-f", instance_name], timeout=60)
-    except Exception as exc:
-        _run_limactl(["limactl", "delete", "-f", instance_name], timeout=30)
-        return IsolationResult(
-            exit_code=-1,
-            stderr=str(exc),
-            provider="microvm",
-        )
-    finally:
-        try:
-            tmp_path.unlink(missing_ok=True)
-        except OSError:
-            pass
 
 
 class MicroVMIsolationProvider(IsolationProvider):

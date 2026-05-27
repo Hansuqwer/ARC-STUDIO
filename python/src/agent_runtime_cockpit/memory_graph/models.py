@@ -56,3 +56,46 @@ class MemoryEvaluationReport(BaseModel):
     cost_delta: float | None = None
     decision: Literal["proceed", "no_go", "insufficient_evidence"] = "insufficient_evidence"
     reasons: list[str] = Field(default_factory=list)
+    memory_runtime_injection: bool = False
+    evidence_source: Literal["manual_metrics", "evidence_pack"] = "manual_metrics"
+
+
+class MemoryEvidenceSample(BaseModel):
+    """Offline research sample; never runtime prompt input."""
+
+    sample_id: str
+    baseline_quality: float
+    candidate_quality: float
+    baseline_cost: float
+    candidate_cost: float
+    reviewed_privacy: bool = False
+    redaction_applied: bool = False
+    memory_runtime_injection: bool = False
+
+
+class MemoryEvidencePack(BaseModel):
+    schema_version: str = "phase64.memory_evidence.v1"
+    pack_id: str
+    created_at: str = Field(default_factory=utc_now)
+    memory_runtime_injection: bool = False
+    samples: list[MemoryEvidenceSample] = Field(default_factory=list)
+
+
+class MemoryEvidenceRunResult(BaseModel):
+    sample_id: str
+    quality_delta: float
+    cost_delta: float
+    valid: bool
+    reasons: list[str] = Field(default_factory=list)
+
+
+class MemoryEvidenceReport(BaseModel):
+    schema_version: str = "phase64.memory_evidence_report.v1"
+    pack_id: str
+    valid_sample_count: int
+    quality_delta: float | None = None
+    cost_delta: float | None = None
+    memory_runtime_injection: bool = False
+    decision: Literal["proceed", "no_go", "insufficient_evidence"] = "insufficient_evidence"
+    reasons: list[str] = Field(default_factory=list)
+    results: list[MemoryEvidenceRunResult] = Field(default_factory=list)

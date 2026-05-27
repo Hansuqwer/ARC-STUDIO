@@ -2506,6 +2506,176 @@ pnpm typecheck
 - Quality/cost deltas are user-supplied metrics; no automated task benchmark runner exists yet.
 - Runtime prompt wiring remains blocked until fixed sample-set evidence is generated and reviewed.
 
+## Phase 62 — Firecracker Strict Proof Harness and Sandbox Gap Closure
+
+**Roadmap:** R38 — CLI Sandbox Hardening + IDE Integration  
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/isolation/test_microvm_truth_guard.py tests/isolation/test_microvm_preflight.py tests/isolation/test_firecracker_smoke.py -q` 78 passed / 1 skipped  
+**Depends on:** Phase 37 active hardening, Phase 23 trust enforcement
+
+### Deliverables
+1. Harden proof-only Firecracker artifact flow for boot entries, proc/sysfs mount attempts, device placeholders, and proof markers without downloads or privileged build steps by default.
+2. Tighten host-gated Firecracker proof runner behind Linux, `/dev/kvm`, `firecracker`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, and explicit kernel/rootfs paths.
+3. Define stable proof-marker parsing for no-default-route, network failure, sentinel read, and symlink escape status.
+4. Keep public `MicroVMIsolationProvider.execute()` blocked and keep `arc sandbox run --provider microvm` unable to succeed.
+5. Update microVM research/ADR/security docs to preserve Lima low-security developer-harness status and Firecracker proof-only status.
+
+### Acceptance
+1. Normal CI requires no Firecracker, Lima, Docker, KVM, kernel image, or rootfs.
+2. Fake-runner tests prove no-NIC config, marker parsing, timeout/process cleanup, and teardown paths.
+3. Host-gated real tests skip cleanly unless every Firecracker opt-in gate and runtime dependency is present.
+4. Doctor/preflight never reports public microVM execution as implemented from proof scaffolds alone.
+5. Docs explicitly state public microVM execution remains blocked.
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/isolation/test_microvm_truth_guard.py tests/isolation/test_microvm_preflight.py tests/isolation/test_firecracker_smoke.py -q
+cd python && uv run pytest tests/ -q
+pnpm build
+pnpm typecheck
+```
+
+### Known Risks
+- Real Firecracker proof requires Linux/KVM host resources unavailable on typical macOS development hosts.
+- Proof markers are still evidence collection, not public microVM execution enablement.
+- Full-suite Python/Node validation still required before continuing to Phase 63.
+
+## Phase 63 — Event Notification Reliability and IDE Badge Truth
+
+**Roadmap:** R25 follow-up — Event-Driven Notifications  
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/events/ tests/cli/test_events_cli.py -q` 59 passed; `pnpm --filter arc-extension test` 822 passed / 3 skipped  
+**Depends on:** Phase 52 SSE push baseline, Phase 55 event log rotation, Phase 29 HITL persistence, Phase 21 audit events
+
+### Deliverables
+1. Make event-log persistence independent of active SSE clients while avoiding duplicate writes.
+2. Emit stable live SSE `id:` values aligned with persisted sequence IDs and `Last-Event-ID` replay.
+3. Add an `arc events summary --json` command with stable ARC envelopes and malformed-line accounting.
+4. Harden IDE notification backend to use argv-only process execution and event-summary-derived counts.
+5. Update notification protocol/source/degraded fields without claiming WebSocket, shared-server, remote sync, or complete audit coverage.
+6. Add/update event surface inventory for task, eval, audit, HITL, run, quota, and session events.
+
+### Acceptance
+1. Events published before any SSE client are persisted locally.
+2. Live SSE events include `id:` and resume correctly from `Last-Event-ID`.
+3. Multiple SSE clients do not duplicate persisted event records.
+4. `arc events summary --json` reports HITL, run failure, audit alert, task failure, eval failure, source, degraded, and malformed counts.
+5. IDE notification service uses `spawn`/argv-only behavior, not shell-string execution.
+6. Docs preserve local-daemon-only SSE posture.
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/events/ tests/cli/test_events_cli.py -q
+cd python && uv run pytest tests/ -q
+pnpm --filter arc-extension test
+pnpm build
+pnpm typecheck
+```
+
+### Known Risks
+- Event-log-derived counts are recent/local summaries, not canonical global state.
+- Log compaction may remove old required/decided event pairs; UI must label summaries accordingly.
+- Full-suite Python/Node validation still required before continuing to Phase 64.
+
+## Phase 64 — Memory Evaluation Evidence Packs
+
+**Roadmap:** R26 — Swarm Memory Graph research follow-up  
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/memory_graph -q` 18 passed  
+**Depends on:** Phase 59 memory research prototype, Phase 60 privacy guardrails, Phase 61 evaluation gate
+
+### Deliverables
+1. Add memory evidence-pack schemas for samples, packs, run results, and evidence reports with explicit `memory_runtime_injection=false` metadata.
+2. Add an offline evaluator for baseline vs candidate metrics from local fixture files only.
+3. Add `arc memory evidence create`, `arc memory evidence evaluate`, and optional `arc memory evidence show` commands with stable JSON envelopes.
+4. Extend `arc memory evaluate` to prefer `--evidence-pack` while keeping manual metrics clearly marked as unreviewed research input.
+5. Require reviewed privacy status, redaction applied on all samples, no runtime injection, and at least 10 valid samples before a research-gate `proceed` decision.
+6. Update memory research docs to state evidence packs are research artifacts and do not enable prompt/runtime memory injection.
+
+### Acceptance
+1. Ten reviewed samples with `quality_delta >= 0.10` return research-gate `proceed`.
+2. Ten reviewed samples with `cost_delta <= -0.20` return research-gate `proceed`.
+3. Fewer than ten valid samples return `insufficient_evidence`.
+4. Unreviewed privacy, missing redaction, or `memory_runtime_injection=true` returns `no_go`.
+5. Malformed evidence packs return stable error envelopes.
+6. Manual metrics alone cannot imply runtime prompt wiring permission.
+7. No tests make provider calls or network calls.
+
+### Known Risks
+- Evidence packs are local research artifacts only and do not wire runtime prompt memory.
+- Evidence quality still depends on user-provided offline fixture metrics.
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/memory_graph -q
+cd python && uv run pytest tests/ -q
+pnpm build
+pnpm typecheck
+```
+
+### Known Risks
+- Evidence packs can still contain self-attested scores; docs must avoid claiming automated benchmark proof.
+- A research-gate `proceed` is not productized memory injection or tenant-safe runtime memory.
+
+## Phase 65 — Event Replay/Summary Regression Closure
+
+**Roadmap:** R25 follow-up — Event Notification Reliability  
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/events/ tests/cli/test_events_cli.py -q` 61 passed; `cd python && uv run pytest tests/ -q` 3037 passed / 34 skipped / 3 xfailed; banned-claims OK  
+**Depends on:** Phase 63
+
+### Deliverables
+1. SSE regression test proves publish-time persisted events replay with `id: <seq>`.
+2. `Last-Event-ID` regression test proves already-seen persisted events are skipped.
+3. Event summary marks stale/compacted HITL decision-only logs as degraded.
+4. Enforcement docs state summary counts are local/recent/derived and may be degraded by compaction.
+
+### Acceptance
+1. No duplicate per-SSE-client persistence writes are needed for live events.
+2. Replay id aligns with persisted sequence ID.
+3. `arc events summary --json` reports `degraded=true`, `unmatched_hitl_decisions`, and `summary_semantics=local_recent_derived_compaction_may_drop_pairs` for unmatched HITL decisions.
+4. Full Python suite remains green.
+
+### Known Risks
+- The summary remains a local/recent derived notification view, not canonical global HITL/audit state.
+
+## Phase 66 — Firecracker Opt-In Host Proof Evidence
+
+**Roadmap:** R38 / ADR-024 host proof  
+**Status:** Blocked | Evidence: local host gate check returned `Darwin`; no Linux `/dev/kvm` Firecracker host available in this environment  
+**Depends on:** Phase 62
+
+### Deliverables
+1. Run real Firecracker proof only on Linux with `/dev/kvm`, `firecracker`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, `ARC_FIRECRACKER_KERNEL`, and `ARC_FIRECRACKER_ROOTFS`.
+2. Record proof markers for no-default-route, network failure, sentinel read, and symlink escape status.
+3. Update ADR/research docs only with real Linux/KVM evidence.
+
+### Acceptance
+1. Normal CI and macOS hosts skip cleanly.
+2. Public `MicroVMIsolationProvider.execute()` remains blocked.
+3. No proof is claimed without a real Linux/KVM run.
+
+### Blocker
+- Current environment is macOS (`Darwin`), so `/dev/kvm` and Firecracker proof execution cannot run here.
+
+## Phase 67 — Reviewed Memory Evidence Fixture Pack
+
+**Roadmap:** R26 memory evidence follow-up  
+**Status:** Blocked | Evidence: repository scan found only schema/tests (`test_phase64_memory_evidence.py`) and no reviewed real fixture pack  
+**Depends on:** Phase 64
+
+### Deliverables
+1. Add a real reviewed evidence pack only when actual reviewed samples exist.
+2. Require `memory_runtime_injection=false`, privacy reviewed, redaction applied, and at least 10 valid samples.
+3. Keep evidence packs research-only; no runtime prompt wiring.
+
+### Acceptance
+1. No synthetic/fake reviewed pack is added.
+2. `arc memory evidence evaluate <pack>` returns stable result for the reviewed fixture.
+3. Docs preserve research-only status.
+
+### Blocker
+- No reviewed real sample dataset was provided or present in the repository.
+
 ### Critical Path
 
 ```

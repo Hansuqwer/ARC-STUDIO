@@ -253,3 +253,29 @@ def test_events_query_no_log(tmp_workspace: Path):
     assert result.exit_code == 1
     data = json.loads(result.stdout)
     assert data.get("ok") is False
+
+
+def test_events_summary_marks_unmatched_hitl_decision_degraded(tmp_events_log: Path):
+    log_path = tmp_events_log / ".arc" / "events" / "event-log.jsonl"
+    log_path.write_text(
+        json.dumps(
+            {
+                "seq": 10,
+                "event_type": "hitl_decided",
+                "run_id": "r1",
+                "hitl_id": "h-old",
+                "decision": "approve",
+                "timestamp": "2026-01-10T00:00:00",
+            },
+            separators=(",", ":"),
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    result = runner.invoke(app, ["events", "summary", "--json"])
+    assert result.exit_code == 0, result.stderr
+    payload = json.loads(result.stdout)["data"]
+    assert payload["hitl"] == 0
+    assert payload["unmatched_hitl_decisions"] == 1
+    assert payload["degraded"] is True
+    assert payload["summary_semantics"] == "local_recent_derived_compaction_may_drop_pairs"

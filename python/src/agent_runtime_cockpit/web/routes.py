@@ -30,7 +30,7 @@ from ..context.pack import ContextPackGenerator
 from ..evals.diff import diff_runs
 from ..events.bus import get_bus
 from ..events.persistence import get_writer
-from ..events.types import ArcEvent, SessionChanged
+from ..events.types import SessionChanged
 from ..gating import GatingError
 from ..orchestration import runtime_router
 from ..orchestration.cross_linker import CrossLinker
@@ -1332,12 +1332,6 @@ async def events_stream(request: web.Request) -> web.StreamResponse:
     bus = get_bus()
     queue = bus.stream("*")
 
-    # Also subscribe to bus to persist new events
-    def _persist_and_publish(ev: "ArcEvent") -> None:  # noqa: F821
-        writer.write(ev)
-
-    bus.subscribe_all(_persist_and_publish)
-
     try:
         while True:
             try:
@@ -1356,9 +1350,10 @@ async def events_stream(request: web.Request) -> web.StreamResponse:
             if event.event_type not in _SSE_PUSH_EVENT_TYPES:
                 continue
 
-            # Get seq from writer (written by _persist_and_publish)
+            seq = event.payload.get("persisted_seq")
             payload = json.dumps(event.model_dump(mode="json"), default=str)
-            await response.write(f"event: {event.event_type}\ndata: {payload}\n\n".encode())
+            prefix = f"id: {seq}\n" if seq is not None else ""
+            await response.write(f"{prefix}event: {event.event_type}\ndata: {payload}\n\n".encode())
 
             # Check if client disconnected
             if response.task is not None and response.task.done():
@@ -1368,7 +1363,6 @@ async def events_stream(request: web.Request) -> web.StreamResponse:
         pass
     finally:
         bus.close_stream("*", queue)
-        bus.unsubscribe_all(_persist_and_publish)
 
     return response
 

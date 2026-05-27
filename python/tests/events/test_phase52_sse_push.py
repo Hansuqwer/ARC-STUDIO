@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -26,7 +27,7 @@ import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from agent_runtime_cockpit.events.bus import reset_bus
+from agent_runtime_cockpit.events.bus import get_bus, reset_bus
 from agent_runtime_cockpit.events.models import DeadLetterEntry
 from agent_runtime_cockpit.events.persistence import (
     EventPersistenceWriter,
@@ -120,6 +121,41 @@ async def test_last_event_id_resumes_from_position(tmp_path: Path) -> None:
     assert replayed[1][1].event_type == "run_failed"
 
     reset_writer(log_path)
+
+
+async def test_sse_replays_publish_persisted_id_with_last_event_id(tmp_path: Path) -> None:
+    """Published-before-client events persist once and replay with stable SSE id."""
+    reset_bus()
+    log_path = tmp_path / ".arc" / "events" / "event-log.jsonl"
+    old = Path.cwd()
+    os.chdir(tmp_path)
+    try:
+        reset_writer()
+        with patch(_TRUST):
+            get_bus().publish(
+                SessionChanged(session_id="s1", operation="write", workspace=str(tmp_path))
+            )
+            seq = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])["seq"]
+            client = await _client(tmp_path)
+            try:
+                resp = await client.get("/api/events/stream", headers={"Last-Event-ID": "0"})
+                body = await asyncio.wait_for(resp.content.read(512), timeout=5.0)
+                text = body.decode("utf-8")
+                assert f"id: {seq}" in text
+                assert "event: session_changed" in text
+
+                resumed = await client.get(
+                    "/api/events/stream", headers={"Last-Event-ID": str(seq)}
+                )
+                with pytest.raises(asyncio.TimeoutError):
+                    await asyncio.wait_for(resumed.content.read(64), timeout=0.2)
+            finally:
+                await client.close()
+    finally:
+        os.chdir(old)
+        reset_bus()
+        reset_writer()
+        reset_writer(log_path)
 
 
 # ── 3. Untrusted workspace returns 403 at connect time ───────────────────────

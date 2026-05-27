@@ -9,6 +9,11 @@ export interface NotificationCounts {
     hitl: number;
     runFailures: number;
     auditAlerts: number;
+    taskFailures?: number;
+    evalFailures?: number;
+    protocol?: 'sse';
+    source?: 'local_event_log_recent' | 'cli_fallback';
+    degraded?: boolean;
 }
 
 export const NotificationService = Symbol('NotificationService');
