@@ -24,6 +24,7 @@ from . import (
     exec,  # noqa: F401
     info,  # noqa: F401
     mcp,  # noqa: F401
+    memory,  # noqa: F401
     mgmt,  # noqa: F401
     profiles,  # noqa: F401
     prompt,  # noqa: F401

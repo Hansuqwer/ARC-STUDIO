@@ -33,6 +33,9 @@ audit_app = typer.Typer(name="audit", help="Audit chain verification and key man
 profiles_app = typer.Typer(name="profiles", help="Run profile management")
 prompt_app = typer.Typer(name="prompt", help="Prompt optimization commands (P1b local)")
 mcp_app = typer.Typer(name="mcp", help="MCP Local Control Plane server (Phase 26 / R19)")
+memory_app = typer.Typer(
+    name="memory", help="Swarm memory graph research commands (Phase 59 / R26)"
+)
 task_app = typer.Typer(name="task", help="Async task execution and management (Phase 27 / R20)")
 replay_app = typer.Typer(name="replay", help="Replay capability analysis (Phase 28 / R21)")
 battle_app = typer.Typer(name="battle", help="SwarmGraph battle mode (Phase 34 / R26A)")

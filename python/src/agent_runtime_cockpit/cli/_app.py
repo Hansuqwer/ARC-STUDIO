@@ -25,6 +25,7 @@ from ._subapps import (
     hitl_app,
     isolation_app,
     mcp_app,
+    memory_app,
     policy_app,
     profiles_app,
     prompt_app,
@@ -72,6 +73,7 @@ app.add_typer(receipt_app)
 app.add_typer(audit_app)
 app.add_typer(profiles_app)
 app.add_typer(mcp_app)
+app.add_typer(memory_app)
 app.add_typer(task_app)
 app.add_typer(replay_app)
 app.add_typer(battle_app)

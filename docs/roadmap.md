@@ -606,7 +606,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Persistent knowledge graph that captures insights across swarm runs for learning.
 
-**Current:** P0 CLI foundation implemented for pipelines, dashboard, aliases, batch mode, and session bundle export/import. IDE daemon/shared-session bridge remains deferred.
+**Current:** Research prototype baseline implemented. Local-only memory schema/store plus `arc memory extract/query/show` can extract deterministic keyword/phrase memories from stored JSONL traces. No runtime prompt wiring, cross-tenant memory, remote sync, or measured quality/cost lift is claimed.
 
 **Deliverables:**
 - Design document with memory schema
@@ -621,7 +621,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - Privacy analysis complete
 - Decision: proceed to implementation or pivot
 
-**Status:** Research | Evidence: no memory graph found | Notes: P3 work; high risk of memory pollution, privacy leakage.
+**Status:** Baseline Complete (research prototype) | Evidence: Phase 59 local verification — 6 memory graph tests pass; ruff OK; `docs/research/swarm-memory-graph.md` | Notes: Research-only. Memory graph persistence is workspace-local at `.arc/memory/graph.json`. No runtime memory injection or quality/cost improvement claim. Secret redaction before ingestion and tenant isolation remain unresolved.
 
 **Source:** Feature List F6.1
 
@@ -966,7 +966,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R23 Consensus Escrow** | **Complete** | **Phase 30 — complete; commit-reveal voting with cryptographic verification and adversarial tests** |
 | **R24 Adaptive Consensus** | **Complete** | **Phase 31 — complete; deterministic risk assessment, protocol selection, raft/bft/bft_escrow hardening** |
 | **R25 Event-Driven Notifications** | **Not Started** | **Phase 32 — add event bus + webhooks** |
-| **R26 Swarm Memory Graph** | **Research** | **Phase 33 — design + prototype** |
+| **R26 Swarm Memory Graph** | **Baseline Complete (research prototype)** | **Phase 59 — local-only schema/store/extract/query; evaluation and runtime wiring deferred** |
 | **R27 LangChain Adapter** | **Baseline Complete** | **Adapter Phase 26 — complete (commits 6beedf8, ea567cf, 7566e60)** |
 | **R28 Anthropic Provider + Registry** | **Baseline Complete** | **Adapter Phase 27 — complete (commit 4a479b7)** |
 | **R29 OpenAI-Compatible Provider** | **Baseline Complete** | **Adapter Phase 28 — complete (commit 6826d8d, 24 tests, 6 vendors)** |

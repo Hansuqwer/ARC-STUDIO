@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.  
 **Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-27 — Phases 53-55 Baseline Complete.  
-**Current evidence anchor:** local worktree | Phases 53-55 verification pass: 2976 Python tests passed (37 new tests); ruff OK; protocol build OK; extension build OK.  
+**Last reality refresh:** 2026-05-27 — Phases 56-59 Baseline Complete.  
+**Current evidence anchor:** local worktree | Phases 56-58 verification pass: 3017 Python tests passed; ruff OK; protocol build OK; extension build OK. Phase 59 targeted verification: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/memory_graph/test_phase59_memory_graph.py -q` 6 passed.  
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -2350,6 +2350,10 @@ pnpm typecheck
 | **53** | **R22 residual** | **Eval Artifact Schema + Batch Eval CLI** |
 | **54** | **R20 residual** | **Task Daemon Integration + SSE Notifications** |
 | **55** | **P52 known-risk** | **Event Log Rotation + Provider Workspace Isolation** |
+| **56** | **R20 residual** | **Daemon-first task CLI + event log browser** |
+| **57** | **R37 residual** | **Provider config IDE bridge + REPL integration** |
+| **58** | **R22 residual** | **Cross-session eval workflow + trend tracking** |
+| **59** | **R26** | **Swarm Memory Graph research prototype** |
 
 ### Dependencies
 
@@ -2377,6 +2381,81 @@ pnpm typecheck
 | 53 Eval Artifact Schema | Baseline Complete | Phase 52, Phase 29 | EvalArtifact model, store, deterministic paths, batch CLI, compare, inspect export; 16 tests |
 | 54 Task Daemon Integration | Baseline Complete | Phase 53, Phase 52 | Wired TaskExecutor operations, daemon task HTTP routes, task SSE events; 10 tests |
 | 55 Event Log Rotation | Baseline Complete | Phase 54, Phase 50 | EventPersistenceWriter compact(), provider workspace trust; 11 tests |
+| 56 Task CLI/Event Browser | Baseline Complete | Phase 54, Phase 55 | Daemon-first task list/status/cancel plus event query/stats CLI |
+| 57 Provider Config Bridge | Baseline Complete | Phase 55, R37 | Provider account daemon routes, REPL provider commands, TS config service bridge |
+| 58 Eval Trend Tracking | Baseline Complete | Phase 53, Phase 56 | Golden-dir eval run, eval_completed event, trending/dashboard CLI |
+| 59 Memory Graph Research | Baseline Complete (research prototype) | R26 | Local-only memory schema/store/extract/query CLI; no runtime prompt wiring or claimed lift |
+
+---
+
+## Phase 56 — Daemon Task CLI and Event Log Browser
+
+**Roadmap:** R20 residual + Phase 52 event-log polish  
+**Status:** Baseline Complete | Evidence: commit `1afca3b`; full Python/TS validation captured in Phase 58 handoff  
+
+### Deliverables
+1. `arc task list/status/cancel` use local daemon when `ARC_PYTHON_DAEMON_URL` is set and fall back to `TaskStorage` direct reads.
+2. `arc events query` supports type/time/limit filters plus `--stats` over `.arc/events/event-log.jsonl`.
+3. `arc doctor all` includes event-log health.
+
+### Acceptance
+1. Task CLI works against daemon and direct storage fallback.
+2. Event query returns stable ARC envelopes.
+3. Event-log stats include total/type/timestamp metadata.
+
+## Phase 57 — Provider Config IDE Bridge and REPL Integration
+
+**Roadmap:** R37 residual  
+**Status:** Baseline Complete | Evidence: commit `1d4a84e`; full Python/TS validation captured in Phase 58 handoff  
+
+### Deliverables
+1. Daemon provider account routes: get/update/test.
+2. REPL `/providers` summary/list/add/remove/test`.
+3. TypeScript protocol/config service provider account methods with daemon-first/local fallback behavior.
+
+### Acceptance
+1. Provider account metadata is configurable without persisting raw secrets.
+2. IDE bridge uses stable protocol types.
+3. REPL provider commands render honest local/provider states.
+
+## Phase 58 — Cross-Session Eval Workflow and Trend Tracking
+
+**Roadmap:** R22 residual  
+**Status:** Baseline Complete | Evidence: commit `0acd364`; `cd python && uv run pytest tests/ -q` 3017 passed / 34 skipped / 3 xfailed; ruff OK; protocol build OK; extension build OK  
+
+### Deliverables
+1. `EvalTrending` and `compute_trending` aggregate artifact pass rates across runs.
+2. `arc eval run --golden-dir`, `arc eval trending`, and `arc eval dashboard`.
+3. `eval_completed` event type and SSE allowlist entry.
+
+### Acceptance
+1. Golden-directory eval writes deterministic artifacts.
+2. Trending/dashboard commands return stable envelopes.
+3. Eval completion emits typed events.
+
+## Phase 59 — Swarm Memory Graph Research Prototype
+
+**Roadmap:** R26  
+**Status:** Baseline Complete (research prototype) | Evidence: local worktree; `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/memory_graph/test_phase59_memory_graph.py -q` 6 passed  
+
+### Deliverables
+1. `memory_graph` models: local-only nodes, edges, snapshot schema with explicit no tenant-isolation claim.
+2. File-backed `MemoryGraphStore` at `.arc/memory/graph.json`.
+3. Deterministic trace extraction helper scanning local JSONL traces only.
+4. `arc memory extract/query/show` CLI.
+5. `docs/research/swarm-memory-graph.md` design/evaluation/privacy note.
+
+### Acceptance
+1. Schema serializes/deserializes.
+2. Extraction works on stored local traces without provider/network calls.
+3. Store merge/query behavior is deterministic.
+4. CLI returns stable ARC envelopes.
+5. Docs state research-only status and no runtime memory prompt wiring.
+
+### Known Risks
+- Extraction is keyword/phrase based; no quality/cost lift demonstrated.
+- Secret redaction is not integrated into memory ingestion yet.
+- Cross-workspace/tenant memory remains blocked.
 
 ### Critical Path
 
