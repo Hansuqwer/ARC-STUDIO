@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-28 — R45, R47, and R50 candidate baselines implemented; R46 plan/explain baseline in progress.
-**Current evidence anchor:** local worktree | R45/R46/R47/R50 post-review verification pass: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3105 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
+**Last reality refresh:** 2026-05-28 — R45-R52 candidate baselines implemented; local sandbox audit/container/policy hardening landed as R53-R55.
+**Current evidence anchor:** local worktree | R53-R55 post-review hardening: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3339 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK; banned-claims check OK.
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -1004,6 +1004,9 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R42 Slash Registry Expansion + REPL Error Boundary** | **Baseline Complete** | **Phase 44 — /help rebuilt as grouped palette (SESSION/RUN/SANDBOX/POLICY/WORKSPACE/PROVIDERS/AUDIT/TASKS/MCP); per-command error boundary; all P0/P1 commands verified; 2828 Python tests** |
 | **R43 Approval + Progress + Error UX** | **Baseline Complete** | **Phase 45 — render-state prefixes ([ok]/[denied]/[blocked]/[empty]/[error]); interactive y/N prompt for NETWORK/INSTALL/UNKNOWN; TTY-aware; DESTRUCTIVE/PRIVILEGED hard-denied; audit events for all deny paths; 2846 Python tests** |
 | **R44 IDE Write Bridge / Daemon Protocol** | **Baseline Complete** | **Phase 46 CLI bridge + Phase 47 daemon HTTP bridge — arc studio sessions write/delete/update fallback; daemon POST/DELETE/PATCH /api/sessions; daemon-first TS bridge with CLI fallback; session_changed event; ADR-025 Windows lock posture** |
+| **R53 Local Sandbox Audit Query + Compaction** | **Baseline Complete** | **Phase 82 — local-only audit query/compaction; compaction refuses canonical hash-chain logs; 19 audit query tests** |
+| **R54 Container Isolation Provider** | **Baseline Complete** | **Phase 83 — container fallback remains disabled unless `ARC_ENABLE_CONTAINER_SANDBOX=1`; Docker/Podman CLI provider hardened** |
+| **R55 Local Sandbox Policy YAML** | **Baseline Complete** | **Phase 84 — local workspace/user YAML policy validation/apply/list/show; no remote policy server** |
 
 **Post-v0.1 Execution Order:** 
 - **Priority 1 stop-the-line:** R39 / Phase 41 (Interactive CLI/UX Foundation). **Baseline Complete** as of Phases 41–45 (commits 37fd92b–7fdba99). Gate lifted. R44 (Phase 46 CLI write bridge + Phase 47 daemon HTTP write bridge) is now Baseline Complete. Continue sandbox hardening for Phase 37 microVM feasibility decision.
@@ -1141,7 +1144,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Deferred:** No live daemon/remote sync/microVM broadening.
 
-**Status:** Baseline Complete | Evidence: commit 7fdba99; 2846 Python tests pass; TS build + typecheck green | Notes: Production-ready subprocess sandbox foundation. MicroVM execution remains unimplemented (preflight/doctor only).
+**Status:** Baseline Complete | Evidence: commit 7fdba99; 2846 Python tests pass; TS build + typecheck green | Notes: Hardened subprocess sandbox foundation. MicroVM execution remains unimplemented (preflight/doctor only).
 
 ---
 
@@ -1179,36 +1182,36 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Source:** Phase 46 execution, 2026-05-26
 
-## R45 — Sandbox Audit Federation
+## R53 — Local Sandbox Audit Query + Compaction
 
-**Goal:** Extend sandbox audit infrastructure with time-range queries, compaction, and structured audit event querying.
+**Goal:** Extend local sandbox audit infrastructure with time-range queries, safe compaction behavior, and structured audit event querying.
 
-**Current:** Baseline Complete. `arc sandbox audit-query` and `arc sandbox audit-compact` (flat + nested) implemented with relative time parsing (`1h`/`30m`/`7d`/`now`), time-range filtering, and events-only compaction.
+**Current:** Baseline Complete. `arc sandbox audit-query` and `arc sandbox audit-compact` (flat + nested) implemented with relative time parsing (`1h`/`30m`/`7d`/`now`), time-range filtering, and guarded local events compaction. Compaction refuses canonical hash-chain logs so `arc sandbox audit-verify` invariants are not silently broken.
 
 **Deliverables:**
 - `parse_relative_time(value: str) -> str` — converts relative time expressions to ISO UTC
-- `compact_sandbox_audit_events(*, before, keep, audit_dir) -> dict` — prunes events file, chain untouched
+- `compact_sandbox_audit_events(*, before, keep, audit_dir) -> dict` — prunes events-only logs and refuses canonical hash-chain logs
 - CLI `arc sandbox audit-query` with `--from`, `--to`, `--classification`, `--provider`, `--allowed/--denied`, `--command-contains`, `--limit`
 - CLI `arc sandbox audit-compact` with `--before`, `--keep`
-- 12 tests covering relative time parsing, filtering, compaction edge cases
+- 19 tests covering relative time parsing, filtering, compaction edge cases, malformed logs, and CLI validation
 
 **Acceptance:**
 - ✅ Relative time parsing works for `1h`, `30m`, `7d`, `now`, and ISO passthrough
 - ✅ Time-range filtering returns correct event subsets
-- ✅ Compaction keeps newest N events or events after timestamp
+- ✅ Compaction keeps newest N events or events after timestamp only for events-only logs
 - ✅ Compaction on missing file returns empty result
 - ✅ CLI commands output valid JSON envelopes
 - ✅ All existing sandbox tests remain green
 
-**Status:** Baseline Complete | Evidence: local worktree; 12 new tests pass; full Python suite 3323 passed / 34 skipped / 3 xfailed; ruff clean; pnpm build + typecheck green | Notes: Compaction is events-only; chain file remains append-only.
+**Status:** Baseline Complete | Evidence: local worktree; 19 audit query/compact tests pass; full Python suite 3339 passed / 34 skipped / 3 xfailed; ruff clean; pnpm build + typecheck green | Notes: Compaction is local-only and refuses canonical hash-chain logs; no global, remote, or complete audit coverage claim.
 
 **Source:** Phase 33 execution, 2026-05-28
 
-## R46 — Container Isolation Provider
+## R54 — Container Isolation Provider
 
 **Goal:** Add subprocess-based container isolation provider (Docker/Podman CLI) as alternative to SDK-based path, wired into sandbox CLI.
 
-**Current:** Baseline Complete. `SubprocessContainerProvider` uses `docker run` / `podman run` via subprocess without SDK dependency. `container_preflight()` detects runtime availability. `arc sandbox run --provider container` routes through container isolation.
+**Current:** Baseline Complete. `SubprocessContainerProvider` uses `docker run` / `podman run` via subprocess without SDK dependency. `container_preflight()` detects runtime availability. `arc sandbox run --provider container` routes through container isolation only when `ARC_ENABLE_CONTAINER_SANDBOX=1` is set and runtime/daemon checks pass.
 
 **Deliverables:**
 - `SubprocessContainerProvider(IsolationProvider)` — subprocess-based container runner with env allowlist, secret strip, output redaction, bounded I/O, timeout/SIGKILL, workspace mount
@@ -1227,15 +1230,15 @@ The following roadmap items implement the adapter integration plan from `docs/re
 - ✅ `arc sandbox doctor --json` includes container provider
 - ✅ All existing sandbox tests remain green
 
-**Status:** Baseline Complete | Evidence: local worktree; 15 new tests pass; full Python suite 3323 passed / 34 skipped / 3 xfailed; ruff clean; pnpm build + typecheck green | Notes: Actual `docker run` requires live daemon; tests use monkeypatched `Popen`. SDK-based `DockerIsolationProvider` remains untouched.
+**Status:** Baseline Complete | Evidence: local worktree; 18 container provider tests pass; full Python suite 3339 passed / 34 skipped / 3 xfailed; ruff clean; pnpm build + typecheck green | Notes: Actual `docker run` requires live daemon and `ARC_ENABLE_CONTAINER_SANDBOX=1`; tests use monkeypatched `Popen`. SDK-based `DockerIsolationProvider` remains untouched.
 
 **Source:** Phase 34 execution, 2026-05-28
 
-## R47 — Sandbox Policy Federation
+## R55 — Local Sandbox Policy YAML
 
-**Goal:** Add YAML-first policy file format with workspace/user inheritance, validation, and apply commands.
+**Goal:** Add local YAML policy file format with workspace/user inheritance, validation, and apply commands.
 
-**Current:** Baseline Complete. YAML policy files supported alongside existing JSON store. `arc policy validate-yaml --file` validates YAML schema. `arc policy apply --file` installs policy to workspace `.arc/`. Policy resolution falls through JSON → workspace YAML → user YAML.
+**Current:** Baseline Complete. YAML policy files supported alongside existing JSON store. `arc policy validate-yaml --file` validates YAML schema. `arc policy apply --file` installs policy under the workspace boundary. Policy resolution falls through JSON → workspace YAML → user YAML. No remote policy service exists.
 
 **Deliverables:**
 - `default_workspace_policy_path(workspace_root) -> Path` — `.arc/sandbox-policy.yaml`
@@ -1246,16 +1249,16 @@ The following roadmap items implement the adapter integration plan from `docs/re
 - `resolve_sandbox_policy_with_yaml(name, workspace_root, *, json_path, yaml_path) -> SandboxPolicy` — JSON → workspace YAML → user YAML
 - Modified `resolve_sandbox_policy` to fall through to YAML on JSON miss
 - CLI `arc policy validate-yaml --file <path>` and `arc policy apply --file <path>`
-- 16 tests covering validation, apply, resolution, CLI commands
+- 22 tests covering validation, apply, resolution, list/show behavior, path bounds, and CLI commands
 
 **Acceptance:**
 - ✅ YAML validation catches missing name, wrong version, non-bool fields, missing files
-- ✅ Apply copies valid YAML to workspace, rejects invalid
+- ✅ Apply copies valid YAML to workspace, rejects invalid or out-of-workspace targets
 - ✅ Resolution finds policy from workspace YAML, falls back to user YAML
 - ✅ JSON-first lookup preserved; YAML is additive
 - ✅ CLI commands output valid JSON envelopes
 - ✅ All existing policy tests remain green
 
-**Status:** Baseline Complete | Evidence: local worktree; 16 new tests pass; full Python suite 3323 passed / 34 skipped / 3 xfailed; ruff clean; pnpm build + typecheck green | Notes: YAML policy files are workspace-local; no remote/centralized policy server. `yaml` dependency already present.
+**Status:** Baseline Complete | Evidence: local worktree; 22 YAML policy tests pass; full Python suite 3339 passed / 34 skipped / 3 xfailed; ruff clean; pnpm build + typecheck green | Notes: YAML policy files are local workspace/user files; no remote/centralized policy server. `yaml` dependency already present.
 
 **Source:** Phase 35 execution, 2026-05-28

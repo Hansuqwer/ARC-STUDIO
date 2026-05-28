@@ -17,6 +17,7 @@ from ..isolation.subprocess import SubprocessIsolationProvider
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
 from ..security.sandbox import (
+    CommandClassification,
     SandboxPolicy,
     SandboxResult,
     apply_sandbox_policy_yaml,
@@ -281,8 +282,12 @@ def _sandbox_audit_query_impl(
     debug: bool,
 ) -> None:
     _setup_logging(debug)
-    since = parse_relative_time(from_time) if from_time else None
-    until = parse_relative_time(to_time) if to_time else None
+    try:
+        since = parse_relative_time(from_time, strict=True) if from_time else None
+        until = parse_relative_time(to_time, strict=True) if to_time else None
+    except ValueError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(2) from exc
     result = list_sandbox_audit_events(
         Path(audit_dir).expanduser() if audit_dir else None,
         allowed=allowed,
@@ -332,12 +337,18 @@ def _sandbox_audit_compact_impl(
     debug: bool,
 ) -> None:
     _setup_logging(debug)
-    result = compact_sandbox_audit_events(
-        before=before,
-        keep=keep,
-        audit_dir=Path(audit_dir).expanduser() if audit_dir else None,
-    )
+    try:
+        result = compact_sandbox_audit_events(
+            before=before,
+            keep=keep,
+            audit_dir=Path(audit_dir).expanduser() if audit_dir else None,
+        )
+    except ValueError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(2) from exc
     _out(ok(result), json_output)
+    if not result.get("ok", True):
+        raise typer.Exit(1)
 
 
 @sandbox_app.command("audit-show")
@@ -517,9 +528,13 @@ def sandbox_run(
 
     try:
         iso = asyncio.run(
-            _build_provider(provider, policy_model, ws).execute(
-                command, cwd=cwd, timeout_seconds=policy_model.timeout_seconds
-            )
+            _build_provider(
+                provider,
+                policy_model,
+                ws,
+                read_write_workspace=decision.classification
+                == CommandClassification.WRITES_WORKSPACE,
+            ).execute(command, cwd=cwd, timeout_seconds=policy_model.timeout_seconds)
         )
     except NotImplementedError as exc:
         _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
@@ -639,14 +654,23 @@ def sandbox_inspect(
 
 
 def _build_provider(
-    name: str, policy_model: SandboxPolicy, ws: Path
+    name: str,
+    policy_model: SandboxPolicy,
+    ws: Path,
+    *,
+    read_write_workspace: bool = False,
 ) -> "SubprocessIsolationProvider | MicroVMIsolationProvider":
     if name == "microvm":
         return MicroVMIsolationProvider()
     if name == "container":
         from ..isolation.docker_provider import SubprocessContainerProvider
 
-        return SubprocessContainerProvider(workspace_root=ws)
+        return SubprocessContainerProvider(
+            workspace_root=ws,
+            max_output_bytes=policy_model.max_output_bytes,
+            read_write_workspace=read_write_workspace,
+            safe_env_keys=frozenset(policy_model.env_allowlist),
+        )
     return SubprocessIsolationProvider(
         safe_env_keys=frozenset(policy_model.env_allowlist),
         workspace_root=ws,
@@ -749,7 +773,11 @@ def policy_list(
     """List built-in and configured sandbox policies."""
     _setup_logging(debug)
     ws = _workspace(workspace)
-    policies = [p.model_dump(mode="json") for p in list_sandbox_policies(ws)]
+    try:
+        policies = [p.model_dump(mode="json") for p in list_sandbox_policies(ws)]
+    except ValueError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(1) from exc
     _out(ok({"policies": policies}, workspace=str(ws)), json_output)
 
 

@@ -1196,11 +1196,17 @@ def validate_sandbox_policy_yaml(path: Path) -> dict[str, Any]:
     except Exception as exc:
         return {"ok": False, "path": str(path), "policy_name": None, "errors": [str(exc)]}
 
-    # Check required fields
     if "name" not in raw:
         errors.append("missing required field: name")
-    if "version" in raw and raw["version"] != 1:
+    if "version" not in raw:
+        errors.append("missing required field: version")
+    elif raw["version"] != 1:
         errors.append("version must be 1")
+
+    allowed = set(SandboxPolicy.model_fields) - {"workspace_root"}
+    unknown = sorted(set(raw) - allowed)
+    if unknown:
+        errors.append(f"unknown fields: {', '.join(unknown)}")
 
     # Validate boolean fields
     bool_fields = ["allow_network", "allow_install", "allow_privileged", "allow_unknown"]
@@ -1208,7 +1214,6 @@ def validate_sandbox_policy_yaml(path: Path) -> dict[str, Any]:
         if field in raw and not isinstance(raw[field], bool):
             errors.append(f"{field} must be a boolean")
 
-    # Try to build a real SandboxPolicy
     if not errors:
         try:
             SandboxPolicy.model_validate({**raw, "workspace_root": Path.cwd()})
@@ -1242,7 +1247,22 @@ def apply_sandbox_policy_yaml(
             "policy_name": validation["policy_name"],
             "errors": validation["errors"],
         }
-    dest = target_path or default_workspace_policy_path(workspace_root)
+    root = workspace_root.expanduser().resolve()
+    raw_dest = target_path or default_workspace_policy_path(root)
+    dest = raw_dest.expanduser()
+    if not dest.is_absolute():
+        dest = root / dest
+    dest = dest.resolve(strict=False)
+    try:
+        check_workspace_escape(dest, root)
+    except ValueError as exc:
+        return {
+            "ok": False,
+            "source": str(source_path),
+            "target": str(dest),
+            "policy_name": validation["policy_name"],
+            "errors": [str(exc)],
+        }
     dest.parent.mkdir(parents=True, exist_ok=True)
     import shutil as _shutil
 
@@ -1267,11 +1287,15 @@ def resolve_sandbox_policy_with_yaml(
 
     Priority: JSON store (existing) → workspace YAML file → user YAML file → built-in.
     """
-    # Try existing JSON store first
-    try:
-        return resolve_sandbox_policy(name, workspace_root, json_path)
-    except KeyError:
-        pass
+    if name == "local-safe":
+        return SandboxPolicy(name=name, workspace_root=workspace_root)
+    store_path = json_path or sandbox_policy_store_path()
+    if store_path.exists():
+        raw = json.loads(store_path.read_text(encoding="utf-8"))
+        _validate_policy_config_shape(raw)
+        for item in raw.get("policies", []):
+            if item.get("name") == name:
+                return SandboxPolicy.model_validate({**item, "workspace_root": workspace_root})
 
     # Try workspace YAML
     ws_yaml = yaml_path or default_workspace_policy_path(workspace_root)
@@ -1341,13 +1365,24 @@ def list_sandbox_policies(workspace_root: Path, path: Path | None = None) -> lis
     """List built-in and configured sandbox policies."""
     policies = [SandboxPolicy(name="local-safe", workspace_root=workspace_root)]
     store_path = path or sandbox_policy_store_path()
-    if not store_path.exists():
-        return policies
-    raw = json.loads(store_path.read_text(encoding="utf-8"))
-    _validate_policy_config_shape(raw)
-    for item in raw.get("policies", []):
-        payload = {**item, "workspace_root": workspace_root}
-        policies.append(SandboxPolicy.model_validate(payload))
+    if store_path.exists():
+        raw = json.loads(store_path.read_text(encoding="utf-8"))
+        _validate_policy_config_shape(raw)
+        for item in raw.get("policies", []):
+            payload = {**item, "workspace_root": workspace_root}
+            policies.append(SandboxPolicy.model_validate(payload))
+    names = {policy.name for policy in policies}
+    for yaml_path in (
+        default_workspace_policy_path(workspace_root),
+        default_user_sandbox_policy_path(),
+    ):
+        if not yaml_path.exists():
+            continue
+        raw_yaml = load_sandbox_policy_yaml(yaml_path)
+        policy = SandboxPolicy.model_validate({**raw_yaml, "workspace_root": workspace_root})
+        if policy.name not in names:
+            policies.append(policy)
+            names.add(policy.name)
     return policies
 
 
@@ -1571,7 +1606,9 @@ def list_sandbox_audit_events(
         events = [event for event in events if str(event.get("started_at", "")) >= since]
     if until:
         events = [event for event in events if str(event.get("started_at", "")) <= until]
-    if limit >= 0:
+    if limit == 0:
+        events = []
+    elif limit > 0:
         events = events[-limit:]
     return _sandbox_audit_list_result(events, events_path, malformed=malformed)
 
@@ -1606,7 +1643,7 @@ def get_sandbox_audit_event(audit_id: str, audit_dir: Path | None = None) -> dic
     return {"event": None, "path": result["path"], "found": False}
 
 
-def parse_relative_time(value: str) -> str:
+def parse_relative_time(value: str, *, strict: bool = False) -> str:
     """Convert a relative time string to an ISO UTC string.
 
     Accepts:
@@ -1614,7 +1651,7 @@ def parse_relative_time(value: str) -> str:
     - ``Nm`` — N minutes ago
     - ``Nd`` — N days ago
     - ``now`` — current UTC time
-    - Any other string is returned unchanged (assumed to be ISO already).
+    - Any other string is returned unchanged unless ``strict=True``.
     """
     value = value.strip()
     if value == "now":
@@ -1632,8 +1669,17 @@ def parse_relative_time(value: str) -> str:
         else:  # d
             delta = timedelta(days=n)
         return (datetime.now(timezone.utc) - delta).isoformat().replace("+00:00", "Z")
-    # Assume already ISO
+    if strict:
+        _parse_iso_time(value)
     return value
+
+
+def _parse_iso_time(value: str) -> datetime:
+    normalized = value.replace("Z", "+00:00")
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def compact_sandbox_audit_events(
@@ -1655,34 +1701,70 @@ def compact_sandbox_audit_events(
     target_dir = audit_dir or sandbox_audit_dir()
     events_path = target_dir / "sandbox.events.jsonl"
     if not events_path.exists():
-        return {"compacted": 0, "remaining": 0, "events_path": str(events_path)}
+        return {"ok": True, "compacted": 0, "remaining": 0, "events_path": str(events_path)}
+    if keep < 0:
+        raise ValueError("keep must be >= 0")
+    if before is not None:
+        before = parse_relative_time(before, strict=True)
+
+    chain_path = target_dir / "sandbox.audit.jsonl"
+    if chain_path.exists():
+        return {
+            "ok": False,
+            "compacted": 0,
+            "remaining": len(
+                [
+                    line
+                    for line in events_path.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ]
+            ),
+            "events_path": str(events_path),
+            "reason": "refusing to compact canonical events while sandbox.audit.jsonl exists",
+        }
 
     raw_lines = [
         line for line in events_path.read_text(encoding="utf-8").splitlines() if line.strip()
     ]
     total = len(raw_lines)
 
+    malformed = sum(1 for line in raw_lines if _event_started_at(line) is None)
+    if malformed:
+        return {
+            "ok": False,
+            "compacted": 0,
+            "remaining": total,
+            "events_path": str(events_path),
+            "malformed": malformed,
+            "reason": "refusing to compact malformed sandbox events",
+        }
+
     if before is not None:
         kept_lines = [line for line in raw_lines if _event_started_at(line) >= before]
+    elif keep == 0:
+        kept_lines = []
     else:
-        kept_lines = raw_lines[-keep:] if keep >= 0 else raw_lines
+        kept_lines = raw_lines[-keep:]
 
     compacted = total - len(kept_lines)
-    events_path.write_text("".join(line + "\n" for line in kept_lines), encoding="utf-8")
+    tmp_path = events_path.with_suffix(events_path.suffix + ".tmp")
+    tmp_path.write_text("".join(line + "\n" for line in kept_lines), encoding="utf-8")
+    tmp_path.replace(events_path)
     return {
+        "ok": True,
         "compacted": compacted,
         "remaining": len(kept_lines),
         "events_path": str(events_path),
     }
 
 
-def _event_started_at(line: str) -> str:
+def _event_started_at(line: str) -> str | None:
     """Extract ``started_at`` from a raw event JSON line for compaction comparisons."""
     try:
         parsed = json.loads(line)
         return str(parsed.get("started_at", ""))
     except Exception:
-        return ""
+        return None
 
 
 def render_lima_template(workspace_root: Path, instance_name: str = "arc-sandbox") -> str:
@@ -1694,7 +1776,7 @@ def render_lima_template(workspace_root: Path, instance_name: str = "arc-sandbox
     """
     workspace = str(workspace_root.resolve())
     return f"""# ARC experimental Lima VM template. Low-security harness only; strict network isolation is not proven.
-# Execution gated by ARC_MICROVM_INTEGRATION=1 and blocked unless the in-guest network proof passes.
+# Internal Lima harness gated by ARC_MICROVM_INTEGRATION=1; public microVM execution remains blocked.
 vmType: vz
 images:
   - location: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-$(arch).img

@@ -8,6 +8,7 @@ from __future__ import annotations
 import gc
 import logging
 import os
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -279,6 +280,8 @@ class SubprocessContainerProvider(IsolationProvider):
         network_disabled: bool = True,
         mem_limit: str = "512m",
         runtime: Optional[str] = None,  # None = auto-detect
+        read_write_workspace: bool = False,
+        safe_env_keys: frozenset[str] | None = None,
     ) -> None:
         self._image = image
         self._workspace_root = workspace_root
@@ -286,6 +289,8 @@ class SubprocessContainerProvider(IsolationProvider):
         self._network_disabled = network_disabled
         self._mem_limit = mem_limit
         self._runtime_override = runtime
+        self._read_write_workspace = read_write_workspace
+        self._safe_env_keys = safe_env_keys or DEFAULT_SAFE_ENV_KEYS
 
     @property
     def provider_id(self) -> str:
@@ -296,7 +301,11 @@ class SubprocessContainerProvider(IsolationProvider):
         if not container_sandbox_enabled():
             return False
         info = self.detect_runtime()
-        return bool(info.get("available"))
+        if not info.get("available") or not info.get("binary"):
+            return False
+        from ..security.sandbox import _container_daemon_alive
+
+        return _container_daemon_alive(str(info["binary"]))
 
     def detect_runtime(self) -> dict[str, Any]:
         """Detect which container runtime binary is available.
@@ -335,7 +344,7 @@ class SubprocessContainerProvider(IsolationProvider):
 
     def _filter_env(self, extra_env: Optional[dict[str, str]] = None) -> list[str]:
         """Return filtered env as list of -e KEY=VAL args for docker run."""
-        safe_keys = DEFAULT_SAFE_ENV_KEYS
+        safe_keys = self._safe_env_keys
         result: list[str] = []
         for key in sorted(safe_keys):
             if key in os.environ and not _is_blocked_env_key(key):
@@ -396,21 +405,37 @@ class SubprocessContainerProvider(IsolationProvider):
             )
 
         binary: str = info["binary"]
+        from ..security.sandbox import _container_daemon_alive
+
+        if not _container_daemon_alive(binary):
+            return IsolationResult(
+                exit_code=-1,
+                stderr="Container runtime daemon unavailable or not configured.",
+                provider=self.provider_id,
+            )
 
         # Build volume mount: workspace → /workspace
         volume_args: list[str] = []
         if self._workspace_root:
-            volume_args = ["-v", f"{self._workspace_root.resolve()}:/workspace:ro"]
+            mode = "rw" if self._read_write_workspace else "ro"
+            volume_args = ["-v", f"{self._workspace_root.resolve()}:/workspace:{mode}"]
 
         container_cwd = self._map_cwd_to_container(cwd)
         env_args = self._filter_env(env)
 
         network_args = ["--network=none"] if self._network_disabled else []
 
+        fd, cidfile_name = tempfile.mkstemp(prefix="arc-container-", suffix=".cid")
+        os.close(fd)
+        os.unlink(cidfile_name)
+        cidfile_path = Path(cidfile_name)
+
         argv = (
             [binary, "run", "--rm"]
             + network_args
             + [
+                "--cidfile",
+                str(cidfile_path),
                 f"-m{self._mem_limit}",
                 "--cpus=0.5",
                 "--security-opt=no-new-privileges:true",
@@ -419,7 +444,7 @@ class SubprocessContainerProvider(IsolationProvider):
             ]
             + volume_args
             + env_args
-            + [self._image, "--"]
+            + ["--", self._image]
             + command
         )
 
@@ -456,6 +481,10 @@ class SubprocessContainerProvider(IsolationProvider):
         except sp.TimeoutExpired:
             killed = True
             kill_reason = "timeout"
+            if cidfile_path.exists():
+                cid = cidfile_path.read_text(encoding="utf-8").strip()
+                if cid:
+                    sp.run([binary, "kill", cid], check=False, capture_output=True, timeout=5)
             try:
                 import os as _os
 
@@ -463,6 +492,8 @@ class SubprocessContainerProvider(IsolationProvider):
             except ProcessLookupError:
                 pass
             proc.wait()
+        finally:
+            cidfile_path.unlink(missing_ok=True)
 
         stdout_reader.join()
         stderr_reader.join()

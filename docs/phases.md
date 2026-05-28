@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-28 — Phases 74, 76, and 77 Baseline Complete; Phase 75 plan/explain baseline implemented with apply path still unwired.
-**Current evidence anchor:** local worktree | Phase 74-77 post-review verification: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3105 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
+**Last reality refresh:** 2026-05-28 — Phases 74-84 Baseline Complete where marked; Phase 82-84 review hardening verified.
+**Current evidence anchor:** local worktree | Phase 82-84 review patch: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3339 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK; banned-claims check OK.
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -3776,15 +3776,15 @@ arc ci verify-audit --json
 7. DELETE /api/providers/accounts/{id} untrusted returns 403.
 8. All return PERMISSION_DENIED code.
 
-## Phase 33 — Sandbox Audit Query + Compaction
+## Phase 82 — Local Sandbox Audit Query + Compaction
 
-**Roadmap:** R45 — Sandbox Audit Federation  
-**Status:** Baseline Complete | Evidence: local worktree; 12 new tests pass; full Python suite 3323 passed / 34 skipped / 3 xfailed; ruff clean; pnpm build + typecheck green  
+**Roadmap:** R53 — Local Sandbox Audit Query + Compaction  
+**Status:** Baseline Complete | Evidence: local worktree; 19 audit query/compact tests pass; full Python suite 3339 passed / 34 skipped / 3 xfailed; ruff clean; pnpm build + typecheck green  
 **Depends on:** Phase 37 (sandbox audit chain infrastructure)
 
 ### Implementation
 1. `parse_relative_time(value: str) -> str` in `security/sandbox.py` — converts `1h`/`30m`/`7d`/`now` to ISO UTC strings; passes ISO strings through unchanged.
-2. `compact_sandbox_audit_events(*, before, keep, audit_dir) -> dict` — prunes `sandbox.events.jsonl` keeping newest `keep` events or events newer than `before`; chain file untouched (append-only).
+2. `compact_sandbox_audit_events(*, before, keep, audit_dir) -> dict` — prunes events-only `sandbox.events.jsonl`; refuses canonical logs when `sandbox.audit.jsonl` exists so verification invariants are not silently broken.
 3. CLI `arc sandbox audit-query` (flat) + `arc sandbox audit query` (nested) with `--from`, `--to`, `--classification`, `--provider`, `--allowed/--denied`, `--command-contains`, `--limit`, `--audit-dir`, `--json`.
 4. CLI `arc sandbox audit-compact` (flat) + `arc sandbox audit compact` (nested) with `--before`, `--keep`, `--audit-dir`, `--json`.
 
@@ -3794,36 +3794,37 @@ arc ci verify-audit --json
 3. ✅ `parse_relative_time("2026-01-01T00:00:00Z")` returns original string unchanged
 4. ✅ `parse_relative_time("now")` returns current ISO string
 5. ✅ `list_sandbox_audit_events` with `since`/`until` filters correctly
-6. ✅ `compact_sandbox_audit_events` with `keep=2` on 5 events keeps newest 2
+6. ✅ `compact_sandbox_audit_events` with `keep=2` on events-only logs keeps newest 2
 7. ✅ `compact_sandbox_audit_events` with `before=` prunes events before timestamp
 8. ✅ Compact on missing events file returns `remaining=0, compacted=0`
 9. ✅ CLI `arc sandbox audit-query --json --classification read_only` outputs valid JSON
-10. ✅ CLI `arc sandbox audit-compact --keep 10 --json` outputs valid JSON
-11. ✅ All existing sandbox tests remain green
+10. ✅ CLI `arc sandbox audit-compact --keep 10 --json` outputs valid JSON for events-only logs
+11. ✅ Compaction refuses canonical hash-chain logs and malformed events instead of silently corrupting verification semantics
+12. ✅ All existing sandbox tests remain green
 
 ### Verification
 ```bash
-cd python && uv run pytest tests/isolation/test_sandbox_audit_query.py -q  # 12 passed
+cd python && uv run pytest tests/isolation/test_sandbox_audit_query.py -q  # 19 passed
 cd python && uv run pytest tests/isolation/ tests/test_cli_sandbox.py -q   # 265 passed, 13 skipped
 cd python && uv run ruff check src tests                                    # clean
 ```
 
 ### Known Risks
-- Compaction is events-only; chain file remains append-only and may grow unbounded.
+- Compaction is events-only and refuses canonical hash-chain logs; chain file remains append-only and may grow unbounded.
 - Relative time parsing is simple (regex-based); complex expressions not supported.
 
-## Phase 34 — Container Isolation Provider (Subprocess-Based)
+## Phase 83 — Container Isolation Provider (Subprocess-Based)
 
-**Roadmap:** R46 — Container Isolation Provider  
-**Status:** Baseline Complete | Evidence: local worktree; 15 new tests pass; full Python suite 3323 passed / 34 skipped / 3 xfailed; ruff clean; pnpm build + typecheck green  
+**Roadmap:** R54 — Container Isolation Provider  
+**Status:** Baseline Complete | Evidence: local worktree; 18 container provider tests pass; full Python suite 3339 passed / 34 skipped / 3 xfailed; ruff clean; pnpm build + typecheck green  
 **Depends on:** Phase 37 (sandbox infrastructure), Phase 23 (trust enforcement)
 
 ### Implementation
-1. `SubprocessContainerProvider(IsolationProvider)` in `isolation/docker_provider.py` — uses `docker run` / `podman run` via subprocess (no SDK dep). Env allowlist + secret strip, output redaction, bounded I/O, timeout/SIGKILL, workspace mount (read-only by default, read-write for `writes_workspace` classification).
+1. `SubprocessContainerProvider(IsolationProvider)` in `isolation/docker_provider.py` — uses `docker run` / `podman run` via subprocess (no SDK dep). Env allowlist + secret strip, output redaction, bounded I/O, timeout/SIGKILL, container cidfile kill on timeout, workspace mount (read-only by default, read-write for `writes_workspace` classification).
 2. `container_preflight() -> dict` in `security/sandbox.py` — detects Docker/Podman binary, daemon liveness, `ARC_ENABLE_CONTAINER_SANDBOX` gate.
 3. `sandbox_doctor` now includes container preflight in provider list.
 4. `_build_provider("container", ...)` wired in `cli/sandbox.py` to return `SubprocessContainerProvider`.
-5. `arc sandbox run --provider container -- <cmd>` routes through container isolation.
+5. `arc sandbox run --provider container -- <cmd>` routes through container isolation only when `ARC_ENABLE_CONTAINER_SANDBOX=1` and runtime/daemon checks pass.
 
 ### Acceptance
 1. ✅ `container_sandbox_enabled()` returns False when env not set, True when `ARC_ENABLE_CONTAINER_SANDBOX=1`
@@ -3842,20 +3843,20 @@ cd python && uv run ruff check src tests                                    # cl
 
 ### Verification
 ```bash
-cd python && uv run pytest tests/isolation/test_container_provider.py -q   # 15 passed
+cd python && uv run pytest tests/isolation/test_container_provider.py -q   # 18 passed
 cd python && uv run pytest tests/isolation/ tests/test_cli_sandbox.py -q   # 280 passed, 13 skipped
 cd python && uv run ruff check src tests                                    # clean
 ```
 
 ### Known Risks
-- Actual `docker run` execution requires a live daemon; tests use monkeypatched `Popen`.
+- Actual `docker run` execution requires a live daemon and `ARC_ENABLE_CONTAINER_SANDBOX=1`; tests use monkeypatched `Popen`.
 - Container image is not pulled or verified in tests.
 - `DockerIsolationProvider` (SDK-based) remains untouched as alternative path.
 
-## Phase 35 — Sandbox Policy Federation (YAML-First)
+## Phase 84 — Local Sandbox Policy YAML
 
-**Roadmap:** R47 — Sandbox Policy Federation  
-**Status:** Baseline Complete | Evidence: local worktree; 16 new tests pass; full Python suite 3323 passed / 34 skipped / 3 xfailed; ruff clean; pnpm build + typecheck green  
+**Roadmap:** R55 — Local Sandbox Policy YAML  
+**Status:** Baseline Complete | Evidence: local worktree; 22 YAML policy tests pass; full Python suite 3339 passed / 34 skipped / 3 xfailed; ruff clean; pnpm build + typecheck green  
 **Depends on:** Phase 37 (sandbox policy infrastructure)
 
 ### Implementation
@@ -3863,7 +3864,7 @@ cd python && uv run ruff check src tests                                    # cl
 2. `default_user_sandbox_policy_path() -> Path` — returns `~/.arc/sandbox-policy.yaml`.
 3. `load_sandbox_policy_yaml(path) -> dict` — parses YAML policy file via `yaml.safe_load`.
 4. `validate_sandbox_policy_yaml(path) -> dict` — validates YAML schema, returns `{"ok", "path", "policy_name", "errors"}`.
-5. `apply_sandbox_policy_yaml(source_path, workspace_root, *, target_path) -> dict` — validates + copies YAML to workspace `.arc/`.
+5. `apply_sandbox_policy_yaml(source_path, workspace_root, *, target_path) -> dict` — validates + copies YAML under the workspace boundary.
 6. `resolve_sandbox_policy_with_yaml(name, workspace_root, *, json_path, yaml_path) -> SandboxPolicy` — JSON → workspace YAML → user YAML lookup chain.
 7. Modified `resolve_sandbox_policy` to fall through to YAML lookup on JSON KeyError (JSON-first preserved).
 8. CLI `arc policy validate-yaml --file <path>` — validates YAML policy file.
@@ -3882,19 +3883,21 @@ cd python && uv run ruff check src tests                                    # cl
 10. ✅ `resolve_sandbox_policy_with_yaml` falls back to user YAML
 11. ✅ `resolve_sandbox_policy_with_yaml` raises KeyError when not found
 12. ✅ `resolve_sandbox_policy` falls through to YAML on JSON miss
-13. ✅ CLI `arc policy validate-yaml --file <valid>` outputs ok=true
-14. ✅ CLI `arc policy validate-yaml --file <invalid>` outputs ok=false, exits 1
-15. ✅ CLI `arc policy apply --file <valid>` copies file, outputs ok=true
-16. ✅ All existing policy tests remain green
+13. ✅ `arc policy list --json` includes workspace YAML policies
+14. ✅ Out-of-workspace apply targets are rejected
+15. ✅ CLI `arc policy validate-yaml --file <valid>` outputs ok=true
+16. ✅ CLI `arc policy validate-yaml --file <invalid>` outputs ok=false, exits 1
+17. ✅ CLI `arc policy apply --file <valid>` copies file, outputs ok=true
+18. ✅ All existing policy tests remain green
 
 ### Verification
 ```bash
-cd python && uv run pytest tests/security/test_sandbox_policy_yaml.py -q   # 16 passed
+cd python && uv run pytest tests/security/test_sandbox_policy_yaml.py -q   # 22 passed
 cd python && uv run pytest tests/security/ tests/test_cli_sandbox.py -q    # 254 passed, 1 skipped
 cd python && uv run ruff check src tests                                    # clean
 ```
 
 ### Known Risks
-- YAML policy files are workspace-local; no remote/centralized policy server.
+- YAML policy files are local workspace/user files; no remote/centralized policy server.
 - `yaml` dependency already present via `config/policy.py`.
 - JSON-first lookup preserved; YAML is additive, not replacement.

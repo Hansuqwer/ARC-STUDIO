@@ -245,6 +245,64 @@ def test_compact_missing_events_file(tmp_path):
     assert "events_path" in result
 
 
+def test_list_audit_events_limit_zero_returns_empty(tmp_path):
+    audit_dir = tmp_path / "audit"
+    _write_events(
+        audit_dir,
+        [
+            _make_event("2026-01-01T00:00:00Z"),
+            _make_event("2026-02-01T00:00:00Z"),
+        ],
+    )
+
+    result = list_sandbox_audit_events(audit_dir, limit=0)
+
+    assert result["count"] == 0
+    assert result["events"] == []
+
+
+def test_compact_refuses_when_chain_exists(tmp_path):
+    audit_dir = tmp_path / "audit"
+    _write_events(audit_dir, [_make_event("2026-01-01T00:00:00Z")])
+    (audit_dir / "sandbox.audit.jsonl").write_text('{"seq":0}\n', encoding="utf-8")
+
+    result = compact_sandbox_audit_events(keep=0, audit_dir=audit_dir)
+
+    assert result["ok"] is False
+    assert result["compacted"] == 0
+    assert "refusing" in result["reason"]
+
+
+def test_compact_refuses_malformed_events(tmp_path):
+    audit_dir = tmp_path / "audit"
+    audit_dir.mkdir(parents=True)
+    events_path = audit_dir / "sandbox.events.jsonl"
+    events_path.write_text("not-json\n", encoding="utf-8")
+
+    result = compact_sandbox_audit_events(keep=0, audit_dir=audit_dir)
+
+    assert result["ok"] is False
+    assert result["malformed"] == 1
+    assert events_path.read_text(encoding="utf-8") == "not-json\n"
+
+
+def test_compact_keep_zero_without_chain_removes_all_events(tmp_path):
+    audit_dir = tmp_path / "audit"
+    _write_events(
+        audit_dir,
+        [
+            _make_event("2026-01-01T00:00:00Z"),
+            _make_event("2026-02-01T00:00:00Z"),
+        ],
+    )
+
+    result = compact_sandbox_audit_events(keep=0, audit_dir=audit_dir)
+
+    assert result["ok"] is True
+    assert result["remaining"] == 0
+    assert (audit_dir / "sandbox.events.jsonl").read_text(encoding="utf-8") == ""
+
+
 # ---------------------------------------------------------------------------
 # 12: CLI audit-query outputs valid JSON with ok=true
 # ---------------------------------------------------------------------------
@@ -282,3 +340,43 @@ def test_cli_audit_query_json_valid(tmp_path, monkeypatch):
     # All returned events must be read_only
     for ev in payload["data"]["events"]:
         assert ev["classification"] == "read_only"
+
+
+def test_cli_audit_query_invalid_time_exits_2(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
+
+    result = CliRunner().invoke(app, ["sandbox", "audit-query", "--json", "--from", "bogus"])
+
+    assert result.exit_code == 2
+    payload = json.loads(result.output)
+    assert payload["ok"] is False
+
+
+def test_cli_audit_compact_json_valid(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    audit_dir = tmp_path / "audit"
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(audit_dir))
+    _write_events(audit_dir, [_make_event("2026-01-01T00:00:00Z")])
+
+    result = CliRunner().invoke(app, ["sandbox", "audit-compact", "--json", "--keep", "1"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["ok"] is True
+    assert payload["data"]["ok"] is True
+
+
+def test_cli_audit_compact_invalid_before_exits_2(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    audit_dir = tmp_path / "audit"
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(audit_dir))
+    _write_events(audit_dir, [_make_event("2026-01-01T00:00:00Z")])
+
+    result = CliRunner().invoke(
+        app, ["sandbox", "audit-compact", "--json", "--before", "not-a-time"]
+    )
+
+    assert result.exit_code == 2
+    payload = json.loads(result.output)
+    assert payload["ok"] is False

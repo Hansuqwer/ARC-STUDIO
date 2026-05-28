@@ -90,6 +90,22 @@ def test_validate_yaml_wrong_version(tmp_path):
     assert any("version" in e for e in result["errors"])
 
 
+def test_validate_yaml_missing_version(tmp_path):
+    content = "name: bad\nallow_network: false\n"
+    p = _write_yaml(tmp_path / "policy.yaml", content)
+    result = validate_sandbox_policy_yaml(p)
+    assert result["ok"] is False
+    assert any("version" in e for e in result["errors"])
+
+
+def test_validate_yaml_unknown_field(tmp_path):
+    content = "version: 1\nname: bad\nallow_network: false\nextra_field: true\n"
+    p = _write_yaml(tmp_path / "policy.yaml", content)
+    result = validate_sandbox_policy_yaml(p)
+    assert result["ok"] is False
+    assert any("unknown fields" in e for e in result["errors"])
+
+
 # ---------------------------------------------------------------------------
 # 4. validate_sandbox_policy_yaml — non-bool allow_network → ok=False
 # ---------------------------------------------------------------------------
@@ -176,6 +192,19 @@ def test_apply_yaml_creates_parent_dirs(tmp_path):
     assert target.exists()
 
 
+def test_apply_yaml_rejects_target_outside_workspace(tmp_path):
+    src = _write_yaml(tmp_path / "policy.yaml", VALID_YAML)
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+    outside = tmp_path / "outside.yaml"
+
+    result = apply_sandbox_policy_yaml(src, ws, target_path=outside)
+
+    assert result["ok"] is False
+    assert not outside.exists()
+    assert "outside workspace root" in result["errors"][0]
+
+
 # ---------------------------------------------------------------------------
 # 10. resolve_sandbox_policy_with_yaml — finds policy by name from workspace YAML
 # ---------------------------------------------------------------------------
@@ -221,6 +250,19 @@ def test_resolve_with_yaml_not_found(tmp_path):
     ws.mkdir()
     with pytest.raises(KeyError, match="not found"):
         resolve_sandbox_policy_with_yaml("nonexistent-policy", ws)
+
+
+def test_resolve_with_yaml_honors_explicit_yaml_path(tmp_path):
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+    (ws / ".arc").mkdir()
+    _write_yaml(ws / ".arc" / "sandbox-policy.yaml", VALID_YAML)
+    override = _write_yaml(tmp_path / "override.yaml", VALID_FULL_YAML)
+
+    policy = resolve_sandbox_policy_with_yaml("full-policy", ws, yaml_path=override)
+
+    assert policy.name == "full-policy"
+    assert policy.allow_network is True
 
 
 # ---------------------------------------------------------------------------
@@ -297,3 +339,29 @@ def test_cli_apply_yaml_valid(tmp_path, monkeypatch):
     data = _payload(result)
     assert data["data"]["ok"] is True
     assert target.exists()
+
+
+def test_policy_list_includes_workspace_yaml(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    arc_dir = tmp_path / ".arc"
+    arc_dir.mkdir()
+    _write_yaml(arc_dir / "sandbox-policy.yaml", VALID_YAML)
+
+    result = CliRunner().invoke(app, ["policy", "list", "--json"])
+
+    assert result.exit_code == 0, result.output
+    names = [policy["name"] for policy in _payload(result)["data"]["policies"]]
+    assert "dev-safe" in names
+
+
+def test_policy_list_invalid_config_returns_json_error(tmp_path, monkeypatch):
+    policy_file = tmp_path / "bad.json"
+    policy_file.write_text("{not-json", encoding="utf-8")
+    monkeypatch.setenv("ARC_SANDBOX_POLICY_CONFIG", str(policy_file))
+
+    result = CliRunner().invoke(app, ["policy", "list", "--json"])
+
+    assert result.exit_code == 1
+    payload = _payload(result)
+    assert payload["ok"] is False
+    assert payload["error"]["code"]

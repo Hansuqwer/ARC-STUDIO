@@ -345,13 +345,18 @@ ARC now has a first-class sandbox CLI foundation:
 - `arc policy explain -- <cmd...>` classifies argv and reports policy decision without execution.
 - `arc sandbox run --policy local-safe -- <cmd...>` enforces local-safe policy before subprocess execution.
 - `arc sandbox run --ask -- <cmd...>` can approve only `network`, `install`, and `unknown`; non-interactive default remains deny.
-- `arc sandbox doctor --json` reports subprocess and microVM preflight state.
+- `arc sandbox doctor --json` reports subprocess, microVM preflight, and container preflight state.
 - `arc sandbox audit-verify --json` verifies the sandbox audit chain.
 - `arc sandbox audit-list --json` reads persisted sandbox events with filters.
+- `arc sandbox audit-query --json` queries local persisted sandbox events with time/classification/provider filters.
+- `arc sandbox audit-compact --json` compacts events-only sandbox logs; canonical hash-chain logs are refused to preserve verification semantics.
 - `arc sandbox audit-show <audit_id> --json` reads one local sandbox audit event.
-- `arc sandbox audit verify|list|show` are nested aliases for the same local audit operations.
+- `arc sandbox audit verify|list|query|compact|show` are nested aliases for the same local audit operations.
+- `arc sandbox run --provider container -- <cmd...>` executes through Docker/Podman only when `ARC_ENABLE_CONTAINER_SANDBOX=1` and local runtime checks pass.
 - `arc sandbox firecracker-artifacts --output <dir> --json` generates Firecracker proof init/manifest artifacts without booting a VM.
 - `arc policy list/show/validate` discovers and validates configured sandbox policies.
+- `arc policy validate-yaml --file <path>` validates a local YAML sandbox policy file.
+- `arc policy apply --file <path>` installs a local YAML sandbox policy under the workspace boundary.
 
 P0 policy defaults:
 
@@ -364,7 +369,7 @@ P0 policy defaults:
 - stdout/stderr are capped and redacted.
 - every allowed/denied sandbox command returns an audit payload.
 - sandbox audit events include an `audit_id` correlation key.
-- sandbox audit events are persisted to an external hash-chain store by default.
+- sandbox audit events are persisted to a local sandbox hash-chain store by default.
 - sandbox audit events best-effort mirror a typed `sandbox_command` event into `.arc/events/event-log.jsonl`; this mirror is local/recent/derived and not canonical global audit state.
 - sandbox audit events best-effort mirror into the keyed audit store when an audit key exists; missing keys do not block CLI execution.
 - Firecracker artifact generation validates static proof-init safety and manifest no-network metadata, but does not prove VM execution.

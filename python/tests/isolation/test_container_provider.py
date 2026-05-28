@@ -94,6 +94,7 @@ async def test_execute_success_path(monkeypatch, tmp_path):
     provider = SubprocessContainerProvider(workspace_root=tmp_path)
     with (
         patch.object(SubprocessContainerProvider, "detect_runtime", return_value=fake_runtime),
+        patch("agent_runtime_cockpit.security.sandbox._container_daemon_alive", return_value=True),
         patch("subprocess.Popen", return_value=FakeProc()),
     ):
         result = await provider.execute(["echo", "hello"], cwd=tmp_path)
@@ -128,7 +129,9 @@ async def test_execute_timeout_sets_killed(monkeypatch, tmp_path):
     provider = SubprocessContainerProvider(workspace_root=tmp_path)
     with (
         patch.object(SubprocessContainerProvider, "detect_runtime", return_value=fake_runtime),
+        patch("agent_runtime_cockpit.security.sandbox._container_daemon_alive", return_value=True),
         patch("subprocess.Popen", return_value=FakeProc()),
+        patch("subprocess.run"),
         patch("os.killpg"),
     ):
         result = await provider.execute(["sleep", "100"], cwd=tmp_path, timeout_seconds=1)
@@ -177,6 +180,7 @@ async def test_execute_truncates_output(monkeypatch, tmp_path):
     provider = SubprocessContainerProvider(workspace_root=tmp_path, max_output_bytes=1024)
     with (
         patch.object(SubprocessContainerProvider, "detect_runtime", return_value=fake_runtime),
+        patch("agent_runtime_cockpit.security.sandbox._container_daemon_alive", return_value=True),
         patch("subprocess.Popen", return_value=FakeProc()),
     ):
         result = await provider.execute(["cat", "bigfile"], cwd=tmp_path)
@@ -209,6 +213,7 @@ async def test_execute_redacts_api_key_in_output(monkeypatch, tmp_path):
     provider = SubprocessContainerProvider(workspace_root=tmp_path)
     with (
         patch.object(SubprocessContainerProvider, "detect_runtime", return_value=fake_runtime),
+        patch("agent_runtime_cockpit.security.sandbox._container_daemon_alive", return_value=True),
         patch("subprocess.Popen", return_value=FakeProc()),
     ):
         result = await provider.execute(["cat", "secrets.txt"], cwd=tmp_path)
@@ -288,3 +293,89 @@ def test_build_provider_returns_subprocess_container_provider(tmp_path):
     policy = SandboxPolicy(name="local-safe", workspace_root=tmp_path)
     provider = _build_provider("container", policy, tmp_path)
     assert isinstance(provider, SubprocessContainerProvider)
+
+
+@pytest.mark.asyncio
+async def test_execute_builds_safe_docker_argv(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_ENABLE_CONTAINER_SANDBOX", "1")
+    captured = {}
+
+    class FakeProc:
+        returncode = 0
+        pid = 123
+
+        def __init__(self):
+            self.stdout = BytesIO(b"ok")
+            self.stderr = BytesIO(b"")
+
+        def wait(self, timeout=None):
+            return 0
+
+    def fake_popen(argv, **kwargs):
+        captured["argv"] = argv
+        return FakeProc()
+
+    fake_runtime = {"runtime": "docker", "available": True, "binary": "/usr/bin/docker"}
+    provider = SubprocessContainerProvider(workspace_root=tmp_path)
+    with (
+        patch.object(SubprocessContainerProvider, "detect_runtime", return_value=fake_runtime),
+        patch("agent_runtime_cockpit.security.sandbox._container_daemon_alive", return_value=True),
+        patch("subprocess.Popen", side_effect=fake_popen),
+    ):
+        result = await provider.execute(["echo", "hello"], cwd=tmp_path)
+
+    assert result.exit_code == 0
+    argv = captured["argv"]
+    assert argv[0] == "/usr/bin/docker"
+    assert argv[1:3] == ["run", "--rm"]
+    assert "--network=none" in argv
+    assert "--cap-drop=ALL" in argv
+    assert "--security-opt=no-new-privileges:true" in argv
+    image_idx = argv.index("python:3.12-slim")
+    assert argv[image_idx - 1] == "--"
+    assert argv[image_idx + 1 :] == ["echo", "hello"]
+    assert any(arg.endswith(":/workspace:ro") for arg in argv)
+
+
+@pytest.mark.asyncio
+async def test_execute_uses_rw_mount_when_requested(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_ENABLE_CONTAINER_SANDBOX", "1")
+    captured = {}
+
+    class FakeProc:
+        returncode = 0
+        pid = 123
+
+        def __init__(self):
+            self.stdout = BytesIO(b"ok")
+            self.stderr = BytesIO(b"")
+
+        def wait(self, timeout=None):
+            return 0
+
+    def fake_popen(argv, **kwargs):
+        captured["argv"] = argv
+        return FakeProc()
+
+    fake_runtime = {"runtime": "docker", "available": True, "binary": "/usr/bin/docker"}
+    provider = SubprocessContainerProvider(workspace_root=tmp_path, read_write_workspace=True)
+    with (
+        patch.object(SubprocessContainerProvider, "detect_runtime", return_value=fake_runtime),
+        patch("agent_runtime_cockpit.security.sandbox._container_daemon_alive", return_value=True),
+        patch("subprocess.Popen", side_effect=fake_popen),
+    ):
+        await provider.execute(["touch", "x"], cwd=tmp_path)
+
+    assert any(arg.endswith(":/workspace:rw") for arg in captured["argv"])
+
+
+@pytest.mark.asyncio
+async def test_health_check_requires_daemon_alive(monkeypatch, tmp_path):
+    monkeypatch.setenv("ARC_ENABLE_CONTAINER_SANDBOX", "1")
+    fake_runtime = {"runtime": "docker", "available": True, "binary": "/usr/bin/docker"}
+    provider = SubprocessContainerProvider(workspace_root=tmp_path)
+    with (
+        patch.object(SubprocessContainerProvider, "detect_runtime", return_value=fake_runtime),
+        patch("agent_runtime_cockpit.security.sandbox._container_daemon_alive", return_value=False),
+    ):
+        assert await provider.health_check() is False
