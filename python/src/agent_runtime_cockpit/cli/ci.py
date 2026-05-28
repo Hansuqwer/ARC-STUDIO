@@ -32,6 +32,7 @@ def ci_check(
 
     checks: dict[str, object] = {
         "private": private,
+        "advisory": True,
         "workspace": str(ws),
         "checks": {},
     }
@@ -44,6 +45,7 @@ def ci_check(
     checks["checks"]["sandbox_audit"] = {
         "status": "fail" if denied_events else "pass",
         "total_events": audit_result.get("count", 0),
+        "exercised": audit_result.get("count", 0) > 0,
         "denied_count": len(denied_events),
         "denied_commands": [
             {

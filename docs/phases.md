@@ -2876,7 +2876,7 @@ pnpm typecheck
 ### Phase 78 — MCP Workbench Phase 1
 
 **Roadmap:** R48 candidate
-**Status:** Not Started | Evidence: research synthesis only
+**Status:** Baseline Complete (CLI baseline) | Evidence: research synthesis only; R48 marked Baseline Complete in docs/roadmap.md — `arc mcp workbench status --json` and `arc mcp workbench inspect --server <cmd> --json` implemented
 **Depends on:** R19 local stdio MCP baseline
 
 #### Acceptance
@@ -2895,7 +2895,7 @@ pnpm typecheck
 ### Phase 79 — Workspace Intelligence + Test Bench MVP
 
 **Roadmap:** R49 candidate
-**Status:** Not Started | Evidence: research synthesis only
+**Status:** Baseline Complete (CLI baseline) | Evidence: research synthesis only; R49 marked Baseline Complete in docs/roadmap.md — `arc workspace inventory --json`, `arc testbench detect --json`, `arc testbench run --policy local-safe -- <cmd>` implemented
 **Depends on:** Trust/root-qualified path model and sandbox command execution stability
 
 #### Acceptance
@@ -2914,7 +2914,7 @@ pnpm typecheck
 ### Phase 80 — ARC CI Guardrails MVP
 
 **Roadmap:** R51 candidate
-**Status:** Not Started | Evidence: research synthesis only
+**Status:** Baseline Complete (CLI baseline) | Evidence: research synthesis only; R51 marked Baseline Complete in docs/roadmap.md — `arc ci check --json --private`, `arc ci summary --format markdown`, `arc ci verify-audit --json` implemented
 **Depends on:** Eval artifact, policy, receipt, audit verification foundations
 
 #### Acceptance

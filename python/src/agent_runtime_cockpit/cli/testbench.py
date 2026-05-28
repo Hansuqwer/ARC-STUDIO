@@ -229,6 +229,198 @@ def _scan_setup_cfg(root: Path, cwd: str) -> list[dict]:
     return []
 
 
+def _scan_jest_config(root: Path, cwd: str) -> list[dict]:
+    """Detect jest via jest.config.* files."""
+    for pattern in ("jest.config.ts", "jest.config.js", "jest.config.mjs", "jest.config.cjs"):
+        if (root / pattern).is_file():
+            return [
+                {
+                    "command": "npx jest",
+                    "source": pattern,
+                    "runner": "jest",
+                    "cwd": cwd,
+                    "confidence": "high",
+                }
+            ]
+    return []
+
+
+def _scan_vitest_config(root: Path, cwd: str) -> list[dict]:
+    """Detect vitest via vitest.config.* files."""
+    for pattern in ("vitest.config.ts", "vitest.config.js", "vitest.config.mjs"):
+        if (root / pattern).is_file():
+            return [
+                {
+                    "command": "npx vitest run",
+                    "source": pattern,
+                    "runner": "vitest",
+                    "cwd": cwd,
+                    "confidence": "high",
+                }
+            ]
+    return []
+
+
+def _scan_playwright_config(root: Path, cwd: str) -> list[dict]:
+    """Detect playwright via playwright.config.* files."""
+    for pattern in ("playwright.config.ts", "playwright.config.js", "playwright.config.mjs"):
+        if (root / pattern).is_file():
+            return [
+                {
+                    "command": "npx playwright test",
+                    "source": pattern,
+                    "runner": "playwright",
+                    "cwd": cwd,
+                    "confidence": "high",
+                }
+            ]
+    return []
+
+
+def _scan_cypress_config(root: Path, cwd: str) -> list[dict]:
+    """Detect cypress via cypress.config.* files."""
+    for pattern in ("cypress.config.ts", "cypress.config.js", "cypress.config.mjs"):
+        if (root / pattern).is_file():
+            return [
+                {
+                    "command": "npx cypress run",
+                    "source": pattern,
+                    "runner": "cypress",
+                    "cwd": cwd,
+                    "confidence": "high",
+                }
+            ]
+    return []
+
+
+def _scan_mocha_config(root: Path, cwd: str) -> list[dict]:
+    """Detect mocha via .mocharc.* files."""
+    for pattern in (".mocharc.yml", ".mocharc.js", ".mocharc.json", ".mocharc.cjs"):
+        if (root / pattern).is_file():
+            return [
+                {
+                    "command": "npx mocha",
+                    "source": pattern,
+                    "runner": "mocha",
+                    "cwd": cwd,
+                    "confidence": "high",
+                }
+            ]
+    return []
+
+
+def _scan_ava_config(root: Path, cwd: str) -> list[dict]:
+    """Detect ava via ava.config.* files."""
+    for pattern in ("ava.config.js", "ava.config.ts", "ava.config.cjs"):
+        if (root / pattern).is_file():
+            return [
+                {
+                    "command": "npx ava",
+                    "source": pattern,
+                    "runner": "ava",
+                    "cwd": cwd,
+                    "confidence": "high",
+                }
+            ]
+    return []
+
+
+def _scan_ruff(root: Path, cwd: str) -> list[dict]:
+    """Detect ruff linter via ruff.toml or pyproject.toml [tool.ruff]."""
+    if (root / "ruff.toml").is_file() or (root / ".ruff.toml").is_file():
+        return [
+            {
+                "command": "ruff check .",
+                "source": "ruff.toml",
+                "runner": "ruff",
+                "cwd": cwd,
+                "confidence": "high",
+            }
+        ]
+    pyproject_toml = root / "pyproject.toml"
+    if pyproject_toml.is_file():
+        try:
+            import tomllib
+
+            data = tomllib.loads(pyproject_toml.read_text(encoding="utf-8"))
+            if data.get("tool", {}).get("ruff"):
+                return [
+                    {
+                        "command": "ruff check .",
+                        "source": "pyproject.toml",
+                        "runner": "ruff",
+                        "cwd": cwd,
+                        "confidence": "high",
+                    }
+                ]
+        except Exception:
+            pass
+    return []
+
+
+def _scan_mypy(root: Path, cwd: str) -> list[dict]:
+    """Detect mypy via mypy.ini or pyproject.toml [tool.mypy]."""
+    if (root / "mypy.ini").is_file() or (root / ".mypy.ini").is_file():
+        return [
+            {
+                "command": "mypy .",
+                "source": "mypy.ini",
+                "runner": "mypy",
+                "cwd": cwd,
+                "confidence": "high",
+            }
+        ]
+    pyproject_toml = root / "pyproject.toml"
+    if pyproject_toml.is_file():
+        try:
+            import tomllib
+
+            data = tomllib.loads(pyproject_toml.read_text(encoding="utf-8"))
+            if data.get("tool", {}).get("mypy"):
+                return [
+                    {
+                        "command": "mypy .",
+                        "source": "pyproject.toml",
+                        "runner": "mypy",
+                        "cwd": cwd,
+                        "confidence": "high",
+                    }
+                ]
+        except Exception:
+            pass
+    return []
+
+
+def _scan_pylint(root: Path, cwd: str) -> list[dict]:
+    """Detect pylint via .pylintrc or pyproject.toml [tool.pylint]."""
+    if (root / ".pylintrc").is_file():
+        return [
+            {
+                "command": "pylint .",
+                "source": ".pylintrc",
+                "runner": "pylint",
+                "cwd": cwd,
+                "confidence": "high",
+            }
+        ]
+    return []
+
+
+def _scan_flake8(root: Path, cwd: str) -> list[dict]:
+    """Detect flake8 via .flake8 or setup.cfg [flake8]."""
+    if (root / ".flake8").is_file():
+        return [
+            {
+                "command": "flake8 .",
+                "source": ".flake8",
+                "runner": "flake8",
+                "cwd": cwd,
+                "confidence": "high",
+            }
+        ]
+    return []
+
+
 _SCANNERS = [
     _scan_package_json,
     _scan_pyproject_toml,
@@ -237,6 +429,16 @@ _SCANNERS = [
     _scan_makefile,
     _scan_pytest_ini,
     _scan_setup_cfg,
+    _scan_jest_config,
+    _scan_vitest_config,
+    _scan_playwright_config,
+    _scan_cypress_config,
+    _scan_mocha_config,
+    _scan_ava_config,
+    _scan_ruff,
+    _scan_mypy,
+    _scan_pylint,
+    _scan_flake8,
 ]
 
 

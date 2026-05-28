@@ -172,3 +172,93 @@ def test_testbench_run_missing_command(tmp_path, monkeypatch):
     assert result.exit_code == 2, result.output
     data = _payload(result)
     assert data["ok"] is False
+
+
+def test_testbench_detect_jest_config(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "jest.config.ts").write_text("export default {}")
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0
+    detected = json.loads(result.stdout)["data"]["detected"]
+    assert any(d["runner"] == "jest" for d in detected)
+
+
+def test_testbench_detect_vitest_config(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "vitest.config.ts").write_text("export default {}")
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0
+    detected = json.loads(result.stdout)["data"]["detected"]
+    assert any(d["runner"] == "vitest" for d in detected)
+
+
+def test_testbench_detect_playwright_config(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "playwright.config.ts").write_text("export default {}")
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0
+    detected = json.loads(result.stdout)["data"]["detected"]
+    assert any(d["runner"] == "playwright" for d in detected)
+
+
+def test_testbench_detect_cypress_config(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "cypress.config.ts").write_text("export default {}")
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0
+    detected = json.loads(result.stdout)["data"]["detected"]
+    assert any(d["runner"] == "cypress" for d in detected)
+
+
+def test_testbench_detect_ruff_toml(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "ruff.toml").write_text("line-length = 100")
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0
+    detected = json.loads(result.stdout)["data"]["detected"]
+    assert any(d["runner"] == "ruff" for d in detected)
+
+
+def test_testbench_detect_mypy_ini(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "mypy.ini").write_text("[mypy]")
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0
+    detected = json.loads(result.stdout)["data"]["detected"]
+    assert any(d["runner"] == "mypy" for d in detected)
+
+
+def test_testbench_detect_mocha_rc(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".mocharc.yml").write_text("")
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0
+    detected = json.loads(result.stdout)["data"]["detected"]
+    assert any(d["runner"] == "mocha" for d in detected)
+
+
+def test_testbench_detect_ava_config(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "ava.config.js").write_text("export default {}")
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0
+    detected = json.loads(result.stdout)["data"]["detected"]
+    assert any(d["runner"] == "ava" for d in detected)
+
+
+def test_testbench_detect_flake8(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".flake8").write_text("[flake8]")
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0
+    detected = json.loads(result.stdout)["data"]["detected"]
+    assert any(d["runner"] == "flake8" for d in detected)
+
+
+def test_testbench_detect_pylintrc(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".pylintrc").write_text("[MASTER]")
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0
+    detected = json.loads(result.stdout)["data"]["detected"]
+    assert any(d["runner"] == "pylint" for d in detected)

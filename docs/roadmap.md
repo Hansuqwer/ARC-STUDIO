@@ -90,9 +90,6 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | R50 Theia-Native Architecture Cleanup | Baseline Complete | local worktree: targeted arc-extension tests 135 passed; `pnpm build` OK; `pnpm typecheck` OK | Daemon discovery extracted into typed Theia service and injected into backend/session bridge; broader backend split remains follow-up. |
 | R51 ARC CI Guardrails | Baseline Complete | local worktree: `cd python && uv run pytest tests/cli/test_ci.py -q` 11 passed; `arc ci check --json --private`, `arc ci summary --format markdown`, `arc ci verify-audit --json` implemented | Advisory local-first CI commands; private mode uploads nothing; existing eval/policy/receipt/audit verification only; no blocking provider-backed AI judgment |
 | R52 SwarmGraph Consensus Differentiators | Not Started | Research synthesis only | Candidate offline/eval-first selective debate, weighted quorum, verifier lane, HITL quorum, and battle metrics; no broad provider-backed execution. |
-| R50 Theia-Native Architecture Cleanup | Baseline Complete | local worktree: targeted arc-extension tests 135 passed; `pnpm build` OK; `pnpm typecheck` OK | Daemon discovery extracted into typed Theia service and injected into backend/session bridge; broader backend split remains follow-up. |
-| R51 ARC CI Guardrails | Not Started | Research synthesis only | Candidate local-first `arc ci` review/eval/policy/receipt workflow; private mode uploads nothing by default. |
-| R52 SwarmGraph Consensus Differentiators | Not Started | Research synthesis only | Candidate offline/eval-first selective debate, weighted quorum, verifier lane, HITL quorum, and battle metrics; no broad provider-backed execution. |
 
 **Deferred by default until explicit roadmap change:** executable plugin marketplace, remote MCP beyond loopback, raw team trace sync, automatic memory injection, public microVM execution, and broad provider-backed SwarmGraph execution.
 
