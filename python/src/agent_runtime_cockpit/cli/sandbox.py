@@ -19,15 +19,19 @@ from ..protocol.event_envelope import err, ok
 from ..security.sandbox import (
     SandboxPolicy,
     SandboxResult,
+    apply_sandbox_policy_yaml,
     approve_command_token,
     approve_decision,
     approve_decision_with_token,
     build_audit_event,
+    compact_sandbox_audit_events,
+    container_preflight,
     decide,
     ensure_workspace_cwd,
     get_sandbox_audit_event,
     list_sandbox_audit_events,
     list_sandbox_policies,
+    parse_relative_time,
     persist_sandbox_audit_event,
     revoke_approval_token,
     prune_expired_approvals,
@@ -36,6 +40,7 @@ from ..security.sandbox import (
     utc_now,
     validate_command_paths,
     validate_sandbox_policy_config,
+    validate_sandbox_policy_yaml,
     verify_sandbox_audit,
 )
 from ._helpers import DEBUG_FLAG, JSON_FLAG, WORKSPACE_FLAG, _out, _setup_logging, _workspace
@@ -59,6 +64,7 @@ def sandbox_doctor(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> N
         "providers": [
             subprocess_provider.describe(),
             microvm_provider.describe(),
+            container_preflight(),
         ]
     }
     _out(ok(data), json_output)
@@ -182,6 +188,154 @@ def _sandbox_audit_list_impl(
         since=since,
         until=until,
         limit=limit,
+    )
+    _out(ok(result), json_output)
+
+
+@sandbox_app.command("audit-query")
+def sandbox_audit_query(
+    from_time: Optional[str] = typer.Option(
+        None, "--from", help="Start time: ISO string or relative (e.g. 1h, 30m, 7d)"
+    ),
+    to_time: Optional[str] = typer.Option(
+        None, "--to", help="End time: ISO string or relative (e.g. now, 30m)"
+    ),
+    classification: Optional[str] = typer.Option(
+        None, "--classification", help="Filter by classification"
+    ),
+    provider: Optional[str] = typer.Option(None, "--provider", help="Filter by provider"),
+    allowed: Optional[bool] = typer.Option(
+        None, "--allowed/--denied", help="Filter allowed or denied events"
+    ),
+    command_contains: Optional[str] = typer.Option(
+        None, "--command-contains", help="Filter by argv substring"
+    ),
+    limit: int = typer.Option(100, "--limit", help="Maximum events to return"),
+    audit_dir: Optional[str] = typer.Option(None, "--audit-dir", help="Sandbox audit directory"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Rich time-range query over sandbox audit events."""
+    _sandbox_audit_query_impl(
+        from_time,
+        to_time,
+        classification,
+        provider,
+        allowed,
+        command_contains,
+        limit,
+        audit_dir,
+        json_output,
+        debug,
+    )
+
+
+@sandbox_audit_app.command("query")
+def sandbox_audit_query_nested(
+    from_time: Optional[str] = typer.Option(
+        None, "--from", help="Start time: ISO string or relative (e.g. 1h, 30m, 7d)"
+    ),
+    to_time: Optional[str] = typer.Option(
+        None, "--to", help="End time: ISO string or relative (e.g. now, 30m)"
+    ),
+    classification: Optional[str] = typer.Option(
+        None, "--classification", help="Filter by classification"
+    ),
+    provider: Optional[str] = typer.Option(None, "--provider", help="Filter by provider"),
+    allowed: Optional[bool] = typer.Option(
+        None, "--allowed/--denied", help="Filter allowed or denied events"
+    ),
+    command_contains: Optional[str] = typer.Option(
+        None, "--command-contains", help="Filter by argv substring"
+    ),
+    limit: int = typer.Option(100, "--limit", help="Maximum events to return"),
+    audit_dir: Optional[str] = typer.Option(None, "--audit-dir", help="Sandbox audit directory"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Rich time-range query over sandbox audit events."""
+    _sandbox_audit_query_impl(
+        from_time,
+        to_time,
+        classification,
+        provider,
+        allowed,
+        command_contains,
+        limit,
+        audit_dir,
+        json_output,
+        debug,
+    )
+
+
+def _sandbox_audit_query_impl(
+    from_time: Optional[str],
+    to_time: Optional[str],
+    classification: Optional[str],
+    provider: Optional[str],
+    allowed: Optional[bool],
+    command_contains: Optional[str],
+    limit: int,
+    audit_dir: Optional[str],
+    json_output: bool,
+    debug: bool,
+) -> None:
+    _setup_logging(debug)
+    since = parse_relative_time(from_time) if from_time else None
+    until = parse_relative_time(to_time) if to_time else None
+    result = list_sandbox_audit_events(
+        Path(audit_dir).expanduser() if audit_dir else None,
+        allowed=allowed,
+        classification=classification,
+        provider=provider,
+        command_contains=command_contains,
+        since=since,
+        until=until,
+        limit=limit,
+    )
+    _out(ok(result), json_output)
+
+
+@sandbox_app.command("audit-compact")
+def sandbox_audit_compact(
+    before: Optional[str] = typer.Option(
+        None, "--before", help="ISO timestamp; prune events before this"
+    ),
+    keep: int = typer.Option(1000, "--keep", help="Keep newest N events when --before omitted"),
+    audit_dir: Optional[str] = typer.Option(None, "--audit-dir", help="Sandbox audit directory"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Prune old sandbox audit events (events file only; chain is preserved)."""
+    _sandbox_audit_compact_impl(before, keep, audit_dir, json_output, debug)
+
+
+@sandbox_audit_app.command("compact")
+def sandbox_audit_compact_nested(
+    before: Optional[str] = typer.Option(
+        None, "--before", help="ISO timestamp; prune events before this"
+    ),
+    keep: int = typer.Option(1000, "--keep", help="Keep newest N events when --before omitted"),
+    audit_dir: Optional[str] = typer.Option(None, "--audit-dir", help="Sandbox audit directory"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Prune old sandbox audit events (events file only; chain is preserved)."""
+    _sandbox_audit_compact_impl(before, keep, audit_dir, json_output, debug)
+
+
+def _sandbox_audit_compact_impl(
+    before: Optional[str],
+    keep: int,
+    audit_dir: Optional[str],
+    json_output: bool,
+    debug: bool,
+) -> None:
+    _setup_logging(debug)
+    result = compact_sandbox_audit_events(
+        before=before,
+        keep=keep,
+        audit_dir=Path(audit_dir).expanduser() if audit_dir else None,
     )
     _out(ok(result), json_output)
 
@@ -486,9 +640,13 @@ def sandbox_inspect(
 
 def _build_provider(
     name: str, policy_model: SandboxPolicy, ws: Path
-) -> SubprocessIsolationProvider | MicroVMIsolationProvider:
+) -> "SubprocessIsolationProvider | MicroVMIsolationProvider":
     if name == "microvm":
         return MicroVMIsolationProvider()
+    if name == "container":
+        from ..isolation.docker_provider import SubprocessContainerProvider
+
+        return SubprocessContainerProvider(workspace_root=ws)
     return SubprocessIsolationProvider(
         safe_env_keys=frozenset(policy_model.env_allowlist),
         workspace_root=ws,
@@ -622,6 +780,41 @@ def policy_validate(
     """Validate sandbox policy config schema."""
     _setup_logging(debug)
     result = validate_sandbox_policy_config(Path(config).expanduser() if config else None)
+    _out(ok(result), json_output)
+    if not result["ok"]:
+        raise typer.Exit(1)
+
+
+@policy_app.command("validate-yaml")
+def policy_validate_yaml(
+    file: str = typer.Option(..., "--file", help="YAML policy file to validate"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Validate a YAML sandbox policy file."""
+    _setup_logging(debug)
+    result = validate_sandbox_policy_yaml(Path(file).expanduser())
+    _out(ok(result), json_output)
+    if not result["ok"]:
+        raise typer.Exit(1)
+
+
+@policy_app.command("apply")
+def policy_apply(
+    file: str = typer.Option(..., "--file", help="YAML policy file to apply"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    target: Optional[str] = typer.Option(None, "--target", help="Override target path"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Apply a YAML policy file to the workspace .arc directory."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    result = apply_sandbox_policy_yaml(
+        Path(file).expanduser(),
+        ws,
+        target_path=Path(target).expanduser() if target else None,
+    )
     _out(ok(result), json_output)
     if not result["ok"]:
         raise typer.Exit(1)

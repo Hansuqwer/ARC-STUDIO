@@ -783,6 +783,49 @@ def build_microvm_audit_event(
     }
 
 
+def _container_daemon_alive(binary: str) -> bool:
+    """Return True if the container daemon responds to an info probe."""
+    try:
+        result = subprocess.run(
+            [binary, "info"],
+            check=False,
+            capture_output=True,
+            timeout=5,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def container_preflight() -> dict[str, Any]:
+    """Detect container runtime availability for sandbox doctor."""
+    from ..isolation.docker_provider import container_sandbox_enabled
+
+    enabled = container_sandbox_enabled()
+    docker_bin = shutil.which("docker")
+    podman_bin = shutil.which("podman")
+    binary = docker_bin or podman_bin
+    runtime = "docker" if docker_bin else "podman" if podman_bin else None
+    status = "unavailable"
+    if enabled and binary:
+        status = "ready" if _container_daemon_alive(binary) else "installed_not_configured"
+    elif binary:
+        status = "disabled"  # installed but ARC_ENABLE_CONTAINER_SANDBOX not set
+    blockers: list[str] = []
+    if not binary:
+        blockers.append("docker or podman binary missing")
+    if not enabled:
+        blockers.append("ARC_ENABLE_CONTAINER_SANDBOX=1 not set")
+    return {
+        "provider": "container",
+        "status": status,
+        "enabled": enabled,
+        "binary": binary,
+        "runtime": runtime,
+        "blockers": blockers,
+    }
+
+
 def microvm_preflight(system: str | None = None) -> dict[str, Any]:
     """Detect lightweight microVM runtime availability without executing workloads."""
     os_name = system or platform.system()
@@ -1118,21 +1161,179 @@ def sandbox_policy_store_path() -> Path:
     return Path.home() / ".arc" / "sandbox-policies.json"
 
 
+def default_workspace_policy_path(workspace_root: Path) -> Path:
+    """Return .arc/sandbox-policy.yaml inside workspace."""
+    return workspace_root / ".arc" / "sandbox-policy.yaml"
+
+
+def default_user_sandbox_policy_path() -> Path:
+    """Return ~/.arc/sandbox-policy.yaml (user-level sandbox policy)."""
+    return Path.home() / ".arc" / "sandbox-policy.yaml"
+
+
+def load_sandbox_policy_yaml(path: Path) -> dict[str, Any]:
+    """Load and parse a YAML sandbox policy file. Returns raw dict."""
+    import yaml
+
+    if not path.exists():
+        raise FileNotFoundError(f"Policy file not found: {path}")
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("Policy YAML must be a mapping")
+    return raw
+
+
+def validate_sandbox_policy_yaml(path: Path) -> dict[str, Any]:
+    """Validate a YAML sandbox policy file and return a stable report.
+
+    Returns {"ok": bool, "path": str, "policy_name": str|None, "errors": list}
+    """
+    errors: list[str] = []
+    try:
+        raw = load_sandbox_policy_yaml(path)
+    except FileNotFoundError as exc:
+        return {"ok": False, "path": str(path), "policy_name": None, "errors": [str(exc)]}
+    except Exception as exc:
+        return {"ok": False, "path": str(path), "policy_name": None, "errors": [str(exc)]}
+
+    # Check required fields
+    if "name" not in raw:
+        errors.append("missing required field: name")
+    if "version" in raw and raw["version"] != 1:
+        errors.append("version must be 1")
+
+    # Validate boolean fields
+    bool_fields = ["allow_network", "allow_install", "allow_privileged", "allow_unknown"]
+    for field in bool_fields:
+        if field in raw and not isinstance(raw[field], bool):
+            errors.append(f"{field} must be a boolean")
+
+    # Try to build a real SandboxPolicy
+    if not errors:
+        try:
+            SandboxPolicy.model_validate({**raw, "workspace_root": Path.cwd()})
+        except Exception as exc:
+            errors.append(str(exc))
+
+    return {
+        "ok": not errors,
+        "path": str(path),
+        "policy_name": raw.get("name"),
+        "errors": errors,
+    }
+
+
+def apply_sandbox_policy_yaml(
+    source_path: Path,
+    workspace_root: Path,
+    *,
+    target_path: Path | None = None,
+) -> dict[str, Any]:
+    """Validate and install a YAML policy file into workspace .arc/sandbox-policy.yaml.
+
+    Returns {"ok": bool, "source": str, "target": str, "policy_name": str|None, "errors": list}
+    """
+    validation = validate_sandbox_policy_yaml(source_path)
+    if not validation["ok"]:
+        return {
+            "ok": False,
+            "source": str(source_path),
+            "target": None,
+            "policy_name": validation["policy_name"],
+            "errors": validation["errors"],
+        }
+    dest = target_path or default_workspace_policy_path(workspace_root)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    import shutil as _shutil
+
+    _shutil.copy2(str(source_path), str(dest))
+    return {
+        "ok": True,
+        "source": str(source_path),
+        "target": str(dest),
+        "policy_name": validation["policy_name"],
+        "errors": [],
+    }
+
+
+def resolve_sandbox_policy_with_yaml(
+    name: str,
+    workspace_root: Path,
+    *,
+    json_path: Path | None = None,
+    yaml_path: Path | None = None,
+) -> SandboxPolicy:
+    """Resolve a sandbox policy with YAML-first lookup.
+
+    Priority: JSON store (existing) → workspace YAML file → user YAML file → built-in.
+    """
+    # Try existing JSON store first
+    try:
+        return resolve_sandbox_policy(name, workspace_root, json_path)
+    except KeyError:
+        pass
+
+    # Try workspace YAML
+    ws_yaml = yaml_path or default_workspace_policy_path(workspace_root)
+    if ws_yaml.exists():
+        try:
+            raw = load_sandbox_policy_yaml(ws_yaml)
+            if raw.get("name") == name:
+                return SandboxPolicy.model_validate({**raw, "workspace_root": workspace_root})
+        except Exception:
+            pass
+
+    # Try user YAML
+    user_yaml = default_user_sandbox_policy_path()
+    if user_yaml.exists():
+        try:
+            raw = load_sandbox_policy_yaml(user_yaml)
+            if raw.get("name") == name:
+                return SandboxPolicy.model_validate({**raw, "workspace_root": workspace_root})
+        except Exception:
+            pass
+
+    raise KeyError(f"Sandbox policy not found: {name}")
+
+
+def _try_yaml_policy(name: str, workspace_root: Path) -> SandboxPolicy | None:
+    """Try workspace then user YAML files for a policy; return None if not found."""
+    for yaml_path in (
+        default_workspace_policy_path(workspace_root),
+        default_user_sandbox_policy_path(),
+    ):
+        if not yaml_path.exists():
+            continue
+        try:
+            raw = load_sandbox_policy_yaml(yaml_path)
+            if raw.get("name") == name:
+                return SandboxPolicy.model_validate({**raw, "workspace_root": workspace_root})
+        except Exception:
+            pass
+    return None
+
+
 def resolve_sandbox_policy(
     name: str, workspace_root: Path, path: Path | None = None
 ) -> SandboxPolicy:
-    """Resolve a built-in or JSON-configured sandbox policy."""
+    """Resolve a built-in or JSON-configured sandbox policy.
+
+    Lookup order: built-in → JSON store → workspace YAML → user YAML.
+    """
     if name == "local-safe":
         return SandboxPolicy(name=name, workspace_root=workspace_root)
     store_path = path or sandbox_policy_store_path()
-    if not store_path.exists():
-        raise KeyError(f"Sandbox policy not found: {name}")
-    raw = json.loads(store_path.read_text(encoding="utf-8"))
-    _validate_policy_config_shape(raw)
-    for item in raw.get("policies", []):
-        if item.get("name") == name:
-            payload = {**item, "workspace_root": workspace_root}
-            return SandboxPolicy.model_validate(payload)
+    if store_path.exists():
+        raw = json.loads(store_path.read_text(encoding="utf-8"))
+        _validate_policy_config_shape(raw)
+        for item in raw.get("policies", []):
+            if item.get("name") == name:
+                payload = {**item, "workspace_root": workspace_root}
+                return SandboxPolicy.model_validate(payload)
+    # Fall through to YAML files
+    found = _try_yaml_policy(name, workspace_root)
+    if found is not None:
+        return found
     raise KeyError(f"Sandbox policy not found: {name}")
 
 
@@ -1403,6 +1604,85 @@ def get_sandbox_audit_event(audit_id: str, audit_dir: Path | None = None) -> dic
         if event.get("audit_id") == audit_id:
             return {"event": event, "path": result["path"], "found": True}
     return {"event": None, "path": result["path"], "found": False}
+
+
+def parse_relative_time(value: str) -> str:
+    """Convert a relative time string to an ISO UTC string.
+
+    Accepts:
+    - ``Nh`` — N hours ago
+    - ``Nm`` — N minutes ago
+    - ``Nd`` — N days ago
+    - ``now`` — current UTC time
+    - Any other string is returned unchanged (assumed to be ISO already).
+    """
+    value = value.strip()
+    if value == "now":
+        return utc_now()
+    import re
+
+    m = re.fullmatch(r"(\d+)([hmd])", value)
+    if m:
+        n = int(m.group(1))
+        unit = m.group(2)
+        if unit == "h":
+            delta = timedelta(hours=n)
+        elif unit == "m":
+            delta = timedelta(minutes=n)
+        else:  # d
+            delta = timedelta(days=n)
+        return (datetime.now(timezone.utc) - delta).isoformat().replace("+00:00", "Z")
+    # Assume already ISO
+    return value
+
+
+def compact_sandbox_audit_events(
+    *,
+    before: str | None = None,
+    keep: int = 1000,
+    audit_dir: Path | None = None,
+) -> dict[str, Any]:
+    """Prune sandbox audit events from ``sandbox.events.jsonl``.
+
+    Two modes:
+    - ``before`` supplied: remove events whose ``started_at`` < ``before``.
+    - ``before`` omitted: keep the newest ``keep`` events.
+
+    The chain file (``sandbox.audit.jsonl``) is never modified.
+
+    Returns ``{"compacted": N, "remaining": M, "events_path": str}``.
+    """
+    target_dir = audit_dir or sandbox_audit_dir()
+    events_path = target_dir / "sandbox.events.jsonl"
+    if not events_path.exists():
+        return {"compacted": 0, "remaining": 0, "events_path": str(events_path)}
+
+    raw_lines = [
+        line for line in events_path.read_text(encoding="utf-8").splitlines() if line.strip()
+    ]
+    total = len(raw_lines)
+
+    if before is not None:
+        kept_lines = [line for line in raw_lines if _event_started_at(line) >= before]
+    else:
+        kept_lines = raw_lines[-keep:] if keep >= 0 else raw_lines
+
+    compacted = total - len(kept_lines)
+    events_path.write_text("".join(line + "\n" for line in kept_lines), encoding="utf-8")
+    return {
+        "compacted": compacted,
+        "remaining": len(kept_lines),
+        "events_path": str(events_path),
+    }
+
+
+def _event_started_at(line: str) -> str:
+    """Extract ``started_at`` from a raw event JSON line for compaction comparisons."""
+    try:
+        parsed = json.loads(line)
+        return str(parsed.get("started_at", ""))
+    except Exception:
+        return ""
 
 
 def render_lima_template(workspace_root: Path, instance_name: str = "arc-sandbox") -> str:

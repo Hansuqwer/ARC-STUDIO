@@ -255,3 +255,251 @@ class DockerIsolationProvider(IsolationProvider):
 def container_sandbox_enabled() -> bool:
     """Return True when container execution is explicitly enabled."""
     return os.environ.get("ARC_ENABLE_CONTAINER_SANDBOX") == "1"
+
+
+# ---------------------------------------------------------------------------
+# SubprocessContainerProvider — CLI subprocess-based container runner
+# ---------------------------------------------------------------------------
+
+
+class SubprocessContainerProvider(IsolationProvider):
+    """Container isolation using docker/podman CLI subprocess (no SDK dep).
+
+    Uses ``docker run`` or ``podman run`` via subprocess; avoids a hard
+    dependency on the ``docker`` Python package.
+
+    Gated by ``ARC_ENABLE_CONTAINER_SANDBOX=1``.
+    """
+
+    def __init__(
+        self,
+        image: str = "python:3.12-slim",
+        workspace_root: Optional[Path] = None,
+        max_output_bytes: int = 65_536,
+        network_disabled: bool = True,
+        mem_limit: str = "512m",
+        runtime: Optional[str] = None,  # None = auto-detect
+    ) -> None:
+        self._image = image
+        self._workspace_root = workspace_root
+        self._max_output_bytes = max_output_bytes
+        self._network_disabled = network_disabled
+        self._mem_limit = mem_limit
+        self._runtime_override = runtime
+
+    @property
+    def provider_id(self) -> str:
+        return "container"
+
+    async def health_check(self) -> bool:
+        """Return True if container runtime binary is available and sandbox enabled."""
+        if not container_sandbox_enabled():
+            return False
+        info = self.detect_runtime()
+        return bool(info.get("available"))
+
+    def detect_runtime(self) -> dict[str, Any]:
+        """Detect which container runtime binary is available.
+
+        Returns a dict with:
+          - ``runtime``: "docker" | "podman" | "orbstack" | "colima" | "unavailable"
+          - ``available``: bool
+          - ``binary``: str | None
+        """
+        import shutil
+
+        docker_bin = shutil.which("docker")
+        podman_bin = shutil.which("podman")
+
+        if self._runtime_override:
+            binary = shutil.which(self._runtime_override)
+            if not binary:
+                return {"runtime": "unavailable", "available": False, "binary": None}
+            return {"runtime": self._runtime_override, "available": True, "binary": binary}
+
+        if docker_bin:
+            # Sniff for OrbStack or Colima via DOCKER_HOST or docker context
+            docker_host = os.environ.get("DOCKER_HOST", "")
+            if "orbstack" in docker_host.lower():
+                runtime_name = "orbstack"
+            elif "colima" in docker_host.lower():
+                runtime_name = "colima"
+            else:
+                runtime_name = "docker"
+            return {"runtime": runtime_name, "available": True, "binary": docker_bin}
+
+        if podman_bin:
+            return {"runtime": "podman", "available": True, "binary": podman_bin}
+
+        return {"runtime": "unavailable", "available": False, "binary": None}
+
+    def _filter_env(self, extra_env: Optional[dict[str, str]] = None) -> list[str]:
+        """Return filtered env as list of -e KEY=VAL args for docker run."""
+        safe_keys = DEFAULT_SAFE_ENV_KEYS
+        result: list[str] = []
+        for key in sorted(safe_keys):
+            if key in os.environ and not _is_blocked_env_key(key):
+                result.extend(["-e", f"{key}={os.environ[key]}"])
+        if extra_env:
+            for key, value in sorted(extra_env.items()):
+                if key in safe_keys and not _is_blocked_env_key(key):
+                    result.extend(["-e", f"{key}={value}"])
+        return result
+
+    def _map_cwd_to_container(self, cwd: Optional[Path]) -> str:
+        """Map host cwd to its container equivalent under /workspace."""
+        if not cwd or not self._workspace_root:
+            return "/workspace"
+        root = self._workspace_root.resolve()
+        resolved = cwd.resolve()
+        try:
+            rel = resolved.relative_to(root)
+            return f"/workspace/{rel}" if str(rel) != "." else "/workspace"
+        except ValueError:
+            return "/workspace"
+
+    async def execute(
+        self,
+        command: list[str],
+        *,
+        cwd: Optional[Path] = None,
+        env: Optional[dict[str, str]] = None,
+        timeout_seconds: int = 300,
+    ) -> IsolationResult:
+        """Execute a command inside a container via CLI subprocess."""
+        import signal
+        import subprocess as sp
+
+        if not container_sandbox_enabled():
+            return IsolationResult(
+                exit_code=-1,
+                stderr="Container sandbox disabled. Set ARC_ENABLE_CONTAINER_SANDBOX=1 to enable.",
+                provider=self.provider_id,
+            )
+
+        if not command:
+            raise ValueError("command must not be empty")
+
+        # Workspace cwd guard
+        if self._workspace_root and cwd:
+            root = self._workspace_root.resolve()
+            resolved = cwd.resolve()
+            if cwd.is_symlink() or not resolved.is_relative_to(root):
+                raise ValueError(f"cwd escapes workspace: {cwd}")
+
+        info = self.detect_runtime()
+        if not info.get("available"):
+            return IsolationResult(
+                exit_code=-1,
+                stderr="No container runtime binary found (docker or podman required).",
+                provider=self.provider_id,
+            )
+
+        binary: str = info["binary"]
+
+        # Build volume mount: workspace → /workspace
+        volume_args: list[str] = []
+        if self._workspace_root:
+            volume_args = ["-v", f"{self._workspace_root.resolve()}:/workspace:ro"]
+
+        container_cwd = self._map_cwd_to_container(cwd)
+        env_args = self._filter_env(env)
+
+        network_args = ["--network=none"] if self._network_disabled else []
+
+        argv = (
+            [binary, "run", "--rm"]
+            + network_args
+            + [
+                f"-m{self._mem_limit}",
+                "--cpus=0.5",
+                "--security-opt=no-new-privileges:true",
+                "--cap-drop=ALL",
+                f"-w{container_cwd}",
+            ]
+            + volume_args
+            + env_args
+            + [self._image, "--"]
+            + command
+        )
+
+        start = time.monotonic()
+        try:
+            proc = sp.Popen(
+                argv,
+                stdout=sp.PIPE,
+                stderr=sp.PIPE,
+                start_new_session=True,
+            )
+        except FileNotFoundError:
+            return IsolationResult(
+                exit_code=-1,
+                stderr=f"container runtime binary not found: {binary}",
+                provider=self.provider_id,
+            )
+
+        killed = False
+        kill_reason: Optional[str] = None
+
+        assert proc.stdout is not None
+        assert proc.stderr is not None
+
+        from .subprocess import _BoundedPipeReader
+
+        stdout_reader = _BoundedPipeReader(proc.stdout, self._max_output_bytes)
+        stderr_reader = _BoundedPipeReader(proc.stderr, self._max_output_bytes)
+        stdout_reader.start()
+        stderr_reader.start()
+
+        try:
+            proc.wait(timeout=timeout_seconds)
+        except sp.TimeoutExpired:
+            killed = True
+            kill_reason = "timeout"
+            try:
+                import os as _os
+
+                _os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            proc.wait()
+
+        stdout_reader.join()
+        stderr_reader.join()
+
+        duration = int((time.monotonic() - start) * 1000)
+        stdout = stdout_reader.text()
+        stderr = stderr_reader.text()
+        stdout_truncated = stdout_reader.truncated
+        stderr_truncated = stderr_reader.truncated
+
+        redacted_stdout = redact_output(stdout)
+        redacted_stderr = redact_output(stderr)
+        redaction_applied = redacted_stdout != stdout or redacted_stderr != stderr
+
+        return IsolationResult(
+            exit_code=proc.returncode if proc.returncode is not None else -1,
+            stdout=redacted_stdout,
+            stderr=redacted_stderr,
+            duration_ms=duration,
+            pid=proc.pid,
+            killed=killed,
+            kill_reason=kill_reason,
+            provider=self.provider_id,
+            stdout_truncated=stdout_truncated,
+            stderr_truncated=stderr_truncated,
+            redaction_applied=redaction_applied,
+        )
+
+    def describe(self) -> dict[str, object]:
+        info = self.detect_runtime()
+        return {
+            "provider_id": self.provider_id,
+            "available": container_sandbox_enabled() and info.get("available", False),
+            "runtime": info.get("runtime", "unavailable"),
+            "binary": info.get("binary"),
+            "image": self._image,
+            "network_disabled": self._network_disabled,
+            "mem_limit": self._mem_limit,
+            "enabled": container_sandbox_enabled(),
+        }
