@@ -81,6 +81,10 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/getProviderDiagnostics/);
             expect(source).toMatch(/getWorkspaceStatus/);
             expect(source).toMatch(/getConfigStatus/);
+            expect(source).toMatch(/getMcpWorkbenchStatus/);
+            expect(source).toMatch(/getWorkspaceInventory/);
+            expect(source).toMatch(/detectTestbench/);
+            expect(source).toMatch(/getCiCheckStatus/);
             expect(source).not.toMatch(/startRun\(/);
             expect(source).not.toMatch(/runGatedProviderAction/);
         });
@@ -92,7 +96,7 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/No isolation providers available/);
             expect(source).toMatch(/No profiles configured/);
             expect(source).toMatch(/No provider diagnostics available/);
-            expect(source).toMatch(/Task producer is not exposed through the IDE protocol yet/);
+            expect(source).toMatch(/Task producer not exposed/);
             expect(source).toMatch(/arc-command-centre__error/);
         });
 
@@ -106,6 +110,10 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/aria-label='Provider Health'/);
             expect(source).toMatch(/aria-label='Workspace Risk'/);
             expect(source).toMatch(/aria-label='Tasks'/);
+            expect(source).toMatch(/aria-label='MCP'/);
+            expect(source).toMatch(/aria-label='Workspace Inventory'/);
+            expect(source).toMatch(/aria-label='Testbench'/);
+            expect(source).toMatch(/aria-label='CI Guardrails'/);
         });
     });
 

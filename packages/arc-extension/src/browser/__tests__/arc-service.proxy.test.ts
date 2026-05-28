@@ -89,6 +89,10 @@ describe('ArcService Proxy Tests', () => {
                 'replayRun',
                 'diffRuns',
                 'resetProviderQuota',
+                'getMcpWorkbenchStatus',
+                'getWorkspaceInventory',
+                'detectTestbench',
+                'getCiCheckStatus',
             ];
 
             const mockService: any = {
@@ -119,6 +123,10 @@ describe('ArcService Proxy Tests', () => {
                 replayRun: async () => ({}),
                 diffRuns: async () => ({}),
                 resetProviderQuota: async () => ({ success: true, message: 'Local provider quota counters reset' }),
+                getMcpWorkbenchStatus: async () => ({ workspace: '', serverCreatable: false, tools: [], resources: [], trust: { level: 'unknown' }, diagnostic: '' }),
+                getWorkspaceInventory: async () => ({ workspace: '', files: { count: 0, totalSize: 0, entries: [] }, git: { provenance: '' }, traces: { count: 0, entries: [] }, mcpResources: [] }),
+                detectTestbench: async () => ({ workspace: '', detected: [], count: 0 }),
+                getCiCheckStatus: async () => ({ private: false, workspace: '', checks: {}, overall: 'skip' }),
             };
 
             for (const method of requiredMethods) {

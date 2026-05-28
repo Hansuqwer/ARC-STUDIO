@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from configparser import ConfigParser
 from pathlib import Path
 from typing import Optional
 
@@ -34,98 +35,316 @@ def _policy(name: str, workspace: Path) -> SandboxPolicy:
         raise typer.BadParameter(str(exc)) from exc
 
 
-def _detect_commands(workspace: Path) -> list[dict]:
-    detected: list[dict] = []
+_IGNORE_DIRS = frozenset({"node_modules", ".venv", "venv", "dist", "build", "__pycache__", ".git"})
 
-    # Check package.json
+
+def _scan_package_json(root: Path, cwd: str) -> list[dict]:
+    results: list[dict] = []
+    pkg_json = root / "package.json"
+    if not pkg_json.is_file():
+        return results
+    try:
+        pkg = json.loads(pkg_json.read_text(encoding="utf-8"))
+    except Exception:
+        return results
+    scripts = pkg.get("scripts", {})
+    if "test" not in scripts:
+        return results
+    lock_files = list(root.glob("pnpm-lock.*")) + list(root.glob("pnpm-lock.yaml"))
+    yarn_lock = list(root.glob("yarn.lock"))
+    pm = "pnpm" if lock_files else ("yarn" if yarn_lock else "npm")
+    pm_from_field = (pkg.get("packageManager") or "").split("@")[0]
+    if pm_from_field in ("pnpm", "yarn", "npm"):
+        pm = pm_from_field
+    results.append(
+        {
+            "command": f"{pm} test",
+            "source": "package.json",
+            "runner": pm,
+            "cwd": cwd,
+            "confidence": "high",
+            "script": scripts["test"],
+        }
+    )
+    return results
+
+
+def _scan_pyproject_toml(root: Path, cwd: str) -> list[dict]:
+    results: list[dict] = []
+    pyproject = root / "pyproject.toml"
+    if not pyproject.is_file():
+        return results
+    try:
+        text = pyproject.read_text(encoding="utf-8")
+    except Exception:
+        return results
+    try:
+        import tomllib
+
+        data = tomllib.loads(text)
+        tool = data.get("tool", {})
+        pytest_opts = tool.get("pytest", {})
+        if "ini_options" in pytest_opts:
+            results.append(
+                {
+                    "command": "pytest",
+                    "source": "pyproject.toml",
+                    "runner": "pytest",
+                    "cwd": cwd,
+                    "confidence": "high",
+                }
+            )
+        elif "tox" in tool:
+            results.append(
+                {
+                    "command": "tox",
+                    "source": "pyproject.toml",
+                    "runner": "tox",
+                    "cwd": cwd,
+                    "confidence": "high",
+                }
+            )
+        elif "project" in data:
+            tests_dir = root / "tests"
+            if tests_dir.is_dir():
+                results.append(
+                    {
+                        "command": "pytest",
+                        "source": "pyproject.toml",
+                        "runner": "pytest",
+                        "cwd": cwd,
+                        "confidence": "medium",
+                    }
+                )
+    except Exception:
+        if "[tool.pytest.ini_options]" in text:
+            results.append(
+                {
+                    "command": "pytest",
+                    "source": "pyproject.toml",
+                    "runner": "pytest",
+                    "cwd": cwd,
+                    "confidence": "high",
+                }
+            )
+        elif "[tool.tox]" in text:
+            results.append(
+                {
+                    "command": "tox",
+                    "source": "pyproject.toml",
+                    "runner": "tox",
+                    "cwd": cwd,
+                    "confidence": "high",
+                }
+            )
+    return results
+
+
+def _scan_tox_ini(root: Path, cwd: str) -> list[dict]:
+    tox_ini = root / "tox.ini"
+    if not tox_ini.is_file():
+        return []
+    return [
+        {
+            "command": "tox",
+            "source": "tox.ini",
+            "runner": "tox",
+            "cwd": cwd,
+            "confidence": "high",
+        }
+    ]
+
+
+def _scan_noxfile(root: Path, cwd: str) -> list[dict]:
+    noxfile = root / "noxfile.py"
+    if not noxfile.is_file():
+        return []
+    return [
+        {
+            "command": "nox",
+            "source": "noxfile.py",
+            "runner": "nox",
+            "cwd": cwd,
+            "confidence": "high",
+        }
+    ]
+
+
+def _scan_makefile(root: Path, cwd: str) -> list[dict]:
+    for name in ("Makefile", "makefile", "GNUmakefile"):
+        mf = root / name
+        if mf.is_file():
+            try:
+                text = mf.read_text(encoding="utf-8")
+                for line in text.splitlines():
+                    if line.strip().startswith("test:"):
+                        return [
+                            {
+                                "command": "make test",
+                                "source": name,
+                                "runner": "make",
+                                "cwd": cwd,
+                                "confidence": "high",
+                            }
+                        ]
+            except Exception:
+                pass
+    return []
+
+
+def _scan_pytest_ini(root: Path, cwd: str) -> list[dict]:
+    pytest_ini = root / "pytest.ini"
+    if not pytest_ini.is_file():
+        return []
+    return [
+        {
+            "command": "pytest",
+            "source": "pytest.ini",
+            "runner": "pytest",
+            "cwd": cwd,
+            "confidence": "high",
+        }
+    ]
+
+
+def _scan_setup_cfg(root: Path, cwd: str) -> list[dict]:
+    setup_cfg = root / "setup.cfg"
+    if not setup_cfg.is_file():
+        return []
+    try:
+        cfg = ConfigParser()
+        cfg.read_string(setup_cfg.read_text(encoding="utf-8"))
+        if cfg.has_section("tool:pytest"):
+            return [
+                {
+                    "command": "pytest",
+                    "source": "setup.cfg",
+                    "runner": "pytest",
+                    "cwd": cwd,
+                    "confidence": "high",
+                }
+            ]
+    except Exception:
+        pass
+    return []
+
+
+_SCANNERS = [
+    _scan_package_json,
+    _scan_pyproject_toml,
+    _scan_tox_ini,
+    _scan_noxfile,
+    _scan_makefile,
+    _scan_pytest_ini,
+    _scan_setup_cfg,
+]
+
+
+def _find_candidate_roots(workspace: Path) -> list[tuple[Path, str]]:
+    roots: list[tuple[Path, str]] = [(workspace, ".")]
+    seen: set[Path] = {workspace}
+
+    # pnpm workspace
+    pnpm_yaml = workspace / "pnpm-workspace.yaml"
+    if pnpm_yaml.is_file():
+        try:
+            import yaml as _yaml
+
+            data = _yaml.safe_load(pnpm_yaml.read_text(encoding="utf-8")) or {}
+            pkgs = data.get("packages", [])
+        except Exception:
+            pkgs = []
+        for pattern in pkgs:
+            if isinstance(pattern, str):
+                for p in workspace.glob(pattern):
+                    p = p.resolve()
+                    if (
+                        p.is_dir()
+                        and p not in seen
+                        and not any(
+                            ign in p.parts
+                            for ign in ("node_modules", ".venv", "venv", "dist", "build")
+                        )
+                    ):
+                        try:
+                            rel = str(p.relative_to(workspace))
+                        except ValueError:
+                            rel = str(p)
+                        seen.add(p)
+                        roots.append((p, rel))
+
+    # package.json workspaces
     pkg_json = workspace / "package.json"
     if pkg_json.is_file():
         try:
             pkg = json.loads(pkg_json.read_text(encoding="utf-8"))
-            scripts = pkg.get("scripts", {})
-            if "test" in scripts:
-                detected.append(
-                    {
-                        "command": scripts["test"],
-                        "source": "package.json",
-                        "confidence": "high",
-                        "runner": "npm_test",
-                    }
-                )
+            ws_config = pkg.get("workspaces")
+            if isinstance(ws_config, dict):
+                ws_config = ws_config.get("packages", [])
+            if isinstance(ws_config, list):
+                for pattern in ws_config:
+                    if isinstance(pattern, str):
+                        for p in workspace.glob(pattern):
+                            p = p.resolve()
+                            if (
+                                p.is_dir()
+                                and p not in seen
+                                and not any(
+                                    ign in p.parts
+                                    for ign in ("node_modules", ".venv", "venv", "dist", "build")
+                                )
+                            ):
+                                try:
+                                    rel = str(p.relative_to(workspace))
+                                except ValueError:
+                                    rel = str(p)
+                                seen.add(p)
+                                roots.append((p, rel))
         except Exception:
-            detected.append(
-                {
-                    "source": "package.json",
-                    "confidence": "none",
-                    "reason": "parse_failed",
-                }
-            )
+            pass
 
-    # Check pyproject.toml for pytest config
+    # pyproject.toml uv workspace
     pyproject = workspace / "pyproject.toml"
     if pyproject.is_file():
         try:
-            text = pyproject.read_text(encoding="utf-8")
-            if "[tool.pytest.ini_options]" in text:
-                detected.append(
-                    {
-                        "command": "pytest",
-                        "source": "pyproject.toml",
-                        "confidence": "high",
-                        "runner": "pytest",
-                    }
-                )
+            import tomllib
+
+            data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+            members = data.get("tool", {}).get("uv", {}).get("workspace", {}).get("members", [])
+            for pattern in members:
+                if isinstance(pattern, str):
+                    for p in workspace.glob(pattern):
+                        p = p.resolve()
+                        if (
+                            p.is_dir()
+                            and p not in seen
+                            and not any(
+                                ign in p.parts
+                                for ign in ("node_modules", ".venv", "venv", "dist", "build")
+                            )
+                        ):
+                            try:
+                                rel = str(p.relative_to(workspace))
+                            except ValueError:
+                                rel = str(p)
+                            seen.add(p)
+                            roots.append((p, rel))
         except Exception:
             pass
 
-    # Check for pytest.ini or setup.cfg with pytest config
-    pytest_ini = workspace / "pytest.ini"
-    if pytest_ini.is_file():
-        detected.append(
-            {
-                "command": "pytest",
-                "source": "pytest.ini",
-                "confidence": "high",
-                "runner": "pytest",
-            }
-        )
+    roots.sort(key=lambda x: (x[1] != ".", x[1]))
+    return roots
 
-    # Check setup.cfg for pytest config
-    setup_cfg = workspace / "setup.cfg"
-    if setup_cfg.is_file():
-        try:
-            text = setup_cfg.read_text(encoding="utf-8")
-            if "[tool:pytest]" in text:
-                detected.append(
-                    {
-                        "command": "pytest",
-                        "source": "setup.cfg",
-                        "confidence": "high",
-                        "runner": "pytest",
-                    }
-                )
-        except Exception:
-            pass
 
-    # Check Makefile for test target
-    makefile = workspace / "Makefile"
-    if makefile.is_file():
-        try:
-            text = makefile.read_text(encoding="utf-8")
-            for line in text.splitlines():
-                if line.strip().startswith("test:"):
-                    detected.append(
-                        {
-                            "command": "make test",
-                            "source": "Makefile",
-                            "confidence": "high",
-                            "runner": "make",
-                        }
-                    )
-                    break
-        except Exception:
-            pass
+def _detect_commands(workspace: Path) -> list[dict]:
+    detected: list[dict] = []
+    roots = _find_candidate_roots(workspace)
 
+    for root, cwd in roots:
+        for scanner in _SCANNERS:
+            detected.extend(scanner(root, cwd))
+
+    detected.sort(key=lambda d: (d.get("cwd", "."), d.get("source", "")))
     return detected
 
 

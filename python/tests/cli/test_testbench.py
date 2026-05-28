@@ -22,7 +22,7 @@ def test_testbench_detect_package_json(tmp_path, monkeypatch):
 
 def test_testbench_detect_pyproject(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "pyproject.toml").write_text("[tool.pytest.ini_options]\n")
+    (tmp_path / "pyproject.toml").write_text('[tool.pytest.ini_options]\nminversion = "7.0"\n')
     result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
     assert result.exit_code == 0, result.output
     data = _payload(result)["data"]
@@ -58,6 +58,81 @@ def test_testbench_detect_empty_workspace(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     data = _payload(result)["data"]
     assert data["count"] == 0
+
+
+def test_testbench_detect_pnpm_workspace(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    pkg = tmp_path / "packages" / "foo"
+    pkg.mkdir(parents=True)
+    (pkg / "package.json").write_text('{"scripts": {"test": "jest"}}')
+    (tmp_path / "pnpm-workspace.yaml").write_text("packages:\n  - 'packages/*'\n")
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0, result.output
+    data = _payload(result)["data"]
+    cwds = {d.get("cwd") for d in data["detected"]}
+    assert "packages/foo" in cwds
+
+
+def test_testbench_detect_pyproject_pytest(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[tool.pytest.ini_options]\nminversion = "7.0"\n')
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0, result.output
+    data = _payload(result)["data"]
+    assert any(d["runner"] == "pytest" for d in data["detected"])
+
+
+def test_testbench_detect_tox_ini(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "tox.ini").write_text("[tox]\nenvlist = py39\n")
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0, result.output
+    data = _payload(result)["data"]
+    assert any(d["runner"] == "tox" for d in data["detected"])
+
+
+def test_testbench_detect_noxfile(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "noxfile.py").write_text("import nox\n")
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0, result.output
+    data = _payload(result)["data"]
+    assert any(d["runner"] == "nox" for d in data["detected"])
+
+
+def test_testbench_detect_makefile_lowercase(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "makefile").write_text("test:\n\tpython -m pytest\n")
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0, result.output
+    data = _payload(result)["data"]
+    assert any(d["runner"] == "make" for d in data["detected"])
+
+
+def test_testbench_detect_gnu_makefile(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "GNUmakefile").write_text("test:\n\tpython -m pytest\n")
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0, result.output
+    data = _payload(result)["data"]
+    assert any(d["runner"] == "make" for d in data["detected"])
+
+
+def test_testbench_detect_monorepo_cwd(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    foo = tmp_path / "packages" / "foo"
+    foo.mkdir(parents=True)
+    (foo / "package.json").write_text('{"scripts": {"test": "jest --watch"}}')
+    bar = tmp_path / "packages" / "bar"
+    bar.mkdir(parents=True)
+    (bar / "package.json").write_text('{"scripts": {"test": "vitest"}}')
+    (tmp_path / "package.json").write_text('{"workspaces": ["packages/*"]}')
+    result = CliRunner().invoke(app, ["testbench", "detect", "--json"])
+    assert result.exit_code == 0, result.output
+    data = _payload(result)["data"]
+    cwds = {d.get("cwd") for d in data["detected"] if d.get("cwd")}
+    assert "packages/foo" in cwds
+    assert "packages/bar" in cwds
 
 
 def test_testbench_run_read_only(tmp_path, monkeypatch):

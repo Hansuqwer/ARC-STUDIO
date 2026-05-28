@@ -492,5 +492,38 @@ describe('Backend Service Extensions (Session B + B7)', () => {
             expect(source).toMatch(/provider_backed/);
             expect(source).toMatch(/providerBacked/);
         });
+
+        // Phase 78/79/80 read-only telemetry methods
+        it('should implement getMcpWorkbenchStatus', () => {
+            expect(source).toMatch(/async getMcpWorkbenchStatus\(\)/);
+        });
+
+        it('should delegate getMcpWorkbenchStatus to LocalTelemetryService', () => {
+            expect(source).toMatch(/return this\.localTelemetryService\.getMcpWorkbenchStatus\(\)/);
+        });
+
+        it('should implement getWorkspaceInventory', () => {
+            expect(source).toMatch(/async getWorkspaceInventory\(options\?/);
+        });
+
+        it('should delegate getWorkspaceInventory to LocalTelemetryService', () => {
+            expect(source).toMatch(/return this\.localTelemetryService\.getWorkspaceInventory\(options\)/);
+        });
+
+        it('should implement detectTestbench', () => {
+            expect(source).toMatch(/async detectTestbench\(commandOverride\?/);
+        });
+
+        it('should delegate detectTestbench to LocalTelemetryService', () => {
+            expect(source).toMatch(/return this\.localTelemetryService\.detectTestbench\(commandOverride\)/);
+        });
+
+        it('should implement getCiCheckStatus', () => {
+            expect(source).toMatch(/async getCiCheckStatus\(\)/);
+        });
+
+        it('should delegate getCiCheckStatus to LocalTelemetryService', () => {
+            expect(source).toMatch(/return this\.localTelemetryService\.getCiCheckStatus\(\)/);
+        });
     });
 });

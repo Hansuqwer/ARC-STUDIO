@@ -4,16 +4,21 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 import typer
 
 from ..protocol.event_envelope import ok
-from ._helpers import DEBUG_FLAG, JSON_FLAG, _out, _setup_logging
+from ._helpers import DEBUG_FLAG, JSON_FLAG, WORKSPACE_FLAG, _out, _setup_logging, _workspace
 from ._subapps import ci_app
 
 
 @ci_app.command("check")
 def ci_check(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    audit_dir: Optional[str] = typer.Option(
+        None, "--audit-dir", help="Path to sandbox audit directory"
+    ),
     json_output: bool = JSON_FLAG,
     private: bool = typer.Option(True, "--private", help="Run checks offline, no uploads"),
     debug: bool = DEBUG_FLAG,
@@ -23,7 +28,7 @@ def ci_check(
     Default mode is private/offline — no network calls.
     """
     _setup_logging(debug)
-    ws = Path.cwd()
+    ws = _workspace(workspace)
 
     checks: dict[str, object] = {
         "private": private,
@@ -68,20 +73,26 @@ def ci_check(
     # 3. Eval gate — check for goldens or eval artifacts
     goldens_dir = ws / ".arc" / "goldens"
     eval_dir = ws / ".arc" / "eval"
+    evals_dir = ws / ".arc" / "evals"
     goldens_content: list[str] = []
     eval_content: list[str] = []
+    evals_content: list[str] = []
     if goldens_dir.exists():
         goldens_content = sorted(
             str(p.relative_to(ws)) for p in goldens_dir.iterdir() if p.is_file()
         )
     if eval_dir.exists():
         eval_content = sorted(str(p.relative_to(ws)) for p in eval_dir.iterdir() if p.is_file())
+    if evals_dir.exists():
+        evals_content = sorted(str(p.relative_to(ws)) for p in evals_dir.iterdir() if p.is_file())
     checks["checks"]["eval"] = {
-        "status": "pass" if (goldens_content or eval_content) else "skip",
+        "status": "pass" if (goldens_content or eval_content or evals_content) else "skip",
         "goldens_found": len(goldens_content),
         "eval_files_found": len(eval_content),
+        "evals_files_found": len(evals_content),
         "goldens_files": goldens_content[:20],
         "eval_files": eval_content[:20],
+        "evals_files": evals_content[:20],
     }
 
     # 4. Receipt check
@@ -110,6 +121,10 @@ def ci_check(
 
 @ci_app.command("summary")
 def ci_summary(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    audit_dir: Optional[str] = typer.Option(
+        None, "--audit-dir", help="Path to sandbox audit directory"
+    ),
     format: str = typer.Option("markdown", "--format", help="Output format: markdown or json"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
@@ -120,7 +135,7 @@ def ci_summary(
     deterministic redacted output. Advisory only — no AI judgment claims.
     """
     _setup_logging(debug)
-    ws = Path.cwd()
+    ws = _workspace(workspace)
 
     from ..security.sandbox import list_sandbox_audit_events, list_sandbox_policies
 
@@ -134,12 +149,18 @@ def ci_summary(
     # Eval status
     goldens_dir = ws / ".arc" / "goldens"
     eval_dir = ws / ".arc" / "eval"
+    evals_dir = ws / ".arc" / "evals"
     goldens_count = (
         len([p for p in goldens_dir.iterdir() if p.is_file()]) if goldens_dir.exists() else 0
     )
     eval_files = (
         [str(p.relative_to(ws)) for p in eval_dir.iterdir() if p.is_file()]
         if eval_dir.exists()
+        else []
+    )
+    evals_files = (
+        [str(p.relative_to(ws)) for p in evals_dir.iterdir() if p.is_file()]
+        if evals_dir.exists()
         else []
     )
 
@@ -176,6 +197,7 @@ def ci_summary(
         "eval": {
             "goldens_count": goldens_count,
             "eval_files": eval_files[:20],
+            "evals_files": evals_files[:20],
         },
         "receipts": {
             "count": receipt_count,
@@ -253,6 +275,10 @@ def ci_summary(
 @ci_app.command("verify-audit")
 def ci_verify_audit(
     audit_dir: str = typer.Option("", "--audit-dir", help="Path to sandbox audit directory"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    strict: bool = typer.Option(
+        False, "--strict", help="If audit is invalid or missing, exit with code 1"
+    ),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
@@ -273,4 +299,6 @@ def ci_verify_audit(
         console.print(f"  Chain: {result.get('chain', '?')}")
         console.print(f"  Reason: {result.get('reason', '?')}")
     if not result.get("ok"):
+        if strict:
+            raise typer.Exit(1)
         raise typer.Exit(0)

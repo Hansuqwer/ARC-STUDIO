@@ -10,6 +10,7 @@ from rich.table import Table
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
 from ..workspace import iter_workspace_files
+from ..workspace.symbols import collect_workspace_symbols
 from ._app import console
 from ._helpers import (
     DEBUG_FLAG,
@@ -711,7 +712,7 @@ def workspace_inventory(
     suffixes_list = (
         tuple(f".{s.strip().lstrip('.')}" for s in suffix.split(",") if s.strip())
         if suffix
-        else (".py", ".ts", ".tsx", ".json", ".yaml", ".md")
+        else (".py", ".ts", ".tsx", ".js", ".jsx", ".json", ".yaml", ".yml", ".md")
     )
 
     files: list[dict] = []
@@ -738,6 +739,8 @@ def workspace_inventory(
                     "error": "stat_failed",
                 }
             )
+
+    symbol_inventory = collect_workspace_symbols(ws, files)
 
     git_meta: dict = {"provenance": "git"}
     git_dir = ws / ".git"
@@ -842,5 +845,6 @@ def workspace_inventory(
             "entries": traces,
         },
         "mcp_resources": mcp_resources,
+        "symbols": symbol_inventory.model_dump(mode="json", by_alias=True),
     }
     _out(ok(payload, workspace=str(ws)), json_output)

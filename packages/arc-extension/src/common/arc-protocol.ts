@@ -1644,4 +1644,55 @@ export interface ArcService {
      * @throws {ArcError} LOCK_CONTENTION if advisory lock cannot be acquired.
      */
     updateSessionField(sessionId: string, field: string, value: string): Promise<{ ok: boolean; message: string }>;
+
+    /** Read-only MCP workbench status via CLI bridge */
+    getMcpWorkbenchStatus(): Promise<McpWorkbenchStatus>;
+    /** Read-only workspace inventory via CLI bridge */
+    getWorkspaceInventory(options?: { suffix?: string; maxEntries?: number }): Promise<WorkspaceInventory>;
+    /** Read-only testbench detection via CLI bridge */
+    detectTestbench(commandOverride?: string): Promise<TestbenchDetection>;
+    /** Read-only CI check status via CLI bridge */
+    getCiCheckStatus(): Promise<CiCheckStatus>;
+}
+
+// Phase 78/79/80 follow-up: read-only telemetry types
+export interface McpWorkbenchStatus {
+    workspace: string;
+    serverCreatable: boolean;
+    serverBlocker?: string | null;
+    tools: string[];
+    resources: string[];
+    trust: { level: string; reason?: string | null; markerPath?: string | null; warning?: string | null };
+    diagnostic: string;
+}
+
+export interface WorkspaceInventoryFile {
+    path: string;
+    size: number | null;
+    suffix: string;
+    provenance: string;
+    error?: string;
+}
+
+export interface WorkspaceInventory {
+    workspace: string;
+    files: { count: number; totalSize: number; entries: WorkspaceInventoryFile[]; truncated?: boolean };
+    git: { provenance: string; present?: boolean; branch?: string | null; commit?: string | null; commitCount?: number | null; dirty?: boolean; gitDir?: string; degraded?: boolean; reason?: string };
+    traces: { count: number; entries: Array<{ name: string; size: number; provenance: string }> };
+    mcpResources: Array<{ name?: string; provenance: string; present?: boolean; reason?: string }>;
+    symbols?: { count: number; entries: Array<{ path: string; language: string; kind: string; name: string; qualname: string; line: number; provenance: string }>; errors: Array<{ path: string; error: string }>; truncated: boolean; provenance: string };
+}
+
+export interface TestbenchDetection {
+    workspace: string;
+    detected: Array<{ command?: string; source: string; cwd?: string; confidence: string; runner?: string; reason?: string; script?: string }>;
+    count: number;
+}
+
+export interface CiCheckStatus {
+    private: boolean;
+    workspace: string;
+    checks: Record<string, Record<string, unknown>>;
+    overall: string;
+    checkedAt?: string;
 }

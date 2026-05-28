@@ -191,6 +191,25 @@ class TestCiCheck:
             assert "status" in check_result
             assert check_result["status"] in ("pass", "fail", "skip")
 
+    def test_check_workspace_option(self, runner, tmp_path):
+        """Test workspace option in ci check."""
+        result = runner.invoke(app, ["ci", "check", "--json", "--workspace", str(tmp_path)])
+        assert result.exit_code == 0
+        output = json.loads(result.stdout)
+        assert output["data"]["workspace"] == str(tmp_path)
+
+    def test_check_canonical_evals_dir(self, runner, tmp_path):
+        """Test canonical .arc/evals/ dir is scanned."""
+        evals_dir = tmp_path / ".arc" / "evals"
+        evals_dir.mkdir(parents=True)
+        (evals_dir / "eval1.json").write_text('{"result": "pass"}')
+        result = runner.invoke(app, ["ci", "check", "--json", "--workspace", str(tmp_path)])
+        assert result.exit_code == 0
+        output = json.loads(result.stdout)
+        eval_check = output["data"]["checks"]["eval"]
+        assert eval_check["evals_files_found"] >= 1
+        assert eval_check["status"] == "pass"
+
 
 class TestCiSummary:
     def test_deterministic_summary_markdown(self, runner, tmp_path, sandbox_audit_events):
@@ -233,6 +252,15 @@ class TestCiSummary:
         assert "network" in classifications
         assert "destructive" in classifications
 
+    def test_summary_workspace_option(self, runner, tmp_path):
+        """Test workspace option in ci summary."""
+        result = runner.invoke(
+            app, ["ci", "summary", "--format", "json", "--json", "--workspace", str(tmp_path)]
+        )
+        assert result.exit_code == 0
+        output = json.loads(result.stdout)
+        assert output["data"]["workspace"] == str(tmp_path)
+
 
 class TestCiVerifyAudit:
     def test_audit_verification_runs(self, runner, tmp_path):
@@ -244,3 +272,18 @@ class TestCiVerifyAudit:
         assert "ok" in output["data"]
         assert "chain" in output["data"]
         assert "reason" in output["data"]
+
+    def test_verify_audit_strict_exit_1_on_missing(self, runner, tmp_path):
+        """Test --strict causes exit code 1 when audit is invalid/missing."""
+        result = runner.invoke(
+            app,
+            [
+                "ci",
+                "verify-audit",
+                "--json",
+                "--strict",
+                "--audit-dir",
+                str(tmp_path / "nonexistent"),
+            ],
+        )
+        assert result.exit_code == 1

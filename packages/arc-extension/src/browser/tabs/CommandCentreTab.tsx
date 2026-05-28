@@ -11,11 +11,15 @@ import {
     ArcProfileInfo,
     ArcService,
     ChatSessionSummary,
+    CiCheckStatus,
     ConfigStatus,
     HitlPromptInfo,
     IsolationProviderInfo,
+    McpWorkbenchStatus,
     ProviderDiagnosticsInfo,
-    TraceFile
+    TestbenchDetection,
+    TraceFile,
+    WorkspaceInventory,
 } from '../../common/arc-protocol';
 
 export interface CommandCentreTabProps {
@@ -45,6 +49,18 @@ interface CommandCentreState {
     configStatus?: ConfigStatus;
     workspaceLoaded: boolean;
     workspaceError: string | null;
+    mcpStatus?: McpWorkbenchStatus;
+    mcpLoaded: boolean;
+    mcpError: string | null;
+    workspaceInventory?: WorkspaceInventory;
+    invLoaded: boolean;
+    invError: string | null;
+    testbench?: TestbenchDetection;
+    testbenchLoaded: boolean;
+    testbenchError: string | null;
+    ciStatus?: CiCheckStatus;
+    ciLoaded: boolean;
+    ciError: string | null;
 }
 
 export class CommandCentreTab extends React.Component<CommandCentreTabProps, CommandCentreState> {
@@ -70,6 +86,14 @@ export class CommandCentreTab extends React.Component<CommandCentreTabProps, Com
             providerError: null,
             workspaceLoaded: false,
             workspaceError: null,
+            mcpLoaded: false,
+            mcpError: null,
+            invLoaded: false,
+            invError: null,
+            testbenchLoaded: false,
+            testbenchError: null,
+            ciLoaded: false,
+            ciError: null,
         };
     }
 
@@ -86,6 +110,10 @@ export class CommandCentreTab extends React.Component<CommandCentreTabProps, Com
             this.loadProfiles(),
             this.loadProviderDiagnostics(),
             this.loadWorkspaceContext(),
+            this.loadMcpStatus(),
+            this.loadWorkspaceInventory(),
+            this.loadTestbench(),
+            this.loadCiStatus(),
         ]);
     }
 
@@ -143,6 +171,42 @@ export class CommandCentreTab extends React.Component<CommandCentreTabProps, Com
         }
     }
 
+    private async loadMcpStatus(): Promise<void> {
+        try {
+            const mcpStatus = await this.props.arcService.getMcpWorkbenchStatus();
+            this.setState({ mcpStatus, mcpLoaded: true });
+        } catch (e: any) {
+            this.setState({ mcpError: e.message || 'Failed to load MCP status', mcpLoaded: true });
+        }
+    }
+
+    private async loadWorkspaceInventory(): Promise<void> {
+        try {
+            const workspaceInventory = await this.props.arcService.getWorkspaceInventory({ maxEntries: 100 });
+            this.setState({ workspaceInventory, invLoaded: true });
+        } catch (e: any) {
+            this.setState({ invError: e.message || 'Failed to load workspace inventory', invLoaded: true });
+        }
+    }
+
+    private async loadTestbench(): Promise<void> {
+        try {
+            const testbench = await this.props.arcService.detectTestbench();
+            this.setState({ testbench, testbenchLoaded: true });
+        } catch (e: any) {
+            this.setState({ testbenchError: e.message || 'Failed to detect testbench', testbenchLoaded: true });
+        }
+    }
+
+    private async loadCiStatus(): Promise<void> {
+        try {
+            const ciStatus = await this.props.arcService.getCiCheckStatus();
+            this.setState({ ciStatus, ciLoaded: true });
+        } catch (e: any) {
+            this.setState({ ciError: e.message || 'Failed to load CI status', ciLoaded: true });
+        }
+    }
+
     private async loadWorkspaceContext(): Promise<void> {
         try {
             const [workspaceStatus, configStatus] = await Promise.all([
@@ -164,6 +228,10 @@ export class CommandCentreTab extends React.Component<CommandCentreTabProps, Com
             profiles, profilesLoaded, profilesError,
             providerDiagnostics, providerLoaded, providerError,
             workspaceStatus, configStatus, workspaceLoaded, workspaceError,
+            mcpStatus, mcpLoaded, mcpError,
+            workspaceInventory, invLoaded, invError,
+            testbench, testbenchLoaded, testbenchError,
+            ciStatus, ciLoaded, ciError,
         } = this.state;
 
         const providerCount = providerDiagnostics?.providers?.length ?? 0;
@@ -337,7 +405,97 @@ export class CommandCentreTab extends React.Component<CommandCentreTabProps, Com
                     {/* Tasks Panel */}
                     <section className='arc-command-centre__panel' aria-label='Tasks'>
                         <h4>Tasks</h4>
-                        <p className='arc-command-centre__empty'>Task producer is not exposed through the IDE protocol yet.</p>
+                        <p className='arc-command-centre__empty'>Task producer not exposed; testbench detection available via the Testbench panel.</p>
+                    </section>
+
+                    {/* MCP Workbench Status Panel */}
+                    <section className='arc-command-centre__panel' aria-label='MCP'>
+                        <h4>MCP Workbench</h4>
+                        {!mcpLoaded && <p className='arc-command-centre__loading'>Loading MCP status...</p>}
+                        {mcpLoaded && mcpError && (
+                            <p className='arc-command-centre__error'>Error: {mcpError}</p>
+                        )}
+                        {mcpLoaded && !mcpError && mcpStatus && (
+                            <ul className='arc-command-centre__list'>
+                                <li><strong>Server creatable:</strong> {mcpStatus.serverCreatable ? 'Yes' : 'No'}</li>
+                                {mcpStatus.serverBlocker && <li><strong>Blocker:</strong> {mcpStatus.serverBlocker}</li>}
+                                <li><strong>Tools:</strong> {mcpStatus.tools.length}</li>
+                                <li><strong>Resources:</strong> {mcpStatus.resources.length}</li>
+                                <li><strong>Trust:</strong> {mcpStatus.trust.level}</li>
+                                <li><strong>Diagnostic:</strong> {mcpStatus.diagnostic}</li>
+                            </ul>
+                        )}
+                        {mcpLoaded && !mcpError && !mcpStatus && (
+                            <p className='arc-command-centre__empty'>MCP status unavailable.</p>
+                        )}
+                    </section>
+
+                    {/* Workspace Inventory Panel */}
+                    <section className='arc-command-centre__panel' aria-label='Workspace Inventory'>
+                        <h4>Workspace Inventory</h4>
+                        {!invLoaded && <p className='arc-command-centre__loading'>Loading inventory...</p>}
+                        {invLoaded && invError && (
+                            <p className='arc-command-centre__error'>Error: {invError}</p>
+                        )}
+                        {invLoaded && !invError && workspaceInventory && (
+                            <ul className='arc-command-centre__list'>
+                                <li><strong>Files:</strong> {workspaceInventory.files.count} ({workspaceInventory.files.totalSize} bytes)</li>
+                                <li><strong>Git:</strong> {workspaceInventory.git.branch || 'unknown'} {workspaceInventory.git.dirty ? '(dirty)' : ''}</li>
+                                <li><strong>Traces:</strong> {workspaceInventory.traces.count}</li>
+                                <li><strong>MCP resources:</strong> {workspaceInventory.mcpResources.length}</li>
+                                {workspaceInventory.symbols && <li><strong>Symbols:</strong> {workspaceInventory.symbols.count}</li>}
+                            </ul>
+                        )}
+                        {invLoaded && !invError && !workspaceInventory && (
+                            <p className='arc-command-centre__empty'>Workspace inventory unavailable.</p>
+                        )}
+                    </section>
+
+                    {/* Testbench Panel */}
+                    <section className='arc-command-centre__panel' aria-label='Testbench'>
+                        <h4>Testbench</h4>
+                        {!testbenchLoaded && <p className='arc-command-centre__loading'>Loading testbench...</p>}
+                        {testbenchLoaded && testbenchError && (
+                            <p className='arc-command-centre__error'>Error: {testbenchError}</p>
+                        )}
+                        {testbenchLoaded && !testbenchError && testbench && (
+                            <>
+                                <p><strong>Detected commands:</strong> {testbench.count}</p>
+                                {testbench.detected.length > 0 && (
+                                    <ul className='arc-command-centre__list'>
+                                        {testbench.detected.slice(0, 5).map((d, i) => (
+                                            <li key={i}>{d.command || d.runner || 'unknown'} ({d.source})</li>
+                                        ))}
+                                        {testbench.detected.length > 5 && (
+                                            <li className='arc-command-centre__more'>...and {testbench.detected.length - 5} more</li>
+                                        )}
+                                    </ul>
+                                )}
+                            </>
+                        )}
+                        {testbenchLoaded && !testbenchError && (!testbench || testbench.count === 0) && (
+                            <p className='arc-command-centre__empty'>No test commands detected.</p>
+                        )}
+                    </section>
+
+                    {/* CI Guardrails Panel */}
+                    <section className='arc-command-centre__panel' aria-label='CI Guardrails'>
+                        <h4>CI Guardrails</h4>
+                        {!ciLoaded && <p className='arc-command-centre__loading'>Loading CI status...</p>}
+                        {ciLoaded && ciError && (
+                            <p className='arc-command-centre__error'>Error: {ciError}</p>
+                        )}
+                        {ciLoaded && !ciError && ciStatus && (
+                            <ul className='arc-command-centre__list'>
+                                <li><strong>Overall:</strong> {ciStatus.overall}</li>
+                                <li><strong>Private:</strong> {ciStatus.private ? 'Yes' : 'No'}</li>
+                                <li><strong>Checks:</strong> {Object.keys(ciStatus.checks).length}</li>
+                                {ciStatus.checkedAt && <li><strong>Checked at:</strong> {ciStatus.checkedAt}</li>}
+                            </ul>
+                        )}
+                        {ciLoaded && !ciError && !ciStatus && (
+                            <p className='arc-command-centre__empty'>CI status unavailable.</p>
+                        )}
                     </section>
                 </div>
             </div>

@@ -70,6 +70,10 @@ import {
     EloRating,
     ChatSessionSummary,
     ChatSessionDetail,
+    McpWorkbenchStatus,
+    WorkspaceInventory,
+    TestbenchDetection,
+    CiCheckStatus,
 } from '../common/arc-protocol';
 import { validateWorkspaceRoot, validateTraceId, validateRunId } from './security-utils';
 import { WorkflowExecutor } from './services/workflow-executor';
@@ -82,6 +86,7 @@ import { AuditBridgeService } from './services/audit-bridge-service';
 import { BattleService } from './services/battle-service';
 import { SessionBridgeService } from './services/session-bridge-service';
 import { DaemonDiscoveryService } from './services/daemon-discovery-service';
+import { LocalTelemetryService } from './services/local-telemetry-service';
 
 const ARC_CLI_ENV_ALLOWLIST = ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR'];
 
@@ -119,6 +124,7 @@ export class ArcBackendService implements ArcService {
     private readonly battleService: BattleService;
     private readonly sessionBridgeService: SessionBridgeService;
     private readonly daemonDiscoveryService: DaemonDiscoveryService;
+    private readonly localTelemetryService: LocalTelemetryService;
     private readonly activeStreamCancels = new Map<string, { cancelled: boolean }>();
     private workspaceRoot: string;
 
@@ -132,7 +138,8 @@ export class ArcBackendService implements ArcService {
         auditBridgeService?: AuditBridgeService,
         battleService?: BattleService,
         sessionBridgeService?: SessionBridgeService,
-        daemonDiscoveryService?: DaemonDiscoveryService
+        daemonDiscoveryService?: DaemonDiscoveryService,
+        localTelemetryService?: LocalTelemetryService
     ) {
         this.executor = executor ?? new WorkflowExecutor();
         this.parser = parser ?? new TraceParser();
@@ -151,6 +158,7 @@ export class ArcBackendService implements ArcService {
         this.battleService = battleService ?? new BattleService();
         this.sessionBridgeService = sessionBridgeService ?? new SessionBridgeService(this.workspaceRoot);
         this.daemonDiscoveryService = daemonDiscoveryService ?? new DaemonDiscoveryService();
+        this.localTelemetryService = localTelemetryService ?? new LocalTelemetryService(this.workspaceRoot);
     }
 
     // ========== Workflow Execution ==========
@@ -1097,5 +1105,23 @@ export class ArcBackendService implements ArcService {
 
     async updateSessionField(sessionId: string, field: string, value: string): Promise<{ ok: boolean; message: string }> {
         return this.sessionBridgeService.updateSessionField(sessionId, field, value);
+    }
+
+    // ========== Read-Only Telemetry (Phase 78/79/80) ==========
+
+    async getMcpWorkbenchStatus(): Promise<McpWorkbenchStatus> {
+        return this.localTelemetryService.getMcpWorkbenchStatus();
+    }
+
+    async getWorkspaceInventory(options?: { suffix?: string; maxEntries?: number }): Promise<WorkspaceInventory> {
+        return this.localTelemetryService.getWorkspaceInventory(options);
+    }
+
+    async detectTestbench(commandOverride?: string): Promise<TestbenchDetection> {
+        return this.localTelemetryService.detectTestbench(commandOverride);
+    }
+
+    async getCiCheckStatus(): Promise<CiCheckStatus> {
+        return this.localTelemetryService.getCiCheckStatus();
     }
 }
