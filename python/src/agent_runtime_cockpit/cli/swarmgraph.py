@@ -12,6 +12,140 @@ from ._helpers import DEBUG_FLAG, JSON_FLAG, _out, _setup_logging
 from ._subapps import swarmgraph_app
 
 
+@swarmgraph_app.command("eval")
+def consensus_eval_cmd(
+    protocol: Optional[str] = typer.Option(
+        None,
+        "--protocol",
+        "-p",
+        help="Protocol to benchmark (default: all). One of: majority, quorum, raft, bft, bft_escrow",
+    ),
+    workers: int = typer.Option(4, "--workers", "-w", help="Number of synthetic workers", min=1),
+    rounds: int = typer.Option(3, "--rounds", "-r", help="Number of consensus rounds", min=1),
+    compare: bool = typer.Option(False, "--compare", help="Output comparison table"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Benchmark consensus protocols with synthetic votes.
+
+    Runs each configured protocol on the same set of deterministic synthetic
+    votes and reports quality, cost, latency, disagreement, and escalation metrics.
+    No LLM, no network — fully deterministic.
+
+    Use --compare to rank protocols by composite score.
+
+    Examples:
+        arc swarmgraph eval
+        arc swarmgraph eval --protocol raft
+        arc swarmgraph eval --protocol majority --workers 6 --rounds 5
+        arc swarmgraph eval --compare --json
+        arc swarmgraph eval --protocol bft_escrow --json
+    """
+    _setup_logging(debug)
+
+    from ..evals.consensus import (
+        ConsensusEvalConfig,
+        compare_protocols,
+        run_consensus_eval,
+    )
+
+    config = ConsensusEvalConfig(
+        protocols=[protocol] if protocol else [],
+        num_workers=workers,
+        num_rounds=rounds,
+    )
+
+    results = run_consensus_eval(config)
+
+    if compare:
+        comparison = compare_protocols(results)
+        if json_output:
+            _out(ok(comparison.model_dump()), json_output)
+        else:
+            # Print human-readable table
+            from rich.console import Console
+            from rich.table import Table
+
+            console = Console()
+            console.print("\n[bold]Consensus Protocol Comparison[/bold]")
+            console.print(f"Workers: {workers} | Rounds: {rounds}\n")
+
+            table = Table()
+            table.add_column("Protocol")
+            table.add_column("Quality", justify="right")
+            table.add_column("Cost", justify="right")
+            table.add_column("Latency", justify="right")
+            table.add_column("Disagree", justify="right")
+            table.add_column("Composite", justify="right")
+
+            scored = [(r, _composite_score_for_display(r, results)) for r in results]
+            scored.sort(key=lambda x: x[1], reverse=True)
+
+            for r, s in scored:
+                marker = "★" if r.protocol == comparison.best_protocol else " "
+                table.add_row(
+                    f"{marker} {r.protocol}",
+                    f"{r.quality_score:.3f}",
+                    f"{r.cost_score:.0f}",
+                    f"{r.latency_ms:.0f}ms",
+                    f"{r.disagreement_rate:.3f}",
+                    f"{s:.4f}",
+                )
+            console.print(table)
+            console.print(f"\n[bold green]Best protocol:[/bold green] {comparison.best_protocol}")
+    else:
+        if json_output:
+            _out(ok([r.model_dump() for r in results]), json_output)
+        else:
+            from rich.console import Console
+            from rich.table import Table
+
+            console = Console()
+            console.print("\n[bold]Consensus Protocol Evaluation Results[/bold]")
+            console.print(f"Workers: {workers} | Rounds: {rounds}\n")
+
+            table = Table()
+            table.add_column("Protocol")
+            table.add_column("Reached", justify="center")
+            table.add_column("Votes", justify="right")
+            table.add_column("Approval", justify="right")
+            table.add_column("Quality", justify="right")
+            table.add_column("Cost", justify="right")
+            table.add_column("Latency", justify="right")
+            table.add_column("Disagree", justify="right")
+            table.add_column("Escalate", justify="right")
+
+            for r in results:
+                reached_str = "[green]YES[/green]" if r.consensus_reached else "[red]NO[/red]"
+                table.add_row(
+                    r.protocol,
+                    reached_str,
+                    str(r.total_votes),
+                    str(r.approval_count),
+                    f"{r.quality_score:.3f}",
+                    f"{r.cost_score:.0f}",
+                    f"{r.latency_ms:.0f}ms",
+                    f"{r.disagreement_rate:.3f}",
+                    f"{r.escalation_rate:.3f}",
+                )
+            console.print(table)
+
+
+def _composite_score_for_display(result, all_results) -> float:
+    """Local composite score helper for display."""
+    max_cost = max(r.cost_score for r in all_results) if all_results else 1
+    max_latency = max(r.latency_ms for r in all_results) if all_results else 1
+    cost_ratio = result.cost_score / max_cost if max_cost > 0 else 0
+    latency_ratio = result.latency_ms / max_latency if max_latency > 0 else 0
+    score = (
+        result.quality_score * 0.4
+        + (1.0 - cost_ratio) * 0.3
+        + (1.0 - latency_ratio) * 0.2
+        + (1.0 - result.disagreement_rate) * 0.1
+    )
+    return max(0.0, min(1.0, score))
+
+
 @swarmgraph_app.command("assess-risk")
 def assess_risk_cmd(
     task: str = typer.Option(..., "--task", "-t", help="Task text to assess for risk"),

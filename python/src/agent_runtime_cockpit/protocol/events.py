@@ -247,6 +247,41 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         },
         optional_fields={"parent_run_id"},
     ),
+    # ── Consensus Differentiator / Eval (Phase 81 / R52) ──────────────────
+    "CONSENSUS_DIFFERENTIATOR": EventTypeDef(
+        required_fields={"protocol", "votes", "decision"},
+        optional_fields={
+            "round",
+            "quality_score",
+            "disagreement_rate",
+            "node_id",
+            "message_id",
+            "evidence_refs",
+        },
+    ),
+    "CONSENSUS_EVAL": EventTypeDef(
+        required_fields={"protocols", "num_workers", "num_rounds"},
+        optional_fields={
+            "consensus_escrow",
+            "node_id",
+            "message_id",
+        },
+    ),
+    "CONSENSUS_EVAL_RUN": EventTypeDef(
+        required_fields={"protocol", "total_votes", "consensus_reached"},
+        optional_fields={
+            "duration_ms",
+            "approval_count",
+            "quality_score",
+            "cost_score",
+            "latency_ms",
+            "disagreement_rate",
+            "escalation_rate",
+            "node_id",
+            "message_id",
+            "evidence_refs",
+        },
+    ),
     # ── Battle Mode (Phase 34/R26A) ──────────────────────────────────────
     "BATTLE_STARTED": EventTypeDef(
         required_fields={"battle_id", "prompt", "workers", "topology", "consensus_protocol"},

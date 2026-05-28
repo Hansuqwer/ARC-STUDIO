@@ -496,6 +496,85 @@ class NodeFailedEvent(BaseModel):
     data: NodeFailedData
 
 
+# ─── Consensus Differentiator / Eval Events (Phase 81 / R52) ────────────────
+
+
+class ConsensusDifferentiatorData(BaseModel):
+    """Data payload for CONSENSUS_DIFFERENTIATOR event."""
+
+    protocol: str
+    votes: int
+    decision: str
+    round: int | None = None
+    quality_score: float | None = None
+    disagreement_rate: float | None = None
+    node_id: str | None = None
+    message_id: str | None = None
+    evidence_refs: list[str] | None = None
+
+
+class ConsensusDifferentiatorEvent(BaseModel):
+    """CONSENSUS_DIFFERENTIATOR event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["CONSENSUS_DIFFERENTIATOR"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: ConsensusDifferentiatorData
+
+
+class ConsensusEvalData(BaseModel):
+    """Data payload for CONSENSUS_EVAL event."""
+
+    protocols: list[str]
+    num_workers: int
+    num_rounds: int
+    consensus_escrow: bool | None = None
+    node_id: str | None = None
+    message_id: str | None = None
+
+
+class ConsensusEvalEvent(BaseModel):
+    """CONSENSUS_EVAL event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["CONSENSUS_EVAL"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: ConsensusEvalData
+
+
+class ConsensusEvalRunData(BaseModel):
+    """Data payload for CONSENSUS_EVAL_RUN event."""
+
+    protocol: str
+    total_votes: int
+    consensus_reached: bool
+    duration_ms: int | None = None
+    approval_count: int | None = None
+    quality_score: float | None = None
+    cost_score: float | None = None
+    latency_ms: float | None = None
+    disagreement_rate: float | None = None
+    escalation_rate: float | None = None
+    node_id: str | None = None
+    message_id: str | None = None
+    evidence_refs: list[str] | None = None
+
+
+class ConsensusEvalRunEvent(BaseModel):
+    """CONSENSUS_EVAL_RUN event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["CONSENSUS_EVAL_RUN"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: ConsensusEvalRunData
+
+
 # ─── Battle Mode Events (Phase 34/R26A) ──────────────────────────────────────
 
 
@@ -728,6 +807,9 @@ KnownRunEvent = Union[
     BattleConsensusReachedEvent,
     BattleHitlRequiredEvent,
     BattleCompletedEvent,
+    ConsensusDifferentiatorEvent,
+    ConsensusEvalEvent,
+    ConsensusEvalRunEvent,
     RawEvent,
 ]
 
@@ -804,6 +886,9 @@ def is_known_event(event: TypedRunEvent) -> TypeGuard[KnownRunEvent]:
         "BATTLE_CONSENSUS_REACHED",
         "BATTLE_HITL_REQUIRED",
         "BATTLE_COMPLETED",
+        "CONSENSUS_DIFFERENTIATOR",
+        "CONSENSUS_EVAL",
+        "CONSENSUS_EVAL_RUN",
         "RAW",
     }
     return event.type in known_types
@@ -859,6 +944,9 @@ def parse_typed_event(raw: dict[str, Any]) -> TypedRunEvent:
         "BATTLE_CONSENSUS_REACHED": BattleConsensusReachedEvent,
         "BATTLE_HITL_REQUIRED": BattleHitlRequiredEvent,
         "BATTLE_COMPLETED": BattleCompletedEvent,
+        "CONSENSUS_DIFFERENTIATOR": ConsensusDifferentiatorEvent,
+        "CONSENSUS_EVAL": ConsensusEvalEvent,
+        "CONSENSUS_EVAL_RUN": ConsensusEvalRunEvent,
         "RAW": RawEvent,
     }
 

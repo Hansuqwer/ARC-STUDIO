@@ -25,3 +25,12 @@ export type { BattleTabProps } from './BattleTab';
 
 export { CommandCentreTab } from './CommandCentreTab';
 export type { CommandCentreTabProps } from './CommandCentreTab';
+
+export { McpWorkbenchTab } from './McpWorkbenchTab';
+export type { McpWorkbenchTabProps } from './McpWorkbenchTab';
+
+export { TestBenchTab } from './TestBenchTab';
+export type { TestBenchTabProps } from './TestBenchTab';
+
+export { CiGuardrailsTab } from './CiGuardrailsTab';
+export type { CiGuardrailsTabProps } from './CiGuardrailsTab';

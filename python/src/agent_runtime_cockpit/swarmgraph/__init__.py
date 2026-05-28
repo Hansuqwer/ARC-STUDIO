@@ -2,10 +2,15 @@ from .config import SwarmGraphConfig
 from .consensus import (
     ConsensusResult,
     bft_consensus,
+    confidence_weighted_consensus,
+    critic_verifier_consensus,
+    gossip_consensus,
+    hitl_signoff_quorum,
     majority_consensus,
     quorum_consensus,
     raft_consensus,
     run_consensus,
+    selective_debate_consensus,
 )
 from .events import (
     AuditEvent,
@@ -59,6 +64,11 @@ __all__ = [
     "quorum_consensus",
     "raft_consensus",
     "bft_consensus",
+    "selective_debate_consensus",
+    "confidence_weighted_consensus",
+    "critic_verifier_consensus",
+    "hitl_signoff_quorum",
+    "gossip_consensus",
     "run_consensus",
     # Phase 31/R24 — Adaptive Consensus Protocol
     "RiskAssessment",

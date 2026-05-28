@@ -10,9 +10,9 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common/message-service';
 import * as React from '@theia/core/shared/react';
 import { ArcService, ConfigStatus, WorkflowInfo } from '../common/arc-protocol';
-import { AssuranceTab, BattleTab, ChatTab, CommandCentreTab, ConfigTab, RunsTab, SwarmGraphInsightTab, WorkflowsTab } from './tabs';
+import { AssuranceTab, BattleTab, ChatTab, CiGuardrailsTab, CommandCentreTab, ConfigTab, McpWorkbenchTab, RunsTab, SwarmGraphInsightTab, TestBenchTab, WorkflowsTab } from './tabs';
 
-type StudioTabId = 'chat' | 'runs' | 'workflows' | 'assurance' | 'swarmgraph-insight' | 'battle' | 'config' | 'command-centre';
+type StudioTabId = 'chat' | 'runs' | 'workflows' | 'assurance' | 'swarmgraph-insight' | 'battle' | 'config' | 'command-centre' | 'mcp-workbench' | 'testbench' | 'ci-guardrails';
 
 interface ArcStudioWidgetState {
     activeTab: StudioTabId;
@@ -99,6 +99,9 @@ export class ArcStudioWidget extends ReactWidget {
             { id: 'swarmgraph-insight', label: 'SwarmGraph Insight' },
             { id: 'battle', label: 'Battle' },
             { id: 'command-centre', label: 'Command Centre' },
+            { id: 'mcp-workbench', label: 'MCP Workbench' },
+            { id: 'testbench', label: 'Test Bench' },
+            { id: 'ci-guardrails', label: 'CI Guardrails' },
             { id: 'config', label: 'Config' }
         ];
 
@@ -197,6 +200,30 @@ export class ArcStudioWidget extends ReactWidget {
                         hidden={activeTab !== 'command-centre'}
                     >
                         {activeTab === 'command-centre' && <CommandCentreTab arcService={this.arcService} />}
+                    </div>
+                    <div
+                        id={`arc-studio-panel-mcp-workbench`}
+                        role='tabpanel'
+                        aria-labelledby='arc-studio-tab-mcp-workbench'
+                        hidden={activeTab !== 'mcp-workbench'}
+                    >
+                        {activeTab === 'mcp-workbench' && <McpWorkbenchTab arcService={this.arcService} />}
+                    </div>
+                    <div
+                        id={`arc-studio-panel-testbench`}
+                        role='tabpanel'
+                        aria-labelledby='arc-studio-tab-testbench'
+                        hidden={activeTab !== 'testbench'}
+                    >
+                        {activeTab === 'testbench' && <TestBenchTab arcService={this.arcService} />}
+                    </div>
+                    <div
+                        id={`arc-studio-panel-ci-guardrails`}
+                        role='tabpanel'
+                        aria-labelledby='arc-studio-tab-ci-guardrails'
+                        hidden={activeTab !== 'ci-guardrails'}
+                    >
+                        {activeTab === 'ci-guardrails' && <CiGuardrailsTab arcService={this.arcService} />}
                     </div>
                     <div
                         id={`arc-studio-panel-config`}

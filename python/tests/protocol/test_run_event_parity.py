@@ -38,7 +38,7 @@ CORE_EVENT_TYPES = {
     "RAW",
 }
 
-# Python-only event types (ARC Battle Mode - Phase 34)
+# Python-only event types (ARC Battle Mode - Phase 34, Consensus Eval - Phase 81)
 PYTHON_ONLY_EVENT_TYPES = {
     "BATTLE_STARTED",
     "BATTLE_CANDIDATE_READY",
@@ -47,6 +47,9 @@ PYTHON_ONLY_EVENT_TYPES = {
     "BATTLE_CONSENSUS_REACHED",
     "BATTLE_HITL_REQUIRED",
     "BATTLE_COMPLETED",
+    "CONSENSUS_DIFFERENTIATOR",
+    "CONSENSUS_EVAL",
+    "CONSENSUS_EVAL_RUN",
 }
 
 INTENTIONALLY_UNTYPED_TS_EVENT_TYPES = {

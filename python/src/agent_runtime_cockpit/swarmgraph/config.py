@@ -12,6 +12,10 @@ class ConsensusProtocol(str, Enum):
     bft = "bft"
     gossip = "gossip"
     bft_escrow = "bft_escrow"
+    selective_debate = "selective_debate"
+    confidence_weighted = "confidence_weighted"
+    critic_verifier = "critic_verifier"
+    hitl_signoff = "hitl_signoff"
 
 
 class SwarmStrategy(str, Enum):

@@ -125,6 +125,16 @@ CONSENSUS_PROTOCOL_BY_RISK: dict[RiskLevel, ConsensusProtocol] = {
     "critical": ConsensusProtocol.bft_escrow,
 }
 
+# Phase 81/R52 — Extended protocol selection matrix supporting
+# all differentiators. Used by select_consensus_protocol when
+# enable_selective_debate or other flags are set.
+CONSENSUS_PROTOCOL_BY_RISK_EXTENDED: dict[RiskLevel, list[ConsensusProtocol]] = {
+    "low": [ConsensusProtocol.majority, ConsensusProtocol.selective_debate],
+    "medium": [ConsensusProtocol.confidence_weighted, ConsensusProtocol.quorum],
+    "high": [ConsensusProtocol.critic_verifier, ConsensusProtocol.bft],
+    "critical": [ConsensusProtocol.bft_escrow],
+}
+
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
@@ -251,13 +261,19 @@ def assess_prompt_risk(input_str: str) -> RiskAssessment:
 
 def select_consensus_protocol(
     input_str: str,
+    enable_selective_debate: bool = False,
 ) -> ProtocolSelection:
     """Assess prompt risk and select the matching consensus protocol.
 
     Fail-closed: any exception during assessment yields critical/bft_escrow.
 
+    When enable_selective_debate is True, low-risk prompts may select
+    selective_debate (50% chance via deterministic hash) instead of majority.
+    Other extended mappings require additional feature flags.
+
     Args:
         input_str: The prompt to assess and route.
+        enable_selective_debate: If True, low risk may use selective_debate.
 
     Returns:
         A ProtocolSelection with risk level, chosen protocol, and assessment details.
@@ -265,7 +281,16 @@ def select_consensus_protocol(
     """
     try:
         assessment = assess_prompt_risk(input_str)
-        protocol = CONSENSUS_PROTOCOL_BY_RISK.get(assessment.risk, ConsensusProtocol.bft_escrow)
+        risk = assessment.risk
+
+        if enable_selective_debate and risk == "low":
+            # Deterministically choose between majority and selective_debate
+            # based on a hash of the input
+            hash_val = sum(ord(c) for c in input_str)
+            options = CONSENSUS_PROTOCOL_BY_RISK_EXTENDED.get(risk, [ConsensusProtocol.majority])
+            protocol = options[hash_val % len(options)]
+        else:
+            protocol = CONSENSUS_PROTOCOL_BY_RISK.get(risk, ConsensusProtocol.bft_escrow)
     except Exception:
         protocol = ConsensusProtocol.bft_escrow
         assessment = RiskAssessment(

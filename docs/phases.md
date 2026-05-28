@@ -2932,20 +2932,38 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md README.md
 ### Phase 81 — SwarmGraph Consensus Differentiators Phase 1
 
 **Roadmap:** R52 candidate
-**Status:** Not Started | Evidence: research synthesis only
+**Status:** Baseline Complete | Evidence: local worktree 2026-05-28 — `cd python && uv run pytest tests/swarmgraph/test_consensus_differentiators.py tests/evals/test_consensus_eval.py -q` 87 passed; full `cd python && uv run pytest tests/ -q` 3280 passed / 34 skipped / 3 xfailed; `ruff check` clean; `pnpm build` OK; `pnpm typecheck` OK; `bash scripts/check-banned-claims.sh` OK
 **Depends on:** Existing SwarmGraph consensus, HITL, event, sandbox, and eval foundations
 
+#### Implementation
+1. **5 new consensus protocols** in `swarmgraph/consensus.py`: selective debate (2-round), confidence-weighted quorum (weighted by vote.confidence), critic/verifier lane (2x weighted verifier votes), HITL sign-off quorum (multi-operator), gossip (simulated eventual consensus).
+2. **Protocol enum extension** in `swarmgraph/config.py`: added `selective_debate`, `confidence_weighted`, `critic_verifier`, `hitl_signoff`, `gossip` to `ConsensusProtocol`.
+3. **Risk assessment matrix** in `swarmgraph/risk_assessment.py`: extended `CONSENSUS_PROTOCOL_BY_RISK_EXTENDED` with `enable_selective_debate` flag.
+4. **Eval harness** at `evals/consensus.py`: `ConsensusEvalConfig`, `ConsensusEvalResult`, `ConsensusEvalComparison`, `run_consensus_eval()`, `compare_protocols()` with quality/cost/latency/disagreement/escalation metrics.
+5. **CLI**: `arc swarmgraph eval --protocol <name> --workers N --rounds N --compare --json` for consensus benchmarks.
+6. **Event types**: `CONSENSUS_DIFFERENTIATOR`, `CONSENSUS_EVAL`, `CONSENSUS_EVAL_RUN` in protocol with typed Pydantic models, fixture registry parity.
+7. **64 consensus protocol tests** + **23 eval harness tests** = 87 total new tests, all deterministic.
+
+**Also in this phase:** Standalone IDE tabs for previously CLI-only phases:
+- **McpWorkbenchTab**: standalone tab for MCP server status (tools/resources/trust/diagnostic)
+- **TestBenchTab**: standalone tab for testbench detection results
+- **CiGuardrailsTab**: standalone tab for CI guardrails check/pass-fail status
+- Registered in `arc-studio-widget.tsx` with contract tests, CSS, and barrel exports
+
 #### Acceptance
-1. Offline/eval harness measures selective debate, confidence-weighted quorum, critic/verifier lane, and HITL sign-off quorum.
-2. Metrics include quality, cost, latency, disagreement, and escalation rate.
-3. Fake/offline remains default; no broad provider-backed execution claim is added.
+1. ✅ Offline/eval harness measures selective debate, confidence-weighted quorum, critic/verifier lane, and HITL sign-off quorum.
+2. ✅ Metrics include quality, cost, latency, disagreement, and escalation rate.
+3. ✅ Fake/offline remains default; no broad provider-backed execution claim is added.
+4. ✅ MCP Workbench, Test Bench, and CI Guardrails have standalone IDE tabs with loading/error/empty/data states.
 
 #### Verification
 ```bash
-cd python && uv run ruff check src tests
+cd python && uv run pytest tests/swarmgraph/test_consensus_differentiators.py tests/evals/test_consensus_eval.py -q
 cd python && uv run pytest tests/ -q
+cd python && uv run ruff check src tests
 pnpm build
 pnpm typecheck
+bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 ```
 
 ### Critical Path

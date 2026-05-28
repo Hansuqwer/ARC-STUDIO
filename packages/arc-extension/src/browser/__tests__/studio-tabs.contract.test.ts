@@ -883,6 +883,178 @@ describe('Studio Tabs Contracts', () => {
         });
     });
 
+    describe('McpWorkbenchTab', () => {
+        let source: string;
+
+        beforeAll(async () => {
+            source = await fs.readFile(path.join(tabsDir, 'McpWorkbenchTab.tsx'), 'utf-8');
+        });
+
+        it('should export McpWorkbenchTabProps interface', () => {
+            expect(source).toMatch(/export interface McpWorkbenchTabProps/);
+        });
+
+        it('should accept arcService prop', () => {
+            expect(source).toMatch(/arcService:\s*ArcService/);
+        });
+
+        it('should call getMcpWorkbenchStatus on load', () => {
+            expect(source).toMatch(/arcService\.getMcpWorkbenchStatus/);
+        });
+
+        it('should render server creatable/blocked status', () => {
+            expect(source).toMatch(/serverCreatable/);
+            expect(source).toMatch(/serverBlocker/);
+        });
+
+        it('should render trust level', () => {
+            expect(source).toMatch(/trust\.level/);
+            expect(source).toMatch(/trust\.reason/);
+        });
+
+        it('should render tools and resources lists', () => {
+            expect(source).toMatch(/Tools/);
+            expect(source).toMatch(/Resources/);
+        });
+
+        it('should render diagnostic info', () => {
+            expect(source).toMatch(/Diagnostic/);
+        });
+
+        it('should have loading state', () => {
+            expect(source).toMatch(/Loading MCP workbench status/);
+        });
+
+        it('should have error state', () => {
+            expect(source).toMatch(/arc-mcp-workbench__error/);
+        });
+
+        it('should have empty state', () => {
+            expect(source).toMatch(/arc-mcp-workbench__empty/);
+        });
+
+        it('should have aria label', () => {
+            expect(source).toMatch(/aria-label='MCP Workbench'/);
+        });
+
+        it('should use React.useState and React.useEffect', () => {
+            expect(source).toMatch(/React\.useState/);
+            expect(source).toMatch(/React\.useEffect/);
+            expect(source).toMatch(/React\.useCallback/);
+        });
+    });
+
+    describe('TestBenchTab', () => {
+        let source: string;
+
+        beforeAll(async () => {
+            source = await fs.readFile(path.join(tabsDir, 'TestBenchTab.tsx'), 'utf-8');
+        });
+
+        it('should export TestBenchTabProps interface', () => {
+            expect(source).toMatch(/export interface TestBenchTabProps/);
+        });
+
+        it('should accept arcService prop', () => {
+            expect(source).toMatch(/arcService:\s*ArcService/);
+        });
+
+        it('should call detectTestbench on load', () => {
+            expect(source).toMatch(/arcService\.detectTestbench/);
+        });
+
+        it('should render detected command count', () => {
+            expect(source).toMatch(/Detected/);
+            expect(source).toMatch(/detection\.count/);
+        });
+
+        it('should render list of detected commands', () => {
+            expect(source).toMatch(/entry\.command/);
+            expect(source).toMatch(/entry\.source/);
+            expect(source).toMatch(/entry\.confidence/);
+            expect(source).toMatch(/entry\.runner/);
+            expect(source).toMatch(/entry\.cwd/);
+        });
+
+        it('should have loading state', () => {
+            expect(source).toMatch(/Detecting test commands/);
+        });
+
+        it('should have empty state', () => {
+            expect(source).toMatch(/No test commands detected/);
+        });
+
+        it('should have error state', () => {
+            expect(source).toMatch(/arc-testbench__error/);
+        });
+
+        it('should have aria label', () => {
+            expect(source).toMatch(/aria-label='Test Bench'/);
+        });
+
+        it('should use React.useState and React.useEffect', () => {
+            expect(source).toMatch(/React\.useState/);
+            expect(source).toMatch(/React\.useEffect/);
+            expect(source).toMatch(/React\.useCallback/);
+        });
+    });
+
+    describe('CiGuardrailsTab', () => {
+        let source: string;
+
+        beforeAll(async () => {
+            source = await fs.readFile(path.join(tabsDir, 'CiGuardrailsTab.tsx'), 'utf-8');
+        });
+
+        it('should export CiGuardrailsTabProps interface', () => {
+            expect(source).toMatch(/export interface CiGuardrailsTabProps/);
+        });
+
+        it('should accept arcService prop', () => {
+            expect(source).toMatch(/arcService:\s*ArcService/);
+        });
+
+        it('should call getCiCheckStatus on load', () => {
+            expect(source).toMatch(/arcService\.getCiCheckStatus/);
+        });
+
+        it('should render overall status pass/fail', () => {
+            expect(source).toMatch(/overall === 'pass'/);
+        });
+
+        it('should render per-check results', () => {
+            expect(source).toMatch(/status\.checks/);
+            expect(source).toMatch(/check\.result/);
+        });
+
+        it('should render check metadata', () => {
+            expect(source).toMatch(/status\.private/);
+            expect(source).toMatch(/status\.checkedAt/);
+        });
+
+        it('should have loading state', () => {
+            expect(source).toMatch(/Loading CI guardrails status/);
+        });
+
+        it('should have empty state', () => {
+            expect(source).toMatch(/arc-ci-guardrails__empty/);
+        });
+
+        it('should have error state', () => {
+            expect(source).toMatch(/arc-ci-guardrails__error/);
+        });
+
+        it('should have aria label', () => {
+            expect(source).toMatch(/aria-label='CI Guardrails'/);
+        });
+
+        it('should use React.useState and React.useEffect', () => {
+            expect(source).toMatch(/React\.useState/);
+            expect(source).toMatch(/React\.useEffect/);
+            expect(source).toMatch(/React\.useCallback/);
+        });
+    });
+
     describe('SwarmGraph Insight Tab', () => {
         let studioSource: string;
         let tabsIndexSource: string;

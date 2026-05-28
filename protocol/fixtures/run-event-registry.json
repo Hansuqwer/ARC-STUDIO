@@ -51,6 +51,9 @@
     {"type":"BATTLE_HITL_REQUIRED","version":2,"requiredFields":["battle_id","candidates","hitl_id"],"optionalFields":["message_id","node_id","prompt","timeout_seconds"]},
     {"type":"BATTLE_COMPLETED","version":2,"requiredFields":["battle_id","status"],"optionalFields":["duration_ms","error","message_id","node_id","winner_candidate_id"]},
     {"type":"RAW","version":2,"requiredFields":["raw"],"optionalFields":["message_id","node_id","source"]},
-    {"type":"CUSTOM","version":2,"requiredFields":["custom_type"],"optionalFields":["data","message_id","node_id"]}
+    {"type":"CUSTOM","version":2,"requiredFields":["custom_type"],"optionalFields":["data","message_id","node_id"]},
+    {"type":"CONSENSUS_DIFFERENTIATOR","version":2,"requiredFields":["decision","protocol","votes"],"optionalFields":["disagreement_rate","evidence_refs","message_id","node_id","quality_score","round"]},
+    {"type":"CONSENSUS_EVAL","version":2,"requiredFields":["num_rounds","num_workers","protocols"],"optionalFields":["consensus_escrow","message_id","node_id"]},
+    {"type":"CONSENSUS_EVAL_RUN","version":2,"requiredFields":["consensus_reached","protocol","total_votes"],"optionalFields":["approval_count","cost_score","disagreement_rate","duration_ms","escalation_rate","evidence_refs","latency_ms","message_id","node_id","quality_score"]}
   ]
 }
