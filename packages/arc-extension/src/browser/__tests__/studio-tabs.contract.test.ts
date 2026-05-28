@@ -54,6 +54,59 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/export.*AssuranceTab/);
             expect(source).toMatch(/export.*AssuranceTabProps/);
         });
+
+        it('should export CommandCentreTab and CommandCentreTabProps', () => {
+            expect(source).toMatch(/export.*CommandCentreTab/);
+            expect(source).toMatch(/export.*CommandCentreTabProps/);
+        });
+    });
+
+    describe('CommandCentreTab', () => {
+        let source: string;
+
+        beforeAll(async () => {
+            source = await fs.readFile(path.join(tabsDir, 'CommandCentreTab.tsx'), 'utf-8');
+        });
+
+        it('should export CommandCentreTabProps interface', () => {
+            expect(source).toMatch(/export interface CommandCentreTabProps/);
+        });
+
+        it('should aggregate only existing producers through ArcService', () => {
+            expect(source).toMatch(/listChatSessions/);
+            expect(source).toMatch(/getTraces/);
+            expect(source).toMatch(/listPendingHitlPrompts/);
+            expect(source).toMatch(/listIsolationProviders/);
+            expect(source).toMatch(/listProfiles/);
+            expect(source).toMatch(/getProviderDiagnostics/);
+            expect(source).toMatch(/getWorkspaceStatus/);
+            expect(source).toMatch(/getConfigStatus/);
+            expect(source).not.toMatch(/startRun\(/);
+            expect(source).not.toMatch(/runGatedProviderAction/);
+        });
+
+        it('should render empty and error states instead of fabricated data', () => {
+            expect(source).toMatch(/No active sessions/);
+            expect(source).toMatch(/No runs recorded/);
+            expect(source).toMatch(/No pending approvals/);
+            expect(source).toMatch(/No isolation providers available/);
+            expect(source).toMatch(/No profiles configured/);
+            expect(source).toMatch(/No provider diagnostics available/);
+            expect(source).toMatch(/Task producer is not exposed through the IDE protocol yet/);
+            expect(source).toMatch(/arc-command-centre__error/);
+        });
+
+        it('should expose command centre region and panels', () => {
+            expect(source).toMatch(/Agent Command Centre/);
+            expect(source).toMatch(/aria-label='Sessions'/);
+            expect(source).toMatch(/aria-label='Runs'/);
+            expect(source).toMatch(/aria-label='Approvals'/);
+            expect(source).toMatch(/aria-label='Sandbox'/);
+            expect(source).toMatch(/aria-label='Profiles'/);
+            expect(source).toMatch(/aria-label='Provider Health'/);
+            expect(source).toMatch(/aria-label='Workspace Risk'/);
+            expect(source).toMatch(/aria-label='Tasks'/);
+        });
     });
 
     describe('ChatTab', () => {

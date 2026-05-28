@@ -43,6 +43,12 @@ describe('ArcBackendService Integration Tests', () => {
             expect(service).toBeDefined();
             expect(service).toBeInstanceOf(ArcBackendService);
         });
+
+        it('delegates daemon discovery to DaemonDiscoveryService', () => {
+            expect(backendSource).toMatch(/DaemonDiscoveryService/);
+            expect(backendSource).toMatch(/daemonDiscoveryService\.getConfiguredUrl\(\)/);
+            expect(backendSource).toMatch(/daemonDiscoveryService\.discoverDefaultUrl\(\)/);
+        });
     });
 
     describe('provider quota reset bridge', () => {

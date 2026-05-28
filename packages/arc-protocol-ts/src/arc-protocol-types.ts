@@ -194,3 +194,61 @@ export function validateEnvelope(obj: unknown): obj is ArcEnvelope {
   const e = obj as Record<string, unknown>;
   return typeof e['version'] === 'string' && typeof e['ok'] === 'boolean';
 }
+
+// ---------------------------------------------------------------------------
+// Review Evidence (Phase 74 — Trace-Aware Review Mode)
+// ---------------------------------------------------------------------------
+
+export type ProvenanceSource =
+  | 'trace_event'
+  | 'tool_call'
+  | 'hitl_decision'
+  | 'audit_record'
+  | 'sandbox_result'
+  | 'eval_result'
+  | 'test_result'
+  | 'plan_step'
+  | 'unknown'
+  | 'manual';
+
+export interface HunkProvenance {
+  file_path: string;
+  source: ProvenanceSource;
+  source_run_id?: string | null;
+  source_step_id?: string | null;
+  source_tool?: string | null;
+  source_approval_id?: string | null;
+  source_audit_id?: string | null;
+  source_test_run_id?: string | null;
+  classification?: string | null;
+  policy_name?: string | null;
+  decision_allowed?: boolean | null;
+  reason?: string | null;
+  detail?: string | null;
+}
+
+export interface ReviewEvidenceHeader {
+  run_id: string;
+  session_id?: string | null;
+  workflow_name?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  total_hunks: number;
+  unknown_hunks: number;
+  manual_hunks: number;
+  classified_hunks: number;
+  producers_available: string[];
+  producers_missing: string[];
+  approval_count: number;
+  sandbox_decision_count: number;
+  audit_records_count: number;
+  test_result_count: number;
+  provenance: HunkProvenance[];
+}
+
+export interface ReviewEnvelope {
+  version: 1;
+  ok: boolean;
+  data: ReviewEvidenceHeader | null;
+  error: string | null;
+}

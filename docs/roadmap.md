@@ -1,9 +1,9 @@
 # ARC Studio — Locked Remaining Roadmap
 
-**Status:** Locked source of truth for remaining product work.  
-**Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-27 — Phase 40–49 review hardening patch applied after Phase 49 Baseline Complete.  
-**Current evidence anchor:** local worktree | Phases 53-55 verification pass: Python 2976 passed / 34 skipped / 3 xfailed (37 new tests); ruff OK; protocol build OK; extension build OK.  
+**Status:** Locked source of truth for remaining product work.
+**Created:** 2026-05-17
+**Last reality refresh:** 2026-05-28 — R45, R47, and R50 candidate baselines implemented; R46 plan/explain baseline in progress.
+**Current evidence anchor:** local worktree | R45/R46/R47/R50 post-review verification pass: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3105 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -74,6 +74,24 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | `docs/archive/` | Historical context only. |
 | `docs/handover/` | Thin pointers/context; must defer to locked docs. |
 | `scripts/check-banned-claims.sh` | Enforced release-claim guard. |
+
+## Research-Backed Candidate Roadmap Intake
+
+**Source:** `docs/research/deep-research-review-findings.md` and `docs/research/deep-research-improvements.md` from the 2026-05-27 deep research synthesis.
+**Status:** Planning intake only. These entries are not implementation evidence and do not change any existing Baseline Complete status.
+
+| Candidate ID | Status | Evidence | Notes |
+|---|---|---|---|
+| R45 Trace-Aware Review Mode | Baseline Complete | local worktree: review/plan tests 34 passed; full Python 3105 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK | Review evidence model/CLI links diffs to trace/tool/approval/test/sandbox/policy/audit material where supplied; missing provenance renders unknown/empty, not fabricated. |
+| R46 Plan / Apply / Review Loop | In Progress | local worktree: review/plan tests 34 passed; full Python 3105 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK | Deterministic plan/explain JSON and plan audit events exist; approved apply path remains unwired. |
+| R47 Agent Command Centre / Approval Centre | Baseline Complete | local worktree: targeted arc-extension tests 135 passed; `pnpm build` OK; `pnpm typecheck` OK | Command Centre aggregates existing sessions, runs/traces, HITL approvals, sandbox/isolation, profiles, provider health, workspace/risk/config context; absent task producer renders degraded state; no new runtime. |
+| R48 MCP Workbench Phase 1 | Not Started | Research synthesis only | Candidate IDE panel and diagnostics for current local stdio MCP server; no HTTP listener or external server auto-start. |
+| R49 Workspace Intelligence + Test Bench | Not Started | Research synthesis only | Candidate deterministic context inventory and structured test evidence surface; no default network/provider calls. |
+| R50 Theia-Native Architecture Cleanup | Baseline Complete | local worktree: targeted arc-extension tests 135 passed; `pnpm build` OK; `pnpm typecheck` OK | Daemon discovery extracted into typed Theia service and injected into backend/session bridge; broader backend split remains follow-up. |
+| R51 ARC CI Guardrails | Not Started | Research synthesis only | Candidate local-first `arc ci` review/eval/policy/receipt workflow; private mode uploads nothing by default. |
+| R52 SwarmGraph Consensus Differentiators | Not Started | Research synthesis only | Candidate offline/eval-first selective debate, weighted quorum, verifier lane, HITL quorum, and battle metrics; no broad provider-backed execution. |
+
+**Deferred by default until explicit roadmap change:** executable plugin marketplace, remote MCP beyond loopback, raw team trace sync, automatic memory injection, public microVM execution, and broad provider-backed SwarmGraph execution.
 
 ## R1 — Live Run Streaming Product Path
 

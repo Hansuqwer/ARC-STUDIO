@@ -27,6 +27,7 @@ import { injectable, inject } from '@theia/core/shared/inversify';
 import { execFileSync } from 'child_process';
 import { ArcError, ArcErrorCode, ChatSessionSummary, ChatSessionDetail } from '../../common/arc-protocol';
 import { buildArcCliEnv } from './arc-cli-utils';
+import { DaemonDiscoveryService } from './daemon-discovery-service';
 
 /** Safe session ID pattern — must match Python SESSION_ID_RE and TypeScript getChatSession() */
 const SESSION_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
@@ -36,9 +37,6 @@ const ALLOWED_UPDATE_FIELDS = new Set(['mode', 'runtime_mode', 'profile_id', 'is
 
 /** Maximum history entries forwarded to the Python write bridge. */
 const MAX_HISTORY_ENTRIES = 200;
-const ARC_PYTHON_DAEMON_URL_ENV = 'ARC_PYTHON_DAEMON_URL';
-const DEFAULT_DAEMON_URL = 'http://127.0.0.1:7777';
-const DAEMON_CACHE_TTL_MS = 30_000;
 const DAEMON_WRITE_TIMEOUT_MS = 10_000;
 
 type SessionOperation = 'write' | 'delete' | 'update';
@@ -158,7 +156,6 @@ export class SessionBridgeService {
      * This is second-layer defense only; Python-side fcntl.flock is authoritative.
      */
     private _writeMutex: Promise<void> = Promise.resolve();
-    private _daemonCache?: { url?: string; expiresAt: number };
     onSessionChanged?: (sessionId: string, operation: SessionOperation) => void;
 
     /**
@@ -171,7 +168,8 @@ export class SessionBridgeService {
     eventSourceFactory: IEventSourceFactory = new DefaultEventSourceFactory();
 
     constructor(
-        @inject('WorkspaceRoot') private readonly workspaceRoot: string
+        @inject('WorkspaceRoot') private readonly workspaceRoot: string,
+        @inject(DaemonDiscoveryService) private readonly daemonDiscoveryService: DaemonDiscoveryService = new DaemonDiscoveryService()
     ) {}
 
     /**
@@ -398,29 +396,7 @@ export class SessionBridgeService {
     }
 
     private async _daemonBaseUrl(): Promise<string | undefined> {
-        const now = Date.now();
-        if (this._daemonCache && this._daemonCache.expiresAt > now) {
-            return this._daemonCache.url;
-        }
-        const configured = process.env[ARC_PYTHON_DAEMON_URL_ENV]?.trim();
-        if (configured) {
-            this._daemonCache = { url: configured.replace(/\/$/, ''), expiresAt: now + DAEMON_CACHE_TTL_MS };
-            return this._daemonCache.url;
-        }
-        try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 2_000);
-            const response = await fetch(new URL('/health', DEFAULT_DAEMON_URL), { signal: controller.signal });
-            clearTimeout(timeout);
-            if (response.ok) {
-                this._daemonCache = { url: DEFAULT_DAEMON_URL, expiresAt: now + DAEMON_CACHE_TTL_MS };
-                return DEFAULT_DAEMON_URL;
-            }
-        } catch {
-            // loopback probe unavailable; use CLI fallback
-        }
-        this._daemonCache = { url: undefined, expiresAt: now + DAEMON_CACHE_TTL_MS };
-        return undefined;
+        return this.daemonDiscoveryService.resolveDaemonBaseUrl();
     }
 
     private async _writeToDaemon(method: string, path: string, body?: unknown): Promise<Record<string, unknown>> {

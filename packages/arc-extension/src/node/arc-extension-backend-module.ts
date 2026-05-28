@@ -18,6 +18,7 @@ import { AuditBridgeService } from './services/audit-bridge-service';
 import { BattleService } from './services/battle-service';
 import { SessionBridgeService } from './services/session-bridge-service';
 import { NotificationBackendService } from './services/notification-service';
+import { DaemonDiscoveryService } from './services/daemon-discovery-service';
 import { NotificationService, NotificationServicePath } from '../common/notification-protocol';
 import { ArcServicePath } from '../common/arc-protocol';
 
@@ -42,6 +43,7 @@ export default new ContainerModule(bind => {
     bind(BattleService).toSelf().inSingletonScope();
 
     // Bind Session bridge service (Phase 43 — read-only)
+    bind(DaemonDiscoveryService).toSelf().inSingletonScope();
     bind(SessionBridgeService).toSelf().inSingletonScope();
 
     // Bind the backend service with explicit service dependencies.
@@ -54,7 +56,8 @@ export default new ContainerModule(bind => {
         ctx.container.get(RunLifecycleService),
         ctx.container.get(AuditBridgeService),
         ctx.container.get(BattleService),
-        ctx.container.get(SessionBridgeService)
+        ctx.container.get(SessionBridgeService),
+        ctx.container.get(DaemonDiscoveryService)
     )).inSingletonScope();
 
     // Bind notification service (Phase 32 / R25 — Slice 32.3)

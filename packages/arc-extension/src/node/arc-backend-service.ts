@@ -81,9 +81,9 @@ import { RunLifecycleService } from './services/run-lifecycle-service';
 import { AuditBridgeService } from './services/audit-bridge-service';
 import { BattleService } from './services/battle-service';
 import { SessionBridgeService } from './services/session-bridge-service';
+import { DaemonDiscoveryService } from './services/daemon-discovery-service';
 
 const ARC_CLI_ENV_ALLOWLIST = ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR'];
-const ARC_PYTHON_DAEMON_URL_ENV = 'ARC_PYTHON_DAEMON_URL';
 
 const TRUST_SENSITIVE_FLAGS = [
     'can_run',
@@ -118,6 +118,7 @@ export class ArcBackendService implements ArcService {
     private readonly auditBridgeService: AuditBridgeService;
     private readonly battleService: BattleService;
     private readonly sessionBridgeService: SessionBridgeService;
+    private readonly daemonDiscoveryService: DaemonDiscoveryService;
     private readonly activeStreamCancels = new Map<string, { cancelled: boolean }>();
     private workspaceRoot: string;
 
@@ -130,7 +131,8 @@ export class ArcBackendService implements ArcService {
         runLifecycleService?: RunLifecycleService,
         auditBridgeService?: AuditBridgeService,
         battleService?: BattleService,
-        sessionBridgeService?: SessionBridgeService
+        sessionBridgeService?: SessionBridgeService,
+        daemonDiscoveryService?: DaemonDiscoveryService
     ) {
         this.executor = executor ?? new WorkflowExecutor();
         this.parser = parser ?? new TraceParser();
@@ -148,6 +150,7 @@ export class ArcBackendService implements ArcService {
         this.auditBridgeService = auditBridgeService ?? new AuditBridgeService(this.workspaceRoot);
         this.battleService = battleService ?? new BattleService();
         this.sessionBridgeService = sessionBridgeService ?? new SessionBridgeService(this.workspaceRoot);
+        this.daemonDiscoveryService = daemonDiscoveryService ?? new DaemonDiscoveryService();
     }
 
     // ========== Workflow Execution ==========
@@ -954,7 +957,7 @@ export class ArcBackendService implements ArcService {
     }
 
     private resolvePythonDaemonBaseUrl(request: ActiveTraceStreamRequest): string | undefined {
-        return request.baseUrl?.trim() || process.env[ARC_PYTHON_DAEMON_URL_ENV]?.trim() || undefined;
+        return request.baseUrl?.trim() || this.daemonDiscoveryService.getConfiguredUrl();
     }
 
     private buildPythonDaemonStreamUrl(baseUrl: string, runId: string): URL {
@@ -1053,31 +1056,11 @@ export class ArcBackendService implements ArcService {
     }
 
     async getPythonDaemonUrl(): Promise<string | undefined> {
-        return process.env[ARC_PYTHON_DAEMON_URL_ENV]?.trim() || undefined;
+        return this.daemonDiscoveryService.getConfiguredUrl();
     }
 
     async discoverPythonDaemonUrl(): Promise<string | undefined> {
-        const defaultUrl = 'http://127.0.0.1:7777';
-        try {
-            const url = new URL('/health', defaultUrl);
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 2000);
-            try {
-                const response = await fetch(url, {
-                    method: 'GET',
-                    signal: controller.signal,
-                });
-                if (response.ok) {
-                    return defaultUrl;
-                }
-                return undefined;
-            } finally {
-                clearTimeout(timeout);
-                controller.abort();
-            }
-        } catch {
-            return undefined;
-        }
+        return this.daemonDiscoveryService.discoverDefaultUrl();
     }
 
     // ========== Battle Methods (Phase 34.2) ==========

@@ -10,9 +10,9 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common/message-service';
 import * as React from '@theia/core/shared/react';
 import { ArcService, ConfigStatus, WorkflowInfo } from '../common/arc-protocol';
-import { AssuranceTab, BattleTab, ChatTab, ConfigTab, RunsTab, SwarmGraphInsightTab, WorkflowsTab } from './tabs';
+import { AssuranceTab, BattleTab, ChatTab, CommandCentreTab, ConfigTab, RunsTab, SwarmGraphInsightTab, WorkflowsTab } from './tabs';
 
-type StudioTabId = 'chat' | 'runs' | 'workflows' | 'assurance' | 'swarmgraph-insight' | 'battle' | 'config';
+type StudioTabId = 'chat' | 'runs' | 'workflows' | 'assurance' | 'swarmgraph-insight' | 'battle' | 'config' | 'command-centre';
 
 interface ArcStudioWidgetState {
     activeTab: StudioTabId;
@@ -98,6 +98,7 @@ export class ArcStudioWidget extends ReactWidget {
             { id: 'assurance', label: 'Assurance' },
             { id: 'swarmgraph-insight', label: 'SwarmGraph Insight' },
             { id: 'battle', label: 'Battle' },
+            { id: 'command-centre', label: 'Command Centre' },
             { id: 'config', label: 'Config' }
         ];
 
@@ -188,6 +189,14 @@ export class ArcStudioWidget extends ReactWidget {
                         hidden={activeTab !== 'battle'}
                     >
                         {activeTab === 'battle' && <BattleTab arcService={this.arcService} />}
+                    </div>
+                    <div
+                        id={`arc-studio-panel-command-centre`}
+                        role='tabpanel'
+                        aria-labelledby='arc-studio-tab-command-centre'
+                        hidden={activeTab !== 'command-centre'}
+                    >
+                        {activeTab === 'command-centre' && <CommandCentreTab arcService={this.arcService} />}
                     </div>
                     <div
                         id={`arc-studio-panel-config`}

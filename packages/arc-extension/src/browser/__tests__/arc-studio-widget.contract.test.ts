@@ -70,6 +70,10 @@ describe('ArcStudioWidget Contracts', () => {
             expect(widgetSource).toMatch(/import.*AssuranceTab.*from.*tabs/);
         });
 
+        it('should import CommandCentreTab', () => {
+            expect(widgetSource).toMatch(/import.*CommandCentreTab.*from.*tabs/);
+        });
+
         it('should render ChatTab in render', () => {
             expect(widgetSource).toMatch(/<ChatTab/);
         });
@@ -89,6 +93,11 @@ describe('ArcStudioWidget Contracts', () => {
         it('should render AssuranceTab in render', () => {
             expect(widgetSource).toMatch(/<AssuranceTab/);
             expect(widgetSource).toMatch(/arc-studio-panel-assurance/);
+        });
+
+        it('should render CommandCentreTab in render', () => {
+            expect(widgetSource).toMatch(/<CommandCentreTab\s+arcService=\{this\.arcService\}/);
+            expect(widgetSource).toMatch(/arc-studio-panel-command-centre/);
         });
 
         it('should pass arcService prop to ConfigTab', () => {
@@ -127,15 +136,16 @@ describe('ArcStudioWidget Contracts', () => {
             expect(widgetSource).toMatch(/role='tabpanel'/);
         });
 
-        it('should have tabs: Chat, Runs, Workflows, Assurance, SwarmGraph Insight, Battle, Config', () => {
+        it('should have tabs: Chat, Runs, Workflows, Assurance, SwarmGraph Insight, Battle, Command Centre, Config', () => {
             expect(widgetSource).toMatch(/Chat/);
             expect(widgetSource).toMatch(/Runs/);
             expect(widgetSource).toMatch(/Workflows/);
             expect(widgetSource).toMatch(/Assurance/);
             expect(widgetSource).toMatch(/SwarmGraph Insight/);
             expect(widgetSource).toMatch(/Battle/);
+            expect(widgetSource).toMatch(/Command Centre/);
             expect(widgetSource).toMatch(/Config/);
-            expect(widgetSource).toMatch(/type StudioTabId = 'chat' \| 'runs' \| 'workflows' \| 'assurance' \| 'swarmgraph-insight' \| 'battle' \| 'config'/);
+            expect(widgetSource).toMatch(/type StudioTabId = 'chat' \| 'runs' \| 'workflows' \| 'assurance' \| 'swarmgraph-insight' \| 'battle' \| 'config' \| 'command-centre'/);
         });
     });
 

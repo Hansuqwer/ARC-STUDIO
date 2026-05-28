@@ -37,6 +37,8 @@ from ._subapps import (
     storage_app,
     studio_app,
     studio_sessions_app,
+    review_app,
+    plan_app,
     swarmgraph_app,
     task_app,
     workspace_app,
@@ -81,6 +83,8 @@ app.add_typer(batch_app)
 app.add_typer(events_app)
 app.add_typer(prompt_app)
 app.add_typer(swarmgraph_app)
+app.add_typer(review_app)
+app.add_typer(plan_app)
 
 
 @app.command("dashboard")

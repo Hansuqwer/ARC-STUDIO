@@ -49,3 +49,11 @@ swarmgraph_app = typer.Typer(
     name="swarmgraph",
     help="SwarmGraph commands — risk assessment, consensus protocol (Phase 51 / R24)",
 )
+review_app = typer.Typer(
+    name="review",
+    help="Review evidence — trace-aware review mode (Phase 74)",
+)
+plan_app = typer.Typer(
+    name="plan",
+    help="Plan/Apply/Review — deterministic plan-before-execution (Phase 75)",
+)

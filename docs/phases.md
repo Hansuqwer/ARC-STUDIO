@@ -1,9 +1,9 @@
 # ARC Studio — Locked Phase Implementation Plan
 
-**Status:** Locked execution plan for remaining work.  
-**Created:** 2026-05-17  
-**Last reality refresh:** 2026-05-27 — Phases 56-61 Baseline Complete.  
-**Current evidence anchor:** local worktree | Phase 61 verification: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/memory_graph/test_phase59_memory_graph.py -q` 12 passed; `cd python && uv run pytest tests/ -q` 3029 passed / 34 skipped / 3 xfailed; protocol build OK; extension build OK; `pnpm typecheck` OK.  
+**Status:** Locked execution plan for remaining work.
+**Created:** 2026-05-17
+**Last reality refresh:** 2026-05-28 — Phases 74, 76, and 77 Baseline Complete; Phase 75 plan/explain baseline implemented with apply path still unwired.
+**Current evidence anchor:** local worktree | Phase 74-77 post-review verification: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3105 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -2792,6 +2792,161 @@ pnpm typecheck
 
 ### Known Risks
 - Static classification is conservative and incomplete by design; unknown commands remain denied unless explicit policy/approval allows them.
+
+## Future Research Intake — Candidate Phases 74-81
+
+**Source:** `docs/research/deep-research-review-findings.md` and `docs/research/deep-research-improvements.md` from the 2026-05-27 deep research synthesis.
+**Status:** Active intake. Phases 74, 76, and 77 have baseline implementations; Phase 75 has plan/explain and audit baseline only, with apply still unwired.
+
+### Phase 74 — Trace-Aware Review Mode MVP
+
+**Roadmap:** R45 candidate
+**Status:** Baseline Complete | Evidence: local worktree `cd python && uv run pytest tests/security/test_review_evidence.py tests/security/test_plan_models.py -q` 34 passed; full `cd python && uv run pytest tests/ -q` 3105 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK
+**Depends on:** Existing trace/audit/HITL/sandbox/test producers; producer gap inventory required first
+
+#### Acceptance
+1. Diff/review surface shows trace, tool, approval, test, sandbox, policy, and audit provenance where producers exist.
+2. Missing provenance renders `unknown` or `manual`, never fabricated.
+3. Review evidence export is redacted and links to source run IDs.
+
+#### Verification
+```bash
+cd python && uv run pytest -q
+pnpm --filter @arc-studio/protocol build
+pnpm --filter arc-extension build
+pnpm typecheck
+```
+
+### Phase 75 — Plan / Apply / Review Loop
+
+**Roadmap:** R46 candidate
+**Status:** In Progress | Evidence: local worktree `cd python && uv run pytest tests/security/test_review_evidence.py tests/security/test_plan_models.py -q` 34 passed; full `cd python && uv run pytest tests/ -q` 3105 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK. Plan/explain and audit events exist; approved apply path remains unwired.
+**Depends on:** Phase 37/R38 sandbox classifier and audit foundation
+
+#### Acceptance
+1. Plan JSON envelope reports command/file intent, classification, sandbox decision, approval need, and known/unknown cost/risk.
+2. Apply path requires approved plan or explicit direct command.
+3. Approval/denial emits audit events.
+
+#### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/ -q
+pnpm build
+pnpm typecheck
+```
+
+### Phase 76 — Agent Command Centre / Approval Centre MVP
+
+**Roadmap:** R47 candidate
+**Status:** Baseline Complete | Evidence: local worktree targeted `pnpm --filter arc-extension test -- --coverage=false --runTestsByPath src/browser/__tests__/studio-tabs.contract.test.ts src/node/services/__tests__/daemon-discovery-service.test.ts` 135 passed; `pnpm build` OK; `pnpm typecheck` OK
+**Depends on:** Run/session/task/HITL/sandbox/audit producer inventory
+
+#### Acceptance
+1. UI aggregates real sessions, runs, tasks, approvals, sandbox, provider, risk, and root/worktree context.
+2. Absent producers render degraded/empty states.
+3. No new runtime or provider execution mode is introduced.
+
+#### Verification
+```bash
+pnpm --filter arc-extension test
+pnpm build
+pnpm typecheck
+```
+
+### Phase 77 — Theia-Native Service Split Phase 1
+
+**Roadmap:** R50 candidate
+**Status:** Baseline Complete | Evidence: local worktree targeted `pnpm --filter arc-extension test -- --coverage=false --runTestsByPath src/browser/__tests__/studio-tabs.contract.test.ts src/node/services/__tests__/daemon-discovery-service.test.ts` 135 passed; `pnpm build` OK; `pnpm typecheck` OK
+**Depends on:** Current bridge/service contract inventory
+
+#### Acceptance
+1. One high-risk domain, likely daemon discovery/session stream/workspace context, is extracted from broad façade into typed Theia-native service(s).
+2. Common DTO/protocol ownership is explicit.
+3. Backend lifecycle cleanup and frontend singleton bridge behavior are tested.
+
+#### Verification
+```bash
+pnpm --filter arc-extension test
+pnpm --filter @arc-studio/protocol build
+pnpm build
+pnpm typecheck
+```
+
+### Phase 78 — MCP Workbench Phase 1
+
+**Roadmap:** R48 candidate
+**Status:** Not Started | Evidence: research synthesis only
+**Depends on:** R19 local stdio MCP baseline
+
+#### Acceptance
+1. IDE/CLI can display local stdio MCP server status, tools, resources, prompts where available, trust state, and audit path.
+2. Inspector-like diagnostics can validate safe read-only tool and envelope shape.
+3. No HTTP listener or external MCP server auto-start is added.
+
+#### Verification
+```bash
+cd python && uv run pytest tests/ -q
+pnpm --filter arc-extension test
+pnpm build
+pnpm typecheck
+```
+
+### Phase 79 — Workspace Intelligence + Test Bench MVP
+
+**Roadmap:** R49 candidate
+**Status:** Not Started | Evidence: research synthesis only
+**Depends on:** Trust/root-qualified path model and sandbox command execution stability
+
+#### Acceptance
+1. Deterministic local context inventory covers files, symbols where available, git metadata, traces, and MCP resources with provenance.
+2. Test command detection is reviewable/editable and runs through policy/sandbox gates.
+3. Test output attaches to run/review evidence without inferred pass/fail.
+
+#### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/ -q
+pnpm build
+pnpm typecheck
+```
+
+### Phase 80 — ARC CI Guardrails MVP
+
+**Roadmap:** R51 candidate
+**Status:** Not Started | Evidence: research synthesis only
+**Depends on:** Eval artifact, policy, receipt, audit verification foundations
+
+#### Acceptance
+1. `arc ci` candidate commands support advisory review, offline eval gate, policy check, receipt signing, and audit verification.
+2. Private mode uploads nothing.
+3. PR summary output is redacted and deterministic; AI comments are advisory only.
+
+#### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/ -q
+bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md README.md
+```
+
+### Phase 81 — SwarmGraph Consensus Differentiators Phase 1
+
+**Roadmap:** R52 candidate
+**Status:** Not Started | Evidence: research synthesis only
+**Depends on:** Existing SwarmGraph consensus, HITL, event, sandbox, and eval foundations
+
+#### Acceptance
+1. Offline/eval harness measures selective debate, confidence-weighted quorum, critic/verifier lane, and HITL sign-off quorum.
+2. Metrics include quality, cost, latency, disagreement, and escalation rate.
+3. Fake/offline remains default; no broad provider-backed execution claim is added.
+
+#### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/ -q
+pnpm build
+pnpm typecheck
+```
 
 ### Critical Path
 

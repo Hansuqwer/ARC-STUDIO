@@ -26,10 +26,12 @@ from . import (
     mcp,  # noqa: F401
     memory,  # noqa: F401
     mgmt,  # noqa: F401
+    plan,  # noqa: F401 — Phase 75: plan/apply/review
     profiles,  # noqa: F401
     prompt,  # noqa: F401
     providers,  # noqa: F401
     receipt,  # noqa: F401
+    review,  # noqa: F401 — Phase 74: trace-aware review
     runs,  # noqa: F401
     sandbox,  # noqa: F401
     studio_workspace,  # noqa: F401
