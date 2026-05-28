@@ -19,6 +19,13 @@ from mcp.client.session import ClientSession
 from mcp.shared.message import SessionMessage
 from mcp.types import JSONRPCMessage
 
+from ..mcp.session import (
+    cleanup_stale_sessions,
+    list_sessions,
+    show_session,
+    start_session,
+    stop_session,
+)
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
 from ..security.trust import WorkspaceUntrusted, resolve_trust
@@ -348,6 +355,94 @@ def workbench_inspect(
         ),
         json_output,
     )
+
+
+# ── session commands ─────────────────────────────────────────────────────────
+
+
+@mcp_workbench_app.command("session-start")
+def workbench_session_start(
+    server: str = typer.Argument(..., help="MCP server command to start"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Start a persistent MCP session (stdio subprocess).
+
+    The server process runs in a process group for clean teardown.
+    No HTTP listener. No auto-restart.
+    """
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    import shlex
+
+    server_cmd = shlex.split(server)
+    if not server_cmd:
+        _out(err(ArcErrorCode.INVALID_INPUT, "missing server command"), json_output)
+        raise typer.Exit(2)
+    record = start_session(ws, server_cmd)
+    _out(ok(record.model_dump(mode="json"), workspace=str(ws)), json_output)
+
+
+@mcp_workbench_app.command("session-stop")
+def workbench_session_stop(
+    session_id: str = typer.Argument(..., help="Session ID to stop"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Stop a persistent MCP session (kill process group)."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    stopped = stop_session(ws, session_id)
+    if not stopped:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Session not found: {session_id}"), json_output)
+        raise typer.Exit(1)
+    _out(ok({"stopped": True, "session_id": session_id}, workspace=str(ws)), json_output)
+
+
+@mcp_workbench_app.command("session-list")
+def workbench_session_list(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """List all registered MCP sessions."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    sessions = list_sessions(ws)
+    _out(ok({"sessions": sessions, "count": len(sessions)}, workspace=str(ws)), json_output)
+
+
+@mcp_workbench_app.command("session-show")
+def workbench_session_show(
+    session_id: str = typer.Argument(..., help="Session ID to show"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show one MCP session details."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    session = show_session(ws, session_id)
+    if not session:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Session not found: {session_id}"), json_output)
+        raise typer.Exit(1)
+    _out(ok(session, workspace=str(ws)), json_output)
+
+
+@mcp_workbench_app.command("session-cleanup")
+def workbench_session_cleanup(
+    timeout: int = typer.Option(3600, "--timeout", help="Idle timeout in seconds"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Clean up stale MCP sessions beyond idle timeout."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    cleaned = cleanup_stale_sessions(ws, timeout=timeout)
+    _out(ok({"cleaned": cleaned, "count": len(cleaned)}, workspace=str(ws)), json_output)
 
 
 # ── serve command (unchanged) ───────────────────────────────────────────────

@@ -114,6 +114,14 @@ describe('Protocol Extensions (Session B + B7)', () => {
             expect(source).toMatch(/counters\?:\s*Record<string, unknown>/);
         });
 
+        it('should export SandboxInspectResult', () => {
+            expect(source).toMatch(/export interface SandboxInspectResult/);
+        });
+
+        it('should have sandboxInspect method on ArcService', () => {
+            expect(source).toMatch(/sandboxInspect\(command/);
+        });
+
         it('should keep provider telemetry protocol generic and non-secret', () => {
             expect(source).toMatch(/ProviderDiagnosticsInfo/);
             expect(source).toMatch(/ProviderQuotaInfo/);
@@ -475,7 +483,7 @@ describe('Backend Service Extensions (Session B + B7)', () => {
             expect(source).toMatch(/async cancelActiveTraceStream\(runId:\s*string\)/);
             expect(source).toMatch(/createActiveTraceIterable/);
             expect(source).toMatch(/this\.replayRun\(request\.runId\)/);
-            expect(source).toMatch(/ARC_PYTHON_DAEMON_URL/);
+            expect(source).toMatch(/daemonDiscoveryService/);
             expect(source).toMatch(/resolvePythonDaemonBaseUrl/);
             expect(source).toMatch(/Live SSE proxy disconnected; no Python web\/SSE base URL configured/);
             expect(source).toMatch(/Live SSE proxy degraded/);

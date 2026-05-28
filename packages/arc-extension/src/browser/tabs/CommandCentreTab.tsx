@@ -17,6 +17,7 @@ import {
     IsolationProviderInfo,
     McpWorkbenchStatus,
     ProviderDiagnosticsInfo,
+    SandboxInspectResult,
     TestbenchDetection,
     TraceFile,
     WorkspaceInventory,
@@ -61,6 +62,10 @@ interface CommandCentreState {
     ciStatus?: CiCheckStatus;
     ciLoaded: boolean;
     ciError: string | null;
+    inspectCommand: string;
+    inspectResult: SandboxInspectResult | null;
+    inspectLoading: boolean;
+    inspectError: string | null;
 }
 
 export class CommandCentreTab extends React.Component<CommandCentreTabProps, CommandCentreState> {
@@ -94,6 +99,10 @@ export class CommandCentreTab extends React.Component<CommandCentreTabProps, Com
             testbenchError: null,
             ciLoaded: false,
             ciError: null,
+            inspectCommand: '',
+            inspectResult: null,
+            inspectLoading: false,
+            inspectError: null,
         };
     }
 
@@ -427,6 +436,67 @@ export class CommandCentreTab extends React.Component<CommandCentreTabProps, Com
                         )}
                         {mcpLoaded && !mcpError && !mcpStatus && (
                             <p className='arc-command-centre__empty'>MCP status unavailable.</p>
+                        )}
+                    </section>
+
+                    {/* Sandbox Inspect Form */}
+                    <section className='arc-command-centre__panel' aria-label='Sandbox Inspect'>
+                        <h4>Sandbox Inspect</h4>
+                        <p className='arc-command-centre__subtitle'>
+                            Run a read-only MCP server inspection through the sandbox.
+                            Network and destructive commands are denied by default.
+                        </p>
+                        <div className='arc-command-centre__form'>
+                            <input
+                                type='text'
+                                className='theia-input'
+                                placeholder='e.g. python -m my_mcp_server'
+                                value={this.state.inspectCommand}
+                                onChange={(e) => this.setState({ inspectCommand: e.target.value })}
+                                style={{ width: '100%', marginBottom: '8px' }}
+                            />
+                            <button
+                                className='theia-button'
+                                disabled={this.state.inspectLoading || !this.state.inspectCommand.trim()}
+                                onClick={async () => {
+                                    this.setState({ inspectLoading: true, inspectError: null, inspectResult: null });
+                                    try {
+                                        const parts = this.state.inspectCommand.trim().split(/\s+/);
+                                        const result = await this.props.arcService.sandboxInspect(parts);
+                                        this.setState({ inspectResult: result, inspectLoading: false });
+                                    } catch (e: any) {
+                                        this.setState({ inspectError: e.message || 'Inspect failed', inspectLoading: false });
+                                    }
+                                }}
+                            >
+                                {this.state.inspectLoading ? 'Inspecting...' : 'Inspect'}
+                            </button>
+                        </div>
+                        {this.state.inspectLoading && <p className='arc-command-centre__loading'>Inspecting MCP server...</p>}
+                        {this.state.inspectError && (
+                            <p className='arc-command-centre__error' role='alert'>Error: {this.state.inspectError}</p>
+                        )}
+                        {this.state.inspectResult && (
+                            <div>
+                                <ul className='arc-command-centre__list'>
+                                    <li><strong>Classification:</strong> {this.state.inspectResult.classification}</li>
+                                    <li><strong>Decision:</strong> {this.state.inspectResult.decision}</li>
+                                    <li><strong>Policy:</strong> {this.state.inspectResult.policy}</li>
+                                    <li><strong>Tools:</strong> {this.state.inspectResult.tools?.length ?? 0}</li>
+                                    <li><strong>Resources:</strong> {this.state.inspectResult.resources?.length ?? 0}</li>
+                                    <li><strong>Prompts:</strong> {this.state.inspectResult.prompts?.length ?? 0}</li>
+                                </ul>
+                                {this.state.inspectResult.tools && this.state.inspectResult.tools.length > 0 && (
+                                    <details>
+                                        <summary>Tools ({this.state.inspectResult.tools.length})</summary>
+                                        <ul className='arc-command-centre__list'>
+                                            {this.state.inspectResult.tools.slice(0, 10).map((t, i) => (
+                                                <li key={i}><strong>{t.name}</strong>: {t.description}</li>
+                                            ))}
+                                        </ul>
+                                    </details>
+                                )}
+                            </div>
                         )}
                     </section>
 

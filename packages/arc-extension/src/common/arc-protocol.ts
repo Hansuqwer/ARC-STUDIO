@@ -1653,6 +1653,9 @@ export interface ArcService {
     detectTestbench(commandOverride?: string): Promise<TestbenchDetection>;
     /** Read-only CI check status via CLI bridge */
     getCiCheckStatus(): Promise<CiCheckStatus>;
+
+    /** Sandbox-gated MCP server inspect via sandbox run */
+    sandboxInspect(command: string[], policy?: string): Promise<SandboxInspectResult>;
 }
 
 // Phase 78/79/80 follow-up: read-only telemetry types
@@ -1695,4 +1698,15 @@ export interface CiCheckStatus {
     checks: Record<string, Record<string, unknown>>;
     overall: string;
     checkedAt?: string;
+}
+
+export interface SandboxInspectResult {
+    command: string[];
+    classification: string;
+    decision: string;
+    policy: string;
+    tools?: Array<{ name: string; description: string }>;
+    resources?: Array<{ uriTemplate: string; name: string; description: string }>;
+    prompts?: Array<{ name: string; description: string }>;
+    stderr?: string | null;
 }

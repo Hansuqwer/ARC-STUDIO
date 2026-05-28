@@ -74,6 +74,7 @@ import {
     WorkspaceInventory,
     TestbenchDetection,
     CiCheckStatus,
+    SandboxInspectResult,
 } from '../common/arc-protocol';
 import { validateWorkspaceRoot, validateTraceId, validateRunId } from './security-utils';
 import { WorkflowExecutor } from './services/workflow-executor';
@@ -1123,5 +1124,9 @@ export class ArcBackendService implements ArcService {
 
     async getCiCheckStatus(): Promise<CiCheckStatus> {
         return this.localTelemetryService.getCiCheckStatus();
+    }
+
+    async sandboxInspect(command: string[], policy?: string): Promise<SandboxInspectResult> {
+        return this.localTelemetryService.sandboxInspect(command, policy);
     }
 }

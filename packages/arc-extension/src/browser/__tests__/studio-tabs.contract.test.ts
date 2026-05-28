@@ -85,6 +85,7 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/getWorkspaceInventory/);
             expect(source).toMatch(/detectTestbench/);
             expect(source).toMatch(/getCiCheckStatus/);
+            expect(source).toMatch(/sandboxInspect/);
             expect(source).not.toMatch(/startRun\(/);
             expect(source).not.toMatch(/runGatedProviderAction/);
         });
@@ -114,6 +115,7 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/aria-label='Workspace Inventory'/);
             expect(source).toMatch(/aria-label='Testbench'/);
             expect(source).toMatch(/aria-label='CI Guardrails'/);
+            expect(source).toMatch(/Sandbox Inspect/);
         });
     });
 

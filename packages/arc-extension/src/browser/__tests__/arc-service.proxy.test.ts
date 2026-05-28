@@ -93,6 +93,7 @@ describe('ArcService Proxy Tests', () => {
                 'getWorkspaceInventory',
                 'detectTestbench',
                 'getCiCheckStatus',
+                'sandboxInspect',
             ];
 
             const mockService: any = {
@@ -127,6 +128,13 @@ describe('ArcService Proxy Tests', () => {
                 getWorkspaceInventory: async () => ({ workspace: '', files: { count: 0, totalSize: 0, entries: [] }, git: { provenance: '' }, traces: { count: 0, entries: [] }, mcpResources: [] }),
                 detectTestbench: async () => ({ workspace: '', detected: [], count: 0 }),
                 getCiCheckStatus: async () => ({ private: false, workspace: '', checks: {}, overall: 'skip' }),
+                sandboxInspect: async () => ({
+                    command: [],
+                    classification: 'read_only',
+                    decision: 'allowed',
+                    policy: 'local-safe',
+                    tools: [{ name: 'greet', description: 'Greet someone' }],
+                }),
             };
 
             for (const method of requiredMethods) {

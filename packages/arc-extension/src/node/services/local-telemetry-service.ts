@@ -1,6 +1,6 @@
 import { execFileSync } from 'child_process';
 import {
-    ArcError, ArcErrorCode, CiCheckStatus, McpWorkbenchStatus, TestbenchDetection, WorkspaceInventory,
+    ArcError, ArcErrorCode, CiCheckStatus, McpWorkbenchStatus, SandboxInspectResult, TestbenchDetection, WorkspaceInventory,
 } from '../../common/arc-protocol';
 import { buildArcCliEnv } from './arc-cli-utils';
 
@@ -83,13 +83,28 @@ export class LocalTelemetryService {
     }
 
     getCiCheckStatus(): CiCheckStatus {
-        const data = this.runArcJson(['ci', 'check', '--json', '--workspace', this.workspaceRoot], 15000, true);
+        const data = this.runArcJson(['ci', 'check', '--json', '--workspace', this.workspaceRoot, '--json'], 15000, true);
         return {
             private: Boolean(data.private),
             workspace: String((data.workspace as string) || this.workspaceRoot),
             checks: (data.checks || {}) as Record<string, Record<string, unknown>>,
             overall: String((data.overall as string) || 'skip'),
             checkedAt: (data.checked_at as string) || (data.checkedAt as string),
+        };
+    }
+
+    sandboxInspect(command: string[], policy?: string): SandboxInspectResult {
+        const args = ['sandbox', 'inspect', '--workspace', this.workspaceRoot, '--policy', policy || 'local-safe', '--json', ...command];
+        const data = this.runArcJson(args, 30000);
+        return {
+            command: (data.command as string[]) || command,
+            classification: String(data.classification || 'unknown'),
+            decision: String(data.decision || 'denied'),
+            policy: String(data.policy || policy || 'local-safe'),
+            tools: Array.isArray(data.tools) ? data.tools as Array<{ name: string; description: string }> : undefined,
+            resources: Array.isArray(data.resources) ? data.resources as Array<{ uriTemplate: string; name: string; description: string }> : undefined,
+            prompts: Array.isArray(data.prompts) ? data.prompts as Array<{ name: string; description: string }> : undefined,
+            stderr: data.stderr as string | null | undefined,
         };
     }
 

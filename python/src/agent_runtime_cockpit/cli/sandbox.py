@@ -406,6 +406,84 @@ def sandbox_run(
         raise typer.Exit(iso.exit_code)
 
 
+@sandbox_app.command(
+    "inspect", context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
+)
+def sandbox_inspect(
+    ctx: typer.Context,
+    policy: str = typer.Option("local-safe", "--policy", help="Sandbox policy profile"),
+    timeout: int = typer.Option(30, "--timeout", help="Timeout in seconds"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Inspect an MCP server through the sandbox.
+
+    The server command is classified and approved by the sandbox policy.
+    Network commands are denied by default. Destructive commands are denied.
+    Output is capped.
+    """
+    _setup_logging(debug)
+    command = list(ctx.args)
+    ws = _workspace(workspace)
+
+    if not command:
+        _out(err(ArcErrorCode.INVALID_INPUT, "missing server command"), json_output)
+        raise typer.Exit(2)
+
+    try:
+        policy_model = _policy(policy, ws)
+        decision = decide(command, policy_model)
+    except (ValueError, typer.BadParameter) as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(2)
+
+    if not decision.allowed:
+        _out(
+            ok(
+                {
+                    "command": command,
+                    "classification": decision.classification.value,
+                    "decision": "denied",
+                    "reason": decision.reason,
+                    "policy": policy_model.name,
+                },
+                workspace=str(ws),
+            ),
+            json_output,
+        )
+        raise typer.Exit(3)
+
+    try:
+        from ..cli.mcp import _inspect_server
+
+        result = _inspect_server(server_cmd=command, workspace=ws, timeout=float(timeout))
+    except Exception as exc:
+        _out(err(ArcErrorCode.INTERNAL_ERROR, str(exc)), json_output)
+        raise typer.Exit(1)
+
+    if "error" in result:
+        _out(err(ArcErrorCode.INTERNAL_ERROR, result["error"]), json_output)
+        raise typer.Exit(1)
+
+    _out(
+        ok(
+            {
+                "command": command,
+                "classification": decision.classification.value,
+                "decision": "allowed",
+                "policy": policy_model.name,
+                "tools": result.get("tools", []),
+                "resources": result.get("resources", []),
+                "prompts": result.get("prompts", []),
+                "stderr": result.get("stderr"),
+            },
+            workspace=str(ws),
+        ),
+        json_output,
+    )
+
+
 def _build_provider(
     name: str, policy_model: SandboxPolicy, ws: Path
 ) -> SubprocessIsolationProvider | MicroVMIsolationProvider:
