@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-28 — Phase 88 edit staleness guard added after Phases 85-87 CLI edit/runtime foundations.
-**Current evidence anchor:** local worktree | Phase 88: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3348 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
+**Last reality refresh:** 2026-05-28 — Phase 89 saved edit-plan apply flow added after Phase 88 staleness guard.
+**Current evidence anchor:** local worktree | Phase 89: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3350 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -4010,3 +4010,30 @@ cd python && uv run ruff check src tests/test_cli_edit_loop.py
 
 ### Known Risks
 - The hash guard is opt-in at apply time for CLI/REPL callers; future interactive flows should pass the preview hash automatically.
+
+## Phase 89 — Saved Edit Plan Apply Flow
+
+**Roadmap:** CLI/UX continuation slice 89
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/test_cli_edit_loop.py -q` 11 passed; ruff clean for changed Python files
+**Depends on:** Phase 88 (edit preview staleness guard)
+
+### Implementation
+1. Edit plans are persisted under `.arc/edit-plans/<plan_id>.json` with safe metadata only: path, hashes, policy, command, decision, timestamps. Replacement content and diff are not stored.
+2. `arc edit apply --plan-id <id> --content <text> --approve` loads the saved plan, checks replacement content hash, and uses the saved original hash as the staleness guard.
+3. REPL `/edit apply --plan-id <id> --content <text> --approve` routes through the same saved-plan helper.
+4. Content drift from the saved plan is denied before file write.
+
+### Acceptance
+1. ✅ `arc edit plan` persists a safe edit-plan record and returns `plan_path`.
+2. ✅ `arc edit apply --plan-id` applies when content hash and file hash match the saved plan.
+3. ✅ `arc edit apply --plan-id` denies replacement content drift.
+4. ✅ Saved plan records do not persist the full diff or replacement content.
+
+### Verification
+```bash
+cd python && uv run pytest tests/test_cli_edit_loop.py -q
+cd python && uv run ruff check src tests/test_cli_edit_loop.py
+```
+
+### Known Risks
+- Saved plans are local workspace artifacts only; there is no collaborative approval server or signed reviewer identity.

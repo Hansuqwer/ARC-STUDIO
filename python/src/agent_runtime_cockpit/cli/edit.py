@@ -40,8 +40,9 @@ def edit_plan(
 
 @edit_app.command("apply")
 def edit_apply(
-    path: str = typer.Option(..., "--path", help="Workspace file path"),
+    path: Optional[str] = typer.Option(None, "--path", help="Workspace file path"),
     content: str = typer.Option(..., "--content", help="Replacement file content"),
+    plan_id: Optional[str] = typer.Option(None, "--plan-id", help="Apply saved edit plan id"),
     approve: bool = typer.Option(False, "--approve", help="Apply after preview approval"),
     expected_original_hash: Optional[str] = typer.Option(
         None,
@@ -56,14 +57,18 @@ def edit_apply(
     """Apply one sandbox-approved file edit after explicit approval."""
     _setup_logging(debug)
     ws = _workspace(workspace)
+    if not path and not plan_id:
+        _out(err(ArcErrorCode.INVALID_INPUT, "--path or --plan-id required"), json_output)
+        raise typer.Exit(2)
     try:
         result = apply_edit_plan(
-            path_arg=path,
+            path_arg=path or "",
             content=content,
             workspace_root=ws,
             policy_name=policy,
             approved=approve,
             expected_original_hash=expected_original_hash,
+            plan_id=plan_id,
         )
     except (KeyError, ValueError) as exc:
         _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)

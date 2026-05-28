@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-28 — R59 edit preview staleness guard added after R56-R58 CLI edit/runtime foundations.
-**Current evidence anchor:** local worktree | R59: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3348 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
+**Last reality refresh:** 2026-05-28 — R60 saved edit-plan apply flow added after R59 staleness guard.
+**Current evidence anchor:** local worktree | R60: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3350 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -1011,6 +1011,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R57 Interactive CLI UX Polish** | **Baseline Complete** | **Phase 86 — `/edit` REPL command + help palette wiring with structured states; no broad Claude Code/OpenCode parity claim** |
 | **R58 Tool Runtime Unification** | **Baseline Complete** | **Phase 87 — shared registered-tool execution wrapper validates args and trust-wraps output; provider turn manager unchanged** |
 | **R59 Edit Preview Staleness Guard** | **Baseline Complete** | **Phase 88 — edit plans expose file/replacement hashes; apply can deny stale preview hashes before writing** |
+| **R60 Saved Edit Plan Apply Flow** | **Baseline Complete** | **Phase 89 — edit plans persist safe metadata; apply by `--plan-id` checks original/replacement hashes before writing** |
 
 **Post-v0.1 Execution Order:** 
 - **Priority 1 stop-the-line:** R39 / Phase 41 (Interactive CLI/UX Foundation). **Baseline Complete** as of Phases 41–45 (commits 37fd92b–7fdba99). Gate lifted. R44 (Phase 46 CLI write bridge + Phase 47 daemon HTTP write bridge) is now Baseline Complete. Continue sandbox hardening for Phase 37 microVM feasibility decision.
@@ -1298,3 +1299,11 @@ The following roadmap items implement the adapter integration plan from `docs/re
 **Current:** Baseline Complete. `arc edit plan` returns `original_hash` and `replacement_hash`. `arc edit apply --expected-original-hash <sha256>` denies stale applies with reason `file changed since preview`, emits an existing plan audit event, and leaves the current file untouched. REPL `/edit apply` supports the same flag.
 
 **Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/test_cli_edit_loop.py -q` 9 passed; ruff clean for changed Python files | Notes: Guard is opt-in for callers; future interactive flows should thread the preview hash automatically.
+
+## R60 — Saved Edit Plan Apply Flow
+
+**Goal:** Let users apply a previously reviewed edit plan without storing replacement content or trusting stale preview state.
+
+**Current:** Baseline Complete. `arc edit plan` persists safe metadata under `.arc/edit-plans/<plan_id>.json` and returns `plan_path`. `arc edit apply --plan-id <id> --content <text> --approve` loads the plan, denies replacement-content hash drift, uses the saved original hash for staleness checking, and writes only when both hashes still match. REPL `/edit apply --plan-id` uses the same helper.
+
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/test_cli_edit_loop.py -q` 11 passed; ruff clean for changed Python files | Notes: Saved plans are local workspace artifacts only; no collaborative approval server or reviewer identity claim.

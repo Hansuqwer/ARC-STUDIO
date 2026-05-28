@@ -31,6 +31,8 @@ def test_edit_plan_previews_diff_without_writing(tmp_path, monkeypatch):
     assert data["original_exists"] is True
     assert data["original_hash"]
     assert data["replacement_hash"]
+    assert data["plan_path"].endswith(f"{data['plan_id']}.json")
+    assert (tmp_path / ".arc" / "edit-plans" / f"{data['plan_id']}.json").exists()
     assert "-old" in data["diff"]
     assert "+new" in data["diff"]
     assert (tmp_path / ".arc" / "audit" / "plan.events.jsonl").exists()
@@ -109,6 +111,65 @@ def test_edit_apply_denies_stale_preview_hash(tmp_path, monkeypatch):
     assert data["applied"] is False
     assert data["reason"] == "file changed since preview"
     assert target.read_text(encoding="utf-8") == "changed\n"
+
+
+def test_edit_apply_by_plan_id_uses_saved_hashes(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    target = tmp_path / "note.txt"
+    target.write_text("old\n", encoding="utf-8")
+    plan = CliRunner().invoke(
+        app,
+        ["edit", "plan", "--json", "--path", "note.txt", "--content", "new\n"],
+    )
+    plan_id = _payload(plan)["data"]["plan_id"]
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "edit",
+            "apply",
+            "--json",
+            "--plan-id",
+            plan_id,
+            "--content",
+            "new\n",
+            "--approve",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert _payload(result)["data"]["applied"] is True
+    assert target.read_text(encoding="utf-8") == "new\n"
+
+
+def test_edit_apply_by_plan_id_denies_content_drift(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    target = tmp_path / "note.txt"
+    target.write_text("old\n", encoding="utf-8")
+    plan = CliRunner().invoke(
+        app,
+        ["edit", "plan", "--json", "--path", "note.txt", "--content", "new\n"],
+    )
+    plan_id = _payload(plan)["data"]["plan_id"]
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "edit",
+            "apply",
+            "--json",
+            "--plan-id",
+            plan_id,
+            "--content",
+            "other\n",
+            "--approve",
+        ],
+    )
+
+    data = _payload(result)["data"]
+    assert result.exit_code == 3
+    assert data["reason"] == "replacement content does not match edit plan"
+    assert target.read_text(encoding="utf-8") == "old\n"
 
 
 def test_edit_denies_path_escape(tmp_path, monkeypatch):

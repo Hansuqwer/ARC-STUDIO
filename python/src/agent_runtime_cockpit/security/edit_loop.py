@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import difflib
 import hashlib
+import json
 from pathlib import Path
 from typing import Any, Literal
 import uuid
@@ -32,7 +33,16 @@ class EditPlan(BaseModel):
     classification: str
     diff: str
     audit_path: str | None = None
+    plan_path: str | None = None
     created_at: str = Field(default_factory=utc_now)
+
+
+def edit_plan_store_dir(workspace_root: Path) -> Path:
+    return workspace_root / ".arc" / "edit-plans"
+
+
+def edit_plan_record_path(workspace_root: Path, plan_id: str) -> Path:
+    return edit_plan_store_dir(workspace_root) / f"{plan_id}.json"
 
 
 def _workspace_file(path_arg: str, workspace_root: Path) -> Path:
@@ -62,6 +72,26 @@ def file_content_hash(path: Path) -> str:
     return _sha256_text(path.read_text(encoding="utf-8"))
 
 
+def persist_edit_plan_record(plan: EditPlan, workspace_root: Path | None = None) -> Path:
+    """Persist safe edit-plan metadata without replacement content or diff."""
+    root = workspace_root or Path(plan.workspace_root)
+    path = edit_plan_record_path(root, plan.plan_id)
+    payload = plan.model_dump(mode="json", exclude={"diff", "audit_path", "plan_path"})
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
+def load_edit_plan_record(workspace_root: Path, plan_id: str) -> EditPlan:
+    path = edit_plan_record_path(workspace_root, plan_id)
+    if not path.exists():
+        raise ValueError(f"edit plan record not found: {plan_id}")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data.setdefault("diff", "")
+    data["plan_path"] = str(path)
+    return EditPlan.model_validate(data)
+
+
 def build_edit_plan(
     *,
     path_arg: str,
@@ -89,7 +119,7 @@ def build_edit_plan(
             lineterm="",
         )
     )
-    return EditPlan(
+    edit_plan = EditPlan(
         plan_id=plan.plan_id,
         workspace_root=str(ws),
         policy=policy.name,
@@ -104,6 +134,33 @@ def build_edit_plan(
         diff=diff,
         audit_path=str(audit_path),
     )
+    plan_path = persist_edit_plan_record(edit_plan, ws)
+    return edit_plan.model_copy(update={"plan_path": str(plan_path)})
+
+
+def _edit_apply_denied(
+    *,
+    plan: EditPlan,
+    workspace_root: Path,
+    reason: str,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    event = build_plan_apply_event(
+        "edit_apply_denied",
+        plan_id=plan.plan_id,
+        policy=plan.policy,
+        workspace_root=workspace_root,
+        reason=reason,
+        command=plan.command,
+    )
+    audit_path = persist_plan_event(event, workspace_root)
+    return {
+        "applied": False,
+        "reason": reason,
+        "plan": plan.model_dump(mode="json"),
+        "audit_events": [{**event, "audit_path": str(audit_path)}],
+        **(extra or {}),
+    }
 
 
 def apply_edit_plan(
@@ -114,10 +171,28 @@ def apply_edit_plan(
     policy_name: str = "local-safe",
     approved: bool = False,
     expected_original_hash: str | None = None,
+    plan_id: str | None = None,
 ) -> dict[str, Any]:
     """Apply an edit only after sandbox policy allows it and caller approves."""
     ws = workspace_root.resolve()
     ensure_workspace_cwd(ws, ws)
+    saved_plan: EditPlan | None = None
+    if plan_id:
+        saved_plan = load_edit_plan_record(ws, plan_id)
+        path_arg = saved_plan.path
+        policy_name = saved_plan.policy
+        expected_original_hash = expected_original_hash or saved_plan.original_hash
+        replacement_hash = _sha256_text(content)
+        if replacement_hash != saved_plan.replacement_hash:
+            return _edit_apply_denied(
+                plan=saved_plan,
+                workspace_root=ws,
+                reason="replacement content does not match edit plan",
+                extra={
+                    "replacement_hash": replacement_hash,
+                    "expected_replacement_hash": saved_plan.replacement_hash,
+                },
+            )
     plan = build_edit_plan(
         path_arg=path_arg,
         content=content,
@@ -125,57 +200,21 @@ def apply_edit_plan(
         policy_name=policy_name,
     )
     if not plan.allowed:
-        event = build_plan_apply_event(
-            "edit_apply_denied",
-            plan_id=plan.plan_id,
-            policy=plan.policy,
-            workspace_root=ws,
-            reason=plan.reason,
-            command=plan.command,
-        )
-        audit_path = persist_plan_event(event, ws)
-        return {
-            "applied": False,
-            "reason": plan.reason,
-            "plan": plan.model_dump(mode="json"),
-            "audit_events": [{**event, "audit_path": str(audit_path)}],
-        }
+        return _edit_apply_denied(plan=plan, workspace_root=ws, reason=plan.reason)
     if not approved:
-        event = build_plan_apply_event(
-            "edit_apply_denied",
-            plan_id=plan.plan_id,
-            policy=plan.policy,
-            workspace_root=ws,
-            reason="approval required",
-            command=plan.command,
-        )
-        audit_path = persist_plan_event(event, ws)
-        return {
-            "applied": False,
-            "reason": "approval required",
-            "plan": plan.model_dump(mode="json"),
-            "audit_events": [{**event, "audit_path": str(audit_path)}],
-        }
+        return _edit_apply_denied(plan=plan, workspace_root=ws, reason="approval required")
     path = _workspace_file(path_arg, ws)
     current_hash = file_content_hash(path)
     if expected_original_hash and current_hash != expected_original_hash:
-        event = build_plan_apply_event(
-            "edit_apply_denied",
-            plan_id=plan.plan_id,
-            policy=plan.policy,
+        return _edit_apply_denied(
+            plan=saved_plan or plan,
             workspace_root=ws,
             reason="file changed since preview",
-            command=plan.command,
+            extra={
+                "current_hash": current_hash,
+                "expected_original_hash": expected_original_hash,
+            },
         )
-        audit_path = persist_plan_event(event, ws)
-        return {
-            "applied": False,
-            "reason": "file changed since preview",
-            "current_hash": current_hash,
-            "expected_original_hash": expected_original_hash,
-            "plan": plan.model_dump(mode="json"),
-            "audit_events": [{**event, "audit_path": str(audit_path)}],
-        }
     write_text_atomic(path, content, lock=True)
     event = build_plan_apply_event(
         "edit_apply_applied",
