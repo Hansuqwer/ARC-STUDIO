@@ -9,6 +9,7 @@ from rich.table import Table
 
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
+from ..workspace import iter_workspace_files
 from ._app import console
 from ._helpers import (
     DEBUG_FLAG,
@@ -687,3 +688,159 @@ def workspace_config_cmd(
         return
     config = load_config(workspace=ws)
     _out(ok(config.flatten()), json_output)
+
+
+@workspace_app.command("inventory")
+def workspace_inventory(
+    suffix: Optional[str] = typer.Option(
+        None,
+        "--suffix",
+        "-s",
+        help="Comma-separated file suffixes to include (default: .py,.ts,.tsx,.json,.yaml,.md)",
+    ),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Deterministic local context inventory — files, git, traces, MCP."""
+    import subprocess as _subprocess
+
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+
+    suffixes_list = (
+        tuple(f".{s.strip().lstrip('.')}" for s in suffix.split(",") if s.strip())
+        if suffix
+        else (".py", ".ts", ".tsx", ".json", ".yaml", ".md")
+    )
+
+    files: list[dict] = []
+    total_size = 0
+    for path in iter_workspace_files(ws, suffixes_list):
+        try:
+            stat = path.stat()
+            files.append(
+                {
+                    "path": str(path.relative_to(ws)),
+                    "size": stat.st_size,
+                    "suffix": path.suffix,
+                    "provenance": "workspace_file",
+                }
+            )
+            total_size += stat.st_size
+        except OSError:
+            files.append(
+                {
+                    "path": str(path.relative_to(ws)),
+                    "size": None,
+                    "suffix": path.suffix,
+                    "provenance": "workspace_file",
+                    "error": "stat_failed",
+                }
+            )
+
+    git_meta: dict = {"provenance": "git"}
+    git_dir = ws / ".git"
+    if git_dir.is_dir():
+        git_meta["present"] = True
+        try:
+            branch = _subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                cwd=ws,
+                check=False,
+            ).stdout.strip()
+            commit = _subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                cwd=ws,
+                check=False,
+            ).stdout.strip()
+            commit_count = _subprocess.run(
+                ["git", "rev-list", "--count", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                cwd=ws,
+                check=False,
+            ).stdout.strip()
+            status = _subprocess.run(
+                ["git", "status", "--porcelain"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                cwd=ws,
+                check=False,
+            ).stdout.strip()
+            git_meta.update(
+                {
+                    "branch": branch or None,
+                    "commit": commit or None,
+                    "commit_count": int(commit_count) if commit_count.isdigit() else None,
+                    "dirty": bool(status),
+                    "git_dir": str(git_dir),
+                }
+            )
+        except Exception:
+            git_meta["degraded"] = True
+            git_meta["reason"] = "git_command_failed"
+    else:
+        git_meta["present"] = False
+        git_meta["reason"] = "no_git_dir"
+
+    traces_dir = ws / ".arc" / "traces"
+    traces: list[dict] = []
+    if traces_dir.is_dir():
+        for tpath in sorted(traces_dir.iterdir()):
+            if tpath.is_file() and tpath.suffix == ".jsonl":
+                try:
+                    tstat = tpath.stat()
+                    traces.append(
+                        {
+                            "name": tpath.name,
+                            "size": tstat.st_size,
+                            "provenance": "trace_store",
+                        }
+                    )
+                except OSError:
+                    pass
+
+    mcp_dir = ws / ".arc" / "mcp"
+    mcp_resources: list[dict] = []
+    if mcp_dir.is_dir():
+        for mpath in sorted(mcp_dir.iterdir()):
+            if mpath.suffix in (".json", ".yaml", ".yml"):
+                mcp_resources.append(
+                    {
+                        "name": mpath.name,
+                        "provenance": "mcp_resource",
+                    }
+                )
+    if not mcp_resources:
+        mcp_resources.append(
+            {
+                "provenance": "mcp_resource",
+                "present": False,
+                "reason": "no_mcp_config_found",
+            }
+        )
+
+    payload = {
+        "workspace": str(ws),
+        "files": {
+            "count": len(files),
+            "total_size": total_size,
+            "entries": files,
+        },
+        "git": git_meta,
+        "traces": {
+            "count": len(traces),
+            "entries": traces,
+        },
+        "mcp_resources": mcp_resources,
+    }
+    _out(ok(payload, workspace=str(ws)), json_output)

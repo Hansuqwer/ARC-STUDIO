@@ -17,6 +17,7 @@ from ._subapps import (
     audit_app,
     batch_app,
     battle_app,
+    ci_app,
     config_app,
     context_app,
     doctor_app,
@@ -41,6 +42,7 @@ from ._subapps import (
     plan_app,
     swarmgraph_app,
     task_app,
+    testbench_app,
     workspace_app,
 )
 
@@ -85,6 +87,8 @@ app.add_typer(prompt_app)
 app.add_typer(swarmgraph_app)
 app.add_typer(review_app)
 app.add_typer(plan_app)
+app.add_typer(testbench_app)
+app.add_typer(ci_app)
 
 
 @app.command("dashboard")

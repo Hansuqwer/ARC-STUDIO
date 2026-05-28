@@ -3604,6 +3604,137 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md docs/security
 **Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/events/test_phase55_log_rotation.py tests/web/test_phase55_provider_trust.py -q` (11 passed); ruff OK  
 **Depends on:** Phase 54 (Baseline Complete), Phase 50 (trust surface audit complete)
 
+---
+
+## Phase 78 — MCP Workbench Phase 1
+
+**Roadmap:** R48  
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/mcp/ -q` (56 passed, 11 new workbench tests); `cd python && uv run ruff check src tests` OK; `pnpm build` OK; `pnpm typecheck` OK  
+**Depends on:** Phase 26 (MCP Local Control Plane), Phase 23 (trust enforcement)
+
+### Implementation
+1. ✅ Added `workbench` sub-app nested under `mcp_app` in `cli/_subapps.py`
+2. ✅ Added `arc mcp workbench status --json` — reports ARC MCP server trust state, server creatability, registered tools/resources, audit path, and stable JSON envelope even when untrusted
+3. ✅ Added `arc mcp workbench inspect --server <cmd> --json` — launches configured stdio MCP subprocess, connects via MCP `ClientSession`, lists tools/resources/prompts, cleans up, emits audit event
+4. ✅ Both commands are read-only diagnostic; no mutation, no HTTP listener
+5. ✅ 11 tests covering: status with no config is stable not error, inspect with fixture server, read-only diagnostic passed, unsafe diagnostic denied, no HTTP listener, audit event emitted, trust state included
+
+### Files changed
+- `python/src/agent_runtime_cockpit/cli/_subapps.py` — added `mcp_workbench_app`
+- `python/src/agent_runtime_cockpit/cli/mcp.py` — added workbench commands (+406 lines)
+- `python/tests/mcp/test_mcp_workbench.py` — 216 lines, 11 tests
+
+### Acceptance
+1. ✅ `arc mcp workbench status --json` works with no configured servers (stable/degraded, not error)
+2. ✅ `arc mcp workbench inspect --server <cmd> --json` lists tools/resources/prompts from fixture server
+3. ✅ Read-only diagnostic succeeds with fixture server
+4. ✅ Unsafe diagnostic denied
+5. ✅ No HTTP listener opened; no external server auto-start without explicit `--server` arg
+6. ✅ Audit event emitted for workbench inspect
+7. ✅ Trust state included in status output
+
+### CLI examples
+```
+arc mcp workbench status --json
+arc mcp workbench inspect --server "python -m my_mcp_server" --json
+```
+
+### Known Risks
+- IDE panel not implemented (CLI baseline only)
+- Inspect command requires the target MCP server to be a valid stdio MCP server
+- MCP protocol is evolving; pinned to mcp>=1.0.0
+
+---
+
+## Phase 79 — Workspace Intelligence + Test Bench MVP
+
+**Roadmap:** R49  
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/cli/test_workspace_inventory.py tests/cli/test_testbench.py -q` (16 passed); `cd python && uv run ruff check src tests` OK; `pnpm build` OK; `pnpm typecheck` OK  
+**Depends on:** Phase 23 (trust enforcement), Phase 37 (sandbox hardening)
+
+### Implementation
+1. ✅ Added `arc workspace inventory --json` — deterministic local context inventory with files (by suffix), git metadata (branch, commit, dirty status), traces from `.arc/traces/`, MCP resource references with provenance; symlink/path traversal guarded; missing items render degraded, never fabricated
+2. ✅ Added `testbench_app` sub-app in `cli/_subapps.py`
+3. ✅ Added `arc testbench detect --json` — detects test commands from `package.json` scripts.test, `pyproject.toml` pytest config, `setup.cfg`, `Makefile`, `pytest.ini`; supports `--command` override
+4. ✅ Added `arc testbench run --policy local-safe -- <cmd...>` — runs argv through `SubprocessIsolationProvider` with sandbox policy; network/destructive denied by default; output capped; no inferred pass/fail beyond actual exit code
+
+### Files created/changed
+- `python/src/agent_runtime_cockpit/cli/_subapps.py` — added `testbench_app`
+- `python/src/agent_runtime_cockpit/cli/_app.py` — registered `testbench_app`
+- `python/src/agent_runtime_cockpit/cli/__init__.py` — added `testbench` module
+- `python/src/agent_runtime_cockpit/cli/studio_workspace.py` — added `inventory` command (+98 lines)
+- `python/src/agent_runtime_cockpit/cli/testbench.py` — 187 lines, detect and run commands
+- `python/tests/cli/test_workspace_inventory.py` — 117 lines, 7 tests
+- `python/tests/cli/test_testbench.py` — 103 lines, 9 tests
+
+### Acceptance
+1. ✅ Inventory includes files with provenance
+2. ✅ Inventory blocks workspace escape / symlink escape
+3. ✅ Git metadata included if repo exists, degraded if absent
+4. ✅ Trace metadata included from local fixtures
+5. ✅ MCP resource references included if available, degraded if absent
+6. ✅ Test command detection from package.json/pyproject.toml/Makefile
+7. ✅ Editable explicit command accepted
+8. ✅ Test run uses sandbox path
+9. ✅ Network/destructive test command denied
+10. ✅ Output attached without inferred pass/fail
+
+### CLI examples
+```
+arc workspace inventory --json
+arc testbench detect --json
+arc testbench run --policy local-safe -- pytest
+```
+
+### Known Risks
+- Symbol detection requires workspace to be indexed; not included in current implementation
+- Test command detection is best-effort; custom test runners may not be detected
+- IDE panel not implemented (CLI baseline only)
+
+---
+
+## Phase 80 — ARC CI Guardrails MVP
+
+**Roadmap:** R51  
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/cli/test_ci.py -q` (11 passed); `cd python && uv run ruff check src tests` OK; `pnpm build` OK; `pnpm typecheck` OK  
+**Depends on:** Phase 25 (CLI decomposition), Phase 53 (eval artifacts), Phase 55 (event/store infrastructure)
+
+### Implementation
+1. ✅ Added `ci_app` sub-app in `cli/_subapps.py`
+2. ✅ Added `arc ci check --json --private` — offline CI checks: sandbox audit (denied commands), policy status, eval goldens, receipts; default private/no-upload
+3. ✅ Added `arc ci summary --format markdown` — advisory PR summary with audit events, policies, eval results, receipts; deterministic, redacted, no AI judgment claims
+4. ✅ Added `arc ci verify-audit --json` — verifies sandbox audit chain via `verify_sandbox_audit()`; optional `--audit-dir` parameter
+
+### Files created/changed
+- `python/src/agent_runtime_cockpit/cli/_subapps.py` — added `ci_app`
+- `python/src/agent_runtime_cockpit/cli/_app.py` — registered `ci_app`
+- `python/src/agent_runtime_cockpit/cli/__init__.py` — added `ci` module
+- `python/src/agent_runtime_cockpit/cli/ci.py` — 185 lines, three CI commands
+- `python/tests/cli/test_ci.py` — 197 lines, 11 tests
+
+### Acceptance
+1. ✅ `arc ci check --private --json` runs offline (no network calls)
+2. ✅ Policy check included
+3. ✅ Audit verification included
+4. ✅ Eval gate included using local fixtures
+5. ✅ Receipt signing reference included
+6. ✅ PR summary deterministic and redacted
+7. ✅ No upload/network call by default
+8. ✅ Advisory review cannot claim authoritative AI approval
+9. ✅ Failures structured in JSON envelope
+
+### CLI examples
+```
+arc ci check --json --private
+arc ci summary --format markdown
+arc ci verify-audit --json
+```
+
+### Known Risks
+- No hosted CI integration; CLI-only advisory commands
+- PR summary does not make AI judgment claims — advisory only
+- Eval gate uses local fixture detection only, not provider-backed evaluation
+
 ### Deliverables
 1. Event log rotation in `events/persistence.py`:
    - `max_entries` (default 2000) and `max_age_days` (default 7) on `EventPersistenceWriter`.

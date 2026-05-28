@@ -35,6 +35,11 @@ audit_app = typer.Typer(name="audit", help="Audit chain verification and key man
 profiles_app = typer.Typer(name="profiles", help="Run profile management")
 prompt_app = typer.Typer(name="prompt", help="Prompt optimization commands (P1b local)")
 mcp_app = typer.Typer(name="mcp", help="MCP Local Control Plane server (Phase 26 / R19)")
+mcp_workbench_app = typer.Typer(
+    name="workbench",
+    help="MCP workbench diagnostics — inspect servers, check local MCP status (Phase 78 / R48)",
+)
+mcp_app.add_typer(mcp_workbench_app)
 memory_app = typer.Typer(
     name="memory", help="Swarm memory graph research commands (Phase 59 / R26)"
 )
@@ -56,4 +61,12 @@ review_app = typer.Typer(
 plan_app = typer.Typer(
     name="plan",
     help="Plan/Apply/Review — deterministic plan-before-execution (Phase 75)",
+)
+testbench_app = typer.Typer(
+    name="testbench",
+    help="Test bench — detect and run tests through sandbox (Phase 79 / R49)",
+)
+ci_app = typer.Typer(
+    name="ci",
+    help="ARC CI guardrails — offline checks, PR summaries, audit verification (Phase 80 / R51)",
 )

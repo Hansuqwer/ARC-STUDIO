@@ -19,6 +19,7 @@ from . import (
     audit,  # noqa: F401
     batch,  # noqa: F401
     battle,  # noqa: F401
+    ci,  # noqa: F401 — Phase 80 / R51: CI guardrails
     discover,  # noqa: F401
     events,  # noqa: F401
     exec,  # noqa: F401
@@ -35,6 +36,7 @@ from . import (
     runs,  # noqa: F401
     sandbox,  # noqa: F401
     studio_workspace,  # noqa: F401
+    testbench,  # noqa: F401
     swarmgraph,  # noqa: F401 — Phase 51: arc swarmgraph assess-risk
     task,  # noqa: F401 — Phase 27 / Phase 56: task CLI
 )
