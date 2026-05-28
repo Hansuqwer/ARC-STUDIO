@@ -584,7 +584,7 @@ def render_policy_show(name: str, workspace: Path | None = None) -> SlashAdapter
     )
 
 
-def _parse_edit_args(arg: str) -> tuple[str, str, bool, str]:
+def _parse_edit_args(arg: str) -> tuple[str, str, bool, str, str | None]:
     parts = shlex.split(arg)
     if parts[:1] in (["plan"], ["apply"]):
         parts = parts[1:]
@@ -592,6 +592,7 @@ def _parse_edit_args(arg: str) -> tuple[str, str, bool, str]:
     content = ""
     approved = False
     policy = "local-safe"
+    expected_hash: str | None = None
     index = 0
     while index < len(parts):
         part = parts[index]
@@ -623,16 +624,24 @@ def _parse_edit_args(arg: str) -> tuple[str, str, bool, str]:
             approved = True
             index += 1
             continue
+        if part == "--expected-original-hash" and index + 1 < len(parts):
+            expected_hash = parts[index + 1]
+            index += 2
+            continue
+        if part.startswith("--expected-original-hash="):
+            expected_hash = part.split("=", 1)[1]
+            index += 1
+            continue
         raise ValueError("Usage: /edit plan|apply --path PATH --content TEXT [--approve]")
     if not path:
         raise ValueError("missing --path")
-    return path, content, approved, policy
+    return path, content, approved, policy, expected_hash
 
 
 def render_edit_plan(arg: str, workspace: Path | None = None) -> SlashAdapterResult:
     ws = _workspace(workspace)
     try:
-        path, content, _approved, policy = _parse_edit_args(arg)
+        path, content, _approved, policy, _expected_hash = _parse_edit_args(arg)
         plan = build_edit_plan(
             path_arg=path, content=content, workspace_root=ws, policy_name=policy
         )
@@ -657,13 +666,14 @@ def render_edit_plan(arg: str, workspace: Path | None = None) -> SlashAdapterRes
 def render_edit_apply(arg: str, workspace: Path | None = None) -> SlashAdapterResult:
     ws = _workspace(workspace)
     try:
-        path, content, approved, policy = _parse_edit_args(arg)
+        path, content, approved, policy, expected_hash = _parse_edit_args(arg)
         result = apply_edit_plan(
             path_arg=path,
             content=content,
             workspace_root=ws,
             policy_name=policy,
             approved=approved,
+            expected_original_hash=expected_hash,
         )
     except (KeyError, ValueError, OSError) as exc:
         return SlashAdapterResult(state="blocked", text=f"Blocked: {exc}", exit_code=2)

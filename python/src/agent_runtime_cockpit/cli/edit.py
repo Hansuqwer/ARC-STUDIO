@@ -43,6 +43,11 @@ def edit_apply(
     path: str = typer.Option(..., "--path", help="Workspace file path"),
     content: str = typer.Option(..., "--content", help="Replacement file content"),
     approve: bool = typer.Option(False, "--approve", help="Apply after preview approval"),
+    expected_original_hash: Optional[str] = typer.Option(
+        None,
+        "--expected-original-hash",
+        help="Deny if current file hash differs from prior edit plan",
+    ),
     policy: str = typer.Option("local-safe", "--policy", help="Sandbox policy profile"),
     workspace: Optional[str] = WORKSPACE_FLAG,
     json_output: bool = JSON_FLAG,
@@ -58,6 +63,7 @@ def edit_apply(
             workspace_root=ws,
             policy_name=policy,
             approved=approve,
+            expected_original_hash=expected_original_hash,
         )
     except (KeyError, ValueError) as exc:
         _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)

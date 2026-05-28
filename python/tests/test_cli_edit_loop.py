@@ -28,6 +28,9 @@ def test_edit_plan_previews_diff_without_writing(tmp_path, monkeypatch):
     data = _payload(result)["data"]
     assert data["allowed"] is True
     assert data["classification"] == "writes_workspace"
+    assert data["original_exists"] is True
+    assert data["original_hash"]
+    assert data["replacement_hash"]
     assert "-old" in data["diff"]
     assert "+new" in data["diff"]
     assert (tmp_path / ".arc" / "audit" / "plan.events.jsonl").exists()
@@ -72,6 +75,40 @@ def test_edit_apply_writes_after_approval(tmp_path, monkeypatch):
     assert _payload(result)["data"]["applied"] is True
     assert _payload(result)["data"]["audit_events"][0]["type"] == "edit_apply_applied"
     assert target.read_text(encoding="utf-8") == "new\n"
+
+
+def test_edit_apply_denies_stale_preview_hash(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    target = tmp_path / "note.txt"
+    target.write_text("old\n", encoding="utf-8")
+    plan = CliRunner().invoke(
+        app,
+        ["edit", "plan", "--json", "--path", "note.txt", "--content", "new\n"],
+    )
+    expected_hash = _payload(plan)["data"]["original_hash"]
+    target.write_text("changed\n", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "edit",
+            "apply",
+            "--json",
+            "--path",
+            "note.txt",
+            "--content",
+            "new\n",
+            "--approve",
+            "--expected-original-hash",
+            expected_hash,
+        ],
+    )
+
+    data = _payload(result)["data"]
+    assert result.exit_code == 3
+    assert data["applied"] is False
+    assert data["reason"] == "file changed since preview"
+    assert target.read_text(encoding="utf-8") == "changed\n"
 
 
 def test_edit_denies_path_escape(tmp_path, monkeypatch):

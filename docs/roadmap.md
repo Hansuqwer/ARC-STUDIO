@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-28 — R56-R58 CLI edit loop, interactive `/edit`, and tool runtime helper landed after R53-R55 sandbox hardening.
-**Current evidence anchor:** local worktree | R56-R58: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3347 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
+**Last reality refresh:** 2026-05-28 — R59 edit preview staleness guard added after R56-R58 CLI edit/runtime foundations.
+**Current evidence anchor:** local worktree | R59: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3348 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -1010,6 +1010,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R56 Agentic CLI Edit Loop** | **Baseline Complete** | **Phase 85 — one-file safety-gated edit plan/apply using sandbox plan policy and existing audit helpers; no autonomous multi-file parity claim** |
 | **R57 Interactive CLI UX Polish** | **Baseline Complete** | **Phase 86 — `/edit` REPL command + help palette wiring with structured states; no broad Claude Code/OpenCode parity claim** |
 | **R58 Tool Runtime Unification** | **Baseline Complete** | **Phase 87 — shared registered-tool execution wrapper validates args and trust-wraps output; provider turn manager unchanged** |
+| **R59 Edit Preview Staleness Guard** | **Baseline Complete** | **Phase 88 — edit plans expose file/replacement hashes; apply can deny stale preview hashes before writing** |
 
 **Post-v0.1 Execution Order:** 
 - **Priority 1 stop-the-line:** R39 / Phase 41 (Interactive CLI/UX Foundation). **Baseline Complete** as of Phases 41–45 (commits 37fd92b–7fdba99). Gate lifted. R44 (Phase 46 CLI write bridge + Phase 47 daemon HTTP write bridge) is now Baseline Complete. Continue sandbox hardening for Phase 37 microVM feasibility decision.
@@ -1289,3 +1290,11 @@ The following roadmap items implement the adapter integration plan from `docs/re
 **Current:** Baseline Complete. `runtime/tool_runtime.py` exposes `run_registered_tool()` for registry lookup, Pydantic arg validation, cancellation token defaulting, tool execution, and `wrap_tool_result()` trust wrapping. Unknown tools are rejected.
 
 **Status:** Baseline Complete | Evidence: local worktree; `tests/test_cli_edit_loop.py` covers wrapped `read_file` execution and unknown-tool rejection | Notes: Existing provider-backed `/run` tool-calling remains unchanged; this is a shared helper foundation, not a broad runtime rewrite.
+
+## R59 — Edit Preview Staleness Guard
+
+**Goal:** Prevent a reviewed edit preview from being applied over a file that changed afterward.
+
+**Current:** Baseline Complete. `arc edit plan` returns `original_hash` and `replacement_hash`. `arc edit apply --expected-original-hash <sha256>` denies stale applies with reason `file changed since preview`, emits an existing plan audit event, and leaves the current file untouched. REPL `/edit apply` supports the same flag.
+
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/test_cli_edit_loop.py -q` 9 passed; ruff clean for changed Python files | Notes: Guard is opt-in for callers; future interactive flows should thread the preview hash automatically.

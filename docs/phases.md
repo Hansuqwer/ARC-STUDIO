@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-28 — Phases 85-87 Baseline Complete; CLI edit loop, interactive `/edit`, and tool runtime helper verified.
-**Current evidence anchor:** local worktree | Phase 85-87: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3347 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
+**Last reality refresh:** 2026-05-28 — Phase 88 edit staleness guard added after Phases 85-87 CLI edit/runtime foundations.
+**Current evidence anchor:** local worktree | Phase 88: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3348 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -3983,3 +3983,30 @@ cd python && uv run pytest tests/test_cli_edit_loop.py -q
 
 ### Known Risks
 - Existing `/run` provider-backed tool-calling remains unchanged; this slice only adds a small shared runtime helper.
+
+## Phase 88 — Edit Preview Staleness Guard
+
+**Roadmap:** CLI/UX continuation slice 88
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/test_cli_edit_loop.py -q` 9 passed; ruff clean for changed Python files
+**Depends on:** Phase 85 (agentic CLI edit loop)
+
+### Implementation
+1. `EditPlan` now includes `original_exists`, `original_hash`, and `replacement_hash`.
+2. `arc edit apply --expected-original-hash <sha256>` denies if the target file changed after preview.
+3. REPL `/edit apply` accepts `--expected-original-hash` and routes it through the same helper.
+4. Denied stale applies emit `edit_apply_denied` audit events with reason `file changed since preview`.
+
+### Acceptance
+1. ✅ Edit preview exposes current file hash and replacement hash.
+2. ✅ Apply with matching/no expected hash preserves existing behavior.
+3. ✅ Apply with a stale expected hash is denied and does not overwrite the changed file.
+4. ✅ Existing edit-loop tests remain green.
+
+### Verification
+```bash
+cd python && uv run pytest tests/test_cli_edit_loop.py -q
+cd python && uv run ruff check src tests/test_cli_edit_loop.py
+```
+
+### Known Risks
+- The hash guard is opt-in at apply time for CLI/REPL callers; future interactive flows should pass the preview hash automatically.
