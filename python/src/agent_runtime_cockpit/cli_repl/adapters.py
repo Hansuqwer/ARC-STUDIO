@@ -28,6 +28,7 @@ from ..security.sandbox import (
     validate_command_paths,
     verify_sandbox_audit,
 )
+from ..security.edit_loop import apply_edit_plan, build_edit_plan
 
 READ_MAX_BYTES = 64_000
 READ_DEFAULT_LIMIT = 200
@@ -580,6 +581,102 @@ def render_policy_show(name: str, workspace: Path | None = None) -> SlashAdapter
     ]
     return SlashAdapterResult(
         state="present", text="\n".join(lines), data={"policy": policy.model_dump(mode="json")}
+    )
+
+
+def _parse_edit_args(arg: str) -> tuple[str, str, bool, str]:
+    parts = shlex.split(arg)
+    if parts[:1] in (["plan"], ["apply"]):
+        parts = parts[1:]
+    path = ""
+    content = ""
+    approved = False
+    policy = "local-safe"
+    index = 0
+    while index < len(parts):
+        part = parts[index]
+        if part == "--path" and index + 1 < len(parts):
+            path = parts[index + 1]
+            index += 2
+            continue
+        if part.startswith("--path="):
+            path = part.split("=", 1)[1]
+            index += 1
+            continue
+        if part == "--content" and index + 1 < len(parts):
+            content = parts[index + 1]
+            index += 2
+            continue
+        if part.startswith("--content="):
+            content = part.split("=", 1)[1]
+            index += 1
+            continue
+        if part == "--policy" and index + 1 < len(parts):
+            policy = parts[index + 1]
+            index += 2
+            continue
+        if part.startswith("--policy="):
+            policy = part.split("=", 1)[1]
+            index += 1
+            continue
+        if part == "--approve":
+            approved = True
+            index += 1
+            continue
+        raise ValueError("Usage: /edit plan|apply --path PATH --content TEXT [--approve]")
+    if not path:
+        raise ValueError("missing --path")
+    return path, content, approved, policy
+
+
+def render_edit_plan(arg: str, workspace: Path | None = None) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    try:
+        path, content, _approved, policy = _parse_edit_args(arg)
+        plan = build_edit_plan(
+            path_arg=path, content=content, workspace_root=ws, policy_name=policy
+        )
+    except (KeyError, ValueError, OSError) as exc:
+        return SlashAdapterResult(state="blocked", text=f"Blocked: {exc}", exit_code=2)
+    lines = [
+        f"Edit plan: {plan.path}",
+        f"Classification: {plan.classification}",
+        f"Decision: {'allow' if plan.allowed else 'deny'}",
+        f"Reason: {plan.reason}",
+    ]
+    if plan.diff:
+        lines.extend(["diff:", plan.diff])
+    return SlashAdapterResult(
+        state="present" if plan.allowed else "denied",
+        text="\n".join(lines),
+        data=plan.model_dump(mode="json"),
+        exit_code=0 if plan.allowed else 3,
+    )
+
+
+def render_edit_apply(arg: str, workspace: Path | None = None) -> SlashAdapterResult:
+    ws = _workspace(workspace)
+    try:
+        path, content, approved, policy = _parse_edit_args(arg)
+        result = apply_edit_plan(
+            path_arg=path,
+            content=content,
+            workspace_root=ws,
+            policy_name=policy,
+            approved=approved,
+        )
+    except (KeyError, ValueError, OSError) as exc:
+        return SlashAdapterResult(state="blocked", text=f"Blocked: {exc}", exit_code=2)
+    plan = result["plan"]
+    text = (
+        f"Edit {'applied' if result['applied'] else 'not applied'}: {plan['path']}\n"
+        f"Reason: {result['reason']}"
+    )
+    return SlashAdapterResult(
+        state="present" if result["applied"] else "blocked",
+        text=text,
+        data=result,
+        exit_code=0 if result["applied"] else 3,
     )
 
 

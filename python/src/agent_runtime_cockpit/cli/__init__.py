@@ -21,6 +21,7 @@ from . import (
     battle,  # noqa: F401
     ci,  # noqa: F401 — Phase 80 / R51: CI guardrails
     discover,  # noqa: F401
+    edit,  # noqa: F401 — Phase 85: safety-gated edit loop
     events,  # noqa: F401
     exec,  # noqa: F401
     info,  # noqa: F401

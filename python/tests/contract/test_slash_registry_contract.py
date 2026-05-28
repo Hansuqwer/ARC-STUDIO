@@ -21,6 +21,7 @@ PHASE_41_COMMANDS = {
     "runs",
     "read",
     "search",
+    "edit",
     "tools",
     "sandbox",
     "policy",

@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-28 — R45-R52 candidate baselines implemented; local sandbox audit/container/policy hardening landed as R53-R55.
-**Current evidence anchor:** local worktree | R53-R55 post-review hardening: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3339 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK; banned-claims check OK.
+**Last reality refresh:** 2026-05-28 — R56-R58 CLI edit loop, interactive `/edit`, and tool runtime helper landed after R53-R55 sandbox hardening.
+**Current evidence anchor:** local worktree | R56-R58: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3347 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -1007,6 +1007,9 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R53 Local Sandbox Audit Query + Compaction** | **Baseline Complete** | **Phase 82 — local-only audit query/compaction; compaction refuses canonical hash-chain logs; 19 audit query tests** |
 | **R54 Container Isolation Provider** | **Baseline Complete** | **Phase 83 — container fallback remains disabled unless `ARC_ENABLE_CONTAINER_SANDBOX=1`; Docker/Podman CLI provider hardened** |
 | **R55 Local Sandbox Policy YAML** | **Baseline Complete** | **Phase 84 — local workspace/user YAML policy validation/apply/list/show; no remote policy server** |
+| **R56 Agentic CLI Edit Loop** | **Baseline Complete** | **Phase 85 — one-file safety-gated edit plan/apply using sandbox plan policy and existing audit helpers; no autonomous multi-file parity claim** |
+| **R57 Interactive CLI UX Polish** | **Baseline Complete** | **Phase 86 — `/edit` REPL command + help palette wiring with structured states; no broad Claude Code/OpenCode parity claim** |
+| **R58 Tool Runtime Unification** | **Baseline Complete** | **Phase 87 — shared registered-tool execution wrapper validates args and trust-wraps output; provider turn manager unchanged** |
 
 **Post-v0.1 Execution Order:** 
 - **Priority 1 stop-the-line:** R39 / Phase 41 (Interactive CLI/UX Foundation). **Baseline Complete** as of Phases 41–45 (commits 37fd92b–7fdba99). Gate lifted. R44 (Phase 46 CLI write bridge + Phase 47 daemon HTTP write bridge) is now Baseline Complete. Continue sandbox hardening for Phase 37 microVM feasibility decision.
@@ -1262,3 +1265,27 @@ The following roadmap items implement the adapter integration plan from `docs/re
 **Status:** Baseline Complete | Evidence: local worktree; 22 YAML policy tests pass; full Python suite 3339 passed / 34 skipped / 3 xfailed; ruff clean; pnpm build + typecheck green | Notes: YAML policy files are local workspace/user files; no remote/centralized policy server. `yaml` dependency already present.
 
 **Source:** Phase 35 execution, 2026-05-28
+
+## R56 — Agentic CLI Edit Loop
+
+**Goal:** Add the next safe CLI edit-loop foundation without claiming autonomous coding-agent parity.
+
+**Current:** Baseline Complete. `arc edit plan` previews one workspace file replacement through sandbox plan policy and emits a unified diff plus plan audit event. `arc edit apply` writes only when policy allows the workspace write and `--approve` is supplied. REPL `/edit plan|apply` uses the same helper. Path traversal and symlink escapes are denied.
+
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/test_cli_edit_loop.py -q` 8 passed; related CLI regressions 274 passed / 1 skipped; ruff clean | Notes: One-file deterministic edit loop only; no Claude Code/OpenCode parity claim.
+
+## R57 — Interactive CLI UX Polish
+
+**Goal:** Improve the interactive CLI command palette and state rendering around the new edit loop.
+
+**Current:** Baseline Complete. `/edit` is registered in the slash command palette, appears in `/help`, returns structured `present`/`blocked`/`denied` states, and preserves existing REPL error-boundary behavior.
+
+**Status:** Baseline Complete | Evidence: local worktree; `tests/test_cli_edit_loop.py` and `tests/test_phase44_slash_expansion.py` pass | Notes: Command-palette polish only; no broad terminal UI parity claim.
+
+## R58 — Tool Runtime Unification
+
+**Goal:** Start consolidating local tool execution around the existing registry and trust wrapper.
+
+**Current:** Baseline Complete. `runtime/tool_runtime.py` exposes `run_registered_tool()` for registry lookup, Pydantic arg validation, cancellation token defaulting, tool execution, and `wrap_tool_result()` trust wrapping. Unknown tools are rejected.
+
+**Status:** Baseline Complete | Evidence: local worktree; `tests/test_cli_edit_loop.py` covers wrapped `read_file` execution and unknown-tool rejection | Notes: Existing provider-backed `/run` tool-calling remains unchanged; this is a shared helper foundation, not a broad runtime rewrite.

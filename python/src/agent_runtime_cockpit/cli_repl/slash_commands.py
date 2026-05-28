@@ -36,6 +36,8 @@ from .adapters import (
     render_context_pack,
     render_dashboard,
     render_doctor_summary,
+    render_edit_apply,
+    render_edit_plan,
     render_events_watch,
     render_hitl_pending,
     render_hitl_respond,
@@ -411,6 +413,22 @@ def _build_registry():
     )
     registry.register(
         CommandDef(
+            name="edit",
+            help_text="Safety-gated edit loop: /edit plan|apply --path P --content TEXT",
+            category="workspace",
+            handler=cmd_edit,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "blocked", "denied"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/edit plan|apply --path PATH --content TEXT [--approve]",
+            subcommands=["plan", "apply"],
+        )
+    )
+    registry.register(
+        CommandDef(
             name="sandbox",
             help_text="Sandbox tools: /sandbox doctor|run -- <cmd...>",
             category="workspace",
@@ -678,6 +696,7 @@ def cmd_help(_arg: str, _session: ChatSession) -> str:
             "status",
             "doctor",
             "dashboard",
+            "edit",
             "read",
             "search",
             "context",
@@ -1380,6 +1399,21 @@ def cmd_read(arg: str, _session: ChatSession) -> CommandResult:
 
 def cmd_search(arg: str, _session: ChatSession) -> CommandResult:
     return _render_adapter_result(render_search(arg))
+
+
+def cmd_edit(arg: str, _session: ChatSession) -> CommandResult:
+    parts = arg.strip().split(maxsplit=1)
+    subcommand = parts[0] if parts else "plan"
+    rest = parts[1] if len(parts) > 1 else ""
+    if subcommand == "plan":
+        return _render_adapter_result(render_edit_plan(rest))
+    if subcommand == "apply":
+        return _render_adapter_result(render_edit_apply(rest))
+    return CommandResult(
+        state="blocked",
+        output="Usage: /edit plan|apply --path PATH --content TEXT [--approve]",
+        reason="invalid_usage",
+    )
 
 
 def cmd_audit(arg: str, _session: ChatSession) -> CommandResult:

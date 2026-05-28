@@ -70,3 +70,7 @@ ci_app = typer.Typer(
     name="ci",
     help="ARC CI guardrails — offline checks, PR summaries, audit verification (Phase 80 / R51)",
 )
+edit_app = typer.Typer(
+    name="edit",
+    help="Agentic edit loop — safety-gated plan/apply commands (Phase 85)",
+)

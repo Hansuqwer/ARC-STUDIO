@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-28 — Phases 74-84 Baseline Complete where marked; Phase 82-84 review hardening verified.
-**Current evidence anchor:** local worktree | Phase 82-84 review patch: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3339 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK; banned-claims check OK.
+**Last reality refresh:** 2026-05-28 — Phases 85-87 Baseline Complete; CLI edit loop, interactive `/edit`, and tool runtime helper verified.
+**Current evidence anchor:** local worktree | Phase 85-87: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3347 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -3901,3 +3901,85 @@ cd python && uv run ruff check src tests                                    # cl
 - YAML policy files are local workspace/user files; no remote/centralized policy server.
 - `yaml` dependency already present via `config/policy.py`.
 - JSON-first lookup preserved; YAML is additive, not replacement.
+
+## Phase 85 — Agentic CLI Edit Loop
+
+**Roadmap:** CLI/UX continuation slice 85
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/test_cli_edit_loop.py -q` 8 passed; related CLI regressions 274 passed / 1 skipped; ruff clean
+**Depends on:** Phase 75 (plan/apply/review), Phase 37 (sandbox policy/path guards), Phase 43/46 (atomic/advisory write posture)
+
+### Implementation
+1. `security/edit_loop.py` adds `EditPlan`, `build_edit_plan()`, and `apply_edit_plan()` for one-file replacement previews and explicit approved apply.
+2. `arc edit plan --path <file> --content <text> --json` returns a stable envelope with classification, policy decision, unified diff, and plan audit path. It does not write.
+3. `arc edit apply --path <file> --content <text> --approve --json` writes only after sandbox policy allows a workspace write and explicit approval is present.
+4. `/edit plan|apply` bridges the same edit helper into the REPL command palette.
+5. Edit preview/apply events use existing plan audit helpers under `.arc/audit/plan.events.jsonl`.
+
+### Acceptance
+1. ✅ Edit plan previews a diff without changing the file.
+2. ✅ Edit apply refuses to write without `--approve`.
+3. ✅ Edit apply writes after approval.
+4. ✅ Path traversal outside the workspace is denied.
+5. ✅ REPL `/edit plan` and `/edit apply` use the same helper.
+6. ✅ Help lists `/edit`.
+7. ✅ Existing sandbox/REPL regressions remain green.
+
+### Verification
+```bash
+cd python && uv run pytest tests/test_cli_edit_loop.py -q
+cd python && uv run pytest tests/test_cli_repl.py tests/test_phase44_slash_expansion.py tests/test_cli_sandbox.py -q
+cd python && uv run ruff check src tests/test_cli_edit_loop.py
+```
+
+### Known Risks
+- This is a deterministic one-file replacement loop, not autonomous multi-file Claude Code/OpenCode parity.
+- Content is supplied directly via CLI/REPL flags; no model-generated patch protocol is claimed.
+
+## Phase 86 — Interactive CLI UX Polish
+
+**Roadmap:** CLI/UX continuation slice 86
+**Status:** Baseline Complete | Evidence: local worktree; `/edit` registry/help tests in `tests/test_cli_edit_loop.py` plus existing slash expansion tests pass
+**Depends on:** Phase 41 (interactive CLI foundation)
+
+### Implementation
+1. `/edit` is a first-class slash command with structured `present`/`blocked`/`denied` states.
+2. `/help` command palette includes `/edit` under workspace tools.
+3. REPL edit failures render blocked/denied states instead of crashing the loop.
+
+### Acceptance
+1. ✅ `/help` includes `/edit`.
+2. ✅ `/edit plan` returns structured output.
+3. ✅ `/edit apply` requires explicit approval.
+4. ✅ Existing Phase 44 slash-command expansion tests remain green.
+
+### Verification
+```bash
+cd python && uv run pytest tests/test_cli_edit_loop.py tests/test_phase44_slash_expansion.py -q
+```
+
+### Known Risks
+- UX is command-palette/structured-state polish only; no broad terminal UI parity claim.
+
+## Phase 87 — Tool Runtime Unification
+
+**Roadmap:** CLI/UX continuation slice 87
+**Status:** Baseline Complete | Evidence: local worktree; `tests/test_cli_edit_loop.py` covers shared registered-tool execution wrapper
+**Depends on:** ADR-019 tool trust contract, existing built-in tool registry
+
+### Implementation
+1. `runtime/tool_runtime.py` adds `run_registered_tool()` as a single helper for registry lookup, argument validation, execution, cancellation token defaulting, and trust wrapping.
+2. Tests prove registered `read_file` output is wrapped as untrusted and unknown tools are rejected.
+
+### Acceptance
+1. ✅ Registered tool execution uses the existing `default_tool_registry()` by default.
+2. ✅ Tool args are validated through the handler `args_schema`.
+3. ✅ Output goes through existing `wrap_tool_result()` trust envelope.
+4. ✅ Unknown tools are rejected.
+
+### Verification
+```bash
+cd python && uv run pytest tests/test_cli_edit_loop.py -q
+```
+
+### Known Risks
+- Existing `/run` provider-backed tool-calling remains unchanged; this slice only adds a small shared runtime helper.

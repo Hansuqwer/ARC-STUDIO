@@ -22,6 +22,7 @@ from ._subapps import (
     context_app,
     doctor_app,
     eval_app,
+    edit_app,
     events_app,
     hitl_app,
     isolation_app,
@@ -72,6 +73,7 @@ app.add_typer(studio_app)
 studio_app.add_typer(studio_sessions_app)
 app.add_typer(runs_app)
 app.add_typer(eval_app)
+app.add_typer(edit_app)
 app.add_typer(providers_app)
 app.add_typer(receipt_app)
 app.add_typer(audit_app)
