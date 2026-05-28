@@ -11,16 +11,25 @@ import json
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
+from typing import Any, Literal
+import uuid
 
 from pydantic import BaseModel, Field
 
+from ..audit.chain import canonical_dumps, sha256_hex
+from ..isolation.base import IsolationResult
 from .sandbox import (
     CommandClassification,
     SandboxDecision,
     SandboxPathViolation,
     SandboxPolicy,
+    SandboxResult,
+    approval_token_hash,
+    build_audit_event,
     classify_command,
     decide,
+    persist_sandbox_audit_event,
+    utc_now,
     validate_command_paths,
 )
 
@@ -76,6 +85,34 @@ class PlanDecision(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
+class PlanApproval(BaseModel):
+    """Persisted approval bound to one exact plan record."""
+
+    model_config = {"frozen": True}
+
+    version: Literal[1] = 1
+    approval_id: str
+    plan_id: str
+    plan_hash: str
+    token_hash: str
+    policy: str
+    workspace_root: str
+    approved_at: str = Field(default_factory=utc_now)
+
+
+class PlanApplyResult(BaseModel):
+    """Stable result for plan apply."""
+
+    plan_id: str
+    policy: str
+    workspace_root: str
+    approved: bool
+    applied: bool
+    reason: str
+    audit_events: list[dict[str, Any]] = Field(default_factory=list)
+    results: list[SandboxResult] = Field(default_factory=list)
+
+
 def build_plan(
     commands: list[list[str]],
     policy: SandboxPolicy,
@@ -87,8 +124,6 @@ def build_plan(
     Each command is classified and evaluated against the sandbox policy.
     Cost/risk estimates are marked as known/unknown - never fabricated.
     """
-    import uuid
-
     pid = plan_id or f"plan-{uuid.uuid4().hex[:12]}"
     steps: list[PlanStep] = []
     has_destructive = False
@@ -258,3 +293,155 @@ def persist_plan_audit_event(plan: PlanDecision, workspace_root: Path | None = N
     event = build_plan_audit_event(plan)
     audit_path.open("a", encoding="utf-8").write(json.dumps(event, sort_keys=True) + "\n")
     return audit_path
+
+
+def plan_store_dir(workspace_root: Path) -> Path:
+    return workspace_root / ".arc" / "plans"
+
+
+def plan_record_path(workspace_root: Path, plan_id: str) -> Path:
+    return plan_store_dir(workspace_root) / f"{plan_id}.json"
+
+
+def plan_approval_path(workspace_root: Path, plan_id: str) -> Path:
+    return plan_store_dir(workspace_root) / f"{plan_id}.approval.json"
+
+
+def plan_hash(plan: PlanDecision) -> str:
+    payload = plan.model_dump(mode="json", exclude={"created_at"})
+    return sha256_hex(canonical_dumps(payload))
+
+
+def persist_plan_record(plan: PlanDecision, workspace_root: Path | None = None) -> Path:
+    root = workspace_root or Path(plan.workspace_root)
+    path = plan_record_path(root, plan.plan_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(plan.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def load_plan_record(workspace_root: Path, plan_id: str) -> PlanDecision:
+    path = plan_record_path(workspace_root, plan_id)
+    if not path.exists():
+        raise ValueError(f"plan record not found: {plan_id}")
+    return PlanDecision.model_validate(json.loads(path.read_text(encoding="utf-8")))
+
+
+def approve_plan(
+    plan: PlanDecision, token: str, workspace_root: Path | None = None
+) -> PlanApproval:
+    if plan.has_destructive or plan.has_privileged:
+        raise ValueError("destructive or privileged plans cannot be approved")
+    approval = PlanApproval(
+        approval_id=f"plan-approval-{uuid.uuid4().hex}",
+        plan_id=plan.plan_id,
+        plan_hash=plan_hash(plan),
+        token_hash=approval_token_hash(token),
+        policy=plan.policy,
+        workspace_root=str(Path(plan.workspace_root).resolve()),
+    )
+    root = workspace_root or Path(plan.workspace_root)
+    path = plan_approval_path(root, plan.plan_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(approval.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return approval
+
+
+def load_plan_approval(workspace_root: Path, plan_id: str) -> PlanApproval:
+    path = plan_approval_path(workspace_root, plan_id)
+    if not path.exists():
+        raise ValueError("approved plan token/record required")
+    return PlanApproval.model_validate(json.loads(path.read_text(encoding="utf-8")))
+
+
+def verify_plan_approval(
+    plan: PlanDecision, token: str | None, workspace_root: Path
+) -> PlanApproval:
+    if not token:
+        raise ValueError("approved plan token/record required")
+    approval = load_plan_approval(workspace_root, plan.plan_id)
+    if approval.plan_hash != plan_hash(plan):
+        raise ValueError("plan record changed after approval")
+    if approval.token_hash != approval_token_hash(token):
+        raise ValueError("approval token does not match plan")
+    if approval.policy != plan.policy:
+        raise ValueError("approval policy does not match plan")
+    if approval.workspace_root != str(workspace_root.resolve()):
+        raise ValueError("approval workspace does not match plan")
+    return approval
+
+
+def build_plan_apply_event(
+    event_type: str,
+    *,
+    plan_id: str,
+    policy: str,
+    workspace_root: Path,
+    reason: str,
+    approval_id: str | None = None,
+    command: list[str] | None = None,
+    exit_code: int | None = None,
+) -> dict[str, Any]:
+    return {
+        "type": event_type,
+        "event_id": f"plan-{uuid.uuid4().hex}",
+        "plan_id": plan_id,
+        "policy": policy,
+        "workspace_root": str(workspace_root),
+        "approval_id": approval_id,
+        "command": command or [],
+        "reason": reason,
+        "exit_code": exit_code,
+        "created_at": utc_now(),
+    }
+
+
+def persist_plan_event(event: dict[str, Any], workspace_root: Path) -> Path:
+    audit_path = workspace_root / ".arc" / "audit" / "plan.events.jsonl"
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    audit_path.open("a", encoding="utf-8").write(
+        json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n"
+    )
+    return audit_path
+
+
+def sandbox_result_from_isolation(
+    *,
+    command: list[str],
+    cwd: Path,
+    decision: SandboxDecision,
+    provider: str,
+    iso: IsolationResult,
+    started_at: str,
+    ended_at: str,
+) -> SandboxResult:
+    audit = build_audit_event(
+        command=command,
+        cwd=cwd,
+        decision=decision,
+        provider=iso.provider if iso.provider != "unknown" else provider,
+        started_at=started_at,
+        ended_at=ended_at,
+        exit_code=iso.exit_code,
+        stdout_truncated=iso.stdout_truncated,
+        stderr_truncated=iso.stderr_truncated,
+        redaction_applied=iso.redaction_applied,
+    )
+    audit_path = persist_sandbox_audit_event(audit)
+    audit["audit_path"] = str(audit_path)
+    return SandboxResult(
+        command=command,
+        cwd=str(cwd),
+        classification=decision.classification,
+        decision=decision,
+        provider=iso.provider if iso.provider != "unknown" else provider,
+        exit_code=iso.exit_code,
+        stdout=iso.stdout,
+        stderr=iso.stderr,
+        duration_ms=iso.duration_ms,
+        timed_out=iso.killed and iso.kill_reason == "timeout",
+        stdout_truncated=iso.stdout_truncated,
+        stderr_truncated=iso.stderr_truncated,
+        redaction_applied=iso.redaction_applied,
+        audit_event=audit,
+    )

@@ -2796,7 +2796,7 @@ pnpm typecheck
 ## Future Research Intake — Candidate Phases 74-81
 
 **Source:** `docs/research/deep-research-review-findings.md` and `docs/research/deep-research-improvements.md` from the 2026-05-27 deep research synthesis.
-**Status:** Active intake. Phases 74, 76, and 77 have baseline implementations; Phase 75 has plan/explain and audit baseline only, with apply still unwired.
+**Status:** Active intake. Phases 74, 75, 76, and 77 have baseline implementations.
 
 ### Phase 74 — Trace-Aware Review Mode MVP
 
@@ -2820,7 +2820,7 @@ pnpm typecheck
 ### Phase 75 — Plan / Apply / Review Loop
 
 **Roadmap:** R46 candidate
-**Status:** In Progress | Evidence: local worktree `cd python && uv run pytest tests/security/test_review_evidence.py tests/security/test_plan_models.py -q` 34 passed; full `cd python && uv run pytest tests/ -q` 3105 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK. Plan/explain and audit events exist; approved apply path remains unwired.
+**Status:** Baseline Complete | Evidence: local worktree `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3114 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK; `bash scripts/check-banned-claims.sh docs/agents.md docs/roadmap.md docs/phases.md docs/release/checklist.md docs/REALITY_AUDIT.md docs/EXTENSION_MIGRATION.md docs/handover/HANDOVER.md README.md` OK. Approved apply baseline exists; destructive/privileged remain denied; no broad runtime/provider execution.
 **Depends on:** Phase 37/R38 sandbox classifier and audit foundation
 
 #### Acceptance

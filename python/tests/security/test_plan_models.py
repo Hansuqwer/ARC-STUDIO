@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 
 from typer.testing import CliRunner
 
@@ -159,6 +161,20 @@ class TestPlanCli:
         assert data["data"]["overall_allowed"] is True
         assert data["data"]["steps"][0]["classification"] == "read_only"
         assert data["data"]["audit_path"].endswith(".arc/audit/plan.events.jsonl")
+        assert data["data"]["plan_path"].endswith(".json")
+
+    def test_plan_explain_writes_stable_plan_record(self, tmp_path) -> None:
+        result = runner.invoke(
+            app,
+            ["plan", "explain", "--json", "--workspace", str(tmp_path), "--", "ls"],
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        plan_path = tmp_path / ".arc" / "plans" / f"{data['data']['plan_id']}.json"
+        assert plan_path.exists()
+        saved = json.loads(plan_path.read_text(encoding="utf-8"))
+        assert saved["plan_id"] == data["data"]["plan_id"]
+        assert saved["steps"][0]["command"] == ["ls"]
 
     def test_plan_explain_destructive(self) -> None:
         result = runner.invoke(app, ["plan", "explain", "--json", "--", "rm", "-rf", "."])
@@ -241,3 +257,227 @@ class TestPlanCli:
         data = json.loads(result.output)
         assert data["ok"] is True
         assert data["data"]["policy"] == "local-safe"
+
+    def test_plan_apply_without_approval_denied(self, tmp_path) -> None:
+        explained = runner.invoke(
+            app,
+            ["plan", "explain", "--json", "--workspace", str(tmp_path), "--", "ls"],
+        )
+        plan_id = json.loads(explained.output)["data"]["plan_id"]
+        result = runner.invoke(
+            app,
+            ["plan", "apply", "--json", "--workspace", str(tmp_path), "--plan-id", plan_id],
+        )
+        assert result.exit_code == 3
+        data = json.loads(result.output)
+        assert data["ok"] is False
+        assert "approved plan token" in data["error"]["message"]
+        events = (tmp_path / ".arc" / "audit" / "plan.events.jsonl").read_text(encoding="utf-8")
+        assert "plan_apply_denied" in events
+
+    def test_approved_readonly_plan_applies_successfully(self, tmp_path) -> None:
+        explained = runner.invoke(
+            app,
+            ["plan", "explain", "--json", "--workspace", str(tmp_path), "--", "pwd"],
+        )
+        plan_id = json.loads(explained.output)["data"]["plan_id"]
+        approved = runner.invoke(
+            app,
+            ["plan", "approve", "--json", "--workspace", str(tmp_path), "--plan-id", plan_id],
+        )
+        assert approved.exit_code == 0
+        approval_data = json.loads(approved.output)["data"]
+        result = runner.invoke(
+            app,
+            [
+                "plan",
+                "apply",
+                "--json",
+                "--workspace",
+                str(tmp_path),
+                "--plan-id",
+                plan_id,
+                "--approval-token",
+                approval_data["approval_token"],
+            ],
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["ok"] is True
+        assert data["data"]["applied"] is True
+        assert data["data"]["results"][0]["exit_code"] == 0
+        assert data["data"]["results"][0]["provider"] == "subprocess"
+        events = (tmp_path / ".arc" / "audit" / "plan.events.jsonl").read_text(encoding="utf-8")
+        assert "plan_approval_accepted" in events
+        assert "plan_apply_attempted" in events
+        assert "plan_apply_completed" in events
+
+    def test_network_plan_denied_without_approval(self, tmp_path) -> None:
+        explained = runner.invoke(
+            app,
+            [
+                "plan",
+                "explain",
+                "--json",
+                "--workspace",
+                str(tmp_path),
+                "--",
+                "curl",
+                "https://example.com",
+            ],
+        )
+        plan_id = json.loads(explained.output)["data"]["plan_id"]
+        result = runner.invoke(
+            app,
+            ["plan", "apply", "--json", "--workspace", str(tmp_path), "--plan-id", plan_id],
+        )
+        assert result.exit_code == 3
+        assert "approved plan token" in json.loads(result.output)["error"]["message"]
+
+    def test_destructive_denied_even_with_approval(self, tmp_path) -> None:
+        explained = runner.invoke(
+            app,
+            [
+                "plan",
+                "explain",
+                "--json",
+                "--workspace",
+                str(tmp_path),
+                "--",
+                "rm",
+                "-rf",
+                ".",
+            ],
+        )
+        plan_id = json.loads(explained.output)["data"]["plan_id"]
+        approved = runner.invoke(
+            app,
+            [
+                "plan",
+                "approve",
+                "--json",
+                "--workspace",
+                str(tmp_path),
+                "--plan-id",
+                plan_id,
+                "--token",
+                "tok",
+            ],
+        )
+        assert approved.exit_code == 3
+        result = runner.invoke(
+            app,
+            [
+                "plan",
+                "apply",
+                "--json",
+                "--workspace",
+                str(tmp_path),
+                "--direct",
+                "--confirm",
+                "APPLY DIRECT COMMAND",
+                "--",
+                "rm",
+                "-rf",
+                ".",
+            ],
+        )
+        assert result.exit_code == 3
+        assert json.loads(result.output)["data"]["applied"] is False
+
+    def test_privileged_denied_even_with_direct_override(self, tmp_path) -> None:
+        result = runner.invoke(
+            app,
+            [
+                "plan",
+                "apply",
+                "--json",
+                "--workspace",
+                str(tmp_path),
+                "--direct",
+                "--confirm",
+                "APPLY DIRECT COMMAND",
+                "--",
+                "sudo",
+                "ls",
+            ],
+        )
+        assert result.exit_code == 3
+        assert (
+            json.loads(result.output)["data"]["reason"]
+            == "destructive or privileged commands denied"
+        )
+
+    def test_direct_override_requires_exact_confirmation(self, tmp_path) -> None:
+        result = runner.invoke(
+            app,
+            ["plan", "apply", "--json", "--workspace", str(tmp_path), "--direct", "--", "ls"],
+        )
+        assert result.exit_code == 3
+        data = json.loads(result.output)
+        assert data["ok"] is False
+        assert "direct apply requires" in data["error"]["message"]
+
+    def test_workspace_escape_denied_on_apply(self, tmp_path) -> None:
+        result = runner.invoke(
+            app,
+            [
+                "plan",
+                "apply",
+                "--json",
+                "--workspace",
+                str(tmp_path),
+                "--direct",
+                "--confirm",
+                "APPLY DIRECT COMMAND",
+                "--",
+                "touch",
+                "../escape.txt",
+            ],
+        )
+        assert result.exit_code == 3
+        assert not (tmp_path.parent / "escape.txt").exists()
+
+    def test_timeout_and_output_caps_inherited(self, tmp_path) -> None:
+        config = tmp_path / "policies.json"
+        config.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "policies": [
+                        {
+                            "name": "tiny-timeout",
+                            "timeout_seconds": 1,
+                            "max_output_bytes": 8,
+                            "allow_unknown": True,
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        env = {**os.environ, "ARC_SANDBOX_POLICY_CONFIG": str(config)}
+        result = runner.invoke(
+            app,
+            [
+                "plan",
+                "apply",
+                "--json",
+                "--workspace",
+                str(tmp_path),
+                "--policy",
+                "tiny-timeout",
+                "--direct",
+                "--confirm",
+                "APPLY DIRECT COMMAND",
+                "--",
+                sys.executable,
+                "-c",
+                "import sys,time; sys.stdout.write('x'*100); sys.stdout.flush(); time.sleep(5)",
+            ],
+            env=env,
+        )
+        assert result.exit_code != 0
+        data = json.loads(result.output)
+        assert data["data"]["results"][0]["timed_out"] is True
+        assert data["data"]["results"][0]["stdout_truncated"] is True
