@@ -808,6 +808,7 @@ def cmd_help(_arg: str, _session: ChatSession) -> str:
         "session": ["help", "version", "clear", "summary", "sessions", "history", "alias", "exit"],
         "run": [
             "run",
+            "agent",
             "runtime",
             "mode",
             "plan",
