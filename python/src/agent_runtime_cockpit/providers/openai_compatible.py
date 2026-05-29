@@ -9,10 +9,10 @@ so default test suites never require credentials or make network calls.
 
 from __future__ import annotations
 
-import os
 import json
+import os
 from collections.abc import Callable
-from typing import Any, AsyncIterator, Literal
+from typing import Any, AsyncIterator, Literal, TypeAlias, cast
 
 from agent_runtime_cockpit.cli_repl.cancellation import CancellationToken, Cancelled
 
@@ -23,6 +23,7 @@ from .base import (
     ModelError,
     NetworkError,
     ProviderCapability,
+    ProviderMessage,
     ProviderFeature,
     ProviderRequest,
     ProviderResponse,
@@ -31,9 +32,28 @@ from .base import (
     UsageRecord,
     ValidationError,
 )
+from .models_dev import (
+    ModelsDevProviderConfig,
+    cost_rates,
+    max_context_tokens,
+    provider_features,
+    sanitize_provider_env_id,
+    select_default_model,
+)
+
+
+OpenAICompatibleConfig: TypeAlias = dict[str, Any]
 
 # Vendor configuration
-VendorName = Literal["openai", "together", "groq", "deepinfra", "fireworks", "llamacpp"]
+VendorName = Literal[
+    "openai",
+    "together",
+    "groq",
+    "deepinfra",
+    "fireworks",
+    "llamacpp",
+    "9router",
+]
 
 VENDOR_CONFIGS = {
     "openai": {
@@ -109,6 +129,25 @@ VENDOR_CONFIGS = {
         "features": [ProviderFeature.STREAMING],
         "cost_rates": {"local-model": CostRates(input_per_million=0.0, output_per_million=0.0)},
     },
+    "9router": {
+        "base_url": "http://127.0.0.1:20128/v1",
+        "default_model": "ag/gemini-3.5-flash-extra-low",
+        "supported_models": [
+            "ag/gemini-3.5-flash-extra-low",
+            "qwen/qwen3-coder",
+            "qwen/qwen-plus",
+            "qwen/qwen-max",
+        ],
+        "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE],
+        "cost_rates": {
+            "ag/gemini-3.5-flash-extra-low": CostRates(
+                input_per_million=0.0, output_per_million=0.0
+            ),
+            "qwen/qwen3-coder": CostRates(input_per_million=0.0, output_per_million=0.0),
+            "qwen/qwen-plus": CostRates(input_per_million=0.0, output_per_million=0.0),
+            "qwen/qwen-max": CostRates(input_per_million=0.0, output_per_million=0.0),
+        },
+    },
 }
 
 
@@ -124,6 +163,7 @@ class OpenAICompatibleClient:
         *,
         vendor: VendorName = "openai",
         base_url: str | None = None,
+        config: OpenAICompatibleConfig | None = None,
         sdk_factory: Callable[[], Any] | None = None,
     ) -> None:
         """Initialize OpenAI-compatible client.
@@ -134,11 +174,11 @@ class OpenAICompatibleClient:
             sdk_factory: Optional factory for dependency injection
 
         """
-        if vendor not in VENDOR_CONFIGS:
+        if config is None and vendor not in VENDOR_CONFIGS:
             raise ValueError(f"Unknown vendor {vendor!r}. Known: {sorted(VENDOR_CONFIGS)}")
 
         self._vendor = vendor
-        self._vendor_config = VENDOR_CONFIGS[vendor]
+        self._vendor_config = config or cast(OpenAICompatibleConfig, VENDOR_CONFIGS[vendor])
         self._base_url = base_url or self._vendor_config["base_url"]
         self._sdk_factory = sdk_factory
         self._client: Any | None = None
@@ -147,16 +187,21 @@ class OpenAICompatibleClient:
     def capabilities(self) -> ProviderCapability:
         """Return provider capabilities for the configured vendor."""
         config = self._vendor_config
-        model = os.environ.get(f"ARC_{self._vendor.upper()}_DEFAULT_MODEL", config["default_model"])
-        timeout = int(os.environ.get(f"ARC_{self._vendor.upper()}_TIMEOUT_SECONDS", "60"))
+        provider_id = str(config.get("provider_id") or f"openai-{self._vendor}")
+        provider_name = str(
+            config.get("provider_name") or f"OpenAI-Compatible ({self._vendor.title()})"
+        )
+        env_id = sanitize_provider_env_id(provider_id.removeprefix("openai-"))
+        model = os.environ.get(f"ARC_{env_id}_DEFAULT_MODEL", config["default_model"])
+        timeout = int(os.environ.get(f"ARC_{env_id}_TIMEOUT_SECONDS", "60"))
 
         return ProviderCapability(
-            provider_id=f"openai-{self._vendor}",
-            provider_name=f"OpenAI-Compatible ({self._vendor.title()})",
+            provider_id=provider_id,
+            provider_name=provider_name,
             supported_models=config["supported_models"],
             default_model=model,
             features=config["features"],
-            max_context_tokens=128_000,  # Conservative default
+            max_context_tokens=int(config.get("max_context_tokens") or 128_000),
             cost_rates=config["cost_rates"],
             timeout_seconds=timeout,
         )
@@ -245,13 +290,8 @@ class OpenAICompatibleClient:
                 except ImportError as exc:
                     raise AuthError("openai SDK is not installed") from exc
 
-                # Determine API key env var based on vendor
-                api_key_var = f"{self._vendor.upper()}_API_KEY"
-                if self._vendor == "openai":
-                    api_key_var = "OPENAI_API_KEY"
-
-                api_key = os.environ.get(api_key_var)
-                if not api_key and self._vendor != "llamacpp":
+                api_key_var, api_key = self._api_key()
+                if not api_key and self._env_vars():
                     raise AuthError(f"{api_key_var} environment variable not set")
 
                 self._client = OpenAI(
@@ -261,9 +301,28 @@ class OpenAICompatibleClient:
                 )
         return self._client
 
+    def _api_key(self) -> tuple[str, str | None]:
+        env_vars = self._env_vars()
+        for name in env_vars:
+            if os.environ.get(name):
+                return name, os.environ[name]
+        return " or ".join(env_vars), None
+
+    def _env_vars(self) -> list[str]:
+        configured = self._vendor_config.get("env_vars")
+        if configured is not None:
+            return list(configured)
+        if self._vendor == "openai":
+            return ["OPENAI_API_KEY"]
+        if self._vendor == "9router":
+            return ["NINEROUTER_API_KEY", "ROUTER9_API_KEY"]
+        if self._vendor == "llamacpp":
+            return []
+        return [f"{self._vendor.upper()}_API_KEY"]
+
     def _request_kwargs(self, request: ProviderRequest, *, stream: bool) -> dict[str, Any]:
         """Build OpenAI API request kwargs."""
-        messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+        messages = [_openai_message(msg) for msg in request.messages]
 
         kwargs: dict[str, Any] = {
             "model": request.model,
@@ -376,3 +435,26 @@ class OpenAICompatibleClient:
             return NetworkError(text)
 
         return ModelError(text)
+
+
+def _openai_message(message: ProviderMessage) -> dict[str, str]:
+    if message.role == "tool":
+        return {
+            "role": "user",
+            "content": "Tool result:\n" + message.content,
+        }
+    return {"role": message.role, "content": message.content}
+
+
+def config_from_models_dev(provider: ModelsDevProviderConfig) -> OpenAICompatibleConfig:
+    return {
+        "base_url": provider.api,
+        "default_model": select_default_model(provider),
+        "supported_models": list(provider.models),
+        "features": provider_features(provider),
+        "cost_rates": cost_rates(provider),
+        "env_vars": provider.env,
+        "provider_id": f"openai-{provider.id}",
+        "provider_name": f"OpenAI-Compatible ({provider.name})",
+        "max_context_tokens": max_context_tokens(provider),
+    }

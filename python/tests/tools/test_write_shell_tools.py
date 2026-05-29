@@ -132,3 +132,24 @@ def test_bash_tool_env_secret_stripped(tmp_path, monkeypatch):
     )
     assert "None" in result.content["stdout"]
     assert os.environ["OPENAI_API_KEY"]
+
+
+def test_bash_tool_denies_python_file_without_explicit_gate(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "hello.py").write_text("print('hello')\n", encoding="utf-8")
+    result = BashTool(tmp_path, trust_db=tmp_path / "trust.json").execute(
+        BashArgs(command="python3 hello.py"), never_cancelled()
+    )
+    assert result.content["allowed"] is False
+    assert "dynamic shell/interpreter" in result.content["error"]
+
+
+def test_bash_tool_allows_workspace_python_file_with_explicit_gate(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARC_AGENT_ALLOW_WORKSPACE_INTERPRETER", "1")
+    (tmp_path / "hello.py").write_text("print('hello from arc')\n", encoding="utf-8")
+    result = BashTool(tmp_path, trust_db=tmp_path / "trust.json").execute(
+        BashArgs(command="python3 hello.py"), never_cancelled()
+    )
+    assert result.content["exit_code"] == 0
+    assert "hello from arc" in result.content["stdout"]

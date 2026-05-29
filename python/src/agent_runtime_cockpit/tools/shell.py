@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import os
 import shlex
 from pathlib import Path
 from typing import Any, Coroutine, TypeVar
@@ -14,6 +15,7 @@ from agent_runtime_cockpit.cli_repl.cancellation import CancellationToken
 from agent_runtime_cockpit.isolation.subprocess import SubprocessIsolationProvider
 from agent_runtime_cockpit.security.sandbox import (
     SandboxPolicy,
+    classify_command,
     build_audit_event,
     decide,
     ensure_workspace_cwd,
@@ -71,14 +73,25 @@ class BashTool:
         command = shlex.split(args.command)
         cwd = ensure_workspace_cwd(Path.cwd(), self.workspace_root)
         decision = decide(command, self.policy)
+        workspace_interpreter_allowed = _workspace_interpreter_gate(command, self.workspace_root)
+        if workspace_interpreter_allowed:
+            decision = decision.model_copy(
+                update={
+                    "allowed": True,
+                    "classification": classify_command(command),
+                    "reason": "explicit workspace interpreter gate",
+                    "approval_required": False,
+                }
+            )
         try:
             ensure_trusted(self.workspace_root, trust_db=self.trust_db, allow_if_no_db=True)
         except Exception as exc:  # noqa: BLE001 - tool errors are returned to model.
             decision = decision.model_copy(update={"allowed": False, "reason": str(exc)})
-        try:
-            validate_command_paths(command, self.policy)
-        except ValueError as exc:
-            decision = decision.model_copy(update={"allowed": False, "reason": str(exc)})
+        if not workspace_interpreter_allowed:
+            try:
+                validate_command_paths(command, self.policy)
+            except ValueError as exc:
+                decision = decision.model_copy(update={"allowed": False, "reason": str(exc)})
         if not decision.allowed:
             audit = build_audit_event(
                 command=command,
@@ -136,3 +149,17 @@ def _persist(audit: dict[str, Any]) -> None:
         persist_sandbox_audit_event(audit)
     except Exception:
         return
+
+
+def _workspace_interpreter_gate(command: list[str], workspace_root: Path) -> bool:
+    if os.environ.get("ARC_AGENT_ALLOW_WORKSPACE_INTERPRETER") != "1":
+        return False
+    if len(command) != 2 or Path(command[0]).name not in {"python", "python3"}:
+        return False
+    script = Path(command[1])
+    if not script.is_absolute():
+        script = workspace_root / script
+    try:
+        return script.resolve(strict=False).is_relative_to(workspace_root.resolve())
+    except OSError:
+        return False

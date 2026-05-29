@@ -124,6 +124,28 @@ pnpm start:browser:stub
 
 The `arc` CLI is your command-line interface to the ARC Studio backend. It handles workflow execution, trace management, runtime detection, HITL flows, audit verification, and evaluation.
 
+For the interactive coding-agent REPL, use the dedicated launcher:
+
+```bash
+cd python
+uv sync --all-extras --dev
+uv run arch-studio-cli
+uv run arch-studio-cli "/help"
+```
+
+Provider-backed agent runs use `/agent <task>` and keep tool execution behind workspace trust and sandbox policy gates. Example 9router/OpenAI-compatible smoke setup:
+
+```bash
+export ARC_DEFAULT_PROVIDER=9router
+export ARC_9ROUTER_DEFAULT_MODEL=ag/gemini-3.5-flash-extra-low
+export NINEROUTER_API_KEY=...
+uv run --extra arena arch-studio-cli "/agent Create hello.py and run it"
+```
+
+Running workspace Python scripts through the agent `bash` tool is denied by default as dynamic interpreter execution. For an explicit local smoke only, set `ARC_AGENT_ALLOW_WORKSPACE_INTERPRETER=1`; the script path must still resolve inside the trusted workspace.
+
+ARC also registers a compact `models.dev`-backed OpenAI-compatible provider catalog without live network fetches at startup. Current bundled catalog providers are `alibaba`, `deepseek`, `github-models`, `moonshotai`, and `zai`; select them with `ARC_DEFAULT_PROVIDER=<provider-id>` and configure the key env var listed by models.dev. Default models can be overridden with sanitized provider IDs, for example `ARC_DEEPSEEK_DEFAULT_MODEL=deepseek-chat` or `ARC_GITHUB_MODELS_DEFAULT_MODEL=ai21-labs/ai21-jamba-1.5-large`. models.dev is used only as model/provider metadata, never as a secret source.
+
 **Set up the Python environment:**
 
 ```bash

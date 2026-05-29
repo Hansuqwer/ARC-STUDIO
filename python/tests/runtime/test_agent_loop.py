@@ -8,7 +8,10 @@ from agent_runtime_cockpit.cli_repl.cancellation import (
     never_cancelled,
 )
 from agent_runtime_cockpit.cli_repl.session import ChatSession
+from agent_runtime_cockpit.providers.base import ProviderMessage, ProviderRequest
+from agent_runtime_cockpit.providers.openai_compatible import OpenAICompatibleClient
 from agent_runtime_cockpit.providers import ProviderResponse, StreamChunk, UsageRecord
+from agent_runtime_cockpit.providers.registry import get as get_provider_client
 from agent_runtime_cockpit.runtime.agent_loop import AgentLoop
 from agent_runtime_cockpit.runtime.turn_manager import TurnManager
 from agent_runtime_cockpit.tools import default_tool_registry
@@ -138,3 +141,23 @@ async def test_agent_loop_cancellation_preserves_state():
     with pytest.raises(Exception):
         await AgentLoop(manager, session).run("task", token)
     assert any(message["role"] == "system" for message in session.history)
+
+
+def test_9router_provider_runtime_registered(monkeypatch, tmp_path):
+    monkeypatch.setenv("NINEROUTER_API_KEY", "sk-test")
+    monkeypatch.setenv("ARC_9ROUTER_DEFAULT_MODEL", "ag/gemini-3.5-flash-extra-low")
+    client = get_provider_client("9router")
+    caps = client.capabilities()
+    assert caps.provider_id == "openai-9router"
+    assert caps.default_model == "ag/gemini-3.5-flash-extra-low"
+
+
+def test_openai_compatible_tool_messages_render_as_user_results():
+    client = OpenAICompatibleClient(vendor="9router", sdk_factory=lambda: object())
+    request = ProviderRequest(
+        model="ag/gemini-3.5-flash-extra-low",
+        messages=[ProviderMessage(role="tool", content="<tool_result>ok</tool_result>")],
+        max_tokens=16,
+    )
+    messages = client._request_kwargs(request, stream=False)["messages"]
+    assert messages == [{"role": "user", "content": "Tool result:\n<tool_result>ok</tool_result>"}]

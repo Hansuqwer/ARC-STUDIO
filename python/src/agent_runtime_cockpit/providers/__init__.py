@@ -28,7 +28,8 @@ from .base import (
     validate_provider_id,
 )
 from .budget_preflight import preflight_with_estimator
-from .openai_compatible import OpenAICompatibleClient
+from .models_dev import bundled_openai_compatible_providers
+from .openai_compatible import OpenAICompatibleClient, config_from_models_dev
 from .registry import register
 
 __all__ = [
@@ -71,3 +72,12 @@ register("groq", lambda: OpenAICompatibleClient(vendor="groq"))
 register("deepinfra", lambda: OpenAICompatibleClient(vendor="deepinfra"))
 register("fireworks", lambda: OpenAICompatibleClient(vendor="fireworks"))
 register("llamacpp", lambda: OpenAICompatibleClient(vendor="llamacpp"))
+register("9router", lambda: OpenAICompatibleClient(vendor="9router"))
+
+for _provider_id, _provider_config in bundled_openai_compatible_providers().items():
+    register(
+        _provider_id,
+        lambda config=_provider_config: OpenAICompatibleClient(
+            config=config_from_models_dev(config)
+        ),
+    )
