@@ -286,8 +286,10 @@ Research note: Context7 Typer docs confirm `CliRunner` command tests and subcomm
 - destructive VCS/file commands (`git clean`, `git reset --hard`, `git checkout --`, `git rm`, `find -delete`, `find -exec rm`, `tar --overwrite`, `dd`, `truncate`) deny by default.
 - privileged ownership/mode changes (`chmod`, `chown`, `sudo`, etc.) deny and are not approvable.
 - write-class commands with known path args must stay inside the workspace; symlink/outside/absolute escapes deny before subprocess execution.
+- write-path options are checked across all classifications, so `curl -o /outside`, install/output flags, and other network/install/unknown commands cannot bypass workspace bounds when policy allows execution.
 - path extraction covers known output/input flags, Python literal `open`/`write_text`/`write_bytes`, `dd of=`, simple `cp`/`mv` destinations, and archive output suffixes.
 - read-only absolute and relative paths outside the workspace deny by default unless a future ADR documents a safe exception.
+- dynamic shell/interpreter commands that remain `unknown` are denied before interactive or token approval because ARC cannot statically prove workspace write bounds.
 - shell, Git, package-manager, and Python write forms have regression coverage for known adversarial argv patterns.
 
 Limits: this is policy/classifier hardening, not syscall or kernel sandboxing. MicroVM remains preflight/doctor-only; container fallback remains gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`.
@@ -368,6 +370,7 @@ P0 policy defaults:
 - timeout kills the POSIX process group.
 - stdout/stderr are capped and redacted.
 - every allowed/denied sandbox command returns an audit payload.
+- `arc sandbox run --provider microvm` remains blocked but now also writes a `SANDBOX_DENIED` audit event with `public_execution_enabled=false`.
 - sandbox audit events include an `audit_id` correlation key.
 - sandbox audit events are persisted to a local sandbox hash-chain store by default.
 - sandbox audit events best-effort mirror a typed `sandbox_command` event into `.arc/events/event-log.jsonl`; this mirror is local/recent/derived and not canonical global audit state.
@@ -376,7 +379,7 @@ P0 policy defaults:
 - sandbox audit chain appends continue across CLI invocations and verify against raw events.
 - container execution requires `ARC_ENABLE_CONTAINER_SANDBOX=1`.
 
-MicroVM status: doctor/preflight/proof-harness only. Linux checks Firecracker/Cloud Hypervisor and `/dev/kvm`; private Firecracker proof paths stay gated behind Linux, `/dev/kvm`, `firecracker`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, and explicit kernel/rootfs paths. macOS checks Lima/VZ availability and remains a low-security developer harness. Windows is explicitly unsupported. Public `MicroVMIsolationProvider.execute()` and `arc sandbox run --provider microvm` remain blocked.
+MicroVM status: doctor/preflight/proof-harness only. Linux checks Firecracker/Cloud Hypervisor and `/dev/kvm`; private Firecracker proof paths stay gated behind Linux, `/dev/kvm`, `firecracker`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, and explicit kernel/rootfs paths. macOS checks Lima/VZ availability and remains a low-security developer harness. Windows is explicitly unsupported. Doctor output may report runtime preflight readiness, but always includes `public_execution_enabled=false` and `public_execution_status=blocked` until ADR-024 prerequisites are satisfied. Public `MicroVMIsolationProvider.execute()` and `arc sandbox run --provider microvm` remain blocked.
 
 ---
 

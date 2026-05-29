@@ -397,6 +397,19 @@ def test_microvm_provider_run_denied_even_with_integration_gate(tmp_path, monkey
     assert "microVM execution not yet available" in _payload(result)["error"]["message"]
 
 
+def test_microvm_provider_blocked_run_emits_denial_audit(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
+    result = CliRunner().invoke(
+        app, ["sandbox", "run", "--json", "--provider", "microvm", "--", "pwd"]
+    )
+    assert result.exit_code == 2
+    events = (tmp_path / "audit" / "sandbox.events.jsonl").read_text(encoding="utf-8")
+    assert '"type":"SANDBOX_DENIED"' in events
+    assert '"provider":"microvm"' in events
+    assert '"public_execution_enabled":false' in events
+
+
 def test_microvm_doctor_never_claims_execution_implemented(monkeypatch):
     from agent_runtime_cockpit.isolation.microvm import MicroVMIsolationProvider
 
@@ -407,6 +420,9 @@ def test_microvm_doctor_never_claims_execution_implemented(monkeypatch):
     data = MicroVMIsolationProvider().describe()
     assert data["execution"] == "gated_unproven"
     assert data["execution"] != "implemented"
+    assert data["available"] is False
+    assert data["public_execution_enabled"] is False
+    assert data["public_execution_status"] == "blocked"
 
 
 def test_custom_sandbox_policy_loaded_from_config(tmp_path, monkeypatch):
@@ -740,6 +756,8 @@ def test_classification_categories():
         (["git", "rm", "file"], CommandClassification.DESTRUCTIVE),
         (["find", ".", "-delete"], CommandClassification.DESTRUCTIVE),
         (["find", ".", "-exec", "rm", "{}", ";"], CommandClassification.DESTRUCTIVE),
+        (["find", ".", "-exec", "sh", "-c", "echo x", "{}", ";"], CommandClassification.UNKNOWN),
+        (["sed", "-i", "s/a/b/", "file.txt"], CommandClassification.WRITES_WORKSPACE),
         (["tar", "--overwrite", "-xf", "a.tar"], CommandClassification.DESTRUCTIVE),
         (["rsync", "a", "b"], CommandClassification.NETWORK),
         (["dd", "if=/dev/zero", "of=x"], CommandClassification.DESTRUCTIVE),
@@ -865,6 +883,62 @@ def test_safe_workspace_relative_output_path_allowed(tmp_path, monkeypatch):
     assert (workspace / "out.txt").read_text(encoding="utf-8") == "x"
 
 
+def test_network_output_outside_workspace_denied_even_when_network_allowed(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    policy_file = workspace / "sandbox-policies.json"
+    policy_file.write_text(
+        json.dumps(
+            {"version": 1, "policies": [{"version": 1, "name": "net", "allow_network": True}]}
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ARC_SANDBOX_POLICY_CONFIG", str(policy_file))
+    monkeypatch.chdir(workspace)
+    result = CliRunner().invoke(
+        app,
+        [
+            "sandbox",
+            "run",
+            "--json",
+            "--workspace",
+            str(workspace),
+            "--policy",
+            "net",
+            "--",
+            "curl",
+            "-o",
+            str(tmp_path / "outside.txt"),
+            "https://example.com",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "write path escapes workspace" in _payload(result)["error"]["message"]
+
+
+def test_unknown_dynamic_shell_denied_even_with_interactive_approval(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.chdir(workspace)
+    result = CliRunner().invoke(
+        app,
+        [
+            "sandbox",
+            "run",
+            "--workspace",
+            str(workspace),
+            "--ask",
+            "--",
+            "bash",
+            "-lc",
+            "ls",
+        ],
+        input="y\n",
+    )
+    assert result.exit_code == 2
+    assert "dynamic shell/interpreter" in result.output
+
+
 def test_read_only_absolute_path_outside_workspace_denied(tmp_path, monkeypatch):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -902,8 +976,8 @@ def test_read_only_relative_path_outside_workspace_denied(command, tmp_path, mon
     ("command", "exit_code"),
     [
         (["tee", "../outside.txt"], 2),
-        (["truncate", "-s", "0", "../outside.txt"], 3),
-        (["dd", "if=/dev/zero", "of=../outside.txt"], 3),
+        (["truncate", "-s", "0", "../outside.txt"], 2),
+        (["dd", "if=/dev/zero", "of=../outside.txt"], 2),
         (["cp", "in.txt", "../outside.txt"], 2),
         (["mkdir", "../outside-dir"], 2),
         (["touch", "../outside.txt"], 2),

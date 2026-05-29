@@ -275,8 +275,10 @@ class TestFirecrackerProofRunner:
         proof = parse_firecracker_guest_proof(
             "boot\n"
             "ARC_FC_PROOF no-default-route=1\n"
+            "ARC_FC_PROOF curl-available=1\n"
             "ARC_FC_PROOF network-failure=1\n"
             "ARC_FC_PROOF sentinel-read=1\n"
+            "ARC_FC_PROOF workspace-mount-proven=1\n"
             "ARC_FC_PROOF symlink-escape-blocked=1\n"
         )
         assert proof.marker_seen is True
@@ -290,15 +292,29 @@ class TestFirecrackerProofRunner:
         assert proof.marker_seen is True
         assert proof.network_proof_passed is False
 
+    def test_guest_proof_marker_parser_rejects_missing_curl(self):
+        proof = parse_firecracker_guest_proof(
+            "ARC_FC_PROOF no-default-route=1\n"
+            "ARC_FC_PROOF curl-available=0\n"
+            "ARC_FC_PROOF network-failure=1\n"
+            "ARC_FC_PROOF sentinel-read=1\n"
+            "ARC_FC_PROOF workspace-mount-proven=1\n"
+            "ARC_FC_PROOF symlink-escape-blocked=1\n"
+        )
+        assert proof.network_proof_passed is False
+        assert proof.workspace_proof_passed is True
+
     def test_guest_proof_init_snippet_is_proof_only(self):
         snippet = render_firecracker_guest_proof_init()
         assert "mount -t proc proc /proc" in snippet
         assert "mount -t sysfs sysfs /sys" in snippet
         assert "ARC_FC_PROOF no-default-route" in snippet
+        assert "ARC_FC_PROOF curl-available" in snippet
         assert "ARC_FC_PROOF network-failure" in snippet
         assert "ARC_FC_PROOF sentinel-read" in snippet
+        assert "ARC_FC_PROOF workspace-mount-proven" in snippet
         assert "ARC_FC_PROOF symlink-escape-blocked" in snippet
-        assert "curl --connect-timeout 2 https://example.com" in snippet
+        assert '"$CURL_BIN" --connect-timeout 2 https://example.com' in snippet
         assert "/workspace/arc-sentinel.txt" in snippet
         assert "/workspace/arc-host-escape-link" in snippet
 
@@ -330,8 +346,10 @@ class TestFirecrackerProofRunner:
         init_path.write_text(
             "#!/bin/sh\n"
             "ARC_FC_PROOF no-default-route=1\n"
+            "ARC_FC_PROOF curl-available=1\n"
             "ARC_FC_PROOF network-failure=1\n"
             "ARC_FC_PROOF sentinel-read=1\n"
+            "ARC_FC_PROOF workspace-mount-proven=1\n"
             "ARC_FC_PROOF symlink-escape-blocked=1\n",
             encoding="utf-8",
         )
@@ -355,8 +373,10 @@ class TestFirecrackerProofRunner:
                     "markers": [
                         "no_default_route",
                         "network_failure",
+                        "curl_available",
                         "sentinel_readable",
                         "symlink_escape_blocked",
+                        "workspace_mount_proven",
                     ],
                     "init_entrypoints": ["arc-fc-proof-init.sh"],
                     "device_nodes": [],
@@ -461,8 +481,10 @@ class TestFirecrackerProofRunner:
                     exit_code=0,
                     stdout=(
                         "ARC_FC_PROOF no-default-route=1\n"
+                        "ARC_FC_PROOF curl-available=1\n"
                         "ARC_FC_PROOF network-failure=1\n"
                         "ARC_FC_PROOF sentinel-read=1\n"
+                        "ARC_FC_PROOF workspace-mount-proven=1\n"
                         "ARC_FC_PROOF symlink-escape-blocked=1\n"
                     ),
                     provider="microvm",
@@ -516,7 +538,11 @@ class TestFirecrackerProofRunner:
                     "agent_runtime_cockpit.isolation.base", fromlist=["IsolationResult"]
                 ).IsolationResult(
                     exit_code=0,
-                    stdout="ARC_FC_PROOF no-default-route=1\nARC_FC_PROOF network-failure=1\n",
+                    stdout=(
+                        "ARC_FC_PROOF no-default-route=1\n"
+                        "ARC_FC_PROOF curl-available=1\n"
+                        "ARC_FC_PROOF network-failure=1\n"
+                    ),
                     provider="microvm",
                 ),
                 None,
@@ -529,6 +555,34 @@ class TestFirecrackerProofRunner:
         assert "guest_proof_failed" in result.lifecycle
         assert result.result.exit_code == -1
         assert "did not satisfy" in result.proof_blocker
+
+    def test_proof_runner_refuses_existing_workspace_markers(self, tmp_path, monkeypatch):
+        kernel = tmp_path / "vmlinux"
+        rootfs = tmp_path / "rootfs.ext4"
+        kernel.write_text("kernel", encoding="utf-8")
+        rootfs.write_text("rootfs", encoding="utf-8")
+        (tmp_path / "arc-sentinel.txt").write_text("user-data", encoding="utf-8")
+        monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+        monkeypatch.setenv("ARC_FC_REAL_EXEC", "1")
+        monkeypatch.setenv("ARC_FIRECRACKER_KERNEL", str(kernel))
+        monkeypatch.setenv("ARC_FIRECRACKER_ROOTFS", str(rootfs))
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm.platform.system", lambda: "Linux"
+        )
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm._firecracker_binary",
+            lambda: "/usr/bin/firecracker",
+        )
+        original_exists = __import__("pathlib", fromlist=["Path"]).Path.exists
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm.Path.exists",
+            lambda self: True if str(self) == "/dev/kvm" else original_exists(self),
+        )
+        monkeypatch.setattr("agent_runtime_cockpit.isolation.microvm.os.access", lambda *_: True)
+
+        with pytest.raises(Exception, match="refusing to overwrite"):
+            FirecrackerProofRunner(workspace_root=tmp_path).run(["ip", "route"])
+        assert (tmp_path / "arc-sentinel.txt").read_text(encoding="utf-8") == "user-data"
 
 
 # ---------------------------------------------------------------------------

@@ -34,7 +34,7 @@ from ..security.sandbox import (
     utc_now,
 )
 from .base import IsolationProvider, IsolationResult
-from .subprocess import redact_output
+from .subprocess import _BoundedPipeReader, redact_output
 
 
 class MicroVMPlanStep(BaseModel):
@@ -288,15 +288,19 @@ class FirecrackerGuestProof(BaseModel):
     network_failure: bool = False
     sentinel_readable: bool = False
     symlink_escape_blocked: bool = False
+    curl_available: bool = False
+    workspace_mount_proven: bool = False
     raw: dict[str, str] = {}
 
     @property
     def network_proof_passed(self) -> bool:
-        return self.no_default_route and self.network_failure
+        return self.no_default_route and self.network_failure and self.curl_available
 
     @property
     def workspace_proof_passed(self) -> bool:
-        return self.sentinel_readable and self.symlink_escape_blocked
+        return (
+            self.workspace_mount_proven and self.sentinel_readable and self.symlink_escape_blocked
+        )
 
 
 class FirecrackerProofArtifactManifest(BaseModel):
@@ -343,22 +347,28 @@ FIRECRACKER_PROOF_MARKER = "ARC_FC_PROOF "
 FIRECRACKER_PROOF_MARKERS = [
     "no_default_route",
     "network_failure",
+    "curl_available",
     "sentinel_readable",
     "symlink_escape_blocked",
+    "workspace_mount_proven",
 ]
 
 FIRECRACKER_PROOF_MARKER_KEYS = {
     "no_default_route": "no-default-route",
     "network_failure": "network-failure",
+    "curl_available": "curl-available",
     "sentinel_readable": "sentinel-read",
     "symlink_escape_blocked": "symlink-escape-blocked",
+    "workspace_mount_proven": "workspace-mount-proven",
 }
 
 _FIRECRACKER_PROOF_ALIASES = {
     "no-default-route": "no_default_route",
     "network-failure": "network_failure",
+    "curl-available": "curl_available",
     "sentinel-read": "sentinel_readable",
     "symlink-escape-blocked": "symlink_escape_blocked",
+    "workspace-mount-proven": "workspace_mount_proven",
     "curl_failed": "network_failure",
 }
 
@@ -379,8 +389,10 @@ def parse_firecracker_guest_proof(output: str) -> FirecrackerGuestProof:
         marker_seen=bool(raw),
         no_default_route=raw.get("no_default_route") == "1",
         network_failure=raw.get("network_failure") == "1",
+        curl_available=raw.get("curl_available") == "1",
         sentinel_readable=raw.get("sentinel_readable") == "1",
         symlink_escape_blocked=raw.get("symlink_escape_blocked") == "1",
+        workspace_mount_proven=raw.get("workspace_mount_proven") == "1",
         raw=raw,
     )
 
@@ -396,15 +408,31 @@ if ip route 2>/dev/null | grep -q '^default'; then
 else
   echo 'ARC_FC_PROOF no-default-route=1'
 fi
-if curl --connect-timeout 2 https://example.com >/tmp/arc-curl.out 2>/tmp/arc-curl.err; then
-  echo 'ARC_FC_PROOF network-failure=0'
+CURL_BIN="$(command -v curl 2>/dev/null || true)"
+if [ "$CURL_BIN" = "" ] && [ -x /bin/curl ]; then
+  CURL_BIN=/bin/curl
+fi
+if [ "$CURL_BIN" = "" ] && [ -x /usr/bin/curl ]; then
+  CURL_BIN=/usr/bin/curl
+fi
+if [ "$CURL_BIN" != "" ]; then
+  echo 'ARC_FC_PROOF curl-available=1'
 else
+  echo 'ARC_FC_PROOF curl-available=0'
+fi
+if [ "$CURL_BIN" != "" ] && "$CURL_BIN" --connect-timeout 2 https://example.com >/tmp/arc-curl.out 2>/tmp/arc-curl.err; then
+  echo 'ARC_FC_PROOF network-failure=0'
+elif [ "$CURL_BIN" != "" ]; then
   echo 'ARC_FC_PROOF network-failure=1'
+else
+  echo 'ARC_FC_PROOF network-failure=0'
 fi
 if cat /workspace/arc-sentinel.txt >/dev/null 2>&1; then
   echo 'ARC_FC_PROOF sentinel-read=1'
+  echo 'ARC_FC_PROOF workspace-mount-proven=1'
 else
   echo 'ARC_FC_PROOF sentinel-read=0'
+  echo 'ARC_FC_PROOF workspace-mount-proven=0'
 fi
 if cat /workspace/arc-host-escape-link >/tmp/arc-escape.out 2>/tmp/arc-escape.err; then
   echo 'ARC_FC_PROOF symlink-escape-blocked=0'
@@ -787,6 +815,12 @@ class FirecrackerProofRunner:
             sentinel = self.workspace_root / "arc-sentinel.txt"
             escape = self.workspace_root / "arc-host-escape-link"
             created_escape = False
+            if sentinel.exists() or escape.exists():
+                reason = (
+                    "proof workspace marker path already exists; refusing to overwrite user files"
+                )
+                blocked = self._blocked_result(command, reason, started_at, utc_now())
+                raise FirecrackerHarnessError(blocked.result.stderr)
             sentinel.write_text("arc-firecracker-proof\n", encoding="utf-8")
             try:
                 if not escape.exists():
@@ -1366,16 +1400,22 @@ def _run_limactl(
 ) -> IsolationResult:
     """Run a ``limactl`` subcommand and return structured result."""
     start = time.monotonic()
+    proc: subprocess.Popen[bytes] | None = None
     try:
         proc = subprocess.Popen(
             argv,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
             start_new_session=True,
         )
         killed = False
         kill_reason: str | None = None
+        assert proc.stdout is not None
+        assert proc.stderr is not None
+        stdout_reader = _BoundedPipeReader(proc.stdout, max_bytes)
+        stderr_reader = _BoundedPipeReader(proc.stderr, max_bytes)
+        stdout_reader.start()
+        stderr_reader.start()
         try:
             proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -1386,10 +1426,10 @@ def _run_limactl(
             except ProcessLookupError:
                 pass
             proc.wait()
-        assert proc.stdout is not None
-        assert proc.stderr is not None
-        stdout_raw, _ = cap_output(proc.stdout.read(), max_bytes)
-        stderr_raw, _ = cap_output(proc.stderr.read(), max_bytes)
+        stdout_reader.join()
+        stderr_reader.join()
+        stdout_raw = stdout_reader.text()
+        stderr_raw = stderr_reader.text()
         redacted_stdout = redact_output(stdout_raw)
         redacted_stderr = redact_output(stderr_raw)
         redaction_applied = redacted_stdout != stdout_raw or redacted_stderr != stderr_raw
@@ -1402,8 +1442,8 @@ def _run_limactl(
             killed=killed,
             kill_reason=kill_reason,
             provider="microvm",
-            stdout_truncated=False,
-            stderr_truncated=False,
+            stdout_truncated=stdout_reader.truncated,
+            stderr_truncated=stderr_reader.truncated,
             redaction_applied=redaction_applied,
         )
     except Exception as exc:
@@ -1608,7 +1648,7 @@ class MicroVMIsolationProvider(IsolationProvider):
         return "microvm"
 
     async def health_check(self) -> bool:
-        return microvm_preflight()["status"] == "ready"
+        return False
 
     async def execute(
         self,
@@ -1629,6 +1669,8 @@ class MicroVMIsolationProvider(IsolationProvider):
         """Return structured status dict for truth-guard checks and CLI output."""
         return {
             "available": False,
+            "public_execution_enabled": False,
+            "public_execution_status": "blocked",
             "reason": "execution_not_implemented",
             "contract_doc": "docs/adr/ADR-024-microvm-public-execution-contract.md",
             "strict_network_isolation": False,
@@ -1640,6 +1682,14 @@ class MicroVMIsolationProvider(IsolationProvider):
 
     def describe(self) -> dict[str, object]:
         info = microvm_preflight()
+        info.update(
+            {
+                "available": False,
+                "public_execution_enabled": False,
+                "public_execution_status": "blocked",
+                "contract_doc": "docs/adr/ADR-024-microvm-public-execution-contract.md",
+            }
+        )
         if _microvm_execution_enabled() and _lima_available():
             info["execution"] = "gated_unproven"
             info["reason"] = (

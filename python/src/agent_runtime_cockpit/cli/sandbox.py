@@ -537,6 +537,31 @@ def sandbox_run(
             ).execute(command, cwd=cwd, timeout_seconds=policy_model.timeout_seconds)
         )
     except NotImplementedError as exc:
+        ended_at = utc_now()
+        denied = decision.model_copy(
+            update={
+                "allowed": False,
+                "reason": str(exc),
+                "approval_required": False,
+                "approved": False,
+            }
+        )
+        audit = build_audit_event(
+            command=command,
+            cwd=cwd,
+            decision=denied,
+            provider=provider,
+            started_at=started_at,
+            ended_at=ended_at,
+            exit_code=None,
+            stdout_truncated=False,
+            stderr_truncated=False,
+            redaction_applied=False,
+        )
+        audit["public_execution_enabled"] = False
+        audit["contract_doc"] = "docs/adr/ADR-024-microvm-public-execution-contract.md"
+        audit_path = persist_sandbox_audit_event(audit)
+        audit["audit_path"] = str(audit_path)
         _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
         raise typer.Exit(2)
     ended_at = utc_now()

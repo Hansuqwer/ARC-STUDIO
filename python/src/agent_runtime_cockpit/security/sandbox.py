@@ -236,6 +236,10 @@ def classify_command(command: list[str]) -> CommandClassification:
     if exe == "find":
         if "-delete" in args or ("-exec" in args and any(Path(a).name == "rm" for a in args)):
             return CommandClassification.DESTRUCTIVE
+        if "-exec" in args:
+            return CommandClassification.UNKNOWN
+    if exe == "sed" and any(a == "-i" or a.startswith("-i") for a in args):
+        return CommandClassification.WRITES_WORKSPACE
     if exe == "tar" and any(a == "--overwrite" or a.startswith("--overwrite=") for a in args):
         return CommandClassification.DESTRUCTIVE
     if exe == "rsync":
@@ -313,18 +317,50 @@ def validate_command_paths(command: list[str], policy: SandboxPolicy) -> None:
     root = policy.workspace_root.resolve()
     exe = Path(command[0]).name
     paths = _extract_path_intents(command)
+    if _requires_static_path_proof(command, classification, policy):
+        raise SandboxPathViolation("dynamic shell/interpreter command cannot be safely approved")
+    for path in paths:
+        if _is_write_path_intent(path) and not _path_within_workspace(
+            _write_path_value(path), root
+        ):
+            raise SandboxPathViolation(f"write path escapes workspace: {_write_path_value(path)}")
     if classification == CommandClassification.READ_ONLY:
         for path in paths:
-            if not _path_within_workspace(path, root):
-                raise SandboxPathViolation(f"read path escapes workspace: {path}")
+            value = _path_value(path)
+            if not _path_within_workspace(value, root):
+                raise SandboxPathViolation(f"read path escapes workspace: {value}")
         return
     if classification != CommandClassification.WRITES_WORKSPACE:
         return
     if exe in INTERPRETERS and not paths:
         raise SandboxPathViolation("write-capable interpreter lacks statically validated path")
     for path in paths:
-        if not _path_within_workspace(path, root):
-            raise SandboxPathViolation(f"write path escapes workspace: {path}")
+        value = _path_value(path)
+        if not _path_within_workspace(value, root):
+            raise SandboxPathViolation(f"write path escapes workspace: {value}")
+
+
+def _requires_static_path_proof(
+    command: list[str], classification: CommandClassification, policy: SandboxPolicy
+) -> bool:
+    exe = Path(command[0]).name if command else ""
+    if classification != CommandClassification.UNKNOWN or policy.allow_unknown:
+        return False
+    if exe in SHELL_COMMANDS:
+        return any(arg in {"-c", "-lc"} for arg in command[1:])
+    return exe in INTERPRETERS or exe in {"node", "ruby", "perl"}
+
+
+def _path_value(path: str) -> str:
+    return path[6:] if path.startswith("write:") else path
+
+
+def _write_path_value(path: str) -> str:
+    return path[6:]
+
+
+def _is_write_path_intent(path: str) -> bool:
+    return path.startswith("write:")
 
 
 def _path_within_workspace(path: str, root: Path) -> bool:
@@ -348,17 +384,17 @@ def _extract_path_intents(command: list[str]) -> list[str]:
     while i < len(args):
         arg = args[i]
         if arg in WRITE_PATH_OPTIONS | READ_PATH_OPTIONS and i + 1 < len(args):
-            paths.append(args[i + 1])
+            paths.append(("write:" if arg in WRITE_PATH_OPTIONS else "") + args[i + 1])
             i += 2
             continue
         for opt in WRITE_PATH_OPTIONS | READ_PATH_OPTIONS:
             prefix = opt + "="
             if arg.startswith(prefix):
-                paths.append(arg[len(prefix) :])
+                paths.append(("write:" if opt in WRITE_PATH_OPTIONS else "") + arg[len(prefix) :])
                 break
         for prefix in WRITE_PATH_PREFIXES:
             if arg.startswith(prefix):
-                paths.append(arg[len(prefix) :])
+                paths.append("write:" + arg[len(prefix) :])
                 break
         i += 1
     if exe in {"python", "python3"} and "-c" in args:
@@ -366,17 +402,17 @@ def _extract_path_intents(command: list[str]) -> list[str]:
         if idx + 1 < len(args):
             paths.extend(_extract_python_code_paths(args[idx + 1]))
     if exe in {"tee", "truncate"}:
-        paths.extend(a for a in args if not a.startswith("-"))
+        paths.extend("write:" + a for a in args if not a.startswith("-"))
     if exe == "dd":
-        paths.extend(a[3:] for a in args if a.startswith("of="))
+        paths.extend("write:" + a[3:] for a in args if a.startswith("of="))
     if exe in {"cp", "mv"} and len([a for a in args if not a.startswith("-")]) >= 2:
-        paths.append([a for a in args if not a.startswith("-")][-1])
+        paths.append("write:" + [a for a in args if not a.startswith("-")][-1])
     if exe == "tar":
         paths.extend(a for a in args if a.endswith((".tar", ".tgz", ".zip")))
         if "-C" in args:
             idx = args.index("-C")
             if idx + 1 < len(args):
-                paths.append(args[idx + 1])
+                paths.append("write:" + args[idx + 1])
     if exe == "zip":
         paths.extend(a for a in args if a.endswith((".tar", ".tgz", ".zip")))
     if exe == "unzip":
@@ -384,16 +420,16 @@ def _extract_path_intents(command: list[str]) -> list[str]:
         if "-d" in args:
             idx = args.index("-d")
             if idx + 1 < len(args):
-                paths.append(args[idx + 1])
+                paths.append("write:" + args[idx + 1])
     if exe == "ln" and len([a for a in args if not a.startswith("-")]) >= 2:
-        paths.append([a for a in args if not a.startswith("-")][-1])
+        paths.append("write:" + [a for a in args if not a.startswith("-")][-1])
     if exe in {"touch", "mkdir"}:
-        paths.extend(a for a in args if not a.startswith("-"))
+        paths.extend("write:" + a for a in args if not a.startswith("-"))
     if exe == "install":
         if "-d" in args:
-            paths.extend(a for a in args if not a.startswith("-"))
+            paths.extend("write:" + a for a in args if not a.startswith("-"))
         elif len([a for a in args if not a.startswith("-")]) >= 2:
-            paths.append([a for a in args if not a.startswith("-")][-1])
+            paths.append("write:" + [a for a in args if not a.startswith("-")][-1])
     if exe in READ_ONLY_COMMANDS:
         paths.extend(
             a for a in args if a and not a.startswith("-") and not _looks_like_git_revision(a)
@@ -418,7 +454,7 @@ def _extract_python_code_paths(code: str) -> list[str]:
             if name in {"open", "write_text", "write_bytes"} and node.args:
                 first = node.args[0]
                 if isinstance(first, ast.Constant) and isinstance(first.value, str):
-                    paths.append(first.value)
+                    paths.append("write:" + first.value)
             if name in {"write_text", "write_bytes"} and isinstance(func, ast.Attribute):
                 target = func.value
                 if (
@@ -428,7 +464,7 @@ def _extract_python_code_paths(code: str) -> list[str]:
                 ):
                     first = target.args[0]
                     if isinstance(first, ast.Constant) and isinstance(first.value, str):
-                        paths.append(first.value)
+                        paths.append("write:" + first.value)
     return paths
 
 
@@ -911,7 +947,13 @@ def microvm_preflight(system: str | None = None) -> dict[str, Any]:
             "provider": "microvm",
             "platform": "linux",
             "status": status,
+            "runtime_preflight_status": status,
+            "public_execution_enabled": False,
+            "public_execution_status": "blocked",
+            "contract_doc": "docs/adr/ADR-024-microvm-public-execution-contract.md",
             "strict_network_candidate": bool(firecracker),
+            "firecracker_strict_candidate": bool(firecracker),
+            "cloud_hypervisor_strict_candidate": bool(cloud_hypervisor),
             "strict_network_proof": "not_proven",
             "network_interfaces_configured": False,
             "binary": binary,
@@ -950,6 +992,10 @@ def microvm_preflight(system: str | None = None) -> dict[str, Any]:
             "provider": "microvm",
             "platform": "macos",
             "status": status,
+            "runtime_preflight_status": status,
+            "public_execution_enabled": False,
+            "public_execution_status": "blocked",
+            "contract_doc": "docs/adr/ADR-024-microvm-public-execution-contract.md",
             "binary": limactl,
             "runtime": "lima-vz",
             "strict_network_isolation": False,
@@ -964,6 +1010,10 @@ def microvm_preflight(system: str | None = None) -> dict[str, Any]:
         "provider": "microvm",
         "platform": os_name.lower(),
         "status": "blocked",
+        "runtime_preflight_status": "blocked",
+        "public_execution_enabled": False,
+        "public_execution_status": "blocked",
+        "contract_doc": "docs/adr/ADR-024-microvm-public-execution-contract.md",
         "reason": "Windows/unsupported platform skipped",
     }
 

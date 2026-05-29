@@ -28,6 +28,7 @@ from __future__ import annotations
 import os
 import platform
 import shutil
+import sys
 
 import pytest
 
@@ -35,6 +36,7 @@ from agent_runtime_cockpit.isolation.base import IsolationResult
 from agent_runtime_cockpit.isolation.microvm import (
     LimaHarnessResult,
     LimaIntegrationHarness,
+    _run_limactl,
     lima_integration_available,
 )
 
@@ -246,6 +248,22 @@ class TestLimaSmokeSkipBehaviour:
         harness = LimaIntegrationHarness(workspace_root=tmp_path)
         # runner=None default → harness.runner should be the real _run_limactl
         assert harness.runner is not None
+
+    def test_run_limactl_caps_large_output_without_deadlock(self):
+        result = _run_limactl(
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.stdout.write('x'*10000); sys.stderr.write('y'*10000)",
+            ],
+            timeout=5,
+            max_bytes=32,
+        )
+        assert result.exit_code == 0
+        assert len(result.stdout.encode("utf-8")) == 32
+        assert len(result.stderr.encode("utf-8")) == 32
+        assert result.stdout_truncated is True
+        assert result.stderr_truncated is True
 
 
 # ---------------------------------------------------------------------------

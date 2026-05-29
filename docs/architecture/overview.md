@@ -158,4 +158,6 @@ argv -> CommandClassification -> SandboxDecision -> IsolationProvider -> Sandbox
 
 `subprocess` is the only real P0 execution provider. `microvm` intentionally keeps public execution blocked; private Firecracker proof-runner code is host-gated for Linux/KVM proof collection only and must not report public command success until disposable VM execution, workspace mounting, network controls, teardown, and opt-in tests exist.
 
+MicroVM doctor/preflight output separates runtime preflight readiness from public execution readiness. Even when Linux/Firecracker or Cloud Hypervisor artifacts look ready, public execution remains `public_execution_enabled=false` / `public_execution_status=blocked` until ADR-024 proof requirements are complete.
+
 Firecracker proof artifact generation is available as a local CLI utility for init/manifest review. It does not boot a VM and does not change the public microVM execution contract.

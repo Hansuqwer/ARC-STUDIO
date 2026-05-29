@@ -142,8 +142,12 @@ class TestMicroVMPreflightStates:
         )
         data = microvm_preflight("Linux")
         assert data["status"] == "ready"
+        assert data["public_execution_enabled"] is False
+        assert data["public_execution_status"] == "blocked"
+        assert data["runtime_preflight_status"] == "ready"
         assert data["cloud_hypervisor_cache_ready"] is True
         assert data["cache_ready"] is True
+        assert data["cloud_hypervisor_strict_candidate"] is True
 
     def test_installed_not_configured_macos_with_limactl(self, monkeypatch):
         """macOS with limactl installed → installed_not_configured (execution not implemented)."""
@@ -161,12 +165,15 @@ class TestMicroVMPreflightStates:
         assert data["status"] == "installed_not_configured"
         assert data["binary"].endswith("limactl")
         assert data["execution"] == "not_implemented"
+        assert data["public_execution_enabled"] is False
+        assert data["public_execution_status"] == "blocked"
 
     def test_blocked_windows(self):
         """Windows platform → blocked with reason."""
         data = microvm_preflight("Windows")
         assert data["status"] == "blocked"
         assert "unsupported" in data["reason"].lower()
+        assert data["public_execution_enabled"] is False
 
     def test_blocked_unknown_platform(self):
         """Unknown platform → blocked."""
@@ -197,6 +204,7 @@ class TestMicroVMPreflightLinuxDeep:
         assert data["binary"] == "/usr/bin/firecracker"
         assert data["jailer"] == "/usr/bin/jailer"
         assert data["strict_network_candidate"] is True
+        assert data["firecracker_strict_candidate"] is True
         assert data["strict_network_proof"] == "not_proven"
         assert data["network_interfaces_configured"] is False
 

@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-29 — Phases 91-93 edit-plan IDE bridge, REPL workflow loop, and patch hardening added after Phase 90.
-**Current evidence anchor:** local worktree | Phases 91-93 verified: Python full suite 3363 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK; e2e 11 passed / 4 skipped; banned-claims guard OK.
+**Last reality refresh:** 2026-05-29 — Phases 94-96 sandbox/microVM truth, classifier/path, and proof-harness hardening added after Phase 93.
+**Current evidence anchor:** local worktree | Phases 94-96 verified: Python full suite 3371 passed / 34 skipped / 3 xfailed; `cd python && uv run ruff check src tests` OK; `pnpm build` OK; `pnpm typecheck` OK; `pnpm test:e2e` OK with known Theia async warnings and 4 skipped smoke tests; banned-claims guard OK.
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -4163,3 +4163,85 @@ cd python && uv run ruff check src tests/test_cli_edit_loop.py
 ### Known Risks
 - This is still not a complete Git patch engine.
 - No-newline and binary patch edge cases remain intentionally unsupported unless explicitly designed later.
+
+## Phase 94 — Sandbox/MicroVM Truth Audit Guard
+
+**Roadmap:** R65 Sandbox/MicroVM Truth Audit Guard
+**Status:** Baseline Complete | Evidence: local worktree; targeted `cd python && uv run pytest tests/test_cli_sandbox.py tests/isolation/test_microvm_preflight.py tests/isolation/test_firecracker_smoke.py tests/isolation/test_lima_smoke.py -q` 196 passed / 13 skipped; targeted ruff clean
+**Depends on:** Phase 37 sandbox foundation, ADR-024 public microVM execution contract
+
+### Implementation
+1. `arc sandbox run --provider microvm` still returns a blocked CLI error, but now persists a `SANDBOX_DENIED` event with `public_execution_enabled=false` and ADR-024 reference.
+2. MicroVM doctor/preflight output keeps runtime preflight status but always emits `public_execution_enabled=false` and `public_execution_status=blocked` until public execution exists.
+3. MicroVM health checks no longer treat runtime preflight readiness as public execution health.
+
+### Acceptance
+1. ✅ Blocked public microVM run attempts leave audit evidence.
+2. ✅ Doctor output cannot be misread as public execution readiness.
+3. ✅ Existing microVM truth-guard behavior remains blocked.
+
+### Verification
+```bash
+cd python && uv run pytest tests/test_cli_sandbox.py tests/isolation/test_microvm_preflight.py tests/isolation/test_firecracker_smoke.py tests/isolation/test_lima_smoke.py -q
+cd python && uv run ruff check src/agent_runtime_cockpit/security/sandbox.py src/agent_runtime_cockpit/isolation/microvm.py src/agent_runtime_cockpit/cli/sandbox.py tests/test_cli_sandbox.py tests/isolation/test_microvm_preflight.py tests/isolation/test_firecracker_smoke.py tests/isolation/test_lima_smoke.py
+```
+
+### Known Risks
+- This is audit/truth hardening only; no microVM execution is implemented.
+
+## Phase 95 — Sandbox Classifier And Path-Intent Hardening v3
+
+**Roadmap:** R66 Sandbox Classifier And Path-Intent Hardening v3
+**Status:** Baseline Complete | Evidence: local worktree; targeted sandbox/microVM tests 196 passed / 13 skipped; targeted ruff clean
+**Depends on:** Phase 94 truth guard
+
+### Implementation
+1. Write-output path intents are validated across classifications, including network/install/unknown commands when policy allows them.
+2. Dynamic shell/interpreter commands that remain `unknown` are denied before interactive/token approval because workspace writes cannot be statically bounded.
+3. `find -exec` without a safe known destructive target is classified `unknown`; `sed -i` is classified `writes_workspace`.
+
+### Acceptance
+1. ✅ Policy-enabled `curl -o /outside` denies before execution.
+2. ✅ `bash -lc ...` unknown commands cannot be approved interactively.
+3. ✅ New classifier regressions cover `find -exec` and `sed -i`.
+4. ✅ Existing safe read-only and workspace-write commands remain covered.
+
+### Verification
+```bash
+cd python && uv run pytest tests/test_cli_sandbox.py -q
+cd python && uv run ruff check src/agent_runtime_cockpit/security/sandbox.py tests/test_cli_sandbox.py
+```
+
+### Known Risks
+- Static classification is still not kernel/syscall sandboxing.
+- Some legitimate dynamic shell/interpreter one-liners now require a future explicit tool/runtime path instead of blanket unknown approval.
+
+## Phase 96 — MicroVM Proof-Harness Truth Guards
+
+**Roadmap:** R67 MicroVM Proof-Harness Truth Guards
+**Status:** Baseline Complete | Evidence: local worktree; targeted sandbox/microVM tests 196 passed / 13 skipped; targeted ruff clean
+**Depends on:** Phase 94 truth guard, ADR-024
+
+### Implementation
+1. Lima harness subprocess probing now drains bounded stdout/stderr while preserving timeout process-group cleanup.
+2. Firecracker guest proof markers now distinguish missing `curl` from true network-denial proof.
+3. Firecracker workspace proof requires an explicit `workspace-mount-proven` marker; sentinel/symlink markers alone are insufficient.
+4. Firecracker proof runner refuses to overwrite existing workspace marker files.
+5. Added reusable three-phase orchestrator prompt with up to eight subagent workstreams and research/execute/test loop.
+
+### Acceptance
+1. ✅ Lima probe output is capped without pipe deadlock.
+2. ✅ Missing `curl` fails network proof instead of counting as success.
+3. ✅ Missing workspace mount proof fails workspace proof.
+4. ✅ Existing user files named like proof markers are not clobbered.
+5. ✅ Orchestrator prompt documents Context7, Vercel Grep/latest-docs, execution, tests, claim safety, commit/e2e flow.
+
+### Verification
+```bash
+cd python && uv run pytest tests/isolation/test_firecracker_smoke.py tests/isolation/test_lima_smoke.py -q
+cd python && uv run ruff check src/agent_runtime_cockpit/isolation/microvm.py tests/isolation/test_firecracker_smoke.py tests/isolation/test_lima_smoke.py
+```
+
+### Known Risks
+- Firecracker real boot/rootfs/serial evidence remains unavailable on this macOS host.
+- Public microVM execution remains blocked.

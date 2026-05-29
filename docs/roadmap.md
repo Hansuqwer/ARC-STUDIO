@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-29 — R62-R64 edit-plan IDE bridge, REPL workflow loop, and patch hardening added after R61.
-**Current evidence anchor:** local worktree | R62-R64 verified: Python full suite 3363 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK; e2e 11 passed / 4 skipped; banned-claims guard OK.
+**Last reality refresh:** 2026-05-29 — R65-R67 sandbox/microVM truth, classifier/path, and proof-harness hardening added after R64.
+**Current evidence anchor:** local worktree | R65-R67 verified: Python full suite 3371 passed / 34 skipped / 3 xfailed; `cd python && uv run ruff check src tests` OK; `pnpm build` OK; `pnpm typecheck` OK; `pnpm test:e2e` OK with known Theia async warnings and 4 skipped smoke tests; banned-claims guard OK.
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -1016,6 +1016,9 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R62 IDE Edit Plan Review Surface** | **Baseline Complete** | **Phase 91 — metadata-only IDE tab/backend bridge for saved edit-plan list/show/approve; no replacement content, autonomous editing, or signed reviewer claim** |
 | **R63 Sandboxed Diff/Apply/Test Loop** | **Baseline Complete** | **Phase 92 — REPL `/diff`, `/apply`, and `/test` commands route through saved edit metadata, edit apply gates, and sandbox execution; no self-healing agent loop or network-by-default claim** |
 | **R64 Patch Engine Hardening v2** | **Baseline Complete** | **Phase 93 — text-only multi-hunk unified diff support with hunk range validation and fail-closed malformed/binary handling; not a complete Git patch engine** |
+| **R65 Sandbox/MicroVM Truth Audit Guard** | **Baseline Complete** | **Phase 94 — blocked public microVM run attempts now emit denial audit events; doctor/preflight separates runtime readiness from public execution readiness** |
+| **R66 Sandbox Classifier And Path-Intent Hardening v3** | **Baseline Complete** | **Phase 95 — write-output paths are validated across classifications and dynamic unknown shell/interpreter approvals are denied before execution** |
+| **R67 MicroVM Proof-Harness Truth Guards** | **Baseline Complete** | **Phase 96 — Lima bounded output drain, Firecracker curl/workspace proof markers, workspace marker clobber guard, and reusable 8-subagent orchestrator prompt** |
 
 **Post-v0.1 Execution Order:** 
 - **Priority 1 stop-the-line:** R39 / Phase 41 (Interactive CLI/UX Foundation). **Baseline Complete** as of Phases 41–45 (commits 37fd92b–7fdba99). Gate lifted. R44 (Phase 46 CLI write bridge + Phase 47 daemon HTTP write bridge) is now Baseline Complete. Continue sandbox hardening for Phase 37 microVM feasibility decision.
@@ -1343,3 +1346,27 @@ The following roadmap items implement the adapter integration plan from `docs/re
 **Current:** Baseline Complete. `apply_unified_patch()` now supports text-only multi-hunk unified diffs, parses hunk ranges, rejects binary patch content, validates old/new hunk line counts, rejects malformed hunks, and preserves existing path-target checks. It still intentionally rejects unsupported Git patch/binary/ambiguous formats.
 
 **Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/test_cli_edit_loop.py -q` 22 passed; ruff targeted clean | Notes: This is not a complete Git patch engine and does not shell out to `patch`.
+
+## R65 — Sandbox/MicroVM Truth Audit Guard
+
+**Goal:** Prevent blocked public microVM attempts and doctor output from implying execution readiness.
+
+**Current:** Baseline Complete. `arc sandbox run --provider microvm` remains blocked but now emits a `SANDBOX_DENIED` audit event with `public_execution_enabled=false`. MicroVM doctor/preflight output keeps runtime preflight detail while explicitly reporting `public_execution_status=blocked` and `public_execution_enabled=false`.
+
+**Status:** Baseline Complete | Evidence: local worktree; targeted sandbox/microVM tests 196 passed / 13 skipped; targeted ruff clean | Notes: No microVM execution exists; this is traceability and truth-label hardening only.
+
+## R66 — Sandbox Classifier And Path-Intent Hardening v3
+
+**Goal:** Close static policy gaps where allowed network/install/unknown commands could write outside the workspace or unknown dynamic shells could be approved.
+
+**Current:** Baseline Complete. Write-output path intents are validated across classifications, dynamic unknown shell/interpreter forms deny before approval, `find -exec` without known destructive target is `unknown`, and `sed -i` is `writes_workspace`.
+
+**Status:** Baseline Complete | Evidence: local worktree; targeted sandbox/microVM tests 196 passed / 13 skipped; targeted ruff clean | Notes: Static policy hardening only; not syscall/kernel sandboxing.
+
+## R67 — MicroVM Proof-Harness Truth Guards
+
+**Goal:** Keep private microVM proof harnesses from producing false-positive evidence before real Linux/macOS proof exists.
+
+**Current:** Baseline Complete. Lima probes use bounded output drain. Firecracker guest proof success now requires `curl-available` and `workspace-mount-proven` markers, and proof runner refuses to overwrite existing workspace marker files. A reusable three-phase orchestrator prompt was added for future research/execute/test phases.
+
+**Status:** Baseline Complete | Evidence: local worktree; targeted sandbox/microVM tests 196 passed / 13 skipped; targeted ruff clean | Notes: Real Firecracker/Lima public microVM execution remains blocked pending ADR-024 proofs.
