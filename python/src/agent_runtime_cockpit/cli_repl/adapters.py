@@ -28,7 +28,7 @@ from ..security.sandbox import (
     validate_command_paths,
     verify_sandbox_audit,
 )
-from ..security.edit_loop import apply_edit_plan, build_edit_plan
+from ..security.edit_loop import apply_edit_plan, build_edit_plan, load_edit_plan_record
 
 READ_MAX_BYTES = 64_000
 READ_DEFAULT_LIMIT = 200
@@ -584,7 +584,7 @@ def render_policy_show(name: str, workspace: Path | None = None) -> SlashAdapter
     )
 
 
-def _parse_edit_args(arg: str) -> tuple[str, str, bool, str, str | None, str | None]:
+def _parse_edit_args(arg: str) -> tuple[str, str, bool, str, str | None, str | None, str | None]:
     parts = shlex.split(arg)
     if parts[:1] in (["plan"], ["apply"]):
         parts = parts[1:]
@@ -594,6 +594,7 @@ def _parse_edit_args(arg: str) -> tuple[str, str, bool, str, str | None, str | N
     policy = "local-safe"
     expected_hash: str | None = None
     plan_id: str | None = None
+    approval_token: str | None = None
     index = 0
     while index < len(parts):
         part = parts[index]
@@ -641,16 +642,26 @@ def _parse_edit_args(arg: str) -> tuple[str, str, bool, str, str | None, str | N
             plan_id = part.split("=", 1)[1]
             index += 1
             continue
+        if part == "--approval-token" and index + 1 < len(parts):
+            approval_token = parts[index + 1]
+            index += 2
+            continue
+        if part.startswith("--approval-token="):
+            approval_token = part.split("=", 1)[1]
+            index += 1
+            continue
         raise ValueError("Usage: /edit plan|apply --path PATH --content TEXT [--approve]")
     if not path and not plan_id:
         raise ValueError("missing --path")
-    return path, content, approved, policy, expected_hash, plan_id
+    return path, content, approved, policy, expected_hash, plan_id, approval_token
 
 
 def render_edit_plan(arg: str, workspace: Path | None = None) -> SlashAdapterResult:
     ws = _workspace(workspace)
     try:
-        path, content, _approved, policy, _expected_hash, _plan_id = _parse_edit_args(arg)
+        path, content, _approved, policy, _expected_hash, _plan_id, _approval_token = (
+            _parse_edit_args(arg)
+        )
         plan = build_edit_plan(
             path_arg=path, content=content, workspace_root=ws, policy_name=policy
         )
@@ -675,7 +686,9 @@ def render_edit_plan(arg: str, workspace: Path | None = None) -> SlashAdapterRes
 def render_edit_apply(arg: str, workspace: Path | None = None) -> SlashAdapterResult:
     ws = _workspace(workspace)
     try:
-        path, content, approved, policy, expected_hash, plan_id = _parse_edit_args(arg)
+        path, content, approved, policy, expected_hash, plan_id, approval_token = _parse_edit_args(
+            arg
+        )
         result = apply_edit_plan(
             path_arg=path,
             content=content,
@@ -684,6 +697,7 @@ def render_edit_apply(arg: str, workspace: Path | None = None) -> SlashAdapterRe
             approved=approved,
             expected_original_hash=expected_hash,
             plan_id=plan_id,
+            approval_token=approval_token,
         )
     except (KeyError, ValueError, OSError) as exc:
         return SlashAdapterResult(state="blocked", text=f"Blocked: {exc}", exit_code=2)
@@ -698,6 +712,60 @@ def render_edit_apply(arg: str, workspace: Path | None = None) -> SlashAdapterRe
         data=result,
         exit_code=0 if result["applied"] else 3,
     )
+
+
+def render_diff(arg: str, workspace: Path | None = None) -> SlashAdapterResult:
+    """Render a saved edit-plan diff/metadata summary for explicit review."""
+    ws = _workspace(workspace)
+    parts = shlex.split(arg)
+    plan_id = ""
+    if parts[:1] == ["--plan-id"] and len(parts) >= 2:
+        plan_id = parts[1]
+    elif parts[:1] == ["show"] and len(parts) >= 2:
+        plan_id = parts[1]
+    elif parts:
+        plan_id = parts[0]
+    if not plan_id:
+        return SlashAdapterResult(state="blocked", text="Usage: /diff --plan-id <id>", exit_code=2)
+    try:
+        plan = load_edit_plan_record(ws, plan_id)
+    except (OSError, ValueError) as exc:
+        return SlashAdapterResult(state="blocked", text=f"Blocked: {exc}", exit_code=2)
+    lines = [
+        f"Edit plan: {plan.plan_id}",
+        f"Policy: {plan.policy}",
+        f"Decision: {'allow' if plan.allowed else 'deny'}",
+        f"Reason: {plan.reason}",
+        "Files:",
+    ]
+    for file_plan in plan.files:
+        lines.append(
+            f"  {file_plan.path} [{file_plan.classification}] original={file_plan.original_hash[:12]}"
+        )
+    lines.append("Saved metadata omits replacement content and full diffs.")
+    return SlashAdapterResult(
+        state="present" if plan.allowed else "denied",
+        text="\n".join(lines),
+        data=plan.model_dump(mode="json"),
+        exit_code=0 if plan.allowed else 3,
+    )
+
+
+def render_apply(arg: str, workspace: Path | None = None) -> SlashAdapterResult:
+    """Alias for the guarded edit apply workflow."""
+    return render_edit_apply(arg, workspace)
+
+
+def render_test(arg: str, workspace: Path | None = None) -> SlashAdapterResult:
+    """Run a local test command through sandbox policy; no inferred repair loop."""
+    parts = shlex.split(arg)
+    if parts[:1] == ["run"]:
+        parts = parts[1:]
+    if "--" not in parts:
+        return SlashAdapterResult(
+            state="blocked", text="Usage: /test [--policy NAME] -- <cmd...>", exit_code=2
+        )
+    return render_sandbox_run(" ".join(shlex.quote(part) for part in parts), workspace)
 
 
 def _trace_files(workspace: Path) -> list[Path]:

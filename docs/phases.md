@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-29 — Phase 90 edit bundle/approval bridge added after Phase 89 saved-plan apply flow.
-**Current evidence anchor:** local worktree | Phase 90: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3358 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
+**Last reality refresh:** 2026-05-29 — Phases 91-93 edit-plan IDE bridge, REPL workflow loop, and patch hardening added after Phase 90.
+**Current evidence anchor:** local worktree | Phases 91-93 verified: Python full suite 3363 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK; e2e 11 passed / 4 skipped; banned-claims guard OK.
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -4072,3 +4072,94 @@ cd python && uv run ruff check src tests/test_cli_edit_loop.py tests/security/te
 - Bridge surfaces are CLI/REPL only; no IDE UI is claimed.
 - Local approval tokens are scoped metadata gates, not signed reviewer identity or collaborative approval.
 - This remains a deterministic local edit loop, not autonomous multi-file Claude Code/OpenCode parity.
+
+## Phase 91 — IDE Edit Plan Review Surface
+
+**Roadmap:** R62 IDE Edit Plan Review Surface
+**Status:** Baseline Complete | Evidence: local worktree; arc-extension Jest 888 passed / 3 skipped; `pnpm typecheck` OK
+**Depends on:** Phase 90 (edit bundle approval bridge)
+
+### Implementation
+1. `ArcService` protocol adds metadata-only edit-plan methods: `listEditPlans`, `showEditPlan`, and `approveEditPlan`.
+2. `EditPlanBridgeService` invokes `arc edit list/show/approve` via argv-only `execFileSync`, sanitized env, bounded output, and plan-id/token validation.
+3. `ArcBackendService` delegates edit-plan bridge calls to `EditPlanBridgeService`.
+4. `EditPlansTab` lists saved plans, shows status/files/hashes/classification/policy metadata, and approves scoped local tokens.
+5. UI copy states replacement content and full diffs are not persisted and apply remains a CLI handoff through existing hash/staleness checks.
+
+### Acceptance
+1. ✅ IDE can list/show saved edit-plan metadata through `ArcService`.
+2. ✅ IDE approval calls the existing CLI approval path.
+3. ✅ Bridge uses argv-only CLI invocation and does not set shell.
+4. ✅ Replacement content/full diffs are not returned by the IDE bridge.
+5. ✅ Empty/error/loading states render honestly.
+
+### Verification
+```bash
+pnpm --filter arc-extension test
+pnpm typecheck
+```
+
+### Known Risks
+- IDE surface is metadata-only; no rich diff viewer exists.
+- Apply is documented as CLI handoff because saved plans intentionally omit replacement content.
+- Local approval tokens are not signed reviewer identity.
+
+## Phase 92 — Sandboxed Diff/Apply/Test Loop
+
+**Roadmap:** R63 Sandboxed Diff/Apply/Test Loop
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/test_cli_edit_loop.py tests/test_phase44_slash_expansion.py tests/test_cli_repl.py tests/cli/test_testbench.py -q` 207 passed; ruff targeted clean
+**Depends on:** Phase 90 (edit bundle approval bridge), existing sandbox/testbench policy path
+
+### Implementation
+1. REPL `/diff --plan-id <id>` renders saved edit-plan metadata and file hash/classification summary.
+2. REPL `/apply ...` aliases the guarded edit apply helper, including approval-token support.
+3. REPL `/test [--policy NAME] -- <cmd...>` routes through existing sandbox execution.
+4. Network/destructive/privileged behavior remains controlled by sandbox policy and classification.
+5. Denied test commands return structured denied state and existing sandbox audit evidence.
+
+### Acceptance
+1. ✅ `/diff` shows real saved edit-plan metadata only.
+2. ✅ `/apply` uses existing edit approval/staleness gates.
+3. ✅ `/test` runs safe local commands through sandbox.
+4. ✅ `/test` denies network commands by default.
+5. ✅ Existing REPL and testbench regressions remain green.
+
+### Verification
+```bash
+cd python && uv run pytest tests/test_cli_edit_loop.py tests/test_phase44_slash_expansion.py tests/test_cli_repl.py tests/cli/test_testbench.py -q
+cd python && uv run ruff check src tests/test_cli_edit_loop.py
+```
+
+### Known Risks
+- Test selection is explicit/manual; no automatic repair loop exists.
+- This is not broad CI orchestration and performs no network by default.
+
+## Phase 93 — Patch Engine Hardening v2
+
+**Roadmap:** R64 Patch Engine Hardening v2
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/test_cli_edit_loop.py -q` 22 passed; ruff targeted clean
+**Depends on:** Phase 90 (edit bundle approval bridge)
+
+### Implementation
+1. `apply_unified_patch()` parses unified hunk headers with old/new ranges.
+2. Multi-hunk text-only diffs are supported when hunks are ordered and context matches.
+3. Binary patch content, malformed hunks, overlapping hunks, unsupported lines, and hunk line-count mismatches fail closed.
+4. Existing path-target checks remain in force before patch application.
+5. No shell-out or `patch` subprocess is introduced.
+
+### Acceptance
+1. ✅ Valid multi-hunk text patch applies.
+2. ✅ Malformed line-count mismatch is denied.
+3. ✅ Binary patch content is rejected by the parser.
+4. ✅ Existing path escape and malformed patch tests remain green.
+5. ✅ No `patch` subprocess or shell execution is used.
+
+### Verification
+```bash
+cd python && uv run pytest tests/test_cli_edit_loop.py -q
+cd python && uv run ruff check src tests/test_cli_edit_loop.py
+```
+
+### Known Risks
+- This is still not a complete Git patch engine.
+- No-newline and binary patch edge cases remain intentionally unsupported unless explicitly designed later.

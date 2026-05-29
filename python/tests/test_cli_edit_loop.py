@@ -305,6 +305,55 @@ def test_patch_mode_valid_and_malformed(tmp_path, monkeypatch):
     assert bad.exit_code == 2
 
 
+def test_patch_mode_multi_hunk_valid(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    target = tmp_path / "note.txt"
+    target.write_text("one\ntwo\nthree\nfour\nfive\n", encoding="utf-8")
+    patch = (
+        "--- a/note.txt\n"
+        "+++ b/note.txt\n"
+        "@@ -1,2 +1,2 @@\n"
+        "-one\n"
+        "+ONE\n"
+        " two\n"
+        "@@ -4,2 +4,2 @@\n"
+        " four\n"
+        "-five\n"
+        "+FIVE"
+    )
+
+    result = CliRunner().invoke(
+        app, ["edit", "apply", "--json", "--path", "note.txt", "--patch", patch, "--approve"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert target.read_text(encoding="utf-8") == "ONE\ntwo\nthree\nfour\nFIVE\n"
+
+
+def test_patch_mode_line_count_mismatch_denied(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "note.txt").write_text("one\ntwo\n", encoding="utf-8")
+    patch = "--- a/note.txt\n+++ b/note.txt\n@@ -1,2 +1,3 @@\n-one\n+ONE\n two"
+
+    result = CliRunner().invoke(
+        app, ["edit", "plan", "--json", "--path", "note.txt", "--patch", patch]
+    )
+
+    assert result.exit_code == 2
+
+
+def test_patch_mode_binary_content_denied(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "note.txt").write_text("one\n", encoding="utf-8")
+    patch = "--- a/note.txt\n+++ b/note.txt\n@@ -1 +1 @@\n-one\n+two\x00"
+
+    result = CliRunner().invoke(
+        app, ["edit", "plan", "--json", "--path", "note.txt", "--patch", patch]
+    )
+
+    assert result.exit_code == 2
+
+
 def test_patch_mode_path_escape_denied(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     patch = "--- a/../x.txt\n+++ b/../x.txt\n@@ -1 +1 @@\n-old\n+new"
@@ -352,6 +401,35 @@ def test_repl_edit_approve(tmp_path, monkeypatch):
     plan_id = _payload(plan)["data"]["plan_id"]
     result = SlashCommandHandler().handle(f"/edit approve {plan_id} tok", ChatSession())
     assert result.state == "present"
+
+
+def test_repl_diff_apply_and_test_commands(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "note.txt").write_text("old\n", encoding="utf-8")
+    plan = CliRunner().invoke(
+        app, ["edit", "plan", "--json", "--path", "note.txt", "--content", "new\n"]
+    )
+    plan_id = _payload(plan)["data"]["plan_id"]
+    handler = SlashCommandHandler()
+    session = ChatSession()
+
+    diff = handler.handle(f"/diff --plan-id {plan_id}", session)
+    assert diff.state == "present"
+    assert "Saved metadata omits replacement content" in diff.output
+
+    apply = handler.handle("/apply --path note.txt --content new --approve", session)
+    assert apply.state == "present"
+    assert (tmp_path / "note.txt").read_text(encoding="utf-8") == "new"
+
+    test = handler.handle("/test -- python -c 'print(123)'", session)
+    assert test.state == "present"
+    assert "123" in test.output
+
+
+def test_repl_test_denies_network_by_default(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = SlashCommandHandler().handle("/test -- curl https://example.com", ChatSession())
+    assert result.state == "denied"
 
 
 def test_help_lists_edit_command():

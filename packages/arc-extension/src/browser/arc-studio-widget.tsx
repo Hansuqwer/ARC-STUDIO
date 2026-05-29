@@ -10,9 +10,9 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { MessageService } from '@theia/core/lib/common/message-service';
 import * as React from '@theia/core/shared/react';
 import { ArcService, ConfigStatus, WorkflowInfo } from '../common/arc-protocol';
-import { AssuranceTab, BattleTab, ChatTab, CiGuardrailsTab, CommandCentreTab, ConfigTab, McpWorkbenchTab, RunsTab, SwarmGraphInsightTab, TestBenchTab, WorkflowsTab } from './tabs';
+import { AssuranceTab, BattleTab, ChatTab, CiGuardrailsTab, CommandCentreTab, ConfigTab, EditPlansTab, McpWorkbenchTab, RunsTab, SwarmGraphInsightTab, TestBenchTab, WorkflowsTab } from './tabs';
 
-type StudioTabId = 'chat' | 'runs' | 'workflows' | 'assurance' | 'swarmgraph-insight' | 'battle' | 'config' | 'command-centre' | 'mcp-workbench' | 'testbench' | 'ci-guardrails';
+type StudioTabId = 'chat' | 'runs' | 'workflows' | 'assurance' | 'swarmgraph-insight' | 'battle' | 'config' | 'command-centre' | 'mcp-workbench' | 'testbench' | 'edit-plans' | 'ci-guardrails';
 
 interface ArcStudioWidgetState {
     activeTab: StudioTabId;
@@ -101,6 +101,7 @@ export class ArcStudioWidget extends ReactWidget {
             { id: 'command-centre', label: 'Command Centre' },
             { id: 'mcp-workbench', label: 'MCP Workbench' },
             { id: 'testbench', label: 'Test Bench' },
+            { id: 'edit-plans', label: 'Edit Plans' },
             { id: 'ci-guardrails', label: 'CI Guardrails' },
             { id: 'config', label: 'Config' }
         ];
@@ -224,6 +225,14 @@ export class ArcStudioWidget extends ReactWidget {
                         hidden={activeTab !== 'ci-guardrails'}
                     >
                         {activeTab === 'ci-guardrails' && <CiGuardrailsTab arcService={this.arcService} />}
+                    </div>
+                    <div
+                        id={`arc-studio-panel-edit-plans`}
+                        role='tabpanel'
+                        aria-labelledby='arc-studio-tab-edit-plans'
+                        hidden={activeTab !== 'edit-plans'}
+                    >
+                        {activeTab === 'edit-plans' && <EditPlansTab arcService={this.arcService} />}
                     </div>
                     <div
                         id={`arc-studio-panel-config`}

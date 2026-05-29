@@ -93,6 +93,9 @@ describe('ArcService Proxy Tests', () => {
                 'getWorkspaceInventory',
                 'detectTestbench',
                 'getCiCheckStatus',
+                'listEditPlans',
+                'showEditPlan',
+                'approveEditPlan',
                 'sandboxInspect',
             ];
 
@@ -128,6 +131,9 @@ describe('ArcService Proxy Tests', () => {
                 getWorkspaceInventory: async () => ({ workspace: '', files: { count: 0, totalSize: 0, entries: [] }, git: { provenance: '' }, traces: { count: 0, entries: [] }, mcpResources: [] }),
                 detectTestbench: async () => ({ workspace: '', detected: [], count: 0 }),
                 getCiCheckStatus: async () => ({ private: false, workspace: '', checks: {}, overall: 'skip' }),
+                listEditPlans: async () => ({ plans: [], count: 0 }),
+                showEditPlan: async () => ({}),
+                approveEditPlan: async () => ({}),
                 sandboxInspect: async () => ({
                     command: [],
                     classification: 'read_only',

@@ -18,6 +18,7 @@ import { AuditBridgeService } from './services/audit-bridge-service';
 import { BattleService } from './services/battle-service';
 import { SessionBridgeService } from './services/session-bridge-service';
 import { LocalTelemetryService } from './services/local-telemetry-service';
+import { EditPlanBridgeService } from './services/edit-plan-bridge-service';
 import { NotificationBackendService } from './services/notification-service';
 import { DaemonDiscoveryService } from './services/daemon-discovery-service';
 import { NotificationService, NotificationServicePath } from '../common/notification-protocol';
@@ -50,6 +51,9 @@ export default new ContainerModule(bind => {
     // Bind LocalTelemetryService (Phase 78/79/80 read-only telemetry)
     bind(LocalTelemetryService).toSelf().inSingletonScope();
 
+    // Bind EditPlanBridgeService (Phase 91 metadata-only edit-plan bridge)
+    bind(EditPlanBridgeService).toDynamicValue(() => new EditPlanBridgeService(process.cwd())).inSingletonScope();
+
     // Bind the backend service with explicit service dependencies.
     bind(ArcBackendService).toDynamicValue(ctx => new ArcBackendService(
         ctx.container.get(WorkflowExecutor),
@@ -62,7 +66,8 @@ export default new ContainerModule(bind => {
         ctx.container.get(BattleService),
         ctx.container.get(SessionBridgeService),
         ctx.container.get(DaemonDiscoveryService),
-        ctx.container.get(LocalTelemetryService)
+        ctx.container.get(LocalTelemetryService),
+        ctx.container.get(EditPlanBridgeService)
     )).inSingletonScope();
 
     // Bind notification service (Phase 32 / R25 — Slice 32.3)

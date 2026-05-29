@@ -6,6 +6,7 @@ import difflib
 import hashlib
 import json
 from pathlib import Path
+import re
 from typing import Any, Literal
 import uuid
 
@@ -208,39 +209,70 @@ def verify_edit_plan_approval(workspace_root: Path, plan: EditPlan, token: str |
     )
 
 
+_HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+
+
+def _parse_hunk_range(value: str | None) -> int:
+    return 1 if value is None else int(value)
+
+
 def apply_unified_patch(old: str, patch: str, *, expected_path: str | None = None) -> str:
-    """Apply a narrow single-file unified diff without shelling out."""
+    """Apply a text-only single-file unified diff without shelling out."""
+    if "\x00" in patch:
+        raise ValueError("binary patch content is unsupported")
     lines = patch.splitlines()
     if len(lines) < 4 or not lines[0].startswith("--- ") or not lines[1].startswith("+++ "):
         raise ValueError("malformed unified diff header")
-    patch_path = lines[1][4:].strip()
+    patch_path = lines[1][4:].strip().split("\t", 1)[0].split(" ", 1)[0]
     if patch_path.startswith("b/"):
         patch_path = patch_path[2:]
     if expected_path and patch_path not in {expected_path, f"./{expected_path}"}:
         raise ValueError("patch target does not match --path")
-    if not lines[2].startswith("@@"):
-        raise ValueError("malformed unified diff hunk")
     old_lines = old.splitlines()
     output: list[str] = []
     index = 0
-    for line in lines[3:]:
-        if not line:
-            raise ValueError("blank patch line is unsupported in narrow patch mode")
-        marker = line[0]
-        text = line[1:]
-        if marker == " ":
-            if index >= len(old_lines) or old_lines[index] != text:
-                raise ValueError("patch context does not match current file")
-            output.append(text)
-            index += 1
-        elif marker == "-":
-            if index >= len(old_lines) or old_lines[index] != text:
-                raise ValueError("patch removal does not match current file")
-            index += 1
-        elif marker == "+":
-            output.append(text)
-        else:
-            raise ValueError("unsupported unified diff line")
+    line_index = 2
+    while line_index < len(lines):
+        match = _HUNK_RE.match(lines[line_index])
+        if not match:
+            raise ValueError("malformed unified diff hunk")
+        old_start = int(match.group(1))
+        old_count = _parse_hunk_range(match.group(2))
+        new_count = _parse_hunk_range(match.group(4))
+        target_index = max(old_start - 1, 0)
+        if target_index < index:
+            raise ValueError("overlapping unified diff hunk")
+        output.extend(old_lines[index:target_index])
+        index = target_index
+        old_seen = 0
+        new_seen = 0
+        line_index += 1
+        while line_index < len(lines) and not lines[line_index].startswith("@@"):
+            line = lines[line_index]
+            if not line:
+                raise ValueError("blank patch control line is unsupported")
+            marker = line[0]
+            text = line[1:]
+            if marker == " ":
+                if index >= len(old_lines) or old_lines[index] != text:
+                    raise ValueError("patch context does not match current file")
+                output.append(text)
+                index += 1
+                old_seen += 1
+                new_seen += 1
+            elif marker == "-":
+                if index >= len(old_lines) or old_lines[index] != text:
+                    raise ValueError("patch removal does not match current file")
+                index += 1
+                old_seen += 1
+            elif marker == "+":
+                output.append(text)
+                new_seen += 1
+            else:
+                raise ValueError("unsupported unified diff line")
+            line_index += 1
+        if old_seen != old_count or new_seen != new_count:
+            raise ValueError("unified diff hunk line count mismatch")
     output.extend(old_lines[index:])
     text = "\n".join(output)
     return text + ("\n" if old.endswith("\n") else "")

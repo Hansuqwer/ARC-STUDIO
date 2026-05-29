@@ -533,5 +533,17 @@ describe('Backend Service Extensions (Session B + B7)', () => {
         it('should delegate getCiCheckStatus to LocalTelemetryService', () => {
             expect(source).toMatch(/return this\.localTelemetryService\.getCiCheckStatus\(\)/);
         });
+
+        it('should implement edit plan bridge methods', () => {
+            expect(source).toMatch(/async listEditPlans\(limit\?/);
+            expect(source).toMatch(/async showEditPlan\(planId/);
+            expect(source).toMatch(/async approveEditPlan\(planId/);
+        });
+
+        it('should delegate edit plan bridge methods to EditPlanBridgeService', () => {
+            expect(source).toMatch(/return this\.editPlanBridgeService\.listEditPlans\(limit\)/);
+            expect(source).toMatch(/return this\.editPlanBridgeService\.showEditPlan\(planId\)/);
+            expect(source).toMatch(/return this\.editPlanBridgeService\.approveEditPlan\(planId, token\)/);
+        });
     });
 });

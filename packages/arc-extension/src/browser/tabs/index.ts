@@ -32,5 +32,8 @@ export type { McpWorkbenchTabProps } from './McpWorkbenchTab';
 export { TestBenchTab } from './TestBenchTab';
 export type { TestBenchTabProps } from './TestBenchTab';
 
+export { EditPlansTab } from './EditPlansTab';
+export type { EditPlansTabProps } from './EditPlansTab';
+
 export { CiGuardrailsTab } from './CiGuardrailsTab';
 export type { CiGuardrailsTabProps } from './CiGuardrailsTab';

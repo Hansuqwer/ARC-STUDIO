@@ -35,7 +35,9 @@ from .adapters import (
     render_config_validate,
     render_context_pack,
     render_dashboard,
+    render_apply,
     render_doctor_summary,
+    render_diff,
     render_edit_apply,
     render_edit_plan,
     render_events_watch,
@@ -59,6 +61,7 @@ from .adapters import (
     render_read,
     render_search,
     render_status,
+    render_test,
     render_task_list,
     render_task_status,
     render_workspace_trust_status,
@@ -425,6 +428,51 @@ def _build_registry():
             trust_required="workspace",
             usage="/edit plan|apply --path PATH --content TEXT [--approve] | approve <plan-id> <token>",
             subcommands=["plan", "apply", "approve"],
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="diff",
+            help_text="Show saved edit-plan metadata: /diff --plan-id ID",
+            category="workspace",
+            handler=cmd_diff,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "blocked", "denied"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/diff --plan-id ID",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="apply",
+            help_text="Apply a guarded edit plan: /apply --plan-id ID --content TEXT --approve",
+            category="workspace",
+            handler=cmd_apply,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "blocked", "denied"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/apply --path PATH --content TEXT --approve | --plan-id ID --content TEXT --approval-token TOKEN",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="test",
+            help_text="Run local test command through sandbox: /test -- <cmd...>",
+            category="workspace",
+            handler=cmd_test,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "blocked", "denied", "error"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/test [--policy NAME] -- <cmd...>",
         )
     )
     registry.register(
@@ -1434,6 +1482,18 @@ def cmd_edit(arg: str, _session: ChatSession) -> CommandResult:
         output="Usage: /edit plan|apply --path PATH --content TEXT [--approve] | approve <plan-id> <token>",
         reason="invalid_usage",
     )
+
+
+def cmd_diff(arg: str, _session: ChatSession) -> CommandResult:
+    return _render_adapter_result(render_diff(arg))
+
+
+def cmd_apply(arg: str, _session: ChatSession) -> CommandResult:
+    return _render_adapter_result(render_apply(arg))
+
+
+def cmd_test(arg: str, _session: ChatSession) -> CommandResult:
+    return _render_adapter_result(render_test(arg))
 
 
 def cmd_audit(arg: str, _session: ChatSession) -> CommandResult:

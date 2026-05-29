@@ -75,6 +75,9 @@ import {
     TestbenchDetection,
     CiCheckStatus,
     SandboxInspectResult,
+    EditPlanApprovalResult,
+    EditPlanInfo,
+    EditPlanListResult,
 } from '../common/arc-protocol';
 import { validateWorkspaceRoot, validateTraceId, validateRunId } from './security-utils';
 import { WorkflowExecutor } from './services/workflow-executor';
@@ -88,6 +91,7 @@ import { BattleService } from './services/battle-service';
 import { SessionBridgeService } from './services/session-bridge-service';
 import { DaemonDiscoveryService } from './services/daemon-discovery-service';
 import { LocalTelemetryService } from './services/local-telemetry-service';
+import { EditPlanBridgeService } from './services/edit-plan-bridge-service';
 
 const ARC_CLI_ENV_ALLOWLIST = ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR'];
 
@@ -126,6 +130,7 @@ export class ArcBackendService implements ArcService {
     private readonly sessionBridgeService: SessionBridgeService;
     private readonly daemonDiscoveryService: DaemonDiscoveryService;
     private readonly localTelemetryService: LocalTelemetryService;
+    private readonly editPlanBridgeService: EditPlanBridgeService;
     private readonly activeStreamCancels = new Map<string, { cancelled: boolean }>();
     private workspaceRoot: string;
 
@@ -140,7 +145,8 @@ export class ArcBackendService implements ArcService {
         battleService?: BattleService,
         sessionBridgeService?: SessionBridgeService,
         daemonDiscoveryService?: DaemonDiscoveryService,
-        localTelemetryService?: LocalTelemetryService
+        localTelemetryService?: LocalTelemetryService,
+        editPlanBridgeService?: EditPlanBridgeService
     ) {
         this.executor = executor ?? new WorkflowExecutor();
         this.parser = parser ?? new TraceParser();
@@ -160,6 +166,7 @@ export class ArcBackendService implements ArcService {
         this.sessionBridgeService = sessionBridgeService ?? new SessionBridgeService(this.workspaceRoot);
         this.daemonDiscoveryService = daemonDiscoveryService ?? new DaemonDiscoveryService();
         this.localTelemetryService = localTelemetryService ?? new LocalTelemetryService(this.workspaceRoot);
+        this.editPlanBridgeService = editPlanBridgeService ?? new EditPlanBridgeService(this.workspaceRoot);
     }
 
     // ========== Workflow Execution ==========
@@ -1128,5 +1135,17 @@ export class ArcBackendService implements ArcService {
 
     async sandboxInspect(command: string[], policy?: string): Promise<SandboxInspectResult> {
         return this.localTelemetryService.sandboxInspect(command, policy);
+    }
+
+    async listEditPlans(limit?: number): Promise<EditPlanListResult> {
+        return this.editPlanBridgeService.listEditPlans(limit);
+    }
+
+    async showEditPlan(planId: string): Promise<EditPlanInfo> {
+        return this.editPlanBridgeService.showEditPlan(planId);
+    }
+
+    async approveEditPlan(planId: string, token: string): Promise<EditPlanApprovalResult> {
+        return this.editPlanBridgeService.approveEditPlan(planId, token);
     }
 }

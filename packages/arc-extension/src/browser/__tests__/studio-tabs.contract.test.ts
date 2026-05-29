@@ -59,6 +59,26 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/export.*CommandCentreTab/);
             expect(source).toMatch(/export.*CommandCentreTabProps/);
         });
+
+        it('should export EditPlansTab and EditPlansTabProps', () => {
+            expect(source).toMatch(/export.*EditPlansTab/);
+            expect(source).toMatch(/export.*EditPlansTabProps/);
+        });
+    });
+
+    describe('EditPlansTab', () => {
+        let source: string;
+
+        beforeAll(async () => {
+            source = await fs.readFile(path.join(tabsDir, 'EditPlansTab.tsx'), 'utf-8');
+        });
+
+        it('should use metadata-only edit plan bridge methods', () => {
+            expect(source).toMatch(/listEditPlans/);
+            expect(source).toMatch(/showEditPlan/);
+            expect(source).toMatch(/approveEditPlan/);
+            expect(source).toMatch(/Replacement content and full diffs are not persisted/);
+        });
     });
 
     describe('CommandCentreTab', () => {

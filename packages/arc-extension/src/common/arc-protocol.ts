@@ -1251,6 +1251,51 @@ export interface DaemonWriteResult {
     message?: string;
 }
 
+export interface EditFilePlanInfo {
+    path: string;
+    command: string[];
+    original_exists: boolean;
+    original_hash: string;
+    replacement_hash?: string | null;
+    patch_hash?: string | null;
+    allowed: boolean;
+    reason: string;
+    classification: string;
+}
+
+export interface EditPlanInfo {
+    version: number;
+    plan_id: string;
+    workspace_root: string;
+    policy: string;
+    path: string;
+    command: string[];
+    original_exists: boolean;
+    original_hash: string;
+    replacement_hash: string;
+    allowed: boolean;
+    reason: string;
+    classification: string;
+    plan_path?: string | null;
+    created_at: string;
+    status?: string;
+    files: EditFilePlanInfo[];
+}
+
+export interface EditPlanListResult {
+    plans: EditPlanInfo[];
+    count: number;
+}
+
+export interface EditPlanApprovalResult {
+    version: number;
+    approval_id: string;
+    plan_id: string;
+    token_hash: string;
+    plan_hash: string;
+    approved_at: string;
+}
+
 /**
  * Main service interface for ARC Studio backend operations.
  *
@@ -1653,6 +1698,13 @@ export interface ArcService {
     detectTestbench(commandOverride?: string): Promise<TestbenchDetection>;
     /** Read-only CI check status via CLI bridge */
     getCiCheckStatus(): Promise<CiCheckStatus>;
+
+    /** Metadata-only saved edit-plan list via CLI bridge. No replacement content is returned. */
+    listEditPlans(limit?: number): Promise<EditPlanListResult>;
+    /** Metadata-only saved edit-plan detail via CLI bridge. No replacement content is returned. */
+    showEditPlan(planId: string): Promise<EditPlanInfo>;
+    /** Scoped local approval for an exact saved edit-plan metadata hash. */
+    approveEditPlan(planId: string, token: string): Promise<EditPlanApprovalResult>;
 
     /** Sandbox-gated MCP server inspect via sandbox run */
     sandboxInspect(command: string[], policy?: string): Promise<SandboxInspectResult>;

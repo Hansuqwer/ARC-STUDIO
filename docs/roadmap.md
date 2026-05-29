@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-29 — R61 edit bundle/approval bridge added after R60 saved-plan apply flow.
-**Current evidence anchor:** local worktree | R61: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3358 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
+**Last reality refresh:** 2026-05-29 — R62-R64 edit-plan IDE bridge, REPL workflow loop, and patch hardening added after R61.
+**Current evidence anchor:** local worktree | R62-R64 verified: Python full suite 3363 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK; e2e 11 passed / 4 skipped; banned-claims guard OK.
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -1013,6 +1013,9 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R59 Edit Preview Staleness Guard** | **Baseline Complete** | **Phase 88 — edit plans expose file/replacement hashes; apply can deny stale preview hashes before writing** |
 | **R60 Saved Edit Plan Apply Flow** | **Baseline Complete** | **Phase 89 — edit plans persist safe metadata; apply by `--plan-id` checks original/replacement hashes before writing** |
 | **R61 Edit Bundle Approval Bridge** | **Baseline Complete** | **Phase 90 — multi-file edit bundles, scoped approval token, list/show bridge, narrow patch mode, and saved edit-plan review provenance; no autonomous coding-agent parity claim** |
+| **R62 IDE Edit Plan Review Surface** | **Baseline Complete** | **Phase 91 — metadata-only IDE tab/backend bridge for saved edit-plan list/show/approve; no replacement content, autonomous editing, or signed reviewer claim** |
+| **R63 Sandboxed Diff/Apply/Test Loop** | **Baseline Complete** | **Phase 92 — REPL `/diff`, `/apply`, and `/test` commands route through saved edit metadata, edit apply gates, and sandbox execution; no self-healing agent loop or network-by-default claim** |
+| **R64 Patch Engine Hardening v2** | **Baseline Complete** | **Phase 93 — text-only multi-hunk unified diff support with hunk range validation and fail-closed malformed/binary handling; not a complete Git patch engine** |
 
 **Post-v0.1 Execution Order:** 
 - **Priority 1 stop-the-line:** R39 / Phase 41 (Interactive CLI/UX Foundation). **Baseline Complete** as of Phases 41–45 (commits 37fd92b–7fdba99). Gate lifted. R44 (Phase 46 CLI write bridge + Phase 47 daemon HTTP write bridge) is now Baseline Complete. Continue sandbox hardening for Phase 37 microVM feasibility decision.
@@ -1316,3 +1319,27 @@ The following roadmap items implement the adapter integration plan from `docs/re
 **Current:** Baseline Complete. `arc edit plan/apply --edit path=text` supports multi-file bundles with per-file original/replacement hashes. Bundle apply is decision-atomic: if any planned file is stale or mismatched, no file is written. `arc edit list`, `arc edit show`, and `arc edit approve` expose saved safe plan metadata and scoped token approval for IDE/CLI bridge use. `--patch` supports a narrow single-file unified-diff parser that fails closed and does not shell out. `arc review summarize` can include saved edit-plan provenance where plan records exist.
 
 **Status:** Baseline Complete | Evidence: local worktree; targeted `cd python && uv run pytest tests/test_cli_edit_loop.py tests/security/test_review_evidence.py -q` 31 passed; targeted ruff clean | Notes: Real scope is local CLI/REPL edit planning/apply, metadata-only plan records, scoped local approvals, narrow patch mode, and review provenance. Not real: autonomous coding-agent parity, general patch engine, IDE UI, collaborative approval server, or reviewer identity.
+
+## R62 — IDE Edit Plan Review Surface
+
+**Goal:** Surface existing saved edit plans/bundles in the IDE for review without broadening execution or claiming autonomous coding-agent parity.
+
+**Current:** Baseline Complete. The TypeScript ARC service now exposes `listEditPlans`, `showEditPlan`, and `approveEditPlan`, backed by a CLI-only `EditPlanBridgeService` that invokes `arc edit list/show/approve` with argv-only `execFileSync` and sanitized env. The `EditPlansTab` lists saved plans, shows metadata/status/files/hashes, and approves scoped local tokens. It does not receive replacement content or full diffs and only shows CLI apply handoff copy.
+
+**Status:** Baseline Complete | Evidence: local worktree; arc-extension Jest 888 passed / 3 skipped; `pnpm typecheck` OK | Notes: Metadata-only IDE surface. No IDE replacement-content persistence, autonomous editing, collaborative approval server, or signed reviewer identity.
+
+## R63 — Sandboxed Diff/Apply/Test Loop
+
+**Goal:** Add explicit local workflow commands for reviewing saved edit metadata, applying guarded edits, and running tests through existing sandbox policy.
+
+**Current:** Baseline Complete. REPL `/diff --plan-id <id>` shows saved edit-plan metadata; `/apply ...` aliases the guarded edit apply helper, including approval-token support; `/test -- <cmd...>` routes through existing sandbox subprocess execution and deny-by-default policy behavior. Network/destructive/privileged commands remain governed by sandbox classification and policy.
+
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/test_cli_edit_loop.py tests/test_phase44_slash_expansion.py tests/test_cli_repl.py tests/cli/test_testbench.py -q` 207 passed; ruff targeted clean | Notes: Explicit local workflow only; no self-healing repair loop, broad CI orchestration, or network-by-default behavior.
+
+## R64 — Patch Engine Hardening v2
+
+**Goal:** Safely broaden patch support for local edit plans while keeping fail-closed behavior and avoiding shell-out.
+
+**Current:** Baseline Complete. `apply_unified_patch()` now supports text-only multi-hunk unified diffs, parses hunk ranges, rejects binary patch content, validates old/new hunk line counts, rejects malformed hunks, and preserves existing path-target checks. It still intentionally rejects unsupported Git patch/binary/ambiguous formats.
+
+**Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/test_cli_edit_loop.py -q` 22 passed; ruff targeted clean | Notes: This is not a complete Git patch engine and does not shell out to `patch`.
