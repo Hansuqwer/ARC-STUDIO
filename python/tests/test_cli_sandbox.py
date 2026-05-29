@@ -394,7 +394,7 @@ def test_microvm_provider_run_denied_even_with_integration_gate(tmp_path, monkey
     )
     assert result.exit_code == 2
     assert _payload(result)["ok"] is False
-    assert "microVM execution not yet available" in _payload(result)["error"]["message"]
+    assert "macOS microVM execution blocked" in _payload(result)["error"]["message"]
 
 
 def test_microvm_provider_blocked_run_emits_denial_audit(tmp_path, monkeypatch):

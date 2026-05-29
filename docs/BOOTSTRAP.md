@@ -167,9 +167,11 @@ Expected defaults:
 - `curl https://example.com` is denied as `network`.
 - `rm -rf .` is denied as `destructive`.
 - MicroVM doctor may report `unavailable` until Firecracker/Cloud Hypervisor plus `/dev/kvm` exist on Linux, or `limactl` exists on macOS.
-- MicroVM doctor/preflight may report runtime readiness, but public execution remains blocked and should show `public_execution_enabled=false` until ADR-024 proofs are complete.
+- Linux/Firecracker microVM execution is blocked by default and requires `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, kernel/rootfs env vars, `firecracker`, `/dev/kvm` rw, and workspace snapshot tools. It is not proven on macOS.
+- macOS Lima/VZ remains a low-security harness only; strict no-network public execution is blocked.
 - Sandbox audit logs are written to `~/.arc/audit/` unless `ARC_SANDBOX_AUDIT_DIR` is set.
 - `--ask` only applies to `network`, `install`, and `unknown`; non-interactive runs still deny by default.
 - Named sandbox policies can be loaded from `ARC_SANDBOX_POLICY_CONFIG` or `~/.arc/sandbox-policies.json`.
 - Container execution is disabled unless `ARC_ENABLE_CONTAINER_SANDBOX=1` is set.
 - Lima template rendering requires `ARC_MICROVM_EXPERIMENTAL=1`; it does not execute a VM.
+- Firecracker execution artifact generation: `ARC_FC_BUILD_EXEC_ROOTFS=1 uv run arc sandbox firecracker-artifacts --exec-rootfs --output /tmp/arc-fc --json`.

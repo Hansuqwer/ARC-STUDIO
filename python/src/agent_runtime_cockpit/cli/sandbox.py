@@ -12,6 +12,7 @@ import typer
 from ..isolation.microvm import (
     MicroVMIsolationProvider,
     build_microvm_run_plan,
+    generate_firecracker_exec_artifacts,
     generate_firecracker_proof_artifacts,
 )
 from ..isolation.subprocess import SubprocessIsolationProvider
@@ -437,14 +438,23 @@ def sandbox_microvm_plan(
 @sandbox_app.command("firecracker-artifacts")
 def sandbox_firecracker_artifacts(
     output: str = typer.Option(..., "--output", help="Output directory for proof artifacts"),
+    exec_rootfs: bool = typer.Option(
+        False,
+        "--exec-rootfs",
+        help="Generate ARC Firecracker execution init/rootfs artifacts instead of proof-only artifacts",
+    ),
     workspace: Optional[str] = WORKSPACE_FLAG,
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
-    """Generate Firecracker proof init/manifest artifacts; does not boot a VM."""
+    """Generate Firecracker proof or execution artifacts; does not boot a VM."""
     _setup_logging(debug)
     ws = _workspace(workspace)
-    report = generate_firecracker_proof_artifacts(Path(output).expanduser())
+    report = (
+        generate_firecracker_exec_artifacts(Path(output).expanduser())
+        if exec_rootfs
+        else generate_firecracker_proof_artifacts(Path(output).expanduser())
+    )
     _out(ok(report.model_dump(mode="json"), workspace=str(ws)), json_output)
 
 
@@ -724,7 +734,9 @@ def _build_provider(
     read_write_workspace: bool = False,
 ) -> "SubprocessIsolationProvider | MicroVMIsolationProvider":
     if name == "microvm":
-        return MicroVMIsolationProvider()
+        return MicroVMIsolationProvider(
+            workspace_root=ws, max_output_bytes=policy_model.max_output_bytes
+        )
     if name == "container":
         from ..isolation.docker_provider import SubprocessContainerProvider
 

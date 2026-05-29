@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-29 — Phases 97-103 baseline implementation added locally; Phase 104 strict macOS no-network proof blocked by Lima networking; Phase 105 remains planned/blocked as listed.
-**Current evidence anchor:** local worktree | Phase 97 research doc exists; Phase 104 targeted microVM tests 57 passed; Python full suite 3386 passed / 34 skipped / 3 xfailed; `cd python && uv run ruff check src tests` clean; `pnpm build` OK; `pnpm typecheck` OK; `pnpm test:e2e` reran with known Theia async-warning fingerprint and 4 skipped smoke tests; banned-claims guard OK.
+**Last reality refresh:** 2026-05-29 — Phase 104 strict macOS no-network proof blocked by Lima networking; Phase 105 Linux/Firecracker execution code wired behind real host gates, proof not run on this macOS host.
+**Current evidence anchor:** local worktree | targeted microVM tests 40 passed / 1 skipped; changed-file ruff clean; full verification pending.
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -2086,7 +2086,8 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Verified: 2515 Python tests passed, 22 skipped, 3 xfailed (pre-existing); ruff clean; pnpm build/typecheck green
 
 #### Slice 37.11: MicroVM Execution Truth Guard ✓
-- Public `MicroVMIsolationProvider.execute()` always raises `NotImplementedError` until lifecycle, mount, network-off, teardown, and opt-in integration proof exist.
+- Superseded by Phase 105 for Linux/Firecracker: public execution is now wired only behind explicit Linux/KVM gates; macOS remains blocked.
+- Historical at Slice 37.11 time: public `MicroVMIsolationProvider.execute()` raised `NotImplementedError` until lifecycle, mount, network-off, teardown, and opt-in integration proof existed.
 - `arc sandbox run --provider microvm` cannot execute Lima opportunistically, even with `ARC_MICROVM_INTEGRATION=1`.
 - `arc sandbox doctor` reports `gated_unproven` when the integration gate and `limactl` are present; it never reports microVM execution as implemented.
 - Verified: targeted sandbox/microVM tests 94 passed, 1 skipped; full Python 2633 passed, 22 skipped, 3 xfailed; ruff clean; pnpm build/typecheck green.
@@ -2115,6 +2116,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Verified: targeted sandbox/microVM tests (including smoke) pass; CI posture confirmed.
 
 #### Slice 37.21: Firecracker Real-Host Smoke Structure (HOST-SKIPPED) ✓
+- Superseded by Phase 105: the real-host test now exercises `MicroVMIsolationProvider.execute()` on eligible Linux/KVM hosts and remains skipped elsewhere.
 - Pre-check: `which firecracker` → not found; `/dev/kvm` → absent (Darwin 25.4.0).
 - Added `python/tests/isolation/test_firecracker_smoke.py`:
   - `TestFirecrackerSmokeSkipBehaviour` (3 always-run tests): confirms unavailable on this host.
@@ -2150,6 +2152,7 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Wording remains: Lima low-security developer harness, not strict microVM sandbox. `ARC_MICROVM_EXEC_ENABLED` remains unwired; no strict network isolation claim.
 
 #### Slice 37.20: P1–P7 Evaluation + ARC_MICROVM_EXEC_ENABLED Wiring Decision ✓
+- Superseded by Phase 105: `ARC_MICROVM_EXEC_ENABLED` is wired for Linux/Firecracker only; macOS remains blocked.
 - Evaluated all 7 ADR-024 prerequisites against current codebase and research findings.
 - Created `docs/research/microvm-p1-p7-status.md` with per-prerequisite status table.
 - Updated `docs/adr/ADR-024-microvm-public-execution-contract.md` status to "Accepted — implementation blocked".
@@ -2177,19 +2180,20 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - Research notes added to `docs/research/sandbox-and-microvm.md`.
 
 #### Slice 37.17: MicroVM Public-Execution Truth Guard ✓
+- Superseded by Phase 105 for Linux/Firecracker. These historical assertions applied before the Linux gated execution path was wired.
 - Added `MicroVMIsolationProvider.name` property returning `"microvm"`.
 - Added `MicroVMIsolationProvider.status()` → dict with `available: False`, `reason`, `contract_doc`, `lima_harness`, `firecracker_harness`, `unblock_gate`.
 - Updated `execute()` error message to reference ADR-024 and P1–P7 prerequisites.
 - Added `python/tests/isolation/test_microvm_truth_guard.py` (10 tests):
   - `test_microvm_execute_always_raises` — raises NotImplementedError unconditionally.
-  - `test_microvm_execute_raises_with_arc_microvm_exec_enabled_set` — gate not yet honored; still raises.
+  - Historical: `test_microvm_execute_raises_with_arc_microvm_exec_enabled_set` — gate not yet honored at that time.
   - `test_microvm_execute_raises_with_both_gates_set` — both gates set; still raises.
   - `test_microvm_execute_error_message_references_adr` — message contains "ADR-024".
   - `test_microvm_status_available_false` — available is always False.
   - `test_microvm_status_contains_contract_ref` — contract_doc references ADR-024.
   - `test_microvm_status_harness_fields_present` — lima_harness and firecracker_harness keys present.
   - `test_microvm_status_reason_execution_not_implemented` — reason is "execution_not_implemented".
-  - `test_microvm_status_unblock_gate_present` — unblock_gate contains "ARC_MICROVM_EXEC_ENABLED" and "not yet honored".
+  - Historical: `test_microvm_status_unblock_gate_present` — unblock_gate contained "ARC_MICROVM_EXEC_ENABLED" and "not yet honored".
   - `test_microvm_name_property` — name returns "microvm".
 - Added `test_sandbox_run_provider_microvm_blocked` to `test_cli_sandbox.py` — CLI must not silently succeed.
 - Updated pre-existing error message assertion to match new ADR-024 reference.
@@ -2206,9 +2210,10 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 - No real Firecracker execution; all tests use fakes/monkeypatches.
 
 #### Slice 37.15: MicroVM Public Execution Contract (ADR-024) ✓
+- Updated in Phase 105: `ARC_MICROVM_EXEC_ENABLED=1` is now honored only by the Linux/Firecracker path; macOS remains blocked.
 - Created `docs/adr/ADR-024-microvm-public-execution-contract.md`.
 - Defines: 7 prerequisite proofs (P1–P7: lifecycle, network-off, workspace-mount, teardown, symlink-escape, output-caps, audit-event).
-- Defines: unblock gate `ARC_MICROVM_EXEC_ENABLED=1` (not yet honored by code; contract only).
+- Defines: unblock gate `ARC_MICROVM_EXEC_ENABLED=1`; Phase 105 later wires it for Linux/Firecracker only.
 - Defines: dual gate requirement (`ARC_MICROVM_EXEC_ENABLED=1` AND `ARC_MICROVM_INTEGRATION=1`).
 - Defines: platform support (macOS/Lima, Linux/Firecracker; Windows explicitly unsupported).
 - Defines: teardown failure handling (surface error, mark result failed, log for cleanup).
@@ -2228,12 +2233,13 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 
 ### Truth Constraints
 - Real: subprocess bounded streaming caps, approval prune CLI, path-intent expansion, protocol parity tests, microVM preflight tests, container fallback tests, E2E deep-link routability
-- Lima lifecycle sketch exists in `isolation/microvm.py`, but public provider execution always raises `NotImplementedError`; macOS preflight reports `installed_not_configured` until runtime is proven with integration tests
+- Linux/Firecracker public provider execution is wired behind explicit host gates and fails closed unless guest proof/result markers are present; real boot proof is not available on this macOS host
+- macOS Lima lifecycle sketch exists in `isolation/microvm.py`, but macOS public provider execution raises `NotImplementedError` because strict no-network is blocked
 - Internal Lima harness exists behind an explicit integration gate, but no public microVM execution is wired or claimed
-- Still true: microVM execution not proven in CI; Lima/Firecracker preflight-only until `ARC_MICROVM_INTEGRATION=1` integration gate passes
+- Still true: microVM execution not proven in CI; Linux/Firecracker proof requires `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, kernel/rootfs, Firecracker, and `/dev/kvm`
 - Still true: container fallback gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`
 - No production-ready sandbox claim
-- No microVM execution claim
+- No real microVM execution claim on this macOS host
 
 ### Verification
 ```bash
@@ -3249,7 +3255,7 @@ bash scripts/check-pr.sh
 
 ### Known Risks
 - TTY detection depends on `sys.stdin.isatty()`; CI/test harnesses must use monkeypatch.
-- MicroVM execution remains unimplemented (preflight/doctor only); no change to Phase 37 microVM status.
+- Historical note: microVM execution was unimplemented at this phase; Phase 105 later wires Linux/Firecracker gated execution.
 
 ---
 
@@ -4451,7 +4457,7 @@ pnpm typecheck
 ## Phase 104 — macOS MicroVM Execution + Strict No-Network Proof
 
 **Roadmap:** R75 macOS MicroVM Execution + Strict No-Network Proof
-**Status:** Blocked | Evidence: local worktree Phase 104 research; macOS Darwin 26.4 arm64 with limactl 2.1.0 detected; Lima official docs confirm default user-mode/slirp network and no documented no-network key; preflight/template truth fields hardened; public execution remains blocked
+**Status:** Blocked | Evidence: local `limactl info` reports Lima 2.1.0 with `vz`; Lima official docs confirm default user-mode/slirp network and no documented no-network key; Apple docs JS-only in this runtime; macOS public execution remains blocked
 **Depends on:** Phase 97, ADR-024, existing Lima harness hardening
 
 ### Implementation
@@ -4484,19 +4490,19 @@ pnpm test:e2e
 ## Phase 105 — Linux Firecracker Execution Proof
 
 **Roadmap:** R76 Linux Firecracker Execution Proof
-**Status:** Not Started | Evidence: none
+**Status:** Baseline Complete (host-unproven) | Evidence: local targeted `uv run pytest tests/isolation/test_microvm_truth_guard.py tests/isolation/test_firecracker_smoke.py -q` → 40 passed / 1 skipped; no Linux/KVM boot run on this host
 **Depends on:** Phase 97, ADR-024, eligible Linux host with KVM
 
 ### Implementation
-1. Build or document a minimal Firecracker kernel/rootfs setup for local proof.
-2. Boot guest through Firecracker API, run argv, collect stdout/stderr/exit code, destroy VM.
-3. Prove workspace/mount/control boundary and cleanup.
+1. Linux/Firecracker public execution path is wired behind `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, kernel/rootfs env vars, `firecracker`, `/dev/kvm` rw, `mkfs.ext4`, and `truncate`.
+2. Runner builds read-only ext4 workspace snapshot, starts Firecracker with no `network-interfaces`, requires guest proof/result markers, collects stdout/stderr/exit, terminates process group, and emits audit.
+3. `arc sandbox firecracker-artifacts --exec-rootfs --output <dir> --json` generates ARC execution init/rootfs artifacts when `ARC_FC_BUILD_EXEC_ROOTFS=1` and local tools exist.
 4. Keep normal CI skipped unless opt-in runtime exists.
 
 ### Acceptance
 1. Preflight checks binary, `/dev/kvm`, kernel/rootfs, permissions.
-2. Opt-in proof boots guest and runs command successfully.
-3. Destroy/cleanup proof exists even on command failure.
+2. Opt-in proof test boots guest and runs command successfully on eligible Linux/KVM host.
+3. Destroy/cleanup path terminates Firecracker process group and temp dir.
 4. Skipped tests state exact missing runtime reason.
 
 ### Verification
@@ -4504,5 +4510,12 @@ pnpm test:e2e
 cd python && uv run pytest tests/isolation/ -q
 ```
 
+Real proof command on eligible Linux/KVM host:
+```bash
+cd python && ARC_FC_BUILD_EXEC_ROOTFS=1 uv run arc sandbox firecracker-artifacts --exec-rootfs --output /tmp/arc-fc --json
+cd python && ARC_MICROVM_INTEGRATION=1 ARC_MICROVM_EXEC_ENABLED=1 ARC_FC_REAL_EXEC=1 ARC_FIRECRACKER_KERNEL=/path/to/vmlinux ARC_FIRECRACKER_ROOTFS=/tmp/arc-fc/arc-fc-exec-rootfs.ext4 uv run pytest tests/isolation/test_firecracker_smoke.py -v
+```
+
 ### Known Risks
 - Firecracker proof cannot run on macOS host and requires Linux/KVM/rootfs setup.
+- The ARC exec rootfs still needs real boot validation with a compatible kernel.

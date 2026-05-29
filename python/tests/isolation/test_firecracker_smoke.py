@@ -12,8 +12,9 @@ and ARC_FC_REAL_EXEC=1.
 
 Truth constraints:
   - FirecrackerIntegrationHarness.run() requires a real runner or raises.
-  - MicroVMIsolationProvider.execute() still raises NotImplementedError.
-  - No Firecracker VM is created by any test here without ARC_FC_REAL_EXEC=1.
+  - MicroVMIsolationProvider.execute() is Linux/Firecracker-only behind dual gates.
+  - No Firecracker VM is created by any test here without ARC_FC_REAL_EXEC=1
+    and ARC_MICROVM_EXEC_ENABLED=1.
   - CI does NOT set ARC_FC_REAL_EXEC=1; all real-host tests are always skipped.
 """
 
@@ -28,9 +29,13 @@ import pytest
 from agent_runtime_cockpit.isolation.microvm import (
     FirecrackerIntegrationHarness,
     FirecrackerProofRunner,
+    MicroVMIsolationProvider,
+    generate_firecracker_exec_artifacts,
     generate_firecracker_proof_artifacts,
     firecracker_proof_gates,
     parse_firecracker_guest_proof,
+    parse_firecracker_guest_command_result,
+    render_firecracker_exec_init,
     render_firecracker_guest_proof_init,
     validate_firecracker_proof_manifest,
     build_cloud_hypervisor_no_network_run_plan,
@@ -53,9 +58,12 @@ _REAL_EXEC_REASON = (
 _REAL_EXEC_GATE = (
     platform.system() == "Linux"
     and os.environ.get("ARC_MICROVM_INTEGRATION") == "1"
+    and os.environ.get("ARC_MICROVM_EXEC_ENABLED") == "1"
     and bool(shutil.which("firecracker"))
     and os.path.exists("/dev/kvm")
     and os.environ.get("ARC_FC_REAL_EXEC") == "1"
+    and bool(os.environ.get("ARC_FIRECRACKER_KERNEL"))
+    and bool(os.environ.get("ARC_FIRECRACKER_ROOTFS"))
 )
 
 
@@ -284,6 +292,35 @@ class TestFirecrackerProofRunner:
         assert proof.marker_seen is True
         assert proof.network_proof_passed is True
         assert proof.workspace_proof_passed is True
+
+    def test_guest_command_result_parser_accepts_b64_markers(self):
+        result = parse_firecracker_guest_command_result(
+            "ARC_FC_RESULT exit-code=7\n"
+            "ARC_FC_RESULT stdout-b64=aGVsbG8K\n"
+            "ARC_FC_RESULT stderr-b64=ZXJyCg==\n"
+        )
+        assert result.marker_seen is True
+        assert result.exit_code == 7
+        assert result.stdout == "hello\n"
+        assert result.stderr == "err\n"
+
+    def test_exec_init_contains_proof_and_result_markers(self):
+        init = render_firecracker_exec_init()
+        assert "ARC_FC_PROOF no-default-route" in init
+        assert "ARC_FC_PROOF network-failure" in init
+        assert "ARC_FC_PROOF workspace-mount-proven" in init
+        assert "ARC_FC_RESULT exit-code" in init
+        assert "arc_cmd_b64" in init
+        assert "mount /dev/vdb /workspace" in init
+
+    def test_exec_artifact_generator_writes_init_only_by_default(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("ARC_FC_BUILD_EXEC_ROOTFS", raising=False)
+        report = generate_firecracker_exec_artifacts(tmp_path)
+        assert report.built_rootfs is False
+        assert report.rootfs_path is None
+        assert "ARC_FC_BUILD_EXEC_ROOTFS=1 not set" in "; ".join(report.blockers)
+        init = (tmp_path / "arc-fc-exec-init.sh").read_text(encoding="utf-8")
+        assert "ARC_FC_RESULT exit-code" in init
 
     def test_guest_proof_marker_parser_rejects_default_route(self):
         proof = parse_firecracker_guest_proof(
@@ -598,40 +635,31 @@ class TestFirecrackerSmokeRealHost:
       - firecracker binary installed
       - /dev/kvm accessible (user in kvm group or root)
       - ARC_MICROVM_INTEGRATION=1
+      - ARC_MICROVM_EXEC_ENABLED=1
       - ARC_FC_REAL_EXEC=1
+      - ARC_FIRECRACKER_KERNEL=/path/to/vmlinux
+      - ARC_FIRECRACKER_ROOTFS=/path/to/arc-exec-rootfs.ext4
 
-    NOTE: FirecrackerIntegrationHarness._run() raises FirecrackerHarnessError
-    when runner=None and real Firecracker execution is not yet implemented
-    (ADR-024). These tests will fail with FirecrackerHarnessError until the
-    real Firecracker runner is implemented. They are structured as a
-    placeholder proving the test gate works correctly.
+    NOTE: The rootfs must be ARC-owned and emit both ARC_FC_PROOF and
+    ARC_FC_RESULT markers from /init using the contract in
+    render_firecracker_exec_init(). A generic distro rootfs will fail safely.
 
-    What is proven by these tests (when Firecracker execution is implemented):
+    What is proven by these tests on an eligible Linux/KVM host:
       P1 — Lifecycle: preflight → create_vm → mount_workspace → network_proof
-               → exec → stop_vm → teardown completes.
+                → exec → stop_vm → teardown completes.
       P4 — Teardown: harness.teardown_attempted=True after any outcome.
-
-    What is NOT proven (pending implementation):
-      P2 — Network-off: no TAP/NAT configured; guest isolation proof pending.
-      P3 — Workspace-mount: virtiofs/block device mapping not yet implemented.
-      P5 — Symlink escape: requires guest-side traversal test.
+      P2 — no default route + curl failure markers.
+      P3/P5 — workspace sentinel readable and symlink escape blocked markers.
     """
 
-    def test_firecracker_harness_requires_real_runner_or_implementation(self, tmp_path):
-        """Firecracker harness raises when no runner and binary not implemented.
+    def test_microvm_provider_firecracker_real_exec(self, tmp_path):
+        """Real gated provider path boots Firecracker, proves P2/P3/P5, runs argv."""
+        import asyncio
 
-        This test documents the current state: FirecrackerIntegrationHarness
-        requires either an injected runner or a real Firecracker implementation.
-        Until the real runner is implemented, this test verifies the harness
-        raises a clear error rather than silently failing.
-        """
-        from agent_runtime_cockpit.isolation.microvm import FirecrackerHarnessError
-
-        harness = FirecrackerIntegrationHarness(
-            workspace_root=tmp_path,
-            runner=None,  # no fake runner and no real impl yet
-            instance_name="arc-fc-real-test",
+        provider = MicroVMIsolationProvider()
+        result = asyncio.run(
+            provider.execute(["sh", "-c", "printf arc-firecracker-ok"], cwd=tmp_path)
         )
-        # Will raise FirecrackerHarnessError because runner=None and real impl missing
-        with pytest.raises(FirecrackerHarnessError):
-            harness.run(["uname", "-a"], timeout_seconds=300, require_gate=True)
+        assert result.provider == "microvm"
+        assert result.exit_code == 0
+        assert "arc-firecracker-ok" in result.stdout

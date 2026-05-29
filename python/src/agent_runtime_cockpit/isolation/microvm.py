@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import os
 import platform
+import base64
 import json
 import hashlib
 import shutil
+import shlex
 import signal
 import subprocess
 import tempfile
@@ -278,6 +280,19 @@ class FirecrackerProofRunResult(BaseModel):
         return self.no_default_route and self.network_failure
 
 
+class FirecrackerGuestCommandResult(BaseModel):
+    """Command result emitted by an ARC Firecracker guest init/agent."""
+
+    model_config = ConfigDict(frozen=True)
+
+    marker_seen: bool = False
+    exit_code: int = -1
+    stdout: str = ""
+    stderr: str = ""
+    stdout_decode_error: str | None = None
+    stderr_decode_error: str | None = None
+
+
 class FirecrackerGuestProof(BaseModel):
     """Proof-only guest marker results parsed from serial/stdout output."""
 
@@ -343,6 +358,17 @@ class FirecrackerProofArtifactReport(BaseModel):
     manifest: FirecrackerProofArtifactManifest
 
 
+class FirecrackerExecArtifactReport(BaseModel):
+    """Result of ARC Firecracker execution init/rootfs artifact generation."""
+
+    model_config = ConfigDict(frozen=True)
+
+    init_path: str
+    rootfs_path: str | None = None
+    built_rootfs: bool = False
+    blockers: list[str] = []
+
+
 FIRECRACKER_PROOF_MARKER = "ARC_FC_PROOF "
 FIRECRACKER_PROOF_MARKERS = [
     "no_default_route",
@@ -397,16 +423,241 @@ def parse_firecracker_guest_proof(output: str) -> FirecrackerGuestProof:
     )
 
 
+def _decode_b64_marker(value: str) -> tuple[str, str | None]:
+    try:
+        padding = "=" * (-len(value) % 4)
+        return base64.b64decode((value + padding).encode("ascii"), validate=False).decode(
+            "utf-8", errors="replace"
+        ), None
+    except Exception as exc:  # noqa: BLE001 - marker parse must not crash teardown.
+        return "", str(exc)
+
+
+def parse_firecracker_guest_command_result(output: str) -> FirecrackerGuestCommandResult:
+    """Parse command-result markers emitted by the ARC exec init/agent."""
+    raw: dict[str, str] = {}
+    for line in output.splitlines():
+        if not line.startswith("ARC_FC_RESULT "):
+            continue
+        payload = line.removeprefix("ARC_FC_RESULT ").strip()
+        if "=" not in payload:
+            continue
+        key, value = payload.split("=", 1)
+        raw[key.strip()] = value.strip()
+    stdout, stdout_error = _decode_b64_marker(raw.get("stdout-b64", ""))
+    stderr, stderr_error = _decode_b64_marker(raw.get("stderr-b64", ""))
+    try:
+        exit_code = int(raw.get("exit-code", "-1"))
+    except ValueError:
+        exit_code = -1
+    return FirecrackerGuestCommandResult(
+        marker_seen=bool(raw),
+        exit_code=exit_code,
+        stdout=stdout,
+        stderr=stderr,
+        stdout_decode_error=stdout_error,
+        stderr_decode_error=stderr_error,
+    )
+
+
+def render_firecracker_exec_init() -> str:
+    """Return ARC-owned guest init for strict no-NIC Firecracker execution.
+
+    Contract: host passes ``arc_cmd_b64=<base64(shlex.join(argv))>`` in kernel
+    args, attaches workspace snapshot as second virtio block drive, configures no
+    NICs, and parses ``ARC_FC_PROOF`` + ``ARC_FC_RESULT`` serial markers.
+    """
+    return """#!/bin/sh
+set +e
+mount -t proc proc /proc 2>/dev/null || true
+mount -t sysfs sysfs /sys 2>/dev/null || true
+mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
+mkdir -p /workspace /tmp
+mount /dev/vdb /workspace 2>/tmp/arc-workspace-mount.err || true
+if ip route >/tmp/arc-ip-route.out 2>/tmp/arc-ip-route.err; then
+  if grep -q '^default' /tmp/arc-ip-route.out; then
+    echo 'ARC_FC_PROOF no-default-route=0'
+  else
+    echo 'ARC_FC_PROOF no-default-route=1'
+  fi
+else
+  echo 'ARC_FC_PROOF no-default-route=0'
+fi
+NET_PROBE="$(command -v curl 2>/dev/null || true)"
+NET_PROBE_KIND="curl"
+if [ "$NET_PROBE" = "" ] && [ -x /bin/curl ]; then NET_PROBE=/bin/curl; fi
+if [ "$NET_PROBE" = "" ] && [ -x /usr/bin/curl ]; then NET_PROBE=/usr/bin/curl; fi
+if [ "$NET_PROBE" = "" ]; then
+  NET_PROBE="$(command -v wget 2>/dev/null || true)"
+  NET_PROBE_KIND="wget"
+fi
+if [ "$NET_PROBE" != "" ]; then
+  echo 'ARC_FC_PROOF curl-available=1'
+else
+  echo 'ARC_FC_PROOF curl-available=0'
+fi
+if [ "$NET_PROBE" != "" ] && [ "$NET_PROBE_KIND" = "curl" ] && "$NET_PROBE" --connect-timeout 2 https://example.com >/tmp/arc-net.out 2>/tmp/arc-net.err; then
+  echo 'ARC_FC_PROOF network-failure=0'
+elif [ "$NET_PROBE" != "" ] && [ "$NET_PROBE_KIND" = "wget" ] && "$NET_PROBE" -T 2 -O - https://example.com >/tmp/arc-net.out 2>/tmp/arc-net.err; then
+  echo 'ARC_FC_PROOF network-failure=0'
+elif [ "$NET_PROBE" != "" ]; then
+  echo 'ARC_FC_PROOF network-failure=1'
+else
+  echo 'ARC_FC_PROOF network-failure=0'
+fi
+if cat /workspace/arc-sentinel.txt >/dev/null 2>&1; then
+  echo 'ARC_FC_PROOF sentinel-read=1'
+  echo 'ARC_FC_PROOF workspace-mount-proven=1'
+else
+  echo 'ARC_FC_PROOF sentinel-read=0'
+  echo 'ARC_FC_PROOF workspace-mount-proven=0'
+fi
+if cat /workspace/arc-host-escape-link >/tmp/arc-escape.out 2>/tmp/arc-escape.err; then
+  echo 'ARC_FC_PROOF symlink-escape-blocked=0'
+else
+  echo 'ARC_FC_PROOF symlink-escape-blocked=1'
+fi
+ARC_CMD_B64=""
+for token in $(cat /proc/cmdline 2>/dev/null); do
+  case "$token" in
+    arc_cmd_b64=*) ARC_CMD_B64="${token#arc_cmd_b64=}" ;;
+  esac
+done
+if [ "$ARC_CMD_B64" = "" ]; then
+  echo 'ARC_FC_RESULT exit-code=-1'
+  printf '%s' 'missing arc_cmd_b64' | base64 | tr -d '\n' | sed 's/^/ARC_FC_RESULT stderr-b64=/'
+  echo
+else
+  printf '%s' "$ARC_CMD_B64" | base64 -d >/tmp/arc-command.sh 2>/tmp/arc-command-decode.err
+  cd /workspace 2>/dev/null || cd /
+  sh /tmp/arc-command.sh >/tmp/arc-stdout 2>/tmp/arc-stderr
+  ARC_EXIT=$?
+  echo "ARC_FC_RESULT exit-code=$ARC_EXIT"
+  base64 /tmp/arc-stdout 2>/dev/null | tr -d '\n' | sed 's/^/ARC_FC_RESULT stdout-b64=/'
+  echo
+  base64 /tmp/arc-stderr 2>/dev/null | tr -d '\n' | sed 's/^/ARC_FC_RESULT stderr-b64=/'
+  echo
+fi
+reboot -f 2>/dev/null || poweroff -f 2>/dev/null || halt -f
+"""
+
+
+def generate_firecracker_exec_artifacts(
+    output_dir: Path,
+    *,
+    build_rootfs: bool | None = None,
+    rootfs_size_mib: int = 64,
+) -> FirecrackerExecArtifactReport:
+    """Generate ARC-owned Firecracker exec init and optional ext4 rootfs.
+
+    This is opt-in and local-tool only. It does not download kernels/rootfs images
+    or run privileged commands.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    init_path = output_dir / "arc-fc-exec-init.sh"
+    rootfs_path = output_dir / "arc-fc-exec-rootfs.ext4"
+    init_path.write_text(render_firecracker_exec_init(), encoding="utf-8")
+    init_path.chmod(0o755)
+    blockers: list[str] = []
+    requested_build = (
+        os.environ.get("ARC_FC_BUILD_EXEC_ROOTFS") == "1" if build_rootfs is None else build_rootfs
+    )
+    if not requested_build:
+        return FirecrackerExecArtifactReport(
+            init_path=str(init_path),
+            rootfs_path=None,
+            built_rootfs=False,
+            blockers=["ARC_FC_BUILD_EXEC_ROOTFS=1 not set; generated exec init only"],
+        )
+    tools = {
+        "busybox": shutil.which("busybox"),
+        "mkfs.ext4": shutil.which("mkfs.ext4"),
+        "truncate": shutil.which("truncate"),
+    }
+    missing = [name for name, value in tools.items() if not value]
+    if missing:
+        blockers.extend(f"missing tool: {name}" for name in missing)
+        return FirecrackerExecArtifactReport(
+            init_path=str(init_path),
+            rootfs_path=None,
+            built_rootfs=False,
+            blockers=blockers,
+        )
+    root_dir = output_dir / "exec-rootfs-tree"
+    for rel in ("bin", "sbin", "proc", "sys", "dev", "tmp", "workspace"):
+        (root_dir / rel).mkdir(parents=True, exist_ok=True)
+    shutil.copy2(str(tools["busybox"]), root_dir / "bin" / "busybox")
+    (root_dir / "init").write_text(init_path.read_text(encoding="utf-8"), encoding="utf-8")
+    (root_dir / "init").chmod(0o755)
+    (root_dir / "sbin" / "init").write_text(init_path.read_text(encoding="utf-8"), encoding="utf-8")
+    (root_dir / "sbin" / "init").chmod(0o755)
+    (root_dir / "dev" / "console").touch(mode=0o600, exist_ok=True)
+    (root_dir / "dev" / "null").touch(mode=0o666, exist_ok=True)
+    required_applets = (
+        "sh",
+        "cat",
+        "echo",
+        "false",
+        "find",
+        "grep",
+        "head",
+        "ip",
+        "ls",
+        "mount",
+        "pwd",
+        "reboot",
+        "poweroff",
+        "halt",
+        "base64",
+        "sleep",
+        "wget",
+        "sed",
+        "tail",
+        "true",
+        "uname",
+        "wc",
+        "printf",
+    )
+    for applet in required_applets:
+        link = root_dir / "bin" / applet
+        if not link.exists():
+            link.symlink_to("busybox")
+    subprocess.run(
+        [str(tools["truncate"]), "-s", f"{rootfs_size_mib}M", str(rootfs_path)],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    subprocess.run(
+        [str(tools["mkfs.ext4"]), "-d", str(root_dir), "-F", str(rootfs_path)],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    return FirecrackerExecArtifactReport(
+        init_path=str(init_path),
+        rootfs_path=str(rootfs_path),
+        built_rootfs=True,
+        blockers=[],
+    )
+
+
 def render_firecracker_guest_proof_init() -> str:
     """Return proof-only init snippet expected inside a dedicated ARC rootfs."""
     return """#!/bin/sh
 set +e
 mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sysfs /sys 2>/dev/null || true
-if ip route 2>/dev/null | grep -q '^default'; then
-  echo 'ARC_FC_PROOF no-default-route=0'
+if ip route >/tmp/arc-ip-route.out 2>/tmp/arc-ip-route.err; then
+  if grep -q '^default' /tmp/arc-ip-route.out; then
+    echo 'ARC_FC_PROOF no-default-route=0'
+  else
+    echo 'ARC_FC_PROOF no-default-route=1'
+  fi
 else
-  echo 'ARC_FC_PROOF no-default-route=1'
+  echo 'ARC_FC_PROOF no-default-route=0'
 fi
 CURL_BIN="$(command -v curl 2>/dev/null || true)"
 if [ "$CURL_BIN" = "" ] && [ -x /bin/curl ]; then
@@ -657,9 +908,9 @@ def firecracker_proof_gates() -> dict[str, object]:
     kernel = os.environ.get("ARC_FIRECRACKER_KERNEL")
     rootfs = os.environ.get("ARC_FIRECRACKER_ROOTFS")
     manifest_env = os.environ.get("ARC_FIRECRACKER_PROOF_ROOTFS_MANIFEST")
-    kernel_path = Path(kernel) if kernel else None
-    rootfs_path = Path(rootfs) if rootfs else None
-    manifest_path = Path(manifest_env) if manifest_env else None
+    kernel_path = Path(kernel).expanduser().resolve() if kernel else None
+    rootfs_path = Path(rootfs).expanduser().resolve() if rootfs else None
+    manifest_path = Path(manifest_env).expanduser().resolve() if manifest_env else None
     kvm_path = Path("/dev/kvm")
     binary = _firecracker_binary()
     gates = {
@@ -957,6 +1208,258 @@ class FirecrackerProofRunner:
             stderr_truncated=result.stderr_truncated,
             redaction_applied=result.redaction_applied,
         )
+        persist_sandbox_audit_event(event)
+
+
+def _firecracker_exec_gates() -> dict[str, object]:
+    gates = firecracker_proof_gates()
+    blockers = list(gates.get("blockers", []))
+    if os.environ.get("ARC_MICROVM_EXEC_ENABLED") != "1":
+        blockers.append("ARC_MICROVM_EXEC_ENABLED=1 required")
+    if not shutil.which("mkfs.ext4"):
+        blockers.append("mkfs.ext4 missing for workspace snapshot")
+    if not shutil.which("truncate"):
+        blockers.append("truncate missing for workspace snapshot")
+    gates["exec_gate"] = os.environ.get("ARC_MICROVM_EXEC_ENABLED") == "1"
+    gates["mkfs_ext4"] = shutil.which("mkfs.ext4")
+    gates["truncate"] = shutil.which("truncate")
+    gates["ready"] = not blockers
+    gates["blockers"] = blockers
+    return gates
+
+
+def _copy_workspace_to_ext4(workspace_root: Path, image_path: Path, size_mib: int = 64) -> None:
+    """Create a read-only snapshot ext4 workspace image for guest proof/run."""
+    tools = {
+        "mkfs.ext4": shutil.which("mkfs.ext4"),
+        "truncate": shutil.which("truncate"),
+    }
+    missing = [name for name, value in tools.items() if not value]
+    if missing:
+        raise FirecrackerHarnessError(f"missing workspace image tool(s): {', '.join(missing)}")
+    with tempfile.TemporaryDirectory(prefix="arc-fc-workspace-tree-") as tmp_tree:
+        tree = Path(tmp_tree)
+        for source in workspace_root.rglob("*"):
+            rel = source.relative_to(workspace_root)
+            target = tree / rel
+            if source.is_symlink():
+                # Never copy host symlink targets into the guest snapshot.
+                continue
+            if source.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+            elif source.is_file():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+        subprocess.run(
+            [str(tools["truncate"]), "-s", f"{size_mib}M", str(image_path)],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        subprocess.run(
+            [str(tools["mkfs.ext4"]), "-d", str(tree), "-F", str(image_path)],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+
+class FirecrackerExecutionRunner:
+    """Linux/KVM Firecracker public execution runner behind explicit gates."""
+
+    def __init__(
+        self,
+        *,
+        workspace_root: Path,
+        instance_name: str | None = None,
+        max_bytes: int = 65_536,
+    ) -> None:
+        check_workspace_escape(workspace_root, workspace_root.parent)
+        self.workspace_root = workspace_root.resolve()
+        self.instance_name = instance_name or f"arc-fc-exec-{uuid.uuid4().hex[:12]}"
+        self.max_bytes = max_bytes
+
+    def run(self, command: list[str], *, timeout_seconds: int = 300) -> IsolationResult:
+        if not command:
+            raise ValueError("missing command")
+        started_at = utc_now()
+        gates = _firecracker_exec_gates()
+        lifecycle: list[str] = ["preflight"]
+        if not gates["ready"]:
+            raise NotImplementedError(
+                "microVM execution blocked: "
+                + "; ".join(str(item) for item in gates["blockers"])
+                + " (ADR-024)"
+            )
+        teardown_attempted = False
+        proc: subprocess.Popen[str] | None = None
+        final = IsolationResult(exit_code=-1, stderr="not started", provider="microvm")
+        with tempfile.TemporaryDirectory(prefix="arc-firecracker-exec-") as tmp:
+            temp_dir = Path(tmp)
+            api_socket = temp_dir / f"{self.instance_name}.socket"
+            config_path = temp_dir / "firecracker.json"
+            workspace_image = temp_dir / "workspace.ext4"
+            sentinel = self.workspace_root / "arc-sentinel.txt"
+            escape = self.workspace_root / "arc-host-escape-link"
+            created_sentinel = False
+            created_escape = False
+            if sentinel.exists() or escape.exists():
+                raise FirecrackerHarnessError(
+                    "proof workspace marker path already exists; refusing to overwrite user files"
+                )
+            sentinel.write_text("arc-firecracker-exec-proof\n", encoding="utf-8")
+            created_sentinel = True
+            try:
+                escape.symlink_to(Path("/etc/passwd"))
+                created_escape = True
+            except OSError:
+                pass
+            try:
+                workspace_size_mib = int(os.environ.get("ARC_FIRECRACKER_WORKSPACE_MIB", "256"))
+                _copy_workspace_to_ext4(self.workspace_root, workspace_image, workspace_size_mib)
+                lifecycle.append("workspace_snapshot")
+                command_script = shlex.join(command)
+                command_b64 = base64.b64encode(command_script.encode("utf-8")).decode("ascii")
+                boot_args = (
+                    "console=ttyS0 reboot=k panic=1 pci=off root=/dev/vda rw init=/init "
+                    f"arc_cmd_b64={command_b64}"
+                )
+                config = FirecrackerNoNetworkConfig(
+                    api_socket=str(api_socket),
+                    config_path=str(config_path),
+                    kernel_image_path=str(gates["kernel_path"]),
+                    rootfs_path=str(gates["rootfs_path"]),
+                    boot_args=boot_args,
+                ).to_firecracker_config()
+                config["drives"].append(
+                    {
+                        "drive_id": "workspace",
+                        "path_on_host": str(workspace_image),
+                        "is_root_device": False,
+                        "is_read_only": True,
+                    }
+                )
+                config_path.write_text(json.dumps(config, sort_keys=True), encoding="utf-8")
+                lifecycle.append("create_config")
+                final, proc = _run_firecracker_process(
+                    [
+                        str(gates["firecracker_binary"]),
+                        "--api-sock",
+                        str(api_socket),
+                        "--config-file",
+                        str(config_path),
+                    ],
+                    timeout_seconds=timeout_seconds,
+                    max_bytes=self.max_bytes,
+                )
+                lifecycle.append("start_vm")
+                combined = f"{final.stdout}\n{final.stderr}"
+                proof = parse_firecracker_guest_proof(combined)
+                guest_result = parse_firecracker_guest_command_result(combined)
+                if not proof.network_proof_passed:
+                    final = IsolationResult(
+                        exit_code=-1,
+                        stdout=final.stdout,
+                        stderr="network-off proof failed: no-default-route and curl-failure markers required",
+                        provider="microvm",
+                        stdout_truncated=final.stdout_truncated,
+                        stderr_truncated=final.stderr_truncated,
+                        redaction_applied=final.redaction_applied,
+                    )
+                    lifecycle.append("network_proof_failed")
+                elif not proof.workspace_proof_passed:
+                    final = IsolationResult(
+                        exit_code=-1,
+                        stdout=final.stdout,
+                        stderr="workspace proof failed: sentinel and symlink-escape markers required",
+                        provider="microvm",
+                        stdout_truncated=final.stdout_truncated,
+                        stderr_truncated=final.stderr_truncated,
+                        redaction_applied=final.redaction_applied,
+                    )
+                    lifecycle.append("workspace_proof_failed")
+                elif not guest_result.marker_seen:
+                    final = IsolationResult(
+                        exit_code=-1,
+                        stdout=final.stdout,
+                        stderr="guest command result markers missing",
+                        provider="microvm",
+                        stdout_truncated=final.stdout_truncated,
+                        stderr_truncated=final.stderr_truncated,
+                        redaction_applied=final.redaction_applied,
+                    )
+                    lifecycle.append("exec_result_missing")
+                else:
+                    stdout, stdout_truncated = cap_output(guest_result.stdout, self.max_bytes)
+                    stderr, stderr_truncated = cap_output(guest_result.stderr, self.max_bytes)
+                    redacted_stdout = redact_output(stdout)
+                    redacted_stderr = redact_output(stderr)
+                    final = IsolationResult(
+                        exit_code=guest_result.exit_code,
+                        stdout=redacted_stdout,
+                        stderr=redacted_stderr,
+                        duration_ms=final.duration_ms,
+                        provider="microvm",
+                        stdout_truncated=stdout_truncated or final.stdout_truncated,
+                        stderr_truncated=stderr_truncated or final.stderr_truncated,
+                        redaction_applied=(
+                            redacted_stdout != stdout
+                            or redacted_stderr != stderr
+                            or final.redaction_applied
+                        ),
+                    )
+                    lifecycle.append("network_proof")
+                    lifecycle.append("workspace_proof")
+                    lifecycle.append("exec")
+                teardown_attempted = True
+                _terminate_process_group(proc)
+                lifecycle.append("teardown")
+                self._persist_audit(
+                    command=command,
+                    lifecycle=lifecycle,
+                    result=final,
+                    network_proof_passed=proof.network_proof_passed,
+                    teardown_attempted=teardown_attempted,
+                    started_at=started_at,
+                    ended_at=utc_now(),
+                )
+                return final
+            finally:
+                _terminate_process_group(proc)
+                if created_sentinel:
+                    sentinel.unlink(missing_ok=True)
+                if created_escape:
+                    escape.unlink(missing_ok=True)
+
+    def _persist_audit(
+        self,
+        *,
+        command: list[str],
+        lifecycle: list[str],
+        result: IsolationResult,
+        network_proof_passed: bool,
+        teardown_attempted: bool,
+        started_at: str,
+        ended_at: str,
+    ) -> None:
+        event = build_microvm_audit_event(
+            command=command,
+            workspace_root=self.workspace_root,
+            provider_runtime="firecracker",
+            instance_name=self.instance_name,
+            lifecycle=lifecycle,
+            network_proof_passed=network_proof_passed,
+            teardown_attempted=teardown_attempted,
+            started_at=started_at,
+            ended_at=ended_at,
+            exit_code=result.exit_code,
+            stdout_truncated=result.stdout_truncated,
+            stderr_truncated=result.stderr_truncated,
+            redaction_applied=result.redaction_applied,
+        )
+        event["public_execution_enabled"] = True
         persist_sandbox_audit_event(event)
 
 
@@ -1635,12 +2138,17 @@ class LimaIntegrationHarness:
 class MicroVMIsolationProvider(IsolationProvider):
     """MicroVM provider for macOS/Linux.
 
-    Public execution (execute()) always raises NotImplementedError until all
-    prerequisites in ADR-024 (docs/adr/ADR-024-microvm-public-execution-contract.md)
-    are satisfied and ARC_MICROVM_EXEC_ENABLED=1 is set.
-
-    Use doctor/preflight/harness surfaces instead.
+    Public execution is Linux/Firecracker-only and remains blocked unless the
+    dual explicit gates and all Firecracker proof gates are satisfied. macOS
+    Lima remains a low-security harness only because strict no-network is not
+    proven through Lima/VZ.
     """
+
+    def __init__(
+        self, *, workspace_root: Path | None = None, max_output_bytes: int = 65_536
+    ) -> None:
+        self.workspace_root = workspace_root.resolve() if workspace_root else None
+        self.max_output_bytes = max_output_bytes
 
     @property
     def provider_id(self) -> str:
@@ -1651,7 +2159,7 @@ class MicroVMIsolationProvider(IsolationProvider):
         return "microvm"
 
     async def health_check(self) -> bool:
-        return False
+        return bool(_firecracker_exec_gates()["ready"])
 
     async def execute(
         self,
@@ -1661,36 +2169,54 @@ class MicroVMIsolationProvider(IsolationProvider):
         env: Optional[dict[str, str]] = None,
         timeout_seconds: int = 300,
     ) -> IsolationResult:
-        raise NotImplementedError(
-            "microVM execution not yet available — prerequisites P1–P7 in "
-            "docs/adr/ADR-024-microvm-public-execution-contract.md must be satisfied "
-            "and ARC_MICROVM_EXEC_ENABLED=1 must be set before this path is enabled "
-            f"(platform={platform.system()})"
+        system = platform.system()
+        if system == "Windows":
+            raise NotImplementedError("microVM execution is not supported on Windows (ADR-024)")
+        if system == "Darwin":
+            raise NotImplementedError(
+                "macOS microVM execution blocked: Lima/VZ does not provide a proven strict "
+                "no-network/no-NIC mode; direct Apple Virtualization.framework helper is "
+                "not implemented (ADR-024)"
+            )
+        if system != "Linux":
+            raise NotImplementedError(f"microVM execution blocked on unsupported platform {system}")
+        workspace = self.workspace_root or (cwd or Path.cwd()).resolve()
+        if cwd is not None:
+            check_workspace_escape(cwd, workspace)
+        runner = FirecrackerExecutionRunner(
+            workspace_root=workspace, max_bytes=self.max_output_bytes
         )
+        return runner.run(command, timeout_seconds=timeout_seconds)
 
     def status(self) -> dict[str, object]:
         """Return structured status dict for truth-guard checks and CLI output."""
+        gates = _firecracker_exec_gates()
+        enabled = bool(gates["ready"])
         return {
-            "available": False,
-            "public_execution_enabled": False,
-            "public_execution_status": "blocked",
-            "reason": "execution_not_implemented",
+            "available": enabled,
+            "public_execution_enabled": enabled,
+            "public_execution_status": "ready" if enabled else "blocked",
+            "reason": "ready" if enabled else "firecracker_exec_gates_not_satisfied",
             "contract_doc": "docs/adr/ADR-024-microvm-public-execution-contract.md",
-            "strict_network_isolation": False,
+            "strict_network_isolation": enabled,
             "lima_security_posture": "low_security_network_present",
             "lima_harness": lima_integration_available(),
             "firecracker_harness": firecracker_integration_available(),
-            "unblock_gate": "ARC_MICROVM_EXEC_ENABLED=1 (not yet honored)",
+            "unblock_gate": "ARC_MICROVM_EXEC_ENABLED=1",
+            "firecracker_exec_gates": gates,
         }
 
     def describe(self) -> dict[str, object]:
         info = microvm_preflight()
+        gates = _firecracker_exec_gates()
+        enabled = bool(gates["ready"])
         info.update(
             {
-                "available": False,
-                "public_execution_enabled": False,
-                "public_execution_status": "blocked",
+                "available": enabled,
+                "public_execution_enabled": enabled,
+                "public_execution_status": "ready" if enabled else "blocked",
                 "contract_doc": "docs/adr/ADR-024-microvm-public-execution-contract.md",
+                "firecracker_exec_gates": gates,
             }
         )
         if _microvm_execution_enabled() and _lima_available():

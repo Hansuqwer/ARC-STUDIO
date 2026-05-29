@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-29 — R68-R74 baseline implementation added locally; R75 strict macOS no-network proof blocked by Lima networking; R76 remains planned/blocked as listed.
-**Current evidence anchor:** local worktree | R68 research doc exists; Phase 104 targeted microVM tests 57 passed; Python full suite 3386 passed / 34 skipped / 3 xfailed; `cd python && uv run ruff check src tests` clean; `pnpm build` OK; `pnpm typecheck` OK; `pnpm test:e2e` reran with known Theia async-warning fingerprint and 4 skipped smoke tests; banned-claims guard OK.
+**Last reality refresh:** 2026-05-29 — R75 strict macOS no-network proof blocked by Lima networking; R76 Linux/Firecracker execution code wired behind real host gates, proof not run on this macOS host.
+**Current evidence anchor:** local worktree | targeted microVM tests 40 passed / 1 skipped; changed-file ruff clean; full verification pending.
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -399,7 +399,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - UI shows trust and paid-call state before execution
 - Denied actions produce typed events
 
-**Status:** Baseline Complete; sandbox hardening active | Evidence: commits 3e6ee8c, fca4bf2, 5a9df47, 09bfbb8, 343d8d6 plus local bounded-streaming slice | 2150 Python tests passed; e2e smoke passed 8/7 skipped | Notes: All 3 enforcement PRs delivered. `arc sandbox run` is real subprocess execution only. Bounded stream readers cap stdout/stderr without `communicate()` full buffering while preserving process-group timeout kill. MicroVM execution remains unimplemented; Lima/Firecracker are preflight-only; container fallback remains opt-in gated.
+**Status:** Baseline Complete; sandbox hardening active | Evidence: commits 3e6ee8c, fca4bf2, 5a9df47, 09bfbb8, 343d8d6 plus local bounded-streaming slice | 2150 Python tests passed; e2e smoke passed 8/7 skipped | Notes: All 3 enforcement PRs delivered. `arc sandbox run` is real subprocess execution by default. Bounded stream readers cap stdout/stderr without `communicate()` full buffering while preserving process-group timeout kill. Phase 105 later wires Linux/Firecracker microVM execution behind explicit host gates; Lima remains preflight/harness only; container fallback remains opt-in gated.
 
 **Source:** Architecture Review P0-3, Feature List F0.3
 
@@ -1026,8 +1026,8 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R72 Provider-Backed Runtime Shell** | **Baseline Complete** | **Phase 101 — gated provider shell contract baseline, dry-run/default-safe path, no default paid calls** |
 | **R73 Live Terminal/Event Streaming UX** | **Baseline Complete** | **Phase 102 — CLI JSONL incremental stdout/stderr/events/cancel for sandbox/testbench/provider-shell; IDE/REPL streaming follow-up** |
 | **R74 Broad CLI CI Orchestration** | **Baseline Complete** | **Phase 103 — detect local CI matrix, run selected argv job through sandbox/streaming, write local artifact, stable JSON** |
-| **R75 macOS MicroVM Execution + Strict No-Network Proof** | **Not Started** | **Phase 104 — real Lima/VZ run proof only if feasible; otherwise documented blocker, no execution claim** |
-| **R76 Linux Firecracker Execution Proof** | **Not Started** | **Phase 105 — real boot/run/destroy proof only on eligible Linux host; otherwise documented blocker, no execution claim** |
+| **R75 macOS MicroVM Execution + Strict No-Network Proof** | **Blocked** | **Phase 104 — Lima/VZ cannot prove strict no-network; direct Apple VZ no-NIC helper required** |
+| **R76 Linux Firecracker Execution Proof** | **Baseline Complete (host-unproven)** | **Phase 105 — Linux/Firecracker execution path wired behind KVM/rootfs/env gates; real proof requires eligible Linux host** |
 
 **Post-v0.1 Execution Order:** 
 - **Priority 1 stop-the-line:** R68-R76 / Phases 97-105 (full CLI parity track). Research first, then implement in order unless the research matrix proves a safer dependency order. Do not claim OpenCode/Claude Code parity, autonomous repair, rich diff review, provider-backed shell, broad CI orchestration, or microVM execution until implemented and tested.
@@ -1165,7 +1165,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Deferred:** No live daemon/remote sync/microVM broadening.
 
-**Status:** Baseline Complete | Evidence: commit 7fdba99; 2846 Python tests pass; TS build + typecheck green | Notes: Hardened subprocess sandbox foundation. MicroVM execution remains unimplemented (preflight/doctor only).
+**Status:** Baseline Complete | Evidence: commit 7fdba99; 2846 Python tests pass; TS build + typecheck green | Notes: Hardened subprocess sandbox foundation. Superseded by Phase 105 for Linux/Firecracker gated microVM execution; macOS remains blocked.
 
 ---
 
@@ -1362,7 +1362,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Current:** Baseline Complete. `arc sandbox run --provider microvm` remains blocked but now emits a `SANDBOX_DENIED` audit event with `public_execution_enabled=false`. MicroVM doctor/preflight output keeps runtime preflight detail while explicitly reporting `public_execution_status=blocked` and `public_execution_enabled=false`.
 
-**Status:** Baseline Complete | Evidence: local worktree; targeted sandbox/microVM tests 196 passed / 13 skipped; targeted ruff clean | Notes: No microVM execution exists; this is traceability and truth-label hardening only.
+**Status:** Baseline Complete | Evidence: local worktree; targeted sandbox/microVM tests 196 passed / 13 skipped; targeted ruff clean | Notes: Historical truth-label hardening. Superseded by Phase 105 for Linux/Firecracker gated execution; macOS remains blocked.
 
 ## R66 — Sandbox Classifier And Path-Intent Hardening v3
 
@@ -1440,14 +1440,14 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Goal:** Prove real local macOS lightweight VM execution, preferably Lima/Apple Virtualization.framework, with strict no-network behavior.
 
-**Current:** Blocked for strict public execution. Phase 104 research re-confirmed Lima/VZ lifecycle and workspace mount proof are feasible, but Lima default user-mode/slirp networking is documented and no no-network template key was found. ARC keeps Lima as a low-security, host-gated proof harness only. macOS preflight/template truth fields were hardened; public `MicroVMIsolationProvider.execute()` remains blocked.
+**Current:** Blocked for strict macOS execution. Phase 104 research re-confirmed Lima/VZ lifecycle and workspace mount proof are feasible, but Lima default user-mode/slirp networking is documented and no no-network template key was found. ARC keeps Lima as a low-security, host-gated proof harness only. On macOS, public `MicroVMIsolationProvider.execute()` raises with a clear ADR-024 blocker.
 
-**Status:** Blocked | Evidence: local worktree Phase 104 research; macOS Darwin 26.4 arm64 with limactl 2.1.0 detected; Lima official docs confirm default user-mode/slirp network and no documented no-network key; preflight/template truth fields hardened | Notes: No macOS strict no-network proof; direct Apple VZ no-NIC provider or future Lima no-network support remains required before any execution claim.
+**Status:** Blocked | Evidence: local `limactl info` reports Lima 2.1.0 with `vz`; Lima docs confirm default user-mode/slirp network and no documented no-network key; Apple docs JS-only in this runtime | Notes: No macOS strict no-network proof; direct Apple VZ no-NIC provider or future Lima no-network support remains required before any execution claim.
 
 ## R76 — Linux Firecracker Execution Proof
 
 **Goal:** Prove real Linux Firecracker boot/run/destroy for a workspace-bounded command.
 
-**Current:** Not Started for real execution proof. Existing Firecracker harness hardening does not boot a guest in normal CI or this macOS host.
+**Current:** Linux/Firecracker execution code is wired but host-unproven. `MicroVMIsolationProvider.execute()` delegates to `FirecrackerExecutionRunner` only on Linux when `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, `ARC_FIRECRACKER_KERNEL`, `ARC_FIRECRACKER_ROOTFS`, `firecracker`, `/dev/kvm` rw, `mkfs.ext4`, and `truncate` are present. The runner builds a read-only ext4 workspace snapshot, starts Firecracker with no `network-interfaces`, requires guest `ARC_FC_PROOF` markers for no default route/network failure/workspace/symlink, parses `ARC_FC_RESULT`, terminates the process group, and emits audit. Normal CI and this macOS host skip real boot.
 
-**Status:** Not Started | Evidence: none | Notes: Requires eligible Linux host with KVM, Firecracker binary, rootfs/kernel, run proof, output capture, cleanup proof, and opt-in skipped tests for normal CI.
+**Status:** Baseline Complete (host-unproven) | Evidence: local targeted `uv run pytest tests/isolation/test_microvm_truth_guard.py tests/isolation/test_firecracker_smoke.py -q` → 40 passed / 1 skipped; no Linux/KVM boot run on this host | Notes: To prove execution, run on Linux/KVM with ARC exec rootfs and the documented gates; do not claim real microVM execution until that test boots a VM and passes.

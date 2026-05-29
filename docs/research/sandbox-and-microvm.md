@@ -66,10 +66,14 @@ Status: research complete for P0 sandbox foundation. MicroVM is preflight/doctor
 | Lima network docs | https://lima-vm.io/docs/config/network/ | Named networks can be attached, but docs describe default/user/VMNet choices and do not expose a `network: none` or no-NIC key. | `networks: []` remains no-extra-network only; it is not strict network-off evidence. | High | Need upstream no-network support or a direct VZ provider. |
 | Lima default user-mode network docs | https://lima-vm.io/docs/config/network/user/ | By default Lima enables user-mode/slirp networking on hard-coded `192.168.5.0/24`; guest can reach host `192.168.5.2` and DNS behavior can fall back to slirp/native nameservers. | ADR-024 P2 remains blocked for Lima; DNS/proxy knobs are hardening only. | High | Whether a future Lima release adds no-network mode. |
 | Lima filesystem mounts docs | https://lima-vm.io/docs/config/mount/ | VZ uses virtiofs on macOS; virtiofs requires Lima >=0.14 and macOS >=13.0. reverse-sshfs caveat says compromised guest sshfs may access unexposed host dirs. | Mac proof template pins `vmType: vz`, `mountType: virtiofs`, and mounts only the workspace at `/workspace`; symlink escape proof remains host-gated. | High | Real VZ virtiofs symlink escape result must be collected on host. |
-| Lima VZ docs | https://lima-vm.io/docs/config/vmtype/vz/ | VZ uses macOS Virtualization.framework, requires macOS >=13.0, default since Lima v1.0, and does not support cross-arch whole VM. | Doctor/preflight reports Lima/VZ as low-security harness; public execution remains blocked. | High | Apple VZ direct no-network option needs separate implementation/research. |
+| Lima VZ docs | https://lima-vm.io/docs/config/vmtype/vz/ | VZ uses macOS Virtualization.framework, requires macOS >=13.0, default since Lima v1.0, and does not support cross-arch whole VM. | Doctor/preflight reports Lima/VZ as low-security harness; macOS public execution remains blocked. | High | Apple VZ direct no-network option needs separate implementation/research. |
 | Lima create docs | https://lima-vm.io/docs/reference/limactl_create/ | `limactl create --name=local -` supports stdin templates; flags include `--plain`, `--mount-none`, `--containerd none`, `--mount-type`, `--vm-type`. | Disposable lifecycle is feasible, but strict no-network is not. Current harness uses generated template/start/delete; no public execution. | High | Cold-start/image download cost remains high. |
 | Lima start docs | https://lima-vm.io/docs/reference/limactl_start/ | `limactl start NAME|FILE.yaml|URL`; `--name` is a create flag available through start when creating from a file. | Harness now starts template files with explicit `--name <instance>` so teardown targets the same instance name instead of Lima choosing/suffixing names. | High | Stale old proof instances may need manual cleanup; no automatic prune added. |
 | Apple Virtualization docs | https://developer.apple.com/documentation/virtualization | Apple page required JavaScript in this runtime. | Official Apple API detail unavailable here; do not implement direct VZ provider from incomplete docs. | Low | Re-fetch with browser/docs access before direct VZ work. |
+| Phase 104 Lima network refresh | https://lima-vm.io/docs/config/network/ and https://lima-vm.io/docs/config/network/user/ | Lima 2.1.0 docs still describe default user-mode/slirp networking (`192.168.5.0/24`) and named networks, but no documented no-NIC/no-network template key. Local `limactl info` reports `vmTypes` includes `vz`; default template still has hostResolver/proxy/user-mode defaults. | Keep macOS public microVM execution blocked. `networks: []` remains no-extra-named-network hardening, not strict network isolation. | High | Direct Apple Virtualization.framework helper with no `VZVirtioNetworkDeviceConfiguration` remains the macOS strict path. |
+| Phase 104 Apple VZ docs refresh | https://developer.apple.com/documentation/virtualization/vzvirtualmachineconfiguration | Apple docs page is JavaScript-only in this runtime; direct API signatures and entitlement/build details were not available. | Do not add a Swift helper from incomplete docs. Document missing capability: direct Apple VZ no-NIC helper/rootfs/command channel. | Low | Need Xcode/macOS API research and a tested Swift helper before macOS strict execution. |
+| Phase 105 Firecracker docs refresh | https://github.com/firecracker-microvm/firecracker/blob/main/docs/getting-started.md | Firecracker requires Linux KVM, `/dev/kvm` read/write, Firecracker binary, kernel, rootfs. `--config-file` can boot with kernel/rootfs config and optional resources. | Public `MicroVMIsolationProvider.execute()` now delegates only to Linux/Firecracker behind `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, kernel/rootfs, binary, `/dev/kvm`, and local workspace-image tools. | High | Real proof still requires an eligible Linux/KVM host; this macOS host cannot boot Firecracker. |
+| Phase 105 Firecracker network docs refresh | https://github.com/firecracker-microvm/firecracker/blob/main/docs/network-setup.md | Firecracker networking requires explicit TAP and `network-interfaces` config; guest default route/DNS setup is separate guest/host work. | ARC execution config omits `network-interfaces`, creates no TAP/NAT/bridge, and requires guest `ARC_FC_PROOF` markers for no default route plus failed curl/wget before returning command output. | High | Need real guest marker evidence on Linux/KVM. |
 
 ## Decision Table
 
@@ -94,6 +98,7 @@ Status: research complete for P0 sandbox foundation. MicroVM is preflight/doctor
 | Write path intents | Validate write-output paths across classifications | Validate only `writes_workspace` commands | Policy-enabled network/install commands with output flags can write outside workspace unless checked independently. | `python/src/agent_runtime_cockpit/security/sandbox.py`, `python/tests/test_cli_sandbox.py` | High |
 | Firecracker proof markers | Require `curl-available` and `workspace-mount-proven` markers before proof success | Treat failed curl/missing sentinel as proof | Missing guest tools or absent workspace mount must not count as network/workspace isolation proof. | `python/src/agent_runtime_cockpit/isolation/microvm.py`, `python/tests/isolation/test_firecracker_smoke.py` | High |
 | Phase 104 macOS path | Keep Lima as low-security proof harness; do not wire public execution | Claim Lima strict no-network; use guest firewall/route deletion as P2; direct Apple VZ provider now | Lima docs prove default slirp/user-mode networking and no documented no-network key. Guest-level denial is not strong enough for ADR-024 P2. | `python/src/agent_runtime_cockpit/security/sandbox.py`, `python/src/agent_runtime_cockpit/isolation/microvm.py`, `python/tests/isolation/test_microvm_preflight.py`, docs | High |
+| Phase 105 Linux execution path | Wire Linux/Firecracker execution behind dual public/integration gates plus real host gates; keep macOS blocked | Keep permanent `NotImplementedError`; claim proof from fake runner; use Lima as fallback | Firecracker can be configured no-NIC by construction, and public execution can fail closed unless guest proof/result markers are present. Tests remain skipped off Linux/KVM. | `python/src/agent_runtime_cockpit/isolation/microvm.py`, `python/src/agent_runtime_cockpit/cli/sandbox.py`, `python/tests/isolation/test_firecracker_smoke.py`, `python/tests/isolation/test_microvm_truth_guard.py`, docs | Medium |
 
 ## Current Scope
 
@@ -129,9 +134,10 @@ Real now:
 - keyed audit append creates parents, locks where portable, writes canonical JSON, flushes and fsyncs, and verification reports partial trailing lines
 - supervisor executor callbacks now have a central timeout wrapper that emits terminal `RUN_FAILED`, autopsy, receipt, and clears active state
 - path-intent extraction covers more common output/input switches (`--output`, `--outfile`, `--dest`, `--files-from`, `of=`), plus simple `cp`/`mv` destination and archive-output suffixes
-- opt-in microVM integration skeleton exists as private code only; public `MicroVMIsolationProvider.execute()` remains disabled until proof exists
+- public `MicroVMIsolationProvider.execute()` has a Linux/Firecracker-only path behind `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, Linux, `/dev/kvm`, `firecracker`, kernel/rootfs env vars, and local `mkfs.ext4`/`truncate` workspace snapshot tools. It still fails closed unless guest proof markers show no default route, failed network probe, workspace sentinel readable, symlink escape blocked, and command result markers are present.
 - Lima/Firecracker harness attempts emit persisted `MICROVM_COMMAND`/`MICROVM_DENIED` sandbox audit events with `public_execution_enabled=false`
 - Private Firecracker proof runner now gates on Linux, `/dev/kvm` rw, `firecracker`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, `ARC_FIRECRACKER_KERNEL`, and `ARC_FIRECRACKER_ROOTFS`; it writes a no-NIC config file, starts Firecracker as a bounded process-group subprocess, records lifecycle/audit, and tears down the process group.
+- Firecracker execution artifact tooling can generate `arc-fc-exec-init.sh` and, when `ARC_FC_BUILD_EXEC_ROOTFS=1` plus local tools are present, `arc-fc-exec-rootfs.ext4`. This rootfs/init contract emits `ARC_FC_PROOF` and `ARC_FC_RESULT` serial markers required by public Linux/Firecracker execution.
 - Firecracker guest proof marker parser and proof-only init snippet exist for stable `ARC_FC_PROOF no-default-route`, `network-failure`, `sentinel-read`, and `symlink-escape-blocked` markers. The parser accepts legacy underscore aliases where safe.
 - Phase 68 hardens the private proof runner so proof success requires both network and workspace markers and temporary sentinel/symlink files are cleaned after the attempt.
 - Firecracker proof rootfs/init artifact tooling exists: `generate_firecracker_proof_artifacts()` writes `arc-fc-proof-init.sh` and `rootfs-manifest.json`; optional ext4 build is opt-in via `ARC_FC_BUILD_PROOF_ROOTFS=1` and local `busybox`, `mkfs.ext4`, and `truncate` only. The scaffold now includes `/init`, `/sbin/init`, `/dev/console`, `/dev/null`, and proc/sysfs mount checks in manifest validation.
@@ -141,9 +147,10 @@ Real now:
 
 Design-only now:
 - container provider as production fallback
-- real microVM execution
+- macOS strict microVM execution
+- Linux/Firecracker execution on this macOS host; code path exists but real boot proof requires eligible Linux/KVM host
 - real Firecracker boot/no-default-route/curl-fails proof
-- Real Firecracker guest proof remains blocked until ARC owns a rootfs/init image that emits the proof markers over serial/stdout.
+- Real Firecracker guest proof remains blocked on this macOS host; ARC now owns an exec init/rootfs artifact generator, but the rootfs has not been booted on Linux/KVM here.
 - Firecracker proof rootfs/init artifact ext4 build remains unproven on this macOS host; normal CI validates manifest/init generation, boot-entrypoint/device metadata, proc/sysfs mount checks, and missing-tool blockers only.
 - Firecracker proof markers now explicitly fail proof when guest `curl` is missing or workspace mount proof is absent; this prevents false-positive network/workspace proof but still does not prove real boot on this host.
 - real Cloud Hypervisor boot/no-default-route/curl-fails proof
@@ -155,11 +162,12 @@ Design-only now:
 Blocked:
 - Google web search tool requires account verification.
 - Vercel Grep tool is not exposed in this environment.
-- MicroVM execution requires host runtime, image strategy, mount policy, network-off proof, and opt-in integration tests.
+- macOS strict microVM execution requires a direct Apple Virtualization.framework no-NIC provider/helper or future Lima no-network support.
+- Linux Firecracker execution proof requires a Linux/KVM host with `/dev/kvm` read/write, `firecracker`, compatible kernel, ARC exec rootfs, and explicit env gates.
 
 ## Phase 37.6 MicroVM Execution Blocker Detail
 
-Status: Blocked. Preflight/doctor only. No microVM execution exists.
+Status: macOS strict execution blocked. Linux/Firecracker execution code exists behind explicit host gates, but no real boot proof has run on this macOS host.
 
 Current design-proof harness:
 
@@ -167,7 +175,7 @@ Current design-proof harness:
 - `arc sandbox microvm-plan --json --provider firecracker -- <cmd...>` renders a non-executing Firecracker run plan.
 - Plans include lifecycle, workspace mount, network-default-deny, run, teardown, and blocker fields.
 - Plan generation does not call `limactl`, `firecracker`, `cloud-hypervisor`, or `jailer` and does not create VMs.
-- `execution_enabled` is always `false`; public `MicroVMIsolationProvider.execute()` remains blocked.
+- `execution_enabled` in plans remains `false`; plans are still non-executing.
 
 Current opt-in Lima harness:
 
@@ -178,32 +186,31 @@ Current opt-in Lima harness:
 - Host-gated symlink proof now tests whether `/workspace` symlinks can read host paths; if readable, Lima P5 is permanently blocked for strict sandbox use.
 
 ### Rootfs/Kernel Lifecycle
-- Firecracker needs a kernel vmlinux binary and a rootfs image. No automated download/cache mechanism exists.
-- Lima VM templates exist as rendered YAML only; no `limactl start/create/delete` lifecycle is implemented.
-- Proposed: manage a local cache dir (`~/.arc/microvm/`) with versioned images. Not implemented.
+- Firecracker needs a kernel vmlinux binary and a rootfs image. ARC does not download images at command runtime.
+- `arc sandbox firecracker-artifacts --exec-rootfs --output <dir> --json` writes `arc-fc-exec-init.sh`; with `ARC_FC_BUILD_EXEC_ROOTFS=1` and local `busybox`, `mkfs.ext4`, and `truncate`, it builds `arc-fc-exec-rootfs.ext4`.
+- Lima VM templates exist as rendered YAML and internal host-gated harnesses only. Lima is not wired to public strict execution.
 
-### Workspace Mount Policy
-- Firecracker: needs virtiofs or block device mapping. No safety analysis for symlink/hardlink escapes in guest mounts.
+- Firecracker: public Linux path creates a per-run read-only ext4 snapshot of the workspace and attaches it as a second block drive. Host symlinks are not copied into that snapshot; a proof symlink marker is added and must be unreadable in the guest.
 - Lima: host-mounted directories are shared via `mounts` in template YAML. `~` and sensitive host paths must be excluded.
-- Proposed: only mount the workspace directory read-only by default; read-write only with explicit policy opt-in. Not implemented.
+- The Firecracker workspace snapshot is read-only in the guest; write-back semantics are not implemented.
 
 ### Network-Off Proof
-- No public provider proves strict guest no-network access.
-- Firecracker: no TAP/NAT interfaces configured by default, but no boot/proof verifies guest isolation yet.
+- No public provider proves strict guest no-network access on this macOS host.
+- Firecracker: public Linux path emits a config with no `network-interfaces`, creates no TAP/NAT/bridge, and requires guest `ARC_FC_PROOF no-default-route=1`, `curl-available=1`, and `network-failure=1` before returning command output.
 - Lima: default slirp/user-mode networking is documented; `user-v2` is also user-mode networking. ARC treats Lima as low-security/network-present, not strict P2 evidence.
 - Proposed strict proof: boot Firecracker/Cloud Hypervisor without guest NIC/default route, then verify `ip route` has no default route and `curl --connect-timeout 1 http://example.com` fails before user argv.
-- Current strict proof status: design/preflight only. `build_firecracker_no_network_run_plan()` emits a Firecracker config dictionary with no `network-interfaces` key and the required proof commands (`ip route`, `curl --connect-timeout 2 https://example.com`). No real boot was executed on this macOS host.
+- Current strict proof status: implemented but host-unproven. No real Firecracker boot was executed on this macOS host.
 
 ### Teardown Guarantees
-- Firecracker: VM is destroyed by stopping the Firecracker process. No timeout/safety net for boot-failure hangs.
+- Firecracker: VM is destroyed by terminating the Firecracker process group in normal, error, timeout, and finally paths; temp jail/config/workspace image live in a per-run temporary directory.
 - Lima: `limactl delete -f` after run. No cleanup on host crash/reboot.
-- Proposed: use a context timeout + defer block with force-cleanup. Not implemented.
+- Host crash cleanup is not proven.
 
 ### Integration Gate
 - Tests exist at `python/tests/isolation/test_microvm_preflight.py` — 4 tests covering all 4 preflight states.
 - A skeleton integration test exists at `python/tests/test_cli_sandbox.py::test_microvm_integration_skeleton_doctor_only`, gated by `ARC_MICROVM_INTEGRATION=1`.
 - Design-proof plan tests cover Lima and Firecracker plan shape and assert CLI plan generation does not run subprocess probes.
-- CI does not set `ARC_MICROVM_INTEGRATION=1` — no microVM runtime in CI.
+- CI does not set `ARC_MICROVM_INTEGRATION=1`, `ARC_MICROVM_EXEC_ENABLED=1`, or `ARC_FC_REAL_EXEC=1` — no microVM runtime in normal CI.
 
 ### Summary
 | Component | Status | What's missing |
@@ -212,12 +219,12 @@ Current opt-in Lima harness:
 | Design-proof plan | Real | Non-executing plan only; no VM creation/start/run/delete |
 | Opt-in Lima harness | Internal low-security developer harness only | Fake-runner lifecycle tests pass; mount-proof mode can bypass only network proof for evidence collection; not wired to public microVM execution |
 | Lima smoke/mount proof | Added (CI-skip) | `python/tests/isolation/test_lima_smoke.py`; real-host tests skipped unless macOS + limactl + ARC_MICROVM_INTEGRATION=1 + ARC_LIMA_REAL_EXEC=1; symlink escape proof records whether host paths are readable through `/workspace` symlinks |
-| MicroVM truth guard | Added | `test_microvm_truth_guard.py` (10 tests): execute() always raises, both gates set still raises, status()["available"]=False, contract_doc references ADR-024, CLI run blocked; arc sandbox run --provider microvm: blocked |
+| MicroVM truth guard | Updated | `test_microvm_truth_guard.py`: default/macOS execution blocked, Linux/Firecracker all-gates path delegates to runner, status includes ADR-024 and gate state; `arc sandbox run --provider microvm` remains blocked by default |
 | Firecracker harness | Design/preflight only | `FirecrackerIntegrationHarness` added with fake-runner tests; no real Firecracker execution; `firecracker_doctor()` expanded with jailer/cache/kvm fields |
-| Firecracker execution | Not implemented | Kernel/rootfs lifecycle, mount policy, network-off proof, jailer config, teardown |
+| Firecracker execution | Implemented behind explicit Linux/KVM gates; unproven on this macOS host | Real Linux/KVM proof run with kernel + ARC exec rootfs, no-default-route/curl-fails markers, command result markers, teardown evidence |
 | Lima strict execution | Not implemented | Lima is explicitly low-security/network-present; strict public `microvm` remains blocked |
 | Integration test skeleton | Real (gated) | Tests exist but require local runtime; CI skips |
-| Harness audit events | Real for internal harnesses | `MICROVM_COMMAND`/`MICROVM_DENIED` persisted for Lima/Firecracker harness attempts; public execution remains blocked |
+| Harness audit events | Real for internal harnesses and Linux/Firecracker path | `MICROVM_COMMAND`/`MICROVM_DENIED` persisted for Lima/Firecracker harness attempts and Linux/Firecracker gated execution; macOS public execution remains blocked |
 | Production-ready claim | Not claimed | Would need full execution + opt-in CI tests + network-off proof |
 
 ## Policy Config

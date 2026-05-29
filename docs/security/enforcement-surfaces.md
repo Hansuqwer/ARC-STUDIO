@@ -356,6 +356,7 @@ ARC now has a first-class sandbox CLI foundation:
 - `arc sandbox audit verify|list|query|compact|show` are nested aliases for the same local audit operations.
 - `arc sandbox run --provider container -- <cmd...>` executes through Docker/Podman only when `ARC_ENABLE_CONTAINER_SANDBOX=1` and local runtime checks pass.
 - `arc sandbox firecracker-artifacts --output <dir> --json` generates Firecracker proof init/manifest artifacts without booting a VM.
+- `arc sandbox firecracker-artifacts --exec-rootfs --output <dir> --json` generates ARC Firecracker execution init/rootfs artifacts; rootfs build requires `ARC_FC_BUILD_EXEC_ROOTFS=1` plus local `busybox`, `mkfs.ext4`, and `truncate`.
 - `arc policy list/show/validate` discovers and validates configured sandbox policies.
 - `arc policy validate-yaml --file <path>` validates a local YAML sandbox policy file.
 - `arc policy apply --file <path>` installs a local YAML sandbox policy under the workspace boundary.
@@ -370,16 +371,16 @@ P0 policy defaults:
 - timeout kills the POSIX process group.
 - stdout/stderr are capped and redacted.
 - every allowed/denied sandbox command returns an audit payload.
-- `arc sandbox run --provider microvm` remains blocked but now also writes a `SANDBOX_DENIED` audit event with `public_execution_enabled=false`.
+- `arc sandbox run --provider microvm` remains blocked by default. On eligible Linux/Firecracker hosts only, it can execute when `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, `ARC_FIRECRACKER_KERNEL`, `ARC_FIRECRACKER_ROOTFS`, `firecracker`, `/dev/kvm` rw, `mkfs.ext4`, and `truncate` are present.
 - sandbox audit events include an `audit_id` correlation key.
 - sandbox audit events are persisted to a local sandbox hash-chain store by default.
 - sandbox audit events best-effort mirror a typed `sandbox_command` event into `.arc/events/event-log.jsonl`; this mirror is local/recent/derived and not canonical global audit state.
 - sandbox audit events best-effort mirror into the keyed audit store when an audit key exists; missing keys do not block CLI execution.
-- Firecracker artifact generation validates static proof-init safety and manifest no-network metadata, but does not prove VM execution.
+- Firecracker execution fails closed unless guest `ARC_FC_PROOF` markers prove no default route, failed network probe, workspace sentinel read, symlink escape blocked, and guest `ARC_FC_RESULT` markers provide stdout/stderr/exit code.
 - sandbox audit chain appends continue across CLI invocations and verify against raw events.
 - container execution requires `ARC_ENABLE_CONTAINER_SANDBOX=1`.
 
-MicroVM status: doctor/preflight/proof-harness only. Linux checks Firecracker/Cloud Hypervisor and `/dev/kvm`; private Firecracker proof paths stay gated behind Linux, `/dev/kvm`, `firecracker`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, and explicit kernel/rootfs paths. macOS checks Lima/VZ availability and remains a low-security developer harness. Windows is explicitly unsupported. Doctor output may report runtime preflight readiness, but always includes `public_execution_enabled=false` and `public_execution_status=blocked` until ADR-024 prerequisites are satisfied. Public `MicroVMIsolationProvider.execute()` and `arc sandbox run --provider microvm` remain blocked.
+MicroVM status: Linux/Firecracker public execution is implemented but host-gated and unproven on this macOS host. macOS checks Lima/VZ availability and remains a low-security developer harness because strict no-network is not proven; macOS public execution raises. Windows is explicitly unsupported. Doctor output may report `public_execution_enabled=true` only when all Linux/Firecracker gates are present; otherwise it remains blocked.
 
 ---
 

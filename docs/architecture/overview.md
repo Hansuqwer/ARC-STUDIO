@@ -146,8 +146,8 @@ The execution isolation model is now layered:
 IsolationProvider
 ├── none
 ├── subprocess
-├── container     # design/future unless explicitly wired safely
-└── microvm       # macOS/Linux doctor/preflight now; execution future
+├── container     # gated Docker/Podman fallback
+└── microvm       # Linux/Firecracker gated execution; macOS preflight/harness only
 ```
 
 The CLI sandbox path separates policy from execution:
@@ -156,8 +156,8 @@ The CLI sandbox path separates policy from execution:
 argv -> CommandClassification -> SandboxDecision -> IsolationProvider -> SandboxResult/audit event -> local event-log mirror
 ```
 
-`subprocess` is the only real P0 execution provider. `microvm` intentionally keeps public execution blocked; private Firecracker proof-runner code is host-gated for Linux/KVM proof collection only and must not report public command success until disposable VM execution, workspace mounting, network controls, teardown, and opt-in tests exist.
+`subprocess` is the default real execution provider. `container` is a gated fallback. `microvm` has a Linux/Firecracker execution path behind `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, Linux/KVM, Firecracker, kernel/rootfs, and workspace snapshot tooling. macOS remains blocked for strict public execution because Lima/VZ networking is network-present and no direct Apple VZ no-NIC helper exists.
 
-MicroVM doctor/preflight output separates runtime preflight readiness from public execution readiness. Even when Linux/Firecracker or Cloud Hypervisor artifacts look ready, public execution remains `public_execution_enabled=false` / `public_execution_status=blocked` until ADR-024 proof requirements are complete.
+MicroVM doctor/preflight output separates runtime preflight readiness from public execution readiness. It reports `public_execution_enabled=true` only when all Linux/Firecracker gates are present; otherwise it remains blocked. Real microVM execution has not been proven on this macOS host.
 
-Firecracker proof artifact generation is available as a local CLI utility for init/manifest review. It does not boot a VM and does not change the public microVM execution contract.
+Firecracker proof and execution artifact generation are available as local CLI utilities. They do not boot a VM; eligible Linux/KVM hosts must run the opt-in smoke test to prove real execution.
