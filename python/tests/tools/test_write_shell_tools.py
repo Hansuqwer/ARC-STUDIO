@@ -23,6 +23,8 @@ def test_write_file_tool_writes_inside_workspace(tmp_path, monkeypatch):
     )
     assert (tmp_path / "a.txt").read_text() == "hello"
     assert result.content["bytes_written"] == 5
+    assert result.content["summary"] == "wrote a.txt (5 bytes)"
+    assert "+hello" in result.content["diff"]
 
 
 def test_write_file_tool_denies_outside_and_symlink_escape(tmp_path, monkeypatch):
@@ -49,6 +51,9 @@ def test_edit_file_tool_applies_replacement(tmp_path, monkeypatch):
     )
     assert result.content["applied"] is True
     assert path.read_text(encoding="utf-8") == "hello new"
+    assert result.content["summary"] == "edited a.txt (1 replacement)"
+    assert "-hello old" in result.content["diff"]
+    assert "+hello new" in result.content["diff"]
 
 
 def test_edit_file_tool_errors_on_missing_old_string(tmp_path, monkeypatch):
@@ -68,6 +73,8 @@ def test_create_file_tool_creates_new_file(tmp_path, monkeypatch):
     )
     assert result.content["created"] is True
     assert (tmp_path / "new.txt").read_text(encoding="utf-8") == "x"
+    assert result.content["summary"] == "created new.txt (1 bytes)"
+    assert "+x" in result.content["diff"]
 
 
 def test_create_file_tool_errors_if_exists(tmp_path, monkeypatch):

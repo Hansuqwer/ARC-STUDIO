@@ -3,11 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from rich.console import Console
+
+from .. import __version__
 from ..runtime.mode import RuntimeMode
+from ..security.trust import resolve_trust
 from .session import ChatSession
 from .slash_commands import SlashCommandHandler
 
 HISTORY_FILE = Path.home() / ".arc" / "repl_history.txt"
+console = Console(highlight=False)
 
 
 def _load_history() -> list[str]:
@@ -45,14 +50,13 @@ def run_chat_repl(
             return
 
     history = _load_history()
-    welcome = f"ARC Studio - SwarmGraph Chat (session: {session.id[:12]}...)"
-    print(welcome)
-    print("Type /help for commands, /quit to exit.")
+    for line in _format_startup_banner(session):
+        console.print(line)
 
     try:
         while True:
             try:
-                user_input = input("> ").strip()
+                user_input = input(_format_prompt(session)).strip()
             except (EOFError, KeyboardInterrupt):
                 print()
                 break
@@ -182,6 +186,67 @@ def _configure_provider_default(session: ChatSession) -> None:
     session.metadata["provider"] = provider
 
 
+def _format_startup_banner(session: ChatSession, workspace: Path | None = None) -> list[str]:
+    ws = (workspace or Path.cwd()).resolve()
+    trust = _trust_label(ws)
+    provider = _provider_label(session)
+    model = str((session.metadata or {}).get("provider_model") or "unknown")
+    tools = "on" if session.tools_enabled else "off"
+    return [
+        f"ARC Studio v{__version__}",
+        "Run agents. See everything.",
+        f"workspace: {ws}",
+        (
+            "state: "
+            f"mode={session.mode} runtime={RuntimeMode.from_legacy(session.runtime_mode).value} "
+            f"provider={provider} model={model} trust={trust} sandbox=subprocess tools={tools} "
+            f"context={_context_label(session)}"
+        ),
+        "next: /status  /tools list  /context pack <task>  /agent <task>  /help",
+    ]
+
+
+def _format_prompt(session: ChatSession) -> str:
+    runtime = RuntimeMode.from_legacy(session.runtime_mode).value
+    provider = _provider_label(session)
+    tools = "on" if session.tools_enabled else "off"
+    return (
+        f"arc[{session.mode}|{runtime}|{provider}|tools:{tools}|ctx:{_context_short(session)}] > "
+    )
+
+
+def _provider_label(session: ChatSession) -> str:
+    metadata = session.metadata or {}
+    return str(metadata.get("provider") or "none")
+
+
+def _trust_label(workspace: Path) -> str:
+    try:
+        return resolve_trust(workspace).level.value
+    except Exception:  # noqa: BLE001 - startup/status must stay best-effort.
+        return "unknown"
+
+
+def _context_short(session: ChatSession) -> str:
+    context = (session.metadata or {}).get("last_context")
+    if not isinstance(context, dict) or not context.get("available"):
+        return "?"
+    pct = context.get("usage_pct")
+    return f"{pct}%" if pct is not None else "?"
+
+
+def _context_label(session: ChatSession) -> str:
+    context = (session.metadata or {}).get("last_context")
+    if not isinstance(context, dict) or not context.get("available"):
+        return "unknown"
+    used = context.get("used_tokens")
+    maximum = context.get("max_context_tokens")
+    pct = context.get("usage_pct")
+    if used is None or maximum is None or pct is None:
+        return "unknown"
+    return f"{pct}%({used}/{maximum})"
+
+
 def _result_text(result: Any) -> str:
     if result is None:
         return ""
@@ -193,6 +258,30 @@ def _result_text(result: Any) -> str:
 def _format_progress_event(name: str, payload: dict[str, Any]) -> str:
     if name == "run.started":
         return "[progress] run started"
+    if name == "turn.started":
+        return f"[agent] turn started ({payload.get('prompt_chars', 0)} chars)"
+    if name == "turn.completed":
+        return f"[agent] turn completed ({payload.get('content_chars', 0)} chars)"
+    if name == "turn.cancelled":
+        return f"[agent] turn cancelled: {payload.get('detail', 'cancelled')}"
+    if name == "tool.requested":
+        args = payload.get("args_preview") or "{}"
+        return f"[tool] {payload.get('tool', 'unknown')} args={args}"
+    if name == "tool.executed":
+        lines = [
+            f"[tool] {payload.get('tool', 'unknown')} ok trust={payload.get('trust', 'unknown')}"
+        ]
+        if payload.get("summary"):
+            lines.append(f"[tool] summary: {payload['summary']}")
+        if payload.get("diff"):
+            lines.extend(["[diff]", str(payload["diff"]).rstrip()])
+        return "\n".join(lines)
+    if name == "tool.result.blocked":
+        return (
+            f"[blocked] tool {payload.get('tool', 'unknown')}: {payload.get('reason', 'blocked')}"
+        )
+    if name.startswith("stream.chunk.delta") and payload.get("delta"):
+        return str(payload["delta"])
     if name.startswith("run.progress."):
         return f"[progress] {payload.get('stage') or name.removeprefix('run.progress.')}"
     if name == "run.completed":

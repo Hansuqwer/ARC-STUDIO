@@ -792,6 +792,7 @@ def _execute_agent(
     )
     loop = AgentLoop(manager, session)
     result = _run_coro_sync(loop.run(task, cancellation_token))
+    _store_context_metadata(session, capability, result.cost_summary)
     return CommandResult(
         state="degraded" if result.degraded else "present",
         output=result.content,
@@ -854,6 +855,8 @@ def cmd_help(_arg: str, _session: ChatSession) -> str:
     lines += [
         "",
         "━" * 48,
+        "Recommended entrypoint: arch-studio-cli (same REPL as arc studio chat).",
+        "Workflow: /status → /context pack <task> → /plan → /agent <task> → /test -- <cmd> → /diff.",
         "Type a message to query the SwarmGraph runner.",
         "Note: OpenCode/Claude Code style agent parity is a target, not yet achieved.",
     ]
@@ -1081,6 +1084,8 @@ def _execute_run(
         )
         cancellation_token.raise_if_cancelled()
         if runtime_mode is RuntimeMode.PROVIDER_BACKED:
+            client = _provider_client_for_run(runtime, session)
+            capability = client.capabilities() if hasattr(client, "capabilities") else None
             try:
                 _preflight_provider_backed_run(session, prompt, runtime)
             except (BudgetExceeded, ConfirmationRequired) as exc:
@@ -1103,6 +1108,18 @@ def _execute_run(
                 event_sink=event_sink,
                 runtime=runtime,
             )
+            if result.response is not None:
+                _store_context_metadata(
+                    session,
+                    capability,
+                    {
+                        "available": result.response.usage.available,
+                        "input_tokens": result.response.usage.input_tokens,
+                        "output_tokens": result.response.usage.output_tokens,
+                        "cache_creation_input_tokens": result.response.usage.cache_creation_input_tokens,
+                        "cache_read_input_tokens": result.response.usage.cache_read_input_tokens,
+                    },
+                )
             elapsed_ms = int((time.monotonic() - started) * 1000)
             _emit(
                 event_sink,
@@ -1169,6 +1186,28 @@ def _handle_run_context(args: list[str], ctx: Any) -> CommandResult:
         event_sink=ctx,
         runtime=getattr(ctx, "runtime", None),
     )
+
+
+def _store_context_metadata(session: Any, capability: Any, cost_summary: dict[str, Any]) -> None:
+    if not cost_summary.get("available"):
+        return
+    max_context = int(getattr(capability, "max_context_tokens", 0) or 0)
+    if max_context <= 0:
+        return
+    input_tokens = int(cost_summary.get("input_tokens") or 0)
+    cache_write = int(cost_summary.get("cache_creation_input_tokens") or 0)
+    cache_read = int(cost_summary.get("cache_read_input_tokens") or 0)
+    used = input_tokens + cache_write + cache_read
+    pct = round((used / max_context) * 100, 2) if max_context else None
+    metadata = getattr(session, "metadata", None)
+    if isinstance(metadata, dict):
+        metadata["last_context"] = {
+            "available": True,
+            "used_tokens": used,
+            "max_context_tokens": max_context,
+            "usage_pct": pct,
+            "source": "provider_usage",
+        }
 
 
 def cmd_summary(_arg: str, session: ChatSession) -> str:
@@ -1318,9 +1357,13 @@ def cmd_tools(arg: str, session: ChatSession) -> str:
     if subcommand == "list":
         allowed = session.available_tools or all_tools
         lines = [f"Tools enabled: {session.tools_enabled}", "Available tools:"]
+        handlers = {handler.name: handler for handler in registry.all_handlers()}
         for name in all_tools:
             marker = "enabled" if name in allowed else "disabled"
-            lines.append(f"  {name} ({marker})")
+            handler = handlers.get(name)
+            trust = getattr(handler, "output_trust_level", "unknown")
+            kind = _tool_kind(name)
+            lines.append(f"  {name} ({marker}, {kind}, trust={trust})")
         return "\n".join(lines)
     if subcommand == "enable":
         if len(parts) > 1:
@@ -1341,6 +1384,16 @@ def cmd_tools(arg: str, session: ChatSession) -> str:
             return f"Disabled tools: {', '.join(parts[1:])}"
         return "Tools disabled."
     return "Usage: /tools list|enable [tool ...]|disable [tool ...]"
+
+
+def _tool_kind(name: str) -> str:
+    if name in {"read_file", "list_directory", "get_current_time"}:
+        return "read"
+    if name in {"write_file", "edit_file", "create_file"}:
+        return "write"
+    if name == "bash":
+        return "shell"
+    return "tool"
 
 
 def _render_adapter_result(result: SlashAdapterResult) -> CommandResult:
@@ -1449,8 +1502,12 @@ def _sandbox_run_with_approval(
     ):
         cmd_display = " ".join(command)
         prompt_text = (
-            f"Command requires approval: {cmd_display}\n"
+            "Sandbox approval required\n"
+            f"Command: {cmd_display}\n"
+            f"Policy: {policy.name}\n"
             f"Classification: {decision.classification.value}\n"
+            f"Reason: {decision.reason}\n"
+            "Default: deny. Destructive and privileged commands remain hard-denied.\n"
             "Approve? [y/N] "
         )
         if confirm_fn is not None:
@@ -1870,7 +1927,17 @@ class SlashCommandHandler:
         self.events.append((name, copied))
         if self.progress_sink and (
             name.startswith("run.progress.")
+            or name.startswith("stream.chunk.")
             or name in {"run.started", "run.completed", "run.cancelled"}
+            or name
+            in {
+                "turn.started",
+                "turn.completed",
+                "turn.cancelled",
+                "tool.requested",
+                "tool.executed",
+                "tool.result.blocked",
+            }
         ):
             self.progress_sink(name, dict(copied))
 

@@ -187,6 +187,8 @@ class TestSlashCommands:
             "mcp",
         ]:
             assert group in result_lower, f"Group missing from /help output: {group}"
+        assert "Recommended entrypoint: arch-studio-cli" in result
+        assert "Workflow: /status" in result
 
     def test_clear(self):
         handler = SlashCommandHandler()
@@ -340,9 +342,10 @@ class TestSlashCommands:
         result = handler.handle("/tools list", s)
         assert result is not None
         assert "Tools enabled: False" in result
-        assert "read_file" in result
-        assert "list_directory" in result
-        assert "get_current_time" in result
+        assert "read_file (enabled, read, trust=untrusted)" in result
+        assert "list_directory (enabled, read, trust=untrusted)" in result
+        assert "get_current_time (enabled, read, trust=trusted)" in result
+        assert "bash (enabled, shell, trust=untrusted)" in result
 
     def test_tools_enable_all(self):
         handler = SlashCommandHandler()
@@ -409,6 +412,8 @@ class TestSlashCommands:
         assert calls[0]["provider_id"] == "anthropic"
         assert calls[0]["request_messages"] == [{"role": "user", "content": "hello"}]
         assert provider.complete_requests
+        assert s.metadata["last_context"]["source"] == "provider_usage"
+        assert s.metadata["last_context"]["used_tokens"] == 1
 
     def test_provider_backed_run_uses_turn_manager_not_swarmgraph(self, monkeypatch):
         monkeypatch.setenv("ARC_ALLOW_RUN", "1")
@@ -639,7 +644,45 @@ class TestMergedSlashCommands:
         result = handler.handle("/status", s)
         assert result is not None
         assert "Workspace" in result
+        assert "Trust:" in result
         assert "BUILD" in result
+        assert "Provider: none" in result
+        assert "Sandbox: subprocess (microvm preflight-only)" in result
+        assert "Context: unknown" in result
+
+    def test_startup_banner_and_prompt_show_state(self, tmp_path):
+        from agent_runtime_cockpit.cli_repl.chat_repl import _format_prompt, _format_startup_banner
+
+        s = ChatSession(tools_enabled=True, metadata={"provider": "anthropic"})
+        banner = "\n".join(_format_startup_banner(s, workspace=tmp_path))
+        assert "ARC Studio v" in banner
+        assert "workspace:" in banner
+        assert "provider=anthropic" in banner
+        assert "sandbox=subprocess" in banner
+        assert "/agent <task>" in banner
+
+        prompt = _format_prompt(s)
+        assert prompt.startswith("arc[")
+        assert "build|fake|anthropic|tools:on|ctx:?" in prompt
+
+    def test_prompt_and_status_show_real_context_metadata(self, tmp_path):
+        from agent_runtime_cockpit.cli_repl.chat_repl import _format_prompt
+        from agent_runtime_cockpit.cli_repl.adapters import render_status
+
+        s = ChatSession(
+            metadata={
+                "last_context": {
+                    "available": True,
+                    "used_tokens": 100,
+                    "max_context_tokens": 1000,
+                    "usage_pct": 10.0,
+                    "source": "provider_usage",
+                }
+            }
+        )
+        assert "ctx:10.0%" in _format_prompt(s)
+        status = render_status(s, tmp_path)
+        assert "Context: 10.0% (100/1000 tokens, source=provider_usage)" in status.text
 
     def test_doctor_runs_checks(self):
         handler = SlashCommandHandler()
@@ -905,6 +948,67 @@ class TestMergedSlashCommands:
             _format_progress_event("run.cancelled", {"reason": "user"})
             == "[progress] run cancelled: user"
         )
+        assert (
+            _format_progress_event("turn.started", {"prompt_chars": 5})
+            == "[agent] turn started (5 chars)"
+        )
+        assert (
+            _format_progress_event(
+                "tool.requested", {"tool": "bash", "args_preview": "{'command': 'ls'}"}
+            )
+            == "[tool] bash args={'command': 'ls'}"
+        )
+        rendered = _format_progress_event(
+            "tool.executed",
+            {
+                "tool": "edit_file",
+                "trust": "untrusted",
+                "summary": "edited a.txt",
+                "diff": "--- a\n+++ b",
+            },
+        )
+        assert "[tool] edit_file ok trust=untrusted" in rendered
+        assert "[diff]" in rendered
+        assert "--- a" in rendered
+        assert (
+            _format_progress_event(
+                "tool.result.blocked", {"tool": "bash", "reason": "network denied"}
+            )
+            == "[blocked] tool bash: network denied"
+        )
+
+    def test_sandbox_approval_prompt_is_actionable(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        prompts: list[str] = []
+
+        def deny(prompt: str) -> bool:
+            prompts.append(prompt)
+            return False
+
+        result = slash_commands._sandbox_run_with_approval(
+            "run -- curl https://example.com", confirm_fn=deny
+        )
+        assert result.state == "denied"
+        assert prompts
+        assert "Sandbox approval required" in prompts[0]
+        assert "Policy: local-safe" in prompts[0]
+        assert "Default: deny" in prompts[0]
+
+    def test_handler_streams_real_agent_tool_events_to_progress_sink(self):
+        progress: list[tuple[str, dict[str, Any]]] = []
+        handler = SlashCommandHandler(
+            progress_sink=lambda name, payload: progress.append((name, payload))
+        )
+        handler.emit_event(
+            "tool.requested", {"tool": "read_file", "args_preview": "{'path': 'a.txt'}"}
+        )
+        handler.emit_event("tool.executed", {"tool": "read_file", "summary": "read a.txt"})
+        handler.emit_event("tool.result.blocked", {"tool": "bash", "reason": "network denied"})
+        assert [name for name, _payload in progress] == [
+            "tool.requested",
+            "tool.executed",
+            "tool.result.blocked",
+        ]
 
 
 class TestCommandRegistry:

@@ -15,6 +15,7 @@ from typing import Any
 from ..isolation.microvm import MicroVMIsolationProvider
 from ..isolation.subprocess import SubprocessIsolationProvider
 from ..runtime.mode import RuntimeMode
+from ..security.trust import resolve_trust
 from ..security.sandbox import (
     SandboxResult,
     build_audit_event,
@@ -265,12 +266,26 @@ def render_status(session: Any, workspace: Path | None = None) -> SlashAdapterRe
     traces = ws / ".arc" / "traces"
     run_count = len(list(traces.glob("*.jsonl"))) if traces.exists() else 0
     runtime = RuntimeMode.from_legacy(getattr(session, "runtime_mode", "fake")).value
+    metadata = getattr(session, "metadata", {}) or {}
+    provider = str(metadata.get("provider") or "none")
+    model = str(metadata.get("provider_model") or "unknown")
+    tools_enabled = bool(getattr(session, "tools_enabled", False))
+    available_tools = getattr(session, "available_tools", None)
+    trust = _trust_state(ws)
+    context_label = _context_label(metadata)
     lines = [
         f"Workspace: {ws}",
+        f"Trust: {trust}",
         f"Mode: {getattr(session, 'mode', 'build').upper()}",
         f"Runtime: {runtime}",
+        f"Provider: {provider}",
+        f"Model: {model}",
         f"Profile: {getattr(session, 'profile_id', 'default')}",
         f"Isolation: {getattr(session, 'isolation_id', 'none')}",
+        "Sandbox: subprocess (microvm preflight-only)",
+        f"Tools: {'on' if tools_enabled else 'off'}",
+        "Tool scope: " + ("all" if available_tools is None else ", ".join(available_tools)),
+        f"Context: {context_label}",
         f"Session: {getattr(session, 'id', 'unknown')[:12]}",
         f"Messages: {len(getattr(session, 'history', []))}",
         f"Stored runs: {run_count}",
@@ -278,8 +293,38 @@ def render_status(session: Any, workspace: Path | None = None) -> SlashAdapterRe
     return SlashAdapterResult(
         state="present",
         text="\n".join(lines),
-        data={"workspace": str(ws), "runtime": runtime, "stored_runs": run_count},
+        data={
+            "workspace": str(ws),
+            "trust": trust,
+            "runtime": runtime,
+            "provider": provider,
+            "model": model,
+            "sandbox": "subprocess",
+            "microvm": "preflight-only",
+            "tools_enabled": tools_enabled,
+            "context_usage": metadata.get("last_context") or "unknown",
+            "stored_runs": run_count,
+        },
     )
+
+
+def _trust_state(workspace: Path) -> str:
+    try:
+        return resolve_trust(workspace).level.value
+    except Exception:  # noqa: BLE001 - status must not fail on trust DB issues.
+        return "unknown"
+
+
+def _context_label(metadata: dict[str, Any]) -> str:
+    context = metadata.get("last_context")
+    if not isinstance(context, dict) or not context.get("available"):
+        return "unknown (provider token metadata unavailable)"
+    used = context.get("used_tokens")
+    maximum = context.get("max_context_tokens")
+    pct = context.get("usage_pct")
+    if used is None or maximum is None or pct is None:
+        return "unknown (provider token metadata incomplete)"
+    return f"{pct}% ({used}/{maximum} tokens, source={context.get('source', 'unknown')})"
 
 
 def render_doctor_summary(workspace: Path | None = None) -> SlashAdapterResult:

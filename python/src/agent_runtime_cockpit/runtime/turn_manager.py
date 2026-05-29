@@ -211,19 +211,31 @@ class TurnManager:
                 cancellation_token.raise_if_cancelled()
                 tool_name = str(tool_call.get("name") or tool_call.get("tool_name") or "")
                 args_payload = tool_call.get("args") or tool_call.get("input") or {}
+                args_preview = _preview_tool_args(args_payload)
                 handler = self._tool_registry.get(tool_name)
                 if handler is None:
                     wrapped = (
                         f'<tool_result trust="blocked" tool="{tool_name}" reason="unknown_tool"/>'
                     )
-                    self._emit("tool.result.blocked", {"tool": tool_name, "reason": "unknown_tool"})
+                    self._emit(
+                        "tool.result.blocked",
+                        {"tool": tool_name, "reason": "unknown_tool", "args_preview": args_preview},
+                    )
                 elif not self._tool_allowed(session, tool_name):
                     wrapped = f'<tool_result trust="blocked" tool="{tool_name}" reason="tool_not_allowed"/>'
                     self._emit(
-                        "tool.result.blocked", {"tool": tool_name, "reason": "tool_not_allowed"}
+                        "tool.result.blocked",
+                        {
+                            "tool": tool_name,
+                            "reason": "tool_not_allowed",
+                            "args_preview": args_preview,
+                        },
                     )
                 else:
-                    self._emit("tool.requested", {"tool": tool_name, "iteration": iteration})
+                    self._emit(
+                        "tool.requested",
+                        {"tool": tool_name, "iteration": iteration, "args_preview": args_preview},
+                    )
                     args = handler.args_schema.model_validate(args_payload)
                     result = handler.execute(args, cancellation_token)
                     detections = (
@@ -235,7 +247,11 @@ class TurnManager:
                         wrapped = f'<tool_result trust="blocked" tool="{tool_name}" reason="injection_detected"/>'
                         self._emit(
                             "tool.result.blocked",
-                            {"tool": tool_name, "reason": "injection_detected"},
+                            {
+                                "tool": tool_name,
+                                "reason": "injection_detected",
+                                "args_preview": args_preview,
+                            },
                         )
                     else:
                         wrapped = wrap_tool_result(tool_name, handler.output_trust_level, result)
@@ -245,6 +261,8 @@ class TurnManager:
                                 "tool": tool_name,
                                 "iteration": iteration,
                                 "trust": handler.output_trust_level,
+                                "args_preview": args_preview,
+                                **_tool_result_event_payload(result.content),
                             },
                         )
                 session.history.append({"role": "tool", "content": wrapped})
@@ -261,3 +279,28 @@ class TurnManager:
     def _emit(self, name: str, payload: dict[str, Any]) -> None:
         if self._event_sink is not None:
             self._event_sink(name, payload)
+
+
+def _preview_tool_args(args_payload: Any, max_chars: int = 240) -> str:
+    text = str(args_payload)
+    if len(text) > max_chars:
+        return text[:max_chars] + "...[truncated]"
+    return text
+
+
+def _tool_result_event_payload(content: Any) -> dict[str, Any]:
+    if isinstance(content, dict):
+        payload: dict[str, Any] = {}
+        summary = content.get("summary")
+        if isinstance(summary, str):
+            payload["summary"] = summary
+        diff = content.get("diff")
+        if isinstance(diff, str) and diff:
+            payload["diff"] = diff
+        for key in ("path", "exit_code", "timed_out", "classification", "allowed"):
+            if key in content:
+                payload[key] = content[key]
+        if not payload:
+            payload["summary"] = _preview_tool_args(content)
+        return payload
+    return {"summary": _preview_tool_args(content)}

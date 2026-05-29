@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,8 @@ from agent_runtime_cockpit.security.sandbox import (
 )
 from agent_runtime_cockpit.security.trust import TRUST_DB, ensure_trusted
 from agent_runtime_cockpit.tools.protocol import ToolResult
+
+DIFF_MAX_CHARS = 12_000
 
 
 class WriteFileArgs(BaseModel):
@@ -71,6 +74,37 @@ def _persist_write_audit(tool: str, path: Path, allowed: bool, reason: str = "")
         return
 
 
+def _text_diff(old: str, new: str, rel_path: str) -> str:
+    diff = "".join(
+        difflib.unified_diff(
+            old.splitlines(keepends=True),
+            new.splitlines(keepends=True),
+            fromfile=f"a/{rel_path}",
+            tofile=f"b/{rel_path}",
+            lineterm="",
+        )
+    )
+    if len(diff) > DIFF_MAX_CHARS:
+        return diff[:DIFF_MAX_CHARS] + "\n[diff truncated]"
+    return diff
+
+
+def _relative(path: Path, workspace_root: Path) -> str:
+    try:
+        return str(path.relative_to(workspace_root))
+    except ValueError:
+        return str(path)
+
+
+def _read_existing_text(path: Path) -> str:
+    if not path.exists():
+        return ""
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return ""
+
+
 class WriteFileTool:
     """Write complete content to a workspace file."""
 
@@ -89,11 +123,20 @@ class WriteFileTool:
         try:
             ensure_trusted(self.workspace_root, trust_db=self.trust_db, allow_if_no_db=True)
             path = _resolve_workspace_path(args.path, self.workspace_root)
+            old = _read_existing_text(path)
+            rel = _relative(path, self.workspace_root)
             path.parent.mkdir(parents=True, exist_ok=True)
             data = args.content.encode("utf-8")
             path.write_bytes(data)
             _persist_write_audit(self.name, path, True)
-            return ToolResult(content={"path": str(path), "bytes_written": len(data)})
+            return ToolResult(
+                content={
+                    "path": str(path),
+                    "bytes_written": len(data),
+                    "summary": f"wrote {rel} ({len(data)} bytes)",
+                    "diff": _text_diff(old, args.content, rel),
+                }
+            )
         except Exception as exc:  # noqa: BLE001 - tool errors are returned to model.
             _persist_write_audit(self.name, self.workspace_root / args.path, False, str(exc))
             return ToolResult(content={"error": str(exc), "path": args.path})
@@ -119,13 +162,22 @@ class EditFileTool:
             if not args.old_string:
                 raise ValueError("old_string must not be empty")
             path = _resolve_workspace_path(args.path, self.workspace_root)
+            rel = _relative(path, self.workspace_root)
             text = path.read_text(encoding="utf-8")
             count = text.count(args.old_string)
             if count != 1:
                 raise ValueError(f"old_string must occur exactly once; found {count}")
-            path.write_text(text.replace(args.old_string, args.new_string, 1), encoding="utf-8")
+            new_text = text.replace(args.old_string, args.new_string, 1)
+            path.write_text(new_text, encoding="utf-8")
             _persist_write_audit(self.name, path, True)
-            return ToolResult(content={"path": str(path), "applied": True})
+            return ToolResult(
+                content={
+                    "path": str(path),
+                    "applied": True,
+                    "summary": f"edited {rel} (1 replacement)",
+                    "diff": _text_diff(text, new_text, rel),
+                }
+            )
         except Exception as exc:  # noqa: BLE001
             _persist_write_audit(self.name, self.workspace_root / args.path, False, str(exc))
             return ToolResult(content={"error": str(exc), "path": args.path, "applied": False})
@@ -149,12 +201,20 @@ class CreateFileTool:
         try:
             ensure_trusted(self.workspace_root, trust_db=self.trust_db, allow_if_no_db=True)
             path = _resolve_workspace_path(args.path, self.workspace_root)
+            rel = _relative(path, self.workspace_root)
             if path.exists():
                 raise ValueError(f"file already exists: {args.path}")
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(args.content, encoding="utf-8")
             _persist_write_audit(self.name, path, True)
-            return ToolResult(content={"path": str(path), "created": True})
+            return ToolResult(
+                content={
+                    "path": str(path),
+                    "created": True,
+                    "summary": f"created {rel} ({len(args.content.encode('utf-8'))} bytes)",
+                    "diff": _text_diff("", args.content, rel),
+                }
+            )
         except Exception as exc:  # noqa: BLE001
             _persist_write_audit(self.name, self.workspace_root / args.path, False, str(exc))
             return ToolResult(content={"error": str(exc), "path": args.path, "created": False})

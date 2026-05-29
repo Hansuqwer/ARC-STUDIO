@@ -191,6 +191,10 @@ async def test_run_turn_executes_single_tool_roundtrip() -> None:
         "tool.executed",
         "turn.completed",
     ]
+    requested = next(event.payload for event in events if event.name == "tool.requested")
+    executed = next(event.payload for event in events if event.name == "tool.executed")
+    assert requested["args_preview"] == "{}"
+    assert executed["summary"]
     assert [message["role"] for message in session.history] == ["user", "tool", "assistant"]
     assert 'trust="trusted" tool="get_current_time"' in session.history[1]["content"]
     assert len(provider.complete_requests) == 2
@@ -237,6 +241,8 @@ async def test_run_turn_blocks_tool_not_in_allowlist() -> None:
         "tool.result.blocked",
         "turn.completed",
     ]
+    blocked = next(event.payload for event in events if event.name == "tool.result.blocked")
+    assert blocked["args_preview"] == "{}"
 
 
 @pytest.mark.asyncio
