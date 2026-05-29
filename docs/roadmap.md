@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-28 — R60 saved edit-plan apply flow added after R59 staleness guard.
-**Current evidence anchor:** local worktree | R60: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3350 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
+**Last reality refresh:** 2026-05-29 — R61 edit bundle/approval bridge added after R60 saved-plan apply flow.
+**Current evidence anchor:** local worktree | R61: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3358 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -1012,6 +1012,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R58 Tool Runtime Unification** | **Baseline Complete** | **Phase 87 — shared registered-tool execution wrapper validates args and trust-wraps output; provider turn manager unchanged** |
 | **R59 Edit Preview Staleness Guard** | **Baseline Complete** | **Phase 88 — edit plans expose file/replacement hashes; apply can deny stale preview hashes before writing** |
 | **R60 Saved Edit Plan Apply Flow** | **Baseline Complete** | **Phase 89 — edit plans persist safe metadata; apply by `--plan-id` checks original/replacement hashes before writing** |
+| **R61 Edit Bundle Approval Bridge** | **Baseline Complete** | **Phase 90 — multi-file edit bundles, scoped approval token, list/show bridge, narrow patch mode, and saved edit-plan review provenance; no autonomous coding-agent parity claim** |
 
 **Post-v0.1 Execution Order:** 
 - **Priority 1 stop-the-line:** R39 / Phase 41 (Interactive CLI/UX Foundation). **Baseline Complete** as of Phases 41–45 (commits 37fd92b–7fdba99). Gate lifted. R44 (Phase 46 CLI write bridge + Phase 47 daemon HTTP write bridge) is now Baseline Complete. Continue sandbox hardening for Phase 37 microVM feasibility decision.
@@ -1307,3 +1308,11 @@ The following roadmap items implement the adapter integration plan from `docs/re
 **Current:** Baseline Complete. `arc edit plan` persists safe metadata under `.arc/edit-plans/<plan_id>.json` and returns `plan_path`. `arc edit apply --plan-id <id> --content <text> --approve` loads the plan, denies replacement-content hash drift, uses the saved original hash for staleness checking, and writes only when both hashes still match. REPL `/edit apply --plan-id` uses the same helper.
 
 **Status:** Baseline Complete | Evidence: local worktree; `cd python && uv run pytest tests/test_cli_edit_loop.py -q` 11 passed; ruff clean for changed Python files | Notes: Saved plans are local workspace artifacts only; no collaborative approval server or reviewer identity claim.
+
+## R61 — Edit Bundle Approval Bridge
+
+**Goal:** Extend the safe edit-loop foundation with multi-file bundles and approval/review bridge surfaces without claiming autonomous Claude Code/OpenCode parity.
+
+**Current:** Baseline Complete. `arc edit plan/apply --edit path=text` supports multi-file bundles with per-file original/replacement hashes. Bundle apply is decision-atomic: if any planned file is stale or mismatched, no file is written. `arc edit list`, `arc edit show`, and `arc edit approve` expose saved safe plan metadata and scoped token approval for IDE/CLI bridge use. `--patch` supports a narrow single-file unified-diff parser that fails closed and does not shell out. `arc review summarize` can include saved edit-plan provenance where plan records exist.
+
+**Status:** Baseline Complete | Evidence: local worktree; targeted `cd python && uv run pytest tests/test_cli_edit_loop.py tests/security/test_review_evidence.py -q` 31 passed; targeted ruff clean | Notes: Real scope is local CLI/REPL edit planning/apply, metadata-only plan records, scoped local approvals, narrow patch mode, and review provenance. Not real: autonomous coding-agent parity, general patch engine, IDE UI, collaborative approval server, or reviewer identity.

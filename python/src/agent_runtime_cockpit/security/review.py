@@ -29,6 +29,7 @@ class ProvenanceSource(str, Enum):
     EVAL_RESULT = "eval_result"
     TEST_RESULT = "test_result"
     PLAN_STEP = "plan_step"
+    EDIT_PLAN = "edit_plan"
     UNKNOWN = "unknown"
     MANUAL = "manual"
 

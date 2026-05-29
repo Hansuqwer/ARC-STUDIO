@@ -142,6 +142,32 @@ def review_summarize(
     except Exception:
         missing_producers.append("eval")
 
+    # Check saved edit plans
+    try:
+        from ..security.edit_loop import list_edit_plan_records
+
+        edit_plans = list_edit_plan_records(Path.cwd(), limit=10)
+        if edit_plans:
+            available_producers.append("edit_plan")
+            for plan in edit_plans:
+                for file_plan in plan.files:
+                    provenance_items.append(
+                        HunkProvenance(
+                            file_path=file_plan.path,
+                            source=ProvenanceSource.EDIT_PLAN,
+                            source_approval_id=plan.plan_id,
+                            classification=file_plan.classification,
+                            policy_name=plan.policy,
+                            decision_allowed=file_plan.allowed,
+                            reason=file_plan.reason,
+                            detail=f"edit plan {plan.plan_id}",
+                        )
+                    )
+        else:
+            missing_producers.append("edit_plan")
+    except Exception:
+        missing_producers.append("edit_plan")
+
     # Build summary
     header = build_review_summary(
         run_id=run_id or "(workspace)",

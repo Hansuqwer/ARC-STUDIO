@@ -414,7 +414,7 @@ def _build_registry():
     registry.register(
         CommandDef(
             name="edit",
-            help_text="Safety-gated edit loop: /edit plan|apply --path P --content TEXT",
+            help_text="Safety-gated edit loop: /edit plan|apply|approve",
             category="workspace",
             handler=cmd_edit,
             gates_required=[],
@@ -423,8 +423,8 @@ def _build_registry():
             requires_events=[],
             privileged=False,
             trust_required="workspace",
-            usage="/edit plan|apply --path PATH --content TEXT [--approve]",
-            subcommands=["plan", "apply"],
+            usage="/edit plan|apply --path PATH --content TEXT [--approve] | approve <plan-id> <token>",
+            subcommands=["plan", "apply", "approve"],
         )
     )
     registry.register(
@@ -1409,9 +1409,29 @@ def cmd_edit(arg: str, _session: ChatSession) -> CommandResult:
         return _render_adapter_result(render_edit_plan(rest))
     if subcommand == "apply":
         return _render_adapter_result(render_edit_apply(rest))
+    if subcommand == "approve":
+        parts = rest.split(maxsplit=1)
+        if len(parts) != 2:
+            return CommandResult(
+                state="blocked",
+                output="Usage: /edit approve <plan-id> <token>",
+                reason="invalid_usage",
+            )
+        try:
+            from pathlib import Path
+            from ..security.edit_loop import approve_edit_plan
+
+            approval = approve_edit_plan(Path.cwd(), parts[0], parts[1])
+        except (OSError, ValueError) as exc:
+            return CommandResult(state="blocked", output=f"Blocked: {exc}")
+        return CommandResult(
+            state="present",
+            output=f"Edit plan approved: {approval.plan_id}",
+            metadata=approval.model_dump(mode="json"),
+        )
     return CommandResult(
         state="blocked",
-        output="Usage: /edit plan|apply --path PATH --content TEXT [--approve]",
+        output="Usage: /edit plan|apply --path PATH --content TEXT [--approve] | approve <plan-id> <token>",
         reason="invalid_usage",
     )
 

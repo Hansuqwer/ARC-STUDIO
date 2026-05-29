@@ -99,6 +99,7 @@ class TestReviewEvidenceModels:
         assert ProvenanceSource.UNKNOWN.value == "unknown"
         assert ProvenanceSource.MANUAL.value == "manual"
         assert ProvenanceSource.PLAN_STEP.value == "plan_step"
+        assert ProvenanceSource.EDIT_PLAN.value == "edit_plan"
 
     def test_no_fabricated_data(self) -> None:
         """Missing producers must render explicit absent/unknown states."""
@@ -162,3 +163,28 @@ class TestReviewCli:
         assert len(plan_items) >= 1
         assert plan_items[0]["classification"] == "destructive"
         assert plan_items[0]["decision_allowed"] is False
+
+    def test_review_summarize_includes_edit_plan(self, tmp_path, monkeypatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "note.txt").write_text("old\n", encoding="utf-8")
+        plan = runner.invoke(
+            app, ["edit", "plan", "--json", "--path", "note.txt", "--content", "new\n"]
+        )
+        assert plan.exit_code == 0, plan.output
+
+        result = runner.invoke(app, ["review", "summarize", "--json", "--run-id", "r-edit"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)["data"]
+        assert "edit_plan" in data["producers_available"]
+        edit_items = [p for p in data["provenance"] if p["source"] == "edit_plan"]
+        assert edit_items
+        assert edit_items[0]["file_path"] == "note.txt"
+        assert edit_items[0]["classification"] == "writes_workspace"
+
+    def test_review_summarize_marks_edit_plan_missing(self, tmp_path, monkeypatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(app, ["review", "summarize", "--json", "--run-id", "r-empty"])
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)["data"]
+        assert "edit_plan" in data["producers_missing"]

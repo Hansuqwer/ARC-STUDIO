@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-28 — Phase 89 saved edit-plan apply flow added after Phase 88 staleness guard.
-**Current evidence anchor:** local worktree | Phase 89: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3350 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
+**Last reality refresh:** 2026-05-29 — Phase 90 edit bundle/approval bridge added after Phase 89 saved-plan apply flow.
+**Current evidence anchor:** local worktree | Phase 90: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3358 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -4037,3 +4037,38 @@ cd python && uv run ruff check src tests/test_cli_edit_loop.py
 
 ### Known Risks
 - Saved plans are local workspace artifacts only; there is no collaborative approval server or signed reviewer identity.
+
+## Phase 90 — Edit Bundle Approval Bridge
+
+**Roadmap:** CLI/UX continuation slice 90
+**Status:** Baseline Complete | Evidence: local worktree; targeted `cd python && uv run pytest tests/test_cli_edit_loop.py tests/security/test_review_evidence.py -q` 31 passed; targeted ruff clean
+**Depends on:** Phase 89 (saved edit-plan apply flow)
+
+### Implementation
+1. `EditPlan.files[]` and `EditFilePlan` add per-file command, original hash, replacement hash or patch hash, decision, classification, and diff metadata.
+2. `arc edit plan/apply --edit path=text` supports multi-file bundles. Apply validates all planned file hashes before any write and writes none if one file is stale.
+3. `arc edit list`, `arc edit show`, and `arc edit approve` provide saved-plan bridge surfaces with metadata-only records and scoped approval-token hashes.
+4. `arc edit plan/apply --path <file> --patch <unified-diff>` supports a narrow single-file unified diff parser that fails closed and does not shell out.
+5. REPL `/edit approve <plan-id> <token>` writes the same scoped approval record.
+6. Review provenance adds `edit_plan` source items from saved plan records when present.
+
+### Acceptance
+1. ✅ Multi-file plans preview without writing.
+2. ✅ Multi-file apply writes all files after approval when hashes match.
+3. ✅ Multi-file apply writes no files when one planned file is stale.
+4. ✅ Saved plan list/show returns metadata without replacement content or diffs.
+5. ✅ Scoped approval token can authorize the exact saved plan metadata.
+6. ✅ Narrow patch mode applies a simple valid diff and rejects malformed/path-escape input.
+7. ✅ Review summarize reports saved edit-plan provenance only when real plan records exist.
+
+### Verification
+```bash
+cd python && uv run pytest tests/test_cli_edit_loop.py tests/security/test_review_evidence.py -q
+cd python && uv run ruff check src tests/test_cli_edit_loop.py tests/security/test_review_evidence.py
+```
+
+### Known Risks
+- Patch mode is intentionally narrow; it is not a general patch engine and does not preserve every unified-diff edge case.
+- Bridge surfaces are CLI/REPL only; no IDE UI is claimed.
+- Local approval tokens are scoped metadata gates, not signed reviewer identity or collaborative approval.
+- This remains a deterministic local edit loop, not autonomous multi-file Claude Code/OpenCode parity.
