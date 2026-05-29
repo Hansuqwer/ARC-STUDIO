@@ -76,6 +76,8 @@ import {
     CiCheckStatus,
     SandboxInspectResult,
     EditPlanApprovalResult,
+    EditPlanApplyResult,
+    EditPlanDiffResult,
     EditPlanInfo,
     EditPlanListResult,
 } from '../common/arc-protocol';
@@ -1147,5 +1149,13 @@ export class ArcBackendService implements ArcService {
 
     async approveEditPlan(planId: string, token: string): Promise<EditPlanApprovalResult> {
         return this.editPlanBridgeService.approveEditPlan(planId, token);
+    }
+
+    async diffEditPlan(planId: string, maxBytes?: number): Promise<EditPlanDiffResult> {
+        return this.editPlanBridgeService.diffEditPlan(planId, maxBytes);
+    }
+
+    async applyEditPlan(planId: string, content: string, token: string): Promise<EditPlanApplyResult> {
+        return this.editPlanBridgeService.applyEditPlan(planId, content, token);
     }
 }

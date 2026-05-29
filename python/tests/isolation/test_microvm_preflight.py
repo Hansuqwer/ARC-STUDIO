@@ -263,14 +263,27 @@ class TestMicroVMPreflightCI:
         data = microvm_preflight("Darwin")
         assert data["runtime"] == "lima-vz"
         assert data["strict_network_isolation"] is False
+        assert data["strict_no_network_proof"] == "blocked"
+        assert data["p2_status"] == "blocked"
+        assert data["guest_network_default"] == "present_by_lima_slirp"
         assert data["security_posture"] == "low_security_network_present"
         assert "network" in data["network_reason"]
+        assert "containerd disabled" in data["template_hardening"]
+        assert "hostResolver disabled" in data["template_hardening"]
 
     def test_lima_template_labels_low_security_network_posture(self, tmp_path):
         template = render_lima_template(tmp_path, "arc-test")
         assert "Low-security harness only" in template
         assert "strict network isolation is not proven" in template
         assert "Does not prove no default Lima user-mode/slirp route" in template
+        assert "mountType: virtiofs" in template
+        assert "containerd:" in template
+        assert "system: false" in template
+        assert "user: false" in template
+        assert "hostResolver:" in template
+        assert "enabled: false" in template
+        assert "propagateProxyEnv: false" in template
+        assert "forwardAgent: false" in template
 
 
 class TestMicroVMRunPlan:
@@ -361,7 +374,14 @@ class TestLimaIntegrationHarness:
         assert result.network_proof_passed is True
         assert result.teardown_attempted is True
         assert result.lifecycle == ["template", "start", "network_proof", "run", "teardown"]
-        assert calls[0][:3] == ["limactl", "start", "--tty=false"]
+        assert calls[0] == [
+            "limactl",
+            "start",
+            "--tty=false",
+            "--name",
+            "arc-test",
+            calls[0][-1],
+        ]
         assert calls[1] == [
             "limactl",
             "shell",

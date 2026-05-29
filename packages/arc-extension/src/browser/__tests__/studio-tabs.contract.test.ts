@@ -73,11 +73,13 @@ describe('Studio Tabs Contracts', () => {
             source = await fs.readFile(path.join(tabsDir, 'EditPlansTab.tsx'), 'utf-8');
         });
 
-        it('should use metadata-only edit plan bridge methods', () => {
+        it('should use real diff/apply edit plan bridge methods', () => {
             expect(source).toMatch(/listEditPlans/);
             expect(source).toMatch(/showEditPlan/);
             expect(source).toMatch(/approveEditPlan/);
-            expect(source).toMatch(/Replacement content and full diffs are not persisted/);
+            expect(source).toMatch(/diffEditPlan/);
+            expect(source).toMatch(/applyEditPlan/);
+            expect(source).toMatch(/Python sandbox and ARC transaction gates/);
         });
     });
 

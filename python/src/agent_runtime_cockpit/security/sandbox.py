@@ -142,6 +142,8 @@ INSTALL_COMMANDS = {
     "dnf",
     "yum",
 }
+SAFE_CI_PACKAGE_SCRIPTS = {"build", "check", "check:pr", "lint", "test", "typecheck"}
+SAFE_CI_UV_TOOLS = {"pytest", "ruff", "mypy"}
 DESTRUCTIVE_COMMANDS = {"rm", "rmdir", "mv", "dd", "mkfs", "truncate", "shred"}
 PRIVILEGED_COMMANDS = {
     "sudo",
@@ -252,6 +254,14 @@ def classify_command(command: list[str]) -> CommandClassification:
         install_markers = {"i", "install", "add", "update", "upgrade", "sync"}
         if exe in {"brew", "apt", "apt-get", "dnf", "yum"} or install_markers.intersection(args):
             return CommandClassification.INSTALL
+        if exe in {"npm", "pnpm", "yarn"} and args:
+            script = args[0]
+            if script in {"run", "exec"} and len(args) > 1:
+                script = args[1]
+            if script in SAFE_CI_PACKAGE_SCRIPTS or script.startswith("test:"):
+                return CommandClassification.WRITES_WORKSPACE
+        if exe == "uv" and len(args) >= 2 and args[0] == "run" and args[1] in SAFE_CI_UV_TOOLS:
+            return CommandClassification.WRITES_WORKSPACE
     if exe == "install":
         return CommandClassification.INSTALL
     if exe in WRITE_COMMANDS:
@@ -988,6 +998,11 @@ def microvm_preflight(system: str | None = None) -> dict[str, Any]:
         limactl_version = _run_probe([limactl, "--version"]) if limactl else None
         limactl_list = _run_probe([limactl, "list", "--json"]) if limactl else None
         status = "installed_not_configured" if limactl else "unavailable"
+        p2_blockers = [
+            "Lima default user-mode/slirp network is present by design",
+            "No documented Lima/VZ network-none template key found",
+            "Guest-level route/firewall denial would not satisfy ADR-024 strict P2",
+        ]
         return {
             "provider": "microvm",
             "platform": "macos",
@@ -999,8 +1014,24 @@ def microvm_preflight(system: str | None = None) -> dict[str, Any]:
             "binary": limactl,
             "runtime": "lima-vz",
             "strict_network_isolation": False,
+            "strict_no_network_proof": "blocked",
+            "p2_status": "blocked",
+            "p2_blockers": p2_blockers,
             "security_posture": "low_security_network_present",
             "network_reason": "Lima default/user-v2 networking provides guest network access",
+            "guest_network_default": "present_by_lima_slirp",
+            "workspace_mount_strategy": "lima-vz-virtiofs-workspace-only",
+            "mount_escape_proof": "host_gated_only",
+            "template_hardening": [
+                "vmType=vz",
+                "mountType=virtiofs",
+                "workspace-only /workspace mount",
+                "containerd disabled",
+                "hostResolver disabled",
+                "proxy env propagation disabled",
+                "SSH agent/key forwarding disabled",
+                "no additional named networks or port forwards",
+            ],
             "macos_version": macos_version,
             "limactl_version": limactl_version,
             "limactl_list": limactl_list,
@@ -1828,6 +1859,10 @@ def render_lima_template(workspace_root: Path, instance_name: str = "arc-sandbox
     return f"""# ARC experimental Lima VM template. Low-security harness only; strict network isolation is not proven.
 # Internal Lima harness gated by ARC_MICROVM_INTEGRATION=1; public microVM execution remains blocked.
 vmType: vz
+mountType: virtiofs
+cpus: 2
+memory: 2GiB
+disk: 20GiB
 images:
   - location: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-$(arch).img
 mounts:
@@ -1836,6 +1871,17 @@ mounts:
     writable: true
 networks: [] # Does not prove no default Lima user-mode/slirp route.
 portForwards: []
+hostResolver:
+  enabled: false # DNS hardening only; not a strict no-network proof.
+propagateProxyEnv: false
+containerd:
+  system: false
+  user: false
+ssh:
+  loadDotSSHPubKeys: false
+  forwardAgent: false
+  forwardX11: false
+  forwardX11Trusted: false
 provision:
   - mode: system
     script: |

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Optional
 
 import typer
@@ -828,6 +829,128 @@ def providers_action(
         _out(err(ArcErrorCode.INVALID_INPUT, message), json_output)
         raise typer.Exit(1)
     _out(ok(result.model_dump()), json_output)
+
+
+@providers_app.command("shell")
+def providers_shell(
+    provider: Optional[str] = typer.Option(None, "--provider", help="Provider id"),
+    model: Optional[str] = typer.Option(None, "--model", help="Model name"),
+    prompt: str = typer.Option("", "--prompt", help="Runtime shell prompt"),
+    tool_command: list[str] = typer.Option(
+        [], "--tool-cmd", help="Proposed tool argv; repeat per arg"
+    ),
+    policy: str = typer.Option("local-safe", "--policy", help="Sandbox policy for tool proposal"),
+    live: bool = typer.Option(False, "--live", help="Require live provider gates"),
+    allow_paid_calls: bool = typer.Option(
+        False, "--allow-paid-calls", help="Allow paid provider calls"
+    ),
+    confirm: Optional[str] = typer.Option(
+        None, "--confirm", help="RUN_PROVIDER_SHELL:<provider>:<model>"
+    ),
+    stream_json: bool = typer.Option(
+        False, "--stream-json", help="Emit JSONL provider-shell stream events"
+    ),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Provider-backed runtime shell contract; dry-run/offline by default."""
+    _setup_logging(debug)
+    import os
+    from pathlib import Path
+
+    from ..provider_action import ProviderRoutingStore
+    from ..runtime.streaming import StreamEventType, TerminalStreamEvent
+    from ..security.sandbox import (
+        decide,
+        persist_sandbox_audit_event,
+        resolve_sandbox_policy,
+        utc_now,
+    )
+
+    routing = ProviderRoutingStore().get()
+    chosen_provider = provider or routing.default_provider
+    chosen_model = model or routing.default_model
+    shell_id = f"provider-shell-{chosen_provider}-{chosen_model}"
+    stream_id = f"stream-{shell_id}"
+    if stream_json:
+        started = TerminalStreamEvent(
+            stream_id=stream_id,
+            event=StreamEventType.STARTED,
+            source="provider_shell",
+            sequence=0,
+            command=tool_command,
+            data="provider shell started",
+        )
+        typer.echo(
+            json.dumps(ok(started.model_dump(mode="json")).model_dump(mode="json"), sort_keys=True)
+        )
+    ws = Path.cwd().resolve()
+    policy_model = resolve_sandbox_policy(policy, ws)
+    decision = decide(tool_command, policy_model) if tool_command else None
+    provider_result = None
+    if live:
+        from ..provider_action import ProviderActionRequest, run_provider_action
+
+        expected = f"RUN_PROVIDER_SHELL:{chosen_provider}:{chosen_model}"
+        if (
+            os.environ.get("ARC_ALLOW_LIVE_PROVIDER_TESTS") != "true"
+            or not allow_paid_calls
+            or confirm != expected
+        ):
+            _out(
+                err(ArcErrorCode.INVALID_INPUT, f"provider shell live gates missing: {expected}"),
+                json_output,
+            )
+            raise typer.Exit(1)
+        try:
+            provider_result = run_provider_action(
+                ProviderActionRequest(
+                    provider=chosen_provider,
+                    model=chosen_model,
+                    prompt=prompt or "ARC provider shell turn",
+                    dry_run=False,
+                    allow_paid_calls=True,
+                    confirmation=f"RUN_PROVIDER_ACTION:{chosen_provider}:{chosen_model}",
+                ),
+                os.environ,
+            )
+        except RuntimeError as exc:
+            _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+            raise typer.Exit(1)
+    event = {
+        "type": "PROVIDER_SHELL" if live else "PROVIDER_SHELL_DRY_RUN",
+        "shell_id": shell_id,
+        "provider": chosen_provider,
+        "model": chosen_model,
+        "prompt_present": bool(prompt),
+        "dry_run": not live,
+        "real_provider_call": bool(provider_result and provider_result.real_provider_call),
+        "network_call_attempted": bool(provider_result and provider_result.network_call_attempted),
+        "provider_result": provider_result.model_dump(mode="json") if provider_result else None,
+        "tool_proposal": tool_command,
+        "tool_decision": decision.model_dump(mode="json") if decision else None,
+        "started_at": utc_now(),
+        "ended_at": utc_now(),
+    }
+    audit_path = persist_sandbox_audit_event(event)
+    event["audit_path"] = str(audit_path)
+    if stream_json:
+        completed = TerminalStreamEvent(
+            stream_id=stream_id,
+            event=StreamEventType.COMPLETED,
+            source="provider_shell",
+            sequence=1,
+            command=tool_command,
+            data="provider shell dry-run completed" if not live else "provider shell completed",
+            exit_code=0,
+        )
+        typer.echo(
+            json.dumps(
+                ok(completed.model_dump(mode="json")).model_dump(mode="json"), sort_keys=True
+            )
+        )
+        return
+    _out(ok(event), json_output)
 
 
 providers_app.add_typer(accounts_app)

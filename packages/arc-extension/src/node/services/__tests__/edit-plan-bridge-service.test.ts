@@ -72,4 +72,26 @@ describe('EditPlanBridgeService', () => {
             expect.any(Object)
         );
     });
+
+    it('loads real diff content through capped CLI bridge', () => {
+        mockExecFileSync.mockReturnValue(ok({ plan_id: 'edit-abc', status: 'present', diff: '-old\n+new\n', diff_truncated: false, binary: false, max_bytes: 131072, files: [] }));
+        const result = service.diffEditPlan('edit-abc');
+        expect(result.diff).toContain('+new');
+        expect(mockExecFileSync).toHaveBeenCalledWith(
+            'arc',
+            ['edit', 'diff', '--workspace', '/workspace/test', '--plan-id', 'edit-abc', '--max-bytes', '131072', '--json'],
+            expect.any(Object)
+        );
+    });
+
+    it('applies edit plan through CLI gates', () => {
+        mockExecFileSync.mockReturnValue(ok({ applied: true, reason: 'applied', transaction_id: 'txn-abc', audit_events: [] }));
+        const result = service.applyEditPlan('edit-abc', 'new\n', 'tok');
+        expect(result.transaction_id).toBe('txn-abc');
+        expect(mockExecFileSync).toHaveBeenCalledWith(
+            'arc',
+            ['edit', 'apply', '--workspace', '/workspace/test', '--plan-id', 'edit-abc', '--content', 'new\n', '--approval-token', 'tok', '--json'],
+            expect.any(Object)
+        );
+    });
 });

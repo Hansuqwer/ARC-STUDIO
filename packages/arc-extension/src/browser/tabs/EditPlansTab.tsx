@@ -1,8 +1,8 @@
 /**
  * Edit Plans Tab
  *
- * Metadata-only review surface for saved ARC edit plans. Replacement content
- * and full diffs are intentionally absent from saved plan records.
+ * Review surface for saved ARC edit plans. Replacement content is not persisted;
+ * real unified diff content is loaded through the Python bridge with caps.
  */
 
 import * as React from '@theia/core/shared/react';
@@ -16,6 +16,8 @@ export const EditPlansTab: React.FC<EditPlansTabProps> = ({ arcService }) => {
     const [plans, setPlans] = React.useState<EditPlanInfo[]>([]);
     const [selected, setSelected] = React.useState<EditPlanInfo | null>(null);
     const [token, setToken] = React.useState('');
+    const [content, setContent] = React.useState('');
+    const [diff, setDiff] = React.useState<string | null>(null);
     const [loading, setLoading] = React.useState(true);
     const [message, setMessage] = React.useState<string | null>(null);
     const [error, setError] = React.useState<string | null>(null);
@@ -44,9 +46,27 @@ export const EditPlansTab: React.FC<EditPlansTabProps> = ({ arcService }) => {
         setError(null);
         setMessage(null);
         try {
-            setSelected(await arcService.showEditPlan(planId));
+            const plan = await arcService.showEditPlan(planId);
+            setSelected(plan);
+            const diffResult = await arcService.diffEditPlan(planId, 131072);
+            setDiff(diffResult.binary ? 'Binary diff blocked.' : diffResult.diff + (diffResult.diff_truncated ? '\n[diff truncated]' : ''));
         } catch (err: any) {
             setError(err.message || 'Failed to show edit plan');
+        }
+    };
+
+    const apply = async () => {
+        if (!selected || !token.trim()) {
+            setError('Approval token required.');
+            return;
+        }
+        setError(null);
+        try {
+            const result = await arcService.applyEditPlan(selected.plan_id, content, token.trim());
+            setMessage(result.applied ? `Applied ${selected.plan_id} transaction ${result.transaction_id || 'n/a'}.` : `Not applied: ${result.reason}`);
+            await load();
+        } catch (err: any) {
+            setError(err.message || 'Failed to apply edit plan');
         }
     };
 
@@ -72,7 +92,7 @@ export const EditPlansTab: React.FC<EditPlansTabProps> = ({ arcService }) => {
                 <button className='arc-edit-plans__refresh' onClick={load}>Refresh</button>
             </div>
             <p className='arc-edit-plans__scope'>
-                Local metadata-only review of saved edit plans. Replacement content and full diffs are not persisted here.
+                Local review of saved edit plans. Replacement content is not persisted; diff/apply use the Python sandbox and ARC transaction gates.
             </p>
             {loading && <p className='arc-edit-plans__loading'>Loading saved edit plans...</p>}
             {error && <div className='arc-edit-plans__error' role='alert'>Error: {error}</div>}
@@ -111,9 +131,16 @@ export const EditPlansTab: React.FC<EditPlansTabProps> = ({ arcService }) => {
                                     </div>
                                 ))}
                             </div>
+                            <pre className='arc-edit-plans__diff' aria-label='Edit plan diff'>
+                                {diff || 'Select a plan to load diff content.'}
+                            </pre>
                             <label className='arc-edit-plans__approval'>
                                 Approval token
                                 <input value={token} onChange={event => setToken(event.currentTarget.value)} />
+                            </label>
+                            <label className='arc-edit-plans__content'>
+                                Replacement content for apply
+                                <textarea value={content} onChange={event => setContent(event.currentTarget.value)} />
                             </label>
                             <button
                                 className='arc-edit-plans__approve'
@@ -121,6 +148,13 @@ export const EditPlansTab: React.FC<EditPlansTabProps> = ({ arcService }) => {
                                 disabled={!selected.allowed || selected.status === 'stale'}
                             >
                                 Approve Saved Plan
+                            </button>
+                            <button
+                                className='arc-edit-plans__apply'
+                                onClick={apply}
+                                disabled={!selected.allowed || selected.status === 'stale'}
+                            >
+                                Apply Through Gates
                             </button>
                             <p className='arc-edit-plans__handoff'>
                                 Apply handoff: use `arc edit apply --plan-id {selected.plan_id} --content &lt;text&gt; --approval-token &lt;token&gt;`.

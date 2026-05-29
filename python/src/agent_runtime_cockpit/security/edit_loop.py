@@ -21,6 +21,7 @@ from .sandbox import (
     resolve_sandbox_policy,
     utc_now,
 )
+from .transactions import create_transaction
 
 
 class EditFilePlan(BaseModel):
@@ -79,6 +80,10 @@ def edit_plan_record_path(workspace_root: Path, plan_id: str) -> Path:
     return edit_plan_store_dir(workspace_root) / f"{plan_id}.json"
 
 
+def edit_plan_diff_path(workspace_root: Path, plan_id: str) -> Path:
+    return edit_plan_store_dir(workspace_root) / f"{plan_id}.diff"
+
+
 def edit_plan_approval_path(workspace_root: Path, plan_id: str) -> Path:
     return edit_plan_store_dir(workspace_root) / f"{plan_id}.approval.json"
 
@@ -126,6 +131,8 @@ def persist_edit_plan_record(plan: EditPlan, workspace_root: Path | None = None)
         file_plan.pop("diff", None)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    diff_path = edit_plan_diff_path(root, plan.plan_id)
+    diff_path.write_text(plan.diff, encoding="utf-8")
     return path
 
 
@@ -180,6 +187,27 @@ def edit_plan_status(workspace_root: Path, plan: EditPlan) -> str:
         ):
             return "stale"
     return "present"
+
+
+def edit_plan_diff(workspace_root: Path, plan_id: str, max_bytes: int = 131_072) -> dict[str, Any]:
+    """Return saved diff content with caps; no replacement content is persisted."""
+    plan = load_edit_plan_record(workspace_root, plan_id)
+    sidecar = edit_plan_diff_path(workspace_root, plan_id)
+    diff = sidecar.read_text(encoding="utf-8") if sidecar.exists() else (plan.diff or "")
+    encoded = diff.encode("utf-8")
+    truncated = len(encoded) > max_bytes
+    if truncated:
+        diff = encoded[:max_bytes].decode("utf-8", errors="replace")
+    binary = "\x00" in diff
+    return {
+        "plan_id": plan.plan_id,
+        "status": edit_plan_status(workspace_root, plan),
+        "diff": "" if binary else diff,
+        "diff_truncated": truncated,
+        "binary": binary,
+        "max_bytes": max_bytes,
+        "files": [file.model_dump(mode="json") for file in plan.files],
+    }
 
 
 def approve_edit_plan(workspace_root: Path, plan_id: str, token: str) -> EditPlanApproval:
@@ -460,6 +488,7 @@ def apply_edit_plan(
                 "expected_original_hash": expected_original_hash,
             },
         )
+    transaction = create_transaction(ws, source="edit_apply", replacements={plan.path: content})
     write_text_atomic(path, content, lock=True)
     event = build_plan_apply_event(
         "edit_apply_applied",
@@ -475,6 +504,7 @@ def apply_edit_plan(
         "applied": True,
         "reason": "applied",
         "plan": plan.model_dump(mode="json"),
+        "transaction_id": transaction.transaction_id,
         "audit_events": [{**event, "audit_path": str(audit_path)}],
     }
 
@@ -540,6 +570,7 @@ def apply_edit_bundle(
                 extra={"current_hashes": current, "expected_original_hashes": expected},
             )
     replacements = {item["path"]: item for item in edits}
+    planned_contents: dict[str, str] = {}
     for file_plan in plan.files:
         path = _workspace_file(file_plan.path, ws)
         item = replacements[file_plan.path]
@@ -548,6 +579,11 @@ def apply_edit_bundle(
             content = apply_unified_patch(old, item["patch"], expected_path=file_plan.path)
         else:
             content = item.get("content", "")
+        planned_contents[file_plan.path] = content
+    transaction = create_transaction(ws, source="edit_bundle_apply", replacements=planned_contents)
+    for file_plan in plan.files:
+        path = _workspace_file(file_plan.path, ws)
+        content = planned_contents[file_plan.path]
         write_text_atomic(path, content, lock=True)
     event = build_plan_apply_event(
         "edit_apply_applied",
@@ -563,5 +599,6 @@ def apply_edit_bundle(
         "applied": True,
         "reason": "applied",
         "plan": check_plan.model_dump(mode="json"),
+        "transaction_id": transaction.transaction_id,
         "audit_events": [{**event, "audit_path": str(audit_path)}],
     }

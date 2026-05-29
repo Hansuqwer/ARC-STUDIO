@@ -3,6 +3,8 @@ import {
     ArcError,
     ArcErrorCode,
     EditPlanApprovalResult,
+    EditPlanApplyResult,
+    EditPlanDiffResult,
     EditPlanInfo,
     EditPlanListResult,
 } from '../../common/arc-protocol';
@@ -46,6 +48,40 @@ export class EditPlanBridgeService {
             token_hash: String(data.token_hash || ''),
             plan_hash: String(data.plan_hash || ''),
             approved_at: String(data.approved_at || ''),
+        };
+    }
+
+    diffEditPlan(planId: string, maxBytes = 131072): EditPlanDiffResult {
+        this.validatePlanId(planId);
+        const safeMax = Math.max(1024, Math.min(Math.floor(maxBytes || 131072), 1024 * 1024));
+        const data = this.runArcJson(['edit', 'diff', '--workspace', this.workspaceRoot, '--plan-id', planId, '--max-bytes', String(safeMax), '--json']);
+        const files = Array.isArray(data.files) ? data.files as Record<string, unknown>[] : [];
+        return {
+            plan_id: String(data.plan_id || planId),
+            status: String(data.status || 'unknown'),
+            diff: String(data.diff || ''),
+            diff_truncated: Boolean(data.diff_truncated),
+            binary: Boolean(data.binary),
+            max_bytes: Number(data.max_bytes || safeMax),
+            files: files.map(file => this.toFilePlan(file)),
+        };
+    }
+
+    applyEditPlan(planId: string, content: string, token: string): EditPlanApplyResult {
+        this.validatePlanId(planId);
+        if (!token || token.length > 512) {
+            throw new ArcError(ArcErrorCode.INVALID_INPUT, 'invalid edit approval token');
+        }
+        if (content.length > 1024 * 1024) {
+            throw new ArcError(ArcErrorCode.INVALID_INPUT, 'edit content too large');
+        }
+        const data = this.runArcJson(['edit', 'apply', '--workspace', this.workspaceRoot, '--plan-id', planId, '--content', content, '--approval-token', token, '--json']);
+        return {
+            applied: Boolean(data.applied),
+            reason: String(data.reason || ''),
+            transaction_id: data.transaction_id == null ? null : String(data.transaction_id),
+            plan: data.plan && typeof data.plan === 'object' ? this.toPlan(data.plan as Record<string, unknown>) : undefined,
+            audit_events: Array.isArray(data.audit_events) ? data.audit_events as Array<Record<string, unknown>> : [],
         };
     }
 
@@ -96,17 +132,21 @@ export class EditPlanBridgeService {
             plan_path: raw.plan_path == null ? null : String(raw.plan_path),
             created_at: String(raw.created_at || ''),
             status: raw.status == null ? undefined : String(raw.status),
-            files: files.map(file => ({
-                path: String(file.path || ''),
-                command: Array.isArray(file.command) ? file.command.map(String) : [],
-                original_exists: Boolean(file.original_exists),
-                original_hash: String(file.original_hash || ''),
-                replacement_hash: file.replacement_hash == null ? null : String(file.replacement_hash),
-                patch_hash: file.patch_hash == null ? null : String(file.patch_hash),
-                allowed: Boolean(file.allowed),
-                reason: String(file.reason || ''),
-                classification: String(file.classification || 'unknown'),
-            })),
+            files: files.map(file => this.toFilePlan(file)),
+        };
+    }
+
+    private toFilePlan(file: Record<string, unknown>) {
+        return {
+            path: String(file.path || ''),
+            command: Array.isArray(file.command) ? file.command.map(String) : [],
+            original_exists: Boolean(file.original_exists),
+            original_hash: String(file.original_hash || ''),
+            replacement_hash: file.replacement_hash == null ? null : String(file.replacement_hash),
+            patch_hash: file.patch_hash == null ? null : String(file.patch_hash),
+            allowed: Boolean(file.allowed),
+            reason: String(file.reason || ''),
+            classification: String(file.classification || 'unknown'),
         };
     }
 }

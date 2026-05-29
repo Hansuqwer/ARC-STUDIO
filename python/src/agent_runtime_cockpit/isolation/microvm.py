@@ -1204,7 +1204,7 @@ def build_microvm_run_plan(
         blockers = [
             "Lima lifecycle not public-execution wired",
             "workspace mount escape proof missing",
-            "network-off proof missing",
+            "strict network-off proof blocked: Lima default user-mode/slirp route is documented",
             "teardown proof missing",
             "opt-in integration test not passing on host runtime",
         ]
@@ -1516,7 +1516,10 @@ class LimaIntegrationHarness:
         result = IsolationResult(exit_code=-1, stderr="not started", provider="microvm")
         started_at = utc_now()
         try:
-            start = self._limactl(["start", "--tty=false", str(tmp_path)], timeout_seconds)
+            start = self._limactl(
+                ["start", "--tty=false", "--name", self.instance_name, str(tmp_path)],
+                timeout_seconds,
+            )
             self.lifecycle.append("start")
             if start.exit_code != 0:
                 result = IsolationResult(

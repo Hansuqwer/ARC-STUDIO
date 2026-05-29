@@ -12,6 +12,7 @@ import typer
 from ..isolation.subprocess import SubprocessIsolationProvider
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
+from ..runtime.streaming import stream_subprocess_events
 from ..security.sandbox import (
     SandboxPolicy,
     SandboxResult,
@@ -592,6 +593,10 @@ def testbench_run(
     approval_token: Optional[str] = typer.Option(
         None, "--approval-token", help="Use a scoped non-interactive approval token"
     ),
+    stream_json: bool = typer.Option(False, "--stream-json", help="Emit JSONL stream events"),
+    cancel_after_events: Optional[int] = typer.Option(
+        None, "--cancel-after-events", help="Deterministically cancel after N output events"
+    ),
     workspace: Optional[str] = WORKSPACE_FLAG,
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
@@ -650,6 +655,29 @@ def testbench_run(
         )
         _out(ok(result.model_dump(mode="json"), workspace=str(ws)), json_output)
         raise typer.Exit(3)
+
+    if stream_json:
+        events, stream_result = stream_subprocess_events(
+            command,
+            cwd=cwd,
+            source="testbench",
+            timeout_seconds=policy_model.timeout_seconds,
+            max_output_bytes=policy_model.max_output_bytes,
+            cancel_after_events=cancel_after_events,
+            safe_env_keys=frozenset(policy_model.env_allowlist),
+        )
+        for event in events:
+            typer.echo(
+                json.dumps(
+                    ok(event.model_dump(mode="json"), workspace=str(ws)).model_dump(mode="json"),
+                    sort_keys=True,
+                )
+            )
+        if stream_result.terminal_event.value in {"cancelled", "timeout"}:
+            raise typer.Exit(130 if stream_result.terminal_event.value == "cancelled" else 124)
+        if stream_result.exit_code not in (0, None):
+            raise typer.Exit(stream_result.exit_code)
+        return
 
     import asyncio
 

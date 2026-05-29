@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-29 — R65-R67 sandbox/microVM truth, classifier/path, and proof-harness hardening added after R64.
-**Current evidence anchor:** local worktree | R65-R67 verified: Python full suite 3371 passed / 34 skipped / 3 xfailed; `cd python && uv run ruff check src tests` OK; `pnpm build` OK; `pnpm typecheck` OK; `pnpm test:e2e` OK with known Theia async warnings and 4 skipped smoke tests; banned-claims guard OK.
+**Last reality refresh:** 2026-05-29 — R68-R74 baseline implementation added locally; R75 strict macOS no-network proof blocked by Lima networking; R76 remains planned/blocked as listed.
+**Current evidence anchor:** local worktree | R68 research doc exists; Phase 104 targeted microVM tests 57 passed; Python full suite 3386 passed / 34 skipped / 3 xfailed; `cd python && uv run ruff check src tests` clean; `pnpm build` OK; `pnpm typecheck` OK; `pnpm test:e2e` reran with known Theia async-warning fingerprint and 4 skipped smoke tests; banned-claims guard OK.
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -31,7 +31,7 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 
 ## Non-Negotiable Scope Boundaries
 
-- Priority 1 until complete: CLI + interactive CLI foundation (`R39` / `Phase 41`). Do not advance product roadmap execution to later phases until Phase 41 acceptance is complete and verified. Security/sandbox fixes that unblock Phase 41 are allowed; unrelated feature phases are deferred behind it.
+- Priority 1 until complete: full CLI parity track (`R68`-`R76` / `Phases 97`-`105`). Do not advance unrelated product roadmap execution until the CLI parity acceptance matrix is complete or explicitly reprioritized. Security/sandbox/provider/IDE/CI work that directly supports this track is allowed.
 - No broad live/provider-backed SwarmGraph adoption claim until real provider-backed adoption paths are implemented and tested.
 - No adapter-wide keyed audit claim until every claimed run path writes/verifies keyed audit material.
 - No production/concurrent-user/tenant isolation claim.
@@ -1019,10 +1019,19 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R65 Sandbox/MicroVM Truth Audit Guard** | **Baseline Complete** | **Phase 94 — blocked public microVM run attempts now emit denial audit events; doctor/preflight separates runtime readiness from public execution readiness** |
 | **R66 Sandbox Classifier And Path-Intent Hardening v3** | **Baseline Complete** | **Phase 95 — write-output paths are validated across classifications and dynamic unknown shell/interpreter approvals are denied before execution** |
 | **R67 MicroVM Proof-Harness Truth Guards** | **Baseline Complete** | **Phase 96 — Lima bounded output drain, Firecracker curl/workspace proof markers, workspace marker clobber guard, and reusable 8-subagent orchestrator prompt** |
+| **R68 Priority 1 CLI Parity Research + Acceptance Matrix** | **Baseline Complete** | **Phase 97 — Context7/Vercel Grep unavailable in runtime and recorded; local/web-supported research matrix landed** |
+| **R69 Autonomous Edit-Test-Repair Loop** | **Baseline Complete** | **Phase 98 — bounded edit -> sandboxed test -> diagnose -> repair loop with audit and stop conditions** |
+| **R70 Git-Backed Undo/Redo Transactions** | **Baseline Complete** | **Phase 99 — safe transaction log, restore/redo, dirty-worktree protection, tests** |
+| **R71 Rich IDE Diff Review/Apply Flow** | **Baseline Complete** | **Phase 100 — real diff rendering, approval/apply/deny flow, patch-content gates** |
+| **R72 Provider-Backed Runtime Shell** | **Baseline Complete** | **Phase 101 — gated provider shell contract baseline, dry-run/default-safe path, no default paid calls** |
+| **R73 Live Terminal/Event Streaming UX** | **Baseline Complete** | **Phase 102 — CLI JSONL incremental stdout/stderr/events/cancel for sandbox/testbench/provider-shell; IDE/REPL streaming follow-up** |
+| **R74 Broad CLI CI Orchestration** | **Baseline Complete** | **Phase 103 — detect local CI matrix, run selected argv job through sandbox/streaming, write local artifact, stable JSON** |
+| **R75 macOS MicroVM Execution + Strict No-Network Proof** | **Not Started** | **Phase 104 — real Lima/VZ run proof only if feasible; otherwise documented blocker, no execution claim** |
+| **R76 Linux Firecracker Execution Proof** | **Not Started** | **Phase 105 — real boot/run/destroy proof only on eligible Linux host; otherwise documented blocker, no execution claim** |
 
 **Post-v0.1 Execution Order:** 
-- **Priority 1 stop-the-line:** R39 / Phase 41 (Interactive CLI/UX Foundation). **Baseline Complete** as of Phases 41–45 (commits 37fd92b–7fdba99). Gate lifted. R44 (Phase 46 CLI write bridge + Phase 47 daemon HTTP write bridge) is now Baseline Complete. Continue sandbox hardening for Phase 37 microVM feasibility decision.
-- **Already active foundation:** Phase 37 (CLI Sandbox Hardening — active) may continue only where it supports CLI/interactive CLI safety, policy, audit, or execution UX.
+- **Priority 1 stop-the-line:** R68-R76 / Phases 97-105 (full CLI parity track). Research first, then implement in order unless the research matrix proves a safer dependency order. Do not claim OpenCode/Claude Code parity, autonomous repair, rich diff review, provider-backed shell, broad CI orchestration, or microVM execution until implemented and tested.
+- **Already active foundation:** R38/R65-R67 sandbox and microVM hardening may continue only where it directly supports Priority 1 CLI parity, strict VM proof, policy, audit, or execution UX.
 - **Foundations:** R14-R16 (Phase 21-23) → R17-R18 (Phase 24-25)
 - **Sandbox:** R38 (Phase 37 — subprocess/approval/path-intent/parity/preflight/container/e2e/truth-guard/design-proof/gated-Lima-low-security-harness/Lima-mount-proof-mode/ADR-024-execution-contract complete; microVM execution blocked pending P1–P7 proofs)
 - **MCP:** R19-R20 (Phase 26-27)
@@ -1032,9 +1041,9 @@ The following roadmap items implement the adapter integration plan from `docs/re
 - **Adapter integration:** R27-R36 (Adapter Phases 26-35)
 - **Provider Management Phase 2:** R37 Phase 2 (Phase 36.2, after Phase 23 + 25 + 36.1)
 
-**Critical Path:** ~~Interactive CLI/UX Foundation (R39 / Phase 41)~~ ✓ → ~~IDE Write Bridge (R44 / Phase 46)~~ ✓ → Streaming Audit → RunEvent Unions → Trust Enforcement → Trace Virtualization → CLI Decomposition → MCP Server → MCP Tasks → Replay Contract → HITL/Eval → Consensus Escrow → Adaptive Consensus → Event Notifications → Memory Graph → Adapter Integration (LangChain, Anthropic, OpenAI-compatible, Pydantic AI, DSPy, Haystack, Smolagents, Semantic Kernel, Google ADK, MCP SDK) → Provider Management Phase 2
+**Critical Path:** Priority 1 CLI parity research matrix (R68/Phase 97) → autonomous edit-test-repair (R69/Phase 98) → git undo/redo transactions (R70/Phase 99) → rich IDE diff review/apply (R71/Phase 100) → provider-backed runtime shell (R72/Phase 101) → live terminal/event UX (R73/Phase 102) → CLI CI orchestration (R74/Phase 103) → macOS microVM no-network proof if feasible (R75/Phase 104) → Firecracker boot/run/destroy proof if feasible (R76/Phase 105) → remaining product roadmap.
 
-**Note:** R39 (Phase 41) execution gate is cleared as of 2026-05-26 (commit 7fdba99). R44 (Phase 46 CLI bridge + Phase 47 daemon HTTP bridge), Phase 48, and Phase 49 are Baseline Complete. Product work may advance to Phase 50 and beyond.
+**Note:** R39 (Phase 41) execution gate was cleared as of 2026-05-26 (commit 7fdba99), but the new Priority 1 track is broader and remains Not Started: OpenCode/Claude Code parity target, autonomous repair, git transactions, rich IDE diff apply, provider-backed shell, live terminal/event streaming, broad CLI CI, and real microVM proof work are not claimed complete.
 
 ## R39 — Interactive CLI/UX Foundation
 
@@ -1370,3 +1379,75 @@ The following roadmap items implement the adapter integration plan from `docs/re
 **Current:** Baseline Complete. Lima probes use bounded output drain. Firecracker guest proof success now requires `curl-available` and `workspace-mount-proven` markers, and proof runner refuses to overwrite existing workspace marker files. A reusable three-phase orchestrator prompt was added for future research/execute/test phases.
 
 **Status:** Baseline Complete | Evidence: local worktree; targeted sandbox/microVM tests 196 passed / 13 skipped; targeted ruff clean | Notes: Real Firecracker/Lima public microVM execution remains blocked pending ADR-024 proofs.
+
+## R68 — Priority 1 CLI Parity Research + Acceptance Matrix
+
+**Goal:** Make the next workstream explicitly Priority 1: research and plan full OpenCode/Claude Code style parity, autonomous edit-test-repair, git transactions, IDE diff apply, provider shell, live terminal/event UX, CLI CI orchestration, and real microVM proof work.
+
+**Current:** Baseline research matrix exists at `docs/research/cli-parity-priority.md`; no full parity claim.
+
+**Status:** Baseline Complete | Evidence: local worktree; `docs/research/cli-parity-priority.md`; Python full suite 3376 passed / 34 skipped / 3 xfailed; `cd python && uv run ruff check src tests` clean; `pnpm build` OK; `pnpm typecheck` OK; banned-claims guard OK | Notes: Context7 and Vercel Grep unavailable in this runtime and recorded as blockers.
+
+## R69 — Autonomous Edit-Test-Repair Loop
+
+**Goal:** Let the CLI run a bounded, auditable edit -> sandboxed test -> diagnose -> repair loop.
+
+**Current:** Deterministic bounded repair loop exists for local fixture workflows; no LLM autonomous repair claim.
+
+**Status:** Baseline Complete | Evidence: local worktree; `tests/test_phase_98_101_cli_parity.py` | Notes: Deterministic repair only; broader diagnosis/provider repair remains future work.
+
+## R70 — Git-Backed Undo/Redo Transactions
+
+**Goal:** Wrap edit/apply/test workflows in safe git-backed transactions with undo/redo.
+
+**Current:** ARC-owned transaction log captures edit apply before/after states and supports safe undo/redo for recorded files.
+
+**Status:** Baseline Complete | Evidence: local worktree; transaction undo/redo targeted tests | Notes: Protects ARC edit transactions only; no arbitrary subprocess/Bash rollback.
+
+## R71 — Rich IDE Diff Review/Apply Flow
+
+**Goal:** Add real IDE diff review and apply flow for proposed edits.
+
+**Current:** IDE edit-plan bridge loads capped real unified diff sidecars and applies approved content through Python edit/sandbox/transaction gates.
+
+**Status:** Baseline Complete | Evidence: local worktree; Python diff/apply tests plus TS bridge/UI contract updates | Notes: Full Monaco side-by-side/e2e polish remains future work.
+
+## R72 — Provider-Backed Runtime Shell
+
+**Goal:** Add a gated provider-backed runtime shell that can drive tools with streaming and audit.
+
+**Current:** Provider shell contract exists with offline dry-run default, policy-visible tool proposals, audit, and live path gated through existing provider action contract.
+
+**Status:** Baseline Complete | Evidence: local worktree; `arc providers shell` targeted tests | Notes: No broad multi-turn provider shell or default paid calls.
+
+## R73 — Live Terminal/Event Streaming UX
+
+**Goal:** Complete live terminal/event streaming across CLI, REPL, and IDE for long-running commands.
+
+**Current:** Baseline CLI JSONL streaming exists for sandbox, testbench, and provider-shell surfaces. It emits stable envelopes for start/stdout/stderr/truncated/cancelled/timeout/completed/disconnected and preserves live/replay labels. IDE consumption and full REPL streaming remain future work.
+
+**Status:** Baseline Complete | Evidence: local worktree; `tests/test_phase102_streaming.py`; Python full suite 3380 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK | Notes: CLI streaming baseline only; no broad IDE terminal streaming claim.
+
+## R74 — Broad CLI CI Orchestration
+
+**Goal:** Let CLI detect, run, summarize, and artifact CI/test matrices under sandbox policy.
+
+**Current:** Baseline CLI orchestration exists. `arc ci matrix --json` detects Python, pnpm/package, testbench, and GitHub Actions run-step jobs. `arc ci run --policy local-safe --job <id> --json` runs one selected argv-safe job through sandbox policy and Phase 102 streaming, writes a local `.arc/ci/runs/...` artifact, emits sandbox audit material, and denies network/destructive commands by default. Complex shell workflow lines are detected but marked not runnable rather than executed through a shell by default.
+
+**Status:** Baseline Complete | Evidence: local worktree; `tests/test_phase103_ci_orchestration.py` 6 passed; Python full suite 3386 passed / 34 skipped / 3 xfailed; ruff/build/typecheck OK | Notes: Local argv-job orchestration only; no remote CI service, no broad shell workflow execution, no live network by default.
+
+## R75 — macOS MicroVM Execution + Strict No-Network Proof
+
+**Goal:** Prove real local macOS lightweight VM execution, preferably Lima/Apple Virtualization.framework, with strict no-network behavior.
+
+**Current:** Blocked for strict public execution. Phase 104 research re-confirmed Lima/VZ lifecycle and workspace mount proof are feasible, but Lima default user-mode/slirp networking is documented and no no-network template key was found. ARC keeps Lima as a low-security, host-gated proof harness only. macOS preflight/template truth fields were hardened; public `MicroVMIsolationProvider.execute()` remains blocked.
+
+**Status:** Blocked | Evidence: local worktree Phase 104 research; macOS Darwin 26.4 arm64 with limactl 2.1.0 detected; Lima official docs confirm default user-mode/slirp network and no documented no-network key; preflight/template truth fields hardened | Notes: No macOS strict no-network proof; direct Apple VZ no-NIC provider or future Lima no-network support remains required before any execution claim.
+
+## R76 — Linux Firecracker Execution Proof
+
+**Goal:** Prove real Linux Firecracker boot/run/destroy for a workspace-bounded command.
+
+**Current:** Not Started for real execution proof. Existing Firecracker harness hardening does not boot a guest in normal CI or this macOS host.
+
+**Status:** Not Started | Evidence: none | Notes: Requires eligible Linux host with KVM, Firecracker binary, rootfs/kernel, run proof, output capture, cleanup proof, and opt-in skipped tests for normal CI.

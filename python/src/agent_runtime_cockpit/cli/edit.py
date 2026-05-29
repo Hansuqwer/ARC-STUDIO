@@ -14,10 +14,13 @@ from ..security.edit_loop import (
     approve_edit_plan,
     build_edit_bundle,
     build_edit_plan,
+    edit_plan_diff,
     edit_plan_status,
     list_edit_plan_records,
     load_edit_plan_record,
 )
+from ..security.repair_loop import run_deterministic_repair_loop
+from ..security.transactions import redo_transaction, undo_transaction
 from ._helpers import DEBUG_FLAG, JSON_FLAG, WORKSPACE_FLAG, _out, _setup_logging, _workspace
 from ._subapps import edit_app
 
@@ -171,6 +174,25 @@ def edit_show(
     _out(ok(payload, workspace=str(ws)), json_output)
 
 
+@edit_app.command("diff")
+def edit_diff(
+    plan_id: str = typer.Option(..., "--plan-id", help="Saved edit plan id"),
+    max_bytes: int = typer.Option(131_072, "--max-bytes", help="Maximum diff bytes"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show saved edit-plan diff content with caps."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    try:
+        payload = edit_plan_diff(ws, plan_id, max_bytes=max_bytes)
+    except (OSError, ValueError) as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(2)
+    _out(ok(payload, workspace=str(ws)), json_output)
+
+
 @edit_app.command("approve")
 def edit_approve(
     plan_id: str = typer.Option(..., "--plan-id", help="Saved edit plan id"),
@@ -188,6 +210,87 @@ def edit_approve(
         _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
         raise typer.Exit(2)
     _out(ok(approval.model_dump(mode="json"), workspace=str(ws)), json_output)
+
+
+@edit_app.command("undo")
+def edit_undo(
+    transaction_id: str = typer.Option(..., "--transaction-id", help="ARC transaction id"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Undo one ARC-owned transaction without git reset/checkout."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    try:
+        result = undo_transaction(ws, transaction_id)
+    except (OSError, ValueError) as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(2)
+    _out(ok(result, workspace=str(ws)), json_output)
+    if not result["ok"]:
+        raise typer.Exit(3)
+
+
+@edit_app.command("redo")
+def edit_redo(
+    transaction_id: str = typer.Option(..., "--transaction-id", help="ARC transaction id"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Redo one ARC-owned transaction without git reset/checkout."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    try:
+        result = redo_transaction(ws, transaction_id)
+    except (OSError, ValueError) as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(2)
+    _out(ok(result, workspace=str(ws)), json_output)
+    if not result["ok"]:
+        raise typer.Exit(3)
+
+
+@edit_app.command("repair-loop")
+def edit_repair_loop(
+    path: str = typer.Option(..., "--path", help="Workspace file path"),
+    initial_content: str = typer.Option(..., "--initial-content", help="Initial proposed content"),
+    repair_content: str = typer.Option(
+        ..., "--repair-content", help="Deterministic repair content"
+    ),
+    test_command: list[str] = typer.Option([], "--test-cmd", help="Test argv; repeat per arg"),
+    policy: str = typer.Option("local-safe", "--policy", help="Sandbox policy profile"),
+    max_attempts: int = typer.Option(2, "--max-attempts", help="Bounded test attempts"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Run deterministic edit -> sandboxed test -> repair loop."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    if not test_command:
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, "--test-cmd required; repeat once per argv item"),
+            json_output,
+        )
+        raise typer.Exit(2)
+    try:
+        result = run_deterministic_repair_loop(
+            workspace_root=ws,
+            path=path,
+            initial_content=initial_content,
+            repair_content=repair_content,
+            test_command=test_command,
+            policy_name=policy,
+            max_attempts=max_attempts,
+        )
+    except (OSError, ValueError) as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(2)
+    _out(ok(result.model_dump(mode="json"), workspace=str(ws)), json_output)
+    if not result.ok:
+        raise typer.Exit(3)
 
 
 def _parse_edit_item(value: str) -> dict[str, str]:

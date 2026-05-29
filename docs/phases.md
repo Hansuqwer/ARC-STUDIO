@@ -2,15 +2,15 @@
 
 **Status:** Locked execution plan for remaining work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-29 — Phases 94-96 sandbox/microVM truth, classifier/path, and proof-harness hardening added after Phase 93.
-**Current evidence anchor:** local worktree | Phases 94-96 verified: Python full suite 3371 passed / 34 skipped / 3 xfailed; `cd python && uv run ruff check src tests` OK; `pnpm build` OK; `pnpm typecheck` OK; `pnpm test:e2e` OK with known Theia async warnings and 4 skipped smoke tests; banned-claims guard OK.
+**Last reality refresh:** 2026-05-29 — Phases 97-103 baseline implementation added locally; Phase 104 strict macOS no-network proof blocked by Lima networking; Phase 105 remains planned/blocked as listed.
+**Current evidence anchor:** local worktree | Phase 97 research doc exists; Phase 104 targeted microVM tests 57 passed; Python full suite 3386 passed / 34 skipped / 3 xfailed; `cd python && uv run ruff check src tests` clean; `pnpm build` OK; `pnpm typecheck` OK; `pnpm test:e2e` reran with known Theia async-warning fingerprint and 4 skipped smoke tests; banned-claims guard OK.
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
 
 Prefer larger coherent implementation chunks over tiny slices. A chunk may include multiple listed slices when they share files/tests and can be completed safely in one session. Keep the no-destructive-actions, no-secret-commits, preserve-unrelated-work, and green-verification rules.
 
-~~Priority 1 stop-the-line: Phase 41 (Interactive CLI/UX Foundation).~~ **Gate cleared 2026-05-26** — Phases 41–49 Baseline Complete. Product work may advance to Phase 50 and beyond.
+**Priority 1 stop-the-line: Phases 97-105 (full CLI parity track).** Research first with Context7, Vercel Grep/code search, and latest official docs/web sources where available. Do not advance unrelated product work until the Priority 1 track is complete or explicitly reprioritized. Phase 41 remains Baseline Complete, but full OpenCode/Claude Code parity is not claimed.
 
 ## Verification Baseline For Every Slice
 
@@ -4245,3 +4245,264 @@ cd python && uv run ruff check src/agent_runtime_cockpit/isolation/microvm.py te
 ### Known Risks
 - Firecracker real boot/rootfs/serial evidence remains unavailable on this macOS host.
 - Public microVM execution remains blocked.
+
+## Phase 97 — Priority 1 CLI Parity Research + Acceptance Matrix
+
+**Roadmap:** R68 Priority 1 CLI Parity Research + Acceptance Matrix
+**Status:** Baseline Complete | Evidence: local worktree; `docs/research/cli-parity-priority.md`; `cd python && uv run pytest tests/ -q` 3376 passed / 34 skipped / 3 xfailed; `cd python && uv run ruff check src tests` clean; `pnpm build` OK; `pnpm typecheck` OK; banned-claims guard OK
+**Depends on:** Phase 96, existing CLI/REPL/edit/sandbox/provider/IDE foundations
+
+### Implementation
+1. Create `docs/research/cli-parity-priority.md`.
+2. Research with Context7, Vercel Grep/code search, and latest official docs/web sources where available.
+3. Compare ARC against current OpenCode/Claude Code behavior without claiming parity.
+4. Produce an acceptance matrix for edit-test-repair, git undo/redo, IDE diff apply, provider shell, live terminal/events, CLI CI, macOS VM no-network proof, and Firecracker proof.
+5. Confirm dependency order for Phases 98-105.
+
+### Acceptance
+1. Research notes include source, link/query, what was learned, consequence, confidence, and unresolved questions.
+2. Tool unavailability is recorded as a blocker, not silently omitted.
+3. Decision table exists with chosen approaches and alternatives.
+4. Acceptance matrix clearly marks current state as Not Started/Baseline/Blocked per capability.
+5. Roadmap/phases remain honest about non-implemented parity and microVM execution.
+
+### Verification
+```bash
+bash scripts/check-banned-claims.sh docs/agents.md docs/roadmap.md docs/phases.md docs/release/checklist.md docs/REALITY_AUDIT.md docs/EXTENSION_MIGRATION.md docs/handover/HANDOVER.md README.md
+```
+
+### Known Risks
+- External research tooling may be unavailable; record exact blockers.
+- OpenCode/Claude Code feature sets may change; cite dates and links.
+
+## Phase 98 — Autonomous Edit-Test-Repair Loop
+
+**Roadmap:** R69 Autonomous Edit-Test-Repair Loop
+**Status:** Baseline Complete | Evidence: local worktree; deterministic `arc edit repair-loop` plus `tests/test_phase_98_101_cli_parity.py` targeted coverage
+**Depends on:** Phase 97, Phase 92, Phase 93
+
+### Implementation
+1. Add bounded loop command/REPL path that proposes an edit, runs sandboxed tests, diagnoses failure, attempts repair, and stops on pass/fail/retry limit.
+2. Reuse existing edit-plan/apply, sandbox policy, audit, and output-cap primitives.
+3. Require explicit gates for writes, network, install, destructive, privileged, and provider-backed behavior.
+4. Emit audit events for each loop step and decision.
+
+### Acceptance
+1. Safe failing test can be repaired in a deterministic fixture.
+2. Retry limit stops loops cleanly.
+3. Denied sandbox command stops the loop with structured reason.
+4. Audit trail includes edit/test/repair attempts.
+5. No live network/provider calls in default tests.
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/ -q
+```
+
+### Known Risks
+- Poor diagnosis can churn edits; bounded retries and approval gates are mandatory.
+
+## Phase 99 — Git-Backed Undo/Redo Transactions
+
+**Roadmap:** R70 Git-Backed Undo/Redo Transactions
+**Status:** Baseline Complete | Evidence: local worktree; ARC transaction log/undo/redo in `security/transactions.py` with targeted tests
+**Depends on:** Phase 98
+
+### Implementation
+1. Add transaction records around edit/apply/test loop changes.
+2. Support undo/redo without destructive git reset/checkout.
+3. Detect dirty pre-existing user changes and refuse unsafe transaction boundaries.
+4. Preserve untracked/unrelated files.
+
+### Acceptance
+1. Undo restores ARC-made changes only.
+2. Redo reapplies recorded ARC transaction safely.
+3. Dirty user changes are detected and preserved.
+4. Tests cover tracked, untracked, and conflicting-change cases.
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/ -q
+```
+
+### Known Risks
+- Git transaction semantics can corrupt user work if overbroad; fail closed.
+
+## Phase 100 — Rich IDE Diff Review/Apply Flow
+
+**Roadmap:** R71 Rich IDE Diff Review/Apply Flow
+**Status:** Baseline Complete | Evidence: local worktree; IDE edit bridge exposes capped real diff + gated apply; targeted Python/TS contract tests updated
+**Depends on:** Phase 99, existing IDE edit-plan metadata surface
+
+### Implementation
+1. Surface real proposed diff content in IDE through a safe backend bridge.
+2. Render side-by-side or unified diff review using existing Theia/Monaco capabilities.
+3. Apply approved changes through existing edit gates and transaction layer.
+4. Keep denial/stale/conflict states visible.
+
+### Acceptance
+1. IDE displays real diff content, not metadata-only summary.
+2. Approve/apply writes only through sandbox/edit/git transaction gates.
+3. Deny/stale/conflict states do not write files.
+4. Tests cover backend bridge and UI state contracts.
+
+### Verification
+```bash
+cd python && uv run pytest tests/ -q
+pnpm build
+pnpm typecheck
+pnpm test:e2e
+```
+
+### Known Risks
+- Large diffs and binary files need caps/fail-closed behavior.
+
+## Phase 101 — Provider-Backed Runtime Shell
+
+**Roadmap:** R72 Provider-Backed Runtime Shell
+**Status:** Baseline Complete | Evidence: local worktree; `arc providers shell` dry-run/default plus live gates through existing provider action path; targeted tests
+**Depends on:** Phase 97, existing gated provider action path
+
+### Implementation
+1. Define a gated provider-backed shell contract with explicit paid/live confirmations.
+2. Wire provider output to tool proposals, approvals, sandboxed execution, and audit.
+3. Stream provider/tool events without default paid calls.
+4. Preserve offline/dry-run behavior by default.
+
+### Acceptance
+1. Missing gates block before provider/network use.
+2. Dry-run path is deterministic and offline.
+3. Opt-in provider path emits audit/cost metadata where available.
+4. Tool calls route through policy/approval gates.
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/ -q
+pnpm build
+pnpm typecheck
+```
+
+### Known Risks
+- Paid calls and provider rate limits remain opt-in only.
+
+## Phase 102 — Live Terminal/Event Streaming UX
+
+**Roadmap:** R73 Live Terminal/Event Streaming UX
+**Status:** Baseline Complete | Evidence: local worktree; `tests/test_phase102_streaming.py`; Python full suite 3380 passed / 34 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK
+**Depends on:** Phase 101 where provider shell streaming is involved
+
+### Implementation
+1. Stream incremental stdout/stderr/events for long-running CLI, REPL, sandbox, provider-shell, and IDE paths.
+2. Support cancellation and terminal states.
+3. Keep replay/stub/live labels distinct.
+4. Cap output and preserve truncation flags.
+
+### Acceptance
+1. Long-running command emits incremental output before completion.
+2. Cancel produces terminal cancelled state and process cleanup.
+3. IDE and CLI display consistent event envelopes.
+4. Tests cover output, stderr, truncation, cancellation, and disconnected states.
+
+### Verification
+```bash
+cd python && uv run pytest tests/ -q
+pnpm build
+pnpm typecheck
+pnpm test:e2e
+```
+
+### Known Risks
+- Baseline is CLI JSONL streaming for sandbox/testbench/provider-shell. Full IDE terminal streaming and REPL incremental rendering remain future work.
+- Async terminal behavior can be flaky; deterministic test producers are used for current coverage.
+
+## Phase 103 — Broad CLI CI Orchestration
+
+**Roadmap:** R74 Broad CLI CI Orchestration
+**Status:** Baseline Complete | Evidence: local worktree; `tests/test_phase103_ci_orchestration.py` 6 passed; Python full suite 3386 passed / 34 skipped / 3 xfailed; ruff/build/typecheck OK
+**Depends on:** Phase 102, existing CI guardrails/testbench
+
+### Implementation
+1. Detect repo CI/test matrix from package managers, pyproject, pnpm, GitHub Actions, and existing testbench sources.
+2. Run selected matrix jobs through sandbox policy.
+3. Capture logs, artifacts, exit codes, timings, and summaries.
+4. Provide stable JSON and human output.
+
+### Acceptance
+1. Detects Python and pnpm jobs in this repo.
+2. Runs selected jobs without live network by default.
+3. Summarizes failures with artifact paths.
+4. Audit/trace events link jobs to sandbox decisions.
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/ -q
+pnpm build
+pnpm typecheck
+```
+
+### Known Risks
+- Baseline detects local matrix jobs and runs one selected argv job through sandbox/streaming. Complex shell workflow lines are detected but marked not runnable unless explicitly handled later.
+- Full CI orchestration can be slow; tests use fixtures/fakes.
+
+## Phase 104 — macOS MicroVM Execution + Strict No-Network Proof
+
+**Roadmap:** R75 macOS MicroVM Execution + Strict No-Network Proof
+**Status:** Blocked | Evidence: local worktree Phase 104 research; macOS Darwin 26.4 arm64 with limactl 2.1.0 detected; Lima official docs confirm default user-mode/slirp network and no documented no-network key; preflight/template truth fields hardened; public execution remains blocked
+**Depends on:** Phase 97, ADR-024, existing Lima harness hardening
+
+### Implementation
+1. Research and choose feasible Lima/Apple Virtualization.framework execution path.
+2. If feasible, create disposable VM/session, mount workspace through controlled path, disable network, run argv, collect stdout/stderr/exit code, destroy VM/session.
+3. Prove positive command success and network denial for the right reason.
+4. Keep tests opt-in and skipped unless local runtime exists.
+
+### Acceptance
+1. Host-gated proof creates and destroys VM/session.
+2. Workspace mount is bounded and symlink escape is denied or proven inaccessible.
+3. Network command fails due network-disabled policy, not missing tool.
+4. Default CI skips real VM proof with clear reason.
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/isolation/ -q
+cd python && uv run pytest tests/ -q
+pnpm build
+pnpm typecheck
+pnpm test:e2e
+```
+
+### Known Risks
+- Lima 2.x networking constraints block strict no-network proof for the current public microVM contract.
+- macOS host/runtime availability cannot be assumed in CI.
+- Direct Apple Virtualization.framework no-NIC execution may be required for macOS, but official Apple docs were JS-only in this runtime and no direct provider is implemented.
+
+## Phase 105 — Linux Firecracker Execution Proof
+
+**Roadmap:** R76 Linux Firecracker Execution Proof
+**Status:** Not Started | Evidence: none
+**Depends on:** Phase 97, ADR-024, eligible Linux host with KVM
+
+### Implementation
+1. Build or document a minimal Firecracker kernel/rootfs setup for local proof.
+2. Boot guest through Firecracker API, run argv, collect stdout/stderr/exit code, destroy VM.
+3. Prove workspace/mount/control boundary and cleanup.
+4. Keep normal CI skipped unless opt-in runtime exists.
+
+### Acceptance
+1. Preflight checks binary, `/dev/kvm`, kernel/rootfs, permissions.
+2. Opt-in proof boots guest and runs command successfully.
+3. Destroy/cleanup proof exists even on command failure.
+4. Skipped tests state exact missing runtime reason.
+
+### Verification
+```bash
+cd python && uv run pytest tests/isolation/ -q
+```
+
+### Known Risks
+- Firecracker proof cannot run on macOS host and requires Linux/KVM/rootfs setup.

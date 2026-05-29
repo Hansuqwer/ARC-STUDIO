@@ -1296,6 +1296,24 @@ export interface EditPlanApprovalResult {
     approved_at: string;
 }
 
+export interface EditPlanDiffResult {
+    plan_id: string;
+    status: string;
+    diff: string;
+    diff_truncated: boolean;
+    binary: boolean;
+    max_bytes: number;
+    files: EditFilePlanInfo[];
+}
+
+export interface EditPlanApplyResult {
+    applied: boolean;
+    reason: string;
+    transaction_id?: string | null;
+    plan?: EditPlanInfo;
+    audit_events?: Array<Record<string, unknown>>;
+}
+
 /**
  * Main service interface for ARC Studio backend operations.
  *
@@ -1705,6 +1723,10 @@ export interface ArcService {
     showEditPlan(planId: string): Promise<EditPlanInfo>;
     /** Scoped local approval for an exact saved edit-plan metadata hash. */
     approveEditPlan(planId: string, token: string): Promise<EditPlanApprovalResult>;
+    /** Real saved edit-plan diff content with caps; no replacement body is returned. */
+    diffEditPlan(planId: string, maxBytes?: number): Promise<EditPlanDiffResult>;
+    /** Apply a saved edit plan through Python edit/sandbox/transaction gates. */
+    applyEditPlan(planId: string, content: string, token: string): Promise<EditPlanApplyResult>;
 
     /** Sandbox-gated MCP server inspect via sandbox run */
     sandboxInspect(command: string[], policy?: string): Promise<SandboxInspectResult>;

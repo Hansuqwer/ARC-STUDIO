@@ -1,16 +1,229 @@
-"""CI guardrails CLI: offline checks, PR summaries, audit verification (Phase 80 / R51)."""
+"""CI guardrails and local CI orchestration CLI."""
 
 from __future__ import annotations
 
+import json
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 import typer
 
-from ..protocol.event_envelope import ok
+from ..ci_orchestration import (
+    CiRunResult,
+    build_ci_matrix,
+    make_custom_ci_job,
+    write_ci_run_artifact,
+)
+from ..protocol.errors import ArcErrorCode
+from ..protocol.event_envelope import err, ok
+from ..runtime.streaming import StreamEventType, stream_subprocess_events
+from ..security.sandbox import (
+    approve_decision_with_token,
+    build_audit_event,
+    decide,
+    ensure_workspace_cwd,
+    persist_sandbox_audit_event,
+    resolve_sandbox_policy,
+    utc_now,
+    validate_command_paths,
+)
 from ._helpers import DEBUG_FLAG, JSON_FLAG, WORKSPACE_FLAG, _out, _setup_logging, _workspace
 from ._subapps import ci_app
+
+
+def _policy(name: str, workspace: Path):
+    try:
+        return resolve_sandbox_policy(name, workspace)
+    except (KeyError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+
+@ci_app.command("matrix")
+def ci_matrix(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    include_workflows: bool = typer.Option(
+        True, "--include-workflows/--no-workflows", help="Include GitHub Actions run steps"
+    ),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Detect local CI/test matrix without executing jobs."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    matrix = build_ci_matrix(ws, include_workflows=include_workflows)
+    _out(ok(matrix.model_dump(mode="json"), workspace=str(ws)), json_output)
+
+
+@ci_app.command("run", context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+def ci_run(
+    ctx: typer.Context,
+    job_id: Optional[str] = typer.Option(None, "--job", help="Detected matrix job id to run"),
+    policy: str = typer.Option("local-safe", "--policy", help="Sandbox policy profile"),
+    approval_token: Optional[str] = typer.Option(
+        None, "--approval-token", help="Use a scoped non-interactive approval token"
+    ),
+    stream_json: bool = typer.Option(False, "--stream-json", help="Emit JSONL stream events"),
+    cancel_after_events: Optional[int] = typer.Option(
+        None, "--cancel-after-events", help="Deterministically cancel after N output events"
+    ),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Run one detected or explicit CI job through sandbox policy."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    explicit_command = list(ctx.args)
+    if job_id and explicit_command:
+        _out(err(ArcErrorCode.INVALID_INPUT, "use --job or -- <cmd>, not both"), json_output)
+        raise typer.Exit(2)
+    if not job_id and not explicit_command:
+        _out(err(ArcErrorCode.INVALID_INPUT, "missing --job or command"), json_output)
+        raise typer.Exit(2)
+
+    matrix = build_ci_matrix(ws)
+    job = make_custom_ci_job(explicit_command) if explicit_command else None
+    if job is None:
+        job = next((candidate for candidate in matrix.jobs if candidate.id == job_id), None)
+    if job is None:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"unknown ci job: {job_id}"), json_output)
+        raise typer.Exit(2)
+    if not job.runnable:
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, job.blocked_reason or "job is not argv-runnable"),
+            json_output,
+        )
+        raise typer.Exit(2)
+
+    try:
+        policy_model = _policy(policy, ws)
+        cwd = ensure_workspace_cwd((ws / job.cwd).resolve(), ws)
+        decision = decide(job.command, policy_model)
+        decision = approve_decision_with_token(
+            token=approval_token, command=job.command, policy=policy_model, decision=decision
+        )
+        validate_command_paths(job.command, policy_model)
+    except (ValueError, typer.BadParameter) as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(2)
+
+    run_id = f"ci-{uuid.uuid4().hex[:12]}"
+    started_at = utc_now()
+    ended_at = started_at
+    if not decision.allowed:
+        audit = build_audit_event(
+            command=job.command,
+            cwd=cwd,
+            decision=decision,
+            provider="subprocess",
+            started_at=started_at,
+            ended_at=ended_at,
+            exit_code=None,
+            stdout_truncated=False,
+            stderr_truncated=False,
+            redaction_applied=False,
+        )
+        audit_path = persist_sandbox_audit_event(audit)
+        audit["audit_path"] = str(audit_path)
+        result = CiRunResult(
+            run_id=run_id,
+            job=job,
+            policy=policy_model.name,
+            status="denied",
+            summary=f"denied: {decision.reason}",
+            decision=decision,
+            audit_event=audit,
+        )
+        artifact_path = write_ci_run_artifact(ws, run_id, result)
+        result.artifact_paths.append(str(artifact_path.relative_to(ws)))
+        _out(ok(result.model_dump(mode="json"), workspace=str(ws)), json_output)
+        raise typer.Exit(3)
+
+    events, stream_result = stream_subprocess_events(
+        job.command,
+        cwd=cwd,
+        source="testbench",
+        timeout_seconds=policy_model.timeout_seconds,
+        max_output_bytes=policy_model.max_output_bytes,
+        cancel_after_events=cancel_after_events,
+        safe_env_keys=frozenset(policy_model.env_allowlist),
+    )
+    ended_at = utc_now()
+    audit = build_audit_event(
+        command=job.command,
+        cwd=cwd,
+        decision=decision,
+        provider="subprocess",
+        started_at=started_at,
+        ended_at=ended_at,
+        exit_code=stream_result.exit_code,
+        stdout_truncated=stream_result.stdout_truncated,
+        stderr_truncated=stream_result.stderr_truncated,
+        redaction_applied=stream_result.redaction_applied,
+    )
+    audit_path = persist_sandbox_audit_event(audit)
+    audit["audit_path"] = str(audit_path)
+    status = _ci_status(stream_result.terminal_event, stream_result.exit_code)
+    result = CiRunResult(
+        run_id=run_id,
+        job=job,
+        policy=policy_model.name,
+        status=status,
+        exit_code=stream_result.exit_code,
+        duration_ms=stream_result.duration_ms,
+        stdout=stream_result.stdout,
+        stderr=stream_result.stderr,
+        stdout_truncated=stream_result.stdout_truncated,
+        stderr_truncated=stream_result.stderr_truncated,
+        redaction_applied=stream_result.redaction_applied,
+        summary=_ci_summary(status, stream_result.exit_code),
+        decision=decision,
+        audit_event=audit,
+    )
+    artifact_path = write_ci_run_artifact(ws, run_id, result)
+    result.artifact_paths.append(str(artifact_path.relative_to(ws)))
+    if stream_json:
+        for event in events:
+            typer.echo(
+                json.dumps(
+                    ok(event.model_dump(mode="json"), workspace=str(ws)).model_dump(mode="json"),
+                    sort_keys=True,
+                )
+            )
+        typer.echo(
+            json.dumps(
+                ok(result.model_dump(mode="json"), workspace=str(ws)).model_dump(mode="json"),
+                sort_keys=True,
+            )
+        )
+    else:
+        _out(ok(result.model_dump(mode="json"), workspace=str(ws)), json_output)
+    if status == "cancelled":
+        raise typer.Exit(130)
+    if status == "timeout":
+        raise typer.Exit(124)
+    if stream_result.exit_code not in (0, None):
+        raise typer.Exit(stream_result.exit_code)
+
+
+def _ci_status(event: StreamEventType, exit_code: int | None):
+    if event == StreamEventType.CANCELLED:
+        return "cancelled"
+    if event == StreamEventType.TIMEOUT:
+        return "timeout"
+    if exit_code == 0:
+        return "passed"
+    return "failed"
+
+
+def _ci_summary(status: str, exit_code: int | None) -> str:
+    if status == "passed":
+        return "job passed"
+    if status == "failed":
+        return f"job failed with exit code {exit_code}"
+    return f"job {status}"
 
 
 @ci_app.command("check")
