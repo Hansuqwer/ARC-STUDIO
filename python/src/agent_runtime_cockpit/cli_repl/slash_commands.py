@@ -8,6 +8,7 @@ import signal
 import shlex
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Coroutine, TypeVar
 
 from ..budget.schema import (
@@ -17,7 +18,9 @@ from ..budget.schema import (
     BudgetState,
     ConfirmationRequired,
 )
-from ..providers import AnthropicClient, preflight_with_estimator
+from ..providers import AnthropicClient, OpenAICompatibleClient, preflight_with_estimator
+from ..providers.registry import get as get_provider_client
+from ..runtime.agent_loop import AgentLoop
 from ..runtime.mode import RuntimeMode
 from ..runtime.registry import default_runtime_registry
 from ..runtime.turn_manager import TurnManager
@@ -250,6 +253,21 @@ def _build_registry():
             requires_events=[],
             privileged=False,
             trust_required="user",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="agent",
+            help_text="Run autonomous provider-backed coding agent loop",
+            category="runtime",
+            handler=cmd_agent,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "blocked", "degraded"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+            usage="/agent <task>",
         )
     )
     registry.register(
@@ -720,6 +738,68 @@ def _build_registry():
 # ── Command handler implementations ────────────────────────────────────────
 
 
+def cmd_agent(arg: str, session: ChatSession) -> CommandResult:
+    task = arg.strip()
+    if not task:
+        return CommandResult(
+            state="blocked", reason="missing_task", remediation="Usage: /agent <task>"
+        )
+    session.runtime_mode = RuntimeMode.PROVIDER_BACKED
+    session.allow_paid_calls = True
+    session.tools_enabled = True
+    return _execute_agent(
+        task,
+        session=session,
+        cancellation_token=CancellationToken(),
+        event_sink=None,
+        runtime=None,
+    )
+
+
+def _execute_agent(
+    task: str,
+    *,
+    session: ChatSession,
+    cancellation_token: CancellationToken,
+    event_sink: Any = None,
+    runtime: Any = None,
+) -> CommandResult:
+    task = task.strip()
+    if not task:
+        return CommandResult(
+            state="blocked", reason="missing_task", remediation="Usage: /agent <task>"
+        )
+    client = _provider_client_for_run(runtime, session)
+    capability = (
+        client.capabilities()
+        if hasattr(client, "capabilities")
+        else AnthropicClient().capabilities()
+    )
+    model = str(
+        (getattr(session, "metadata", {}) or {}).get("provider_model") or capability.default_model
+    )
+    try:
+        _preflight_provider_backed_run(session, task, client)
+    except (BudgetExceeded, ConfirmationRequired) as exc:
+        return CommandResult(
+            state="blocked", reason="budget_preflight_failed", remediation=str(exc)
+        )
+    manager = TurnManager(
+        client,
+        model=model,
+        event_sink=lambda name, payload: _emit(event_sink, name, payload),
+        tool_registry=default_tool_registry(Path.cwd()),
+    )
+    loop = AgentLoop(manager, session)
+    result = _run_coro_sync(loop.run(task, cancellation_token))
+    return CommandResult(
+        state="degraded" if result.degraded else "present",
+        output=result.content,
+        reason=result.degraded_reason or "",
+        metadata={"turns": result.turns, "cost_summary": result.cost_summary},
+    )
+
+
 def cmd_help(_arg: str, _session: ChatSession) -> str:
     registry = get_registry()
     # Ordered command palette grouped by surface area.
@@ -807,8 +887,8 @@ def _provider_budget_config(session: Any) -> BudgetConfig:
     return BudgetConfig(first_launch_confirmed=True)
 
 
-def _preflight_provider_backed_run(session: Any, prompt: str) -> None:
-    client = AnthropicClient()
+def _preflight_provider_backed_run(session: Any, prompt: str, runtime: Any = None) -> None:
+    client = _provider_client_for_run(runtime, session)
     capability = client.capabilities()
     model = str(
         (getattr(session, "metadata", {}) or {}).get("provider_model") or capability.default_model
@@ -883,10 +963,28 @@ def _run_runner(
     return runner.run(prompt=prompt, **kwargs)
 
 
-def _provider_client_for_run(runtime: Any) -> Any:
+def _detect_provider_name() -> str | None:
+    explicit = os.environ.get("ARC_DEFAULT_PROVIDER")
+    if explicit:
+        return explicit
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return "anthropic"
+    if os.environ.get("OPENAI_API_KEY"):
+        return "openai"
+    return None
+
+
+def _provider_client_for_run(runtime: Any, session: Any = None) -> Any:
     if runtime is not None and hasattr(runtime, "complete") and hasattr(runtime, "stream"):
         return runtime
-    return AnthropicClient()
+    metadata = getattr(session, "metadata", {}) or {}
+    provider_name = str(metadata.get("provider") or _detect_provider_name() or "anthropic")
+    try:
+        return get_provider_client(provider_name)
+    except Exception:
+        if provider_name == "openai":
+            return OpenAICompatibleClient(vendor="openai")
+        return AnthropicClient()
 
 
 def _run_provider_turn(
@@ -897,7 +995,7 @@ def _run_provider_turn(
     event_sink: Any,
     runtime: Any,
 ) -> Any:
-    client = _provider_client_for_run(runtime)
+    client = _provider_client_for_run(runtime, session)
     capability = (
         client.capabilities()
         if hasattr(client, "capabilities")
@@ -910,7 +1008,9 @@ def _run_provider_turn(
         client,
         model=model,
         event_sink=lambda name, payload: _emit(event_sink, name, payload),
-        tool_registry=default_tool_registry() if getattr(session, "tools_enabled", False) else None,
+        tool_registry=default_tool_registry(Path.cwd())
+        if getattr(session, "tools_enabled", False)
+        else None,
     )
     return _run_coro_sync(manager.run_turn(session, prompt, cancellation_token=cancellation_token))
 
@@ -981,7 +1081,7 @@ def _execute_run(
         cancellation_token.raise_if_cancelled()
         if runtime_mode is RuntimeMode.PROVIDER_BACKED:
             try:
-                _preflight_provider_backed_run(session, prompt)
+                _preflight_provider_backed_run(session, prompt, runtime)
             except (BudgetExceeded, ConfirmationRequired) as exc:
                 _emit(
                     event_sink,
@@ -1796,6 +1896,17 @@ class SlashCommandHandler:
 
         if name == "run":
             return _execute_run(
+                arg,
+                session=session,
+                cancellation_token=self.run_token_factory(),
+                event_sink=self,
+                runtime=self.runner,
+            )
+        if name == "agent":
+            session.runtime_mode = RuntimeMode.PROVIDER_BACKED
+            session.allow_paid_calls = True
+            session.tools_enabled = True
+            return _execute_agent(
                 arg,
                 session=session,
                 cancellation_token=self.run_token_factory(),

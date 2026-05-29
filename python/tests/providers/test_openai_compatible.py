@@ -185,6 +185,42 @@ class TestComplete:
         assert response.degraded_reason == "provider usage data unavailable"
         assert response.usage.available is False
 
+    @pytest.mark.asyncio
+    async def test_complete_wraps_arc_tool_schema_for_openai(self):
+        mock_response = Mock()
+        mock_response.model = "gpt-4o-mini"
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message = Mock()
+        mock_response.choices[0].message.content = "ok"
+        mock_response.choices[0].finish_reason = "stop"
+        mock_response.usage = None
+        mock_client = Mock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        client = OpenAICompatibleClient(sdk_factory=lambda: mock_client)
+        request = ProviderRequest(
+            model="gpt-4o-mini",
+            messages=[ProviderMessage(role="user", content="Hello")],
+            max_tokens=100,
+            tools=[
+                {"name": "read_file", "description": "Read", "input_schema": {"type": "object"}}
+            ],
+        )
+
+        await client.complete(request, cancellation_token=CancellationToken())
+
+        tools = mock_client.chat.completions.create.call_args.kwargs["tools"]
+        assert tools == [
+            {
+                "type": "function",
+                "function": {
+                    "name": "read_file",
+                    "description": "Read",
+                    "parameters": {"type": "object"},
+                },
+            }
+        ]
+
 
 class TestStream:
     """Test stream() method."""

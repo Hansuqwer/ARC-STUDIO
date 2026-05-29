@@ -13,6 +13,7 @@ from agent_runtime_cockpit.providers import (
     ProviderRequest,
     ProviderResponse,
     StreamChunk,
+    UsageRecord,
 )
 from agent_runtime_cockpit.security.injection_patterns import Severity, scan_structured
 from agent_runtime_cockpit.tools import ToolRegistry, wrap_tool_result
@@ -73,17 +74,61 @@ class TurnManager:
             cancellation_token.raise_if_cancelled()
             if stream:
                 chunks: list[StreamChunk] = []
+                tool_calls: list[dict[str, Any]] = []
+                usage_payload: dict[str, Any] | None = None
                 async for chunk in self._provider_client.stream(
                     request, cancellation_token=cancellation_token
                 ):
                     chunks.append(chunk)
                     self._emit("stream.chunk." + chunk.chunk_type, chunk.model_dump(mode="json"))
                     partial += chunk.delta
+                    if chunk.chunk_type == "tool_use":
+                        payload = dict(chunk.payload)
+                        if "tool_calls" in payload and isinstance(payload["tool_calls"], list):
+                            tool_calls.extend(payload["tool_calls"])
+                        else:
+                            tool_calls.append(payload)
+                    if chunk.chunk_type == "stop" and isinstance(chunk.payload.get("usage"), dict):
+                        usage_payload = chunk.payload["usage"]
+                response = ProviderResponse(
+                    call_id=request.call_id,
+                    model=self._model,
+                    content=partial,
+                    finish_reason="tool_use" if tool_calls else "stop",
+                    usage=UsageRecord.model_validate(usage_payload)
+                    if usage_payload
+                    else UsageRecord(available=False, input_tokens=0, output_tokens=0),
+                    tool_calls=tool_calls,
+                    degraded=usage_payload is None,
+                    degraded_reason=None if usage_payload else "provider usage data unavailable",
+                )
+                if session.tools_enabled and response.tool_calls:
+                    response = await self._run_tool_loop(
+                        session, response, cancellation_token=cancellation_token
+                    )
+                    session.add_message("assistant", response.content)
+                    self._emit(
+                        "turn.completed",
+                        {"session_id": session.id, "content_chars": len(response.content)},
+                    )
+                    return TurnResult(
+                        content=response.content,
+                        response=response,
+                        chunks=chunks,
+                        degraded=response.degraded,
+                        degraded_reason=response.degraded_reason,
+                    )
                 session.add_message("assistant", partial)
                 self._emit(
                     "turn.completed", {"session_id": session.id, "content_chars": len(partial)}
                 )
-                return TurnResult(content=partial, chunks=chunks)
+                return TurnResult(
+                    content=partial,
+                    response=response,
+                    chunks=chunks,
+                    degraded=response.degraded,
+                    degraded_reason=response.degraded_reason,
+                )
 
             response = await self._provider_client.complete(
                 request, cancellation_token=cancellation_token
@@ -125,12 +170,23 @@ class TurnManager:
             for message in session.history
             if message.get("role") in {"system", "user", "assistant", "tool"}
         ]
-        return ProviderRequest(
+        request = ProviderRequest(
             model=self._model,
             messages=messages,
             max_tokens=self._max_tokens,
             temperature=self._temperature,
         )
+        if session.tools_enabled and self._tool_registry:
+            request.tools = [
+                {
+                    "name": handler.name,
+                    "description": handler.description,
+                    "input_schema": handler.args_schema.model_json_schema(),
+                }
+                for handler in self._tool_registry.all_handlers()
+                if session.available_tools is None or handler.name in session.available_tools
+            ]
+        return request
 
     async def _run_tool_loop(
         self,

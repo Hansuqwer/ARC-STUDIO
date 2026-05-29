@@ -16,6 +16,7 @@ from ..isolation.microvm import (
     generate_firecracker_proof_artifacts,
 )
 from ..isolation.subprocess import SubprocessIsolationProvider
+from ..isolation.vz_provider import VZNoNetworkProof
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
 from ..runtime.streaming import stream_subprocess_events
@@ -68,6 +69,7 @@ def sandbox_doctor(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> N
         "providers": [
             subprocess_provider.describe(),
             microvm_provider.describe(),
+            VZNoNetworkProof().preflight(),
             container_preflight(),
         ]
     }

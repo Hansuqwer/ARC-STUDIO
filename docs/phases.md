@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-29 — Phase 104 strict macOS no-network proof blocked by Lima networking; Phase 105 Linux/Firecracker execution code wired behind real host gates, proof not run on this macOS host.
-**Current evidence anchor:** local worktree | targeted microVM tests 40 passed / 1 skipped; changed-file ruff clean; full verification pending.
+**Last reality refresh:** 2026-05-29 — provider-backed coding-agent loop/tools added; Phase 104 direct Apple VZ no-NIC proof scaffold added, real boot still opt-in/unproven on this host; Phase 105 Linux/Firecracker remains Linux/KVM-only.
+**Current evidence anchor:** local worktree | Python full suite 3406 passed / 35 skipped / 3 xfailed; ruff clean; pnpm build/typecheck green.
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -319,7 +319,7 @@ Every new phase/chunk should include:
 | **17 SwarmGraph Native Runtime** | **P1-P4 Baseline Complete** | existing adapter/swarmgraph.py + CLI/IDE surfaces | P1: native `swarmgraph/` package. P2: adapter bridge rewrite using native `SwarmGraphRunner` by default, CLI fallback. P3: CLI REPL. P4: ChatTab default alignment. 989 total Python tests pass; 762 TS tests pass. |
 | **18 CLI Consolidation** | **Baseline Complete** | ADR-016 Phase 2 subset | Unified slash command registry under `cli_repl/commands/`; merged current cli_studio.py and cli_repl slash commands; cli_studio.py reduced to thin shim; ChatSession schema version (v1 subset); nested legacy flat session migration (`arc studio sessions migrate`); bare `arc` TTY launch with `ARC_NO_TUI` guard. 1318 Python tests pass. Full Phase 0 target slash/session inventory is deferred by ADR-016. |
 | **19 Provider-Backed Runtime** | **Baseline Complete** | Phase 3 (provider_action) + Phase 17 (SwarmGraph) | ProviderClient protocol, BudgetEnforcer, AnthropicClient skeleton, CostRecord v2 schema + migration, extract_cost(), tokenizer-based estimator (AnthropicCountTokens + TiktokenApproximate), per-message/tools cache-control breakpoint computation + Anthropic wire format. 1246 Python tests pass (pre-existing 1 failure). Review-fix code tip `c2f39df`; docs refreshed in follow-up commits. |
-| **20 Streaming, Tool Use, and Multi-Turn Sessions** | **Baseline Complete (review pending)** | Phase 4.1 complete | Slices 1-9 implemented on `phase-5-streaming-tools`: streaming verified, ADR-019 accepted, ToolRegistry + built-in read-only tools, ChatSession v4, TurnManager single/multi-turn tool loop, CostRecord cost components, `/tools` commands, provider-backed `/run` routed through TurnManager, structured scanner. 1313 Python tests pass; final re-review required before merge/tag. |
+| **20 Streaming, Tool Use, and Multi-Turn Sessions** | **Baseline Complete (expanded coding-agent tools)** | Phase 4.1 complete | Slices 1-9 implemented on `phase-5-streaming-tools`; current work adds workspace-bound write/edit/create tools, sandboxed bash tool, streamed tool-use handoff, provider auto-detect, and autonomous `/agent` loop. Evidence: Python full suite 3406 passed / 35 skipped / 3 xfailed; ruff/build/typecheck green. |
 | 21 Streaming Audit + HMAC | Baseline Complete | — | `StreamingAuditVerifier` with sha256/hmac/auto modes; 100 MB trace <30s; CLI `arc audit verify` |
 | 22 Discriminated RunEvent Unions | Baseline Complete | — | Typed event variants in TS+Python; `RAW` fallback for unknown types |
 | 23 Enforced Workspace Trust | Baseline Complete with sandbox hardening | Phase 22 | 5 enforcement helpers; EnforcementContext; UI modals; sandbox subprocess hardening |
@@ -697,7 +697,7 @@ scripts/check-pr.sh                     # PASS
 **Roadmap:** Phase 5 after Phase 4.1 completion.  
 **Status:** Baseline Complete (review pending) — implementation on `phase-5-streaming-tools`. ADR-019 accepted; slices 1-9 have local Python coverage; provider-backed `/run` routes through TurnManager while fake/gated-local stays on the existing SwarmGraph path. Evidence: `cd python && .venv/bin/python -m pytest tests/ -q` (1313 passed, 20 skipped, 13 warnings), protocol/extension builds pass, workspace tests pass, PR hygiene pass, scoped banned-claims pass.
 
-Phase 5 makes provider-backed runtime conversational and tool-capable: implement `AnthropicClient.stream()` as an async generator yielding `StreamChunk`; add an in-process `ToolRegistry`/`ToolHandler` protocol with ADR-019 `output_trust_level`; add read-only built-in tools (`read_file`, `list_directory`, `get_current_time`); bump `ChatSession` v3→v4 with `tools_enabled`, `max_tool_iterations`, and `available_tools`; add `TurnManager` to drive request → response → tool-call → tool-result → request loops; aggregate per-call costs into `CostRecord.cost_components`; add turn/stream/tool events; extend the ADR-014 scanner for structured tool-result payloads; and route `/run` plus `/tools list|enable|disable` through the new turn/tool layer. Out of scope: write tools, shell/subprocess/network tools, MCP, parallel tools, Skills, web search, vision/computer-use APIs, SwarmGraph multi-agent orchestration, and real mixed-trust tool handling.
+Phase 5 made provider-backed runtime conversational and tool-capable: `AnthropicClient.stream()` yields `StreamChunk`; `ToolRegistry`/`ToolHandler` enforce ADR-019 `output_trust_level`; built-ins include read-only tools plus current workspace-bound `write_file`, `edit_file`, `create_file`, and sandboxed `bash`; `ChatSession` v4 tracks tool state; `TurnManager` drives request → response → tool-call → tool-result → request loops and now sends tool schemas plus handles streamed tool-use after stream completion; `/run`, `/tools`, and `/agent` route through the turn/tool layer where configured. Still out of scope: MCP, parallel tools, Skills, web search, vision/computer-use APIs, SwarmGraph multi-agent orchestration, and real mixed-trust tool handling.
 
 **Locked early decisions:** `complete()` fallback may aggregate streams transparently when needed and return a normal response with `degraded=False`; `available_tools` is a per-session allowlist, defaulting to all registered tools when unset; ADR-019 keeps `mixed` in the type contract but Phase 5 wrapper execution raises `NotImplementedError`; `wrap_tool_result` starts in `tools/wrapping.py`; read-like tools must enforce an output byte limit with an explicit truncation marker.
 
@@ -4457,14 +4457,15 @@ pnpm typecheck
 ## Phase 104 — macOS MicroVM Execution + Strict No-Network Proof
 
 **Roadmap:** R75 macOS MicroVM Execution + Strict No-Network Proof
-**Status:** Blocked | Evidence: local `limactl info` reports Lima 2.1.0 with `vz`; Lima official docs confirm default user-mode/slirp network and no documented no-network key; Apple docs JS-only in this runtime; macOS public execution remains blocked
+**Status:** In Progress | Evidence: local full Python 3406 passed / 35 skipped / 3 xfailed; `tests/isolation/test_vz_proof.py` preflight passes/skips real boot unless gated; ruff/build/typecheck green; macOS public `MicroVMIsolationProvider.execute()` remains blocked
 **Depends on:** Phase 97, ADR-024, existing Lima harness hardening
 
 ### Implementation
-1. Research and choose feasible Lima/Apple Virtualization.framework execution path.
-2. If feasible, create disposable VM/session, mount workspace through controlled path, disable network, run argv, collect stdout/stderr/exit code, destroy VM/session.
-3. Prove positive command success and network denial for the right reason.
-4. Keep tests opt-in and skipped unless local runtime exists.
+1. Direct Apple Virtualization.framework path selected for strict no-network proof; Lima remains low-security because networking is present.
+2. `VZNoNetworkProof` preflights macOS 13+, pyobjc or compiled helper, kernel/initrd, explicit `ARC_VZ_PROOF=1`, and reports `networkDevices=[]`.
+3. `tools/arc-vz-runner.swift` contains the no-NIC helper source with `config.networkDevices = []`, virtiofs workspace mount, and serial console wiring.
+4. If fully gated, run disposable VM/session, mount workspace through controlled path, run argv, collect stdout/stderr/exit code, prove no guest ethernet, destroy VM/session.
+5. Keep real boot test opt-in and skipped unless local runtime inputs exist.
 
 ### Acceptance
 1. Host-gated proof creates and destroys VM/session.
@@ -4483,9 +4484,9 @@ pnpm test:e2e
 ```
 
 ### Known Risks
-- Lima 2.x networking constraints block strict no-network proof for the current public microVM contract.
+- Lima 2.x networking constraints block strict no-network proof for Lima; direct VZ is the macOS strict candidate.
 - macOS host/runtime availability cannot be assumed in CI.
-- Direct Apple Virtualization.framework no-NIC execution may be required for macOS, but official Apple docs were JS-only in this runtime and no direct provider is implemented.
+- Direct Apple Virtualization.framework no-NIC execution is scaffolded but not proven until a real VM boots with `ARC_VZ_PROOF=1`, kernel/initrd, and runner binary.
 
 ## Phase 105 — Linux Firecracker Execution Proof
 

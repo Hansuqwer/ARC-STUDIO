@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from ..runtime.mode import RuntimeMode
 from .session import ChatSession
 from .slash_commands import SlashCommandHandler
 
@@ -31,6 +32,7 @@ def run_chat_repl(
         session = ChatSession.load(session_id)
     if not session:
         session = ChatSession()
+    _configure_provider_default(session)
 
     handler = SlashCommandHandler(
         progress_sink=lambda name, payload: print(_format_progress_event(name, payload))
@@ -114,6 +116,10 @@ def _handle_input(
                 output(result)
         return
 
+    if session.mode == "auto" and session.runtime_mode is RuntimeMode.PROVIDER_BACKED:
+        result = handler.handle(f"/agent {text}", session)
+        output(_result_text(result))
+        return
     session.add_message("user", text)
     try:
         from ..swarmgraph import SwarmGraphRunner
@@ -157,6 +163,31 @@ def _format_result(result: dict[str, Any]) -> str:
         if output_text:
             lines.append(f"  {output_text[:500]}")
     return "\n".join(lines)
+
+
+def _configure_provider_default(session: ChatSession) -> None:
+    import os
+
+    provider = os.environ.get("ARC_DEFAULT_PROVIDER")
+    if not provider:
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            provider = "anthropic"
+        elif os.environ.get("OPENAI_API_KEY"):
+            provider = "openai"
+    if not provider:
+        return
+    session.runtime_mode = RuntimeMode.PROVIDER_BACKED
+    session.allow_paid_calls = True
+    session.tools_enabled = True
+    session.metadata["provider"] = provider
+
+
+def _result_text(result: Any) -> str:
+    if result is None:
+        return ""
+    if hasattr(result, "output"):
+        return str(result.output or result.reason or result.state)
+    return str(result)
 
 
 def _format_progress_event(name: str, payload: dict[str, Any]) -> str:

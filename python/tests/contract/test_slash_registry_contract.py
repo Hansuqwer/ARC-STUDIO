@@ -11,6 +11,7 @@ PHASE_41_COMMANDS = {
     "sessions",
     "history",
     "run",
+    "agent",
     "runtime",
     "mode",
     "plan",

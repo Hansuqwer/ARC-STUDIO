@@ -37,6 +37,7 @@ context = ["httpx>=0.27"]
 optimizer = ["tiktoken>=0.12"]
 docker = ["docker>=7.1"]
 arena = ["openai>=1.0", "anthropic>=0.30"]
+vz = ["pyobjc-framework-Virtualization>=10.0; platform_system == 'Darwin'"]
 all = ["agent-runtime-cockpit[langgraph,context,optimizer,docker,arena]"]
 dev = [
     "pytest>=8.2",

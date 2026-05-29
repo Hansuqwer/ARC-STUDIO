@@ -7,6 +7,7 @@ so default test suites never require credentials or make network calls.
 from __future__ import annotations
 
 import os
+import json
 from collections.abc import Callable
 from typing import Any, AsyncIterator
 
@@ -126,6 +127,7 @@ class AnthropicClient:
             degraded_reason=None
             if getattr(response, "usage", None) is not None
             else "provider usage data unavailable",
+            tool_calls=self._extract_tool_calls(response),
         )
         # If degraded, wire the estimator for subsequent extract_cost() calls
         if provider_response.degraded:
@@ -157,18 +159,49 @@ class AnthropicClient:
                 **self._request_kwargs(request, stream=True)
             )
             usage: UsageRecord | None = None
+            tool_blocks: dict[int, dict[str, Any]] = {}
             with stream as events:
                 for event in events:
                     cancellation_token.raise_if_cancelled()
                     event_type = getattr(event, "type", "")
+                    if event_type == "content_block_start":
+                        block = getattr(event, "content_block", None)
+                        if getattr(block, "type", None) == "tool_use":
+                            tool_blocks[int(getattr(event, "index", len(tool_blocks)))] = {
+                                "id": getattr(block, "id", None),
+                                "name": getattr(block, "name", ""),
+                                "args_json": "",
+                            }
                     if event_type == "content_block_delta":
                         delta = getattr(getattr(event, "delta", None), "text", "")
                         if delta:
                             yield StreamChunk(
                                 call_id=request.call_id, chunk_type="delta", delta=str(delta)
                             )
+                        partial_json = getattr(getattr(event, "delta", None), "partial_json", "")
+                        if partial_json:
+                            idx = int(getattr(event, "index", 0))
+                            tool_blocks.setdefault(idx, {"name": "", "args_json": ""})[
+                                "args_json"
+                            ] += str(partial_json)
                     elif event_type == "message_delta":
                         usage = self._usage_record(getattr(event, "usage", None))
+            tool_calls = []
+            for block in tool_blocks.values():
+                raw = str(block.get("args_json") or "{}")
+                try:
+                    args = json.loads(raw) if raw else {}
+                except json.JSONDecodeError:
+                    args = {}
+                tool_calls.append(
+                    {"id": block.get("id"), "name": block.get("name", ""), "args": args}
+                )
+            if tool_calls:
+                yield StreamChunk(
+                    call_id=request.call_id,
+                    chunk_type="tool_use",
+                    payload={"tool_calls": tool_calls},
+                )
             yield StreamChunk(
                 call_id=request.call_id,
                 chunk_type="stop",
@@ -342,6 +375,20 @@ class AnthropicClient:
             if text is not None:
                 parts.append(str(text))
         return "".join(parts)
+
+    @staticmethod
+    def _extract_tool_calls(response: Any) -> list[dict[str, Any]]:
+        calls: list[dict[str, Any]] = []
+        for block in getattr(response, "content", []) or []:
+            if getattr(block, "type", None) == "tool_use":
+                calls.append(
+                    {
+                        "id": getattr(block, "id", None),
+                        "name": getattr(block, "name", ""),
+                        "args": getattr(block, "input", {}) or {},
+                    }
+                )
+        return calls
 
     @staticmethod
     def _usage_record(usage: Any) -> UsageRecord:

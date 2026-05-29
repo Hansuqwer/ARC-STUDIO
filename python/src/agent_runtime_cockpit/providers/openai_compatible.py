@@ -10,6 +10,7 @@ so default test suites never require credentials or make network calls.
 from __future__ import annotations
 
 import os
+import json
 from collections.abc import Callable
 from typing import Any, AsyncIterator, Literal
 
@@ -186,6 +187,7 @@ class OpenAICompatibleClient:
                 if getattr(response, "usage", None) is not None
                 else "provider usage data unavailable"
             ),
+            tool_calls=self._extract_tool_calls(response),
         )
 
     async def stream(
@@ -275,9 +277,22 @@ class OpenAICompatibleClient:
             kwargs["stop"] = request.stop_sequences
 
         if request.tools:
-            kwargs["tools"] = request.tools
+            kwargs["tools"] = [self._openai_tool_schema(tool) for tool in request.tools]
 
         return kwargs
+
+    @staticmethod
+    def _openai_tool_schema(tool: dict[str, Any]) -> dict[str, Any]:
+        if tool.get("type") == "function":
+            return tool
+        return {
+            "type": "function",
+            "function": {
+                "name": tool.get("name", ""),
+                "description": tool.get("description", ""),
+                "parameters": tool.get("input_schema", tool.get("parameters", {})),
+            },
+        }
 
     @staticmethod
     def _extract_content(response: Any) -> str:
@@ -291,6 +306,31 @@ class OpenAICompatibleClient:
             return str(message.content)
 
         return ""
+
+    @staticmethod
+    def _extract_tool_calls(response: Any) -> list[dict[str, Any]]:
+        if not hasattr(response, "choices") or not response.choices:
+            return []
+        message = getattr(response.choices[0], "message", None)
+        calls = getattr(message, "tool_calls", None) if message is not None else None
+        if calls is None or not isinstance(calls, list | tuple):
+            return []
+        result: list[dict[str, Any]] = []
+        for call in calls:
+            fn = getattr(call, "function", None)
+            raw_args = getattr(fn, "arguments", "{}") if fn is not None else "{}"
+            try:
+                args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+            except json.JSONDecodeError:
+                args = {}
+            result.append(
+                {
+                    "id": getattr(call, "id", None),
+                    "name": getattr(fn, "name", "") if fn is not None else "",
+                    "args": args,
+                }
+            )
+        return result
 
     @staticmethod
     def _usage_record(usage: Any) -> UsageRecord:

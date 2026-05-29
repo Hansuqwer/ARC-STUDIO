@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-29 — R75 strict macOS no-network proof blocked by Lima networking; R76 Linux/Firecracker execution code wired behind real host gates, proof not run on this macOS host.
-**Current evidence anchor:** local worktree | targeted microVM tests 40 passed / 1 skipped; changed-file ruff clean; full verification pending.
+**Last reality refresh:** 2026-05-29 — provider-backed coding-agent loop/tools added; R75 direct Apple VZ no-NIC proof scaffold added, real boot still opt-in/unproven on this host; R76 Linux/Firecracker proof remains Linux/KVM-only.
+**Current evidence anchor:** local worktree | Python full suite 3406 passed / 35 skipped / 3 xfailed; ruff clean; pnpm build/typecheck green.
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -1026,7 +1026,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R72 Provider-Backed Runtime Shell** | **Baseline Complete** | **Phase 101 — gated provider shell contract baseline, dry-run/default-safe path, no default paid calls** |
 | **R73 Live Terminal/Event Streaming UX** | **Baseline Complete** | **Phase 102 — CLI JSONL incremental stdout/stderr/events/cancel for sandbox/testbench/provider-shell; IDE/REPL streaming follow-up** |
 | **R74 Broad CLI CI Orchestration** | **Baseline Complete** | **Phase 103 — detect local CI matrix, run selected argv job through sandbox/streaming, write local artifact, stable JSON** |
-| **R75 macOS MicroVM Execution + Strict No-Network Proof** | **Blocked** | **Phase 104 — Lima/VZ cannot prove strict no-network; direct Apple VZ no-NIC helper required** |
+| **R75 macOS MicroVM Execution + Strict No-Network Proof** | **In Progress** | **Phase 104 — Direct Apple VZ no-NIC provider/helper scaffold and doctor preflight exist; real no-NIC boot proof remains opt-in and unproven on this host** |
 | **R76 Linux Firecracker Execution Proof** | **Baseline Complete (host-unproven)** | **Phase 105 — Linux/Firecracker execution path wired behind KVM/rootfs/env gates; real proof requires eligible Linux host** |
 
 **Post-v0.1 Execution Order:** 
@@ -1440,9 +1440,9 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Goal:** Prove real local macOS lightweight VM execution, preferably Lima/Apple Virtualization.framework, with strict no-network behavior.
 
-**Current:** Blocked for strict macOS execution. Phase 104 research re-confirmed Lima/VZ lifecycle and workspace mount proof are feasible, but Lima default user-mode/slirp networking is documented and no no-network template key was found. ARC keeps Lima as a low-security, host-gated proof harness only. On macOS, public `MicroVMIsolationProvider.execute()` raises with a clear ADR-024 blocker.
+**Current:** In progress for strict macOS proof via direct Apple Virtualization.framework, not Lima. ARC now has `VZNoNetworkProof` preflight/opt-in runner scaffolding, `arc sandbox doctor --json` reports `vz_no_nic` with `networkDevices=[]`, and `tools/arc-vz-runner.swift` shows the no-NIC VZ configuration path. Real boot proof is still gated by `ARC_VZ_PROOF=1`, macOS 13+, kernel/initrd, and a compiled runner; no VM boot was proven on this host. Lima remains a low-security harness only because its default/user-mode networking is network-present.
 
-**Status:** Blocked | Evidence: local `limactl info` reports Lima 2.1.0 with `vz`; Lima docs confirm default user-mode/slirp network and no documented no-network key; Apple docs JS-only in this runtime | Notes: No macOS strict no-network proof; direct Apple VZ no-NIC provider or future Lima no-network support remains required before any execution claim.
+**Status:** In Progress | Evidence: local full Python 3406 passed / 35 skipped / 3 xfailed; `tests/isolation/test_vz_proof.py` preflight passes/skips real boot unless gated; ruff/build/typecheck green | Notes: macOS VZ no-NIC execution is not claimed until `ARC_VZ_PROOF=1` boots a guest, proves `networkDevices=[]` plus no guest ethernet, runs a command, and destroys the VM.
 
 ## R76 — Linux Firecracker Execution Proof
 
