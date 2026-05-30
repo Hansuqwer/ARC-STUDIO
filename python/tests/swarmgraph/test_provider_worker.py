@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+import time
 
 import pytest
 
@@ -54,6 +55,13 @@ class _FakeProvider:
         return self.response
 
 
+class _BlockingProvider(_FakeProvider):
+    async def complete(self, request: ProviderRequest, *, cancellation_token) -> ProviderResponse:
+        self.request = request
+        time.sleep(0.2)
+        return self.response
+
+
 def test_gated_local_calls_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     provider = _FakeProvider()
     monkeypatch.setenv("ARC_SWARMGRAPH_PROVIDER", "test-provider")
@@ -100,6 +108,20 @@ def test_gated_local_provider_exception(monkeypatch: pytest.MonkeyPatch) -> None
     assert result.output == ""
     assert result.error is not None
     assert "API error" in result.error
+
+
+def test_gated_local_timeout_returns_without_hanging(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = _BlockingProvider()
+    monkeypatch.setenv("ARC_SWARMGRAPH_PROVIDER", "test-provider")
+    monkeypatch.setattr(worker_module, "get_provider", lambda _provider_id: provider)
+
+    task = SwarmTask(prompt="test")
+    started = time.monotonic()
+    result = worker_execute(task, mode=ExecutionMode.gated_local, timeout=0.01)
+
+    assert time.monotonic() - started < 0.1
+    assert result.error == "timeout"
+    time.sleep(0.25)
 
 
 @pytest.mark.asyncio

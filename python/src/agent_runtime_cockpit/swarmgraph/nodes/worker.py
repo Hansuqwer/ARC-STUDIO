@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import Any, Protocol
 
 from ...cli_repl.cancellation import never_cancelled
-from ...providers.base import ProviderMessage, ProviderRequest
+from ...providers.base import ProviderMessage, ProviderRequest, ProviderResponse
 from ...providers.registry import get as get_provider
 from ..config import ExecutionMode
 from ..models import (
@@ -123,9 +123,11 @@ async def _worker_execute_gated_local(
             max_tokens=1024,
         )
         provider_token = cancellation_token or never_cancelled()
-        response = await asyncio.wait_for(
-            client.complete(request, cancellation_token=provider_token),
-            timeout=timeout,
+        response = await _complete_provider_with_timeout(
+            client,
+            request,
+            provider_token,
+            timeout,
         )
         elapsed = time.time() - t0
         return WorkerResult(
@@ -208,6 +210,40 @@ def _response_cost_usd(client: Any, response: Any, requested_model: str) -> floa
         return float(cost / Decimal("1000000"))
     except Exception:
         return 0.0
+
+
+async def _complete_provider_with_timeout(
+    client: Any,
+    request: ProviderRequest,
+    cancellation_token: CancellationTokenLike,
+    timeout: float,
+) -> ProviderResponse:
+    loop = asyncio.get_running_loop()
+    done = asyncio.Event()
+    result: dict[str, ProviderResponse | BaseException] = {}
+
+    def run_complete() -> None:
+        try:
+            result["response"] = asyncio.run(
+                client.complete(request, cancellation_token=cancellation_token)
+            )
+        except BaseException as exc:
+            result["error"] = exc
+        finally:
+            try:
+                loop.call_soon_threadsafe(done.set)
+            except RuntimeError:
+                pass
+
+    threading.Thread(target=run_complete, daemon=True).start()
+    await asyncio.wait_for(done.wait(), timeout=timeout)
+    error = result.get("error")
+    if isinstance(error, BaseException):
+        raise error
+    response = result.get("response")
+    if not isinstance(response, ProviderResponse):
+        raise RuntimeError("provider returned no response")
+    return response
 
 
 def process_worker_results(

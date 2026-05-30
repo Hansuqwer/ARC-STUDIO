@@ -4525,7 +4525,7 @@ cd python && ARC_MICROVM_INTEGRATION=1 ARC_MICROVM_EXEC_ENABLED=1 ARC_FC_REAL_EX
 ## Phase 106 — SwarmGraph Runtime Hardening
 
 **Roadmap:** R77 SwarmGraph Runtime Hardening (Post-Analysis)
-**Status:** Baseline Complete (offline/mocked) | Evidence: Phase 106 implementation complete with mocked ProviderClient coverage; `cd python && uv run ruff check src tests`, `cd python && uv run pytest tests/swarmgraph/ tests/test_swarmgraph_native.py -q`, and `cd python && uv run pytest tests/ -q` passed after each slice. Live 9router smoke using `ag/gemini-3.5-flash-extra-low` was attempted and blocked by missing `NINEROUTER_API_KEY`/`ROUTER9_API_KEY`.
+**Status:** Baseline Complete + Live Smoke Proven | Evidence: Phase 106 implementation complete with mocked ProviderClient coverage; `cd python && uv run ruff check src tests`, `cd python && uv run pytest tests/swarmgraph/ tests/test_swarmgraph_native.py -q`, and `cd python && uv run pytest tests/ -q` passed after each slice. Opt-in live 9router smoke using `ag/gemini-3.5-flash-extra-low` passed via `.env` key with `ARC_SWARMGRAPH_PROVIDER_TESTS=1`.
 **Depends on:** Phase 20 (ProviderClient/TurnManager stable), Phase 17 (SwarmGraph native runtime exists)
 
 ### Context

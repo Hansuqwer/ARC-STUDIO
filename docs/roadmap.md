@@ -994,7 +994,7 @@ P2 — Quality:
 - All 10 consensus protocols produce differentiated results when multiple votes exist
 - Existing fake_offline tests remain green; new tests require `ARC_SWARMGRAPH_PROVIDER_TESTS=1`
 
-**Status:** Baseline Complete (offline/mocked) | Evidence: Phase 106 wired `gated_local` workers through `ProviderClient`, added async semaphore-bounded execution, fan-out audit, context isolation, event callback, and 3 detector events; `cd python && uv run ruff check src tests`, targeted SwarmGraph tests, and `cd python && uv run pytest tests/ -q` passed. Live 9router smoke was attempted with `ag/gemini-3.5-flash-extra-low` but blocked by missing `NINEROUTER_API_KEY`/`ROUTER9_API_KEY`. | Notes: No live provider-backed end-to-end execution claim until credentials-backed smoke/e2e passes.
+**Status:** Baseline Complete + Live Smoke Proven | Evidence: Phase 106 wired `gated_local` workers through `ProviderClient`, added async semaphore-bounded execution, fan-out audit, context isolation, event callback, and 3 detector events; `cd python && uv run ruff check src tests`, targeted SwarmGraph tests, and `cd python && uv run pytest tests/ -q` passed. Opt-in 9router smoke using `ag/gemini-3.5-flash-extra-low` passed via `.env` key with `ARC_SWARMGRAPH_PROVIDER_TESTS=1`. | Notes: This proves a narrow live ProviderClient worker smoke, not broad provider-backed SwarmGraph E2E.
 
 ## Updated Status Summary
 
@@ -1069,7 +1069,7 @@ P2 — Quality:
 | **R74 Broad CLI CI Orchestration** | **Baseline Complete** | **Phase 103 — detect local CI matrix, run selected argv job through sandbox/streaming, write local artifact, stable JSON** |
 | **R75 macOS MicroVM Execution + Strict No-Network Proof** | **In Progress** | **Phase 104 — Direct Apple VZ no-NIC provider/helper scaffold and doctor preflight exist; real no-NIC boot proof remains opt-in and unproven on this host** |
 | **R76 Linux Firecracker Execution Proof** | **Baseline Complete (host-unproven)** | **Phase 105 — Linux/Firecracker execution path wired behind KVM/rootfs/env gates; real proof requires eligible Linux host** |
-| **R77 SwarmGraph Runtime Hardening** | **Baseline Complete (offline/mocked)** | **Phase 106 — ProviderClient worker wiring, async parallel execution, fan-out gate, context isolation, event callback, and 3 failure detectors complete; live 9router smoke blocked by missing API key** |
+| **R77 SwarmGraph Runtime Hardening** | **Baseline Complete + Live Smoke Proven** | **Phase 106 — ProviderClient worker wiring, async parallel execution, fan-out gate, context isolation, event callback, 3 failure detectors, and opt-in 9router worker smoke complete** |
 
 **Post-v0.1 Execution Order:** 
 - **Priority 1 stop-the-line:** R68-R76 / Phases 97-105 (full CLI parity track). Research first, then implement in order unless the research matrix proves a safer dependency order. Do not claim OpenCode/Claude Code parity, autonomous repair, rich diff review, provider-backed shell, broad CI orchestration, or microVM execution until implemented and tested.
