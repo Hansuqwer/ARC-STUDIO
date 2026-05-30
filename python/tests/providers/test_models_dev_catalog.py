@@ -121,6 +121,7 @@ def test_bundled_models_dev_providers_registered():
 
 
 def test_9router_custom_behavior_unchanged(monkeypatch):
+    monkeypatch.delenv("NINEROUTER_API_KEY", raising=False)
     monkeypatch.setenv("ROUTER9_API_KEY", "sk-test")
     monkeypatch.setenv("ARC_9ROUTER_DEFAULT_MODEL", "ag/gemini-3.5-flash-extra-low")
     client = get("9router")

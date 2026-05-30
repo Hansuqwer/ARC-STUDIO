@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-29 — provider-backed coding-agent loop/tools added; Phase 104 direct Apple VZ no-NIC proof scaffold added, real boot still opt-in/unproven on this host; Phase 105 Linux/Firecracker remains Linux/KVM-only.
-**Current evidence anchor:** local worktree | Python full suite 3406 passed / 35 skipped / 3 xfailed; ruff clean; pnpm build/typecheck green.
+**Last reality refresh:** 2026-05-30 — Phase 104 macOS strict no-network proof is Blocked pending direct Apple VZ no-NIC runner/kernel/initrd evidence; Phase 105 Linux/Firecracker remains host-unproven and Linux/KVM-only; Phase 106 remains narrow live-smoke/gated, not broad provider-backed SwarmGraph E2E.
+**Current evidence anchor:** local worktree | Phase 104-106 research refresh and orchestrator prompt; `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3453 passed / 36 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK; `pnpm test:e2e` OK; banned-claims guard OK.
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -4458,7 +4458,7 @@ pnpm typecheck
 ## Phase 104 — macOS MicroVM Execution + Strict No-Network Proof
 
 **Roadmap:** R75 macOS MicroVM Execution + Strict No-Network Proof
-**Status:** In Progress | Evidence: local full Python 3406 passed / 35 skipped / 3 xfailed; `tests/isolation/test_vz_proof.py` preflight passes/skips real boot unless gated; ruff/build/typecheck green; macOS public `MicroVMIsolationProvider.execute()` remains blocked
+**Status:** Blocked | Evidence: local research refresh in `docs/research/sandbox-and-microvm.md`; `cd python && uv run pytest tests/ -q` 3453 passed / 36 skipped / 3 xfailed; `pnpm test:e2e` OK; `tests/isolation/test_vz_proof.py` preflight passes/skips real boot unless gated; macOS public `MicroVMIsolationProvider.execute()` remains blocked | Notes: strict no-network proof cannot complete until a direct Apple Virtualization.framework no-NIC runner/kernel/initrd boots a guest, proves no NIC/default route, runs argv, proves workspace/symlink bounds, and tears down.
 **Depends on:** Phase 97, ADR-024, existing Lima harness hardening
 
 ### Implementation
@@ -4488,6 +4488,7 @@ pnpm test:e2e
 - Lima 2.x networking constraints block strict no-network proof for Lima; direct VZ is the macOS strict candidate.
 - macOS host/runtime availability cannot be assumed in CI.
 - Direct Apple Virtualization.framework no-NIC execution is scaffolded but not proven until a real VM boots with `ARC_VZ_PROOF=1`, kernel/initrd, and runner binary.
+- This phase must remain Blocked, not complete, until the host-gated proof creates/runs/destroys a VM and records guest no-network/workspace evidence.
 
 ## Phase 105 — Linux Firecracker Execution Proof
 
@@ -4619,7 +4620,7 @@ Acceptance:
 Implementation:
 1. Add `on_event: Callable[[SwarmGraphEvent], None] | None = None` parameter to `SwarmGraphRunner.__init__()`.
 2. Call `self._emit(event)` helper instead of `self.events.append(event)` — helper appends to list AND calls callback if set.
-3. Adapter can pass an `on_event` that publishes directly to EventBroker for live streaming.
+3. Adapter can pass an `on_event` that publishes directly to EventBroker for incremental event transport.
 
 Acceptance:
 1. When `on_event` is set, each event triggers the callback immediately.

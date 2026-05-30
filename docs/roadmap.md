@@ -2,8 +2,8 @@
 
 **Status:** Locked source of truth for remaining product work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-29 — provider-backed coding-agent loop/tools added; R75 direct Apple VZ no-NIC proof scaffold added, real boot still opt-in/unproven on this host; R76 Linux/Firecracker proof remains Linux/KVM-only.
-**Current evidence anchor:** local worktree | Python full suite 3406 passed / 35 skipped / 3 xfailed; ruff clean; pnpm build/typecheck green.
+**Last reality refresh:** 2026-05-30 — R75 macOS strict no-network proof marked Blocked pending direct Apple VZ no-NIC runner/kernel/initrd evidence; R76 Linux/Firecracker proof remains host-unproven and Linux/KVM-only; R77 remains narrow live-smoke/gated, not broad provider-backed SwarmGraph E2E.
+**Current evidence anchor:** local worktree | Phase 104-106 research refresh and orchestrator prompt; `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3453 passed / 36 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK; `pnpm test:e2e` OK; banned-claims guard OK.
 **Update rule:** Update this file in the same commit whenever implementation status changes. Do not create replacement roadmap/status/implementation markdowns.
 
 ## Status Vocabulary
@@ -975,7 +975,7 @@ P0 — Unblocks real execution:
 P1 — Production readiness:
 4. Add fan-out gate with parallelizability score (ADR-013 requirement)
 5. Implement worker context isolation — workers receive only assigned task context
-6. Add event streaming callback (`on_event: Callable`) into runner for live streaming without adapter mediation
+6. Add event streaming callback (`on_event: Callable`) into runner for incremental event transport without adapter mediation
 7. Implement 3 of 13 failure mode detectors: coordination deadlock, consensus failure, resource exhaustion
 
 P2 — Quality:
@@ -1067,7 +1067,7 @@ P2 — Quality:
 | **R72 Provider-Backed Runtime Shell** | **Baseline Complete** | **Phase 101 — gated provider shell contract baseline, dry-run/default-safe path, no default paid calls** |
 | **R73 Live Terminal/Event Streaming UX** | **Baseline Complete** | **Phase 102 — CLI JSONL incremental stdout/stderr/events/cancel for sandbox/testbench/provider-shell; IDE/REPL streaming follow-up** |
 | **R74 Broad CLI CI Orchestration** | **Baseline Complete** | **Phase 103 — detect local CI matrix, run selected argv job through sandbox/streaming, write local artifact, stable JSON** |
-| **R75 macOS MicroVM Execution + Strict No-Network Proof** | **In Progress** | **Phase 104 — Direct Apple VZ no-NIC provider/helper scaffold and doctor preflight exist; real no-NIC boot proof remains opt-in and unproven on this host** |
+| **R75 macOS MicroVM Execution + Strict No-Network Proof** | **Blocked** | **Phase 104 — Direct Apple VZ no-NIC provider/helper scaffold and doctor preflight exist; real no-NIC boot proof requires runner/kernel/initrd/guest evidence unavailable here** |
 | **R76 Linux Firecracker Execution Proof** | **Baseline Complete (host-unproven)** | **Phase 105 — Linux/Firecracker execution path wired behind KVM/rootfs/env gates; real proof requires eligible Linux host** |
 | **R77 SwarmGraph Runtime Hardening** | **Baseline Complete + Live Smoke Proven** | **Phase 106 — ProviderClient worker wiring, async parallel execution, fan-out gate, context isolation, event callback, 3 failure detectors, and opt-in 9router worker smoke complete** |
 
@@ -1482,9 +1482,9 @@ P2 — Quality:
 
 **Goal:** Prove real local macOS lightweight VM execution, preferably Lima/Apple Virtualization.framework, with strict no-network behavior.
 
-**Current:** In progress for strict macOS proof via direct Apple Virtualization.framework, not Lima. ARC now has `VZNoNetworkProof` preflight/opt-in runner scaffolding, `arc sandbox doctor --json` reports `vz_no_nic` with `networkDevices=[]`, and `tools/arc-vz-runner.swift` shows the no-NIC VZ configuration path. Real boot proof is still gated by `ARC_VZ_PROOF=1`, macOS 13+, kernel/initrd, and a compiled runner; no VM boot was proven on this host. Lima remains a low-security harness only because its default/user-mode networking is network-present.
+**Current:** Blocked for strict macOS proof via direct Apple Virtualization.framework, not Lima. ARC has `VZNoNetworkProof` preflight/opt-in runner scaffolding, `arc sandbox doctor --json` reports `vz_no_nic` with `networkDevices=[]`, and `tools/arc-vz-runner.swift` shows the no-NIC VZ configuration path. Real boot proof is still gated by `ARC_VZ_PROOF=1`, macOS 13+, kernel/initrd, and a compiled runner; no VM boot was proven on this host. Lima remains a low-security harness only because its default/user-mode networking is network-present.
 
-**Status:** In Progress | Evidence: local full Python 3406 passed / 35 skipped / 3 xfailed; `tests/isolation/test_vz_proof.py` preflight passes/skips real boot unless gated; ruff/build/typecheck green | Notes: macOS VZ no-NIC execution is not claimed until `ARC_VZ_PROOF=1` boots a guest, proves `networkDevices=[]` plus no guest ethernet, runs a command, and destroys the VM.
+**Status:** Blocked | Evidence: local research refresh in `docs/research/sandbox-and-microvm.md`; `cd python && uv run pytest tests/ -q` 3453 passed / 36 skipped / 3 xfailed; `pnpm test:e2e` OK; `tests/isolation/test_vz_proof.py` preflight passes/skips real boot unless gated | Notes: macOS VZ no-NIC execution is not claimed until `ARC_VZ_PROOF=1` boots a guest, proves `networkDevices=[]` plus no guest ethernet/default route, runs a command, proves workspace/symlink bounds, and destroys the VM.
 
 ## R76 — Linux Firecracker Execution Proof
 

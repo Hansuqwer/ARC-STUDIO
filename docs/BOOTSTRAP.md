@@ -175,3 +175,4 @@ Expected defaults:
 - Container execution is disabled unless `ARC_ENABLE_CONTAINER_SANDBOX=1` is set.
 - Lima template rendering requires `ARC_MICROVM_EXPERIMENTAL=1`; it does not execute a VM.
 - Firecracker execution artifact generation: `ARC_FC_BUILD_EXEC_ROOTFS=1 uv run arc sandbox firecracker-artifacts --exec-rootfs --output /tmp/arc-fc --json`.
+- Next-three phase orchestration prompt: `docs/prompts/phase-104-106-orchestrator.md`. It includes research, up-to-8-subagent workflow, e2e, commit, and push gates while preserving Blocked/host-unproven labels.
