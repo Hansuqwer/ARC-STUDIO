@@ -160,3 +160,46 @@ async def test_budget_failure_after_completed_worker(monkeypatch: pytest.MonkeyP
     assert result["error"] == "budget exhausted"
     assert result["total_cost_usd"] == pytest.approx(1.2)
     assert len([event for event in result["events"] if event["kind"] == "budget"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_budget_exhausted_before_dispatch_skips_workers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def unexpected_worker(task, mode, timeout, cancellation_token=None):
+        raise AssertionError("worker should not run when budget is already exhausted")
+
+    monkeypatch.setattr(runner_module, "worker_execute_async", unexpected_worker)
+    cfg = SwarmGraphConfig(
+        num_workers=3,
+        max_rounds=1,
+        max_parallel_workers=3,
+        fan_out_threshold=0,
+        enable_budget=True,
+        budget_limit_usd=0.0,
+    )
+    runner = SwarmGraphRunner(config=cfg)
+
+    result = await runner.run_async("Implement A. Test B. Document C.")
+
+    assert result["status"] == "failed"
+    assert result["error"] == "budget exhausted"
+    assert result["completed_tasks"] == 0
+    assert result["total_cost_usd"] == 0.0
+    assert not [event for event in result["events"] if event["kind"] == "worker"]
+    budget_events = [event for event in result["events"] if event["kind"] == "budget"]
+    assert budget_events == [
+        {
+            "id": budget_events[0]["id"],
+            "kind": "budget",
+            "swarm_id": result["swarm_id"],
+            "timestamp": budget_events[0]["timestamp"],
+            "data": {
+                "cost_usd": 0.0,
+                "limit_usd": 0.0,
+                "accumulated": 0.0,
+                "exhausted": True,
+            },
+            "round": 0,
+        }
+    ]

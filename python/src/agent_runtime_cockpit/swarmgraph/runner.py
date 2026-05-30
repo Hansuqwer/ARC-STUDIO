@@ -140,6 +140,12 @@ class SwarmGraphRunner:
             if not pending:
                 break
 
+            if self._budget_exhausted(cfg):
+                self.state.status = SwarmStatus.failed
+                self.state.error = "budget exhausted"
+                self._emit(emit_budget_event(self.state, 0.0, cfg.budget_limit_usd))
+                break
+
             assignment = queen_assign(self.state, pending)
             worker_results = await self._execute_workers_parallel(
                 pending,
@@ -294,6 +300,11 @@ class SwarmGraphRunner:
         ):
             self.state.status = SwarmStatus.failed
             self.state.error = "budget exhausted"
+
+    def _budget_exhausted(self, cfg: SwarmGraphConfig) -> bool:
+        if self.state is None or not cfg.enable_budget or cfg.budget_limit_usd is None:
+            return False
+        return self.state.accumulated_cost_usd >= cfg.budget_limit_usd
 
     def get_state(self) -> SwarmState | None:
         return self.state
