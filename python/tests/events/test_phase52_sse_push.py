@@ -42,8 +42,6 @@ from agent_runtime_cockpit.security.enforcement import TrustEnforcementError
 from agent_runtime_cockpit.web.keys import WORKSPACE_KEY
 from agent_runtime_cockpit.web.routes import setup_routes
 
-pytestmark = pytest.mark.asyncio
-
 _TRUST = "agent_runtime_cockpit.web.routes.enforce_workspace_trust"
 _GET_WRITER = "agent_runtime_cockpit.web.routes.get_writer"
 
@@ -60,6 +58,7 @@ async def _client(workspace: Path) -> TestClient:
 # ── 1. SSE endpoint streams 3 events ─────────────────────────────────────────
 
 
+@pytest.mark.asyncio
 async def test_sse_stream_receives_three_events(tmp_path: Path) -> None:
     """GET /api/events/stream delivers 3 allowed event types to client."""
     reset_bus()
@@ -100,6 +99,7 @@ async def test_sse_stream_receives_three_events(tmp_path: Path) -> None:
 # ── 2. Last-Event-ID resumes from correct position ───────────────────────────
 
 
+@pytest.mark.asyncio
 async def test_last_event_id_resumes_from_position(tmp_path: Path) -> None:
     """Last-Event-ID skips already-seen events."""
     log_path = tmp_path / ".arc" / "events" / "event-log.jsonl"
@@ -123,6 +123,7 @@ async def test_last_event_id_resumes_from_position(tmp_path: Path) -> None:
     reset_writer(log_path)
 
 
+@pytest.mark.asyncio
 async def test_sse_replays_publish_persisted_id_with_last_event_id(tmp_path: Path) -> None:
     """Published-before-client events persist once and replay with stable SSE id."""
     reset_bus()
@@ -161,6 +162,7 @@ async def test_sse_replays_publish_persisted_id_with_last_event_id(tmp_path: Pat
 # ── 3. Untrusted workspace returns 403 at connect time ───────────────────────
 
 
+@pytest.mark.asyncio
 async def test_sse_stream_untrusted_returns_403_not_mid_stream(tmp_path: Path) -> None:
     """Untrusted workspace returns 403 JSON before SSE stream starts."""
     with patch(_TRUST, side_effect=TrustEnforcementError("untrusted")):
@@ -337,6 +339,7 @@ def test_dead_letter_payload_hash_is_deterministic() -> None:
 # ── SSE endpoint trusts before returning any data ────────────────────────────
 
 
+@pytest.mark.asyncio
 async def test_sse_stream_doc_constraint() -> None:
     """Document constraint: no WebSocket, no shared-server, no remote-sync."""
     # This is a documentation/constraint test.

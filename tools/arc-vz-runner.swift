@@ -39,14 +39,19 @@ guard let parsed = parseArgs() else {
 }
 
 let config = VZVirtualMachineConfiguration()
-config.bootLoader = VZLinuxBootLoader(kernelURL: URL(fileURLWithPath: parsed.kernel))
-if let loader = config.bootLoader as? VZLinuxBootLoader {
-    loader.initialRamdiskURL = URL(fileURLWithPath: parsed.initrd)
-    loader.commandLine = "console=hvc0 ARC_VZ_COMMAND=\(parsed.command.joined(separator: " "))"
-}
+config.platform = VZGenericPlatformConfiguration()
+let loader = VZLinuxBootLoader(kernelURL: URL(fileURLWithPath: parsed.kernel))
+loader.initialRamdiskURL = URL(fileURLWithPath: parsed.initrd)
+let encodedCommand = parsed.command
+    .joined(separator: "\u{1f}")
+    .data(using: .utf8)?
+    .base64EncodedString() ?? ""
+loader.commandLine = "console=hvc0 quiet ARC_VZ_COMMAND_B64=\(encodedCommand)"
+config.bootLoader = loader
 config.cpuCount = 1
 config.memorySize = 512 * 1024 * 1024
 config.networkDevices = []
+config.entropyDevices = [VZVirtioEntropyDeviceConfiguration()]
 
 let console = VZVirtioConsoleDeviceSerialPortConfiguration()
 console.attachment = VZFileHandleSerialPortAttachment(fileHandleForReading: FileHandle.standardInput, fileHandleForWriting: FileHandle.standardOutput)
