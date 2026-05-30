@@ -60,6 +60,40 @@ def _policy(name: str, workspace: Path) -> SandboxPolicy:
         raise typer.BadParameter(str(exc)) from exc
 
 
+def _persist_sandbox_denial(
+    *,
+    command: list[str],
+    cwd: Path,
+    decision,
+    provider: str,
+    started_at: str,
+    reason: str,
+) -> dict:
+    denied = decision.model_copy(
+        update={
+            "allowed": False,
+            "reason": reason,
+            "approval_required": False,
+            "approved": False,
+        }
+    )
+    audit = build_audit_event(
+        command=command,
+        cwd=cwd,
+        decision=denied,
+        provider=provider,
+        started_at=started_at,
+        ended_at=utc_now(),
+        exit_code=None,
+        stdout_truncated=False,
+        stderr_truncated=False,
+        redaction_applied=False,
+    )
+    audit_path = persist_sandbox_audit_event(audit)
+    audit["audit_path"] = str(audit_path)
+    return audit
+
+
 @sandbox_app.command("doctor")
 def sandbox_doctor(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
     """Report sandbox and microVM provider preflight state."""
@@ -504,7 +538,22 @@ def sandbox_run(
     try:
         validate_command_paths(command, policy_model)
     except ValueError as exc:
-        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        audit = _persist_sandbox_denial(
+            command=command,
+            cwd=cwd,
+            decision=decision,
+            provider=provider,
+            started_at=started_at,
+            reason=str(exc),
+        )
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                str(exc),
+                details={"audit_path": audit["audit_path"], "audit_id": audit["audit_id"]},
+            ),
+            json_output,
+        )
         raise typer.Exit(2)
     if not decision.allowed:
         if ask and json_output:
@@ -571,6 +620,21 @@ def sandbox_run(
                     sort_keys=True,
                 )
             )
+        ended_at = utc_now()
+        audit = build_audit_event(
+            command=command,
+            cwd=cwd,
+            decision=decision,
+            provider="subprocess",
+            started_at=started_at,
+            ended_at=ended_at,
+            exit_code=stream_result.exit_code,
+            stdout_truncated=stream_result.stdout_truncated,
+            stderr_truncated=stream_result.stderr_truncated,
+            redaction_applied=stream_result.redaction_applied,
+        )
+        audit_path = persist_sandbox_audit_event(audit)
+        audit["audit_path"] = str(audit_path)
         if stream_result.terminal_event.value in {"cancelled", "timeout"}:
             raise typer.Exit(130 if stream_result.terminal_event.value == "cancelled" else 124)
         if stream_result.exit_code not in (0, None):

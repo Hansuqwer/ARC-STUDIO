@@ -147,7 +147,7 @@ IsolationProvider
 ├── none
 ├── subprocess
 ├── container     # gated Docker/Podman fallback
-└── microvm       # Linux/Firecracker gated execution; macOS preflight/harness only
+└── microvm       # Linux/Firecracker gated scaffold, host-unproven; macOS preflight/harness only
 ```
 
 The CLI sandbox path separates policy from execution:
@@ -156,8 +156,8 @@ The CLI sandbox path separates policy from execution:
 argv -> CommandClassification -> SandboxDecision -> IsolationProvider -> SandboxResult/audit event -> local event-log mirror
 ```
 
-`subprocess` is the default real execution provider. `container` is a gated fallback. `microvm` has a Linux/Firecracker execution path behind `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, Linux/KVM, Firecracker, kernel/rootfs, and workspace snapshot tooling. macOS remains blocked for strict public execution because Lima/VZ networking is network-present and no direct Apple VZ no-NIC helper exists.
+`subprocess` is the default real execution provider. `container` is a gated fallback. `microvm` has a Linux/Firecracker gated scaffold behind `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, Linux/KVM, Firecracker, kernel/rootfs, and workspace snapshot tooling. It is host-unproven until an eligible Linux/KVM host boots/runs/tears down a VM and tests pass. macOS remains blocked for strict public execution because Lima/VZ networking is network-present and no direct Apple VZ no-NIC helper exists.
 
-MicroVM doctor/preflight output separates runtime preflight readiness from public execution readiness. It reports `public_execution_enabled=true` only when all Linux/Firecracker gates are present; otherwise it remains blocked. Real microVM execution has not been proven on this macOS host.
+MicroVM doctor/preflight output separates runtime preflight readiness from public execution readiness. Real microVM execution has not been proven on this macOS host; release docs must keep Linux/Firecracker labeled gated scaffold, host-unproven until live proof exists.
 
 Firecracker proof and execution artifact generation are available as local CLI utilities. They do not boot a VM; eligible Linux/KVM hosts must run the opt-in smoke test to prove real execution.

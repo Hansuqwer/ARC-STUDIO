@@ -1068,7 +1068,7 @@ P2 — Quality:
 | **R73 Live Terminal/Event Streaming UX** | **Baseline Complete** | **Phase 102 — CLI JSONL incremental stdout/stderr/events/cancel for sandbox/testbench/provider-shell; IDE/REPL streaming follow-up** |
 | **R74 Broad CLI CI Orchestration** | **Baseline Complete** | **Phase 103 — detect local CI matrix, run selected argv job through sandbox/streaming, write local artifact, stable JSON** |
 | **R75 macOS MicroVM Execution + Strict No-Network Proof** | **Blocked** | **Phase 104 — Direct Apple VZ no-NIC provider/helper scaffold and doctor preflight exist; real no-NIC boot proof requires runner/kernel/initrd/guest evidence unavailable here** |
-| **R76 Linux Firecracker Execution Proof** | **Baseline Complete (host-unproven)** | **Phase 105 — Linux/Firecracker execution path wired behind KVM/rootfs/env gates; real proof requires eligible Linux host** |
+| **R76 Linux Firecracker Execution Proof** | **Host-Unproven Scaffold** | **Phase 105 — Linux/Firecracker gated scaffold exists behind KVM/rootfs/env gates; real proof requires eligible Linux host** |
 | **R77 SwarmGraph Runtime Hardening** | **Baseline Complete + Live Smoke Proven** | **Phase 106 — ProviderClient worker wiring, async parallel execution, fan-out gate, context isolation, event callback, 3 failure detectors, and opt-in 9router worker smoke complete** |
 
 **Post-v0.1 Execution Order:** 

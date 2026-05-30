@@ -292,7 +292,7 @@ Research note: Context7 Typer docs confirm `CliRunner` command tests and subcomm
 - dynamic shell/interpreter commands that remain `unknown` are denied before interactive or token approval because ARC cannot statically prove workspace write bounds.
 - shell, Git, package-manager, and Python write forms have regression coverage for known adversarial argv patterns.
 
-Limits: this is policy/classifier hardening, not syscall or kernel sandboxing. MicroVM remains preflight/doctor-only; container fallback remains gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`.
+Limits: this is policy/classifier hardening, not syscall or kernel sandboxing. MicroVM remains preflight/doctor plus Linux/Firecracker gated scaffold, host-unproven; container fallback remains gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`.
 
 ## HMAC Audit Append Durability
 
@@ -371,7 +371,7 @@ P0 policy defaults:
 - timeout kills the POSIX process group.
 - stdout/stderr are capped and redacted.
 - every allowed/denied sandbox command returns an audit payload.
-- `arc sandbox run --provider microvm` remains blocked by default. On eligible Linux/Firecracker hosts only, it can execute when `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, `ARC_FIRECRACKER_KERNEL`, `ARC_FIRECRACKER_ROOTFS`, `firecracker`, `/dev/kvm` rw, `mkfs.ext4`, and `truncate` are present.
+- `arc sandbox run --provider microvm` remains blocked by default. Linux/Firecracker is a gated scaffold that requires `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, `ARC_FIRECRACKER_KERNEL`, `ARC_FIRECRACKER_ROOTFS`, `firecracker`, `/dev/kvm` rw, `mkfs.ext4`, and `truncate`; no live host proof is recorded from this macOS host.
 - sandbox audit events include an `audit_id` correlation key.
 - sandbox audit events are persisted to a local sandbox hash-chain store by default.
 - sandbox audit events best-effort mirror a typed `sandbox_command` event into `.arc/events/event-log.jsonl`; this mirror is local/recent/derived and not canonical global audit state.
@@ -380,7 +380,11 @@ P0 policy defaults:
 - sandbox audit chain appends continue across CLI invocations and verify against raw events.
 - container execution requires `ARC_ENABLE_CONTAINER_SANDBOX=1`.
 
-MicroVM status: Linux/Firecracker public execution is implemented but host-gated and unproven on this macOS host. macOS checks Lima/VZ availability and remains a low-security developer harness because strict no-network is not proven; macOS public execution raises. Windows is explicitly unsupported. Doctor output may report `public_execution_enabled=true` only when all Linux/Firecracker gates are present; otherwise it remains blocked.
+MCP workbench status: `arc mcp workbench inspect` and `session-start` now require workspace trust, evaluate `SandboxPolicy`, validate command paths, launch with filtered env/workspace cwd/process-group cleanup, and emit sandbox audit events for allowed and denied subprocess launches.
+
+Plan apply status: `arc plan apply` no longer treats generic plan approval/direct confirmation as approval for `network`, `install`, or `unknown` commands. Those categories require policy allowance or a matching sandbox approval token. Destructive and privileged commands remain unapprovable.
+
+MicroVM status: Linux/Firecracker public execution remains a gated scaffold, host-unproven on this macOS host. macOS checks Lima/VZ availability and remains a low-security developer harness because strict no-network is not proven; macOS public execution raises. Windows is explicitly unsupported.
 
 ---
 

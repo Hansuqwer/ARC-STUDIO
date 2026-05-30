@@ -99,6 +99,9 @@ def _session_alive(session: McpSessionRecord) -> bool:
 def start_session(
     workspace: Path,
     server_cmd: list[str],
+    *,
+    cwd: Path | None = None,
+    env: dict[str, str] | None = None,
 ) -> McpSessionRecord:
     """Start a new MCP session: spawn subprocess, register, return record.
 
@@ -107,9 +110,15 @@ def start_session(
     """
     session_id = uuid.uuid4().hex[:16]
     started_at = _now()
+    launch_cwd = cwd or workspace
+    from ..isolation.subprocess import SubprocessIsolationProvider
+
+    launch_env = SubprocessIsolationProvider(workspace_root=workspace).filter_env(env)
 
     proc = subprocess.Popen(
         server_cmd,
+        cwd=str(launch_cwd),
+        env=launch_env,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

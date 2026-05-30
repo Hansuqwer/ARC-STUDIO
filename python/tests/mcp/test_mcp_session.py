@@ -162,3 +162,24 @@ def test_store_roundtrip(tmp_path: Path):
     loaded = _load_store(tmp_path)
     assert loaded.sessions["test123"].session_id == "test123"
     assert loaded.sessions["test123"].pid == 12345
+
+
+def test_start_session_strips_secret_env(tmp_path: Path):
+    """Session launch defaults to subprocess env filtering."""
+    import os
+    import time
+
+    out = tmp_path / "secret.txt"
+    record = start_session(
+        tmp_path,
+        ["sh", "-c", f"printf %s ${{SECRET_KEY:-missing}} > {out.name}; sleep 5"],
+        env={"SECRET_KEY": "should-not-pass", "PATH": os.environ.get("PATH", "/usr/bin")},
+    )
+    try:
+        for _ in range(20):
+            if out.exists():
+                break
+            time.sleep(0.05)
+        assert out.read_text(encoding="utf-8") == "missing"
+    finally:
+        stop_session(tmp_path, record.session_id)

@@ -1,4 +1,5 @@
 """Tests: Isolation providers — none and subprocess."""
+
 from __future__ import annotations
 
 import os
@@ -55,7 +56,7 @@ class TestNoneIsolationProvider:
 
     @pytest.mark.asyncio
     async def test_execute_with_env(self):
-        provider = NoneIsolationProvider()
+        provider = NoneIsolationProvider(safe_env_keys=frozenset({"PATH", "CUSTOM_VAR"}))
         result = await provider.execute(
             ["sh", "-c", "echo $CUSTOM_VAR"],
             env={"CUSTOM_VAR": "pass-through"},
@@ -72,6 +73,24 @@ class TestNoneIsolationProvider:
         desc = provider.describe()
         assert desc["provider_id"] == "none"
         assert desc["available"] is True
+        assert desc["security_posture"] == "diagnostics_only_no_isolation"
+        assert desc["user_selectable"] is False
+
+    @pytest.mark.asyncio
+    async def test_execute_strips_secret_env(self):
+        provider = NoneIsolationProvider(safe_env_keys=frozenset({"PATH", "SECRET_KEY"}))
+        result = await provider.execute(
+            ["sh", "-c", "printf %s ${SECRET_KEY:-missing}"],
+            env={"SECRET_KEY": "should-not-pass", "PATH": os.environ.get("PATH", "/usr/bin")},
+        )
+        assert result.stdout == "missing"
+
+    @pytest.mark.asyncio
+    async def test_execute_caps_output(self):
+        provider = NoneIsolationProvider(max_output_bytes=8)
+        result = await provider.execute(["sh", "-c", "printf %s xxxxxxxxxxxxxxxxxxxx"])
+        assert result.stdout == "xxxxxxxx"
+        assert result.stdout_truncated is True
 
 
 class TestSubprocessIsolationProvider:
@@ -152,6 +171,7 @@ class TestSubprocessIsolationProvider:
     def test_filter_env_blocks_api_keys(self):
         """Blocked patterns prevent *_API_KEY vars from passing through."""
         from agent_runtime_cockpit.isolation.subprocess import _is_blocked_env_key
+
         assert _is_blocked_env_key("OPENAI_API_KEY") is True
         assert _is_blocked_env_key("ANTHROPIC_API_KEY") is True
         assert _is_blocked_env_key("MY_API_KEY") is True
@@ -160,6 +180,7 @@ class TestSubprocessIsolationProvider:
     def test_filter_env_blocks_tokens(self):
         """Blocked patterns prevent *_TOKEN vars from passing through."""
         from agent_runtime_cockpit.isolation.subprocess import _is_blocked_env_key
+
         assert _is_blocked_env_key("GITHUB_TOKEN") is True
         assert _is_blocked_env_key("AUTH_TOKEN") is True
         assert _is_blocked_env_key("HOME") is False
@@ -167,6 +188,7 @@ class TestSubprocessIsolationProvider:
     def test_filter_env_blocks_secrets(self):
         """Blocked patterns prevent *_SECRET vars from passing through."""
         from agent_runtime_cockpit.isolation.subprocess import _is_blocked_env_key
+
         assert _is_blocked_env_key("CLIENT_SECRET") is True
         assert _is_blocked_env_key("AWS_SECRET_ACCESS_KEY") is True
         assert _is_blocked_env_key("LANG") is False
@@ -174,12 +196,14 @@ class TestSubprocessIsolationProvider:
     def test_filter_env_blocks_aws_prefix(self):
         """Blocked patterns prevent AWS_* vars from passing through."""
         from agent_runtime_cockpit.isolation.subprocess import _is_blocked_env_key
+
         assert _is_blocked_env_key("AWS_ACCESS_KEY_ID") is True
         assert _is_blocked_env_key("AWS_DEFAULT_REGION") is True
 
     def test_output_redaction_openai_key(self):
         """Output redaction removes OpenAI API keys."""
         from agent_runtime_cockpit.isolation.subprocess import redact_output
+
         text = "Using key sk-abc123def456ghi789jkl012mno345pqr678 for API"
         result = redact_output(text)
         assert "sk-abc123def456ghi789jkl012mno345pqr678" not in result
@@ -188,6 +212,7 @@ class TestSubprocessIsolationProvider:
     def test_output_redaction_anthropic_key(self):
         """Output redaction removes Anthropic API keys."""
         from agent_runtime_cockpit.isolation.subprocess import redact_output
+
         text = "ANTHROPIC_API_KEY=sk-ant-api03-abc123def456ghi789jkl"
         result = redact_output(text)
         assert "sk-ant-api03" not in result
@@ -196,6 +221,7 @@ class TestSubprocessIsolationProvider:
     def test_output_redaction_bearer_token(self):
         """Output redaction removes bearer tokens."""
         from agent_runtime_cockpit.isolation.subprocess import redact_output
+
         text = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.abc123"
         result = redact_output(text)
         assert "eyJhbGci" not in result
@@ -204,6 +230,7 @@ class TestSubprocessIsolationProvider:
     def test_output_redaction_password_url(self):
         """Output redaction removes passwords from URLs."""
         from agent_runtime_cockpit.isolation.subprocess import redact_output
+
         text = "postgresql://admin:supersecret@localhost:5432/db"
         result = redact_output(text)
         assert "supersecret" not in result
@@ -212,6 +239,7 @@ class TestSubprocessIsolationProvider:
     def test_output_redaction_no_secrets(self):
         """Output without secrets is unchanged."""
         from agent_runtime_cockpit.isolation.subprocess import redact_output
+
         text = "Hello world, this is normal output"
         result = redact_output(text)
         assert result == text

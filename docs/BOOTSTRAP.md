@@ -144,7 +144,7 @@ After successful bootstrap:
 
 ---
 
-**Last Updated:** 2026-05-24
+**Last Updated:** 2026-05-30
 **Status:** Alpha
 # Sandbox Bootstrap
 
@@ -167,8 +167,10 @@ Expected defaults:
 - `curl https://example.com` is denied as `network`.
 - `rm -rf .` is denied as `destructive`.
 - MicroVM doctor may report `unavailable` until Firecracker/Cloud Hypervisor plus `/dev/kvm` exist on Linux, or `limactl` exists on macOS.
-- Linux/Firecracker microVM execution is blocked by default and requires `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, kernel/rootfs env vars, `firecracker`, `/dev/kvm` rw, and workspace snapshot tools. It is not proven on macOS.
+- Linux/Firecracker microVM remains a gated scaffold, blocked by default, and requires `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, kernel/rootfs env vars, `firecracker`, `/dev/kvm` rw, and workspace snapshot tools. It is not proven on this macOS host.
 - macOS Lima/VZ remains a low-security harness only; strict no-network public execution is blocked.
+- `arc mcp workbench inspect` and `session-start` route user-supplied server commands through sandbox policy, workspace trust, env filtering, cwd bounds, and sandbox audit.
+- `arc plan apply` no longer treats generic plan/direct approval as approval for `network`, `install`, or `unknown`; use policy allowance or a matching sandbox approval token.
 - Sandbox audit logs are written to `~/.arc/audit/` unless `ARC_SANDBOX_AUDIT_DIR` is set.
 - `--ask` only applies to `network`, `install`, and `unknown`; non-interactive runs still deny by default.
 - Named sandbox policies can be loaded from `ARC_SANDBOX_POLICY_CONFIG` or `~/.arc/sandbox-policies.json`.

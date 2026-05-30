@@ -30,7 +30,7 @@ from ..security.plan import (
 )
 from ..security.sandbox import (
     CommandClassification,
-    approve_decision,
+    approve_decision_with_token,
     decide,
     ensure_workspace_cwd,
     resolve_sandbox_policy,
@@ -260,7 +260,42 @@ def plan_apply(
         command = step.command
         decision = decide(command, policy_model)
         if decision.approval_required:
-            decision = approve_decision(decision, reason="approved plan")
+            decision = approve_decision_with_token(
+                token=approval_token,
+                command=command,
+                policy=policy_model,
+                decision=decision,
+            )
+        if not decision.allowed:
+            reason = (
+                f"sandbox approval required for {decision.classification.value} command"
+                if decision.approval_required
+                else decision.reason
+            )
+            event = build_plan_apply_event(
+                "plan_apply_denied",
+                plan_id=plan.plan_id,
+                policy=plan.policy,
+                workspace_root=ws,
+                reason=reason,
+                approval_id=approval_id,
+                command=command,
+                classification=decision.classification.value,
+                approval_required=decision.approval_required,
+            )
+            audit_path = persist_plan_event(event, ws)
+            result = PlanApplyResult(
+                plan_id=plan.plan_id,
+                policy=plan.policy,
+                workspace_root=str(ws),
+                approved=not direct,
+                applied=False,
+                reason=reason,
+                audit_events=[*events, {**event, "audit_path": str(audit_path)}],
+                results=results,
+            )
+            _out(ok(result.model_dump(mode="json"), workspace=str(ws)), json_output)
+            raise typer.Exit(3)
         try:
             validate_command_paths(command, policy_model)
         except ValueError as exc:

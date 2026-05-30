@@ -334,6 +334,178 @@ class TestPlanCli:
         assert result.exit_code == 3
         assert "approved plan token" in json.loads(result.output)["error"]["message"]
 
+    def test_approved_network_plan_still_requires_sandbox_approval(self, tmp_path) -> None:
+        explained = runner.invoke(
+            app,
+            [
+                "plan",
+                "explain",
+                "--json",
+                "--workspace",
+                str(tmp_path),
+                "--",
+                "python",
+                "-c",
+                "import socket; print('ok')",
+            ],
+        )
+        plan_id = json.loads(explained.output)["data"]["plan_id"]
+        approved = runner.invoke(
+            app,
+            ["plan", "approve", "--json", "--workspace", str(tmp_path), "--plan-id", plan_id],
+        )
+        assert approved.exit_code == 0, approved.output
+        approval_token = json.loads(approved.output)["data"]["approval_token"]
+        result = runner.invoke(
+            app,
+            [
+                "plan",
+                "apply",
+                "--json",
+                "--workspace",
+                str(tmp_path),
+                "--plan-id",
+                plan_id,
+                "--approval-token",
+                approval_token,
+            ],
+        )
+        assert result.exit_code == 3
+        data = json.loads(result.output)["data"]
+        assert data["reason"] == "sandbox approval required for network command"
+        assert data["audit_events"][-1]["classification"] == "network"
+
+    def test_direct_network_apply_denied_without_sandbox_approval(self, tmp_path) -> None:
+        result = runner.invoke(
+            app,
+            [
+                "plan",
+                "apply",
+                "--json",
+                "--workspace",
+                str(tmp_path),
+                "--direct",
+                "--confirm",
+                "APPLY DIRECT COMMAND",
+                "--",
+                "curl",
+                "https://example.com",
+            ],
+        )
+        assert result.exit_code == 3
+        data = json.loads(result.output)["data"]
+        assert data["applied"] is False
+        assert data["reason"] == "sandbox approval required for network command"
+        assert data["audit_events"][-1]["classification"] == "network"
+
+    def test_direct_network_apply_allowed_with_policy(self, tmp_path) -> None:
+        config = tmp_path / "policies.json"
+        config.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "policies": [
+                        {
+                            "version": 1,
+                            "name": "net-ok",
+                            "allow_network": True,
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        env = {**os.environ, "ARC_SANDBOX_POLICY_CONFIG": str(config)}
+        result = runner.invoke(
+            app,
+            [
+                "plan",
+                "apply",
+                "--json",
+                "--workspace",
+                str(tmp_path),
+                "--policy",
+                "net-ok",
+                "--direct",
+                "--confirm",
+                "APPLY DIRECT COMMAND",
+                "--",
+                "python",
+                "-c",
+                "import socket; print('ok')",
+            ],
+            env=env,
+        )
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["data"]["results"][0]["stdout"].strip() == "ok"
+
+    def test_direct_network_apply_allowed_with_sandbox_approval_token(self, tmp_path) -> None:
+        store = tmp_path / ".arc" / "approvals.json"
+        env = {**os.environ, "ARC_SANDBOX_APPROVAL_STORE": str(store)}
+        approved = runner.invoke(
+            app,
+            [
+                "policy",
+                "approve",
+                "--json",
+                "--workspace",
+                str(tmp_path),
+                "--token",
+                "tok-net",
+                "--",
+                "python",
+                "-c",
+                "import socket; print('ok')",
+            ],
+            env=env,
+        )
+        assert approved.exit_code == 0, approved.output
+        result = runner.invoke(
+            app,
+            [
+                "plan",
+                "apply",
+                "--json",
+                "--workspace",
+                str(tmp_path),
+                "--direct",
+                "--confirm",
+                "APPLY DIRECT COMMAND",
+                "--approval-token",
+                "tok-net",
+                "--",
+                "python",
+                "-c",
+                "import socket; print('ok')",
+            ],
+            env=env,
+        )
+        assert result.exit_code == 0, result.output
+
+    def test_direct_install_and_unknown_apply_denied_by_default(self, tmp_path) -> None:
+        for command, classification in [
+            (["pip", "install", "requests"], "install"),
+            (["custom-tool"], "unknown"),
+        ]:
+            result = runner.invoke(
+                app,
+                [
+                    "plan",
+                    "apply",
+                    "--json",
+                    "--workspace",
+                    str(tmp_path),
+                    "--direct",
+                    "--confirm",
+                    "APPLY DIRECT COMMAND",
+                    "--",
+                    *command,
+                ],
+            )
+            assert result.exit_code == 3
+            data = json.loads(result.output)["data"]
+            assert data["audit_events"][-1]["classification"] == classification
+
     def test_destructive_denied_even_with_approval(self, tmp_path) -> None:
         explained = runner.invoke(
             app,

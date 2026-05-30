@@ -381,8 +381,10 @@ def build_plan_apply_event(
     approval_id: str | None = None,
     command: list[str] | None = None,
     exit_code: int | None = None,
+    classification: str | None = None,
+    approval_required: bool | None = None,
 ) -> dict[str, Any]:
-    return {
+    event = {
         "type": event_type,
         "event_id": f"plan-{uuid.uuid4().hex}",
         "plan_id": plan_id,
@@ -394,6 +396,11 @@ def build_plan_apply_event(
         "exit_code": exit_code,
         "created_at": utc_now(),
     }
+    if classification is not None:
+        event["classification"] = classification
+    if approval_required is not None:
+        event["approval_required"] = approval_required
+    return event
 
 
 def persist_plan_event(event: dict[str, Any], workspace_root: Path) -> Path:

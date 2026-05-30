@@ -257,6 +257,125 @@ def test_status_includes_trust_state(tmp_path: Path):
     assert result["data"]["trust"]["level"] in ("trusted", "untrusted", "partial")
 
 
+def test_workbench_inspect_denies_network_by_default(
+    trusted_workspace: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from agent_runtime_cockpit.cli._app import app
+
+    monkeypatch.chdir(trusted_workspace)
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(trusted_workspace / "audit"))
+    result = runner.invoke(
+        app,
+        [
+            "mcp",
+            "workbench",
+            "inspect",
+            "curl https://example.com",
+            "--json",
+            "--workspace",
+            str(trusted_workspace),
+        ],
+    )
+    assert result.exit_code == 3
+    data = json.loads(result.output)
+    assert data["error"]["details"]["classification"] == "network"
+    events = (trusted_workspace / "audit" / "sandbox.events.jsonl").read_text(encoding="utf-8")
+    assert '"type":"SANDBOX_DENIED"' in events
+
+
+def test_workbench_inspect_denies_unknown_by_default(
+    trusted_workspace: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from agent_runtime_cockpit.cli._app import app
+
+    monkeypatch.chdir(trusted_workspace)
+    result = runner.invoke(
+        app,
+        [
+            "mcp",
+            "workbench",
+            "inspect",
+            "custom-mcp-server",
+            "--json",
+            "--workspace",
+            str(trusted_workspace),
+        ],
+    )
+    assert result.exit_code == 3
+    assert json.loads(result.output)["error"]["details"]["classification"] == "unknown"
+
+
+def test_workbench_inspect_allowed_readonly_emits_sandbox_audit(
+    trusted_workspace: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from agent_runtime_cockpit.cli import mcp as mcp_cli
+    from agent_runtime_cockpit.cli._app import app
+
+    monkeypatch.chdir(trusted_workspace)
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(trusted_workspace / "audit"))
+
+    def fake_inspect(*args, **kwargs):
+        return {"server_cmd": "pwd", "tools": [], "resources": [], "prompts": []}
+
+    monkeypatch.setattr(mcp_cli, "_inspect_server", fake_inspect)
+    result = runner.invoke(
+        app,
+        [
+            "mcp",
+            "workbench",
+            "inspect",
+            "pwd",
+            "--json",
+            "--workspace",
+            str(trusted_workspace),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    events = (trusted_workspace / "audit" / "sandbox.events.jsonl").read_text(encoding="utf-8")
+    assert '"type":"SANDBOX_COMMAND"' in events
+    assert '"classification":"read_only"' in events
+
+
+def test_workbench_session_start_allowed_readonly_emits_audit(
+    trusted_workspace: Path, monkeypatch: pytest.MonkeyPatch
+):
+    from agent_runtime_cockpit.cli import mcp as mcp_cli
+    from agent_runtime_cockpit.cli._app import app
+    from agent_runtime_cockpit.mcp.session import McpSessionRecord
+
+    monkeypatch.chdir(trusted_workspace)
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(trusted_workspace / "audit"))
+
+    def fake_start_session(*args, **kwargs):
+        return McpSessionRecord(
+            session_id="fake-session",
+            server_cmd=["pwd"],
+            pid=123,
+            pgid=123,
+            started_at="2026-01-01T00:00:00Z",
+            last_used_at="2026-01-01T00:00:00Z",
+            workspace=str(trusted_workspace),
+        )
+
+    monkeypatch.setattr(mcp_cli, "start_session", fake_start_session)
+    result = runner.invoke(
+        app,
+        [
+            "mcp",
+            "workbench",
+            "session-start",
+            "pwd",
+            "--json",
+            "--workspace",
+            str(trusted_workspace),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["data"]["session_id"] == "fake-session"
+    events = (trusted_workspace / "audit" / "sandbox.events.jsonl").read_text(encoding="utf-8")
+    assert '"type":"SANDBOX_COMMAND"' in events
+
+
 # ── Test: CLI help text ──────────────────────────────────────────────────────
 
 

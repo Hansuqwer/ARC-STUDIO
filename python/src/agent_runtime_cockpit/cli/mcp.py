@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import signal
 import time
 from pathlib import Path
 from typing import Optional
@@ -28,13 +30,25 @@ from ..mcp.session import (
 )
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
-from ..security.trust import WorkspaceUntrusted, resolve_trust
+from ..isolation.subprocess import SubprocessIsolationProvider
+from ..security.sandbox import (
+    approve_decision_with_token,
+    build_audit_event,
+    decide,
+    ensure_workspace_cwd,
+    persist_sandbox_audit_event,
+    resolve_sandbox_policy,
+    utc_now,
+    validate_command_paths,
+)
+from ..security.trust import WorkspaceUntrusted, ensure_trusted, resolve_trust
 from ._app import console, err_console
 from ._helpers import DEBUG_FLAG, JSON_FLAG, WORKSPACE_FLAG, _out, _setup_logging, _workspace
 from ._subapps import mcp_app, mcp_workbench_app
 
 _AUDIT_EVENT_TYPE = "mcp_workbench_inspect"
 _DEFAULT_INSPECT_TIMEOUT = 10.0
+_MCP_STDERR_MAX_BYTES = 65_536
 
 
 # ── Helper: persist audit event for workbench commands ──────────────────────
@@ -49,6 +63,45 @@ def _persist_workbench_audit_event(workspace: Path, event: dict) -> None:
             fp.write(json.dumps(event, sort_keys=True, separators=(",", ":"), default=str) + "\n")
     except Exception:
         pass
+
+
+def _persist_mcp_sandbox_audit(
+    *,
+    command: list[str],
+    cwd: Path,
+    decision,
+    started_at: str,
+    exit_code: int | None,
+    stdout_truncated: bool = False,
+    stderr_truncated: bool = False,
+    redaction_applied: bool = False,
+) -> dict:
+    audit = build_audit_event(
+        command=command,
+        cwd=cwd,
+        decision=decision,
+        provider="subprocess",
+        started_at=started_at,
+        ended_at=utc_now(),
+        exit_code=exit_code,
+        stdout_truncated=stdout_truncated,
+        stderr_truncated=stderr_truncated,
+        redaction_applied=redaction_applied,
+    )
+    audit_path = persist_sandbox_audit_event(audit)
+    audit["audit_path"] = str(audit_path)
+    return audit
+
+
+def _deny_decision(decision, reason: str):
+    return decision.model_copy(
+        update={
+            "allowed": False,
+            "reason": reason,
+            "approval_required": False,
+            "approved": False,
+        }
+    )
 
 
 # ── status command ──────────────────────────────────────────────────────────
@@ -123,13 +176,24 @@ def workbench_status(
 async def _inspect_server_async(
     server_cmd: list[str],
     timeout: float,
+    *,
+    cwd: Path | None = None,
+    safe_env_keys: frozenset[str] | None = None,
 ) -> dict:
     """Connect to a stdio MCP server, inspect its capabilities, and clean up."""
+    provider = SubprocessIsolationProvider(
+        safe_env_keys=safe_env_keys,
+        workspace_root=cwd,
+        max_output_bytes=_MCP_STDERR_MAX_BYTES,
+    )
     proc = await asyncio.create_subprocess_exec(
         *server_cmd,
+        cwd=str(cwd) if cwd else None,
+        env=provider.filter_env(),
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        start_new_session=True,
     )
     assert proc.stdin is not None
     assert proc.stdout is not None
@@ -162,49 +226,64 @@ async def _inspect_server_async(
             await s2c_send.aclose()
 
     async def _read_stderr():
+        chunks = bytearray()
         try:
-            stderr_data = await asyncio.wait_for(proc.stderr.read(), timeout=timeout)
+            stderr_data = await asyncio.wait_for(
+                proc.stderr.read(_MCP_STDERR_MAX_BYTES + 1), timeout=timeout
+            )
             if stderr_data:
-                return stderr_data.decode("utf-8", errors="replace")
+                chunks.extend(stderr_data[:_MCP_STDERR_MAX_BYTES])
         except asyncio.TimeoutError:
             pass
-        return ""
+        return bytes(chunks).decode("utf-8", errors="replace")
+
+    async def _terminate_process() -> None:
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+        except (OSError, ProcessLookupError):
+            try:
+                proc.terminate()
+            except ProcessLookupError:
+                pass
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=5.0)
+        except asyncio.TimeoutError:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (OSError, ProcessLookupError):
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+            await proc.wait()
 
     stderr_task = asyncio.create_task(_read_stderr())
 
-    async with anyio.create_task_group() as tg:
-        tg.start_soon(_forward_stdin)
-        tg.start_soon(_forward_stdout)
-
-        async with ClientSession(
-            read_stream=s2c_recv,
-            write_stream=c2s_send,
-        ) as session:
-            await session.initialize()
-
-            tools_result = await session.list_tools()
-            resources_result = await session.list_resource_templates()
-            prompts_result = await session.list_prompts()
-
-            tools = [{"name": t.name, "description": t.description} for t in tools_result.tools]
-            resources = [
-                {"uriTemplate": r.uriTemplate, "name": r.name, "description": r.description}
-                for r in resources_result.resourceTemplates
-            ]
-            prompts = [
-                {"name": p.name, "description": p.description} for p in prompts_result.prompts
-            ]
-
-    # Clean up
     try:
-        proc.terminate()
-        await asyncio.wait_for(proc.wait(), timeout=5.0)
-    except asyncio.TimeoutError:
-        try:
-            proc.kill()
-            await proc.wait()
-        except ProcessLookupError:
-            pass
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(_forward_stdin)
+            tg.start_soon(_forward_stdout)
+
+            async with ClientSession(
+                read_stream=s2c_recv,
+                write_stream=c2s_send,
+            ) as session:
+                await session.initialize()
+
+                tools_result = await session.list_tools()
+                resources_result = await session.list_resource_templates()
+                prompts_result = await session.list_prompts()
+
+                tools = [{"name": t.name, "description": t.description} for t in tools_result.tools]
+                resources = [
+                    {"uriTemplate": r.uriTemplate, "name": r.name, "description": r.description}
+                    for r in resources_result.resourceTemplates
+                ]
+                prompts = [
+                    {"name": p.name, "description": p.description} for p in prompts_result.prompts
+                ]
+    finally:
+        await _terminate_process()
 
     stderr_output = stderr_task.result() if stderr_task.done() else ""
 
@@ -239,10 +318,20 @@ def _inspect_server(
     server_cmd: list[str],
     workspace: Path,
     timeout: float,
+    *,
+    safe_env_keys: frozenset[str] | None = None,
+    cwd: Path | None = None,
 ) -> dict:
     """Synchronous wrapper around _inspect_server_async."""
     try:
-        result = asyncio.run(_inspect_server_async(server_cmd, timeout))
+        result = asyncio.run(
+            _inspect_server_async(
+                server_cmd,
+                timeout,
+                cwd=cwd,
+                safe_env_keys=safe_env_keys,
+            )
+        )
     except asyncio.TimeoutError:
         result = {
             "server_cmd": " ".join(server_cmd),
@@ -287,6 +376,10 @@ def workbench_inspect(
     server: str = typer.Argument(
         ..., help="MCP server command to inspect (e.g. 'python -m my_mcp_server')"
     ),
+    policy: str = typer.Option("local-safe", "--policy", help="Sandbox policy profile"),
+    approval_token: Optional[str] = typer.Option(
+        None, "--approval-token", help="Use a scoped sandbox approval token"
+    ),
     timeout: float = typer.Option(
         _DEFAULT_INSPECT_TIMEOUT,
         "--timeout",
@@ -308,7 +401,7 @@ def workbench_inspect(
     """
     _setup_logging(debug)
     ws = _workspace(workspace)
-    started_at = time.perf_counter()
+    perf_start = time.perf_counter()
 
     if not server or not server.strip():
         _out(
@@ -326,8 +419,82 @@ def workbench_inspect(
 
     server_cmd = shlex.split(server)
 
-    result = _inspect_server(server_cmd, ws, timeout)
-    elapsed = round((time.perf_counter() - started_at) * 1000, 3)
+    try:
+        ensure_trusted(ws)
+        cwd = ensure_workspace_cwd(Path.cwd(), ws)
+        policy_model = resolve_sandbox_policy(policy, ws)
+        decision = decide(server_cmd, policy_model)
+        decision = approve_decision_with_token(
+            token=approval_token,
+            command=server_cmd,
+            policy=policy_model,
+            decision=decision,
+        )
+    except WorkspaceUntrusted as exc:
+        _out(
+            err(
+                ArcErrorCode.PERMISSION_DENIED,
+                str(exc),
+                details={"code": "WORKSPACE_UNTRUSTED"},
+            ),
+            json_output,
+        )
+        raise typer.Exit(3) from exc
+    except (KeyError, ValueError) as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(2) from exc
+
+    started_at = utc_now()
+    try:
+        validate_command_paths(server_cmd, policy_model)
+    except ValueError as exc:
+        audit = _persist_mcp_sandbox_audit(
+            command=server_cmd,
+            cwd=cwd,
+            decision=_deny_decision(decision, str(exc)),
+            started_at=started_at,
+            exit_code=None,
+        )
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                str(exc),
+                details={"audit_path": audit["audit_path"], "audit_id": audit["audit_id"]},
+            ),
+            json_output,
+        )
+        raise typer.Exit(2) from exc
+    if not decision.allowed:
+        audit = _persist_mcp_sandbox_audit(
+            command=server_cmd,
+            cwd=cwd,
+            decision=decision,
+            started_at=started_at,
+            exit_code=None,
+        )
+        _out(
+            err(
+                ArcErrorCode.PERMISSION_DENIED,
+                decision.reason,
+                details={
+                    "classification": decision.classification.value,
+                    "policy": policy_model.name,
+                    "audit_path": audit["audit_path"],
+                    "audit_id": audit["audit_id"],
+                },
+            ),
+            json_output,
+        )
+        raise typer.Exit(3)
+
+    result = _inspect_server(
+        server_cmd,
+        ws,
+        timeout,
+        cwd=cwd,
+        safe_env_keys=frozenset(policy_model.env_allowlist),
+    )
+    elapsed = round((time.perf_counter() - perf_start) * 1000, 3)
 
     if "error" in result:
         _out(
@@ -339,6 +506,14 @@ def workbench_inspect(
             json_output,
         )
         raise typer.Exit(1)
+
+    _persist_mcp_sandbox_audit(
+        command=server_cmd,
+        cwd=cwd,
+        decision=decision,
+        started_at=started_at,
+        exit_code=0,
+    )
 
     _out(
         ok(
@@ -363,6 +538,10 @@ def workbench_inspect(
 @mcp_workbench_app.command("session-start")
 def workbench_session_start(
     server: str = typer.Argument(..., help="MCP server command to start"),
+    policy: str = typer.Option("local-safe", "--policy", help="Sandbox policy profile"),
+    approval_token: Optional[str] = typer.Option(
+        None, "--approval-token", help="Use a scoped sandbox approval token"
+    ),
     workspace: Optional[str] = WORKSPACE_FLAG,
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
@@ -380,7 +559,84 @@ def workbench_session_start(
     if not server_cmd:
         _out(err(ArcErrorCode.INVALID_INPUT, "missing server command"), json_output)
         raise typer.Exit(2)
-    record = start_session(ws, server_cmd)
+
+    try:
+        ensure_trusted(ws)
+        cwd = ensure_workspace_cwd(Path.cwd(), ws)
+        policy_model = resolve_sandbox_policy(policy, ws)
+        decision = decide(server_cmd, policy_model)
+        decision = approve_decision_with_token(
+            token=approval_token,
+            command=server_cmd,
+            policy=policy_model,
+            decision=decision,
+        )
+    except WorkspaceUntrusted as exc:
+        _out(
+            err(
+                ArcErrorCode.PERMISSION_DENIED,
+                str(exc),
+                details={"code": "WORKSPACE_UNTRUSTED"},
+            ),
+            json_output,
+        )
+        raise typer.Exit(3) from exc
+    except (KeyError, ValueError) as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(2) from exc
+
+    started_at = utc_now()
+    try:
+        validate_command_paths(server_cmd, policy_model)
+    except ValueError as exc:
+        audit = _persist_mcp_sandbox_audit(
+            command=server_cmd,
+            cwd=cwd,
+            decision=_deny_decision(decision, str(exc)),
+            started_at=started_at,
+            exit_code=None,
+        )
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                str(exc),
+                details={"audit_path": audit["audit_path"], "audit_id": audit["audit_id"]},
+            ),
+            json_output,
+        )
+        raise typer.Exit(2) from exc
+    if not decision.allowed:
+        audit = _persist_mcp_sandbox_audit(
+            command=server_cmd,
+            cwd=cwd,
+            decision=decision,
+            started_at=started_at,
+            exit_code=None,
+        )
+        _out(
+            err(
+                ArcErrorCode.PERMISSION_DENIED,
+                decision.reason,
+                details={
+                    "classification": decision.classification.value,
+                    "policy": policy_model.name,
+                    "audit_path": audit["audit_path"],
+                    "audit_id": audit["audit_id"],
+                },
+            ),
+            json_output,
+        )
+        raise typer.Exit(3)
+
+    provider = SubprocessIsolationProvider(safe_env_keys=frozenset(policy_model.env_allowlist))
+    record = start_session(ws, server_cmd, cwd=cwd, env=provider.filter_env())
+    _persist_mcp_sandbox_audit(
+        command=server_cmd,
+        cwd=cwd,
+        decision=decision,
+        started_at=started_at,
+        exit_code=0,
+    )
     _out(ok(record.model_dump(mode="json"), workspace=str(ws)), json_output)
 
 

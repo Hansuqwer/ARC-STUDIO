@@ -35,6 +35,7 @@ DEFAULT_SAFE_ENV_KEYS: frozenset[str] = frozenset(
 BLOCKED_ENV_PATTERNS: list[re.Pattern] = [
     re.compile(r"(?i).*API_KEY$"),
     re.compile(r"(?i).*APIKEY$"),
+    re.compile(r"(?i).*_KEY$"),
     re.compile(r"(?i).*SECRET$"),
     re.compile(r"(?i).*TOKEN$"),
     re.compile(r"(?i).*PASSWORD$"),

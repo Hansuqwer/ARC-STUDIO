@@ -1,8 +1,8 @@
 # ADR-024 — MicroVM Public Execution Contract
 
-**Status:** Accepted — macOS blocked; Linux/Firecracker implementation wired behind host gates, proof pending
+**Status:** Accepted — macOS blocked; Linux/Firecracker gated scaffold is host-unproven
 **Date:** 2026-05-26  
-**Last updated:** 2026-05-29 — Linux/Firecracker execute path wired behind explicit gates; real Linux/KVM proof pending; macOS strict no-network remains blocked
+**Last updated:** 2026-05-30 — Linux/Firecracker remains a gated scaffold with no live Linux/KVM boot proof from this host; macOS strict no-network remains blocked
 **Authors:** ARC Studio sandbox team  
 **Related:** Phase 37 (R38), `docs/research/sandbox-and-microvm.md`, `docs/research/microvm-p1-p7-status.md`, ADR-014 (security architecture)
 
@@ -16,7 +16,7 @@ support preflight/doctor and design-proof surfaces for macOS (Lima) and
 Linux (Firecracker). As of Phase 37.14 the following is true:
 
 - `MicroVMIsolationProvider.execute()` still raises on macOS, Windows, unsupported platforms, and Linux when any explicit gate is missing.
-- `arc sandbox run --provider microvm` can execute only on eligible Linux/Firecracker hosts with every explicit gate and guest proof marker present.
+- `arc sandbox run --provider microvm` has a Linux/Firecracker gated scaffold only; no eligible-host boot/run/teardown proof is recorded yet.
 - Lima harness exists as an internal opt-in helper only.
 - Firecracker has a private Linux/KVM host-gated proof harness, proof-only `ARC_FC_PROOF` marker parser, and deterministic proof init/manifest artifact scaffold; Cloud Hypervisor remains scaffold/preflight only.
 - No real Firecracker boot was proven on the current macOS host.
@@ -85,7 +85,7 @@ referencing this ADR.
 | Platform | Provider | Status |
 |---|---|---|
 | macOS (≥ 13, Apple Silicon or Intel) | Lima / Apple Virtualization.framework | **Low-security harness only**; Lima default/user-v2 networking is network-present and cannot currently satisfy P2; public execute raises |
-| Linux (x86_64, aarch64 with KVM) | Firecracker (primary), Cloud Hypervisor (secondary) | Firecracker execution path wired behind `/dev/kvm` + binary + kernel/rootfs + dual env gates + proof markers; real boot proof pending |
+| Linux (x86_64, aarch64 with KVM) | Firecracker (primary), Cloud Hypervisor (secondary) | Firecracker gated scaffold behind `/dev/kvm` + binary + kernel/rootfs + dual env gates + proof markers; real boot proof pending |
 | Windows | — | **Explicitly unsupported**; emit clear error: "microVM execution is not supported on Windows" |
 | Other (FreeBSD, etc.) | — | Blocked; `microvm_preflight()` returns `status: blocked` |
 
@@ -170,7 +170,7 @@ are mandatory. Missing any of these fields is a schema violation.
 - `arc sandbox run --provider microvm` remains blocked by default.
 - `ARC_MICROVM_EXEC_ENABLED` is read only by the Linux/Firecracker path.
 - Lima harness is still internal / not wired to public execution.
-- Firecracker execution code exists and requires stable proof markers (`no-default-route`, `network-failure`, `sentinel-read`, `workspace-mount-proven`, `symlink-escape-blocked`) plus command result markers before returning command output. No real Linux/KVM boot proof has run on the current host.
+- Firecracker gated scaffold exists and requires stable proof markers (`no-default-route`, `network-failure`, `sentinel-read`, `workspace-mount-proven`, `symlink-escape-blocked`) plus command result markers before any future command output can be trusted. No real Linux/KVM boot proof has run on the current host.
 
 ### What must be done before unblocking
 
@@ -187,13 +187,13 @@ Full detail: `docs/research/microvm-p1-p7-status.md`
 
 | P# | Description | Status |
 |---|---|---|
-| P1 | Lifecycle proof | Implemented for Linux/Firecracker path; real host proof pending |
-| P2 | Network-off proof | macOS Lima blocked; Linux/Firecracker requires no-NIC config plus guest no-default-route/network-failure markers; real host proof pending |
-| P3 | Workspace-mount proof | Linux path uses read-only ext4 workspace snapshot and sentinel marker; real host proof pending |
-| P4 | Teardown proof | Linux path terminates Firecracker process group and temp dir; real host proof pending |
-| P5 | Symlink-escape proof | Linux path skips host symlinks in snapshot and requires symlink-escape marker; real host proof pending |
+| P1 | Lifecycle proof | Linux/Firecracker gated scaffold exists; real host proof pending |
+| P2 | Network-off proof | macOS Lima blocked; Linux/Firecracker scaffold requires no-NIC config plus guest no-default-route/network-failure markers; real host proof pending |
+| P3 | Workspace-mount proof | Linux scaffold uses read-only ext4 workspace snapshot and sentinel marker; real host proof pending |
+| P4 | Teardown proof | Linux scaffold terminates Firecracker process group and temp dir; real host proof pending |
+| P5 | Symlink-escape proof | Linux scaffold skips host symlinks in snapshot and requires symlink-escape marker; real host proof pending |
 | P6 | stdout/stderr caps | **Satisfied** — bounded stream readers + cap tests pass |
-| P7 | Audit event emitted | **Satisfied for internal harnesses** — Lima/Firecracker harness attempts persist `MICROVM_COMMAND`/`MICROVM_DENIED`; public provider audit tests still required before execution wiring |
+| P7 | Audit event emitted | **Schema satisfied for blocked attempts/internal harnesses/gated scaffold** — real host proof pending |
 
 **ARC_MICROVM_EXEC_ENABLED wiring: Linux/Firecracker only; macOS blocked.**
 
@@ -227,7 +227,7 @@ as the strict public `microvm` provider.
 
 ### Firecracker/Cloud Hypervisor no-network design/preflight status
 
-Current Linux/Firecracker implementation emits `strict_network_candidate=true`,
+Current Linux/Firecracker gated scaffold emits `strict_network_candidate=true`,
 requires guest proof markers, and intentionally omits `network-interfaces`.
 The generated Cloud Hypervisor argv intentionally omits `--net` options.
 Host-gated Firecracker execution remains blocked unless all are present:

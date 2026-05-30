@@ -166,6 +166,57 @@ def test_denial_event_emitted_for_denied_command(tmp_path, monkeypatch):
     assert (tmp_path / "audit" / "sandbox.audit.jsonl").exists()
 
 
+def test_path_validation_denial_emits_audit(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.chdir(workspace)
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
+    result = CliRunner().invoke(
+        app,
+        ["sandbox", "run", "--json", "--workspace", str(workspace), "--", "touch", "../x"],
+    )
+    assert result.exit_code == 2
+    events = (tmp_path / "audit" / "sandbox.events.jsonl").read_text(encoding="utf-8")
+    assert '"type":"SANDBOX_DENIED"' in events
+    assert "write path escapes workspace" in events
+
+
+def test_symlink_path_validation_denial_emits_audit(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    outside = tmp_path / "outside"
+    workspace.mkdir()
+    outside.mkdir()
+    (workspace / "escape").symlink_to(outside, target_is_directory=True)
+    monkeypatch.chdir(workspace)
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
+    result = CliRunner().invoke(
+        app,
+        [
+            "sandbox",
+            "run",
+            "--json",
+            "--workspace",
+            str(workspace),
+            "--",
+            "touch",
+            "escape/file.txt",
+        ],
+    )
+    assert result.exit_code == 2
+    events = (tmp_path / "audit" / "sandbox.events.jsonl").read_text(encoding="utf-8")
+    assert '"type":"SANDBOX_DENIED"' in events
+
+
+def test_stream_json_allowed_command_emits_final_audit(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
+    result = CliRunner().invoke(app, ["sandbox", "run", "--stream-json", "--", "pwd"])
+    assert result.exit_code == 0, result.output
+    events = (tmp_path / "audit" / "sandbox.events.jsonl").read_text(encoding="utf-8")
+    assert '"type":"SANDBOX_COMMAND"' in events
+    assert '"command":["pwd"]' in events
+
+
 def test_ask_decline_preserves_denial_default(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     result = CliRunner().invoke(
