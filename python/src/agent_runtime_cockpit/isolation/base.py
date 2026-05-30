@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import abc
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class IsolationResult(BaseModel):
@@ -31,6 +31,7 @@ class IsolationResult(BaseModel):
     stdout_truncated: bool = False
     stderr_truncated: bool = False
     redaction_applied: bool = False
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class IsolationProvider(abc.ABC):

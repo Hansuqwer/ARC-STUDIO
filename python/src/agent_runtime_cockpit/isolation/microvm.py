@@ -1409,6 +1409,17 @@ class FirecrackerExecutionRunner:
                             or redacted_stderr != stderr
                             or final.redaction_applied
                         ),
+                        metadata={
+                            "microvm_provider": "firecracker",
+                            "platform": "linux",
+                            "lifecycle": list(lifecycle)
+                            + ["network_proof", "workspace_proof", "exec"],
+                            "lifecycle_errors": [],
+                            "network_proof_passed": proof.network_proof_passed,
+                            "teardown_attempted": True,
+                            "gate": "ARC_MICROVM_EXEC_ENABLED=1",
+                            "public_execution_enabled": True,
+                        },
                     )
                     lifecycle.append("network_proof")
                     lifecycle.append("workspace_proof")
@@ -1416,6 +1427,21 @@ class FirecrackerExecutionRunner:
                 teardown_attempted = True
                 _terminate_process_group(proc)
                 lifecycle.append("teardown")
+                if final.provider == "microvm":
+                    lifecycle_errors = (
+                        [final.stderr] if final.exit_code != 0 and final.stderr else []
+                    )
+                    final.metadata = {
+                        **final.metadata,
+                        "microvm_provider": "firecracker",
+                        "platform": "linux",
+                        "lifecycle": lifecycle,
+                        "lifecycle_errors": lifecycle_errors,
+                        "network_proof_passed": proof.network_proof_passed,
+                        "teardown_attempted": teardown_attempted,
+                        "gate": "ARC_MICROVM_EXEC_ENABLED=1",
+                        "public_execution_enabled": True,
+                    }
                 self._persist_audit(
                     command=command,
                     lifecycle=lifecycle,
@@ -1458,8 +1484,10 @@ class FirecrackerExecutionRunner:
             stdout_truncated=result.stdout_truncated,
             stderr_truncated=result.stderr_truncated,
             redaction_applied=result.redaction_applied,
+            lifecycle_errors=[result.stderr] if result.exit_code != 0 and result.stderr else [],
+            gate="ARC_MICROVM_EXEC_ENABLED=1",
+            public_execution_enabled=True,
         )
-        event["public_execution_enabled"] = True
         persist_sandbox_audit_event(event)
 
 

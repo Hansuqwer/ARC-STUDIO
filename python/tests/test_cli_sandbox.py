@@ -410,6 +410,43 @@ def test_microvm_provider_blocked_run_emits_denial_audit(tmp_path, monkeypatch):
     assert '"public_execution_enabled":false' in events
 
 
+def test_microvm_provider_blocked_run_emits_adr024_audit_schema(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
+    result = CliRunner().invoke(
+        app, ["sandbox", "run", "--json", "--provider", "microvm", "--", "pwd"]
+    )
+    assert result.exit_code == 2
+    raw = (tmp_path / "audit" / "sandbox.events.jsonl").read_text(encoding="utf-8")
+    event = json.loads(raw.splitlines()[-1])
+    assert event["type"] == "SANDBOX_DENIED"
+    assert event["event"] == "sandbox.microvm.run"
+    assert event["version"] == 1
+    assert event["command"] == ["pwd"]
+    assert event["cwd"] == str(tmp_path)
+    assert event["provider"] == "microvm"
+    assert event["microvm_provider"] in {"firecracker", "lima", "unsupported"}
+    assert event["platform"] in {"linux", "macos", "windows"}
+    assert event["policy"] == "local-safe"
+    assert event["classification"] == "read_only"
+    assert event["decision"]["allowed"] is False
+    assert event["allowed"] is False
+    assert event["lifecycle"] == ["preflight"]
+    assert event["lifecycle_errors"]
+    assert event["exit_code"] is None
+    assert event["stdout_truncated"] is False
+    assert event["stderr_truncated"] is False
+    assert event["redaction_applied"] is False
+    assert event["teardown_status"] == "skipped"
+    assert event["network_proof_passed"] is False
+    assert event["start_ts"] == event["started_at"]
+    assert event["end_ts"] == event["ended_at"]
+    assert isinstance(event["duration_ms"], int)
+    assert event["gate"] == "ARC_MICROVM_EXEC_ENABLED=1"
+    assert event["public_execution_enabled"] is False
+    assert "ADR-024" in event["contract_doc"]
+
+
 def test_microvm_doctor_never_claims_execution_implemented(monkeypatch):
     from agent_runtime_cockpit.isolation.microvm import MicroVMIsolationProvider
 

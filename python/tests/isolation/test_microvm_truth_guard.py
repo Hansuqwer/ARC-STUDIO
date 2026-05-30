@@ -8,6 +8,8 @@ Truth constraints:
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from agent_runtime_cockpit.isolation.microvm import MicroVMIsolationProvider
@@ -40,6 +42,7 @@ class TestMicroVMExecuteGates:
         self, monkeypatch, tmp_path
     ):
         """All gates delegate to real Firecracker runner; subprocess call is faked only here."""
+        monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
         kernel = tmp_path / "vmlinux"
         rootfs = tmp_path / "rootfs.ext4"
         kernel.write_text("kernel", encoding="utf-8")
@@ -106,6 +109,32 @@ class TestMicroVMExecuteGates:
         assert result.exit_code == 0
         assert result.stdout == "hello\n"
         assert result.provider == "microvm"
+        assert result.metadata["microvm_provider"] == "firecracker"
+        assert result.metadata["network_proof_passed"] is True
+        assert result.metadata["teardown_attempted"] is True
+        assert result.metadata["public_execution_enabled"] is True
+        assert result.metadata["lifecycle"] == [
+            "preflight",
+            "workspace_snapshot",
+            "create_config",
+            "start_vm",
+            "network_proof",
+            "workspace_proof",
+            "exec",
+            "teardown",
+        ]
+        raw = (tmp_path / "audit" / "sandbox.events.jsonl").read_text(encoding="utf-8")
+        event = json.loads(raw.splitlines()[-1])
+        assert event["event"] == "sandbox.microvm.run"
+        assert event["version"] == 1
+        assert event["type"] == "MICROVM_COMMAND"
+        assert event["microvm_provider"] == "firecracker"
+        assert event["platform"] == "linux"
+        assert event["teardown_status"] == "ok"
+        assert event["lifecycle_errors"] == []
+        assert event["network_proof_passed"] is True
+        assert event["public_execution_enabled"] is True
+        assert event["gate"] == "ARC_MICROVM_EXEC_ENABLED=1"
 
     def test_microvm_execute_error_message_references_adr(self, tmp_path):
         """execute() error message must reference ADR-024."""

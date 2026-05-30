@@ -22,6 +22,7 @@ Truth constraints:
 
 import shutil
 import subprocess
+import json
 from pathlib import Path
 
 import pytest
@@ -426,6 +427,17 @@ class TestLimaIntegrationHarness:
         assert '"type":"MICROVM_COMMAND"' in events
         assert '"runtime":"lima"' in events
         assert '"public_execution_enabled":false' in events
+        event = json.loads(events.splitlines()[-1])
+        assert event["event"] == "sandbox.microvm.run"
+        assert event["version"] == 1
+        assert event["microvm_provider"] == "lima"
+        assert event["platform"] in {"linux", "macos", "windows"}
+        assert event["lifecycle_errors"] == []
+        assert event["teardown_status"] == "ok"
+        assert event["start_ts"] == event["started_at"]
+        assert event["end_ts"] == event["ended_at"]
+        assert isinstance(event["duration_ms"], int)
+        assert event["gate"] == "ARC_MICROVM_INTEGRATION=1"
 
     def test_harness_blocks_user_command_when_network_proof_fails(self, tmp_path):
         calls: list[list[str]] = []
@@ -646,6 +658,12 @@ class TestFirecrackerHarness:
         assert '"type":"MICROVM_COMMAND"' in events
         assert '"runtime":"firecracker"' in events
         assert '"lifecycle"' in events
+        event = json.loads(events.splitlines()[-1])
+        assert event["event"] == "sandbox.microvm.run"
+        assert event["version"] == 1
+        assert event["microvm_provider"] == "firecracker"
+        assert event["teardown_status"] == "ok"
+        assert event["lifecycle_errors"] == []
 
     def test_firecracker_harness_blocks_command_when_network_proof_fails(self, tmp_path):
         calls: list[list[str]] = []

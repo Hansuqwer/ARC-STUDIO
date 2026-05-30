@@ -29,6 +29,7 @@ from ..security.sandbox import (
     approve_decision,
     approve_decision_with_token,
     build_audit_event,
+    attach_microvm_audit_contract_fields,
     compact_sandbox_audit_events,
     container_preflight,
     decide,
@@ -608,8 +609,14 @@ def sandbox_run(
             stderr_truncated=False,
             redaction_applied=False,
         )
-        audit["public_execution_enabled"] = False
-        audit["contract_doc"] = "docs/adr/ADR-024-microvm-public-execution-contract.md"
+        attach_microvm_audit_contract_fields(
+            audit,
+            lifecycle=["preflight"],
+            lifecycle_errors=[str(exc)],
+            network_proof_passed=False,
+            teardown_attempted=False,
+            public_execution_enabled=False,
+        )
         audit_path = persist_sandbox_audit_event(audit)
         audit["audit_path"] = str(audit_path)
         _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
@@ -627,6 +634,18 @@ def sandbox_run(
         stderr_truncated=iso.stderr_truncated,
         redaction_applied=iso.redaction_applied,
     )
+    if iso.provider == "microvm":
+        attach_microvm_audit_contract_fields(
+            audit,
+            microvm_provider=iso.metadata.get("microvm_provider"),
+            platform_name=iso.metadata.get("platform"),
+            lifecycle=iso.metadata.get("lifecycle", []),
+            lifecycle_errors=iso.metadata.get("lifecycle_errors", []),
+            network_proof_passed=bool(iso.metadata.get("network_proof_passed", False)),
+            teardown_attempted=bool(iso.metadata.get("teardown_attempted", False)),
+            gate=str(iso.metadata.get("gate", "ARC_MICROVM_EXEC_ENABLED=1")),
+            public_execution_enabled=bool(iso.metadata.get("public_execution_enabled", False)),
+        )
     audit_path = persist_sandbox_audit_event(audit)
     audit["audit_path"] = str(audit_path)
     result = SandboxResult(

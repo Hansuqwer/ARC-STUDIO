@@ -768,6 +768,86 @@ def build_audit_event(
     }
 
 
+def _duration_ms_from_iso(started_at: str, ended_at: str) -> int:
+    try:
+        start = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+        end = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
+    except ValueError:
+        return 0
+    return max(0, int((end - start).total_seconds() * 1000))
+
+
+def _normalize_microvm_platform(system_name: str | None = None) -> str:
+    os_name = system_name or platform.system()
+    if os_name == "Darwin":
+        return "macos"
+    if os_name == "Linux":
+        return "linux"
+    if os_name == "Windows":
+        return "windows"
+    return os_name.lower()
+
+
+def _default_microvm_provider(platform_name: str) -> str:
+    if platform_name == "macos":
+        return "lima"
+    if platform_name == "linux":
+        return "firecracker"
+    return "unsupported"
+
+
+def _microvm_teardown_status(
+    teardown_attempted: bool,
+    lifecycle_errors: list[str],
+) -> str:
+    if not teardown_attempted:
+        return "skipped"
+    if lifecycle_errors:
+        return "failed" if any("teardown" in error.lower() for error in lifecycle_errors) else "ok"
+    return "ok"
+
+
+def attach_microvm_audit_contract_fields(
+    event: dict[str, Any],
+    *,
+    microvm_provider: str | None = None,
+    platform_name: str | None = None,
+    lifecycle: list[str] | None = None,
+    lifecycle_errors: list[str] | None = None,
+    network_proof_passed: bool = False,
+    teardown_attempted: bool = False,
+    gate: str = "ARC_MICROVM_EXEC_ENABLED=1",
+    public_execution_enabled: bool | None = None,
+) -> dict[str, Any]:
+    """Add ADR-024 v1 microVM audit fields without removing legacy fields."""
+    normalized_platform = _normalize_microvm_platform(platform_name)
+    errors = lifecycle_errors or []
+    started_at = str(event.get("started_at") or event.get("start_ts") or utc_now())
+    ended_at = str(event.get("ended_at") or event.get("end_ts") or started_at)
+    lifecycle_value = lifecycle if lifecycle is not None else list(event.get("lifecycle", []))
+    if public_execution_enabled is not None:
+        event["public_execution_enabled"] = public_execution_enabled
+    event.update(
+        {
+            "event": "sandbox.microvm.run",
+            "version": 1,
+            "provider": "microvm",
+            "microvm_provider": microvm_provider or _default_microvm_provider(normalized_platform),
+            "platform": normalized_platform,
+            "lifecycle": lifecycle_value,
+            "lifecycle_errors": errors,
+            "teardown_status": _microvm_teardown_status(teardown_attempted, errors),
+            "network_proof_passed": network_proof_passed,
+            "start_ts": started_at,
+            "end_ts": ended_at,
+            "duration_ms": _duration_ms_from_iso(started_at, ended_at),
+            "gate": gate,
+            "contract_doc": "docs/adr/ADR-024-microvm-public-execution-contract.md",
+        }
+    )
+    return event
+
+
 def build_microvm_audit_event(
     *,
     command: list[str],
@@ -783,6 +863,10 @@ def build_microvm_audit_event(
     stdout_truncated: bool,
     stderr_truncated: bool,
     redaction_applied: bool = False,
+    lifecycle_errors: list[str] | None = None,
+    gate: str = "ARC_MICROVM_INTEGRATION=1",
+    public_execution_enabled: bool = False,
+    platform_name: str | None = None,
 ) -> dict[str, Any]:
     """Build the ADR-024 microVM harness audit event.
 
@@ -791,7 +875,7 @@ def build_microvm_audit_event(
     """
     allowed = exit_code == 0 and network_proof_passed
     audit_id = f"microvm-{uuid.uuid4().hex}"
-    return {
+    event = {
         "audit_id": audit_id,
         "type": "MICROVM_COMMAND" if allowed else "MICROVM_DENIED",
         "command": command,
@@ -825,8 +909,19 @@ def build_microvm_audit_event(
         "stdout_truncated": stdout_truncated,
         "stderr_truncated": stderr_truncated,
         "redaction_applied": redaction_applied,
-        "public_execution_enabled": False,
+        "public_execution_enabled": public_execution_enabled,
     }
+    return attach_microvm_audit_contract_fields(
+        event,
+        microvm_provider=provider_runtime,
+        platform_name=platform_name,
+        lifecycle=lifecycle,
+        lifecycle_errors=lifecycle_errors,
+        network_proof_passed=network_proof_passed,
+        teardown_attempted=teardown_attempted,
+        gate=gate,
+        public_execution_enabled=public_execution_enabled,
+    )
 
 
 def _container_daemon_alive(binary: str) -> bool:
