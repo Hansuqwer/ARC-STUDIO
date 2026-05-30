@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from ..config import SwarmTopology
 from ..models import (
     AgentRole,
     AgentSpec,
@@ -8,9 +7,9 @@ from ..models import (
     AgentStatus,
     QueenDirective,
     SwarmTask,
-    TaskPriority,
     TaskStatus,
 )
+from ..decomposition import TrivialDecomposition
 from ..state import SwarmState
 
 
@@ -18,34 +17,7 @@ def queen_decompose(
     state: SwarmState,
     prompt: str,
 ) -> list[SwarmTask]:
-    tasks: list[SwarmTask] = []
-    num_workers = state.config.num_workers
-
-    if state.config.topology == SwarmTopology.star:
-        for i in range(num_workers):
-            task = SwarmTask(
-                prompt=prompt,
-                priority=TaskPriority.medium,
-                metadata={"worker_index": i, "total_workers": num_workers},
-            )
-            tasks.append(task)
-    elif state.config.topology == SwarmTopology.chain:
-        for i in range(num_workers):
-            task = SwarmTask(
-                prompt=f"{prompt} (step {i + 1}/{num_workers})",
-                priority=TaskPriority.medium,
-                parent_task_id=tasks[-1].id if tasks else None,
-                metadata={"step": i, "total_steps": num_workers},
-            )
-            tasks.append(task)
-    else:
-        task = SwarmTask(
-            prompt=prompt,
-            priority=TaskPriority.medium,
-            metadata={"topology": state.config.topology.value},
-        )
-        tasks.append(task)
-    return tasks
+    return TrivialDecomposition().decompose(prompt, state.config.num_workers, state.config)
 
 
 def queen_assign(

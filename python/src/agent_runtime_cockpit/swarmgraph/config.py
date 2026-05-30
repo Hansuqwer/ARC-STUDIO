@@ -67,6 +67,8 @@ class SwarmGraphConfig(BaseModel):
 
     worker_timeout_seconds: float = Field(default=30.0, ge=1, le=600)
     poll_interval_seconds: float = Field(default=0.1, ge=0.01, le=10)
+    fan_out_threshold: float = Field(default=0.6, ge=0, le=1.0)
+    max_parallel_workers: int = Field(default=3, ge=1, le=50)
 
     def effective_quorum(self, num_workers: int) -> int:
         if self.quorum_size is not None:

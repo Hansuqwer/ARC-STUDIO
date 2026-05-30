@@ -295,6 +295,7 @@ Every new phase/chunk should include:
 | **Phase 17** | **R13** | **SwarmGraph Native Runtime (P1+P2 Baseline Complete)** |
 | **Phase 18** | **—** | **CLI Consolidation (Phase 2 inventory scope)** |
 | **Phase 19** | **—** | **Provider-Backed Runtime Foundations** |
+| **Phase 106** | **R77** | **SwarmGraph Runtime Hardening (ProviderClient workers, async parallel, fan-out, isolation, failure detectors)** |
 
 | Phase | Status | Depends On | Notes |
 |---|---|---|
@@ -4520,3 +4521,143 @@ cd python && ARC_MICROVM_INTEGRATION=1 ARC_MICROVM_EXEC_ENABLED=1 ARC_FC_REAL_EX
 ### Known Risks
 - Firecracker proof cannot run on macOS host and requires Linux/KVM/rootfs setup.
 - The ARC exec rootfs still needs real boot validation with a compatible kernel.
+
+## Phase 106 — SwarmGraph Runtime Hardening
+
+**Roadmap:** R77 SwarmGraph Runtime Hardening (Post-Analysis)
+**Status:** Baseline Complete (offline/mocked) | Evidence: Phase 106 implementation complete with mocked ProviderClient coverage; `cd python && uv run ruff check src tests`, `cd python && uv run pytest tests/swarmgraph/ tests/test_swarmgraph_native.py -q`, and `cd python && uv run pytest tests/ -q` passed after each slice. Live 9router smoke using `ag/gemini-3.5-flash-extra-low` was attempted and blocked by missing `NINEROUTER_API_KEY`/`ROUTER9_API_KEY`.
+**Depends on:** Phase 20 (ProviderClient/TurnManager stable), Phase 17 (SwarmGraph native runtime exists)
+
+### Context
+
+2026-05-29 deep analysis identified that the SwarmGraph runtime is a fully deterministic simulation with no real LLM execution, no parallel workers, trivial decomposition, and 9/16 ADR-013 commitments unmet. The 10 consensus protocols are functionally identical in practice because fake_offline always produces 1 auto-approved vote. Phase 20's ProviderClient/TurnManager exists but is not wired into SwarmGraph workers.
+
+### Slice 106.1 — Wire ProviderClient into gated_local Worker
+
+**Priority:** P0
+**Effort:** Medium
+**Files:** `swarmgraph/nodes/worker.py`, new `swarmgraph/provider_worker.py`
+
+Implementation:
+1. Add `gated_local` branch in `worker_execute()` that creates a `ProviderClient` instance via existing `providers/registry.py`.
+2. Call `client.complete(messages=[{"role": "user", "content": task.prompt}])` with timeout from `AgentSpec.timeout_seconds`.
+3. Map response to `WorkerResult` with real token_count, cost_usd, and duration.
+4. Require `ARC_SWARMGRAPH_PROVIDER_TESTS=1` for provider-backed tests; default tests remain fake_offline.
+5. Wire existing `BudgetEnforcer` to check cost before and after execution.
+
+Acceptance:
+1. `worker_execute(task, mode=ExecutionMode.gated_local)` calls ProviderClient.complete() and returns real output.
+2. `fake_offline` tests remain unchanged and green.
+3. Budget enforcement rejects execution when accumulated cost exceeds limit.
+4. Cost/token metrics are populated in WorkerResult.
+
+### Slice 106.2 — Async Parallel Worker Execution
+
+**Priority:** P0
+**Effort:** Medium-Large
+**Files:** `swarmgraph/runner.py`, `swarmgraph/config.py`, `swarmgraph/nodes/worker.py`
+
+Implementation:
+1. Add `max_parallel_workers: int = Field(default=3, ge=1, le=50)` to `SwarmGraphConfig`.
+2. Convert `SwarmGraphRunner.run()` to `async def run()` (keep sync wrapper for backward compat).
+3. Replace sequential worker FOR loop with `asyncio.gather(*[worker_execute_async(t) for t in batch], return_exceptions=True)` where batch size = min(pending_tasks, max_parallel_workers).
+4. Convert `worker_execute()` to `async def worker_execute_async()` for `gated_local` mode; keep sync path for `fake_offline`.
+5. Implement `asyncio.Semaphore(max_parallel_workers)` to bound concurrency.
+6. Propagate cancellation token into each gather coroutine.
+7. Add `SwarmGraphRunner.run_sync()` convenience wrapper using `asyncio.run()`.
+
+Acceptance:
+1. With 3 workers and max_parallel=2, two workers run concurrently and one waits.
+2. Cancellation token cancels in-flight workers within 1 second.
+3. Failed worker does not cancel other in-flight workers (isolation).
+4. Budget check runs after each worker completes, not after all complete.
+5. Events are emitted in completion order, not assignment order.
+
+### Slice 106.3 — DecompositionStrategy Protocol + Fan-Out Gate
+
+**Priority:** P0/P1
+**Effort:** Medium
+**Files:** `swarmgraph/nodes/queen.py`, `swarmgraph/config.py`, new `swarmgraph/decomposition.py`
+
+Implementation:
+1. Define `DecompositionStrategy` protocol: `def decompose(prompt: str, num_workers: int, config: SwarmGraphConfig) -> list[SwarmTask]`.
+2. Implement `TrivialDecomposition` (current behavior), `StepDecomposition` (chain), `CopyDecomposition` (star).
+3. Add `parallelizability_score(prompt: str) -> float` function using heuristic (length, sentence count, keyword diversity).
+4. Add `fan_out_threshold: float = Field(default=0.6, ge=0, le=1)` to `SwarmGraphConfig`.
+5. In runner: if `score < threshold`, use 1 worker regardless of `num_workers`.
+6. Emit audit event with `fan_out_score`, `fan_out_decision`, worker count chosen.
+
+Acceptance:
+1. Simple prompts ("explain X") score < 0.6 and execute with 1 worker.
+2. Complex prompts ("implement X, test Y, document Z") score >= 0.6 and fan out.
+3. Fan-out decision logged in audit event.
+4. `DecompositionStrategy` is pluggable via config or constructor injection.
+
+### Slice 106.4 — Worker Context Isolation
+
+**Priority:** P1
+**Effort:** Small
+**Files:** `swarmgraph/nodes/queen.py`, `swarmgraph/nodes/worker.py`
+
+Implementation:
+1. `queen_decompose()` assigns per-task context (only the sub-prompt, not full parent prompt).
+2. `worker_execute()` receives only `task.prompt` and `task.directive.context` — not the SwarmState or other tasks' prompts.
+3. Workers cannot access `SwarmState.tasks` for other tasks (they only receive their assigned task).
+4. Add test: worker output does not contain content from sibling tasks' prompts.
+
+Acceptance:
+1. Worker receives only its assigned task context.
+2. Worker cannot access sibling task prompts or outputs.
+3. Test proves isolation by checking worker output against cross-task leakage markers.
+
+### Slice 106.5 — Event Streaming Callback
+
+**Priority:** P1
+**Effort:** Small
+**Files:** `swarmgraph/runner.py`
+
+Implementation:
+1. Add `on_event: Callable[[SwarmGraphEvent], None] | None = None` parameter to `SwarmGraphRunner.__init__()`.
+2. Call `self._emit(event)` helper instead of `self.events.append(event)` — helper appends to list AND calls callback if set.
+3. Adapter can pass an `on_event` that publishes directly to EventBroker for live streaming.
+
+Acceptance:
+1. When `on_event` is set, each event triggers the callback immediately.
+2. When `on_event` is None, behavior is identical to current (list append only).
+3. Callback errors are logged and do not crash the runner.
+
+### Slice 106.6 — Failure Mode Detectors (3 of 13)
+
+**Priority:** P1
+**Effort:** Medium
+**Files:** new `swarmgraph/detectors.py`, `swarmgraph/runner.py`
+
+Implementation:
+1. `detect_consensus_failure(outcomes: list[ConsensusRoundOutcome]) -> FailureEvent | None` — fires when >50% of tasks in a round are rejected.
+2. `detect_resource_exhaustion(state: SwarmState, config: SwarmGraphConfig) -> FailureEvent | None` — fires when accumulated cost > 80% of budget limit.
+3. `detect_coordination_deadlock(state: SwarmState, round_num: int) -> FailureEvent | None` — fires when same tasks remain pending for 2+ consecutive rounds without progress.
+4. Each detector returns a typed `FailureEvent` (new model) or None.
+5. Runner calls detectors at end of each round and emits failure events.
+
+Acceptance:
+1. Consensus failure detector fires when majority of tasks are rejected in a round.
+2. Resource exhaustion fires at 80% budget consumption.
+3. Deadlock detector fires after 2 rounds with zero task completion progress.
+4. All three produce typed events that appear in the event stream.
+5. Detectors do not modify state — they are read-only observers.
+
+### Verification
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/swarmgraph/ tests/test_swarmgraph_native.py -q
+cd python && uv run pytest tests/ -q
+pnpm build
+pnpm typecheck
+```
+
+### Known Risks
+- Async conversion of runner may break downstream consumers that expect sync `run()`.
+- ProviderClient integration requires stable provider registry (Phase 20 dependency).
+- Parallel execution introduces race conditions in state mutation (SwarmState is mutable).
+- Fan-out heuristic may be too aggressive or too conservative — needs tuning with real prompts.
+- Priority 1 CLI parity track (Phases 97-105) takes precedence per roadmap rules; this phase must not block it.

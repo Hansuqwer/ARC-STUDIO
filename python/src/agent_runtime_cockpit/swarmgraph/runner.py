@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+import asyncio
+import threading
 from datetime import datetime, timezone
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 from .config import SwarmGraphConfig
+from .decomposition import DecompositionStrategy, parallelizability_score
+from .detectors import (
+    detect_consensus_failure,
+    detect_coordination_deadlock,
+    detect_resource_exhaustion,
+)
 from .events import (
     SwarmGraphEvent,
+    SwarmGraphEventKind,
     emit_budget_event,
     emit_topology_event,
     emit_worker_event,
@@ -13,6 +22,7 @@ from .events import (
 from .graph import build_swarm_graph
 from .models import (
     SwarmStatus,
+    SwarmTask,
     TaskStatus,
     WorkerResult,
 )
@@ -22,19 +32,35 @@ from .nodes.consensus import (
     run_consensus_round_with_results,
 )
 from .nodes.queen import queen_assign, queen_decompose, queen_prepare_agents
-from .nodes.worker import process_worker_results, worker_execute
+from .nodes.worker import process_worker_results, worker_execute_async
 from .state import SwarmState
 
 
 class CancellationToken(Protocol):
-    def is_cancelled(self) -> bool: ...
+    is_cancelled: Any
 
 
 class SwarmGraphRunner:
-    def __init__(self, config: SwarmGraphConfig | None = None):
+    def __init__(
+        self,
+        config: SwarmGraphConfig | None = None,
+        on_event: Callable[[SwarmGraphEvent], None] | None = None,
+        decomposition_strategy: DecompositionStrategy | None = None,
+    ):
         self.config = config or SwarmGraphConfig()
         self.state: SwarmState | None = None
         self.events: list[SwarmGraphEvent] = []
+        self._on_event = on_event
+        self._decomposition_strategy = decomposition_strategy
+
+    def _emit(self, event: SwarmGraphEvent) -> None:
+        self.events.append(event)
+        if self._on_event is None:
+            return
+        try:
+            self._on_event(event)
+        except Exception:
+            return
 
     def run(
         self,
@@ -42,29 +68,70 @@ class SwarmGraphRunner:
         config: SwarmGraphConfig | None = None,
         cancellation_token: CancellationToken | None = None,
     ) -> dict[str, Any]:
+        return _run_coro_sync(self.run_async(prompt, config, cancellation_token))
+
+    def run_sync(
+        self,
+        prompt: str,
+        config: SwarmGraphConfig | None = None,
+        cancellation_token: CancellationToken | None = None,
+    ) -> dict[str, Any]:
+        return self.run(prompt, config, cancellation_token)
+
+    async def run_async(
+        self,
+        prompt: str,
+        config: SwarmGraphConfig | None = None,
+        cancellation_token: CancellationToken | None = None,
+    ) -> dict[str, Any]:
         cfg = config or self.config
+        fan_out_score = parallelizability_score(prompt)
+        effective_workers = cfg.num_workers if fan_out_score >= cfg.fan_out_threshold else 1
+        runtime_cfg = cfg.model_copy(update={"num_workers": effective_workers})
+        cfg = runtime_cfg
         self.state = SwarmState(config=cfg)
         self.state.status = SwarmStatus.running
+        self.state.metadata["requested_workers"] = (config or self.config).num_workers
+        self.state.metadata["effective_workers"] = effective_workers
         self.events = []
 
-        if cancellation_token and cancellation_token.is_cancelled():
+        if _token_cancelled(cancellation_token):
             self.state.status = SwarmStatus.cancelled
             self.state.error = "cancelled"
             self.state.updated_at = datetime.now(timezone.utc)
             return self._build_result()
 
+        self._emit(
+            SwarmGraphEvent(
+                kind=SwarmGraphEventKind.audit,
+                swarm_id=self.state.id,
+                data={
+                    "fan_out_score": fan_out_score,
+                    "fan_out_threshold": cfg.fan_out_threshold,
+                    "requested_workers": (config or self.config).num_workers,
+                    "effective_workers": effective_workers,
+                    "decision": "fan_out" if effective_workers > 1 else "single",
+                },
+                round=0,
+            )
+        )
+
         queen_prepare_agents(self.state, cfg.num_workers)
         self.state.save_checkpoint()
 
-        tasks = queen_decompose(self.state, prompt)
+        if self._decomposition_strategy is None:
+            tasks = queen_decompose(self.state, prompt)
+        else:
+            tasks = self._decomposition_strategy.decompose(prompt, cfg.num_workers, cfg)
         for t in tasks:
             self.state.tasks[t.id] = t
 
         topology = build_swarm_graph(self.state)
-        self.events.append(emit_topology_event(self.state, topology))
+        self._emit(emit_topology_event(self.state, topology))
+        previous_pending_count = -1
 
         for round_num in range(cfg.max_rounds):
-            if cancellation_token and cancellation_token.is_cancelled():
+            if _token_cancelled(cancellation_token):
                 self.state.status = SwarmStatus.cancelled
                 self.state.error = "cancelled"
                 break
@@ -74,31 +141,12 @@ class SwarmGraphRunner:
                 break
 
             assignment = queen_assign(self.state, pending)
-            worker_results: list[WorkerResult] = []
-            for task in pending:
-                if cancellation_token and cancellation_token.is_cancelled():
-                    task.status = TaskStatus.cancelled
-                    self.state.status = SwarmStatus.cancelled
-                    self.state.error = "cancelled"
-                    break
-                if task.id not in assignment:
-                    continue
-                result = worker_execute(
-                    task,
-                    mode=cfg.execution_mode,
-                    timeout=cfg.worker_timeout_seconds,
-                )
-                worker_results.append(result)
-                self.events.append(emit_worker_event(self.state, result))
-                if cfg.enable_budget:
-                    self.state.accumulated_cost_usd += result.cost_usd
-                    self.events.append(
-                        emit_budget_event(
-                            self.state,
-                            result.cost_usd,
-                            cfg.budget_limit_usd,
-                        )
-                    )
+            worker_results = await self._execute_workers_parallel(
+                pending,
+                assignment,
+                cfg,
+                cancellation_token,
+            )
 
             if self.state.status == SwarmStatus.cancelled:
                 break
@@ -117,7 +165,20 @@ class SwarmGraphRunner:
                 outcomes = run_consensus_round_with_results(
                     pending, protocol=cfg.consensus_protocol.value
                 )
-                self.events.extend(emit_consensus_events_for_outcomes(self.state, outcomes))
+                for event in emit_consensus_events_for_outcomes(self.state, outcomes):
+                    self._emit(event)
+                failure_event = detect_consensus_failure(outcomes, self.state)
+                if failure_event is not None:
+                    self._emit(failure_event)
+
+            resource_event = detect_resource_exhaustion(self.state, cfg.budget_limit_usd)
+            if resource_event is not None:
+                self._emit(resource_event)
+
+            deadlock_event = detect_coordination_deadlock(self.state, previous_pending_count)
+            if deadlock_event is not None:
+                self._emit(deadlock_event)
+            previous_pending_count = len(self.state.get_pending_tasks())
 
             if cfg.enable_budget and cfg.budget_limit_usd is not None:
                 if self.state.accumulated_cost_usd >= cfg.budget_limit_usd:
@@ -135,6 +196,104 @@ class SwarmGraphRunner:
 
         self.state.updated_at = datetime.now(timezone.utc)
         return self._build_result()
+
+    async def _execute_workers_parallel(
+        self,
+        pending: list[SwarmTask],
+        assignment: dict[str, str],
+        cfg: SwarmGraphConfig,
+        cancellation_token: CancellationToken | None,
+    ) -> list[WorkerResult]:
+        if self.state is None:
+            return []
+
+        sem = asyncio.Semaphore(cfg.max_parallel_workers)
+
+        async def bounded_execute(task: SwarmTask) -> WorkerResult | None:
+            async with sem:
+                if _token_cancelled(cancellation_token):
+                    return None
+                try:
+                    return await worker_execute_async(
+                        task,
+                        mode=cfg.execution_mode,
+                        timeout=cfg.worker_timeout_seconds,
+                        cancellation_token=cancellation_token,
+                    )
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    return WorkerResult(
+                        worker_id=task.assigned_agent_id or "unknown",
+                        task_id=task.id,
+                        output="",
+                        error=f"worker exception: {exc}",
+                        started_at=datetime.now(timezone.utc),
+                    )
+
+        worker_tasks = [
+            asyncio.create_task(bounded_execute(task)) for task in pending if task.id in assignment
+        ]
+        remaining = set(worker_tasks)
+        worker_results: list[WorkerResult] = []
+
+        try:
+            while remaining:
+                if _token_cancelled(cancellation_token):
+                    for worker_task in remaining:
+                        worker_task.cancel()
+                    for task in pending:
+                        if task.status not in (TaskStatus.completed, TaskStatus.failed):
+                            task.status = TaskStatus.cancelled
+                    self.state.status = SwarmStatus.cancelled
+                    self.state.error = "cancelled"
+                    break
+
+                done, remaining = await asyncio.wait(
+                    remaining,
+                    timeout=0.05,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                for worker_task in done:
+                    try:
+                        result = worker_task.result()
+                    except asyncio.CancelledError:
+                        continue
+                    if result is None:
+                        continue
+                    worker_results.append(result)
+                    self._record_worker_result(result, cfg)
+                    if self.state.status == SwarmStatus.failed:
+                        for pending_task in remaining:
+                            pending_task.cancel()
+                        remaining.clear()
+                        break
+        finally:
+            for worker_task in remaining:
+                worker_task.cancel()
+
+        return worker_results
+
+    def _record_worker_result(self, result: WorkerResult, cfg: SwarmGraphConfig) -> None:
+        if self.state is None:
+            return
+        self._emit(emit_worker_event(self.state, result))
+        if not cfg.enable_budget:
+            return
+        self.state.accumulated_cost_usd += result.cost_usd
+        self._emit(
+            emit_budget_event(
+                self.state,
+                result.cost_usd,
+                cfg.budget_limit_usd,
+            )
+        )
+        if (
+            cfg.budget_limit_usd is not None
+            and self.state.accumulated_cost_usd >= cfg.budget_limit_usd
+        ):
+            self.state.status = SwarmStatus.failed
+            self.state.error = "budget exhausted"
 
     def get_state(self) -> SwarmState | None:
         return self.state
@@ -168,3 +327,36 @@ class SwarmGraphRunner:
             ],
             "events": [e.to_dict() for e in self.events],
         }
+
+
+def _token_cancelled(cancellation_token: CancellationToken | None) -> bool:
+    if cancellation_token is None:
+        return False
+    marker = getattr(cancellation_token, "is_cancelled", False)
+    if callable(marker):
+        return bool(marker())
+    return bool(marker)
+
+
+def _run_coro_sync(coro) -> dict[str, Any]:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+
+    result: dict[str, Any] | None = None
+    error: BaseException | None = None
+
+    def run_in_thread() -> None:
+        nonlocal result, error
+        try:
+            result = asyncio.run(coro)
+        except BaseException as exc:
+            error = exc
+
+    thread = threading.Thread(target=run_in_thread)
+    thread.start()
+    thread.join()
+    if error is not None:
+        raise error
+    return result or {"status": "no_run", "error": "no run executed"}

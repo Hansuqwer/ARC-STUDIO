@@ -12,6 +12,18 @@ from .consensus import (
     run_consensus,
     selective_debate_consensus,
 )
+from .decomposition import (
+    CopyDecomposition,
+    DecompositionStrategy,
+    StepDecomposition,
+    TrivialDecomposition,
+    parallelizability_score,
+)
+from .detectors import (
+    detect_consensus_failure,
+    detect_coordination_deadlock,
+    detect_resource_exhaustion,
+)
 from .events import (
     AuditEvent,
     BudgetEvent,
@@ -70,6 +82,14 @@ __all__ = [
     "hitl_signoff_quorum",
     "gossip_consensus",
     "run_consensus",
+    "DecompositionStrategy",
+    "CopyDecomposition",
+    "StepDecomposition",
+    "TrivialDecomposition",
+    "parallelizability_score",
+    "detect_consensus_failure",
+    "detect_resource_exhaustion",
+    "detect_coordination_deadlock",
     # Phase 31/R24 — Adaptive Consensus Protocol
     "RiskAssessment",
     "ProtocolSelection",

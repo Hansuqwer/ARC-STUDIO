@@ -955,6 +955,47 @@ The following roadmap items implement the adapter integration plan from `docs/re
 
 **Source:** OpenCode provider system research (2026-05-23), Option C (Hybrid) approach approved 2026-05-23
 
+## R77 — SwarmGraph Runtime Hardening (Post-Analysis)
+
+**Goal:** Address the critical gaps identified in the 2026-05-29 deep analysis of SwarmGraph runtime. Transform the deterministic simulation into a production-capable multi-agent execution engine with real provider-backed execution, parallel workers, failure detection, and ADR-013 compliance.
+
+**Source:** `docs/research/swarmgraph-runtime-analysis.md` (2026-05-29)
+
+**Current:** The SwarmGraph runtime (Phase 17) exists as a deterministic `fake_offline` simulation with 10 consensus protocols, checkpoint/restore, budget enforcement, and event emission. However: workers execute sequentially with no parallelism, no LLM/provider integration exists in the SwarmGraph layer, fan-out gate is missing, worker context isolation is missing, 13 ADR-013 failure mode detectors are missing, and task decomposition is trivial (copy prompt to all workers). Phase 20's `TurnManager`/`ProviderClient` infrastructure exists but is NOT wired into SwarmGraph workers.
+
+**Key Finding:** The 10 consensus protocols are functionally identical in practice because `fake_offline` always produces 1 auto-approved vote per task. Consensus diversity only matters with multi-vote scenarios requiring real multi-worker execution.
+
+**Deliverables (prioritized by corrected analysis):**
+
+P0 — Unblocks real execution:
+1. Wire Phase 20 `ProviderClient`/`TurnManager` into `worker_execute()` for `gated_local` mode
+2. Add async parallel worker execution via `asyncio.gather()` with configurable `max_parallel_workers`
+3. Add `DecompositionStrategy` protocol (interface for trivial/heuristic/LLM decomposition)
+
+P1 — Production readiness:
+4. Add fan-out gate with parallelizability score (ADR-013 requirement)
+5. Implement worker context isolation — workers receive only assigned task context
+6. Add event streaming callback (`on_event: Callable`) into runner for live streaming without adapter mediation
+7. Implement 3 of 13 failure mode detectors: coordination deadlock, consensus failure, resource exhaustion
+
+P2 — Quality:
+8. Add task dependency graph (`context=[other_tasks]` pattern from CrewAI)
+9. Add task guardrails (validation before consensus)
+10. Implement cancellation propagation mid-execution
+11. Add JSON round-trip tests for all 19 models
+12. Complete mesh/tree topology execution logic
+
+**Acceptance:**
+- `gated_local` worker mode runs a real provider-backed LLM call per task through existing `ProviderClient`
+- Parallel workers execute concurrently with configurable limit (not all N simultaneously)
+- Fan-out gate logs decision/score to audit trail before spawning workers
+- Workers receive only their assigned task prompt, not the full decomposed prompt set
+- At least 3 failure mode detectors emit typed events when triggered
+- All 10 consensus protocols produce differentiated results when multiple votes exist
+- Existing fake_offline tests remain green; new tests require `ARC_SWARMGRAPH_PROVIDER_TESTS=1`
+
+**Status:** Baseline Complete (offline/mocked) | Evidence: Phase 106 wired `gated_local` workers through `ProviderClient`, added async semaphore-bounded execution, fan-out audit, context isolation, event callback, and 3 detector events; `cd python && uv run ruff check src tests`, targeted SwarmGraph tests, and `cd python && uv run pytest tests/ -q` passed. Live 9router smoke was attempted with `ag/gemini-3.5-flash-extra-low` but blocked by missing `NINEROUTER_API_KEY`/`ROUTER9_API_KEY`. | Notes: No live provider-backed end-to-end execution claim until credentials-backed smoke/e2e passes.
+
 ## Updated Status Summary
 
 | Roadmap ID | Status | Next Slice |
@@ -1028,6 +1069,7 @@ The following roadmap items implement the adapter integration plan from `docs/re
 | **R74 Broad CLI CI Orchestration** | **Baseline Complete** | **Phase 103 — detect local CI matrix, run selected argv job through sandbox/streaming, write local artifact, stable JSON** |
 | **R75 macOS MicroVM Execution + Strict No-Network Proof** | **In Progress** | **Phase 104 — Direct Apple VZ no-NIC provider/helper scaffold and doctor preflight exist; real no-NIC boot proof remains opt-in and unproven on this host** |
 | **R76 Linux Firecracker Execution Proof** | **Baseline Complete (host-unproven)** | **Phase 105 — Linux/Firecracker execution path wired behind KVM/rootfs/env gates; real proof requires eligible Linux host** |
+| **R77 SwarmGraph Runtime Hardening** | **Baseline Complete (offline/mocked)** | **Phase 106 — ProviderClient worker wiring, async parallel execution, fan-out gate, context isolation, event callback, and 3 failure detectors complete; live 9router smoke blocked by missing API key** |
 
 **Post-v0.1 Execution Order:** 
 - **Priority 1 stop-the-line:** R68-R76 / Phases 97-105 (full CLI parity track). Research first, then implement in order unless the research matrix proves a safer dependency order. Do not claim OpenCode/Claude Code parity, autonomous repair, rich diff review, provider-backed shell, broad CI orchestration, or microVM execution until implemented and tested.
