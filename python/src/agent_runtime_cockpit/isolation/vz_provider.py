@@ -50,19 +50,24 @@ class VZNoNetworkProof:
         version = platform.mac_ver()[0]
         pyobjc = _pyobjc_available()
         runner_exists = bool(self.runner_path and self.runner_path.exists())
+        runner_executable = _executable_file(self.runner_path)
         kernel_exists = bool(self.kernel_path and self.kernel_path.exists())
+        kernel_readable = _readable_file(self.kernel_path)
         initrd_exists = bool(self.initrd_path and self.initrd_path.exists())
+        initrd_readable = _readable_file(self.initrd_path)
         gate = os.environ.get("ARC_VZ_PROOF") == "1"
         blockers: list[str] = []
         if system != "Darwin":
             blockers.append("Apple Virtualization.framework requires macOS")
         if not _macos_at_least(version, 13):
             blockers.append("macOS 13+ required")
-        if not pyobjc and not runner_exists:
-            blockers.append("pyobjc-framework-Virtualization or ARC_VZ_RUNNER missing")
-        if not kernel_exists:
+        if not runner_executable:
+            blockers.append("ARC_VZ_RUNNER missing/not executable")
+        if pyobjc and not runner_executable:
+            blockers.append("pyobjc runner path is not implemented; use executable ARC_VZ_RUNNER")
+        if not kernel_readable:
             blockers.append("ARC_VZ_KERNEL missing/unreadable")
-        if not initrd_exists:
+        if not initrd_readable:
             blockers.append("ARC_VZ_INITRD missing/unreadable")
         if not gate:
             blockers.append("ARC_VZ_PROOF=1 not set")
@@ -76,17 +81,23 @@ class VZNoNetworkProof:
             "network_devices_configured": 0,
             "networkDevices": [],
             "strict_network_candidate": True,
-            "strict_no_network_proof": "ready" if ready else "not_proven",
+            "strict_no_network_proof": "not_proven",
+            "proof_status": "ready_to_attempt" if ready else "not_ready",
+            "preflight_ready": ready,
             "gate": gate,
             "macos_version": version,
             "pyobjc_available": pyobjc,
+            "pyobjc_runner_implemented": False,
             "swiftc": shutil.which("swiftc"),
             "runner": str(self.runner_path) if self.runner_path else None,
             "runner_exists": runner_exists,
+            "runner_executable": runner_executable,
             "kernel": str(self.kernel_path) if self.kernel_path else None,
             "kernel_exists": kernel_exists,
+            "kernel_readable": kernel_readable,
             "initrd": str(self.initrd_path) if self.initrd_path else None,
             "initrd_exists": initrd_exists,
+            "initrd_readable": initrd_readable,
             "blockers": blockers,
         }
 
@@ -154,6 +165,14 @@ def _pyobjc_available() -> bool:
     except Exception:
         return False
     return True
+
+
+def _readable_file(path: Path | None) -> bool:
+    return bool(path and path.is_file() and os.access(path, os.R_OK))
+
+
+def _executable_file(path: Path | None) -> bool:
+    return bool(path and path.is_file() and os.access(path, os.X_OK))
 
 
 def _macos_at_least(version: str, major: int) -> bool:

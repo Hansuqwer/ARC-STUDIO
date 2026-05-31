@@ -168,7 +168,7 @@ Expected defaults:
 - `rm -rf .` is denied as `destructive`.
 - MicroVM doctor may report `unavailable` until Firecracker/Cloud Hypervisor plus `/dev/kvm` exist on Linux, or `limactl` exists on macOS.
 - Linux/Firecracker microVM remains a gated scaffold, blocked by default, and requires `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, kernel/rootfs env vars, `firecracker`, `/dev/kvm` rw, and workspace snapshot tools. It is not proven on this macOS host.
-- macOS Lima/VZ remains a low-security harness only; strict no-network public execution is blocked.
+- macOS Lima remains a low-security harness only; strict no-network public execution is blocked. Direct Apple VZ has a no-NIC source scaffold, but it is proof-only and requires `ARC_VZ_PROOF=1`, executable `ARC_VZ_RUNNER`, readable kernel/initrd, and real guest proof before any execution claim.
 - `arc mcp workbench inspect` and `session-start` route user-supplied server commands through sandbox policy, workspace trust, env filtering, cwd bounds, and sandbox audit.
 - Direct `SubprocessIsolationProvider(workspace_root=...)` callers execute from that workspace root when `cwd` is omitted; no parent-cwd inheritance across that provider boundary.
 - `arc plan apply` no longer treats generic plan/direct approval as approval for `network`, `install`, or `unknown`; use policy allowance or a matching sandbox approval token.

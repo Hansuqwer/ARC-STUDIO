@@ -385,7 +385,7 @@ MCP workbench status: `arc mcp workbench inspect` and `session-start` now requir
 
 Plan apply status: `arc plan apply` no longer treats generic plan approval/direct confirmation as approval for `network`, `install`, or `unknown` commands. Those categories require policy allowance or a matching sandbox approval token. Destructive and privileged commands remain unapprovable.
 
-MicroVM status: Linux/Firecracker public execution remains a gated scaffold, host-unproven on this macOS host. macOS checks Lima/VZ availability and remains a low-security developer harness because strict no-network is not proven; macOS public execution raises. Windows is explicitly unsupported.
+MicroVM status: Linux/Firecracker public execution remains a gated scaffold, host-unproven on this macOS host. macOS Lima remains a low-security developer harness because strict no-network is not proven. Direct Apple VZ no-NIC has source/preflight scaffolding only; preflight can be ready to attempt proof but `strict_no_network_proof` stays `not_proven` until a guest boots and evidence is collected. macOS public execution raises. Windows is explicitly unsupported.
 
 ---
 
