@@ -1,8 +1,8 @@
 # ADR-024 — MicroVM Public Execution Contract
 
-**Status:** Accepted — macOS blocked; Linux/Firecracker gated scaffold is host-unproven
+**Status:** Accepted — macOS VZ proof-only host proof passed; public execution blocked; Linux/Firecracker gated scaffold is host-unproven
 **Date:** 2026-05-26  
-**Last updated:** 2026-05-30 — Linux/Firecracker remains a gated scaffold with no live Linux/KVM boot proof from this host; macOS strict no-network remains blocked
+**Last updated:** 2026-05-31 — direct macOS VZ no-NIC proof passed once behind `ARC_VZ_PROOF=1`; public macOS execution remains blocked. Linux/Firecracker remains a gated scaffold with no live Linux/KVM boot proof from this host.
 **Authors:** ARC Studio sandbox team  
 **Related:** Phase 37 (R38), `docs/research/sandbox-and-microvm.md`, `docs/research/microvm-p1-p7-status.md`, ADR-014 (security architecture)
 
@@ -18,6 +18,7 @@ Linux (Firecracker). As of Phase 37.14 the following is true:
 - `MicroVMIsolationProvider.execute()` still raises on macOS, Windows, unsupported platforms, and Linux when any explicit gate is missing.
 - `arc sandbox run --provider microvm` has a Linux/Firecracker gated scaffold only; no eligible-host boot/run/teardown proof is recorded yet.
 - Lima harness exists as an internal opt-in helper only.
+- Direct Apple VZ proof-only path exists behind `ARC_VZ_PROOF=1`; one macOS 26.4 arm64 host run booted a no-NIC guest, proved no ethernet/default route/network probe failure, workspace sentinel/symlink markers, command result markers, and teardown ok.
 - Firecracker has a private Linux/KVM host-gated proof harness, proof-only `ARC_FC_PROOF` marker parser, and deterministic proof init/manifest artifact scaffold; Cloud Hypervisor remains scaffold/preflight only.
 - No real Firecracker boot was proven on the current macOS host.
 
@@ -57,7 +58,8 @@ ARC_MICROVM_EXEC_ENABLED=1
 ```
 
 This variable is honored only by the Linux/Firecracker provider path. It is
-not honored for macOS because Lima/VZ strict no-network proof is blocked.
+not honored for macOS yet; direct VZ no-NIC proof is proof-only and public
+provider wiring remains blocked.
 
 Implementation when honored:
 
@@ -65,8 +67,9 @@ Implementation when honored:
 - If unset → raise `NotImplementedError` (current behavior, permanent default).
 - If set AND all Linux/Firecracker gates are present → delegate to
   `FirecrackerExecutionRunner` on Linux.
-- macOS continues to raise until a direct Apple VZ no-NIC provider/helper or a
-  proven Lima no-network mode exists.
+- macOS continues to raise until the direct Apple VZ proof-only path is promoted
+  into a public provider with durable artifacts, audit/output caps, timeout and
+  signal cleanup, host CI, and failure-mode coverage.
 - The variable must never silently enable execution without all P1–P7 proofs.
 
 ### 3. Execution denied by default
@@ -84,7 +87,7 @@ referencing this ADR.
 
 | Platform | Provider | Status |
 |---|---|---|
-| macOS (≥ 13, Apple Silicon or Intel) | Lima / Apple Virtualization.framework | **Low-security harness only**; Lima default/user-v2 networking is network-present and cannot currently satisfy P2; public execute raises |
+| macOS (≥ 13, Apple Silicon or Intel) | Lima / Apple Virtualization.framework | **Direct VZ proof-only host proof passed once**; Lima default/user-v2 networking is network-present and remains low-security; public execute raises |
 | Linux (x86_64, aarch64 with KVM) | Firecracker (primary), Cloud Hypervisor (secondary) | Firecracker gated scaffold behind `/dev/kvm` + binary + kernel/rootfs + dual env gates + proof markers; real boot proof pending |
 | Windows | — | **Explicitly unsupported**; emit clear error: "microVM execution is not supported on Windows" |
 | Other (FreeBSD, etc.) | — | Blocked; `microvm_preflight()` returns `status: blocked` |
@@ -170,13 +173,14 @@ are mandatory. Missing any of these fields is a schema violation.
 - `arc sandbox run --provider microvm` remains blocked by default.
 - `ARC_MICROVM_EXEC_ENABLED` is read only by the Linux/Firecracker path.
 - Lima harness is still internal / not wired to public execution.
+- Direct Apple VZ proof is opt-in/proof-only via `ARC_VZ_PROOF=1`; it is not public sandbox execution.
 - Firecracker gated scaffold exists and requires stable proof markers (`no-default-route`, `network-failure`, `sentinel-read`, `workspace-mount-proven`, `symlink-escape-blocked`) plus command result markers before any future command output can be trusted. No real Linux/KVM boot proof has run on the current host.
 
 ### What must be done before unblocking
 
 1. Complete P1–P7 Linux proof on a real host with Firecracker + `/dev/kvm`.
 2. Add CI opt-in smoke with host runners that have Firecracker installed.
-3. For macOS, implement/test direct Apple VZ no-NIC helper or wait for a Lima no-network feature.
+3. For macOS, promote the direct Apple VZ proof-only path into a public provider only after durable artifact provenance, audit/output caps, timeout/SIGINT cleanup, policy gates, host CI, and broader failure-mode tests pass.
 4. Update this ADR status from "Accepted" to "Implemented" only after real host evidence links exist.
 
 ---
@@ -187,15 +191,15 @@ Full detail: `docs/research/microvm-p1-p7-status.md`
 
 | P# | Description | Status |
 |---|---|---|
-| P1 | Lifecycle proof | Linux/Firecracker gated scaffold exists; real host proof pending |
-| P2 | Network-off proof | macOS Lima blocked; Linux/Firecracker scaffold requires no-NIC config plus guest no-default-route/network-failure markers; real host proof pending |
-| P3 | Workspace-mount proof | Linux scaffold uses read-only ext4 workspace snapshot and sentinel marker; real host proof pending |
-| P4 | Teardown proof | Linux scaffold terminates Firecracker process group and temp dir; real host proof pending |
-| P5 | Symlink-escape proof | Linux scaffold skips host symlinks in snapshot and requires symlink-escape marker; real host proof pending |
+| P1 | Lifecycle proof | macOS direct VZ proof-only path passed once; Linux/Firecracker gated scaffold exists, real Linux host proof pending |
+| P2 | Network-off proof | macOS direct VZ proof-only path passed once; macOS Lima blocked; Linux/Firecracker scaffold requires no-NIC config plus guest no-default-route/network-failure markers, real Linux host proof pending |
+| P3 | Workspace-mount proof | macOS direct VZ proof-only path passed once with sentinel marker; Linux scaffold uses read-only ext4 workspace snapshot and sentinel marker, real Linux host proof pending |
+| P4 | Teardown proof | macOS direct VZ proof-only path passed once with teardown ok; Linux scaffold terminates Firecracker process group and temp dir, real Linux host proof pending |
+| P5 | Symlink-escape proof | macOS direct VZ proof-only path passed once with symlink escape blocked; Linux scaffold skips host symlinks in snapshot and requires symlink-escape marker, real Linux host proof pending |
 | P6 | stdout/stderr caps | **Satisfied** — bounded stream readers + cap tests pass |
 | P7 | Audit event emitted | **Schema satisfied for blocked attempts/internal harnesses/gated scaffold** — real host proof pending |
 
-**ARC_MICROVM_EXEC_ENABLED wiring: Linux/Firecracker only; macOS blocked.**
+**ARC_MICROVM_EXEC_ENABLED wiring: Linux/Firecracker only; macOS public execution blocked.**
 
 ### P2 Lima posture decision
 

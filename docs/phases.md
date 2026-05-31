@@ -4458,14 +4458,14 @@ pnpm typecheck
 ## Phase 104 — macOS MicroVM Execution + Strict No-Network Proof
 
 **Roadmap:** R75 macOS MicroVM Execution + Strict No-Network Proof
-**Status:** Blocked | Evidence: local research refresh in `docs/research/sandbox-and-microvm.md`; `cd python && uv run pytest tests/ -q` 3453 passed / 36 skipped / 3 xfailed; `pnpm test:e2e` OK; `tests/isolation/test_vz_proof.py` preflight passes/skips real boot unless gated; macOS public `MicroVMIsolationProvider.execute()` remains blocked | Notes: strict no-network proof cannot complete until a direct Apple Virtualization.framework no-NIC runner/kernel/initrd boots a guest, proves no NIC/default route, runs argv, proves workspace/symlink bounds, and tears down.
+**Status:** Host Proof Passed / Public Execution Blocked | Evidence: `cd python && ARC_VZ_PROOF=1 ARC_VZ_RUNNER=/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-runner ARC_VZ_KERNEL=/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-proof/debian-linux ARC_VZ_INITRD=/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-proof/arc-vz-proof-initrd.gz ARC_VZ_TIMEOUT_SECONDS=45 uv run pytest tests/isolation/test_vz_proof.py -v` → 9 passed; macOS public `MicroVMIsolationProvider.execute()` remains blocked | Notes: direct VZ proof created/booted/stopped a no-NIC guest and proved no guest ethernet/default route, failed network probe, command result markers, workspace sentinel read, symlink escape blocked, and teardown ok. This is proof-only, not public/production microVM execution.
 **Depends on:** Phase 97, ADR-024, existing Lima harness hardening
 
 ### Implementation
 1. Direct Apple Virtualization.framework path selected for strict no-network proof; Lima remains low-security because networking is present.
-2. `VZNoNetworkProof` preflights macOS 13+, pyobjc or compiled helper, kernel/initrd, explicit `ARC_VZ_PROOF=1`, and reports `networkDevices=[]`.
-3. `tools/arc-vz-runner.swift` contains the no-NIC helper source with `config.networkDevices = []`, virtiofs workspace mount, and serial console wiring.
-4. If fully gated, run disposable VM/session, mount workspace through controlled path, run argv, collect stdout/stderr/exit code, prove no guest ethernet, destroy VM/session.
+2. `VZNoNetworkProof` preflights macOS 13+, compiled helper, kernel/initrd, explicit `ARC_VZ_PROOF=1`, and reports `networkDevices=[]`.
+3. `tools/arc-vz-runner.swift` contains the no-NIC helper source with `config.networkDevices = []`, virtiofs workspace mount, serial console wiring, and teardown markers.
+4. The fully gated proof run boots a disposable VM/session, mounts workspace through controlled path, collects guest command markers, proves no guest ethernet/default route, failed network probe, sentinel read, symlink escape blocked, and teardown ok.
 5. Keep real boot test opt-in and skipped unless local runtime inputs exist.
 
 ### Acceptance
@@ -4487,8 +4487,8 @@ pnpm test:e2e
 ### Known Risks
 - Lima 2.x networking constraints block strict no-network proof for Lima; direct VZ is the macOS strict candidate.
 - macOS host/runtime availability cannot be assumed in CI.
-- Direct Apple Virtualization.framework no-NIC execution is scaffolded but not proven until a real VM boots with `ARC_VZ_PROOF=1`, kernel/initrd, and runner binary.
-- This phase must remain Blocked, not complete, until the host-gated proof creates/runs/destroys a VM and records guest no-network/workspace evidence.
+- Direct Apple Virtualization.framework no-NIC proof passed once with `ARC_VZ_PROOF=1`, kernel/initrd, and runner binary, but public execution remains blocked until artifact provenance, audit/output caps, timeout/SIGINT cleanup, provider wiring, and host CI are complete.
+- This phase must not be labeled production-grade or public execution complete until `arc sandbox run --provider microvm` is wired behind explicit gates and verified with the same evidence plus failure-mode coverage.
 
 ## Phase 105 — Linux Firecracker Execution Proof
 

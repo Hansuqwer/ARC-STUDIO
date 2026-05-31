@@ -77,7 +77,17 @@ vm.start { result in
     case .success:
         print("ARC_VZ_BOOTED=1")
         DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-            vm.stop { _ in exit(0) }
+            print("ARC_VZ_TEARDOWN_ATTEMPTED=1")
+            vm.stop { error in
+                if let error = error {
+                    print("ARC_VZ_TEARDOWN_OK=0")
+                    FileHandle.standardError.write(Data("VZ stop failed: \(error)\n".utf8))
+                    exit(1)
+                } else {
+                    print("ARC_VZ_TEARDOWN_OK=1")
+                    exit(0)
+                }
+            }
         }
     case .failure(let error):
         FileHandle.standardError.write(Data("VZ start failed: \(error)\n".utf8))

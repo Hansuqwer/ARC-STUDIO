@@ -147,7 +147,7 @@ IsolationProvider
 ├── none
 ├── subprocess
 ├── container     # gated Docker/Podman fallback
-└── microvm       # Linux/Firecracker gated scaffold, host-unproven; macOS preflight/harness only
+└── microvm       # Linux/Firecracker gated scaffold; macOS VZ proof-only path
 ```
 
 The CLI sandbox path separates policy from execution:
@@ -156,8 +156,8 @@ The CLI sandbox path separates policy from execution:
 argv -> CommandClassification -> SandboxDecision -> IsolationProvider -> SandboxResult/audit event -> local event-log mirror
 ```
 
-`subprocess` is the default real execution provider. It uses argv lists, filtered env, bounded stdout/stderr capture, process-group timeout kill, workspace cwd checks, and defaults to `workspace_root` as cwd when a direct caller omits `cwd`. `container` is a gated fallback. `microvm` has a Linux/Firecracker gated scaffold behind `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, Linux/KVM, Firecracker, kernel/rootfs, and workspace snapshot tooling. It is host-unproven until an eligible Linux/KVM host boots/runs/tears down a VM and tests pass. macOS Lima remains blocked for strict public execution because Lima/VZ networking is network-present. A direct Apple VZ no-NIC source scaffold exists (`tools/arc-vz-runner.swift`) but remains proof-only until a compiled runner, kernel/initrd, guest no-network evidence, workspace/symlink proof, and teardown evidence exist.
+`subprocess` is the default real execution provider. It uses argv lists, filtered env, bounded stdout/stderr capture, process-group timeout kill, workspace cwd checks, and defaults to `workspace_root` as cwd when a direct caller omits `cwd`. `container` is a gated fallback. `microvm` has a Linux/Firecracker gated scaffold behind `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, Linux/KVM, Firecracker, kernel/rootfs, and workspace snapshot tooling. It is host-unproven until an eligible Linux/KVM host boots/runs/tears down a VM and tests pass. macOS Lima remains blocked for strict public execution because Lima/VZ networking is network-present. A direct Apple VZ no-NIC proof-only path exists (`tools/arc-vz-runner.swift` plus `VZNoNetworkProof.run_proof()`); one gated host proof passed on macOS 26.4 arm64 with guest no-network/workspace/symlink/teardown evidence. It is not wired to public `arc sandbox run --provider microvm` execution.
 
-MicroVM doctor/preflight output separates runtime preflight readiness from public execution readiness. Real microVM execution has not been proven on this macOS host; release docs must keep Linux/Firecracker labeled gated scaffold, host-unproven until live proof exists.
+MicroVM doctor/preflight output separates runtime preflight readiness from public execution readiness. Direct macOS VZ host proof is proof-only; release docs must keep public macOS microVM execution blocked and Linux/Firecracker labeled gated scaffold, host-unproven until live Linux/KVM proof exists.
 
 Firecracker proof and execution artifact generation are available as local CLI utilities. They do not boot a VM; eligible Linux/KVM hosts must run the opt-in smoke test to prove real execution.
