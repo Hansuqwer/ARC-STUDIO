@@ -3,9 +3,10 @@
     "any_available": true,
     "checks": [
       {
-        "available": false,
+        "available": true,
         "command": "swarmgraph",
-        "reason": "not_found"
+        "path": "/Users/hansvilund/HansuQWER/WorkSpace/ARC/arc-theia-studio/python/.venv/bin/swarmgraph",
+        "version": "dynamic"
       },
       {
         "available": false,

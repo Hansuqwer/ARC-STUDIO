@@ -484,6 +484,15 @@ AGUI:
 - Enforced paid-call denial by default for `gated_local` provider execution.
 - Added a subprocess import guard proving `import swarmgraph` and `import swarmgraph.providers` do not load `agent_runtime_cockpit.providers` or `agent_runtime_cockpit.cli_repl.cancellation`.
 
+### Executed third slice
+
+- Added a local buildable `swarmgraph-sdk` distribution under `python/packages/swarmgraph-sdk` with a `swarmgraph` console entrypoint.
+- Added `swarmgraph run` for fake-offline SDK runs, JSON output, JSONL stream output, and durable checkpoint directory output.
+- Added `SwarmGraphRunner.stream()` as a typed async event stream yielding `SwarmGraphEvent` objects while preserving `run()` and `run_async()` return contracts.
+- Added `CheckpointStore` and `JsonFileCheckpointStore` for durable JSON checkpoint save/load/list.
+- Added grouped consensus metadata for fan-out tasks so consensus summaries can include multiple worker votes while preserving individual failed worker status.
+- Verified isolated local wheel import and CLI execution from `packages/swarmgraph-sdk/dist/swarmgraph_sdk-0.1.0a0-py3-none-any.whl`.
+
 ### Recommended SDK shape
 
 ```python
@@ -496,10 +505,11 @@ result = runner.run_result("Explain consensus")
 ### Packaging status
 
 - Current: SDK facade is bundled with ARC's Python package.
-- Not yet done: separate `swarmgraph-sdk` distribution, independent release workflow, and independent docs site.
-- Provider contract split is now done inside the shared source tree; a separate `swarmgraph-sdk` wheel still requires moving shared source ownership rather than copying code.
-- Safe claim: "SwarmGraph SDK import facade / first extraction slice."
-- Unsafe claim: "Standalone published SDK" or "production provider-backed SDK."
+- Current: a local `swarmgraph-sdk` wheel can be built and installed from this repository.
+- Not yet done: external publication, independent release workflow, and independent docs site.
+- Provider contract split is done inside the shared source tree; source ownership is still shared with ARC until a later move removes duplication/compat shims.
+- Safe claim: "local buildable SwarmGraph SDK wheel."
+- Unsafe claim: "published SDK" or "production provider-backed SDK."
 
 ### Pros
 
@@ -518,7 +528,7 @@ result = runner.run_result("Explain consensus")
 
 ### Next SDK queue
 
-1. Split `swarmgraph-sdk` into its own wheel by moving shared source ownership to the SDK package and keeping ARC as a bridge/compat consumer.
-2. Add a real typed event stream API.
-3. Add a durable checkpoint store interface.
-4. Implement real multi-worker vote semantics before claiming consensus affects runtime outcomes broadly.
+1. Move source ownership to `python/packages/swarmgraph-sdk/swarmgraph` and make `agent_runtime_cockpit.swarmgraph` a compatibility bridge.
+2. Add independent SDK docs and release workflow.
+3. Add provider adapters outside ARC using the SDK provider protocol.
+4. Deepen multi-worker vote semantics beyond deterministic present/error votes.

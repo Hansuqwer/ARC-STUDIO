@@ -35,6 +35,8 @@ class CopyDecomposition:
                     prompt=scoped_prompt,
                     priority=TaskPriority.medium,
                     metadata={
+                        "consensus_group": "root",
+                        "consensus_prompt": prompt,
                         "worker_index": i,
                         "total_workers": num_workers,
                         "isolated": True,

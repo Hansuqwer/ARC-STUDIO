@@ -1,3 +1,4 @@
+from .checkpoint import CheckpointStore, JsonFileCheckpointStore
 from .config import SwarmGraphConfig
 from .consensus import (
     ConsensusResult,
@@ -71,6 +72,8 @@ from .state import SwarmCheckpoint, SwarmState
 
 __all__ = [
     "SwarmGraphConfig",
+    "CheckpointStore",
+    "JsonFileCheckpointStore",
     "AgentSpec",
     "AgentState",
     "AgentVote",

@@ -1,16 +1,18 @@
-"""SwarmGraph SDK import package.
-
-This package exposes the SwarmGraph core without importing ARC provider or
-registry modules. Until the standalone wheel is split, modules are loaded from
-the shared source directory packaged in ARC's Python distribution.
-"""
+from __future__ import annotations
 
 # ruff: noqa: E402
 
 from pathlib import Path
 
-_CORE_PATH = Path(__file__).resolve().parents[1] / "agent_runtime_cockpit" / "swarmgraph"
-__path__.insert(0, str(_CORE_PATH))
+_CANDIDATES = (
+    Path(__file__).resolve().parents[3] / "src" / "agent_runtime_cockpit" / "swarmgraph",
+    Path.cwd() / "src" / "agent_runtime_cockpit" / "swarmgraph",
+    Path.cwd() / "python" / "src" / "agent_runtime_cockpit" / "swarmgraph",
+)
+for _path in _CANDIDATES:
+    if _path.exists():
+        __path__.insert(0, str(_path))
+        break
 
 from .checkpoint import CheckpointStore, JsonFileCheckpointStore
 from .config import SwarmGraphConfig
@@ -148,4 +150,4 @@ __all__ = [
     "run_deterministic_swarm",
 ]
 
-del Path, _CORE_PATH
+del Path, _CANDIDATES, _path

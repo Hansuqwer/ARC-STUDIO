@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "swarmgraph-sdk"
+version = "0.1.0a0"
+description = "SwarmGraph SDK: deterministic multi-agent orchestration primitives"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.11"
+authors = [{ name = "ARC Studio Contributors" }]
+dependencies = [
+    "pydantic>=2.7",
+    "typer>=0.12",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[project.scripts]
+swarmgraph = "swarmgraph.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["swarmgraph"]
+
+[tool.hatch.build.targets.sdist.force-include]
+"../../src/agent_runtime_cockpit/swarmgraph" = "swarmgraph"

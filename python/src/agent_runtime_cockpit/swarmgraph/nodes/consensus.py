@@ -159,7 +159,29 @@ def run_consensus_round_with_results(
     _legacy_protocol = ConsensusProtocol(protocol) if isinstance(protocol, str) else protocol
 
     outcomes: list[ConsensusRoundOutcome] = []
+    grouped: dict[str, list[SwarmTask]] = {}
     for task in tasks:
+        group_id = task.metadata.get("consensus_group")
+        if isinstance(group_id, str) and group_id:
+            grouped.setdefault(group_id, []).append(task)
+
+    grouped_task_ids: set[str] = set()
+    for group_tasks in grouped.values():
+        if len(group_tasks) <= 1:
+            continue
+        outcomes.extend(
+            _run_group_consensus_round(
+                group_tasks,
+                quorum=quorum,
+                prompt=prompt,
+                escrow=escrow,
+            )
+        )
+        grouped_task_ids.update(task.id for task in group_tasks)
+
+    for task in tasks:
+        if task.id in grouped_task_ids:
+            continue
         # Determine selection prompt: explicit shared prompt or per-task prompt
         selection_prompt = prompt if prompt is not None else task.prompt
         selection = select_consensus_protocol(selection_prompt)
@@ -262,6 +284,77 @@ def run_consensus_round_with_results(
             )
         )
 
+    return outcomes
+
+
+def _run_group_consensus_round(
+    tasks: list[SwarmTask],
+    quorum: int | None = None,
+    prompt: str | None = None,
+    escrow: ConsensusEscrow | None = None,
+) -> list[ConsensusRoundOutcome]:
+    group_prompt = prompt or str(tasks[0].metadata.get("consensus_prompt") or tasks[0].prompt)
+    selection = select_consensus_protocol(group_prompt)
+    proto = selection.protocol
+
+    votes = [
+        AgentVote(
+            agent_id=task.assigned_agent_id or (task.result.worker_id if task.result else "system"),
+            task_id=tasks[0].id,
+            round=0,
+            approved=task.result is not None and task.result.error is None,
+            confidence=1.0,
+            reasoning="worker result present" if task.result else "missing worker result",
+        )
+        for task in tasks
+    ]
+
+    if proto == ConsensusProtocol.bft_escrow and escrow is not None:
+        consensus = _run_bft_escrow_consensus(votes, tasks[0], escrow, quorum)
+    else:
+        consensus = run_consensus(votes, protocol=proto, quorum=quorum)
+
+    consensus = consensus.model_copy(
+        update={
+            "risk_level": selection.risk,
+            "risk_score": selection.assessment.score,
+            "risk_signals": list(selection.assessment.matched_signals),
+            "risk_rationale": selection.assessment.rationale,
+        }
+    )
+
+    decision = ApprovalDecision(
+        approved=consensus.approved,
+        reason=_format_decision_reason(consensus, selection),
+        decided_by="consensus",
+    )
+
+    outcomes: list[ConsensusRoundOutcome] = []
+    summary = consensus_result_to_metadata(consensus)
+    for task in tasks:
+        task.votes = list(votes)
+        task.metadata["adaptive_consensus"] = {
+            "risk": selection.risk,
+            "protocol": selection.protocol.value,
+            "score": selection.assessment.score,
+            "matched_signals": list(selection.assessment.matched_signals),
+            "rationale": selection.assessment.rationale,
+            "grouped_votes": len(votes),
+        }
+        task.metadata["consensus_result"] = summary
+        task.approval = decision
+        task.status = (
+            TaskStatus.completed
+            if consensus.approved and task.result is not None and task.result.error is None
+            else TaskStatus.failed
+        )
+        outcomes.append(
+            ConsensusRoundOutcome(
+                task_id=task.id,
+                decision=decision,
+                consensus_result=consensus,
+            )
+        )
     return outcomes
 
 

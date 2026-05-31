@@ -56,14 +56,18 @@ class SwarmState(BaseModel):
     def restore_checkpoint(self, ckpt_id: str) -> bool:
         for ckpt in self.checkpoint_history:
             if ckpt.id == ckpt_id:
-                self.current_round = ckpt.round
-                self.agents = copy.deepcopy(ckpt.agents)
-                self.tasks = copy.deepcopy(ckpt.tasks)
-                self.status = ckpt.status
-                self.accumulated_cost_usd = ckpt.accumulated_cost_usd
-                self.updated_at = datetime.now(timezone.utc)
+                self.restore_checkpoint_object(ckpt)
                 return True
         return False
+
+    def restore_checkpoint_object(self, ckpt: SwarmCheckpoint) -> None:
+        self.current_round = ckpt.round
+        self.config = ckpt.config
+        self.agents = copy.deepcopy(ckpt.agents)
+        self.tasks = copy.deepcopy(ckpt.tasks)
+        self.status = ckpt.status
+        self.accumulated_cost_usd = ckpt.accumulated_cost_usd
+        self.updated_at = datetime.now(timezone.utc)
 
     def fork(self, new_config: SwarmGraphConfig | None = None) -> SwarmState:
         return SwarmState(

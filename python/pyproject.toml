@@ -29,6 +29,7 @@ dependencies = [
     "PyYAML>=6.0",
     "tiktoken>=0.8",
     "mcp>=1.0.0",
+    "swarmgraph-sdk",
 ]
 
 [project.optional-dependencies]
@@ -59,7 +60,10 @@ arc-studio = "agent_runtime_cockpit.cli_studio:app"
 arch-studio-cli = "agent_runtime_cockpit.cli_studio:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agent_runtime_cockpit", "src/swarmgraph"]
+packages = ["src/agent_runtime_cockpit"]
+
+[tool.uv.sources]
+swarmgraph-sdk = { path = "packages/swarmgraph-sdk", editable = true }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

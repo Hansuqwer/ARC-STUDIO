@@ -3,10 +3,11 @@ from __future__ import annotations
 import asyncio
 import threading
 from datetime import datetime, timezone
-from typing import Any, Callable, Protocol
+from typing import Any, AsyncIterator, Callable, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .checkpoint import CheckpointStore
 from .config import ExecutionMode, SwarmGraphConfig
 from .decomposition import DecompositionStrategy, parallelizability_score
 from .detectors import (
@@ -82,6 +83,7 @@ class SwarmGraphRunner:
         on_event: Callable[[SwarmGraphEvent], None] | None = None,
         decomposition_strategy: DecompositionStrategy | None = None,
         provider: Provider | None = None,
+        checkpoint_store: CheckpointStore | None = None,
     ):
         self.config = config or SwarmGraphConfig()
         self.state: SwarmState | None = None
@@ -89,6 +91,7 @@ class SwarmGraphRunner:
         self._on_event = on_event
         self._decomposition_strategy = decomposition_strategy
         self._provider = provider
+        self._checkpoint_store = checkpoint_store
 
     def _emit(self, event: SwarmGraphEvent) -> None:
         self.events.append(event)
@@ -162,7 +165,7 @@ class SwarmGraphRunner:
         )
 
         queen_prepare_agents(self.state, cfg.num_workers)
-        self.state.save_checkpoint()
+        self._save_checkpoint()
 
         if self._decomposition_strategy is None:
             tasks = queen_decompose(self.state, prompt)
@@ -237,7 +240,7 @@ class SwarmGraphRunner:
                     self.state.error = "budget exhausted"
                     break
 
-            self.state.save_checkpoint()
+            self._save_checkpoint()
 
         if self.state.status not in (SwarmStatus.failed, SwarmStatus.cancelled):
             if self.state.all_tasks_completed():
@@ -256,6 +259,39 @@ class SwarmGraphRunner:
     ) -> SwarmRunResult:
         payload = await self.run_async(prompt, config, cancellation_token)
         return SwarmRunResult.from_dict(payload)
+
+    async def stream(
+        self,
+        prompt: str,
+        config: SwarmGraphConfig | None = None,
+        cancellation_token: CancellationToken | None = None,
+    ) -> AsyncIterator[SwarmGraphEvent]:
+        queue: asyncio.Queue[SwarmGraphEvent] = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+
+        def on_event(event: SwarmGraphEvent) -> None:
+            loop.call_soon_threadsafe(queue.put_nowait, event)
+
+        runner = SwarmGraphRunner(
+            config=config or self.config,
+            on_event=on_event,
+            decomposition_strategy=self._decomposition_strategy,
+            provider=self._provider,
+            checkpoint_store=self._checkpoint_store,
+        )
+        run_task = asyncio.create_task(runner.run_async(prompt, None, cancellation_token))
+
+        while True:
+            if run_task.done() and queue.empty():
+                break
+            try:
+                yield await asyncio.wait_for(queue.get(), timeout=0.05)
+            except TimeoutError:
+                continue
+
+        await run_task
+        self.state = runner.state
+        self.events = runner.events
 
     async def _execute_workers_parallel(
         self,
@@ -367,6 +403,13 @@ class SwarmGraphRunner:
         ):
             self.state.status = SwarmStatus.failed
             self.state.error = "budget exhausted"
+
+    def _save_checkpoint(self) -> None:
+        if self.state is None:
+            return
+        checkpoint = self.state.save_checkpoint()
+        if self._checkpoint_store is not None:
+            self._checkpoint_store.save(checkpoint)
 
     def _budget_exhausted(self, cfg: SwarmGraphConfig) -> bool:
         if self.state is None or not cfg.enable_budget or cfg.budget_limit_usd is None:
