@@ -14,9 +14,11 @@ import agent_runtime_cockpit.isolation.vz_provider as vz_provider
 from agent_runtime_cockpit.isolation.vz_provider import (
     VZNoNetworkProof,
     VZPublicExecutionRunner,
+    generate_vz_exec_init_artifacts,
     generate_vz_proof_artifacts,
     parse_vz_guest_command_result,
     parse_vz_guest_proof,
+    validate_vz_exec_init_manifest,
     validate_vz_artifact_manifest,
     vz_public_exec_gates,
 )
@@ -282,6 +284,36 @@ def test_vz_artifact_build_runner_failure_is_blocker(tmp_path, monkeypatch):
     assert any("swiftc failed" in blocker for blocker in report.blockers)
 
 
+def test_vz_exec_init_artifacts_are_reviewable_and_no_download(tmp_path):
+    report = generate_vz_exec_init_artifacts(tmp_path)
+    manifest = validate_vz_exec_init_manifest(tmp_path / "vz-exec-init-manifest.json")
+    init_text = (tmp_path / "arc-vz-exec-init.sh").read_text(encoding="utf-8")
+
+    assert report.blockers == []
+    assert manifest.no_downloads is True
+    assert manifest.shell_string_execution is False
+    assert manifest.python_runtime_included is False
+    assert "ARC_VZ_COMMAND_ARGV_B64CSV" in init_text
+    assert "ARC_VZ_RESULT command_sha256" in init_text
+    assert '"$@" >/tmp/arc-vz-cmd.out' in init_text
+    assert "sh -c" not in init_text
+    assert "requested argv binary/runtime present inside the guest" in manifest.guest_requirements
+
+
+def test_vz_exec_init_validator_rejects_shell_string_execution(tmp_path):
+    report = generate_vz_exec_init_artifacts(tmp_path)
+    init_path = tmp_path / "arc-vz-exec-init.sh"
+    init_path.write_text(init_path.read_text(encoding="utf-8") + "\nsh -c 'echo unsafe'\n")
+    manifest = report.manifest.model_copy(
+        update={"init_sha256": hashlib.sha256(init_path.read_bytes()).hexdigest()}
+    )
+    manifest_path = tmp_path / "vz-exec-init-manifest.json"
+    manifest_path.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="forbidden shell execution"):
+        validate_vz_exec_init_manifest(manifest_path)
+
+
 def test_vz_public_exec_gates_require_all_env(tmp_path, monkeypatch):
     manifest = _valid_public_manifest(tmp_path)
     monkeypatch.setattr(vz_provider.platform, "system", lambda: "Darwin")
@@ -427,6 +459,56 @@ def test_vz_public_runner_timeout_caps_output_and_marks_failure(tmp_path, monkey
     assert result.metadata["teardown_ok"] is False
 
 
+def test_vz_public_runner_missing_command_hash_fails_result(tmp_path, monkeypatch):
+    manifest = _valid_public_manifest(tmp_path)
+    monkeypatch.setenv("ARC_MICROVM_EXEC_ENABLED", "1")
+    monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+    monkeypatch.setenv("ARC_VZ_REAL_EXEC", "1")
+    monkeypatch.setenv("ARC_VZ_ARTIFACT_MANIFEST", str(manifest))
+    monkeypatch.setattr(vz_provider.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(vz_provider, "_codesign_verify", lambda _path: True)
+    monkeypatch.setattr(
+        vz_provider.subprocess,
+        "Popen",
+        lambda *args, **kwargs: _FakePopen(_successful_guest_output()),
+    )
+
+    result = VZPublicExecutionRunner(workspace_root=tmp_path).run(["pwd"])
+
+    assert result.exit_code == -1
+    assert "guest command result did not prove requested argv hash" in result.stderr
+
+
+def test_vz_public_runner_interrupt_kills_group_and_fails_result(tmp_path, monkeypatch):
+    manifest = _valid_public_manifest(tmp_path)
+    fake = _FakePopen(_successful_guest_output())
+
+    def interrupt_once(timeout=None):
+        if not fake.killed:
+            raise KeyboardInterrupt
+        fake.returncode = -2
+        return fake.returncode
+
+    fake.wait = interrupt_once
+    monkeypatch.setenv("ARC_MICROVM_EXEC_ENABLED", "1")
+    monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+    monkeypatch.setenv("ARC_VZ_REAL_EXEC", "1")
+    monkeypatch.setenv("ARC_VZ_ARTIFACT_MANIFEST", str(manifest))
+    monkeypatch.setattr(vz_provider.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(vz_provider, "_codesign_verify", lambda _path: True)
+    monkeypatch.setattr(vz_provider.subprocess, "Popen", lambda *args, **kwargs: fake)
+    monkeypatch.setattr(
+        vz_provider.os, "killpg", lambda *args, **kwargs: setattr(fake, "killed", True)
+    )
+
+    result = VZPublicExecutionRunner(workspace_root=tmp_path).run(["pwd"])
+
+    assert result.exit_code == -1
+    assert result.killed is True
+    assert result.kill_reason == "signal"
+    assert "interrupted" in "; ".join(result.metadata["lifecycle_errors"])
+
+
 @pytest.mark.asyncio
 async def test_vz_run_proof_requires_teardown_marker(tmp_path, monkeypatch):
     proof = _ready_proof(tmp_path, monkeypatch)
@@ -500,3 +582,22 @@ async def test_vz_no_nic_boot_and_proof(tmp_path):
     assert result.no_nic_configured is True
     assert result.network_devices_configured == 0
     assert result.proof == "proven"
+
+
+@pytest.mark.skipif(
+    os.environ.get("ARC_MICROVM_EXEC_ENABLED") != "1"
+    or os.environ.get("ARC_MICROVM_INTEGRATION") != "1"
+    or os.environ.get("ARC_VZ_REAL_EXEC") != "1"
+    or not os.environ.get("ARC_VZ_ARTIFACT_MANIFEST")
+    or platform.system() != "Darwin",
+    reason="requires explicit macOS VZ public exec gates and local artifact manifest",
+)
+def test_vz_public_real_host_pwd(tmp_path):
+    result = VZPublicExecutionRunner(workspace_root=tmp_path).run(["pwd"])
+
+    assert result.provider == "microvm"
+    assert result.exit_code == 0
+    assert result.stdout == "/workspace"
+    assert result.metadata["network_proof_passed"] is True
+    assert result.metadata["workspace_proof_passed"] is True
+    assert result.metadata["teardown_ok"] is True

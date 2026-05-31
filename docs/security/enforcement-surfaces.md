@@ -357,6 +357,7 @@ ARC now has a first-class sandbox CLI foundation:
 - `arc sandbox run --provider container -- <cmd...>` executes through Docker/Podman only when `ARC_ENABLE_CONTAINER_SANDBOX=1` and local runtime checks pass.
 - `arc sandbox firecracker-artifacts --output <dir> --json` generates Firecracker proof init/manifest artifacts without booting a VM.
 - `arc sandbox firecracker-artifacts --exec-rootfs --output <dir> --json` generates ARC Firecracker execution init/rootfs artifacts; rootfs build requires `ARC_FC_BUILD_EXEC_ROOTFS=1` plus local `busybox`, `mkfs.ext4`, and `truncate`.
+- `arc sandbox vz-artifacts --exec-init --output <dir> --json` writes a reviewable VZ guest init contract plus manifest. It does not build an initrd, download assets, bundle Python, or boot a VM.
 - `arc policy list/show/validate` discovers and validates configured sandbox policies.
 - `arc policy validate-yaml --file <path>` validates a local YAML sandbox policy file.
 - `arc policy apply --file <path>` installs a local YAML sandbox policy under the workspace boundary.
@@ -385,7 +386,7 @@ MCP workbench status: `arc mcp workbench inspect` and `session-start` now requir
 
 Plan apply status: `arc plan apply` no longer treats generic plan approval/direct confirmation as approval for `network`, `install`, or `unknown` commands. Those categories require policy allowance or a matching sandbox approval token. Destructive and privileged commands remain unapprovable.
 
-MicroVM status: Linux/Firecracker public execution remains a gated scaffold, host-unproven on this macOS host. macOS Lima remains a low-security developer harness because default/user-mode networking is network-present. Direct Apple VZ gated public CLI proof passed once on this macOS 26.4 arm64 host with `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_VZ_REAL_EXEC=1`, valid manifest, compiled/signed runner, ARM64 kernel/initrd, guest no-ethernet/no-default-route/network-failure markers, workspace sentinel/symlink markers, exact argv hash, stdout `/workspace`, teardown ok, and sandbox audit. `arc sandbox vz-artifacts --build-runner` can generate a local hash-pinned artifact set with no downloads and no VM boot. No production-grade or arbitrary host-command microVM execution is claimed. Windows is explicitly unsupported.
+MicroVM status: Linux/Firecracker public execution remains a gated scaffold, host-unproven on this macOS host. macOS Lima remains a low-security developer harness because default/user-mode networking is network-present. Direct Apple VZ gated public CLI proof passed once on this macOS 26.4 arm64 host with `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_VZ_REAL_EXEC=1`, valid manifest, compiled/signed runner, ARM64 kernel/initrd, guest no-ethernet/no-default-route/network-failure markers, workspace sentinel/symlink markers, exact argv hash, stdout `/workspace`, teardown ok, and sandbox audit. `arc sandbox vz-artifacts --build-runner` can generate a local hash-pinned artifact set with no downloads and no VM boot. `--exec-init` now records the guest init contract/policy, still without packaging an initrd. No production-grade or arbitrary host-command microVM execution is claimed. Windows is explicitly unsupported.
 
 ---
 

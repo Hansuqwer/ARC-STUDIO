@@ -161,6 +161,7 @@ uv run arc policy validate --json
 uv run arc sandbox audit-verify --json
 uv run arc sandbox audit-list --json --limit 20
 uv run arc sandbox vz-artifacts --json --output /tmp/arc-vz-artifacts --kernel /path/to/arm64-linux-kernel --initrd /path/to/arc-vz-proof-initrd.gz --build-runner
+uv run arc sandbox vz-artifacts --json --exec-init --output /tmp/arc-vz-exec-init
 ```
 
 Opt-in macOS direct VZ proof run, using local artifacts only:
@@ -174,7 +175,7 @@ ARC_VZ_ARTIFACT_MANIFEST=/path/to/vz-artifacts-manifest.json \
 uv run arc sandbox run --json --provider microvm --policy local-safe -- pwd
 ```
 
-Expected proven stdout for the current proof initrd is `/workspace`. Do not use this as evidence for `python -c` or arbitrary host-command execution unless the guest artifact actually contains that runtime and emits the matching `ARC_VZ_RESULT command_sha256` marker.
+Expected proven stdout for the current proof initrd is `/workspace`. Do not use this as evidence for `python -c` or arbitrary host-command execution unless the guest artifact actually contains that runtime and emits the matching `ARC_VZ_RESULT command_sha256` marker. `--exec-init` writes the reviewable guest init contract and manifest only; it does not build an initrd, download assets, or bundle Python.
 
 Expected defaults:
 

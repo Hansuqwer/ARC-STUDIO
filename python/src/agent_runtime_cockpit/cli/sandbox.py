@@ -18,6 +18,7 @@ from ..isolation.microvm import (
 from ..isolation.subprocess import SubprocessIsolationProvider
 from ..isolation.vz_provider import (
     VZNoNetworkProof,
+    generate_vz_exec_init_artifacts,
     generate_vz_proof_artifacts,
     vz_public_exec_gates,
 )
@@ -513,6 +514,11 @@ def sandbox_vz_artifacts(
         "--build-runner",
         help="Compile/sign the local Swift VZ runner into the artifact set",
     ),
+    exec_init: bool = typer.Option(
+        False,
+        "--exec-init",
+        help="Write the reviewable ARC VZ guest exec-init contract only; no initrd build or downloads",
+    ),
     workspace: Optional[str] = WORKSPACE_FLAG,
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
@@ -520,11 +526,15 @@ def sandbox_vz_artifacts(
     """Generate VZ proof artifact provenance; does not boot a VM."""
     _setup_logging(debug)
     ws = _workspace(workspace)
-    report = generate_vz_proof_artifacts(
-        Path(output).expanduser(),
-        kernel_path=Path(kernel).expanduser() if kernel else None,
-        initrd_path=Path(initrd).expanduser() if initrd else None,
-        build_runner=build_runner,
+    report = (
+        generate_vz_exec_init_artifacts(Path(output).expanduser())
+        if exec_init
+        else generate_vz_proof_artifacts(
+            Path(output).expanduser(),
+            kernel_path=Path(kernel).expanduser() if kernel else None,
+            initrd_path=Path(initrd).expanduser() if initrd else None,
+            build_runner=build_runner,
+        )
     )
     _out(ok(report.model_dump(mode="json"), workspace=str(ws)), json_output)
 

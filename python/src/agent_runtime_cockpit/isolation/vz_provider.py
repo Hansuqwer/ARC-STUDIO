@@ -180,6 +180,41 @@ class VZArtifactReport(BaseModel):
     manifest: VZArtifactManifest
 
 
+class VZExecInitManifest(BaseModel):
+    """Manifest for the reviewable ARC VZ guest init contract."""
+
+    model_config = ConfigDict(frozen=True)
+
+    version: int = 1
+    generator_version: str = "arc-vz-exec-init-v1"
+    marker_contract_version: int = 1
+    artifact: str = "arc-vz-exec-init"
+    generated_at: str
+    host_os: str
+    host_arch: str
+    no_downloads: bool = True
+    shell_string_execution: bool = False
+    argv_transport: str = "ARC_VZ_COMMAND_ARGV_B64CSV"
+    command_hash_marker: str = "ARC_VZ_RESULT command_sha256"
+    python_runtime_included: bool = False
+    markers: list[str] = Field(default_factory=lambda: list(VZ_MARKERS))
+    init_path: str
+    init_sha256: str
+    guest_requirements: list[str] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+
+
+class VZExecInitReport(BaseModel):
+    """Result of writing the ARC VZ guest init contract."""
+
+    model_config = ConfigDict(frozen=True)
+
+    manifest_path: str
+    init_path: str
+    blockers: list[str] = Field(default_factory=list)
+    manifest: VZExecInitManifest
+
+
 def vz_public_exec_gates(manifest_path: Path | None = None) -> dict[str, object]:
     """Return public macOS VZ execution gates without starting a VM."""
     manifest_env = os.environ.get("ARC_VZ_ARTIFACT_MANIFEST")
@@ -1004,6 +1039,128 @@ def generate_vz_proof_artifacts(
         blockers=blockers,
         manifest=manifest,
     )
+
+
+def render_vz_exec_init() -> str:
+    """Return the reviewable ARC VZ init contract for guest-available argv execution."""
+    return """#!/bin/sh
+set +e
+BB=/usr/bin/busybox
+PATH=/usr/bin:/bin:/sbin:/usr/sbin
+echo ARC_VZ_PROOF booted=1
+$BB mount -t proc proc /proc 2>/dev/null || true
+$BB mount -t sysfs sysfs /sys 2>/dev/null || true
+$BB mkdir -p /workspace /tmp
+if $BB grep -Eq "(^|[[:space:]])(eth|ens|enp|wlan)[0-9a-z]*:" /proc/net/dev 2>/dev/null; then echo ARC_VZ_PROOF no-guest-ethernet=0; else echo ARC_VZ_PROOF no-guest-ethernet=1; fi
+if $BB grep -q "00000000" /proc/net/route 2>/dev/null; then echo ARC_VZ_PROOF no-default-route=0; else echo ARC_VZ_PROOF no-default-route=1; fi
+if [ -x /usr/bin/wget ]; then echo ARC_VZ_PROOF wget-available=1; else echo ARC_VZ_PROOF wget-available=0; fi
+if /usr/bin/wget -T 2 -O /tmp/arc-vz-net http://192.0.2.1/ 2>/tmp/arc-vz-wget.err; then echo ARC_VZ_PROOF network-failure=0; else echo ARC_VZ_PROOF network-failure=1; fi
+if $BB mount -t virtiofs workspace /workspace 2>/tmp/arc-vz-mount.err; then echo ARC_VZ_PROOF workspace-mount=1; else echo ARC_VZ_PROOF workspace-mount=0; fi
+if [ -r /workspace/.arc-vz-sentinel ]; then echo ARC_VZ_PROOF sentinel-read=1; else echo ARC_VZ_PROOF sentinel-read=0; fi
+if [ -r /workspace/.arc-vz-escape ]; then echo ARC_VZ_PROOF symlink-escape-blocked=0; else echo ARC_VZ_PROOF symlink-escape-blocked=1; fi
+cd /workspace 2>/tmp/arc-vz-cd.err || true
+ARGV_B64CSV=""
+COMMAND_SHA256=""
+for arg in $(cat /proc/cmdline); do
+  case "$arg" in
+    ARC_VZ_COMMAND_ARGV_B64CSV=*) ARGV_B64CSV=${arg#ARC_VZ_COMMAND_ARGV_B64CSV=} ;;
+    ARC_VZ_COMMAND_SHA256=*) COMMAND_SHA256=${arg#ARC_VZ_COMMAND_SHA256=} ;;
+  esac
+done
+set --
+REST="$ARGV_B64CSV"
+while [ -n "$REST" ]; do
+  case "$REST" in
+    *,*) PART=${REST%%,*}; REST=${REST#*,} ;;
+    *) PART=$REST; REST="" ;;
+  esac
+  DECODED=$(printf '%s' "$PART" | /usr/bin/base64 -d 2>/tmp/arc-vz-decode.err || true)
+  set -- "$@" "$DECODED"
+done
+if [ "$#" -eq 0 ] || [ -z "$1" ]; then
+  echo ARC_VZ_RESULT exit_code=127
+  echo ARC_VZ_RESULT stdout=
+  echo ARC_VZ_RESULT stderr=missing-command
+  echo ARC_VZ_RESULT command_sha256="$COMMAND_SHA256"
+else
+  "$@" >/tmp/arc-vz-cmd.out 2>/tmp/arc-vz-cmd.err
+  RC=$?
+  OUT=$(tr '\n' ' ' </tmp/arc-vz-cmd.out | head -c 8192)
+  ERR=$(tr '\n' ' ' </tmp/arc-vz-cmd.err | head -c 8192)
+  echo ARC_VZ_RESULT exit_code=$RC
+  echo ARC_VZ_RESULT stdout=$OUT
+  echo ARC_VZ_RESULT stderr=$ERR
+  echo ARC_VZ_RESULT command_sha256="$COMMAND_SHA256"
+fi
+$BB sync || true
+$BB reboot -f || $BB poweroff -f || $BB halt -f || true
+"""
+
+
+def generate_vz_exec_init_artifacts(output_dir: Path) -> VZExecInitReport:
+    """Write the ARC VZ exec init contract; does not build an initrd or download assets."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    init_path = output_dir / "arc-vz-exec-init.sh"
+    manifest_path = output_dir / "vz-exec-init-manifest.json"
+    init_path.write_text(render_vz_exec_init(), encoding="utf-8")
+    init_path.chmod(0o755)
+    manifest = VZExecInitManifest(
+        generated_at=_utc_now(),
+        host_os=platform.system(),
+        host_arch=platform.machine(),
+        init_path=str(init_path),
+        init_sha256=_sha256_file(init_path),
+        guest_requirements=[
+            "Linux initramfs with /init wired to this script",
+            "/usr/bin/busybox",
+            "/usr/bin/base64",
+            "/usr/bin/wget for network-failure proof",
+            "virtiofs workspace tag mounted as /workspace",
+            "requested argv binary/runtime present inside the guest",
+        ],
+    )
+    manifest_path.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return VZExecInitReport(
+        manifest_path=str(manifest_path),
+        init_path=str(init_path),
+        blockers=[],
+        manifest=manifest,
+    )
+
+
+def validate_vz_exec_init_manifest(path: Path) -> VZExecInitManifest:
+    """Validate the ARC VZ exec-init contract without building or booting a VM."""
+    manifest = VZExecInitManifest.model_validate_json(path.read_text(encoding="utf-8"))
+    if manifest.marker_contract_version != 1:
+        raise ValueError("unsupported VZ exec init marker contract version")
+    if manifest.no_downloads is not True:
+        raise ValueError("VZ exec init artifacts must not use downloads")
+    if manifest.shell_string_execution:
+        raise ValueError("VZ exec init must not use shell-string command execution")
+    if manifest.python_runtime_included:
+        raise ValueError("VZ exec init manifest must not claim bundled Python runtime")
+    if set(manifest.markers) != set(VZ_MARKERS):
+        raise ValueError("VZ exec init marker list mismatch")
+    init_path = Path(manifest.init_path)
+    if not init_path.exists() or _sha256_file(init_path) != manifest.init_sha256:
+        raise ValueError("VZ exec init sha256 mismatch")
+    init_text = init_path.read_text(encoding="utf-8")
+    required = [
+        "ARC_VZ_COMMAND_ARGV_B64CSV",
+        "ARC_VZ_COMMAND_SHA256",
+        "ARC_VZ_RESULT command_sha256",
+        '"$@" >/tmp/arc-vz-cmd.out',
+        "ARC_VZ_PROOF network-failure",
+        "ARC_VZ_PROOF symlink-escape-blocked",
+    ]
+    for token in required:
+        if token not in init_text:
+            raise ValueError(f"VZ exec init missing contract token: {token}")
+    forbidden = ["eval ", "sh -c", "ash -c", "bash -c"]
+    for token in forbidden:
+        if token in init_text:
+            raise ValueError(f"VZ exec init contains forbidden shell execution token: {token}")
+    return manifest
 
 
 def validate_vz_artifact_manifest(path: Path) -> VZArtifactManifest:

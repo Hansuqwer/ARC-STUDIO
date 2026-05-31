@@ -3,7 +3,7 @@
 **Status:** Locked execution plan for remaining work.
 **Created:** 2026-05-17
 **Last reality refresh:** 2026-05-31 — Phase 104 direct Apple VZ gated public CLI proof passed once for guest-available `pwd` with no-network/workspace/teardown/audit evidence; default-off and not production-grade; Phase 105 Linux/Firecracker remains host-unproven and Linux/KVM-only; Phase 106 remains narrow live-smoke/gated, not broad provider-backed SwarmGraph E2E.
-**Current evidence anchor:** local worktree | VZ gated public proof slice; `cd python && ARC_MICROVM_EXEC_ENABLED=1 ARC_MICROVM_INTEGRATION=1 ARC_VZ_REAL_EXEC=1 ARC_VZ_ARTIFACT_MANIFEST=/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-artifacts-exec/vz-artifacts-manifest.json ARC_VZ_TIMEOUT_SECONDS=45 uv run arc sandbox run --json --provider microvm --policy local-safe -- pwd` OK; `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3545 passed / 35 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
+**Current evidence anchor:** local worktree | VZ exec-init contract slice; `cd python && ARC_MICROVM_EXEC_ENABLED=1 ARC_MICROVM_INTEGRATION=1 ARC_VZ_REAL_EXEC=1 ARC_VZ_ARTIFACT_MANIFEST=/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-artifacts-exec/vz-artifacts-manifest.json ARC_VZ_TIMEOUT_SECONDS=45 uv run arc sandbox run --json --provider microvm --policy local-safe -- pwd` OK; `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3550 passed / 36 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -4459,7 +4459,7 @@ pnpm typecheck
 ## Phase 104 — macOS MicroVM Execution + Strict No-Network Proof
 
 **Roadmap:** R75 macOS MicroVM Execution + Strict No-Network Proof
-**Status:** Gated Public CLI Proof Passed Once / Artifact Provenance Added / Default Off | Evidence: `cd python && uv run arc sandbox vz-artifacts --json --output /var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-artifacts-exec --kernel /var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-proof/debian-linux --initrd /var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-proof/arc-vz-exec-initrd.gz --build-runner` → blockers `[]`; `cd python && ARC_MICROVM_EXEC_ENABLED=1 ARC_MICROVM_INTEGRATION=1 ARC_VZ_REAL_EXEC=1 ARC_VZ_ARTIFACT_MANIFEST=/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-artifacts-exec/vz-artifacts-manifest.json ARC_VZ_TIMEOUT_SECONDS=45 uv run arc sandbox run --json --provider microvm --policy local-safe -- pwd` → stdout `/workspace`, no-network/workspace/symlink/teardown/audit ok; targeted VZ/sandbox tests 149 passed / 2 skipped | Notes: Direct VZ proof created/booted/stopped a no-NIC guest and proved exact guest-available argv execution. This is default-off and not production-grade or arbitrary host-command microVM execution.
+**Status:** Gated Public CLI Proof Passed Once / Artifact Provenance Added / Default Off | Evidence: `cd python && uv run arc sandbox vz-artifacts --json --output /var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-artifacts-exec --kernel /var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-proof/debian-linux --initrd /var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-proof/arc-vz-exec-initrd.gz --build-runner` → blockers `[]`; `cd python && ARC_MICROVM_EXEC_ENABLED=1 ARC_MICROVM_INTEGRATION=1 ARC_VZ_REAL_EXEC=1 ARC_VZ_ARTIFACT_MANIFEST=/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-artifacts-exec/vz-artifacts-manifest.json ARC_VZ_TIMEOUT_SECONDS=45 uv run arc sandbox run --json --provider microvm --policy local-safe -- pwd` → stdout `/workspace`, no-network/workspace/symlink/teardown/audit ok; `cd python && uv run arc sandbox vz-artifacts --json --exec-init --output /tmp/arc-vz-exec-init` writes reviewable contract; targeted VZ/sandbox tests 154 passed / 3 skipped | Notes: Direct VZ proof created/booted/stopped a no-NIC guest and proved exact guest-available argv execution. This is default-off and not production-grade or arbitrary host-command microVM execution.
 **Depends on:** Phase 97, ADR-024, existing Lima harness hardening
 
 ### Implementation
@@ -4468,7 +4468,8 @@ pnpm typecheck
 3. `tools/arc-vz-runner.swift` contains the no-NIC helper source with `config.networkDevices = []`, virtiofs workspace mount, serial console wiring, argv/hash boot parameters, and teardown markers.
 4. The fully gated public CLI run boots a disposable VM/session, mounts workspace through controlled path, collects guest command markers, proves no guest ethernet/default route, failed network probe, sentinel read, symlink escape blocked, exact requested argv hash, and teardown ok.
 5. `arc sandbox vz-artifacts` writes local proof artifacts and `vz-artifacts-manifest.json` with source/entitlements/runner/kernel/initrd SHA256 hashes; no downloads, no VM boot.
-6. Keep real boot test opt-in and skipped unless local runtime inputs exist.
+6. `arc sandbox vz-artifacts --exec-init` writes the reviewable guest init contract and manifest only; no initrd packaging, no downloads, no Python runtime bundle.
+7. Keep real boot test opt-in and skipped unless local runtime inputs exist.
 
 ### Acceptance
 1. Host-gated proof creates and destroys VM/session.

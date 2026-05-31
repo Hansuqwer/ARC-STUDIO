@@ -1384,6 +1384,30 @@ def test_vz_artifacts_cli_generates_manifest_without_boot(tmp_path, monkeypatch)
     assert (output / "vz-artifacts-manifest.json").exists()
 
 
+def test_vz_artifacts_cli_generates_exec_init_contract(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    output = tmp_path / "vz-exec-init"
+    result = CliRunner().invoke(
+        app,
+        [
+            "sandbox",
+            "vz-artifacts",
+            "--json",
+            "--exec-init",
+            "--output",
+            str(output),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    data = _payload(result)["data"]
+    assert data["manifest"]["artifact"] == "arc-vz-exec-init"
+    assert data["manifest"]["no_downloads"] is True
+    assert data["manifest"]["shell_string_execution"] is False
+    assert data["manifest"]["python_runtime_included"] is False
+    assert (output / "arc-vz-exec-init.sh").exists()
+    assert (output / "vz-exec-init-manifest.json").exists()
+
+
 def test_approval_rules_allow_policy(tmp_path, monkeypatch):
     """Test that allow_network=True makes approval_required=False."""
     monkeypatch.chdir(tmp_path)

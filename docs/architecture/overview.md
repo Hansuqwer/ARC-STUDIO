@@ -160,4 +160,4 @@ argv -> CommandClassification -> SandboxDecision -> IsolationProvider -> Sandbox
 
 MicroVM doctor/preflight output separates runtime preflight readiness from public execution readiness. Direct macOS VZ public execution is default-off and only available through explicit VZ gates and local artifacts; release docs must keep it labeled gated/host-proven-once, not production-grade. Linux/Firecracker stays labeled gated scaffold, host-unproven until live Linux/KVM proof exists.
 
-Firecracker and VZ proof artifact generation are available as local CLI utilities. They do not boot a VM; eligible hosts must run the opt-in proof/smoke tests to prove real execution.
+Firecracker and VZ proof artifact generation are available as local CLI utilities. They do not boot a VM; eligible hosts must run the opt-in proof/smoke tests to prove real execution. `arc sandbox vz-artifacts --exec-init` writes only the reviewable VZ guest init contract plus manifest; it does not package an initrd or download/bundle guest runtimes.
