@@ -32,6 +32,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+swarmgraph = []
 langgraph = ["langgraph>=0.2"]
 context = ["httpx>=0.27"]
 optimizer = ["tiktoken>=0.12"]
@@ -58,7 +59,7 @@ arc-studio = "agent_runtime_cockpit.cli_studio:app"
 arch-studio-cli = "agent_runtime_cockpit.cli_studio:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agent_runtime_cockpit"]
+packages = ["src/agent_runtime_cockpit", "src/swarmgraph"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

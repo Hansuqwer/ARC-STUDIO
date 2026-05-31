@@ -5,7 +5,9 @@ import threading
 from datetime import datetime, timezone
 from typing import Any, Callable, Protocol
 
-from .config import SwarmGraphConfig
+from pydantic import BaseModel, ConfigDict, Field
+
+from .config import ExecutionMode, SwarmGraphConfig
 from .decomposition import DecompositionStrategy, parallelizability_score
 from .detectors import (
     detect_consensus_failure,
@@ -33,11 +35,44 @@ from .nodes.consensus import (
 )
 from .nodes.queen import queen_assign, queen_decompose, queen_prepare_agents
 from .nodes.worker import process_worker_results, worker_execute_async
+from .providers import Provider
 from .state import SwarmState
 
 
 class CancellationToken(Protocol):
     is_cancelled: Any
+
+
+class SwarmRunTaskResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    task_id: str
+    output: str = ""
+    status: str
+
+
+class SwarmRunResult(BaseModel):
+    """Typed SDK result wrapper for the existing stable dict payload."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    swarm_id: str | None = None
+    status: str
+    rounds: int = Field(default=0, ge=0)
+    total_tasks: int = Field(default=0, ge=0)
+    completed_tasks: int = Field(default=0, ge=0)
+    failed_tasks: int = Field(default=0, ge=0)
+    total_cost_usd: float = Field(default=0.0, ge=0)
+    error: str | None = None
+    results: list[SwarmRunTaskResult] = Field(default_factory=list)
+    events: list[dict[str, Any]] = Field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> SwarmRunResult:
+        return cls.model_validate(payload)
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.model_dump(mode="json")
 
 
 class SwarmGraphRunner:
@@ -46,12 +81,14 @@ class SwarmGraphRunner:
         config: SwarmGraphConfig | None = None,
         on_event: Callable[[SwarmGraphEvent], None] | None = None,
         decomposition_strategy: DecompositionStrategy | None = None,
+        provider: Provider | None = None,
     ):
         self.config = config or SwarmGraphConfig()
         self.state: SwarmState | None = None
         self.events: list[SwarmGraphEvent] = []
         self._on_event = on_event
         self._decomposition_strategy = decomposition_strategy
+        self._provider = provider
 
     def _emit(self, event: SwarmGraphEvent) -> None:
         self.events.append(event)
@@ -77,6 +114,14 @@ class SwarmGraphRunner:
         cancellation_token: CancellationToken | None = None,
     ) -> dict[str, Any]:
         return self.run(prompt, config, cancellation_token)
+
+    def run_result(
+        self,
+        prompt: str,
+        config: SwarmGraphConfig | None = None,
+        cancellation_token: CancellationToken | None = None,
+    ) -> SwarmRunResult:
+        return SwarmRunResult.from_dict(self.run(prompt, config, cancellation_token))
 
     async def run_async(
         self,
@@ -203,6 +248,15 @@ class SwarmGraphRunner:
         self.state.updated_at = datetime.now(timezone.utc)
         return self._build_result()
 
+    async def run_result_async(
+        self,
+        prompt: str,
+        config: SwarmGraphConfig | None = None,
+        cancellation_token: CancellationToken | None = None,
+    ) -> SwarmRunResult:
+        payload = await self.run_async(prompt, config, cancellation_token)
+        return SwarmRunResult.from_dict(payload)
+
     async def _execute_workers_parallel(
         self,
         pending: list[SwarmTask],
@@ -220,11 +274,24 @@ class SwarmGraphRunner:
                 if _token_cancelled(cancellation_token):
                     return None
                 try:
+                    worker_kwargs: dict[str, Any] = {
+                        "mode": cfg.execution_mode,
+                        "timeout": cfg.worker_timeout_seconds,
+                        "cancellation_token": cancellation_token,
+                    }
+                    if (
+                        cfg.execution_mode == ExecutionMode.gated_local
+                        or self._provider is not None
+                    ):
+                        worker_kwargs.update(
+                            {
+                                "provider": self._provider,
+                                "allow_paid_calls": cfg.allow_paid_calls,
+                            }
+                        )
                     return await worker_execute_async(
                         task,
-                        mode=cfg.execution_mode,
-                        timeout=cfg.worker_timeout_seconds,
-                        cancellation_token=cancellation_token,
+                        **worker_kwargs,
                     )
                 except asyncio.CancelledError:
                     raise

@@ -465,3 +465,60 @@ AGUI:
   packages/arc-ag-ui/src/mapping/swarmgraph.ts
     → SwarmGraphMapper maps native events to AGUI events
 ```
+
+---
+
+## 10. SDK Extraction Notes
+
+### Executed first slice
+
+- Added a library-facing `swarmgraph` import facade packaged inside the existing `agent-runtime-cockpit` wheel.
+- Added typed `SwarmRunResult` / `SwarmRunTaskResult` wrappers while preserving the existing `dict` return contract for `SwarmGraphRunner.run()` and `run_async()`.
+- Added `SwarmGraphRunner.run_result()` and `run_result_async()` for SDK-style typed usage.
+
+### Executed second slice
+
+- Added SDK-owned `swarmgraph.providers` models/protocols: `Provider`, `ProviderRequest`, `ProviderResponse`, `UsageRecord`, `ProviderMessage`, `ProviderCapability`, and `CostRates`.
+- Removed ARC provider registry/env coupling from `swarmgraph.nodes.worker`; gated provider execution now requires explicit provider injection.
+- Added `SwarmGraphRunner(provider=...)` injection and passes `allow_paid_calls` from `SwarmGraphConfig` into worker execution.
+- Enforced paid-call denial by default for `gated_local` provider execution.
+- Added a subprocess import guard proving `import swarmgraph` and `import swarmgraph.providers` do not load `agent_runtime_cockpit.providers` or `agent_runtime_cockpit.cli_repl.cancellation`.
+
+### Recommended SDK shape
+
+```python
+from swarmgraph import SwarmGraphConfig, SwarmGraphRunner
+
+runner = SwarmGraphRunner(config=SwarmGraphConfig(max_rounds=1))
+result = runner.run_result("Explain consensus")
+```
+
+### Packaging status
+
+- Current: SDK facade is bundled with ARC's Python package.
+- Not yet done: separate `swarmgraph-sdk` distribution, independent release workflow, and independent docs site.
+- Provider contract split is now done inside the shared source tree; a separate `swarmgraph-sdk` wheel still requires moving shared source ownership rather than copying code.
+- Safe claim: "SwarmGraph SDK import facade / first extraction slice."
+- Unsafe claim: "Standalone published SDK" or "production provider-backed SDK."
+
+### Pros
+
+- Existing core is mostly self-contained.
+- Deterministic offline mode is CI-safe.
+- Consensus, risk, events, decomposition, state, and runner APIs are already useful as library primitives.
+- ARC adapter can remain a host integration layer instead of becoming the SDK boundary.
+
+### Cons / blockers
+
+- `gated_local` no longer depends on ARC provider registry/env names, but real provider wiring is injection-only and host-owned.
+- `provider_backed` is still not a working SDK-owned execution mode.
+- Runner consensus is still limited by current task/vote semantics.
+- Durable checkpoint resume remains in-memory only.
+- Separate package publication requires dependency pruning and import-path conflict checks.
+
+### Next SDK queue
+
+1. Split `swarmgraph-sdk` into its own wheel by moving shared source ownership to the SDK package and keeping ARC as a bridge/compat consumer.
+2. Add a real typed event stream API.
+3. Add a durable checkpoint store interface.
+4. Implement real multi-worker vote semantics before claiming consensus affects runtime outcomes broadly.

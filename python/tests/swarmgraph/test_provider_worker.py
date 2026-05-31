@@ -5,16 +5,17 @@ import time
 
 import pytest
 
-from agent_runtime_cockpit.providers.base import (
+from agent_runtime_cockpit.swarmgraph.config import ExecutionMode, SwarmGraphConfig
+from agent_runtime_cockpit.swarmgraph.models import SwarmTask
+from agent_runtime_cockpit.swarmgraph.providers import (
     CostRates,
     ProviderCapability,
+    ProviderMessage,
     ProviderRequest,
     ProviderResponse,
     UsageRecord,
 )
-from agent_runtime_cockpit.swarmgraph.config import ExecutionMode
-from agent_runtime_cockpit.swarmgraph.models import SwarmTask
-from agent_runtime_cockpit.swarmgraph.nodes import worker as worker_module
+from agent_runtime_cockpit.swarmgraph.runner import SwarmGraphRunner
 from agent_runtime_cockpit.swarmgraph.nodes.worker import worker_execute, worker_execute_async
 
 
@@ -62,14 +63,25 @@ class _BlockingProvider(_FakeProvider):
         return self.response
 
 
-def test_gated_local_calls_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+class _CancellationToken:
+    def __init__(self) -> None:
+        self.is_cancelled = True
+
+    def raise_if_cancelled(self) -> None:
+        raise RuntimeError("cancelled")
+
+
+def test_gated_local_calls_provider() -> None:
     provider = _FakeProvider()
-    monkeypatch.setenv("ARC_SWARMGRAPH_PROVIDER", "test-provider")
-    monkeypatch.setattr(worker_module, "get_provider", lambda _provider_id: provider)
 
     task = SwarmTask(prompt="test prompt")
     task.assigned_agent_id = "worker-1"
-    result = worker_execute(task, mode=ExecutionMode.gated_local)
+    result = worker_execute(
+        task,
+        mode=ExecutionMode.gated_local,
+        provider=provider,
+        allow_paid_calls=True,
+    )
 
     assert result.error is None
     assert result.output == "real output"
@@ -79,45 +91,57 @@ def test_gated_local_calls_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     assert provider.request.messages[0].content == "test prompt"
 
 
-def test_gated_local_provider_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ARC_SWARMGRAPH_PROVIDER", "missing-provider")
-    monkeypatch.setattr(
-        worker_module,
-        "get_provider",
-        lambda provider_id: (_ for _ in ()).throw(KeyError(provider_id)),
-    )
-
+def test_gated_local_provider_unavailable() -> None:
     task = SwarmTask(prompt="test")
     task.assigned_agent_id = "worker-1"
     result = worker_execute(task, mode=ExecutionMode.gated_local)
 
     assert result.output == ""
     assert result.error is not None
-    assert "provider not available: missing-provider" in result.error
+    assert "provider not configured" in result.error
 
 
-def test_gated_local_provider_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_gated_local_paid_call_denied_by_default() -> None:
+    provider = _FakeProvider()
+    task = SwarmTask(prompt="test")
+    task.assigned_agent_id = "worker-1"
+
+    result = worker_execute(task, mode=ExecutionMode.gated_local, provider=provider)
+
+    assert result.output == ""
+    assert result.error == "paid provider calls disabled; set allow_paid_calls=True"
+    assert provider.request is None
+
+
+def test_gated_local_provider_exception() -> None:
     provider = _FakeProvider(error=RuntimeError("API error"))
-    monkeypatch.setenv("ARC_SWARMGRAPH_PROVIDER", "test-provider")
-    monkeypatch.setattr(worker_module, "get_provider", lambda _provider_id: provider)
 
     task = SwarmTask(prompt="test")
     task.assigned_agent_id = "worker-1"
-    result = worker_execute(task, mode=ExecutionMode.gated_local)
+    result = worker_execute(
+        task,
+        mode=ExecutionMode.gated_local,
+        provider=provider,
+        allow_paid_calls=True,
+    )
 
     assert result.output == ""
     assert result.error is not None
     assert "API error" in result.error
 
 
-def test_gated_local_timeout_returns_without_hanging(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_gated_local_timeout_returns_without_hanging() -> None:
     provider = _BlockingProvider()
-    monkeypatch.setenv("ARC_SWARMGRAPH_PROVIDER", "test-provider")
-    monkeypatch.setattr(worker_module, "get_provider", lambda _provider_id: provider)
 
     task = SwarmTask(prompt="test")
     started = time.monotonic()
-    result = worker_execute(task, mode=ExecutionMode.gated_local, timeout=0.01)
+    result = worker_execute(
+        task,
+        mode=ExecutionMode.gated_local,
+        timeout=0.01,
+        provider=provider,
+        allow_paid_calls=True,
+    )
 
     assert time.monotonic() - started < 0.1
     assert result.error == "timeout"
@@ -125,13 +149,16 @@ def test_gated_local_timeout_returns_without_hanging(monkeypatch: pytest.MonkeyP
 
 
 @pytest.mark.asyncio
-async def test_gated_local_async_calls_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_gated_local_async_calls_provider() -> None:
     provider = _FakeProvider()
-    monkeypatch.setenv("ARC_SWARMGRAPH_PROVIDER", "test-provider")
-    monkeypatch.setattr(worker_module, "get_provider", lambda _provider_id: provider)
 
     task = SwarmTask(prompt="async prompt")
-    result = await worker_execute_async(task, mode=ExecutionMode.gated_local)
+    result = await worker_execute_async(
+        task,
+        mode=ExecutionMode.gated_local,
+        provider=provider,
+        allow_paid_calls=True,
+    )
 
     assert result.error is None
     assert result.output == "real output"
@@ -139,17 +166,54 @@ async def test_gated_local_async_calls_provider(monkeypatch: pytest.MonkeyPatch)
     assert provider.request.messages[0].content == "async prompt"
 
 
-@pytest.mark.skipif(
-    not __import__("os").environ.get("ARC_SWARMGRAPH_PROVIDER_TESTS"),
-    reason="set ARC_SWARMGRAPH_PROVIDER_TESTS=1 for live provider smoke",
-)
-def test_gated_local_live_provider_smoke(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ARC_SWARMGRAPH_PROVIDER", "9router")
-    monkeypatch.setenv("ARC_SWARMGRAPH_MODEL", "ag/gemini-3.5-flash-extra-low")
+@pytest.mark.asyncio
+async def test_gated_local_cancellation_token_reaches_provider() -> None:
+    provider = _FakeProvider()
+    task = SwarmTask(prompt="cancel")
 
-    task = SwarmTask(prompt="Reply with exactly: arc-live-ok")
-    task.assigned_agent_id = "worker-live"
-    result = worker_execute(task, mode=ExecutionMode.gated_local, timeout=60)
+    result = await worker_execute_async(
+        task,
+        mode=ExecutionMode.gated_local,
+        provider=provider,
+        allow_paid_calls=True,
+        cancellation_token=_CancellationToken(),
+    )
 
-    assert result.error is None
-    assert "arc-live-ok" in result.output.lower()
+    assert result.output == ""
+    assert result.error is not None
+    assert "cancelled" in result.error
+
+
+@pytest.mark.asyncio
+async def test_runner_injects_provider_and_paid_gate() -> None:
+    provider = _FakeProvider()
+    cfg = SwarmGraphConfig(
+        execution_mode=ExecutionMode.gated_local,
+        allow_paid_calls=True,
+        max_rounds=1,
+    )
+
+    result = await SwarmGraphRunner(config=cfg, provider=provider).run_async("runner prompt")
+
+    assert result["status"] == "completed"
+    assert result["results"][0]["output"] == "real output"
+    assert provider.request is not None
+    assert provider.request.messages[0].role == "user"
+    assert "runner prompt" in provider.request.messages[0].content
+
+
+def test_provider_models_do_not_require_arc_provider_types() -> None:
+    request = ProviderRequest(
+        model="test-model",
+        messages=[ProviderMessage(role="user", content="hello")],
+    )
+    response = ProviderResponse(
+        call_id=request.call_id,
+        model="test-model",
+        content="ok",
+        finish_reason="stop",
+        usage=UsageRecord(input_tokens=1, output_tokens=1),
+    )
+
+    assert request.messages[0].content == "hello"
+    assert response.content == "ok"

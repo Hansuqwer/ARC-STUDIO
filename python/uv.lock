@@ -93,7 +93,7 @@ requires-dist = [
     { name = "tiktoken", marker = "extra == 'optimizer'", specifier = ">=0.12" },
     { name = "typer", specifier = ">=0.12" },
 ]
-provides-extras = ["langgraph", "context", "optimizer", "docker", "arena", "vz", "all", "dev"]
+provides-extras = ["swarmgraph", "langgraph", "context", "optimizer", "docker", "arena", "vz", "all", "dev"]
 
 [[package]]
 name = "aiofiles"

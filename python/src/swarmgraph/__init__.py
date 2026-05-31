@@ -1,3 +1,17 @@
+"""SwarmGraph SDK import package.
+
+This package exposes the SwarmGraph core without importing ARC provider or
+registry modules. Until the standalone wheel is split, modules are loaded from
+the shared source directory packaged in ARC's Python distribution.
+"""
+
+# ruff: noqa: E402
+
+from pathlib import Path
+
+_CORE_PATH = Path(__file__).resolve().parents[1] / "agent_runtime_cockpit" / "swarmgraph"
+__path__.insert(0, str(_CORE_PATH))
+
 from .config import SwarmGraphConfig
 from .consensus import (
     ConsensusResult,
@@ -106,7 +120,6 @@ __all__ = [
     "detect_consensus_failure",
     "detect_resource_exhaustion",
     "detect_coordination_deadlock",
-    # Phase 31/R24 — Adaptive Consensus Protocol
     "RiskAssessment",
     "ProtocolSelection",
     "RiskFixture",
@@ -131,3 +144,5 @@ __all__ = [
     "BudgetEvent",
     "run_deterministic_swarm",
 ]
+
+del Path, _CORE_PATH

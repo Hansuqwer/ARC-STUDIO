@@ -1,22 +1,19 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import threading
 import time
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Protocol
 
-from ...cli_repl.cancellation import never_cancelled
-from ...providers.base import ProviderMessage, ProviderRequest, ProviderResponse
-from ...providers.registry import get as get_provider
 from ..config import ExecutionMode
 from ..models import (
     SwarmTask,
     TaskStatus,
     WorkerResult,
 )
+from ..providers import Provider, ProviderMessage, ProviderRequest, ProviderResponse
 
 
 class CancellationTokenLike(Protocol):
@@ -25,13 +22,33 @@ class CancellationTokenLike(Protocol):
     def raise_if_cancelled(self) -> None: ...
 
 
+class _NeverCancelled:
+    is_cancelled = False
+
+    def raise_if_cancelled(self) -> None:
+        return None
+
+
+_NEVER_CANCELLED = _NeverCancelled()
+
+
 def worker_execute(
     task: SwarmTask,
     mode: ExecutionMode = ExecutionMode.fake_offline,
     timeout: float = 30.0,
+    provider: Provider | None = None,
+    allow_paid_calls: bool = False,
 ) -> WorkerResult:
     if mode == ExecutionMode.gated_local:
-        return _run_coro_sync(worker_execute_async(task, mode=mode, timeout=timeout))
+        return _run_coro_sync(
+            worker_execute_async(
+                task,
+                mode=mode,
+                timeout=timeout,
+                provider=provider,
+                allow_paid_calls=allow_paid_calls,
+            )
+        )
 
     return _worker_execute_sync(task, mode=mode, timeout=timeout)
 
@@ -41,12 +58,16 @@ async def worker_execute_async(
     mode: ExecutionMode = ExecutionMode.fake_offline,
     timeout: float = 30.0,
     cancellation_token: CancellationTokenLike | None = None,
+    provider: Provider | None = None,
+    allow_paid_calls: bool = False,
 ) -> WorkerResult:
     if mode == ExecutionMode.gated_local:
         return await _worker_execute_gated_local(
             task,
             timeout=timeout,
             cancellation_token=cancellation_token,
+            provider=provider,
+            allow_paid_calls=allow_paid_calls,
         )
     return _worker_execute_sync(task, mode=mode, timeout=timeout)
 
@@ -95,36 +116,42 @@ async def _worker_execute_gated_local(
     task: SwarmTask,
     timeout: float,
     cancellation_token: CancellationTokenLike | None,
+    provider: Provider | None,
+    allow_paid_calls: bool,
 ) -> WorkerResult:
     started = datetime.now(timezone.utc)
     t0 = time.time()
-    provider_id = os.environ.get("ARC_SWARMGRAPH_PROVIDER", "anthropic")
 
-    try:
-        client = get_provider(provider_id)
-    except KeyError:
-        client = None
-
-    if client is None:
+    if provider is None:
         return WorkerResult(
             worker_id=task.assigned_agent_id or "unknown",
             task_id=task.id,
             output="",
-            error=f"provider not available: {provider_id}",
+            error="provider not configured",
+            duration_seconds=time.time() - t0,
+            started_at=started,
+        )
+
+    if not allow_paid_calls:
+        return WorkerResult(
+            worker_id=task.assigned_agent_id or "unknown",
+            task_id=task.id,
+            output="",
+            error="paid provider calls disabled; set allow_paid_calls=True",
             duration_seconds=time.time() - t0,
             started_at=started,
         )
 
     try:
-        model = os.environ.get("ARC_SWARMGRAPH_MODEL") or client.capabilities().default_model
+        model = provider.capabilities().default_model
         request = ProviderRequest(
             model=model,
             messages=[ProviderMessage(role="user", content=task.prompt)],
             max_tokens=1024,
         )
-        provider_token = cancellation_token or never_cancelled()
+        provider_token = cancellation_token or _NEVER_CANCELLED
         response = await _complete_provider_with_timeout(
-            client,
+            provider,
             request,
             provider_token,
             timeout,
@@ -135,7 +162,7 @@ async def _worker_execute_gated_local(
             task_id=task.id,
             output=response.content[:65536],
             duration_seconds=elapsed,
-            cost_usd=_response_cost_usd(client, response, model),
+            cost_usd=_response_cost_usd(provider, response, model),
             token_count=_response_token_count(response),
             started_at=started,
             completed_at=datetime.now(timezone.utc),
@@ -213,7 +240,7 @@ def _response_cost_usd(client: Any, response: Any, requested_model: str) -> floa
 
 
 async def _complete_provider_with_timeout(
-    client: Any,
+    client: Provider,
     request: ProviderRequest,
     cancellation_token: CancellationTokenLike,
     timeout: float,
