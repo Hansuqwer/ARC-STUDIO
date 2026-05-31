@@ -6,7 +6,37 @@ from swarmgraph import EchoProvider, JsonFileCheckpointStore, SwarmGraphConfig, 
 from swarmgraph.config import ExecutionMode
 from swarmgraph.models import SwarmTask, TaskStatus
 from swarmgraph.nodes.queen import queen_prepare_agents
+from swarmgraph.providers import (
+    CostRates,
+    ProviderCapability,
+    ProviderRequest,
+    ProviderResponse,
+    UsageRecord,
+)
 from swarmgraph.state import SwarmState
+
+
+class _PricedProvider:
+    def capabilities(self) -> ProviderCapability:
+        return ProviderCapability(
+            provider_id="priced-fake",
+            provider_name="Priced Fake",
+            supported_models=["priced-model"],
+            default_model="priced-model",
+            cost_rates={
+                "priced-model": CostRates(input_per_million=2.0, output_per_million=4.0),
+            },
+        )
+
+    async def complete(self, request: ProviderRequest, *, cancellation_token) -> ProviderResponse:
+        cancellation_token.raise_if_cancelled()
+        return ProviderResponse(
+            call_id=request.call_id,
+            model="priced-model",
+            content="priced output",
+            finish_reason="stop",
+            usage=UsageRecord(input_tokens=1_000, output_tokens=2_000),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +98,29 @@ def test_provider_backed_emits_worker_events() -> None:
 
     kinds = {event.kind.value for event in runner.get_events()}
     assert "worker" in kinds
+
+
+def test_provider_backed_priced_provider_records_worker_cost_and_budget_events() -> None:
+    cfg = SwarmGraphConfig(
+        execution_mode=ExecutionMode.provider_backed,
+        enable_budget=True,
+        budget_limit_usd=1.0,
+        max_rounds=1,
+        num_workers=1,
+    )
+    runner = SwarmGraphRunner(config=cfg, provider=_PricedProvider())
+
+    result = runner.run_result("Explain consensus")
+
+    assert result.status == "completed"
+    assert result.total_cost_usd == pytest.approx(0.01)
+    worker_events = [event for event in runner.get_events() if event.kind.value == "worker"]
+    assert worker_events
+    assert worker_events[0].data["cost_usd"] == pytest.approx(0.01)
+    budget_events = [event for event in runner.get_events() if event.kind.value == "budget"]
+    assert budget_events
+    assert budget_events[0].data["cost_usd"] == pytest.approx(0.01)
+    assert budget_events[0].data["accumulated"] == pytest.approx(0.01)
 
 
 # ---------------------------------------------------------------------------
@@ -203,3 +256,28 @@ def test_resume_emits_resume_audit_event(tmp_path) -> None:
 
     decisions = [e.data.get("decision") for e in runner.get_events() if e.kind.value == "audit"]
     assert "resume" in decisions
+
+
+def test_resume_preserves_checkpoint_event_history_before_resume_event(tmp_path) -> None:
+    store = JsonFileCheckpointStore(tmp_path)
+    cfg = SwarmGraphConfig(max_rounds=2, num_workers=1)
+    initial_runner = SwarmGraphRunner(config=cfg, checkpoint_store=store)
+    initial_runner.run("Explain consensus")
+    checkpoint_id = store.list_ids()[-1]
+    checkpoint = store.load(checkpoint_id)
+
+    assert checkpoint.events
+
+    runner = SwarmGraphRunner(config=cfg, checkpoint_store=store)
+    runner.resume(checkpoint_id)
+
+    events = runner.get_events()
+    assert [event.id for event in events[: len(checkpoint.events)]] == [
+        event["id"] for event in checkpoint.events
+    ]
+    assert any(
+        event.kind.value == "audit" and event.data.get("decision") == "resume" for event in events
+    )
+    resumed = runner.get_state()
+    assert resumed is not None
+    assert len(resumed.events) == len(events)

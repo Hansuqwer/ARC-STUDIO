@@ -86,6 +86,8 @@ SwarmGraphRunner ←→ SwarmState (mutable, in-memory)
 
 ```
 SwarmGraphRunner.events
+  → SwarmState.events[] mirrors serializable event history
+  → SwarmCheckpoint.events[] persists history for resume continuity
   → SwarmGraphAdapter._map_swarmgraph_event()
     → RunEvent objects (NODE_COMPLETED, SWARMGRAPH_CONSENSUS, etc.)
       → RunRecord.events[]
@@ -107,8 +109,8 @@ SwarmGraphRunner.events
 | `WorkerResult` | models.py | **Yes** | worker_id, task_id, output, artifacts, error, duration, cost, tokens | 118 |
 | `QueenDirective` | models.py | **Yes** | task_id, prompt, assigned_worker_ids, expected_output_count, priority | 129 |
 | `SwarmTask` | models.py | **No** | id, prompt, status, assigned_agent, directive, result, votes, approval, priority | 146 |
-| `SwarmState` | state.py | **No** | id, config, agents, tasks, spec_map, status, current_round, accumulated_cost, checkpoint_history | 93 |
-| `SwarmCheckpoint` | state.py | **Yes** | id, round, config, agents, tasks, status, accumulated_cost | 25 |
+| `SwarmState` | state.py | **No** | id, config, agents, tasks, spec_map, status, current_round, accumulated_cost, events, checkpoint_history | 93 |
+| `SwarmCheckpoint` | state.py | **Yes** | id, round, config, agents, tasks, status, accumulated_cost, events | 25 |
 | `ConsensusResult` | consensus.py | **Yes** | reached, approved, total_votes, approval_count, rejection_count, required, protocol, details, votes + risk audit fields | 29 |
 | `RiskAssessment` | risk_assessment.py | **Yes** | risk, score, matched_signals, rationale | 159 |
 | `ProtocolSelection` | risk_assessment.py | **Yes** | risk, protocol, assessment | 169 |
@@ -201,7 +203,7 @@ SwarmGraphRunner.events
 3. **Trivial decomposition**: `queen_decompose()` copies the same prompt (star) or appends step numbers (chain) — no semantic splitting
 4. **No LLM integration at all**: The entire runtime is a deterministic simulation — no model calls, no provider routing
 5. **No inter-agent communication**: Workers don't actually talk to each other or the queen after assignment
-6. **Events are memory-only**: Stored on the runner instance, returned in result dict — no streaming or persistence at the SwarmGraph level (adapter handles this externally)
+6. **Event persistence remains shallow**: Stored on the runner, mirrored into `SwarmState.events`, and persisted in `SwarmCheckpoint.events`; adapter-level external event storage remains separate
 7. **No async support**: The core runner is synchronous; the adapter wraps it with `run_in_executor`
 8. **16/19 models frozen but 3 critical ones aren't**: `SwarmState`, `AgentState`, `SwarmTask` are mutable, mutated in-place by multiple nodes
 9. **No cancellation signal propagation**: `CancellationToken` is a Protocol but only checked at round boundaries, not inside worker execution
@@ -625,3 +627,31 @@ an actual publish, which are out of scope. Release gating remains dry-run defaul
 - **Real:** `GatedProvider` paid-call wrapper (denied by default, surfaces as failed task); resume idempotency (terminal tasks preserved, in-flight tasks requeued, `resumed_requeued_tasks` recorded + `requeued_tasks` in resume audit event); enforced ARC↔SDK boundary via AST allowlist guard (current allowlist: `config`, `consensus`, `consensus_escrow`, `models`, `events`, `adaptive_consensus`, `nodes.worker`).
 - **Design-only / not done:** external publication (skipped per decision).
 - **Safe claims:** "paid provider gate wrapper", "resume idempotency (no re-dispatch of completed tasks)", "enforced ARC↔SDK import boundary (test guard)".
+
+---
+
+## Boundary Hardening + Priced Provider + Event History (2026-05-31)
+
+### Research notes
+
+| Source | Link / query | What was learned | Implementation consequence | Confidence | Unresolved questions |
+|---|---|---|---|---|---|
+| Ruff docs (local CLI) | `uv run ruff rule TID251` + `uv run ruff config lint.flake8-tidy-imports.banned-api` | TID251 (`flake8-tidy-imports` banned-api) bans specific module strings; `per-file-ignores` allows grandfathered files to keep existing deep imports | Added `extend-select = ["TID251"]` + `[tool.ruff.lint.flake8-tidy-imports.banned-api]` banning all `agent_runtime_cockpit.swarmgraph.*` submodules; `per-file-ignores` for grandfathered ARC src files and all test files (tests legitimately use SDK directly) | High | None |
+| grep.app API | Queried for `flake8-tidy-imports banned-api`, `TID251`, architectural import boundary patterns | grep.app API returned no JSON hits (API endpoint appears to require a different format) | Used Ruff local docs instead | Low | Re-query grep.app via web UI if external pattern comparison is needed |
+| Context7 | Queried astral-sh/ruff and pytest-dev/pytest llms.txt | Returned installation/setup snippets, not config detail; `per-file-ignores` pattern confirmed from existing ruff.toml snippets | Confirmed `[tool.ruff.lint.per-file-ignores]` glob syntax; used `"tests/swarmgraph/test_*.py"` glob | Medium | None |
+| Local codebase | `python/packages/swarmgraph-sdk/swarmgraph/providers/__init__.py` | `UsageRecord`, `CostRates`, `ProviderCapability` are in providers `__init__`; `_response_cost_usd` in `nodes/worker.py` reads `capability.cost_rates[model].input_per_million` * tokens / 1_000_000 | Priced fake provider needs non-zero `input_tokens`/`output_tokens` in `UsageRecord` and matching key in `cost_rates` dict; cost_usd = (1000 * 2.0 + 2000 * 4.0) / 1_000_000 = 0.01 | High | None |
+
+### Decision table
+
+| Decision | Chosen approach | Alternatives considered | Reason | Files affected | Confidence |
+|----------|-----------------|-------------------------|--------|----------------|-----------
+| Boundary scan scope | Scan both `python/src/agent_runtime_cockpit` AND `python/tests`; allowlist expanded to include all SDK submodules legitimately used in tests | Scan src only | Tests can also introduce boundary violations; allowlist-as-signal pattern still enforces reviewable intentionality | `tests/swarmgraph/test_arc_sdk_boundary.py` | High |
+| Ruff TID251 defense | Add `extend-select = ["TID251"]` + banned-api map for all `agent_runtime_cockpit.swarmgraph.*` submodules; `per-file-ignores` for grandfathered files | Not adding Ruff defense (test-only guard) | Defense-in-depth: Ruff catches new violations at lint time, before the AST test runs | `python/pyproject.toml` | High |
+| Priced provider test | Deterministic `_PricedProvider` with non-zero `UsageRecord(input_tokens=1000, output_tokens=2000)` and `CostRates(input_per_million=2.0, output_per_million=4.0)`; `enable_budget=True`; assert `total_cost_usd ≈ 0.01`, budget events emitted | Use real provider | Avoids network, deterministic math, proves cost pipeline end-to-end | `tests/swarmgraph/test_provider_backed_and_resume.py` | High |
+| Event history persistence | Add `events: list[dict]` to both `SwarmCheckpoint` and `SwarmState`; `_emit` mirrors to `state.events`; `save_checkpoint` includes events; `from_checkpoint` seeds events; resume path seeds `runner.events` from checkpoint before emitting resume audit event | Events memory-only (status quo) | Enables event continuity across checkpoint/resume; checkpoint is now a complete audit record | `swarmgraph/state.py`, `swarmgraph/runner.py` | High |
+
+### Status after this batch
+
+- **Real:** ARC↔SDK boundary test now scans both `src/` and `tests/`; Ruff TID251 bans `agent_runtime_cockpit.swarmgraph.*` deep imports project-wide with grandfathered per-file ignores; deterministic priced-provider test proves cost pipeline (worker cost_usd + budget events) with non-zero `UsageRecord` + `CostRates`; event history persisted in `SwarmCheckpoint.events` and `SwarmState.events`; resume seeds `runner.events` from checkpoint events before emitting resume audit event; `test_resume_preserves_checkpoint_event_history_before_resume_event` proves continuity.
+- **Safe claims:** "enforced ARC↔SDK import boundary (AST test + Ruff TID251 defense-in-depth)", "deterministic priced provider cost pipeline (proven by test)", "event history checkpoint persistence + resume continuity (proven by test)".
+- **Unsafe claims:** none added.

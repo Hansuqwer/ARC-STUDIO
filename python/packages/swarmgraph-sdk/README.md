@@ -123,7 +123,33 @@ per-worker vote confidence is derived from observable worker-result signals
 (output substance, artifacts, errors) rather than a fixed value, so
 confidence-weighted protocols can differentiate strong and weak outputs.
 
-## Relationship to ARC
+## Event history and checkpoint continuity
+
+Events emitted during a run are persisted in `SwarmCheckpoint.events` (as
+serializable dicts) and mirrored on `SwarmState.events`. On resume, the runner
+seeds its event list from the checkpoint before emitting the resume audit event,
+so `runner.get_events()` provides a continuous audit trail across
+checkpoint/resume boundaries:
+
+```python
+from swarmgraph import JsonFileCheckpointStore, SwarmGraphConfig, SwarmGraphRunner
+
+store = JsonFileCheckpointStore("./checkpoints")
+cfg = SwarmGraphConfig(max_rounds=2)
+runner = SwarmGraphRunner(config=cfg, checkpoint_store=store)
+runner.run("Explain consensus")
+
+checkpoint_id = store.list_ids()[-1]
+checkpoint = store.load(checkpoint_id)
+# checkpoint.events contains all events emitted during the original run.
+
+runner2 = SwarmGraphRunner(config=cfg, checkpoint_store=store)
+runner2.resume(checkpoint_id)
+# runner2.get_events() starts with the checkpoint events, then adds the resume
+# audit event and any new events from the resumed run.
+```
+
+
 
 Source ownership lives **here**. ARC (`agent_runtime_cockpit.swarmgraph`) is a
 thin compatibility bridge that re-exports this package so existing

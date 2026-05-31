@@ -95,6 +95,8 @@ class SwarmGraphRunner:
 
     def _emit(self, event: SwarmGraphEvent) -> None:
         self.events.append(event)
+        if self.state is not None:
+            self.state.events.append(event.to_dict())
         if self._on_event is None:
             return
         try:
@@ -140,6 +142,25 @@ class SwarmGraphRunner:
             self.state = resume_state
             self.state.status = SwarmStatus.running
             start_round = resume_state.current_round
+            # Seed runner event list from checkpoint history so continuity is
+            # preserved before the resume audit event is appended.
+            seeded: list[SwarmGraphEvent] = []
+            for evt_dict in resume_state.events:
+                try:
+                    seeded.append(
+                        SwarmGraphEvent(
+                            id=evt_dict["id"],
+                            kind=SwarmGraphEventKind(evt_dict["kind"]),
+                            swarm_id=evt_dict["swarm_id"],
+                            data=evt_dict.get("data", {}),
+                            round=evt_dict.get("round", 0),
+                        )
+                    )
+                except Exception:
+                    pass
+            self.events = seeded
+            # The state.events list is authoritative; runner.events is derived.
+            # Do not double-append; _emit will add to state.events going forward.
             self._emit(
                 SwarmGraphEvent(
                     kind=SwarmGraphEventKind.audit,

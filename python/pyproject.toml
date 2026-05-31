@@ -98,6 +98,41 @@ target-version = "py311"
 # E741: ambiguous variable name 'l' is accepted in short list comprehensions
 #   (audit/chain.py, test_real_execution.py)
 ignore = ["E701", "E702", "E741"]
+extend-select = ["TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"agent_runtime_cockpit.swarmgraph.adaptive_consensus".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.adapters".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.checkpoint".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.cli".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.config".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.consensus".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.consensus_escrow".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.decomposition".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.detectors".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.events".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.fixtures".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.graph".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.models".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.nodes.approval".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.nodes.consensus".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.nodes.queen".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.nodes.worker".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.providers".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.risk_assessment".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.runner".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+"agent_runtime_cockpit.swarmgraph.state".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
+
+[tool.ruff.lint.per-file-ignores]
+"src/agent_runtime_cockpit/adapters/swarmgraph.py" = ["TID251"]
+"src/agent_runtime_cockpit/battle/runner.py" = ["TID251"]
+"src/agent_runtime_cockpit/cli/swarmgraph.py" = ["TID251"]
+"src/agent_runtime_cockpit/cli_repl/chat_repl.py" = ["TID251"]
+"src/agent_runtime_cockpit/cli_repl/slash_commands.py" = ["TID251"]
+"src/agent_runtime_cockpit/evals/consensus.py" = ["TID251"]
+"tests/test_swarmgraph_native.py" = ["TID251"]
+"tests/swarmgraph/test_*.py" = ["TID251"]
+"tests/adapters/swarmgraph/test_security.py" = ["TID251"]
 
 [tool.mypy]
 python_version = "3.11"

@@ -22,6 +22,9 @@ class SwarmCheckpoint(BaseModel):
     status: SwarmStatus = Field(default=SwarmStatus.pending)
     accumulated_cost_usd: float = Field(default=0.0, ge=0)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Serialized event history accumulated up to and including this checkpoint.
+    # Each entry is the dict produced by SwarmGraphEvent.to_dict().
+    events: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class SwarmState(BaseModel):
@@ -40,6 +43,11 @@ class SwarmState(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     checkpoint_history: list[SwarmCheckpoint] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # In-memory mirror of all events emitted during this run (or seeded from a
+    # checkpoint on resume). Each entry is the dict produced by
+    # SwarmGraphEvent.to_dict(). The runner keeps the typed list; state keeps
+    # the serializable copy for checkpoint persistence.
+    events: list[dict[str, Any]] = Field(default_factory=list)
 
     def save_checkpoint(self) -> SwarmCheckpoint:
         ckpt = SwarmCheckpoint(
@@ -49,6 +57,7 @@ class SwarmState(BaseModel):
             tasks=copy.deepcopy(self.tasks),
             status=self.status,
             accumulated_cost_usd=self.accumulated_cost_usd,
+            events=list(self.events),
         )
         self.checkpoint_history.append(ckpt)
         return ckpt
@@ -67,6 +76,7 @@ class SwarmState(BaseModel):
         self.tasks = copy.deepcopy(ckpt.tasks)
         self.status = ckpt.status
         self.accumulated_cost_usd = ckpt.accumulated_cost_usd
+        self.events = list(ckpt.events)
         self.updated_at = datetime.now(timezone.utc)
 
     @classmethod
@@ -98,6 +108,7 @@ class SwarmState(BaseModel):
             status=checkpoint.status,
             current_round=checkpoint.round,
             accumulated_cost_usd=checkpoint.accumulated_cost_usd,
+            events=list(checkpoint.events),
         )
         state.checkpoint_history.append(checkpoint)
         state.metadata["resumed_from"] = checkpoint.id
