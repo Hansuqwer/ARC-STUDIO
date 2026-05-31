@@ -1,4 +1,10 @@
-from .adapters import EchoProvider, HTTPChatProvider, HTTPTransport
+from .adapters import (
+    EchoProvider,
+    GatedProvider,
+    HTTPChatProvider,
+    HTTPTransport,
+    PaidCallDeniedError,
+)
 from .checkpoint import CheckpointStore, JsonFileCheckpointStore
 from .config import SwarmGraphConfig
 from .consensus import (
@@ -90,8 +96,10 @@ __all__ = [
     "UsageRecord",
     "CostRates",
     "EchoProvider",
+    "GatedProvider",
     "HTTPChatProvider",
     "HTTPTransport",
+    "PaidCallDeniedError",
     "SwarmState",
     "SwarmCheckpoint",
     "ConsensusResult",

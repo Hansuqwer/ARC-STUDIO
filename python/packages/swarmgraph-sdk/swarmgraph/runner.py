@@ -149,6 +149,9 @@ class SwarmGraphRunner:
                         "resumed_from": self.state.metadata.get("resumed_from"),
                         "resumed_from_round": start_round,
                         "pending_tasks": len(self.state.get_pending_tasks()),
+                        "requeued_tasks": len(
+                            self.state.metadata.get("resumed_requeued_tasks", [])
+                        ),
                     },
                     round=start_round,
                 )

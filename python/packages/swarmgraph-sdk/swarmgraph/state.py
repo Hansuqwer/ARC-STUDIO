@@ -77,11 +77,24 @@ class SwarmState(BaseModel):
         config, and accumulated cost rather than starting fresh. The checkpoint
         itself is preserved as the first entry of the resumed history so the
         lineage is auditable.
+
+        Idempotency: tasks that already reached a terminal state
+        (``completed`` / ``failed`` / ``cancelled``) are preserved as-is and are
+        never re-dispatched on resume. Tasks left mid-flight (``assigned`` /
+        ``in_progress``) when the checkpoint was taken are reset to ``pending``
+        so resume re-runs exactly those, and only those.
         """
+        tasks = copy.deepcopy(checkpoint.tasks)
+        requeued: list[str] = []
+        for task in tasks.values():
+            if task.status in (TaskStatus.assigned, TaskStatus.in_progress):
+                task.status = TaskStatus.pending
+                requeued.append(task.id)
+
         state = cls(
             config=checkpoint.config,
             agents=copy.deepcopy(checkpoint.agents),
-            tasks=copy.deepcopy(checkpoint.tasks),
+            tasks=tasks,
             status=checkpoint.status,
             current_round=checkpoint.round,
             accumulated_cost_usd=checkpoint.accumulated_cost_usd,
@@ -89,6 +102,7 @@ class SwarmState(BaseModel):
         state.checkpoint_history.append(checkpoint)
         state.metadata["resumed_from"] = checkpoint.id
         state.metadata["resumed_from_round"] = checkpoint.round
+        state.metadata["resumed_requeued_tasks"] = requeued
         return state
 
     def fork(self, new_config: SwarmGraphConfig | None = None) -> SwarmState:

@@ -18,6 +18,13 @@ Available adapters:
 from __future__ import annotations
 
 from .echo import EchoProvider
+from .gated import GatedProvider, PaidCallDeniedError
 from .http_chat import HTTPChatProvider, HTTPTransport
 
-__all__ = ["EchoProvider", "HTTPChatProvider", "HTTPTransport"]
+__all__ = [
+    "EchoProvider",
+    "GatedProvider",
+    "HTTPChatProvider",
+    "HTTPTransport",
+    "PaidCallDeniedError",
+]

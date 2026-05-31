@@ -72,8 +72,19 @@ runner.run("Explain consensus")
 ```
 
 `gated_local` still denies paid provider calls unless `allow_paid_calls=True`.
-`provider_backed` only requires a provider to be injected; pair it with a paid
-HTTP provider plus your own gating if you opt into real cost.
+`provider_backed` only requires a provider to be injected. To gate a *paid*
+provider in `provider_backed`, wrap it in `GatedProvider`:
+
+```python
+from swarmgraph import GatedProvider, HTTPChatProvider
+
+paid = HTTPChatProvider(base_url="https://api.example.com/v1", model="gpt-test", transport=transport)
+runner = SwarmGraphRunner(config=cfg, provider=GatedProvider(paid))            # denied by default
+runner = SwarmGraphRunner(config=cfg, provider=GatedProvider(paid, allow_paid_calls=True))  # opt-in
+```
+
+A denied call surfaces as a failed task (raising `PaidCallDeniedError` inside the
+worker), never a silent paid request.
 
 ## Provider adapters
 

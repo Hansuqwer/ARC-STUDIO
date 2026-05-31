@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from swarmgraph.adapters import EchoProvider, HTTPChatProvider
+from swarmgraph.adapters import (
+    EchoProvider,
+    GatedProvider,
+    HTTPChatProvider,
+    PaidCallDeniedError,
+)
 from swarmgraph.providers import ProviderMessage, ProviderRequest
 
 
@@ -79,3 +84,52 @@ async def test_http_chat_provider_uses_injected_transport() -> None:
 def test_http_chat_provider_rejects_empty_base_url() -> None:
     with pytest.raises(ValueError):
         HTTPChatProvider(base_url="", model="x")
+
+
+@pytest.mark.asyncio
+async def test_gated_provider_denies_by_default() -> None:
+    gated = GatedProvider(EchoProvider())
+    # capabilities pass through even when calls are denied
+    assert gated.capabilities().provider_id == "swarmgraph.echo"
+    with pytest.raises(PaidCallDeniedError):
+        await gated.complete(_request("hi"), cancellation_token=_TOKEN)
+
+
+@pytest.mark.asyncio
+async def test_gated_provider_allows_when_enabled() -> None:
+    gated = GatedProvider(EchoProvider(), allow_paid_calls=True)
+    response = await gated.complete(_request("hi"), cancellation_token=_TOKEN)
+    assert response.content == "echo: hi"
+
+
+def test_gated_provider_in_provider_backed_run_denies_cleanly() -> None:
+    from swarmgraph import SwarmGraphConfig, SwarmGraphRunner
+    from swarmgraph.config import ExecutionMode
+
+    cfg = SwarmGraphConfig(
+        execution_mode=ExecutionMode.provider_backed,
+        max_rounds=1,
+        num_workers=1,
+    )
+    runner = SwarmGraphRunner(config=cfg, provider=GatedProvider(EchoProvider()))
+    result = runner.run_result("Explain consensus")
+    # Denied paid call surfaces as a failed task, not a crash.
+    assert result.failed_tasks == 1
+
+
+def test_gated_provider_in_provider_backed_run_allows_when_enabled() -> None:
+    from swarmgraph import SwarmGraphConfig, SwarmGraphRunner
+    from swarmgraph.config import ExecutionMode
+
+    cfg = SwarmGraphConfig(
+        execution_mode=ExecutionMode.provider_backed,
+        max_rounds=1,
+        num_workers=1,
+    )
+    runner = SwarmGraphRunner(
+        config=cfg,
+        provider=GatedProvider(EchoProvider(), allow_paid_calls=True),
+    )
+    result = runner.run_result("Explain consensus")
+    assert result.status == "completed"
+    assert result.results[0].output.startswith("echo: ")

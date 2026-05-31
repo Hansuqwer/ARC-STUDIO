@@ -603,3 +603,25 @@ result = runner.run_result("Explain consensus")
 - **Design-only / not done:** actual external publication (still none; requires maintainer to create `pypi` env + PyPI trusted publisher); paid provider cost-gating for `provider_backed` (caller responsibility); resume idempotency hardening for partially-completed rounds.
 - **Safe claims:** "uv workspace", "SDK-owned provider_backed mode (offline by default)", "checkpoint resume", "hard-gated trusted-publisher release workflow (no auto-publish)".
 - **Unsafe claims:** "published SDK", "production provider-backed SDK".
+
+---
+
+## Paid Gate + Resume Idempotency + Boundary Guard (2026-05-31)
+
+### Decision table
+
+| Decision | Chosen approach | Alternatives considered | Reason | Files affected | Confidence |
+|----------|-----------------|-------------------------|--------|----------------|-----------|
+| Paid provider gate | `GatedProvider` wrapper implementing `Provider`; denies `complete()` unless `allow_paid_calls=True` | Config flag inside runner for provider_backed; per-call arg | Composable, drop-in, keeps provider_backed itself unopinionated; denial surfaces as failed task (no crash, no silent paid call) | `swarmgraph/adapters/gated.py`, adapters/SDK `__init__` | High |
+| Resume idempotency | `from_checkpoint` requeues only `assigned`/`in_progress` -> `pending`; terminal tasks untouched | Re-run whole round; diff-based replay | Loop already filters by `pending`; mid-flight tasks would otherwise stall; completed outputs preserved (proven by test) | `swarmgraph/state.py`, `swarmgraph/runner.py` | High |
+| ARC↔SDK boundary | Test-based AST allowlist guard (per user decision) | ruff flake8-tidy-imports banned-api | No broad per-file ignores; resolves relative imports; distinguishes SDK from sibling `adapters.swarmgraph`; allowlist is a reviewable signal | `tests/swarmgraph/test_arc_sdk_boundary.py` | High |
+
+Item 1 (create PyPI environment + trusted publisher + flip first real release) was
+**explicitly skipped** by user decision: it requires external service changes and
+an actual publish, which are out of scope. Release gating remains dry-run default.
+
+### Status after this batch
+
+- **Real:** `GatedProvider` paid-call wrapper (denied by default, surfaces as failed task); resume idempotency (terminal tasks preserved, in-flight tasks requeued, `resumed_requeued_tasks` recorded + `requeued_tasks` in resume audit event); enforced ARC↔SDK boundary via AST allowlist guard (current allowlist: `config`, `consensus`, `consensus_escrow`, `models`, `events`, `adaptive_consensus`, `nodes.worker`).
+- **Design-only / not done:** external publication (skipped per decision).
+- **Safe claims:** "paid provider gate wrapper", "resume idempotency (no re-dispatch of completed tasks)", "enforced ARC↔SDK import boundary (test guard)".

@@ -128,6 +128,61 @@ def test_resume_continues_from_saved_round(tmp_path) -> None:
     assert resumed.tasks[pending.id].status in (TaskStatus.completed, TaskStatus.failed)
 
 
+def test_resume_does_not_redispatch_completed_tasks(tmp_path) -> None:
+    """Already-completed tasks are preserved and never re-run on resume."""
+    from swarmgraph.models import WorkerResult
+
+    store = JsonFileCheckpointStore(tmp_path)
+    cfg = SwarmGraphConfig(max_rounds=3, num_workers=1)
+    state = SwarmState(config=cfg)
+    queen_prepare_agents(state, cfg.num_workers)
+    state.current_round = 1
+    worker_id = next(iter(state.agents))
+
+    done = SwarmTask(prompt="done", status=TaskStatus.completed, assigned_agent_id=worker_id)
+    sentinel = "ORIGINAL-OUTPUT"
+    done.result = WorkerResult(worker_id=worker_id, task_id=done.id, output=sentinel)
+    todo = SwarmTask(prompt="todo", status=TaskStatus.pending, assigned_agent_id=worker_id)
+    state.tasks[done.id] = done
+    state.tasks[todo.id] = todo
+    store.save(state.save_checkpoint())
+    ckpt_id = store.list_ids()[0]
+
+    runner = SwarmGraphRunner(config=cfg, checkpoint_store=store)
+    runner.resume(ckpt_id)
+    resumed = runner.get_state()
+
+    # Completed task output is untouched (not re-dispatched / overwritten).
+    assert resumed.tasks[done.id].result.output == sentinel
+    assert resumed.tasks[done.id].status == TaskStatus.completed
+
+
+def test_resume_requeues_in_flight_tasks(tmp_path) -> None:
+    """Tasks left assigned/in_progress at checkpoint time are reset to pending."""
+    store = JsonFileCheckpointStore(tmp_path)
+    cfg = SwarmGraphConfig(max_rounds=3, num_workers=1)
+    state = SwarmState(config=cfg)
+    queen_prepare_agents(state, cfg.num_workers)
+    state.current_round = 1
+    worker_id = next(iter(state.agents))
+    inflight = SwarmTask(
+        prompt="mid-flight",
+        status=TaskStatus.in_progress,
+        assigned_agent_id=worker_id,
+    )
+    state.tasks[inflight.id] = inflight
+    store.save(state.save_checkpoint())
+    ckpt_id = store.list_ids()[0]
+
+    runner = SwarmGraphRunner(config=cfg, checkpoint_store=store)
+    runner.resume(ckpt_id)
+    resumed = runner.get_state()
+
+    assert inflight.id in resumed.metadata["resumed_requeued_tasks"]
+    # After resume it should have been processed (no longer in_progress).
+    assert resumed.tasks[inflight.id].status in (TaskStatus.completed, TaskStatus.failed)
+
+
 def test_resume_emits_resume_audit_event(tmp_path) -> None:
     store = JsonFileCheckpointStore(tmp_path)
     cfg = SwarmGraphConfig(max_rounds=2, num_workers=1)
