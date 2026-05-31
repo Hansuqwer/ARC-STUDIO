@@ -3,17 +3,17 @@
 **ADR:** docs/adr/ADR-024-microvm-public-execution-contract.md  
 **Date:** 2026-05-31
 **Branch:** feat/sandbox-lima-execution-docker-hardening-fuzzing  
-**Platform checked:** macOS Darwin 26.4, arm64, limactl 2.1.0; direct Apple VZ proof-only path passed once; Firecracker/KVM unavailable on this host
+**Platform checked:** macOS Darwin 26.4, arm64, limactl 2.1.0; direct Apple VZ proof-only path passed once and `arc sandbox vz-artifacts` generated local hash-pinned proof artifacts; Firecracker/KVM unavailable on this host
 
 This document records the current status of each ADR-024 prerequisite.
 `ARC_MICROVM_EXEC_ENABLED` is recognized only by the Linux/Firecracker gated scaffold and
-only when all explicit Linux/KVM proof gates are present. No live Firecracker boot/run/teardown proof has run on this macOS host. macOS Lima remains blocked for strict public execution. Direct Apple VZ proof-only host proof passed once behind `ARC_VZ_PROOF=1`; it is not public microVM execution.
+only when all explicit Linux/KVM proof gates are present. No live Firecracker boot/run/teardown proof has run on this macOS host. macOS Lima remains blocked for strict public execution. Direct Apple VZ proof-only host proof passed once behind `ARC_VZ_PROOF=1`; local proof artifact provenance exists through `arc sandbox vz-artifacts`; it is not public microVM execution.
 
 ## P1–P7 Status Table
 
 | P# | Description | Status | Evidence | Remaining |
 |---|---|---|---|---|
-| P1 | Lifecycle proof: create→start→exec→stop/delete completes | **macOS direct VZ proof-only passed once; Linux/Firecracker gated scaffold unproven on this host** | Gated VZ proof booted and stopped a no-NIC guest with teardown ok. Linux scaffold writes no-NIC config, creates a workspace snapshot, starts Firecracker only behind host/env gates, parses proof/result markers, terminates process group, and removes temp dir. Tests fake the Firecracker subprocess. | Promote VZ only after product wiring/failure-mode work. Run opt-in Firecracker test on Linux/KVM. |
+| P1 | Lifecycle proof: create→start→exec→stop/delete completes | **macOS direct VZ proof-only passed once; Linux/Firecracker gated scaffold unproven on this host** | Gated VZ proof booted and stopped a no-NIC guest with teardown ok. `arc sandbox vz-artifacts` can compile/sign/hash-pin the proof runner and inputs. Linux scaffold writes no-NIC config, creates a workspace snapshot, starts Firecracker only behind host/env gates, parses proof/result markers, terminates process group, and removes temp dir. Tests fake the Firecracker subprocess. | Promote VZ only after product wiring/failure-mode work. Run opt-in Firecracker test on Linux/KVM. |
 | P2 | Network-off proof: guest has no default route before user argv | **macOS direct VZ proof-only passed once; BLOCKED for macOS Lima; scaffold/host-unproven for Linux Firecracker** | VZ proof emitted no guest ethernet, no default route, network tool available, and network probe failure. Lima default user-mode/slirp networking remains documented and no no-network key found. Linux scaffold omits `network-interfaces`, creates no TAP/NAT/bridge, and requires `ARC_FC_PROOF no-default-route=1`, `curl-available=1`, and `network-failure=1`. | Add VZ public provider gates/CI before enabling. Prove Linux markers on Linux/KVM with ARC exec rootfs. |
 | P3 | Workspace-mount proof: only workspace accessible, not host home/root | **macOS direct VZ proof-only passed once; scaffold/host-unproven for Linux Firecracker; partial for Lima** | VZ proof emitted workspace mount and sentinel-read markers. Linux scaffold builds a per-run read-only ext4 workspace snapshot and mounts it as `/workspace`; host symlinks are skipped. | Add broader VZ mount escape/failure tests. Prove Firecracker on Linux/KVM. Lima remains low-security harness only. |
 | P4 | Teardown proof: cleanup on success/failure/timeout/SIGINT | **macOS direct VZ proof-only passed once; scaffold/host-unproven for Linux Firecracker; partial for Lima** | VZ proof emitted teardown attempted/ok markers. Linux scaffold terminates the Firecracker process group on timeout/finally and uses a temporary directory for socket/config/workspace image. SIGINT/host-crash teardown not proven. | Add VZ timeout/SIGINT cleanup proof. Run real-host Firecracker teardown proof. |
@@ -31,13 +31,14 @@ The gate is honored only on Linux when all of these are present:
 read/write, `mkfs.ext4`, and `truncate`.
 
 On macOS, `MicroVMIsolationProvider.execute()` still raises `NotImplementedError`.
-Direct Apple VZ no-NIC proof exists only as a gated proof harness; public provider
-wiring remains blocked pending durable artifacts, audit/output caps, timeout/SIGINT
-cleanup, host CI, and failure-mode coverage.
+Direct Apple VZ no-NIC proof exists only as a gated proof harness; local artifact
+hash provenance exists, but public provider wiring remains blocked pending audit/output
+caps, timeout/SIGINT cleanup, host CI, failure-mode coverage, and kernel/initrd
+distribution/provenance policy.
 
 ## What must happen before wiring
 
 1. On Linux/KVM, build ARC exec rootfs: `cd python && ARC_FC_BUILD_EXEC_ROOTFS=1 uv run arc sandbox firecracker-artifacts --exec-rootfs --output /tmp/arc-fc --json`.
 2. Run opt-in proof: `cd python && ARC_MICROVM_INTEGRATION=1 ARC_MICROVM_EXEC_ENABLED=1 ARC_FC_REAL_EXEC=1 ARC_FIRECRACKER_KERNEL=/path/to/vmlinux ARC_FIRECRACKER_ROOTFS=/tmp/arc-fc/arc-fc-exec-rootfs.ext4 uv run pytest tests/isolation/test_firecracker_smoke.py -v`.
 3. Update this document and ADR-024 with real-host evidence.
-4. For macOS strict execution, promote the direct Apple VZ proof-only harness only after product/provider wiring, artifact provenance, host CI, audit/output caps, timeout/SIGINT cleanup, and failure-mode coverage pass.
+4. For macOS strict execution, promote the direct Apple VZ proof-only harness only after product/provider wiring, host CI, audit/output caps, timeout/SIGINT cleanup, failure-mode coverage, and kernel/initrd distribution/provenance policy pass.

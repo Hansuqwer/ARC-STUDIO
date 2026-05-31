@@ -1126,6 +1126,40 @@ def test_firecracker_artifacts_cli_generates_manifest_without_kvm(tmp_path, monk
     assert data["manifest"]["network_interfaces_configured"] is False
 
 
+def test_vz_artifacts_cli_generates_manifest_without_boot(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    kernel = tmp_path / "kernel"
+    initrd = tmp_path / "initrd.gz"
+    output = tmp_path / "vz-artifacts"
+    kernel.write_bytes(b"kernel")
+    initrd.write_bytes(b"initrd")
+    result = CliRunner().invoke(
+        app,
+        [
+            "sandbox",
+            "vz-artifacts",
+            "--json",
+            "--output",
+            str(output),
+            "--kernel",
+            str(kernel),
+            "--initrd",
+            str(initrd),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    data = _payload(result)["data"]
+    assert data["runner_built"] is False
+    assert data["manifest"]["artifact"] == "arc-vz-proof"
+    assert data["manifest"]["public_execution_enabled"] is False
+    assert data["manifest"]["network_devices_configured"] == 0
+    assert (output / "arc-vz-runner.swift").exists()
+    assert (output / "arc-vz-runner.entitlements").exists()
+    assert (output / "arc-vz-kernel").exists()
+    assert (output / "arc-vz-initrd.gz").exists()
+    assert (output / "vz-artifacts-manifest.json").exists()
+
+
 def test_approval_rules_allow_policy(tmp_path, monkeypatch):
     """Test that allow_network=True makes approval_required=False."""
     monkeypatch.chdir(tmp_path)

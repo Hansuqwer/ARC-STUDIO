@@ -372,7 +372,7 @@ P0 policy defaults:
 - timeout kills the POSIX process group.
 - stdout/stderr are capped and redacted.
 - every allowed/denied sandbox command returns an audit payload.
-- `arc sandbox run --provider microvm` remains blocked by default. Linux/Firecracker is a gated scaffold that requires `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, `ARC_FIRECRACKER_KERNEL`, `ARC_FIRECRACKER_ROOTFS`, `firecracker`, `/dev/kvm` rw, `mkfs.ext4`, and `truncate`; no live Firecracker host proof is recorded from this macOS host. Direct Apple VZ has a separate proof-only path gated by `ARC_VZ_PROOF=1`.
+- `arc sandbox run --provider microvm` remains blocked by default. Linux/Firecracker is a gated scaffold that requires `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, `ARC_FIRECRACKER_KERNEL`, `ARC_FIRECRACKER_ROOTFS`, `firecracker`, `/dev/kvm` rw, `mkfs.ext4`, and `truncate`; no live Firecracker host proof is recorded from this macOS host. Direct Apple VZ has a separate proof-only path gated by `ARC_VZ_PROOF=1`, plus `arc sandbox vz-artifacts` for local source/entitlement/kernel/initrd hash provenance without booting a VM.
 - sandbox audit events include an `audit_id` correlation key.
 - sandbox audit events are persisted to a local sandbox hash-chain store by default.
 - sandbox audit events best-effort mirror a typed `sandbox_command` event into `.arc/events/event-log.jsonl`; this mirror is local/recent/derived and not canonical global audit state.
@@ -385,7 +385,7 @@ MCP workbench status: `arc mcp workbench inspect` and `session-start` now requir
 
 Plan apply status: `arc plan apply` no longer treats generic plan approval/direct confirmation as approval for `network`, `install`, or `unknown` commands. Those categories require policy allowance or a matching sandbox approval token. Destructive and privileged commands remain unapprovable.
 
-MicroVM status: Linux/Firecracker public execution remains a gated scaffold, host-unproven on this macOS host. macOS Lima remains a low-security developer harness because default/user-mode networking is network-present. Direct Apple VZ no-NIC proof passed once on this macOS 26.4 arm64 host with `ARC_VZ_PROOF=1`, compiled/signed runner, ARM64 kernel/initrd, guest no-ethernet/no-default-route/network-failure markers, workspace sentinel/symlink markers, command result markers, and teardown ok. macOS public execution still raises; no production-grade microVM execution is claimed. Windows is explicitly unsupported.
+MicroVM status: Linux/Firecracker public execution remains a gated scaffold, host-unproven on this macOS host. macOS Lima remains a low-security developer harness because default/user-mode networking is network-present. Direct Apple VZ no-NIC proof passed once on this macOS 26.4 arm64 host with `ARC_VZ_PROOF=1`, compiled/signed runner, ARM64 kernel/initrd, guest no-ethernet/no-default-route/network-failure markers, workspace sentinel/symlink markers, command result markers, and teardown ok. `arc sandbox vz-artifacts --build-runner` can now generate a local hash-pinned proof artifact set with no downloads and no VM boot. macOS public execution still raises; no production-grade microVM execution is claimed. Windows is explicitly unsupported.
 
 ---
 

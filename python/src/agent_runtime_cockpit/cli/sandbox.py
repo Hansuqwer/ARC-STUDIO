@@ -16,7 +16,7 @@ from ..isolation.microvm import (
     generate_firecracker_proof_artifacts,
 )
 from ..isolation.subprocess import SubprocessIsolationProvider
-from ..isolation.vz_provider import VZNoNetworkProof
+from ..isolation.vz_provider import VZNoNetworkProof, generate_vz_proof_artifacts
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
 from ..runtime.streaming import stream_subprocess_events
@@ -491,6 +491,36 @@ def sandbox_firecracker_artifacts(
         generate_firecracker_exec_artifacts(Path(output).expanduser())
         if exec_rootfs
         else generate_firecracker_proof_artifacts(Path(output).expanduser())
+    )
+    _out(ok(report.model_dump(mode="json"), workspace=str(ws)), json_output)
+
+
+@sandbox_app.command("vz-artifacts")
+def sandbox_vz_artifacts(
+    output: str = typer.Option(..., "--output", help="Output directory for VZ proof artifacts"),
+    kernel: Optional[str] = typer.Option(
+        None, "--kernel", help="ARM64 Linux kernel to copy into the proof artifact set"
+    ),
+    initrd: Optional[str] = typer.Option(
+        None, "--initrd", help="VZ proof initrd to copy into the proof artifact set"
+    ),
+    build_runner: bool = typer.Option(
+        False,
+        "--build-runner",
+        help="Compile/sign the local Swift VZ runner into the artifact set",
+    ),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Generate VZ proof artifact provenance; does not boot a VM."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    report = generate_vz_proof_artifacts(
+        Path(output).expanduser(),
+        kernel_path=Path(kernel).expanduser() if kernel else None,
+        initrd_path=Path(initrd).expanduser() if initrd else None,
+        build_runner=build_runner,
     )
     _out(ok(report.model_dump(mode="json"), workspace=str(ws)), json_output)
 

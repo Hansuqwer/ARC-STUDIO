@@ -9,8 +9,10 @@ import pytest
 import agent_runtime_cockpit.isolation.vz_provider as vz_provider
 from agent_runtime_cockpit.isolation.vz_provider import (
     VZNoNetworkProof,
+    generate_vz_proof_artifacts,
     parse_vz_guest_command_result,
     parse_vz_guest_proof,
+    validate_vz_artifact_manifest,
 )
 
 
@@ -140,6 +142,85 @@ def test_vz_guest_marker_parsers_failure():
     assert proof.workspace_proof_passed is False
     assert proof.symlink_escape_blocked is False
     assert result.exit_code == -1
+
+
+def test_vz_artifact_generator_writes_manifest_without_boot(tmp_path, monkeypatch):
+    monkeypatch.delenv("ARC_VZ_KERNEL", raising=False)
+    monkeypatch.delenv("ARC_VZ_INITRD", raising=False)
+
+    report = generate_vz_proof_artifacts(tmp_path)
+
+    assert report.runner_built is False
+    assert report.runner_signed is False
+    assert "--build-runner not set" in "; ".join(report.blockers)
+    assert "ARC_VZ_KERNEL missing/not provided" in report.blockers
+    assert "ARC_VZ_INITRD missing/not provided" in report.blockers
+    assert (tmp_path / "arc-vz-runner.swift").exists()
+    assert (tmp_path / "arc-vz-runner.entitlements").exists()
+    manifest = validate_vz_artifact_manifest(tmp_path / "vz-artifacts-manifest.json")
+    assert manifest.artifact == "arc-vz-proof"
+    assert manifest.public_execution_enabled is False
+    assert manifest.proof_only is True
+    assert manifest.no_downloads is True
+    assert manifest.network_devices_configured == 0
+    assert manifest.networkDevices == []
+    assert "symlink_escape_blocked" in manifest.markers
+
+
+def test_vz_artifact_generator_copies_kernel_initrd_and_hashes(tmp_path):
+    kernel = tmp_path / "kernel"
+    initrd = tmp_path / "initrd.gz"
+    output = tmp_path / "artifacts"
+    kernel.write_bytes(b"kernel")
+    initrd.write_bytes(b"initrd")
+
+    report = generate_vz_proof_artifacts(output, kernel_path=kernel, initrd_path=initrd)
+    manifest = validate_vz_artifact_manifest(output / "vz-artifacts-manifest.json")
+
+    assert report.kernel_path == str(output / "arc-vz-kernel")
+    assert report.initrd_path == str(output / "arc-vz-initrd.gz")
+    assert manifest.kernel_sha256
+    assert manifest.initrd_sha256
+    assert not report.runner_built
+
+
+def test_vz_artifact_validator_rejects_network_device_source(tmp_path):
+    report = generate_vz_proof_artifacts(tmp_path)
+    source = tmp_path / "arc-vz-runner.swift"
+    source.write_text(
+        source.read_text(encoding="utf-8") + "\nlet _ = VZVirtioNetworkDeviceConfiguration()\n",
+        encoding="utf-8",
+    )
+    manifest = report.manifest.model_copy(
+        update={"source_sha256": __import__("hashlib").sha256(source.read_bytes()).hexdigest()}
+    )
+    manifest_path = tmp_path / "vz-artifacts-manifest.json"
+    manifest_path.write_text(manifest.model_dump_json(), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="network device type"):
+        validate_vz_artifact_manifest(manifest_path)
+
+
+def test_vz_artifact_build_runner_failure_is_blocker(tmp_path, monkeypatch):
+    kernel = tmp_path / "kernel"
+    initrd = tmp_path / "initrd.gz"
+    output = tmp_path / "artifacts"
+    kernel.write_bytes(b"kernel")
+    initrd.write_bytes(b"initrd")
+    monkeypatch.setattr(vz_provider.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(vz_provider.shutil, "which", lambda name: f"/usr/bin/{name}")
+
+    def fake_run(*args, **kwargs):
+        return SimpleNamespace(returncode=1, stdout="", stderr="compile failed")
+
+    monkeypatch.setattr(vz_provider.subprocess, "run", fake_run)
+
+    report = generate_vz_proof_artifacts(
+        output, kernel_path=kernel, initrd_path=initrd, build_runner=True
+    )
+
+    assert report.runner_built is False
+    assert any("swiftc failed" in blocker for blocker in report.blockers)
 
 
 @pytest.mark.asyncio

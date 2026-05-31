@@ -144,7 +144,7 @@ After successful bootstrap:
 
 ---
 
-**Last Updated:** 2026-05-30
+**Last Updated:** 2026-05-31
 **Status:** Alpha
 # Sandbox Bootstrap
 
@@ -160,6 +160,7 @@ uv run arc policy list --json
 uv run arc policy validate --json
 uv run arc sandbox audit-verify --json
 uv run arc sandbox audit-list --json --limit 20
+uv run arc sandbox vz-artifacts --json --output /tmp/arc-vz-artifacts --kernel /path/to/arm64-linux-kernel --initrd /path/to/arc-vz-proof-initrd.gz --build-runner
 ```
 
 Expected defaults:
@@ -168,7 +169,7 @@ Expected defaults:
 - `rm -rf .` is denied as `destructive`.
 - MicroVM doctor may report `unavailable` until Firecracker/Cloud Hypervisor plus `/dev/kvm` exist on Linux, or `limactl` exists on macOS.
 - Linux/Firecracker microVM remains a gated scaffold, blocked by default, and requires `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, kernel/rootfs env vars, `firecracker`, `/dev/kvm` rw, and workspace snapshot tools. It is not proven on this macOS host.
-- macOS Lima remains a low-security harness only; strict no-network public execution is blocked. Direct Apple VZ has a proof-only no-NIC path gated by `ARC_VZ_PROOF=1`; one local host proof passed with compiled/signed runner, ARM64 kernel/initrd, guest no-network/workspace/symlink markers, command result markers, and teardown ok. Public macOS `microvm` execution is still not enabled.
+- macOS Lima remains a low-security harness only; strict no-network public execution is blocked. Direct Apple VZ has a proof-only no-NIC path gated by `ARC_VZ_PROOF=1`; one local host proof passed with compiled/signed runner, ARM64 kernel/initrd, guest no-network/workspace/symlink markers, command result markers, and teardown ok. `arc sandbox vz-artifacts` creates a local hash-pinned proof artifact set without downloading assets or booting a VM. Public macOS `microvm` execution is still not enabled.
 - `arc mcp workbench inspect` and `session-start` route user-supplied server commands through sandbox policy, workspace trust, env filtering, cwd bounds, and sandbox audit.
 - Direct `SubprocessIsolationProvider(workspace_root=...)` callers execute from that workspace root when `cwd` is omitted; no parent-cwd inheritance across that provider boundary.
 - `arc plan apply` no longer treats generic plan/direct approval as approval for `network`, `install`, or `unknown`; use policy allowance or a matching sandbox approval token.

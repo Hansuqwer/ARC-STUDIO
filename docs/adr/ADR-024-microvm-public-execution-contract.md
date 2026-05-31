@@ -1,8 +1,8 @@
 # ADR-024 — MicroVM Public Execution Contract
 
-**Status:** Accepted — macOS VZ proof-only host proof passed; public execution blocked; Linux/Firecracker gated scaffold is host-unproven
+**Status:** Accepted — macOS VZ proof-only host proof passed with local artifact provenance; public execution blocked; Linux/Firecracker gated scaffold is host-unproven
 **Date:** 2026-05-26  
-**Last updated:** 2026-05-31 — direct macOS VZ no-NIC proof passed once behind `ARC_VZ_PROOF=1`; public macOS execution remains blocked. Linux/Firecracker remains a gated scaffold with no live Linux/KVM boot proof from this host.
+**Last updated:** 2026-05-31 — direct macOS VZ no-NIC proof passed once behind `ARC_VZ_PROOF=1`; `arc sandbox vz-artifacts` adds local SHA256 provenance for proof inputs; public macOS execution remains blocked. Linux/Firecracker remains a gated scaffold with no live Linux/KVM boot proof from this host.
 **Authors:** ARC Studio sandbox team  
 **Related:** Phase 37 (R38), `docs/research/sandbox-and-microvm.md`, `docs/research/microvm-p1-p7-status.md`, ADR-014 (security architecture)
 
@@ -174,13 +174,14 @@ are mandatory. Missing any of these fields is a schema violation.
 - `ARC_MICROVM_EXEC_ENABLED` is read only by the Linux/Firecracker path.
 - Lima harness is still internal / not wired to public execution.
 - Direct Apple VZ proof is opt-in/proof-only via `ARC_VZ_PROOF=1`; it is not public sandbox execution.
+- `arc sandbox vz-artifacts` can compile/sign the local VZ runner and hash-pin source, entitlements, runner, kernel, and initrd into `vz-artifacts-manifest.json` without downloading assets or booting a VM.
 - Firecracker gated scaffold exists and requires stable proof markers (`no-default-route`, `network-failure`, `sentinel-read`, `workspace-mount-proven`, `symlink-escape-blocked`) plus command result markers before any future command output can be trusted. No real Linux/KVM boot proof has run on the current host.
 
 ### What must be done before unblocking
 
 1. Complete P1–P7 Linux proof on a real host with Firecracker + `/dev/kvm`.
 2. Add CI opt-in smoke with host runners that have Firecracker installed.
-3. For macOS, promote the direct Apple VZ proof-only path into a public provider only after durable artifact provenance, audit/output caps, timeout/SIGINT cleanup, policy gates, host CI, and broader failure-mode tests pass.
+3. For macOS, promote the direct Apple VZ proof-only path into a public provider only after audit/output caps, timeout/SIGINT cleanup, policy gates, host CI, broader failure-mode tests, and upstream kernel/initrd provenance/distribution policy pass.
 4. Update this ADR status from "Accepted" to "Implemented" only after real host evidence links exist.
 
 ---

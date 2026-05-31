@@ -6,11 +6,13 @@ capable of creating VZVirtualMachineConfiguration with networkDevices = [].
 
 from __future__ import annotations
 
+import hashlib
 import os
 import platform
 import shutil
 import subprocess
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -18,6 +20,16 @@ from pydantic import BaseModel, ConfigDict, Field
 
 VZ_PROOF_MARKER = "ARC_VZ_PROOF "
 VZ_RESULT_MARKER = "ARC_VZ_RESULT "
+VZ_MARKERS = [
+    "booted",
+    "no_guest_ethernet",
+    "no_default_route",
+    "network_tool_available",
+    "network_failure",
+    "workspace_mount_proven",
+    "sentinel_readable",
+    "symlink_escape_blocked",
+]
 
 _VZ_PROOF_ALIASES = {
     "booted": "booted",
@@ -103,6 +115,61 @@ class VZProofResult(BaseModel):
     proof_markers: dict[str, str] = Field(default_factory=dict)
     proof: str = "not_run"
     blocker: str | None = None
+
+
+class VZArtifactManifest(BaseModel):
+    """Manifest for local Apple VZ proof artifacts."""
+
+    model_config = ConfigDict(frozen=True)
+
+    version: int = 1
+    generator_version: str = "arc-vz-proof-v1"
+    marker_contract_version: int = 1
+    artifact: str = "arc-vz-proof"
+    generated_at: str
+    host_os: str
+    host_arch: str
+    public_execution_enabled: bool = False
+    proof_only: bool = True
+    no_downloads: bool = True
+    network_devices_configured: int = 0
+    networkDevices: list[object] = Field(default_factory=list)
+    markers: list[str] = Field(default_factory=lambda: list(VZ_MARKERS))
+    source_path: str
+    source_sha256: str
+    entitlements_path: str
+    entitlements_sha256: str
+    runner_path: str | None = None
+    runner_sha256: str | None = None
+    runner_built: bool = False
+    runner_signed: bool = False
+    kernel_path: str | None = None
+    kernel_sha256: str | None = None
+    kernel_source_path: str | None = None
+    initrd_path: str | None = None
+    initrd_sha256: str | None = None
+    initrd_source_path: str | None = None
+    tools: dict[str, str | None] = Field(default_factory=dict)
+    build_status: str
+    build_commands: list[list[str]] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+
+
+class VZArtifactReport(BaseModel):
+    """Result of VZ proof artifact generation."""
+
+    model_config = ConfigDict(frozen=True)
+
+    manifest_path: str
+    source_path: str
+    entitlements_path: str
+    runner_path: str | None = None
+    kernel_path: str | None = None
+    initrd_path: str | None = None
+    runner_built: bool = False
+    runner_signed: bool = False
+    blockers: list[str] = Field(default_factory=list)
+    manifest: VZArtifactManifest
 
 
 class VZNoNetworkProof:
@@ -346,6 +413,234 @@ class VZNoNetworkProof:
 def _env_path(name: str) -> Path | None:
     value = os.environ.get(name)
     return Path(value).expanduser() if value else None
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[4]
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _copy_required_file(
+    source: Path | None, destination: Path, label: str
+) -> tuple[str | None, str | None, str | None]:
+    if source is None:
+        return None, None, f"{label} missing/not provided"
+    resolved = source.expanduser().resolve()
+    if not _readable_file(resolved):
+        return None, None, f"{label} missing/unreadable"
+    shutil.copy2(resolved, destination)
+    return str(destination), _sha256_file(destination), None
+
+
+def generate_vz_proof_artifacts(
+    output_dir: Path,
+    *,
+    kernel_path: Path | None = None,
+    initrd_path: Path | None = None,
+    build_runner: bool = False,
+    source_path: Path | None = None,
+    entitlements_path: Path | None = None,
+) -> VZArtifactReport:
+    """Generate local VZ proof artifacts and provenance; never boots a VM."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    repo_root = _repo_root()
+    source_input = source_path or repo_root / "tools" / "arc-vz-runner.swift"
+    entitlements_input = entitlements_path or repo_root / "tools" / "arc-vz-runner.entitlements"
+    source_copy = output_dir / "arc-vz-runner.swift"
+    entitlements_copy = output_dir / "arc-vz-runner.entitlements"
+    runner_path = output_dir / "arc-vz-runner"
+    manifest_path = output_dir / "vz-artifacts-manifest.json"
+    blockers: list[str] = []
+
+    source_artifact, source_sha, blocker = _copy_required_file(
+        source_input, source_copy, "VZ runner source"
+    )
+    if blocker:
+        blockers.append(blocker)
+        source_artifact = str(source_copy)
+        source_sha = ""
+    entitlements_artifact, entitlements_sha, blocker = _copy_required_file(
+        entitlements_input, entitlements_copy, "VZ runner entitlements"
+    )
+    if blocker:
+        blockers.append(blocker)
+        entitlements_artifact = str(entitlements_copy)
+        entitlements_sha = ""
+
+    kernel_source = kernel_path or _env_path("ARC_VZ_KERNEL")
+    initrd_source = initrd_path or _env_path("ARC_VZ_INITRD")
+    kernel_artifact, kernel_sha, blocker = _copy_required_file(
+        kernel_source, output_dir / "arc-vz-kernel", "ARC_VZ_KERNEL"
+    )
+    if blocker:
+        blockers.append(blocker)
+    initrd_artifact, initrd_sha, blocker = _copy_required_file(
+        initrd_source, output_dir / "arc-vz-initrd.gz", "ARC_VZ_INITRD"
+    )
+    if blocker:
+        blockers.append(blocker)
+
+    tools = {
+        "swiftc": shutil.which("swiftc"),
+        "codesign": shutil.which("codesign"),
+    }
+    build_commands: list[list[str]] = []
+    runner_built = False
+    runner_signed = False
+    runner_sha: str | None = None
+    if not build_runner:
+        blockers.append("--build-runner not set; copied source/entitlements only")
+    elif platform.system() != "Darwin":
+        blockers.append("VZ runner build requires macOS")
+    elif not source_sha or not entitlements_sha:
+        blockers.append("VZ runner build requires source and entitlements artifacts")
+    elif not tools["swiftc"]:
+        blockers.append("missing tool: swiftc")
+    elif not tools["codesign"]:
+        blockers.append("missing tool: codesign")
+    else:
+        swiftc_cmd = [str(tools["swiftc"]), str(source_copy), "-o", str(runner_path)]
+        build_commands.append(swiftc_cmd)
+        compile_proc = subprocess.run(
+            swiftc_cmd,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if compile_proc.returncode != 0:
+            blockers.append(
+                f"swiftc failed: {compile_proc.stderr.strip() or compile_proc.stdout.strip()}"
+            )
+        else:
+            runner_built = True
+            sign_cmd = [
+                str(tools["codesign"]),
+                "--force",
+                "--sign",
+                "-",
+                "--entitlements",
+                str(entitlements_copy),
+                str(runner_path),
+            ]
+            build_commands.append(sign_cmd)
+            sign_proc = subprocess.run(
+                sign_cmd,
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            if sign_proc.returncode != 0:
+                blockers.append(
+                    f"codesign failed: {sign_proc.stderr.strip() or sign_proc.stdout.strip()}"
+                )
+            else:
+                runner_signed = True
+            if runner_path.exists():
+                runner_sha = _sha256_file(runner_path)
+
+    if runner_built and runner_signed and kernel_artifact and initrd_artifact and not blockers:
+        build_status = "runner_inputs_pinned"
+    elif runner_built:
+        build_status = "runner_built_with_blockers"
+    else:
+        build_status = "source_manifest_only"
+    manifest = VZArtifactManifest(
+        generated_at=_utc_now(),
+        host_os=platform.system(),
+        host_arch=platform.machine(),
+        source_path=str(source_artifact),
+        source_sha256=source_sha or "",
+        entitlements_path=str(entitlements_artifact),
+        entitlements_sha256=entitlements_sha or "",
+        runner_path=str(runner_path) if runner_built else None,
+        runner_sha256=runner_sha,
+        runner_built=runner_built,
+        runner_signed=runner_signed,
+        kernel_path=kernel_artifact,
+        kernel_sha256=kernel_sha,
+        kernel_source_path=str(kernel_source.expanduser().resolve()) if kernel_source else None,
+        initrd_path=initrd_artifact,
+        initrd_sha256=initrd_sha,
+        initrd_source_path=str(initrd_source.expanduser().resolve()) if initrd_source else None,
+        tools=tools,
+        build_status=build_status,
+        build_commands=build_commands,
+        blockers=blockers,
+    )
+    manifest_path.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return VZArtifactReport(
+        manifest_path=str(manifest_path),
+        source_path=str(source_artifact),
+        entitlements_path=str(entitlements_artifact),
+        runner_path=str(runner_path) if runner_built else None,
+        kernel_path=kernel_artifact,
+        initrd_path=initrd_artifact,
+        runner_built=runner_built,
+        runner_signed=runner_signed,
+        blockers=blockers,
+        manifest=manifest,
+    )
+
+
+def validate_vz_artifact_manifest(path: Path) -> VZArtifactManifest:
+    """Validate VZ artifact provenance without booting a VM."""
+    manifest = VZArtifactManifest.model_validate_json(path.read_text(encoding="utf-8"))
+    if manifest.marker_contract_version != 1:
+        raise ValueError("unsupported VZ marker contract version")
+    if set(manifest.markers) != set(VZ_MARKERS):
+        raise ValueError("VZ manifest marker list mismatch")
+    if manifest.public_execution_enabled:
+        raise ValueError("VZ artifacts must not enable public execution")
+    if not manifest.proof_only:
+        raise ValueError("VZ artifacts must remain proof-only")
+    if not manifest.no_downloads:
+        raise ValueError("VZ artifacts must not use downloads")
+    if manifest.network_devices_configured != 0 or manifest.networkDevices:
+        raise ValueError("VZ artifacts must configure zero network devices")
+    source = Path(manifest.source_path)
+    if not source.exists() or _sha256_file(source) != manifest.source_sha256:
+        raise ValueError("VZ runner source sha256 mismatch")
+    source_text = source.read_text(encoding="utf-8")
+    if "config.networkDevices = []" not in source_text:
+        raise ValueError("VZ runner source missing no-NIC configuration")
+    if "VZVirtioNetworkDeviceConfiguration" in source_text:
+        raise ValueError("VZ runner source configures network device type")
+    if (
+        "ARC_VZ_TEARDOWN_ATTEMPTED=1" not in source_text
+        or "ARC_VZ_TEARDOWN_OK=1" not in source_text
+    ):
+        raise ValueError("VZ runner source missing teardown markers")
+    entitlements = Path(manifest.entitlements_path)
+    if not entitlements.exists() or _sha256_file(entitlements) != manifest.entitlements_sha256:
+        raise ValueError("VZ entitlements sha256 mismatch")
+    if "com.apple.security.virtualization" not in entitlements.read_text(encoding="utf-8"):
+        raise ValueError("VZ entitlements missing virtualization entitlement")
+    if manifest.runner_path:
+        runner = Path(manifest.runner_path)
+        if not runner.exists() or _sha256_file(runner) != manifest.runner_sha256:
+            raise ValueError("VZ runner sha256 mismatch")
+    if manifest.kernel_path:
+        kernel = Path(manifest.kernel_path)
+        if not kernel.exists() or _sha256_file(kernel) != manifest.kernel_sha256:
+            raise ValueError("VZ kernel sha256 mismatch")
+    if manifest.initrd_path:
+        initrd = Path(manifest.initrd_path)
+        if not initrd.exists() or _sha256_file(initrd) != manifest.initrd_sha256:
+            raise ValueError("VZ initrd sha256 mismatch")
+    return manifest
 
 
 def _timeout_stream_to_text(value: str | bytes | None) -> str:

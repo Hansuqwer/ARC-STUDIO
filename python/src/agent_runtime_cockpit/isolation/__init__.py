@@ -3,7 +3,7 @@
 from .base import IsolationProvider, IsolationResult
 from .none import NoneIsolationProvider
 from .subprocess import SubprocessIsolationProvider
-from .vz_provider import VZNoNetworkProof, VZProofResult
+from .vz_provider import VZNoNetworkProof, VZProofResult, generate_vz_proof_artifacts
 
 __all__ = [
     "IsolationProvider",
@@ -12,4 +12,5 @@ __all__ = [
     "SubprocessIsolationProvider",
     "VZNoNetworkProof",
     "VZProofResult",
+    "generate_vz_proof_artifacts",
 ]
