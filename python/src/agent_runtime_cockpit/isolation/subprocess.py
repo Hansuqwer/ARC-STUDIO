@@ -186,16 +186,19 @@ class SubprocessIsolationProvider(IsolationProvider):
     ) -> IsolationResult:
         if not command:
             raise ValueError("command must not be empty")
-        if self._workspace_root and cwd:
+        execution_cwd = cwd or self._workspace_root
+        popen_cwd = execution_cwd
+        if self._workspace_root and execution_cwd:
             root = self._workspace_root.resolve()
-            resolved = cwd.resolve()
-            if cwd.is_symlink() or not resolved.is_relative_to(root):
-                raise ValueError(f"cwd escapes workspace: {cwd}")
+            resolved = execution_cwd.resolve()
+            if execution_cwd.is_symlink() or not resolved.is_relative_to(root):
+                raise ValueError(f"cwd escapes workspace: {execution_cwd}")
+            popen_cwd = resolved
         filtered_env = self.filter_env(env)
         start = time.monotonic()
         proc = subprocess.Popen(
             command,
-            cwd=str(cwd) if cwd else None,
+            cwd=str(popen_cwd) if popen_cwd else None,
             env=filtered_env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

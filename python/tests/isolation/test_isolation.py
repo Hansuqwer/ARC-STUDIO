@@ -109,6 +109,18 @@ class TestSubprocessIsolationProvider:
         assert "hello" in result.stdout
         assert result.provider == "subprocess"
 
+    @pytest.mark.asyncio
+    async def test_workspace_root_is_default_cwd(self, tmp_path, monkeypatch):
+        host_cwd = tmp_path / "host"
+        workspace = tmp_path / "workspace"
+        host_cwd.mkdir()
+        workspace.mkdir()
+        monkeypatch.chdir(host_cwd)
+        provider = SubprocessIsolationProvider(workspace_root=workspace)
+        result = await provider.execute(["pwd"])
+        assert result.exit_code == 0
+        assert result.stdout.strip() == str(workspace)
+
     def test_filter_env_blocks_secret_key(self):
         provider = SubprocessIsolationProvider()
         filtered = provider.filter_env(

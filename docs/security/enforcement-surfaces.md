@@ -367,6 +367,7 @@ P0 policy defaults:
 - network, install, privileged, destructive, and unknown commands are denied unless an explicit future policy enables them.
 - subprocess execution uses argv lists only, not shell strings.
 - cwd must resolve inside the workspace.
+- when `SubprocessIsolationProvider` is constructed with `workspace_root`, that root becomes the default execution cwd if a direct caller omits `cwd`; parent-process cwd is not inherited across the provider boundary.
 - environment is allowlisted and secret-looking variables are stripped.
 - timeout kills the POSIX process group.
 - stdout/stderr are capped and redacted.

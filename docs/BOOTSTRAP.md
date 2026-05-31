@@ -170,6 +170,7 @@ Expected defaults:
 - Linux/Firecracker microVM remains a gated scaffold, blocked by default, and requires `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, kernel/rootfs env vars, `firecracker`, `/dev/kvm` rw, and workspace snapshot tools. It is not proven on this macOS host.
 - macOS Lima/VZ remains a low-security harness only; strict no-network public execution is blocked.
 - `arc mcp workbench inspect` and `session-start` route user-supplied server commands through sandbox policy, workspace trust, env filtering, cwd bounds, and sandbox audit.
+- Direct `SubprocessIsolationProvider(workspace_root=...)` callers execute from that workspace root when `cwd` is omitted; no parent-cwd inheritance across that provider boundary.
 - `arc plan apply` no longer treats generic plan/direct approval as approval for `network`, `install`, or `unknown`; use policy allowance or a matching sandbox approval token.
 - Sandbox audit logs are written to `~/.arc/audit/` unless `ARC_SANDBOX_AUDIT_DIR` is set.
 - `--ask` only applies to `network`, `install`, and `unknown`; non-interactive runs still deny by default.
