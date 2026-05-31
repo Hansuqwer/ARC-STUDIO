@@ -69,6 +69,28 @@ class SwarmState(BaseModel):
         self.accumulated_cost_usd = ckpt.accumulated_cost_usd
         self.updated_at = datetime.now(timezone.utc)
 
+    @classmethod
+    def from_checkpoint(cls, checkpoint: SwarmCheckpoint) -> SwarmState:
+        """Rehydrate a SwarmState from a durable checkpoint.
+
+        The resumed state continues from the checkpoint's round, tasks, agents,
+        config, and accumulated cost rather than starting fresh. The checkpoint
+        itself is preserved as the first entry of the resumed history so the
+        lineage is auditable.
+        """
+        state = cls(
+            config=checkpoint.config,
+            agents=copy.deepcopy(checkpoint.agents),
+            tasks=copy.deepcopy(checkpoint.tasks),
+            status=checkpoint.status,
+            current_round=checkpoint.round,
+            accumulated_cost_usd=checkpoint.accumulated_cost_usd,
+        )
+        state.checkpoint_history.append(checkpoint)
+        state.metadata["resumed_from"] = checkpoint.id
+        state.metadata["resumed_from_round"] = checkpoint.round
+        return state
+
     def fork(self, new_config: SwarmGraphConfig | None = None) -> SwarmState:
         return SwarmState(
             config=new_config or self.config,

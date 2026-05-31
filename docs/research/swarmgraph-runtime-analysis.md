@@ -569,3 +569,37 @@ result = runner.run_result("Explain consensus")
 - **Design-only / not done:** external publication (still none), `provider_backed` SDK-owned execution mode, durable checkpoint *resume* wiring, real `tool.uv.workspace` conversion.
 - **Safe claims:** "local buildable SwarmGraph SDK wheel with offline provider adapters and a dry-run release workflow", "ARC compatibility bridge".
 - **Unsafe claims:** "published SDK", "production provider-backed SDK".
+
+---
+
+## Workspace + provider_backed + Resume + Trusted Publisher (2026-05-31)
+
+### Research notes
+
+| # | Source | Link | Learned | Implementation consequence | Confidence | Open questions |
+|---|--------|------|---------|----------------------------|-----------|----------------|
+| 1 | uv workspaces | https://docs.astral.sh/uv/concepts/projects/workspaces/ | `tool.uv.workspace { members }` + `tool.uv.sources { swarmgraph-sdk = { workspace = true } }` gives one shared lockfile; `uv run --package <member>` targets a member. | Converted `python/pyproject.toml` from path-source to a real workspace; ARC bridge + class identity unchanged. | High | Should ARC importing SDK internals be isolation-enforced? uv does not enforce it. |
+| 2 | uv GitHub Actions / publishing | https://docs.astral.sh/uv/guides/integration/github/ | Trusted publishing pattern: `environment: pypi`, `permissions: id-token: write`, `uv build` + `uv publish`, no stored token. | PR4 publish job uses protected `pypi` env + OIDC; hard-gated on `publish=true` dispatch input; dry-run is default. | High | Maintainer must create the `pypi` environment + PyPI trusted publisher before publish can succeed. |
+| 3 | PyPI Trusted Publishers | https://docs.pypi.org/trusted-publishers/ | OIDC binds repo+workflow+environment; no API token. | Asserted via test that no `PYPI_TOKEN`/`secrets.PYPI` is referenced. | High | None |
+| 4 | Existing worker/runner source | in-repo | `provider_backed` was in the `ExecutionMode` enum but unrouted; runner already forwards an injected provider. | Routed `provider_backed` through the provider path; kept the paid-call gate exclusive to `gated_local`. | High | provider_backed has no built-in cost gate — callers must gate paid HTTP providers themselves. |
+| 5 | SwarmCheckpoint/SwarmState | in-repo | Checkpoints persist round/tasks/agents/config/cost; resume needs assigned agents to dispatch. | Added `SwarmState.from_checkpoint` + runner `resume*`; resume loop starts at `current_round`. Tests build a paused state with prepared agents. | High | Resume re-runs the saved round; idempotency of already-completed tasks relies on task status filtering. |
+
+> Tooling note: Context7 + Grep MCP servers were added to `opencode.json` in the
+> previous batch but are not active until opencode restarts, so this batch again
+> used official docs via web fetch + in-repo reads.
+
+### Decision table
+
+| Decision | Chosen approach | Alternatives considered | Reason | Files affected | Confidence |
+|----------|-----------------|-------------------------|--------|----------------|-----------|
+| Workspace | Real `tool.uv.workspace` + `workspace = true` source | Keep editable path dep | Enables `uv run --package`, single lockfile, idiomatic uv | `python/pyproject.toml`, `python/uv.lock` | High |
+| provider_backed gating | Run injected provider; paid-gate only for `gated_local` | Apply paid-gate to both modes | provider_backed is the explicit opt-in; EchoProvider is free/offline for tests | `swarmgraph/nodes/worker.py` | Medium |
+| Resume | `from_checkpoint` rehydrate + run loop from `current_round` | Replay from round 0; separate resume engine | Minimal, reuses existing loop, proven to continue mid-run | `swarmgraph/state.py`, `swarmgraph/runner.py`, `swarmgraph/cli.py` | High |
+| Publish gating | Hard gate: dispatch input + protected env + OIDC; dry-run default | Auto-publish on tag | Prevents accidental publish; nothing publishes without explicit human approval | `.github/workflows/swarmgraph-sdk-release.yml` | High |
+
+### Status after this batch
+
+- **Real:** uv workspace (`uv run --package swarmgraph-sdk` verified); `provider_backed` mode runs through injected providers (EchoProvider offline); checkpoint **resume** continues from saved round/tasks (proven by test); hard-gated trusted-publisher workflow (publish job conditional, OIDC, protected env), dry-run default.
+- **Design-only / not done:** actual external publication (still none; requires maintainer to create `pypi` env + PyPI trusted publisher); paid provider cost-gating for `provider_backed` (caller responsibility); resume idempotency hardening for partially-completed rounds.
+- **Safe claims:** "uv workspace", "SDK-owned provider_backed mode (offline by default)", "checkpoint resume", "hard-gated trusted-publisher release workflow (no auto-publish)".
+- **Unsafe claims:** "published SDK", "production provider-backed SDK".

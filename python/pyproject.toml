@@ -62,8 +62,11 @@ arch-studio-cli = "agent_runtime_cockpit.cli_studio:app"
 [tool.hatch.build.targets.wheel]
 packages = ["src/agent_runtime_cockpit"]
 
+[tool.uv.workspace]
+members = ["packages/*"]
+
 [tool.uv.sources]
-swarmgraph-sdk = { path = "packages/swarmgraph-sdk", editable = true }
+swarmgraph-sdk = { workspace = true }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

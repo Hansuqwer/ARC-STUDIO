@@ -20,7 +20,7 @@ def main() -> None:
 
 @app.command("run")
 def run_cmd(
-    prompt: str = typer.Argument(..., help="Prompt to run"),
+    prompt: str = typer.Argument("", help="Prompt to run"),
     workers: int = typer.Option(3, "--workers", "-w", min=1, max=50),
     max_rounds: int = typer.Option(1, "--max-rounds", min=1, max=100),
     json_output: bool = typer.Option(False, "--json", help="Emit JSON result"),
@@ -30,6 +30,11 @@ def run_cmd(
         "--checkpoint-dir",
         help="Directory for durable JSON checkpoints",
     ),
+    resume: str | None = typer.Option(
+        None,
+        "--resume",
+        help="Resume from a checkpoint id (requires --checkpoint-dir)",
+    ),
 ) -> None:
     config = SwarmGraphConfig(
         num_workers=workers,
@@ -38,6 +43,21 @@ def run_cmd(
     )
     store = JsonFileCheckpointStore(checkpoint_dir) if checkpoint_dir is not None else None
     runner = SwarmGraphRunner(config=config, checkpoint_store=store)
+
+    if resume is not None:
+        if store is None:
+            raise typer.BadParameter("--resume requires --checkpoint-dir")
+        result = runner.resume_result(resume)
+        if json_output:
+            typer.echo(json.dumps(result.to_dict(), sort_keys=True))
+            return
+        typer.echo(f"status={result.status} tasks={result.completed_tasks}/{result.total_tasks}")
+        for task_result in result.results:
+            typer.echo(task_result.output)
+        return
+
+    if not prompt:
+        raise typer.BadParameter("prompt is required unless --resume is used")
 
     if stream:
         asyncio.run(_stream_run(runner, prompt))

@@ -131,54 +131,79 @@ class SwarmGraphRunner:
         prompt: str,
         config: SwarmGraphConfig | None = None,
         cancellation_token: CancellationToken | None = None,
+        resume_state: SwarmState | None = None,
     ) -> dict[str, Any]:
-        cfg = config or self.config
-        fan_out_score = parallelizability_score(prompt)
-        effective_workers = cfg.num_workers if fan_out_score >= cfg.fan_out_threshold else 1
-        runtime_cfg = cfg.model_copy(update={"num_workers": effective_workers})
-        cfg = runtime_cfg
-        self.state = SwarmState(config=cfg)
-        self.state.status = SwarmStatus.running
-        self.state.metadata["requested_workers"] = (config or self.config).num_workers
-        self.state.metadata["effective_workers"] = effective_workers
         self.events = []
 
-        if _token_cancelled(cancellation_token):
-            self.state.status = SwarmStatus.cancelled
-            self.state.error = "cancelled"
-            self.state.updated_at = datetime.now(timezone.utc)
-            return self._build_result()
-
-        self._emit(
-            SwarmGraphEvent(
-                kind=SwarmGraphEventKind.audit,
-                swarm_id=self.state.id,
-                data={
-                    "fan_out_score": fan_out_score,
-                    "fan_out_threshold": cfg.fan_out_threshold,
-                    "requested_workers": (config or self.config).num_workers,
-                    "effective_workers": effective_workers,
-                    "decision": "fan_out" if effective_workers > 1 else "single",
-                },
-                round=0,
+        if resume_state is not None:
+            cfg = resume_state.config
+            self.state = resume_state
+            self.state.status = SwarmStatus.running
+            start_round = resume_state.current_round
+            self._emit(
+                SwarmGraphEvent(
+                    kind=SwarmGraphEventKind.audit,
+                    swarm_id=self.state.id,
+                    data={
+                        "decision": "resume",
+                        "resumed_from": self.state.metadata.get("resumed_from"),
+                        "resumed_from_round": start_round,
+                        "pending_tasks": len(self.state.get_pending_tasks()),
+                    },
+                    round=start_round,
+                )
             )
-        )
-
-        queen_prepare_agents(self.state, cfg.num_workers)
-        self._save_checkpoint()
-
-        if self._decomposition_strategy is None:
-            tasks = queen_decompose(self.state, prompt)
+            topology = build_swarm_graph(self.state)
+            self._emit(emit_topology_event(self.state, topology))
         else:
-            tasks = self._decomposition_strategy.decompose(prompt, cfg.num_workers, cfg)
-        for t in tasks:
-            self.state.tasks[t.id] = t
+            cfg = config or self.config
+            fan_out_score = parallelizability_score(prompt)
+            effective_workers = cfg.num_workers if fan_out_score >= cfg.fan_out_threshold else 1
+            runtime_cfg = cfg.model_copy(update={"num_workers": effective_workers})
+            cfg = runtime_cfg
+            self.state = SwarmState(config=cfg)
+            self.state.status = SwarmStatus.running
+            self.state.metadata["requested_workers"] = (config or self.config).num_workers
+            self.state.metadata["effective_workers"] = effective_workers
+            start_round = 0
 
-        topology = build_swarm_graph(self.state)
-        self._emit(emit_topology_event(self.state, topology))
+            if _token_cancelled(cancellation_token):
+                self.state.status = SwarmStatus.cancelled
+                self.state.error = "cancelled"
+                self.state.updated_at = datetime.now(timezone.utc)
+                return self._build_result()
+
+            self._emit(
+                SwarmGraphEvent(
+                    kind=SwarmGraphEventKind.audit,
+                    swarm_id=self.state.id,
+                    data={
+                        "fan_out_score": fan_out_score,
+                        "fan_out_threshold": cfg.fan_out_threshold,
+                        "requested_workers": (config or self.config).num_workers,
+                        "effective_workers": effective_workers,
+                        "decision": "fan_out" if effective_workers > 1 else "single",
+                    },
+                    round=0,
+                )
+            )
+
+            queen_prepare_agents(self.state, cfg.num_workers)
+            self._save_checkpoint()
+
+            if self._decomposition_strategy is None:
+                tasks = queen_decompose(self.state, prompt)
+            else:
+                tasks = self._decomposition_strategy.decompose(prompt, cfg.num_workers, cfg)
+            for t in tasks:
+                self.state.tasks[t.id] = t
+
+            topology = build_swarm_graph(self.state)
+            self._emit(emit_topology_event(self.state, topology))
+
         previous_pending_count = -1
 
-        for round_num in range(cfg.max_rounds):
+        for round_num in range(start_round, cfg.max_rounds):
             if _token_cancelled(cancellation_token):
                 self.state.status = SwarmStatus.cancelled
                 self.state.error = "cancelled"
@@ -259,6 +284,44 @@ class SwarmGraphRunner:
     ) -> SwarmRunResult:
         payload = await self.run_async(prompt, config, cancellation_token)
         return SwarmRunResult.from_dict(payload)
+
+    def _load_checkpoint_state(self, checkpoint_id: str) -> SwarmState:
+        if self._checkpoint_store is None:
+            raise ValueError("resume requires a checkpoint_store")
+        checkpoint = self._checkpoint_store.load(checkpoint_id)
+        return SwarmState.from_checkpoint(checkpoint)
+
+    def resume(
+        self,
+        checkpoint_id: str,
+        cancellation_token: CancellationToken | None = None,
+    ) -> dict[str, Any]:
+        """Resume a run from a durable checkpoint, continuing from its round.
+
+        Loads the checkpoint via the configured ``checkpoint_store`` and
+        rehydrates :class:`SwarmState` so the round loop continues from the saved
+        round and task state instead of starting over.
+        """
+        return _run_coro_sync(self.resume_async(checkpoint_id, cancellation_token))
+
+    async def resume_async(
+        self,
+        checkpoint_id: str,
+        cancellation_token: CancellationToken | None = None,
+    ) -> dict[str, Any]:
+        resume_state = self._load_checkpoint_state(checkpoint_id)
+        return await self.run_async(
+            prompt="",
+            cancellation_token=cancellation_token,
+            resume_state=resume_state,
+        )
+
+    def resume_result(
+        self,
+        checkpoint_id: str,
+        cancellation_token: CancellationToken | None = None,
+    ) -> SwarmRunResult:
+        return SwarmRunResult.from_dict(self.resume(checkpoint_id, cancellation_token))
 
     async def stream(
         self,

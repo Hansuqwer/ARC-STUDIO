@@ -32,6 +32,9 @@ class _NeverCancelled:
 _NEVER_CANCELLED = _NeverCancelled()
 
 
+_PROVIDER_MODES = (ExecutionMode.gated_local, ExecutionMode.provider_backed)
+
+
 def worker_execute(
     task: SwarmTask,
     mode: ExecutionMode = ExecutionMode.fake_offline,
@@ -39,7 +42,7 @@ def worker_execute(
     provider: Provider | None = None,
     allow_paid_calls: bool = False,
 ) -> WorkerResult:
-    if mode == ExecutionMode.gated_local:
+    if mode in _PROVIDER_MODES:
         return _run_coro_sync(
             worker_execute_async(
                 task,
@@ -61,9 +64,10 @@ async def worker_execute_async(
     provider: Provider | None = None,
     allow_paid_calls: bool = False,
 ) -> WorkerResult:
-    if mode == ExecutionMode.gated_local:
-        return await _worker_execute_gated_local(
+    if mode in _PROVIDER_MODES:
+        return await _worker_execute_provider(
             task,
+            mode=mode,
             timeout=timeout,
             cancellation_token=cancellation_token,
             provider=provider,
@@ -112,13 +116,25 @@ def _worker_execute_sync(
     )
 
 
-async def _worker_execute_gated_local(
+async def _worker_execute_provider(
     task: SwarmTask,
+    mode: ExecutionMode,
     timeout: float,
     cancellation_token: CancellationTokenLike | None,
     provider: Provider | None,
     allow_paid_calls: bool,
 ) -> WorkerResult:
+    """Execute a task through an injected Provider.
+
+    Two provider-backed modes share this path:
+
+    - ``gated_local``: paid provider calls are denied unless ``allow_paid_calls``
+      is explicitly True. This preserves the existing cost-gate contract.
+    - ``provider_backed``: the SDK-owned mode that runs the injected provider
+      directly. It only requires that a provider is configured; the paid-call
+      flag does not block it (an offline provider such as ``EchoProvider`` is the
+      default deterministic, no-network choice for tests).
+    """
     started = datetime.now(timezone.utc)
     t0 = time.time()
 
@@ -132,7 +148,7 @@ async def _worker_execute_gated_local(
             started_at=started,
         )
 
-    if not allow_paid_calls:
+    if mode == ExecutionMode.gated_local and not allow_paid_calls:
         return WorkerResult(
             worker_id=task.assigned_agent_id or "unknown",
             task_id=task.id,
@@ -181,7 +197,7 @@ async def _worker_execute_gated_local(
             worker_id=task.assigned_agent_id or "unknown",
             task_id=task.id,
             output="",
-            error=f"gated_local error: {exc}",
+            error=f"{mode.value} error: {exc}",
             duration_seconds=time.time() - t0,
             started_at=started,
         )

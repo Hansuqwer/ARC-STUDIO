@@ -35,15 +35,45 @@ async for event in runner.stream("Explain consensus"):
     print(event.kind, event.id)
 ```
 
-### Durable checkpoints
+### Durable checkpoints + resume
 
 ```python
-from swarmgraph import JsonFileCheckpointStore
+from swarmgraph import JsonFileCheckpointStore, SwarmGraphRunner
 
 store = JsonFileCheckpointStore("./checkpoints")
 runner = SwarmGraphRunner(checkpoint_store=store)
 runner.run("Explain consensus")
+
+# Resume continues from the saved round/tasks, not from round 0.
+checkpoint_id = store.list_ids()[-1]
+runner.resume(checkpoint_id)
 ```
+
+CLI:
+
+```bash
+swarmgraph run "Explain consensus" --checkpoint-dir ./ckpts --json
+swarmgraph run --resume <checkpoint-id> --checkpoint-dir ./ckpts --json
+```
+
+### Provider-backed execution
+
+`provider_backed` runs each worker through an injected `Provider`. With the
+offline `EchoProvider` it stays deterministic and network-free, which is the
+default for tests:
+
+```python
+from swarmgraph import EchoProvider, SwarmGraphConfig, SwarmGraphRunner
+from swarmgraph.config import ExecutionMode
+
+cfg = SwarmGraphConfig(execution_mode=ExecutionMode.provider_backed)
+runner = SwarmGraphRunner(config=cfg, provider=EchoProvider())
+runner.run("Explain consensus")
+```
+
+`gated_local` still denies paid provider calls unless `allow_paid_calls=True`.
+`provider_backed` only requires a provider to be injected; pair it with a paid
+HTTP provider plus your own gating if you opt into real cost.
 
 ## Provider adapters
 
@@ -86,7 +116,9 @@ confidence-weighted protocols can differentiate strong and weak outputs.
 
 Source ownership lives **here**. ARC (`agent_runtime_cockpit.swarmgraph`) is a
 thin compatibility bridge that re-exports this package so existing
-`agent_runtime_cockpit.swarmgraph.*` imports keep working unchanged.
+`agent_runtime_cockpit.swarmgraph.*` imports keep working unchanged. The repo is
+a uv workspace, so `uv run --package swarmgraph-sdk ...` targets this member
+directly while sharing one lockfile with ARC.
 
 ## Release
 

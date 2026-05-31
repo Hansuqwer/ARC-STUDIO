@@ -83,3 +83,28 @@ def test_cli_stream_outputs_jsonl_events() -> None:
 
     assert result.exit_code == 0
     assert '"kind": "audit"' in result.output
+
+
+def test_cli_resume_requires_checkpoint_dir() -> None:
+    result = CliRunner().invoke(app, ["run", "--resume", "ckpt-x"])
+
+    assert result.exit_code != 0
+
+
+def test_cli_run_then_resume(tmp_path) -> None:
+    runner = CliRunner()
+    run_result = runner.invoke(
+        app,
+        ["run", "Explain consensus", "--checkpoint-dir", str(tmp_path), "--json"],
+    )
+    assert run_result.exit_code == 0
+
+    store = JsonFileCheckpointStore(tmp_path)
+    checkpoint_id = store.list_ids()[0]
+
+    resume_result = runner.invoke(
+        app,
+        ["run", "--resume", checkpoint_id, "--checkpoint-dir", str(tmp_path), "--json"],
+    )
+    assert resume_result.exit_code == 0
+    assert '"status":' in resume_result.output
