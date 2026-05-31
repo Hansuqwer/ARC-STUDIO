@@ -27,5 +27,5 @@ swarmgraph = "swarmgraph.cli:app"
 [tool.hatch.build.targets.wheel]
 packages = ["swarmgraph"]
 
-[tool.hatch.build.targets.sdist.force-include]
-"../../src/agent_runtime_cockpit/swarmgraph" = "swarmgraph"
+[tool.hatch.build.targets.sdist]
+include = ["swarmgraph", "README.md", "pyproject.toml"]

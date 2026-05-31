@@ -287,6 +287,41 @@ def run_consensus_round_with_results(
     return outcomes
 
 
+def _worker_confidence(task: SwarmTask) -> tuple[float, str]:
+    """Derive a deterministic per-worker vote confidence and reasoning.
+
+    Confidence is computed from observable worker-result signals rather than a
+    fixed 1.0, so confidence-weighted/quorum protocols can differentiate strong
+    and weak worker outputs:
+
+    - Missing result or error -> 0.0 (no confidence, vote is a rejection).
+    - Empty output -> low confidence (0.2).
+    - Otherwise scale by output substance (length) and presence of artifacts,
+      clamped to [0.3, 1.0].
+
+    The computation is pure and order-independent, preserving determinism.
+    """
+    result = task.result
+    if result is None:
+        return 0.0, "missing worker result"
+    if result.error:
+        return 0.0, f"worker error: {result.error[:120]}"
+
+    output = result.output or ""
+    if not output.strip():
+        return 0.2, "worker result present but empty output"
+
+    # Length signal: saturates around ~400 chars of substance.
+    length_signal = min(1.0, len(output.strip()) / 400.0)
+    artifact_bonus = 0.1 if result.artifacts else 0.0
+    confidence = round(min(1.0, max(0.3, 0.3 + 0.6 * length_signal + artifact_bonus)), 4)
+    reasoning = (
+        f"worker result present (len={len(output.strip())}, "
+        f"artifacts={len(result.artifacts)}, confidence={confidence})"
+    )
+    return confidence, reasoning
+
+
 def _run_group_consensus_round(
     tasks: list[SwarmTask],
     quorum: int | None = None,
@@ -297,17 +332,20 @@ def _run_group_consensus_round(
     selection = select_consensus_protocol(group_prompt)
     proto = selection.protocol
 
-    votes = [
-        AgentVote(
-            agent_id=task.assigned_agent_id or (task.result.worker_id if task.result else "system"),
-            task_id=tasks[0].id,
-            round=0,
-            approved=task.result is not None and task.result.error is None,
-            confidence=1.0,
-            reasoning="worker result present" if task.result else "missing worker result",
+    votes: list[AgentVote] = []
+    for task in tasks:
+        confidence, reasoning = _worker_confidence(task)
+        votes.append(
+            AgentVote(
+                agent_id=task.assigned_agent_id
+                or (task.result.worker_id if task.result else "system"),
+                task_id=tasks[0].id,
+                round=0,
+                approved=task.result is not None and task.result.error is None,
+                confidence=confidence,
+                reasoning=reasoning,
+            )
         )
-        for task in tasks
-    ]
 
     if proto == ConsensusProtocol.bft_escrow and escrow is not None:
         consensus = _run_bft_escrow_consensus(votes, tasks[0], escrow, quorum)
@@ -329,6 +367,15 @@ def _run_group_consensus_round(
         decided_by="consensus",
     )
 
+    approving = [v.confidence for v in votes if v.approved]
+    mean_confidence = round(sum(approving) / len(approving), 4) if approving else 0.0
+    weighted_total = sum(v.confidence for v in votes)
+    weighted_ratio = (
+        round(sum(v.confidence for v in votes if v.approved) / weighted_total, 4)
+        if weighted_total > 0
+        else 0.0
+    )
+
     outcomes: list[ConsensusRoundOutcome] = []
     summary = consensus_result_to_metadata(consensus)
     for task in tasks:
@@ -340,6 +387,8 @@ def _run_group_consensus_round(
             "matched_signals": list(selection.assessment.matched_signals),
             "rationale": selection.assessment.rationale,
             "grouped_votes": len(votes),
+            "mean_approval_confidence": mean_confidence,
+            "weighted_approval_ratio": weighted_ratio,
         }
         task.metadata["consensus_result"] = summary
         task.approval = decision

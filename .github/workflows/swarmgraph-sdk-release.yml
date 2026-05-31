@@ -1,0 +1,71 @@
+name: swarmgraph-sdk-release
+
+# Builds and verifies the standalone swarmgraph-sdk wheel.
+#
+# This workflow DOES NOT publish to PyPI. Publishing is intentionally a manual,
+# gated, dry-run-only step until the SDK is approved for external release. The
+# `publish-dry-run` job runs `twine check` against the built artifacts and stops
+# there. To actually publish in the future, a maintainer must add a trusted
+# publisher / token and remove the dry-run guard explicitly.
+
+on:
+  push:
+    tags:
+      - "swarmgraph-sdk-v*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.inputs.ref || github.ref }}
+      - uses: astral-sh/setup-uv@v5
+      - name: Build SDK wheel + sdist
+        working-directory: python
+        run: uv build packages/swarmgraph-sdk
+      - name: Verify isolated import + CLI
+        working-directory: python
+        run: |
+          WHL=$(ls packages/swarmgraph-sdk/dist/*.whl)
+          uv run --isolated --with "$WHL" python -c "import swarmgraph; print(swarmgraph.SwarmGraphRunner)"
+          uv run --isolated --with "$WHL" swarmgraph run "Explain consensus" --json
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: swarmgraph-sdk-dist
+          path: python/packages/swarmgraph-sdk/dist/*
+
+  publish-dry-run:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: swarmgraph-sdk-dist
+          path: dist
+      - name: Twine check (dry-run only, no upload)
+        run: |
+          uvx twine check dist/*
+          echo "Dry-run complete. Publishing is intentionally disabled."

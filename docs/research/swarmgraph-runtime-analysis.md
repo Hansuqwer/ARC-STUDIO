@@ -532,3 +532,40 @@ result = runner.run_result("Explain consensus")
 2. Add independent SDK docs and release workflow.
 3. Add provider adapters outside ARC using the SDK provider protocol.
 4. Deepen multi-worker vote semantics beyond deterministic present/error votes.
+
+---
+
+## SDK Ownership Move + Adapters + Consensus (2026-05-31)
+
+### Research notes
+
+| # | Source | Link | Learned | Implementation consequence | Confidence | Open questions |
+|---|--------|------|---------|----------------------------|-----------|----------------|
+| 1 | Hatch build config docs | https://hatch.pypa.io/latest/config/build/ | `force-include` maps arbitrary trees into a dist; `packages`/`only-include` collapse the final path component; sdist `include` selects files. | Physically moving source into `packages/swarmgraph-sdk/swarmgraph` removes the cross-tree `force-include` hack; sdist now uses a simple `include`. | High | None |
+| 2 | uv workspaces/sources docs | https://docs.astral.sh/uv/concepts/projects/workspaces/ | Path deps via `tool.uv.sources { path, editable=true }` are supported and editable; workspaces share one lockfile. | Keep ARC's editable path dep on `swarmgraph-sdk`; no workspace table needed. ARC importing SDK internals across the boundary is allowed but not isolation-enforced. | High | Convert to a real `tool.uv.workspace` later? |
+| 3 | CPython import system (meta path finders) | https://docs.python.org/3/reference/import.html | A second module name re-executing the same file yields *distinct* class objects, breaking Pydantic identity checks. A `MetaPathFinder` can alias one module name to an already-imported module. | ARC bridge installs a `MetaPathFinder` aliasing `agent_runtime_cockpit.swarmgraph.X` -> `swarmgraph.X`, preserving class identity for `SwarmState.config` validation. | High | None — proven by `test_arc_bridge.py`. |
+| 4 | typing.Protocol provider contract (existing `swarmgraph.providers`) | in-repo | Provider protocol is async `complete()` + `capabilities()` with a cancellation token. | External adapters only need to implement those two; `EchoProvider`/`HTTPChatProvider` added with zero ARC coupling. | High | None |
+| 5 | Existing consensus protocols (`consensus.py`) | in-repo | `confidence_weighted_consensus` already weights by `AgentVote.confidence`, but grouped votes hardcoded `confidence=1.0`. | Derive per-worker confidence from `WorkerResult` signals so weighted/quorum protocols differentiate; keep deterministic. | High | Should length-based heuristic be replaced by provider-reported confidence once provider_backed exists? |
+
+> Tooling note: Context7 and Vercel Grep MCP servers were **not wired into this
+> session's tool surface** (only the Vercel platform MCP, which is deploy-only).
+> Research used official docs via web fetch plus in-repo source reads. Follow-up:
+> add Context7 + Vercel Grep MCP to opencode config so future sessions can use
+> them directly.
+
+### Decision table
+
+| Decision | Chosen approach | Alternatives considered | Reason | Files affected | Confidence |
+|----------|-----------------|-------------------------|--------|----------------|-----------|
+| Source ownership | Physically move core to `packages/swarmgraph-sdk/swarmgraph`; ARC re-exports | Keep shared tree + `force-include`; symlink | Single source of truth; SDK builds without reaching into ARC `src` | `packages/swarmgraph-sdk/**`, removed `src/swarmgraph`, moved `src/agent_runtime_cockpit/swarmgraph` | High |
+| ARC compatibility | `MetaPathFinder` aliasing submodules to SDK modules | Plain `__path__` extension; explicit re-export of every submodule | `__path__` extension re-executes files -> dual classes; aliasing preserves identity and covers all submodules incl. `nodes.*` | `src/agent_runtime_cockpit/swarmgraph/__init__.py` | High |
+| Provider adapters | `EchoProvider` (offline) + `HTTPChatProvider` (transport-injected) | Concrete httpx/openai client baked in | No network in tests, no client dependency, no surprise live calls | `packages/swarmgraph-sdk/swarmgraph/adapters/**` | High |
+| Consensus depth | Derive per-worker confidence from `WorkerResult` signals | Provider-reported confidence; random/ML scoring | Deterministic, CI-safe, makes confidence-weighted protocol meaningful now | `packages/swarmgraph-sdk/swarmgraph/nodes/consensus.py` | Medium |
+| Release | Build + isolated verify + `twine check` dry-run only | Auto-publish on tag | SDK not approved for external release; avoid accidental publish | `.github/workflows/swarmgraph-sdk-release.yml` | High |
+
+### Status after this change
+
+- **Real:** source ownership moved to SDK; ARC is a verified compat bridge (462 swarmgraph tests + bridge identity tests green); offline provider adapters; transport-injected HTTP adapter shape; confidence-aware grouped votes; build + isolated import/CLI verified; dry-run release workflow.
+- **Design-only / not done:** external publication (still none), `provider_backed` SDK-owned execution mode, durable checkpoint *resume* wiring, real `tool.uv.workspace` conversion.
+- **Safe claims:** "local buildable SwarmGraph SDK wheel with offline provider adapters and a dry-run release workflow", "ARC compatibility bridge".
+- **Unsafe claims:** "published SDK", "production provider-backed SDK".

@@ -1,19 +1,4 @@
-from __future__ import annotations
-
-# ruff: noqa: E402
-
-from pathlib import Path
-
-_CANDIDATES = (
-    Path(__file__).resolve().parents[3] / "src" / "agent_runtime_cockpit" / "swarmgraph",
-    Path.cwd() / "src" / "agent_runtime_cockpit" / "swarmgraph",
-    Path.cwd() / "python" / "src" / "agent_runtime_cockpit" / "swarmgraph",
-)
-for _path in _CANDIDATES:
-    if _path.exists():
-        __path__.insert(0, str(_path))
-        break
-
+from .adapters import EchoProvider, HTTPChatProvider, HTTPTransport
 from .checkpoint import CheckpointStore, JsonFileCheckpointStore
 from .config import SwarmGraphConfig
 from .consensus import (
@@ -104,6 +89,9 @@ __all__ = [
     "ProviderCapability",
     "UsageRecord",
     "CostRates",
+    "EchoProvider",
+    "HTTPChatProvider",
+    "HTTPTransport",
     "SwarmState",
     "SwarmCheckpoint",
     "ConsensusResult",
@@ -125,6 +113,7 @@ __all__ = [
     "detect_consensus_failure",
     "detect_resource_exhaustion",
     "detect_coordination_deadlock",
+    # Phase 31/R24 — Adaptive Consensus Protocol
     "RiskAssessment",
     "ProtocolSelection",
     "RiskFixture",
@@ -149,5 +138,3 @@ __all__ = [
     "BudgetEvent",
     "run_deterministic_swarm",
 ]
-
-del Path, _CANDIDATES, _path
