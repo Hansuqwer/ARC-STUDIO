@@ -5,7 +5,8 @@
 **Branch:** feat/sandbox-lima-execution-docker-hardening-fuzzing  
 **Platform checked:** macOS Darwin 25.4.0, limactl 2.1.0; Firecracker/KVM unavailable on this host  
 
-This document records the current status of each ADR-024 prerequisite.
+Archived snapshot. Current status lives in `docs/research/microvm-p1-p7-status.md`.
+This document records the historical status of each ADR-024 prerequisite.
 `ARC_MICROVM_EXEC_ENABLED` must NOT be wired in `execute()` until all
 prerequisites are Satisfied (not Partial or Missing).
 
@@ -30,7 +31,8 @@ Firecracker/Cloud Hypervisor are proof-path candidates only; a private Firecrack
 Firecracker proof rootfs/init artifact tooling exists and now validates boot entrypoints/device placeholders/proc/sysfs setup, but ext4 build and real boot are not proven on this macOS host.
 P1, P3, P4, P5 are partially satisfied (code-level proofs exist; real-host
 proofs are pending `ARC_LIMA_REAL_EXEC=1`). P7 is satisfied for internal
-Lima/Firecracker harness attempts only; public execution remains blocked.
+Lima/Firecracker harness attempts only; public execution was blocked in this
+archived snapshot.
 
 `ARC_MICROVM_EXEC_ENABLED` remains defined in ADR-024 only. It is NOT
 read by any code. `MicroVMIsolationProvider.execute()` still always raises

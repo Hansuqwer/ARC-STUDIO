@@ -191,7 +191,7 @@ Current opt-in Lima harness:
 | Firecracker execution | Not implemented | Kernel/rootfs lifecycle, mount policy, network-off proof, jailer config, teardown |
 | Lima strict execution | Not implemented | Lima is explicitly low-security/network-present; strict public `microvm` remains blocked |
 | Integration test skeleton | Real (gated) | Tests exist but require local runtime; CI skips |
-| Harness audit events | Real for internal harnesses | `MICROVM_COMMAND`/`MICROVM_DENIED` persisted for Lima/Firecracker harness attempts; public execution remains blocked |
+| Harness audit events | Real for internal harnesses | Archived snapshot: `MICROVM_COMMAND`/`MICROVM_DENIED` persisted for Lima/Firecracker harness attempts; public execution remained blocked at that time |
 | Production-ready claim | Not claimed | Would need full execution + opt-in CI tests + network-off proof |
 
 ## Policy Config

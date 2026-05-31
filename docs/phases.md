@@ -2,8 +2,8 @@
 
 **Status:** Locked execution plan for remaining work.
 **Created:** 2026-05-17
-**Last reality refresh:** 2026-05-31 — Phase 104 direct Apple VZ proof passed once and local artifact provenance tooling exists, but public macOS microVM execution remains blocked; Phase 105 Linux/Firecracker remains host-unproven and Linux/KVM-only; Phase 106 remains narrow live-smoke/gated, not broad provider-backed SwarmGraph E2E.
-**Current evidence anchor:** local worktree | VZ artifact provenance slice; `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3533 passed / 35 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
+**Last reality refresh:** 2026-05-31 — Phase 104 direct Apple VZ gated public CLI proof passed once for guest-available `pwd` with no-network/workspace/teardown/audit evidence; default-off and not production-grade; Phase 105 Linux/Firecracker remains host-unproven and Linux/KVM-only; Phase 106 remains narrow live-smoke/gated, not broad provider-backed SwarmGraph E2E.
+**Current evidence anchor:** local worktree | VZ gated public proof slice; `cd python && ARC_MICROVM_EXEC_ENABLED=1 ARC_MICROVM_INTEGRATION=1 ARC_VZ_REAL_EXEC=1 ARC_VZ_ARTIFACT_MANIFEST=/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-artifacts-exec/vz-artifacts-manifest.json ARC_VZ_TIMEOUT_SECONDS=45 uv run arc sandbox run --json --provider microvm --policy local-safe -- pwd` OK; `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/ -q` 3545 passed / 35 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK.
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
 ## Execution Preference
@@ -2235,12 +2235,13 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
 ### Truth Constraints
 - Real: subprocess bounded streaming caps, approval prune CLI, path-intent expansion, protocol parity tests, microVM preflight tests, container fallback tests, E2E deep-link routability
 - Linux/Firecracker public provider execution is wired behind explicit host gates and fails closed unless guest proof/result markers are present; real boot proof is not available on this macOS host
-- macOS Lima lifecycle sketch exists in `isolation/microvm.py`, but macOS public provider execution raises `NotImplementedError` because strict no-network is blocked
+- macOS direct Apple VZ public provider execution is wired behind `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_VZ_REAL_EXEC=1`, and a valid local artifact manifest; one real `pwd` run proved no-network/workspace/symlink/teardown/audit, but this remains default-off and not production-grade or arbitrary host-command execution
+- macOS Lima lifecycle sketch exists in `isolation/microvm.py`, but Lima public provider execution remains blocked because strict no-network is blocked
 - Internal Lima harness exists behind an explicit integration gate, but no public microVM execution is wired or claimed
 - Still true: microVM execution not proven in CI; Linux/Firecracker proof requires `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, kernel/rootfs, Firecracker, and `/dev/kvm`
 - Still true: container fallback gated by `ARC_ENABLE_CONTAINER_SANDBOX=1`
 - No production-ready sandbox claim
-- No real microVM execution claim on this macOS host
+- Real macOS VZ microVM execution claim is limited to the gated `pwd` proof above; no production-grade or arbitrary-command claim
 
 ### Verification
 ```bash
@@ -4458,14 +4459,14 @@ pnpm typecheck
 ## Phase 104 — macOS MicroVM Execution + Strict No-Network Proof
 
 **Roadmap:** R75 macOS MicroVM Execution + Strict No-Network Proof
-**Status:** Host Proof Passed / Artifact Provenance Added / Public Execution Blocked | Evidence: `cd python && ARC_VZ_PROOF=1 ARC_VZ_RUNNER=/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-runner ARC_VZ_KERNEL=/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-proof/debian-linux ARC_VZ_INITRD=/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-proof/arc-vz-proof-initrd.gz ARC_VZ_TIMEOUT_SECONDS=45 uv run pytest tests/isolation/test_vz_proof.py -v` → 9 passed; `cd python && uv run arc sandbox vz-artifacts --json --output /var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-artifacts --kernel /var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-proof/debian-linux --initrd /var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-proof/arc-vz-proof-initrd.gz --build-runner` → blockers `[]`; macOS public `MicroVMIsolationProvider.execute()` remains blocked | Notes: direct VZ proof created/booted/stopped a no-NIC guest and proved no guest ethernet/default route, failed network probe, command result markers, workspace sentinel read, symlink escape blocked, and teardown ok. Artifact generation hash-pins local proof inputs only. This is proof-only, not public/production microVM execution.
+**Status:** Gated Public CLI Proof Passed Once / Artifact Provenance Added / Default Off | Evidence: `cd python && uv run arc sandbox vz-artifacts --json --output /var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-artifacts-exec --kernel /var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-proof/debian-linux --initrd /var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-proof/arc-vz-exec-initrd.gz --build-runner` → blockers `[]`; `cd python && ARC_MICROVM_EXEC_ENABLED=1 ARC_MICROVM_INTEGRATION=1 ARC_VZ_REAL_EXEC=1 ARC_VZ_ARTIFACT_MANIFEST=/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-artifacts-exec/vz-artifacts-manifest.json ARC_VZ_TIMEOUT_SECONDS=45 uv run arc sandbox run --json --provider microvm --policy local-safe -- pwd` → stdout `/workspace`, no-network/workspace/symlink/teardown/audit ok; targeted VZ/sandbox tests 149 passed / 2 skipped | Notes: Direct VZ proof created/booted/stopped a no-NIC guest and proved exact guest-available argv execution. This is default-off and not production-grade or arbitrary host-command microVM execution.
 **Depends on:** Phase 97, ADR-024, existing Lima harness hardening
 
 ### Implementation
 1. Direct Apple Virtualization.framework path selected for strict no-network proof; Lima remains low-security because networking is present.
 2. `VZNoNetworkProof` preflights macOS 13+, compiled helper, kernel/initrd, explicit `ARC_VZ_PROOF=1`, and reports `networkDevices=[]`.
-3. `tools/arc-vz-runner.swift` contains the no-NIC helper source with `config.networkDevices = []`, virtiofs workspace mount, serial console wiring, and teardown markers.
-4. The fully gated proof run boots a disposable VM/session, mounts workspace through controlled path, collects guest command markers, proves no guest ethernet/default route, failed network probe, sentinel read, symlink escape blocked, and teardown ok.
+3. `tools/arc-vz-runner.swift` contains the no-NIC helper source with `config.networkDevices = []`, virtiofs workspace mount, serial console wiring, argv/hash boot parameters, and teardown markers.
+4. The fully gated public CLI run boots a disposable VM/session, mounts workspace through controlled path, collects guest command markers, proves no guest ethernet/default route, failed network probe, sentinel read, symlink escape blocked, exact requested argv hash, and teardown ok.
 5. `arc sandbox vz-artifacts` writes local proof artifacts and `vz-artifacts-manifest.json` with source/entitlements/runner/kernel/initrd SHA256 hashes; no downloads, no VM boot.
 6. Keep real boot test opt-in and skipped unless local runtime inputs exist.
 
@@ -4489,8 +4490,8 @@ pnpm test:e2e
 ### Known Risks
 - Lima 2.x networking constraints block strict no-network proof for Lima; direct VZ is the macOS strict candidate.
 - macOS host/runtime availability cannot be assumed in CI.
-- Direct Apple Virtualization.framework no-NIC proof passed once with `ARC_VZ_PROOF=1`, kernel/initrd, and runner binary, and local artifact hash provenance exists. Public execution remains blocked until audit/output caps, timeout/SIGINT cleanup, provider wiring, host CI, and artifact distribution/upstream provenance policy are complete.
-- This phase must not be labeled production-grade or public execution complete until `arc sandbox run --provider microvm` is wired behind explicit gates and verified with the same evidence plus failure-mode coverage.
+- Direct Apple Virtualization.framework no-NIC public CLI proof passed once with explicit VZ gates, kernel/initrd, runner binary, exact argv hash, and local artifact hash provenance.
+- This phase must not be labeled production-grade or arbitrary-command execution complete until repeated host CI, real timeout/SIGINT/failure proofs, artifact distribution/upstream provenance policy, and broader guest runtime coverage exist.
 
 ## Phase 105 — Linux Firecracker Execution Proof
 

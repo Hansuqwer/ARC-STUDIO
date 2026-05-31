@@ -7,15 +7,22 @@ capable of creating VZVirtualMachineConfiguration with networkDevices = [].
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import platform
 import shutil
+import signal
 import subprocess
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from ..security.sandbox import cap_output
+from .base import IsolationResult
+from .subprocess import _BoundedPipeReader, redact_output
 
 
 VZ_PROOF_MARKER = "ARC_VZ_PROOF "
@@ -85,6 +92,7 @@ class VZGuestCommandResult(BaseModel):
     exit_code: int = -1
     stdout: str = ""
     stderr: str = ""
+    command_sha256: str | None = None
     raw: dict[str, str] = Field(default_factory=dict)
 
 
@@ -170,6 +178,331 @@ class VZArtifactReport(BaseModel):
     runner_signed: bool = False
     blockers: list[str] = Field(default_factory=list)
     manifest: VZArtifactManifest
+
+
+def vz_public_exec_gates(manifest_path: Path | None = None) -> dict[str, object]:
+    """Return public macOS VZ execution gates without starting a VM."""
+    manifest_env = os.environ.get("ARC_VZ_ARTIFACT_MANIFEST")
+    resolved_manifest = manifest_path or (Path(manifest_env).expanduser() if manifest_env else None)
+    blockers: list[str] = []
+    manifest: VZArtifactManifest | None = None
+    artifact_hashes: dict[str, str | None] = {}
+    if platform.system() != "Darwin":
+        blockers.append("macOS/Darwin required for Apple Virtualization.framework")
+    gates = {
+        "ARC_MICROVM_EXEC_ENABLED": os.environ.get("ARC_MICROVM_EXEC_ENABLED") == "1",
+        "ARC_MICROVM_INTEGRATION": os.environ.get("ARC_MICROVM_INTEGRATION") == "1",
+        "ARC_VZ_REAL_EXEC": os.environ.get("ARC_VZ_REAL_EXEC") == "1",
+        "ARC_VZ_ARTIFACT_MANIFEST": bool(resolved_manifest),
+    }
+    for name, enabled in gates.items():
+        if not enabled:
+            blockers.append(
+                f"{name}=1 required" if name != "ARC_VZ_ARTIFACT_MANIFEST" else f"{name} required"
+            )
+    manifest_valid = False
+    codesign_valid = False
+    if resolved_manifest:
+        try:
+            manifest = validate_vz_artifact_manifest(resolved_manifest.resolve())
+            manifest_valid = True
+        except Exception as exc:
+            blockers.append(f"ARC_VZ_ARTIFACT_MANIFEST invalid: {exc}")
+    if manifest:
+        artifact_hashes = {
+            "source_sha256": manifest.source_sha256,
+            "entitlements_sha256": manifest.entitlements_sha256,
+            "runner_sha256": manifest.runner_sha256,
+            "kernel_sha256": manifest.kernel_sha256,
+            "initrd_sha256": manifest.initrd_sha256,
+        }
+        if not manifest.runner_built:
+            blockers.append("VZ runner was not built in manifest")
+        if not manifest.runner_signed:
+            blockers.append("VZ runner was not signed in manifest")
+        if not manifest.runner_path or not _executable_file(Path(manifest.runner_path)):
+            blockers.append("manifest VZ runner missing/not executable")
+        if not manifest.kernel_path or not _readable_file(Path(manifest.kernel_path)):
+            blockers.append("manifest VZ kernel missing/unreadable")
+        if not manifest.initrd_path or not _readable_file(Path(manifest.initrd_path)):
+            blockers.append("manifest VZ initrd missing/unreadable")
+        if manifest.runner_path:
+            codesign_valid = _codesign_verify(Path(manifest.runner_path))
+            if not codesign_valid:
+                blockers.append("VZ runner codesign verification failed")
+    ready = not blockers
+    return {
+        "provider": "microvm",
+        "microvm_provider": "vz",
+        "platform": "macos" if platform.system() == "Darwin" else platform.system().lower(),
+        "ready": ready,
+        "status": "ready" if ready else "blocked",
+        "gates": gates,
+        "manifest_path": str(resolved_manifest.resolve()) if resolved_manifest else None,
+        "manifest_valid": manifest_valid,
+        "runner_codesign_valid": codesign_valid,
+        "artifact_hashes": artifact_hashes,
+        "public_execution_enabled": ready,
+        "networkDevices": [] if manifest_valid else None,
+        "network_devices_configured": 0 if manifest_valid else None,
+        "blockers": blockers,
+    }
+
+
+class VZPublicExecutionRunner:
+    """Public macOS VZ runner behind explicit gates and proof markers."""
+
+    def __init__(
+        self,
+        *,
+        workspace_root: Path,
+        manifest_path: Path | None = None,
+        max_bytes: int = 65_536,
+    ) -> None:
+        self.workspace_root = workspace_root.resolve()
+        self.manifest_path = manifest_path
+        self.max_bytes = max_bytes
+
+    def run(
+        self, command: list[str], *, cwd: Path | None = None, timeout_seconds: int = 300
+    ) -> IsolationResult:
+        if not command:
+            raise ValueError("missing command")
+        gates = vz_public_exec_gates(self.manifest_path)
+        if not gates["ready"]:
+            raise NotImplementedError(
+                "macOS VZ microVM execution blocked: "
+                + "; ".join(str(item) for item in gates["blockers"])
+                + " (ADR-024)"
+            )
+        manifest = validate_vz_artifact_manifest(Path(str(gates["manifest_path"])))
+        assert manifest.runner_path is not None
+        assert manifest.kernel_path is not None
+        assert manifest.initrd_path is not None
+        resolved_cwd = (cwd or self.workspace_root).resolve()
+        if (cwd and cwd.is_symlink()) or not resolved_cwd.is_relative_to(self.workspace_root):
+            raise ValueError(f"cwd escapes workspace: {cwd}")
+        return self._run_with_manifest(command, manifest, resolved_cwd, gates, timeout_seconds)
+
+    def _run_with_manifest(
+        self,
+        command: list[str],
+        manifest: VZArtifactManifest,
+        cwd: Path,
+        gates: dict[str, object],
+        timeout_seconds: int,
+    ) -> IsolationResult:
+        start = time.monotonic()
+        lifecycle = ["preflight", "workspace_markers"]
+        lifecycle_errors: list[str] = []
+        sentinel = self.workspace_root / ".arc-vz-sentinel"
+        escape = self.workspace_root / ".arc-vz-escape"
+        escape_target: Path | None = None
+        created_sentinel = False
+        created_escape = False
+        proc: subprocess.Popen[bytes] | None = None
+        try:
+            if sentinel.exists() or escape.exists():
+                raise ValueError(
+                    "proof workspace marker path already exists; refusing to overwrite user files"
+                )
+            sentinel.write_text("arc-vz-proof\n", encoding="utf-8")
+            created_sentinel = True
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", prefix="arc-vz-host-secret-", delete=False
+            ) as handle:
+                handle.write("arc-vz-host-secret\n")
+                escape_target = Path(handle.name)
+            escape.symlink_to(escape_target)
+            created_escape = True
+            argv = [
+                str(manifest.runner_path),
+                "--kernel",
+                str(manifest.kernel_path),
+                "--initrd",
+                str(manifest.initrd_path),
+                "--workspace",
+                str(self.workspace_root),
+                "--command-sha256",
+                _command_sha256(command),
+                "--",
+                *command,
+            ]
+            proc = subprocess.Popen(
+                argv,
+                cwd=str(cwd),
+                env=_vz_runner_env(),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                start_new_session=True,
+            )
+            lifecycle.append("start_vm")
+            assert proc.stdout is not None
+            assert proc.stderr is not None
+            capture_bytes = max(self.max_bytes, 65_536)
+            stdout_reader = _BoundedPipeReader(proc.stdout, capture_bytes)
+            stderr_reader = _BoundedPipeReader(proc.stderr, capture_bytes)
+            stdout_reader.start()
+            stderr_reader.start()
+            killed = False
+            kill_reason: str | None = None
+            try:
+                proc.wait(timeout=timeout_seconds)
+            except subprocess.TimeoutExpired:
+                killed = True
+                kill_reason = "timeout"
+                lifecycle.append("timeout")
+                lifecycle_errors.append(
+                    f"VZ proof runner timed out after {timeout_seconds} seconds"
+                )
+                _terminate_process_group(proc)
+            except KeyboardInterrupt:
+                killed = True
+                kill_reason = "signal"
+                lifecycle.append("interrupted")
+                lifecycle_errors.append("VZ proof runner interrupted; teardown state unknown")
+                _terminate_process_group(proc)
+            stdout_reader.join()
+            stderr_reader.join()
+            stdout_raw = stdout_reader.text()
+            stderr_raw = stderr_reader.text()
+            return self._result_from_output(
+                command=command,
+                runner_exit_code=proc.returncode if proc.returncode is not None else -1,
+                stdout_raw=stdout_raw,
+                stderr_raw=stderr_raw,
+                duration_ms=int((time.monotonic() - start) * 1000),
+                lifecycle=lifecycle,
+                lifecycle_errors=lifecycle_errors,
+                gates=gates,
+                manifest=manifest,
+                killed=killed,
+                kill_reason=kill_reason,
+                stdout_truncated=stdout_reader.truncated,
+                stderr_truncated=stderr_reader.truncated,
+            )
+        except Exception as exc:
+            lifecycle_errors.append(str(exc))
+            return IsolationResult(
+                exit_code=-1,
+                stderr=redact_output(str(exc)),
+                duration_ms=int((time.monotonic() - start) * 1000),
+                provider="microvm",
+                metadata=_vz_metadata(
+                    lifecycle=lifecycle,
+                    lifecycle_errors=lifecycle_errors,
+                    gates=gates,
+                    manifest=manifest,
+                    proof=parse_vz_guest_proof(""),
+                    teardown_attempted=False,
+                    teardown_ok=False,
+                ),
+            )
+        finally:
+            _terminate_process_group(proc)
+            if created_sentinel:
+                sentinel.unlink(missing_ok=True)
+            if created_escape:
+                escape.unlink(missing_ok=True)
+            if escape_target:
+                escape_target.unlink(missing_ok=True)
+
+    def _result_from_output(
+        self,
+        *,
+        command: list[str],
+        runner_exit_code: int,
+        stdout_raw: str,
+        stderr_raw: str,
+        duration_ms: int,
+        lifecycle: list[str],
+        lifecycle_errors: list[str],
+        gates: dict[str, object],
+        manifest: VZArtifactManifest,
+        killed: bool,
+        kill_reason: str | None,
+        stdout_truncated: bool,
+        stderr_truncated: bool,
+    ) -> IsolationResult:
+        combined = f"{stdout_raw}\n{stderr_raw}"
+        lower = combined.lower()
+        proof = parse_vz_guest_proof(combined)
+        guest_result = parse_vz_guest_command_result(combined)
+        teardown_attempted = "arc_vz_teardown_attempted=1" in lower
+        teardown_ok = "arc_vz_teardown_ok=1" in lower
+        blockers = _vz_proof_blockers(
+            runner_exit_code,
+            proof,
+            guest_result,
+            teardown_attempted=teardown_attempted,
+            teardown_ok=teardown_ok,
+            expected_command_sha256=_command_sha256(command),
+        )
+        blockers.extend(lifecycle_errors)
+        if proof.network_proof_passed:
+            lifecycle.append("network_proof")
+        else:
+            lifecycle.append("network_proof_failed")
+        if proof.workspace_proof_passed:
+            lifecycle.append("workspace_proof")
+        else:
+            lifecycle.append("workspace_proof_failed")
+        if guest_result.marker_seen:
+            lifecycle.append("exec")
+        else:
+            lifecycle.append("exec_result_missing")
+        lifecycle.append("teardown" if teardown_attempted else "teardown_unknown")
+        if blockers:
+            stdout, out_cap = cap_output(stdout_raw, self.max_bytes)
+            stderr, err_cap = cap_output("; ".join(blockers) or stderr_raw, self.max_bytes)
+            redacted_stdout = redact_output(stdout)
+            redacted_stderr = redact_output(stderr)
+            return IsolationResult(
+                exit_code=-1,
+                stdout=redacted_stdout,
+                stderr=redacted_stderr,
+                duration_ms=duration_ms,
+                killed=killed,
+                kill_reason=kill_reason,
+                provider="microvm",
+                stdout_truncated=stdout_truncated or out_cap,
+                stderr_truncated=stderr_truncated or err_cap,
+                redaction_applied=redacted_stdout != stdout or redacted_stderr != stderr,
+                metadata=_vz_metadata(
+                    lifecycle=lifecycle,
+                    lifecycle_errors=blockers,
+                    gates=gates,
+                    manifest=manifest,
+                    proof=proof,
+                    teardown_attempted=teardown_attempted,
+                    teardown_ok=teardown_ok,
+                ),
+            )
+        stdout, out_cap = cap_output(guest_result.stdout, self.max_bytes)
+        stderr, err_cap = cap_output(guest_result.stderr, self.max_bytes)
+        redacted_stdout = redact_output(stdout)
+        redacted_stderr = redact_output(stderr)
+        return IsolationResult(
+            exit_code=guest_result.exit_code,
+            stdout=redacted_stdout,
+            stderr=redacted_stderr,
+            duration_ms=duration_ms,
+            killed=killed,
+            kill_reason=kill_reason,
+            provider="microvm",
+            stdout_truncated=stdout_truncated or out_cap,
+            stderr_truncated=stderr_truncated or err_cap,
+            redaction_applied=redacted_stdout != stdout or redacted_stderr != stderr,
+            metadata=_vz_metadata(
+                lifecycle=lifecycle,
+                lifecycle_errors=[] if guest_result.exit_code == 0 else [guest_result.stderr],
+                gates=gates,
+                manifest=manifest,
+                proof=proof,
+                teardown_attempted=teardown_attempted,
+                teardown_ok=teardown_ok,
+            ),
+        )
 
 
 class VZNoNetworkProof:
@@ -415,6 +748,79 @@ def _env_path(name: str) -> Path | None:
     return Path(value).expanduser() if value else None
 
 
+def _codesign_verify(path: Path) -> bool:
+    if platform.system() != "Darwin":
+        return False
+    codesign = shutil.which("codesign")
+    if not codesign:
+        return False
+    try:
+        result = subprocess.run(
+            [codesign, "--verify", "--strict", str(path)],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=10,
+        )
+    except Exception:
+        return False
+    return result.returncode == 0
+
+
+def _vz_runner_env() -> dict[str, str]:
+    allowed = {"PATH", "HOME", "USER", "LANG", "LC_ALL", "TMPDIR"}
+    return {key: os.environ[key] for key in allowed if key in os.environ}
+
+
+def _terminate_process_group(proc: subprocess.Popen[bytes] | None) -> None:
+    if proc is None or proc.poll() is not None:
+        return
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+        proc.wait(timeout=5)
+    except Exception:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except Exception:
+            pass
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            pass
+
+
+def _vz_metadata(
+    *,
+    lifecycle: list[str],
+    lifecycle_errors: list[str],
+    gates: dict[str, object],
+    manifest: VZArtifactManifest,
+    proof: VZGuestProof,
+    teardown_attempted: bool,
+    teardown_ok: bool,
+) -> dict[str, object]:
+    return {
+        "microvm_provider": "vz",
+        "platform": "macos",
+        "lifecycle": lifecycle,
+        "lifecycle_errors": lifecycle_errors,
+        "network_proof_passed": proof.network_proof_passed,
+        "workspace_proof_passed": proof.workspace_proof_passed,
+        "proof_markers": proof.raw,
+        "teardown_attempted": teardown_attempted,
+        "teardown_ok": teardown_ok,
+        "gate": "ARC_MICROVM_EXEC_ENABLED=1,ARC_MICROVM_INTEGRATION=1,ARC_VZ_REAL_EXEC=1",
+        "gates": gates.get("gates", {}),
+        "artifact_manifest_path": gates.get("manifest_path"),
+        "artifact_hashes": gates.get("artifact_hashes", {}),
+        "runner_codesign_valid": gates.get("runner_codesign_valid", False),
+        "network_devices_configured": 0,
+        "networkDevices": [],
+        "public_execution_enabled": True,
+    }
+
+
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
@@ -429,6 +835,11 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _command_sha256(command: list[str]) -> str:
+    payload = json.dumps(command, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _copy_required_file(
@@ -623,6 +1034,10 @@ def validate_vz_artifact_manifest(path: Path) -> VZArtifactManifest:
         or "ARC_VZ_TEARDOWN_OK=1" not in source_text
     ):
         raise ValueError("VZ runner source missing teardown markers")
+    if "--command-sha256" not in source_text or "ARC_VZ_COMMAND_SHA256" not in source_text:
+        raise ValueError("VZ runner source missing command hash contract")
+    if "ARC_VZ_COMMAND_ARGV_B64CSV" not in source_text:
+        raise ValueError("VZ runner source missing argv transport contract")
     entitlements = Path(manifest.entitlements_path)
     if not entitlements.exists() or _sha256_file(entitlements) != manifest.entitlements_sha256:
         raise ValueError("VZ entitlements sha256 mismatch")
@@ -697,6 +1112,7 @@ def parse_vz_guest_command_result(output: str) -> VZGuestCommandResult:
         exit_code=exit_code,
         stdout=raw.get("stdout", ""),
         stderr=raw.get("stderr", ""),
+        command_sha256=raw.get("command_sha256") or raw.get("command-sha256"),
         raw=raw,
     )
 
@@ -708,6 +1124,7 @@ def _vz_proof_blockers(
     *,
     teardown_attempted: bool,
     teardown_ok: bool,
+    expected_command_sha256: str | None = None,
 ) -> list[str]:
     blockers: list[str] = []
     if runner_exit_code != 0:
@@ -725,6 +1142,8 @@ def _vz_proof_blockers(
         )
     if not guest_result.marker_seen:
         blockers.append("guest command result markers missing")
+    if expected_command_sha256 and guest_result.command_sha256 != expected_command_sha256:
+        blockers.append("guest command result did not prove requested argv hash")
     if not teardown_attempted:
         blockers.append("teardown marker missing")
     elif not teardown_ok:

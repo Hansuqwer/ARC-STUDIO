@@ -3,11 +3,16 @@ import os
 import platform
 import shutil
 import subprocess
+import hashlib
+import io
 
 import pytest
 from typer.testing import CliRunner
 
 from agent_runtime_cockpit.cli import app
+import agent_runtime_cockpit.isolation.microvm as microvm_module
+import agent_runtime_cockpit.isolation.vz_provider as vz_provider
+from agent_runtime_cockpit.isolation.vz_provider import generate_vz_proof_artifacts
 from agent_runtime_cockpit.security.sandbox import (
     CommandClassification,
     classify_command,
@@ -17,6 +22,89 @@ from agent_runtime_cockpit.security.sandbox import (
 
 def _payload(result):
     return json.loads(result.output)
+
+
+def _successful_vz_output(stdout: str = "hello-vz", command: list[str] | None = None) -> str:
+    lines = [
+        "ARC_VZ_PROOF booted=1",
+        "ARC_VZ_PROOF no-guest-ethernet=1",
+        "ARC_VZ_PROOF no-default-route=1",
+        "ARC_VZ_PROOF wget-available=1",
+        "ARC_VZ_PROOF network-failure=1",
+        "ARC_VZ_PROOF workspace-mount=1",
+        "ARC_VZ_PROOF sentinel-read=1",
+        "ARC_VZ_PROOF symlink-escape-blocked=1",
+        "ARC_VZ_RESULT exit_code=0",
+        f"ARC_VZ_RESULT stdout={stdout}",
+        "ARC_VZ_RESULT stderr=",
+        "ARC_VZ_TEARDOWN_ATTEMPTED=1",
+        "ARC_VZ_TEARDOWN_OK=1",
+    ]
+    if command is not None:
+        digest = hashlib.sha256(
+            json.dumps(command, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        lines.append(f"ARC_VZ_RESULT command_sha256={digest}")
+    return "\n".join(lines)
+
+
+def _valid_cli_vz_manifest(tmp_path):
+    kernel = tmp_path / "kernel"
+    initrd = tmp_path / "initrd.gz"
+    output = tmp_path / "vz-artifacts"
+    kernel.write_bytes(b"kernel")
+    initrd.write_bytes(b"initrd")
+    report = generate_vz_proof_artifacts(output, kernel_path=kernel, initrd_path=initrd)
+    runner = output / "arc-vz-runner"
+    runner.write_text("#!/bin/sh\n", encoding="utf-8")
+    runner.chmod(0o755)
+    manifest = report.manifest.model_copy(
+        update={
+            "runner_path": str(runner),
+            "runner_sha256": hashlib.sha256(runner.read_bytes()).hexdigest(),
+            "runner_built": True,
+            "runner_signed": True,
+            "blockers": [],
+            "build_status": "runner_inputs_pinned",
+        }
+    )
+    manifest_path = output / "vz-artifacts-manifest.json"
+    manifest_path.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return manifest_path
+
+
+class _FakeVZPopen:
+    def __init__(self, stdout: str, stderr: str = "", returncode: int = 0):
+        self.stdout = io.BytesIO(stdout.encode("utf-8"))
+        self.stderr = io.BytesIO(stderr.encode("utf-8"))
+        self.returncode = None
+        self.pid = 12345
+        self._returncode = returncode
+
+    def wait(self, timeout=None):
+        self.returncode = self._returncode
+        return self.returncode
+
+    def poll(self):
+        return self.returncode
+
+
+def _patch_vz_public_host(
+    monkeypatch, manifest_path, stdout: str = "hello-vz", command: list[str] | None = None
+):
+    monkeypatch.setenv("ARC_MICROVM_EXEC_ENABLED", "1")
+    monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+    monkeypatch.setenv("ARC_VZ_REAL_EXEC", "1")
+    monkeypatch.setenv("ARC_VZ_ARTIFACT_MANIFEST", str(manifest_path))
+    monkeypatch.setattr(platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(microvm_module.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(vz_provider.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(vz_provider, "_codesign_verify", lambda _path: True)
+    monkeypatch.setattr(
+        vz_provider.subprocess,
+        "Popen",
+        lambda *args, **kwargs: _FakeVZPopen(_successful_vz_output(stdout, command)),
+    )
 
 
 def test_read_only_command_allowed(tmp_path, monkeypatch):
@@ -445,7 +533,7 @@ def test_microvm_provider_run_denied_even_with_integration_gate(tmp_path, monkey
     )
     assert result.exit_code == 2
     assert _payload(result)["ok"] is False
-    assert "macOS microVM execution blocked" in _payload(result)["error"]["message"]
+    assert "macOS VZ microVM execution blocked" in _payload(result)["error"]["message"]
 
 
 def test_microvm_provider_blocked_run_emits_denial_audit(tmp_path, monkeypatch):
@@ -476,7 +564,7 @@ def test_microvm_provider_blocked_run_emits_adr024_audit_schema(tmp_path, monkey
     assert event["command"] == ["pwd"]
     assert event["cwd"] == str(tmp_path)
     assert event["provider"] == "microvm"
-    assert event["microvm_provider"] in {"firecracker", "lima", "unsupported"}
+    assert event["microvm_provider"] in {"firecracker", "lima", "vz", "unsupported"}
     assert event["platform"] in {"linux", "macos", "windows"}
     assert event["policy"] == "local-safe"
     assert event["classification"] == "read_only"
@@ -496,6 +584,142 @@ def test_microvm_provider_blocked_run_emits_adr024_audit_schema(tmp_path, monkey
     assert event["gate"] == "ARC_MICROVM_EXEC_ENABLED=1"
     assert event["public_execution_enabled"] is False
     assert "ADR-024" in event["contract_doc"]
+
+
+def test_macos_public_microvm_default_denied_when_gates_missing(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
+    monkeypatch.setattr(platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(microvm_module.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(vz_provider.platform, "system", lambda: "Darwin")
+
+    result = CliRunner().invoke(
+        app, ["sandbox", "run", "--json", "--provider", "microvm", "--", "pwd"]
+    )
+
+    assert result.exit_code == 2
+    assert "ARC_MICROVM_EXEC_ENABLED=1 required" in _payload(result)["error"]["message"]
+    event = json.loads((tmp_path / "audit" / "sandbox.events.jsonl").read_text().splitlines()[-1])
+    assert event["type"] == "SANDBOX_DENIED"
+    assert event["microvm_provider"] == "vz"
+    assert event["gates"]["ARC_MICROVM_EXEC_ENABLED"] is False
+
+
+def test_macos_public_vz_denied_with_missing_manifest(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARC_MICROVM_EXEC_ENABLED", "1")
+    monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+    monkeypatch.setenv("ARC_VZ_REAL_EXEC", "1")
+    monkeypatch.setattr(platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(microvm_module.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(vz_provider.platform, "system", lambda: "Darwin")
+
+    result = CliRunner().invoke(
+        app, ["sandbox", "run", "--json", "--provider", "microvm", "--", "pwd"]
+    )
+
+    assert result.exit_code == 2
+    assert "ARC_VZ_ARTIFACT_MANIFEST required" in _payload(result)["error"]["message"]
+
+
+def test_macos_public_vz_denied_with_manifest_hash_mismatch(tmp_path, monkeypatch):
+    manifest = _valid_cli_vz_manifest(tmp_path)
+    (manifest.parent / "arc-vz-initrd.gz").write_bytes(b"tamper")
+    _patch_vz_public_host(monkeypatch, manifest)
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(
+        app, ["sandbox", "run", "--json", "--provider", "microvm", "--", "pwd"]
+    )
+
+    assert result.exit_code == 2
+    assert "sha256 mismatch" in _payload(result)["error"]["message"]
+
+
+def test_macos_public_vz_allowed_with_all_gates_valid_fake_runner(tmp_path, monkeypatch):
+    manifest = _valid_cli_vz_manifest(tmp_path)
+    command = ["python", "-c", "print('hello-vz')"]
+    _patch_vz_public_host(monkeypatch, manifest, stdout="hello-vz", command=command)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(tmp_path / "audit"))
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "sandbox",
+            "run",
+            "--json",
+            "--provider",
+            "microvm",
+            "--policy",
+            "local-safe",
+            "--",
+            *command,
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    data = _payload(result)["data"]
+    assert data["provider"] == "microvm"
+    assert data["stdout"] == "hello-vz"
+    audit = data["audit_event"]
+    assert audit["event"] == "sandbox.microvm.run"
+    assert audit["microvm_provider"] == "vz"
+    assert audit["network_proof_passed"] is True
+    assert audit["workspace_proof_passed"] is True
+    assert audit["teardown_ok"] is True
+    assert audit["artifact_manifest_path"] == str(manifest)
+    assert audit["artifact_hashes"]["kernel_sha256"]
+    assert "hello-vz" in data["stdout"]
+
+
+def test_macos_public_vz_proof_failure_denies_result_and_audit(tmp_path, monkeypatch):
+    manifest = _valid_cli_vz_manifest(tmp_path)
+    command = ["pwd"]
+    _patch_vz_public_host(monkeypatch, manifest, command=command)
+    monkeypatch.setattr(
+        vz_provider.subprocess,
+        "Popen",
+        lambda *args, **kwargs: _FakeVZPopen(
+            _successful_vz_output(command=command).replace(
+                "ARC_VZ_PROOF network-failure=1", "ARC_VZ_PROOF network-failure=0"
+            )
+        ),
+    )
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(
+        app, ["sandbox", "run", "--json", "--provider", "microvm", "--", "pwd"]
+    )
+
+    assert result.exit_code != 0
+    data = _payload(result)["data"]
+    assert data["decision"]["allowed"] is False
+    assert data["audit_event"]["network_proof_passed"] is False
+
+
+def test_macos_public_vz_stdout_stderr_caps(tmp_path, monkeypatch):
+    manifest = _valid_cli_vz_manifest(tmp_path)
+    command = ["pwd"]
+    policy_file = tmp_path / "sandbox-policies.json"
+    policy_file.write_text(
+        json.dumps(
+            {"version": 1, "policies": [{"version": 1, "name": "tiny", "max_output_bytes": 8}]}
+        ),
+        encoding="utf-8",
+    )
+    _patch_vz_public_host(monkeypatch, manifest, stdout="x" * 100, command=command)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ARC_SANDBOX_POLICY_CONFIG", str(policy_file))
+
+    result = CliRunner().invoke(
+        app, ["sandbox", "run", "--json", "--provider", "microvm", "--policy", "tiny", "--", "pwd"]
+    )
+
+    assert result.exit_code == 0, result.output
+    data = _payload(result)["data"]
+    assert data["stdout"] == "x" * 8
+    assert data["stdout_truncated"] is True
 
 
 def test_microvm_doctor_never_claims_execution_implemented(monkeypatch):

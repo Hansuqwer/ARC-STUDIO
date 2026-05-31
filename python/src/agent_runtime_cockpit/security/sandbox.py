@@ -815,8 +815,14 @@ def attach_microvm_audit_contract_fields(
     lifecycle: list[str] | None = None,
     lifecycle_errors: list[str] | None = None,
     network_proof_passed: bool = False,
+    workspace_proof_passed: bool | None = None,
+    proof_markers: dict[str, Any] | None = None,
     teardown_attempted: bool = False,
+    teardown_ok: bool | None = None,
     gate: str = "ARC_MICROVM_EXEC_ENABLED=1",
+    gates: dict[str, Any] | None = None,
+    artifact_manifest_path: str | None = None,
+    artifact_hashes: dict[str, Any] | None = None,
     public_execution_enabled: bool | None = None,
 ) -> dict[str, Any]:
     """Add ADR-024 v1 microVM audit fields without removing legacy fields."""
@@ -827,6 +833,18 @@ def attach_microvm_audit_contract_fields(
     lifecycle_value = lifecycle if lifecycle is not None else list(event.get("lifecycle", []))
     if public_execution_enabled is not None:
         event["public_execution_enabled"] = public_execution_enabled
+    if workspace_proof_passed is not None:
+        event["workspace_proof_passed"] = workspace_proof_passed
+    if proof_markers is not None:
+        event["proof_markers"] = proof_markers
+    if teardown_ok is not None:
+        event["teardown_ok"] = teardown_ok
+    if gates is not None:
+        event["gates"] = gates
+    if artifact_manifest_path is not None:
+        event["artifact_manifest_path"] = artifact_manifest_path
+    if artifact_hashes is not None:
+        event["artifact_hashes"] = artifact_hashes
     event.update(
         {
             "event": "sandbox.microvm.run",

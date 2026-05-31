@@ -37,6 +37,7 @@ from ..security.sandbox import (
 )
 from .base import IsolationProvider, IsolationResult
 from .subprocess import _BoundedPipeReader, redact_output
+from .vz_provider import VZPublicExecutionRunner, vz_public_exec_gates
 
 
 class MicroVMPlanStep(BaseModel):
@@ -2187,6 +2188,8 @@ class MicroVMIsolationProvider(IsolationProvider):
         return "microvm"
 
     async def health_check(self) -> bool:
+        if platform.system() == "Darwin":
+            return bool(vz_public_exec_gates()["ready"])
         return bool(_firecracker_exec_gates()["ready"])
 
     async def execute(
@@ -2201,11 +2204,13 @@ class MicroVMIsolationProvider(IsolationProvider):
         if system == "Windows":
             raise NotImplementedError("microVM execution is not supported on Windows (ADR-024)")
         if system == "Darwin":
-            raise NotImplementedError(
-                "macOS microVM execution blocked: Lima/VZ does not provide a proven strict "
-                "no-network/no-NIC mode; direct Apple Virtualization.framework helper is "
-                "not implemented (ADR-024)"
+            workspace = self.workspace_root or (cwd or Path.cwd()).resolve()
+            if cwd is not None:
+                check_workspace_escape(cwd, workspace)
+            runner = VZPublicExecutionRunner(
+                workspace_root=workspace, max_bytes=self.max_output_bytes
             )
+            return runner.run(command, cwd=cwd, timeout_seconds=timeout_seconds)
         if system != "Linux":
             raise NotImplementedError(f"microVM execution blocked on unsupported platform {system}")
         workspace = self.workspace_root or (cwd or Path.cwd()).resolve()
@@ -2218,6 +2223,22 @@ class MicroVMIsolationProvider(IsolationProvider):
 
     def status(self) -> dict[str, object]:
         """Return structured status dict for truth-guard checks and CLI output."""
+        if platform.system() == "Darwin":
+            gates = vz_public_exec_gates()
+            enabled = bool(gates["ready"])
+            return {
+                "available": enabled,
+                "public_execution_enabled": enabled,
+                "public_execution_status": "ready" if enabled else "blocked",
+                "reason": "ready" if enabled else "vz_exec_gates_not_satisfied",
+                "contract_doc": "docs/adr/ADR-024-microvm-public-execution-contract.md",
+                "strict_network_isolation": enabled,
+                "lima_security_posture": "low_security_network_present",
+                "lima_harness": lima_integration_available(),
+                "firecracker_harness": False,
+                "unblock_gate": "ARC_MICROVM_EXEC_ENABLED=1",
+                "vz_exec_gates": gates,
+            }
         gates = _firecracker_exec_gates()
         enabled = bool(gates["ready"])
         return {
@@ -2236,6 +2257,24 @@ class MicroVMIsolationProvider(IsolationProvider):
 
     def describe(self) -> dict[str, object]:
         info = microvm_preflight()
+        if platform.system() == "Darwin":
+            gates = vz_public_exec_gates()
+            enabled = bool(gates["ready"])
+            info.update(
+                {
+                    "available": enabled,
+                    "public_execution_enabled": enabled,
+                    "public_execution_status": "ready" if enabled else "blocked",
+                    "contract_doc": "docs/adr/ADR-024-microvm-public-execution-contract.md",
+                    "execution": "gated_vz_ready"
+                    if enabled
+                    else "gated_unproven"
+                    if _microvm_execution_enabled() and _lima_available()
+                    else info.get("execution", "not_implemented"),
+                    "vz_exec_gates": gates,
+                }
+            )
+            return info
         gates = _firecracker_exec_gates()
         enabled = bool(gates["ready"])
         info.update(

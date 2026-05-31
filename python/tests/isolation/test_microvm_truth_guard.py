@@ -9,6 +9,7 @@ Truth constraints:
 from __future__ import annotations
 
 import json
+import platform
 
 import pytest
 
@@ -172,7 +173,12 @@ class TestMicroVMStatus:
     def test_microvm_status_reason_gate_blocked(self):
         """status()['reason'] explains unsatisfied execution gates."""
         provider = MicroVMIsolationProvider()
-        assert provider.status()["reason"] == "firecracker_exec_gates_not_satisfied"
+        expected = (
+            "vz_exec_gates_not_satisfied"
+            if platform.system() == "Darwin"
+            else "firecracker_exec_gates_not_satisfied"
+        )
+        assert provider.status()["reason"] == expected
 
     def test_microvm_status_unblock_gate_present(self):
         """status()['unblock_gate'] describes the honored gate."""

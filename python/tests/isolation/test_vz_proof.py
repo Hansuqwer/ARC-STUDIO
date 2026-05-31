@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import os
 import platform
+import hashlib
+import io
+import json
+import subprocess
 from types import SimpleNamespace
 
 import pytest
@@ -9,10 +13,12 @@ import pytest
 import agent_runtime_cockpit.isolation.vz_provider as vz_provider
 from agent_runtime_cockpit.isolation.vz_provider import (
     VZNoNetworkProof,
+    VZPublicExecutionRunner,
     generate_vz_proof_artifacts,
     parse_vz_guest_command_result,
     parse_vz_guest_proof,
     validate_vz_artifact_manifest,
+    vz_public_exec_gates,
 )
 
 
@@ -49,6 +55,59 @@ def _successful_guest_output() -> str:
             "ARC_VZ_TEARDOWN_OK=1",
         ]
     )
+
+
+def _with_command_hash(output: str, command: list[str]) -> str:
+    digest = hashlib.sha256(
+        json.dumps(command, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return output + f"\nARC_VZ_RESULT command_sha256={digest}"
+
+
+def _valid_public_manifest(tmp_path):
+    kernel = tmp_path / "kernel"
+    initrd = tmp_path / "initrd.gz"
+    output = tmp_path / "artifacts"
+    kernel.write_bytes(b"kernel")
+    initrd.write_bytes(b"initrd")
+    report = generate_vz_proof_artifacts(output, kernel_path=kernel, initrd_path=initrd)
+    runner = output / "arc-vz-runner"
+    runner.write_text("#!/bin/sh\n", encoding="utf-8")
+    runner.chmod(0o755)
+    runner_sha = hashlib.sha256(runner.read_bytes()).hexdigest()
+    manifest = report.manifest.model_copy(
+        update={
+            "runner_path": str(runner),
+            "runner_sha256": runner_sha,
+            "runner_built": True,
+            "runner_signed": True,
+            "blockers": [],
+            "build_status": "runner_inputs_pinned",
+        }
+    )
+    manifest_path = output / "vz-artifacts-manifest.json"
+    manifest_path.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return manifest_path
+
+
+class _FakePopen:
+    def __init__(self, stdout: str, stderr: str = "", returncode: int = 0, timeout: bool = False):
+        self.stdout = io.BytesIO(stdout.encode("utf-8"))
+        self.stderr = io.BytesIO(stderr.encode("utf-8"))
+        self.returncode = None
+        self.pid = 12345
+        self._final_returncode = returncode
+        self._timeout = timeout
+        self.killed = False
+
+    def wait(self, timeout=None):
+        if self._timeout and not self.killed:
+            raise subprocess.TimeoutExpired(["arc-vz-runner"], timeout)
+        self.returncode = self._final_returncode
+        return self.returncode
+
+    def poll(self):
+        return self.returncode
 
 
 def test_vz_preflight_reports_status(monkeypatch):
@@ -221,6 +280,151 @@ def test_vz_artifact_build_runner_failure_is_blocker(tmp_path, monkeypatch):
 
     assert report.runner_built is False
     assert any("swiftc failed" in blocker for blocker in report.blockers)
+
+
+def test_vz_public_exec_gates_require_all_env(tmp_path, monkeypatch):
+    manifest = _valid_public_manifest(tmp_path)
+    monkeypatch.setattr(vz_provider.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(vz_provider, "_codesign_verify", lambda _path: True)
+
+    gates = vz_public_exec_gates(manifest)
+
+    assert gates["ready"] is False
+    assert "ARC_MICROVM_EXEC_ENABLED=1 required" in gates["blockers"]
+
+
+def test_vz_public_exec_gates_reject_manifest_hash_mismatch(tmp_path, monkeypatch):
+    manifest = _valid_public_manifest(tmp_path)
+    (manifest.parent / "arc-vz-kernel").write_bytes(b"tampered")
+    monkeypatch.setenv("ARC_MICROVM_EXEC_ENABLED", "1")
+    monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+    monkeypatch.setenv("ARC_VZ_REAL_EXEC", "1")
+    monkeypatch.setenv("ARC_VZ_ARTIFACT_MANIFEST", str(manifest))
+    monkeypatch.setattr(vz_provider.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(vz_provider, "_codesign_verify", lambda _path: True)
+
+    gates = vz_public_exec_gates()
+
+    assert gates["ready"] is False
+    assert any("sha256 mismatch" in blocker for blocker in gates["blockers"])
+
+
+@pytest.mark.asyncio
+async def test_vz_public_runner_allows_valid_fake_run(tmp_path, monkeypatch):
+    manifest = _valid_public_manifest(tmp_path)
+    monkeypatch.setenv("ARC_MICROVM_EXEC_ENABLED", "1")
+    monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+    monkeypatch.setenv("ARC_VZ_REAL_EXEC", "1")
+    monkeypatch.setenv("ARC_VZ_ARTIFACT_MANIFEST", str(manifest))
+    monkeypatch.setattr(vz_provider.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(vz_provider, "_codesign_verify", lambda _path: True)
+    command = ["python", "-c", "print('hello')"]
+    seen: dict[str, object] = {}
+
+    def fake_popen(args, *_args, **_kwargs):
+        seen["args"] = args
+        return _FakePopen(
+            _with_command_hash(
+                _successful_guest_output().replace("arc-vz-proof-ok", "hello-vz"), command
+            )
+        )
+
+    monkeypatch.setattr(
+        vz_provider.subprocess,
+        "Popen",
+        fake_popen,
+    )
+
+    result = VZPublicExecutionRunner(workspace_root=tmp_path).run(command)
+
+    assert result.exit_code == 0
+    assert result.stdout == "hello-vz"
+    assert result.metadata["microvm_provider"] == "vz"
+    assert result.metadata["network_proof_passed"] is True
+    assert result.metadata["workspace_proof_passed"] is True
+    assert result.metadata["teardown_ok"] is True
+    assert "--command-sha256" in seen["args"]
+
+
+def test_vz_public_runner_proof_failure_fails_result(tmp_path, monkeypatch):
+    manifest = _valid_public_manifest(tmp_path)
+    monkeypatch.setenv("ARC_MICROVM_EXEC_ENABLED", "1")
+    monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+    monkeypatch.setenv("ARC_VZ_REAL_EXEC", "1")
+    monkeypatch.setenv("ARC_VZ_ARTIFACT_MANIFEST", str(manifest))
+    monkeypatch.setattr(vz_provider.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(vz_provider, "_codesign_verify", lambda _path: True)
+    command = ["pwd"]
+    monkeypatch.setattr(
+        vz_provider.subprocess,
+        "Popen",
+        lambda *args, **kwargs: _FakePopen(
+            _with_command_hash(
+                _successful_guest_output().replace(
+                    "ARC_VZ_PROOF no-default-route=1", "ARC_VZ_PROOF no-default-route=0"
+                ),
+                command,
+            )
+        ),
+    )
+
+    result = VZPublicExecutionRunner(workspace_root=tmp_path).run(command)
+
+    assert result.exit_code == -1
+    assert "network proof failed" in result.stderr
+    assert result.metadata["network_proof_passed"] is False
+
+
+def test_vz_public_runner_teardown_failure_fails_result(tmp_path, monkeypatch):
+    manifest = _valid_public_manifest(tmp_path)
+    monkeypatch.setenv("ARC_MICROVM_EXEC_ENABLED", "1")
+    monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+    monkeypatch.setenv("ARC_VZ_REAL_EXEC", "1")
+    monkeypatch.setenv("ARC_VZ_ARTIFACT_MANIFEST", str(manifest))
+    monkeypatch.setattr(vz_provider.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(vz_provider, "_codesign_verify", lambda _path: True)
+    command = ["pwd"]
+    monkeypatch.setattr(
+        vz_provider.subprocess,
+        "Popen",
+        lambda *args, **kwargs: _FakePopen(
+            _with_command_hash(
+                _successful_guest_output().replace("ARC_VZ_TEARDOWN_OK=1", "ARC_VZ_TEARDOWN_OK=0"),
+                command,
+            )
+        ),
+    )
+
+    result = VZPublicExecutionRunner(workspace_root=tmp_path).run(command)
+
+    assert result.exit_code == -1
+    assert "teardown did not report ok" in result.stderr
+    assert result.metadata["teardown_ok"] is False
+
+
+def test_vz_public_runner_timeout_caps_output_and_marks_failure(tmp_path, monkeypatch):
+    manifest = _valid_public_manifest(tmp_path)
+    fake = _FakePopen("x" * 1000, timeout=True)
+    monkeypatch.setenv("ARC_MICROVM_EXEC_ENABLED", "1")
+    monkeypatch.setenv("ARC_MICROVM_INTEGRATION", "1")
+    monkeypatch.setenv("ARC_VZ_REAL_EXEC", "1")
+    monkeypatch.setenv("ARC_VZ_ARTIFACT_MANIFEST", str(manifest))
+    monkeypatch.setattr(vz_provider.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(vz_provider, "_codesign_verify", lambda _path: True)
+    monkeypatch.setattr(vz_provider.subprocess, "Popen", lambda *args, **kwargs: fake)
+    monkeypatch.setattr(
+        vz_provider.os, "killpg", lambda *args, **kwargs: setattr(fake, "killed", True)
+    )
+
+    result = VZPublicExecutionRunner(workspace_root=tmp_path, max_bytes=32).run(
+        ["pwd"], timeout_seconds=1
+    )
+
+    assert result.exit_code == -1
+    assert result.killed is True
+    assert result.kill_reason == "timeout"
+    assert result.stdout_truncated is True
+    assert result.metadata["teardown_ok"] is False
 
 
 @pytest.mark.asyncio

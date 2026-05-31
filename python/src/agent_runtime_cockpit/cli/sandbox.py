@@ -16,7 +16,11 @@ from ..isolation.microvm import (
     generate_firecracker_proof_artifacts,
 )
 from ..isolation.subprocess import SubprocessIsolationProvider
-from ..isolation.vz_provider import VZNoNetworkProof, generate_vz_proof_artifacts
+from ..isolation.vz_provider import (
+    VZNoNetworkProof,
+    generate_vz_proof_artifacts,
+    vz_public_exec_gates,
+)
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
 from ..runtime.streaming import stream_subprocess_events
@@ -703,12 +707,24 @@ def sandbox_run(
             stderr_truncated=False,
             redaction_applied=False,
         )
+        import platform as _platform
+
+        vz_gates = (
+            vz_public_exec_gates()
+            if provider == "microvm" and _platform.system() == "Darwin"
+            else {}
+        )
         attach_microvm_audit_contract_fields(
             audit,
+            microvm_provider="vz" if vz_gates.get("microvm_provider") == "vz" else None,
+            platform_name=str(vz_gates.get("platform")) if vz_gates else None,
             lifecycle=["preflight"],
             lifecycle_errors=[str(exc)],
             network_proof_passed=False,
             teardown_attempted=False,
+            gates=vz_gates.get("gates") if vz_gates else None,
+            artifact_manifest_path=vz_gates.get("manifest_path") if vz_gates else None,
+            artifact_hashes=vz_gates.get("artifact_hashes") if vz_gates else None,
             public_execution_enabled=False,
         )
         audit_path = persist_sandbox_audit_event(audit)
@@ -716,10 +732,20 @@ def sandbox_run(
         _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
         raise typer.Exit(2)
     ended_at = utc_now()
+    result_decision = decision
+    if iso.provider == "microvm" and iso.exit_code != 0:
+        result_decision = decision.model_copy(
+            update={
+                "allowed": False,
+                "reason": iso.stderr or "microVM proof failed",
+                "approval_required": False,
+                "approved": False,
+            }
+        )
     audit = build_audit_event(
         command=command,
         cwd=cwd,
-        decision=decision,
+        decision=result_decision,
         provider=iso.provider if iso.provider != "unknown" else provider,
         started_at=started_at,
         ended_at=ended_at,
@@ -736,8 +762,14 @@ def sandbox_run(
             lifecycle=iso.metadata.get("lifecycle", []),
             lifecycle_errors=iso.metadata.get("lifecycle_errors", []),
             network_proof_passed=bool(iso.metadata.get("network_proof_passed", False)),
+            workspace_proof_passed=iso.metadata.get("workspace_proof_passed"),
+            proof_markers=iso.metadata.get("proof_markers"),
             teardown_attempted=bool(iso.metadata.get("teardown_attempted", False)),
+            teardown_ok=iso.metadata.get("teardown_ok"),
             gate=str(iso.metadata.get("gate", "ARC_MICROVM_EXEC_ENABLED=1")),
+            gates=iso.metadata.get("gates"),
+            artifact_manifest_path=iso.metadata.get("artifact_manifest_path"),
+            artifact_hashes=iso.metadata.get("artifact_hashes"),
             public_execution_enabled=bool(iso.metadata.get("public_execution_enabled", False)),
         )
     audit_path = persist_sandbox_audit_event(audit)
@@ -746,7 +778,7 @@ def sandbox_run(
         command=command,
         cwd=str(cwd),
         classification=decision.classification,
-        decision=decision,
+        decision=result_decision,
         provider=iso.provider if iso.provider != "unknown" else provider,
         exit_code=iso.exit_code,
         stdout=iso.stdout,

@@ -9,6 +9,7 @@ struct Args {
     let kernel: String
     let initrd: String
     let workspace: String
+    let commandSHA256: String
     let command: [String]
 }
 
@@ -16,6 +17,7 @@ func parseArgs() -> Args? {
     var kernel = ""
     var initrd = ""
     var workspace = ""
+    var commandSHA256 = ""
     var command: [String] = []
     var i = 1
     let args = CommandLine.arguments
@@ -24,17 +26,18 @@ func parseArgs() -> Args? {
         case "--kernel": i += 1; if i < args.count { kernel = args[i] }
         case "--initrd": i += 1; if i < args.count { initrd = args[i] }
         case "--workspace": i += 1; if i < args.count { workspace = args[i] }
+        case "--command-sha256": i += 1; if i < args.count { commandSHA256 = args[i] }
         case "--": command = Array(args[(i + 1)...]); i = args.count
         default: break
         }
         i += 1
     }
-    if kernel.isEmpty || initrd.isEmpty || workspace.isEmpty { return nil }
-    return Args(kernel: kernel, initrd: initrd, workspace: workspace, command: command)
+    if kernel.isEmpty || initrd.isEmpty || workspace.isEmpty || commandSHA256.isEmpty { return nil }
+    return Args(kernel: kernel, initrd: initrd, workspace: workspace, commandSHA256: commandSHA256, command: command)
 }
 
 guard let parsed = parseArgs() else {
-    FileHandle.standardError.write(Data("usage: arc-vz-runner --kernel K --initrd I --workspace W -- cmd\n".utf8))
+    FileHandle.standardError.write(Data("usage: arc-vz-runner --kernel K --initrd I --workspace W --command-sha256 H -- cmd\n".utf8))
     exit(2)
 }
 
@@ -43,10 +46,9 @@ config.platform = VZGenericPlatformConfiguration()
 let loader = VZLinuxBootLoader(kernelURL: URL(fileURLWithPath: parsed.kernel))
 loader.initialRamdiskURL = URL(fileURLWithPath: parsed.initrd)
 let encodedCommand = parsed.command
-    .joined(separator: "\u{1f}")
-    .data(using: .utf8)?
-    .base64EncodedString() ?? ""
-loader.commandLine = "console=hvc0 quiet ARC_VZ_COMMAND_B64=\(encodedCommand)"
+    .map { $0.data(using: .utf8)?.base64EncodedString() ?? "" }
+    .joined(separator: ",")
+loader.commandLine = "console=hvc0 quiet ARC_VZ_COMMAND_ARGV_B64CSV=\(encodedCommand) ARC_VZ_COMMAND_SHA256=\(parsed.commandSHA256)"
 config.bootLoader = loader
 config.cpuCount = 1
 config.memorySize = 512 * 1024 * 1024

@@ -163,13 +163,26 @@ uv run arc sandbox audit-list --json --limit 20
 uv run arc sandbox vz-artifacts --json --output /tmp/arc-vz-artifacts --kernel /path/to/arm64-linux-kernel --initrd /path/to/arc-vz-proof-initrd.gz --build-runner
 ```
 
+Opt-in macOS direct VZ proof run, using local artifacts only:
+
+```bash
+cd python
+ARC_MICROVM_EXEC_ENABLED=1 \
+ARC_MICROVM_INTEGRATION=1 \
+ARC_VZ_REAL_EXEC=1 \
+ARC_VZ_ARTIFACT_MANIFEST=/path/to/vz-artifacts-manifest.json \
+uv run arc sandbox run --json --provider microvm --policy local-safe -- pwd
+```
+
+Expected proven stdout for the current proof initrd is `/workspace`. Do not use this as evidence for `python -c` or arbitrary host-command execution unless the guest artifact actually contains that runtime and emits the matching `ARC_VZ_RESULT command_sha256` marker.
+
 Expected defaults:
 
 - `curl https://example.com` is denied as `network`.
 - `rm -rf .` is denied as `destructive`.
 - MicroVM doctor may report `unavailable` until Firecracker/Cloud Hypervisor plus `/dev/kvm` exist on Linux, or `limactl` exists on macOS.
 - Linux/Firecracker microVM remains a gated scaffold, blocked by default, and requires `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, kernel/rootfs env vars, `firecracker`, `/dev/kvm` rw, and workspace snapshot tools. It is not proven on this macOS host.
-- macOS Lima remains a low-security harness only; strict no-network public execution is blocked. Direct Apple VZ has a proof-only no-NIC path gated by `ARC_VZ_PROOF=1`; one local host proof passed with compiled/signed runner, ARM64 kernel/initrd, guest no-network/workspace/symlink markers, command result markers, and teardown ok. `arc sandbox vz-artifacts` creates a local hash-pinned proof artifact set without downloading assets or booting a VM. Public macOS `microvm` execution is still not enabled.
+- macOS Lima remains a low-security harness only; strict no-network public execution is blocked for Lima. Direct Apple VZ has a default-off gated path requiring `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_VZ_REAL_EXEC=1`, valid `ARC_VZ_ARTIFACT_MANIFEST`, signed runner, readable kernel/initrd, guest no-network/workspace/symlink markers, exact argv hash, teardown, and audit. One local host proof passed for guest-available `pwd` with stdout `/workspace`. `arc sandbox vz-artifacts` creates a local hash-pinned artifact set without downloading assets or booting a VM. This is not production-grade or arbitrary host-command microVM execution.
 - `arc mcp workbench inspect` and `session-start` route user-supplied server commands through sandbox policy, workspace trust, env filtering, cwd bounds, and sandbox audit.
 - Direct `SubprocessIsolationProvider(workspace_root=...)` callers execute from that workspace root when `cwd` is omitted; no parent-cwd inheritance across that provider boundary.
 - `arc plan apply` no longer treats generic plan/direct approval as approval for `network`, `install`, or `unknown`; use policy allowance or a matching sandbox approval token.
