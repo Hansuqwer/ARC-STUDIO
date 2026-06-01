@@ -7,6 +7,7 @@ capable of creating VZVirtualMachineConfiguration with networkDevices = [].
 from __future__ import annotations
 
 import hashlib
+import gzip
 import json
 import os
 import platform
@@ -200,6 +201,16 @@ class VZExecInitManifest(BaseModel):
     markers: list[str] = Field(default_factory=lambda: list(VZ_MARKERS))
     init_path: str
     init_sha256: str
+    packed_initrd: bool = False
+    initrd_path: str | None = None
+    initrd_sha256: str | None = None
+    initrd_root_path: str | None = None
+    busybox_path: str | None = None
+    busybox_sha256: str | None = None
+    busybox_static_required: bool = True
+    busybox_static: bool | None = None
+    tools: dict[str, str | None] = Field(default_factory=dict)
+    build_commands: list[list[str]] = Field(default_factory=list)
     guest_requirements: list[str] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
 
@@ -211,6 +222,8 @@ class VZExecInitReport(BaseModel):
 
     manifest_path: str
     init_path: str
+    initrd_path: str | None = None
+    packed_initrd: bool = False
     blockers: list[str] = Field(default_factory=list)
     manifest: VZExecInitManifest
 
@@ -1097,33 +1110,175 @@ $BB reboot -f || $BB poweroff -f || $BB halt -f || true
 """
 
 
-def generate_vz_exec_init_artifacts(output_dir: Path) -> VZExecInitReport:
-    """Write the ARC VZ exec init contract; does not build an initrd or download assets."""
+def _copy_exec(path: Path, destination: Path, label: str) -> str | None:
+    if not _executable_file(path):
+        return f"{label} missing/not executable"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(path.expanduser().resolve(), destination)
+    destination.chmod(0o755)
+    return None
+
+
+def _looks_static_linux_binary(path: Path) -> bool:
+    data = path.read_bytes()
+    dynamic_loader_tokens = [
+        b"/lib/ld-linux",
+        b"/lib64/ld-linux",
+        b"/lib/ld-musl",
+        b"/lib64/ld-musl",
+    ]
+    return not any(token in data for token in dynamic_loader_tokens)
+
+
+def _gzip_file(source: Path, destination: Path) -> None:
+    with source.open("rb") as raw, gzip.open(destination, "wb", compresslevel=9) as compressed:
+        shutil.copyfileobj(raw, compressed)
+
+
+def _pack_vz_exec_initrd(
+    output_dir: Path,
+    *,
+    init_path: Path,
+    busybox_path: Path,
+    cpio_path: str,
+) -> tuple[str | None, str | None, str | None, list[list[str]], list[str]]:
+    root = output_dir / "arc-vz-exec-initrd-root"
+    if root.exists():
+        shutil.rmtree(root)
+    (root / "bin").mkdir(parents=True)
+    (root / "usr" / "bin").mkdir(parents=True)
+    (root / "sbin").mkdir(parents=True)
+    shutil.copy2(init_path, root / "init")
+    (root / "init").chmod(0o755)
+    blocker = _copy_exec(busybox_path, root / "usr" / "bin" / "busybox", "busybox")
+    if blocker:
+        return str(root), None, None, [], [blocker]
+    (root / "bin" / "sh").symlink_to("../usr/bin/busybox")
+    for name in [
+        "base64",
+        "cat",
+        "cd",
+        "grep",
+        "head",
+        "halt",
+        "mkdir",
+        "mount",
+        "poweroff",
+        "pwd",
+        "reboot",
+        "sleep",
+        "sync",
+        "tr",
+        "wget",
+    ]:
+        link = root / "usr" / "bin" / name
+        if not link.exists():
+            link.symlink_to("busybox")
+    commands = [[cpio_path, "--quiet", "-o", "-H", "newc"]]
+    proc = subprocess.run(
+        commands[0],
+        cwd=root,
+        input=(
+            "\n".join(sorted(str(path.relative_to(root)) for path in root.rglob("*"))) + "\n"
+        ).encode("utf-8"),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return (
+            str(root),
+            None,
+            None,
+            commands,
+            [
+                f"cpio failed: {(proc.stderr or proc.stdout).decode('utf-8', errors='replace').strip()}"
+            ],
+        )
+    cpio_path_out = output_dir / "arc-vz-exec-initrd.cpio"
+    initrd_path = output_dir / "arc-vz-exec-initrd.gz"
+    cpio_path_out.write_bytes(proc.stdout)
+    _gzip_file(cpio_path_out, initrd_path)
+    cpio_path_out.unlink(missing_ok=True)
+    return str(root), str(initrd_path), _sha256_file(initrd_path), commands, []
+
+
+def generate_vz_exec_init_artifacts(
+    output_dir: Path,
+    *,
+    pack_initrd: bool = False,
+    busybox_path: Path | None = None,
+) -> VZExecInitReport:
+    """Write the ARC VZ exec init contract; optionally packages a local-tools initrd."""
     output_dir.mkdir(parents=True, exist_ok=True)
     init_path = output_dir / "arc-vz-exec-init.sh"
     manifest_path = output_dir / "vz-exec-init-manifest.json"
     init_path.write_text(render_vz_exec_init(), encoding="utf-8")
     init_path.chmod(0o755)
+    blockers: list[str] = []
+    tools = {"cpio": shutil.which("cpio")}
+    busybox = busybox_path or _env_path("ARC_VZ_BUSYBOX")
+    initrd_path: str | None = None
+    initrd_sha: str | None = None
+    initrd_root: str | None = None
+    busybox_sha: str | None = None
+    busybox_static: bool | None = None
+    build_commands: list[list[str]] = []
+    if pack_initrd:
+        if not tools["cpio"]:
+            blockers.append("missing tool: cpio")
+        if not busybox:
+            blockers.append("ARC_VZ_BUSYBOX missing/not provided")
+        elif not _executable_file(busybox.expanduser().resolve()):
+            blockers.append("ARC_VZ_BUSYBOX missing/not executable")
+        else:
+            busybox = busybox.expanduser().resolve()
+            busybox_sha = _sha256_file(busybox)
+            busybox_static = _looks_static_linux_binary(busybox)
+            if not busybox_static:
+                blockers.append("ARC_VZ_BUSYBOX must be a static Linux BusyBox binary")
+        if not blockers and busybox and tools["cpio"]:
+            initrd_root, initrd_path, initrd_sha, build_commands, pack_blockers = (
+                _pack_vz_exec_initrd(
+                    output_dir,
+                    init_path=init_path,
+                    busybox_path=busybox,
+                    cpio_path=tools["cpio"],
+                )
+            )
+            blockers.extend(pack_blockers)
+    packed_initrd = bool(initrd_path and initrd_sha and not blockers)
     manifest = VZExecInitManifest(
         generated_at=_utc_now(),
         host_os=platform.system(),
         host_arch=platform.machine(),
         init_path=str(init_path),
         init_sha256=_sha256_file(init_path),
+        packed_initrd=packed_initrd,
+        initrd_path=initrd_path,
+        initrd_sha256=initrd_sha,
+        initrd_root_path=initrd_root,
+        busybox_path=str(busybox) if busybox else None,
+        busybox_sha256=busybox_sha,
+        busybox_static=busybox_static,
+        tools=tools,
+        build_commands=build_commands,
         guest_requirements=[
-            "Linux initramfs with /init wired to this script",
-            "/usr/bin/busybox",
-            "/usr/bin/base64",
-            "/usr/bin/wget for network-failure proof",
+            "Linux initramfs with /init wired to this script"
+            if not packed_initrd
+            else "packed initramfs with ARC /init and BusyBox applets",
             "virtiofs workspace tag mounted as /workspace",
             "requested argv binary/runtime present inside the guest",
         ],
+        blockers=blockers,
     )
     manifest_path.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
     return VZExecInitReport(
         manifest_path=str(manifest_path),
         init_path=str(init_path),
-        blockers=[],
+        initrd_path=initrd_path,
+        packed_initrd=packed_initrd,
+        blockers=blockers,
         manifest=manifest,
     )
 
@@ -1160,6 +1315,21 @@ def validate_vz_exec_init_manifest(path: Path) -> VZExecInitManifest:
     for token in forbidden:
         if token in init_text:
             raise ValueError(f"VZ exec init contains forbidden shell execution token: {token}")
+    if manifest.packed_initrd:
+        if not manifest.initrd_path or not manifest.initrd_sha256:
+            raise ValueError("VZ exec init manifest missing packed initrd fields")
+        initrd = Path(manifest.initrd_path)
+        if not initrd.exists() or _sha256_file(initrd) != manifest.initrd_sha256:
+            raise ValueError("VZ exec initrd sha256 mismatch")
+        if not manifest.busybox_path or not manifest.busybox_sha256:
+            raise ValueError("VZ exec init manifest missing busybox fields")
+        if manifest.busybox_static_required and manifest.busybox_static is not True:
+            raise ValueError("VZ exec init manifest requires static busybox")
+        busybox = Path(manifest.busybox_path)
+        if not busybox.exists() or _sha256_file(busybox) != manifest.busybox_sha256:
+            raise ValueError("VZ exec busybox sha256 mismatch")
+    elif manifest.initrd_path or manifest.initrd_sha256:
+        raise ValueError("VZ exec initrd fields present but packed_initrd is false")
     return manifest
 
 

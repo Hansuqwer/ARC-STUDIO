@@ -517,7 +517,17 @@ def sandbox_vz_artifacts(
     exec_init: bool = typer.Option(
         False,
         "--exec-init",
-        help="Write the reviewable ARC VZ guest exec-init contract only; no initrd build or downloads",
+        help="Write the reviewable ARC VZ guest exec-init contract; no downloads",
+    ),
+    pack_initrd: bool = typer.Option(
+        False,
+        "--pack-initrd",
+        help="With --exec-init, package a minimal initrd using local BusyBox and cpio",
+    ),
+    busybox: Optional[str] = typer.Option(
+        None,
+        "--busybox",
+        help="Local executable BusyBox path for --exec-init --pack-initrd",
     ),
     workspace: Optional[str] = WORKSPACE_FLAG,
     json_output: bool = JSON_FLAG,
@@ -526,8 +536,15 @@ def sandbox_vz_artifacts(
     """Generate VZ proof artifact provenance; does not boot a VM."""
     _setup_logging(debug)
     ws = _workspace(workspace)
+    if pack_initrd and not exec_init:
+        _out(err(ArcErrorCode.INVALID_INPUT, "--pack-initrd requires --exec-init"), json_output)
+        raise typer.Exit(2)
     report = (
-        generate_vz_exec_init_artifacts(Path(output).expanduser())
+        generate_vz_exec_init_artifacts(
+            Path(output).expanduser(),
+            pack_initrd=pack_initrd,
+            busybox_path=Path(busybox).expanduser() if busybox else None,
+        )
         if exec_init
         else generate_vz_proof_artifacts(
             Path(output).expanduser(),

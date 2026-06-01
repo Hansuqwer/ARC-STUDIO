@@ -1404,8 +1404,49 @@ def test_vz_artifacts_cli_generates_exec_init_contract(tmp_path, monkeypatch):
     assert data["manifest"]["no_downloads"] is True
     assert data["manifest"]["shell_string_execution"] is False
     assert data["manifest"]["python_runtime_included"] is False
+    assert data["manifest"]["packed_initrd"] is False
     assert (output / "arc-vz-exec-init.sh").exists()
     assert (output / "vz-exec-init-manifest.json").exists()
+
+
+def test_vz_artifacts_cli_pack_initrd_requires_exec_init(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(
+        app,
+        [
+            "sandbox",
+            "vz-artifacts",
+            "--json",
+            "--pack-initrd",
+            "--output",
+            str(tmp_path / "vz-exec-init"),
+        ],
+    )
+    assert result.exit_code == 2
+    assert _payload(result)["ok"] is False
+
+
+def test_vz_artifacts_cli_pack_initrd_reports_missing_busybox(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(vz_provider.shutil, "which", lambda name: "/usr/bin/cpio")
+    output = tmp_path / "vz-exec-init"
+    result = CliRunner().invoke(
+        app,
+        [
+            "sandbox",
+            "vz-artifacts",
+            "--json",
+            "--exec-init",
+            "--pack-initrd",
+            "--output",
+            str(output),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    data = _payload(result)["data"]
+    assert data["packed_initrd"] is False
+    assert "ARC_VZ_BUSYBOX missing/not provided" in data["blockers"]
+    assert data["manifest"]["initrd_path"] is None
 
 
 def test_approval_rules_allow_policy(tmp_path, monkeypatch):

@@ -6,6 +6,8 @@ import hashlib
 import io
 import json
 import subprocess
+import signal
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -90,6 +92,28 @@ def _valid_public_manifest(tmp_path):
     manifest_path = output / "vz-artifacts-manifest.json"
     manifest_path.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
     return manifest_path
+
+
+def _host_vz_public_ready() -> bool:
+    return (
+        os.environ.get("ARC_MICROVM_EXEC_ENABLED") == "1"
+        and os.environ.get("ARC_MICROVM_INTEGRATION") == "1"
+        and os.environ.get("ARC_VZ_REAL_EXEC") == "1"
+        and bool(os.environ.get("ARC_VZ_ARTIFACT_MANIFEST"))
+        and platform.system() == "Darwin"
+    )
+
+
+def _env_argv(name: str, default: list[str] | None = None) -> list[str]:
+    value = os.environ.get(name)
+    if not value:
+        if default is None:
+            pytest.skip(f"{name} required")
+        return default
+    parsed = json.loads(value)
+    if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
+        pytest.skip(f"{name} must be a JSON string array")
+    return parsed
 
 
 class _FakePopen:
@@ -293,11 +317,73 @@ def test_vz_exec_init_artifacts_are_reviewable_and_no_download(tmp_path):
     assert manifest.no_downloads is True
     assert manifest.shell_string_execution is False
     assert manifest.python_runtime_included is False
+    assert manifest.packed_initrd is False
+    assert manifest.initrd_path is None
     assert "ARC_VZ_COMMAND_ARGV_B64CSV" in init_text
     assert "ARC_VZ_RESULT command_sha256" in init_text
     assert '"$@" >/tmp/arc-vz-cmd.out' in init_text
     assert "sh -c" not in init_text
     assert "requested argv binary/runtime present inside the guest" in manifest.guest_requirements
+
+
+def test_vz_exec_init_pack_initrd_uses_local_busybox_and_cpio(tmp_path, monkeypatch):
+    busybox = tmp_path / "busybox"
+    busybox.write_bytes(b"busybox")
+    busybox.chmod(0o755)
+    cpio = tmp_path / "cpio"
+    cpio.write_text("#!/bin/sh\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        vz_provider.shutil, "which", lambda name: str(cpio) if name == "cpio" else None
+    )
+
+    def fake_run(*args, **kwargs):
+        assert kwargs["cwd"] == tmp_path / "arc-vz-exec-initrd-root"
+        assert b"init" in kwargs["input"]
+        assert b"usr/bin/busybox" in kwargs["input"]
+        return SimpleNamespace(returncode=0, stdout=b"newc-archive", stderr=b"")
+
+    monkeypatch.setattr(vz_provider.subprocess, "run", fake_run)
+
+    report = generate_vz_exec_init_artifacts(tmp_path, pack_initrd=True, busybox_path=busybox)
+    manifest = validate_vz_exec_init_manifest(tmp_path / "vz-exec-init-manifest.json")
+
+    assert report.packed_initrd is True
+    assert report.blockers == []
+    assert manifest.packed_initrd is True
+    assert manifest.initrd_path == str(tmp_path / "arc-vz-exec-initrd.gz")
+    assert manifest.busybox_sha256 == hashlib.sha256(busybox.read_bytes()).hexdigest()
+    assert manifest.busybox_static is True
+    assert (tmp_path / "arc-vz-exec-initrd-root" / "init").exists()
+    assert (tmp_path / "arc-vz-exec-initrd-root" / "usr" / "bin" / "pwd").is_symlink()
+    assert (tmp_path / "arc-vz-exec-initrd-root" / "usr" / "bin" / "sleep").is_symlink()
+
+
+def test_vz_exec_init_pack_initrd_missing_busybox_is_blocker(tmp_path, monkeypatch):
+    monkeypatch.setattr(vz_provider.shutil, "which", lambda name: "/usr/bin/cpio")
+
+    report = generate_vz_exec_init_artifacts(tmp_path, pack_initrd=True)
+    manifest = validate_vz_exec_init_manifest(tmp_path / "vz-exec-init-manifest.json")
+
+    assert report.packed_initrd is False
+    assert "ARC_VZ_BUSYBOX missing/not provided" in report.blockers
+    assert manifest.packed_initrd is False
+    assert manifest.initrd_path is None
+
+
+def test_vz_exec_init_pack_initrd_rejects_dynamic_busybox(tmp_path, monkeypatch):
+    busybox = tmp_path / "busybox"
+    busybox.write_bytes(b"ELF.../lib/ld-linux-aarch64.so.1")
+    busybox.chmod(0o755)
+    monkeypatch.setattr(vz_provider.shutil, "which", lambda name: "/usr/bin/cpio")
+
+    report = generate_vz_exec_init_artifacts(tmp_path, pack_initrd=True, busybox_path=busybox)
+    manifest = validate_vz_exec_init_manifest(tmp_path / "vz-exec-init-manifest.json")
+
+    assert report.packed_initrd is False
+    assert "ARC_VZ_BUSYBOX must be a static Linux BusyBox binary" in report.blockers
+    assert manifest.busybox_static is False
+    assert manifest.initrd_path is None
 
 
 def test_vz_exec_init_validator_rejects_shell_string_execution(tmp_path):
@@ -585,11 +671,7 @@ async def test_vz_no_nic_boot_and_proof(tmp_path):
 
 
 @pytest.mark.skipif(
-    os.environ.get("ARC_MICROVM_EXEC_ENABLED") != "1"
-    or os.environ.get("ARC_MICROVM_INTEGRATION") != "1"
-    or os.environ.get("ARC_VZ_REAL_EXEC") != "1"
-    or not os.environ.get("ARC_VZ_ARTIFACT_MANIFEST")
-    or platform.system() != "Darwin",
+    not _host_vz_public_ready(),
     reason="requires explicit macOS VZ public exec gates and local artifact manifest",
 )
 def test_vz_public_real_host_pwd(tmp_path):
@@ -601,3 +683,65 @@ def test_vz_public_real_host_pwd(tmp_path):
     assert result.metadata["network_proof_passed"] is True
     assert result.metadata["workspace_proof_passed"] is True
     assert result.metadata["teardown_ok"] is True
+
+
+@pytest.mark.skipif(
+    not _host_vz_public_ready() or os.environ.get("ARC_VZ_REAL_FAILURE_TESTS") != "1",
+    reason="requires explicit macOS VZ public exec gates and ARC_VZ_REAL_FAILURE_TESTS=1",
+)
+def test_vz_public_real_host_command_failure(tmp_path):
+    command = _env_argv("ARC_VZ_REAL_FAILURE_ARGV", ["/definitely-missing-arc-command"])
+
+    result = VZPublicExecutionRunner(workspace_root=tmp_path).run(command, timeout_seconds=45)
+
+    assert result.provider == "microvm"
+    assert result.exit_code == -1
+    assert result.metadata["network_proof_passed"] is True
+    assert result.metadata["workspace_proof_passed"] is True
+    assert result.metadata["teardown_ok"] is True
+    assert result.metadata["guest_exit_code"] not in (None, 0)
+    assert result.metadata["command_result_seen"] is True
+
+
+@pytest.mark.skipif(
+    not _host_vz_public_ready() or os.environ.get("ARC_VZ_REAL_FAILURE_TESTS") != "1",
+    reason="requires explicit macOS VZ public exec gates and ARC_VZ_REAL_FAILURE_TESTS=1",
+)
+def test_vz_public_real_host_timeout(tmp_path):
+    command = _env_argv("ARC_VZ_REAL_TIMEOUT_ARGV")
+
+    result = VZPublicExecutionRunner(workspace_root=tmp_path).run(command, timeout_seconds=1)
+
+    assert result.provider == "microvm"
+    assert result.exit_code == -1
+    assert result.killed is True
+    assert result.kill_reason == "timeout"
+    assert any("timed out" in item for item in result.metadata["lifecycle_errors"])
+
+
+@pytest.mark.skipif(
+    not _host_vz_public_ready() or os.environ.get("ARC_VZ_REAL_FAILURE_TESTS") != "1",
+    reason="requires explicit macOS VZ public exec gates and ARC_VZ_REAL_FAILURE_TESTS=1",
+)
+def test_vz_public_real_host_sigint(tmp_path):
+    command = _env_argv("ARC_VZ_REAL_SIGINT_ARGV")
+    runner = VZPublicExecutionRunner(workspace_root=tmp_path)
+    done = threading.Event()
+
+    def interrupt() -> None:
+        if not done.wait(timeout=3):
+            os.kill(os.getpid(), signal.SIGINT)
+
+    timer = threading.Thread(target=interrupt)
+    timer.start()
+    try:
+        result = runner.run(command, timeout_seconds=45)
+    finally:
+        done.set()
+        timer.join(timeout=5)
+
+    assert result.provider == "microvm"
+    assert result.exit_code == -1
+    assert result.killed is True
+    assert result.kill_reason == "signal"
+    assert any("interrupted" in item for item in result.metadata["lifecycle_errors"])

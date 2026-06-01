@@ -2,7 +2,7 @@
 
 **Status:** Accepted — macOS direct VZ gated public path proven once for guest-available `pwd`; default-off and not production-grade; Linux/Firecracker gated scaffold is host-unproven
 **Date:** 2026-05-26  
-**Last updated:** 2026-05-31 — direct macOS VZ `arc sandbox run --provider microvm -- pwd` passed once behind `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_VZ_REAL_EXEC=1`, and a valid local artifact manifest; `arc sandbox vz-artifacts` adds local SHA256 provenance for proof inputs, and `--exec-init` writes the reviewable guest init contract without packaging/downloading assets. Linux/Firecracker remains a gated scaffold with no live Linux/KVM boot proof from this host.
+**Last updated:** 2026-05-31 — direct macOS VZ `arc sandbox run --provider microvm -- pwd` passed once behind `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_VZ_REAL_EXEC=1`, and a valid local artifact manifest; `arc sandbox vz-artifacts` adds local SHA256 provenance for proof inputs, and `--exec-init --pack-initrd --busybox <path>` can package the reviewable guest init contract with static local BusyBox/`cpio` only. Current packed-initrd host proof is blocked because the local BusyBox candidate is dynamically linked. Linux/Firecracker remains a gated scaffold with no live Linux/KVM boot proof from this host.
 **Authors:** ARC Studio sandbox team  
 **Related:** Phase 37 (R38), `docs/research/sandbox-and-microvm.md`, `docs/research/microvm-p1-p7-status.md`, ADR-014 (security architecture)
 
@@ -179,14 +179,14 @@ are mandatory. Missing any of these fields is a schema violation.
 - Lima harness is still internal / not wired to public execution.
 - Direct Apple VZ public execution is opt-in only via `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_VZ_REAL_EXEC=1`, and a valid local manifest. Current real CLI evidence is `pwd` only; guest artifacts must contain the requested command/runtime.
 - `arc sandbox vz-artifacts` can compile/sign the local VZ runner and hash-pin source, entitlements, runner, kernel, and initrd into `vz-artifacts-manifest.json` without downloading assets or booting a VM.
-- `arc sandbox vz-artifacts --exec-init` can write the reviewable guest init contract and manifest. It does not build an initrd, download assets, or include Python.
+- `arc sandbox vz-artifacts --exec-init` can write the reviewable guest init contract and manifest. `--pack-initrd --busybox <path>` can package a gzip `newc` initramfs with static local BusyBox/`cpio`. It does not download assets or include Python. Dynamically linked BusyBox is rejected unless a future policy also packages the loader/libs. The packed initrd is not execution evidence until a gated VZ host run uses it.
 - Firecracker gated scaffold exists and requires stable proof markers (`no-default-route`, `network-failure`, `sentinel-read`, `workspace-mount-proven`, `symlink-escape-blocked`) plus command result markers before any future command output can be trusted. No real Linux/KVM boot proof has run on the current host.
 
 ### What must be done before unblocking
 
 1. Complete P1–P7 Linux proof on a real host with Firecracker + `/dev/kvm`.
 2. Add CI opt-in smoke with host runners that have Firecracker installed.
-3. For macOS, repeat the direct Apple VZ gated path in host CI and add real timeout/SIGINT/failure proofs plus upstream kernel/initrd provenance/distribution policy before any production-grade or broad arbitrary-command claim.
+3. For macOS, repeat the direct Apple VZ gated path in host CI and add real timeout/SIGINT/failure proofs plus upstream kernel/initrd/static-BusyBox provenance/distribution policy before any production-grade or broad arbitrary-command claim.
 4. Update this ADR status from "Accepted" to "Implemented" only after real host evidence links exist.
 
 ---

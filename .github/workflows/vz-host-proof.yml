@@ -1,0 +1,103 @@
+name: vz-host-proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_path:
+        description: Local ARM64 Linux kernel path on the self-hosted macOS runner
+        required: true
+        type: string
+      busybox_path:
+        description: Local static ARM64 Linux BusyBox path on the self-hosted macOS runner
+        required: true
+        type: string
+      artifact_output:
+        description: Local output directory for generated VZ artifacts
+        required: false
+        default: /tmp/arc-vz-host-proof
+        type: string
+      run_failure_tests:
+        description: Run real VZ timeout/SIGINT/failure proofs after pwd smoke
+        required: false
+        default: false
+        type: boolean
+      timeout_argv_json:
+        description: Guest argv JSON for timeout/SIGINT proofs, e.g. ["sleep","30"]
+        required: false
+        default: '["sleep","30"]'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  vz-proof:
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 20
+    env:
+      ARC_MICROVM_EXEC_ENABLED: '1'
+      ARC_MICROVM_INTEGRATION: '1'
+      ARC_VZ_REAL_EXEC: '1'
+      ARC_VZ_TIMEOUT_SECONDS: '45'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Sync dependencies
+        working-directory: python
+        run: uv sync --all-extras --dev
+
+      - name: Build packed VZ exec initrd
+        working-directory: python
+        run: |
+          rm -rf "${{ inputs.artifact_output }}"
+          uv run arc sandbox vz-artifacts \
+            --json \
+            --exec-init \
+            --pack-initrd \
+            --busybox "${{ inputs.busybox_path }}" \
+            --output "${{ inputs.artifact_output }}/exec-init"
+
+      - name: Build VZ runner/provenance manifest
+        working-directory: python
+        run: |
+          uv run arc sandbox vz-artifacts \
+            --json \
+            --output "${{ inputs.artifact_output }}/vz-artifacts" \
+            --kernel "${{ inputs.kernel_path }}" \
+            --initrd "${{ inputs.artifact_output }}/exec-init/arc-vz-exec-initrd.gz" \
+            --build-runner
+
+      - name: Run gated VZ public proof
+        working-directory: python
+        env:
+          ARC_VZ_ARTIFACT_MANIFEST: ${{ inputs.artifact_output }}/vz-artifacts/vz-artifacts-manifest.json
+        run: |
+          uv run arc sandbox run \
+            --json \
+            --provider microvm \
+            --policy local-safe \
+            -- pwd
+
+      - name: Host-gated VZ pytest smoke
+        working-directory: python
+        env:
+          ARC_VZ_ARTIFACT_MANIFEST: ${{ inputs.artifact_output }}/vz-artifacts/vz-artifacts-manifest.json
+        run: uv run pytest tests/isolation/test_vz_proof.py::test_vz_public_real_host_pwd -q
+
+      - name: Host-gated VZ failure proofs
+        if: ${{ inputs.run_failure_tests }}
+        working-directory: python
+        env:
+          ARC_VZ_ARTIFACT_MANIFEST: ${{ inputs.artifact_output }}/vz-artifacts/vz-artifacts-manifest.json
+          ARC_VZ_REAL_FAILURE_TESTS: '1'
+          ARC_VZ_REAL_TIMEOUT_ARGV: ${{ inputs.timeout_argv_json }}
+          ARC_VZ_REAL_SIGINT_ARGV: ${{ inputs.timeout_argv_json }}
+        run: |
+          uv run pytest \
+            tests/isolation/test_vz_proof.py::test_vz_public_real_host_command_failure \
+            tests/isolation/test_vz_proof.py::test_vz_public_real_host_timeout \
+            tests/isolation/test_vz_proof.py::test_vz_public_real_host_sigint \
+            -q

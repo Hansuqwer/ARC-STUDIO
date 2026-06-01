@@ -162,6 +162,7 @@ uv run arc sandbox audit-verify --json
 uv run arc sandbox audit-list --json --limit 20
 uv run arc sandbox vz-artifacts --json --output /tmp/arc-vz-artifacts --kernel /path/to/arm64-linux-kernel --initrd /path/to/arc-vz-proof-initrd.gz --build-runner
 uv run arc sandbox vz-artifacts --json --exec-init --output /tmp/arc-vz-exec-init
+uv run arc sandbox vz-artifacts --json --exec-init --pack-initrd --busybox /path/to/static-arm64-linux-busybox --output /tmp/arc-vz-exec-init
 ```
 
 Opt-in macOS direct VZ proof run, using local artifacts only:
@@ -175,7 +176,11 @@ ARC_VZ_ARTIFACT_MANIFEST=/path/to/vz-artifacts-manifest.json \
 uv run arc sandbox run --json --provider microvm --policy local-safe -- pwd
 ```
 
-Expected proven stdout for the current proof initrd is `/workspace`. Do not use this as evidence for `python -c` or arbitrary host-command execution unless the guest artifact actually contains that runtime and emits the matching `ARC_VZ_RESULT command_sha256` marker. `--exec-init` writes the reviewable guest init contract and manifest only; it does not build an initrd, download assets, or bundle Python.
+Expected proven stdout for the current proof initrd is `/workspace`. Do not use this as evidence for `python -c` or arbitrary host-command execution unless the guest artifact actually contains that runtime and emits the matching `ARC_VZ_RESULT command_sha256` marker. `--exec-init --pack-initrd` can package the reviewable guest init contract with static local BusyBox/`cpio`; it rejects dynamically linked BusyBox for the minimal standalone initramfs path, does not download assets or bundle Python, and is not execution evidence until a gated VZ host run uses that initrd.
+
+Repeatable packed-initrd proof is wired as manual-only `.github/workflows/vz-host-proof.yml` on a self-hosted macOS ARM64 runner with local kernel/static BusyBox paths. It is not run by default CI and is not evidence until executed successfully.
+
+Real VZ failure proofs are host-gated and skipped by default. To run them on a prepared macOS VZ host, set `ARC_VZ_REAL_FAILURE_TESTS=1` plus JSON argv env vars such as `ARC_VZ_REAL_TIMEOUT_ARGV='["sleep","30"]'` and `ARC_VZ_REAL_SIGINT_ARGV='["sleep","30"]'`, then run `uv run pytest tests/isolation/test_vz_proof.py -q`.
 
 Expected defaults:
 
