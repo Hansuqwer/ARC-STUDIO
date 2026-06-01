@@ -473,3 +473,34 @@ All surfaces return HTTP 403 + `ArcErrorCode.PERMISSION_DENIED` on untrusted wor
 - `/api/arena/models`, `/api/arena/tags`, `/api/arena/rankings` — read-only model metadata, not workspace-private data.
 - `run_events_sse` (`GET /api/runs/{run_id}/events`) — per-run SSE endpoint; trust check deferred pending future ADR (no workspace-private data served that isn't already trust-checked on run creation).
 - `events_stream` (`GET /api/events/stream`) — added in Phase 52; trust checked at connect time before any event data is sent. See Phase 52 SSE surface below.
+
+## Sandbox command hardening (H1–H9, 2026-06-01)
+
+Hardening of the command-sandbox/policy layer. These are defense-in-depth on top
+of deny-default classification; they are **not** an isolation boundary (microVM
+execution remains preflight-only).
+
+| ID | Surface | Hardening | Where | Test |
+|----|---------|-----------|-------|------|
+| H1 | Workspace path validation | Resolve instead of `..` substring reject; reject NUL bytes; confinement via `is_path_within_root` | `security/validation.py:validate_workspace_path` | `tests/security/test_hardening.py::TestValidateWorkspacePathHardening` |
+| H2 | Env allowlist | Single canonical `SAFE_ENV_KEYS`; providers + `SandboxPolicy.env_allowlist` cannot diverge; SHELL excluded | `security/validation.py`, `isolation/subprocess.py`, `security/sandbox.py` | `::TestEnvAllowlistSingleSource` |
+| H3 | Secret redaction | One `redact_secrets()` / `SECRET_PATTERNS`; frontend `Redactor` and subprocess `redact_output` delegate to it | `security/redaction.py`, `isolation/subprocess.py` | `::TestRedactionParity` |
+| H4 | `none` provider cwd | Runs resolved cwd (closes check-vs-exec symlink gap) | `isolation/none.py` | `::TestNoneProviderResolvedCwd` |
+| H5 | `python -c` classification | AST: only READ_ONLY when no network/process imports and no `eval/exec/compile/__import__`; else UNKNOWN | `security/sandbox.py:_python_code_is_trivially_read_only` | `::TestPythonDashCClassification` |
+| H7 | `git` global options | Strip `-c/-C/--git-dir/--work-tree/--namespace`/pager flags before classifying subcommand | `security/sandbox.py:_strip_git_global_options` | `::TestGitGlobalOptionStripping` |
+| H8 | Argv bounds | Oversized argv (>4096 args or >1 MiB) → UNKNOWN (deny-default) | `security/sandbox.py:_argv_within_bounds` | `::TestArgvBounds` |
+| H9 | Audit persistence | Write failure logs + marks `audit_persisted=False`; never fail-opens a denial | `cli/sandbox.py:_persist_audit_safely` | `::TestAuditPersistenceNeverFailOpen` |
+
+See `docs/research/sandbox-and-microvm.md` → "Sandbox Hardening Pass (H1–H9)" for
+research notes and the decision table.
+
+## Sandbox PR-A/B/C (2026-06-01)
+
+Clean-room ideas adopted from external CLI study (patterns only, no code copied).
+Defense-in-depth on the argv-only sandbox; not an isolation boundary.
+
+| ID | Surface | Change | Where | Test |
+|----|---------|--------|-------|------|
+| PR-A | Exit-code interpretation | Command-aware `is_error`/`exit_note`; grep/rg/diff/test/find nonzero-but-benign exits not reported as failures; benign nonzero no longer forces CLI nonzero exit | `security/sandbox.py:interpret_exit_code`, `SandboxResult`, `cli/sandbox.py` | `tests/security/test_sandbox_pr_abc.py::TestExitCodeSemantics` |
+| PR-B | Secret/credential read | Deny access to `/proc/*/environ`, `.env*`, `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.kube`, `~/.docker`, `.netrc`, `.pgpass`, `.git-credentials`, `.npmrc`, `.pypirc`, `.gitconfig` — regardless of workspace confinement | `security/sandbox.py:_is_secret_read_path`, `validate_command_paths` | `::TestSecretReadDeny` |
+| PR-C | Denial reason codes | `SandboxReasonCode` enum + `SandboxDecision.reason_code`, threaded through `decide()`/`validate_command_paths`/audit event (free-text `reason` preserved) | `security/sandbox.py`, `cli/sandbox.py` | `::TestReasonCodes` |

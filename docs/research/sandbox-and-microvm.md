@@ -568,3 +568,45 @@ Consequence: Step 1 (Lima lifecycle proof) **can proceed** on this host. Steps 4
 3. **Step 1 feasibility**: limactl 2.1.0 is present. However, real Lima VM start takes 60–300 seconds for first-time image download + boot. The smoke tests must handle this in CI with very generous timeouts. The network_proof test will need adjustment given finding (1) above.
 
 4. **Firecracker (Step 4)**: absent on this host. Step 4 code and docs can be written but tests will always skip here.
+
+---
+
+## Sandbox Hardening Pass (H1–H9) — 2026-06-01
+
+Hardening of the existing subprocess/policy foundation (no new isolation
+boundary; microVM remains preflight-only per the truth constraints above). All
+changes are small, evidence-driven, and covered by tests in
+`tests/security/test_hardening.py` plus updated existing suites.
+
+### Research notes
+
+| Source | Link | What was learned | Implementation consequence | Confidence | Unresolved |
+|---|---|---|---|---|---|
+| OWASP Input Validation Cheat Sheet | https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html | Denylist substring checks (e.g. rejecting any path containing `..`) both over-reject legitimate input and are trivially bypassable; canonicalize/resolve and validate against an allowlist/root instead. Beware ReDoS in validation regexes. | H1: drop the `..` substring scan in `validate_workspace_path`; rely on `Path.resolve()` + existence/type checks, and document that workspace confinement is the caller's job via `is_path_within_root`. Reject NUL bytes. | High | None. |
+| OWASP Input Validation Cheat Sheet (same) | (same) | "Define exactly what IS authorized" — allowlists beat denylists for both env and command surfaces. | H2: collapse the two divergent env allowlists into one canonical tuple (`security/validation.py:SAFE_ENV_KEYS`), shared by `SandboxPolicy.env_allowlist` and the isolation providers, so the effective allowlist cannot depend on call path. SHELL dropped (argv runs shell-less → least-environment). | High | None. |
+| CPython `ast` module behavior (local verification) | stdlib | `ast.parse` + `ast.walk` lets us statically reject imports of network/process modules and dynamic-exec builtins in `python -c` snippets without executing them. Static analysis is best-effort, never an isolation boundary. | H5: `python -c` is only `READ_ONLY` when the snippet imports nothing from a network/process module set and calls no `eval/exec/compile/__import__`. Write-mode + path confinement remain enforced separately. Everything else → UNKNOWN (deny-default). | High | A determined attacker can still smuggle behavior past static analysis; the real boundary is microVM/no-NIC isolation (still pending). |
+| Git config-injection background (`-c protocol.ext.allow`) | git-scm config docs | `git -c <k=v>` and `git -C <dir>` precede the subcommand and can enable transports; classifying the option token instead of the subcommand could let network/destructive git slip through as read-only. | H7: strip leading git global options (`-c`, `-C`, `--git-dir`, `--work-tree`, `--namespace`, pager flags) before classifying the subcommand. | Med | Inline `-c=` style and unusual global-option spellings are handled defensively but git's surface is large; deny-default covers the residue. |
+| Context7 (`/python/cpython` os.path) — from earlier rows in this doc | this doc | `Path.resolve()` wraps `realpath`; canonical, symlink-eliminating, consistent on 3.11+. | H4: `NoneIsolationProvider` now runs the *resolved* cwd (matching `SubprocessIsolationProvider`) to close a check-vs-exec symlink gap. | Med | `none` provider is diagnostics-only (`user_selectable=False`), so exposure is low. |
+| Vercel Grep / code search | tool not exposed in this runtime | Attempted; unavailable (consistent with prior rows). GitHub code search returned rate-limit (`Too Many Requests`). | Relied on local repo evidence + OWASP + stdlib behavior. | Low | Re-run Vercel Grep / GitHub code search manually before security sign-off to cross-check redaction-pattern coverage against real-world leak corpora. |
+
+### Decision table
+
+| Decision | Chosen approach | Alternatives considered | Reason | Files affected | Confidence |
+|---|---|---|---|---|---|
+| H1 path validation | Resolve + existence/type + NUL reject; confinement delegated to `is_path_within_root` | Keep `..` substring reject; full chroot | Substring check over-rejects and is not a real guard; resolution is the correct primitive | `security/validation.py`, `tests/test_security.py`, `tests/security/test_hardening.py` | High |
+| H2 env allowlist | Single canonical `SAFE_ENV_KEYS` tuple in `security/validation.py` (dependency leaf), imported by providers + policy | Define in `subprocess.py` and import into `sandbox.py` (caused import cycle via `isolation/__init__` → `vz_provider` → `security.sandbox`) | Leaf module avoids the cycle and gives one source of truth; SHELL excluded for least-environment | `security/validation.py`, `isolation/subprocess.py`, `security/sandbox.py` | High |
+| H3 redaction | Single `redact_secrets()` + canonical `SECRET_PATTERNS` in `security/redaction.py`; `Redactor` and `isolation.subprocess.redact_output` both delegate | Keep two pattern sets in sync manually | One detection set → no path-dependent leaks; ordering (anthropic before openai) prevents partial matches | `security/redaction.py`, `isolation/subprocess.py` | High |
+| H4 none.py cwd | Run resolved cwd | Leave unresolved | Mirrors subprocess provider; closes check-vs-exec symlink gap | `isolation/none.py` | Med |
+| H5 `python -c` | AST: reject network/process imports + dynamic-exec builtins; else UNKNOWN | Keep `"print(" in code` → READ_ONLY; full taint analysis | Old check was trivially evadable; full taint analysis is out of scope and the real boundary is isolation | `security/sandbox.py` | High (as best-effort) |
+| H7 git options | Strip leading global options before classification | Treat any `git -c` as UNKNOWN | Stripping classifies the true subcommand (network/destructive) instead of mislabeling read-only | `security/sandbox.py` | Med |
+| H8 argv bounds | `MAX_ARGV_COUNT=4096`, `MAX_ARGV_TOTAL_BYTES=1MiB` → UNKNOWN (deny-default) | Raise/abort on oversized argv | Deny-default is consistent with the rest of the classifier and avoids a new error path | `security/sandbox.py` | Med |
+| H9 audit persistence | `_persist_audit_safely` logs OSError, marks `audit_persisted=False`, never fail-opens | Let persistence errors propagate | A broken audit sink must never turn a denial into an allow | `cli/sandbox.py` | Med |
+
+### What is real vs design-only
+
+- **Real, tested:** H1–H9 behaviors above, verified by `uv run ruff check src tests`,
+  `uv run pytest tests/` (3586 passed / 39 skipped / 3 xfailed), `pnpm build`, `pnpm typecheck`.
+- **Best-effort, not a boundary:** command classification (H5/H7) is static and
+  evadable; it is defense-in-depth layered on top of deny-default, not isolation.
+- **Still pending (unchanged):** microVM execution (preflight/doctor only), Lima
+  network-off proof, virtiofs symlink-mount escape proof.

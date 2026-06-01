@@ -72,16 +72,21 @@ class NoneIsolationProvider(IsolationProvider):
         env: Optional[dict[str, str]] = None,
         timeout_seconds: int = 300,
     ) -> IsolationResult:
+        popen_cwd = cwd
         if self._workspace_root and cwd:
             root = self._workspace_root.resolve()
             resolved = cwd.resolve()
             if cwd.is_symlink() or not resolved.is_relative_to(root):
                 raise ValueError(f"cwd escapes workspace: {cwd}")
+            # Run the resolved path (mirrors SubprocessIsolationProvider) so the
+            # process cannot be steered through a symlinked parent component
+            # between the check and the exec.
+            popen_cwd = resolved
         filtered_env = self.filter_env(env)
         start = time.monotonic()
         proc = subprocess.Popen(
             command,
-            cwd=str(cwd) if cwd else None,
+            cwd=str(popen_cwd) if popen_cwd else None,
             env=filtered_env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

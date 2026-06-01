@@ -12,25 +12,15 @@ import re
 from pathlib import Path
 from typing import Optional
 
+from ..security.redaction import redact_secrets
+from ..security.validation import SAFE_ENV_KEYS
 from .base import IsolationProvider, IsolationResult
 
 log = logging.getLogger(__name__)
 
-DEFAULT_SAFE_ENV_KEYS: frozenset[str] = frozenset(
-    {
-        "PATH",
-        "HOME",
-        "USER",
-        "LANG",
-        "LC_ALL",
-        "TERM",
-        "TMPDIR",
-        "SHELL",
-        "VIRTUAL_ENV",
-        "PYTHONPATH",
-        "PYTHONWARNINGS",
-    }
-)
+# Derived from the canonical allowlist in security/validation.py so the
+# isolation providers and SandboxPolicy.env_allowlist can never diverge.
+DEFAULT_SAFE_ENV_KEYS: frozenset[str] = frozenset(SAFE_ENV_KEYS)
 
 BLOCKED_ENV_PATTERNS: list[re.Pattern] = [
     re.compile(r"(?i).*API_KEY$"),
@@ -58,22 +48,6 @@ def _is_blocked_env_key(key: str) -> bool:
             return True
     return False
 
-
-OUTPUT_REDACTION_PATTERNS: list[tuple[str, re.Pattern]] = [
-    ("openai_key", re.compile(r"sk-[A-Za-z0-9]{20,}")),
-    ("anthropic_key", re.compile(r"sk-ant-[A-Za-z0-9\-_]{10,}")),
-    ("bearer_token", re.compile(r"(?i)Bearer\s+[A-Za-z0-9\-_\.]{20,}")),
-    ("aws_key", re.compile(r"AKIA[0-9A-Z]{16}")),
-    ("github_token", re.compile(r"gh[ps]_[A-Za-z0-9]{36,}")),
-    ("password_url", re.compile(r"(://[^:]+:)[^@]+(@)")),
-    (
-        "generic_secret",
-        re.compile(
-            r"((?:api_key|apikey|secret|password|token|access_token)\s*[:=]\s*['\"]?)([^\s'\",}\]]{8,})(['\"]?)",
-            re.IGNORECASE,
-        ),
-    ),
-]
 
 REDACTED = "[REDACTED]"
 
@@ -112,16 +86,12 @@ class _BoundedPipeReader:
 
 
 def redact_output(text: str) -> str:
-    """Redact known secret patterns from subprocess output."""
-    result = text
-    for name, pattern in OUTPUT_REDACTION_PATTERNS:
-        if name == "password_url":
-            result = pattern.sub(r"\1[REDACTED]\2", result)
-        elif name == "generic_secret":
-            result = pattern.sub(r"\1[REDACTED]\3", result)
-        else:
-            result = pattern.sub(REDACTED, result)
-    return result
+    """Redact known secret patterns from subprocess output.
+
+    Delegates to the canonical :func:`redact_secrets` so subprocess output and
+    frontend redaction share one detection pattern set (no divergence).
+    """
+    return redact_secrets(text)
 
 
 class SubprocessIsolationProvider(IsolationProvider):

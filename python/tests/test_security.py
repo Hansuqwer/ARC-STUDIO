@@ -1,6 +1,7 @@
 """Tests: Security — redaction, validation."""
 
 import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -65,9 +66,20 @@ class TestValidation:
         with pytest.raises(ValueError, match="empty"):
             validate_workspace_path("")
 
-    def test_path_traversal_raises(self):
-        with pytest.raises(ValueError, match="traversal"):
-            validate_workspace_path("/tmp/../etc/passwd")
+    def test_path_traversal_is_resolved_not_substring_rejected(self):
+        """`..` is resolved away, not substring-rejected.
+
+        Confinement to a workspace root is the caller's responsibility (via
+        is_path_within_root); validate_workspace_path only normalizes + checks
+        existence. A resolvable traversal target that exists is returned in
+        canonical form.
+        """
+        result = validate_workspace_path("/tmp/../etc")
+        assert result == Path("/etc").resolve()
+
+    def test_nul_byte_rejected(self):
+        with pytest.raises(ValueError, match="NUL"):
+            validate_workspace_path("/tmp/evil\x00.txt")
 
     def test_nonexistent_path_raises(self):
         with pytest.raises(ValueError):

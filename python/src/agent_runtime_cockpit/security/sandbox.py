@@ -6,6 +6,7 @@ import ast
 import json
 import os
 import platform
+import re
 import subprocess
 import shutil
 import stat
@@ -18,6 +19,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..audit.chain import GENESIS, canonical_dumps, sha256_hex, verify
+from .validation import SAFE_ENV_KEYS
 
 
 class CommandClassification(str, Enum):
@@ -30,6 +32,35 @@ class CommandClassification(str, Enum):
     DESTRUCTIVE = "destructive"
     PRIVILEGED = "privileged"
     UNKNOWN = "unknown"
+
+
+class SandboxReasonCode(str, Enum):
+    """Stable machine-readable codes for sandbox decisions.
+
+    These accompany (never replace) the human-readable ``reason`` so audit
+    queries, telemetry, and tests can match on a stable identifier instead of
+    free text. Add new variants append-only; do not renumber/rename existing
+    ones (they are persisted in the audit log).
+    """
+
+    # Allows
+    ALLOW_READ_ONLY = "allow_read_only"
+    ALLOW_WRITES_WORKSPACE = "allow_writes_workspace"
+    ALLOW_NETWORK = "allow_network"
+    ALLOW_INSTALL = "allow_install"
+    ALLOW_UNKNOWN = "allow_unknown"
+    ALLOW_APPROVED = "allow_approved"
+    # Denials / approval-required
+    NETWORK_DENIED = "network_denied"
+    INSTALL_DENIED = "install_denied"
+    DESTRUCTIVE_DENIED = "destructive_denied"
+    PRIVILEGED_DENIED = "privileged_denied"
+    UNKNOWN_DENIED = "unknown_denied"
+    # Path / input guards (raised as SandboxPathViolation, surfaced in audit)
+    PATH_ESCAPE = "path_escape"
+    SECRET_READ_DENIED = "secret_read_denied"
+    DYNAMIC_COMMAND_DENIED = "dynamic_command_denied"
+    ARGV_OVERSIZED = "argv_oversized"
 
 
 class SandboxPolicy(BaseModel):
@@ -51,18 +82,10 @@ class SandboxPolicy(BaseModel):
     approval_ttl_seconds: int = 86_400
     timeout_seconds: int = 30
     max_output_bytes: int = 65_536
-    env_allowlist: tuple[str, ...] = (
-        "PATH",
-        "HOME",
-        "USER",
-        "LANG",
-        "LC_ALL",
-        "TERM",
-        "TMPDIR",
-        "VIRTUAL_ENV",
-        "PYTHONPATH",
-        "PYTHONWARNINGS",
-    )
+    # Shares the single canonical allowlist with the isolation providers
+    # (isolation/subprocess.py) so policy intent and provider behavior cannot
+    # diverge regardless of which call path constructs the provider.
+    env_allowlist: tuple[str, ...] = SAFE_ENV_KEYS
 
 
 class SandboxDecision(BaseModel):
@@ -74,6 +97,9 @@ class SandboxDecision(BaseModel):
     policy: str
     approval_required: bool = False
     approved: bool = False
+    # Stable machine-readable code accompanying ``reason`` (PR-C). Optional for
+    # backward compatibility with any externally constructed decisions.
+    reason_code: SandboxReasonCode | None = None
 
 
 class SandboxResult(BaseModel):
@@ -92,6 +118,11 @@ class SandboxResult(BaseModel):
     stdout_truncated: bool = False
     stderr_truncated: bool = False
     redaction_applied: bool = False
+    # PR-A: command-aware error interpretation. ``is_error`` may be False even
+    # when exit_code != 0 (e.g. grep exit 1 = "no matches"). ``exit_note``
+    # carries a human hint for benign nonzero exits.
+    is_error: bool = False
+    exit_note: str | None = None
     audit_event: dict[str, Any]
 
 
@@ -175,8 +206,82 @@ SHELL_DESTRUCTIVE_HINTS = {"rm ", "rm -", "rmdir", "dd ", "mkfs", "truncate", "s
 WRITE_HINTS = {"open", "write_text", "write_bytes", "Path("}
 
 
+# Argv size bounds (defense against resource-exhaustion via pathological argv).
+MAX_ARGV_COUNT = 4096
+MAX_ARGV_TOTAL_BYTES = 1_048_576  # 1 MiB
+
+
+def _argv_within_bounds(command: list[str]) -> bool:
+    if len(command) > MAX_ARGV_COUNT:
+        return False
+    total = sum(len(a.encode("utf-8", errors="ignore")) for a in command)
+    return total <= MAX_ARGV_TOTAL_BYTES
+
+
 class SandboxPathViolation(ValueError):
-    """Raised when command path intent escapes the workspace."""
+    """Raised when command path intent escapes the workspace or hits a deny path.
+
+    Carries an optional ``reason_code`` so callers can attach a stable code to
+    the denial audit event (PR-C).
+    """
+
+    def __init__(self, message: str, reason_code: "SandboxReasonCode | None" = None) -> None:
+        super().__init__(message)
+        self.reason_code = reason_code or SandboxReasonCode.PATH_ESCAPE
+
+
+# Secret / credential read-exfil sinks. Reading these is denied regardless of
+# whether the path resolves inside the workspace, because they hold credentials
+# the sandbox must never surface (defense-in-depth on top of env stripping).
+# Matching is best-effort on the literal path intent (argv-only threat model).
+# Exact basenames that are credential sinks wherever they appear.
+_SECRET_READ_DENY_BASENAMES = frozenset(
+    {
+        ".netrc",
+        ".pgpass",
+        ".git-credentials",
+        ".npmrc",
+        ".pypirc",
+        ".gitconfig",
+    }
+)
+_SECRET_READ_DENY_SUFFIXES = (
+    ".env",
+    "/.docker/config.json",
+)
+_SECRET_READ_DENY_SEGMENTS = (
+    "/.ssh/",
+    "/.aws/",
+    "/.gnupg/",
+    "/.config/gcloud/",
+    "/.kube/",
+    "/.docker/",
+    "/.gitconfig",
+)
+_SECRET_READ_DENY_REGEXES = (
+    re.compile(r"/proc/[^/]+/environ$"),
+    re.compile(r"(^|/)\.env(\.[\w.-]+)?$"),  # .env, .env.local, .env.production
+)
+
+
+def _is_secret_read_path(raw: str) -> bool:
+    """Return True if a literal path intent targets a known secret/credential sink."""
+    if not raw:
+        return False
+    candidate = raw.strip().strip("'\"")
+    expanded = os.path.expanduser(candidate)
+    norm = expanded.replace("\\", "/")
+    lowered = norm.lower()
+    basename = lowered.rsplit("/", 1)[-1]
+    if basename in _SECRET_READ_DENY_BASENAMES:
+        return True
+    if any(lowered.endswith(s) for s in _SECRET_READ_DENY_SUFFIXES):
+        return True
+    if any(seg in lowered for seg in _SECRET_READ_DENY_SEGMENTS):
+        return True
+    if any(rx.search(norm) for rx in _SECRET_READ_DENY_REGEXES):
+        return True
+    return False
 
 
 WRITE_PATH_OPTIONS = {
@@ -216,11 +321,20 @@ def classify_command(command: list[str]) -> CommandClassification:
     """Classify argv without executing it."""
     if not command:
         return CommandClassification.UNKNOWN
+    if not _argv_within_bounds(command):
+        # Oversized argv is treated as UNKNOWN so it is denied by default rather
+        # than walked through the full classifier.
+        return CommandClassification.UNKNOWN
     exe = Path(command[0]).name
     args = command[1:]
     if exe in PRIVILEGED_COMMANDS:
         return CommandClassification.PRIVILEGED
     if exe == "git":
+        # Strip leading global options (git -c k=v, git -C <dir>, git --git-dir=…)
+        # so the real subcommand is classified, not the option token. `git -c`
+        # in particular can inject config that enables protocols/transports, so
+        # we never let it slip through as a bare read-only invocation.
+        args = _strip_git_global_options(args)
         if args and args[0] in GIT_NETWORK_SUBCOMMANDS:
             return CommandClassification.NETWORK
         if args and args[0] in {"clean", "rm", "worktree"}:
@@ -282,9 +396,11 @@ def classify_command(command: list[str]) -> CommandClassification:
             or "write_bytes" in code
         ):
             return CommandClassification.WRITES_WORKSPACE
-        if "-c" in args and "print(" in code:
-            return CommandClassification.READ_ONLY
         if "-c" in args:
+            idx = args.index("-c")
+            snippet = args[idx + 1] if idx + 1 < len(args) else ""
+            if _python_code_is_trivially_read_only(snippet):
+                return CommandClassification.READ_ONLY
             return CommandClassification.UNKNOWN
     if exe in {"node", "ruby", "perl"} and any(a in {"-e", "-c"} for a in args):
         code = " ".join(args)
@@ -327,8 +443,22 @@ def validate_command_paths(command: list[str], policy: SandboxPolicy) -> None:
     root = policy.workspace_root.resolve()
     exe = Path(command[0]).name
     paths = _extract_path_intents(command)
+    # PR-B: deny any access (read or write) to known secret/credential sinks,
+    # independent of workspace confinement. Check raw argv tokens too, since a
+    # bare `cat ~/.ssh/id_rsa` read path is included via _extract_path_intents
+    # for read-only commands, but other commands may reference it as a plain arg.
+    for token in [*paths, *command[1:]]:
+        value = _path_value(token)
+        if _is_secret_read_path(value):
+            raise SandboxPathViolation(
+                f"access to secret/credential path denied: {value}",
+                reason_code=SandboxReasonCode.SECRET_READ_DENIED,
+            )
     if _requires_static_path_proof(command, classification, policy):
-        raise SandboxPathViolation("dynamic shell/interpreter command cannot be safely approved")
+        raise SandboxPathViolation(
+            "dynamic shell/interpreter command cannot be safely approved",
+            reason_code=SandboxReasonCode.DYNAMIC_COMMAND_DENIED,
+        )
     for path in paths:
         if _is_write_path_intent(path) and not _path_within_workspace(
             _write_path_value(path), root
@@ -451,6 +581,103 @@ def _looks_like_git_revision(value: str) -> bool:
     return ":" in value or value in {"HEAD", "FETCH_HEAD", "ORIG_HEAD"}
 
 
+# git global options that take a value and precede the subcommand.
+_GIT_VALUE_OPTIONS = {"-c", "-C", "--git-dir", "--work-tree", "--namespace"}
+
+
+def _strip_git_global_options(args: list[str]) -> list[str]:
+    """Drop leading ``git`` global options so the subcommand can be classified.
+
+    Handles both ``-c key=val`` / ``-C dir`` (value as next token) and
+    ``--git-dir=…`` (inline value) forms. Returns args starting at the first
+    token that is not a recognized global option, so e.g.
+    ``git -c protocol.ext.allow=always fetch …`` classifies as NETWORK rather
+    than slipping through as a bare read-only invocation.
+    """
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg in _GIT_VALUE_OPTIONS:
+            i += 2  # skip option and its value
+            continue
+        if arg.startswith("-") and "=" in arg:
+            # --git-dir=…, --work-tree=…, -c=… style inline value
+            i += 1
+            continue
+        if arg in {"-p", "--paginate", "--no-pager", "--bare", "--no-replace-objects"}:
+            i += 1
+            continue
+        break
+    return args[i:]
+
+
+# Dynamic-execution builtins that defeat static analysis entirely. Their
+# presence means we cannot prove the snippet is side-effect free.
+_PYTHON_DYNAMIC_NAMES = {"__import__", "eval", "exec", "compile"}
+
+# Import roots that can reach the network or spawn processes. A `python -c`
+# snippet importing any of these is never treated as trivially read-only.
+# (Write-mode file ops are already split off as WRITES_WORKSPACE before this
+#  check runs, and all path intents are confined by validate_command_paths.)
+_PYTHON_UNSAFE_IMPORT_ROOTS = {
+    "os",
+    "subprocess",
+    "socket",
+    "asyncio",
+    "multiprocessing",
+    "threading",
+    "ctypes",
+    "signal",
+    "pty",
+    "shutil",
+    "http",
+    "urllib",
+    "ftplib",
+    "smtplib",
+    "telnetlib",
+    "requests",
+    "httpx",
+    "aiohttp",
+    "importlib",
+    "pickle",
+    "shlex",
+    "platform",
+    "resource",
+}
+
+
+def _python_code_is_trivially_read_only(code: str) -> bool:
+    """Return True only if a ``python -c`` snippet is provably free of network /
+    process / dynamic-exec side effects.
+
+    Best-effort static check (defense in depth, not an isolation boundary):
+    the snippet must parse, import nothing from a network/process module set,
+    and never call dynamic-exec builtins (eval/exec/compile/__import__). Write
+    intents and path confinement are enforced separately (WRITES_WORKSPACE
+    classification + validate_command_paths). Anything we cannot prove safe is
+    left as UNKNOWN (deny-default).
+    """
+    if not code:
+        return False
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.split(".")[0] in _PYTHON_UNSAFE_IMPORT_ROOTS:
+                    return False
+        elif isinstance(node, ast.ImportFrom):
+            if (node.module or "").split(".")[0] in _PYTHON_UNSAFE_IMPORT_ROOTS:
+                return False
+        elif isinstance(node, ast.Call):
+            func = node.func
+            if isinstance(func, ast.Name) and func.id in _PYTHON_DYNAMIC_NAMES:
+                return False
+    return True
+
+
 def _extract_python_code_paths(code: str) -> list[str]:
     try:
         tree = ast.parse(code)
@@ -480,6 +707,14 @@ def _extract_python_code_paths(code: str) -> list[str]:
 
 def decide(command: list[str], policy: SandboxPolicy) -> SandboxDecision:
     """Evaluate a command under a sandbox policy."""
+    if command and not _argv_within_bounds(command):
+        return SandboxDecision(
+            allowed=False,
+            classification=CommandClassification.UNKNOWN,
+            reason="argv exceeds size bounds",
+            policy=policy.name,
+            reason_code=SandboxReasonCode.ARGV_OVERSIZED,
+        )
     classification = classify_command(command)
     if classification == CommandClassification.READ_ONLY:
         return SandboxDecision(
@@ -487,6 +722,7 @@ def decide(command: list[str], policy: SandboxPolicy) -> SandboxDecision:
             classification=classification,
             reason="read-only command",
             policy=policy.name,
+            reason_code=SandboxReasonCode.ALLOW_READ_ONLY,
         )
     if classification == CommandClassification.WRITES_WORKSPACE:
         return SandboxDecision(
@@ -494,6 +730,7 @@ def decide(command: list[str], policy: SandboxPolicy) -> SandboxDecision:
             classification=classification,
             reason="workspace writes allowed",
             policy=policy.name,
+            reason_code=SandboxReasonCode.ALLOW_WRITES_WORKSPACE,
         )
     if classification == CommandClassification.NETWORK:
         allowed = policy.allow_network
@@ -504,6 +741,9 @@ def decide(command: list[str], policy: SandboxPolicy) -> SandboxDecision:
             reason="network policy",
             policy=policy.name,
             approval_required=approval_required,
+            reason_code=(
+                SandboxReasonCode.ALLOW_NETWORK if allowed else SandboxReasonCode.NETWORK_DENIED
+            ),
         )
     if classification == CommandClassification.INSTALL:
         allowed = policy.allow_install
@@ -514,6 +754,9 @@ def decide(command: list[str], policy: SandboxPolicy) -> SandboxDecision:
             reason="install policy",
             policy=policy.name,
             approval_required=approval_required,
+            reason_code=(
+                SandboxReasonCode.ALLOW_INSTALL if allowed else SandboxReasonCode.INSTALL_DENIED
+            ),
         )
     if classification == CommandClassification.PRIVILEGED:
         # Privileged commands are always denied by default and cannot be approved
@@ -522,6 +765,7 @@ def decide(command: list[str], policy: SandboxPolicy) -> SandboxDecision:
             classification=classification,
             reason="privileged commands denied",
             policy=policy.name,
+            reason_code=SandboxReasonCode.PRIVILEGED_DENIED,
         )
     if classification == CommandClassification.DESTRUCTIVE:
         # Destructive commands are always denied and cannot be approved
@@ -530,13 +774,18 @@ def decide(command: list[str], policy: SandboxPolicy) -> SandboxDecision:
             classification=classification,
             reason="destructive commands denied",
             policy=policy.name,
+            reason_code=SandboxReasonCode.DESTRUCTIVE_DENIED,
         )
+    allow_unknown = policy.allow_unknown
     return SandboxDecision(
-        allowed=policy.allow_unknown,
+        allowed=allow_unknown,
         classification=classification,
         reason="unknown command policy",
         policy=policy.name,
         approval_required=policy.unknown_approval_required and not policy.allow_unknown,
+        reason_code=(
+            SandboxReasonCode.ALLOW_UNKNOWN if allow_unknown else SandboxReasonCode.UNKNOWN_DENIED
+        ),
     )
 
 
@@ -566,6 +815,7 @@ def approve_decision(
         policy=decision.policy,
         approval_required=True,
         approved=True,
+        reason_code=SandboxReasonCode.ALLOW_APPROVED,
     )
 
 
@@ -733,6 +983,46 @@ def cap_output(text: str, max_bytes: int) -> tuple[str, bool]:
     return truncated, True
 
 
+# Per-command exit-code semantics (PR-A). Many tools use nonzero exit codes to
+# convey information other than failure (grep/rg: 1 = no matches; diff: 1 =
+# differs; test/[: 1 = condition false; find: 1 = some dirs inaccessible).
+# Maps base command -> (error_threshold, {benign_code: note}). An exit code is
+# an error only if it is >= error_threshold.
+_COMMAND_EXIT_SEMANTICS: dict[str, tuple[int, dict[int, str]]] = {
+    "grep": (2, {1: "no matches found"}),
+    "rg": (2, {1: "no matches found"}),
+    "egrep": (2, {1: "no matches found"}),
+    "fgrep": (2, {1: "no matches found"}),
+    "diff": (2, {1: "files differ"}),
+    "cmp": (2, {1: "files differ"}),
+    "find": (2, {1: "some directories were inaccessible"}),
+    "test": (2, {1: "condition is false"}),
+    "[": (2, {1: "condition is false"}),
+}
+
+
+def interpret_exit_code(command: list[str], exit_code: int | None) -> tuple[bool, str | None]:
+    """Interpret a process exit code in a command-aware way.
+
+    Returns ``(is_error, note)``. For most commands a nonzero exit is an error.
+    For commands in :data:`_COMMAND_EXIT_SEMANTICS`, certain nonzero codes are
+    benign (e.g. grep exit 1 = no matches) and are reported as not-an-error with
+    an explanatory note. ``exit_code is None`` (never ran / killed) is an error.
+    """
+    if exit_code is None:
+        return True, None
+    if exit_code == 0:
+        return False, None
+    exe = Path(command[0]).name if command else ""
+    semantics = _COMMAND_EXIT_SEMANTICS.get(exe)
+    if semantics is None:
+        return True, None
+    threshold, benign = semantics
+    if exit_code >= threshold:
+        return True, None
+    return False, benign.get(exit_code)
+
+
 def build_audit_event(
     *,
     command: list[str],
@@ -759,6 +1049,7 @@ def build_audit_event(
         "provider": provider,
         "allowed": decision.allowed,
         "reason": decision.reason,
+        "reason_code": decision.reason_code.value if decision.reason_code else None,
         "started_at": started_at,
         "ended_at": ended_at,
         "exit_code": exit_code,

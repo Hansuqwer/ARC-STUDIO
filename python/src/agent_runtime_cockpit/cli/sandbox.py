@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -40,6 +41,7 @@ from ..security.sandbox import (
     decide,
     ensure_workspace_cwd,
     get_sandbox_audit_event,
+    interpret_exit_code,
     list_sandbox_audit_events,
     list_sandbox_policies,
     parse_relative_time,
@@ -57,12 +59,32 @@ from ..security.sandbox import (
 from ._helpers import DEBUG_FLAG, JSON_FLAG, WORKSPACE_FLAG, _out, _setup_logging, _workspace
 from ._subapps import policy_app, sandbox_app, sandbox_audit_app
 
+log = logging.getLogger(__name__)
+
 
 def _policy(name: str, workspace: Path) -> SandboxPolicy:
     try:
         return resolve_sandbox_policy(name, workspace)
     except (KeyError, ValueError) as exc:
         raise typer.BadParameter(str(exc)) from exc
+
+
+def _persist_audit_safely(audit: dict) -> dict:
+    """Persist a sandbox audit event without ever fail-opening on write error.
+
+    The decision (allow/deny) has already been made by the caller; this only
+    records it. If the audit log cannot be written we log the failure and mark
+    the event, but the security decision still stands — a broken audit sink must
+    never turn a denial into an allow.
+    """
+    try:
+        audit_path = persist_sandbox_audit_event(audit)
+        audit["audit_path"] = str(audit_path)
+    except OSError as exc:
+        log.error("sandbox audit persistence failed: %s", exc)
+        audit["audit_path"] = None
+        audit["audit_persisted"] = False
+    return audit
 
 
 def _persist_sandbox_denial(
@@ -73,15 +95,17 @@ def _persist_sandbox_denial(
     provider: str,
     started_at: str,
     reason: str,
+    reason_code=None,
 ) -> dict:
-    denied = decision.model_copy(
-        update={
-            "allowed": False,
-            "reason": reason,
-            "approval_required": False,
-            "approved": False,
-        }
-    )
+    update: dict = {
+        "allowed": False,
+        "reason": reason,
+        "approval_required": False,
+        "approved": False,
+    }
+    if reason_code is not None:
+        update["reason_code"] = reason_code
+    denied = decision.model_copy(update=update)
     audit = build_audit_event(
         command=command,
         cwd=cwd,
@@ -94,9 +118,7 @@ def _persist_sandbox_denial(
         stderr_truncated=False,
         redaction_applied=False,
     )
-    audit_path = persist_sandbox_audit_event(audit)
-    audit["audit_path"] = str(audit_path)
-    return audit
+    return _persist_audit_safely(audit)
 
 
 @sandbox_app.command("doctor")
@@ -606,6 +628,7 @@ def sandbox_run(
             provider=provider,
             started_at=started_at,
             reason=str(exc),
+            reason_code=getattr(exc, "reason_code", None),
         )
         _out(
             err(
@@ -642,8 +665,7 @@ def sandbox_run(
                 stderr_truncated=False,
                 redaction_applied=False,
             )
-            audit_path = persist_sandbox_audit_event(audit)
-            audit["audit_path"] = str(audit_path)
+            audit = _persist_audit_safely(audit)
             result = SandboxResult(
                 command=command,
                 cwd=str(cwd),
@@ -694,8 +716,7 @@ def sandbox_run(
             stderr_truncated=stream_result.stderr_truncated,
             redaction_applied=stream_result.redaction_applied,
         )
-        audit_path = persist_sandbox_audit_event(audit)
-        audit["audit_path"] = str(audit_path)
+        audit = _persist_audit_safely(audit)
         if stream_result.terminal_event.value in {"cancelled", "timeout"}:
             raise typer.Exit(130 if stream_result.terminal_event.value == "cancelled" else 124)
         if stream_result.exit_code not in (0, None):
@@ -754,8 +775,7 @@ def sandbox_run(
             artifact_hashes=vz_gates.get("artifact_hashes") if vz_gates else None,
             public_execution_enabled=False,
         )
-        audit_path = persist_sandbox_audit_event(audit)
-        audit["audit_path"] = str(audit_path)
+        audit = _persist_audit_safely(audit)
         _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
         raise typer.Exit(2)
     ended_at = utc_now()
@@ -799,8 +819,8 @@ def sandbox_run(
             artifact_hashes=iso.metadata.get("artifact_hashes"),
             public_execution_enabled=bool(iso.metadata.get("public_execution_enabled", False)),
         )
-    audit_path = persist_sandbox_audit_event(audit)
-    audit["audit_path"] = str(audit_path)
+    audit = _persist_audit_safely(audit)
+    is_error, exit_note = interpret_exit_code(command, iso.exit_code)
     result = SandboxResult(
         command=command,
         cwd=str(cwd),
@@ -815,10 +835,15 @@ def sandbox_run(
         stdout_truncated=iso.stdout_truncated,
         stderr_truncated=iso.stderr_truncated,
         redaction_applied=iso.redaction_applied,
+        is_error=is_error,
+        exit_note=exit_note,
         audit_event=audit,
     )
     _out(ok(result.model_dump(mode="json"), workspace=str(ws)), json_output)
-    if iso.exit_code != 0:
+    # Preserve the real process exit code for the caller, but only when the
+    # command-aware interpreter considers it a genuine error (PR-A). A benign
+    # nonzero exit (e.g. grep "no matches") returns success.
+    if iso.exit_code not in (0, None) and is_error:
         raise typer.Exit(iso.exit_code)
 
 
