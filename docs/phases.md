@@ -4531,7 +4531,7 @@ cd python && ARC_MICROVM_INTEGRATION=1 ARC_MICROVM_EXEC_ENABLED=1 ARC_FC_REAL_EX
 ## Phase 106 — SwarmGraph Runtime Hardening
 
 **Roadmap:** R77 SwarmGraph Runtime Hardening (Post-Analysis)
-**Status:** Baseline Complete + Live Smoke Proven | Evidence: Phase 106 implementation complete with mocked ProviderClient coverage; `cd python && uv run ruff check src tests`, `cd python && uv run pytest tests/swarmgraph/ tests/test_swarmgraph_native.py -q`, and `cd python && uv run pytest tests/ -q` passed after each slice. Opt-in live 9router smoke using `ag/gemini-3.5-flash-extra-low` passed via `.env` key with `ARC_SWARMGRAPH_PROVIDER_TESTS=1`.
+**Status:** Baseline Complete + Live Smoke Proven | Evidence: Phase 106 implementation complete with mocked ProviderClient coverage; Phase 107/109 local worktree adds remaining detector coverage, mesh/tree decomposition, parent/multi-dependency DAG scheduling, guardrails, broad Pydantic JSON round-trip coverage across 30 SwarmGraph models, optional SwarmGraph notification hooks, durable webhook config/outbox retry support, and an opt-in provider-backed E2E smoke test gated by `ARC_SWARMGRAPH_PROVIDER_E2E=1`. Verification: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/swarmgraph/test_phase107_109.py -q` 17 passed; `cd python && uv run pytest tests/swarmgraph/ -q --tb=short` 406 passed / 1 skipped; prior `cd python && uv run pytest tests/ -q` 3686 passed / 39 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK. Prior opt-in live 9router smoke using `ag/gemini-3.5-flash-extra-low` passed via `.env` key with `ARC_SWARMGRAPH_PROVIDER_TESTS=1`.
 **Depends on:** Phase 20 (ProviderClient/TurnManager stable), Phase 17 (SwarmGraph native runtime exists)
 
 ### Context
@@ -4660,6 +4660,28 @@ cd python && uv run pytest tests/ -q
 pnpm build
 pnpm typecheck
 ```
+
+### Phase 107/109 Follow-On — Dependency Graph, Guardrails, Notifications
+
+Status: Baseline Complete.
+
+Evidence: local worktree verification listed above.
+
+Acceptance:
+1. Detectors 4-10 emit typed error events and remain read-only observers.
+2. Mesh decomposition creates independent worker tasks; tree decomposition creates parent-linked leaf tasks.
+3. `parent_task_id` and `dependency_task_ids` gate child/join execution until all referenced tasks complete.
+4. Guardrail accept/reject/exception paths are tested before consensus.
+5. SwarmGraph run/result/event plus related config/state/provider/consensus/risk/notification models round-trip through stable JSON.
+6. Optional webhook and EventBroker notification hooks are implemented; hook failures do not interrupt a run.
+7. Durable webhook notification config loads from JSON and records pending/delivered/failed attempts in a local append-only JSONL outbox with explicit retry of outstanding failed records.
+8. Provider-backed E2E smoke path is present but skipped by default; it requires `ARC_SWARMGRAPH_PROVIDER_E2E=1` plus provider/model env and uses a test-only ARC ProviderClient bridge.
+
+Known risks:
+- Notification delivery is best-effort. Durable webhook delivery persists local attempts/results but requires explicit retry invocation; no managed background delivery service or SSE/WebSocket push claim.
+- Dependency scheduling supports explicit task dependency IDs only; no automatic DAG planner/decomposer yet.
+- Provider-backed evidence remains the prior narrow opt-in worker smoke, not broad SwarmGraph E2E.
+- The newly added provider-backed E2E path is gated and skipped in normal CI; skipped status is not live proof.
 
 ### Known Risks
 - Async conversion of runner may break downstream consumers that expect sync `run()`.

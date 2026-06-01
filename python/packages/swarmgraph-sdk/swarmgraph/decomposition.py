@@ -60,10 +60,80 @@ class StepDecomposition:
                 prompt=f"{prompt} (step {i + 1}/{num_workers})",
                 priority=TaskPriority.medium,
                 parent_task_id=tasks[-1].id if tasks else None,
+                dependency_task_ids=[tasks[-1].id] if tasks else [],
                 metadata={"step": i, "total_steps": num_workers, "isolated": True},
             )
             tasks.append(task)
         return tasks
+
+
+class MeshDecomposition:
+    """Each worker gets an independent copy of the full prompt (no shared context).
+
+    Mesh topology is similar to star/copy but each worker operates completely
+    independently — suitable for diversity sampling and ensemble approaches.
+    """
+
+    def decompose(
+        self,
+        prompt: str,
+        num_workers: int,
+        config: SwarmGraphConfig,
+    ) -> list[SwarmTask]:
+        return [
+            SwarmTask(
+                prompt=prompt,
+                priority=TaskPriority.medium,
+                metadata={
+                    "topology": "mesh",
+                    "worker_index": i,
+                    "total_workers": num_workers,
+                    "isolated": True,
+                },
+            )
+            for i in range(num_workers)
+        ]
+
+
+class TreeDecomposition:
+    """Hierarchical decomposition: one root summary task + leaf worker tasks.
+
+    The root task carries the full prompt and runs first (no parent).
+    Leaf tasks each receive a scoped slice of the prompt and have the root
+    task set as their parent, so they only run after the root completes.
+    This allows the root to provide context that leaves can build on.
+    """
+
+    def decompose(
+        self,
+        prompt: str,
+        num_workers: int,
+        config: SwarmGraphConfig,
+    ) -> list[SwarmTask]:
+        root = SwarmTask(
+            prompt=prompt,
+            priority=TaskPriority.high,
+            metadata={"topology": "tree", "role": "root", "isolated": False},
+        )
+        leaves: list[SwarmTask] = []
+        num_leaves = max(1, num_workers - 1)
+        for i in range(num_leaves):
+            leaves.append(
+                SwarmTask(
+                    prompt=f"{prompt} (subtask {i + 1}/{num_leaves})",
+                    priority=TaskPriority.medium,
+                    parent_task_id=root.id,
+                    dependency_task_ids=[root.id],
+                    metadata={
+                        "topology": "tree",
+                        "role": "leaf",
+                        "leaf_index": i,
+                        "total_leaves": num_leaves,
+                        "isolated": True,
+                    },
+                )
+            )
+        return [root, *leaves]
 
 
 class TrivialDecomposition:
@@ -77,6 +147,10 @@ class TrivialDecomposition:
             return CopyDecomposition().decompose(prompt, num_workers, config)
         if config.topology == SwarmTopology.chain:
             return StepDecomposition().decompose(prompt, num_workers, config)
+        if config.topology == SwarmTopology.mesh:
+            return MeshDecomposition().decompose(prompt, num_workers, config)
+        if config.topology == SwarmTopology.tree:
+            return TreeDecomposition().decompose(prompt, num_workers, config)
         return [
             SwarmTask(
                 prompt=prompt,

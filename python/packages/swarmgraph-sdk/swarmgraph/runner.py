@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import threading
 from datetime import datetime, timezone
-from typing import Any, AsyncIterator, Callable, Protocol
+from typing import Any, AsyncIterator, Callable, Protocol, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -24,6 +24,7 @@ from .events import (
 )
 from .graph import build_swarm_graph
 from .models import (
+    AgentStatus,
     SwarmStatus,
     SwarmTask,
     TaskStatus,
@@ -37,7 +38,12 @@ from .nodes.consensus import (
 from .nodes.queen import queen_assign, queen_decompose, queen_prepare_agents
 from .nodes.worker import process_worker_results, worker_execute_async
 from .providers import Provider
+from .notifications import NotificationHook
 from .state import SwarmState
+
+# Type alias for the optional guardrail callable (107.3).
+# Defined after all imports to avoid E402 with forward-reference strings.
+GuardrailFn: TypeAlias = Callable[[SwarmTask, WorkerResult], bool]
 
 
 class CancellationToken(Protocol):
@@ -84,6 +90,8 @@ class SwarmGraphRunner:
         decomposition_strategy: DecompositionStrategy | None = None,
         provider: Provider | None = None,
         checkpoint_store: CheckpointStore | None = None,
+        guardrail: "GuardrailFn | None" = None,
+        notification_hooks: list[NotificationHook] | None = None,
     ):
         self.config = config or SwarmGraphConfig()
         self.state: SwarmState | None = None
@@ -92,17 +100,29 @@ class SwarmGraphRunner:
         self._decomposition_strategy = decomposition_strategy
         self._provider = provider
         self._checkpoint_store = checkpoint_store
+        self._guardrail = guardrail
+        self._notification_hooks: list[NotificationHook] = notification_hooks or []
+        self._notification_tasks: list[asyncio.Task[None]] = []
 
     def _emit(self, event: SwarmGraphEvent) -> None:
         self.events.append(event)
         if self.state is not None:
             self.state.events.append(event.to_dict())
-        if self._on_event is None:
-            return
-        try:
-            self._on_event(event)
-        except Exception:
-            return
+        if self._on_event is not None:
+            try:
+                self._on_event(event)
+            except Exception:
+                pass
+        # Notification hooks (109.1): fire-and-forget async hooks.
+        # Errors are caught inside each hook; they must never interrupt the run.
+        for hook in self._notification_hooks:
+            try:
+                loop = asyncio.get_running_loop()
+                task = loop.create_task(hook.notify(event))
+                task.add_done_callback(_consume_task_exception)
+                self._notification_tasks.append(task)
+            except Exception:
+                pass
 
     def run(
         self,
@@ -195,6 +215,7 @@ class SwarmGraphRunner:
                 self.state.status = SwarmStatus.cancelled
                 self.state.error = "cancelled"
                 self.state.updated_at = datetime.now(timezone.utc)
+                await self._drain_notifications()
                 return self._build_result()
 
             self._emit(
@@ -243,9 +264,10 @@ class SwarmGraphRunner:
                 self._emit(emit_budget_event(self.state, 0.0, cfg.budget_limit_usd))
                 break
 
-            assignment = queen_assign(self.state, pending)
+            ready_pending = [task for task in pending if self._parent_complete(task)]
+            assignment = queen_assign(self.state, ready_pending)
             worker_results = await self._execute_workers_parallel(
-                pending,
+                ready_pending,
                 assignment,
                 cfg,
                 cancellation_token,
@@ -254,10 +276,10 @@ class SwarmGraphRunner:
             if self.state.status == SwarmStatus.cancelled:
                 break
 
-            process_worker_results(pending, worker_results)
+            process_worker_results(ready_pending, worker_results)
 
             if cfg.require_hitl:
-                for task in pending:
+                for task in ready_pending:
                     if (
                         task.status == TaskStatus.completed
                         and task.result
@@ -266,7 +288,7 @@ class SwarmGraphRunner:
                         require_hitl_approval(task)
             else:
                 outcomes = run_consensus_round_with_results(
-                    pending, protocol=cfg.consensus_protocol.value
+                    ready_pending, protocol=cfg.consensus_protocol.value
                 )
                 for event in emit_consensus_events_for_outcomes(self.state, outcomes):
                     self._emit(event)
@@ -298,6 +320,7 @@ class SwarmGraphRunner:
                 self.state.status = SwarmStatus.completed
 
         self.state.updated_at = datetime.now(timezone.utc)
+        await self._drain_notifications()
         return self._build_result()
 
     async def run_result_async(
@@ -365,6 +388,8 @@ class SwarmGraphRunner:
             decomposition_strategy=self._decomposition_strategy,
             provider=self._provider,
             checkpoint_store=self._checkpoint_store,
+            guardrail=self._guardrail,
+            notification_hooks=self._notification_hooks,
         )
         run_task = asyncio.create_task(runner.run_async(prompt, None, cancellation_token))
 
@@ -427,6 +452,10 @@ class SwarmGraphRunner:
                         started_at=datetime.now(timezone.utc),
                     )
 
+        # Dependency gate: only schedule tasks whose parent is completed (or
+        # have no parent). This turns parent_task_id into a real execution
+        # dependency without requiring a separate scheduler — the runner's
+        # round loop naturally retries pending tasks in subsequent rounds.
         worker_tasks = [
             asyncio.create_task(bounded_execute(task)) for task in pending if task.id in assignment
         ]
@@ -473,7 +502,35 @@ class SwarmGraphRunner:
     def _record_worker_result(self, result: WorkerResult, cfg: SwarmGraphConfig) -> None:
         if self.state is None:
             return
+        # Guardrail check (107.3): if a guardrail is configured and rejects the
+        # result, mark the task as failed before consensus and emit an error event.
+        if self._guardrail is not None:
+            task = self.state.tasks.get(result.task_id)
+            if task is not None:
+                try:
+                    accepted = self._guardrail(task, result)
+                except Exception:
+                    accepted = False
+                if not accepted:
+                    failed_result = result.model_copy(update={"error": "guardrail rejected"})
+                    task.result = failed_result
+                    task.status = TaskStatus.failed
+                    task.updated_at = datetime.now(timezone.utc)
+                    self._emit(
+                        SwarmGraphEvent(
+                            kind=SwarmGraphEventKind.error,
+                            swarm_id=self.state.id,
+                            data={
+                                "failure_mode": "guardrail_rejected",
+                                "task_id": result.task_id,
+                            },
+                            round=self.state.current_round,
+                        )
+                    )
+                    self._release_agent(result.worker_id, result.task_id)
+                    return
         self._emit(emit_worker_event(self.state, result))
+        self._release_agent(result.worker_id, result.task_id)
         if not cfg.enable_budget:
             return
         self.state.accumulated_cost_usd += result.cost_usd
@@ -497,6 +554,38 @@ class SwarmGraphRunner:
         checkpoint = self.state.save_checkpoint()
         if self._checkpoint_store is not None:
             self._checkpoint_store.save(checkpoint)
+
+    def _parent_complete(self, task: SwarmTask) -> bool:
+        if self.state is None:
+            return True
+        dependency_ids = list(task.dependency_task_ids)
+        if task.parent_task_id is not None and task.parent_task_id not in dependency_ids:
+            dependency_ids.append(task.parent_task_id)
+        if not dependency_ids:
+            return True
+        for dependency_id in dependency_ids:
+            dependency = self.state.tasks.get(dependency_id)
+            if dependency is None or dependency.status != TaskStatus.completed:
+                return False
+        return True
+
+    def _release_agent(self, worker_id: str, task_id: str) -> None:
+        if self.state is None:
+            return
+        agent = self.state.agents.get(worker_id)
+        if agent is None:
+            return
+        agent.status = AgentStatus.idle
+        agent.current_task_id = None
+        if task_id not in agent.completed_tasks:
+            agent.completed_tasks.append(task_id)
+
+    async def _drain_notifications(self) -> None:
+        if not self._notification_tasks:
+            return
+        tasks = list(self._notification_tasks)
+        self._notification_tasks.clear()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     def _budget_exhausted(self, cfg: SwarmGraphConfig) -> bool:
         if self.state is None or not cfg.enable_budget or cfg.budget_limit_usd is None:
@@ -544,6 +633,13 @@ def _token_cancelled(cancellation_token: CancellationToken | None) -> bool:
     if callable(marker):
         return bool(marker())
     return bool(marker)
+
+
+def _consume_task_exception(task: asyncio.Task[None]) -> None:
+    try:
+        task.exception()
+    except Exception:
+        pass
 
 
 def _run_coro_sync(coro) -> dict[str, Any]:

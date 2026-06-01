@@ -142,6 +142,7 @@ class SwarmTask(BaseModel):
     approval: ApprovalDecision | None = Field(default=None)
     priority: TaskPriority = Field(default=TaskPriority.medium)
     parent_task_id: str | None = Field(default=None)
+    dependency_task_ids: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime | None = Field(default=None)

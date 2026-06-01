@@ -601,7 +601,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Implement webhook/callback triggers for audit events, consensus outcomes, and HITL requests.
 
-**Current:** Baseline Complete. Local event bus with 6 typed event types, CLI watch mode, webhook delivery with HMAC-SHA256 signing, bounded retry, and dead-letter log. Event producers wired into HITL store, audit verifier, run supervisor, and budget enforcer. IDE badge protocol types and notification component exist. 36 Python tests + 5 TS tests.
+**Current:** Baseline Complete. Local event bus with 6 typed event types, CLI watch mode, webhook delivery with HMAC-SHA256 signing, bounded retry, and dead-letter log. Event producers wired into HITL store, audit verifier, run supervisor, budget enforcer, and SwarmGraph optional notification hooks. SwarmGraph hooks now include a file-configured durable webhook hook with append-only JSONL outbox and explicit retry of outstanding failed records. IDE badge protocol types and notification component exist.
 
 **Deliverables:**
 - Local event bus for: `hitl_required`, `hitl_decided`, `audit_verified`, `run_completed`, `run_failed`, `quota_warning`
@@ -616,7 +616,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - Webhook payloads are HMAC-signed if configured
 - Dead letter queue captures permanent failures
 
-**Status:** Baseline Complete | Evidence: 2254 Python tests, 1554 TS tests, extension builds clean | Notes: Event bus is in-memory only (no persistence across daemon restart). Webhook delivery is best-effort. IDE badges poll CLI, not push. No SSE/WebSocket transport in baseline.
+**Status:** Baseline Complete | Evidence: local worktree: `cd python && uv run pytest tests/swarmgraph/test_phase107_109.py -q` 15 passed; `cd python && uv run pytest tests/swarmgraph/ -q --tb=short` 402 passed; prior full verification `cd python && uv run pytest tests/ -q` 3681 passed / 39 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK | Notes: Event bus is in-memory only (no persistence across daemon restart). Webhook delivery and SwarmGraph hooks are best-effort. SwarmGraph durable hook persists delivery attempts/results to a local JSONL outbox and requires explicit retry invocation; it is not a managed background delivery service. IDE badges poll CLI, not push. No SSE/WebSocket transport in baseline.
 
 **Source:** Architecture Review P2-11, Feature List F5.1
 
@@ -994,7 +994,7 @@ P2 — Quality:
 - All 10 consensus protocols produce differentiated results when multiple votes exist
 - Existing fake_offline tests remain green; new tests require `ARC_SWARMGRAPH_PROVIDER_TESTS=1`
 
-**Status:** Baseline Complete + Live Smoke Proven | Evidence: Phase 106 wired `gated_local` workers through `ProviderClient`, added async semaphore-bounded execution, fan-out audit, context isolation, event callback, and 3 detector events; `cd python && uv run ruff check src tests`, targeted SwarmGraph tests, and `cd python && uv run pytest tests/ -q` passed. Opt-in 9router smoke using `ag/gemini-3.5-flash-extra-low` passed via `.env` key with `ARC_SWARMGRAPH_PROVIDER_TESTS=1`. | Notes: This proves a narrow live ProviderClient worker smoke, not broad provider-backed SwarmGraph E2E.
+**Status:** Baseline Complete + Live Smoke Proven | Evidence: Phase 106 wired `gated_local` workers through `ProviderClient`, async semaphore-bounded execution, fan-out audit, context isolation, event callback, and 3 detector events. Phase 107/109 local worktree added detectors 4-10, mesh/tree decomposition, parent/multi-dependency DAG scheduling, guardrails, broad Pydantic JSON round-trip coverage across 30 SwarmGraph models, optional SwarmGraph notification hooks, durable webhook config/outbox retry support, and an opt-in provider-backed E2E smoke test gated by `ARC_SWARMGRAPH_PROVIDER_E2E=1`. Verification: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/swarmgraph/test_phase107_109.py -q` 17 passed; `cd python && uv run pytest tests/swarmgraph/ -q --tb=short` 406 passed / 1 skipped; prior `cd python && uv run pytest tests/ -q` 3686 passed / 39 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK. Prior opt-in 9router smoke using `ag/gemini-3.5-flash-extra-low` passed via `.env` key with `ARC_SWARMGRAPH_PROVIDER_TESTS=1`. | Notes: Default tests make no live provider calls. The new E2E is skipped unless explicitly gated; skipped status is not live E2E evidence. Prior live smoke proves only a narrow ProviderClient worker path, not broad provider-backed SwarmGraph E2E.
 
 ## Updated Status Summary
 
@@ -1024,7 +1024,7 @@ P2 — Quality:
 | **R22 Persistent HITL + Eval** | **Baseline Complete (HITL only)** | **Phase 29 — HITL persistence complete; eval artifact schema and Inspect-style export deferred** |
 | **R23 Consensus Escrow** | **Complete** | **Phase 30 — complete; commit-reveal voting with cryptographic verification and adversarial tests** |
 | **R24 Adaptive Consensus** | **Complete** | **Phase 31 — complete; deterministic risk assessment, protocol selection, raft/bft/bft_escrow hardening** |
-| **R25 Event-Driven Notifications** | **Not Started** | **Phase 32 — add event bus + webhooks** |
+| **R25 Event-Driven Notifications** | **Baseline Complete** | **Phase 32 + SwarmGraph hooks — event bus/webhooks baseline exists; SwarmGraph optional webhook/EventBroker hooks plus durable local JSONL outbox/retry support added; delivery remains best-effort, no SSE/WebSocket claim** |
 | **R26 Swarm Memory Graph** | **Baseline Complete (research prototype + privacy/evaluation gates)** | **Phases 59-61 — local-only schema/store/extract/query, redaction-before-extraction, forget-run, evaluate; runtime wiring deferred** |
 | **R27 LangChain Adapter** | **Baseline Complete** | **Adapter Phase 26 — complete (commits 6beedf8, ea567cf, 7566e60)** |
 | **R28 Anthropic Provider + Registry** | **Baseline Complete** | **Adapter Phase 27 — complete (commit 4a479b7)** |
@@ -1069,7 +1069,7 @@ P2 — Quality:
 | **R74 Broad CLI CI Orchestration** | **Baseline Complete** | **Phase 103 — detect local CI matrix, run selected argv job through sandbox/streaming, write local artifact, stable JSON** |
 | **R75 macOS MicroVM Execution + Strict No-Network Proof** | **Gated Public CLI Proof Passed Once / Artifact Provenance Added / Default Off** | **Phase 104 — Direct Apple VZ `arc sandbox run --provider microvm -- pwd` passed once with no-network/workspace/teardown/audit evidence; not production-grade or arbitrary-command execution** |
 | **R76 Linux Firecracker Execution Proof** | **Host-Unproven Scaffold** | **Phase 105 — Linux/Firecracker gated scaffold exists behind KVM/rootfs/env gates; real proof requires eligible Linux host** |
-| **R77 SwarmGraph Runtime Hardening** | **Baseline Complete + Live Smoke Proven** | **Phase 106 — ProviderClient worker wiring, async parallel execution, fan-out gate, context isolation, event callback, 3 failure detectors, and opt-in 9router worker smoke complete** |
+| **R77 SwarmGraph Runtime Hardening** | **Baseline Complete + Live Smoke Proven** | **Phase 106/107 — ProviderClient worker wiring, async parallel execution, fan-out gate, context isolation, event callback, 10 failure detectors, mesh/tree decomposition, parent/multi-dependency DAG scheduling, guardrails, notification hooks, and opt-in 9router worker smoke complete** |
 
 **Post-v0.1 Execution Order:** 
 - **Priority 1 stop-the-line:** R68-R76 / Phases 97-105 (full CLI parity track). Research first, then implement in order unless the research matrix proves a safer dependency order. Do not claim OpenCode/Claude Code parity, autonomous repair, rich diff review, provider-backed shell, broad CI orchestration, or microVM execution until implemented and tested.

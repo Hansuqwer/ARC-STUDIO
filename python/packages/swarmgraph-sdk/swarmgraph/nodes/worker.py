@@ -296,6 +296,8 @@ def process_worker_results(
     result_map = {r.task_id: r for r in results}
     for task in tasks:
         if task.id in result_map:
+            if task.status == TaskStatus.failed:
+                continue
             task.result = result_map[task.id]
             if result_map[task.id].error:
                 task.status = TaskStatus.failed

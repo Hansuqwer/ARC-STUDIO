@@ -53,6 +53,15 @@ from .models import (
     SwarmTask,
     WorkerResult,
 )
+from .notifications import (
+    DurableNotificationOutbox,
+    DurableWebhookNotificationHook,
+    EventBrokerNotificationHook,
+    NotificationConfig,
+    NotificationDeliveryRecord,
+    WebhookNotificationHook,
+    WebhookTargetConfig,
+)
 from .providers import (
     CostRates,
     Provider,
@@ -145,4 +154,11 @@ __all__ = [
     "AuditEvent",
     "BudgetEvent",
     "run_deterministic_swarm",
+    "WebhookNotificationHook",
+    "EventBrokerNotificationHook",
+    "DurableWebhookNotificationHook",
+    "DurableNotificationOutbox",
+    "NotificationConfig",
+    "NotificationDeliveryRecord",
+    "WebhookTargetConfig",
 ]
