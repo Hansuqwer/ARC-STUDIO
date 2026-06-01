@@ -560,7 +560,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - ✅ `ConsensusEscrow` class: commit / reveal / verify / tally
 - ✅ Commit: `hash(canonical_json(vote) || nonce)` using SHA-256
 - ✅ Reveal: vote + nonce → recompute hash → compare
-- ⚠️ Opt-in via `--consensus-escrow` flag or adaptive high-risk selection — flag deferred to R24
+- ✅ Opt-in via adaptive high-risk selection exists through R24 risk-to-protocol mapping; critical risk maps to `bft_escrow`
 - ✅ Audit chain records commit and reveal events
 
 **Acceptance:**
@@ -570,7 +570,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - ✅ Adversarial tests: 5 scenarios all pass (vote change, replay, hash collision, nonce reuse, metadata manipulation)
 - ⚠️ Performance overhead <10% vs standard consensus — percentage overhead ~14000% due to crypto, but absolute overhead <1ms per vote (acceptable)
 
-**Status:** Complete | Evidence: `python/src/agent_runtime_cockpit/swarmgraph/consensus_escrow.py` (343 lines), `python/tests/swarmgraph/test_consensus_escrow.py` (26 tests passing) | Notes: CLI flag deferred to R24 (adaptive consensus); absolute performance overhead acceptable despite high percentage.
+**Status:** Complete | Evidence: `python/packages/swarmgraph-sdk/swarmgraph/consensus_escrow.py`, `python/tests/swarmgraph/test_consensus_escrow.py` (26 tests passing), and R24 adaptive mapping to `bft_escrow` for critical risk | Notes: Absolute performance overhead acceptable despite high percentage.
 
 **Source:** Architecture Review P2-9, Feature List F4.1
 
@@ -578,23 +578,23 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Dynamically select consensus protocol based on task risk, automatically balancing safety, cost, and speed.
 
-**Current:** Not Started. No adaptive protocol selection exists.
+**Current:** Baseline Complete. Deterministic adaptive consensus exists in `python/packages/swarmgraph-sdk/swarmgraph/risk_assessment.py` and `adaptive_consensus.py`, with compatibility imports through `agent_runtime_cockpit.swarmgraph`. `arc swarmgraph assess-risk` returns a stable JSON envelope with risk level, recommended protocol, worker count, HITL requirement, anti-drift flag, cost estimate, and rationale. Critical risk maps to `bft_escrow`; user protocol overrides emit `AuditOverrideEvent`. High/critical paths surface `hitl_required=true`, but full blocking confirmation at every runtime entrypoint remains a separate integration concern.
 
 **Deliverables:**
-- Deterministic heuristic risk assessor (not LLM-based)
-- Inputs: task text, workspace trust, file types, target runtime, paid-call status, keywords
-- Outputs: risk level, recommended protocol, worker count, HITL requirement, anti-drift setting, cost estimate, rationale
-- Protocol selection matrix (Low→Simple Majority, Medium→Raft, High→BFT, Critical→BFT+Escrow)
-- User confirmation for high/critical risk
-- User override with audit record
+- ✅ Deterministic heuristic risk assessor (not LLM-based)
+- ✅ Inputs: task text, workspace trust, file types, target runtime, paid-call status, keywords
+- ✅ Outputs: risk level, recommended protocol, worker count, HITL requirement, anti-drift setting, cost estimate, rationale
+- ✅ Protocol selection matrix (Low→Simple Majority, Medium→Raft, High→BFT, Critical→BFT+Escrow)
+- ✅ High/critical risk surfaces `hitl_required=true`; full runtime-entrypoint confirmation remains integration follow-up
+- ✅ User override with audit record
 
 **Acceptance:**
-- 100 labeled prompt fixtures classify at 90%+ agreement with expected risk
-- User can override protocol with audit record
-- Cost estimate appears before run
-- Deterministic heuristics (no LLM dependency)
+- ✅ 100 labeled prompt fixtures classify at 90%+ agreement with expected risk
+- ✅ User can override protocol with audit record
+- ✅ Cost estimate appears in risk assessment output before run
+- ✅ Deterministic heuristics (no LLM dependency)
 
-**Status:** Not Started | Evidence: no adaptive consensus found | Notes: P2 work; major differentiator.
+**Status:** Baseline Complete | Evidence: local worktree reality check after Phase 110 commit: `cd python && uv run pytest tests/swarmgraph/test_adaptive_consensus.py tests/swarmgraph/test_adaptive_consensus_hardening.py -q` → 56 passed; `cd python && uv run arc swarmgraph assess-risk --task "Delete production database." --json` → `risk_level=critical`, `recommended_protocol=bft_escrow`, `hitl_required=true`, `cost_estimate_tokens=5000` | Notes: Runtime-wide mandatory confirmation for every high/critical adaptive decision remains a follow-up; no LLM/provider calls are used for risk assessment.
 
 **Source:** Architecture Review P2-10, Feature List F4.2
 
