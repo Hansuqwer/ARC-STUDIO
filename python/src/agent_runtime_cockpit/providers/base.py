@@ -29,7 +29,12 @@ class CostRates(BaseModel):
     cache_write_per_million: float | None = None
     cache_read_per_million: float | None = None
 
-    @field_validator("input_per_million", "output_per_million", "cache_write_per_million", "cache_read_per_million")
+    @field_validator(
+        "input_per_million",
+        "output_per_million",
+        "cache_write_per_million",
+        "cache_read_per_million",
+    )
     @classmethod
     def _non_negative(cls, value: float | None) -> float | None:
         if value is not None and value < 0:
@@ -122,6 +127,7 @@ class ProviderResponse(BaseModel):
     tool_calls: list[dict[str, Any]] = Field(default_factory=list)
     degraded: bool = False
     degraded_reason: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class StreamChunk(BaseModel):
@@ -202,8 +208,7 @@ class CostExtractionError(ProviderError):
 @runtime_checkable
 class ProviderClient(Protocol):
     @abstractmethod
-    def capabilities(self) -> ProviderCapability:
-        ...
+    def capabilities(self) -> ProviderCapability: ...
 
     @abstractmethod
     async def complete(
@@ -211,8 +216,7 @@ class ProviderClient(Protocol):
         request: ProviderRequest,
         *,
         cancellation_token: CancellationToken,
-    ) -> ProviderResponse:
-        ...
+    ) -> ProviderResponse: ...
 
     @abstractmethod
     async def stream(
@@ -220,12 +224,10 @@ class ProviderClient(Protocol):
         request: ProviderRequest,
         *,
         cancellation_token: CancellationToken,
-    ) -> AsyncIterator[StreamChunk]:
-        ...
+    ) -> AsyncIterator[StreamChunk]: ...
 
     @abstractmethod
-    async def cancel(self, call_id: str) -> None:
-        ...
+    async def cancel(self, call_id: str) -> None: ...
 
 
 _PROVIDER_ID_PATTERN: Final = r"^[a-z][a-z0-9-]{1,31}$"

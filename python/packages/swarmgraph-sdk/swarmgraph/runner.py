@@ -292,6 +292,27 @@ class SwarmGraphRunner:
                 )
                 for event in emit_consensus_events_for_outcomes(self.state, outcomes):
                     self._emit(event)
+
+                # Emit arena vote events for tasks with arena metadata
+                if cfg.arena_battle_mode:
+                    from .events import emit_arena_vote_event
+
+                    for task in ready_pending:
+                        if task.result and task.result.artifacts.get("arena_pair_id"):
+                            arena_event = emit_arena_vote_event(
+                                state=self.state,
+                                task_id=task.id,
+                                pair_id=task.result.artifacts["arena_pair_id"],
+                                accepted_index=0,  # Winner is always index 0 in our design
+                                winner_model=task.result.artifacts.get(
+                                    "arena_winner_model", "unknown"
+                                ),
+                                loser_model=task.result.artifacts.get(
+                                    "arena_loser_model", "unknown"
+                                ),
+                            )
+                            self._emit(arena_event)
+
                 failure_event = detect_consensus_failure(outcomes, self.state)
                 if failure_event is not None:
                     self._emit(failure_event)
@@ -318,6 +339,26 @@ class SwarmGraphRunner:
                 self.state.status = SwarmStatus.completed
             else:
                 self.state.status = SwarmStatus.completed
+
+        # Emit arena votes to server if arena_battle_mode is enabled
+        if cfg.arena_battle_mode and self._provider is not None:
+            provider_id = getattr(self._provider.capabilities(), "provider_id", "")
+            if provider_id == "arena":
+                from .events import ArenaVoteEvent
+                from .vote_emitter import emit_arena_votes
+
+                arena_vote_events = [evt for evt in self.events if isinstance(evt, ArenaVoteEvent)]
+                if arena_vote_events:
+                    # Import ArenaClient from ARC (not SDK)
+                    try:
+                        from agent_runtime_cockpit.arena.client import ArenaClient
+
+                        arena_client = ArenaClient.from_env()
+                        if arena_client:
+                            await emit_arena_votes(arena_vote_events, arena_client)
+                    except ImportError:
+                        # ArenaClient not available (SDK-only usage), skip vote emission
+                        pass
 
         self.state.updated_at = datetime.now(timezone.utc)
         await self._drain_notifications()

@@ -1,0 +1,14 @@
+fastapi>=0.111.0
+uvicorn>=0.30.5
+slowapi>=0.1.9
+groq>=0.9.0
+cachetools>=5.3.3
+mistralai>=1.0.0
+openai>=1.35.10
+PyYAML>=6.0.1
+anthropic>=0.31.2
+tiktoken>=0.7.0
+bcrypt~=4.2.0
+fireworks-ai~=0.15.4
+prometheus_client>=0.20.0
+python-dotenv~=1.0.1

@@ -21,6 +21,7 @@ class SwarmGraphEventKind(str, Enum):
     budget = "budget"
     state_transition = "state_transition"
     error = "error"
+    arena_vote = "arena_vote"
 
 
 class SwarmGraphEvent(BaseModel):
@@ -65,6 +66,10 @@ class AuditEvent(SwarmGraphEvent):
 
 
 class BudgetEvent(SwarmGraphEvent):
+    pass
+
+
+class ArenaVoteEvent(SwarmGraphEvent):
     pass
 
 
@@ -178,6 +183,43 @@ def emit_budget_event(
             "limit_usd": limit_usd,
             "accumulated": state.accumulated_cost_usd,
             "exhausted": limit_usd is not None and state.accumulated_cost_usd >= limit_usd,
+        },
+        round=state.current_round,
+    )
+    return event
+
+
+def emit_arena_vote_event(
+    state: SwarmState,
+    task_id: str,
+    pair_id: str,
+    accepted_index: int,
+    winner_model: str,
+    loser_model: str,
+) -> ArenaVoteEvent:
+    """Emit an arena vote event for a completed battle.
+
+    Args:
+        state: Current swarm state.
+        task_id: The task that triggered the battle.
+        pair_id: The arena pair ID from the server.
+        accepted_index: 0 or 1 (which completion was accepted by consensus).
+        winner_model: Model ID of the winning completion.
+        loser_model: Model ID of the losing completion.
+
+    Returns:
+        An ArenaVoteEvent with the vote data.
+
+    """
+    event = ArenaVoteEvent(
+        kind=SwarmGraphEventKind.arena_vote,
+        swarm_id=state.id,
+        data={
+            "task_id": task_id,
+            "pair_id": pair_id,
+            "accepted_index": accepted_index,
+            "winner_model": winner_model,
+            "loser_model": loser_model,
         },
         round=state.current_round,
     )

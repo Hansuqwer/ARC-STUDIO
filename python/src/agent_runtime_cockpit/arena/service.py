@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import random
@@ -12,6 +13,7 @@ from typing import Any
 
 from ..protocol.schemas import RunEvent, RunRecord, RunStatus
 from ..storage.jsonl import JsonlTraceStore
+from .client import ArenaClient, ArenaClientError
 from .models import (
     ArenaAdoptRequest,
     ArenaAdoptResult,
@@ -368,6 +370,76 @@ def _live_anthropic_chat(
         raise RuntimeError(f"Live Anthropic call failed for '{model_id}': {_redact_live(str(exc))}")
 
 
+def _arena_server_response(ws: Path, req: ArenaRequest) -> ArenaResponse:
+    """Generate a live Arena response via the open-source Copilot Arena server.
+
+    Gated behind ARC_ARENA_SERVER_URL + ARC_ALLOW_LIVE_ARENA=true.
+    Calls POST /create_pair (battle) or POST /create_edit_pair (edit modes).
+    """
+    client = ArenaClient.from_env()
+    if client is None:
+        return ArenaResponse(
+            run_id=f"arena-{uuid.uuid4().hex[:12]}",
+            mode=req.mode,
+            warnings=["Arena server not configured: set ARC_ARENA_SERVER_URL."],
+        )
+
+    prompt = req.prompt
+    run_id = f"arena-{uuid.uuid4().hex[:12]}"
+    warnings: list[str] = []
+    candidates: list[ArenaCandidate] = []
+
+    try:
+        if req.mode == ArenaMode.BATTLE:
+            pair = asyncio.get_event_loop().run_until_complete(
+                client.create_pair(
+                    prefix=prompt,
+                    suffix="",
+                    model_tags=req.model_tags,
+                )
+            )
+            for item in pair.items:
+                candidates.append(
+                    ArenaCandidate(
+                        id=f"{run_id}-{item.model.split('-')[0]}-{item.pair_index}",
+                        model=item.model,
+                        text=item.completion,
+                    )
+                )
+        elif req.mode in (ArenaMode.DIRECT, ArenaMode.CODE, ArenaMode.AGENT_ARENA_PREVIEW):
+            pair = asyncio.get_event_loop().run_until_complete(
+                client.create_pair(
+                    prefix=prompt,
+                    suffix="",
+                    model_tags=req.model_tags,
+                )
+            )
+            if pair.items:
+                winner = pair.items[0]
+                candidates.append(
+                    ArenaCandidate(
+                        id=f"{run_id}-{winner.model.split('-')[0]}",
+                        model=winner.model,
+                        text=winner.completion,
+                    )
+                )
+        else:
+            warnings.append(f"Arena server does not support mode: {req.mode.value}")
+    except ArenaClientError as exc:
+        warnings.append(f"Arena server error: {exc}")
+    except Exception as exc:
+        log.warning("Arena server call failed", exc_info=True)
+        warnings.append(f"Arena server call failed: {exc}")
+
+    return ArenaResponse(
+        run_id=run_id,
+        mode=req.mode,
+        candidates=candidates,
+        recommended=candidates[0].id if candidates else "",
+        warnings=warnings,
+    )
+
+
 def _live_response(ws: Path, req: ArenaRequest) -> ArenaResponse:
     """Generate a live Arena response by calling actual provider APIs.
 
@@ -485,7 +557,9 @@ def arena_request(ws: Path, req: ArenaRequest) -> ArenaResponse:
     """Process an Arena request in the specified mode.
 
     In stub mode (default), generates mock responses.
-    Set ARC_ALLOW_LIVE_ARENA=true + configure provider API keys for real calls.
+    Set ARC_ARENA_SERVER_URL + ARC_ALLOW_LIVE_ARENA=true to use the open-source
+    Copilot Arena server.
+    Set ARC_ALLOW_LIVE_ARENA=true + configure provider API keys for direct calls.
     """
     mode = req.mode
     prompt = req.prompt
@@ -493,7 +567,32 @@ def arena_request(ws: Path, req: ArenaRequest) -> ArenaResponse:
     model_tags = req.model_tags
 
     live = os.environ.get("ARC_ALLOW_LIVE_ARENA", "").lower() in {"true", "1"}
+    arena_server_url = os.environ.get("ARC_ARENA_SERVER_URL", "").strip()
 
+    # Priority 1: Copilot Arena server (if configured)
+    if (
+        arena_server_url
+        and live
+        and mode
+        in (
+            ArenaMode.BATTLE,
+            ArenaMode.DIRECT,
+            ArenaMode.CODE,
+            ArenaMode.AGENT_ARENA_PREVIEW,
+        )
+    ):
+        if os.environ.get("ARC_LMARENA_ALLOW_COSTS", "").strip().lower() != "true":
+            return ArenaResponse(
+                run_id=f"arena-{uuid.uuid4().hex[:12]}",
+                mode=mode,
+                warnings=["Live arena blocked: ARC_LMARENA_ALLOW_COSTS=true is required."],
+            )
+        try:
+            return _arena_server_response(ws, req)
+        except Exception:
+            log.warning("Arena server call failed, falling back", exc_info=True)
+
+    # Priority 2: Direct provider API calls (if configured)
     if live and mode in (
         ArenaMode.BATTLE,
         ArenaMode.DIRECT,

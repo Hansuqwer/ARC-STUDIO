@@ -52,6 +52,16 @@ export const ArcPreferenceSchema: PreferenceSchema = {
             default: false,
             description: 'Show the ARC Studio welcome widget on startup.',
         },
+        'arc.arena.inlineCompletion.enabled': {
+            type: 'boolean',
+            default: false,
+            description: 'Enable experimental Copilot Arena inline completions from a self-hosted ARC arena server.',
+        },
+        'arc.arena.serverUrl': {
+            type: 'string',
+            default: '',
+            description: 'Self-hosted ARC Copilot Arena server URL. Required for arena inline completions.',
+        },
         'arc.swarmgraph.provider': {
             type: 'string',
             default: 'openai',

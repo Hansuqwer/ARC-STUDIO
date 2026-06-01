@@ -1,5 +1,6 @@
 from .anthropic import AnthropicClient
 from .anthropic_cost import extract_cost
+from .arena_provider import ArenaProvider
 from .anthropic_estimator import (
     AnthropicCountTokensEstimator,
     EstimateFallback,
@@ -35,6 +36,7 @@ from .registry import register
 __all__ = [
     "AnthropicClient",
     "AnthropicCountTokensEstimator",
+    "ArenaProvider",
     "AuthError",
     "CostExtractionError",
     "EstimateFallback",
@@ -74,6 +76,9 @@ register("fireworks", lambda: OpenAICompatibleClient(vendor="fireworks"))
 register("llamacpp", lambda: OpenAICompatibleClient(vendor="llamacpp"))
 register("9router", lambda: OpenAICompatibleClient(vendor="9router"))
 register("crofai", lambda: OpenAICompatibleClient(vendor="crofai"))
+
+# Register Arena provider (Copilot Arena integration)
+register("arena", ArenaProvider)
 
 for _provider_id, _provider_config in bundled_openai_compatible_providers().items():
     register(

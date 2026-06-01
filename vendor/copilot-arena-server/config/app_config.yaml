@@ -1,0 +1,40 @@
+models:
+  gpt-4o-mini-2024-07-18:
+    weight: 0.3
+    tags: [fast, edit]
+    input_cost: 0.15
+    output_cost: 0.6
+  
+  gpt-4o-2024-08-06:
+    weight: 0.2
+    tags: [best, edit]
+    input_cost: 2.5
+    output_cost: 10.0
+  
+  claude-sonnet-4-20250514:
+    weight: 0.25
+    tags: [best, code]
+    input_cost: 3.0
+    output_cost: 15.0
+  
+  codestral-2405:
+    weight: 0.15
+    tags: [fast, code]
+    input_cost: 0.5
+    output_cost: 1.5
+  
+  deepseek-coder-v2:
+    weight: 0.1
+    tags: [code]
+    input_cost: 0.14
+    output_cost: 0.28
+
+firebase_collections:
+  all_completions: completions
+  completions: completions_shown
+  single_outcomes: single_outcomes
+  outcomes: outcomes
+  edits: edits
+  edit_outcomes: edit_outcomes
+
+version_backend: 1.0.0-arc-fork

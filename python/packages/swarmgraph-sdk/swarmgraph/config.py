@@ -45,20 +45,22 @@ class ExecutionMode(str, Enum):
 
 
 class SwarmGraphConfig(BaseModel):
+    """Configuration for SwarmGraph execution."""
+
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    name: str = Field(default="default-swarm", min_length=1, max_length=128)
-    version: str = Field(default="0.1.0", max_length=32)
-
-    num_workers: int = Field(default=3, ge=1, le=50)
-    max_rounds: int = Field(default=3, ge=1, le=100)
-    quorum_size: int | None = Field(default=None, ge=1)
-    consensus_protocol: ConsensusProtocol = Field(default=ConsensusProtocol.majority)
-    strategy: SwarmStrategy = Field(default=SwarmStrategy.fan_out)
-    topology: SwarmTopology = Field(default=SwarmTopology.star)
-
+    name: str = Field(default="swarmgraph")
     execution_mode: ExecutionMode = Field(default=ExecutionMode.fake_offline)
+    consensus_protocol: ConsensusProtocol = Field(default=ConsensusProtocol.majority)
+    num_workers: int = Field(default=3, ge=1, le=50)
+    quorum_size: int | None = Field(default=None, ge=1, le=50)
+    max_rounds: int = Field(default=3, ge=1, le=10)
+    timeout_seconds: float = Field(default=30.0, ge=1.0, le=300.0)
     allow_paid_calls: bool = Field(default=False)
+    arena_battle_mode: bool = Field(
+        default=False,
+        description="When True and provider is ArenaProvider, each worker triggers an arena battle (2 completions). Consensus picks winners per battle.",
+    )
     require_hitl: bool = Field(default=False)
     enable_audit: bool = Field(default=False)
     enable_budget: bool = Field(default=False)
@@ -69,6 +71,9 @@ class SwarmGraphConfig(BaseModel):
     poll_interval_seconds: float = Field(default=0.1, ge=0.01, le=10)
     fan_out_threshold: float = Field(default=0.6, ge=0, le=1.0)
     max_parallel_workers: int = Field(default=3, ge=1, le=50)
+
+    topology: SwarmTopology = Field(default=SwarmTopology.star)
+    strategy: SwarmStrategy = Field(default=SwarmStrategy.fan_out)
 
     def effective_quorum(self, num_workers: int) -> int:
         if self.quorum_size is not None:

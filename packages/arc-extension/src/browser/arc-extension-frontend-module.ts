@@ -21,6 +21,9 @@ import { ArcStudioWidget } from './arc-studio-widget';
 import { ArcStudioWidgetContribution } from './arc-studio-widget-contribution';
 import { ArcKeybindingContribution } from './arc-keybinding-contribution';
 import { ArcPreferenceSchema } from './arc-preference-schema';
+import { ArenaContribution } from './arena/arena-contribution';
+import { ArenaInlineCompletionProvider } from './arena/arena-inline-completion-provider';
+import { ArenaService } from './arena/arena-service';
 import { ArcServicePath, ArcService } from '../common/arc-protocol';
 import type { ArcService as IArcService } from '../common/arc-protocol';
 import './style/arc-widget.css';
@@ -40,6 +43,14 @@ export default new ContainerModule(bind => {
     bind(ArcKeybindingContribution).toSelf().inSingletonScope();
     bind(CommandContribution).toService(ArcKeybindingContribution);
     bind(KeybindingContribution).toService(ArcKeybindingContribution);
+
+    // Bind Copilot Arena inline completion integration. It remains preference-gated.
+    bind(ArenaService).toSelf().inSingletonScope();
+    bind(ArenaInlineCompletionProvider).toSelf().inSingletonScope();
+    bind(ArenaContribution).toSelf().inSingletonScope();
+    bind(FrontendApplicationContribution).toService(ArenaContribution);
+    bind(CommandContribution).toService(ArenaContribution);
+    bind(KeybindingContribution).toService(ArenaContribution);
 
     // Bind the ARC Studio widget (primary/default)
     bind(ArcStudioWidget).toSelf();

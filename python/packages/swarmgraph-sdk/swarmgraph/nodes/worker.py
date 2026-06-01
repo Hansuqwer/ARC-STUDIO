@@ -173,10 +173,23 @@ async def _worker_execute_provider(
             timeout,
         )
         elapsed = time.time() - t0
+
+        # Detect ArenaProvider and extract battle metadata
+        artifacts = {}
+        provider_id = getattr(provider.capabilities(), "provider_id", "")
+        if provider_id == "arena":
+            metadata = getattr(response, "metadata", {})
+            if metadata:
+                artifacts["arena_pair_id"] = metadata.get("arena_pair_id")
+                artifacts["arena_winner_model"] = metadata.get("arena_winner_model")
+                artifacts["arena_loser_model"] = metadata.get("arena_loser_model")
+                artifacts["arena_loser_content"] = metadata.get("arena_loser_content", "")[:1000]
+
         return WorkerResult(
             worker_id=task.assigned_agent_id or "unknown",
             task_id=task.id,
             output=response.content[:65536],
+            artifacts=artifacts,
             duration_seconds=elapsed,
             cost_usd=_response_cost_usd(provider, response, model),
             token_count=_response_token_count(response),
@@ -284,9 +297,11 @@ async def _complete_provider_with_timeout(
     if isinstance(error, BaseException):
         raise error
     response = result.get("response")
-    if not isinstance(response, ProviderResponse):
+    # Duck-type check: accept any object with 'content' and 'model' attributes
+    # to allow ARC ArenaProvider (different ProviderResponse class) to work.
+    if response is None or not (hasattr(response, "content") and hasattr(response, "model")):
         raise RuntimeError("provider returned no response")
-    return response
+    return response  # type: ignore[return-value]
 
 
 def process_worker_results(
