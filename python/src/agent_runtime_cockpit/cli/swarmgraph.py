@@ -146,6 +146,45 @@ def _composite_score_for_display(result, all_results) -> float:
     return max(0.0, min(1.0, score))
 
 
+@swarmgraph_app.command("plan")
+def plan_cmd(
+    task: str = typer.Option(..., "--task", "-t", help="Task text to decompose"),
+    strategy: str = typer.Option("dag", "--strategy", help="Planning strategy. Currently: dag"),
+    max_nodes: int | None = typer.Option(None, "--max-nodes", help="Maximum plan nodes"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Explain deterministic SwarmGraph decomposition without provider calls."""
+    _setup_logging(debug)
+    if strategy != "dag":
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, "Only --strategy dag is supported"),
+            json_output,
+        )
+        raise typer.Exit(1)
+
+    from ..swarmgraph.decomposition import plan_dag
+
+    try:
+        plan = plan_dag(task, max_nodes=max_nodes)
+    except ValueError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(1)
+
+    _out(
+        ok(
+            {
+                "strategy": "dag",
+                "planner": "deterministic",
+                "provider_backed": False,
+                "nodes": [node.model_dump(mode="json") for node in plan.nodes],
+                "topological_order": plan.topological_order(),
+            }
+        ),
+        json_output,
+    )
+
+
 @swarmgraph_app.command("assess-risk")
 def assess_risk_cmd(
     task: str = typer.Option(..., "--task", "-t", help="Task text to assess for risk"),

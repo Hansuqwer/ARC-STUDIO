@@ -127,3 +127,17 @@ def test_9router_custom_behavior_unchanged(monkeypatch):
     client = get("9router")
     assert client.capabilities().default_model == "ag/gemini-3.5-flash-extra-low"
     assert client._api_key() == ("ROUTER9_API_KEY", "sk-test")
+
+
+def test_crofai_provider_registered_with_env_aliases(monkeypatch):
+    monkeypatch.delenv("CROFAI_API_KEY", raising=False)
+    monkeypatch.delenv("CROF_API_KEY", raising=False)
+    monkeypatch.setenv("CROFAI", "sk-test")
+
+    client = get("crofai")
+    caps = client.capabilities()
+
+    assert caps.provider_id == "openai-crofai"
+    assert caps.default_model == "deepseek-v4-pro-precision"
+    assert "deepseek-v4-pro-precision" in caps.supported_models
+    assert client._api_key() == ("CROFAI", "sk-test")

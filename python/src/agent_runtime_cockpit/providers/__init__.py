@@ -73,6 +73,7 @@ register("deepinfra", lambda: OpenAICompatibleClient(vendor="deepinfra"))
 register("fireworks", lambda: OpenAICompatibleClient(vendor="fireworks"))
 register("llamacpp", lambda: OpenAICompatibleClient(vendor="llamacpp"))
 register("9router", lambda: OpenAICompatibleClient(vendor="9router"))
+register("crofai", lambda: OpenAICompatibleClient(vendor="crofai"))
 
 for _provider_id, _provider_config in bundled_openai_compatible_providers().items():
     register(

@@ -38,6 +38,36 @@ Before commit:
 git status --short
 ```
 
+## Phase 110 — SwarmGraph Notifications + Deterministic DAG Planner
+
+**Roadmap:** R53
+**Status:** Baseline Complete + Narrow Live E2E Proven | Evidence: local worktree: `cd python && uv run pytest tests/ -q` 3705 passed / 41 skipped / 3 xfailed; `cd python && uv run ruff check src tests` OK; `pnpm build` OK; `pnpm typecheck` OK; opt-in CrofAI artifact E2E `ARC_RUN_LIVE_PROVIDER_E2E=1 ARC_ALLOW_LIVE_PROVIDER_TESTS=true ARC_SWARMGRAPH_PROVIDER=crofai ARC_SWARMGRAPH_MODEL=deepseek-v4-pro-precision ARC_PROVIDER_E2E_ARTIFACT=/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-provider-e2e-crofai.json uv run pytest tests/integration/real_runtime/test_swarmgraph_provider_e2e.py::test_live_provider_backed_swarmgraph_e2e_opt_in_only -q` passed | Notes: Evidence artifact support stores prompt/output hashes and lengths only. This phase does not claim public SSE/WebSocket product routing, provider-backed auto planning, or broad provider-backed SwarmGraph adoption.
+
+### Acceptance
+
+1. Managed notification service has explicit `start()`, `stop()`, and `flush_once()` lifecycle with offline retry tests.
+2. SwarmGraph push hook surface broadcasts events to bounded in-memory subscribers with cleanup/overflow tests.
+3. Deterministic DAG planner validates unique ids, dependency existence, cycles, and stable topological order.
+4. `arc swarmgraph plan --strategy dag --json` returns a stable JSON envelope and performs no provider calls.
+5. Live provider-backed SwarmGraph E2E test is opt-in and skipped by default; CrofAI/DeepSeek V4 Pro Precision proof is claimed only for the command that actually ran and passed.
+6. Live provider-backed SwarmGraph E2E writes a durable redacted JSON evidence artifact only after successful assertions; artifact contains no raw prompt or model output.
+
+### Verification
+
+```bash
+cd python && uv run ruff check src tests
+cd python && uv run pytest tests/ -q
+pnpm build
+pnpm typecheck
+```
+
+### Known risks
+
+- Push hook surface is in-memory and process-local; public daemon routes and IDE live UI remain future work.
+- DAG planner is deterministic/local only; provider-backed planning remains unimplemented.
+- Provider-backed SwarmGraph E2E is proven only for the narrow opt-in CrofAI/DeepSeek V4 Pro Precision path; broader provider-backed adoption remains unclaimed.
+- Provider E2E evidence hashes can be compared if the raw prompt/output is known elsewhere, so artifacts are redacted evidence, not anonymized data.
+
 ## Acceptance Ledger Format
 
 Every new phase/chunk should include:
@@ -4531,7 +4561,7 @@ cd python && ARC_MICROVM_INTEGRATION=1 ARC_MICROVM_EXEC_ENABLED=1 ARC_FC_REAL_EX
 ## Phase 106 — SwarmGraph Runtime Hardening
 
 **Roadmap:** R77 SwarmGraph Runtime Hardening (Post-Analysis)
-**Status:** Baseline Complete + Live Smoke Proven | Evidence: Phase 106 implementation complete with mocked ProviderClient coverage; Phase 107/109 local worktree adds remaining detector coverage, mesh/tree decomposition, parent/multi-dependency DAG scheduling, guardrails, broad Pydantic JSON round-trip coverage across 30 SwarmGraph models, optional SwarmGraph notification hooks, durable webhook config/outbox retry support, and an opt-in provider-backed E2E smoke test gated by `ARC_SWARMGRAPH_PROVIDER_E2E=1`. Verification: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/swarmgraph/test_phase107_109.py -q` 17 passed; `cd python && uv run pytest tests/swarmgraph/ -q --tb=short` 406 passed / 1 skipped; prior `cd python && uv run pytest tests/ -q` 3686 passed / 39 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK. Prior opt-in live 9router smoke using `ag/gemini-3.5-flash-extra-low` passed via `.env` key with `ARC_SWARMGRAPH_PROVIDER_TESTS=1`.
+**Status:** Baseline Complete + Live Smoke Proven | Evidence: Phase 106 implementation complete with mocked ProviderClient coverage; Phase 107/109 local worktree adds remaining detector coverage, mesh/tree decomposition, parent/multi-dependency DAG scheduling, guardrails, broad Pydantic JSON round-trip coverage across 30 SwarmGraph models, optional SwarmGraph notification hooks, durable webhook config/outbox retry support, and an opt-in provider-backed E2E smoke test gated by `ARC_SWARMGRAPH_PROVIDER_E2E=1`. Verification: `cd python && uv run ruff check src tests` OK; `cd python && uv run pytest tests/swarmgraph/test_phase107_109.py -q` 17 passed; `cd python && uv run pytest tests/swarmgraph/ -q --tb=short` 406 passed / 1 skipped; prior `cd python && uv run pytest tests/ -q` 3686 passed / 39 skipped / 3 xfailed; `pnpm build` OK; `pnpm typecheck` OK. Prior opt-in live 9router smoke using `ag/gemini-3.5-flash-extra-low` passed via `.env` key with `ARC_SWARMGRAPH_PROVIDER_TESTS=1`. Local worktree follow-up registered the CrofAI OpenAI-compatible provider and passed opt-in live SwarmGraph smoke with `ARC_SWARMGRAPH_PROVIDER=crofai` / `ARC_SWARMGRAPH_MODEL=deepseek-v4-pro-precision`; ruff and provider catalog tests passed.
 **Depends on:** Phase 20 (ProviderClient/TurnManager stable), Phase 17 (SwarmGraph native runtime exists)
 
 ### Context

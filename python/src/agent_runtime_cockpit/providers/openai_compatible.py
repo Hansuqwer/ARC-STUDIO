@@ -53,6 +53,7 @@ VendorName = Literal[
     "fireworks",
     "llamacpp",
     "9router",
+    "crofai",
 ]
 
 VENDOR_CONFIGS = {
@@ -146,6 +147,15 @@ VENDOR_CONFIGS = {
             "qwen/qwen3-coder": CostRates(input_per_million=0.0, output_per_million=0.0),
             "qwen/qwen-plus": CostRates(input_per_million=0.0, output_per_million=0.0),
             "qwen/qwen-max": CostRates(input_per_million=0.0, output_per_million=0.0),
+        },
+    },
+    "crofai": {
+        "base_url": "https://crof.ai/v1",
+        "default_model": "deepseek-v4-pro-precision",
+        "supported_models": ["deepseek-v4-pro-precision"],
+        "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE],
+        "cost_rates": {
+            "deepseek-v4-pro-precision": CostRates(input_per_million=0.0, output_per_million=0.0),
         },
     },
 }
@@ -316,6 +326,8 @@ class OpenAICompatibleClient:
             return ["OPENAI_API_KEY"]
         if self._vendor == "9router":
             return ["NINEROUTER_API_KEY", "ROUTER9_API_KEY"]
+        if self._vendor == "crofai":
+            return ["CROFAI_API_KEY", "CROF_API_KEY", "CROFAI"]
         if self._vendor == "llamacpp":
             return []
         return [f"{self._vendor.upper()}_API_KEY"]

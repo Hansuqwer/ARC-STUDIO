@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import re
 from typing import Protocol
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .config import SwarmGraphConfig, SwarmTopology
 from .models import SwarmTask, TaskPriority
@@ -134,6 +137,109 @@ class TreeDecomposition:
                 )
             )
         return [root, *leaves]
+
+
+class DAGPlanNode(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(..., min_length=1, max_length=128)
+    prompt: str = Field(..., min_length=1, max_length=32768)
+    depends_on: list[str] = Field(default_factory=list)
+
+
+class DAGPlan(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    nodes: list[DAGPlanNode] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_dag(self) -> DAGPlan:
+        ids = [node.id for node in self.nodes]
+        if len(ids) != len(set(ids)):
+            raise ValueError("DAG node ids must be unique")
+        id_set = set(ids)
+        for node in self.nodes:
+            missing = [dep for dep in node.depends_on if dep not in id_set]
+            if missing:
+                raise ValueError(f"DAG node {node.id} has missing dependencies: {missing}")
+        self.topological_order()
+        return self
+
+    def topological_order(self) -> list[str]:
+        remaining = {node.id: set(node.depends_on) for node in self.nodes}
+        ordered: list[str] = []
+        while remaining:
+            ready = sorted(node_id for node_id, deps in remaining.items() if not deps)
+            if not ready:
+                raise ValueError("DAG contains a cycle")
+            for node_id in ready:
+                ordered.append(node_id)
+                remaining.pop(node_id)
+                for deps in remaining.values():
+                    deps.discard(node_id)
+        return ordered
+
+    def to_tasks(self) -> list[SwarmTask]:
+        by_id = {node.id: node for node in self.nodes}
+        tasks: dict[str, SwarmTask] = {}
+        for node_id in self.topological_order():
+            node = by_id[node_id]
+            tasks[node.id] = SwarmTask(
+                id=node.id,
+                prompt=node.prompt,
+                priority=TaskPriority.medium,
+                parent_task_id=node.depends_on[-1] if node.depends_on else None,
+                dependency_task_ids=list(node.depends_on),
+                metadata={"topology": "dag", "planner": "deterministic", "auto_provider": False},
+            )
+        return [tasks[node_id] for node_id in self.topological_order()]
+
+
+class DAGDecomposition:
+    def decompose(
+        self,
+        prompt: str,
+        num_workers: int,
+        config: SwarmGraphConfig,
+    ) -> list[SwarmTask]:
+        return plan_dag(prompt, max_nodes=max(1, num_workers)).to_tasks()
+
+
+def plan_dag(prompt: str, max_nodes: int | None = None) -> DAGPlan:
+    parts = _split_prompt_steps(prompt)
+    if max_nodes is not None:
+        parts = parts[:max_nodes]
+    if not parts:
+        parts = [prompt.strip() or "task"]
+    nodes = []
+    for index, part in enumerate(parts, start=1):
+        node_id = f"task-{index:03d}"
+        depends_on = [f"task-{index - 1:03d}"] if index > 1 else []
+        nodes.append(DAGPlanNode(id=node_id, prompt=part, depends_on=depends_on))
+    return DAGPlan(nodes=nodes)
+
+
+def _split_prompt_steps(prompt: str) -> list[str]:
+    text = prompt.strip()
+    if not text:
+        return []
+    numbered = [
+        part.strip(" .:-\t") for part in re.split(r"(?:^|\n|\s)\d+[.)]\s+", text) if part.strip()
+    ]
+    if len(numbered) > 1:
+        return numbered
+    bullets = [part.strip(" -\t") for part in re.split(r"(?:^|\n)\s*[-*]\s+", text) if part.strip()]
+    if len(bullets) > 1:
+        return bullets
+    then_parts = [
+        part.strip(" .")
+        for part in re.split(r"\bthen\b", text, flags=re.IGNORECASE)
+        if part.strip()
+    ]
+    if len(then_parts) > 1:
+        return then_parts
+    sentence_parts = [part.strip() for part in re.split(r"(?<=[.!?])\s+", text) if part.strip()]
+    return sentence_parts if len(sentence_parts) > 1 else [text]
 
 
 class TrivialDecomposition:

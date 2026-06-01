@@ -89,6 +89,10 @@ Workspace trust resolver (external DB at `~/.arc/trusted-workspaces.json`), secr
 
 `RuntimeRouter` supports combo routing (multiple adapters) and adoption routing (scaffolding for non-native runtimes). Provider configuration uses 4-level precedence: environment > workspace > user > defaults.
 
+### SwarmGraph Runtime Surfaces
+
+SwarmGraph has a deterministic offline planning and notification foundation in the SDK package. `ManagedNotificationService` wraps the durable webhook outbox with explicit `start()`, `stop()`, and `flush_once()` lifecycle methods; it is a local process service, not a managed external notification product. `SwarmGraphEventBroadcaster` and `PushNotificationHook` provide a server-side in-memory push hook surface for future SSE/WebSocket bridges; public route/UI wiring is not claimed by this surface alone. `DAGDecomposition` and `arc swarmgraph plan --strategy dag` provide deterministic local DAG planning with stable topological order and no provider calls.
+
 ## Protocol Boundary
 
 Frontend and backend communicate via **JSON-RPC** over Theia's connection infrastructure (JSON-RPC channel). Protocol types are defined in TypeScript at `packages/arc-extension/src/common/arc-protocol.ts` and mirrored in Python at `python/src/agent_runtime_cockpit/protocol/`. The `packages/arc-protocol-ts/` package provides standalone TypeScript types for use outside Theia.
