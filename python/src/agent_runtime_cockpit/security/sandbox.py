@@ -396,6 +396,20 @@ _SECRET_READ_DENY_SEGMENTS = (
     "/etc/shadow",  # Unix password shadow file
     "/etc/gshadow",  # Unix group shadow file
     "/etc/security/",  # PAM / security policies
+    # CLI credential stores identified via awslabs/git-secrets + OWASP corpus sweep
+    "/.config/gh/",  # GitHub CLI (gh auth token)
+    "/.config/hub",  # hub CLI (github OAuth)
+    "/.config/glab-cli/",  # GitLab CLI
+    "/.config/netlify/",  # Netlify CLI
+    "/.config/heroku/",  # Heroku CLI
+    "/.config/doctl/",  # DigitalOcean CLI
+    "/.config/fly/",  # Fly.io CLI
+    "/.config/stripe/",  # Stripe CLI
+    "/.config/vercel/",  # Vercel CLI
+    "/.config/op/",  # 1Password CLI (op)
+    "/.1password/",  # 1Password agent socket dir
+    "/.password-store/",  # pass (unix password manager)
+    "/.dbt/",  # dbt profiles (database credentials)
 )
 
 # Regex matches — applied after expanduser + normalization.
@@ -483,6 +497,10 @@ _WRAPPER_SKIP: dict[str, int] = {
     "nohup": 0,  # nohup <cmd...>
     "setsid": 0,  # setsid <cmd...>
     "unbuffer": 0,  # unbuffer <cmd...>
+    # runuser intentionally NOT listed here: its primary form is
+    # `runuser -l USER --command 'CMD_STRING'` where CMD_STRING is a shell
+    # string, not an argv sublist. ARC cannot safely classify it without
+    # shelling → correctly falls to UNKNOWN → deny-default.
 }
 
 # Wrappers whose next token is a value to swallow (then inner command follows).

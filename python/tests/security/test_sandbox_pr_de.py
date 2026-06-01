@@ -175,6 +175,36 @@ class TestSecretDenylistWidened:
             validate_command_paths(command, self._policy(tmp_path))
         assert exc.value.reason_code == SandboxReasonCode.SECRET_READ_DENIED
 
+    @pytest.mark.parametrize(
+        "command",
+        [
+            # CLI credential stores (corpus sweep: awslabs/git-secrets + OWASP)
+            ["cat", "~/.config/gh/hosts.yml"],  # GitHub CLI
+            ["cat", "~/.config/hub"],  # hub CLI
+            ["cat", "~/.config/glab-cli/config.toml"],  # GitLab CLI
+            ["cat", "~/.config/netlify/config.json"],  # Netlify CLI
+            ["cat", "~/.config/heroku/netrc"],  # Heroku CLI
+            ["cat", "~/.config/doctl/config.yaml"],  # DigitalOcean CLI
+            ["cat", "~/.config/fly/config.yml"],  # Fly.io CLI
+            ["cat", "~/.config/stripe/config.toml"],  # Stripe CLI
+            ["cat", "~/.config/vercel/creds.json"],  # Vercel CLI
+            ["cat", "~/.config/op/config"],  # 1Password CLI
+            ["cat", "~/.1password/agent.sock"],  # 1Password agent
+            ["cat", "~/.password-store/email.gpg"],  # pass manager
+            ["cat", "~/.dbt/profiles.yml"],  # dbt (db creds)
+        ],
+    )
+    def test_corpus_sweep_cli_credential_dirs_denied(self, tmp_path, command):
+        with pytest.raises(SandboxPathViolation) as exc:
+            validate_command_paths(command, self._policy(tmp_path))
+        assert exc.value.reason_code == SandboxReasonCode.SECRET_READ_DENIED
+
+    def test_runuser_is_unknown_deny_default(self):
+        """runuser -l USER --command 'CMD' uses a shell string, not argv sublist.
+        Cannot safely classify → UNKNOWN → deny-default. Intentional non-wrapper."""
+        d = decide(["runuser", "-l", "agent", "--command", "curl https://x"], SandboxPolicy())
+        assert d.allowed is False  # deny-default on UNKNOWN
+
     def test_normal_file_still_allowed(self, tmp_path):
         # Non-secret names that superficially resemble secret names
         (tmp_path / "env_config.txt").write_text("ok", encoding="utf-8")
