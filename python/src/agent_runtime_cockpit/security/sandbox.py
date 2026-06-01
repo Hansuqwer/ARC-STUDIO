@@ -63,6 +63,37 @@ class SandboxReasonCode(str, Enum):
     ARGV_OVERSIZED = "argv_oversized"
 
 
+class CommandRuleVerdict(str, Enum):
+    """Verdict emitted by a CommandRule match."""
+
+    ALLOW = "allow"
+    DENY = "deny"
+    ASK = "ask"  # prompt for interactive approval
+
+
+class CommandRule(BaseModel):
+    """Wildcard permission rule for explicit allow/deny/ask of specific commands.
+
+    Pattern syntax (clean-room re-implementation):
+    - ``git *``        — matches 'git' with any arguments
+    - ``npm test``     — matches exactly 'npm test'
+    - ``pip install *``— matches 'pip install' followed by anything
+    - ``*``            — matches any command
+
+    Wildcard ``*`` is glob-style: matches any sequence of tokens (not just
+    characters). Matching is done on the joined argv string after the base
+    command is resolved.
+
+    Rules are evaluated in order; first match wins.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    pattern: str
+    verdict: CommandRuleVerdict
+    comment: str = ""
+
+
 class SandboxPolicy(BaseModel):
     """Policy controlling sandbox command execution."""
 
@@ -86,6 +117,10 @@ class SandboxPolicy(BaseModel):
     # (isolation/subprocess.py) so policy intent and provider behavior cannot
     # diverge regardless of which call path constructs the provider.
     env_allowlist: tuple[str, ...] = SAFE_ENV_KEYS
+    # PR-E: explicit per-command rules evaluated before classification.
+    # Rules are checked in order; first match wins and short-circuits the
+    # classification path. Empty list = no explicit rules (existing behaviour).
+    command_rules: tuple[CommandRule, ...] = Field(default_factory=tuple)
 
 
 class SandboxDecision(BaseModel):
@@ -211,6 +246,67 @@ MAX_ARGV_COUNT = 4096
 MAX_ARGV_TOTAL_BYTES = 1_048_576  # 1 MiB
 
 
+def _rule_matches(rule: "CommandRule", command: list[str]) -> bool:
+    """Return True if a command rule pattern matches the given argv.
+
+    Pattern is matched against the full space-joined command string using
+    simple glob semantics: ``*`` matches any sequence of characters (including
+    spaces, i.e. any number of tokens). Matching is case-sensitive on the
+    base command, case-insensitive on arguments for portability.
+
+    Examples:
+        ``git *``        matches any git invocation
+        ``npm test``     matches only 'npm test'
+        ``*``            matches everything
+    """
+    if not command:
+        return False
+    import fnmatch
+
+    subject = " ".join(command)
+    return fnmatch.fnmatch(subject, rule.pattern)
+
+
+def _apply_command_rules(command: list[str], policy: "SandboxPolicy") -> "SandboxDecision | None":
+    """Evaluate explicit CommandRules; return a decision on first match or None.
+
+    Verdicts:
+    - ALLOW  → SandboxDecision(allowed=True, reason_code=ALLOW_APPROVED)
+    - DENY   → SandboxDecision(allowed=False, reason_code=UNKNOWN_DENIED)
+    - ASK    → SandboxDecision(allowed=False, approval_required=True)
+    """
+    for rule in policy.command_rules:
+        if not _rule_matches(rule, command):
+            continue
+        classification = classify_command(command)
+        if rule.verdict == CommandRuleVerdict.ALLOW:
+            return SandboxDecision(
+                allowed=True,
+                classification=classification,
+                reason=f"explicit allow rule: {rule.pattern!r}",
+                policy=policy.name,
+                reason_code=SandboxReasonCode.ALLOW_APPROVED,
+            )
+        if rule.verdict == CommandRuleVerdict.DENY:
+            return SandboxDecision(
+                allowed=False,
+                classification=classification,
+                reason=f"explicit deny rule: {rule.pattern!r}",
+                policy=policy.name,
+                reason_code=SandboxReasonCode.UNKNOWN_DENIED,
+            )
+        if rule.verdict == CommandRuleVerdict.ASK:
+            return SandboxDecision(
+                allowed=False,
+                classification=classification,
+                reason=f"explicit ask rule: {rule.pattern!r}",
+                policy=policy.name,
+                approval_required=True,
+                reason_code=SandboxReasonCode.UNKNOWN_DENIED,
+            )
+    return None
+
+
 def _argv_within_bounds(command: list[str]) -> bool:
     if len(command) > MAX_ARGV_COUNT:
         return False
@@ -235,32 +331,83 @@ class SandboxPathViolation(ValueError):
 # the sandbox must never surface (defense-in-depth on top of env stripping).
 # Matching is best-effort on the literal path intent (argv-only threat model).
 # Exact basenames that are credential sinks wherever they appear.
+# ---------------------------------------------------------------------------
+# PR-B: secret/credential read-exfil deny list.
+#
+# Sources: OWASP Secrets Management Cheat Sheet; standard tooling credential
+# locations; common leakage patterns. GitHub/Vercel code search unavailable
+# (rate-limited); extended from known toolchains below. Append-only — do not
+# remove entries; record reason for each addition.
+# ---------------------------------------------------------------------------
+
+# Exact basename matches — denied wherever they appear in any path.
 _SECRET_READ_DENY_BASENAMES = frozenset(
     {
-        ".netrc",
-        ".pgpass",
-        ".git-credentials",
-        ".npmrc",
-        ".pypirc",
-        ".gitconfig",
+        # VCS / package manager auth
+        ".netrc",  # FTP/curl credentials
+        ".git-credentials",  # git credential store
+        ".npmrc",  # npm auth token
+        ".pypirc",  # PyPI upload credentials
+        ".gitconfig",  # may carry credential helper config
+        # Database credentials
+        ".pgpass",  # PostgreSQL passwords
+        ".my.cnf",  # MySQL client credentials
+        ".mylogin.cnf",  # MySQL login path (encrypted but sensitive)
+        # Cloud/infra auth
+        ".vault-token",  # HashiCorp Vault token file
+        "credentials.tfrc.json",  # Terraform Cloud token
+        # macOS keychain export
+        "login.keychain-db",
+        # Shell history files (may contain secrets entered interactively)
+        ".bash_history",
+        ".zsh_history",
+        ".sh_history",
+        ".fish_history",
+        ".histfile",
+        # Python/env tooling
+        ".python-version",  # not secret per se but guards toolchain env leaks
     }
 )
+
+# Path-suffix matches (lowercased, checked against the full resolved path).
 _SECRET_READ_DENY_SUFFIXES = (
     ".env",
     "/.docker/config.json",
+    "/.terraform.d/credentials.tfrc.json",
+    "/credentials.tfrc.json",
+    "/.azure/accessTokens.json",
+    "/.azure/azureProfile.json",
 )
+
+# Substring segment matches — deny any path containing these segments.
 _SECRET_READ_DENY_SEGMENTS = (
-    "/.ssh/",
-    "/.aws/",
-    "/.gnupg/",
-    "/.config/gcloud/",
-    "/.kube/",
-    "/.docker/",
-    "/.gitconfig",
+    "/.ssh/",  # SSH private keys, known_hosts, authorized_keys
+    "/.aws/",  # AWS credentials, config, sso/cache
+    "/.gnupg/",  # GnuPG keyrings
+    "/.config/gcloud/",  # Google Cloud SDK credentials
+    "/.kube/",  # kubeconfig, service-account tokens
+    "/.docker/",  # Docker Hub auth
+    "/.gitconfig",  # git credential helper (basename already covered)
+    "/.azure/",  # Azure CLI tokens / subscriptions
+    "/.config/helm/",  # Helm chart repo credentials
+    "/.config/pip/",  # pip index credentials (pip.conf)
+    "/.terraform.d/",  # Terraform provider cache + cloud token
+    "/var/run/secrets/kubernetes.io/",  # k8s in-pod service-account tokens
+    "/etc/shadow",  # Unix password shadow file
+    "/etc/gshadow",  # Unix group shadow file
+    "/etc/security/",  # PAM / security policies
 )
+
+# Regex matches — applied after expanduser + normalization.
 _SECRET_READ_DENY_REGEXES = (
-    re.compile(r"/proc/[^/]+/environ$"),
+    re.compile(r"/proc/[^/]+/environ$"),  # process environment
+    re.compile(r"/proc/[^/]+/mem$"),  # process memory
     re.compile(r"(^|/)\.env(\.[\w.-]+)?$"),  # .env, .env.local, .env.production
+    re.compile(r"(^|/)pip\.conf$"),  # pip credentials anywhere
+    re.compile(r"(^|/)\.terraformrc$"),  # Terraform Cloud token (home-dir form)
+    re.compile(
+        r"(^|/)[^/]*\.tfvars(\.json)?$"
+    ),  # Terraform variable files (*.tfvars, *.tfvars.json)
 )
 
 
@@ -317,6 +464,143 @@ def utc_now_plus(seconds: int) -> str:
     )
 
 
+# ---------------------------------------------------------------------------
+# PR-D: wrapper/compound normalisation.
+#
+# Common wrapper commands (timeout, env, nice, nohup, stdbuf, ionice, watch,
+# xargs) pass the real command as a tail argument. Classifying the wrapper
+# token instead of the inner command can leave dangerous inner commands
+# underclassified (e.g. `timeout 30 curl …` → UNKNOWN instead of NETWORK).
+#
+# Strategy: iteratively strip recognised leading wrapper tokens until we
+# reach a non-wrapper or exhaust the argv. Depth-limited (max 8 hops) to
+# prevent infinite loops on pathological argv.
+# ---------------------------------------------------------------------------
+
+# Wrappers that consume a fixed number of *following* tokens before the inner
+# command begins.  `0` means the next token IS the inner command.
+_WRAPPER_SKIP: dict[str, int] = {
+    "nohup": 0,  # nohup <cmd...>
+    "setsid": 0,  # setsid <cmd...>
+    "unbuffer": 0,  # unbuffer <cmd...>
+}
+
+# Wrappers whose next token is a value to swallow (then inner command follows).
+_WRAPPER_VALUE_FLAGS: dict[str, frozenset[str]] = {
+    "timeout": frozenset({"--signal", "-s", "-k"}),  # timeout [opts] DURATION cmd
+    "nice": frozenset({"-n", "--adjustment"}),  # nice [-n N] cmd
+    "ionice": frozenset({"-c", "-n", "-t", "-p"}),  # ionice [-c C] [-n N] cmd
+    "stdbuf": frozenset({"-i", "-o", "-e"}),  # stdbuf [-i SZ] [-o SZ] cmd
+    "watch": frozenset({"-n", "-t", "-g", "-e"}),  # watch [-n INT] cmd
+}
+
+
+def _strip_one_wrapper_layer(args: list[str]) -> list[str] | None:
+    """Return the inner argv if the first token is a recognised wrapper; else None.
+
+    Strips the wrapper binary plus any leading options/values it owns, leaving
+    the wrapped command as the new head. Returns None when no stripping applies
+    so the caller can stop iterating.
+    """
+    if not args:
+        return None
+    exe = Path(args[0]).name
+
+    # Simple zero-arg wrappers (nohup, setsid, unbuffer).
+    if exe in _WRAPPER_SKIP:
+        inner = args[1:]
+        return inner if inner else None
+
+    # `env`: skip leading VAR=val assignments and -u/-i flags, then inner cmd.
+    if exe == "env":
+        i = 1
+        while i < len(args):
+            tok = args[i]
+            if tok in {"-i", "--ignore-environment", "-0", "--null"}:
+                i += 1
+                continue
+            if tok in {"-u", "--unset"}:
+                i += 2  # skip flag + name
+                continue
+            if "=" in tok and not tok.startswith("-"):
+                i += 1  # VAR=val assignment
+                continue
+            break  # first non-option, non-assignment → inner command
+        inner = args[i:]
+        return inner if inner else None
+
+    # Wrappers with value-consuming flags.
+    if exe in _WRAPPER_VALUE_FLAGS:
+        value_flags = _WRAPPER_VALUE_FLAGS[exe]
+        i = 1
+        positional_consumed = False  # track whether a bare positional value was found
+        while i < len(args):
+            tok = args[i]
+            if tok in value_flags:
+                i += 2  # named flag + its value
+                positional_consumed = True  # named flag provided the value
+                continue
+            if tok.startswith("-") and "=" not in tok and len(tok) > 1:
+                # Unknown flag: skip just the flag itself (no value assumed).
+                # Conservative — misparse means classifying a value as the
+                # inner command → UNKNOWN → deny-default. Safe.
+                i += 1
+                continue
+            # First non-option token.
+            # For commands with a mandatory bare positional before the inner
+            # command (timeout DURATION, nice ADJ when -n not used, ionice
+            # CLASS, watch INTERVAL), skip that ONE positional then stop.
+            # But ONLY if no named flag already consumed the value.
+            if tok and not tok.startswith("-"):
+                if not positional_consumed and exe in {"timeout", "nice", "ionice", "watch"}:
+                    i += 1  # skip the bare positional (DURATION / ADJ / ...)
+                    break  # inner command starts at i
+                # Either the value was already consumed by a named flag, or
+                # this is stdbuf (no bare positional) — this token IS the inner
+                # command. Fall through to break without advancing i.
+            break
+        inner = args[i:]
+        return inner if inner else None
+
+    # `xargs` with -I or -n: pass the remaining argv as a whole command.
+    if exe == "xargs":
+        # xargs [-I {} | -n N | …] cmd [args…]
+        # Skip xargs options, yield the first non-option as inner command head.
+        i = 1
+        while i < len(args):
+            tok = args[i]
+            if tok in {"-I", "-i", "-n", "-P", "-L", "-s", "-d", "-a"}:
+                i += 2  # flag + value
+                continue
+            if tok.startswith("-I") or tok.startswith("-n") or tok.startswith("-P"):
+                i += 1  # inline value form
+                continue
+            if tok.startswith("-"):
+                i += 1
+                continue
+            break
+        inner = args[i:]
+        return inner if inner else None
+
+    return None
+
+
+def strip_command_wrappers(command: list[str], max_depth: int = 8) -> list[str]:
+    """Iteratively strip recognised wrapper prefixes, returning the inner argv.
+
+    Idempotent (returns original if no wrappers). Depth-limited to prevent
+    pathological inputs from looping forever. The result is the innermost
+    argv that no longer starts with a known wrapper.
+    """
+    current = command
+    for _ in range(max_depth):
+        stripped = _strip_one_wrapper_layer(current)
+        if stripped is None or stripped == current:
+            break
+        current = stripped
+    return current
+
+
 def classify_command(command: list[str]) -> CommandClassification:
     """Classify argv without executing it."""
     if not command:
@@ -325,6 +609,11 @@ def classify_command(command: list[str]) -> CommandClassification:
         # Oversized argv is treated as UNKNOWN so it is denied by default rather
         # than walked through the full classifier.
         return CommandClassification.UNKNOWN
+    # PR-D: peel wrapper layers before classifying so that e.g.
+    # `timeout 30 curl https://x` is NETWORK, not UNKNOWN.
+    inner = strip_command_wrappers(command)
+    if inner != command:
+        return classify_command(inner)
     exe = Path(command[0]).name
     args = command[1:]
     if exe in PRIVILEGED_COMMANDS:
@@ -715,6 +1004,10 @@ def decide(command: list[str], policy: SandboxPolicy) -> SandboxDecision:
             policy=policy.name,
             reason_code=SandboxReasonCode.ARGV_OVERSIZED,
         )
+    # PR-E: explicit rules take precedence over classification-based policy.
+    rule_decision = _apply_command_rules(command, policy)
+    if rule_decision is not None:
+        return rule_decision
     classification = classify_command(command)
     if classification == CommandClassification.READ_ONLY:
         return SandboxDecision(
@@ -939,6 +1232,72 @@ def prune_expired_approvals(path: Path | None = None) -> dict[str, Any]:
     store.approvals = [a for a in store.approvals if not approval_is_expired(a, now)]
     save_sandbox_approval_store(store, path)
     return {"pruned": before - len(store.approvals), "remaining": len(store.approvals)}
+
+
+# ---------------------------------------------------------------------------
+# PR-E: command rule store
+# ---------------------------------------------------------------------------
+
+
+class _CommandRuleStore(BaseModel):
+    """Persisted per-policy command rules."""
+
+    version: Literal[1] = 1
+    rules: list[CommandRule] = Field(default_factory=list)
+
+
+def _rule_store_path() -> Path:
+    override = os.environ.get("ARC_POLICY_RULES_STORE")
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / ".arc" / "policy-rules.json"
+
+
+def _load_rule_store(path: Path | None = None) -> _CommandRuleStore:
+    p = path or _rule_store_path()
+    if not p.exists():
+        return _CommandRuleStore()
+    try:
+        return _CommandRuleStore.model_validate_json(p.read_text())
+    except Exception:
+        return _CommandRuleStore()
+
+
+def _save_rule_store(store: _CommandRuleStore, path: Path | None = None) -> Path:
+    p = path or _rule_store_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(stable_json(store.model_dump(mode="json")) + "\n")
+    return p
+
+
+def add_command_rule(
+    pattern: str,
+    verdict: CommandRuleVerdict,
+    comment: str = "",
+    path: Path | None = None,
+) -> CommandRule:
+    """Persist a new command rule; no-op if identical rule already exists."""
+    store = _load_rule_store(path)
+    rule = CommandRule(pattern=pattern, verdict=verdict, comment=comment)
+    # Deduplicate by (pattern, verdict).
+    if not any(r.pattern == pattern and r.verdict == verdict for r in store.rules):
+        store.rules.append(rule)
+        _save_rule_store(store, path)
+    return rule
+
+
+def list_command_rules(path: Path | None = None) -> list[CommandRule]:
+    """Return all persisted command rules in order."""
+    return _load_rule_store(path).rules
+
+
+def remove_command_rule(pattern: str, path: Path | None = None) -> dict[str, int]:
+    """Remove all rules matching *pattern* exactly."""
+    store = _load_rule_store(path)
+    before = len(store.rules)
+    store.rules = [r for r in store.rules if r.pattern != pattern]
+    _save_rule_store(store, path)
+    return {"removed": before - len(store.rules), "remaining": len(store.rules)}
 
 
 def approve_decision_with_token(

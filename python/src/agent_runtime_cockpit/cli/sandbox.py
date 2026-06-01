@@ -41,9 +41,13 @@ from ..security.sandbox import (
     decide,
     ensure_workspace_cwd,
     get_sandbox_audit_event,
+    CommandRuleVerdict,
+    add_command_rule,
     interpret_exit_code,
+    list_command_rules,
     list_sandbox_audit_events,
     list_sandbox_policies,
+    remove_command_rule,
     parse_relative_time,
     persist_sandbox_audit_event,
     revoke_approval_token,
@@ -1120,3 +1124,62 @@ def policy_apply(
     _out(ok(result), json_output)
     if not result["ok"]:
         raise typer.Exit(1)
+
+
+# ---------------------------------------------------------------------------
+# PR-E: policy rule management commands
+# ---------------------------------------------------------------------------
+
+
+@policy_app.command("rule-add")
+def policy_rule_add(
+    pattern: str = typer.Option(..., "--pattern", help="Command glob pattern, e.g. 'git *'"),
+    verdict: str = typer.Option(..., "--verdict", help="allow | deny | ask"),
+    comment: str = typer.Option("", "--comment", help="Optional human note"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Add an explicit command rule (allow/deny/ask) to the rule store.
+
+    Rules are evaluated before classification; first match wins.
+
+    Examples:
+      arc policy rule-add --pattern 'git *' --verdict allow
+      arc policy rule-add --pattern 'curl *' --verdict deny --comment 'no network'
+    """
+    _setup_logging(debug)
+    try:
+        v = CommandRuleVerdict(verdict.lower())
+    except ValueError:
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, f"invalid verdict {verdict!r}; use allow/deny/ask"),
+            json_output,
+        )
+        raise typer.Exit(2)
+    rule = add_command_rule(pattern=pattern, verdict=v, comment=comment)
+    _out(ok(rule.model_dump(mode="json")), json_output)
+
+
+@policy_app.command("rule-list")
+def policy_rule_list(
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """List all persisted command rules in evaluation order."""
+    _setup_logging(debug)
+    rules = list_command_rules()
+    _out(
+        ok({"rules": [r.model_dump(mode="json") for r in rules], "count": len(rules)}), json_output
+    )
+
+
+@policy_app.command("rule-remove")
+def policy_rule_remove(
+    pattern: str = typer.Option(..., "--pattern", help="Pattern to remove (exact match)"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Remove all command rules matching the given pattern exactly."""
+    _setup_logging(debug)
+    result = remove_command_rule(pattern=pattern)
+    _out(ok(result), json_output)
