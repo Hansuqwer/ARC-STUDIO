@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -26,12 +27,112 @@ def _save_history(history: list[str]) -> None:
     HISTORY_FILE.write_text("\n".join(history[-500:]) + "\n")
 
 
+def _run_with_adapter(prompt: str, session: ChatSession, renderer: Any) -> str:
+    """Dispatch a bare-prompt turn through the session's selected engine adapter.
+
+    Routes via session.metadata['runtime_adapter'] (default 'swarmgraph').
+    - swarmgraph: uses SwarmGraphRunner (sync REPL path).
+    - provider_backed mode: uses TurnManager streaming via Rich Live.
+    - all others without a sync REPL path: returns an honest degraded message.
+    """
+    engine = str((session.metadata or {}).get("runtime_adapter") or "swarmgraph")
+
+    # Provider-backed mode overrides engine dispatch: use TurnManager streaming
+    if session.runtime_mode is RuntimeMode.PROVIDER_BACKED and session.allow_paid_calls:
+        return _run_provider_streaming(prompt, session, renderer)
+
+    if engine == "swarmgraph":
+        from ..swarmgraph import SwarmGraphRunner
+        from ..swarmgraph.config import SwarmGraphConfig
+
+        cfg = SwarmGraphConfig(num_workers=3, max_rounds=1)
+        runner = SwarmGraphRunner(config=cfg)
+        result = runner.run(prompt=prompt)
+        return _format_result(result)
+
+    # Other engines: check can_run via adapter registry
+    from ..adapters.registry import default_registry
+    from pathlib import Path
+
+    adapter = default_registry().get(engine)
+    if adapter is None:
+        return f"[degraded] Unknown engine '{engine}'. Use /runtime list."
+    caps = adapter.capabilities()
+    if not caps.can_run:
+        report = adapter.capability_report(Path.cwd())
+        return (
+            f"[degraded] Engine '{engine}' is detected but not runnable.\n"
+            f"  {report.reason or 'No REPL execution path available.'}\n"
+            "  Use /runtime use swarmgraph for the default offline path."
+        )
+    # Adapter has can_run=True but no sync REPL bridge yet
+    return (
+        f"[degraded] Engine '{engine}' can_run=True but has no synchronous REPL path.\n"
+        "  Use /run or configure the engine's CLI export. See /doctor."
+    )
+
+
+def _run_provider_streaming(prompt: str, session: ChatSession, renderer: Any) -> str:
+    """Run a provider-backed turn with Rich Live streaming.
+
+    Uses the existing _run_provider_turn / TurnManager path.
+    Only called when runtime_mode==PROVIDER_BACKED and allow_paid_calls=True.
+
+    For tests: renderer.stream_fn (if set) is a callable(prompt) -> Iterable[str]
+    used instead of the real provider so tests need no network.
+    """
+    # Injectable test seam
+    stream_fn = getattr(renderer, "stream_fn", None)
+    if stream_fn is not None:
+        from rich.live import Live
+
+        accumulated = ""
+        with Live(
+            renderer.assistant_block("…"),
+            console=renderer.console,
+            transient=False,
+            auto_refresh=False,
+        ) as live:
+            for chunk in stream_fn(prompt):
+                accumulated += chunk
+                live.update(renderer.assistant_block(accumulated), refresh=True)
+        return accumulated
+
+    # Real provider path: delegate to the slash command handler's /run mechanism
+    # which uses TurnManager. We call it synchronously via the existing _run_coro_sync.
+    try:
+        from .slash_commands import _execute_run, CancellationToken
+
+        class _FakeEventSink:
+            def emit_event(self, name: str, payload: dict) -> None:
+                pass
+
+        result = _execute_run(
+            prompt,
+            session=session,
+            cancellation_token=CancellationToken(),
+            event_sink=_FakeEventSink(),
+        )
+        if hasattr(result, "output"):
+            return result.output or str(result)
+        return str(result)
+    except Exception as exc:  # noqa: BLE001
+        return f"[provider] turn failed: {exc}"
+
+
 def run_chat_repl(
     initial_prompt: str | None = None,
     session_id: str | None = None,
     non_interactive: bool = False,
     config: Any = None,
 ) -> None:
+    """Launch the ARC interactive shell.
+
+    Default: a Rich-based interactive shell. Legacy/plain mode is preserved and
+    selected with ``ARC_PLAIN_REPL=1`` (also used for non-interactive runs to keep
+    output deterministic). Safe defaults are unchanged: no provider/network/paid
+    calls unless the user explicitly opts in via the environment.
+    """
     session: ChatSession | None = None
     if session_id:
         session = ChatSession.load(session_id)
@@ -39,6 +140,16 @@ def run_chat_repl(
         session = ChatSession()
     _configure_provider_default(session)
 
+    if non_interactive or os.environ.get("ARC_PLAIN_REPL"):
+        _run_plain_repl(session, initial_prompt, non_interactive)
+    else:
+        _run_rich_repl(session, initial_prompt)
+
+
+def _run_plain_repl(
+    session: ChatSession, initial_prompt: str | None, non_interactive: bool
+) -> None:
+    """Legacy plain REPL (ARC_PLAIN_REPL=1 / non-interactive). Behavior preserved."""
     handler = SlashCommandHandler(
         progress_sink=lambda name, payload: print(_format_progress_event(name, payload))
     )
@@ -74,6 +185,105 @@ def run_chat_repl(
         session.save()
         _save_history(history)
         print(f"Session saved: {session.id[:12]}...")
+
+
+def _run_rich_repl(session: ChatSession, initial_prompt: str | None = None) -> None:
+    """Rich-based interactive shell (default). Orchestration only; visuals via Renderer."""
+    from .rendering import Renderer
+
+    renderer = Renderer()
+
+    # ARC_TUI=1: full-screen TUI not yet implemented — show honest blocker and continue.
+    if os.environ.get("ARC_TUI") == "1":
+        renderer.print(
+            renderer.system_block(
+                "Full-screen TUI (ARC_TUI=1) is experimental and not yet implemented.\n"
+                "Falling back to line-oriented Rich shell.\n"
+                "Blocker: input blocking conflicts with Live(screen=True) refresh loop."
+            )
+        )
+    handler = SlashCommandHandler(
+        progress_sink=lambda name, payload: renderer.print(renderer.progress_line(name, payload))
+    )
+    # Approval-required sandbox actions render a prompt instead of failing silently.
+    handler.confirm_fn = renderer.confirm_approval
+
+    renderer.print(renderer.startup_panel(session))
+    renderer.print(renderer.command_palette())
+
+    history = _load_history()
+    if initial_prompt:
+        _handle_input_rich(initial_prompt, session, handler, renderer)
+
+    try:
+        while True:
+            try:
+                user_input = input(_format_prompt(session)).strip()
+            except (EOFError, KeyboardInterrupt):
+                renderer.console.print()
+                break
+
+            if not user_input:
+                continue
+
+            history.append(user_input)
+            _handle_input_rich(user_input, session, handler, renderer)
+
+            if user_input.strip().lower() in ("/quit", "/exit"):
+                break
+
+    finally:
+        session.save()
+        _save_history(history)
+        renderer.print(renderer.system_block(f"Session saved: {session.id[:12]}..."))
+
+
+def _handle_input_rich(
+    text: str,
+    session: ChatSession,
+    handler: SlashCommandHandler,
+    renderer: Any,
+) -> None:
+    """Route one line of input for the rich shell, rendering distinct blocks.
+
+    Mirrors the plain ``_handle_input`` exception boundary: no slash-command or
+    runner failure escapes to the loop.
+    """
+    text = text.strip()
+    if not text:
+        return
+
+    renderer.print(renderer.user_block(text))
+
+    if text.startswith("/"):
+        try:
+            result = handler.handle(text, session)
+        except SystemExit:
+            raise  # /exit must propagate
+        except Exception as exc:  # noqa: BLE001
+            renderer.print(renderer.error_block(f"command failed: {exc}"))
+            return
+        if result is None:
+            renderer.print(renderer.error_block(f"Unknown command: {text}"))
+        elif result == "__EXIT__":
+            session.add_message("user", text)
+            raise SystemExit(0)
+        else:
+            renderer.print(renderer.command_result(text, result))
+        return
+
+    if session.mode == "auto" and session.runtime_mode is RuntimeMode.PROVIDER_BACKED:
+        result = handler.handle(f"/agent {text}", session)
+        renderer.print(renderer.command_result(f"/agent {text}", result))
+        return
+
+    session.add_message("user", text)
+    try:
+        reply = _run_with_adapter(text, session, renderer)
+        session.add_message("assistant", reply)
+        renderer.print(renderer.assistant_block(reply))
+    except Exception as exc:  # noqa: BLE001
+        renderer.print(renderer.error_block(f"runner failed: {exc}"))
 
 
 def _handle_input(

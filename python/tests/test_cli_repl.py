@@ -334,7 +334,9 @@ class TestSlashCommands:
         s = ChatSession()
         result = handler.handle("/runtime", s)
         assert result is not None
-        assert "Runtime: fake" in result
+        # New semantics: /runtime is the engine selector, shows active engine + list
+        assert "Active engine" in str(result)
+        assert "swarmgraph" in str(result)  # default active engine
 
     def test_tools_list_shows_builtin_tools(self):
         handler = SlashCommandHandler()
@@ -924,13 +926,20 @@ class TestMergedSlashCommands:
             raise RuntimeError("boom")
 
         monkeypatch.setattr(slash_commands, "cmd_status", boom)
-        handler._registry.get("status").handler = boom
-        result = handler.handle("/status", s)
-        assert result is not None
-        assert result.state == "error"
-        assert "boom" in result.output
-        assert result.metadata["command"] == "status"
-        assert result.metadata["error_type"] == "RuntimeError"
+        # The registry is a global singleton; restore the handler afterwards so this
+        # test does not pollute /status for tests that run later in the suite.
+        status_cmd = handler._registry.get("status")
+        original_handler = status_cmd.handler
+        status_cmd.handler = boom
+        try:
+            result = handler.handle("/status", s)
+            assert result is not None
+            assert result.state == "error"
+            assert "boom" in result.output
+            assert result.metadata["command"] == "status"
+            assert result.metadata["error_type"] == "RuntimeError"
+        finally:
+            status_cmd.handler = original_handler
 
     def test_chat_repl_formats_progress_events(self):
         from agent_runtime_cockpit.cli_repl.chat_repl import _format_progress_event

@@ -195,6 +195,36 @@ def _build_registry():
     )
     registry.register(
         CommandDef(
+            name="session",
+            help_text="Show current session summary",
+            category="session",
+            handler=cmd_session,
+            gates_required=[],
+            mode_required=[],
+            renders=["present"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="model",
+            help_text="Provider/model selector: /model [list] | use <provider[:model]>",
+            category="provider",
+            handler=cmd_model,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "degraded", "blocked"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+            usage="/model [list] | use <provider[:model]>",
+            subcommands=["list", "use"],
+        )
+    )
+    registry.register(
+        CommandDef(
             name="summary",
             help_text="Show session summary",
             category="session",
@@ -273,15 +303,17 @@ def _build_registry():
     registry.register(
         CommandDef(
             name="runtime",
-            help_text="Show or set runtime mode: fake, gated_local, provider_backed",
+            help_text="Engine selector: /runtime [list] | use <id>  (swarmgraph, langgraph, …)",
             category="runtime",
             handler=cmd_runtime,
             gates_required=[],
             mode_required=[],
-            renders=["present", "blocked"],
+            renders=["present", "degraded", "blocked"],
             requires_events=[],
             privileged=False,
             trust_required="user",
+            usage="/runtime [list] | use <engine_id>",
+            subcommands=["list", "use"],
         )
     )
     registry.register(
@@ -301,9 +333,9 @@ def _build_registry():
     registry.register(
         CommandDef(
             name="mode",
-            help_text="Alias for /runtime",
+            help_text="Execution-mode switcher: /mode [fake|gated_local|provider_backed]",
             category="runtime",
-            handler=cmd_runtime,
+            handler=cmd_mode,
             gates_required=[],
             mode_required=[],
             renders=["present", "blocked"],
@@ -476,6 +508,21 @@ def _build_registry():
             privileged=False,
             trust_required="workspace",
             usage="/apply --path PATH --content TEXT --approve | --plan-id ID --content TEXT --approval-token TOKEN",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="apply-diff",
+            help_text="Diff preview → approve → apply: /apply-diff <file> [diff_text]",
+            category="workspace",
+            handler=cmd_apply_diff,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "denied", "blocked"],
+            requires_events=[],
+            privileged=False,
+            trust_required="workspace",
+            usage="/apply-diff <file> [diff_text]",
         )
     )
     registry.register(
@@ -806,7 +853,17 @@ def cmd_help(_arg: str, _session: ChatSession) -> str:
     # Ordered command palette grouped by surface area.
     # All entries are implemented; none are deferred or design-only in this list.
     groups: dict[str, list[str]] = {
-        "session": ["help", "version", "clear", "summary", "sessions", "history", "alias", "exit"],
+        "session": [
+            "help",
+            "version",
+            "clear",
+            "summary",
+            "session",
+            "sessions",
+            "history",
+            "alias",
+            "exit",
+        ],
         "run": [
             "run",
             "agent",
@@ -833,7 +890,7 @@ def cmd_help(_arg: str, _session: ChatSession) -> str:
             "workspace",
             "config",
         ],
-        "providers": ["providers"],
+        "providers": ["providers", "model"],
         "tools": ["tools"],
         "audit": ["audit", "hitl"],
         "tasks": ["task"],
@@ -866,6 +923,126 @@ def cmd_help(_arg: str, _session: ChatSession) -> str:
 def cmd_clear(_arg: str, session: ChatSession) -> str:
     session.history.clear()
     return "Session history cleared."
+
+
+def cmd_model(arg: str, session: ChatSession) -> CommandResult:
+    """Provider/model selector: /model [list] | /model use <provider[:model]>.
+
+    Switches the in-session provider/model. Never enables paid calls automatically.
+    Switching is only effective if the provider's key env var is set.
+    """
+    import os
+
+    parts = arg.strip().split(maxsplit=1)
+    subcommand = parts[0] if parts else "list"
+    rest = parts[1] if len(parts) > 1 else ""
+
+    md = session.metadata or {}
+
+    def _provider_catalog() -> dict:
+        try:
+            from ..providers import bundled_openai_compatible_providers
+
+            return bundled_openai_compatible_providers()
+        except Exception:  # noqa: BLE001
+            return {}
+
+    def _env_for_provider(pid: str) -> str:
+        safe = pid.replace("-", "_").upper()
+        for suffix in ("API_KEY", "TOKEN", "KEY"):
+            cand = f"ARC_{safe}_{suffix}"
+            if cand in os.environ:
+                return cand
+            # legacy / explicit mappings
+        mapping = {
+            "9router": "NINEROUTER_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
+            "crofai": "CROFAI_API_KEY",
+        }
+        return mapping.get(pid, f"ARC_{safe}_API_KEY")
+
+    if subcommand in ("", "list"):
+        catalog = _provider_catalog()
+        active_provider = str(md.get("provider") or "none")
+        active_model = str(md.get("provider_model") or "unknown")
+        lines = [f"Active: {active_provider} / {active_model}", ""]
+        lines.append(f"  {'Provider':<20} {'Configured':<12} Default model")
+        for pid, cfg in catalog.items():
+            key_var = _env_for_provider(pid)
+            configured = "yes" if os.environ.get(key_var) else "no"
+            default_model = str(getattr(cfg, "default_model", "?") or "?")
+            lines.append(f"  {pid:<20} {configured:<12} {default_model[:40]}")
+        lines += [
+            "",
+            "Use: /model use <provider[:model]>",
+            "Paid calls: unchanged. Enable separately.",
+        ]
+        return CommandResult(state="present", output="\n".join(lines))
+
+    if subcommand == "use":
+        spec = rest.strip()
+        if not spec:
+            return CommandResult(
+                state="blocked",
+                output="Usage: /model use <provider[:model]>",
+                reason="missing_spec",
+            )
+        if ":" in spec:
+            provider_id, model_id = spec.split(":", 1)
+        else:
+            provider_id, model_id = spec, ""
+        provider_id = provider_id.strip()
+        key_var = _env_for_provider(provider_id)
+        if not os.environ.get(key_var):
+            return CommandResult(
+                state="degraded",
+                output=(
+                    f"Provider {provider_id!r} key not set ({key_var}).\n"
+                    "Model selection stored but provider-backed calls will fail until key is set.\n"
+                    "Paid calls: unchanged."
+                ),
+                reason="no_key",
+                metadata={"provider": provider_id, "key_var": key_var},
+            )
+        if session.metadata is None:
+            session.metadata = {}
+        session.metadata["provider"] = provider_id
+        if model_id:
+            session.metadata["provider_model"] = model_id
+        else:
+            # use catalog default
+            catalog = _provider_catalog()
+            cfg = catalog.get(provider_id)
+            if cfg:
+                session.metadata["provider_model"] = str(getattr(cfg, "default_model", "") or "")
+        return CommandResult(
+            state="present",
+            output=(
+                f"Provider: {session.metadata['provider']}\n"
+                f"Model: {session.metadata.get('provider_model') or 'default'}\n"
+                "Paid calls: unchanged. Execution mode: unchanged."
+            ),
+        )
+
+    return CommandResult(
+        state="blocked",
+        output="Usage: /model [list] | use <provider[:model]>",
+        reason="invalid_subcommand",
+    )
+
+
+def cmd_session(_arg: str, session: ChatSession) -> CommandResult:
+    """Show the current session summary (id, mode, runtime, message count)."""
+    runtime = RuntimeMode.from_legacy(session.runtime_mode).value
+    body = (
+        f"Session: {session.id}\n"
+        f"Mode: {session.mode}\n"
+        f"Runtime: {runtime}\n"
+        f"Messages: {len(session.history)}\n"
+        f"Created: {session.created_at[:19]}"
+    )
+    return CommandResult(state="present", output=body)
 
 
 def cmd_run(arg: Any, session: Any, cancellation_token: Any = None) -> str | CommandResult:
@@ -1329,16 +1506,17 @@ def cmd_auto(_arg: str, session: ChatSession) -> str:
     return "Switched to Auto mode (policy-driven)."
 
 
-def cmd_runtime(arg: str, session: ChatSession) -> str:
+def cmd_mode(arg: str, session: ChatSession) -> str:
+    """Execution-mode switcher: /mode [fake | gated_local | gated | provider_backed | live].
+
+    Changes the execution mode (FAKE/GATED_LOCAL/PROVIDER_BACKED). Use /runtime for engine.
+    """
     value = arg.strip()
     if not value:
-        capability = default_runtime_registry().get(session.runtime_mode)
         return (
-            f"Runtime: {RuntimeMode.from_legacy(session.runtime_mode).value}\n"
-            f"Profile: {session.profile_id}\n"
-            f"Isolation: {session.isolation_id}\n"
-            f"Allow paid calls: {session.allow_paid_calls}\n"
-            f"Cost source: {capability.cost_source_default}"
+            f"Execution mode: {RuntimeMode.from_legacy(session.runtime_mode).value}\n"
+            "Values: fake | gated_local (gated) | provider_backed (live)\n"
+            "Engine selection: /runtime"
         )
     try:
         mode = RuntimeMode.from_legacy(value)
@@ -1347,6 +1525,92 @@ def cmd_runtime(arg: str, session: ChatSession) -> str:
     session.runtime_mode = mode
     session.allow_paid_calls = mode is RuntimeMode.PROVIDER_BACKED
     return f"Runtime mode: {mode.value}"
+
+
+def cmd_runtime(arg: str, session: ChatSession) -> CommandResult:
+    """Engine selector: /runtime [list] | /runtime use <id>.
+
+    Lists or selects the execution engine (swarmgraph, langgraph, lmarena, …).
+    Selecting an engine does NOT change the execution mode (FAKE/GATED_LOCAL/PROVIDER_BACKED)
+    and does NOT enable paid calls. Use /mode for execution-mode switching.
+    """
+    from pathlib import Path
+
+    from ..adapters.registry import default_registry
+
+    parts = arg.strip().split(maxsplit=1)
+    subcommand = parts[0] if parts else "list"
+    rest = parts[1] if len(parts) > 1 else ""
+
+    ws = Path.cwd()
+    active = str((session.metadata or {}).get("runtime_adapter") or "swarmgraph")
+
+    if subcommand in ("", "list"):
+        try:
+            from ..orchestration import runtime_router
+
+            reports = runtime_router.list_runtimes(ws)
+        except Exception as exc:  # noqa: BLE001
+            return CommandResult(state="degraded", output=f"Runtime list unavailable: {exc}")
+        lines = [
+            f"Active engine: {active}",
+            "",
+            f"{'ID':<20} {'detected':<10} {'can_run':<10} {'paid':<6} availability",
+        ]
+        for r in reports:
+            lines.append(
+                f"  {r.runtime_id:<18} {'yes' if r.detected else 'no':<10}"
+                f" {'yes' if r.can_run else 'no':<10} {'yes' if r.requires_paid_calls else 'no':<6}"
+                f" {r.availability}"
+            )
+        lines += [
+            "",
+            "Use: /runtime use <id>",
+            "Execution mode: /mode  Paid calls: /mode provider_backed",
+        ]
+        return CommandResult(state="present", output="\n".join(lines), metadata={"active": active})
+
+    if subcommand == "use":
+        engine_id = rest.strip()
+        if not engine_id:
+            return CommandResult(
+                state="blocked", output="Usage: /runtime use <engine_id>", reason="missing_id"
+            )
+        registry = default_registry()
+        adapter = registry.get(engine_id)
+        if adapter is None:
+            known = [a.adapter_id for a in registry.all()]
+            return CommandResult(
+                state="blocked",
+                output=f"Unknown engine: {engine_id}. Known: {', '.join(known)}",
+                reason="unknown_engine",
+            )
+        caps = adapter.capabilities()
+        if session.metadata is None:
+            session.metadata = {}
+        session.metadata["runtime_adapter"] = engine_id
+        state = "present" if caps.can_run else "degraded"
+        note = (
+            "ready"
+            if caps.can_run
+            else f"detected but not runnable — {adapter.capability_report(ws).reason or 'see /doctor'}"
+        )
+        paid_note = (
+            " (requires paid calls)" if adapter.capability_report(ws).requires_paid_calls else ""
+        )
+        return CommandResult(
+            state=state,
+            output=(
+                f"Active engine: {engine_id}\n"
+                f"Status: {note}{paid_note}\n"
+                "Execution mode unchanged. Paid calls unchanged."
+            ),
+            metadata={"engine": engine_id, "can_run": caps.can_run},
+        )
+
+    return CommandResult(
+        state="blocked", output="Usage: /runtime [list] | use <id>", reason="invalid_subcommand"
+    )
 
 
 def cmd_tools(arg: str, session: ChatSession) -> str:
@@ -1650,6 +1914,77 @@ def cmd_apply(arg: str, _session: ChatSession) -> CommandResult:
     return _render_adapter_result(render_apply(arg))
 
 
+def cmd_apply_diff(
+    arg: str,
+    session: ChatSession,
+    *,
+    confirm_fn: Any = None,
+) -> CommandResult:
+    """In-shell diff→preview→approve→apply. Denied in plan mode and untrusted workspace.
+
+    Usage: /apply-diff <file> <diff_text>   (primarily called programmatically or via /agent output)
+    confirm_fn: (prompt: str) -> bool — injectable for tests; defaults to stdin y/N.
+    """
+    from pathlib import Path
+
+    # Gate: plan mode
+    if session.mode == "plan":
+        return CommandResult(
+            state="denied", output="Apply denied in plan mode.", reason="plan_mode"
+        )
+
+    # Gate: workspace trust
+    ws = Path.cwd()
+    try:
+        from ..security.trust import resolve_trust
+
+        trust = resolve_trust(ws)
+        if trust.level.value == "untrusted":
+            return CommandResult(
+                state="denied",
+                output="Apply denied: workspace is untrusted. Trust the workspace first.",
+                reason="untrusted_workspace",
+            )
+    except Exception:  # noqa: BLE001
+        pass
+
+    parts = arg.strip().split(maxsplit=1)
+    if len(parts) < 1:
+        return CommandResult(
+            state="blocked", output="Usage: /apply-diff <file> [diff_text]", reason="missing_file"
+        )
+    file_arg = parts[0]
+    diff_text = parts[1] if len(parts) > 1 else ""
+
+    # Show diff preview via rendering.py diff_panel (rendered as text for the prompt)
+    from .rendering import Renderer
+    from rich.console import Console as _Console
+
+    preview_console = _Console(record=True, width=100)
+    preview_renderer = Renderer(preview_console, ascii_only=True)
+    preview_renderer.print(preview_renderer.diff_panel(file_arg, diff_text))
+    preview_text = preview_console.export_text()
+
+    prompt_text = f"{preview_text}\nApply changes to {file_arg}? [y/N] "
+    if confirm_fn is not None:
+        confirmed = bool(confirm_fn(prompt_text))
+    elif os.isatty(0):  # pragma: no cover — live path
+        try:
+            answer = input(prompt_text).strip().lower()
+            confirmed = answer == "y"
+        except (EOFError, KeyboardInterrupt):
+            confirmed = False
+    else:
+        confirmed = False
+
+    if not confirmed:
+        return CommandResult(
+            state="denied", output="Apply cancelled by user.", reason="user_declined"
+        )
+
+    return _render_adapter_result(render_apply(f"{file_arg} {diff_text}".strip()))
+
+
 def cmd_test(arg: str, _session: ChatSession) -> CommandResult:
     return _render_adapter_result(render_test(arg))
 
@@ -1921,6 +2256,9 @@ class SlashCommandHandler:
         self.events: list[tuple[str, dict[str, Any]]] = []
         self._registry = _build_registry()
         self._alias_depth = 0
+        # Optional approval callback (prompt: str) -> bool, used only for /sandbox.
+        # Default None preserves the existing isatty()/non-interactive behavior.
+        self.confirm_fn: Callable[[str], bool] | None = None
 
     def emit_event(self, name: str, payload: dict[str, Any]) -> None:
         copied = dict(payload)
@@ -1982,7 +2320,12 @@ class SlashCommandHandler:
                 runtime=self.runner,
             )
         try:
-            result = defn.handler(arg, session)
+            if name == "sandbox":
+                result = defn.handler(arg, session, confirm_fn=self.confirm_fn)
+            elif name == "apply-diff":
+                result = defn.handler(arg, session, confirm_fn=self.confirm_fn)
+            else:
+                result = defn.handler(arg, session)
             if name == "alias" and isinstance(result, CommandResult):
                 expansion = result.metadata.get("alias_expansion")
                 if isinstance(expansion, str):
