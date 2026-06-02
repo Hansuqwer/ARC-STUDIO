@@ -1,0 +1,91 @@
+{
+  "id": "wf-branch",
+  "name": "Branching review flow",
+  "runtime": "langgraph",
+  "source_file": null,
+  "nodes": [
+    {
+      "id": "__start__",
+      "label": "START",
+      "type": "start",
+      "source_location": null,
+      "metadata": {}
+    },
+    {
+      "id": "router",
+      "label": "Router",
+      "type": "router",
+      "source_location": null,
+      "metadata": {}
+    },
+    {
+      "id": "approval",
+      "label": "Human approval",
+      "type": "router",
+      "source_location": null,
+      "metadata": {}
+    },
+    {
+      "id": "vote",
+      "label": "Majority consensus",
+      "type": "router",
+      "source_location": null,
+      "metadata": {
+        "consensus_protocol": "majority"
+      }
+    },
+    {
+      "id": "__end__",
+      "label": "END",
+      "type": "end",
+      "source_location": null,
+      "metadata": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from_node": "__start__",
+      "to_node": "router",
+      "label": null,
+      "conditional": false,
+      "metadata": {}
+    },
+    {
+      "id": "e2",
+      "from_node": "router",
+      "to_node": "approval",
+      "label": "needs_review",
+      "conditional": true,
+      "metadata": {}
+    },
+    {
+      "id": "e3",
+      "from_node": "router",
+      "to_node": "vote",
+      "label": "auto",
+      "conditional": true,
+      "metadata": {}
+    },
+    {
+      "id": "e4",
+      "from_node": "approval",
+      "to_node": "__end__",
+      "label": null,
+      "conditional": false,
+      "metadata": {}
+    },
+    {
+      "id": "e5",
+      "from_node": "vote",
+      "to_node": "__end__",
+      "label": null,
+      "conditional": false,
+      "metadata": {}
+    }
+  ],
+  "entry_points": [
+    "__start__"
+  ],
+  "metadata": {}
+}

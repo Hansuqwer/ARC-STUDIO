@@ -1,0 +1,55 @@
+{
+  "id": "wf-mcp",
+  "name": "MCP tool graph",
+  "runtime": "native",
+  "source_file": null,
+  "nodes": [
+    {
+      "id": "__start__",
+      "label": "START",
+      "type": "start",
+      "source_location": null,
+      "metadata": {}
+    },
+    {
+      "id": "mcp_fs",
+      "label": "filesystem mcp",
+      "type": "tool",
+      "source_location": null,
+      "metadata": {
+        "is_mcp": true,
+        "mcp_server_id": "fs",
+        "mcp_tool_name": "write_file"
+      }
+    },
+    {
+      "id": "__end__",
+      "label": "END",
+      "type": "end",
+      "source_location": null,
+      "metadata": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from_node": "__start__",
+      "to_node": "mcp_fs",
+      "label": null,
+      "conditional": false,
+      "metadata": {}
+    },
+    {
+      "id": "e2",
+      "from_node": "mcp_fs",
+      "to_node": "__end__",
+      "label": null,
+      "conditional": false,
+      "metadata": {}
+    }
+  ],
+  "entry_points": [
+    "__start__"
+  ],
+  "metadata": {}
+}

@@ -1,0 +1,224 @@
+{
+  "ir_version": 1,
+  "id": "wf-branch",
+  "name": "Branching review flow",
+  "runtime": "langgraph",
+  "provenance": {
+    "adapter_id": "langgraph",
+    "runtime": "langgraph",
+    "adapter_version": null,
+    "source_file": null,
+    "exported_via": "export_workflow",
+    "imported_at": null
+  },
+  "nodes": [
+    {
+      "id": "__start__",
+      "label": "START",
+      "kind": "start",
+      "tool": null,
+      "mcp_tool": null,
+      "model_call": null,
+      "human_gate": null,
+      "consensus": null,
+      "risk": {
+        "level": "low",
+        "score": 0.0,
+        "signals": [],
+        "rationale": null,
+        "source": "heuristic"
+      },
+      "capabilities": [],
+      "side_effects": [],
+      "budget": null,
+      "audit_boundary": null,
+      "replay_marker": null,
+      "trust_annotation": null,
+      "privileged": false,
+      "write_path": null,
+      "eval_metadata": {},
+      "metadata": {}
+    },
+    {
+      "id": "router",
+      "label": "Router",
+      "kind": "router",
+      "tool": null,
+      "mcp_tool": null,
+      "model_call": null,
+      "human_gate": null,
+      "consensus": null,
+      "risk": {
+        "level": "low",
+        "score": 0.0,
+        "signals": [],
+        "rationale": null,
+        "source": "heuristic"
+      },
+      "capabilities": [],
+      "side_effects": [],
+      "budget": null,
+      "audit_boundary": null,
+      "replay_marker": null,
+      "trust_annotation": null,
+      "privileged": false,
+      "write_path": null,
+      "eval_metadata": {},
+      "metadata": {}
+    },
+    {
+      "id": "approval",
+      "label": "Human approval",
+      "kind": "human_gate",
+      "tool": null,
+      "mcp_tool": null,
+      "model_call": null,
+      "human_gate": null,
+      "consensus": null,
+      "risk": {
+        "level": "low",
+        "score": 0.0,
+        "signals": [],
+        "rationale": null,
+        "source": "heuristic"
+      },
+      "capabilities": [],
+      "side_effects": [],
+      "budget": null,
+      "audit_boundary": null,
+      "replay_marker": null,
+      "trust_annotation": null,
+      "privileged": false,
+      "write_path": null,
+      "eval_metadata": {},
+      "metadata": {}
+    },
+    {
+      "id": "vote",
+      "label": "Majority consensus",
+      "kind": "consensus",
+      "tool": null,
+      "mcp_tool": null,
+      "model_call": null,
+      "human_gate": null,
+      "consensus": {
+        "protocol": "majority",
+        "suggested_protocol": null,
+        "min_workers": null,
+        "source": "metadata"
+      },
+      "risk": {
+        "level": "low",
+        "score": 0.0,
+        "signals": [],
+        "rationale": null,
+        "source": "heuristic"
+      },
+      "capabilities": [],
+      "side_effects": [],
+      "budget": null,
+      "audit_boundary": null,
+      "replay_marker": null,
+      "trust_annotation": null,
+      "privileged": false,
+      "write_path": null,
+      "eval_metadata": {},
+      "metadata": {
+        "consensus_protocol": "majority"
+      }
+    },
+    {
+      "id": "__end__",
+      "label": "END",
+      "kind": "end",
+      "tool": null,
+      "mcp_tool": null,
+      "model_call": null,
+      "human_gate": null,
+      "consensus": null,
+      "risk": {
+        "level": "low",
+        "score": 0.0,
+        "signals": [],
+        "rationale": null,
+        "source": "heuristic"
+      },
+      "capabilities": [],
+      "side_effects": [],
+      "budget": null,
+      "audit_boundary": null,
+      "replay_marker": null,
+      "trust_annotation": null,
+      "privileged": false,
+      "write_path": null,
+      "eval_metadata": {},
+      "metadata": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from_node": "__start__",
+      "to_node": "router",
+      "conditional": false,
+      "condition": null,
+      "label": null,
+      "metadata": {}
+    },
+    {
+      "id": "e2",
+      "from_node": "router",
+      "to_node": "approval",
+      "conditional": true,
+      "condition": null,
+      "label": "needs_review",
+      "metadata": {}
+    },
+    {
+      "id": "e3",
+      "from_node": "router",
+      "to_node": "vote",
+      "conditional": true,
+      "condition": null,
+      "label": "auto",
+      "metadata": {}
+    },
+    {
+      "id": "e4",
+      "from_node": "approval",
+      "to_node": "__end__",
+      "conditional": false,
+      "condition": null,
+      "label": null,
+      "metadata": {}
+    },
+    {
+      "id": "e5",
+      "from_node": "vote",
+      "to_node": "__end__",
+      "conditional": false,
+      "condition": null,
+      "label": null,
+      "metadata": {}
+    }
+  ],
+  "entry_points": [
+    "__start__"
+  ],
+  "risk": {
+    "level": "low",
+    "score": 0.0,
+    "signals": [],
+    "rationale": null,
+    "source": "heuristic"
+  },
+  "consensus": {
+    "protocol": null,
+    "suggested_protocol": null,
+    "min_workers": null,
+    "source": "default"
+  },
+  "graph_hash": "797eb07e4fa294a62ae518abaf130a4d33d2ae1ce4fc28484c9be1ee25421d10",
+  "compiled_at": null,
+  "metadata": {}
+}

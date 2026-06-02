@@ -1,0 +1,51 @@
+{
+  "id": "wf-min",
+  "name": "Minimal linear flow",
+  "runtime": "native",
+  "source_file": null,
+  "nodes": [
+    {
+      "id": "__start__",
+      "label": "START",
+      "type": "start",
+      "source_location": null,
+      "metadata": {}
+    },
+    {
+      "id": "agent",
+      "label": "Agent",
+      "type": "agent",
+      "source_location": null,
+      "metadata": {}
+    },
+    {
+      "id": "__end__",
+      "label": "END",
+      "type": "end",
+      "source_location": null,
+      "metadata": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from_node": "__start__",
+      "to_node": "agent",
+      "label": null,
+      "conditional": false,
+      "metadata": {}
+    },
+    {
+      "id": "e2",
+      "from_node": "agent",
+      "to_node": "__end__",
+      "label": null,
+      "conditional": false,
+      "metadata": {}
+    }
+  ],
+  "entry_points": [
+    "__start__"
+  ],
+  "metadata": {}
+}
