@@ -2,6 +2,7 @@
 
 from .audit_view import AuditView
 from .hitl_view import HitlView
+from .providers_view import ModelListScreen, ProvidersView
 from .runtimes_view import RuntimesView
 from .runs_view import RunsView
 from .sessions_view import SessionsView
@@ -11,6 +12,8 @@ from .side_panel import SidePanel
 __all__ = [
     "AuditView",
     "HitlView",
+    "ModelListScreen",
+    "ProvidersView",
     "RuntimesView",
     "RunsView",
     "SessionsView",

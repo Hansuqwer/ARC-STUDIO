@@ -541,3 +541,84 @@ async def test_enter_unknown_slash_shows_error():
         await pilot.pause()
         assert len(app.data.entries) > before
         assert any("Unknown slash command" in e.content for e in app.data.entries)
+
+
+# ── ProvidersView tests ────────────────────────────────────────────────────
+
+
+class TestProvidersView:
+    def test_instantiates(self):
+        from agent_runtime_cockpit.tui.views.providers_view import ProvidersView
+
+        view = ProvidersView(data=DataStore())
+        assert view is not None
+
+    def test_load_all_providers_returns_list(self):
+        from agent_runtime_cockpit.tui.views.providers_view import _load_all_providers
+
+        providers = _load_all_providers()
+        assert len(providers) >= 7  # at least the original snapshot size
+
+    def test_all_providers_have_models(self):
+        from agent_runtime_cockpit.tui.views.providers_view import _load_all_providers
+
+        for p in _load_all_providers():
+            assert len(p.models) >= 1, f"{p.id} has no models"
+
+    def test_free_providers_marked(self):
+        from agent_runtime_cockpit.tui.views.providers_view import (
+            _has_free_model,
+            _load_all_providers,
+        )
+
+        has_any_free = any(_has_free_model(p) for p in _load_all_providers())
+        assert has_any_free, "Expected at least one provider with free models"
+
+    def test_configured_provider_shows_check(self, monkeypatch):
+        from agent_runtime_cockpit.tui.views.providers_view import (
+            _load_all_providers,
+            _provider_row,
+        )
+
+        providers = _load_all_providers()
+        p = providers[0]
+        # Simulate key set in env
+        monkeypatch.setenv(p.env[0], "fake-test-key")
+        row = _provider_row(p)
+        assert "✓" in row
+
+    def test_unconfigured_provider_shows_empty(self, monkeypatch):
+        from agent_runtime_cockpit.tui.views.providers_view import (
+            _load_all_providers,
+            _is_configured,
+            _provider_row,
+        )
+
+        providers = _load_all_providers()
+        p = providers[0]
+        for env_var in p.env:
+            monkeypatch.delenv(env_var, raising=False)
+        # Patch get_decrypted_api_key to return None
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.auth.manager.get_decrypted_api_key",
+            lambda *a, **kw: None,
+        )
+        assert not _is_configured(p)
+        row = _provider_row(p)
+        assert "[ ]" in row
+
+
+@pytest.mark.asyncio
+async def test_headless_providers_view_opens():
+    """Typing /providers pushes ProvidersView onto the screen stack."""
+    from agent_runtime_cockpit.tui.app import ArcApp
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        app.screen._handle_slash("/providers")
+        await pilot.pause()
+        # A modal screen should now be active (not ArcScreen)
+        from agent_runtime_cockpit.tui.views.providers_view import ProvidersView
+
+        assert any(isinstance(s, ProvidersView) for s in app.screen_stack)

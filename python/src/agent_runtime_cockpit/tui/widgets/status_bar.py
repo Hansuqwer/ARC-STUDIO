@@ -31,8 +31,15 @@ class StatusBar(Static):
         daemon_dot = "●" if self.data.daemon_online else "○"
         stream_indicator = " ● streaming" if self.data.is_streaming else ""
         paid_indicator = " $paid" if getattr(self.data, "allow_paid", False) else ""
+        model_str = ""
+        if getattr(self.data, "current_provider", None) or getattr(
+            self.data, "current_model", None
+        ):
+            p = getattr(self.data, "current_provider", "") or ""
+            m = (getattr(self.data, "current_model", "") or "").split("/")[-1][:20]
+            model_str = f" │ {p}/{m}" if p else f" │ {m}"
         line = (
-            f" {self.data.mode} │ {self.data.runtime_mode}{paid_indicator} │ {ws} │ "
+            f" {self.data.mode} │ {self.data.runtime_mode}{paid_indicator}{model_str} │ {ws} │ "
             f"{session_short} │ {cost} │"
             f" {daemon_dot}{stream_indicator} │"
             f" Esc:cancel  /:commands  Ctrl+P:palette"

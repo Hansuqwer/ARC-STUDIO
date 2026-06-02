@@ -63,6 +63,8 @@ class DataStore:
     # ── domain caches ────────────────────────────────────────────────────
     run_count: int = 0
     hitl_pending_count: int = 0
+    current_provider: str | None = None  # active provider id
+    current_model: str | None = None  # active model id
 
     # ── input history ────────────────────────────────────────────────────
     input_history: list[str] = field(default_factory=list)

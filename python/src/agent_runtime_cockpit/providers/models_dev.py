@@ -248,6 +248,177 @@ MODELS_DEV_OPENAI_COMPATIBLE_SNAPSHOT: dict[str, Any] = {
             },
         },
     },
+    # ── Additional providers from models.dev catalog (official API docs) ──
+    # Groq: https://api.groq.com/openai/v1, GROQ_API_KEY
+    "groq": {
+        "id": "groq",
+        "env": ["GROQ_API_KEY"],
+        "npm": "@ai-sdk/openai-compatible",
+        "api": "https://api.groq.com/openai/v1",
+        "name": "Groq",
+        "doc": "https://console.groq.com/docs/openai",
+        "models": {
+            "llama-3.3-70b-versatile": {
+                "id": "llama-3.3-70b-versatile",
+                "name": "Llama 3.3 70B Versatile",
+                "tool_call": True,
+                "modalities": {"input": ["text"], "output": ["text"]},
+                "limit": {"context": 131072, "output": 32768},
+                "cost": {"input": 0.59, "output": 0.79},
+            },
+            "llama-3.1-8b-instant": {
+                "id": "llama-3.1-8b-instant",
+                "name": "Llama 3.1 8B Instant",
+                "tool_call": True,
+                "modalities": {"input": ["text"], "output": ["text"]},
+                "limit": {"context": 131072, "output": 131072},
+                "cost": {"input": 0.05, "output": 0.08},
+            },
+        },
+    },
+    # Together AI: https://api.together.xyz/v1, TOGETHER_API_KEY
+    "together": {
+        "id": "together",
+        "env": ["TOGETHER_API_KEY"],
+        "npm": "@ai-sdk/openai-compatible",
+        "api": "https://api.together.xyz/v1",
+        "name": "Together AI",
+        "doc": "https://docs.together.ai",
+        "models": {
+            "meta-llama/Llama-3.3-70B-Instruct-Turbo": {
+                "id": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+                "name": "Llama 3.3 70B Instruct Turbo",
+                "tool_call": True,
+                "modalities": {"input": ["text"], "output": ["text"]},
+                "limit": {"context": 131072, "output": 8192},
+                "cost": {"input": 0.88, "output": 0.88},
+            },
+            "deepseek-ai/DeepSeek-V3": {
+                "id": "deepseek-ai/DeepSeek-V3",
+                "name": "DeepSeek V3",
+                "tool_call": True,
+                "modalities": {"input": ["text"], "output": ["text"]},
+                "limit": {"context": 128000, "output": 8192},
+                "cost": {"input": 1.25, "output": 1.25},
+            },
+        },
+    },
+    # Fireworks AI: https://api.fireworks.ai/inference/v1, FIREWORKS_API_KEY
+    "fireworks": {
+        "id": "fireworks",
+        "env": ["FIREWORKS_API_KEY"],
+        "npm": "@ai-sdk/openai-compatible",
+        "api": "https://api.fireworks.ai/inference/v1",
+        "name": "Fireworks AI",
+        "doc": "https://docs.fireworks.ai",
+        "models": {
+            "accounts/fireworks/models/llama4-maverick-instruct-basic": {
+                "id": "accounts/fireworks/models/llama4-maverick-instruct-basic",
+                "name": "Llama 4 Maverick Instruct",
+                "tool_call": True,
+                "modalities": {"input": ["text"], "output": ["text"]},
+                "limit": {"context": 131072, "output": 16384},
+                "cost": {"input": 0.22, "output": 0.88},
+            },
+            "accounts/fireworks/models/deepseek-v3": {
+                "id": "accounts/fireworks/models/deepseek-v3",
+                "name": "DeepSeek V3",
+                "tool_call": True,
+                "modalities": {"input": ["text"], "output": ["text"]},
+                "limit": {"context": 131072, "output": 16384},
+                "cost": {"input": 0.9, "output": 0.9},
+            },
+        },
+    },
+    # Deep Infra: https://api.deepinfra.com/v1/openai, DEEPINFRA_API_KEY
+    "deepinfra": {
+        "id": "deepinfra",
+        "env": ["DEEPINFRA_API_KEY"],
+        "npm": "@ai-sdk/openai-compatible",
+        "api": "https://api.deepinfra.com/v1/openai",
+        "name": "Deep Infra",
+        "doc": "https://deepinfra.com/docs",
+        "models": {
+            "meta-llama/Llama-3.3-70B-Instruct-Turbo": {
+                "id": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+                "name": "Llama 3.3 70B Turbo",
+                "tool_call": True,
+                "modalities": {"input": ["text"], "output": ["text"]},
+                "limit": {"context": 131072, "output": 8192},
+                "cost": {"input": 0.59, "output": 0.79},
+            },
+            "deepseek-ai/DeepSeek-V3": {
+                "id": "deepseek-ai/DeepSeek-V3",
+                "name": "DeepSeek V3",
+                "tool_call": True,
+                "modalities": {"input": ["text"], "output": ["text"]},
+                "limit": {"context": 65536, "output": 8192},
+                "cost": {"input": 0.49, "output": 0.89},
+            },
+        },
+    },
+    # OpenAI: https://api.openai.com/v1, OPENAI_API_KEY
+    "openai": {
+        "id": "openai",
+        "env": ["OPENAI_API_KEY"],
+        "npm": "@ai-sdk/openai-compatible",
+        "api": "https://api.openai.com/v1",
+        "name": "OpenAI",
+        "doc": "https://platform.openai.com/docs",
+        "models": {
+            "gpt-4.1": {
+                "id": "gpt-4.1",
+                "name": "GPT-4.1",
+                "tool_call": True,
+                "modalities": {"input": ["text"], "output": ["text"]},
+                "limit": {"context": 1047576, "output": 32768},
+                "cost": {"input": 2.0, "output": 8.0},
+            },
+            "gpt-4.1-mini": {
+                "id": "gpt-4.1-mini",
+                "name": "GPT-4.1 Mini",
+                "tool_call": True,
+                "modalities": {"input": ["text"], "output": ["text"]},
+                "limit": {"context": 1047576, "output": 32768},
+                "cost": {"input": 0.4, "output": 1.6},
+            },
+            "o4-mini": {
+                "id": "o4-mini",
+                "name": "o4-mini",
+                "tool_call": True,
+                "modalities": {"input": ["text"], "output": ["text"]},
+                "limit": {"context": 200000, "output": 100000},
+                "cost": {"input": 1.1, "output": 4.4},
+            },
+        },
+    },
+    # NVIDIA: https://integrate.api.nvidia.com/v1, NVIDIA_API_KEY
+    "nvidia": {
+        "id": "nvidia",
+        "env": ["NVIDIA_API_KEY"],
+        "npm": "@ai-sdk/openai-compatible",
+        "api": "https://integrate.api.nvidia.com/v1",
+        "name": "NVIDIA",
+        "doc": "https://build.nvidia.com",
+        "models": {
+            "nvidia/llama-3.1-nemotron-ultra-253b-v1": {
+                "id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+                "name": "Llama 3.1 Nemotron Ultra 253B",
+                "tool_call": True,
+                "modalities": {"input": ["text"], "output": ["text"]},
+                "limit": {"context": 131072, "output": 32768},
+                "cost": {"input": 0.0, "output": 0.0},
+            },
+            "nvidia/llama-3.3-nemotron-super-49b-v1": {
+                "id": "nvidia/llama-3.3-nemotron-super-49b-v1",
+                "name": "Llama 3.3 Nemotron Super 49B",
+                "tool_call": True,
+                "modalities": {"input": ["text"], "output": ["text"]},
+                "limit": {"context": 131072, "output": 32768},
+                "cost": {"input": 0.0, "output": 0.0},
+            },
+        },
+    },
     # ── Free-tier providers added from models.dev / official docs ──────────
     # Cerebras: free tier (CEREBRAS_API_KEY, rate-limited).
     # Base URL: https://api.cerebras.ai/v1  (official OpenAI compat docs)

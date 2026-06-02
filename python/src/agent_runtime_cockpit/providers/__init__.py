@@ -32,6 +32,7 @@ from .budget_preflight import preflight_with_estimator
 from .models_dev import bundled_openai_compatible_providers
 from .openai_compatible import OpenAICompatibleClient, config_from_models_dev
 from .registry import register
+from .registry import _FACTORIES
 
 __all__ = [
     "AnthropicClient",
@@ -81,9 +82,10 @@ register("crofai", lambda: OpenAICompatibleClient(vendor="crofai"))
 register("arena", ArenaProvider)
 
 for _provider_id, _provider_config in bundled_openai_compatible_providers().items():
-    register(
-        _provider_id,
-        lambda config=_provider_config: OpenAICompatibleClient(
-            config=config_from_models_dev(config)
-        ),
-    )
+    if _provider_id not in _FACTORIES:  # skip if already registered (e.g. groq, together)
+        register(
+            _provider_id,
+            lambda config=_provider_config: OpenAICompatibleClient(
+                config=config_from_models_dev(config)
+            ),
+        )

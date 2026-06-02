@@ -199,6 +199,40 @@ class ArcScreen(Screen):
                 self._add_error_entry("VIEW_ERROR", str(e))
             return
 
+        if cmd in ("/providers", "/connect"):
+            try:
+                from .views.providers_view import ProvidersView
+
+                self.app.push_screen(ProvidersView(data=self.data))
+            except Exception as e:
+                self._add_error_entry("VIEW_ERROR", str(e))
+            return
+
+        if cmd == "/models":
+            try:
+                from .views.providers_view import ModelListScreen, ProvidersView
+                from agent_runtime_cockpit.providers.models_dev import (
+                    bundled_openai_compatible_providers,
+                )
+
+                # Find current or first configured provider
+                providers = list(bundled_openai_compatible_providers().values())
+                provider = next(
+                    (
+                        p
+                        for p in providers
+                        if self.data.current_provider and p.id == self.data.current_provider
+                    ),
+                    None,
+                ) or next((p for p in providers), None)
+                if provider:
+                    self.app.push_screen(ModelListScreen(provider, self.data))
+                else:
+                    self.app.push_screen(ProvidersView(data=self.data))
+            except Exception as e:
+                self._add_error_entry("VIEW_ERROR", str(e))
+            return
+
         # Delegate remaining slash commands to backend
         self.query_one(SlashMenu).hide()
         try:
