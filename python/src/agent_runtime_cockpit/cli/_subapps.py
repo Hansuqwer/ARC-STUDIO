@@ -74,3 +74,7 @@ edit_app = typer.Typer(
     name="edit",
     help="Agentic edit loop — safety-gated plan/apply commands (Phase 85)",
 )
+ir_app = typer.Typer(
+    name="ir",
+    help="SwarmGraph IR — compile/inspect/validate normalized workflow graphs",
+)

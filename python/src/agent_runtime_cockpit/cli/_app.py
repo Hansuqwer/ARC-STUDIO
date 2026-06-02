@@ -25,6 +25,7 @@ from ._subapps import (
     edit_app,
     events_app,
     hitl_app,
+    ir_app,
     isolation_app,
     mcp_app,
     memory_app,
@@ -68,6 +69,7 @@ app.add_typer(sandbox_app)
 app.add_typer(policy_app)
 app.add_typer(config_app)
 app.add_typer(hitl_app)
+app.add_typer(ir_app)
 app.add_typer(storage_app)
 app.add_typer(studio_app)
 studio_app.add_typer(studio_sessions_app)

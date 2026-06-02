@@ -25,6 +25,7 @@ from . import (
     events,  # noqa: F401
     exec,  # noqa: F401
     info,  # noqa: F401
+    ir,  # noqa: F401 — SwarmGraph IR compile/inspect/validate/policy
     mcp,  # noqa: F401
     memory,  # noqa: F401
     mgmt,  # noqa: F401
