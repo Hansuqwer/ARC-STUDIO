@@ -16,6 +16,16 @@ from .widgets.status_bar import StatusBar
 from .widgets.transcript import Transcript
 
 
+def _free_hint() -> str:
+    """One-line free-provider hint derived from the bundled snapshot."""
+    try:
+        from agent_runtime_cockpit.providers.models_dev import free_providers_hint
+
+        return free_providers_hint()
+    except Exception:
+        return ""
+
+
 class ArcScreen(Screen):
     """Primary screen: Banner + Transcript + StatusBar + InputArea."""
 
@@ -56,7 +66,8 @@ class ArcScreen(Screen):
             "system",
             f"ARC Studio v{__version__} — Agent Runtime Cockpit\n"
             "Type a message to begin, /help for commands, Ctrl+C to exit.\n"
-            f"Session: {self.data.session_id[:12]}…  ·  Workspace: {self.data.workspace}",
+            f"Session: {self.data.session_id[:12]}…  ·  Workspace: {self.data.workspace}\n"
+            + _free_hint(),
         )
         self.set_interval(5.0, self._check_daemon)
         self._check_daemon()
