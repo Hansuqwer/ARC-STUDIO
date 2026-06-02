@@ -415,6 +415,25 @@ async def test_headless_slash_menu_visible_on_slash():
         assert not menu.has_class("visible")
 
 
+@pytest.mark.asyncio
+async def test_headless_slash_menu_rerender_no_duplicate_ids():
+    """Re-rendering a multi-match prefix must not raise DuplicateIds."""
+    from types import SimpleNamespace
+
+    from agent_runtime_cockpit.tui.app import ArcApp
+    from agent_runtime_cockpit.tui.widgets.slash_menu import SlashMenu
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        screen = app.screen
+        for text in ("/m", "/mo", "/m", "/pr", "/m"):
+            screen.on_text_area_changed(SimpleNamespace(text_area=SimpleNamespace(text=text)))
+            await pilot.pause()
+        # No exception == pass; the menu is still operable.
+        assert screen.query_one(SlashMenu) is not None
+
+
 # ── Slash execution (Issue 2) ──────────────────────────────────────────────
 
 

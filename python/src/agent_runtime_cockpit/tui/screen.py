@@ -113,9 +113,8 @@ class ArcScreen(Screen):
 
     def on_list_view_selected(self, event) -> None:
         """Mouse/Enter selection of a slash-menu row completes the input."""
-        item_id = getattr(event.item, "id", "") or ""
-        if item_id.startswith("slash-"):
-            name = item_id[len("slash-") :]
+        name = getattr(event.item, "command_name", None)
+        if name:
             self.query_one(SlashMenu).hide()
             self.query_one("#input-area", InputArea).set_text(f"/{name} ")
 
