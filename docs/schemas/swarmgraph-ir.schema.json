@@ -1,0 +1,871 @@
+{
+  "$defs": {
+    "IRAdapterProvenance": {
+      "properties": {
+        "adapter_id": {
+          "title": "Adapter Id",
+          "type": "string"
+        },
+        "adapter_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adapter Version"
+        },
+        "exported_via": {
+          "default": "export_workflow",
+          "title": "Exported Via",
+          "type": "string"
+        },
+        "imported_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Imported At"
+        },
+        "runtime": {
+          "title": "Runtime",
+          "type": "string"
+        },
+        "source_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source File"
+        }
+      },
+      "required": [
+        "adapter_id",
+        "runtime"
+      ],
+      "title": "IRAdapterProvenance",
+      "type": "object"
+    },
+    "IRAuditBoundary": {
+      "properties": {
+        "audit_level": {
+          "default": "arc_sha256",
+          "enum": [
+            "none",
+            "arc_sha256",
+            "swarmgraph_hmac"
+          ],
+          "title": "Audit Level",
+          "type": "string"
+        },
+        "boundary_id": {
+          "title": "Boundary Id",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "boundary_id",
+        "reason"
+      ],
+      "title": "IRAuditBoundary",
+      "type": "object"
+    },
+    "IRBudget": {
+      "properties": {
+        "cost_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Usd"
+        },
+        "latency_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latency Ms"
+        },
+        "paid_call_gate": {
+          "default": false,
+          "title": "Paid Call Gate",
+          "type": "boolean"
+        },
+        "requires_paid_call": {
+          "default": false,
+          "title": "Requires Paid Call",
+          "type": "boolean"
+        },
+        "tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tokens"
+        }
+      },
+      "title": "IRBudget",
+      "type": "object"
+    },
+    "IRCapabilityRequirement": {
+      "properties": {
+        "capability": {
+          "title": "Capability",
+          "type": "string"
+        },
+        "optional": {
+          "default": false,
+          "title": "Optional",
+          "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "capability"
+      ],
+      "title": "IRCapabilityRequirement",
+      "type": "object"
+    },
+    "IRConsensusHint": {
+      "properties": {
+        "min_workers": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Workers"
+        },
+        "protocol": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Protocol"
+        },
+        "source": {
+          "default": "default",
+          "enum": [
+            "sdk",
+            "metadata",
+            "default"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "suggested_protocol": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Suggested Protocol"
+        }
+      },
+      "title": "IRConsensusHint",
+      "type": "object"
+    },
+    "IREdge": {
+      "properties": {
+        "condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition"
+        },
+        "conditional": {
+          "default": false,
+          "title": "Conditional",
+          "type": "boolean"
+        },
+        "from_node": {
+          "title": "From Node",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "to_node": {
+          "title": "To Node",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "from_node",
+        "to_node"
+      ],
+      "title": "IREdge",
+      "type": "object"
+    },
+    "IRHumanGate": {
+      "properties": {
+        "blocking": {
+          "default": true,
+          "title": "Blocking",
+          "type": "boolean"
+        },
+        "gate_id": {
+          "title": "Gate Id",
+          "type": "string"
+        },
+        "prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt"
+        },
+        "trust_required": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trust Required"
+        }
+      },
+      "required": [
+        "gate_id"
+      ],
+      "title": "IRHumanGate",
+      "type": "object"
+    },
+    "IRMcpToolRef": {
+      "properties": {
+        "accesses_outside_workspace": {
+          "default": false,
+          "title": "Accesses Outside Workspace",
+          "type": "boolean"
+        },
+        "approved": {
+          "default": false,
+          "title": "Approved",
+          "type": "boolean"
+        },
+        "blocked": {
+          "default": false,
+          "title": "Blocked",
+          "type": "boolean"
+        },
+        "can_network": {
+          "default": false,
+          "title": "Can Network",
+          "type": "boolean"
+        },
+        "can_read_secrets": {
+          "default": false,
+          "title": "Can Read Secrets",
+          "type": "boolean"
+        },
+        "can_write": {
+          "default": false,
+          "title": "Can Write",
+          "type": "boolean"
+        },
+        "manifest_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Manifest Hash"
+        },
+        "risk_level": {
+          "default": "low",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Risk Level",
+          "type": "string"
+        },
+        "server_id": {
+          "title": "Server Id",
+          "type": "string"
+        },
+        "tool_name": {
+          "title": "Tool Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "server_id",
+        "tool_name"
+      ],
+      "title": "IRMcpToolRef",
+      "type": "object"
+    },
+    "IRModelCall": {
+      "properties": {
+        "budget": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IRBudget"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "paid": {
+          "default": false,
+          "title": "Paid",
+          "type": "boolean"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        }
+      },
+      "title": "IRModelCall",
+      "type": "object"
+    },
+    "IRNode": {
+      "properties": {
+        "audit_boundary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IRAuditBoundary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "budget": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IRBudget"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "capabilities": {
+          "items": {
+            "$ref": "#/$defs/IRCapabilityRequirement"
+          },
+          "title": "Capabilities",
+          "type": "array"
+        },
+        "consensus": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IRConsensusHint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "eval_metadata": {
+          "additionalProperties": true,
+          "title": "Eval Metadata",
+          "type": "object"
+        },
+        "human_gate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IRHumanGate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/IRNodeKind",
+          "default": "unknown"
+        },
+        "label": {
+          "default": "",
+          "title": "Label",
+          "type": "string"
+        },
+        "mcp_tool": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IRMcpToolRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "model_call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IRModelCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "privileged": {
+          "default": false,
+          "title": "Privileged",
+          "type": "boolean"
+        },
+        "replay_marker": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IRReplayMarker"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "risk": {
+          "$ref": "#/$defs/IRRisk"
+        },
+        "side_effects": {
+          "items": {
+            "$ref": "#/$defs/IRSideEffect"
+          },
+          "title": "Side Effects",
+          "type": "array"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IRToolRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "trust_annotation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trust Annotation"
+        },
+        "write_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Write Path"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "IRNode",
+      "type": "object"
+    },
+    "IRNodeKind": {
+      "description": "Normalized node kinds across all source frameworks.",
+      "enum": [
+        "agent",
+        "tool",
+        "mcp_tool",
+        "model_call",
+        "human_gate",
+        "consensus",
+        "router",
+        "fan_out",
+        "fan_in",
+        "start",
+        "end",
+        "unknown"
+      ],
+      "title": "IRNodeKind",
+      "type": "string"
+    },
+    "IRReplayMarker": {
+      "properties": {
+        "correlation_key": {
+          "title": "Correlation Key",
+          "type": "string"
+        },
+        "marker_id": {
+          "title": "Marker Id",
+          "type": "string"
+        },
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "marker_id",
+        "node_id",
+        "correlation_key"
+      ],
+      "title": "IRReplayMarker",
+      "type": "object"
+    },
+    "IRRisk": {
+      "properties": {
+        "level": {
+          "default": "low",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "title": "Level",
+          "type": "string"
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rationale"
+        },
+        "score": {
+          "default": 0.0,
+          "title": "Score",
+          "type": "number"
+        },
+        "signals": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Signals",
+          "type": "array"
+        },
+        "source": {
+          "default": "heuristic",
+          "enum": [
+            "sdk",
+            "heuristic",
+            "manual"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "title": "IRRisk",
+      "type": "object"
+    },
+    "IRSideEffect": {
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "kind": {
+          "$ref": "#/$defs/SideEffectKind"
+        },
+        "paid": {
+          "default": false,
+          "title": "Paid",
+          "type": "boolean"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "IRSideEffect",
+      "type": "object"
+    },
+    "IRToolRef": {
+      "properties": {
+        "capabilities": {
+          "items": {
+            "$ref": "#/$defs/IRCapabilityRequirement"
+          },
+          "title": "Capabilities",
+          "type": "array"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "namespace": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Namespace"
+        },
+        "pinned": {
+          "default": false,
+          "title": "Pinned",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "IRToolRef",
+      "type": "object"
+    },
+    "SideEffectKind": {
+      "enum": [
+        "none",
+        "read",
+        "write",
+        "network",
+        "paid_call",
+        "exec",
+        "secret_read"
+      ],
+      "title": "SideEffectKind",
+      "type": "string"
+    }
+  },
+  "$id": "https://arc.studio/schemas/swarmgraph-ir.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "compiled_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Compiled At"
+    },
+    "consensus": {
+      "$ref": "#/$defs/IRConsensusHint"
+    },
+    "edges": {
+      "items": {
+        "$ref": "#/$defs/IREdge"
+      },
+      "title": "Edges",
+      "type": "array"
+    },
+    "entry_points": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Entry Points",
+      "type": "array"
+    },
+    "graph_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Graph Hash"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "ir_version": {
+      "default": 1,
+      "title": "Ir Version",
+      "type": "integer"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "name": {
+      "default": "",
+      "title": "Name",
+      "type": "string"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/IRNode"
+      },
+      "title": "Nodes",
+      "type": "array"
+    },
+    "provenance": {
+      "$ref": "#/$defs/IRAdapterProvenance"
+    },
+    "risk": {
+      "$ref": "#/$defs/IRRisk"
+    },
+    "runtime": {
+      "title": "Runtime",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "runtime",
+    "provenance"
+  ],
+  "title": "SwarmGraph IR Graph",
+  "type": "object"
+}
