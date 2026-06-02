@@ -485,3 +485,59 @@ class TestPaidDefault:
         ds = DataStore()
         bar = StatusBar(ds, ThemeManager())
         assert "$paid" in bar.render()
+
+
+# ── Enter-key routing regression tests ────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_enter_submits_slash_command():
+    """Pressing Enter after a slash command runs it (not inserts a newline)."""
+    from agent_runtime_cockpit.tui.app import ArcApp
+    from agent_runtime_cockpit.tui.widgets.input_area import InputArea
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        # Type /version and press Enter.
+        await pilot.press("/", "v", "e", "r", "s", "i", "o", "n")
+        before = len(app.data.entries)
+        await pilot.press("enter")
+        await pilot.pause()
+        # The input should be cleared (submitted, not newline-inserted).
+        input_area = app.screen.query_one("#input-area", InputArea)
+        assert input_area._input.text.strip() == ""
+        # A new transcript entry should have appeared.
+        assert len(app.data.entries) > before
+
+
+@pytest.mark.asyncio
+async def test_shift_enter_inserts_newline_not_submit():
+    """Shift+Enter does NOT submit — no new transcript entry produced."""
+    from agent_runtime_cockpit.tui.app import ArcApp
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        before_entries = len(app.data.entries)
+        await pilot.press("h", "i")
+        await pilot.press("shift+enter")
+        await pilot.pause()
+        # Must not have submitted.
+        assert len(app.data.entries) == before_entries
+
+
+@pytest.mark.asyncio
+async def test_enter_unknown_slash_shows_error():
+    """Enter on an unknown slash command produces transcript output."""
+    from agent_runtime_cockpit.tui.app import ArcApp
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("/", "x", "y", "z", "n", "o", "t", "r", "e", "a", "l")
+        before = len(app.data.entries)
+        await pilot.press("enter")
+        await pilot.pause()
+        assert len(app.data.entries) > before
+        assert any("Unknown slash command" in e.content for e in app.data.entries)
