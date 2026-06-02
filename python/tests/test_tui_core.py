@@ -304,16 +304,29 @@ async def test_headless_app_mounts():
 
 
 @pytest.mark.asyncio
-async def test_headless_slash_version():
-    """Typing /version adds an entry with the version string."""
-    from agent_runtime_cockpit import __version__
+async def test_headless_widgets_render():
+    """ArcScreen widgets are actually mounted (guards the blank-window bug)."""
     from agent_runtime_cockpit.tui.app import ArcApp
-    from agent_runtime_cockpit.tui.screen import ArcScreen
 
     app = ArcApp()
     async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
-        screen = app.query_one(ArcScreen)
+        assert app.query_one("#banner") is not None
+        assert app.query_one("#transcript") is not None
+        assert app.query_one("#status-bar") is not None
+        assert app.query_one("#input-area") is not None
+
+
+@pytest.mark.asyncio
+async def test_headless_slash_version():
+    """Typing /version adds an entry with the version string."""
+    from agent_runtime_cockpit import __version__
+    from agent_runtime_cockpit.tui.app import ArcApp
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        screen = app.screen
         screen._handle_slash("/version")
         await pilot.pause()
         assert any(__version__ in e.content for e in app.data.entries)
@@ -334,12 +347,11 @@ async def test_headless_clear_empties_transcript():
 @pytest.mark.asyncio
 async def test_headless_streaming_flag():
     from agent_runtime_cockpit.tui.app import ArcApp
-    from agent_runtime_cockpit.tui.screen import ArcScreen
 
     app = ArcApp()
     async with app.run_test(size=(120, 40)):
         app.data.is_streaming = True
-        screen = app.query_one(ArcScreen)
+        screen = app.screen
         screen.action_handle_escape()
         assert app.data.is_streaming is False
 
@@ -347,12 +359,11 @@ async def test_headless_streaming_flag():
 @pytest.mark.asyncio
 async def test_headless_help_slash():
     from agent_runtime_cockpit.tui.app import ArcApp
-    from agent_runtime_cockpit.tui.screen import ArcScreen
 
     app = ArcApp()
     async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
-        screen = app.query_one(ArcScreen)
+        screen = app.screen
         screen._show_help_inline()
         await pilot.pause()
         assert any("KEYBOARD SHORTCUTS" in e.content for e in app.data.entries)

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import os
 
-from textual.app import App, ComposeResult
+from textual.app import App
+from textual.screen import Screen
 
 from .data import DataStore
 from .screen import ArcScreen
@@ -28,11 +29,11 @@ class ArcApp(App):
         self._data = data or DataStore()
         self._theme = theme or ThemeManager()
 
-    def compose(self) -> ComposeResult:
-        yield ArcScreen(self._data, self._theme)
-
-    def on_mount(self) -> None:
-        pass  # Theme CSS loaded at startup; runtime reload deferred to Phase 4.2+
+    def get_default_screen(self) -> Screen:
+        # Return ArcScreen as the first screen on the stack. App.compose() must
+        # yield widgets (not a Screen); yielding a Screen leaves the default
+        # empty screen active → blank window.
+        return ArcScreen(self._data, self._theme)
 
     @property
     def data(self) -> DataStore:
