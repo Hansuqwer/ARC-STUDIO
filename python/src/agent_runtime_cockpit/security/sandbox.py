@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import errno
 import json
 import os
 import platform
@@ -226,10 +227,12 @@ WRITE_SHELL_TOKENS = {">", ">>", "tee"}
 SHELL_COMMANDS = {"sh", "bash", "zsh"}
 INTERPRETERS = {"python", "python3", "node", "ruby", "perl"}
 WRITE_COMMANDS = {"touch", "mkdir", "ln", "cp", "tee", "unzip", "install"}
-GIT_DESTRUCTIVE_SUBCOMMANDS = {"branch", "clean", "checkout", "restore", "rm", "switch", "worktree"}
+# Network-capable git subcommands are classified NETWORK (require network policy).
+# Destructive git subcommands are matched inline in classify_command() with
+# per-subcommand nuance (e.g. `git branch -D` is destructive but `git branch` is
+# read-only; `git reset --hard` vs a plain reset), so there is no standalone
+# destructive/hard-reset/checkout-force constant — a flat set would misclassify.
 GIT_NETWORK_SUBCOMMANDS = {"clone", "fetch", "pull", "push", "remote", "submodule"}
-GIT_HARD_RESET = {"reset", "--hard"}
-GIT_CHECKOUT_FORCE = {"checkout", "--"}
 PACKAGE_MANAGER_MODULES = {"pip"}
 NETWORK_HINTS = {"socket", "requests", "urllib", "http.client", "subprocess", "os.system"}
 NODE_NETWORK_HINTS = {"http", "https", "net", "dgram", "fetch", "axios", "node-fetch"}
@@ -814,13 +817,13 @@ def _path_within_workspace(path: str, root: Path) -> bool:
     candidate = Path(path)
     if not candidate.is_absolute():
         candidate = root / candidate
-    try:
-        resolved = candidate.resolve(strict=False)
-    except OSError:
-        return False
+    # Reject a final-component symlink outright (defense in depth) even when it
+    # resolves back inside the workspace; then delegate the symlink-resolving
+    # containment check to the canonical is_path_within_root() helper so the two
+    # path guards cannot diverge.
     if candidate.exists() and candidate.is_symlink():
         return False
-    return resolved.is_relative_to(root)
+    return is_path_within_root(candidate, root)
 
 
 def _extract_path_intents(command: list[str]) -> list[str]:
@@ -1622,6 +1625,73 @@ def _container_daemon_alive(binary: str) -> bool:
         return result.returncode == 0
     except Exception:
         return False
+
+
+# Linux Landlock LSM detection (DETECTION ONLY — enforcement is a Linux-CI
+# follow-up; see docs/research/sandbox-and-microvm.md). landlock_create_ruleset
+# is syscall 444 on x86_64 and aarch64; the LANDLOCK_CREATE_RULESET_VERSION flag
+# (1<<0) returns the highest supported ABI version (>=1) without creating or
+# enforcing a ruleset, so this probe is side-effect-free.
+_SYS_LANDLOCK_CREATE_RULESET = 444
+_LANDLOCK_CREATE_RULESET_VERSION = 1 << 0
+
+
+def _landlock_abi_probe() -> tuple[int, int]:
+    """Return (ret, errno) from a side-effect-free Landlock ABI version query."""
+    import ctypes
+
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.syscall.restype = ctypes.c_long
+    ctypes.set_errno(0)
+    ret = libc.syscall(
+        ctypes.c_long(_SYS_LANDLOCK_CREATE_RULESET),
+        None,
+        ctypes.c_size_t(0),
+        ctypes.c_uint(_LANDLOCK_CREATE_RULESET_VERSION),
+    )
+    return int(ret), ctypes.get_errno()
+
+
+def landlock_preflight() -> dict[str, Any]:
+    """Detect Linux Landlock LSM support (detection only — NOT enforcement).
+
+    Landlock is a stackable, unprivileged LSM (Linux 5.13+) that lets a process
+    additively restrict its own filesystem/network access. ARC does not yet wire
+    Landlock enforcement into command execution; this surfaces kernel support in
+    ``arc sandbox doctor`` so a Linux-only follow-up can gate real enforcement on
+    a proven ABI. ``enforced`` is always False here (no faked completion).
+    """
+    info: dict[str, Any] = {
+        "provider": "landlock",
+        "platform": platform.system(),
+        "enforced": False,
+        "enforcement_status": "detection_only",
+        "abi_version": None,
+    }
+    if platform.system() != "Linux":
+        info["status"] = "unavailable"
+        info["reason"] = "Landlock requires Linux"
+        return info
+    info["kernel"] = platform.release()
+    try:
+        ret, err = _landlock_abi_probe()
+    except Exception as exc:  # pragma: no cover - host/arch dependent
+        info["status"] = "unavailable"
+        info["reason"] = f"Landlock ABI probe failed: {exc}"
+        return info
+    if ret >= 1:
+        info["status"] = "ready"
+        info["abi_version"] = ret
+        info["reason"] = (
+            f"Landlock ABI v{ret} detected; enforcement not yet wired (Linux follow-up)"
+        )
+    elif err == errno.EOPNOTSUPP:
+        info["status"] = "blocked"
+        info["reason"] = "Landlock supported by the kernel but disabled at boot time"
+    else:
+        info["status"] = "unavailable"
+        info["reason"] = "kernel Landlock unavailable (pre-5.13 or not compiled)"
+    return info
 
 
 def container_preflight() -> dict[str, Any]:

@@ -6,11 +6,11 @@ import logging
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
 
 import typer
-from rich import print as rprint
 from rich.console import Console
 from rich.json import JSON
 
@@ -47,8 +47,14 @@ def _out(envelope: ArcEnvelope, as_json: bool) -> None:
     else:
         if not envelope.ok:
             err_console.print(f"[red]Error [{envelope.error.code}]: {envelope.error.message}[/red]")
+        elif sys.stdout.isatty():
+            # Pretty, colorized JSON for interactive terminals.
+            Console().print(JSON(envelope.model_dump_json()))
         else:
-            rprint(JSON(envelope.model_dump_json()))
+            # Plain, parseable JSON for pipes/CI/tests. Rich's JSON renderer keeps
+            # bold/style ANSI even with no_color, so emit unstyled JSON here to
+            # stay machine-readable regardless of FORCE_COLOR.
+            print(envelope.model_dump_json(indent=2))
 
 
 def _profile_payload(profile) -> dict[str, object]:

@@ -610,3 +610,44 @@ changes are small, evidence-driven, and covered by tests in
   evadable; it is defense-in-depth layered on top of deny-default, not isolation.
 - **Still pending (unchanged):** microVM execution (preflight/doctor only), Lima
   network-off proof, virtiofs symlink-mount escape proof.
+
+---
+
+## Review Follow-up — Landlock detection + CLI/path hardening (2026-06-02)
+
+Small, evidence-driven follow-ups from the deep-architecture review
+(`docs/review/deep-architecture-review-prompt.md`). No new isolation boundary is
+claimed: Landlock is **detection/preflight only**, enforcement is a Linux-CI
+follow-up. All changes verified by `uv run ruff check src tests` and
+`uv run pytest tests/`.
+
+### Research notes
+
+| Source | Link | What was learned | Implementation consequence | Confidence | Unresolved |
+|---|---|---|---|---|---|
+| Context7 Rich | `/textualize/rich` | `NO_COLOR`/`no_color` takes precedence over `FORCE_COLOR`, but `NO_COLOR` only disables **color** — bold/italic styling is preserved. `Console.is_terminal` detects pipes. | `Console(no_color=True)` was insufficient for parseable output (Rich still emits bold ANSI around JSON keys). `_out()` now emits unstyled `print(model_dump_json(indent=2))` when stdout is not a TTY, and pretty Rich JSON only on interactive terminals — machine-readable regardless of `FORCE_COLOR`. | High | None. |
+| Vercel/GitHub code search | queries `Console(no_color=` | Common idiom: `Console(no_color=...)` driven by `NO_COLOR` env / not-a-TTY; CI uses plain output. | Confirms the no-TTY→plain approach; ARC keys off `sys.stdout.isatty()`. | Med | grep.app returned no hits for several queries in this runtime (consistent with prior rows). |
+| Context7 CPython | `/python/cpython` | `Path.resolve(strict=False)` ≈ `os.path.realpath()` (canonicalize + follow symlinks; neither raises with strict=False on 3.11). `is_relative_to` is a pure logical (no-FS) check. | `_path_within_workspace` now delegates containment to the canonical `is_path_within_root` (single symlink-resolving primitive) while keeping its stricter final-component symlink rejection. Behavior-preserving; covered by `test_workspace_escape.py`. | High | None. |
+| Linux kernel docs (Landlock) | https://docs.kernel.org/userspace-api/landlock.html | Landlock is a stackable, unprivileged LSM (5.13+) that only **adds** restrictions; safe no-op where unavailable. ABI version query returns highest supported ABI (≥1). | Justifies Landlock as additive defense-in-depth layered under the policy engine. Detection added now; enforcement deferred. | High | Real enforcement (apply ruleset in child) untestable on macOS; needs Linux CI. |
+| GitHub code search — `spack/spack/sandbox.py` (Apache-2.0) | https://github.com/spack/spack/blob/develop/lib/spack/spack/sandbox.py | Real Python precedent: syscall `444`, `LANDLOCK_CREATE_RULESET_VERSION = 1<<0`, `libc.syscall(444, None, 0, VERSION)` returns the ABI version (side-effect-free; no ruleset created). | `_landlock_abi_probe()` mirrors this exactly via `ctypes` (no new dependency). | High | None. |
+| GitHub code search — NVIDIA/OpenShell, torvalds/linux | (landlock.rs / syscalls.c) | Syscall `444` is identical on x86_64 and aarch64. `-EOPNOTSUPP` = "supported by kernel but disabled at boot time"; `-ENOSYS` = not compiled/too old. | `landlock_preflight()` maps EOPNOTSUPP→`blocked`, ENOSYS/other→`unavailable`, ABI≥1→`ready`. | High | 32-bit/other arches not mapped (Linux CI targets are x86_64/aarch64). |
+
+### Decision table
+
+| Decision | Chosen approach | Alternatives | Reason | Files | Confidence |
+|---|---|---|---|---|---|
+| JSON output color | Plain `print(indent=2)` when not a TTY; pretty Rich JSON only on interactive TTY | `Console(no_color=…)` (insufficient — keeps bold); strip ANSI in tests | Keeps machine-readable output parseable regardless of `FORCE_COLOR`; fixes brittle `--ask` tests at the source | `cli/_helpers.py` | High |
+| Path confinement | `_path_within_workspace` delegates to `is_path_within_root`, keeps final-symlink rejection | Leave duplicated; collapse into one and drop the extra symlink guard | Removes divergence risk while preserving the stricter guard | `security/sandbox.py` | High |
+| Landlock | Detection/preflight + `arc sandbox doctor` wiring; `enforced=False` always | Implement enforcement now; add `landlock` PyPI dep | Enforcement is untestable on the macOS review host; shipping it unverified would violate don't-break-tests / don't-fake-completion | `security/sandbox.py`, `cli/sandbox.py`, `tests/security/test_landlock_preflight.py` | High |
+
+### What is real vs design-only
+
+- **Real, tested:** plain-JSON-when-piped output; unified path confinement;
+  `landlock_preflight()` detection (unavailable/blocked/ready) + doctor wiring;
+  dead-constant removal and `subprocess.py` `(OSError, ProcessLookupError)` parity
+  from the prior review pass.
+- **Design-only / Linux-CI follow-up:** Landlock **enforcement** (apply a ruleset
+  via `landlock_add_rule`/`landlock_restrict_self` in a `preexec_fn` confining the
+  child to the workspace + `/tmp`, network scoped by policy). Must be gated
+  (e.g. `ARC_SANDBOX_LANDLOCK=1`), no-op where unavailable, and proven on a Linux
+  runner before any enforcement claim.

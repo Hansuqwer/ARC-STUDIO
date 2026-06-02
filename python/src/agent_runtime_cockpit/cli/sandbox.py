@@ -39,6 +39,7 @@ from ..security.sandbox import (
     compact_sandbox_audit_events,
     container_preflight,
     decide,
+    landlock_preflight,
     ensure_workspace_cwd,
     get_sandbox_audit_event,
     CommandRuleVerdict,
@@ -137,6 +138,7 @@ def sandbox_doctor(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> N
             microvm_provider.describe(),
             VZNoNetworkProof().preflight(),
             container_preflight(),
+            landlock_preflight(),
         ]
     }
     _out(ok(data), json_output)

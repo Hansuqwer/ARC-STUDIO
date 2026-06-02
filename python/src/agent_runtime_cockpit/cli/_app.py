@@ -47,7 +47,7 @@ from ._subapps import (
     workspace_app,
 )
 
-console = Console()
+console = Console(no_color=not _sys.stdout.isatty(), highlight=_sys.stdout.isatty())
 err_console = Console(stderr=True)
 
 app = typer.Typer(

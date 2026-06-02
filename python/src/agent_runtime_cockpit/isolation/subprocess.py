@@ -189,7 +189,10 @@ class SubprocessIsolationProvider(IsolationProvider):
             kill_reason = "timeout"
             try:
                 os.killpg(proc.pid, signal.SIGKILL)
-            except ProcessLookupError:
+            except (OSError, ProcessLookupError):
+                # Process group already gone, or killpg denied — nothing to kill.
+                # Mirrors NoneIsolationProvider so both providers handle the
+                # full range of os.killpg failures (OSError subclasses).
                 pass
             proc.wait()
         stdout_reader.join()
