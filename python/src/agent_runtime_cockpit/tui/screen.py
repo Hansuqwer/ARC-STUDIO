@@ -11,6 +11,7 @@ from .data import DataStore
 from .theme import ThemeManager
 from .widgets.banner import Banner
 from .widgets.input_area import InputArea
+from .widgets.slash_menu import SlashMenu
 from .widgets.status_bar import StatusBar
 from .widgets.transcript import Transcript
 
@@ -39,10 +40,12 @@ class ArcScreen(Screen):
         self._ctrl_c_count = 0
         self._ctrl_c_timer: float = 0.0
         self._daemon_was_online: bool = False
+        self._session = None  # lazily-built persistent ChatSession
 
     def compose(self) -> ComposeResult:
         yield Banner(self.data, self.theme, id="banner")
         yield Transcript(self.data, self.theme, id="transcript")
+        yield SlashMenu()
         yield StatusBar(self.data, self.theme, id="status-bar")
         yield InputArea(self.data, self.theme, id="input-area")
 
@@ -95,19 +98,34 @@ class ArcScreen(Screen):
         else:
             self._handle_chat_message(text)
 
-    def on_input_area_completion_requested(self, event: InputArea.CompletionRequested) -> None:
-        """Tab completion: find first matching slash command."""
+    def on_text_area_changed(self, event) -> None:
+        """Drive the slash dropdown as the user types."""
         try:
-            from agent_runtime_cockpit.cli_repl.commands import get_registry
-
-            commands = get_registry().list_commands()
-            prefix = event.text.lstrip("/").lower()
-            match = next((c for c in commands if c.name.startswith(prefix)), None)
-            if match:
-                input_area = self.query_one("#input-area", InputArea)
-                input_area.set_text(f"/{match.name} ")
+            text = event.text_area.text
         except Exception:
-            pass
+            return
+        menu = self.query_one(SlashMenu)
+        first_line = text.split("\n", 1)[0]
+        if first_line.startswith("/") and " " not in first_line:
+            menu.show_for(first_line)
+        else:
+            menu.hide()
+
+    def on_list_view_selected(self, event) -> None:
+        """Mouse/Enter selection of a slash-menu row completes the input."""
+        item_id = getattr(event.item, "id", "") or ""
+        if item_id.startswith("slash-"):
+            name = item_id[len("slash-") :]
+            self.query_one(SlashMenu).hide()
+            self.query_one("#input-area", InputArea).set_text(f"/{name} ")
+
+    def on_input_area_completion_requested(self, event: InputArea.CompletionRequested) -> None:
+        """Tab completion: complete to the best matching slash command."""
+        menu = self.query_one(SlashMenu)
+        match = menu.best_match(event.text)
+        if match:
+            menu.hide()
+            self.query_one("#input-area", InputArea).set_text(f"/{match} ")
 
     def _handle_slash(self, text: str) -> None:
         parts = text.split(maxsplit=1)
@@ -172,17 +190,38 @@ class ArcScreen(Screen):
             return
 
         # Delegate remaining slash commands to backend
+        self.query_one(SlashMenu).hide()
         try:
-            from agent_runtime_cockpit.cli_repl.slash_commands import SlashCommandHandler
-            from agent_runtime_cockpit.cli_repl.session import ChatSession
+            from agent_runtime_cockpit.cli_repl.slash_commands import (
+                SlashCommandHandler,
+                _result_text,
+            )
 
             handler = SlashCommandHandler()
-            session = ChatSession()
-            result = handler.handle(text, session)
-            if result is not None and result != "__EXIT__":
-                self.data.add_entry("assistant", str(result))
+            result = handler.handle(text, self._get_session())
+            if result == "__EXIT__":
+                self._do_exit()
+                return
+            out = _result_text(result)
+            if not out:
+                state = getattr(result, "state", None)
+                out = f"({state})" if state else "(no output)"
+            self.data.add_entry("assistant", out)
         except Exception as e:
             self._add_error_entry("SLASH_ERROR", str(e))
+
+    def _get_session(self):
+        """Return a persistent ChatSession bound to this TUI session.
+
+        Paid calls are enabled by default (data.allow_paid); provider-key and
+        trust gates still apply downstream.
+        """
+        if self._session is None:
+            from agent_runtime_cockpit.cli_repl.session import ChatSession
+
+            self._session = ChatSession(id=self.data.session_id)
+        self._session.allow_paid_calls = bool(getattr(self.data, "allow_paid", True))
+        return self._session
 
     def _handle_shell_escape(self, text: str) -> None:
         import subprocess

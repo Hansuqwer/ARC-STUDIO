@@ -4,44 +4,53 @@ from __future__ import annotations
 
 from textual.widgets import Label, ListItem, ListView
 
+_FALLBACK = [
+    ("help", "Show help"),
+    ("clear", "Clear transcript"),
+    ("exit", "Exit ARC Studio"),
+    ("theme", "Toggle dark/light theme"),
+    ("version", "Show version"),
+    ("status", "Show workspace status"),
+    ("runs", "List stored runs"),
+    ("sessions", "List & switch sessions"),
+    ("hitl", "HITL pending prompts"),
+    ("runtimes", "List detected runtimes"),
+]
+
 
 class SlashMenu(ListView):
-    """Fuzzy-filtered slash command dropdown."""
+    """Fuzzy-filtered slash command dropdown with one-line descriptions."""
 
     def __init__(self, **kwargs) -> None:
         super().__init__(id="slash-menu", **kwargs)
-        self._all_commands: list[str] = []
-        self._load_commands()
+        self._commands: list[tuple[str, str]] = self._load_commands()
 
-    def _load_commands(self) -> None:
+    def _load_commands(self) -> list[tuple[str, str]]:
         try:
-            from agent_runtime_cockpit.cli_repl.commands import get_registry
+            # Use the populated registry (the bare global get_registry() may be
+            # empty until a SlashCommandHandler is built).
+            from agent_runtime_cockpit.cli_repl.slash_commands import _build_registry
 
-            self._all_commands = [c.name for c in get_registry().list_commands()]
+            reg = _build_registry()
+            cmds = [(c.name, c.help_text) for c in reg.list_commands() if c.popup_visible]
+            return cmds or _FALLBACK
         except Exception:
-            self._all_commands = [
-                "help",
-                "clear",
-                "exit",
-                "theme",
-                "version",
-                "status",
-                "runs",
-                "sessions",
-                "hitl",
-                "runtimes",
-                "doctor",
-            ]
+            return _FALLBACK
 
-    def filter(self, prefix: str) -> list[str]:
+    def filter(self, prefix: str) -> list[tuple[str, str]]:
         p = prefix.lstrip("/").lower()
-        return [c for c in self._all_commands if c.startswith(p)]
+        return [(n, h) for (n, h) in self._commands if n.startswith(p)]
+
+    def best_match(self, prefix: str) -> str | None:
+        matches = self.filter(prefix)
+        return matches[0][0] if matches else None
 
     def show_for(self, prefix: str) -> None:
         self.clear()
         matches = self.filter(prefix)
-        for name in matches[:10]:
-            self.append(ListItem(Label(f"/{name}"), id=f"slash-{name}"))
+        for name, help_text in matches[:12]:
+            desc = help_text[:50] if help_text else ""
+            self.append(ListItem(Label(f"/{name} — {desc}"), id=f"slash-{name}"))
         if matches:
             self.add_class("visible")
         else:

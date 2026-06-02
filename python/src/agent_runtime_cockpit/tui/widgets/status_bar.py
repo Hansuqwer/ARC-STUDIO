@@ -30,8 +30,10 @@ class StatusBar(Static):
         session_short = self.data.session_id[:8] if self.data.session_id else "--------"
         daemon_dot = "●" if self.data.daemon_online else "○"
         stream_indicator = " ● streaming" if self.data.is_streaming else ""
+        paid_indicator = " $paid" if getattr(self.data, "allow_paid", False) else ""
         line = (
-            f" {self.data.mode} │ {self.data.runtime_mode} │ {ws} │ {session_short} │ {cost} │"
+            f" {self.data.mode} │ {self.data.runtime_mode}{paid_indicator} │ {ws} │ "
+            f"{session_short} │ {cost} │"
             f" {daemon_dot}{stream_indicator} │"
             f" Esc:cancel  /:commands  Ctrl+P:palette"
         )

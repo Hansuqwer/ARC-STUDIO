@@ -367,3 +367,102 @@ async def test_headless_help_slash():
         screen._show_help_inline()
         await pilot.pause()
         assert any("KEYBOARD SHORTCUTS" in e.content for e in app.data.entries)
+
+
+# ── Slash menu (Issue 1) ───────────────────────────────────────────────────
+
+
+class TestSlashMenu:
+    def test_menu_loads_descriptions(self):
+        from agent_runtime_cockpit.tui.widgets.slash_menu import SlashMenu
+
+        menu = SlashMenu()
+        assert len(menu._commands) > 0
+        # every entry is (name, help_text)
+        assert all(isinstance(n, str) and isinstance(h, str) for n, h in menu._commands)
+
+    def test_menu_filters_by_prefix(self):
+        from agent_runtime_cockpit.tui.widgets.slash_menu import SlashMenu
+
+        menu = SlashMenu()
+        results = menu.filter("/ru")
+        assert all(n.startswith("ru") for n, _ in results)
+
+    def test_menu_best_match(self):
+        from agent_runtime_cockpit.tui.widgets.slash_menu import SlashMenu
+
+        menu = SlashMenu()
+        assert menu.best_match("/zzzznope") is None
+
+
+@pytest.mark.asyncio
+async def test_headless_slash_menu_visible_on_slash():
+    from types import SimpleNamespace
+
+    from agent_runtime_cockpit.tui.app import ArcApp
+    from agent_runtime_cockpit.tui.widgets.slash_menu import SlashMenu
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        screen = app.screen
+        menu = screen.query_one(SlashMenu)
+        screen.on_text_area_changed(SimpleNamespace(text_area=SimpleNamespace(text="/")))
+        await pilot.pause()
+        assert menu.has_class("visible")
+        screen.on_text_area_changed(SimpleNamespace(text_area=SimpleNamespace(text="/zzzz@")))
+        await pilot.pause()
+        assert not menu.has_class("visible")
+
+
+# ── Slash execution (Issue 2) ──────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_headless_unknown_slash_reports():
+    from agent_runtime_cockpit.tui.app import ArcApp
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        before = len(app.data.entries)
+        app.screen._handle_slash("/definitely-not-a-real-command")
+        await pilot.pause()
+        assert len(app.data.entries) > before
+        assert any("Unknown slash command" in e.content for e in app.data.entries)
+
+
+@pytest.mark.asyncio
+async def test_headless_known_slash_non_silent():
+    """A delegated slash command always produces a visible (non-empty) entry."""
+    from agent_runtime_cockpit.tui.app import ArcApp
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        before = len(app.data.entries)
+        app.screen._handle_slash("/doctor")
+        await pilot.pause()
+        assert len(app.data.entries) > before
+        assert app.data.entries[-1].content.strip() != ""
+
+
+# ── Paid on by default (Issue 3) ───────────────────────────────────────────
+
+
+class TestPaidDefault:
+    def test_paid_on_by_default(self, monkeypatch):
+        monkeypatch.delenv("ARC_TUI_NO_PAID", raising=False)
+        assert DataStore().allow_paid is True
+
+    def test_paid_opt_out_env(self, monkeypatch):
+        monkeypatch.setenv("ARC_TUI_NO_PAID", "1")
+        assert DataStore().allow_paid is False
+
+    def test_status_bar_shows_paid(self, monkeypatch):
+        monkeypatch.delenv("ARC_TUI_NO_PAID", raising=False)
+        from agent_runtime_cockpit.tui.widgets.status_bar import StatusBar
+
+        ds = DataStore()
+        bar = StatusBar(ds, ThemeManager())
+        assert "$paid" in bar.render()

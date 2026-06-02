@@ -55,6 +55,10 @@ class DataStore:
     is_streaming: bool = False
     pending_approval: str | None = None
     approval_options: list[str] = field(default_factory=list)
+    # Paid provider calls are ON by default in the TUI; opt out with
+    # ARC_TUI_NO_PAID=1. This flips only the paid default — provider-key,
+    # workspace-trust, and dual-gate checks still apply downstream.
+    allow_paid: bool = True
 
     # ── domain caches ────────────────────────────────────────────────────
     run_count: int = 0
@@ -71,6 +75,8 @@ class DataStore:
             self.session_id = f"s-{uuid.uuid4().hex[:12]}"
         self.daemon_host = os.environ.get("ARC_DAEMON_HOST", "127.0.0.1")
         self.daemon_port = int(os.environ.get("ARC_DAEMON_PORT", "7777"))
+        if os.environ.get("ARC_TUI_NO_PAID"):
+            self.allow_paid = False
 
     def add_entry(
         self, role: str, content: str, metadata: dict[str, Any] | None = None
