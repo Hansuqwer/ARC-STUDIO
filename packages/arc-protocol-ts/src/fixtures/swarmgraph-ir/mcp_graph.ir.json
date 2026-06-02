@@ -1,0 +1,151 @@
+{
+  "ir_version": 1,
+  "id": "wf-mcp",
+  "name": "MCP tool graph",
+  "runtime": "native",
+  "provenance": {
+    "adapter_id": "native",
+    "runtime": "native",
+    "adapter_version": null,
+    "source_file": null,
+    "exported_via": "export_workflow",
+    "imported_at": null
+  },
+  "nodes": [
+    {
+      "id": "__start__",
+      "label": "START",
+      "kind": "start",
+      "tool": null,
+      "mcp_tool": null,
+      "model_call": null,
+      "human_gate": null,
+      "consensus": null,
+      "risk": {
+        "level": "low",
+        "score": 0.0,
+        "signals": [],
+        "rationale": null,
+        "source": "heuristic"
+      },
+      "capabilities": [],
+      "side_effects": [],
+      "budget": null,
+      "audit_boundary": null,
+      "replay_marker": null,
+      "trust_annotation": null,
+      "privileged": false,
+      "write_path": null,
+      "eval_metadata": {},
+      "metadata": {}
+    },
+    {
+      "id": "mcp_fs",
+      "label": "filesystem mcp",
+      "kind": "mcp_tool",
+      "tool": null,
+      "mcp_tool": {
+        "server_id": "fs",
+        "tool_name": "write_file",
+        "manifest_hash": null,
+        "can_write": false,
+        "can_network": false,
+        "can_read_secrets": false,
+        "accesses_outside_workspace": false,
+        "risk_level": "low",
+        "approved": false,
+        "blocked": false
+      },
+      "model_call": null,
+      "human_gate": null,
+      "consensus": null,
+      "risk": {
+        "level": "low",
+        "score": 0.0,
+        "signals": [],
+        "rationale": null,
+        "source": "heuristic"
+      },
+      "capabilities": [],
+      "side_effects": [],
+      "budget": null,
+      "audit_boundary": null,
+      "replay_marker": null,
+      "trust_annotation": null,
+      "privileged": false,
+      "write_path": null,
+      "eval_metadata": {},
+      "metadata": {
+        "is_mcp": true,
+        "mcp_server_id": "fs",
+        "mcp_tool_name": "write_file"
+      }
+    },
+    {
+      "id": "__end__",
+      "label": "END",
+      "kind": "end",
+      "tool": null,
+      "mcp_tool": null,
+      "model_call": null,
+      "human_gate": null,
+      "consensus": null,
+      "risk": {
+        "level": "low",
+        "score": 0.0,
+        "signals": [],
+        "rationale": null,
+        "source": "heuristic"
+      },
+      "capabilities": [],
+      "side_effects": [],
+      "budget": null,
+      "audit_boundary": null,
+      "replay_marker": null,
+      "trust_annotation": null,
+      "privileged": false,
+      "write_path": null,
+      "eval_metadata": {},
+      "metadata": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from_node": "__start__",
+      "to_node": "mcp_fs",
+      "conditional": false,
+      "condition": null,
+      "label": null,
+      "metadata": {}
+    },
+    {
+      "id": "e2",
+      "from_node": "mcp_fs",
+      "to_node": "__end__",
+      "conditional": false,
+      "condition": null,
+      "label": null,
+      "metadata": {}
+    }
+  ],
+  "entry_points": [
+    "__start__"
+  ],
+  "risk": {
+    "level": "low",
+    "score": 0.0,
+    "signals": [],
+    "rationale": null,
+    "source": "heuristic"
+  },
+  "consensus": {
+    "protocol": null,
+    "suggested_protocol": null,
+    "min_workers": null,
+    "source": "default"
+  },
+  "graph_hash": "8ff15445321fd0b8813d6fa35a34c8b885e3bb374c0f4c13bdb994014a54b1e8",
+  "compiled_at": null,
+  "metadata": {}
+}
