@@ -202,7 +202,12 @@ def ir_policy_cmd(
     try:
         graph = from_json(path.read_text(encoding="utf-8"))
         wf = to_workflow_info(graph)
-        report = lint_workflow(wf, workspace_root=Path(workspace) if workspace else None)
+        report = lint_workflow(
+            wf,
+            workspace_root=Path(workspace) if workspace else None,
+            risk_level=graph.risk.level,
+            suggested_consensus=graph.consensus.suggested_protocol,
+        )
     except Exception as exc:  # noqa: BLE001
         _out(err(ArcErrorCode.INTERNAL_ERROR, f"Policy lint failed: {exc}"), json_output)
         raise typer.Exit(1) from exc

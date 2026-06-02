@@ -253,36 +253,40 @@ def _r8_unbounded_fan_out(wf: WorkflowInfo) -> list[PolicyIssue]:
 def lint_workflow(
     workflow: WorkflowInfo,
     workspace_root: Path | None = None,
+    *,
+    risk_level: str | None = None,
+    suggested_consensus: str | None = None,
 ) -> PolicyReport:
     """Run all policy rules against a WorkflowInfo and return a PolicyReport.
 
     Args:
         workflow: The WorkflowInfo to lint.
         workspace_root: Confine write-path checks to this directory (default: cwd).
+        risk_level: Pre-computed risk level (skips SDK call when provided).
+        suggested_consensus: Pre-computed consensus suggestion (skips SDK call when provided).
 
     Returns:
         PolicyReport with issues, risk level, suggested consensus, and can_run flag.
     """
-    from swarmgraph import assess_prompt_risk, select_consensus_protocol
-
     ws = (workspace_root or Path.cwd()).resolve()
 
-    # Derive risk from workflow name/description heuristic + metadata
-    description = f"{workflow.name} {' '.join(n.label for n in workflow.nodes)}"
-    risk_assessment = assess_prompt_risk(description)
-    risk_level = risk_assessment.risk  # "low" | "medium" | "high" | "critical"
+    if risk_level is None or suggested_consensus is None:
+        from swarmgraph import assess_prompt_risk, select_consensus_protocol
 
-    # Suggested consensus from the SDK
-    try:
-        consensus_result = select_consensus_protocol(risk_assessment)
-        suggested = consensus_result.protocol.value if consensus_result else None
-    except Exception:
-        suggested = None
+        description = f"{workflow.name} {' '.join(n.label for n in workflow.nodes)}"
+        risk_assessment = assess_prompt_risk(description)
+        risk_level = risk_level or risk_assessment.risk
+        if suggested_consensus is None:
+            try:
+                consensus_result = select_consensus_protocol(risk_assessment)
+                suggested_consensus = consensus_result.protocol.value if consensus_result else None
+            except Exception:
+                suggested_consensus = None
 
     # Run all rules
     issues: list[PolicyIssue] = []
     issues += _r1_missing_hitl(workflow, risk_level)
-    issues += _r2_weak_consensus(workflow, risk_level, suggested)
+    issues += _r2_weak_consensus(workflow, risk_level, suggested_consensus)
     issues += _r3_paid_call_unguarded(workflow)
     issues += _r4_untrusted_mcp_tool(workflow)
     issues += _r5_write_outside_workspace(workflow, ws)
@@ -297,7 +301,7 @@ def lint_workflow(
         workflow_name=workflow.name,
         runtime=workflow.runtime,
         risk_level=risk_level,
-        suggested_consensus=suggested,
+        suggested_consensus=suggested_consensus,
         issues=issues,
         can_run=can_run,
     )
