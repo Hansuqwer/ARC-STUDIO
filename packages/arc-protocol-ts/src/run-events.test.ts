@@ -40,6 +40,9 @@ const intentionallyUntypedCanonicalTypes = [
   'BATTLE_CONSENSUS_REACHED',
   'BATTLE_HITL_REQUIRED',
   'BATTLE_COMPLETED',
+  'CONSENSUS_DIFFERENTIATOR',
+  'CONSENSUS_EVAL',
+  'CONSENSUS_EVAL_RUN',
   'CUSTOM',
 ] as const;
 

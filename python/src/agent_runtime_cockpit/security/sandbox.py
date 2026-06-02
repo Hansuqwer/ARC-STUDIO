@@ -2672,7 +2672,11 @@ def compact_sandbox_audit_events(
         }
 
     if before is not None:
-        kept_lines = [line for line in raw_lines if _event_started_at(line) >= before]
+        kept_lines = [
+            line
+            for line in raw_lines
+            if (ts := _event_started_at(line)) is not None and ts >= before
+        ]
     elif keep == 0:
         kept_lines = []
     else:
