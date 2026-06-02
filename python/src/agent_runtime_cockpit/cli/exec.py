@@ -25,6 +25,16 @@ from ._helpers import (
 )
 
 
+@app.command("tui")
+def tui_command(
+    resume: Optional[str] = typer.Option(None, "--resume", help="Session ID to resume"),
+) -> None:
+    """Launch the ARC Studio interactive TUI."""
+    from ..tui.app import run_tui
+
+    run_tui(resume_id=resume)
+
+
 @app.command()
 def serve(
     host: str = typer.Option("127.0.0.1", "--host"),

@@ -30,6 +30,8 @@ dependencies = [
     "tiktoken>=0.8",
     "mcp>=1.0.0",
     "swarmgraph-sdk",
+    "textual>=0.80",
+    "pygments>=2.17",
 ]
 
 [project.optional-dependencies]
@@ -124,6 +126,8 @@ extend-select = ["TID251"]
 "agent_runtime_cockpit.swarmgraph.state".msg = "Use swarmgraph public API or update test_arc_sdk_boundary.py intentionally."
 
 [tool.ruff.lint.per-file-ignores]
+"src/agent_runtime_cockpit/tui/**/*.py" = ["TID251"]
+"src/agent_runtime_cockpit/cli/exec.py" = ["TID251"]
 "src/agent_runtime_cockpit/adapters/swarmgraph.py" = ["TID251"]
 "src/agent_runtime_cockpit/battle/runner.py" = ["TID251"]
 "src/agent_runtime_cockpit/cli/swarmgraph.py" = ["TID251"]

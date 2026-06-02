@@ -156,9 +156,14 @@ def _arc_default(
 
     no_tui = os.environ.get("ARC_NO_TUI", "")
     if not no_tui and _sys.stdin.isatty():
-        from ..cli_repl.chat_repl import run_chat_repl
+        if os.environ.get("ARC_CLASSIC"):
+            from ..cli_repl.chat_repl import run_chat_repl
 
-        run_chat_repl()
+            run_chat_repl()
+        else:
+            from ..tui.app import run_tui
+
+            run_tui()
     else:
         import click as _click
 
