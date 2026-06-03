@@ -1627,3 +1627,71 @@ def config_show(
     ws = _workspace(workspace)
     config = load_config(ws)
     _out(ok(config.flatten(), workspace=str(ws)), json_output)
+
+
+@eval_app.command("recommend-policy")
+def eval_recommend_policy(
+    dataset: str = typer.Option(
+        ...,
+        "--dataset",
+        "-d",
+        help="Path to JSONL eval results or directory of EvalResult JSON files.",
+    ),
+    min_failure_rate: float = typer.Option(0.2, "--min-failure-rate"),
+    min_sample: int = typer.Option(3, "--min-sample"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Analyse eval results and recommend policy adjustments."""
+    _setup_logging(debug)
+    import json as _json
+    from pathlib import Path as _Path
+    from ..evals.golden import EvalResult
+    from ..evals.policy_recommend import recommend_policy, save_recommendations
+
+    ds = _Path(dataset)
+    results: list = []
+
+    if ds.is_file() and ds.suffix == ".jsonl":
+        for line in ds.read_text().splitlines():
+            line = line.strip()
+            if line:
+                try:
+                    results.append(EvalResult.model_validate(_json.loads(line)))
+                except Exception:
+                    pass
+    elif ds.is_dir():
+        for f in sorted(ds.glob("*.json")):
+            try:
+                results.append(EvalResult.model_validate_json(f.read_text()))
+            except Exception:
+                pass
+
+    if not results:
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, f"No valid EvalResult records found in: {dataset}"),
+            json_output,
+        )
+        raise typer.Exit(1)
+
+    report = recommend_policy(results, min_failure_rate=min_failure_rate, min_sample=min_sample)
+    ws = _workspace(workspace)
+    saved = save_recommendations(report, ws)
+
+    from ..flight_recorder import EventType, record_cli_event
+
+    record_cli_event(
+        EventType.EVAL_RECOMMENDATION_GENERATED,
+        {
+            "total_runs": report.total_runs,
+            "failed_runs": report.failed_runs,
+            "failure_rate": report.failure_rate,
+            "recommendations_count": len(report.recommendations),
+            "saved_to": str(saved),
+        },
+        source="arc.evals.recommend-policy",
+    )
+
+    payload = {**report.model_dump(), "saved_to": str(saved)}
+    _out(ok(payload), json_output)

@@ -95,6 +95,20 @@ def ir_simulate_cmd(
         "report": _json.loads(report_json),
     }
 
+    from ..flight_recorder import EventType, record_cli_event
+
+    record_cli_event(
+        EventType.SIMULATION_GENERATED,
+        {
+            "graph_id": report.graph_id,
+            "determinism_hash": report.determinism_hash,
+            "overall_allowed": report.policy.can_run,
+            "risk_level": report.policy.risk_level,
+            "span_count": len(report.spans),
+        },
+        source="arc.ir.simulate",
+    )
+
     _out(ok(payload), json_output)
 
     if fail_on_policy_block and not report.policy.can_run:

@@ -98,6 +98,19 @@ def ir_compile_cmd(
         )
         raise typer.Exit(2)
 
+    from ..flight_recorder import EventType, record_cli_event
+
+    record_cli_event(
+        EventType.IR_COMPILED,
+        {
+            "graph_id": payload["graph_id"],
+            "graph_hash": payload["graph_hash"],
+            "risk_level": payload["risk_level"],
+            "node_count": payload["node_count"],
+        },
+        source="arc.ir.compile",
+    )
+
     _out(ok(payload), json_output)
 
 

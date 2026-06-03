@@ -236,6 +236,20 @@ def obs_export_cmd(
     if live_status:
         payload["live_export"] = live_status
 
+    from ..flight_recorder import EventType, record_cli_event
+
+    record_cli_event(
+        EventType.EVAL_RECOMMENDATION_GENERATED,
+        {
+            "export_id": export.export_id,
+            "format": export.format,
+            "export_hash": export.export_hash,
+            "run_id": export.source.run_id,
+            "span_count": len(export.spans),
+        },
+        source="arc.obs.export",
+    )
+
     _out(ok(payload), json_output)
     if not val.ok:
         raise typer.Exit(2)

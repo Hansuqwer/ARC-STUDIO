@@ -59,3 +59,29 @@ __all__ = [
     "RunEntry",
     "SegmentRef",
 ]
+
+
+def record_cli_event(
+    event_type: "EventType",
+    payload: "dict | None" = None,
+    *,
+    source: str = "arc.cli",
+    workspace: str | None = None,
+) -> None:
+    """Fire-and-forget: emit one flight event from a CLI command.
+
+    Creates a synthetic run, records the event, stops. Never raises.
+    """
+    import uuid
+    from pathlib import Path
+
+    try:
+        base = str(Path(workspace or ".") / ".arc" / "flight")
+        cfg = FlightRecorderConfig(base_dir=base, enabled=True)
+        fr = FlightRecorder(cfg)
+        rid = f"cli-{uuid.uuid4().hex[:8]}"
+        fr.start_run(rid)
+        fr.record(rid, event_type, payload=payload or {}, source=source)
+        fr.stop_run(rid)
+    except Exception:
+        pass
