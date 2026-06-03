@@ -32,7 +32,6 @@ const SUBPROCESS_ENV_ALLOWLIST = [
     'ARC_SWARMGRAPH_RUN_BACKEND',
     'ARC_SWARMGRAPH_ALLOW_COSTS',
     'ARC_SWARMGRAPH_GATEWAY_URL',
-    'ARC_SWARMGRAPH_GATEWAY_TOKEN',
 ];
 
 function buildChildEnv(): NodeJS.ProcessEnv {
@@ -213,6 +212,7 @@ export class WorkflowExecutor {
                 cwd,
                 shell: false,
                 env: buildChildEnv(),
+                detached: process.platform !== 'win32',
                 stdio: ['ignore', 'pipe', 'pipe']
             });
 
@@ -264,11 +264,11 @@ export class WorkflowExecutor {
 
             timeoutHandle = setTimeout(() => {
                 killed = true;
-                child.kill('SIGTERM');
+                this.killProcessTree(child, 'SIGTERM');
 
                 setTimeout(() => {
                     if (!child.killed) {
-                        child.kill('SIGKILL');
+                        this.killProcessTree(child, 'SIGKILL');
                     }
                 }, 5000);
 
@@ -279,6 +279,18 @@ export class WorkflowExecutor {
                 ));
             }, timeout);
         });
+    }
+
+    private killProcessTree(child: ChildProcess, signal: NodeJS.Signals): void {
+        if (child.pid && process.platform !== 'win32') {
+            try {
+                process.kill(-child.pid, signal);
+                return;
+            } catch {
+                // Fall back to direct kill if the process group is already gone.
+            }
+        }
+        child.kill(signal);
     }
 
     // ========== Validation ==========

@@ -3,10 +3,10 @@ import { BackendApplicationContribution } from '@theia/core/lib/node';
 import { Application } from 'express';
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 @injectable()
 export class ArcHealthEndpoint implements BackendApplicationContribution {
@@ -54,7 +54,7 @@ export class ArcHealthEndpoint implements BackendApplicationContribution {
     private async checkSwarmGraph(): Promise<{ status: string; details?: string }> {
         try {
             const cli = process.env.ARC_SWARMGRAPH_CLI || 'swarmgraph';
-            await execAsync(`${cli} --version`, { timeout: 5000 });
+            await execFileAsync(cli, ['--version'], { timeout: 5000 });
             return { status: 'ok' };
         } catch (error) {
             return { status: 'degraded', details: 'SwarmGraph CLI not available' };

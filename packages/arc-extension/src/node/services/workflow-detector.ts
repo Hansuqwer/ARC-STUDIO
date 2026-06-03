@@ -163,9 +163,9 @@ export class WorkflowDetector {
             }
 
             const hasStateGraphImport = this.matchPattern(content, [
-                /from\s+langgraph\.graph\s+import\s+[\s\S]*StateGraph/,
-                /from\s+langgraph\s+import\s+[\s\S]*StateGraph/,
-                /import\s+langgraph\.graph[\s\S]*StateGraph/,
+                /^\s*from\s+langgraph\.graph\s+import\s+[^\n]*\bStateGraph\b/m,
+                /^\s*from\s+langgraph\s+import\s+[^\n]*\bStateGraph\b/m,
+                /^\s*import\s+langgraph\.graph\b/m,
             ]);
 
             if (!hasStateGraphImport) {

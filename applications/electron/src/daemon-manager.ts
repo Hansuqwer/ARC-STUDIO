@@ -14,6 +14,31 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import * as http from 'http';
 
+const DAEMON_ENV_ALLOWLIST = [
+  'PATH',
+  'HOME',
+  'USER',
+  'LANG',
+  'LC_ALL',
+  'TZ',
+  'TMPDIR',
+  'VIRTUAL_ENV',
+  'VIRTUAL_ENV_PROMPT',
+  'PYTHONPATH',
+  'PIP_REQUIRE_VIRTUALENV',
+];
+
+function buildDaemonEnv(extra: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const key of DAEMON_ENV_ALLOWLIST) {
+    const value = process.env[key];
+    if (value !== undefined) {
+      env[key] = value;
+    }
+  }
+  return { ...env, ...extra };
+}
+
 export interface DaemonManagerOptions {
   /** Port the daemon listens on (default: 7777) */
   port?: number;
@@ -76,12 +101,11 @@ export class DaemonManager {
     console.log(`[DaemonManager] Starting daemon: ${daemonPath} ${args.join(' ')}`);
 
     this.process = spawn(daemonPath, args, {
-      env: {
-        ...process.env,
+      env: buildDaemonEnv({
         ARC_DAEMON_TOKEN: this._token,
         ARC_WORKSPACE_PATH: this.getWorkspacePath(),
         ARC_DAEMON_PORT: String(this.daemonPort),
-      },
+      }),
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 

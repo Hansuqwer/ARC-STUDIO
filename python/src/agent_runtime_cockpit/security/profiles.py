@@ -1,4 +1,5 @@
 """Run profiles and tool firewall — permission model for ARC runs."""
+
 from __future__ import annotations
 
 import json
@@ -28,22 +29,29 @@ class RunProfile:
 # Built-in profiles
 BUILTIN_PROFILES: dict[str, RunProfile] = {
     "stub": RunProfile(
-        id="stub", name="Stub (Safe)",
+        id="stub",
+        name="Stub (Safe)",
         backend=BackendMode.STUB,
     ),
     "local-safe": RunProfile(
-        id="local-safe", name="Local Safe",
-        allow_network=True,
+        id="local-safe",
+        name="Local Safe",
         backend=BackendMode.STUB,
     ),
     "local-paid": RunProfile(
-        id="local-paid", name="Local Paid",
-        allow_paid_calls=True, allow_network=True,
+        id="local-paid",
+        name="Local Paid",
+        allow_paid_calls=True,
+        allow_network=True,
         backend=BackendMode.LOCAL,
     ),
     "gateway": RunProfile(
-        id="gateway", name="Gateway (Full Access)",
-        allow_paid_calls=True, allow_network=True, allow_shell=True, allow_secrets=True,
+        id="gateway",
+        name="Gateway (Full Access)",
+        allow_paid_calls=True,
+        allow_network=True,
+        allow_shell=True,
+        allow_secrets=True,
         backend=BackendMode.GATEWAY,
     ),
 }
@@ -137,14 +145,8 @@ def enforce_profile(profile: RunProfile, runtime: str) -> None:
         return
 
     if profile.backend is BackendMode.LOCAL:
-        if not profile.allow_network:
-            raise GatingError(
-                f"Profile '{profile.id}' does not allow network access "
-                f"but backend is {profile.backend.value}"
-            )
         if allow_costs and not profile.allow_paid_calls:
             raise GatingError(
-                f"Profile '{profile.id}' does not allow paid calls "
-                f"but costs are enabled"
+                f"Profile '{profile.id}' does not allow paid calls but costs are enabled"
             )
         return

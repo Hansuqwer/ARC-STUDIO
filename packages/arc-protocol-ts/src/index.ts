@@ -1,7 +1,25 @@
 export * from './swarmgraph-ir';
-export * from './simulation';
 export * from './flight-recorder';
 export * from './run-diff';
-export * from './observability-export';
-export * from './runtime-pack';
+export {
+  OBSERVABILITY_SCHEMA_VERSION,
+  isArcTraceExport,
+  getRootSpan,
+  getChildSpans,
+  exportHasWarnings,
+} from './observability-export';
+export type {
+  ObsExportFormat,
+  ObservabilityExportConfig,
+  ArcSpanEvent,
+  ArcSpanLink,
+  ArcSpan,
+  ArcMetric,
+  RedactionSummary as ObservabilityRedactionSummary,
+  ExportSource,
+  ExportWarning,
+  ArcTraceExport,
+  ExportValidationReport,
+  LiveExportStatus,
+} from './observability-export';
 export * from './mobile-runtime';

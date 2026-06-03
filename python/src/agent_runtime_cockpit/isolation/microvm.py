@@ -1957,9 +1957,12 @@ def _run_limactl(
                 os.killpg(proc.pid, 9)
             except ProcessLookupError:
                 pass
-            proc.wait()
-        stdout_reader.join()
-        stderr_reader.join()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                pass
+        stdout_reader.join(timeout=5)
+        stderr_reader.join(timeout=5)
         stdout_raw = stdout_reader.text()
         stderr_raw = stderr_reader.text()
         redacted_stdout = redact_output(stdout_raw)

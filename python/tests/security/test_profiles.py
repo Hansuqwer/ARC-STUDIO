@@ -1,8 +1,9 @@
 """Tests for run profiles."""
 
-from agent_runtime_cockpit.gating import GatingError
+from agent_runtime_cockpit.gating import BackendMode, GatingError
 from agent_runtime_cockpit.security.profiles import (
     BUILTIN_PROFILES,
+    RunProfile,
     enforce_profile,
     resolve_profile,
 )
@@ -77,3 +78,16 @@ def test_enforce_local_safe_rejects_paid_when_disallowed(monkeypatch):
         assert False, "Should have raised GatingError"
     except GatingError:
         pass
+
+
+def test_enforce_local_backend_allows_network_denied_profile(monkeypatch):
+    profile = RunProfile(
+        id="local-no-network",
+        name="Local No Network",
+        allow_paid_calls=True,
+        backend=BackendMode.LOCAL,
+    )
+    monkeypatch.setenv("ARC_SWARMGRAPH_RUN_BACKEND", "local")
+    monkeypatch.setenv("ARC_SWARMGRAPH_ALLOW_COSTS", "true")
+
+    enforce_profile(profile, "SWARMGRAPH")

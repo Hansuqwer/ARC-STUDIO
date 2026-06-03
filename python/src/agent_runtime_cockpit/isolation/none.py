@@ -72,15 +72,13 @@ class NoneIsolationProvider(IsolationProvider):
         env: Optional[dict[str, str]] = None,
         timeout_seconds: int = 300,
     ) -> IsolationResult:
-        popen_cwd = cwd
-        if self._workspace_root and cwd:
+        execution_cwd = cwd or self._workspace_root
+        popen_cwd = execution_cwd
+        if self._workspace_root and execution_cwd:
             root = self._workspace_root.resolve()
-            resolved = cwd.resolve()
-            if cwd.is_symlink() or not resolved.is_relative_to(root):
-                raise ValueError(f"cwd escapes workspace: {cwd}")
-            # Run the resolved path (mirrors SubprocessIsolationProvider) so the
-            # process cannot be steered through a symlinked parent component
-            # between the check and the exec.
+            resolved = execution_cwd.resolve()
+            if execution_cwd.is_symlink() or not resolved.is_relative_to(root):
+                raise ValueError(f"cwd escapes workspace: {execution_cwd}")
             popen_cwd = resolved
         filtered_env = self.filter_env(env)
         start = time.monotonic()
@@ -101,8 +99,8 @@ class NoneIsolationProvider(IsolationProvider):
         try:
             proc.wait(timeout=timeout_seconds)
             duration = int((time.monotonic() - start) * 1000)
-            stdout_reader.join()
-            stderr_reader.join()
+            stdout_reader.join(timeout=5)
+            stderr_reader.join(timeout=5)
             stdout = stdout_reader.text()
             stderr = stderr_reader.text()
             redacted_stdout = redact_output(stdout) if self._redact else stdout
@@ -119,13 +117,17 @@ class NoneIsolationProvider(IsolationProvider):
                 redaction_applied=redacted_stdout != stdout or redacted_stderr != stderr,
             )
         except subprocess.TimeoutExpired:
-            try:
-                os.killpg(proc.pid, signal.SIGKILL)
-            except (OSError, ProcessLookupError):
-                pass
-            proc.wait()
-            stdout_reader.join()
-            stderr_reader.join()
+            if proc.returncode is None:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except (OSError, ProcessLookupError):
+                    pass
+                try:
+                    proc.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    pass
+            stdout_reader.join(timeout=5)
+            stderr_reader.join(timeout=5)
             duration = int((time.monotonic() - start) * 1000)
             stdout = stdout_reader.text()
             stderr = stderr_reader.text()

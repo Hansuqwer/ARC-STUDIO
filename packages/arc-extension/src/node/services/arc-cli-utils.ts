@@ -10,7 +10,19 @@
  * Environment variables allowed when calling the ARC CLI.
  * This allowlist ensures only safe, non-secret environment variables are passed.
  */
-const ARC_CLI_ENV_ALLOWLIST = ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR'];
+const ARC_CLI_ENV_ALLOWLIST = [
+    'PATH',
+    'HOME',
+    'USER',
+    'LANG',
+    'LC_ALL',
+    'TZ',
+    'TMPDIR',
+    'VIRTUAL_ENV',
+    'VIRTUAL_ENV_PROMPT',
+    'PYTHONPATH',
+    'PIP_REQUIRE_VIRTUALENV',
+];
 
 /**
  * Build a sanitized environment object for ARC CLI calls.

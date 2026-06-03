@@ -15,6 +15,7 @@ import type {
     BattleShowResponse,
     BattleLeaderboardResponse
 } from '../../common/battle-protocol';
+import { buildArcCliEnv } from './arc-cli-utils';
 
 @injectable()
 export class BattleService {
@@ -39,6 +40,7 @@ export class BattleService {
 
             const output = execFileSync('arc', args, {
                 cwd: this.workspaceRoot,
+                env: buildArcCliEnv(),
                 encoding: 'utf-8',
                 maxBuffer: 10 * 1024 * 1024, // 10MB
                 timeout: 30000 // 30 seconds
@@ -64,6 +66,7 @@ export class BattleService {
         try {
             const output = execFileSync('arc', ['battle', 'show', battleId, '--json'], {
                 cwd: this.workspaceRoot,
+                env: buildArcCliEnv(),
                 encoding: 'utf-8',
                 maxBuffer: 10 * 1024 * 1024, // 10MB
                 timeout: 30000 // 30 seconds
@@ -95,6 +98,7 @@ export class BattleService {
 
             const output = execFileSync('arc', args, {
                 cwd: this.workspaceRoot,
+                env: buildArcCliEnv(),
                 encoding: 'utf-8',
                 maxBuffer: 10 * 1024 * 1024, // 10MB
                 timeout: 30000 // 30 seconds

@@ -64,8 +64,8 @@ class _BoundedPipeReader:
     def start(self) -> None:
         self._thread.start()
 
-    def join(self) -> None:
-        self._thread.join()
+    def join(self, timeout: float | None = None) -> None:
+        self._thread.join(timeout=timeout)
 
     def text(self) -> str:
         return bytes(self._buffer).decode("utf-8", errors="replace")
@@ -187,16 +187,18 @@ class SubprocessIsolationProvider(IsolationProvider):
         except subprocess.TimeoutExpired:
             killed = True
             kill_reason = "timeout"
-            try:
-                os.killpg(proc.pid, signal.SIGKILL)
-            except (OSError, ProcessLookupError):
-                # Process group already gone, or killpg denied — nothing to kill.
-                # Mirrors NoneIsolationProvider so both providers handle the
-                # full range of os.killpg failures (OSError subclasses).
-                pass
-            proc.wait()
-        stdout_reader.join()
-        stderr_reader.join()
+            if proc.returncode is None:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except (OSError, ProcessLookupError):
+                    pass
+                try:
+                    proc.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    # Last resort: if killpg/wait still hangs, reaping is best-effort
+                    pass
+        stdout_reader.join(timeout=5)
+        stderr_reader.join(timeout=5)
         duration = int((time.monotonic() - start) * 1000)
         stdout = stdout_reader.text()
         stderr = stderr_reader.text()
