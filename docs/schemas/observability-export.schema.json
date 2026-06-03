@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arc-studio/schemas/observability-export.schema.json",
+  "title": "ArcTraceExport",
+  "description": "ARC Studio OpenInference / OpenTelemetry local export. Schema version 1.",
+  "type": "object",
+  "required": ["schema_version", "export_id", "format", "source", "spans"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "export_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": ["string", "null"] },
+    "format": { "type": "string", "enum": ["arc-otel-json", "openinference-json"] },
+    "source": { "$ref": "#/$defs/ExportSource" },
+    "resource": { "type": "object", "additionalProperties": true },
+    "spans": { "type": "array", "items": { "$ref": "#/$defs/ArcSpan" } },
+    "metrics": { "type": "array", "items": { "$ref": "#/$defs/ArcMetric" } },
+    "redaction_summary": { "$ref": "#/$defs/RedactionSummary" },
+    "warnings": { "type": "array", "items": { "$ref": "#/$defs/ExportWarning" } },
+    "export_hash": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "ExportSource": {
+      "type": "object",
+      "properties": {
+        "run_id": { "type": ["string", "null"] },
+        "trace_file": { "type": ["string", "null"] },
+        "ir_hash": { "type": ["string", "null"] },
+        "policy_hash": { "type": ["string", "null"] },
+        "source_hash": { "type": ["string", "null"] }
+      }
+    },
+    "ArcSpanEvent": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "timestamp": { "type": ["string", "null"] },
+        "attributes": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "ArcSpanLink": {
+      "type": "object",
+      "required": ["trace_id", "span_id"],
+      "properties": {
+        "trace_id": { "type": "string" },
+        "span_id": { "type": "string" },
+        "attributes": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "ArcSpan": {
+      "type": "object",
+      "required": ["trace_id", "span_id", "name"],
+      "properties": {
+        "trace_id": { "type": "string" },
+        "span_id": { "type": "string" },
+        "parent_span_id": { "type": ["string", "null"] },
+        "name": { "type": "string" },
+        "kind": { "type": "string", "enum": ["INTERNAL", "SERVER", "CLIENT", "PRODUCER", "CONSUMER"] },
+        "start_time": { "type": ["string", "null"] },
+        "end_time": { "type": ["string", "null"] },
+        "attributes": { "type": "object", "additionalProperties": true },
+        "events": { "type": "array", "items": { "$ref": "#/$defs/ArcSpanEvent" } },
+        "status": { "type": "string", "enum": ["OK", "ERROR", "UNSET"] },
+        "links": { "type": "array", "items": { "$ref": "#/$defs/ArcSpanLink" } }
+      }
+    },
+    "ArcMetric": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "kind": { "type": "string", "enum": ["gauge", "counter", "histogram"] },
+        "value": { "type": "number" },
+        "unit": { "type": "string" },
+        "attributes": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "RedactionSummary": {
+      "type": "object",
+      "properties": {
+        "fields_redacted": { "type": "integer", "minimum": 0 },
+        "tokens_redacted": { "type": "integer", "minimum": 0 },
+        "payloads_removed": { "type": "integer", "minimum": 0 },
+        "paths_redacted": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "ExportWarning": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "span_id": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

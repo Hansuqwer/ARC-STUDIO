@@ -86,3 +86,7 @@ flight_app = typer.Typer(
     name="flight",
     help="Local Agent Flight Recorder — status/verify/export/prune/inspect",
 )
+obs_app = typer.Typer(
+    name="obs",
+    help="Observability export — OpenInference / OpenTelemetry local file export",
+)

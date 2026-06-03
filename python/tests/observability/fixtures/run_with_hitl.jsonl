@@ -1,0 +1,6 @@
+{"schema_version":2,"type":"run.started","timestamp":"2026-06-01T10:00:00Z","run_id":"run-hitl","sequence":0,"data":{"runtime":"swarmgraph"}}
+{"schema_version":2,"type":"hitl.prompt","timestamp":"2026-06-01T10:00:10Z","run_id":"run-hitl","sequence":1,"data":{"gate_id":"gate-1","blocking":true}}
+{"schema_version":2,"type":"consensus.selected","timestamp":"2026-06-01T10:00:20Z","run_id":"run-hitl","sequence":2,"data":{"protocol":"majority","risk":"low"}}
+{"schema_version":2,"type":"policy.evaluated","timestamp":"2026-06-01T10:00:30Z","run_id":"run-hitl","sequence":3,"data":{"can_run":true,"risk_level":"low","issue_count":0}}
+{"schema_version":2,"type":"arc.unknown.custom","timestamp":"2026-06-01T10:00:40Z","run_id":"run-hitl","sequence":4,"data":{"custom_field":"opaque_value"}}
+{"schema_version":2,"type":"run.completed","timestamp":"2026-06-01T10:01:00Z","run_id":"run-hitl","sequence":5,"data":{"status":"completed"}}

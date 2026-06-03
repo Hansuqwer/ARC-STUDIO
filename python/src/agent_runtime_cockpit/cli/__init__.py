@@ -30,6 +30,7 @@ from . import (
     capabilities,  # noqa: F401 — Capability Cards (arc capabilities)
     capabilities_policy,  # noqa: F401 — Capability Cards policy linting
     flight,  # noqa: F401 — Local Agent Flight Recorder (arc flight)
+    obs,  # noqa: F401 — Observability export (arc obs)
     mcp,  # noqa: F401
     memory,  # noqa: F401
     mgmt,  # noqa: F401
