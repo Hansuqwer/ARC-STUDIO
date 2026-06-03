@@ -78,3 +78,7 @@ ir_app = typer.Typer(
     name="ir",
     help="SwarmGraph IR — compile/inspect/validate normalized workflow graphs",
 )
+capabilities_app = typer.Typer(
+    name="capabilities",
+    help="Capability Cards — generate, inspect, validate, and lint typed capability manifests",
+)

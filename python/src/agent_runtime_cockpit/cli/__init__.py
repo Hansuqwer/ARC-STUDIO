@@ -27,6 +27,8 @@ from . import (
     info,  # noqa: F401
     ir,  # noqa: F401 — SwarmGraph IR compile/inspect/validate/policy
     simulate,  # noqa: F401 — SwarmGraph IR action simulation (arc ir simulate)
+    capabilities,  # noqa: F401 — Capability Cards (arc capabilities)
+    capabilities_policy,  # noqa: F401 — Capability Cards policy linting
     mcp,  # noqa: F401
     memory,  # noqa: F401
     mgmt,  # noqa: F401
