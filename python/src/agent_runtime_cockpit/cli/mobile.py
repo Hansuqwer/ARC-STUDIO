@@ -204,3 +204,37 @@ def mobile_export_runtime_pack_cmd(
         raise typer.Exit(1) from exc
 
     _out(ok(summary), json_output)
+
+
+@mobile_app.command("pin")
+def mobile_pin_cmd(
+    path: str = typer.Argument(..., help="Path to arc-mobile-capabilities.json or directory."),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Recompute and write the manifest_hash field in-place."""
+    import json as _json
+    from ..mobile import MobileManifestLoadError
+    from ..mobile.hashing import manifest_hash as compute_hash
+    from ..mobile.manifest import MANIFEST_FILENAME, load_manifest
+
+    p = Path(path)
+    manifest_file = p if p.is_file() else p / MANIFEST_FILENAME
+
+    try:
+        manifest = load_manifest(path)
+    except MobileManifestLoadError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Cannot load manifest: {exc}"), json_output)
+        raise typer.Exit(1) from exc
+
+    new_hash = compute_hash(manifest)
+    manifest.manifest_hash = new_hash
+
+    data = manifest.model_dump(mode="json")
+    manifest_file.write_text(
+        _json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+
+    _out(
+        ok({"id": manifest.id, "manifest_hash": new_hash, "path": str(manifest_file)}), json_output
+    )

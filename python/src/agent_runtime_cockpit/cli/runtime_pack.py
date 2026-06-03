@@ -305,3 +305,36 @@ def runtime_pack_doctor(
 
 
 __all__ = ["runtime_pack_app"]
+
+
+@runtime_pack_app.command("pin")
+def runtime_pack_pin(
+    path: str = typer.Argument(default=".", help="Pack directory or arc-runtime-pack.json file."),
+    as_json: bool = JSON_FLAG,
+    workspace: Optional[str] = WORKSPACE_FLAG,
+) -> None:
+    """Recompute and write the manifest_hash field in-place."""
+    from pathlib import Path as _Path
+    from ..runtime_packs.loader import ManifestLoadError, load_manifest
+    from ..runtime_packs.hashing import manifest_hash as compute_hash
+    from ..runtime_packs.models import MANIFEST_FILENAME
+    import json as _json
+
+    p = _Path(path)
+    manifest_file = p if p.is_file() else p / MANIFEST_FILENAME
+
+    try:
+        manifest = load_manifest(path)
+    except ManifestLoadError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Cannot load manifest: {exc}"), as_json)
+        raise typer.Exit(1) from exc
+
+    new_hash = compute_hash(manifest)
+    manifest.manifest_hash = new_hash
+
+    data = manifest.model_dump(mode="json")
+    manifest_file.write_text(
+        _json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+
+    _out(ok({"id": manifest.id, "manifest_hash": new_hash, "path": str(manifest_file)}), as_json)
