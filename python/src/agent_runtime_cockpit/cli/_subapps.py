@@ -82,3 +82,7 @@ capabilities_app = typer.Typer(
     name="capabilities",
     help="Capability Cards — generate, inspect, validate, and lint typed capability manifests",
 )
+flight_app = typer.Typer(
+    name="flight",
+    help="Local Agent Flight Recorder — status/verify/export/prune/inspect",
+)

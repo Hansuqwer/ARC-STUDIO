@@ -23,7 +23,7 @@ SECRET_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("private_key", re.compile(r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----")),
     ("anthropic_key", re.compile(r"sk-ant-[A-Za-z0-9\-_]{10,}")),
     # OpenAI keys are >=20 chars (sk-proj-, sk-svcacct-, classic sk-...).
-    ("openai_key", re.compile(r"sk-[A-Za-z0-9]{20,}")),
+    ("openai_key", re.compile(r"sk-[A-Za-z0-9\-_]{20,}")),
     ("aws_key", re.compile(r"AKIA[0-9A-Z]{16}")),
     ("github_token", re.compile(r"gh[pousr]_[A-Za-z0-9]{32,}")),
     # Bearer tokens with whitespace separator (Authorization headers, logs).

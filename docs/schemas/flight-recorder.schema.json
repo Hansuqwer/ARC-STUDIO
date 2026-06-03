@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arc-studio/schemas/flight-recorder/v1",
+  "title": "ARC Studio Local Agent Flight Recorder",
+  "description": "Schema for flight recorder events, segments, index, export bundles, and verification reports. Schema version: 1.",
+  "definitions": {
+    "RedactionSummary": {
+      "type": "object",
+      "required": ["fields_redacted", "patterns_matched", "redact_applied"],
+      "properties": {
+        "fields_redacted": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "patterns_matched": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "redact_applied": { "type": "boolean" }
+      }
+    },
+    "FlightEventType": {
+      "type": "string",
+      "enum": [
+        "run.started", "run.completed", "run.failed",
+        "ir.compiled",
+        "policy.evaluated",
+        "simulation.generated",
+        "mcp.manifest.checked", "mcp.tool.approved", "mcp.tool.blocked",
+        "hitl.requested", "hitl.approved", "hitl.rejected",
+        "consensus.selected",
+        "audit.receipt.created",
+        "eval.recommendation.generated",
+        "tool.call.planned", "tool.call.completed",
+        "error.raised", "crash.marker",
+        "segment.opened", "segment.closed",
+        "recorder.started", "recorder.stopped"
+      ]
+    },
+    "FlightEvent": {
+      "type": "object",
+      "required": [
+        "schema_version", "event_id", "event_type", "run_id",
+        "timestamp", "sequence", "source", "payload",
+        "redaction", "hash"
+      ],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1" },
+        "event_id": { "type": "string", "format": "uuid" },
+        "event_type": { "$ref": "#/definitions/FlightEventType" },
+        "run_id": { "type": "string" },
+        "session_id": { "type": ["string", "null"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "source": { "type": "string" },
+        "payload": {
+          "type": "object",
+          "description": "Arbitrary event-specific data. All values are redacted before persistence."
+        },
+        "redaction": { "$ref": "#/definitions/RedactionSummary" },
+        "audit_ref": { "type": ["string", "null"] },
+        "trace_ref": { "type": ["string", "null"] },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 hex of canonical event JSON (excluding hash field)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FlightSegment": {
+      "type": "object",
+      "required": [
+        "schema_version", "segment_id", "run_id", "created_at",
+        "segment_hash", "previous_segment_hash", "events_path", "meta_path", "corrupt"
+      ],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1" },
+        "segment_id": { "type": "string" },
+        "run_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "closed_at": { "type": ["string", "null"], "format": "date-time" },
+        "event_count": { "type": "integer", "minimum": 0 },
+        "first_sequence": { "type": "integer", "minimum": 0 },
+        "last_sequence": { "type": "integer", "minimum": 0 },
+        "segment_hash": { "type": "string", "description": "SHA-256 of all event hashes in order" },
+        "previous_segment_hash": {
+          "type": "string",
+          "description": "'GENESIS' for the first segment in a run"
+        },
+        "events_path": { "type": "string" },
+        "meta_path": { "type": "string" },
+        "corrupt": { "type": "boolean" },
+        "metadata": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "RetentionPolicy": {
+      "type": "object",
+      "required": ["max_segments", "max_total_bytes", "max_age_days"],
+      "properties": {
+        "max_segments": { "type": "integer", "minimum": 0, "default": 200 },
+        "max_total_bytes": { "type": "integer", "minimum": 0, "default": 104857600 },
+        "max_age_days": { "type": "integer", "minimum": 0, "default": 30 }
+      }
+    },
+    "RunEntry": {
+      "type": "object",
+      "required": ["run_id", "started_at", "status"],
+      "properties": {
+        "run_id": { "type": "string" },
+        "session_id": { "type": ["string", "null"] },
+        "started_at": { "type": "string", "format": "date-time" },
+        "completed_at": { "type": ["string", "null"], "format": "date-time" },
+        "status": {
+          "type": "string",
+          "enum": ["running", "completed", "failed", "crashed"]
+        },
+        "segment_ids": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "ir_hash": { "type": ["string", "null"] },
+        "policy_risk": { "type": ["string", "null"] },
+        "trace_ref": { "type": ["string", "null"] },
+        "audit_ref": { "type": ["string", "null"] }
+      }
+    },
+    "SegmentRef": {
+      "type": "object",
+      "required": ["segment_id", "run_id", "created_at"],
+      "properties": {
+        "segment_id": { "type": "string" },
+        "run_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "closed_at": { "type": ["string", "null"], "format": "date-time" },
+        "event_count": { "type": "integer", "minimum": 0 },
+        "segment_hash": { "type": "string" },
+        "previous_segment_hash": { "type": "string" },
+        "events_path": { "type": "string" },
+        "meta_path": { "type": "string" },
+        "corrupt": { "type": "boolean" }
+      }
+    },
+    "FlightIndex": {
+      "type": "object",
+      "required": ["schema_version", "segments", "runs", "retention", "last_updated_at"],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1" },
+        "segments": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/SegmentRef" }
+        },
+        "runs": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/RunEntry" }
+        },
+        "retention": { "$ref": "#/definitions/RetentionPolicy" },
+        "last_verified_at": { "type": ["string", "null"], "format": "date-time" },
+        "last_updated_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "BundleManifestEntry": {
+      "type": "object",
+      "required": ["path", "sha256", "size_bytes"],
+      "properties": {
+        "path": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "FlightExportBundle": {
+      "type": "object",
+      "required": ["schema_version", "bundle_id", "created_at"],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1" },
+        "bundle_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "runs": { "type": "array", "items": { "type": "string" } },
+        "segments": { "type": "array", "items": { "type": "string" } },
+        "manifest": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/BundleManifestEntry" }
+        },
+        "checksums": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "redaction_summary": { "$ref": "#/definitions/RedactionSummary" },
+        "total_events": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "VerificationIssue": {
+      "type": "object",
+      "required": ["segment_id", "issue_type", "detail"],
+      "properties": {
+        "segment_id": { "type": "string" },
+        "issue_type": {
+          "type": "string",
+          "enum": ["hash_mismatch", "corrupt_json", "missing_file", "chain_break"]
+        },
+        "detail": { "type": "string" }
+      }
+    },
+    "FlightVerificationReport": {
+      "type": "object",
+      "required": ["schema_version", "ok", "verified_at"],
+      "properties": {
+        "schema_version": { "type": "string", "const": "1" },
+        "ok": { "type": "boolean" },
+        "checked_segments": { "type": "integer", "minimum": 0 },
+        "corrupt_segments": { "type": "array", "items": { "type": "string" } },
+        "missing_segments": { "type": "array", "items": { "type": "string" } },
+        "hash_chain_valid": { "type": "boolean" },
+        "issues": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/VerificationIssue" }
+        },
+        "verified_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/definitions/FlightEvent" },
+    { "$ref": "#/definitions/FlightSegment" },
+    { "$ref": "#/definitions/FlightIndex" },
+    { "$ref": "#/definitions/FlightExportBundle" },
+    { "$ref": "#/definitions/FlightVerificationReport" }
+  ]
+}

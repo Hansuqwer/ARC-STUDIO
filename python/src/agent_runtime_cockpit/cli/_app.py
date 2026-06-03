@@ -27,6 +27,7 @@ from ._subapps import (
     hitl_app,
     ir_app,
     capabilities_app,
+    flight_app,
     isolation_app,
     mcp_app,
     memory_app,
@@ -72,6 +73,7 @@ app.add_typer(config_app)
 app.add_typer(hitl_app)
 app.add_typer(ir_app)
 app.add_typer(capabilities_app)
+app.add_typer(flight_app)
 app.add_typer(storage_app)
 app.add_typer(studio_app)
 studio_app.add_typer(studio_sessions_app)

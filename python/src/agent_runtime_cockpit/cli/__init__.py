@@ -29,6 +29,7 @@ from . import (
     simulate,  # noqa: F401 — SwarmGraph IR action simulation (arc ir simulate)
     capabilities,  # noqa: F401 — Capability Cards (arc capabilities)
     capabilities_policy,  # noqa: F401 — Capability Cards policy linting
+    flight,  # noqa: F401 — Local Agent Flight Recorder (arc flight)
     mcp,  # noqa: F401
     memory,  # noqa: F401
     mgmt,  # noqa: F401
