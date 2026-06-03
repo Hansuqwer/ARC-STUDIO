@@ -23,3 +23,7 @@ export type {
   LiveExportStatus,
 } from './observability-export';
 export * from './mobile-runtime';
+export * from './mobile-capability';
+export * from './mobile-action-plan';
+export * from './mobile-events';
+export * from './mobile-trace';

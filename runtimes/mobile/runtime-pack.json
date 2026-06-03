@@ -1,0 +1,16 @@
+{
+  "$schema": "./spec/mobile-runtime-pack.schema.json",
+  "schema_version": 1,
+  "id": "arc.mobile.runtime",
+  "name": "ARC Mobile Runtime",
+  "version": "0.1.0",
+  "runtime_kind": "mobile",
+  "simulator_only": true,
+  "manifest": "fixtures/capabilities.safe-demo.json",
+  "safety": {
+    "real_native_access": false,
+    "background_execution": false,
+    "network_by_default": false,
+    "production_mcp_gateway": false
+  }
+}

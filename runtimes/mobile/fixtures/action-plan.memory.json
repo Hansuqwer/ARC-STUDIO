@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "plan_id": "mobile-memory-demo",
+  "name": "Memory Demo",
+  "steps": [
+    {
+      "step_id": "memory-1",
+      "capability_id": "app.memory.write.mock",
+      "description": "Write local mock memory.",
+      "mock": true,
+      "inputs": { "key": "note", "value": "offline first" },
+      "expected_outputs": { "stored": true }
+    }
+  ],
+  "requires_network": false,
+  "requires_background": false
+}

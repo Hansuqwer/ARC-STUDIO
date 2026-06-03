@@ -1,0 +1,44 @@
+{
+  "plan_id": "plan-8eccc47da17d",
+  "policy": "local-safe",
+  "workspace_root": "/Users/hansvilund/HansuQWER/WorkSpace/ARC/arc-theia-studio/python",
+  "steps": [
+    {
+      "step_index": 0,
+      "command": [
+        "rm",
+        "-rf",
+        "."
+      ],
+      "classification": "destructive",
+      "decision": {
+        "allowed": false,
+        "classification": "destructive",
+        "reason": "destructive commands denied",
+        "policy": "local-safe",
+        "approval_required": false,
+        "approved": false,
+        "reason_code": "destructive_denied"
+      },
+      "file_intents": [],
+      "approval_required": false,
+      "status": "pending",
+      "cost_estimate": "none",
+      "risk_estimate": "critical",
+      "detail": null
+    }
+  ],
+  "total_steps": 1,
+  "approved_steps": 0,
+  "denied_steps": 1,
+  "pending_approval_steps": 0,
+  "has_destructive": true,
+  "has_privileged": false,
+  "has_network": false,
+  "has_install": false,
+  "overall_allowed": false,
+  "overall_reason": "destructive or privileged commands denied",
+  "cost_summary": "none",
+  "risk_summary": "critical",
+  "created_at": "2026-06-02T10:52:10.045297+00:00"
+}

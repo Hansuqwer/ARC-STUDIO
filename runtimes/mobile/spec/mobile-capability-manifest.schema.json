@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arc.local/schemas/mobile-capability-manifest.schema.json",
+  "title": "ARC Mobile Capability Manifest",
+  "type": "object",
+  "required": ["schema_version", "id", "name", "version", "capabilities", "background_execution", "network_by_default", "simulator_mode"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string" },
+    "background_execution": { "const": false },
+    "network_by_default": { "const": false },
+    "simulator_mode": { "const": true },
+    "privacy_manifest": { "type": "boolean" },
+    "platforms": { "type": "array" },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "approval_mode", "data_sensitivity", "background", "network", "mcp_exposable", "simulator_supported"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string", "pattern": "\\.mock$" },
+          "name": { "type": "string" },
+          "approval_mode": { "enum": ["none", "recommended", "required", "blocking"] },
+          "data_sensitivity": { "enum": ["none", "low", "medium", "high", "critical"] },
+          "background": { "const": false },
+          "network": { "const": false },
+          "mcp_exposable": { "const": false },
+          "simulator_supported": { "const": true }
+        }
+      }
+    }
+  }
+}

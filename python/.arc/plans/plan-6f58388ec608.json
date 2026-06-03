@@ -1,0 +1,68 @@
+{
+  "plan_id": "plan-6f58388ec608",
+  "policy": "local-safe",
+  "workspace_root": "/Users/hansvilund/HansuQWER/WorkSpace/ARC/arc-theia-studio/python",
+  "steps": [
+    {
+      "step_index": 0,
+      "command": [
+        "ls",
+        "-la"
+      ],
+      "classification": "read_only",
+      "decision": {
+        "allowed": true,
+        "classification": "read_only",
+        "reason": "read-only command",
+        "policy": "local-safe",
+        "approval_required": false,
+        "approved": false,
+        "reason_code": "allow_read_only"
+      },
+      "file_intents": [],
+      "approval_required": false,
+      "status": "pending",
+      "cost_estimate": "none",
+      "risk_estimate": "low",
+      "detail": null
+    },
+    {
+      "step_index": 1,
+      "command": [
+        "cat",
+        "file.txt"
+      ],
+      "classification": "read_only",
+      "decision": {
+        "allowed": true,
+        "classification": "read_only",
+        "reason": "read-only command",
+        "policy": "local-safe",
+        "approval_required": false,
+        "approved": false,
+        "reason_code": "allow_read_only"
+      },
+      "file_intents": [
+        "file.txt"
+      ],
+      "approval_required": false,
+      "status": "pending",
+      "cost_estimate": "none",
+      "risk_estimate": "low",
+      "detail": null
+    }
+  ],
+  "total_steps": 2,
+  "approved_steps": 2,
+  "denied_steps": 0,
+  "pending_approval_steps": 0,
+  "has_destructive": false,
+  "has_privileged": false,
+  "has_network": false,
+  "has_install": false,
+  "overall_allowed": true,
+  "overall_reason": "all steps allowed",
+  "cost_summary": "none",
+  "risk_summary": "low",
+  "created_at": "2026-06-02T07:19:14.698017+00:00"
+}
