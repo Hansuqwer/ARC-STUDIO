@@ -14,6 +14,8 @@ import { ArcEventStreamWidget } from './arc-event-stream-widget';
 import { ArcEventStreamContribution } from './arc-event-stream-contribution';
 import { ArcHealthWidget } from './arc-health-widget';
 import { ArcHealthContribution } from './arc-health-contribution';
+import { ArcSimulationWidget } from './arc-simulation-widget';
+import { ArcSimulationContribution } from './arc-simulation-contribution';
 import { ArcStatusBarContribution } from './arc-status-bar-contribution';
 import { ArcWelcomeWidget } from './arc-welcome-widget';
 import { ArcWelcomeContribution } from './arc-welcome-contribution';
@@ -115,6 +117,15 @@ export default new ContainerModule(bind => {
     })).inSingletonScope();
     bindViewContribution(bind, ArcHealthContribution);
     bind(FrontendApplicationContribution).toService(ArcHealthContribution);
+
+    // Bind the ARC IR Simulation Panel widget
+    bind(ArcSimulationWidget).toSelf();
+    bind(WidgetFactory).toDynamicValue(ctx => ({
+        id: ArcSimulationWidget.ID,
+        createWidget: () => ctx.container.get<ArcSimulationWidget>(ArcSimulationWidget),
+    })).inSingletonScope();
+    bindViewContribution(bind, ArcSimulationContribution);
+    bind(FrontendApplicationContribution).toService(ArcSimulationContribution);
 
     // Bind the ARC Welcome widget (manual command; startup controlled by pref)
     bind(ArcWelcomeWidget).toSelf();

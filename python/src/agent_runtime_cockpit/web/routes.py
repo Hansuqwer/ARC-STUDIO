@@ -1413,3 +1413,38 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_post("/api/arena/vote", arena_vote)
     app.router.add_post("/api/arena/adopt", arena_adopt)
     app.router.add_get("/api/arena/rankings", arena_rankings)
+    app.router.add_post("/v1/ir/simulate", ir_simulate)
+
+
+async def ir_simulate(request: web.Request) -> web.Response:
+    """POST /v1/ir/simulate — simulate an IR graph, return SimulationReport.
+
+    Body: IR JSON (dict with 'ir_version' + 'provenance') or WorkflowInfo JSON.
+    Local-only; no data leaves 127.0.0.1.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response(
+            {"ok": False, "error": {"code": "INVALID_INPUT", "message": "Invalid JSON body"}},
+            status=400,
+        )
+
+    try:
+        from ..swarmgraph_ir.compiler import compile_from_json
+        from ..simulation import ObservabilityExportConfig, simulate_graph
+        import json as _json
+
+        text = _json.dumps(body)
+        compile_result = compile_from_json(text)
+        report = simulate_graph(compile_result.graph, ObservabilityExportConfig())
+        return web.json_response(
+            {
+                "ok": True,
+                "data": _json.loads(report.model_dump_json()),
+            }
+        )
+    except Exception as exc:
+        return web.json_response(
+            {"ok": False, "error": {"code": "INTERNAL_ERROR", "message": str(exc)}}, status=500
+        )
