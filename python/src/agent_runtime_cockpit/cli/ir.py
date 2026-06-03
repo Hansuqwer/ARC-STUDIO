@@ -216,3 +216,106 @@ def ir_policy_cmd(
     _out(ok(payload), json_output)
     if not report.can_run:
         raise typer.Exit(2)
+
+
+@ir_app.command("diff")
+def ir_diff_cmd(
+    left: str = typer.Argument(..., help="Path to the first IR JSON file (or 'left')."),
+    right: str = typer.Argument(..., help="Path to the second IR JSON file (or 'right')."),
+    timeline: bool = typer.Option(False, "--timeline", help="Include timeline frames in output."),
+    redact: bool = typer.Option(
+        True, "--redact/--no-redact", help="Redact secrets before display."
+    ),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Compare two SwarmGraph IR JSON files (read-only, local-only).
+
+    This command performs a structural and semantic diff of two IR graphs:
+    - Nodes added/removed/changed
+    - Edges added/removed/changed
+    - Risk level changes
+    - HITL gate changes
+    - Consensus protocol changes
+    - Paid call introductions
+    - MCP manifest drift
+    - Policy regression
+
+    Example:
+        arc ir diff a.ir.json b.ir.json --json
+
+    The diff_hash is deterministic: same inputs always produce identical output.
+    """
+    _setup_logging(debug)
+    from ..run_diff import diff_ir_from_paths
+    from ..run_diff.export import summary_text
+
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    if not json_output:
+        from ._app import console
+
+        console.print(f"[dim]Comparing:[/dim] {left} vs {right}")
+
+    report, errors, warnings = diff_ir_from_paths(left, right)
+
+    # Add timeline if requested
+    if timeline:
+        from ..run_diff.timeline import build_timeline_from_report
+
+        frames = build_timeline_from_report(report)
+        report_timeline = report.model_copy(deep=True)
+        report_timeline.timeline = frames
+
+        if json_output:
+            payload = report_timeline.model_dump(mode="json")
+            if redact:
+                from ..run_diff.redaction import redact_report
+
+                payload = redact_report(payload)
+            from ..protocol.event_envelope import ok
+
+            _out(ok(payload), json_output)
+        else:
+            from ._app import console
+
+            console.print(f"\n[bold]Timeline ({len(frames)} frames):[/bold]")
+            for frame in frames[:20]:  # Show first 20
+                color = {"added": "green", "removed": "red", "changed": "yellow"}.get(
+                    frame.change_type, "white"
+                )
+                console.print(
+                    f"  [{color}]{frame.change_type}[/{color}] "
+                    f"[dim]seq={frame.sequence}[/dim] {frame.summary}"
+                )
+            if len(frames) > 20:
+                console.print(f"  [dim]... and {len(frames) - 20} more frames[/dim]")
+            return
+
+    if json_output:
+        payload = report.model_dump(mode="json")
+        if redact:
+            from ..run_diff.redaction import redact_report
+
+            payload = redact_report(payload)
+        from ..protocol.event_envelope import ok
+
+        _out(ok(payload), json_output)
+    else:
+        from ._app import console
+
+        text = summary_text(report)
+        console.print(text)
+
+        if errors:
+            console.print("\n[red]Errors:[/red]")
+            for e in errors:
+                console.print(f"  [red]{e}[/red]")
+        if warnings:
+            console.print("\n[yellow]Warnings:[/yellow]")
+            for w in warnings:
+                console.print(f"  [yellow]{w}[/yellow]")
+
+        if report.summary.total_changes == 0:
+            console.print("\n[green]No differences found.[/green]")

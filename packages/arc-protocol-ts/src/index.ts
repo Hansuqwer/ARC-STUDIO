@@ -6,6 +6,7 @@ export * from './arc-protocol-types';
 export * from './swarmgraph-ir';
 export * from './simulation';
 export * from './flight-recorder';
+export * from './run-diff';
 export * from './runtime-mode';
 export * from './runtime-capability-v2';
 export * from './audit-events';

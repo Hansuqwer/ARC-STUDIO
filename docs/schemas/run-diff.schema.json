@@ -1,0 +1,892 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arc-studio/schemas/run-diff/v1",
+  "title": "ARC Studio Run Diff Report",
+  "description": "Schema for the RunDiffReport produced by the run_diff package — local-first deterministic run comparison and time-travel inspection. Schema version: 1.",
+  "$defs": {
+    "DiffSubjectKind": {
+      "enum": [
+        "ir_graph",
+        "run_record",
+        "policy_report",
+        "simulation_report",
+        "capability_card",
+        "flight_segment",
+        "mcp_manifest",
+        "unknown"
+      ],
+      "title": "DiffSubjectKind",
+      "type": "string"
+    },
+    "DiffSubject": {
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/DiffSubjectKind",
+          "default": "unknown"
+        },
+        "id": {
+          "default": "",
+          "title": "Id",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "hash": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "title": "Hash"
+        },
+        "run_id": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "graph_hash": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "title": "Graph Hash"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "default": {},
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "title": "DiffSubject",
+      "type": "object"
+    },
+    "DiffSummary": {
+      "properties": {
+        "nodes_added": {
+          "default": 0,
+          "title": "Nodes Added",
+          "type": "integer"
+        },
+        "nodes_removed": {
+          "default": 0,
+          "title": "Nodes Removed",
+          "type": "integer"
+        },
+        "nodes_changed": {
+          "default": 0,
+          "title": "Nodes Changed",
+          "type": "integer"
+        },
+        "edges_added": {
+          "default": 0,
+          "title": "Edges Added",
+          "type": "integer"
+        },
+        "edges_removed": {
+          "default": 0,
+          "title": "Edges Removed",
+          "type": "integer"
+        },
+        "edges_changed": {
+          "default": 0,
+          "title": "Edges Changed",
+          "type": "integer"
+        },
+        "events_added": {
+          "default": 0,
+          "title": "Events Added",
+          "type": "integer"
+        },
+        "events_removed": {
+          "default": 0,
+          "title": "Events Removed",
+          "type": "integer"
+        },
+        "events_changed": {
+          "default": 0,
+          "title": "Events Changed",
+          "type": "integer"
+        },
+        "event_types_added": {
+          "default": [],
+          "items": { "type": "string" },
+          "title": "Event Types Added",
+          "type": "array"
+        },
+        "event_types_removed": {
+          "default": [],
+          "items": { "type": "string" },
+          "title": "Event Types Removed",
+          "type": "array"
+        },
+        "policy_issues_added": {
+          "default": 0,
+          "title": "Policy Issues Added",
+          "type": "integer"
+        },
+        "policy_issues_removed": {
+          "default": 0,
+          "title": "Policy Issues Removed",
+          "type": "integer"
+        },
+        "policy_blockers_introduced": {
+          "default": 0,
+          "title": "Policy Blockers Introduced",
+          "type": "integer"
+        },
+        "policy_errors_introduced": {
+          "default": 0,
+          "title": "Policy Errors Introduced",
+          "type": "integer"
+        },
+        "risk_increased": {
+          "default": false,
+          "title": "Risk Increased",
+          "type": "boolean"
+        },
+        "risk_decreased": {
+          "default": false,
+          "title": "Risk Decreased",
+          "type": "boolean"
+        },
+        "mcp_drift_changed": {
+          "default": false,
+          "title": "Mcp Drift Changed",
+          "type": "boolean"
+        },
+        "paid_call_delta": {
+          "default": 0,
+          "title": "Paid Call Delta",
+          "type": "integer"
+        },
+        "hitl_gate_delta": {
+          "default": 0,
+          "title": "Hitl Gate Delta",
+          "type": "integer"
+        },
+        "consensus_changed": {
+          "default": false,
+          "title": "Consensus Changed",
+          "type": "boolean"
+        },
+        "hitl_removed": {
+          "default": false,
+          "title": "Hitl Removed",
+          "type": "boolean"
+        },
+        "total_changes": {
+          "default": 0,
+          "title": "Total Changes",
+          "type": "integer"
+        }
+      },
+      "title": "DiffSummary",
+      "type": "object"
+    },
+    "NodeDiffField": {
+      "properties": {
+        "field_name": { "type": "string" },
+        "left_value": true,
+        "right_value": true,
+        "change_type": {
+          "$ref": "#/$defs/ChangeType",
+          "default": "unchanged"
+        }
+      },
+      "required": ["field_name", "change_type"],
+      "title": "NodeDiffField",
+      "type": "object"
+    },
+    "NodeDiff": {
+      "properties": {
+        "node_id": { "type": "string" },
+        "change_type": {
+          "$ref": "#/$defs/ChangeType",
+          "default": "changed"
+        },
+        "changed_fields": {
+          "items": { "$ref": "#/$defs/NodeDiffField" },
+          "type": "array"
+        },
+        "risk_delta": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "policy_delta": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "tool_delta": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "mcp_delta": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "consensus_delta": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "hitl_delta": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "paid_call_delta": {
+          "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+          "default": null
+        },
+        "audit_delta": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "is_semantic_regression": {
+          "default": false,
+          "type": "boolean"
+        },
+        "regression_reason": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        }
+      },
+      "required": ["node_id", "change_type", "is_semantic_regression"],
+      "title": "NodeDiff",
+      "type": "object"
+    },
+    "GraphDiff": {
+      "properties": {
+        "nodes_added": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "nodes_removed": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "nodes_changed": {
+          "default": [],
+          "items": { "$ref": "#/$defs/NodeDiff" },
+          "type": "array"
+        },
+        "edges_added": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "edges_removed": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "edges_changed": {
+          "default": [],
+          "items": { "type": "object" },
+          "type": "array"
+        },
+        "node_count_left": { "default": 0, "type": "integer" },
+        "node_count_right": { "default": 0, "type": "integer" },
+        "edge_count_left": { "default": 0, "type": "integer" },
+        "edge_count_right": { "default": 0, "type": "integer" },
+        "risk_level_left": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "risk_level_right": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "consensus_left": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "consensus_right": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        }
+      },
+      "title": "GraphDiff",
+      "type": "object"
+    },
+    "EventEntry": {
+      "properties": {
+        "event_index": { "type": "integer" },
+        "event_type": { "type": "string" },
+        "timestamp": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "sequence": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "default": null
+        },
+        "data_keys": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "hash": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        }
+      },
+      "required": ["event_index", "event_type"],
+      "title": "EventEntry",
+      "type": "object"
+    },
+    "EventDiff": {
+      "properties": {
+        "events_added": {
+          "default": [],
+          "items": { "$ref": "#/$defs/EventEntry" },
+          "type": "array"
+        },
+        "events_removed": {
+          "default": [],
+          "items": { "$ref": "#/$defs/EventEntry" },
+          "type": "array"
+        },
+        "events_changed": {
+          "default": [],
+          "items": { "type": "object" },
+          "type": "array"
+        },
+        "sequence_alignment": {
+          "default": [],
+          "items": { "type": "object" },
+          "type": "array"
+        },
+        "first_event_divergence": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "default": null
+        },
+        "event_count_left": { "default": 0, "type": "integer" },
+        "event_count_right": { "default": 0, "type": "integer" }
+      },
+      "title": "EventDiff",
+      "type": "object"
+    },
+    "PolicyIssueDiff": {
+      "properties": {
+        "rule": { "type": "string" },
+        "left_severity": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "right_severity": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "node_id": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "left_present": { "default": false, "type": "boolean" },
+        "right_present": { "default": false, "type": "boolean" },
+        "is_regression": { "default": false, "type": "boolean" },
+        "regression_type": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        }
+      },
+      "required": ["rule", "left_present", "right_present", "is_regression"],
+      "title": "PolicyIssueDiff",
+      "type": "object"
+    },
+    "PolicyDiff": {
+      "properties": {
+        "issues_added": {
+          "default": [],
+          "items": { "$ref": "#/$defs/PolicyIssueDiff" },
+          "type": "array"
+        },
+        "issues_removed": {
+          "default": [],
+          "items": { "$ref": "#/$defs/PolicyIssueDiff" },
+          "type": "array"
+        },
+        "issues_changed": {
+          "default": [],
+          "items": { "$ref": "#/$defs/PolicyIssueDiff" },
+          "type": "array"
+        },
+        "can_run_left": { "default": true, "type": "boolean" },
+        "can_run_right": { "default": true, "type": "boolean" },
+        "can_run_regression": { "default": false, "type": "boolean" },
+        "risk_level_left": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "risk_level_right": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "risk_regression": { "default": false, "type": "boolean" },
+        "suggested_consensus_left": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "suggested_consensus_right": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "consensus_regression": { "default": false, "type": "boolean" },
+        "error_count_left": { "default": 0, "type": "integer" },
+        "error_count_right": { "default": 0, "type": "integer" },
+        "error_count_delta": { "default": 0, "type": "integer" },
+        "warning_count_left": { "default": 0, "type": "integer" },
+        "warning_count_right": { "default": 0, "type": "integer" },
+        "warning_count_delta": { "default": 0, "type": "integer" }
+      },
+      "title": "PolicyDiff",
+      "type": "object"
+    },
+    "SimulationDiff": {
+      "properties": {
+        "summary_changed": { "default": false, "type": "boolean" },
+        "reachable_nodes_left": { "default": 0, "type": "integer" },
+        "reachable_nodes_right": { "default": 0, "type": "integer" },
+        "hitl_gates_left": { "default": 0, "type": "integer" },
+        "hitl_gates_right": { "default": 0, "type": "integer" },
+        "hitl_gate_delta": { "default": 0, "type": "integer" },
+        "paid_calls_left": { "default": 0, "type": "integer" },
+        "paid_calls_right": { "default": 0, "type": "integer" },
+        "paid_call_delta": { "default": 0, "type": "integer" },
+        "mcp_tools_left": { "default": 0, "type": "integer" },
+        "mcp_tools_right": { "default": 0, "type": "integer" },
+        "gate_count_left": { "default": 0, "type": "integer" },
+        "gate_count_right": { "default": 0, "type": "integer" },
+        "policy_regression": { "default": false, "type": "boolean" },
+        "can_run_left": { "default": true, "type": "boolean" },
+        "can_run_right": { "default": true, "type": "boolean" },
+        "warnings_added": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "warnings_removed": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        }
+      },
+      "title": "SimulationDiff",
+      "type": "object"
+    },
+    "McpManifestDiff": {
+      "properties": {
+        "servers_added": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "servers_removed": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "hash_changed": {
+          "default": [],
+          "items": {
+            "properties": { "server": { "type": "string" }, "left_hash": { "type": "string" }, "right_hash": { "type": "string" } },
+            "required": ["server", "left_hash", "right_hash"],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "approved_tools_delta": { "default": 0, "type": "integer" },
+        "blocked_tools_delta": { "default": 0, "type": "integer" },
+        "tools_added": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "tools_removed": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "drifted_servers": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        }
+      },
+      "title": "McpManifestDiff",
+      "type": "object"
+    },
+    "CapabilityDiff": {
+      "properties": {
+        "cards_added": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "cards_removed": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "cards_changed": {
+          "default": [],
+          "items": { "type": "object" },
+          "type": "array"
+        },
+        "capabilities_added": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "capabilities_removed": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "risk_level_changed": {
+          "default": [],
+          "items": {
+            "properties": { "card_id": { "type": "string" }, "left_level": { "type": "string" }, "right_level": { "type": "string" } },
+            "required": ["card_id", "left_level", "right_level"],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "mcp_drift_detected": { "default": false, "type": "boolean" },
+        "trust_regression": { "default": false, "type": "boolean" }
+      },
+      "title": "CapabilityDiff",
+      "type": "object"
+    },
+    "FlightDiff": {
+      "properties": {
+        "events_added": { "default": 0, "type": "integer" },
+        "events_removed": { "default": 0, "type": "integer" },
+        "events_changed": { "default": 0, "type": "integer" },
+        "segment_hashes_match": { "default": false, "type": "boolean" },
+        "hash_chain_valid": { "default": true, "type": "boolean" },
+        "event_types_added": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "event_types_removed": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "first_event_divergence": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "default": null
+        }
+      },
+      "title": "FlightDiff",
+      "type": "object"
+    },
+    "CostDiff": {
+      "properties": {
+        "has_paid_calls_left": { "default": false, "type": "boolean" },
+        "has_paid_calls_right": { "default": false, "type": "boolean" },
+        "paid_calls_introduced": { "default": false, "type": "boolean" },
+        "estimated_cost_delta_usd": { "default": 0.0, "type": "number" },
+        "estimated_cost_floor_left": { "default": 0.0, "type": "number" },
+        "estimated_cost_floor_right": { "default": 0.0, "type": "number" }
+      },
+      "title": "CostDiff",
+      "type": "object"
+    },
+    "RiskDiff": {
+      "properties": {
+        "level_left": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "level_right": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "level_changed": { "default": false, "type": "boolean" },
+        "signals_added": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "signals_removed": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        },
+        "score_delta": { "default": 0.0, "type": "number" }
+      },
+      "title": "RiskDiff",
+      "type": "object"
+    },
+    "FirstDivergence": {
+      "properties": {
+        "kind": { "default": "unknown", "type": "string" },
+        "node_id": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "edge_id": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "event_id": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "policy_rule": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "sequence": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "default": null
+        },
+        "frame_index": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "default": null
+        },
+        "left_value": true,
+        "right_value": true,
+        "reason": { "default": "", "type": "string" }
+      },
+      "required": ["kind", "reason"],
+      "title": "FirstDivergence",
+      "type": "object"
+    },
+    "TimelineFrame": {
+      "properties": {
+        "frame_id": { "type": "string" },
+        "sequence": { "type": "integer" },
+        "timestamp": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "subject": { "default": "run", "type": "string" },
+        "event_type": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "node_id": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "summary": { "default": "", "type": "string" },
+        "left_label": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "right_label": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "default": null
+        },
+        "change_type": {
+          "$ref": "#/$defs/ChangeType",
+          "default": "unchanged"
+        },
+        "left_value": {
+          "anyOf": [{ "type": "object" }, { "type": "null" }],
+          "default": null
+        },
+        "right_value": {
+          "anyOf": [{ "type": "object" }, { "type": "null" }],
+          "default": null
+        },
+        "redacted": { "default": false, "type": "boolean" },
+        "redacted_fields": {
+          "default": [],
+          "items": { "type": "string" },
+          "type": "array"
+        }
+      },
+      "required": ["frame_id", "sequence", "summary", "change_type", "redacted", "redacted_fields"],
+      "title": "TimelineFrame",
+      "type": "object"
+    },
+    "ChangeType": {
+      "enum": ["added", "removed", "changed", "unchanged"],
+      "title": "ChangeType",
+      "type": "string"
+    },
+    "DiffMode": {
+      "enum": [
+        "ir_vs_ir",
+        "run_vs_run",
+        "policy_vs_policy",
+        "simulation_vs_simulation",
+        "simulation_vs_run",
+        "capability_vs_capability",
+        "flight_vs_flight",
+        "mcp_vs_mcp"
+      ],
+      "title": "DiffMode",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "description": "Schema version — always 1 for v1 reports",
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "generated_at": {
+      "description": "ISO-8601 timestamp when the report was generated",
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "left": {
+      "$ref": "#/$defs/DiffSubject",
+      "description": "Identity of the left (baseline) artifact"
+    },
+    "right": {
+      "$ref": "#/$defs/DiffSubject",
+      "description": "Identity of the right (modified) artifact"
+    },
+    "mode": {
+      "$ref": "#/$defs/DiffMode",
+      "default": "run_vs_run",
+      "description": "What kind of artifacts were compared"
+    },
+    "summary": {
+      "$ref": "#/$defs/DiffSummary",
+      "description": "Aggregated change counts and regression flags"
+    },
+    "first_divergence": {
+      "anyOf": [
+        { "$ref": "#/$defs/FirstDivergence" },
+        { "type": "null" }
+      ],
+      "default": null,
+      "description": "The earliest point of structural divergence between left and right"
+    },
+    "graph_diff": {
+      "anyOf": [
+        { "$ref": "#/$defs/GraphDiff" },
+        { "type": "null" }
+      ],
+      "default": null,
+      "description": "Node and edge level diff for IR graph comparisons"
+    },
+    "event_diff": {
+      "anyOf": [
+        { "$ref": "#/$defs/EventDiff" },
+        { "type": "null" }
+      ],
+      "default": null,
+      "description": "Run event diff with sequence alignment"
+    },
+    "policy_diff": {
+      "anyOf": [
+        { "$ref": "#/$defs/PolicyDiff" },
+        { "type": "null" }
+      ],
+      "default": null,
+      "description": "Policy linter issue regression detection"
+    },
+    "simulation_diff": {
+      "anyOf": [
+        { "$ref": "#/$defs/SimulationDiff" },
+        { "type": "null" }
+      ],
+      "default": null,
+      "description": "Action simulation report comparison"
+    },
+    "capability_diff": {
+      "anyOf": [
+        { "$ref": "#/$defs/CapabilityDiff" },
+        { "type": "null" }
+      ],
+      "default": null,
+      "description": "Capability card drift detection"
+    },
+    "flight_diff": {
+      "anyOf": [
+        { "$ref": "#/$defs/FlightDiff" },
+        { "type": "null" }
+      ],
+      "default": null,
+      "description": "Flight recorder segment hash chain validation"
+    },
+    "mcp_diff": {
+      "anyOf": [
+        { "$ref": "#/$defs/McpManifestDiff" },
+        { "type": "null" }
+      ],
+      "default": null,
+      "description": "MCP server manifest drift detection"
+    },
+    "cost_diff": {
+      "anyOf": [
+        { "$ref": "#/$defs/CostDiff" },
+        { "type": "null" }
+      ],
+      "default": null,
+      "description": "Paid-call introduction and estimated cost delta"
+    },
+    "risk_diff": {
+      "anyOf": [
+        { "$ref": "#/$defs/RiskDiff" },
+        { "type": "null" }
+      ],
+      "default": null,
+      "description": "Risk level change detection"
+    },
+    "timeline": {
+      "default": [],
+      "description": "Ordered list of TimelineFrame objects representing the diff as a navigable sequence",
+      "items": { "$ref": "#/$defs/TimelineFrame" },
+      "type": "array"
+    },
+    "warnings": {
+      "default": [],
+      "description": "Non-fatal issues encountered during diff computation (e.g. corrupt/partial trace)",
+      "items": { "type": "string" },
+      "type": "array"
+    },
+    "errors": {
+      "default": [],
+      "description": "Fatal errors that prevented some diff sections from being computed",
+      "items": { "type": "string" },
+      "type": "array"
+    },
+    "mode_metadata": {
+      "additionalProperties": true,
+      "default": {},
+      "description": "Mode-specific additional metadata",
+      "type": "object"
+    },
+    "diff_hash": {
+      "anyOf": [
+        { "type": "string" },
+        { "type": "null" }
+      ],
+      "default": null,
+      "description": "SHA-256 hex of canonical report content for determinism verification"
+    }
+  },
+  "required": [
+    "schema_version",
+    "generated_at",
+    "left",
+    "right",
+    "mode",
+    "summary"
+  ],
+  "type": "object"
+}
