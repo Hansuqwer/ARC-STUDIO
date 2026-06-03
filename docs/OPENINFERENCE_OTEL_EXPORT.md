@@ -46,14 +46,27 @@ The `arc obs redaction-check` command verifies the output file contains no detec
 ## CLI examples
 
 ```bash
-# Export a trace as OpenInference JSON
+# Export by trace file (original)
 arc obs export --trace-file run.jsonl --format openinference-json --out run.oi.json --json
 
+# Export by run ID (loads from ARC storage)
+arc obs export --run-id run-abc123 --format openinference-json --out run.oi.json --json
+
 # Export with IR and policy metadata attached
-arc obs export --trace-file run.jsonl --ir-file graph.ir.json --policy-file policy.json --out run.oi.json
+arc obs export --run-id run-abc123 --ir-file graph.ir.json --policy-file policy.json --out run.oi.json
 
 # Export as arc-otel-json
-arc obs export --trace-file run.jsonl --format arc-otel-json --out run.otel.json
+arc obs export --run-id run-abc123 --format arc-otel-json --out run.otel.json
+
+# Live OTLP HTTP export (requires explicit confirmation)
+arc obs export --run-id run-abc123 --format otlp-http \
+  --endpoint http://localhost:4318/v1/traces \
+  --confirm-network-export --json
+
+# Live OTLP gRPC export (requires opentelemetry-exporter-otlp-proto-grpc)
+arc obs export --run-id run-abc123 --format otlp-grpc \
+  --endpoint grpc://localhost:4317 \
+  --confirm-network-export --json
 
 # Inspect an export
 arc obs inspect run.oi.json --json
@@ -120,6 +133,73 @@ MCP tool calls in the trace produce `arc.mcp.tool` child spans with `server_id`,
 ## Relation to Flight Recorder
 
 The Flight Recorder stores raw segment events; the observability exporter reads JSONL traces (storage format). They are complementary: FR for crash forensics, obs for structured portability.
+
+## `--run-id` loading
+
+When `--run-id` is provided, the exporter reads from ARC storage (`.arc/traces/<run-id>.jsonl`). The stored `RunRecord` JSON is parsed and its embedded events list is converted to ARC spans. The source file is never modified.
+
+```bash
+arc obs export --run-id run-abc123 --format openinference-json --out run.oi.json
+```
+
+- `RUN_NOT_FOUND` error if the ID is not in storage.
+- `RUN_RECORD_INVALID` error if the file is malformed.
+- Use `--storage-root` to override the default `.arc/traces` directory.
+
+## Live OTLP export
+
+Live export is opt-in. All three of these flags are required:
+
+1. `--format otlp-http` or `--format otlp-grpc`
+2. `--endpoint <url>`
+3. `--confirm-network-export`
+
+Without all three, the command **fails closed** — no data is sent.
+
+### Safety guarantees
+
+- Validation is run before send. If validation fails, no data is sent.
+- Redaction runs before the payload is built. Secrets cannot appear in the OTLP body.
+- No payload bodies are logged.
+- Timeout is enforced (10 seconds by default).
+- No retry loop.
+
+### Dependencies
+
+- `otlp-http`: uses Python stdlib `urllib.request` — no extra dependencies.
+- `otlp-grpc`: requires `pip install opentelemetry-exporter-otlp-proto-grpc`. Without it, the command returns `OTLP_GRPC_UNAVAILABLE`.
+
+## MCP drift inference from run ID
+
+When `--run-id` is used, the exporter scans the run events for MCP tool calls and compares manifest hashes against the local `ManifestStore` and `McpRegistryStore`.
+
+Each MCP tool gets one of these statuses:
+
+| Status | Meaning |
+|---|---|
+| `pinned` | Run hash matches local manifest pin |
+| `drifted` | Run hash differs from local pin |
+| `unpinned` | Hash in run but no local pin |
+| `approved` | Approved in local registry |
+| `blocked` | Blocked in local registry |
+| `unknown` | No hash in run, no local pin |
+
+- No MCP servers are started.
+- No remote registries are queried.
+- `MCP_METADATA_NOT_FOUND_FOR_RUN` warning (not error) if no MCP events in the run.
+
+## Failure modes
+
+| Situation | Behavior |
+|---|---|
+| Run ID not found | `RUN_NOT_FOUND` error, exit 1 |
+| Malformed run record | `RUN_RECORD_INVALID` error, exit 1 |
+| OTLP without `--confirm-network-export` | Fail closed, no send, exit 1 |
+| OTLP without `--endpoint` | Fail closed, exit 1 |
+| gRPC SDK not installed | `OTLP_GRPC_UNAVAILABLE` error, exit 1 |
+| Secret detected in payload | Refuse send, exit 1 |
+| Validation failure | Refuse live send, exit 2 |
+| Corrupt JSONL line | Warning added to export, continue |
 
 ## Future: Phoenix / Langfuse / collector
 

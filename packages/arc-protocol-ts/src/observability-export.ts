@@ -103,6 +103,16 @@ export interface ExportValidationReport {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+export interface LiveExportStatus {
+  attempted: boolean;
+  format: string;
+  endpoint?: string;
+  ok: boolean;
+  span_count: number;
+  http_status?: number;
+  error?: string;
+}
+
 /** Type guard for ArcTraceExport */
 export function isArcTraceExport(obj: unknown): obj is ArcTraceExport {
   return (

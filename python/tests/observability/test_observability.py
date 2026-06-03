@@ -301,6 +301,9 @@ class TestSafety:
         compiled = re.compile(pattern)
         violations = []
         for f in self._SRC.glob("**/*.py"):
+            # otlp_exporter.py intentionally uses urllib.request for opt-in live export
+            if f.name == "otlp_exporter.py":
+                continue
             for i, line in enumerate(f.read_text().splitlines(), 1):
                 if line.strip().startswith("#"):
                     continue

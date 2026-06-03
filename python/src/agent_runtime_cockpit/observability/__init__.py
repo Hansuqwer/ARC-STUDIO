@@ -8,7 +8,14 @@ Usage:
 """
 
 from .exporters import export_trace
-from .loaders import LoadedTrace, load_trace_file
+from .loaders import (
+    LoadedTrace,
+    RunNotFoundError,
+    RunRecordInvalidError,
+    load_run_by_id,
+    load_trace_file,
+)
+from .mcp_drift import McpDriftSummary, McpToolStatus, infer_mcp_drift
 from .models import (
     ArcMetric,
     ArcSpan,
@@ -17,6 +24,7 @@ from .models import (
     ExportSource,
     ExportValidationReport,
     ExportWarning,
+    LiveExportStatus,
     ObservabilityExportConfig,
     RedactionSummary,
     OBSERVABILITY_SCHEMA_VERSION,
@@ -26,7 +34,13 @@ from .validation import validate_export, validate_export_file
 __all__ = [
     "export_trace",
     "load_trace_file",
+    "load_run_by_id",
     "LoadedTrace",
+    "RunNotFoundError",
+    "RunRecordInvalidError",
+    "infer_mcp_drift",
+    "McpDriftSummary",
+    "McpToolStatus",
     "ObservabilityExportConfig",
     "ArcTraceExport",
     "ArcSpan",
@@ -35,6 +49,7 @@ __all__ = [
     "ExportSource",
     "ExportWarning",
     "ExportValidationReport",
+    "LiveExportStatus",
     "RedactionSummary",
     "validate_export",
     "validate_export_file",

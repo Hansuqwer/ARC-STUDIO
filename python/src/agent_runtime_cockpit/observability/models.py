@@ -128,3 +128,13 @@ class ExportValidationReport(_Base):
     span_count: int = 0
     errors: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+
+
+class LiveExportStatus(_Base):
+    attempted: bool = False
+    format: str = ""  # otlp-http | otlp-grpc
+    endpoint: Optional[str] = None
+    ok: bool = False
+    span_count: int = 0
+    http_status: Optional[int] = None
+    error: Optional[str] = None

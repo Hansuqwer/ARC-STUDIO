@@ -110,3 +110,63 @@ def load_policy_json(path: str | Path) -> Optional[dict[str, Any]]:
     except Exception as exc:
         log.warning("Could not load policy JSON %s: %s", path, exc)
         return None
+
+
+class RunNotFoundError(FileNotFoundError):
+    """Raised when a run ID cannot be found in storage."""
+
+
+class RunRecordInvalidError(ValueError):
+    """Raised when a run record exists but cannot be parsed."""
+
+
+def load_run_by_id(
+    run_id: str,
+    *,
+    storage_root: Optional[str | Path] = None,
+) -> LoadedTrace:
+    """Load a run by ID from ARC storage (JsonlTraceStore format).
+
+    Reads <storage_root>/<run_id>.jsonl, first line is RunRecord JSON.
+    RunRecord contains an embedded events list.
+
+    Args:
+        run_id:       ARC run ID.
+        storage_root: Override storage root (default: .arc/traces).
+
+    Raises:
+        RunNotFoundError:    run ID not in storage.
+        RunRecordInvalidError: file exists but cannot be parsed.
+    """
+    from ..storage.jsonl import DEFAULT_STORE_PATH, JsonlTraceStore
+
+    root = Path(storage_root) if storage_root else DEFAULT_STORE_PATH
+    store = JsonlTraceStore(base_dir=root)
+    trace_path = store.trace_path(run_id)
+
+    if not trace_path.exists():
+        raise RunNotFoundError(f"Run not found in storage: {run_id!r} (looked in {root})")
+
+    try:
+        record = store.load(run_id)
+    except Exception as exc:
+        raise RunRecordInvalidError(f"Run record invalid for {run_id!r}: {exc}") from exc
+
+    if record is None:
+        raise RunRecordInvalidError(f"Run record returned None for {run_id!r}")
+
+    events = [
+        e.model_dump() if hasattr(e, "model_dump") else dict(e) for e in (record.events or [])
+    ]
+
+    return LoadedTrace(
+        run_id=record.id,
+        workflow_id=record.workflow_id,
+        runtime=record.runtime,
+        status=record.status.value if hasattr(record.status, "value") else str(record.status),
+        started_at=record.started_at,
+        ended_at=record.ended_at,
+        events=events,
+        metadata=dict(record.metadata or {}),
+        source_file=str(trace_path),
+    )
