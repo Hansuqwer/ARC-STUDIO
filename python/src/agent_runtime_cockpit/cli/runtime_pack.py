@@ -256,12 +256,16 @@ def runtime_pack_doctor(
 
     cap_card_available = False
     try:
+        from ..capabilities.models import CapabilityCard  # type: ignore  # noqa: F401
+
         cap_card_available = True
     except Exception:
         pass
 
     mcp_reg_available = False
     try:
+        from ..mcp.registry import McpRegistryStore  # type: ignore  # noqa: F401
+
         mcp_reg_available = True
     except Exception:
         pass
