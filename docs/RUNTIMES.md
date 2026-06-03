@@ -81,3 +81,37 @@ Timeout/cancellation honesty:
 - `timeout_seconds` in run inputs wraps CrewAI kickoff with a local timeout and returns `CREWAI_TIMEOUT` on expiry.
 - Cancelled kickoff returns status `cancelled` with a `RUN_CANCELLED` event and `CREWAI_CANCELLED` metadata.
 - ARC does not claim provider-side cancellation; timeout/cancellation only describes the local adapter wait path.
+
+## Runtime Pack SDK
+
+The **Runtime Pack SDK** provides a static, local-first mechanism for declaring new runtime adapters to ARC without hard-coding each one into the core repository.
+
+A runtime pack is a version-pinned `arc-runtime-pack.json` file that describes identity, permissions, capabilities, entrypoints, MCP dependencies, model usage, SwarmGraph IR claims, and policy requirements — all statically, without any code execution.
+
+### Key properties
+
+- **Inert discovery**: ARC reads the manifest JSON but never imports, executes, or starts the runtime.
+- **Fail-closed**: All risk flags (network, paid, secrets, shell, outside-workspace) default to `false`.
+- **Hash-pinned**: Every manifest carries a deterministic `manifest_hash` (sha256 of canonical JSON) that detects drift.
+- **Validation-gated install**: `arc runtime-pack install` refuses manifests that fail any of the 12 static validation rules.
+- **No secrets**: Manifests are committed to VCS; the validator rejects any that contain secret material.
+
+### CLI quick-start
+
+```bash
+# Scaffold a new pack
+arc runtime-pack init --id org.my-runtime --name "My Runtime" ./my-pack/
+
+# Validate (static, no code run)
+arc runtime-pack validate ./my-pack/
+
+# Install metadata into workspace registry
+arc runtime-pack install ./my-pack/
+
+# Full health check
+arc runtime-pack doctor ./my-pack/
+```
+
+### Further reading
+
+See [docs/RUNTIME_PACK_SDK.md](RUNTIME_PACK_SDK.md) for the full developer guide, including schema reference, validation rules, permission system, IR integration, and Python/TypeScript SDK usage.

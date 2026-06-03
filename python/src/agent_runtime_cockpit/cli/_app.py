@@ -50,6 +50,7 @@ from ._subapps import (
     testbench_app,
     workspace_app,
 )
+from .runtime_pack import runtime_pack_app
 
 console = Console(no_color=not _sys.stdout.isatty(), highlight=_sys.stdout.isatty())
 err_console = Console(stderr=True)
@@ -99,6 +100,7 @@ app.add_typer(review_app)
 app.add_typer(plan_app)
 app.add_typer(testbench_app)
 app.add_typer(ci_app)
+app.add_typer(runtime_pack_app)
 
 
 @app.command("dashboard")

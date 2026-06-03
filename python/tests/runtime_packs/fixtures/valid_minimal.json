@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "acme.minimal-runtime",
+  "name": "Acme Minimal Runtime",
+  "version": "0.1.0",
+  "description": "Minimal runtime for testing.",
+  "runtime": {
+    "runtime_name": "AcmeRuntime",
+    "runtime_kind": "agent",
+    "language": "python",
+    "framework": null,
+    "homepage": null,
+    "license": null
+  },
+  "adapter": null,
+  "entrypoints": {
+    "inspect": null,
+    "export": null,
+    "compile_to_ir": null,
+    "simulate": null,
+    "validate": null,
+    "run": null,
+    "eval": null
+  },
+  "permissions": [],
+  "capabilities": [],
+  "tools": [],
+  "mcp": [],
+  "models": {
+    "requires_paid_models": false,
+    "providers": [],
+    "default_mode": "fake"
+  },
+  "storage": {
+    "enabled": false,
+    "scope": "workspace",
+    "outside_workspace": false
+  },
+  "memory": {
+    "enabled": false,
+    "persistent": false
+  },
+  "search": {
+    "enabled": false,
+    "network": false
+  },
+  "observability": {
+    "enabled": false,
+    "otel": false,
+    "exporters": []
+  },
+  "ir": {
+    "can_export_ir": false,
+    "supported_ir_version": null,
+    "opaque_node_policy": null,
+    "provenance_required": true
+  },
+  "policy": {
+    "supports_preflight": false,
+    "fail_closed": true,
+    "required_rules": []
+  },
+  "tests": {
+    "examples": [],
+    "golden_traces": []
+  },
+  "provenance": {
+    "source_path": null,
+    "created_at": null,
+    "generated_by": null,
+    "git_commit": null
+  },
+  "metadata": {},
+  "manifest_hash": "511eb9edc87510dfbc10f8bbfd0d24c70bce15ab75e2165c7fe69ab15d270a26"
+}

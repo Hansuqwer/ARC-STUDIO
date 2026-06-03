@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "id": "acme.ir-runtime",
+  "name": "Acme IR Runtime",
+  "version": "1.0.0",
+  "description": "A runtime that can export SwarmGraph IR.",
+  "runtime": {
+    "runtime_name": "AcmeIRRuntime",
+    "runtime_kind": "graph",
+    "language": "python",
+    "framework": null,
+    "homepage": null,
+    "license": null
+  },
+  "adapter": null,
+  "entrypoints": {
+    "inspect": null,
+    "export": null,
+    "compile_to_ir": null,
+    "simulate": null,
+    "validate": null,
+    "run": null,
+    "eval": null
+  },
+  "permissions": [],
+  "capabilities": [
+    {
+      "name": "export_graph",
+      "description": "",
+      "reads": true,
+      "writes": false,
+      "network": false,
+      "paid": false,
+      "secrets": false,
+      "shell": false,
+      "mcp": false,
+      "outside_workspace": false,
+      "background": false,
+      "replayable": true,
+      "auditable": true
+    }
+  ],
+  "tools": [],
+  "mcp": [],
+  "models": {
+    "requires_paid_models": false,
+    "providers": [],
+    "default_mode": "fake"
+  },
+  "storage": {
+    "enabled": false,
+    "scope": "workspace",
+    "outside_workspace": false
+  },
+  "memory": {
+    "enabled": false,
+    "persistent": false
+  },
+  "search": {
+    "enabled": false,
+    "network": false
+  },
+  "observability": {
+    "enabled": false,
+    "otel": false,
+    "exporters": []
+  },
+  "ir": {
+    "can_export_ir": true,
+    "supported_ir_version": 1,
+    "opaque_node_policy": "reject",
+    "provenance_required": true
+  },
+  "policy": {
+    "supports_preflight": false,
+    "fail_closed": true,
+    "required_rules": []
+  },
+  "tests": {
+    "examples": [],
+    "golden_traces": []
+  },
+  "provenance": {
+    "source_path": null,
+    "created_at": null,
+    "generated_by": null,
+    "git_commit": null
+  },
+  "metadata": {},
+  "manifest_hash": "920e78e3b2a723118c1da373e9e4304611742856acdb50f0abb012bbde2dbbd7"
+}

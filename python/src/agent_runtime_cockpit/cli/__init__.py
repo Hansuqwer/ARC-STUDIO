@@ -46,6 +46,7 @@ from . import (
     testbench,  # noqa: F401
     swarmgraph,  # noqa: F401 — Phase 51: arc swarmgraph assess-risk
     task,  # noqa: F401 — Phase 27 / Phase 56: task CLI
+    runtime_pack,  # noqa: F401 — Runtime Pack SDK commands
 )
 from ._app import app, main
 

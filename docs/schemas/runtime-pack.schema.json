@@ -1,0 +1,225 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://arc-studio.dev/schemas/runtime-pack/v1",
+  "title": "RuntimePackManifest",
+  "description": "Canonical arc-runtime-pack.json manifest (schema version 1).",
+  "type": "object",
+  "required": ["schema_version", "id", "name", "runtime"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Must equal 1 (RUNTIME_PACK_SCHEMA_VERSION)."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+      "description": "Stable, safe pack identifier. No path separators or '..'."
+    },
+    "name": { "type": "string" },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+([-+][0-9A-Za-z.\\-]+)?$",
+      "default": "0.1.0"
+    },
+    "description": { "type": "string", "default": "" },
+    "runtime": {
+      "type": "object",
+      "required": ["runtime_name"],
+      "properties": {
+        "runtime_name": { "type": "string" },
+        "runtime_kind": {
+          "type": "string",
+          "enum": ["graph", "agent", "pipeline", "swarm", "tooled_llm", "unknown"],
+          "default": "unknown"
+        },
+        "language": { "type": "string", "default": "python" },
+        "framework": { "type": ["string", "null"] },
+        "homepage": { "type": ["string", "null"] },
+        "license": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "adapter": { "type": ["string", "null"] },
+    "entrypoints": {
+      "type": "object",
+      "description": "Non-executed module:function references. No absolute paths or shell invocations.",
+      "properties": {
+        "inspect":       { "type": ["string", "null"] },
+        "export":        { "type": ["string", "null"] },
+        "compile_to_ir": { "type": ["string", "null"] },
+        "simulate":      { "type": ["string", "null"] },
+        "validate":      { "type": ["string", "null"] },
+        "run":           { "type": ["string", "null"] },
+        "eval":          { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "Known kinds: network, filesystem, shell, mcp, secrets, memory, search, paid_models, outside_workspace, background, observability. Unknown kinds fail closed."
+          },
+          "required":         { "type": "boolean", "default": true },
+          "scope":            { "type": ["string", "null"] },
+          "reason":           { "type": ["string", "null"], "description": "Required for dangerous kinds." },
+          "default_decision": { "type": "string", "enum": ["deny", "prompt", "allow"], "default": "deny" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name":              { "type": "string" },
+          "description":       { "type": "string", "default": "" },
+          "reads":             { "type": "boolean", "default": false },
+          "writes":            { "type": "boolean", "default": false },
+          "network":           { "type": "boolean", "default": false },
+          "paid":              { "type": "boolean", "default": false },
+          "secrets":           { "type": "boolean", "default": false },
+          "shell":             { "type": "boolean", "default": false },
+          "mcp":               { "type": "boolean", "default": false },
+          "outside_workspace": { "type": "boolean", "default": false },
+          "background":        { "type": "boolean", "default": false },
+          "replayable":        { "type": "boolean", "default": false },
+          "auditable":         { "type": "boolean", "default": false }
+        },
+        "additionalProperties": true
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name":           { "type": "string" },
+          "kind":           { "type": "string", "enum": ["function", "mcp", "http", "shell", "native", "unknown"] },
+          "schema":         { "type": ["object", "null"] },
+          "side_effects":   { "type": "array", "items": { "type": "string" } },
+          "requires_hitl":  { "type": "boolean", "default": false },
+          "requires_trust": { "type": "boolean", "default": false },
+          "paid":           { "type": "boolean", "default": false }
+        },
+        "additionalProperties": true
+      }
+    },
+    "mcp": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["server_id"],
+        "properties": {
+          "server_id":          { "type": "string" },
+          "tools":              { "type": "array", "items": { "type": "string" } },
+          "manifest_hash":      { "type": ["string", "null"], "description": "64-char lowercase hex sha256. Required when required=true." },
+          "required":           { "type": "boolean", "default": false },
+          "approved_by_default":{ "type": "boolean", "default": false }
+        },
+        "additionalProperties": true
+      }
+    },
+    "models": {
+      "type": "object",
+      "properties": {
+        "requires_paid_models": { "type": "boolean", "default": false },
+        "providers":            { "type": "array", "items": { "type": "string" } },
+        "default_mode":         { "type": "string", "default": "fake" }
+      },
+      "additionalProperties": true
+    },
+    "storage": {
+      "type": "object",
+      "properties": {
+        "enabled":           { "type": "boolean", "default": false },
+        "scope":             { "type": "string", "default": "workspace" },
+        "outside_workspace": { "type": "boolean", "default": false }
+      },
+      "additionalProperties": true
+    },
+    "memory": {
+      "type": "object",
+      "properties": {
+        "enabled":    { "type": "boolean", "default": false },
+        "persistent": { "type": "boolean", "default": false }
+      },
+      "additionalProperties": true
+    },
+    "search": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "network": { "type": "boolean", "default": false }
+      },
+      "additionalProperties": true
+    },
+    "observability": {
+      "type": "object",
+      "properties": {
+        "enabled":   { "type": "boolean", "default": false },
+        "otel":      { "type": "boolean", "default": false },
+        "exporters": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "ir": {
+      "type": "object",
+      "description": "SwarmGraph IR export claims. supported_ir_version and opaque_node_policy required when can_export_ir=true.",
+      "properties": {
+        "can_export_ir":         { "type": "boolean", "default": false },
+        "supported_ir_version":  { "type": ["integer", "null"] },
+        "opaque_node_policy":    { "type": ["string", "null"], "enum": ["reject", "mark_opaque", "require_review", null] },
+        "provenance_required":   { "type": "boolean", "default": true }
+      },
+      "additionalProperties": true
+    },
+    "policy": {
+      "type": "object",
+      "properties": {
+        "supports_preflight": { "type": "boolean", "default": false },
+        "fail_closed":        { "type": "boolean", "default": true },
+        "required_rules":     { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "tests": {
+      "type": "object",
+      "properties": {
+        "examples":      { "type": "array", "items": { "type": "string" } },
+        "golden_traces": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "provenance": {
+      "type": "object",
+      "description": "created_at and similar fields are volatile: excluded from manifest_hash.",
+      "properties": {
+        "source_path":   { "type": ["string", "null"] },
+        "created_at":    { "type": ["string", "null"] },
+        "generated_by":  { "type": ["string", "null"] },
+        "git_commit":    { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Arbitrary extension metadata. Must contain no secrets."
+    },
+    "manifest_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "sha256 hex digest of canonical JSON (volatile keys excluded). Absent hash is a validation warning."
+    }
+  }
+}

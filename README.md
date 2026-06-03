@@ -177,7 +177,16 @@ uv run arc audit verify <run-id>
 uv run arc hitl pending
 
 # Evaluation
+# Evaluation
 uv run arc eval run --batch
+
+# Runtime packs (static metadata, no code executed)
+uv run arc runtime-pack init --id org.my-runtime --name "My Runtime" ./my-pack/
+uv run arc runtime-pack validate ./my-pack/ --json
+uv run arc runtime-pack inspect ./my-pack/ --json
+uv run arc runtime-pack install ./my-pack/
+uv run arc runtime-pack list --json
+uv run arc runtime-pack doctor ./my-pack/
 ```
 
 Full reference: `uv run arc --help`

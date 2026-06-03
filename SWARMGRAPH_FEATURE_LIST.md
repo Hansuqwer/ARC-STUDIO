@@ -896,3 +896,52 @@ These must be resolved during implementation:
 **Document Status:** APPROVED — Ready for implementation  
 **Next Review:** 2026-05-29  
 **Implementation Start:** Phase 0, Week 1
+
+---
+
+## Runtime Pack SDK (Phase RP-1)
+
+**Status:** Implemented (patch series 0001–0008)  
+**Priority:** P1  
+**Constraint:** Local-first MVP; no network, no code execution, no dynamic import.
+
+### Feature Summary
+
+The Runtime Pack SDK adds a static, fail-closed discovery layer for runtime adapters. A runtime pack is a version-pinned JSON file (`arc-runtime-pack.json`) that fully describes a runtime's identity, permissions, capabilities, entrypoints, MCP/IR/policy claims, and security surface — without ARC having to hard-code any runtime-specific knowledge into the core codebase.
+
+### Core Components
+
+| Component | Location | Purpose |
+|---|---|---|
+| `models.py` | `runtime_packs/` | Typed Pydantic models for all manifest sub-structures |
+| `hashing.py` | `runtime_packs/` | Deterministic sha256 over canonical JSON (volatile keys excluded) |
+| `redaction.py` | `runtime_packs/` | Secret pattern detection; manifest redaction before registry write |
+| `validation.py` | `runtime_packs/` | 12 static rules (R1–R12); fail-closed, no I/O |
+| `loader.py` | `runtime_packs/` | JSON load, schema check, typed model, inspection summary |
+| `registry.py` | `runtime_packs/` | Workspace registry: install (metadata only), list, drift, uninstall |
+| `scaffold.py` | `runtime_packs/` | Scaffold minimal valid pack; hash-pinned at creation |
+| `exporters.py` | `runtime_packs/` | Optional integrations: CapabilityCard, PolicyIssue, IR compat, MCP verify |
+| `cli/runtime_pack.py` | `cli/` | 7 CLI commands: init/validate/inspect/list/install/uninstall/doctor |
+
+### Validation Rules
+
+R1 schema_version · R2 id safety · R3 semver · R4 entrypoint safety · R5 unknown permission (fail-closed) · R6 dangerous permission reason · R7 capability→permission backing · R8 dangerous default-allow warning · R9 MCP hash pin · R10 IR version + opaque policy · R11 no secrets · R12 hash integrity
+
+### Design Properties
+
+- All risk flags default `false` (missing data is safe)
+- Unknown permission kinds are **errors** (fail-closed, not warnings)
+- Dangerous permissions (network/paid/secrets/shell/outside_workspace) require an explicit `reason`
+- Install refuses any manifest that fails validation
+- No `subprocess`, no `importlib.import_module`, no network, no server start
+- Manifests are deterministic and hash-addressable; `created_at` and similar volatile fields excluded from hash
+
+### TypeScript Mirror
+
+`packages/arc-protocol-ts/src/runtime-pack.ts` provides typed interfaces matching the Python models for UI and tooling consumption.
+
+### Documentation
+
+- `docs/RUNTIME_PACK_SDK.md` — full developer guide
+- `docs/schemas/runtime-pack.schema.json` — JSON Schema (draft-07)
+- `docs/RUNTIMES.md` — updated with Runtime Pack section
