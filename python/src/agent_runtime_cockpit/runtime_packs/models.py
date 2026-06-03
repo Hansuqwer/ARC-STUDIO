@@ -95,6 +95,7 @@ class RuntimeKind(str, Enum):
     PIPELINE = "pipeline"
     SWARM = "swarm"
     TOOLED_LLM = "tooled_llm"
+    MOBILE = "mobile"
     UNKNOWN = "unknown"
 
 

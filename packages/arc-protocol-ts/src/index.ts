@@ -4,3 +4,4 @@ export * from './flight-recorder';
 export * from './run-diff';
 export * from './observability-export';
 export * from './runtime-pack';
+export * from './mobile-runtime';

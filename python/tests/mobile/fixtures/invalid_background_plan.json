@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "plan_id": "plan-bad-bg",
+  "name": "Bad Background Plan",
+  "steps": [
+    {
+      "step_id": "s1",
+      "capability_id": "app.memory.write.mock",
+      "description": "",
+      "mock": true,
+      "inputs": {},
+      "expected_outputs": {}
+    }
+  ],
+  "requires_network": false,
+  "requires_background": true,
+  "plan_hash": null
+}

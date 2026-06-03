@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "id": "arc.mobile.runtime",
+  "name": "ARC Mobile Runtime",
+  "version": "0.1.0",
+  "description": "ARC Mobile Runtime Pack — ARC Mobile Runtime",
+  "runtime": {
+    "runtime_name": "arc.mobile.runtime",
+    "runtime_kind": "mobile",
+    "language": "dart/typescript/kotlin/swift",
+    "framework": "flutter/expo/react_native",
+    "homepage": null,
+    "license": null
+  },
+  "adapter": null,
+  "entrypoints": {
+    "inspect": null,
+    "export": null,
+    "compile_to_ir": null,
+    "simulate": null,
+    "validate": null,
+    "run": null,
+    "eval": null
+  },
+  "permissions": [],
+  "capabilities": [],
+  "tools": [],
+  "mcp": [],
+  "models": {
+    "requires_paid_models": false,
+    "providers": [],
+    "default_mode": "fake"
+  },
+  "storage": {
+    "enabled": false,
+    "scope": "workspace",
+    "outside_workspace": false
+  },
+  "memory": {
+    "enabled": false,
+    "persistent": false
+  },
+  "search": {
+    "enabled": false,
+    "network": false
+  },
+  "observability": {
+    "enabled": false,
+    "otel": false,
+    "exporters": []
+  },
+  "ir": {
+    "can_export_ir": false,
+    "supported_ir_version": null,
+    "opaque_node_policy": null,
+    "provenance_required": true
+  },
+  "policy": {
+    "supports_preflight": false,
+    "fail_closed": true,
+    "required_rules": []
+  },
+  "tests": {
+    "examples": [],
+    "golden_traces": []
+  },
+  "provenance": {
+    "source_path": null,
+    "created_at": null,
+    "generated_by": null,
+    "git_commit": null
+  },
+  "metadata": {
+    "mobile_manifest_hash": "bd2d65ea5e6ab8ae13347ad4fee9979988398d0262c7be5ee7eb5981f53f0c37",
+    "mobile_capabilities": [
+      "device.camera.capture.mock",
+      "device.microphone.transcribe.mock",
+      "device.location.current.mock",
+      "device.calendar.read.mock",
+      "device.calendar.write.mock",
+      "device.contacts.search.mock",
+      "device.files.pick.mock",
+      "device.photos.pick.mock",
+      "device.notifications.schedule.mock",
+      "app.memory.write.mock",
+      "app.memory.retrieve.mock",
+      "app.local_search.query.mock",
+      "app.ui.action_plan.mock"
+    ],
+    "simulator_mode": true,
+    "background_execution": false,
+    "network_by_default": false
+  },
+  "manifest_hash": "1a0e00f3111c83c9d101dc65646b2e0d28148d2aa58ec497b1192e7e22ebd04d"
+}

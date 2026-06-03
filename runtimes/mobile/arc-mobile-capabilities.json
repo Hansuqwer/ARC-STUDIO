@@ -1,0 +1,512 @@
+{
+  "schema_version": 1,
+  "id": "arc.mobile.runtime",
+  "name": "ARC Mobile Runtime",
+  "version": "0.1.0",
+  "description": "",
+  "platforms": [
+    {
+      "platform": "ios",
+      "min_os_version": null,
+      "stub_only": true,
+      "framework": "native"
+    },
+    {
+      "platform": "android",
+      "min_os_version": null,
+      "stub_only": true,
+      "framework": "native"
+    },
+    {
+      "platform": "flutter",
+      "min_os_version": null,
+      "stub_only": true,
+      "framework": "flutter"
+    },
+    {
+      "platform": "expo",
+      "min_os_version": null,
+      "stub_only": true,
+      "framework": "expo"
+    },
+    {
+      "platform": "react_native",
+      "min_os_version": null,
+      "stub_only": true,
+      "framework": "react_native"
+    }
+  ],
+  "capabilities": [
+    {
+      "schema_version": 1,
+      "id": "device.camera.capture.mock",
+      "name": "Camera Capture (Mock)",
+      "description": "Simulated camera capture; returns a fixture image. No real camera access.",
+      "category": "media",
+      "platforms": [
+        "ios",
+        "android",
+        "flutter",
+        "expo"
+      ],
+      "required_permissions": [
+        {
+          "id": "ios.camera",
+          "platform": "ios",
+          "required": true,
+          "reason": null,
+          "mock_safe": true
+        },
+        {
+          "id": "android.CAMERA",
+          "platform": "android",
+          "required": true,
+          "reason": null,
+          "mock_safe": true
+        }
+      ],
+      "approval_mode": "required",
+      "data_sensitivity": "high",
+      "reads": true,
+      "writes": false,
+      "network": false,
+      "paid": false,
+      "background": false,
+      "replayable": true,
+      "auditable": true,
+      "mcp_exposable": false,
+      "simulator_supported": true,
+      "test_fixture_supported": true,
+      "requires_trust": true,
+      "requires_hitl": false,
+      "metadata": {},
+      "capability_hash": "45090ad437adfe4c595f0c08a3cc26cdf723264ee5a0e0b21956021ba5dea17c"
+    },
+    {
+      "schema_version": 1,
+      "id": "device.microphone.transcribe.mock",
+      "name": "Microphone Transcription (Mock)",
+      "description": "Simulated audio transcription; returns fixture transcript. No real microphone access.",
+      "category": "media",
+      "platforms": [
+        "ios",
+        "android"
+      ],
+      "required_permissions": [
+        {
+          "id": "ios.microphone",
+          "platform": "ios",
+          "required": true,
+          "reason": null,
+          "mock_safe": true
+        },
+        {
+          "id": "android.RECORD_AUDIO",
+          "platform": "android",
+          "required": true,
+          "reason": null,
+          "mock_safe": true
+        }
+      ],
+      "approval_mode": "blocking",
+      "data_sensitivity": "critical",
+      "reads": true,
+      "writes": false,
+      "network": false,
+      "paid": false,
+      "background": false,
+      "replayable": true,
+      "auditable": true,
+      "mcp_exposable": false,
+      "simulator_supported": true,
+      "test_fixture_supported": true,
+      "requires_trust": true,
+      "requires_hitl": true,
+      "metadata": {},
+      "capability_hash": "8e371ead4845c46f7909ca0ac6197ab74450f3c504cce9cf197da52c781c0e59"
+    },
+    {
+      "schema_version": 1,
+      "id": "device.location.current.mock",
+      "name": "Location (Mock)",
+      "description": "Simulated GPS coordinates; returns fixture location. No real GPS access.",
+      "category": "sensor",
+      "platforms": [
+        "ios",
+        "android"
+      ],
+      "required_permissions": [
+        {
+          "id": "ios.location.whenInUse",
+          "platform": "ios",
+          "required": true,
+          "reason": null,
+          "mock_safe": true
+        },
+        {
+          "id": "android.ACCESS_FINE_LOCATION",
+          "platform": "android",
+          "required": true,
+          "reason": null,
+          "mock_safe": true
+        }
+      ],
+      "approval_mode": "required",
+      "data_sensitivity": "high",
+      "reads": true,
+      "writes": false,
+      "network": false,
+      "paid": false,
+      "background": false,
+      "replayable": true,
+      "auditable": true,
+      "mcp_exposable": false,
+      "simulator_supported": true,
+      "test_fixture_supported": true,
+      "requires_trust": true,
+      "requires_hitl": false,
+      "metadata": {},
+      "capability_hash": "611a44cb22df4e5abcf08c072ed48564f6ad0a28c32772660fd6e7c38b9af954"
+    },
+    {
+      "schema_version": 1,
+      "id": "device.calendar.read.mock",
+      "name": "Calendar Read (Mock)",
+      "description": "Simulated calendar events; returns fixture events. No real calendar access.",
+      "category": "communication",
+      "platforms": [
+        "ios",
+        "android"
+      ],
+      "required_permissions": [
+        {
+          "id": "ios.calendars",
+          "platform": "ios",
+          "required": true,
+          "reason": null,
+          "mock_safe": true
+        },
+        {
+          "id": "android.READ_CALENDAR",
+          "platform": "android",
+          "required": true,
+          "reason": null,
+          "mock_safe": true
+        }
+      ],
+      "approval_mode": "required",
+      "data_sensitivity": "high",
+      "reads": true,
+      "writes": false,
+      "network": false,
+      "paid": false,
+      "background": false,
+      "replayable": true,
+      "auditable": true,
+      "mcp_exposable": false,
+      "simulator_supported": true,
+      "test_fixture_supported": true,
+      "requires_trust": true,
+      "requires_hitl": false,
+      "metadata": {},
+      "capability_hash": "a28091ad4f671ef3ac314a7dd585f657b08e2cda326778cf23129f15f232fb86"
+    },
+    {
+      "schema_version": 1,
+      "id": "device.calendar.write.mock",
+      "name": "Calendar Write (Mock)",
+      "description": "Simulated calendar write; no real events created.",
+      "category": "communication",
+      "platforms": [
+        "ios",
+        "android"
+      ],
+      "required_permissions": [
+        {
+          "id": "ios.calendars",
+          "platform": "ios",
+          "required": true,
+          "reason": null,
+          "mock_safe": true
+        },
+        {
+          "id": "android.WRITE_CALENDAR",
+          "platform": "android",
+          "required": true,
+          "reason": null,
+          "mock_safe": true
+        }
+      ],
+      "approval_mode": "blocking",
+      "data_sensitivity": "high",
+      "reads": false,
+      "writes": true,
+      "network": false,
+      "paid": false,
+      "background": false,
+      "replayable": true,
+      "auditable": true,
+      "mcp_exposable": false,
+      "simulator_supported": true,
+      "test_fixture_supported": true,
+      "requires_trust": true,
+      "requires_hitl": true,
+      "metadata": {},
+      "capability_hash": "9d0f5013ab25d9f1fa2635d8531f545ada225068b69ca9cb4f8d6d1674d497c9"
+    },
+    {
+      "schema_version": 1,
+      "id": "device.contacts.search.mock",
+      "name": "Contacts Search (Mock)",
+      "description": "Simulated contacts search; returns fixture contacts. No real contacts access.",
+      "category": "communication",
+      "platforms": [
+        "ios",
+        "android"
+      ],
+      "required_permissions": [
+        {
+          "id": "ios.contacts",
+          "platform": "ios",
+          "required": true,
+          "reason": null,
+          "mock_safe": true
+        },
+        {
+          "id": "android.READ_CONTACTS",
+          "platform": "android",
+          "required": true,
+          "reason": null,
+          "mock_safe": true
+        }
+      ],
+      "approval_mode": "blocking",
+      "data_sensitivity": "critical",
+      "reads": true,
+      "writes": false,
+      "network": false,
+      "paid": false,
+      "background": false,
+      "replayable": true,
+      "auditable": true,
+      "mcp_exposable": false,
+      "simulator_supported": true,
+      "test_fixture_supported": true,
+      "requires_trust": true,
+      "requires_hitl": true,
+      "metadata": {},
+      "capability_hash": "57193cdda941b54d8555f358dbedeaebc3cf803715241285a670fb0e7235d087"
+    },
+    {
+      "schema_version": 1,
+      "id": "device.files.pick.mock",
+      "name": "File Picker (Mock)",
+      "description": "Simulated file picker; returns fixture file reference.",
+      "category": "storage",
+      "platforms": [
+        "all"
+      ],
+      "required_permissions": [],
+      "approval_mode": "recommended",
+      "data_sensitivity": "medium",
+      "reads": true,
+      "writes": false,
+      "network": false,
+      "paid": false,
+      "background": false,
+      "replayable": true,
+      "auditable": true,
+      "mcp_exposable": false,
+      "simulator_supported": true,
+      "test_fixture_supported": true,
+      "requires_trust": false,
+      "requires_hitl": false,
+      "metadata": {},
+      "capability_hash": "58d98fbfab957474f39d4d29f976a990446af38d120d9802c4b64feb8635dcf3"
+    },
+    {
+      "schema_version": 1,
+      "id": "device.photos.pick.mock",
+      "name": "Photo Picker (Mock)",
+      "description": "Simulated photo picker; returns fixture image metadata. No real PhotoKit access.",
+      "category": "media",
+      "platforms": [
+        "ios",
+        "android"
+      ],
+      "required_permissions": [
+        {
+          "id": "ios.photoLibrary",
+          "platform": "ios",
+          "required": true,
+          "reason": null,
+          "mock_safe": true
+        },
+        {
+          "id": "android.READ_MEDIA_IMAGES",
+          "platform": "android",
+          "required": true,
+          "reason": null,
+          "mock_safe": true
+        }
+      ],
+      "approval_mode": "required",
+      "data_sensitivity": "high",
+      "reads": true,
+      "writes": false,
+      "network": false,
+      "paid": false,
+      "background": false,
+      "replayable": true,
+      "auditable": true,
+      "mcp_exposable": false,
+      "simulator_supported": true,
+      "test_fixture_supported": true,
+      "requires_trust": true,
+      "requires_hitl": false,
+      "metadata": {},
+      "capability_hash": "9ead0e5d5194a1d8e9da4a8937cf405e46cd8da8cdaf2d842545e07d1db7194c"
+    },
+    {
+      "schema_version": 1,
+      "id": "device.notifications.schedule.mock",
+      "name": "Notifications (Mock)",
+      "description": "Simulated local notification scheduling; no real notification sent.",
+      "category": "communication",
+      "platforms": [
+        "ios",
+        "android"
+      ],
+      "required_permissions": [],
+      "approval_mode": "recommended",
+      "data_sensitivity": "low",
+      "reads": false,
+      "writes": true,
+      "network": false,
+      "paid": false,
+      "background": false,
+      "replayable": true,
+      "auditable": true,
+      "mcp_exposable": false,
+      "simulator_supported": true,
+      "test_fixture_supported": true,
+      "requires_trust": false,
+      "requires_hitl": false,
+      "metadata": {},
+      "capability_hash": "69faa8a42ce9c095fa7ab4bac7f05933582771c963715030be1389fe149cdb1d"
+    },
+    {
+      "schema_version": 1,
+      "id": "app.memory.write.mock",
+      "name": "App Memory Write (Mock)",
+      "description": "Simulated in-app memory write; stored locally in mock store.",
+      "category": "app",
+      "platforms": [
+        "all"
+      ],
+      "required_permissions": [],
+      "approval_mode": "none",
+      "data_sensitivity": "low",
+      "reads": false,
+      "writes": true,
+      "network": false,
+      "paid": false,
+      "background": false,
+      "replayable": true,
+      "auditable": true,
+      "mcp_exposable": false,
+      "simulator_supported": true,
+      "test_fixture_supported": true,
+      "requires_trust": false,
+      "requires_hitl": false,
+      "metadata": {},
+      "capability_hash": "625723fd865c60d72c62ffb0404eae9d9ebbd41345534d3447b79c92815b2f53"
+    },
+    {
+      "schema_version": 1,
+      "id": "app.memory.retrieve.mock",
+      "name": "App Memory Retrieve (Mock)",
+      "description": "Simulated in-app memory retrieval from mock store.",
+      "category": "app",
+      "platforms": [
+        "all"
+      ],
+      "required_permissions": [],
+      "approval_mode": "none",
+      "data_sensitivity": "low",
+      "reads": true,
+      "writes": false,
+      "network": false,
+      "paid": false,
+      "background": false,
+      "replayable": true,
+      "auditable": true,
+      "mcp_exposable": false,
+      "simulator_supported": true,
+      "test_fixture_supported": true,
+      "requires_trust": false,
+      "requires_hitl": false,
+      "metadata": {},
+      "capability_hash": "7e1e659c96755426ad41d7c523628a8f523f701c8408f0d37b5f22accf7366a5"
+    },
+    {
+      "schema_version": 1,
+      "id": "app.local_search.query.mock",
+      "name": "Local Search (Mock)",
+      "description": "Simulated local app search; returns fixture results.",
+      "category": "app",
+      "platforms": [
+        "all"
+      ],
+      "required_permissions": [],
+      "approval_mode": "none",
+      "data_sensitivity": "low",
+      "reads": true,
+      "writes": false,
+      "network": false,
+      "paid": false,
+      "background": false,
+      "replayable": true,
+      "auditable": true,
+      "mcp_exposable": false,
+      "simulator_supported": true,
+      "test_fixture_supported": true,
+      "requires_trust": false,
+      "requires_hitl": false,
+      "metadata": {},
+      "capability_hash": "ddefc730eb95f535587f6bdcad2b37396be394be42631fedc818bcdca6975aaf"
+    },
+    {
+      "schema_version": 1,
+      "id": "app.ui.action_plan.mock",
+      "name": "UI Action Plan (Mock)",
+      "description": "Simulated UI automation plan; describes steps without executing native UI.",
+      "category": "ui",
+      "platforms": [
+        "all"
+      ],
+      "required_permissions": [],
+      "approval_mode": "recommended",
+      "data_sensitivity": "none",
+      "reads": false,
+      "writes": false,
+      "network": false,
+      "paid": false,
+      "background": false,
+      "replayable": true,
+      "auditable": true,
+      "mcp_exposable": false,
+      "simulator_supported": true,
+      "test_fixture_supported": true,
+      "requires_trust": false,
+      "requires_hitl": false,
+      "metadata": {},
+      "capability_hash": "90eefb39063c950f33b7b7e307d30c1a4dc40dc3316d616a440f5370ae9b9194"
+    }
+  ],
+  "background_execution": false,
+  "network_by_default": false,
+  "simulator_mode": true,
+  "privacy_manifest": true,
+  "manifest_hash": "bd2d65ea5e6ab8ae13347ad4fee9979988398d0262c7be5ee7eb5981f53f0c37"
+}

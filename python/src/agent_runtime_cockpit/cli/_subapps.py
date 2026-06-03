@@ -90,3 +90,7 @@ obs_app = typer.Typer(
     name="obs",
     help="Observability export — OpenInference / OpenTelemetry local file export",
 )
+mobile_app = typer.Typer(
+    name="mobile",
+    help="ARC Mobile Runtime SDK — capabilities, simulator, runtime pack",
+)

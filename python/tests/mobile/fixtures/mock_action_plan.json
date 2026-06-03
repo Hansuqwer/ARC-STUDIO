@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "plan_id": "plan-001",
+  "name": "Mock Demo Plan",
+  "steps": [
+    {
+      "step_id": "s1",
+      "capability_id": "app.memory.write.mock",
+      "description": "",
+      "mock": true,
+      "inputs": {},
+      "expected_outputs": {}
+    },
+    {
+      "step_id": "s2",
+      "capability_id": "app.memory.retrieve.mock",
+      "description": "",
+      "mock": true,
+      "inputs": {},
+      "expected_outputs": {}
+    }
+  ],
+  "requires_network": false,
+  "requires_background": false,
+  "plan_hash": "7cd33249e05cd5639005a2c948629e28c5eb2948a7bb0656d6229b15d7ae9fa1"
+}

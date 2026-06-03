@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arc-studio/schemas/mobile-runtime.schema.json",
+  "title": "MobileRuntimeManifest",
+  "description": "ARC Mobile Runtime SDK capability manifest. Schema version 1.",
+  "type": "object",
+  "required": ["schema_version", "id", "name", "capabilities"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string" },
+    "version": { "type": "string" },
+    "description": { "type": "string" },
+    "platforms": { "type": "array", "items": { "$ref": "#/$defs/MobilePlatformSupport" } },
+    "capabilities": { "type": "array", "items": { "$ref": "#/$defs/MobileCapability" } },
+    "background_execution": { "type": "boolean", "const": false },
+    "network_by_default": { "type": "boolean", "const": false },
+    "simulator_mode": { "type": "boolean" },
+    "privacy_manifest": { "type": "boolean" },
+    "manifest_hash": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "MobilePlatform": {
+      "type": "string",
+      "enum": ["ios", "android", "flutter", "expo", "react_native", "web", "all"]
+    },
+    "MobileDataSensitivity": {
+      "type": "string",
+      "enum": ["none", "low", "medium", "high", "critical"]
+    },
+    "MobileApprovalMode": {
+      "type": "string",
+      "enum": ["none", "recommended", "required", "blocking"]
+    },
+    "MobilePlatformSupport": {
+      "type": "object",
+      "required": ["platform"],
+      "properties": {
+        "platform": { "$ref": "#/$defs/MobilePlatform" },
+        "min_os_version": { "type": ["string", "null"] },
+        "stub_only": { "type": "boolean" },
+        "framework": { "type": ["string", "null"] }
+      }
+    },
+    "MobilePermissionRequirement": {
+      "type": "object",
+      "required": ["id", "platform"],
+      "properties": {
+        "id": { "type": "string" },
+        "platform": { "$ref": "#/$defs/MobilePlatform" },
+        "required": { "type": "boolean" },
+        "reason": { "type": ["string", "null"] },
+        "mock_safe": { "type": "boolean" }
+      }
+    },
+    "MobileCapability": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "schema_version": { "type": "integer" },
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "platforms": { "type": "array", "items": { "$ref": "#/$defs/MobilePlatform" } },
+        "required_permissions": { "type": "array", "items": { "$ref": "#/$defs/MobilePermissionRequirement" } },
+        "approval_mode": { "$ref": "#/$defs/MobileApprovalMode" },
+        "data_sensitivity": { "$ref": "#/$defs/MobileDataSensitivity" },
+        "reads": { "type": "boolean" },
+        "writes": { "type": "boolean" },
+        "network": { "type": "boolean" },
+        "paid": { "type": "boolean" },
+        "background": { "type": "boolean" },
+        "replayable": { "type": "boolean" },
+        "auditable": { "type": "boolean" },
+        "mcp_exposable": { "type": "boolean" },
+        "simulator_supported": { "type": "boolean" },
+        "test_fixture_supported": { "type": "boolean" },
+        "requires_trust": { "type": "boolean" },
+        "requires_hitl": { "type": "boolean" },
+        "metadata": { "type": "object" },
+        "capability_hash": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
