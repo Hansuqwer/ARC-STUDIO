@@ -333,8 +333,17 @@ class OpenAICompatibleClient:
         return [f"{self._vendor.upper()}_API_KEY"]
 
     def _request_kwargs(self, request: ProviderRequest, *, stream: bool) -> dict[str, Any]:
-        """Build OpenAI API request kwargs."""
-        messages = [_openai_message(msg) for msg in request.messages]
+        """Build OpenAI API request kwargs.
+
+        ORDER STABLE: system messages → conversation history.
+        For OpenAI auto-prefix-cache, the stable prefix (system) must come
+        first. Tools are passed separately via kwargs["tools"], not in messages.
+        Do NOT reorder — cache stability depends on this.
+        """
+        # Enforce byte-stable order: system first, then non-system.
+        system_msgs = [_openai_message(m) for m in request.messages if m.role == "system"]
+        other_msgs = [_openai_message(m) for m in request.messages if m.role != "system"]
+        messages = system_msgs + other_msgs
 
         kwargs: dict[str, Any] = {
             "model": request.model,

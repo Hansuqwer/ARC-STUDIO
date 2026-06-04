@@ -1,0 +1,168 @@
+From eb6d1e1799418b78d85a2da596f4a4836f940b23 Mon Sep 17 00:00:00 2001
+From: ARC Studio <arc-studio@local>
+Date: Thu, 4 Jun 2026 18:30:13 +0200
+Subject: [PATCH] feat(providers): byte-stable message ordering for prefix
+ caching (P0-1)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+openai_compatible._request_kwargs: enforce system → non-system order so
+OpenAI auto-prefix-cache always sees the same stable prefix. New tools
+append to end; never reorder existing list.
+
+anthropic._request_kwargs: add ORDER STABLE comment documenting that
+system → tools → messages order is cache-critical; existing extraction
+already correct.
+
+5 tests in tests/providers/test_message_ordering.py — all pass.
+Risk: zero. Cache miss falls back to normal pricing.
+---
+ .../providers/anthropic.py                    |  7 ++
+ .../providers/openai_compatible.py            | 13 ++-
+ .../tests/providers/test_message_ordering.py  | 91 +++++++++++++++++++
+ 3 files changed, 109 insertions(+), 2 deletions(-)
+ create mode 100644 python/tests/providers/test_message_ordering.py
+
+diff --git a/python/src/agent_runtime_cockpit/providers/anthropic.py b/python/src/agent_runtime_cockpit/providers/anthropic.py
+index e125f48..368a3a2 100644
+--- a/python/src/agent_runtime_cockpit/providers/anthropic.py
++++ b/python/src/agent_runtime_cockpit/providers/anthropic.py
+@@ -235,6 +235,13 @@ class AnthropicClient:
+         return self._client
+ 
+     def _request_kwargs(self, request: ProviderRequest, *, stream: bool) -> dict[str, Any]:
++        """Build Anthropic API request kwargs.
++
++        ORDER STABLE: system block → tools → messages (conversation history).
++        Anthropic cache_control breakpoints depend on this ordering.
++        Do NOT reorder — cache stability requires system and tools to be
++        a stable prefix across requests in the same session.
++        """
+         system_texts = [message.content for message in request.messages if message.role == "system"]
+         messages = [
+             {"role": message.role, "content": message.content}
+diff --git a/python/src/agent_runtime_cockpit/providers/openai_compatible.py b/python/src/agent_runtime_cockpit/providers/openai_compatible.py
+index 47b28e3..59af6a8 100644
+--- a/python/src/agent_runtime_cockpit/providers/openai_compatible.py
++++ b/python/src/agent_runtime_cockpit/providers/openai_compatible.py
+@@ -333,8 +333,17 @@ class OpenAICompatibleClient:
+         return [f"{self._vendor.upper()}_API_KEY"]
+ 
+     def _request_kwargs(self, request: ProviderRequest, *, stream: bool) -> dict[str, Any]:
+-        """Build OpenAI API request kwargs."""
+-        messages = [_openai_message(msg) for msg in request.messages]
++        """Build OpenAI API request kwargs.
++
++        ORDER STABLE: system messages → conversation history.
++        For OpenAI auto-prefix-cache, the stable prefix (system) must come
++        first. Tools are passed separately via kwargs["tools"], not in messages.
++        Do NOT reorder — cache stability depends on this.
++        """
++        # Enforce byte-stable order: system first, then non-system.
++        system_msgs = [_openai_message(m) for m in request.messages if m.role == "system"]
++        other_msgs = [_openai_message(m) for m in request.messages if m.role != "system"]
++        messages = system_msgs + other_msgs
+ 
+         kwargs: dict[str, Any] = {
+             "model": request.model,
+diff --git a/python/tests/providers/test_message_ordering.py b/python/tests/providers/test_message_ordering.py
+new file mode 100644
+index 0000000..ccd0cdc
+--- /dev/null
++++ b/python/tests/providers/test_message_ordering.py
+@@ -0,0 +1,91 @@
++"""P0-1: byte-stable message ordering for provider prefix caching."""
++
++from __future__ import annotations
++
++from agent_runtime_cockpit.providers.base import ProviderMessage, ProviderRequest
++from agent_runtime_cockpit.providers.openai_compatible import OpenAICompatibleClient
++
++
++def _req(roles_and_content: list[tuple[str, str]], tools: list | None = None) -> ProviderRequest:
++    msgs = [ProviderMessage(role=r, content=c, trust="user") for r, c in roles_and_content]
++    return ProviderRequest(
++        model="gpt-4o-mini",
++        messages=msgs,
++        max_tokens=100,
++        temperature=0.0,
++        tools=tools or [],
++    )
++
++
++def _client() -> OpenAICompatibleClient:
++    return OpenAICompatibleClient(vendor="openai")
++
++
++def _kwargs(req: ProviderRequest) -> dict:
++    return _client()._request_kwargs(req, stream=False)
++
++
++# ── OpenAI ordering ────────────────────────────────────────────────────────
++
++
++def test_openai_system_first() -> None:
++    req = _req([("user", "hello"), ("system", "You are helpful."), ("user", "world")])
++    messages = _kwargs(req)["messages"]
++    assert messages[0]["role"] == "system"
++
++
++def test_openai_tools_passed_separately_not_in_messages() -> None:
++    tools = [{"name": "bash", "description": "run shell", "input_schema": {}}]
++    req = _req([("system", "sys"), ("user", "hi")], tools=tools)
++    kw = _kwargs(req)
++    # tools are in kwargs["tools"], not embedded in messages
++    for msg in kw["messages"]:
++        assert msg.get("role") != "tool_definitions"
++    assert len(kw["tools"]) == 1
++
++
++def test_byte_stable_across_two_calls_same_session() -> None:
++    req = _req([("system", "sys"), ("user", "turn1"), ("assistant", "reply1"), ("user", "turn2")])
++    kw1 = _kwargs(req)
++    kw2 = _kwargs(req)
++    assert kw1["messages"] == kw2["messages"]
++
++
++def test_new_tool_appended_not_inserted() -> None:
++    """Adding a tool must not reorder existing tools (cache stability)."""
++    tools_v1 = [{"name": "bash", "description": "run", "input_schema": {}}]
++    tools_v2 = [
++        {"name": "bash", "description": "run", "input_schema": {}},
++        {"name": "read_file", "description": "read", "input_schema": {}},
++    ]
++    req1 = _req([("user", "hi")], tools=tools_v1)
++    req2 = _req([("user", "hi")], tools=tools_v2)
++    kw1 = _kwargs(req1)
++    kw2 = _kwargs(req2)
++    # First tool unchanged between v1 and v2
++    assert kw1["tools"][0]["function"]["name"] == kw2["tools"][0]["function"]["name"]
++    # New tool appended at end
++    assert kw2["tools"][-1]["function"]["name"] == "read_file"
++
++
++# ── Anthropic ordering ─────────────────────────────────────────────────────
++
++
++def test_anthropic_system_block_set_before_messages() -> None:
++    from agent_runtime_cockpit.providers.anthropic import AnthropicClient
++
++    client = AnthropicClient.__new__(AnthropicClient)
++    req = ProviderRequest(
++        model="claude-3-haiku-20240307",
++        messages=[
++            ProviderMessage(role="system", content="You are helpful.", trust="system"),
++            ProviderMessage(role="user", content="Hello", trust="user"),
++        ],
++        max_tokens=100,
++        temperature=0.0,
++    )
++    kw = client._request_kwargs(req, stream=False)
++    # system always set as a top-level key, not inside messages
++    assert "system" in kw
++    for msg in kw["messages"]:
++        assert msg.get("role") != "system"
+-- 
+2.50.1 (Apple Git-155)
+

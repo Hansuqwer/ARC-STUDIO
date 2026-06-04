@@ -179,6 +179,8 @@ def _handle_model_call(
         "gen_ai.request.model": data.get("model", ""),
         "gen_ai.usage.input_tokens": usage.get("input_tokens", usage.get("prompt_tokens", 0)),
         "gen_ai.usage.output_tokens": usage.get("output_tokens", usage.get("completion_tokens", 0)),
+        "gen_ai.usage.cache_read_input_tokens": usage.get("cache_read_input_tokens", 0),
+        "gen_ai.usage.cache_creation_input_tokens": usage.get("cache_creation_input_tokens", 0),
         "gen_ai.response.finish_reasons": finish_reasons or ["stop"],
     }
     # NEVER log prompt/completion content by default (semconv compliance)
@@ -363,6 +365,8 @@ GENAI_REQUIRED_MODEL = (
     "gen_ai.request.model",
     "gen_ai.usage.input_tokens",
     "gen_ai.usage.output_tokens",
+    "gen_ai.usage.cache_read_input_tokens",
+    "gen_ai.usage.cache_creation_input_tokens",
     "gen_ai.response.finish_reasons",
 )
 GENAI_REQUIRED_TOOL = ("gen_ai.tool.name", "gen_ai.tool.description")

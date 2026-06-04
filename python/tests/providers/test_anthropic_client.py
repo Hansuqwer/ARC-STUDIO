@@ -94,7 +94,9 @@ async def test_complete_maps_response_and_usage() -> None:
     assert result.finish_reason == "stop"
     assert result.usage.input_tokens == 10
     assert result.usage.cache_creation_input_tokens == 2
-    assert messages.create_kwargs["system"] == "be concise"
+    # P0-2: system block is now always a content-block list with cache_control
+    assert isinstance(messages.create_kwargs["system"], list)
+    assert messages.create_kwargs["system"][0]["text"] == "be concise"
     assert messages.create_kwargs["messages"] == [{"role": "user", "content": "hello"}]
 
 

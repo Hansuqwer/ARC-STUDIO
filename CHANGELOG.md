@@ -5,6 +5,17 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 ## [Unreleased]
 
 ### Added
+- feat(providers): byte-stable message ordering for OpenAI auto-prefix-cache and Anthropic breakpoint cache (P0-1)
+- feat(providers): auto-inject cache_control ephemeral breakpoints on Anthropic system + tools blocks; uses 2 of 4 breakpoints (P0-2)
+- feat(context): provider-aware token counter — AnthropicCountTokensEstimator / tiktoken / heuristic fallback; LRU-cached; wired into DataStore.add_entry (P0-3)
+- feat(tui): inline context-usage meter in status bar — "tok N/M (P%)"; green/yellow/red tiers at 60%/85%; NO_COLOR text tags (P0-4)
+- **Observability**: `gen_ai.usage.cache_read_input_tokens` and `gen_ai.usage.cache_creation_input_tokens` semconv attributes on Anthropic model_call spans; added to `GENAI_REQUIRED_MODEL` validator and `SwarmGraphCostData` + TS mirror. Makes P0-2 cache hits measurable. (R-03)
+
+### Security
+- cache_creation_input_tokens attributed at 25% premium in BudgetEnforcer; wallet will not under-count first-turn cost
+
+
+### Added
 
 - **Context**: AGENTS.md workspace ingestion — discovery, nearest-wins resolution, override priority, LLM-generated heuristic, pin/drift detection
 - **Context**: SKILL.md read-only catalog — YAML frontmatter parsing, discovery

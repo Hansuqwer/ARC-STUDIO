@@ -102,6 +102,13 @@ class DataStore:
             metadata=metadata or {},
         )
         self.entries.append(entry)
+        # Increment running token estimate (approximation; exact counts come from provider responses).
+        try:
+            from agent_runtime_cockpit.context.token_counter import estimate_tokens
+
+            self.total_tokens += estimate_tokens(content, provider=self.current_provider)
+        except Exception:
+            pass
         return entry
 
     def append_to_last(self, text: str) -> None:

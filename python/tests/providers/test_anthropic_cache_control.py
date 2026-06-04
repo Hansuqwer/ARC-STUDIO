@@ -13,6 +13,7 @@ def _request(
     cache_control: list | None = None,
     system_prompt: str | None = None,
     user_message: str = "hello",
+    tools: list | None = None,
 ) -> ProviderRequest:
     messages = []
     if system_prompt:
@@ -23,19 +24,20 @@ def _request(
         messages=messages,
         max_tokens=32,
         cache_control=cache_control or [],
+        tools=tools or [],
     )
 
 
 class TestSystemCacheControl:
-    def test_system_without_cache_control_is_plain_string(self):
-        """Without cache control, system prompt is a plain string."""
+    def test_system_without_explicit_cache_control_gets_auto_breakpoint(self) -> None:
+        """P0-2: auto-injection means system block always gets cache_control ephemeral."""
         client = AnthropicClient()
         kwargs = client._request_kwargs(
             _request(system_prompt="be concise"),
             stream=False,
         )
-        assert kwargs["system"] == "be concise"
-        assert isinstance(kwargs["system"], str)
+        assert isinstance(kwargs["system"], list)
+        assert kwargs["system"][-1].get("cache_control") == {"type": "ephemeral"}
 
     def test_system_with_cache_control_is_content_block(self):
         """With system cache control, system prompt becomes a content block list."""
@@ -214,3 +216,50 @@ class TestStreamingPreserved:
         )
         assert kwargs["stream"] is True
         assert isinstance(kwargs["system"], list)
+
+
+class TestAutoBreakpointInjection:
+    """P0-2: default breakpoints injected when caller doesn't set cache_control."""
+
+    def test_system_block_gets_cache_control_by_default(self) -> None:
+        client = AnthropicClient()
+        kw = client._request_kwargs(_request(system_prompt="be concise"), stream=False)
+        system = kw["system"]
+        assert isinstance(system, list)
+        assert system[-1].get("cache_control") == {"type": "ephemeral"}
+
+    def test_last_tool_def_gets_cache_control_by_default(self) -> None:
+        client = AnthropicClient()
+        tools = [
+            {"name": "bash", "description": "run", "input_schema": {}},
+            {"name": "read", "description": "read file", "input_schema": {}},
+        ]
+        kw = client._request_kwargs(
+            _request(system_prompt="sys", user_message="hi", tools=tools), stream=False
+        )
+        assert kw["tools"][-1].get("cache_control") == {"type": "ephemeral"}
+        # First tool should NOT have cache_control (only last tool gets it)
+        assert "cache_control" not in kw["tools"][0]
+
+    def test_explicit_cache_control_not_overridden(self) -> None:
+        client = AnthropicClient()
+        explicit = [CacheBreakpoint(position="system", index=0)]
+        kw = client._request_kwargs(
+            _request(system_prompt="sys", cache_control=explicit), stream=False
+        )
+        # Explicit path: system is a content block list (from _system_with_cache_control)
+        assert isinstance(kw["system"], list)
+
+    def test_no_auto_injection_when_no_system_or_tools(self) -> None:
+        client = AnthropicClient()
+        kw = client._request_kwargs(_request(user_message="hello"), stream=False)
+        # No system key set, no tools key set
+        assert "system" not in kw
+        assert kw.get("tools") is None or kw.get("tools") == []
+
+    def test_idempotent_two_calls_same_input(self) -> None:
+        client = AnthropicClient()
+        req = _request(system_prompt="sys", user_message="hi")
+        kw1 = client._request_kwargs(req, stream=False)
+        kw2 = client._request_kwargs(req, stream=False)
+        assert kw1["system"] == kw2["system"]
