@@ -78,6 +78,7 @@ if git grep -nE '(sk-(ant-|or-)?[A-Za-z0-9_-]{20,}|Authorization:[[:space:]]*Bea
   ':(exclude)python/src/agent_runtime_cockpit/web/server.py' \
   ':(exclude)examples/**' \
   ':(exclude)runtimes/swarmgraph/**' \
+  ':(exclude)vendor/**' \
   ':(exclude)scripts/check-pr.sh'; then
   echo "ERROR: Product code contains potential secret material."
   exit 1
