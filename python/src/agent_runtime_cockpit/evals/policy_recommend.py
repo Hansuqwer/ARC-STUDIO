@@ -15,8 +15,12 @@ Usage:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from .apply import ProfileApplyResult
 
 from .golden import EvalResult
 
@@ -179,3 +183,27 @@ def save_recommendations(
     p = d / f"{run_id}.json"
     p.write_text(report.model_dump_json(indent=2))
     return p
+
+
+def apply_to_profile(
+    report: PolicyRecommendationReport,
+    profile_id: str,
+    *,
+    workspace: Path | None = None,
+    dry_run: bool = True,
+) -> ProfileApplyResult:
+    """Apply all recommendations from a report to a named profile.
+
+    Args:
+        report: The recommendation report containing actions.
+        profile_id: Target profile to mutate (forks builtins).
+        workspace: Workspace root; defaults to cwd.
+        dry_run: If True (default), compute without writing.
+
+    Returns:
+        ProfileApplyResult with path, diff summary, and correlation_id.
+    """
+    from .apply import apply_to_profile as _apply
+
+    actions = [rec.action for rec in report.recommendations]
+    return _apply(profile_id, actions, workspace=workspace, dry_run=dry_run)
