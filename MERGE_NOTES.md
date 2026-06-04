@@ -1,57 +1,43 @@
-# v0.4.0-alpha — R-01 TokenWallet + /wallet + /budget + QuotaWarning Consumer
+# v0.4.1-alpha — Budget Persistence + Pricing Refresh
 
-Closes the visibility/action loop opened by v0.3.0-alpha:
-- v0.3.0-alpha P0-4 showed token *usage* in the status bar
-- v0.3.0-alpha R-03 made cache hits *measurable* via OTel
-- v0.4.0-alpha R-01 makes budget *actionable* — TokenWallet view, /wallet
-  + /budget commands, QuotaWarning consumer in TUI
+Discharges 2 of 4 deferrals from v0.4.0-alpha. Two remain deferred (see below).
 
 ## What shipped
-1. `TokenWallet` (budget/wallet.py) — read-only frozen snapshot over
-   BudgetEnforcer. Per-scope spent/cap/remaining/cache-hit-rate. Fail-closed
-   on unknown scope. PROVIDER_DAY gracefully skipped when provider_id=None.
-2. `/wallet` slash command — renders the snapshot. Honors first-launch cap.
-   NO_COLOR fallback.
-3. `/budget` slash command (QW-3 bonus) — preflight estimate via
-   providers/budget_preflight.preflight_with_estimator().
-4. `QuotaWarning` event consumer in status bar — amber WARN, latched red
-   CRITICAL until any keypress. Wires events/types.py:70 into the TUI.
-5. `QuotaWarning` typed event registered in protocol (3 Python sites + 1 TS).
-6. OTel cache attribute spec alignment — emits both dotted form
-   (gen_ai.usage.cache_read.input_tokens, spec) and underscored R-03 form
-   (gen_ai.usage.cache_read_input_tokens, backward compat).
+1. **Budget persistence** — SQLite WAL backend (budget/storage.py, 210 LOC).
+   SESSION + PROVIDER_DAY survive process restart via crash-safe WAL journal
+   mode. RUN correctly resets per-enforcer-instance. Concurrent multi-process
+   accumulation safe. Corrupt DB fails closed.
+2. **Tier-1 pricing refresh** — 17 new model rows:
+   - Anthropic: Haiku 4.5, Sonnet 4.6, Opus 4.6, Opus 4.7 (+ tokenizer
+     drift flag), Haiku 3 (legacy), Opus 4.1 (legacy)
+   - OpenAI: GPT-5 family + GPT-5.4 family + GPT-5.5 + GPT-4.1 family
+   - **OpenAI cache discount bumped 50% → 90% for GPT-5.x current-gen.**
+     Wallet now correctly shows the savings users were already getting.
+     gpt-4o-mini legacy preserved at 50% (guarded by test_gpt4o_mini_legacy_50pct_cache).
+     GPT-4.1 family at 75%.
 
-## Invariants verified
-- No EnforcementContext mutation
-- No LLM imports in budget/wallet.py (enforced by import-guard test)
-- Fail-closed on unknown budget scope
-- Additive protocol only (extra='ignore' forward-compat)
-- BudgetEnforcer in budget/schema.py is authoritative; legacy budget.py untouched
+## Still deferred (tracked)
+- **Gemini pricing rows** — No standalone Gemini cost file; ARC doesn't
+  currently route to Vertex/AI Studio directly. Gemini exists only as a
+  single proxy entry (ag/gemini-3.5-flash-extra-low via agentrouter).
+  Gemini 3.x rows, gemini-2.0-flash deprecation warning, and
+  cache_storage_usd_per_million_per_hour field defer to whichever sprint
+  adds direct Gemini/Vertex routing.
+- **Anthropic inline rate consolidation** — anthropic.py has inline cost rates
+  alongside anthropic_cost.py. Tracking item: consolidate to single source of
+  truth in a future patch.
+- **OTel underscored attribute removal** — emitting both forms; removal
+  scheduled for v0.6.0-alpha per overlap policy.
+- **EnforcementContext-aware wallet test** — vacuous against current wallet.
 
 ## Verification
-- Python: 4922 passed / 0 failed (+29 from v0.3.0-alpha baseline)
-- TS: 143 passed (+2 QuotaWarning cases on top of v0.3.1-alpha)
-- pnpm build + typecheck clean
-- banned-claims clean
-- 4 patches in patches/r01/v0.4.0-alpha/ (832 lines)
-
-## Deferred to v0.4.1-alpha (tracked)
-- **Budget persistence**: BudgetState is in-memory; SESSION + PROVIDER_DAY
-  reset on every CLI launch. Wallet display is honest about live state — no
-  silent corruption. Audit: docs/research/budget-persistence-audit.md.
-  Fix path: SQLite WAL or append-only JSONL ledger per audit §4.
-- **Pricing table refresh**: providers/*_cost.py not updated for OpenAI cache
-  50%→90% / Vertex cache 75%→90%+storage / new model rows. Wallet under-shows
-  savings on OpenAI/Vertex. Source: docs/research/pricing-snapshot-2026Q2.md.
-- **OTel underscored attribute removal**: dotted+underscored both emitted now.
-  Underscored deprecated; remove in v0.6.0-alpha.
-- **EnforcementContext-aware wallet test**: spec called for it; current
-  TokenWallet has no enforcement-context-derived state, so the test would be
-  vacuous. Reintroduce when/if wallet reads ContextVar state.
+- Python: 4937 passed / 0 failed (+15 from v0.4.0-alpha)
+- 5 persistence invariant gates green (restart, RUN-reset, corrupt-fail-closed,
+  concurrent-safe, in-memory parity)
+- TS: unchanged
+- pnpm build + typecheck + banned-claims: clean
 
 ## Commits
-- a4996ef feat(budget): TokenWallet read-only view (R-01 1/5)
-- 71eb9f2 feat(tui): /wallet + /budget slash commands (R-01 2/5)
-- c98fccd feat(tui): QuotaWarning event consumer (R-01 3/5)
-- c15f422 feat(protocol+ts): QUOTA_WARNING typed event mirror (R-01 4/5)
-- 5eb0256 chore(release): OTel spec alias + test backfills + 4 patches + CHANGELOG (R-01 5/5)
+- b6c4beb feat(budget): SQLite WAL persistence for SESSION + PROVIDER_DAY
+- edfa2b1 feat(providers): pricing snapshot 2026-Q2 refresh (Tier-1)
+- df6ca9c chore(release): roadmap R-TS4/R-TS5 rows + CHANGELOG + patches
