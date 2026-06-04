@@ -263,7 +263,25 @@ class AnthropicClient:
         if stream:
             kwargs["stream"] = True
         if request.cache_control:
+            # Caller set explicit breakpoints — respect them exactly.
             kwargs = self._apply_cache_breakpoints_to_request(kwargs, request.cache_control)
+        else:
+            # Auto-inject default breakpoints (uses 2 of 4; leaves 2 reserved for P1).
+            # P0-2: last tool definition gets ephemeral breakpoint (breakpoint 1 of 4).
+            if kwargs.get("tools"):
+                kwargs["tools"] = AnthropicClient._apply_tools_cache_control(kwargs["tools"])
+            # P0-2: system block gets ephemeral breakpoint (breakpoint 2 of 4).
+            if system_texts:
+                if isinstance(kwargs.get("system"), list):
+                    # Already content-block list from _system_with_cache_control.
+                    kwargs["system"] = [
+                        {**b, "cache_control": {"type": "ephemeral"}} for b in kwargs["system"]
+                    ]
+                else:
+                    kwargs["system"] = [
+                        {"type": "text", "text": t, "cache_control": {"type": "ephemeral"}}
+                        for t in system_texts
+                    ]
         return kwargs
 
     @staticmethod
