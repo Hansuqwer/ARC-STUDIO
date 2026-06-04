@@ -371,6 +371,18 @@ export interface EvalPolicyAppliedEvent extends RunEventBase {
   };
 }
 
+// ─── Quota Warning Events ────────────────────────────────────────────────────
+
+export interface QuotaWarningEvent extends RunEventBase {
+  type: 'QUOTA_WARNING';
+  data: {
+    dimension: string;
+    usage_pct: number;
+    limit: number;
+    current: number;
+  };
+}
+
 // ─── Raw/Unknown Events ──────────────────────────────────────────────────────
 
 export interface RawEvent extends RunEventBase {
@@ -432,6 +444,7 @@ export type KnownRunEvent =
   | McpCallDecisionEvent
   | EvalPolicyRecommendedEvent
   | EvalPolicyAppliedEvent
+  | QuotaWarningEvent
   | RawEvent;
 
 /**
@@ -470,6 +483,7 @@ export const KNOWN_RUN_EVENT_TYPES = [
   'MCP_CALL_DECISION',
   'EVAL_POLICY_RECOMMENDED',
   'EVAL_POLICY_APPLIED',
+  'QUOTA_WARNING',
   'RAW',
 ] as const satisfies readonly KnownRunEvent['type'][];
 

@@ -792,6 +792,17 @@
         "message_id",
         "node_id"
       ]
+    },
+    {
+      "type": "QUOTA_WARNING",
+      "version": 2,
+      "requiredFields": [
+        "current",
+        "dimension",
+        "limit",
+        "usage_pct"
+      ],
+      "optionalFields": []
     }
   ]
 }

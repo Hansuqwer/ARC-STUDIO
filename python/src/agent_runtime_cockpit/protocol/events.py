@@ -365,6 +365,11 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         required_fields={"custom_type"},
         optional_fields={"data", "node_id", "message_id"},
     ),
+    # ── Budget / Quota ───────────────────────────────────────────────────
+    "QUOTA_WARNING": EventTypeDef(
+        required_fields={"dimension", "usage_pct", "limit", "current"},
+        optional_fields=set(),
+    ),
 }
 
 

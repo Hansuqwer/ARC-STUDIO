@@ -142,4 +142,17 @@ describe('run-events helpers', () => {
 
     expect(accountedTypes).toEqual(canonicalTypes);
   });
+
+  it('isKnownEvent recognizes QUOTA_WARNING', () => {
+    const event = parseRunEvent({
+      ...baseEvent,
+      type: 'QUOTA_WARNING',
+      data: { dimension: 'session', usage_pct: 85.0, limit: 10.0, current: 8.5 },
+    });
+    expect(isKnownEvent(event)).toBe(true);
+  });
+
+  it('KNOWN_RUN_EVENT_TYPES includes QUOTA_WARNING', () => {
+    expect(KNOWN_RUN_EVENT_TYPES).toContain('QUOTA_WARNING');
+  });
 });
