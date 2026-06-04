@@ -235,6 +235,13 @@ class AnthropicClient:
         return self._client
 
     def _request_kwargs(self, request: ProviderRequest, *, stream: bool) -> dict[str, Any]:
+        """Build Anthropic API request kwargs.
+
+        ORDER STABLE: system block → tools → messages (conversation history).
+        Anthropic cache_control breakpoints depend on this ordering.
+        Do NOT reorder — cache stability requires system and tools to be
+        a stable prefix across requests in the same session.
+        """
         system_texts = [message.content for message in request.messages if message.role == "system"]
         messages = [
             {"role": message.role, "content": message.content}
