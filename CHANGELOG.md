@@ -13,6 +13,16 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 - **R-02 Context compaction**: `context/compaction.py` — deterministic Lost-in-the-Middle eviction. Trigger 0.85, stop 0.70. Preserves system prompt + first 2 pairs + last 4 pairs + current user. No LLM in path (CoSAI). Emits `ContextCompacted` event. (v0.5.0)
 - **R-02 Provider wiring**: `_maybe_compact()` hooked in `anthropic.py` + `openai_compatible.py` before `_request_kwargs`. `ARC_COMPACTION_ENABLED=0` to disable. Best-effort (never blocks a request). (v0.5.0)
 - **Typed events**: `ContextCompactedEvent` + `ToolOutputVirtualizedEvent` added to 3 Python protocol sites + TS `run-events.ts`. `extra='ignore'` forward-compat on both. (v0.5.0)
+- **Providers**: Adopted 6 Chinese-lab / open-weight vendor families (DeepSeek, Qwen/Alibaba, Kimi/Moonshot, GLM/Z.AI, MiMo/Xiaomi, MiniMax) via `openai_compatible.py`. 91 model rows synced from OpenRouter 2026-06-05 (4 free-tier, 2 deprecated). (v0.5.1)
+- **Providers**: `CostRates` schema extended with 6 optional fields: `is_free_tier`, `pricing_valid_until`, `auto_route_to`, `cache_field_names`, `tokenizer_family`, `cache_storage_usd_per_million_per_hour`. All additive; defaults preserve backward compat. (v0.5.1)
+- **TUI (/wallet)**: FREE TIER rendering (OpenRouter `:free` variants), `≈` qualifier for non-cl100k tokenizer families, deprecation warning for expired `pricing_valid_until`, `(routed to X)` annotation for `auto_route_to`. (v0.5.1)
+- **Scripts**: `sync_from_pricing_feed.py` — dev-time multi-source pricing fetcher (OpenRouter primary, models.dev fallback). Not shipped in ARC runtime; pricing rows are hardcoded. (v0.5.1)
+- **Docs (research)**: `pricing-feed-sources-comparison.md` — OpenRouter vs models.dev decision rationale, locked for v0.5.1+. (v0.5.1)
+
+### Changed
+- **OpenAI cache multiplier**: GPT-5.x current-gen corrected from legacy 50% → 90% off (0.10× input). gpt-4o-mini legacy 50% preserved. GPT-4.1 family at 75% off (0.25×). (v0.4.1)
+- **Anthropic capabilities**: Full rate table exposed in `capabilities().cost_rates` for all current-gen models (was single-model only). (v0.4.1)
+- **Providers**: `openai_compatible.py` `VendorName` Literal extended with 6 new vendor names. `crofai` block expanded from 1 placeholder to 17 models (live CrofAI API prices). Gemini block UNTOUCHED. (v0.5.1)
 
 ### Changed
 - **OpenAI cache multiplier**: GPT-5.x current-gen corrected from legacy 50% → 90% off (0.10× input). gpt-4o-mini legacy 50% preserved. GPT-4.1 family at 75% off (0.25×). (v0.4.1)
