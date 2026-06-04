@@ -1,6 +1,7 @@
 export * from './swarmgraph-ir';
 export * from './flight-recorder';
 export * from './run-diff';
+export * from './run-events';
 export {
   OBSERVABILITY_SCHEMA_VERSION,
   isArcTraceExport,

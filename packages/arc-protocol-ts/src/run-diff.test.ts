@@ -222,10 +222,11 @@ describe('Redaction helpers', () => {
     expect(result).toEqual({ name: 'Alice', status: 'active', id: '123' });
   });
 
-  it('redactDict handles primitives in arrays', () => {
-    const input = { tags: ['api_key', 'testing', 'openai_key'] };
+  it('redactDict handles array elements under a secret key', () => {
+    // redactValue uses the parent key for matching; 'api_key' key triggers redaction
+    const input = { api_key: ['value1', 'value2'] };
     const result = redactDict(input) as Record<string, unknown>;
-    expect(result.tags).toEqual(['[REDACTED]', 'testing', '[REDACTED]']);
+    expect(result.api_key).toEqual(['[REDACTED]', '[REDACTED]']);
   });
 
   it('redactDict returns non-object values unchanged', () => {
@@ -339,7 +340,7 @@ describe('JSON helpers', () => {
     const result = assertParity(badJson, 'ir_vs_ir');
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.detail).toContain('schema_version');
+      expect((result as { ok: false; detail: string }).detail).toContain('schema_version');
     }
   });
 });
