@@ -138,6 +138,6 @@ def test_crofai_provider_registered_with_env_aliases(monkeypatch):
     caps = client.capabilities()
 
     assert caps.provider_id == "openai-crofai"
-    assert caps.default_model == "deepseek-v4-pro-precision"
-    assert "deepseek-v4-pro-precision" in caps.supported_models
+    assert caps.default_model == "deepseek-v4-flash"
+    assert "deepseek-v4-flash" in caps.supported_models
     assert client._api_key() == ("CROFAI", "sk-test")
