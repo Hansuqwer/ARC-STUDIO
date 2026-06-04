@@ -74,6 +74,9 @@ class DataStore:
     input_history: list[str] = field(default_factory=list)
     _history_index: int = -1
 
+    # ── budget/quota ─────────────────────────────────────────────────────
+    quota_warnings: list = field(default_factory=list)
+
     def __post_init__(self) -> None:
         if not self.session_id:
             if self.seed is not None:
