@@ -55,6 +55,12 @@ VendorName = Literal[
     "9router",
     "crofai",
     "gemini",
+    "deepseek",
+    "qwen",
+    "kimi",
+    "glm",
+    "mimo",
+    "minimax",
 ]
 
 VENDOR_CONFIGS = {
@@ -197,12 +203,481 @@ VENDOR_CONFIGS = {
         },
     },
     "crofai": {
+        # CrofAI unified proxy — covers all Chinese-lab models under one API key.
+        # Prices from /v1/models API 2026-06-05. Cache field: cache_prompt ($/M read).
         "base_url": "https://crof.ai/v1",
-        "default_model": "deepseek-v4-pro-precision",
-        "supported_models": ["deepseek-v4-pro-precision"],
+        "default_model": "deepseek-v4-flash",
+        "supported_models": [
+            # DeepSeek
+            "deepseek-v4-pro",
+            "deepseek-v4-pro-lightning",
+            "deepseek-v4-flash",
+            "deepseek-v3.2",
+            # Kimi
+            "kimi-k2.6",
+            "kimi-k2.5",
+            "kimi-k2.5-lightning",
+            # GLM
+            "glm-5.1",
+            "glm-5",
+            "glm-4.7",
+            "glm-4.7-flash",
+            # MiMo
+            "mimo-v2.5-pro",
+            # MiniMax
+            "minimax-m2.5",
+            # Qwen
+            "qwen3.5-397b-a17b",
+            "qwen3.5-9b",
+            "qwen3.6-27b",
+        ],
+        "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE, ProviderFeature.VISION],
+        "cost_rates": {
+            "deepseek-v4-pro": CostRates(
+                input_per_million=0.35,
+                output_per_million=0.80,
+                cache_read_per_million=0.003,
+                cache_field_names={"hit": "prompt_cache_hit_tokens"},
+            ),
+            "deepseek-v4-pro-lightning": CostRates(
+                input_per_million=0.80,
+                output_per_million=1.60,
+                cache_read_per_million=0.02,
+                cache_field_names={"hit": "prompt_cache_hit_tokens"},
+            ),
+            "deepseek-v4-flash": CostRates(
+                input_per_million=0.12,
+                output_per_million=0.21,
+                cache_read_per_million=0.003,
+                cache_field_names={"hit": "prompt_cache_hit_tokens"},
+            ),
+            "deepseek-v3.2": CostRates(
+                input_per_million=0.18,
+                output_per_million=0.35,
+                cache_read_per_million=0.04,
+                cache_field_names={"hit": "prompt_cache_hit_tokens"},
+                pricing_valid_until="2026-07-24",
+            ),
+            "kimi-k2.6": CostRates(
+                input_per_million=0.50,
+                output_per_million=1.99,
+            ),
+            "kimi-k2.5": CostRates(
+                input_per_million=0.35,
+                output_per_million=1.70,
+            ),
+            "kimi-k2.5-lightning": CostRates(
+                input_per_million=1.00,
+                output_per_million=3.00,
+            ),
+            "glm-5.1": CostRates(
+                input_per_million=0.45,
+                output_per_million=2.15,
+                tokenizer_family="glm",
+            ),
+            "glm-5": CostRates(
+                input_per_million=0.48,
+                output_per_million=1.90,
+                tokenizer_family="glm",
+            ),
+            "glm-4.7": CostRates(
+                input_per_million=0.25,
+                output_per_million=1.10,
+                tokenizer_family="glm",
+            ),
+            "glm-4.7-flash": CostRates(
+                input_per_million=0.04,
+                output_per_million=0.30,
+                tokenizer_family="glm",
+                is_free_tier=True,
+            ),
+            "mimo-v2.5-pro": CostRates(
+                input_per_million=0.40,
+                output_per_million=0.80,
+                cache_read_per_million=0.08,
+            ),
+            "minimax-m2.5": CostRates(
+                input_per_million=0.11,
+                output_per_million=0.95,
+            ),
+            "qwen3.5-397b-a17b": CostRates(
+                input_per_million=0.35,
+                output_per_million=1.75,
+                tokenizer_family="qwen",
+            ),
+            "qwen3.5-9b": CostRates(
+                input_per_million=0.04,
+                output_per_million=0.15,
+                tokenizer_family="qwen",
+            ),
+            "qwen3.6-27b": CostRates(
+                input_per_million=0.20,
+                output_per_million=1.50,
+                tokenizer_family="qwen",
+            ),
+        },
+    },
+    # ── DeepSeek native API ─────────────────────────────────────────────────
+    "deepseek": {
+        # https://api.deepseek.com/v1 — OpenAI-compatible
+        # Cache field names: prompt_cache_hit_tokens / prompt_cache_miss_tokens
+        # V3-era IDs (deepseek-chat, deepseek-reasoner) retire 2026-07-24.
+        "base_url": "https://api.deepseek.com/v1",
+        "default_model": "deepseek-v4-flash",
+        "supported_models": [
+            "deepseek-v4-pro",
+            "deepseek-v4-flash",
+            "deepseek-v3.2",
+            "deepseek-chat",  # legacy alias → V4-Flash, retires 2026-07-24
+            "deepseek-reasoner",  # legacy alias → V4-Flash thinking, retires 2026-07-24
+        ],
         "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE],
         "cost_rates": {
-            "deepseek-v4-pro-precision": CostRates(input_per_million=0.0, output_per_million=0.0),
+            "deepseek-v4-pro": CostRates(
+                input_per_million=0.35,
+                output_per_million=0.80,
+                cache_read_per_million=0.003,
+                cache_field_names={
+                    "hit": "prompt_cache_hit_tokens",
+                    "miss": "prompt_cache_miss_tokens",
+                },
+            ),
+            "deepseek-v4-flash": CostRates(
+                input_per_million=0.14,
+                output_per_million=0.28,
+                cache_read_per_million=0.0028,
+                cache_field_names={
+                    "hit": "prompt_cache_hit_tokens",
+                    "miss": "prompt_cache_miss_tokens",
+                },
+            ),
+            "deepseek-v3.2": CostRates(
+                input_per_million=0.18,
+                output_per_million=0.35,
+                cache_read_per_million=0.04,
+                cache_field_names={
+                    "hit": "prompt_cache_hit_tokens",
+                    "miss": "prompt_cache_miss_tokens",
+                },
+            ),
+            "deepseek-chat": CostRates(
+                input_per_million=0.14,
+                output_per_million=0.28,
+                cache_read_per_million=0.0028,
+                cache_field_names={
+                    "hit": "prompt_cache_hit_tokens",
+                    "miss": "prompt_cache_miss_tokens",
+                },
+                pricing_valid_until="2026-07-24",
+                auto_route_to="deepseek-v4-flash",
+            ),
+            "deepseek-reasoner": CostRates(
+                input_per_million=0.14,
+                output_per_million=0.28,
+                cache_read_per_million=0.0028,
+                cache_field_names={
+                    "hit": "prompt_cache_hit_tokens",
+                    "miss": "prompt_cache_miss_tokens",
+                },
+                pricing_valid_until="2026-07-24",
+                auto_route_to="deepseek-v4-flash",
+            ),
+        },
+    },
+    # ── Qwen (Alibaba DashScope) ────────────────────────────────────────────
+    "qwen": {
+        # https://dashscope.aliyuncs.com/compatible-mode/v1
+        # Tokenizer family: qwen (differs from cl100k_base; heuristic less accurate)
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "default_model": "qwen3.6-plus",
+        "supported_models": [
+            "qwen3.7-max",
+            "qwen3.7-plus",
+            "qwen3-max",
+            "qwen3.6-plus",
+            "qwen3-coder-plus",
+            "qwen3.6-35b-a3b",
+            "qwen2.5-72b-instruct",
+        ],
+        "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE, ProviderFeature.VISION],
+        "cost_rates": {
+            "qwen3.7-max": CostRates(
+                input_per_million=2.50,
+                output_per_million=7.50,
+                cache_read_per_million=0.25,
+                tokenizer_family="qwen",
+            ),
+            "qwen3.7-plus": CostRates(
+                input_per_million=0.40,
+                output_per_million=1.60,
+                cache_read_per_million=0.08,
+                tokenizer_family="qwen",
+            ),
+            "qwen3-max": CostRates(
+                input_per_million=0.78,
+                output_per_million=3.90,
+                tokenizer_family="qwen",
+            ),
+            "qwen3.6-plus": CostRates(
+                input_per_million=0.325,
+                output_per_million=1.95,
+                tokenizer_family="qwen",
+            ),
+            "qwen3-coder-plus": CostRates(
+                input_per_million=0.50,
+                output_per_million=1.50,
+                tokenizer_family="qwen",
+            ),
+            "qwen3.6-35b-a3b": CostRates(
+                input_per_million=0.15,
+                output_per_million=0.65,
+                cache_read_per_million=0.05,
+                tokenizer_family="qwen",
+            ),
+            "qwen2.5-72b-instruct": CostRates(
+                input_per_million=0.35,
+                output_per_million=0.65,
+                tokenizer_family="qwen",
+            ),
+        },
+    },
+    # ── Kimi (Moonshot AI) ──────────────────────────────────────────────────
+    "kimi": {
+        # https://api.moonshot.ai/v1 — OpenAI-compatible
+        # Legacy K2 preview SKUs EOL 2026-05-25; new code targets K2.5 / K2.6.
+        "base_url": "https://api.moonshot.ai/v1",
+        "default_model": "kimi-k2.5",
+        "supported_models": [
+            "kimi-k2.6",
+            "kimi-k2.5",
+            "kimi-k2-0905-preview",  # EOL 2026-05-25
+            "kimi-k2-0711-preview",  # EOL 2026-05-25
+            "kimi-k2-turbo-preview",  # EOL 2026-05-25
+            "kimi-k2-thinking-turbo",  # EOL 2026-05-25
+        ],
+        "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE, ProviderFeature.VISION],
+        "cost_rates": {
+            "kimi-k2.6": CostRates(
+                input_per_million=0.95,
+                output_per_million=4.00,
+                cache_read_per_million=0.16,
+            ),
+            "kimi-k2.5": CostRates(
+                input_per_million=0.60,
+                output_per_million=3.00,
+                cache_read_per_million=0.10,
+            ),
+            "kimi-k2-0905-preview": CostRates(
+                input_per_million=0.60,
+                output_per_million=2.50,
+                cache_read_per_million=0.15,
+                pricing_valid_until="2026-05-25",
+                auto_route_to="kimi-k2.5",
+            ),
+            "kimi-k2-0711-preview": CostRates(
+                input_per_million=0.55,
+                output_per_million=2.20,
+                cache_read_per_million=0.15,
+                pricing_valid_until="2026-05-25",
+                auto_route_to="kimi-k2.5",
+            ),
+            "kimi-k2-turbo-preview": CostRates(
+                input_per_million=1.15,
+                output_per_million=8.00,
+                cache_read_per_million=0.15,
+                pricing_valid_until="2026-05-25",
+                auto_route_to="kimi-k2.6",
+            ),
+            "kimi-k2-thinking-turbo": CostRates(
+                input_per_million=1.15,
+                output_per_million=8.00,
+                cache_read_per_million=0.15,
+                pricing_valid_until="2026-05-25",
+                auto_route_to="kimi-k2.6",
+            ),
+        },
+    },
+    # ── GLM (Zhipu AI / Z.AI) ───────────────────────────────────────────────
+    "glm": {
+        # https://open.bigmodel.cn/api/paas/v4/ — OpenAI-compatible
+        # 3 genuinely free models (is_free_tier=True): glm-4.7-flash, glm-4.5-flash, glm-4.6v-flash
+        "base_url": "https://open.bigmodel.cn/api/paas/v4/",
+        "default_model": "glm-4.7",
+        "supported_models": [
+            "glm-5-turbo",
+            "glm-5.1",
+            "glm-5",
+            "glm-4.7",
+            "glm-4.7-thinking",
+            "glm-4.6",
+            "glm-4.5",
+            "glm-4.5-air",
+            "glm-4.7-flash",
+            "glm-4.5-flash",
+            "glm-4.6v",
+            "glm-4.5v",
+        ],
+        "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE, ProviderFeature.VISION],
+        "cost_rates": {
+            "glm-5-turbo": CostRates(
+                input_per_million=1.20,
+                output_per_million=4.00,
+                cache_read_per_million=0.24,
+                tokenizer_family="glm",
+            ),
+            "glm-5.1": CostRates(
+                input_per_million=0.98,
+                output_per_million=3.08,
+                cache_read_per_million=0.182,
+                tokenizer_family="glm",
+            ),
+            "glm-5": CostRates(
+                input_per_million=0.60,
+                output_per_million=1.92,
+                cache_read_per_million=0.12,
+                tokenizer_family="glm",
+            ),
+            "glm-4.7": CostRates(
+                input_per_million=0.40,
+                output_per_million=1.54,
+                cache_read_per_million=0.08,
+                tokenizer_family="glm",
+            ),
+            "glm-4.7-thinking": CostRates(
+                input_per_million=0.40,
+                output_per_million=1.54,
+                cache_read_per_million=0.08,
+                tokenizer_family="glm",
+            ),
+            "glm-4.6": CostRates(
+                input_per_million=0.43,
+                output_per_million=1.74,
+                cache_read_per_million=0.08,
+                tokenizer_family="glm",
+            ),
+            "glm-4.5": CostRates(
+                input_per_million=0.60,
+                output_per_million=2.20,
+                cache_read_per_million=0.11,
+                tokenizer_family="glm",
+            ),
+            "glm-4.5-air": CostRates(
+                input_per_million=0.125,
+                output_per_million=0.85,
+                cache_read_per_million=0.025,
+                tokenizer_family="glm",
+            ),
+            "glm-4.7-flash": CostRates(
+                input_per_million=0.0,
+                output_per_million=0.0,
+                tokenizer_family="glm",
+                is_free_tier=True,
+            ),
+            "glm-4.5-flash": CostRates(
+                input_per_million=0.0,
+                output_per_million=0.0,
+                tokenizer_family="glm",
+                is_free_tier=True,
+            ),
+            "glm-4.6v": CostRates(
+                input_per_million=0.30,
+                output_per_million=0.90,
+                cache_read_per_million=0.05,
+                tokenizer_family="glm",
+            ),
+            "glm-4.5v": CostRates(
+                input_per_million=0.60,
+                output_per_million=1.80,
+                cache_read_per_million=0.11,
+                tokenizer_family="glm",
+            ),
+        },
+    },
+    # ── MiMo (Xiaomi) ───────────────────────────────────────────────────────
+    "mimo": {
+        # https://api.xiaomimimo.com/v1 — OpenAI-compatible
+        # V2-Pro/Omni auto-routed to V2.5 on 2026-06-01; deprecated 2026-06-30.
+        "base_url": "https://api.xiaomimimo.com/v1",
+        "default_model": "mimo-v2.5-pro",
+        "supported_models": [
+            "mimo-v2.5-pro",
+            "mimo-v2.5",
+            "mimo-v2-flash",
+            "mimo-v2-pro",  # auto-routes to v2.5 as of 2026-06-01
+            "mimo-v2-omni",  # auto-routes to v2.5 as of 2026-06-01
+        ],
+        "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE, ProviderFeature.VISION],
+        "cost_rates": {
+            "mimo-v2.5-pro": CostRates(
+                input_per_million=1.00,
+                output_per_million=3.00,
+                cache_read_per_million=0.20,
+            ),
+            "mimo-v2.5": CostRates(
+                input_per_million=0.40,
+                output_per_million=2.00,
+                cache_read_per_million=0.08,
+            ),
+            "mimo-v2-flash": CostRates(
+                input_per_million=0.10,
+                output_per_million=0.40,
+                cache_read_per_million=0.02,
+            ),
+            "mimo-v2-pro": CostRates(
+                input_per_million=1.00,
+                output_per_million=3.00,
+                cache_read_per_million=0.20,
+                auto_route_to="mimo-v2.5-pro",
+                pricing_valid_until="2026-06-30",
+            ),
+            "mimo-v2-omni": CostRates(
+                input_per_million=0.40,
+                output_per_million=2.00,
+                cache_read_per_million=0.08,
+                auto_route_to="mimo-v2.5",
+                pricing_valid_until="2026-06-30",
+            ),
+        },
+    },
+    # ── MiniMax ─────────────────────────────────────────────────────────────
+    "minimax": {
+        # https://api.minimax.io/v1 — OpenAI-compatible
+        "base_url": "https://api.minimax.io/v1",
+        "default_model": "MiniMax-M2.5",
+        "supported_models": [
+            "MiniMax-M2.5",
+            "MiniMax-M2.5-Lightning",
+            "MiniMax-M2.7",
+            "MiniMax-M2.7-Highspeed",
+            "MiniMax-M2.1",
+            "MiniMax-M2-her",
+        ],
+        "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE],
+        "cost_rates": {
+            "MiniMax-M2.5": CostRates(
+                input_per_million=0.30,
+                output_per_million=1.20,
+            ),
+            "MiniMax-M2.5-Lightning": CostRates(
+                input_per_million=0.30,
+                output_per_million=2.40,
+            ),
+            "MiniMax-M2.7": CostRates(
+                input_per_million=0.39,
+                output_per_million=1.56,
+            ),
+            "MiniMax-M2.7-Highspeed": CostRates(
+                input_per_million=0.78,
+                output_per_million=3.12,
+            ),
+            "MiniMax-M2.1": CostRates(
+                input_per_million=0.78,
+                output_per_million=3.12,
+            ),
+            "MiniMax-M2-her": CostRates(
+                input_per_million=0.39,
+                output_per_million=1.56,
+            ),
         },
     },
     "gemini": {
