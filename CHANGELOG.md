@@ -4,6 +4,12 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 
 ## [Unreleased]
 
+### Fixed
+- `arc-protocol-ts` jest coverage thresholds restored to 73/80/87/85 (branches/functions/lines/statements).
+  The existing `run-events.test.ts` (11 cases, added in `15b361a`) already covers 87.59/75.16/82.08/89.21% —
+  thresholds were just under-set at 35/42/44/43 in commit `898ee26`. (R-TS3)
+- R-TS3 roadmap row updated from Not Started → Baseline Complete.
+
 ### Added
 - feat(providers): byte-stable message ordering for OpenAI auto-prefix-cache and Anthropic breakpoint cache (P0-1)
 - feat(providers): auto-inject cache_control ephemeral breakpoints on Anthropic system + tools blocks; uses 2 of 4 breakpoints (P0-2)

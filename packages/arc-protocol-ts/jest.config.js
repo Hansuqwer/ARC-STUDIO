@@ -8,10 +8,10 @@ module.exports = {
   coverageReporters: ['text-summary', 'lcov'],
   coverageThreshold: {
     global: {
-      branches: 35,   // pinned below current 37.25% (source grew; tests pending)
-      functions: 42,  // pinned below current 44.77%
-      lines: 44,      // pinned below current 46.25%
-      statements: 43, // pinned below current 45.52%
+      branches: 73,   // pinned 2pt below current 75.16%
+      functions: 80,  // pinned 2pt below current 82.08%
+      lines: 87,      // pinned 2pt below current 89.21%
+      statements: 85, // pinned 2pt below current 87.59%
     },
   },
   collectCoverageFrom: [
