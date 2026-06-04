@@ -31,6 +31,20 @@ class StatusBar(Static):
         daemon_dot = "●" if self.data.daemon_online else "○"
         stream_indicator = " ● streaming" if self.data.is_streaming else ""
         paid_indicator = " $paid" if getattr(self.data, "allow_paid", False) else ""
+        # P0-4: token usage meter
+        no_color = bool(getattr(self.theme.current, "no_color", False))
+        tok = self.data.total_tokens
+        lim = self.data.context_limit
+        if lim > 0:
+            pct = int(tok / lim * 100)
+            if no_color:
+                tier = "[low]" if pct < 60 else "[warn]" if pct < 85 else "[hot]"
+                tok_str = f"{tier} tok {tok}/{lim} ({pct}%)"
+            else:
+                color = "green" if pct < 60 else "yellow" if pct < 85 else "red"
+                tok_str = f"[{color}]tok {tok}/{lim} ({pct}%)[/]"
+        else:
+            tok_str = f"tok {tok}"
         model_str = ""
         if getattr(self.data, "current_provider", None) or getattr(
             self.data, "current_model", None
@@ -40,7 +54,7 @@ class StatusBar(Static):
             model_str = f" │ {p}/{m}" if p else f" │ {m}"
         line = (
             f" {self.data.mode} │ {self.data.runtime_mode}{paid_indicator}{model_str} │ {ws} │ "
-            f"{session_short} │ {cost} │"
+            f"{session_short} │ {cost} │ {tok_str} │"
             f" {daemon_dot}{stream_indicator} │"
             f" Esc:cancel  /:commands  Ctrl+P:palette"
         )
