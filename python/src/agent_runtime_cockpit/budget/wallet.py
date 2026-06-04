@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Mapping, Optional
+from typing import Any, Mapping, Optional
 
 from .schema import BudgetEnforcer, BudgetScope
 
@@ -52,3 +52,40 @@ class TokenWallet:
                 balances={}, first_launch=False, fail_closed_reason=f"{type(exc).__name__}: {exc}"
             )
         return WalletSnapshot(balances=balances, first_launch=first_launch)
+
+
+def model_display_notes(model_id: str, rates: Any) -> list[str]:
+    """Wallet annotation lines for a model's CostRates metadata. Never raises."""
+    from datetime import date
+
+    notes: list[str] = []
+    try:
+        if rates.is_free_tier:
+            notes.append(
+                f"  {model_id}: FREE TIER (via OpenRouter free tier; rate-limited) — budget tracking skipped"
+            )
+            return notes
+
+        if rates.pricing_valid_until:
+            try:
+                until = date.fromisoformat(rates.pricing_valid_until)
+                status = (
+                    "EXPIRED" if until < date.today() else f"expires {rates.pricing_valid_until}"
+                )
+                notes.append(
+                    f"  ⚠ {model_id}: pricing stale ({status})"
+                    + (f" — use {rates.auto_route_to}" if rates.auto_route_to else "")
+                )
+            except ValueError:
+                pass
+
+        if rates.auto_route_to and not rates.pricing_valid_until:
+            notes.append(f"  {model_id}: (routed to {rates.auto_route_to})")
+
+        if rates.tokenizer_family not in (None, "cl100k_base"):
+            notes.append(
+                f"  {model_id}: ≈ cost (tokenizer_family={rates.tokenizer_family}; heuristic accuracy unverified)"
+            )
+    except Exception:
+        pass
+    return notes

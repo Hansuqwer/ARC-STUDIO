@@ -2488,6 +2488,23 @@ def cmd_wallet(_arg: str, session: ChatSession) -> CommandResult:
         if bal.cache_hit_rate > 0:
             line += f"  cache:{bal.cache_hit_rate:.0%}"
         lines.append(line)
+    # Per-model annotations: free tier, tokenizer warning, deprecation, auto_route
+    provider_id = (session.metadata or {}).get("provider")
+    model_id = (session.metadata or {}).get("provider_model")
+    if provider_id and model_id:
+        try:
+            from ..budget.wallet import model_display_notes
+            from ..providers.openai_compatible import OpenAICompatibleClient
+
+            caps = OpenAICompatibleClient(vendor=provider_id).capabilities()
+            rates = (caps.cost_rates or {}).get(model_id)
+            if rates:
+                notes = model_display_notes(model_id, rates)
+                if notes:
+                    lines.append("")
+                    lines.extend(notes)
+        except Exception:
+            pass
     return CommandResult(state="present", output="\n".join(lines))
 
 
