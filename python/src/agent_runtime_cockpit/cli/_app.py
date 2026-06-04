@@ -13,6 +13,8 @@ from .. import __version__ as arc_version
 from ..security.context import DryRunAbort, EnforcementContext, set_enforcement_context
 from ._subapps import (
     adapter_app,
+    a2a_app,
+    agents_app,
     arena_app,
     audit_app,
     batch_app,
@@ -41,6 +43,7 @@ from ._subapps import (
     replay_app,
     runs_app,
     sandbox_app,
+    skills_app,
     storage_app,
     studio_app,
     studio_sessions_app,
@@ -79,6 +82,8 @@ app.add_typer(capabilities_app)
 app.add_typer(flight_app)
 app.add_typer(obs_app)
 app.add_typer(mobile_app)
+app.add_typer(agents_app)
+app.add_typer(skills_app)
 app.add_typer(storage_app)
 app.add_typer(studio_app)
 studio_app.add_typer(studio_sessions_app)
@@ -103,6 +108,7 @@ app.add_typer(plan_app)
 app.add_typer(testbench_app)
 app.add_typer(ci_app)
 app.add_typer(runtime_pack_app)
+app.add_typer(a2a_app)
 
 
 @app.command("dashboard")
