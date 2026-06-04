@@ -170,6 +170,11 @@ def _handle_model_call(
     finish_reasons = data.get("finish_reasons") or data.get("finish_reason")
     if isinstance(finish_reasons, str):
         finish_reasons = [finish_reasons]
+    # Per spec: input_tokens includes cached tokens (cache_read + cache_creation + non-cached)
+    cache_read = usage.get("cache_read_input_tokens", 0)
+    cache_creation = usage.get("cache_creation_input_tokens", 0)
+    raw_input = usage.get("input_tokens", usage.get("prompt_tokens", 0))
+    total_input = raw_input + cache_read + cache_creation
     attrs: dict[str, Any] = {
         "arc.model.provider": data.get("provider", ""),
         "arc.model.name": data.get("model", ""),
@@ -177,10 +182,15 @@ def _handle_model_call(
         # OpenTelemetry GenAI semantic conventions
         "gen_ai.system": data.get("provider", ""),
         "gen_ai.request.model": data.get("model", ""),
-        "gen_ai.usage.input_tokens": usage.get("input_tokens", usage.get("prompt_tokens", 0)),
+        "gen_ai.usage.input_tokens": total_input,
         "gen_ai.usage.output_tokens": usage.get("output_tokens", usage.get("completion_tokens", 0)),
-        "gen_ai.usage.cache_read_input_tokens": usage.get("cache_read_input_tokens", 0),
-        "gen_ai.usage.cache_creation_input_tokens": usage.get("cache_creation_input_tokens", 0),
+        # Underscored form (R-03). Both forms emitted during migration.
+        # Underscored form deprecated — removal target v0.6.0-alpha.
+        "gen_ai.usage.cache_read_input_tokens": cache_read,
+        "gen_ai.usage.cache_creation_input_tokens": cache_creation,
+        # Dotted form (spec-aligned, v0.4.0-alpha)
+        "gen_ai.usage.cache_read.input_tokens": cache_read,
+        "gen_ai.usage.cache_creation.input_tokens": cache_creation,
         "gen_ai.response.finish_reasons": finish_reasons or ["stop"],
     }
     # NEVER log prompt/completion content by default (semconv compliance)
@@ -367,6 +377,8 @@ GENAI_REQUIRED_MODEL = (
     "gen_ai.usage.output_tokens",
     "gen_ai.usage.cache_read_input_tokens",
     "gen_ai.usage.cache_creation_input_tokens",
+    "gen_ai.usage.cache_read.input_tokens",
+    "gen_ai.usage.cache_creation.input_tokens",
     "gen_ai.response.finish_reasons",
 )
 GENAI_REQUIRED_TOOL = ("gen_ai.tool.name", "gen_ai.tool.description")

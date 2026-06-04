@@ -745,6 +745,29 @@ class BattleCompletedEvent(BaseModel):
     data: BattleCompletedData
 
 
+# ─── Quota Warning Events ────────────────────────────────────────────────────
+
+
+class QuotaWarningData(BaseModel):
+    """Data payload for QUOTA_WARNING event."""
+
+    dimension: str
+    usage_pct: float
+    limit: float
+    current: float
+
+
+class QuotaWarningEvent(BaseModel):
+    """QUOTA_WARNING event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["QUOTA_WARNING"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: QuotaWarningData
+
+
 # ─── Raw/Unknown Events ──────────────────────────────────────────────────────
 
 
@@ -864,6 +887,7 @@ KnownRunEvent = Union[
     McpCallDecisionEvent,
     EvalPolicyRecommendedEvent,
     EvalPolicyAppliedEvent,
+    QuotaWarningEvent,
     RawEvent,
 ]
 
@@ -947,6 +971,7 @@ def is_known_event(event: TypedRunEvent) -> TypeGuard[KnownRunEvent]:
         "MCP_CALL_DECISION",
         "EVAL_POLICY_RECOMMENDED",
         "EVAL_POLICY_APPLIED",
+        "QUOTA_WARNING",
         "RAW",
     }
     return event.type in known_types
@@ -1009,6 +1034,7 @@ def parse_typed_event(raw: dict[str, Any]) -> TypedRunEvent:
         "MCP_CALL_DECISION": McpCallDecisionEvent,
         "EVAL_POLICY_RECOMMENDED": EvalPolicyRecommendedEvent,
         "EVAL_POLICY_APPLIED": EvalPolicyAppliedEvent,
+        "QUOTA_WARNING": QuotaWarningEvent,
         "RAW": RawEvent,
     }
 

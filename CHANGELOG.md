@@ -4,6 +4,18 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 
 ## [Unreleased]
 
+### Added
+- **Budget**: `TokenWallet` read-only view over `BudgetEnforcer` with frozen `WalletSnapshot` per scope (RUN/WORKFLOW/SESSION/PROVIDER_DAY). Cache hit rate populated from R-03 OTel attrs. Fail-closed on unknown scope. (R-01)
+- **TUI**: `/wallet` slash command renders per-scope spent/cap/remaining/cache-hit-rate. Honors first-launch cap. NO_COLOR fallback. (R-01)
+- **TUI**: `/budget` slash command shows per-scope spend pct display. (QW-3)
+- **TUI**: `QuotaWarning` event consumer — status bar flashes amber on WARN, latches red on CRITICAL. (R-01)
+- **Protocol**: `QUOTA_WARNING` typed event registered in `protocol/typed_events.py` (3 Python sites) and `packages/arc-protocol-ts/src/run-events.ts` (1 TS site). (R-01)
+- **Observability**: spec-aligned dotted-form OTel cache attribute names (`gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_creation.input_tokens`) emitted alongside existing underscored R-03 names. Both forms in `GENAI_REQUIRED_MODEL` validator. (R-03 follow-up)
+- **Observability**: `gen_ai.usage.input_tokens` now includes cached tokens per spec (`raw + cache_read + cache_creation`). Previously under-reported for Anthropic calls with cache hits.
+
+### Changed
+- **Observability**: underscored cache attr names (`gen_ai.usage.cache_read_input_tokens`, `gen_ai.usage.cache_creation_input_tokens`) deprecated — both forms emitted until v0.6.0-alpha removal.
+
 ### Fixed
 - `arc-protocol-ts` jest coverage thresholds restored to 73/80/87/85 (branches/functions/lines/statements).
   The existing `run-events.test.ts` (11 cases, added in `15b361a`) already covers 87.59/75.16/82.08/89.21% —

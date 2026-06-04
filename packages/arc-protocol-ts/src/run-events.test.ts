@@ -122,6 +122,16 @@ describe('run-events helpers', () => {
     expect(isKnownEvent(warning)).toBe(true);
   });
 
+  it('isKnownEvent returns true for quota_warning', () => {
+    const event = parseRunEvent({ ...baseEvent, type: 'QUOTA_WARNING',
+      data: { dimension: 'session', usage_pct: 0.85, limit: 10.0, current: 8.5 } });
+    expect(isKnownEvent(event)).toBe(true);
+  });
+
+  it('KNOWN_RUN_EVENT_TYPES includes QUOTA_WARNING', () => {
+    expect(KNOWN_RUN_EVENT_TYPES).toContain('QUOTA_WARNING');
+  });
+
   it('exports the single known event type source used by guards', () => {
     expect(KNOWN_RUN_EVENT_TYPES).toContain('RUN_STARTED');
     expect(KNOWN_RUN_EVENT_TYPES).toContain('POLICY_BYPASS_WARNING');
@@ -141,5 +151,18 @@ describe('run-events helpers', () => {
     ].sort();
 
     expect(accountedTypes).toEqual(canonicalTypes);
+  });
+
+  it('isKnownEvent recognizes QUOTA_WARNING', () => {
+    const event = parseRunEvent({
+      ...baseEvent,
+      type: 'QUOTA_WARNING',
+      data: { dimension: 'session', usage_pct: 85.0, limit: 10.0, current: 8.5 },
+    });
+    expect(isKnownEvent(event)).toBe(true);
+  });
+
+  it('KNOWN_RUN_EVENT_TYPES includes QUOTA_WARNING', () => {
+    expect(KNOWN_RUN_EVENT_TYPES).toContain('QUOTA_WARNING');
   });
 });

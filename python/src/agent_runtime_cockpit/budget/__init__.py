@@ -10,6 +10,7 @@ from .schema import (
     ConfirmationRequired,
     ScopeSpend,
 )
+from .wallet import TokenWallet, WalletBalance, WalletSnapshot
 
 __all__ = [
     "BudgetCap",
@@ -20,4 +21,7 @@ __all__ = [
     "BudgetState",
     "ConfirmationRequired",
     "ScopeSpend",
+    "TokenWallet",
+    "WalletBalance",
+    "WalletSnapshot",
 ]

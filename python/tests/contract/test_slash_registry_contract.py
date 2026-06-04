@@ -45,6 +45,8 @@ PHASE_41_COMMANDS = {
     "events",
     "dashboard",
     "alias",
+    "wallet",
+    "budget",
 }
 
 

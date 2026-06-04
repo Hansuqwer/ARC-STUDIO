@@ -52,9 +52,19 @@ class StatusBar(Static):
             p = getattr(self.data, "current_provider", "") or ""
             m = (getattr(self.data, "current_model", "") or "").split("/")[-1][:20]
             model_str = f" │ {p}/{m}" if p else f" │ {m}"
+        # QuotaWarning flash
+        warning_str = ""
+        warnings = getattr(self.data, "quota_warnings", [])
+        if warnings:
+            latest = warnings[-1]
+            pct = latest.usage_pct
+            if no_color:
+                warning_str = " [WARN]" if pct < 1.0 else " [CRITICAL]"
+            else:
+                warning_str = " [yellow]⚠[/]" if pct < 1.0 else " [bold red]🛑[/]"
         line = (
             f" {self.data.mode} │ {self.data.runtime_mode}{paid_indicator}{model_str} │ {ws} │ "
-            f"{session_short} │ {cost} │ {tok_str} │"
+            f"{session_short} │ {cost} │ {tok_str}{warning_str} │"
             f" {daemon_dot}{stream_indicator} │"
             f" Esc:cancel  /:commands  Ctrl+P:palette"
         )

@@ -1,0 +1,179 @@
+From c15f4223b3633c00392f6b425d6287f9376b31a6 Mon Sep 17 00:00:00 2001
+From: ARC Studio <arc-studio@local>
+Date: Thu, 4 Jun 2026 21:16:16 +0200
+Subject: [PATCH] feat(protocol): add QUOTA_WARNING typed event (Python + TS)
+
+- QuotaWarningEvent model in typed_events.py
+- Added to KnownRunEvent union, is_known_event set, parse_typed_event map
+- QUOTA_WARNING in EVENT_TYPES registry and fixture JSON
+- TS QuotaWarningEvent interface + union + KNOWN_RUN_EVENT_TYPES
+- 2 new TS test cases: isKnownEvent, KNOWN_RUN_EVENT_TYPES
+---
+ .../arc-protocol-ts/src/run-events.test.ts    | 13 ++++++++++
+ packages/arc-protocol-ts/src/run-events.ts    | 14 ++++++++++
+ protocol/fixtures/run-event-registry.json     | 11 ++++++++
+ .../agent_runtime_cockpit/protocol/events.py  |  5 ++++
+ .../protocol/typed_events.py                  | 26 +++++++++++++++++++
+ 5 files changed, 69 insertions(+)
+
+diff --git a/packages/arc-protocol-ts/src/run-events.test.ts b/packages/arc-protocol-ts/src/run-events.test.ts
+index 5d89095..466c893 100644
+--- a/packages/arc-protocol-ts/src/run-events.test.ts
++++ b/packages/arc-protocol-ts/src/run-events.test.ts
+@@ -142,4 +142,17 @@ describe('run-events helpers', () => {
+ 
+     expect(accountedTypes).toEqual(canonicalTypes);
+   });
++
++  it('isKnownEvent recognizes QUOTA_WARNING', () => {
++    const event = parseRunEvent({
++      ...baseEvent,
++      type: 'QUOTA_WARNING',
++      data: { dimension: 'session', usage_pct: 85.0, limit: 10.0, current: 8.5 },
++    });
++    expect(isKnownEvent(event)).toBe(true);
++  });
++
++  it('KNOWN_RUN_EVENT_TYPES includes QUOTA_WARNING', () => {
++    expect(KNOWN_RUN_EVENT_TYPES).toContain('QUOTA_WARNING');
++  });
+ });
+diff --git a/packages/arc-protocol-ts/src/run-events.ts b/packages/arc-protocol-ts/src/run-events.ts
+index 55a545f..75a58c4 100644
+--- a/packages/arc-protocol-ts/src/run-events.ts
++++ b/packages/arc-protocol-ts/src/run-events.ts
+@@ -371,6 +371,18 @@ export interface EvalPolicyAppliedEvent extends RunEventBase {
+   };
+ }
+ 
++// ─── Quota Warning Events ────────────────────────────────────────────────────
++
++export interface QuotaWarningEvent extends RunEventBase {
++  type: 'QUOTA_WARNING';
++  data: {
++    dimension: string;
++    usage_pct: number;
++    limit: number;
++    current: number;
++  };
++}
++
+ // ─── Raw/Unknown Events ──────────────────────────────────────────────────────
+ 
+ export interface RawEvent extends RunEventBase {
+@@ -432,6 +444,7 @@ export type KnownRunEvent =
+   | McpCallDecisionEvent
+   | EvalPolicyRecommendedEvent
+   | EvalPolicyAppliedEvent
++  | QuotaWarningEvent
+   | RawEvent;
+ 
+ /**
+@@ -470,6 +483,7 @@ export const KNOWN_RUN_EVENT_TYPES = [
+   'MCP_CALL_DECISION',
+   'EVAL_POLICY_RECOMMENDED',
+   'EVAL_POLICY_APPLIED',
++  'QUOTA_WARNING',
+   'RAW',
+ ] as const satisfies readonly KnownRunEvent['type'][];
+ 
+diff --git a/protocol/fixtures/run-event-registry.json b/protocol/fixtures/run-event-registry.json
+index 6bc169c..380d94c 100644
+--- a/protocol/fixtures/run-event-registry.json
++++ b/protocol/fixtures/run-event-registry.json
+@@ -792,6 +792,17 @@
+         "message_id",
+         "node_id"
+       ]
++    },
++    {
++      "type": "QUOTA_WARNING",
++      "version": 2,
++      "requiredFields": [
++        "current",
++        "dimension",
++        "limit",
++        "usage_pct"
++      ],
++      "optionalFields": []
+     }
+   ]
+ }
+\ No newline at end of file
+diff --git a/python/src/agent_runtime_cockpit/protocol/events.py b/python/src/agent_runtime_cockpit/protocol/events.py
+index 667e836..6c3d98d 100644
+--- a/python/src/agent_runtime_cockpit/protocol/events.py
++++ b/python/src/agent_runtime_cockpit/protocol/events.py
+@@ -365,6 +365,11 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
+         required_fields={"custom_type"},
+         optional_fields={"data", "node_id", "message_id"},
+     ),
++    # ── Budget / Quota ───────────────────────────────────────────────────
++    "QUOTA_WARNING": EventTypeDef(
++        required_fields={"dimension", "usage_pct", "limit", "current"},
++        optional_fields=set(),
++    ),
+ }
+ 
+ 
+diff --git a/python/src/agent_runtime_cockpit/protocol/typed_events.py b/python/src/agent_runtime_cockpit/protocol/typed_events.py
+index b022399..0130a9f 100644
+--- a/python/src/agent_runtime_cockpit/protocol/typed_events.py
++++ b/python/src/agent_runtime_cockpit/protocol/typed_events.py
+@@ -745,6 +745,29 @@ class BattleCompletedEvent(BaseModel):
+     data: BattleCompletedData
+ 
+ 
++# ─── Quota Warning Events ────────────────────────────────────────────────────
++
++
++class QuotaWarningData(BaseModel):
++    """Data payload for QUOTA_WARNING event."""
++
++    dimension: str
++    usage_pct: float
++    limit: float
++    current: float
++
++
++class QuotaWarningEvent(BaseModel):
++    """QUOTA_WARNING event with typed payload."""
++
++    schema_version: int = 2
++    type: Literal["QUOTA_WARNING"]
++    timestamp: str
++    run_id: str
++    sequence: int
++    data: QuotaWarningData
++
++
+ # ─── Raw/Unknown Events ──────────────────────────────────────────────────────
+ 
+ 
+@@ -864,6 +887,7 @@ KnownRunEvent = Union[
+     McpCallDecisionEvent,
+     EvalPolicyRecommendedEvent,
+     EvalPolicyAppliedEvent,
++    QuotaWarningEvent,
+     RawEvent,
+ ]
+ 
+@@ -947,6 +971,7 @@ def is_known_event(event: TypedRunEvent) -> TypeGuard[KnownRunEvent]:
+         "MCP_CALL_DECISION",
+         "EVAL_POLICY_RECOMMENDED",
+         "EVAL_POLICY_APPLIED",
++        "QUOTA_WARNING",
+         "RAW",
+     }
+     return event.type in known_types
+@@ -1009,6 +1034,7 @@ def parse_typed_event(raw: dict[str, Any]) -> TypedRunEvent:
+         "MCP_CALL_DECISION": McpCallDecisionEvent,
+         "EVAL_POLICY_RECOMMENDED": EvalPolicyRecommendedEvent,
+         "EVAL_POLICY_APPLIED": EvalPolicyAppliedEvent,
++        "QUOTA_WARNING": QuotaWarningEvent,
+         "RAW": RawEvent,
+     }
+ 
+-- 
+2.50.1 (Apple Git-155)
+

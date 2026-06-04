@@ -50,3 +50,23 @@ def test_cache_attrs_default_to_zero_when_absent() -> None:
 def test_genai_required_model_includes_cache_fields() -> None:
     assert "gen_ai.usage.cache_read_input_tokens" in GENAI_REQUIRED_MODEL
     assert "gen_ai.usage.cache_creation_input_tokens" in GENAI_REQUIRED_MODEL
+
+
+def test_dotted_form_attr_names_emitted() -> None:
+    """Dotted-form spec-aligned attr names emitted alongside underscored form."""
+    attrs = _span_attrs({"input_tokens": 100, "output_tokens": 50, "cache_read_input_tokens": 42})
+    assert attrs["gen_ai.usage.cache_read.input_tokens"] == 42
+    assert attrs["gen_ai.usage.cache_creation.input_tokens"] == 0
+
+
+def test_anthropic_input_tokens_includes_cached_per_spec() -> None:
+    """gen_ai.usage.input_tokens = raw + cache_read + cache_creation per spec."""
+    attrs = _span_attrs(
+        {
+            "input_tokens": 100,
+            "output_tokens": 50,
+            "cache_read_input_tokens": 30,
+            "cache_creation_input_tokens": 20,
+        }
+    )
+    assert attrs["gen_ai.usage.input_tokens"] == 150  # 100 + 30 + 20
