@@ -1,0 +1,137 @@
+From 1cbc295a3217ef9dc14b9733848d243f74f8713a Mon Sep 17 00:00:00 2001
+From: ARC Studio <arc-studio@local>
+Date: Thu, 4 Jun 2026 18:44:28 +0200
+Subject: [PATCH] feat(tui): context-usage meter in status bar (P0-4)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Inline 'tok N/M (P%)' segment added to StatusBar.render(). Color tiers:
+  green  <60%   | [low] in NO_COLOR
+  yellow 60-85% | [warn] in NO_COLOR
+  red    >85%   | [hot] in NO_COLOR
+
+When context_limit==0 (unknown): renders 'tok N' only — no division.
+
+8 tests pass in tests/tui/test_status_bar_context_meter.py.
+---
+ .../tui/widgets/status_bar.py                 | 16 ++++-
+ .../tui/test_status_bar_context_meter.py      | 72 +++++++++++++++++++
+ 2 files changed, 87 insertions(+), 1 deletion(-)
+ create mode 100644 python/tests/tui/test_status_bar_context_meter.py
+
+diff --git a/python/src/agent_runtime_cockpit/tui/widgets/status_bar.py b/python/src/agent_runtime_cockpit/tui/widgets/status_bar.py
+index cca6cd2..a34f8dd 100644
+--- a/python/src/agent_runtime_cockpit/tui/widgets/status_bar.py
++++ b/python/src/agent_runtime_cockpit/tui/widgets/status_bar.py
+@@ -31,6 +31,20 @@ class StatusBar(Static):
+         daemon_dot = "●" if self.data.daemon_online else "○"
+         stream_indicator = " ● streaming" if self.data.is_streaming else ""
+         paid_indicator = " $paid" if getattr(self.data, "allow_paid", False) else ""
++        # P0-4: token usage meter
++        no_color = bool(getattr(self.theme.current, "no_color", False))
++        tok = self.data.total_tokens
++        lim = self.data.context_limit
++        if lim > 0:
++            pct = int(tok / lim * 100)
++            if no_color:
++                tier = "[low]" if pct < 60 else "[warn]" if pct < 85 else "[hot]"
++                tok_str = f"{tier} tok {tok}/{lim} ({pct}%)"
++            else:
++                color = "green" if pct < 60 else "yellow" if pct < 85 else "red"
++                tok_str = f"[{color}]tok {tok}/{lim} ({pct}%)[/]"
++        else:
++            tok_str = f"tok {tok}"
+         model_str = ""
+         if getattr(self.data, "current_provider", None) or getattr(
+             self.data, "current_model", None
+@@ -40,7 +54,7 @@ class StatusBar(Static):
+             model_str = f" │ {p}/{m}" if p else f" │ {m}"
+         line = (
+             f" {self.data.mode} │ {self.data.runtime_mode}{paid_indicator}{model_str} │ {ws} │ "
+-            f"{session_short} │ {cost} │"
++            f"{session_short} │ {cost} │ {tok_str} │"
+             f" {daemon_dot}{stream_indicator} │"
+             f" Esc:cancel  /:commands  Ctrl+P:palette"
+         )
+diff --git a/python/tests/tui/test_status_bar_context_meter.py b/python/tests/tui/test_status_bar_context_meter.py
+new file mode 100644
+index 0000000..8c98786
+--- /dev/null
++++ b/python/tests/tui/test_status_bar_context_meter.py
+@@ -0,0 +1,72 @@
++"""P0-4: context-usage meter in status bar."""
++
++from __future__ import annotations
++
++from agent_runtime_cockpit.tui.data import DataStore
++from agent_runtime_cockpit.tui.theme import Theme, ThemeManager
++from agent_runtime_cockpit.tui.widgets.status_bar import StatusBar
++
++
++def _bar(total_tokens: int = 0, context_limit: int = 0, no_color: bool = False) -> StatusBar:
++    ds = DataStore(seed=0)
++    ds.total_tokens = total_tokens
++    ds.context_limit = context_limit
++    tm = ThemeManager()
++    if no_color:
++        tm._current = Theme(name="nocolor", no_color=True)
++    bar = StatusBar(ds, tm)
++    return bar
++
++
++def test_renders_tokens_and_limit() -> None:
++    # Use a short path so the line isn't truncated before the tok segment.
++    ds = DataStore(seed=0)
++    ds.total_tokens = 5000
++    ds.context_limit = 10000
++    # Override workspace to short path
++    from pathlib import Path
++
++    ds.workspace = Path("/tmp")
++    tm = ThemeManager()
++    bar = StatusBar(ds, tm)
++    out = bar.render()
++    assert "tok" in out
++    assert "50%" in out
++
++
++def test_no_limit_shows_only_count() -> None:
++    out = _bar(5000, 0).render()
++    assert "5000" in out
++    assert "%" not in out
++    assert "/" not in out.split("tok ")[1].split(" │")[0]
++
++
++def test_color_tier_green() -> None:
++    out = _bar(3000, 10000).render()
++    assert "green" in out
++
++
++def test_color_tier_yellow() -> None:
++    out = _bar(7000, 10000).render()
++    assert "yellow" in out
++
++
++def test_color_tier_red() -> None:
++    out = _bar(9000, 10000).render()
++    assert "red" in out
++
++
++def test_no_color_low() -> None:
++    out = _bar(3000, 10000, no_color=True).render()
++    assert "[low]" in out
++    assert "green" not in out
++
++
++def test_no_color_warn() -> None:
++    out = _bar(7000, 10000, no_color=True).render()
++    assert "[warn]" in out
++
++
++def test_no_color_hot() -> None:
++    out = _bar(9000, 10000, no_color=True).render()
++    assert "[hot]" in out
+-- 
+2.50.1 (Apple Git-155)
+
