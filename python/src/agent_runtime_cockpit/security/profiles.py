@@ -10,6 +10,9 @@ from pathlib import Path
 from ..gating import BackendMode, GatingError, require_dual_gate
 
 
+PROFILE_SCHEMA_VERSION = 2
+
+
 class ProfileNotFound(KeyError):
     """Raised when a strict profile lookup cannot resolve an id."""
 
@@ -24,6 +27,11 @@ class RunProfile:
     allow_secrets: bool = False
     env_allowlist: tuple[str, ...] = ()
     backend: BackendMode = BackendMode.STUB
+    extra: dict[str, str] = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.extra is None:
+            object.__setattr__(self, "extra", {})
 
 
 # Built-in profiles
@@ -102,6 +110,7 @@ def load_custom_profiles(path: Path | None = None) -> dict[str, RunProfile]:
             allow_secrets=bool(item.get("allow_secrets", False)),
             env_allowlist=tuple(item.get("env_allowlist", ())),
             backend=backend,
+            extra=dict(item.get("extra", {})),
         )
     return profiles
 
@@ -126,6 +135,7 @@ def _profile_to_json(profile: RunProfile) -> dict[str, object]:
     payload = asdict(profile)
     payload["backend"] = profile.backend.value
     payload["env_allowlist"] = list(profile.env_allowlist)
+    payload["extra"] = dict(profile.extra) if profile.extra else {}
     return payload
 
 
