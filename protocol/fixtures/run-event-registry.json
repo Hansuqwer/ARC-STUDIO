@@ -54,6 +54,10 @@
     {"type":"CUSTOM","version":2,"requiredFields":["custom_type"],"optionalFields":["data","message_id","node_id"]},
     {"type":"CONSENSUS_DIFFERENTIATOR","version":2,"requiredFields":["decision","protocol","votes"],"optionalFields":["disagreement_rate","evidence_refs","message_id","node_id","quality_score","round"]},
     {"type":"CONSENSUS_EVAL","version":2,"requiredFields":["num_rounds","num_workers","protocols"],"optionalFields":["consensus_escrow","message_id","node_id"]},
-    {"type":"CONSENSUS_EVAL_RUN","version":2,"requiredFields":["consensus_reached","protocol","total_votes"],"optionalFields":["approval_count","cost_score","disagreement_rate","duration_ms","escalation_rate","evidence_refs","latency_ms","message_id","node_id","quality_score"]}
+    {"type":"CONSENSUS_EVAL_RUN","version":2,"requiredFields":["consensus_reached","protocol","total_votes"],"optionalFields":["approval_count","cost_score","disagreement_rate","duration_ms","escalation_rate","evidence_refs","latency_ms","message_id","node_id","quality_score"]},
+    {"type":"CAPABILITY_CARD_DECISION","version":2,"requiredFields":["action","decision","mode","reason"],"optionalFields":["card_hash","card_id","correlation_id","details","entity_type","remediation"]},
+    {"type":"MCP_CALL_DECISION","version":2,"requiredFields":["decision","policy","reason","risk_level","server_id","tool_name"],"optionalFields":["correlation_id","drift","injection_severity","manifest_risk","roots_violation"]},
+    {"type":"EVAL_POLICY_RECOMMENDED","version":2,"requiredFields":["actions","correlation_id","profile_id","recommendations_count"],"optionalFields":["message_id","node_id"]},
+    {"type":"EVAL_POLICY_APPLIED","version":2,"requiredFields":["correlation_id","diff_summary","dry_run","new_path","profile_id","version"],"optionalFields":["message_id","node_id"]}
   ]
 }

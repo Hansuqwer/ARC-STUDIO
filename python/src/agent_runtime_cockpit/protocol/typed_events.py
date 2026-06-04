@@ -15,6 +15,8 @@ from typing import Any, Literal, TypeGuard, Union
 from pydantic import BaseModel, Field
 
 from ._bypass import PolicyBypassWarning
+from .capability_card_events import CapabilityCardDecisionEvent
+from .mcp_decision_events import McpCallDecisionEvent
 
 # ─── Base Event Model ────────────────────────────────────────────────────────
 
@@ -744,6 +746,52 @@ class BattleCompletedEvent(BaseModel):
 # ─── Raw/Unknown Events ──────────────────────────────────────────────────────
 
 
+class EvalPolicyRecommendedData(BaseModel):
+    """Data payload for EVAL_POLICY_RECOMMENDED event."""
+
+    profile_id: str
+    recommendations_count: int
+    actions: list[str]
+    correlation_id: str
+    node_id: str | None = None
+    message_id: str | None = None
+
+
+class EvalPolicyRecommendedEvent(BaseModel):
+    """EVAL_POLICY_RECOMMENDED event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["EVAL_POLICY_RECOMMENDED"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: EvalPolicyRecommendedData
+
+
+class EvalPolicyAppliedData(BaseModel):
+    """Data payload for EVAL_POLICY_APPLIED event."""
+
+    profile_id: str
+    new_path: str
+    diff_summary: str
+    correlation_id: str
+    version: int
+    dry_run: bool
+    node_id: str | None = None
+    message_id: str | None = None
+
+
+class EvalPolicyAppliedEvent(BaseModel):
+    """EVAL_POLICY_APPLIED event with typed payload."""
+
+    schema_version: int = 2
+    type: Literal["EVAL_POLICY_APPLIED"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: EvalPolicyAppliedData
+
+
 class RawEventData(BaseModel):
     """Data payload for RAW event."""
 
@@ -810,6 +858,10 @@ KnownRunEvent = Union[
     ConsensusDifferentiatorEvent,
     ConsensusEvalEvent,
     ConsensusEvalRunEvent,
+    CapabilityCardDecisionEvent,
+    McpCallDecisionEvent,
+    EvalPolicyRecommendedEvent,
+    EvalPolicyAppliedEvent,
     RawEvent,
 ]
 
@@ -889,6 +941,10 @@ def is_known_event(event: TypedRunEvent) -> TypeGuard[KnownRunEvent]:
         "CONSENSUS_DIFFERENTIATOR",
         "CONSENSUS_EVAL",
         "CONSENSUS_EVAL_RUN",
+        "CAPABILITY_CARD_DECISION",
+        "MCP_CALL_DECISION",
+        "EVAL_POLICY_RECOMMENDED",
+        "EVAL_POLICY_APPLIED",
         "RAW",
     }
     return event.type in known_types
@@ -947,6 +1003,10 @@ def parse_typed_event(raw: dict[str, Any]) -> TypedRunEvent:
         "CONSENSUS_DIFFERENTIATOR": ConsensusDifferentiatorEvent,
         "CONSENSUS_EVAL": ConsensusEvalEvent,
         "CONSENSUS_EVAL_RUN": ConsensusEvalRunEvent,
+        "CAPABILITY_CARD_DECISION": CapabilityCardDecisionEvent,
+        "MCP_CALL_DECISION": McpCallDecisionEvent,
+        "EVAL_POLICY_RECOMMENDED": EvalPolicyRecommendedEvent,
+        "EVAL_POLICY_APPLIED": EvalPolicyAppliedEvent,
         "RAW": RawEvent,
     }
 

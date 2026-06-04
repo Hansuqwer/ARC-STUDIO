@@ -86,6 +86,9 @@ from .from_adapters import (
     cards_from_adapters,
 )
 
+# Workspace converters
+from .from_workspace import card_from_agents_md, card_from_skill
+
 # Policy linter
 from .policy import (
     lint_cards,
@@ -106,6 +109,15 @@ from .signing import (
     SignatureAlgorithm,
     CardSignature,
     SignedCapabilityCard,
+)
+
+# Enforcement gate
+from .enforcement import (
+    DenialReason,
+    EnforcementResult,
+    enforce_card,
+    enforce_card_by_id,
+    resolve_mode,
 )
 
 __all__ = [
@@ -159,6 +171,9 @@ __all__ = [
     "card_from_adapter",
     "card_from_capability_report",
     "cards_from_adapters",
+    # Workspace converters
+    "card_from_agents_md",
+    "card_from_skill",
     # Policy linter
     "lint_cards",
     "lint_ir_cards",
@@ -175,4 +190,10 @@ __all__ = [
     "SignatureAlgorithm",
     "CardSignature",
     "SignedCapabilityCard",
+    # Enforcement gate
+    "DenialReason",
+    "EnforcementResult",
+    "enforce_card",
+    "enforce_card_by_id",
+    "resolve_mode",
 ]

@@ -102,3 +102,17 @@ def set_enforcement_context(ctx: EnforcementContext) -> None:
 
     """
     _enforcement_context.set(ctx)
+
+
+# Cards enforcement mode (separate ContextVar; EnforcementContext is frozen)
+_cards_mode: ContextVar[str] = ContextVar("_cards_mode", default="warn")
+
+
+def get_cards_mode() -> str:
+    """Get current capability card enforcement mode."""
+    return _cards_mode.get()
+
+
+def set_cards_mode(mode: str) -> None:
+    """Set capability card enforcement mode for current execution."""
+    _cards_mode.set(mode)

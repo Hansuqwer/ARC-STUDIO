@@ -304,6 +304,71 @@ export interface PolicyBypassWarning extends RunEventBase {
   };
 }
 
+// ─── Capability Card Decision Event ──────────────────────────────────────────
+
+export interface CapabilityCardDecisionEvent extends RunEventBase {
+  type: 'CAPABILITY_CARD_DECISION';
+  data: {
+    action: string;
+    decision: 'allow' | 'deny' | 'warn';
+    reason: string;
+    card_id?: string;
+    card_hash?: string;
+    entity_type?: string;
+    mode: 'off' | 'warn' | 'strict';
+    remediation?: string;
+    correlation_id?: string;
+    details?: Record<string, string>;
+  };
+}
+
+// ─── MCP Call Decision Event ─────────────────────────────────────────────────
+
+export interface McpCallDecisionEvent extends RunEventBase {
+  type: 'MCP_CALL_DECISION';
+  data: {
+    server_id: string;
+    tool_name: string;
+    decision: 'allow' | 'deny' | 'warn';
+    risk_level: 'low' | 'medium' | 'high' | 'critical';
+    policy: 'strict' | 'permissive';
+    reason: string;
+    injection_severity?: string;
+    manifest_risk?: string;
+    roots_violation?: boolean;
+    drift?: string;
+    correlation_id?: string;
+  };
+}
+
+// ─── Eval Policy Events ──────────────────────────────────────────────────────
+
+export interface EvalPolicyRecommendedEvent extends RunEventBase {
+  type: 'EVAL_POLICY_RECOMMENDED';
+  data: {
+    profile_id: string;
+    recommendations_count: number;
+    actions: string[];
+    correlation_id: string;
+    node_id?: string;
+    message_id?: string;
+  };
+}
+
+export interface EvalPolicyAppliedEvent extends RunEventBase {
+  type: 'EVAL_POLICY_APPLIED';
+  data: {
+    profile_id: string;
+    new_path: string;
+    diff_summary: string;
+    correlation_id: string;
+    version: number;
+    dry_run: boolean;
+    node_id?: string;
+    message_id?: string;
+  };
+}
+
 // ─── Raw/Unknown Events ──────────────────────────────────────────────────────
 
 export interface RawEvent extends RunEventBase {
@@ -361,6 +426,10 @@ export type KnownRunEvent =
   | NodeStartedEvent
   | NodeFailedEvent
   | PolicyBypassWarning
+  | CapabilityCardDecisionEvent
+  | McpCallDecisionEvent
+  | EvalPolicyRecommendedEvent
+  | EvalPolicyAppliedEvent
   | RawEvent;
 
 /**
@@ -395,6 +464,10 @@ export const KNOWN_RUN_EVENT_TYPES = [
   'NODE_STARTED',
   'NODE_FAILED',
   'POLICY_BYPASS_WARNING',
+  'CAPABILITY_CARD_DECISION',
+  'MCP_CALL_DECISION',
+  'EVAL_POLICY_RECOMMENDED',
+  'EVAL_POLICY_APPLIED',
   'RAW',
 ] as const satisfies readonly KnownRunEvent['type'][];
 
