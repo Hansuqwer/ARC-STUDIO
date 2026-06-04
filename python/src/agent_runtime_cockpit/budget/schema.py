@@ -6,8 +6,12 @@ import logging
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field, model_validator
+
+if TYPE_CHECKING:
+    from .storage import BudgetStorage
 
 log = logging.getLogger(__name__)
 
@@ -160,9 +164,18 @@ class ConfirmationRequired(Exception):
 
 
 class BudgetEnforcer:
-    def __init__(self, config: BudgetConfig, state: BudgetState) -> None:
+    def __init__(
+        self,
+        config: BudgetConfig,
+        state: BudgetState,
+        storage: "BudgetStorage | None" = None,
+    ) -> None:
         self._config = config
         self._state = state
+        self._storage = storage
+        # Load durable spend into in-memory state on construction
+        if storage is not None:
+            self._load_from_storage(storage)
 
     def preflight(
         self,
@@ -206,6 +219,24 @@ class BudgetEnforcer:
             run_active=run_active,
             workflow_active=workflow_active,
         )
+        if self._storage is not None:
+            self._persist(provider_id)
+
+    def _load_from_storage(self, storage: "BudgetStorage") -> None:
+        """Load durable SESSION + PROVIDER_DAY spend into in-memory state."""
+        session_usd = storage.load_session()
+        self._state.session.amount_usd = session_usd
+
+    def _persist(self, provider_id: str) -> None:
+        """Write current SESSION + PROVIDER_DAY to durable storage after each record()."""
+        if self._storage is None:
+            return
+        self._storage.save_session(self._state.session.amount_usd)
+        key = self._state._provider_day_key(provider_id)
+        entry = self._state.provider_days.get(key)
+        if entry is not None:
+            date_key = key.split(":", 1)[1] if ":" in key else key
+            self._storage.save_provider_day(provider_id, date_key, entry.amount_usd)
 
     def check_and_warn(
         self,

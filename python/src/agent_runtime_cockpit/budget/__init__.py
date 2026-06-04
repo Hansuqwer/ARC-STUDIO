@@ -10,6 +10,7 @@ from .schema import (
     ConfirmationRequired,
     ScopeSpend,
 )
+from .storage import BudgetStorage, InMemoryStorage, SQLiteWALStorage, default_storage
 from .wallet import TokenWallet, WalletBalance, WalletSnapshot
 
 __all__ = [
@@ -21,6 +22,10 @@ __all__ = [
     "BudgetState",
     "ConfirmationRequired",
     "ScopeSpend",
+    "BudgetStorage",
+    "InMemoryStorage",
+    "SQLiteWALStorage",
+    "default_storage",
     "TokenWallet",
     "WalletBalance",
     "WalletSnapshot",
