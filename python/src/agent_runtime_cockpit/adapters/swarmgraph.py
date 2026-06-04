@@ -313,6 +313,15 @@ class SwarmGraphAdapter(RuntimeAdapter):
         inputs = inputs or {}
         workspace = Path(str(inputs.get("workspace") or ".")).resolve()
         prompt = str(inputs.get("prompt") or f"Run ARC workflow {workflow_id}")
+        # D-01: Capability Card enforcement (default mode=warn; never blocks)
+        try:
+            _cc_payload = self.enforce_capability_card(
+                workflow_id=workflow_id, workspace=workspace
+            )
+            log.debug("capability_card_decision: %s", _cc_payload)
+            inputs.setdefault("_capability_card_decision", _cc_payload)
+        except Exception as exc:  # pragma: no cover - defensive only
+            log.warning("capability_card enforcement skipped: %s", exc)
 
         if os.environ.get("ARC_SWARMGRAPH_CLI"):
             self._resolve_cli(workspace)

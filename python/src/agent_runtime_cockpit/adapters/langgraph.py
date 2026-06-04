@@ -177,6 +177,15 @@ class LangGraphAdapter(RuntimeAdapter):
         inputs = inputs or {}
         workspace = Path(str(inputs.get("workspace") or ".")).resolve()
         run_id = f"run-lg-{uuid.uuid4().hex[:8]}"
+        # D-01: Capability Card enforcement (default mode=warn; never blocks)
+        try:
+            _cc_payload = self.enforce_capability_card(
+                workflow_id=workflow_id, workspace=workspace
+            )
+            log.debug("capability_card_decision: %s", _cc_payload)
+            inputs.setdefault("_capability_card_decision", _cc_payload)
+        except Exception as exc:  # pragma: no cover
+            log.warning("capability_card enforcement skipped: %s", exc)
         started = datetime.now(timezone.utc)
         events = [
             self._event(
