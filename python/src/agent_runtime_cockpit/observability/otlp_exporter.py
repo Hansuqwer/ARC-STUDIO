@@ -134,6 +134,7 @@ def export_otlp_http(
     confirm_network_export: bool = False,
     timeout_seconds: float = 10.0,
     headers: Optional[dict[str, str]] = None,
+    dry_run: bool = False,
 ) -> OtlpExportResult:
     """POST export to OTLP HTTP endpoint.
 
@@ -143,6 +144,7 @@ def export_otlp_http(
         confirm_network_export: Must be True; fails closed otherwise.
         timeout_seconds:        Request timeout.
         headers:                Extra HTTP headers (e.g. auth). Never logged.
+        dry_run:                If True, build payload and validate but do not send.
 
     Returns:
         OtlpExportResult
@@ -168,6 +170,16 @@ def export_otlp_http(
         _validate_no_secrets(payload)
     except ValueError as exc:
         return OtlpExportResult(ok=False, format="otlp-http", endpoint=endpoint, error=str(exc))
+
+    if dry_run:
+        return OtlpExportResult(
+            ok=True,
+            format="otlp-http",
+            endpoint=endpoint,
+            span_count=span_count,
+            http_status=None,
+            error=None,
+        )
 
     # Use stdlib urllib — no heavy deps required
     import urllib.request  # noqa: S310 — opt-in only, confirmation required

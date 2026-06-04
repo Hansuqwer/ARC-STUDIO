@@ -325,6 +325,46 @@ def obs_validate_cmd(
         raise typer.Exit(2)
 
 
+@obs_app.command("semconv-check")
+def obs_semconv_check_cmd(
+    export_path: str = typer.Argument(..., help="Path to observability export JSON file."),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Check gen_ai.* semconv conformance. Exits non-zero on violations."""
+    _setup_logging(debug)
+
+    from ..observability.models import ArcTraceExport
+    from ..observability.otel_mapping import check_genai_semconv
+
+    p = Path(export_path)
+    if not p.is_file():
+        _out(err(ArcErrorCode.INVALID_INPUT, f"File not found: {export_path}"), json_output)
+        raise typer.Exit(1)
+
+    try:
+        export = ArcTraceExport.model_validate_json(p.read_text())
+    except Exception as exc:  # noqa: BLE001
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid export file: {exc}"), json_output)
+        raise typer.Exit(1) from exc
+
+    violations = check_genai_semconv(export.spans)
+    payload = {
+        "file": export_path,
+        "span_count": len(export.spans),
+        "violation_count": len(violations),
+        "violations": violations,
+        "compliant": len(violations) == 0,
+    }
+    if violations:
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, "gen_ai.* semconv violations found", details=payload),
+            json_output,
+        )
+        raise typer.Exit(2)
+    _out(ok(payload), json_output)
+
+
 @obs_app.command("redaction-check")
 def obs_redaction_check_cmd(
     export_path: str = typer.Argument(...),

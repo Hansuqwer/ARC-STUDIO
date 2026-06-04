@@ -175,3 +175,124 @@ class TestOtlpGrpcSafetyGate:
                 confirm_network_export=True,
             )
             assert isinstance(result.ok, bool)
+
+
+class TestCollectorMockReceivesSpans:
+    """End-to-end: mock OTLP collector receives N spans. No real network."""
+
+    def test_collector_receives_correct_span_count(self):
+        """A mock collector receives all spans from the export payload."""
+        from agent_runtime_cockpit.observability.otlp_exporter import (
+            export_otlp_http,
+        )
+
+        export_dict = _minimal_export_dict()
+        expected_spans = len(export_dict.get("spans", []))
+
+        # Capture what would be sent
+        captured_payloads = []
+
+        def fake_urlopen(req, timeout=None):
+            captured_payloads.append(json.loads(req.data.decode("utf-8")))
+            mock_resp = MagicMock()
+            mock_resp.__enter__ = lambda s: s
+            mock_resp.__exit__ = MagicMock(return_value=False)
+            mock_resp.status = 200
+            return mock_resp
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            result = export_otlp_http(
+                export_dict,
+                endpoint="http://localhost:4318/v1/traces",
+                confirm_network_export=True,
+            )
+
+        assert result.ok
+        assert result.span_count == expected_spans
+        assert len(captured_payloads) == 1
+        # Verify OTLP structure
+        payload = captured_payloads[0]
+        resource_spans = payload["resourceSpans"]
+        total_sent = sum(len(ss["spans"]) for rs in resource_spans for ss in rs["scopeSpans"])
+        assert total_sent == expected_spans
+
+    def test_dry_run_does_not_send(self):
+        """--dry-run builds and validates payload but never calls urlopen."""
+        from agent_runtime_cockpit.observability.otlp_exporter import export_otlp_http
+
+        with patch("urllib.request.urlopen") as mock_open:
+            result = export_otlp_http(
+                _minimal_export_dict(),
+                endpoint="http://localhost:4318/v1/traces",
+                confirm_network_export=True,
+                dry_run=True,
+            )
+
+        assert result.ok
+        assert result.span_count >= 1
+        assert result.http_status is None
+        mock_open.assert_not_called()
+
+    def test_multi_span_export(self):
+        """Export with multiple spans arrives intact at collector."""
+        from agent_runtime_cockpit.observability.otel_mapping import map_events_to_spans
+        from agent_runtime_cockpit.observability.loaders import LoadedTrace
+        from agent_runtime_cockpit.observability import ObservabilityExportConfig
+        from agent_runtime_cockpit.observability.otlp_exporter import export_otlp_http
+
+        trace = LoadedTrace(
+            run_id="multi-span-001",
+            runtime="test",
+            workflow_id="wf",
+            status="completed",
+            started_at="2025-01-01T00:00:00Z",
+            ended_at="2025-01-01T00:01:00Z",
+            events=[
+                {
+                    "type": "llm.request",
+                    "run_id": "multi-span-001",
+                    "sequence": i,
+                    "timestamp": "2025-01-01T00:00:10Z",
+                    "data": {
+                        "provider": "openai",
+                        "model": "gpt-4",
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+                for i in range(5)
+            ],
+            source_file="<synthetic>",
+        )
+        cfg = ObservabilityExportConfig(format="openinference-json")
+        spans, _, _ = map_events_to_spans(trace, cfg)
+        # 1 root + 5 model spans = 6
+        assert len(spans) == 6
+
+        export_dict = {
+            "spans": [s.model_dump() for s in spans],
+            "resource": {"service.name": "arc-test"},
+        }
+
+        captured = []
+
+        def fake_urlopen(req, timeout=None):
+            captured.append(json.loads(req.data.decode("utf-8")))
+            mock_resp = MagicMock()
+            mock_resp.__enter__ = lambda s: s
+            mock_resp.__exit__ = MagicMock(return_value=False)
+            mock_resp.status = 200
+            return mock_resp
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            result = export_otlp_http(
+                export_dict,
+                endpoint="http://localhost:4318/v1/traces",
+                confirm_network_export=True,
+            )
+
+        assert result.ok
+        assert result.span_count == 6
+        total_sent = sum(
+            len(ss["spans"]) for rs in captured[0]["resourceSpans"] for ss in rs["scopeSpans"]
+        )
+        assert total_sent == 6
