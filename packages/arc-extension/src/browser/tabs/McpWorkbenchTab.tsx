@@ -7,7 +7,12 @@
  */
 
 import * as React from '@theia/core/shared/react';
-import type { ArcService, McpWorkbenchStatus } from '../../common/arc-protocol';
+import type { ArcService, McpDecisionEntry, McpWorkbenchStatus } from '../../common/arc-protocol';
+
+const DECISION_LIMIT = 20;
+const RISK_VARIANT: Record<string, string> = {
+    low: 'success', medium: 'warning', high: 'info', critical: 'info',
+};
 
 export interface McpWorkbenchTabProps {
     arcService: ArcService;
@@ -17,6 +22,9 @@ export const McpWorkbenchTab: React.FC<McpWorkbenchTabProps> = ({ arcService }) 
     const [status, setStatus] = React.useState<McpWorkbenchStatus | null>(null);
     const [loading, setLoading] = React.useState<boolean>(true);
     const [error, setError] = React.useState<string | null>(null);
+
+    const [decisions, setDecisions] = React.useState<McpDecisionEntry[]>([]);
+    const [decisionsLoading, setDecisionsLoading] = React.useState(false);
 
     const load = React.useCallback(async () => {
         setLoading(true);
@@ -31,9 +39,20 @@ export const McpWorkbenchTab: React.FC<McpWorkbenchTabProps> = ({ arcService }) 
         }
     }, [arcService]);
 
+    const loadDecisions = React.useCallback(async () => {
+        setDecisionsLoading(true);
+        try {
+            const result = await arcService.getMcpDecisions({ limit: DECISION_LIMIT });
+            setDecisions(result.decisions);
+        } finally {
+            setDecisionsLoading(false);
+        }
+    }, [arcService]);
+
     React.useEffect(() => {
         load();
-    }, [load]);
+        loadDecisions();
+    }, [load, loadDecisions]);
 
     if (loading) {
         return (
@@ -140,6 +159,32 @@ export const McpWorkbenchTab: React.FC<McpWorkbenchTabProps> = ({ arcService }) 
             <section className='arc-mcp-workbench__section'>
                 <h4>Diagnostic Info</h4>
                 <pre className='arc-mcp-workbench__diagnostic'>{status.diagnostic}</pre>
+            </section>
+
+            <section className='arc-mcp-workbench__section'>
+                <div className='arc-mcp-workbench__header'>
+                    <h4>Recent MCP Decisions ({decisions.length})</h4>
+                    <button className='arc-mcp-workbench__refresh' onClick={loadDecisions} disabled={decisionsLoading}>
+                        {decisionsLoading ? '...' : 'Refresh'}
+                    </button>
+                </div>
+                {decisions.length === 0 && !decisionsLoading && (
+                    <p className='arc-mcp-workbench__empty'>No recent MCP outbound call decisions.</p>
+                )}
+                {decisions.length > 0 && (
+                    <ul className='arc-mcp-workbench__list'>
+                        {decisions.map((d, i) => (
+                            <li key={i} className={`arc-mcp-workbench__decision arc-mcp-workbench__decision--${d.decision}`}>
+                                <span className='arc-mcp-workbench__decision-badge'>{d.decision.toUpperCase()}</span>
+                                <span className='arc-mcp-workbench__decision-tool'>{d.serverId}/{d.toolName}</span>
+                                <span className={`arc-mcp-workbench__badge arc-mcp-workbench__badge--${RISK_VARIANT[d.riskScore] ?? 'ok'}`}>
+                                    risk:{d.riskScore}
+                                </span>
+                                <span className='arc-mcp-workbench__decision-reason'>{d.reason}</span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
             </section>
         </div>
     );

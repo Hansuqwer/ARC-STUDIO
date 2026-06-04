@@ -8,6 +8,7 @@ import * as React from '@theia/core/shared/react';
 import type {
     ArcService,
     AuditChainInfo,
+    CapabilityCardSummary,
     HitlPromptInfo,
     ReplayEvent,
 } from '../../common/arc-protocol';
@@ -119,6 +120,9 @@ export const AssuranceTab: React.FC<AssuranceTabProps> = ({ arcService, initialR
     const [auditLoading, setAuditLoading] = React.useState(false);
     const [auditError, setAuditError] = React.useState<string | null>(null);
 
+    const [cardSummary, setCardSummary] = React.useState<CapabilityCardSummary | null>(null);
+    const [cardsLoading, setCardsLoading] = React.useState(false);
+
     const [replayEvents, setReplayEvents] = React.useState<ReplayEvent[]>([]);
     const [replayTotal, setReplayTotal] = React.useState(0);
     const [activeStep, setActiveStep] = React.useState(0);
@@ -179,6 +183,17 @@ export const AssuranceTab: React.FC<AssuranceTabProps> = ({ arcService, initialR
             setAuditError(errorMessage(error));
         } finally {
             setAuditLoading(false);
+        }
+    }, [arcService, runId]);
+
+    const verifyCards = React.useCallback(async () => {
+        const trimmedRunId = runId.trim();
+        if (!trimmedRunId) { return; }
+        setCardsLoading(true);
+        try {
+            setCardSummary(await arcService.getCapabilityCardSummary(trimmedRunId));
+        } finally {
+            setCardsLoading(false);
         }
     }, [arcService, runId]);
 
@@ -342,7 +357,10 @@ export const AssuranceTab: React.FC<AssuranceTabProps> = ({ arcService, initialR
                         placeholder='Run id'
                     />
                     <button className='arc-studio-assurance__button' onClick={verifyAudit} disabled={auditLoading}>
-                        {auditLoading ? 'Verifying...' : 'Verify'}
+                        {auditLoading ? 'Verifying...' : 'Verify Audit'}
+                    </button>
+                    <button className='arc-studio-assurance__button arc-studio-assurance__button--secondary' onClick={verifyCards} disabled={cardsLoading}>
+                        {cardsLoading ? 'Loading...' : 'Verify Capability Cards'}
                     </button>
                 </div>
                 <p className='arc-studio-assurance__note'>No adapter-wide keyed audit/HMAC claim. This view reports available run audit material only.</p>
@@ -368,6 +386,28 @@ export const AssuranceTab: React.FC<AssuranceTabProps> = ({ arcService, initialR
                         <dt>signature</dt><dd>{auditInfo.signature || 'not provided'}</dd>
                         <dt>hmac</dt><dd>{auditInfo.hmacAlgo || 'not provided'}</dd>
                     </dl>
+                )}
+            </section>
+
+            <section className='arc-studio-assurance__section arc-studio-assurance__cards'>
+                <h3>Capability Cards</h3>
+                {!cardSummary && !cardsLoading && (
+                    <p className='arc-studio-assurance__empty'>Enter a run id above and click Verify Capability Cards.</p>
+                )}
+                {cardSummary && cardSummary.decisions.length === 0 && (
+                    <p className='arc-studio-assurance__empty'>No capability card decisions recorded for this run (mode: {cardSummary.mode}).</p>
+                )}
+                {cardSummary && cardSummary.decisions.length > 0 && (
+                    <ul className='arc-studio-assurance__cards-list'>
+                        {cardSummary.decisions.map((d, i) => (
+                            <li key={i} className={`arc-studio-assurance__state-banner arc-studio-assurance__state-banner--${d.decision === 'allow' ? 'success' : d.decision === 'warn' ? 'warning' : 'info'}`}>
+                                <strong>{d.decision.toUpperCase()}</strong>
+                                {d.cardId && <span> [{d.cardId}]</span>}
+                                <span> — {d.reason.replace('capability_card_', '').replace(/_/g, ' ')}</span>
+                                {d.remediation && <em> · {d.remediation}</em>}
+                            </li>
+                        ))}
+                    </ul>
                 )}
             </section>
 
