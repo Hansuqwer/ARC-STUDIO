@@ -18,6 +18,8 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 - **TUI (/wallet)**: FREE TIER rendering (OpenRouter `:free` variants), `≈` qualifier for non-cl100k tokenizer families, deprecation warning for expired `pricing_valid_until`, `(routed to X)` annotation for `auto_route_to`. (v0.5.1)
 - **Scripts**: `sync_from_pricing_feed.py` — dev-time multi-source pricing fetcher (OpenRouter primary, models.dev fallback). Not shipped in ARC runtime; pricing rows are hardcoded. (v0.5.1)
 - **Docs (research)**: `pricing-feed-sources-comparison.md` — OpenRouter vs models.dev decision rationale, locked for v0.5.1+. (v0.5.1)
+- **Providers**: `CostRates` extended with 2 capability fields: `supported_parameters: list[str]` (API params the model accepts, e.g. `["tools", "reasoning_effort"]`) and `input_modalities: list[str]` (e.g. `["text", "image", "audio"]`). Both default to `[]`; backward-compat. 48 Chinese-lab model rows populated from OpenRouter. (v0.5.2)
+- **Scripts**: `sync_from_pricing_feed.py` updated to emit `supported_parameters` + `input_modalities` in rendered vendor blocks. (v0.5.2)
 
 ### Changed
 - **OpenAI cache multiplier**: GPT-5.x current-gen corrected from legacy 50% → 90% off (0.10× input). gpt-4o-mini legacy 50% preserved. GPT-4.1 family at 75% off (0.25×). (v0.4.1)

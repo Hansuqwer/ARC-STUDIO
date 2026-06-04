@@ -1,70 +1,60 @@
-# v0.5.1-alpha Merge Notes
+# v0.5.2-alpha Merge Notes
 
 ## What ships
 
-**Chinese-lab / open-weight vendor adoption — first batch.**
+**CostRate capability fields backfill — prerequisite for v0.6-alpha /models picker.**
 
-6 new vendor families route via `providers/openai_compatible.py`. No new provider class. No new mandatory dependencies. Gemini block (`if self._vendor == "gemini"` caching guard at `8cdc378`) untouched.
+Triggered by: Task 0 gap audit in v0.6-alpha sprint found that v0.5.1's `CostRate`
+extension didn't include `supported_parameters` or `input_modalities`. The v0.6
+`/models` picker requires per-model capability data for filtering (e.g.
+`--has vision`, `--has tools`).
 
-### Vendors
+## Changes
 
-| Vendor | Native API | Models | Notes |
-|---|---|---|---|
-| DeepSeek | `api.deepseek.com/v1` | 6 | Cache field names: `prompt_cache_hit_tokens`; `deepseek-chat` deprecated 2026-07-24 |
-| Qwen (Alibaba) | `dashscope.aliyuncs.com/compatible-mode/v1` | 10 | `tokenizer_family=qwen`; all rows get `≈` qualifier in `/wallet` |
-| Kimi (Moonshot) | `api.moonshot.ai/v1` | 5 | `kimi-k2-0905` deprecated 2026-05-25; K2.6 is current flagship |
-| GLM (Z.AI) | `open.bigmodel.cn/api/paas/v4/` | 12 | `glm-4.5-air` is free-tier per OpenRouter; `tokenizer_family=glm` |
-| MiMo (Xiaomi) | `api.xiaomimimo.com/v1` | 3 | OpenRouter has 3 active models (legacy V2-Pro/Omni absent from OpenRouter) |
-| MiniMax | `api.minimax.io/v1` | 6 | `minimax-m3` is new flagship ($0.30/$1.20/M) |
-| CrofAI proxy | `crof.ai/v1` | 17 | Unified proxy; all of the above under one `CROFAI` key |
+### CostRates schema (`base.py`)
 
-**Total: 91 OpenRouter-sourced model rows** (pricing cross-checked against OpenRouter `/api/v1/models` on 2026-06-05 via `scripts/sync_from_pricing_feed.py`).
+Two new fields, both additive with empty-list defaults:
 
-### OpenRouter `:free` tier vs vendor-direct free
+```python
+supported_parameters: list[str] = Field(default_factory=list)
+input_modalities: list[str] = Field(default_factory=list)
+```
 
-4 rows are marked `is_free_tier=True`: `glm-4.5-air:free`, `kimi-k2.6:free`, `qwen3-next:free`, `qwen3-coder:free`. These are **OpenRouter rate-limited free-tier variants**, not vendor-direct perpetually free models. `/wallet` shows `FREE TIER (via OpenRouter free tier; rate-limited)` — not `$0.00` to avoid confusion with exhausted caps.
+All existing rows are unaffected (default `[]`). No migration needed.
 
-### CostRates schema extension
+### Vendor block backfill (`openai_compatible.py`)
 
-6 new optional fields on `CostRates` (additive; all existing rows unaffected):
+48 of 57 Chinese-lab model rows updated with capability data from OpenRouter
+(`architecture.input_modalities` + `supported_parameters`):
 
-| Field | Purpose |
-|---|---|
-| `is_free_tier` | Wallet skips enforcement; shows "FREE TIER" |
-| `pricing_valid_until` | ISO date; triggers ⚠ EXPIRED warning |
-| `auto_route_to` | Server-side routing alias; shown in wallet |
-| `cache_field_names` | Per-vendor cache token field names (e.g. DeepSeek) |
-| `tokenizer_family` | Non-cl100k → `≈` qualifier in wallet |
-| `cache_storage_usd_per_million_per_hour` | Vertex/Gemini storage fee (reserved) |
+| Vendor | Rows updated | Notes |
+|---|---|---|
+| DeepSeek | 6 | All text-only; tools + reasoning + structured_outputs in params |
+| Qwen | ~9/10 | 7 multimodal [text,image,video]; legacy `qwen2.5-72b` missed suffix match |
+| Kimi | 5 | k2.5/k2.6 = [text,image]; k2 = [text] |
+| GLM | 12 | v/vl models = [image,text,video]; others text-only |
+| MiMo | 3 | mimo-v2.5 = [text,audio,image,video] — only model with audio in sprint |
+| MiniMax | 6 | minimax-m3 = [text,image,video] |
 
-### Wallet display
+Non-Chinese-lab vendors (OpenAI, Anthropic, Groq, etc.) left with empty defaults.
+No OpenRouter data for these; v0.6 can backfill from native API schemas if needed.
 
-`/wallet` now shows per-model annotations when a provider+model is active in session:
-- `is_free_tier=True` → `FREE TIER (via OpenRouter free tier; rate-limited)`
-- Expired `pricing_valid_until` → `⚠ EXPIRED — use <auto_route_to>`
-- Non-cl100k tokenizer → `≈ cost (tokenizer_family=X; heuristic accuracy unverified)`
-- `auto_route_to` (non-expired) → `(routed to X)`
+### Sync script update
 
-## Pricing source decision
-
-OpenRouter (`/api/v1/models`) chosen over models.dev. Rationale locked in `docs/research/pricing-feed-sources-comparison.md`. Decision fields (`is_free`, `deprecation_date`, `canonical_slug`) are native in OpenRouter; addendum overlay applied for 2 IDs not flagged by OpenRouter (`deepseek-chat` 2026-07-24, `kimi-k2-0905` 2026-05-25).
+`scripts/sync_from_pricing_feed.py` now emits `supported_parameters` and
+`input_modalities` in `render_vendor_block()` output. Future syncs will
+automatically include capability data.
 
 ## Test delta
 
-Python: 4979 (v0.5.0) → 5030 passed (+51). TS: 147 (unchanged).
+5030 (v0.5.1) → 5039 (+9). 9 new capability field tests.
 
-Pre-existing acceptable failures (same as v0.5.0):
-- `test_concurrent_accumulation` — SQLite lock, env-specific
-- 5 xfailed: 2 CLI doctor exit-code, 1 CLI runs mode, 2 TUI snapshot SVG-hash
+## Pre-existing acceptable failures
 
-## Behavior smokes
-
-**Smoke 1 (DeepSeek round-trip):** SKIP-no-key — no DeepSeek native account. Pricing verified by unit test (`test_deepseek_v4_pro_openrouter_price`).
-
-**Smoke 2 (GLM free tier):** SKIP-no-key — no GLM native account. Free-tier rendering verified by `test_free_tier_shows_free_tier_label`. CrofAI key available for end-to-end test: `CROFAI_VENDOR=crofai ARC_MODEL=glm-4.7-flash uv run arc` will show FREE TIER annotation.
+Same as v0.5.1: `test_concurrent_accumulation` SQLite env flake + 5 xfailed.
 
 ## Branch
 
-`spec/v0.5.1-chinese-labs` — 9 commits — ready to merge to `main`.
+`spec/v0.5.2-capability-fields` — 4 commits — ready to merge.
 
 **Do NOT tag yet. Awaiting your go.**
