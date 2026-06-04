@@ -80,6 +80,8 @@ import {
     EditPlanDiffResult,
     EditPlanInfo,
     EditPlanListResult,
+    CapabilityCardSummary,
+    McpDecisionList,
 } from '../common/arc-protocol';
 import { validateWorkspaceRoot, validateTraceId, validateRunId } from './security-utils';
 import { WorkflowExecutor } from './services/workflow-executor';
@@ -1196,5 +1198,59 @@ export class ArcBackendService implements ArcService {
 
     async applyEditPlan(planId: string, content: string, token: string): Promise<EditPlanApplyResult> {
         return this.editPlanBridgeService.applyEditPlan(planId, content, token);
+    }
+
+    async getCapabilityCardSummary(runId: string): Promise<CapabilityCardSummary> {
+        try {
+            const output = execFileSync(
+                'arc', ['capabilities', 'verify-run', runId, '--json'],
+                { cwd: this.workspaceRoot, encoding: 'utf8', timeout: 10000 }
+            );
+            const parsed = JSON.parse(output);
+            const data = parsed?.data ?? parsed;
+            return {
+                runId,
+                decisions: (data?.decisions ?? []).map((d: any) => ({
+                    action: d.action ?? '',
+                    decision: d.decision ?? 'warn',
+                    reason: d.reason ?? '',
+                    cardId: d.card_id ?? d.cardId,
+                    cardHash: d.card_hash ?? d.cardHash,
+                    entityType: d.entity_type ?? d.entityType,
+                    mode: d.mode ?? 'warn',
+                    correlationId: d.correlation_id ?? d.correlationId,
+                    remediation: d.remediation,
+                })),
+                mode: data?.mode ?? 'warn',
+            };
+        } catch {
+            return { runId, decisions: [], mode: 'warn' };
+        }
+    }
+
+    async getMcpDecisions(opts?: { limit?: number; since?: string }): Promise<McpDecisionList> {
+        try {
+            const args = ['mcp', 'decisions', '--json'];
+            if (opts?.limit) { args.push('--limit', String(opts.limit)); }
+            if (opts?.since) { args.push('--since', opts.since); }
+            const output = execFileSync('arc', args,
+                { cwd: this.workspaceRoot, encoding: 'utf8', timeout: 10000 }
+            );
+            const parsed = JSON.parse(output);
+            const items: any[] = parsed?.data ?? parsed?.decisions ?? parsed ?? [];
+            const decisions = (Array.isArray(items) ? items : []).map((d: any) => ({
+                serverId: d.server_id ?? d.serverId ?? '',
+                toolName: d.tool_name ?? d.toolName ?? '',
+                decision: d.decision ?? 'allow',
+                riskScore: d.risk_score ?? d.riskScore ?? 'low',
+                policy: d.policy ?? 'strict',
+                reason: d.reason ?? '',
+                timestamp: d.timestamp ?? 0,
+                correlationId: d.correlation_id ?? d.correlationId,
+            }));
+            return { decisions, total: decisions.length };
+        } catch {
+            return { decisions: [], total: 0 };
+        }
     }
 }

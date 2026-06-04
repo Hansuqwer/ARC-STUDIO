@@ -1754,6 +1754,45 @@ export interface ArcService {
 
     /** Sandbox-gated MCP server inspect via sandbox run */
     sandboxInspect(command: string[], policy?: string): Promise<SandboxInspectResult>;
+
+    /** Capability Card enforcement decisions for a run (CAPABILITY_CARD_DECISION events) */
+    getCapabilityCardSummary(runId: string): Promise<CapabilityCardSummary>;
+    /** Recent MCP outbound call decisions (MCP_CALL_DECISION events) from .arc/mcp/decisions.jsonl */
+    getMcpDecisions(opts?: { limit?: number; since?: string }): Promise<McpDecisionList>;
+}
+
+export interface CapabilityCardDecision {
+    action: string;
+    decision: 'allow' | 'deny' | 'warn';
+    reason: string;
+    cardId?: string;
+    cardHash?: string;
+    entityType?: string;
+    mode: 'off' | 'warn' | 'strict';
+    correlationId?: string;
+    remediation?: string;
+}
+
+export interface CapabilityCardSummary {
+    runId: string;
+    decisions: CapabilityCardDecision[];
+    mode: 'off' | 'warn' | 'strict';
+}
+
+export interface McpDecisionEntry {
+    serverId: string;
+    toolName: string;
+    decision: 'allow' | 'deny' | 'warn';
+    riskScore: 'low' | 'medium' | 'high' | 'critical';
+    policy: string;
+    reason: string;
+    timestamp: number;
+    correlationId?: string;
+}
+
+export interface McpDecisionList {
+    decisions: McpDecisionEntry[];
+    total: number;
 }
 
 // Phase 78/79/80 follow-up: read-only telemetry types
