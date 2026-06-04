@@ -50,6 +50,9 @@ class DataStore:
     # ── cost ─────────────────────────────────────────────────────────────
     total_cost_usd: float = 0.0
     total_tokens: int = 0
+    # UX R-002: context-window size for the currently selected model.
+    # 0 means unknown — ContextMeter falls back to a conservative default.
+    context_limit: int = 0
 
     # ── agent state ──────────────────────────────────────────────────────
     is_streaming: bool = False

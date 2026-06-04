@@ -39,6 +39,14 @@ class Transcript(VerticalScroll):
             from .tool_card import ToolCard
 
             self.mount(ToolCard(entry, self.theme))
+        elif entry.role == "assistant":
+            # UX R-004: assistant body gets markdown + syntax via MarkdownBlock.
+            # We still emit a small role header above it so timestamps stay visible.
+            from .markdown_block import MarkdownBlock
+
+            self.mount(MessageHeader(entry, self.theme))
+            no_color = bool(getattr(self.theme.current, "no_color", False))
+            self.mount(MarkdownBlock(entry.content, no_color=no_color))
         else:
             msg = MessageWidget(entry, self.theme, self.data)
             self.mount(msg)
@@ -52,6 +60,32 @@ class Transcript(VerticalScroll):
 
     def key_end(self) -> None:
         self.scroll_to_bottom()
+
+
+class MessageHeader(Static):
+    """One-line role + timestamp header. Used above MarkdownBlock for assistant.
+
+    Kept tiny so it never competes with the body for vertical space.
+    """
+
+    def __init__(self, entry: TranscriptEntry, theme: ThemeManager, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.entry = entry
+        self.theme = theme
+
+    def render(self) -> str:
+        no_color = bool(getattr(self.theme.current, "no_color", False))
+        label = {"user": "you", "assistant": "arc", "system": "sys"}.get(
+            self.entry.role, self.entry.role
+        )
+        if no_color:
+            return f"> {label}  {self.entry.display_time}"
+        color = {
+            "user": "magenta",
+            "assistant": "cyan",
+            "system": "dim",
+        }.get(self.entry.role, "white")
+        return f"[bold {color}]\u25b8 {label}[/]  [dim]{self.entry.display_time}[/]"
 
 
 class MessageWidget(Static):
