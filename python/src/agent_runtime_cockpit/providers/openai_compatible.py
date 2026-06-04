@@ -54,6 +54,7 @@ VendorName = Literal[
     "llamacpp",
     "9router",
     "crofai",
+    "gemini",
 ]
 
 VENDOR_CONFIGS = {
@@ -202,6 +203,37 @@ VENDOR_CONFIGS = {
         "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE],
         "cost_rates": {
             "deepseek-v4-pro-precision": CostRates(input_per_million=0.0, output_per_million=0.0),
+        },
+    },
+    "gemini": {
+        # Google AI Studio OpenAI-compatible endpoint (requires GEMINI_API_KEY)
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "default_model": "gemini-2.5-flash",
+        "supported_models": [
+            "gemini-2.5-pro",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-3-flash",
+            "gemini-3.5-flash",
+        ],
+        "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE, ProviderFeature.VISION],
+        # Rates per pricing-snapshot-2026Q2.md §1 (≤200K context window tier)
+        "cost_rates": {
+            "gemini-2.5-pro": CostRates(
+                input_per_million=1.25, output_per_million=10.0, cache_read_per_million=0.125
+            ),
+            "gemini-2.5-flash": CostRates(
+                input_per_million=0.30, output_per_million=2.50, cache_read_per_million=0.03
+            ),
+            "gemini-2.5-flash-lite": CostRates(
+                input_per_million=0.10, output_per_million=0.40, cache_read_per_million=0.01
+            ),
+            "gemini-3-flash": CostRates(
+                input_per_million=0.50, output_per_million=3.00, cache_read_per_million=0.05
+            ),
+            "gemini-3.5-flash": CostRates(
+                input_per_million=1.50, output_per_million=9.00, cache_read_per_million=0.15
+            ),
         },
     },
 }
@@ -374,6 +406,8 @@ class OpenAICompatibleClient:
             return ["NINEROUTER_API_KEY", "ROUTER9_API_KEY"]
         if self._vendor == "crofai":
             return ["CROFAI_API_KEY", "CROF_API_KEY", "CROFAI"]
+        if self._vendor == "gemini":
+            return ["GEMINI_API_KEY", "GOOGLE_API_KEY"]
         if self._vendor == "llamacpp":
             return []
         return [f"{self._vendor.upper()}_API_KEY"]
