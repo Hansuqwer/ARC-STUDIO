@@ -2,62 +2,796 @@
   "schemaVersion": 1,
   "source": "python/src/agent_runtime_cockpit/protocol/events.py EVENT_TYPES",
   "eventTypes": [
-    {"type":"RUN_STARTED","version":2,"requiredFields":["runtime","workflow_id"],"optionalFields":["evidence_refs","isolation","message_id","node_id","profile_id"]},
-    {"type":"RUN_COMPLETED","version":2,"requiredFields":["duration_ms"],"optionalFields":["evidence_refs","message_id","node_id","output"]},
-    {"type":"RUN_FAILED","version":2,"requiredFields":["error"],"optionalFields":["error_detail","error_type","evidence_refs","message_id","node_id"]},
-    {"type":"RUN_CANCELLED","version":2,"requiredFields":["cancel_reason"],"optionalFields":["message_id","node_id"]},
-    {"type":"STEP_STARTED","version":2,"requiredFields":["step_id","step_name"],"optionalFields":["evidence_refs","message_id","node_id","step_type"]},
-    {"type":"STEP_COMPLETED","version":2,"requiredFields":["step_id"],"optionalFields":["duration_ms","evidence_refs","message_id","node_id","output"]},
-    {"type":"STEP_FAILED","version":2,"requiredFields":["error","step_id"],"optionalFields":["evidence_refs","message_id","node_id"]},
-    {"type":"AGENT_START","version":2,"requiredFields":["agent_name"],"optionalFields":["instructions","message_id","node_id"]},
-    {"type":"AGENT_END","version":2,"requiredFields":["agent_name","output"],"optionalFields":["message_id","node_id","usage"]},
-    {"type":"TOOL_CALL","version":2,"requiredFields":["tool_call_id","tool_name"],"optionalFields":["evidence_refs","message_id","node_id"]},
-    {"type":"TOOL_CALL_START","version":2,"requiredFields":["tool_call_id","tool_name"],"optionalFields":["evidence_refs","message_id","node_id"]},
-    {"type":"TOOL_CALL_ARGS","version":2,"requiredFields":["delta","tool_call_id"],"optionalFields":["message_id","node_id"]},
-    {"type":"TOOL_CALL_END","version":2,"requiredFields":["tool_call_id"],"optionalFields":["evidence_refs","message_id","node_id"]},
-    {"type":"TOOL_CALL_RESULT","version":2,"requiredFields":["result","tool_call_id"],"optionalFields":["evidence_refs","message_id","node_id"]},
-    {"type":"TOOL_CALL_ERROR","version":2,"requiredFields":["error","tool_call_id"],"optionalFields":["evidence_refs","message_id","node_id"]},
-    {"type":"TOOL_END","version":2,"requiredFields":["result","tool_name"],"optionalFields":["evidence_refs","message_id","node_id"]},
-    {"type":"HANDOFF","version":2,"requiredFields":["from_agent","to_agent"],"optionalFields":["message_id","node_id"]},
-    {"type":"NODE_STARTED","version":2,"requiredFields":["node_id"],"optionalFields":["evidence_refs","message_id","node_name","node_type"]},
-    {"type":"NODE_UPDATE","version":2,"requiredFields":["runtime","status"],"optionalFields":["message_id","node_id","run_id"]},
-    {"type":"NODE_FAILED","version":2,"requiredFields":["error","node_id"],"optionalFields":["evidence_refs","message_id","node_name"]},
-    {"type":"MESSAGE","version":2,"requiredFields":["text"],"optionalFields":["coalesced","evidence_refs","message_id","node_id","source","tool_call_id"]},
-    {"type":"MESSAGE_CHUNK","version":2,"requiredFields":["text"],"optionalFields":["message_id","node_id","source"]},
-    {"type":"TEXT_MESSAGE_START","version":2,"requiredFields":["message_id"],"optionalFields":["node_id","role"]},
-    {"type":"TEXT_MESSAGE_CONTENT","version":2,"requiredFields":["delta","message_id"],"optionalFields":["node_id"]},
-    {"type":"TEXT_MESSAGE_END","version":2,"requiredFields":["message_id"],"optionalFields":["evidence_refs","node_id"]},
-    {"type":"TEXT_MESSAGE_CHUNK","version":2,"requiredFields":["delta","role"],"optionalFields":["message_id","node_id"]},
-    {"type":"STATE_SNAPSHOT","version":2,"requiredFields":["state"],"optionalFields":["node_id","redacted"]},
-    {"type":"SWARMGRAPH_TOPOLOGY","version":2,"requiredFields":["edges","nodes"],"optionalFields":["evidence_refs","message_id","node_id","strategy","task_id"]},
-    {"type":"SWARMGRAPH_CONSENSUS","version":2,"requiredFields":["votes"],"optionalFields":["confidence","consensus_reached","decision","evidence_refs","message_id","node_id","strategy","task_id","voters"]},
-    {"type":"SWARMGRAPH_COST","version":2,"requiredFields":[],"optionalFields":["completionTokens","currency","evidence_refs","items","measured","message_id","model","node_id","promptTokens","provider","runtime","source","totalCost","totalTokens"]},
-    {"type":"HITL_PROMPT","version":2,"requiredFields":["hitl_id","options","prompt_text","step_id","timeout_seconds"],"optionalFields":["context","created_at","evidence_refs","message_id","node_id"]},
-    {"type":"HITL_RESPONSE","version":2,"requiredFields":["decision","hitl_id","operator_id","responded_at"],"optionalFields":["message_id","modified_data","node_id","notes"]},
-    {"type":"HITL_TIMEOUT","version":2,"requiredFields":["hitl_id","timeout_seconds"],"optionalFields":["message_id","node_id"]},
-    {"type":"CONTRACT_PROPOSED","version":2,"requiredFields":["contract"],"optionalFields":["message_id","node_id"]},
-    {"type":"CONTRACT_ACCEPTED","version":2,"requiredFields":["contract_id"],"optionalFields":["evidence_refs","message_id","node_id"]},
-    {"type":"CONTRACT_FULFILLED","version":2,"requiredFields":["contract_id","run_id"],"optionalFields":["evidence_refs","message_id","node_id"]},
-    {"type":"CONTRACT_VIOLATED","version":2,"requiredFields":["contract_id","reason","run_id"],"optionalFields":["evidence_refs","message_id","node_id"]},
-    {"type":"RECEIPT_GENERATED","version":2,"requiredFields":["receipt"],"optionalFields":["evidence_refs","message_id","node_id"]},
-    {"type":"FAILURE_AUTOPSY_GENERATED","version":2,"requiredFields":["autopsy"],"optionalFields":["evidence_refs","message_id","node_id"]},
-    {"type":"EVIDENCE_REF_CREATED","version":2,"requiredFields":["evidence_ref"],"optionalFields":["message_id","node_id"]},
-    {"type":"POLICY_BYPASS_WARNING","version":2,"requiredFields":["bypass_reason","policy_id","suggested_remediation","surface","surface_identifier"],"optionalFields":["parent_run_id"]},
-    {"type":"BATTLE_STARTED","version":2,"requiredFields":["battle_id","consensus_protocol","prompt","topology","workers"],"optionalFields":["consensus_escrow","message_id","node_id","require_hitl","runtime_mode"]},
-    {"type":"BATTLE_CANDIDATE_READY","version":2,"requiredFields":["battle_id","candidate_id","model_id","worker_id"],"optionalFields":["message_id","node_id","output_preview"]},
-    {"type":"BATTLE_VOTE_COMMITTED","version":2,"requiredFields":["battle_id","commit_hash","vote_id"],"optionalFields":["message_id","node_id","voter"]},
-    {"type":"BATTLE_VOTE_REVEALED","version":2,"requiredFields":["approved","battle_id","candidate_id","vote_id"],"optionalFields":["message_id","node_id","reasoning","voter"]},
-    {"type":"BATTLE_CONSENSUS_REACHED","version":2,"requiredFields":["battle_id","consensus_reached"],"optionalFields":["consensus_result","message_id","node_id","winner_candidate_id"]},
-    {"type":"BATTLE_HITL_REQUIRED","version":2,"requiredFields":["battle_id","candidates","hitl_id"],"optionalFields":["message_id","node_id","prompt","timeout_seconds"]},
-    {"type":"BATTLE_COMPLETED","version":2,"requiredFields":["battle_id","status"],"optionalFields":["duration_ms","error","message_id","node_id","winner_candidate_id"]},
-    {"type":"RAW","version":2,"requiredFields":["raw"],"optionalFields":["message_id","node_id","source"]},
-    {"type":"CUSTOM","version":2,"requiredFields":["custom_type"],"optionalFields":["data","message_id","node_id"]},
-    {"type":"CONSENSUS_DIFFERENTIATOR","version":2,"requiredFields":["decision","protocol","votes"],"optionalFields":["disagreement_rate","evidence_refs","message_id","node_id","quality_score","round"]},
-    {"type":"CONSENSUS_EVAL","version":2,"requiredFields":["num_rounds","num_workers","protocols"],"optionalFields":["consensus_escrow","message_id","node_id"]},
-    {"type":"CONSENSUS_EVAL_RUN","version":2,"requiredFields":["consensus_reached","protocol","total_votes"],"optionalFields":["approval_count","cost_score","disagreement_rate","duration_ms","escalation_rate","evidence_refs","latency_ms","message_id","node_id","quality_score"]},
-    {"type":"CAPABILITY_CARD_DECISION","version":2,"requiredFields":["action","decision","mode","reason"],"optionalFields":["card_hash","card_id","correlation_id","details","entity_type","remediation"]},
-    {"type":"MCP_CALL_DECISION","version":2,"requiredFields":["decision","policy","reason","risk_level","server_id","tool_name"],"optionalFields":["correlation_id","drift","injection_severity","manifest_risk","roots_violation"]},
-    {"type":"EVAL_POLICY_RECOMMENDED","version":2,"requiredFields":["actions","correlation_id","profile_id","recommendations_count"],"optionalFields":["message_id","node_id"]},
-    {"type":"EVAL_POLICY_APPLIED","version":2,"requiredFields":["correlation_id","diff_summary","dry_run","new_path","profile_id","version"],"optionalFields":["message_id","node_id"]}
+    {
+      "type": "RUN_STARTED",
+      "version": 2,
+      "requiredFields": [
+        "runtime",
+        "workflow_id"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "isolation",
+        "message_id",
+        "node_id",
+        "profile_id"
+      ]
+    },
+    {
+      "type": "RUN_COMPLETED",
+      "version": 2,
+      "requiredFields": [
+        "duration_ms"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_id",
+        "output"
+      ]
+    },
+    {
+      "type": "RUN_FAILED",
+      "version": 2,
+      "requiredFields": [
+        "error"
+      ],
+      "optionalFields": [
+        "error_detail",
+        "error_type",
+        "evidence_refs",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "RUN_CANCELLED",
+      "version": 2,
+      "requiredFields": [
+        "cancel_reason"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "STEP_STARTED",
+      "version": 2,
+      "requiredFields": [
+        "step_id",
+        "step_name"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_id",
+        "step_type"
+      ]
+    },
+    {
+      "type": "STEP_COMPLETED",
+      "version": 2,
+      "requiredFields": [
+        "step_id"
+      ],
+      "optionalFields": [
+        "duration_ms",
+        "evidence_refs",
+        "message_id",
+        "node_id",
+        "output"
+      ]
+    },
+    {
+      "type": "STEP_FAILED",
+      "version": 2,
+      "requiredFields": [
+        "error",
+        "step_id"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "AGENT_START",
+      "version": 2,
+      "requiredFields": [
+        "agent_name"
+      ],
+      "optionalFields": [
+        "instructions",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "AGENT_END",
+      "version": 2,
+      "requiredFields": [
+        "agent_name",
+        "output"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id",
+        "usage"
+      ]
+    },
+    {
+      "type": "TOOL_CALL",
+      "version": 2,
+      "requiredFields": [
+        "tool_call_id",
+        "tool_name"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "TOOL_CALL_START",
+      "version": 2,
+      "requiredFields": [
+        "tool_call_id",
+        "tool_name"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "TOOL_CALL_ARGS",
+      "version": 2,
+      "requiredFields": [
+        "delta",
+        "tool_call_id"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "TOOL_CALL_END",
+      "version": 2,
+      "requiredFields": [
+        "tool_call_id"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "TOOL_CALL_RESULT",
+      "version": 2,
+      "requiredFields": [
+        "result",
+        "tool_call_id"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "TOOL_CALL_ERROR",
+      "version": 2,
+      "requiredFields": [
+        "error",
+        "tool_call_id"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "TOOL_END",
+      "version": 2,
+      "requiredFields": [
+        "result",
+        "tool_name"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "HANDOFF",
+      "version": 2,
+      "requiredFields": [
+        "from_agent",
+        "to_agent"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "NODE_STARTED",
+      "version": 2,
+      "requiredFields": [
+        "node_id"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_name",
+        "node_type"
+      ]
+    },
+    {
+      "type": "NODE_UPDATE",
+      "version": 2,
+      "requiredFields": [
+        "runtime",
+        "status"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id",
+        "run_id"
+      ]
+    },
+    {
+      "type": "NODE_FAILED",
+      "version": 2,
+      "requiredFields": [
+        "error",
+        "node_id"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_name"
+      ]
+    },
+    {
+      "type": "MESSAGE",
+      "version": 2,
+      "requiredFields": [
+        "text"
+      ],
+      "optionalFields": [
+        "coalesced",
+        "evidence_refs",
+        "message_id",
+        "node_id",
+        "source",
+        "tool_call_id"
+      ]
+    },
+    {
+      "type": "MESSAGE_CHUNK",
+      "version": 2,
+      "requiredFields": [
+        "text"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id",
+        "source"
+      ]
+    },
+    {
+      "type": "TEXT_MESSAGE_START",
+      "version": 2,
+      "requiredFields": [
+        "message_id"
+      ],
+      "optionalFields": [
+        "node_id",
+        "role"
+      ]
+    },
+    {
+      "type": "TEXT_MESSAGE_CONTENT",
+      "version": 2,
+      "requiredFields": [
+        "delta",
+        "message_id"
+      ],
+      "optionalFields": [
+        "node_id"
+      ]
+    },
+    {
+      "type": "TEXT_MESSAGE_END",
+      "version": 2,
+      "requiredFields": [
+        "message_id"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "node_id"
+      ]
+    },
+    {
+      "type": "TEXT_MESSAGE_CHUNK",
+      "version": 2,
+      "requiredFields": [
+        "delta",
+        "role"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "STATE_SNAPSHOT",
+      "version": 2,
+      "requiredFields": [
+        "state"
+      ],
+      "optionalFields": [
+        "node_id",
+        "redacted"
+      ]
+    },
+    {
+      "type": "SWARMGRAPH_TOPOLOGY",
+      "version": 2,
+      "requiredFields": [
+        "edges",
+        "nodes"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_id",
+        "strategy",
+        "task_id"
+      ]
+    },
+    {
+      "type": "SWARMGRAPH_CONSENSUS",
+      "version": 2,
+      "requiredFields": [
+        "votes"
+      ],
+      "optionalFields": [
+        "confidence",
+        "consensus_reached",
+        "decision",
+        "evidence_refs",
+        "message_id",
+        "node_id",
+        "strategy",
+        "task_id",
+        "voters"
+      ]
+    },
+    {
+      "type": "SWARMGRAPH_COST",
+      "version": 2,
+      "requiredFields": [],
+      "optionalFields": [
+        "completionTokens",
+        "currency",
+        "evidence_refs",
+        "items",
+        "measured",
+        "message_id",
+        "model",
+        "node_id",
+        "promptTokens",
+        "provider",
+        "runtime",
+        "source",
+        "totalCost",
+        "totalTokens"
+      ]
+    },
+    {
+      "type": "HITL_PROMPT",
+      "version": 2,
+      "requiredFields": [
+        "hitl_id",
+        "options",
+        "prompt_text",
+        "step_id",
+        "timeout_seconds"
+      ],
+      "optionalFields": [
+        "context",
+        "created_at",
+        "evidence_refs",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "HITL_RESPONSE",
+      "version": 2,
+      "requiredFields": [
+        "decision",
+        "hitl_id",
+        "operator_id",
+        "responded_at"
+      ],
+      "optionalFields": [
+        "message_id",
+        "modified_data",
+        "node_id",
+        "notes"
+      ]
+    },
+    {
+      "type": "HITL_TIMEOUT",
+      "version": 2,
+      "requiredFields": [
+        "hitl_id",
+        "timeout_seconds"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "CONTRACT_PROPOSED",
+      "version": 2,
+      "requiredFields": [
+        "contract"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "CONTRACT_ACCEPTED",
+      "version": 2,
+      "requiredFields": [
+        "contract_id"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "CONTRACT_FULFILLED",
+      "version": 2,
+      "requiredFields": [
+        "contract_id",
+        "run_id"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "CONTRACT_VIOLATED",
+      "version": 2,
+      "requiredFields": [
+        "contract_id",
+        "reason",
+        "run_id"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "RECEIPT_GENERATED",
+      "version": 2,
+      "requiredFields": [
+        "receipt"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "FAILURE_AUTOPSY_GENERATED",
+      "version": 2,
+      "requiredFields": [
+        "autopsy"
+      ],
+      "optionalFields": [
+        "evidence_refs",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "EVIDENCE_REF_CREATED",
+      "version": 2,
+      "requiredFields": [
+        "evidence_ref"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "POLICY_BYPASS_WARNING",
+      "version": 2,
+      "requiredFields": [
+        "bypass_reason",
+        "policy_id",
+        "suggested_remediation",
+        "surface",
+        "surface_identifier"
+      ],
+      "optionalFields": [
+        "parent_run_id"
+      ]
+    },
+    {
+      "type": "BATTLE_STARTED",
+      "version": 2,
+      "requiredFields": [
+        "battle_id",
+        "consensus_protocol",
+        "prompt",
+        "topology",
+        "workers"
+      ],
+      "optionalFields": [
+        "consensus_escrow",
+        "message_id",
+        "node_id",
+        "require_hitl",
+        "runtime_mode"
+      ]
+    },
+    {
+      "type": "BATTLE_CANDIDATE_READY",
+      "version": 2,
+      "requiredFields": [
+        "battle_id",
+        "candidate_id",
+        "model_id",
+        "worker_id"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id",
+        "output_preview"
+      ]
+    },
+    {
+      "type": "BATTLE_VOTE_COMMITTED",
+      "version": 2,
+      "requiredFields": [
+        "battle_id",
+        "commit_hash",
+        "vote_id"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id",
+        "voter"
+      ]
+    },
+    {
+      "type": "BATTLE_VOTE_REVEALED",
+      "version": 2,
+      "requiredFields": [
+        "approved",
+        "battle_id",
+        "candidate_id",
+        "vote_id"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id",
+        "reasoning",
+        "voter"
+      ]
+    },
+    {
+      "type": "BATTLE_CONSENSUS_REACHED",
+      "version": 2,
+      "requiredFields": [
+        "battle_id",
+        "consensus_reached"
+      ],
+      "optionalFields": [
+        "consensus_result",
+        "message_id",
+        "node_id",
+        "winner_candidate_id"
+      ]
+    },
+    {
+      "type": "BATTLE_HITL_REQUIRED",
+      "version": 2,
+      "requiredFields": [
+        "battle_id",
+        "candidates",
+        "hitl_id"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id",
+        "prompt",
+        "timeout_seconds"
+      ]
+    },
+    {
+      "type": "BATTLE_COMPLETED",
+      "version": 2,
+      "requiredFields": [
+        "battle_id",
+        "status"
+      ],
+      "optionalFields": [
+        "duration_ms",
+        "error",
+        "message_id",
+        "node_id",
+        "winner_candidate_id"
+      ]
+    },
+    {
+      "type": "RAW",
+      "version": 2,
+      "requiredFields": [
+        "raw"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id",
+        "source"
+      ]
+    },
+    {
+      "type": "CUSTOM",
+      "version": 2,
+      "requiredFields": [
+        "custom_type"
+      ],
+      "optionalFields": [
+        "data",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "CONSENSUS_DIFFERENTIATOR",
+      "version": 2,
+      "requiredFields": [
+        "decision",
+        "protocol",
+        "votes"
+      ],
+      "optionalFields": [
+        "disagreement_rate",
+        "evidence_refs",
+        "message_id",
+        "node_id",
+        "quality_score",
+        "round"
+      ]
+    },
+    {
+      "type": "CONSENSUS_EVAL",
+      "version": 2,
+      "requiredFields": [
+        "num_rounds",
+        "num_workers",
+        "protocols"
+      ],
+      "optionalFields": [
+        "consensus_escrow",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "CONSENSUS_EVAL_RUN",
+      "version": 2,
+      "requiredFields": [
+        "consensus_reached",
+        "protocol",
+        "total_votes"
+      ],
+      "optionalFields": [
+        "approval_count",
+        "cost_score",
+        "disagreement_rate",
+        "duration_ms",
+        "escalation_rate",
+        "evidence_refs",
+        "latency_ms",
+        "message_id",
+        "node_id",
+        "quality_score"
+      ]
+    },
+    {
+      "type": "CAPABILITY_CARD_DECISION",
+      "version": 2,
+      "requiredFields": [
+        "action",
+        "decision",
+        "mode",
+        "reason"
+      ],
+      "optionalFields": [
+        "card_hash",
+        "card_id",
+        "correlation_id",
+        "details",
+        "entity_type",
+        "remediation"
+      ]
+    },
+    {
+      "type": "MCP_CALL_DECISION",
+      "version": 2,
+      "requiredFields": [
+        "decision",
+        "policy",
+        "reason",
+        "risk_level",
+        "server_id",
+        "tool_name"
+      ],
+      "optionalFields": [
+        "correlation_id",
+        "drift",
+        "injection_severity",
+        "manifest_risk",
+        "roots_violation"
+      ]
+    },
+    {
+      "type": "EVAL_POLICY_RECOMMENDED",
+      "version": 2,
+      "requiredFields": [
+        "actions",
+        "correlation_id",
+        "profile_id",
+        "recommendations_count"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "EVAL_POLICY_APPLIED",
+      "version": 2,
+      "requiredFields": [
+        "correlation_id",
+        "diff_summary",
+        "dry_run",
+        "new_path",
+        "profile_id",
+        "version"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id"
+      ]
+    }
   ]
 }
