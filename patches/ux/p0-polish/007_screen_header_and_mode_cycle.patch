@@ -1,0 +1,72 @@
+diff --git a/python/src/agent_runtime_cockpit/tui/screen.py b/python/src/agent_runtime_cockpit/tui/screen.py
+index ed3ce97..1cd2269 100644
+--- a/python/src/agent_runtime_cockpit/tui/screen.py
++++ b/python/src/agent_runtime_cockpit/tui/screen.py
+@@ -9,8 +9,10 @@ from textual.screen import Screen
+ 
+ from .data import DataStore
+ from .theme import ThemeManager
+-from .widgets.banner import Banner
++from .widgets.banner import Banner  # noqa: F401  # kept for backward compat / external imports
++from .widgets.header import Header  # UX R-001: modern header
+ from .widgets.input_area import InputArea
++from .widgets.mode_badge import ModeBadge  # UX R-003
+ from .widgets.slash_menu import SlashMenu
+ from .widgets.status_bar import StatusBar
+ from .widgets.transcript import Transcript
+@@ -41,6 +43,8 @@ class ArcScreen(Screen):
+         ("ctrl+o", "toggle_expand", "Expand/Collapse"),
+         ("f1", "toggle_help", "Help"),
+         ("?", "toggle_help", "Help"),
++        # UX R-003: Shift+Tab cycles Plan → Build → Auto → Review
++        ("shift+tab", "cycle_mode", "Cycle Mode"),
+     ]
+ 
+     def __init__(self, data: DataStore, theme: ThemeManager, **kwargs) -> None:
+@@ -53,7 +57,12 @@ class ArcScreen(Screen):
+         self._session = None  # lazily-built persistent ChatSession
+ 
+     def compose(self) -> ComposeResult:
+-        yield Banner(self.data, self.theme, id="banner")
++        # UX R-001: modern Header replaces the ASCII banner. We keep the
++        # id="banner" so existing tests/CSS selectors continue to work, and
++        # add a "header" class for the new selector.
++        header = Header(self.data, self.theme, id="banner")
++        header.add_class("header")
++        yield header
+         yield Transcript(self.data, self.theme, id="transcript")
+         yield SlashMenu()
+         yield StatusBar(self.data, self.theme, id="status-bar")
+@@ -163,6 +172,16 @@ class ArcScreen(Screen):
+ 
+             self.data.add_entry("system", f"ARC Studio v{__version__}")
+             return
++        # UX R-003 + R-012: mode jumps
++        if cmd in ("/plan", "/build", "/auto", "/review"):
++            mode = cmd[1:]
++            try:
++                badge = self.query_one(ModeBadge)
++                badge.set_mode(mode)  # type: ignore[arg-type]
++            except Exception:
++                self.data.mode = mode
++            self.data.add_entry("system", f"Mode: {mode}")
++            return
+         if cmd == "/status":
+             self._show_status()
+             return
+@@ -353,6 +372,15 @@ class ArcScreen(Screen):
+         else:
+             self.query_one("#input-area", InputArea)._input.load_text("")
+ 
++    def action_cycle_mode(self) -> None:
++        """UX R-003: cycle Plan → Build → Auto → Review with Shift+Tab."""
++        try:
++            badge = self.query_one(ModeBadge)
++            new_mode = badge.cycle()
++            self.data.add_entry("system", f"Mode: {new_mode}")
++        except Exception:
++            pass
++
+     def action_toggle_palette(self) -> None:
+         try:
+             from .widgets.command_palette import CommandPalette

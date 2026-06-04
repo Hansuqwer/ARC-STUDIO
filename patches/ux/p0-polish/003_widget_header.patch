@@ -1,0 +1,126 @@
+diff --git a/python/src/agent_runtime_cockpit/tui/widgets/header.py b/python/src/agent_runtime_cockpit/tui/widgets/header.py
+new file mode 100644
+index 0000000..c7cc8bb
+--- /dev/null
++++ b/python/src/agent_runtime_cockpit/tui/widgets/header.py
+@@ -0,0 +1,120 @@
++"""Header — modern 2-row replacement for the ASCII banner.
++
++Implements UX_AUDIT R-001. Row 1: wordmark + version + workspace + TrustBadge.
++Row 2: ModeBadge + ContextMeter + daemon dot.
++
++The original Banner widget remains importable for callers that haven't
++migrated yet; ArcScreen prefers this Header when available.
++"""
++
++from __future__ import annotations
++
++from pathlib import Path
++
++from textual.app import ComposeResult
++from textual.containers import Container, Horizontal
++from textual.widgets import Static
++
++from agent_runtime_cockpit import __version__
++
++from ..data import DataStore
++from ..theme import ThemeManager
++from .context_meter import ContextMeter
++from .mode_badge import ModeBadge
++
++
++class _Wordmark(Static):
++    DEFAULT_CSS = """_Wordmark { width: auto; height: 1; padding: 0 1; }"""
++
++    def __init__(self, theme: ThemeManager, **kwargs) -> None:
++        super().__init__(**kwargs)
++        self.theme = theme
++
++    def render(self) -> str:
++        no_color = bool(getattr(self.theme.current, "no_color", False))
++        if no_color:
++            return f"ARC v{__version__}"
++        return f"[bold magenta]ARC[/] [dim]v{__version__}[/]"
++
++
++class _WorkspaceLabel(Static):
++    DEFAULT_CSS = """_WorkspaceLabel { width: 1fr; height: 1; padding: 0 1; }"""
++
++    def __init__(self, data: DataStore, theme: ThemeManager, **kwargs) -> None:
++        super().__init__(**kwargs)
++        self.data = data
++        self.theme = theme
++
++    def render(self) -> str:
++        ws = str(self.data.workspace)
++        home = str(Path.home())
++        if ws.startswith(home):
++            ws = "~" + ws[len(home):]
++        if len(ws) > 40:
++            ws = "\u2026" + ws[-39:]
++        return ws
++
++
++class _TrustBadge(Static):
++    DEFAULT_CSS = """_TrustBadge { width: auto; height: 1; padding: 0 1; }"""
++
++    def __init__(self, data: DataStore, theme: ThemeManager, **kwargs) -> None:
++        super().__init__(**kwargs)
++        self.data = data
++        self.theme = theme
++
++    def render(self) -> str:
++        try:
++            from ...security.trust import TrustLevel, resolve_trust
++
++            state = resolve_trust(self.data.workspace).level
++        except Exception:
++            state = None
++        no_color = bool(getattr(self.theme.current, "no_color", False))
++        if state and state == TrustLevel.TRUSTED:
++            return "[trusted]" if no_color else "[bold green]\u25cf trusted[/]"
++        if state and state == TrustLevel.PARTIAL:
++            return "[partial]" if no_color else "[bold yellow]\u25cf partial[/]"
++        return "[untrusted]" if no_color else "[bold red]\u25cb untrusted[/]"
++
++
++class _DaemonDot(Static):
++    DEFAULT_CSS = """_DaemonDot { width: auto; height: 1; padding: 0 1; }"""
++
++    def __init__(self, data: DataStore, theme: ThemeManager, **kwargs) -> None:
++        super().__init__(**kwargs)
++        self.data = data
++        self.theme = theme
++
++    def render(self) -> str:
++        no_color = bool(getattr(self.theme.current, "no_color", False))
++        if self.data.daemon_online:
++            return "[ok]" if no_color else "[bold green]\u25cf daemon[/]"
++        return "[off]" if no_color else "[dim]\u25cb daemon[/]"
++
++
++class Header(Container):
++    """Compact 2-row header. Replaces Banner."""
++
++    DEFAULT_CSS = """
++    Header { height: 2; background: $surface; }
++    Header > Horizontal { height: 1; width: 100%; }
++    """
++
++    def __init__(self, data: DataStore, theme: ThemeManager, **kwargs) -> None:
++        super().__init__(**kwargs)
++        self.data = data
++        self.theme = theme
++
++    def compose(self) -> ComposeResult:
++        with Horizontal():
++            yield _Wordmark(self.theme)
++            yield _WorkspaceLabel(self.data, self.theme)
++            yield _TrustBadge(self.data, self.theme, id="trust-badge")
++        with Horizontal():
++            yield ModeBadge(self.data, self.theme, id="mode-badge")
++            yield _DaemonDot(self.data, self.theme, id="daemon-dot")
++            yield ContextMeter(self.data, self.theme, id="context-meter")
++
++
++__all__ = ["Header"]

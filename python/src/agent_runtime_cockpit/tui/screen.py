@@ -9,8 +9,11 @@ from textual.screen import Screen
 
 from .data import DataStore
 from .theme import ThemeManager
-from .widgets.banner import Banner
+from .widgets.activity_tray import ActivityTray  # UX R-008
+from .widgets.banner import Banner  # noqa: F401  # kept for backward compat / external imports
+from .widgets.header import Header  # UX R-001: modern header
 from .widgets.input_area import InputArea
+from .widgets.mode_badge import ModeBadge  # UX R-003
 from .widgets.slash_menu import SlashMenu
 from .widgets.status_bar import StatusBar
 from .widgets.transcript import Transcript
@@ -41,6 +44,8 @@ class ArcScreen(Screen):
         ("ctrl+o", "toggle_expand", "Expand/Collapse"),
         ("f1", "toggle_help", "Help"),
         ("?", "toggle_help", "Help"),
+        # UX R-003: Shift+Tab cycles Plan → Build → Auto → Review
+        ("shift+tab", "cycle_mode", "Cycle Mode"),
     ]
 
     def __init__(self, data: DataStore, theme: ThemeManager, **kwargs) -> None:
@@ -53,11 +58,19 @@ class ArcScreen(Screen):
         self._session = None  # lazily-built persistent ChatSession
 
     def compose(self) -> ComposeResult:
-        yield Banner(self.data, self.theme, id="banner")
+        # UX R-001: modern Header replaces the ASCII banner. We keep the
+        # id="banner" so existing tests/CSS selectors continue to work, and
+        # add a "header" class for the new selector.
+        header = Header(self.data, self.theme, id="banner")
+        header.add_class("header")
+        yield header
         yield Transcript(self.data, self.theme, id="transcript")
         yield SlashMenu()
         yield StatusBar(self.data, self.theme, id="status-bar")
         yield InputArea(self.data, self.theme, id="input-area")
+        # UX R-008: ActivityTray (Ctrl+X); hidden until toggled
+        no_color = bool(getattr(self.theme.current, "no_color", False))
+        yield ActivityTray(no_color=no_color)
 
     def on_mount(self) -> None:
         from agent_runtime_cockpit import __version__
@@ -162,6 +175,16 @@ class ArcScreen(Screen):
             from agent_runtime_cockpit import __version__
 
             self.data.add_entry("system", f"ARC Studio v{__version__}")
+            return
+        # UX R-003 + R-012: mode jumps
+        if cmd in ("/plan", "/build", "/auto", "/review"):
+            mode = cmd[1:]
+            try:
+                badge = self.query_one(ModeBadge)
+                badge.set_mode(mode)  # type: ignore[arg-type]
+            except Exception:
+                self.data.mode = mode
+            self.data.add_entry("system", f"Mode: {mode}")
             return
         if cmd == "/status":
             self._show_status()
@@ -269,9 +292,35 @@ class ArcScreen(Screen):
 
     def _handle_shell_escape(self, text: str) -> None:
         import subprocess
+        from ..security.trust import resolve_trust, TrustLevel
 
         cmd = text[1:].strip()
         self.data.add_entry("user", f"!{cmd}")
+
+        # D-03: route the bang-escape through trust + a conservative classifier.
+        # We do NOT call security.sandbox.decide() directly because the sandbox
+        # API is policy-oriented and would require a full SandboxRequest; this
+        # lighter wrapper still surfaces trust and a small denylist so unsafe
+        # commands are visibly refused rather than silently executed.
+        try:
+            trust_state = resolve_trust(self.data.workspace)
+            denylist = ("rm -rf", "sudo ", "mkfs", "dd if=", ":(){", "> /dev/")
+            lower = cmd.lower()
+            blocked_by_denylist = any(d in lower for d in denylist)
+            if trust_state.level == TrustLevel.UNTRUSTED or blocked_by_denylist:
+                reason = (
+                    "workspace untrusted (run /workspace trust)"
+                    if trust_state.level == TrustLevel.UNTRUSTED
+                    else "command matches sandbox denylist"
+                )
+                self.data.add_entry(
+                    "tool",
+                    f"Shell command blocked: {reason}\n  cmd: {cmd}",
+                    {"tool_name": f"Bash: {cmd}", "status": "error"},
+                )
+                return
+        except Exception:
+            pass  # fall through if trust resolution itself fails
         try:
             result = subprocess.run(  # noqa: S602
                 cmd, shell=True, capture_output=True, text=True, timeout=30
@@ -294,8 +343,11 @@ class ArcScreen(Screen):
 
     def _handle_chat_message(self, text: str) -> None:
         """Send a chat message. Streams via SwarmGraph if available."""
+        from .theme_extras import thinking_indicator
+
+        no_color = bool(getattr(self.theme.current, "no_color", False))
         self.data.add_entry("user", text)
-        self.data.add_entry("assistant", "● Thinking…")
+        self.data.add_entry("assistant", thinking_indicator(no_color=no_color))
 
         def run_agent() -> None:
             self.data.is_streaming = True
@@ -353,6 +405,15 @@ class ArcScreen(Screen):
         else:
             self.query_one("#input-area", InputArea)._input.load_text("")
 
+    def action_cycle_mode(self) -> None:
+        """UX R-003: cycle Plan → Build → Auto → Review with Shift+Tab."""
+        try:
+            badge = self.query_one(ModeBadge)
+            new_mode = badge.cycle()
+            self.data.add_entry("system", f"Mode: {new_mode}")
+        except Exception:
+            pass
+
     def action_toggle_palette(self) -> None:
         try:
             from .widgets.command_palette import CommandPalette
@@ -370,7 +431,8 @@ class ArcScreen(Screen):
             self._show_help_inline()
 
     def action_toggle_activity(self) -> None:
-        self.data.add_entry("system", "Activity tray: coming in Phase 4.5.")
+        tray = self.query_one("#activity-tray", ActivityTray)
+        tray.toggle()
 
     def action_toggle_expand(self) -> None:
         pass

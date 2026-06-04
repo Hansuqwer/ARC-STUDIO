@@ -19,6 +19,12 @@ class PromptTextArea(TextArea):
     typed messages instead so they are handled reliably regardless of focus.
     """
 
+    def check_consume_key(self, key: str, character: str | None = None) -> bool:
+        # Let shift+tab bubble up to ArcScreen.action_cycle_mode.
+        if key == "shift+tab":
+            return False
+        return super().check_consume_key(key, character)
+
     def _on_key(self, event: events.Key) -> None:
         if event.key == "enter":
             # Submit — prevent the default newline insertion.
@@ -83,6 +89,7 @@ class InputArea(Container):
             language=None,
             show_line_numbers=False,
             max_checkpoints=20,
+            theme="vscode_dark",
         )
         self._input.styles.height = 3
         self._input.styles.min_height = 3

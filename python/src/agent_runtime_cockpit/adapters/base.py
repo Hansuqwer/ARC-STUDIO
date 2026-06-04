@@ -170,3 +170,49 @@ class RuntimeAdapter(abc.ABC):
     def list_runs(self, workspace: Path) -> list[RunRecord]:
         """List all runs for a workspace."""
         raise NotImplementedError(f"{self.adapter_id} does not implement list_runs")
+
+    # ── Capability Card enforcement helper (D-01 wiring) ──────────────────
+    def enforce_capability_card(
+        self,
+        *,
+        workflow_id: str,
+        workspace: Path,
+    ) -> dict:
+        """Look up and enforce the adapter-level Capability Card.
+
+        Returns a dict suitable for emitting as a CAPABILITY_CARD_DECISION
+        event payload. Never raises on the default (warn) mode. Adapters MUST
+        call this once at the top of run_workflow() to satisfy the wiring
+        contract from EXECUTION_PROMPT.md Item 1.
+        """
+        import os
+        from ..capabilities.enforcement import enforce_card, resolve_mode
+        from ..capabilities.registry import CardRegistry
+
+        env = {
+            "ARC_CAPABILITIES_ENFORCE": os.environ.get(
+                "ARC_CAPABILITIES_ENFORCE", ""
+            )
+        }
+        mode = resolve_mode(env=env)
+
+        try:
+            registry = CardRegistry(workspace=workspace)
+            card_id = f"adapter::{self.adapter_id}"
+            card = registry.load(card_id)
+        except Exception:
+            card = None
+
+        result = enforce_card(card=card, signed=None, mode=mode)
+        return {
+            "action": "run_workflow",
+            "workflow_id": workflow_id,
+            "adapter_id": self.adapter_id,
+            "decision": result.decision,
+            "reason": result.reason,
+            "card_id": result.card_id,
+            "card_hash": result.card_hash,
+            "mode": mode,
+            "correlation_id": result.correlation_id,
+            "details": result.details,
+        }
