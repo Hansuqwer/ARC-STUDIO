@@ -44,7 +44,11 @@ def _estimate(messages: Sequence[ProviderMessage]) -> int:
 
 def _pair_messages(
     messages: Sequence[ProviderMessage],
-) -> tuple[list[ProviderMessage], list[tuple[ProviderMessage, ProviderMessage | None]]]:
+) -> tuple[
+    list[ProviderMessage],
+    list[tuple[ProviderMessage, ProviderMessage | None]],
+    ProviderMessage | None,
+]:
     """Split messages into [system/pinned], [(user, assistant), ...] pairs.
 
     The final user message (current turn) is always excluded from pairing
