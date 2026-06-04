@@ -34,6 +34,7 @@ class DataStore:
 
     # ── session ──────────────────────────────────────────────────────────
     session_id: str = ""
+    seed: int | None = None  # if set, session_id is derived deterministically (for tests)
     mode: str = "build"  # plan | build | auto
     runtime_mode: str = "fake"
     profile_id: str = "default"
@@ -75,9 +76,15 @@ class DataStore:
 
     def __post_init__(self) -> None:
         if not self.session_id:
-            import uuid
+            if self.seed is not None:
+                import random
 
-            self.session_id = f"s-{uuid.uuid4().hex[:12]}"
+                rng = random.Random(self.seed)
+                self.session_id = f"s-{rng.getrandbits(48):012x}"
+            else:
+                import uuid
+
+                self.session_id = f"s-{uuid.uuid4().hex[:12]}"
         self.daemon_host = os.environ.get("ARC_DAEMON_HOST", "127.0.0.1")
         self.daemon_port = int(os.environ.get("ARC_DAEMON_PORT", "7777"))
         if os.environ.get("ARC_TUI_NO_PAID"):
