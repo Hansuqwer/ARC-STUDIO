@@ -368,26 +368,37 @@ class OpenAICompatibleClient:
         self._cancelled_calls.add(call_id)
 
     def _client_instance(self) -> Any:
-        """Get or create OpenAI client instance."""
+        """Get or create OpenAI client instance.
+
+        Gemini's AI Studio endpoint has HTTP/2 stream reuse issues with the
+        OpenAI SDK v2 that cause silent empty-content responses on the second+
+        call from a cached connection. Use a fresh client per call for gemini.
+        """
+        if self._vendor == "gemini":
+            return self._build_openai_client()
+
         if self._client is None:
             if self._sdk_factory is not None:
                 self._client = self._sdk_factory()
             else:
-                try:
-                    from openai import OpenAI
-                except ImportError as exc:
-                    raise AuthError("openai SDK is not installed") from exc
-
-                api_key_var, api_key = self._api_key()
-                if not api_key and self._env_vars():
-                    raise AuthError(f"{api_key_var} environment variable not set")
-
-                self._client = OpenAI(
-                    api_key=api_key or "not-needed",  # llama.cpp doesn't need a key
-                    base_url=self._base_url,
-                    timeout=self.capabilities().timeout_seconds,
-                )
+                self._client = self._build_openai_client()
         return self._client
+
+    def _build_openai_client(self) -> Any:
+        try:
+            from openai import OpenAI
+        except ImportError as exc:
+            raise AuthError("openai SDK is not installed") from exc
+
+        api_key_var, api_key = self._api_key()
+        if not api_key and self._env_vars():
+            raise AuthError(f"{api_key_var} environment variable not set")
+
+        return OpenAI(
+            api_key=api_key or "not-needed",
+            base_url=self._base_url,
+            timeout=self.capabilities().timeout_seconds,
+        )
 
     def _api_key(self) -> tuple[str, str | None]:
         env_vars = self._env_vars()
@@ -464,6 +475,14 @@ class OpenAICompatibleClient:
         message = getattr(choice, "message", None)
         if message and hasattr(message, "content") and message.content:
             return str(message.content)
+
+        # OpenAI SDK v2 with Gemini-compatible endpoints: content may be in model_dump()
+        # but not accessible via attribute (serialization quirk). Fall back to dict access.
+        if message and hasattr(message, "model_dump"):
+            dumped = message.model_dump()
+            content = dumped.get("content")
+            if content:
+                return str(content)
 
         return ""
 
