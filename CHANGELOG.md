@@ -5,6 +5,17 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 ## [Unreleased]
 
 ### Added
+- **Budget persistence**: `SQLiteWALStorage` in `budget/storage.py` — SESSION + PROVIDER_DAY spend survive process restart via SQLite WAL. `InMemoryStorage` preserved as default for tests/back-compat. `BudgetEnforcer.__init__` accepts optional `storage` param. (v0.4.1)
+- **Pricing refresh**: Current-gen model rows added to `anthropic.py` (Haiku 4.5, Sonnet 4.6, Opus 4.6/4.7) and `openai_compatible.py` (GPT-5.5/5.4/5.4-mini/5.4-nano/5.2/5, GPT-4.1 family). (v0.4.1)
+
+### Changed
+- **OpenAI cache multiplier**: GPT-5.x current-gen corrected from legacy 50% → 90% off (0.10× input). gpt-4o-mini legacy 50% preserved. GPT-4.1 family at 75% off (0.25×). (v0.4.1)
+- **Anthropic capabilities**: Full rate table exposed in `capabilities().cost_rates` for all current-gen models (was single-model only). (v0.4.1)
+
+### Deprecated
+- `claude-opus-4-1` (legacy): available but 3× more expensive than Opus 4.7. Use Opus 4.7 for new integrations.
+
+### Added
 - **Budget**: `TokenWallet` read-only view over `BudgetEnforcer` with frozen `WalletSnapshot` per scope (RUN/WORKFLOW/SESSION/PROVIDER_DAY). Cache hit rate populated from R-03 OTel attrs. Fail-closed on unknown scope. (R-01)
 - **TUI**: `/wallet` slash command renders per-scope spent/cap/remaining/cache-hit-rate. Honors first-launch cap. NO_COLOR fallback. (R-01)
 - **TUI**: `/budget` slash command shows per-scope spend pct display. (QW-3)

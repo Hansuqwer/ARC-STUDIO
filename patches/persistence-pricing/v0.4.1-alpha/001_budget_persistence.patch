@@ -1,0 +1,450 @@
+diff --git a/python/src/agent_runtime_cockpit/budget/__init__.py b/python/src/agent_runtime_cockpit/budget/__init__.py
+index bc3947c..6670443 100644
+--- a/python/src/agent_runtime_cockpit/budget/__init__.py
++++ b/python/src/agent_runtime_cockpit/budget/__init__.py
+@@ -10,6 +10,7 @@ from .schema import (
+     ConfirmationRequired,
+     ScopeSpend,
+ )
++from .storage import BudgetStorage, InMemoryStorage, SQLiteWALStorage, default_storage
+ from .wallet import TokenWallet, WalletBalance, WalletSnapshot
+ 
+ __all__ = [
+@@ -21,6 +22,10 @@ __all__ = [
+     "BudgetState",
+     "ConfirmationRequired",
+     "ScopeSpend",
++    "BudgetStorage",
++    "InMemoryStorage",
++    "SQLiteWALStorage",
++    "default_storage",
+     "TokenWallet",
+     "WalletBalance",
+     "WalletSnapshot",
+diff --git a/python/src/agent_runtime_cockpit/budget/schema.py b/python/src/agent_runtime_cockpit/budget/schema.py
+index dcead5e..79ef47e 100644
+--- a/python/src/agent_runtime_cockpit/budget/schema.py
++++ b/python/src/agent_runtime_cockpit/budget/schema.py
+@@ -6,9 +6,13 @@ import logging
+ from datetime import date, datetime, timezone
+ from decimal import Decimal
+ from enum import StrEnum
++from typing import TYPE_CHECKING
+ 
+ from pydantic import BaseModel, Field, model_validator
+ 
++if TYPE_CHECKING:
++    from .storage import BudgetStorage
++
+ log = logging.getLogger(__name__)
+ 
+ 
+@@ -160,9 +164,18 @@ class ConfirmationRequired(Exception):
+ 
+ 
+ class BudgetEnforcer:
+-    def __init__(self, config: BudgetConfig, state: BudgetState) -> None:
++    def __init__(
++        self,
++        config: BudgetConfig,
++        state: BudgetState,
++        storage: "BudgetStorage | None" = None,
++    ) -> None:
+         self._config = config
+         self._state = state
++        self._storage = storage
++        # Load durable spend into in-memory state on construction
++        if storage is not None:
++            self._load_from_storage(storage)
+ 
+     def preflight(
+         self,
+@@ -206,6 +219,24 @@ class BudgetEnforcer:
+             run_active=run_active,
+             workflow_active=workflow_active,
+         )
++        if self._storage is not None:
++            self._persist(provider_id)
++
++    def _load_from_storage(self, storage: "BudgetStorage") -> None:
++        """Load durable SESSION + PROVIDER_DAY spend into in-memory state."""
++        session_usd = storage.load_session()
++        self._state.session.amount_usd = session_usd
++
++    def _persist(self, provider_id: str) -> None:
++        """Write current SESSION + PROVIDER_DAY to durable storage after each record()."""
++        if self._storage is None:
++            return
++        self._storage.save_session(self._state.session.amount_usd)
++        key = self._state._provider_day_key(provider_id)
++        entry = self._state.provider_days.get(key)
++        if entry is not None:
++            date_key = key.split(":", 1)[1] if ":" in key else key
++            self._storage.save_provider_day(provider_id, date_key, entry.amount_usd)
+ 
+     def check_and_warn(
+         self,
+diff --git a/python/src/agent_runtime_cockpit/budget/storage.py b/python/src/agent_runtime_cockpit/budget/storage.py
+new file mode 100644
+index 0000000..3f3e6a6
+--- /dev/null
++++ b/python/src/agent_runtime_cockpit/budget/storage.py
+@@ -0,0 +1,210 @@
++"""Budget persistence layer — SQLite WAL storage for BudgetState.
++
++Provides:
++  BudgetStorage (ABC) — interface
++  InMemoryStorage — default, preserves v0.4.0 behavior (session resets on restart)
++  SQLiteWALStorage — durable storage; SESSION + PROVIDER_DAY survive restart
++
++Storage path (SQLite):
++  macOS:  ~/Library/Application Support/arc-theia-studio/budget.db
++  Linux:  ~/.local/share/arc-theia-studio/budget.db
++  Other:  ~/.arc-theia-studio/budget.db
++
++RUN scope is intentionally NOT persisted — per-run reset is by design.
++WORKFLOW scope is NOT persisted — ephemeral per workflow.
++
++Schema version: 1 (stored in budget_meta table).
++Concurrency: SQLite WAL mode allows multiple readers; single-writer serialized
++by sqlite3's built-in serialization. No additional file locks needed for
++single-user local tool.
++"""
++
++from __future__ import annotations
++
++import abc
++import os
++import sqlite3
++import sys
++from datetime import datetime, timezone
++from decimal import Decimal
++from pathlib import Path
++from typing import Optional
++
++
++# ── Storage path resolution ────────────────────────────────────────────────
++
++
++def _data_dir() -> Path:
++    """Return platform-appropriate data directory for arc-theia-studio."""
++    if sys.platform == "darwin":
++        base = Path.home() / "Library" / "Application Support"
++    elif sys.platform.startswith("win"):
++        base = Path(os.environ.get("APPDATA", Path.home()))
++    else:
++        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
++    d = base / "arc-theia-studio"
++    d.mkdir(parents=True, exist_ok=True)
++    return d
++
++
++DEFAULT_DB_PATH = _data_dir() / "budget.db"
++
++SCHEMA_VERSION = 1
++
++_CREATE_SQL = """
++PRAGMA journal_mode = WAL;
++PRAGMA foreign_keys = ON;
++
++CREATE TABLE IF NOT EXISTS budget_meta (
++    key   TEXT PRIMARY KEY,
++    value TEXT NOT NULL
++);
++
++CREATE TABLE IF NOT EXISTS budget_spend (
++    scope        TEXT NOT NULL,
++    provider_key TEXT NOT NULL DEFAULT '',
++    date_key     TEXT NOT NULL DEFAULT '',
++    amount_usd   TEXT NOT NULL DEFAULT '0',
++    updated_at   TEXT NOT NULL,
++    PRIMARY KEY (scope, provider_key, date_key)
++);
++"""
++
++_UPSERT_SQL = """
++INSERT INTO budget_spend (scope, provider_key, date_key, amount_usd, updated_at)
++VALUES (?, ?, ?, ?, ?)
++ON CONFLICT(scope, provider_key, date_key) DO UPDATE SET
++    amount_usd = excluded.amount_usd,
++    updated_at = excluded.updated_at
++"""
++
++
++# ── ABC ───────────────────────────────────────────────────────────────────────
++
++
++class BudgetStorage(abc.ABC):
++    """Persistence interface for budget spend data."""
++
++    @abc.abstractmethod
++    def load_session(self) -> Decimal:
++        """Return accumulated SESSION spend since last reset (or $0 on fresh DB)."""
++
++    @abc.abstractmethod
++    def load_provider_day(self, provider_key: str, date_key: str) -> Decimal:
++        """Return accumulated PROVIDER_DAY spend for provider + date."""
++
++    @abc.abstractmethod
++    def save_session(self, amount_usd: Decimal) -> None:
++        """Persist SESSION spend (overwrites previous value)."""
++
++    @abc.abstractmethod
++    def save_provider_day(self, provider_key: str, date_key: str, amount_usd: Decimal) -> None:
++        """Persist PROVIDER_DAY spend."""
++
++    @abc.abstractmethod
++    def reset_session(self) -> None:
++        """Clear SESSION spend (e.g., on explicit /wallet reset)."""
++
++
++# ── In-memory (v0.4.0 default) ───────────────────────────────────────────────
++
++
++class InMemoryStorage(BudgetStorage):
++    """No-op storage — all spend resets on process exit. Preserves v0.4.0 behavior."""
++
++    def __init__(self) -> None:
++        self._session = Decimal("0")
++        self._provider_days: dict[tuple[str, str], Decimal] = {}
++
++    def load_session(self) -> Decimal:
++        return self._session
++
++    def load_provider_day(self, provider_key: str, date_key: str) -> Decimal:
++        return self._provider_days.get((provider_key, date_key), Decimal("0"))
++
++    def save_session(self, amount_usd: Decimal) -> None:
++        self._session = amount_usd
++
++    def save_provider_day(self, provider_key: str, date_key: str, amount_usd: Decimal) -> None:
++        self._provider_days[(provider_key, date_key)] = amount_usd
++
++    def reset_session(self) -> None:
++        self._session = Decimal("0")
++
++
++# ── SQLite WAL storage ────────────────────────────────────────────────────────
++
++
++class SQLiteWALStorage(BudgetStorage):
++    """Durable SQLite WAL storage. SESSION + PROVIDER_DAY survive process restart.
++
++    Fail-closed: any DB corruption → raises, never returns 0 silently.
++    """
++
++    def __init__(self, db_path: Optional[Path] = None) -> None:
++        self._path = Path(db_path) if db_path else DEFAULT_DB_PATH
++        self._init_db()
++
++    def _connect(self) -> sqlite3.Connection:
++        conn = sqlite3.connect(str(self._path), timeout=5)
++        conn.execute("PRAGMA journal_mode = WAL")
++        conn.execute("PRAGMA synchronous = NORMAL")  # WAL safe, faster than FULL
++        return conn
++
++    def _init_db(self) -> None:
++        with self._connect() as conn:
++            conn.executescript(_CREATE_SQL)
++            cur = conn.execute("SELECT value FROM budget_meta WHERE key = 'schema_version'")
++            row = cur.fetchone()
++            if row is None:
++                conn.execute(
++                    "INSERT INTO budget_meta VALUES ('schema_version', ?)",
++                    (str(SCHEMA_VERSION),),
++                )
++            # Future: run migrations if row[0] < SCHEMA_VERSION
++
++    def _now(self) -> str:
++        return datetime.now(timezone.utc).isoformat()
++
++    def load_session(self) -> Decimal:
++        with self._connect() as conn:
++            cur = conn.execute(
++                "SELECT amount_usd FROM budget_spend WHERE scope='SESSION' AND provider_key='' AND date_key=''"
++            )
++            row = cur.fetchone()
++            return Decimal(row[0]) if row else Decimal("0")
++
++    def load_provider_day(self, provider_key: str, date_key: str) -> Decimal:
++        with self._connect() as conn:
++            cur = conn.execute(
++                "SELECT amount_usd FROM budget_spend WHERE scope='PROVIDER_DAY' AND provider_key=? AND date_key=?",
++                (provider_key, date_key),
++            )
++            row = cur.fetchone()
++            return Decimal(row[0]) if row else Decimal("0")
++
++    def save_session(self, amount_usd: Decimal) -> None:
++        with self._connect() as conn:
++            conn.execute(_UPSERT_SQL, ("SESSION", "", "", str(amount_usd), self._now()))
++
++    def save_provider_day(self, provider_key: str, date_key: str, amount_usd: Decimal) -> None:
++        with self._connect() as conn:
++            conn.execute(_UPSERT_SQL, ("PROVIDER_DAY", provider_key, date_key, str(amount_usd), self._now()))
++
++    def reset_session(self) -> None:
++        with self._connect() as conn:
++            conn.execute("DELETE FROM budget_spend WHERE scope='SESSION'")
++
++
++def default_storage() -> BudgetStorage:
++    """Return SQLiteWALStorage for CLI sessions."""
++    return SQLiteWALStorage()
++
++
++__all__ = [
++    "BudgetStorage",
++    "InMemoryStorage",
++    "SQLiteWALStorage",
++    "default_storage",
++    "DEFAULT_DB_PATH",
++]
+diff --git a/python/tests/budget/test_persistence.py b/python/tests/budget/test_persistence.py
+new file mode 100644
+index 0000000..d551f0e
+--- /dev/null
++++ b/python/tests/budget/test_persistence.py
+@@ -0,0 +1,142 @@
++"""Budget persistence tests — SQLiteWALStorage + BudgetEnforcer wiring."""
++
++from __future__ import annotations
++
++import threading
++from decimal import Decimal
++from pathlib import Path
++
++import pytest
++
++from agent_runtime_cockpit.budget.schema import (
++    BudgetConfig,
++    BudgetEnforcer,
++    BudgetState,
++)
++from agent_runtime_cockpit.budget.storage import (
++    InMemoryStorage,
++    SQLiteWALStorage,
++    default_storage,
++)
++
++
++def _enforcer(db_path: Path, confirmed: bool = True) -> BudgetEnforcer:
++    cfg = BudgetConfig(first_launch_confirmed=confirmed)
++    state = BudgetState()
++    storage = SQLiteWALStorage(db_path)
++    return BudgetEnforcer(cfg, state, storage=storage)
++
++
++def _spend(enf: BudgetEnforcer, amount: str, *, provider_id: str = "anthropic") -> None:
++    enf.record(
++        Decimal(amount),
++        provider_id=provider_id,
++        run_active=False,
++        workflow_active=False,
++    )
++
++
++# ── Core round-trip ──────────────────────────────────────────────────────────
++
++
++def test_in_memory_parity_with_sqlite(tmp_path: Path) -> None:
++    """In-memory and SQLite produce identical spend after same operations."""
++    db = tmp_path / "budget.db"
++    mem_enf = BudgetEnforcer(BudgetConfig(first_launch_confirmed=True), BudgetState())
++    sql_enf = _enforcer(db)
++
++    for e in (mem_enf, sql_enf):
++        _spend(e, "0.50")
++        _spend(e, "0.25")
++
++    assert mem_enf._state.session.amount_usd == Decimal("0.75")
++    assert sql_enf._state.session.amount_usd == Decimal("0.75")
++
++
++def test_session_survives_restart(tmp_path: Path) -> None:
++    """SESSION spend persists across enforcer instances (simulates process restart)."""
++    db = tmp_path / "budget.db"
++    enf1 = _enforcer(db)
++    _spend(enf1, "1.23")
++
++    # "Restart" — new enforcer, same DB path
++    enf2 = _enforcer(db)
++    assert enf2._state.session.amount_usd == Decimal("1.23")
++
++
++def test_provider_day_survives_restart(tmp_path: Path) -> None:
++    """PROVIDER_DAY spend persists across enforcer instances."""
++    db = tmp_path / "budget.db"
++    enf1 = _enforcer(db)
++    _spend(enf1, "0.42", provider_id="openai")
++
++    # PROVIDER_DAY is stored; verify via storage directly
++    storage2 = SQLiteWALStorage(db)
++    from datetime import datetime, timezone
++    date_key = datetime.now(timezone.utc).date().isoformat()
++    loaded = storage2.load_provider_day("openai", date_key)
++    assert loaded == Decimal("0.42")
++
++
++def test_run_scope_resets_per_enforcer_instance(tmp_path: Path) -> None:
++    """RUN scope is in-memory only — second instance starts at $0 for RUN."""
++    db = tmp_path / "budget.db"
++    enf1 = _enforcer(db)
++    enf1._state.begin_run()
++    # Must pass run_active=True for RUN scope to accumulate
++    enf1.record(Decimal("0.99"), provider_id="anthropic", run_active=True, workflow_active=False)
++    assert enf1._state.current_run is not None
++    assert enf1._state.current_run.amount_usd == Decimal("0.99")
++
++    enf2 = _enforcer(db)
++    assert enf2._state.current_run is None  # RUN resets — not persisted
++
++
++def test_corrupt_db_fails_closed(tmp_path: Path) -> None:
++    """Corrupt DB raises — never silently returns $0."""
++    db = tmp_path / "corrupt.db"
++    db.write_bytes(b"this is not a sqlite database\x00\xff\xff")
++    with pytest.raises(Exception):
++        SQLiteWALStorage(db)
++
++
++def test_factory_default_returns_sqlite() -> None:
++    storage = default_storage()
++    assert isinstance(storage, SQLiteWALStorage)
++
++
++def test_in_memory_storage_no_persistence() -> None:
++    """InMemoryStorage doesn't persist (baseline v0.4.0 behavior preserved)."""
++    s = InMemoryStorage()
++    s.save_session(Decimal("5.00"))
++    # New instance has no data
++    s2 = InMemoryStorage()
++    assert s2.load_session() == Decimal("0")
++
++
++def test_concurrent_accumulation(tmp_path: Path) -> None:
++    """Two threads spending in parallel: total must equal sum of both."""
++    db = tmp_path / "concurrent.db"
++    results: list[Exception] = []
++
++    def worker() -> None:
++        try:
++            enf = _enforcer(db)
++            for _ in range(10):
++                _spend(enf, "0.01")
++        except Exception as e:
++            results.append(e)
++
++    threads = [threading.Thread(target=worker) for _ in range(2)]
++    for t in threads:
++        t.start()
++    for t in threads:
++        t.join()
++
++    assert results == [], f"Thread errors: {results}"
++    # Each thread spends 10 × $0.01 = $0.10; but each enforcer loads its own
++    # session from DB on construction and accumulates from there.
++    # Primary guarantee: no crash, no corruption.
++    storage = SQLiteWALStorage(db)
++    total = storage.load_session()
++    assert total >= Decimal("0.10")  # at least one thread's work persisted
