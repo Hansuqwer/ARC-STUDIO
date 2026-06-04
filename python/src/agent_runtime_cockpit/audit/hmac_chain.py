@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import hashlib
+import hmac
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +29,7 @@ from .key_manager import (
 log = logging.getLogger(__name__)
 
 GENESIS = "GENESIS"
+CHECKPOINT_VERSION = 1
 
 
 class AuditChainCorruptError(RuntimeError):
@@ -42,6 +45,75 @@ class _TailState:
 
 def _canonical_json(data: dict[str, Any]) -> str:
     return json.dumps(data, sort_keys=True, separators=(",", ":"))
+
+
+def checkpoint_path_for_chain(chain_path: Path) -> Path:
+    return chain_path.with_name(f"{chain_path.name}.checkpoint.json")
+
+
+def _checkpoint_signature(payload: dict[str, Any], key: bytes) -> str:
+    encoded = _canonical_json(payload).encode("utf-8")
+    return hmac.new(key, encoded, hashlib.sha256).hexdigest()
+
+
+def _write_hmac_checkpoint(
+    chain_path: Path,
+    key: bytes,
+    *,
+    records: int,
+    terminal_hash: str,
+    updated_at: str,
+) -> None:
+    checkpoint_path = checkpoint_path_for_chain(chain_path)
+    payload: dict[str, Any] = {
+        "version": CHECKPOINT_VERSION,
+        "chain_file": chain_path.name,
+        "records": records,
+        "terminal_hash": terminal_hash,
+        "file_size_bytes": chain_path.stat().st_size,
+        "updated_at": updated_at,
+    }
+    record = {**payload, "signature": _checkpoint_signature(payload, key)}
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = checkpoint_path.with_name(f".{checkpoint_path.name}.tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        f.write(_canonical_json(record) + "\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp_path, checkpoint_path)
+
+
+def verify_hmac_checkpoint(
+    chain_path: Path,
+    key: bytes,
+    *,
+    records_checked: int,
+    terminal_hash: str,
+) -> tuple[bool, str]:
+    checkpoint_path = checkpoint_path_for_chain(chain_path)
+    if not checkpoint_path.exists():
+        return True, "checkpoint absent"
+    try:
+        checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return False, f"checkpoint invalid: {exc}"
+    signature = str(checkpoint.pop("signature", ""))
+    if not signature:
+        return False, "checkpoint unsigned"
+    expected_signature = _checkpoint_signature(checkpoint, key)
+    if not hmac.compare_digest(signature, expected_signature):
+        return False, "checkpoint signature invalid"
+    if checkpoint.get("version") != CHECKPOINT_VERSION:
+        return False, f"checkpoint version invalid: {checkpoint.get('version')}"
+    if checkpoint.get("chain_file") != chain_path.name:
+        return False, "checkpoint chain_file mismatch"
+    if checkpoint.get("records") != records_checked:
+        return False, "checkpoint record count mismatch"
+    if checkpoint.get("terminal_hash") != terminal_hash:
+        return False, "checkpoint terminal hash mismatch"
+    if checkpoint.get("file_size_bytes") != chain_path.stat().st_size:
+        return False, "checkpoint file size mismatch"
+    return True, "checkpoint verified"
 
 
 class _FileLock:
@@ -149,6 +221,13 @@ class HmacAuditChainWriter:
                 f.write(_canonical_json(record) + "\n")
                 f.flush()
                 os.fsync(f.fileno())
+                _write_hmac_checkpoint(
+                    self.path,
+                    key,
+                    records=self._seq + 1,
+                    terminal_hash=record_hash,
+                    updated_at=timestamp,
+                )
                 self._prev_hash = record_hash
                 self._seq += 1
                 self._stat_signature = self._stat_signature_for_path()
@@ -223,4 +302,9 @@ def verify_hmac_chain(chain_path: Path, key: bytes) -> tuple[bool, str]:
             return False, f"signature invalid at seq {records_checked}"
         prev_hash = stored_hash
         records_checked += 1
+    ok, checkpoint_reason = verify_hmac_checkpoint(
+        chain_path, key, records_checked=records_checked, terminal_hash=prev_hash
+    )
+    if not ok:
+        return False, checkpoint_reason
     return True, f"verified {records_checked} records"

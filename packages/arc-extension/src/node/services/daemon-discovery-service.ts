@@ -7,6 +7,7 @@
  */
 
 import { injectable } from '@theia/core/shared/inversify';
+import type { PythonDaemonHealth } from '../../common/arc-protocol';
 
 const ARC_PYTHON_DAEMON_URL_ENV = 'ARC_PYTHON_DAEMON_URL';
 const DEFAULT_DAEMON_URL = 'http://127.0.0.1:7777';
@@ -54,7 +55,11 @@ export class DaemonDiscoveryService {
                     method: 'GET',
                     signal: controller.signal,
                 });
-                return response.ok ? DEFAULT_DAEMON_URL : undefined;
+                if (!response.ok) {
+                    return undefined;
+                }
+                const body = await response.json().catch(() => undefined);
+                return this.isPythonDaemonHealth(body) ? DEFAULT_DAEMON_URL : undefined;
             } finally {
                 clearTimeout(timeout);
                 controller.abort();
@@ -62,6 +67,18 @@ export class DaemonDiscoveryService {
         } catch {
             return undefined;
         }
+    }
+
+    private isPythonDaemonHealth(value: unknown): value is PythonDaemonHealth {
+        if (!value || typeof value !== 'object') {
+            return false;
+        }
+        const body = value as Record<string, unknown>;
+        return body.status === 'healthy'
+            && typeof body.version === 'string'
+            && typeof body.uptime_seconds === 'number'
+            && body.arc === true
+            && !('active_runs' in body);
     }
 
     async resolveDaemonBaseUrl(): Promise<string | undefined> {

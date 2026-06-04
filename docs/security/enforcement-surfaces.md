@@ -300,6 +300,8 @@ Limits: this is policy/classifier hardening, not syscall or kernel sandboxing. M
 
 The writer caches tail state by file stat signature between appends and revalidates if the file changes. If an existing chain contains invalid JSON, missing `record_hash`, or sequence gaps, append fails rather than extending a corrupt chain.
 
+Writer-owned HMAC chains also write a signed `<chain>.checkpoint.json` sidecar on each append. The checkpoint binds terminal hash, record count, and file size so verification can detect truncation of a previously longer chain. Checkpoints are additive compatibility metadata: chains without a checkpoint still verify according to the chain records alone.
+
 ## Adding Enforcement to New Code
 
 ### Step 1: Identify operation type

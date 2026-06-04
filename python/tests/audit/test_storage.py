@@ -182,19 +182,14 @@ class TestChainTamperDetection:
         assert ok is False
         assert "signature" in msg.lower() or "invalid" in msg.lower()
 
-    def test_truncated_chain_is_short_valid_chain(self, audit_dir):
-        """Truncation is a known limitation of simple HMAC chains.
-
-        A shorter chain with valid signatures is still valid. Detecting
-        truncation requires periodic integrity checkpoints (future work).
-        This test documents the current behavior.
-        """
+    def test_truncated_chain_detected_by_checkpoint(self, audit_dir):
+        """Writer checkpoint detects truncation of a previously longer chain."""
         store = _make_store(audit_dir)
         store.append_event(RunStartedEvent(run_id="run_abc", runtime="swarmgraph"))
         store.append_event(RunCompletedEvent(run_id="run_abc", runtime="swarmgraph"))
         path = audit_dir / "run_abc.audit.jsonl"
         lines = path.read_text().splitlines()
-        path.write_text("\n".join(lines[:1]))
+        path.write_text("\n".join(lines[:1]) + "\n")
         ok, msg = store.verify_run("run_abc")
-        assert ok is True  # shorter chain with valid HMACs is still valid
-        assert "1 records" in msg
+        assert ok is False
+        assert "checkpoint" in msg

@@ -18,7 +18,9 @@ Workspace trust is enabled in browser and Electron app preferences (`security.wo
 
 The daemon binds to `127.0.0.1` by default, and Theia backend daemon calls use `127.0.0.1` rather than `localhost` to avoid host resolution drift. CORS defaults to `http://127.0.0.1:3000` and can be overridden with `ARC_CORS_ORIGIN` for local development only.
 
-All non-`/health` daemon routes require `Authorization: Bearer $ARC_DAEMON_TOKEN` by default. `ARC_DAEMON_ALLOW_UNAUTHENTICATED=1` is a local test/development bypass only and must not be used for shared or production-like sessions. Mutating requests, including legacy `GET /api/runs/start`, reject unexpected `Origin`/`Referer` headers and request bodies larger than 512 KiB.
+All non-`/health` daemon routes require `Authorization: Bearer $ARC_DAEMON_TOKEN` by default. `arc serve` generates a process-local token when `ARC_DAEMON_TOKEN` is unset and prints it for local clients. `ARC_DAEMON_ALLOW_UNAUTHENTICATED=1` is a local test/development bypass only and must not be used for shared or production-like sessions. Mutating requests, including legacy `GET /api/runs/start`, reject unexpected `Origin`/`Referer` headers and request bodies larger than 512 KiB.
+
+The Python daemon `/health` response is intentionally not an ARC envelope. Its stable public shape is `{status:"healthy", version:string, uptime_seconds:number, arc:true}` and it must not expose run inventory such as active run counts.
 
 `X-ARC-Workspace` must resolve to an existing directory inside the daemon root by default. Malformed, missing, or out-of-root workspace paths return `400 INVALID_INPUT`; they do not silently fall back to the daemon working directory. `ARC_DAEMON_ALLOW_EXTERNAL_WORKSPACE=1` is an explicit trusted-local-development escape hatch only.
 
@@ -26,7 +28,7 @@ OTLP trace export is localhost-only by default. Remote OTLP endpoints require `A
 
 ## HMAC Audit Chains
 
-New HMAC audit records fail closed if no audit key is available. New records bind `seq`, `timestamp`, `key_id`, `prev_hash`, and `event` into the signed hash. Verifiers keep a legacy compatibility path for already-written HMAC chains that lack the new metadata, but new writes always use the bound format. Existing corrupt chains are not extended; append fails instead of skipping over malformed lines.
+New HMAC audit records fail closed if no audit key is available. New records bind `seq`, `timestamp`, `key_id`, `prev_hash`, and `event` into the signed hash. Verifiers keep a legacy compatibility path for already-written HMAC chains that lack the new metadata, but new writes always use the bound format. Existing corrupt chains are not extended; append fails instead of skipping over malformed lines. Writer-owned chains also maintain a signed `.checkpoint.json` sidecar with the terminal hash, record count, and file size so truncation of a previously longer chain is detected during verification.
 
 ## Secrets
 

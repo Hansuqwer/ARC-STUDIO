@@ -95,6 +95,20 @@ export class ArcError extends Error {
     }
 }
 
+// ========== Python Daemon ==========
+
+/**
+ * Minimal unauthenticated Python daemon health response from `/health`.
+ * This endpoint is intentionally not an ArcEnvelope and must not expose run
+ * inventory such as active run counts.
+ */
+export interface PythonDaemonHealth {
+    status: 'healthy';
+    version: string;
+    uptime_seconds: number;
+    arc: true;
+}
+
 // ========== Execution ==========
 
 /**

@@ -1496,7 +1496,16 @@ graph = builder.compile(checkpointer=MemorySaver())
             global.fetch = jest.fn(async (url: RequestInfo | URL) => {
                 const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.href : String(url);
                 expect(urlStr).toContain('/health');
-                return { ok: true, status: 200 } as Response;
+                return {
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        status: 'healthy',
+                        version: '0.1.0-alpha',
+                        uptime_seconds: 1,
+                        arc: true,
+                    }),
+                } as Response;
             });
 
             const result = await service.discoverPythonDaemonUrl();
@@ -1523,7 +1532,16 @@ graph = builder.compile(checkpointer=MemorySaver())
 
         it('should probe only loopback address 127.0.0.1:7777', async () => {
             global.fetch = jest.fn(async () => {
-                return { ok: true, status: 200 } as Response;
+                return {
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        status: 'healthy',
+                        version: '0.1.0-alpha',
+                        uptime_seconds: 1,
+                        arc: true,
+                    }),
+                } as Response;
             });
 
             const fetchMock = global.fetch as jest.Mock;

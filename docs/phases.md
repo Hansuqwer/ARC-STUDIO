@@ -791,7 +791,7 @@ bash scripts/check-pr.sh
 ## Phase 21 — Streaming Audit Verification + HMAC Signing
 
 **Roadmap:** R14 — Streaming Audit + HMAC  
-**Status:** Baseline Complete | Evidence: local worktree 2026-06-04 | 4586 Python tests passed, 42 skipped, 3 xfailed; TypeScript build/typecheck green | Notes: Streaming verifier handles 100 MB+ traces with bounded memory; SHA-256 backward compatibility preserved; new HMAC appends fail closed without a key, bind `seq`/`timestamp`/`key_id`, keep legacy verify compatibility for already-written HMAC records, and refuse to extend corrupt chains
+**Status:** Baseline Complete | Evidence: local worktree 2026-06-04 | 4586 Python tests passed, 42 skipped, 3 xfailed; TypeScript build/typecheck green | Notes: Streaming verifier handles 100 MB+ traces with bounded memory; SHA-256 backward compatibility preserved; new HMAC appends fail closed without a key, bind `seq`/`timestamp`/`key_id`, write signed checkpoint sidecars, keep legacy verify compatibility for already-written HMAC records, and refuse to extend corrupt chains
 **Depends on:** None (standalone foundation work)  
 **Design note:** Current `audit/chain.py` has `verify_audit_signature()` and `verify_hmac_chain()` but both use `read_text().splitlines()` which reads full files into memory. Architecture review requires streaming (line-by-line) verification for large traces (100 MB+).
 
@@ -808,7 +808,7 @@ bash scripts/check-pr.sh
 ### Acceptance
 1. `arc audit verify` on synthetic 100 MB trace completes in <30s and <500 MB RSS.
 2. Old SHA-256 traces verify without migration or changes.
-3. HMAC traces fail verification when content, chain, or signature is mutated.
+3. HMAC traces fail verification when content, chain, signature, or signed checkpoint metadata is mutated.
 4. CLI emits stable JSON: `{ ok, mode, records_checked, reason, duration_ms }`.
 5. All existing Phase 4/10 audit tests remain green.
 

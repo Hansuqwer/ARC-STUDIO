@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from agent_runtime_cockpit.events import get_bus
 from agent_runtime_cockpit.events.types import AuditVerified
 
+from .hmac_chain import verify_hmac_checkpoint
 from .key_manager import (
     legacy_sign_audit_record,
     sign_audit_record,
@@ -261,14 +262,27 @@ class StreamingAuditVerifier:
                 file_size_bytes=file_size,
             )
 
-        duration_ms = int((time.time() - start_time) * 1000)
-
         if records_checked == 0:
+            duration_ms = int((time.time() - start_time) * 1000)
             return VerificationResult(
                 ok=True,
                 mode="hmac",
                 records_checked=0,
                 reason="Empty chain",
+                duration_ms=duration_ms,
+                file_size_bytes=file_size,
+            )
+
+        checkpoint_ok, checkpoint_reason = verify_hmac_checkpoint(
+            file_path, key, records_checked=records_checked, terminal_hash=prev_hash
+        )
+        duration_ms = int((time.time() - start_time) * 1000)
+        if not checkpoint_ok:
+            return VerificationResult(
+                ok=False,
+                mode="hmac",
+                records_checked=records_checked,
+                reason=checkpoint_reason,
                 duration_ms=duration_ms,
                 file_size_bytes=file_size,
             )
