@@ -6,6 +6,25 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 
 ### Added
 
+- **Context**: AGENTS.md workspace ingestion — discovery, nearest-wins resolution, override priority, LLM-generated heuristic, pin/drift detection
+- **Context**: SKILL.md read-only catalog — YAML frontmatter parsing, discovery
+- **Capabilities**: `EntityType.AGENTS_MD` and `EntityType.SKILL` — workspace-sourced Capability Card entity types
+- **Capabilities**: `card_from_agents_md()` and `card_from_skill()` workspace card builders (`from_workspace.py`)
+- **CLI**: `arc agents-md discover|nearest|pin|drift|cards` commands
+- **CLI**: `arc skills discover|cards` commands
+- **Evals**: Eval-to-policy auto-apply loop (`evals/apply.py`) — maps `PolicyRecommendation.action` → `RunProfile` mutations with append-only versioned profiles
+- **CLI**: `arc eval recommend-apply` command with `--profile`, `--dry-run/--no-dry-run`, `--json` flags
+- **Protocol**: `EVAL_POLICY_RECOMMENDED` and `EVAL_POLICY_APPLIED` typed events (schema v2)
+- **Security**: `PROFILE_SCHEMA_VERSION=2`, `RunProfile.extra: dict[str, str]` field with v1→v2 auto-migration
+- **MCP**: Outbound per-call risk gate — deterministic LLM-free risk scorer, sandbox policy decision, stdio proxy with 1MB cap (ADR-028)
+- **Protocol**: `MCP_CALL_DECISION` typed event for risk gate audit trail (schema v2)
+- **CLI**: `arc mcp risk-scan`, `arc mcp decisions`, `arc mcp policy-explain`, `arc mcp proxy` commands
+- **A2A**: Local AgentCard generator + loopback-only outbound client (`a2a/` package, ADR-029)
+- **CLI**: `arc a2a generate|list|verify|inspect|approve|invoke` commands — disk-only A2A v1.2 cards
+- **Capabilities**: `EntityType.A2A_AGENT` enum value for A2A agent cards
+- **Capabilities**: Runtime enforcement gate (`capabilities/enforcement.py`) — deterministic, LLM-free card enforcement with fail-closed semantics (ADR-027)
+- **Protocol**: `CAPABILITY_CARD_DECISION` typed event for enforcement audit trail (schema v2)
+- **Security**: `_cards_mode` ContextVar for capability card enforcement mode without mutating frozen `EnforcementContext`
 - **Protocol**: PolicyBypassWarning event type for non-blocking enforcement gap alerts (Phase 22.1)
 - **Protocol**: PolicyBypassReason enum with 5 bypass reason codes (Phase 22.1)
 - **Security**: `emit_policy_bypass_warning()` helper with rate-limiting per (run_id, surface_identifier) (Phase 22.1)
