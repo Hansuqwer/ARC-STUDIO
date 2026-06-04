@@ -779,6 +779,38 @@ def _build_registry():
         )
     )
 
+    # ── Budget ────────────────────────────────────────────────────────────
+    registry.register(
+        CommandDef(
+            name="wallet",
+            help_text="Show per-scope token budget snapshot",
+            category="budget",
+            handler=cmd_wallet,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "degraded"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+            usage="/wallet",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="budget",
+            help_text="Show per-scope budget status",
+            category="budget",
+            handler=cmd_budget,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "degraded"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+            usage="/budget",
+        )
+    )
+
     return registry
 
 
@@ -2410,3 +2442,78 @@ class SlashCommandHandler:
             output="\n".join(part for part in outputs if part),
             metadata={"pipeline_segments": len(segments)},
         )
+
+
+# ── Budget handlers ────────────────────────────────────────────────────────────
+
+
+def cmd_wallet(_arg: str, session: ChatSession) -> CommandResult:
+    """Show per-scope token budget snapshot."""
+    from ..budget.wallet import TokenWallet
+
+    enforcer = _session_budget_enforcer(session)
+    if enforcer is None:
+        return CommandResult(
+            state="degraded", output="[wallet] No budget enforcer active in this session."
+        )
+    wallet = TokenWallet(enforcer)
+    snap = wallet.snapshot()
+    if snap.fail_closed_reason:
+        return CommandResult(
+            state="degraded", output=f"[wallet] Error reading budget: {snap.fail_closed_reason}"
+        )
+    lines: list[str] = []
+    if snap.first_launch:
+        lines.append("First-launch cap active ($1.00/run). Cap restores after first run.")
+    header = "SCOPE          SPENT       CAP        REMAINING"
+    lines.append(header)
+    lines.append("-" * len(header))
+    for scope_val, bal in snap.balances.items():
+        line = f"{scope_val:<14} ${float(bal.spent_usd):>8.4f}  ${float(bal.cap_usd):>8.2f}  ${float(bal.remaining_usd):>8.4f}"
+        if bal.cache_hit_rate > 0:
+            line += f"  cache:{bal.cache_hit_rate:.0%}"
+        lines.append(line)
+    return CommandResult(state="present", output="\n".join(lines))
+
+
+def cmd_budget(_arg: str, session: ChatSession) -> CommandResult:
+    """Show per-scope budget status."""
+    from ..budget.schema import BudgetScope as _BS
+
+    enforcer = _session_budget_enforcer(session)
+    if enforcer is None:
+        return CommandResult(state="degraded", output="[budget] No budget enforcer active.")
+    lines: list[str] = []
+    for scope in _BS:
+        if scope is _BS.PROVIDER_DAY:
+            continue
+        try:
+            cap = enforcer._config.effective_cap(scope, None)
+            spent = enforcer._state.spend_for(scope, None)
+            remaining = max(0, float(cap - spent))
+            pct = float(spent / cap * 100) if cap > 0 else 0.0
+            lines.append(
+                f"{scope.value}: ${float(spent):.4f} / ${float(cap):.2f} ({pct:.0f}%) — ${remaining:.4f} remaining"
+            )
+        except Exception:
+            lines.append(f"{scope.value}: (unavailable)")
+    return (
+        CommandResult(state="present", output="\n".join(lines))
+        if lines
+        else CommandResult(state="degraded", output="[budget] No budget state available.")
+    )
+
+
+def _session_budget_enforcer(session: ChatSession) -> BudgetEnforcer | None:
+    """Extract or build a BudgetEnforcer from session metadata."""
+    metadata = getattr(session, "metadata", {}) or {}
+    raw = metadata.get("provider_budget")
+    if isinstance(raw, dict):
+        try:
+            return BudgetEnforcer(BudgetConfig.model_validate(raw), BudgetState())
+        except Exception:
+            return None
+    # If first_launch_confirmed in metadata, build a default enforcer for display
+    if metadata.get("budget_enforcer_active"):
+        return BudgetEnforcer(BudgetConfig(first_launch_confirmed=True), BudgetState())
+    return None
