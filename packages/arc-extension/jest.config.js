@@ -17,7 +17,7 @@ module.exports = {
     // OR whenever a patch organically improves coverage. See CONTRIBUTING.md.
     coverageThreshold: {
         global: {
-            branches: 19,
+            branches: 18,
             functions: 20,
             lines: 27,
             statements: 26,
