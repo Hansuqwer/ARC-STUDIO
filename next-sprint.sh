@@ -30,6 +30,8 @@ extract_prompt() {
 # 1. Housekeeping — fix check-pr.sh false positive (5 min)
 # ─────────────────────────────────────────────────────────────────
 housekeeping() {
+    [ -n "${EDITOR:-}" ] || {
+        echo "✗ \$EDITOR is not set. Run: export EDITOR=vim  (or nano/code/cursor)"; exit 1; }
     git checkout -b chore/check-pr-false-positive
     grep -n 'OPENAI_API_KEY\|ANTHROPIC_API_KEY\|env\|secret' scripts/check-pr.sh \
         | head -20
