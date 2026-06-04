@@ -417,3 +417,33 @@ class TestRequestKwargs:
 
         assert "stop" in kwargs
         assert kwargs["stop"] == ["STOP", "END"]
+
+
+class TestGeminiClientBehavior:
+    def test_gemini_client_is_not_cached(self):
+        from unittest.mock import Mock
+
+        calls = []
+
+        def factory():
+            client = Mock()
+            calls.append(client)
+            return client
+
+        c = OpenAICompatibleClient(vendor="gemini", sdk_factory=factory)
+
+        assert c._client_instance() is not c._client_instance()
+        assert len(calls) == 2
+
+    def test_extract_content_falls_back_to_model_dump(self):
+        from unittest.mock import Mock
+
+        message = Mock()
+        message.content = None
+        message.model_dump.return_value = {"content": "4"}
+
+        response = Mock()
+        response.choices = [Mock()]
+        response.choices[0].message = message
+
+        assert OpenAICompatibleClient._extract_content(response) == "4"

@@ -368,23 +368,20 @@ class OpenAICompatibleClient:
         self._cancelled_calls.add(call_id)
 
     def _client_instance(self) -> Any:
-        """Get or create OpenAI client instance.
-
-        Gemini's AI Studio endpoint has HTTP/2 stream reuse issues with the
-        OpenAI SDK v2 that cause silent empty-content responses on the second+
-        call from a cached connection. Use a fresh client per call for gemini.
-        """
+        """Get or create OpenAI client instance."""
         if self._vendor == "gemini":
-            return self._build_openai_client()
+            # Gemini's OpenAI-compatible endpoint behaves unreliably with the
+            # long-lived OpenAI SDK client in openai>=2.x. Use a fresh client per call.
+            return self._create_client()
 
         if self._client is None:
-            if self._sdk_factory is not None:
-                self._client = self._sdk_factory()
-            else:
-                self._client = self._build_openai_client()
+            self._client = self._create_client()
         return self._client
 
-    def _build_openai_client(self) -> Any:
+    def _create_client(self) -> Any:
+        if self._sdk_factory is not None:
+            return self._sdk_factory()
+
         try:
             from openai import OpenAI
         except ImportError as exc:
@@ -473,12 +470,12 @@ class OpenAICompatibleClient:
 
         choice = response.choices[0]
         message = getattr(choice, "message", None)
-        if message and hasattr(message, "content") and message.content:
-            return str(message.content)
 
-        # OpenAI SDK v2 with Gemini-compatible endpoints: content may be in model_dump()
-        # but not accessible via attribute (serialization quirk). Fall back to dict access.
-        if message and hasattr(message, "model_dump"):
+        content = getattr(message, "content", None) if message is not None else None
+        if content:
+            return str(content)
+
+        if message is not None and hasattr(message, "model_dump"):
             dumped = message.model_dump()
             content = dumped.get("content")
             if content:
