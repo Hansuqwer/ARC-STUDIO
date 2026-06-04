@@ -768,6 +768,53 @@ class QuotaWarningEvent(BaseModel):
     data: QuotaWarningData
 
 
+# ─── R-02 / QW-4 Events ──────────────────────────────────────────────────────
+
+
+class ContextCompactedData(BaseModel):
+    """Data payload for CONTEXT_COMPACTED event (R-02)."""
+
+    model_config = {"extra": "ignore"}
+
+    tokens_before: int
+    tokens_after: int
+    messages_evicted_count: int
+    evicted_handles: list[str] = []
+
+
+class ContextCompactedEvent(BaseModel):
+    """CONTEXT_COMPACTED event — emitted when R-02 evicts messages."""
+
+    schema_version: int = 2
+    type: Literal["CONTEXT_COMPACTED"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: ContextCompactedData
+
+
+class ToolOutputVirtualizedData(BaseModel):
+    """Data payload for TOOL_OUTPUT_VIRTUALIZED event (QW-4)."""
+
+    model_config = {"extra": "ignore"}
+
+    tool_name: str
+    original_size_bytes: int
+    handle_uri: str
+    estimated_tokens_saved: int
+
+
+class ToolOutputVirtualizedEvent(BaseModel):
+    """TOOL_OUTPUT_VIRTUALIZED event — emitted when a tool output is stored as a handle."""
+
+    schema_version: int = 2
+    type: Literal["TOOL_OUTPUT_VIRTUALIZED"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: ToolOutputVirtualizedData
+
+
 # ─── Raw/Unknown Events ──────────────────────────────────────────────────────
 
 
@@ -888,6 +935,8 @@ KnownRunEvent = Union[
     EvalPolicyRecommendedEvent,
     EvalPolicyAppliedEvent,
     QuotaWarningEvent,
+    ContextCompactedEvent,
+    ToolOutputVirtualizedEvent,
     RawEvent,
 ]
 
@@ -1035,6 +1084,8 @@ def parse_typed_event(raw: dict[str, Any]) -> TypedRunEvent:
         "EVAL_POLICY_RECOMMENDED": EvalPolicyRecommendedEvent,
         "EVAL_POLICY_APPLIED": EvalPolicyAppliedEvent,
         "QUOTA_WARNING": QuotaWarningEvent,
+        "CONTEXT_COMPACTED": ContextCompactedEvent,
+        "TOOL_OUTPUT_VIRTUALIZED": ToolOutputVirtualizedEvent,
         "RAW": RawEvent,
     }
 

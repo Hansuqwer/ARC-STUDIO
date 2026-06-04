@@ -803,6 +803,27 @@
         "usage_pct"
       ],
       "optionalFields": []
+    },
+    {
+      "type": "CONTEXT_COMPACTED",
+      "version": 2,
+      "requiredFields": [
+        "messages_evicted_count",
+        "tokens_after",
+        "tokens_before"
+      ],
+      "optionalFields": ["evicted_handles"]
+    },
+    {
+      "type": "TOOL_OUTPUT_VIRTUALIZED",
+      "version": 2,
+      "requiredFields": [
+        "estimated_tokens_saved",
+        "handle_uri",
+        "original_size_bytes",
+        "tool_name"
+      ],
+      "optionalFields": []
     }
   ]
 }

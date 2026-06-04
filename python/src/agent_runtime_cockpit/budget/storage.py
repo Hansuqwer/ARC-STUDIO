@@ -68,6 +68,17 @@ CREATE TABLE IF NOT EXISTS budget_spend (
     updated_at   TEXT NOT NULL,
     PRIMARY KEY (scope, provider_key, date_key)
 );
+
+CREATE TABLE IF NOT EXISTS handles (
+    sha256         TEXT PRIMARY KEY,
+    size_bytes     INTEGER NOT NULL,
+    mime_type      TEXT NOT NULL,
+    created_ts     TEXT NOT NULL,
+    last_access_ts TEXT NOT NULL,
+    content        BLOB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_handles_last_access
+    ON handles (last_access_ts);
 """
 
 _UPSERT_SQL = """
@@ -196,6 +207,68 @@ class SQLiteWALStorage(BudgetStorage):
     def reset_session(self) -> None:
         with self._connect() as conn:
             conn.execute("DELETE FROM budget_spend WHERE scope='SESSION'")
+
+    # ── Handle store methods ───────────────────────────────────────────────
+
+    def handle_store(self, sha256: str, content: bytes, mime_type: str) -> None:
+        """Insert handle (INSERT OR IGNORE — dedup by sha256)."""
+        now = self._now()
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT OR IGNORE INTO handles
+                   (sha256, size_bytes, mime_type, created_ts, last_access_ts, content)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (sha256, len(content), mime_type, now, now, content),
+            )
+
+    def handle_fetch(self, sha256: str) -> Optional[bytes]:
+        """Return content for exact sha256, updating last_access_ts. None if missing."""
+        now = self._now()
+        with self._connect() as conn:
+            cur = conn.execute("SELECT content FROM handles WHERE sha256 = ?", (sha256,))
+            row = cur.fetchone()
+            if row is None:
+                return None
+            conn.execute("UPDATE handles SET last_access_ts = ? WHERE sha256 = ?", (now, sha256))
+            return bytes(row[0])
+
+    def handle_resolve_prefix(self, prefix: str) -> Optional[str]:
+        """Return full sha256 matching prefix. None if missing; raises if ambiguous."""
+        with self._connect() as conn:
+            cur = conn.execute("SELECT sha256 FROM handles WHERE sha256 LIKE ?", (prefix + "%",))
+            rows = cur.fetchall()
+        if not rows:
+            return None
+        if len(rows) > 1:
+            raise ValueError(f"Ambiguous handle prefix {prefix!r}: matches {len(rows)} handles")
+        return rows[0][0]
+
+    def handle_total_bytes(self) -> int:
+        """Return total bytes stored in handles table."""
+        with self._connect() as conn:
+            cur = conn.execute("SELECT COALESCE(SUM(size_bytes), 0) FROM handles")
+            return int(cur.fetchone()[0])
+
+    def handle_count(self) -> int:
+        """Return number of handles stored."""
+        with self._connect() as conn:
+            cur = conn.execute("SELECT COUNT(*) FROM handles")
+            return int(cur.fetchone()[0])
+
+    def handle_evict_lru(self, max_bytes: int) -> int:
+        """Evict LRU handles until total_bytes <= max_bytes. Return bytes freed."""
+        freed = 0
+        while self.handle_total_bytes() > max_bytes:
+            with self._connect() as conn:
+                cur = conn.execute(
+                    "SELECT sha256, size_bytes FROM handles ORDER BY last_access_ts ASC LIMIT 1"
+                )
+                row = cur.fetchone()
+                if row is None:
+                    break
+                conn.execute("DELETE FROM handles WHERE sha256 = ?", (row[0],))
+                freed += row[1]
+        return freed
 
 
 def default_storage() -> BudgetStorage:

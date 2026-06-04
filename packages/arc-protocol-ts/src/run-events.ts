@@ -383,6 +383,28 @@ export interface QuotaWarningEvent extends RunEventBase {
   };
 }
 
+export interface ContextCompactedEvent extends RunEventBase {
+  type: 'CONTEXT_COMPACTED';
+  data: {
+    tokens_before: number;
+    tokens_after: number;
+    messages_evicted_count: number;
+    evicted_handles?: string[];
+    [key: string]: unknown;
+  };
+}
+
+export interface ToolOutputVirtualizedEvent extends RunEventBase {
+  type: 'TOOL_OUTPUT_VIRTUALIZED';
+  data: {
+    tool_name: string;
+    original_size_bytes: number;
+    handle_uri: string;
+    estimated_tokens_saved: number;
+    [key: string]: unknown;
+  };
+}
+
 // ─── Raw/Unknown Events ──────────────────────────────────────────────────────
 
 export interface RawEvent extends RunEventBase {
@@ -445,6 +467,8 @@ export type KnownRunEvent =
   | EvalPolicyRecommendedEvent
   | EvalPolicyAppliedEvent
   | QuotaWarningEvent
+  | ContextCompactedEvent
+  | ToolOutputVirtualizedEvent
   | RawEvent;
 
 /**
@@ -484,6 +508,8 @@ export const KNOWN_RUN_EVENT_TYPES = [
   'EVAL_POLICY_RECOMMENDED',
   'EVAL_POLICY_APPLIED',
   'QUOTA_WARNING',
+  'CONTEXT_COMPACTED',
+  'TOOL_OUTPUT_VIRTUALIZED',
   'RAW',
 ] as const satisfies readonly KnownRunEvent['type'][];
 

@@ -239,6 +239,24 @@ VENDOR_CONFIGS = {
 }
 
 
+def _maybe_compact(request: "ProviderRequest") -> "ProviderRequest":
+    """Apply R-02 compaction if enabled and context is near the limit."""
+    import os
+
+    if os.environ.get("ARC_COMPACTION_ENABLED", "1") == "0":
+        return request
+    try:
+        from ..context.compaction import compact
+
+        context_limit = int(os.environ.get("ARC_CONTEXT_LIMIT", "200000"))
+        result = compact(request.messages, context_limit=context_limit)
+        if result.compacted:
+            return request.model_copy(update={"messages": list(result.messages_kept)})
+    except Exception:
+        pass
+    return request
+
+
 class OpenAICompatibleClient:
     """OpenAI-compatible provider client supporting multiple vendors.
 
@@ -300,6 +318,7 @@ class OpenAICompatibleClient:
         """Execute a completion request."""
         try:
             cancellation_token.raise_if_cancelled()
+            request = _maybe_compact(request)
             kwargs = self._request_kwargs(request, stream=False)
             response = self._client_instance().chat.completions.create(**kwargs)
             cancellation_token.raise_if_cancelled()

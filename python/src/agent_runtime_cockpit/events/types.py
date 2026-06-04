@@ -146,6 +146,26 @@ class SandboxCommandEvent(ArcEvent):
     event_type: Literal["sandbox_command"] = "sandbox_command"
 
 
+class ToolOutputVirtualized(ArcEvent):
+    """Emitted when a tool output > threshold is stored as a handle."""
+
+    event_type: Literal["tool_output_virtualized"] = "tool_output_virtualized"
+    tool_name: str
+    original_size_bytes: int
+    handle_uri: str
+    estimated_tokens_saved: int
+
+
+class ContextCompacted(ArcEvent):
+    """Emitted when R-02 compaction evicts messages from the context window."""
+
+    event_type: Literal["context_compacted"] = "context_compacted"
+    tokens_before: int
+    tokens_after: int
+    messages_evicted_count: int
+    evicted_handles: list[str] = []
+
+
 EVENT_TYPE_MAP: dict[str, type[ArcEvent]] = {
     "hitl_required": HitlRequired,
     "hitl_decided": HitlDecided,
@@ -160,6 +180,8 @@ EVENT_TYPE_MAP: dict[str, type[ArcEvent]] = {
     "task_failed": TaskFailed,
     "eval_completed": EvalCompleted,
     "sandbox_command": SandboxCommandEvent,
+    "tool_output_virtualized": ToolOutputVirtualized,
+    "context_compacted": ContextCompacted,
 }
 
 

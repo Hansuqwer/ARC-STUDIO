@@ -810,6 +810,21 @@ def _build_registry():
             usage="/budget",
         )
     )
+    registry.register(
+        CommandDef(
+            name="expand",
+            help_text="Re-inject a virtualized tool output handle into the conversation",
+            category="context",
+            handler=cmd_expand,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "not_found", "degraded"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+            usage="/expand <handle-prefix>",
+        )
+    )
 
     return registry
 
@@ -2517,3 +2532,44 @@ def _session_budget_enforcer(session: ChatSession) -> BudgetEnforcer | None:
     if metadata.get("budget_enforcer_active"):
         return BudgetEnforcer(BudgetConfig(first_launch_confirmed=True), BudgetState())
     return None
+
+
+# ── Handle expand handler ──────────────────────────────────────────────────────
+
+
+def cmd_expand(arg: str, session: ChatSession) -> CommandResult:
+    """Re-inject a virtualized tool output handle into the conversation."""
+    from ..budget.storage import SQLiteWALStorage
+    from ..context.handles import HandleAmbiguous, HandleCorrupt, HandleNotFound, HandleStore
+
+    prefix = arg.strip()
+    if not prefix:
+        return CommandResult(
+            state="blocked",
+            reason="missing_prefix",
+            remediation="Usage: /expand <handle-prefix>",
+        )
+
+    try:
+        storage = SQLiteWALStorage()
+        hs = HandleStore(storage)
+        content = hs.expand(prefix)
+    except HandleNotFound:
+        return CommandResult(
+            state="not_found",
+            output=f"[handle {prefix!r} not found; rerun the originating tool call]",
+        )
+    except HandleAmbiguous as exc:
+        return CommandResult(state="blocked", reason=str(exc))
+    except HandleCorrupt as exc:
+        return CommandResult(state="degraded", reason=str(exc))
+
+    text = content.decode(errors="replace")
+    if hasattr(session, "add_message"):
+        session.add_message("user", text)
+
+    return CommandResult(
+        state="present",
+        output=f"[expanded {len(content)} bytes from handle {prefix!r}]",
+        metadata={"handle_prefix": prefix, "bytes": len(content)},
+    )

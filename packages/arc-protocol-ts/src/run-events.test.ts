@@ -165,4 +165,42 @@ describe('run-events helpers', () => {
   it('KNOWN_RUN_EVENT_TYPES includes QUOTA_WARNING', () => {
     expect(KNOWN_RUN_EVENT_TYPES).toContain('QUOTA_WARNING');
   });
+
+  it('parseRunEvent recognizes CONTEXT_COMPACTED', () => {
+    const event = parseRunEvent({
+      ...baseEvent,
+      type: 'CONTEXT_COMPACTED',
+      data: { tokens_before: 170000, tokens_after: 120000, messages_evicted_count: 4, evicted_handles: [] },
+    });
+    expect(isKnownEvent(event)).toBe(true);
+    expect(event.type).toBe('CONTEXT_COMPACTED');
+  });
+
+  it('CONTEXT_COMPACTED extra fields are ignored (forward-compat)', () => {
+    const event = parseRunEvent({
+      ...baseEvent,
+      type: 'CONTEXT_COMPACTED',
+      data: { tokens_before: 1, tokens_after: 2, messages_evicted_count: 1, future_field: 'ignored' },
+    });
+    expect(isKnownEvent(event)).toBe(true);
+  });
+
+  it('parseRunEvent recognizes TOOL_OUTPUT_VIRTUALIZED', () => {
+    const event = parseRunEvent({
+      ...baseEvent,
+      type: 'TOOL_OUTPUT_VIRTUALIZED',
+      data: { tool_name: 'bash', original_size_bytes: 9000, handle_uri: 'arc://output/sha256/abc', estimated_tokens_saved: 2200 },
+    });
+    expect(isKnownEvent(event)).toBe(true);
+    expect(event.type).toBe('TOOL_OUTPUT_VIRTUALIZED');
+  });
+
+  it('TOOL_OUTPUT_VIRTUALIZED extra fields are ignored (forward-compat)', () => {
+    const event = parseRunEvent({
+      ...baseEvent,
+      type: 'TOOL_OUTPUT_VIRTUALIZED',
+      data: { tool_name: 'x', original_size_bytes: 1, handle_uri: 'arc://output/sha256/ff', estimated_tokens_saved: 1, future_field: 42 },
+    });
+    expect(isKnownEvent(event)).toBe(true);
+  });
 });

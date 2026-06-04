@@ -7,6 +7,12 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 ### Added
 - **Budget persistence**: `SQLiteWALStorage` in `budget/storage.py` — SESSION + PROVIDER_DAY spend survive process restart via SQLite WAL. `InMemoryStorage` preserved as default for tests/back-compat. `BudgetEnforcer.__init__` accepts optional `storage` param. (v0.4.1)
 - **Pricing refresh**: Current-gen model rows added to `anthropic.py` (Haiku 4.5, Sonnet 4.6, Opus 4.6/4.7) and `openai_compatible.py` (GPT-5.5/5.4/5.4-mini/5.4-nano/5.2/5, GPT-4.1 family). (v0.4.1)
+- **QW-4 Handle store**: `context/handles.py` — `HandleStore` over SQLiteWAL. Tool outputs >8KB stored as `arc://output/sha256/<hex>` handles. Content-addressed dedup, LRU eviction, SHA computed post-redaction. (v0.5.0)
+- **QW-4 Tool-output virtualization**: `context/tool_interceptor.py` — `virtualize_tool_outputs()` replaces oversized tool messages with resource_link summaries + head/tail preview. Emits `ToolOutputVirtualized` event. No LLM in path. (v0.5.0)
+- **QW-4 /expand command**: `/expand <handle-prefix>` re-injects full handle content into conversation history. Resolves prefix, raises on ambiguous/missing/corrupt. (v0.5.0)
+- **R-02 Context compaction**: `context/compaction.py` — deterministic Lost-in-the-Middle eviction. Trigger 0.85, stop 0.70. Preserves system prompt + first 2 pairs + last 4 pairs + current user. No LLM in path (CoSAI). Emits `ContextCompacted` event. (v0.5.0)
+- **R-02 Provider wiring**: `_maybe_compact()` hooked in `anthropic.py` + `openai_compatible.py` before `_request_kwargs`. `ARC_COMPACTION_ENABLED=0` to disable. Best-effort (never blocks a request). (v0.5.0)
+- **Typed events**: `ContextCompactedEvent` + `ToolOutputVirtualizedEvent` added to 3 Python protocol sites + TS `run-events.ts`. `extra='ignore'` forward-compat on both. (v0.5.0)
 
 ### Changed
 - **OpenAI cache multiplier**: GPT-5.x current-gen corrected from legacy 50% → 90% off (0.10× input). gpt-4o-mini legacy 50% preserved. GPT-4.1 family at 75% off (0.25×). (v0.4.1)
