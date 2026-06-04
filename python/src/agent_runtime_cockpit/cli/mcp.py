@@ -766,3 +766,216 @@ def mcp_serve(
     except KeyboardInterrupt:
         console.print("\n[dim]MCP server stopped.[/dim]")
         raise typer.Exit(0)
+
+
+# ── MCP outbound risk gate commands (Item 2) ────────────────────────────────
+
+
+@mcp_app.command("risk-scan")
+def mcp_risk_scan(
+    server_id: str = typer.Argument(..., help="MCP server ID to scan"),
+    tool: str = typer.Argument(..., help="Tool name to score"),
+    arguments: Optional[str] = typer.Option(None, "--args", help="JSON arguments string"),
+    policy: str = typer.Option("strict", "--policy", help="Policy: strict or permissive"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Score an MCP tool call for risk without executing it.
+
+    Examples:
+        arc mcp risk-scan my-server write_file --args '{"path":"/tmp/x"}'
+        arc mcp risk-scan my-server read_file --policy permissive
+    """
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    perf_start = time.perf_counter()
+
+    from ..mcp.manifests import ManifestStore
+    from ..mcp.sandbox import McpPolicy, decide_call
+
+    args_dict = None
+    if arguments:
+        try:
+            args_dict = json.loads(arguments)
+        except json.JSONDecodeError as exc:
+            _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid JSON arguments: {exc}"), json_output)
+            raise typer.Exit(2) from exc
+
+    # Check manifest for tool risk
+    store = ManifestStore(workspace=ws)
+    manifest = store.load(server_id)
+    manifest_risk = "low"
+    if manifest:
+        for tr in manifest.tool_risks:
+            if tr.tool_name == tool:
+                manifest_risk = tr.risk_level
+                break
+
+    pol = McpPolicy.STRICT if policy == "strict" else McpPolicy.PERMISSIVE
+    decision = decide_call(
+        server_id=server_id,
+        tool_name=tool,
+        arguments=args_dict,
+        manifest_risk=manifest_risk,
+        policy=pol,
+    )
+    elapsed = round((time.perf_counter() - perf_start) * 1000, 3)
+    _out(
+        ok(
+            {
+                "server_id": server_id,
+                "tool_name": tool,
+                "decision": decision.decision.value,
+                "risk_level": decision.risk_score.level.value,
+                "reasons": decision.risk_score.reasons,
+                "policy": decision.policy.value,
+                "reason": decision.reason,
+            },
+            workspace=str(ws),
+            duration_ms=elapsed,
+        ),
+        json_output,
+    )
+
+
+@mcp_app.command("decisions")
+def mcp_decisions(
+    limit: int = typer.Option(50, "--limit", help="Max decisions to show"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """List recent MCP call risk decisions from workspace audit log.
+
+    Reads .arc/mcp/decisions.jsonl in the current workspace.
+    """
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    perf_start = time.perf_counter()
+
+    from ..mcp.sandbox import load_decisions
+
+    decisions = load_decisions(ws, limit=limit)
+    elapsed = round((time.perf_counter() - perf_start) * 1000, 3)
+    _out(
+        ok(
+            {"decisions": decisions, "count": len(decisions)},
+            workspace=str(ws),
+            duration_ms=elapsed,
+        ),
+        json_output,
+    )
+
+
+@mcp_app.command("policy-explain")
+def mcp_policy_explain(
+    server_id: str = typer.Argument(..., help="MCP server ID"),
+    tool: str = typer.Argument(..., help="Tool name"),
+    arguments: Optional[str] = typer.Option(None, "--args", help="JSON arguments string"),
+    policy: str = typer.Option("strict", "--policy", help="Policy: strict or permissive"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Explain what policy decision would apply to an MCP tool call.
+
+    Like risk-scan, but includes full signal breakdown and manifest context.
+
+    Examples:
+        arc mcp policy-explain my-server write_file --args '{"content":"hello"}'
+    """
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    perf_start = time.perf_counter()
+
+    from ..mcp.manifests import ManifestStore
+    from ..mcp.risk import RiskSignals, scan_call_arguments, score_call
+    from ..mcp.sandbox import McpPolicy
+
+    args_dict = None
+    if arguments:
+        try:
+            args_dict = json.loads(arguments)
+        except json.JSONDecodeError as exc:
+            _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid JSON arguments: {exc}"), json_output)
+            raise typer.Exit(2) from exc
+
+    store = ManifestStore(workspace=ws)
+    manifest = store.load(server_id)
+    manifest_risk = "low"
+    tool_meta = None
+    if manifest:
+        for tr in manifest.tool_risks:
+            if tr.tool_name == tool:
+                manifest_risk = tr.risk_level
+                tool_meta = tr.model_dump()
+                break
+
+    drift_report = store.check_drift(server_id, []) if manifest else None
+    inj_sev = scan_call_arguments(args_dict)
+    signals = RiskSignals(manifest_risk=manifest_risk, injection_severity=inj_sev)
+    score = score_call(signals)
+
+    pol = McpPolicy.STRICT if policy == "strict" else McpPolicy.PERMISSIVE
+    elapsed = round((time.perf_counter() - perf_start) * 1000, 3)
+    _out(
+        ok(
+            {
+                "server_id": server_id,
+                "tool_name": tool,
+                "manifest_pinned": manifest is not None,
+                "manifest_risk": manifest_risk,
+                "tool_meta": tool_meta,
+                "injection_severity": inj_sev,
+                "drift": drift_report,
+                "risk_level": score.level.value,
+                "reasons": score.reasons,
+                "policy": pol.value,
+                "explanation": f"With policy={pol.value} and risk={score.level.value}: "
+                + (
+                    "DENY"
+                    if (pol == McpPolicy.STRICT and score.level.value in ("high", "critical"))
+                    or (pol == McpPolicy.PERMISSIVE and score.level.value == "critical")
+                    else "WARN"
+                    if score.level.value in ("medium", "high")
+                    else "ALLOW"
+                ),
+            },
+            workspace=str(ws),
+            duration_ms=elapsed,
+        ),
+        json_output,
+    )
+
+
+@mcp_app.command("proxy")
+def mcp_proxy(
+    server: str = typer.Argument(..., help="Upstream MCP server command"),
+    policy: str = typer.Option("strict", "--policy", help="Policy: strict or permissive"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Run stdio MCP proxy with per-call risk gating.
+
+    Sits between client and upstream MCP server. Intercepts tools/call,
+    scores risk, denies high/critical calls under strict policy.
+
+    Examples:
+        arc mcp proxy "python -m my_server" --policy strict
+    """
+    import shlex
+
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+
+    from ..mcp.proxy import run_proxy
+    from ..mcp.sandbox import McpPolicy
+
+    server_cmd = shlex.split(server)
+    pol = McpPolicy.STRICT if policy == "strict" else McpPolicy.PERMISSIVE
+
+    try:
+        asyncio.run(run_proxy(server_cmd, workspace=ws, policy=pol))
+    except KeyboardInterrupt:
+        pass
