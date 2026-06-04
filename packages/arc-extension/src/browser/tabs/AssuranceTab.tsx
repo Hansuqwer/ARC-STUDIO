@@ -360,6 +360,11 @@ export const AssuranceTab: React.FC<AssuranceTabProps> = ({ arcService, initialR
                         <dt>path</dt><dd>{auditInfo.auditPath || 'missing'}</dd>
                         <dt>records</dt><dd>{auditInfo.recordCount}</dd>
                         <dt>verified</dt><dd>{auditInfo.chainVerified ? 'yes' : 'no'}</dd>
+                        {auditInfo.mode && <><dt>mode</dt><dd>{auditInfo.mode}</dd></>}
+                        {auditInfo.recordsChecked != null && <><dt>records checked</dt><dd>{auditInfo.recordsChecked}</dd></>}
+                        {auditInfo.durationMs != null && <><dt>duration</dt><dd>{auditInfo.durationMs} ms</dd></>}
+                        {auditInfo.fileSizeBytes != null && <><dt>file size</dt><dd>{(auditInfo.fileSizeBytes / 1024).toFixed(1)} KB</dd></>}
+                        {auditInfo.peakMemoryMb != null && <><dt>peak memory</dt><dd>{auditInfo.peakMemoryMb.toFixed(2)} MB</dd></>}
                         <dt>signature</dt><dd>{auditInfo.signature || 'not provided'}</dd>
                         <dt>hmac</dt><dd>{auditInfo.hmacAlgo || 'not provided'}</dd>
                     </dl>

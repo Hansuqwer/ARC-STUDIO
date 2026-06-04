@@ -85,9 +85,9 @@ def audit_verify(
         "duration_ms": result.duration_ms,
         "run_id": run_id,
         "chain_path": str(chain),
+        "file_size_bytes": result.file_size_bytes,
+        "peak_memory_mb": result.peak_memory_mb,
     }
-    if result.file_size_bytes is not None:
-        payload["file_size_bytes"] = result.file_size_bytes
     if key_status is not None:
         payload["key_source"] = key_status.source
         payload["key_degraded"] = key_status.degraded
