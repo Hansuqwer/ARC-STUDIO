@@ -28,25 +28,20 @@ class CostRates(BaseModel):
     output_per_million: float
     cache_write_per_million: float | None = None
     cache_read_per_million: float | None = None
-    # ── v0.5.1 additions (all optional; defaults preserve backward compat) ──
-    # True for genuinely free models (e.g. GLM-4.7-Flash); wallet shows
-    # "FREE TIER" instead of "$X.XX" to avoid confusion with exhausted caps.
+    # ── v0.5.1 additions ───────────────────────────────────────────────────
     is_free_tier: bool = False
-    # ISO date after which this pricing row is known stale; triggers one-time
-    # deprecation warning on first use (e.g. DeepSeek V3-era IDs retire 2026-07-24).
     pricing_valid_until: str | None = None  # ISO date YYYY-MM-DD
-    # When set, requests to this model ID are silently redirected server-side;
-    # wallet shows "(routed to X)" so the user knows what actually ran.
     auto_route_to: str | None = None
-    # Per-vendor cache token field names in API usage responses.
-    # None → use Anthropic defaults (cache_read_input_tokens / cache_creation_input_tokens).
-    # Example for DeepSeek: {"hit": "prompt_cache_hit_tokens", "miss": "prompt_cache_miss_tokens"}
     cache_field_names: dict[str, str] | None = None
-    # Tokenizer family for heuristic accuracy warnings in wallet output.
-    # "cl100k_base" → no qualifier. Anything else → "≈" qualifier.
     tokenizer_family: str = "cl100k_base"
-    # Cache storage fee charged per million tokens per hour (rare; Anthropic beta).
     cache_storage_usd_per_million_per_hour: float | None = None
+    # ── v0.5.2 additions (capability fields for /models picker + capability gating) ──
+    # Parameters the model accepts (e.g. ["tools", "reasoning_effort", "response_format"]).
+    # Sourced from OpenRouter supported_parameters field. Empty = unknown.
+    supported_parameters: list[str] = Field(default_factory=list)
+    # Input modalities accepted (e.g. ["text", "image", "audio"]).
+    # Sourced from OpenRouter architecture.input_modalities. Empty = unknown.
+    input_modalities: list[str] = Field(default_factory=list)
 
     @field_validator(
         "input_per_million",
