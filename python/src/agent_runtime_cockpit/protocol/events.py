@@ -317,6 +317,45 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         required_fields={"battle_id", "status"},
         optional_fields={"winner_candidate_id", "duration_ms", "error", "node_id", "message_id"},
     ),
+    # ── Capability Card enforcement (sprint wire-and-enforce) ────────────
+    "CAPABILITY_CARD_DECISION": EventTypeDef(
+        required_fields={"action", "decision", "reason", "mode"},
+        optional_fields={
+            "card_id",
+            "card_hash",
+            "entity_type",
+            "remediation",
+            "correlation_id",
+            "details",
+        },
+    ),
+    # ── MCP outbound risk gate (sprint wire-and-enforce) ─────────────────
+    "MCP_CALL_DECISION": EventTypeDef(
+        required_fields={"server_id", "tool_name", "decision", "reason", "risk_level", "policy"},
+        optional_fields={
+            "correlation_id",
+            "drift",
+            "injection_severity",
+            "manifest_risk",
+            "roots_violation",
+        },
+    ),
+    # ── Eval-to-Policy loop (sprint wire-and-enforce) ─────────────────────
+    "EVAL_POLICY_RECOMMENDED": EventTypeDef(
+        required_fields={"profile_id", "actions", "recommendations_count", "correlation_id"},
+        optional_fields={"message_id", "node_id"},
+    ),
+    "EVAL_POLICY_APPLIED": EventTypeDef(
+        required_fields={
+            "profile_id",
+            "new_path",
+            "version",
+            "diff_summary",
+            "correlation_id",
+            "dry_run",
+        },
+        optional_fields={"message_id", "node_id"},
+    ),
     # ── Raw / fallback ───────────────────────────────────────────────────
     "RAW": EventTypeDef(
         required_fields={"raw"},
