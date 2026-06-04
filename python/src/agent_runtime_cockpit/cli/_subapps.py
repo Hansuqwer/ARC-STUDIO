@@ -94,3 +94,15 @@ mobile_app = typer.Typer(
     name="mobile",
     help="ARC Mobile Runtime SDK — capabilities, simulator, runtime pack",
 )
+agents_app = typer.Typer(
+    name="agents-md",
+    help="AGENTS.md workspace ingestion — discover, pin, drift, cards",
+)
+skills_app = typer.Typer(
+    name="skills",
+    help="SKILL.md catalog — discover and inspect workspace skill definitions",
+)
+a2a_app = typer.Typer(
+    name="a2a",
+    help="A2A AgentCard — generate, inspect, verify, approve, invoke (loopback only)",
+)
