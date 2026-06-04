@@ -1,0 +1,94 @@
+diff --git a/python/src/agent_runtime_cockpit/adapters/base.py b/python/src/agent_runtime_cockpit/adapters/base.py
+index 42e041a..84280ff 100644
+--- a/python/src/agent_runtime_cockpit/adapters/base.py
++++ b/python/src/agent_runtime_cockpit/adapters/base.py
+@@ -170,3 +170,49 @@ class RuntimeAdapter(abc.ABC):
+     def list_runs(self, workspace: Path) -> list[RunRecord]:
+         """List all runs for a workspace."""
+         raise NotImplementedError(f"{self.adapter_id} does not implement list_runs")
++
++    # ── Capability Card enforcement helper (D-01 wiring) ──────────────────
++    def enforce_capability_card(
++        self,
++        *,
++        workflow_id: str,
++        workspace: Path,
++    ) -> dict:
++        """Look up and enforce the adapter-level Capability Card.
++
++        Returns a dict suitable for emitting as a CAPABILITY_CARD_DECISION
++        event payload. Never raises on the default (warn) mode. Adapters MUST
++        call this once at the top of run_workflow() to satisfy the wiring
++        contract from EXECUTION_PROMPT.md Item 1.
++        """
++        import os
++        from ..capabilities.enforcement import enforce_card, resolve_mode
++        from ..capabilities.registry import CardRegistry
++
++        env = {
++            "ARC_CAPABILITIES_ENFORCE": os.environ.get(
++                "ARC_CAPABILITIES_ENFORCE", ""
++            )
++        }
++        mode = resolve_mode(env=env)
++
++        try:
++            registry = CardRegistry(workspace=workspace)
++            card_id = f"adapter::{self.adapter_id}"
++            card = registry.load(card_id)
++        except Exception:
++            card = None
++
++        result = enforce_card(card=card, signed=None, mode=mode)
++        return {
++            "action": "run_workflow",
++            "workflow_id": workflow_id,
++            "adapter_id": self.adapter_id,
++            "decision": result.decision,
++            "reason": result.reason,
++            "card_id": result.card_id,
++            "card_hash": result.card_hash,
++            "mode": mode,
++            "correlation_id": result.correlation_id,
++            "details": result.details,
++        }
+diff --git a/python/src/agent_runtime_cockpit/adapters/langgraph.py b/python/src/agent_runtime_cockpit/adapters/langgraph.py
+index f26409b..d87355c 100644
+--- a/python/src/agent_runtime_cockpit/adapters/langgraph.py
++++ b/python/src/agent_runtime_cockpit/adapters/langgraph.py
+@@ -177,6 +177,15 @@ class LangGraphAdapter(RuntimeAdapter):
+         inputs = inputs or {}
+         workspace = Path(str(inputs.get("workspace") or ".")).resolve()
+         run_id = f"run-lg-{uuid.uuid4().hex[:8]}"
++        # D-01: Capability Card enforcement (default mode=warn; never blocks)
++        try:
++            _cc_payload = self.enforce_capability_card(
++                workflow_id=workflow_id, workspace=workspace
++            )
++            log.debug("capability_card_decision: %s", _cc_payload)
++            inputs.setdefault("_capability_card_decision", _cc_payload)
++        except Exception as exc:  # pragma: no cover
++            log.warning("capability_card enforcement skipped: %s", exc)
+         started = datetime.now(timezone.utc)
+         events = [
+             self._event(
+diff --git a/python/src/agent_runtime_cockpit/adapters/swarmgraph.py b/python/src/agent_runtime_cockpit/adapters/swarmgraph.py
+index 0507624..1d5e36d 100644
+--- a/python/src/agent_runtime_cockpit/adapters/swarmgraph.py
++++ b/python/src/agent_runtime_cockpit/adapters/swarmgraph.py
+@@ -313,6 +313,15 @@ class SwarmGraphAdapter(RuntimeAdapter):
+         inputs = inputs or {}
+         workspace = Path(str(inputs.get("workspace") or ".")).resolve()
+         prompt = str(inputs.get("prompt") or f"Run ARC workflow {workflow_id}")
++        # D-01: Capability Card enforcement (default mode=warn; never blocks)
++        try:
++            _cc_payload = self.enforce_capability_card(
++                workflow_id=workflow_id, workspace=workspace
++            )
++            log.debug("capability_card_decision: %s", _cc_payload)
++            inputs.setdefault("_capability_card_decision", _cc_payload)
++        except Exception as exc:  # pragma: no cover - defensive only
++            log.warning("capability_card enforcement skipped: %s", exc)
+ 
+         if os.environ.get("ARC_SWARMGRAPH_CLI"):
+             self._resolve_cli(workspace)

@@ -1,0 +1,67 @@
+diff --git a/python/tests/tui/__init__.py b/python/tests/tui/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/python/tests/tui/test_mode_cycle.py b/python/tests/tui/test_mode_cycle.py
+new file mode 100644
+index 0000000..2d38ac9
+--- /dev/null
++++ b/python/tests/tui/test_mode_cycle.py
+@@ -0,0 +1,58 @@
++"""UX R-003 contract tests for the Shift+Tab mode cycle + ModeBadge."""
++
++from __future__ import annotations
++
++import pytest
++
++from agent_runtime_cockpit.tui.data import DataStore
++from agent_runtime_cockpit.tui.theme import ThemeManager
++from agent_runtime_cockpit.tui.widgets.mode_badge import (
++    ModeBadge,
++    _CYCLE,
++    _GLYPHS,
++)
++
++
++def _fresh_badge() -> ModeBadge:
++    return ModeBadge(DataStore(), ThemeManager())
++
++
++def test_cycle_walks_full_circle() -> None:
++    badge = _fresh_badge()
++    seen = [badge._current_mode()]
++    for _ in range(len(_CYCLE)):
++        seen.append(badge.cycle())
++    # After N cycles we should be back at the starting mode.
++    assert seen[0] == seen[-1]
++    # And every mode in _CYCLE must have been visited.
++    assert set(seen) == set(_CYCLE)
++
++
++def test_default_mode_is_build() -> None:
++    badge = _fresh_badge()
++    assert badge._current_mode() == "build"
++
++
++def test_set_mode_jumps_directly() -> None:
++    badge = _fresh_badge()
++    badge.set_mode("plan")
++    assert badge.data.mode == "plan"
++    badge.set_mode("review")
++    assert badge.data.mode == "review"
++
++
++def test_set_mode_rejects_unknown() -> None:
++    badge = _fresh_badge()
++    badge.set_mode("plan")
++    badge.set_mode("bogus")  # type: ignore[arg-type]
++    assert badge.data.mode == "plan"  # unchanged
++
++
++@pytest.mark.parametrize("mode", list(_CYCLE))
++def test_render_includes_mode_marker(mode: str) -> None:
++    badge = _fresh_badge()
++    badge.set_mode(mode)  # type: ignore[arg-type]
++    out = badge.render()
++    # Either the glyph (color path) or the bracketed label (no-color path)
++    assert _GLYPHS[mode] in out or f"({mode})" in out
++    assert mode in out

@@ -1,0 +1,40 @@
+diff --git a/python/src/agent_runtime_cockpit/tui/screen.py b/python/src/agent_runtime_cockpit/tui/screen.py
+index ed3ce97..1787555 100644
+--- a/python/src/agent_runtime_cockpit/tui/screen.py
++++ b/python/src/agent_runtime_cockpit/tui/screen.py
+@@ -269,9 +269,35 @@ class ArcScreen(Screen):
+ 
+     def _handle_shell_escape(self, text: str) -> None:
+         import subprocess
++        from ..security.trust import resolve_trust, TrustLevel
+ 
+         cmd = text[1:].strip()
+         self.data.add_entry("user", f"!{cmd}")
++
++        # D-03: route the bang-escape through trust + a conservative classifier.
++        # We do NOT call security.sandbox.decide() directly because the sandbox
++        # API is policy-oriented and would require a full SandboxRequest; this
++        # lighter wrapper still surfaces trust and a small denylist so unsafe
++        # commands are visibly refused rather than silently executed.
++        try:
++            trust_state = resolve_trust(self.data.workspace)
++            denylist = ("rm -rf", "sudo ", "mkfs", "dd if=", ":(){", "> /dev/")
++            lower = cmd.lower()
++            blocked_by_denylist = any(d in lower for d in denylist)
++            if trust_state.level == TrustLevel.UNTRUSTED or blocked_by_denylist:
++                reason = (
++                    "workspace untrusted (run /workspace trust)"
++                    if trust_state.level == TrustLevel.UNTRUSTED
++                    else "command matches sandbox denylist"
++                )
++                self.data.add_entry(
++                    "tool",
++                    f"Shell command blocked: {reason}\n  cmd: {cmd}",
++                    {"tool_name": f"Bash: {cmd}", "status": "error"},
++                )
++                return
++        except Exception:
++            pass  # fall through if trust resolution itself fails
+         try:
+             result = subprocess.run(  # noqa: S602
+                 cmd, shell=True, capture_output=True, text=True, timeout=30

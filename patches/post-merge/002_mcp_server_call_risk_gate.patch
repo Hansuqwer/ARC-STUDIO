@@ -1,0 +1,81 @@
+diff --git a/python/src/agent_runtime_cockpit/mcp/server.py b/python/src/agent_runtime_cockpit/mcp/server.py
+index 887fb17..3e08150 100644
+--- a/python/src/agent_runtime_cockpit/mcp/server.py
++++ b/python/src/agent_runtime_cockpit/mcp/server.py
+@@ -12,6 +12,7 @@ from __future__ import annotations
+ 
+ import json
+ import logging
++import os
+ import re
+ import time
+ from datetime import datetime, timezone
+@@ -24,6 +25,7 @@ from mcp.server.fastmcp import FastMCP
+ from .. import __version__ as arc_version
+ from ..protocol.errors import ArcErrorCode
+ from ..protocol.event_envelope import err, ok
++from .sandbox import McpDecision, McpPolicy, decide_call, persist_decision
+ from ..security.redaction import Redactor
+ from ..security.trust import WorkspaceUntrusted, ensure_trusted
+ 
+@@ -160,12 +162,60 @@ def create_mcp_server(
+         }
+         try:
+             _trusted()
++            # D-02: Outbound per-call risk gate (LLM-free; deterministic).
++            try:
++                policy_value = os.environ.get(
++                    "ARC_MCP_POLICY", McpPolicy.STRICT.value
++                )
++                policy = McpPolicy(policy_value)
++            except ValueError:
++                policy = McpPolicy.STRICT
++            mcp_decision = decide_call(
++                server_id="arc-local",
++                tool_name=tool_name,
++                arguments=audit_args,
++                manifest_risk="low",
++                roots_violation=False,
++                drift=None,
++                policy=policy,
++            )
++            try:
++                persist_decision(ws, mcp_decision)
++            except Exception:  # pragma: no cover
++                pass
++            if mcp_decision.decision == McpDecision.DENY:
++                _persist_mcp_audit_event(
++                    ws,
++                    {
++                        **base_audit,
++                        "decision": "denied",
++                        "error_code": "MCP_RISK_DENIED",
++                        "error_reason": mcp_decision.reason,
++                        "risk_level": mcp_decision.risk_score.level.value,
++                        "policy": policy.value,
++                        "ended_at": _utc_now(),
++                        "duration_ms": round((time.perf_counter() - started) * 1000, 3),
++                        "truncated": False,
++                    },
++                )
++                return _error_json(
++                    ArcErrorCode.PERMISSION_DENIED,
++                    f"MCP outbound call denied: {mcp_decision.reason}",
++                    details={
++                        "tool": tool_name,
++                        "code": "MCP_RISK_DENIED",
++                        "risk": mcp_decision.risk_score.level.value,
++                        "policy": policy.value,
++                    },
++                )
+             text, truncated = _redacted_json_envelope(callback(), workspace=ws)
+             _persist_mcp_audit_event(
+                 ws,
+                 {
+                     **base_audit,
+                     "decision": "allowed",
++                    "risk_level": mcp_decision.risk_score.level.value,
++                    "policy": policy.value,
+                     "ended_at": _utc_now(),
+                     "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                     "truncated": truncated,
