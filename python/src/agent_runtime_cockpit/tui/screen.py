@@ -343,8 +343,11 @@ class ArcScreen(Screen):
 
     def _handle_chat_message(self, text: str) -> None:
         """Send a chat message. Streams via SwarmGraph if available."""
+        from .theme_extras import thinking_indicator
+
+        no_color = bool(getattr(self.theme.current, "no_color", False))
         self.data.add_entry("user", text)
-        self.data.add_entry("assistant", "● Thinking…")
+        self.data.add_entry("assistant", thinking_indicator(no_color=no_color))
 
         def run_agent() -> None:
             self.data.is_streaming = True
