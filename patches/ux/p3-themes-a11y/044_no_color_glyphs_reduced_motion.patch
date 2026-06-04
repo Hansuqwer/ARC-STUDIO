@@ -1,0 +1,210 @@
+From c0cd62e154edbe0de716b39ca99dafdb3ddeb1f9 Mon Sep 17 00:00:00 2001
+From: HansuQWER <HansuQWER@protonmail.com>
+Date: Thu, 4 Jun 2026 15:56:59 +0200
+Subject: [PATCH] =?UTF-8?q?feat(tui):=20P3=20=E2=80=94=20NO=5FCOLOR=20glyp?=
+ =?UTF-8?q?h=20fallbacks=20+=20ARC=5FREDUCED=5FMOTION=20(R-044,=20R-045)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- tui/theme_extras.py: glyph(char, no_color) returns ASCII fallback map;
+  is_reduced_motion() reads ARC_REDUCED_MOTION env var;
+  thinking_indicator() respects both flags
+- screen.py: _handle_chat_message uses thinking_indicator() instead of
+  hardcoded '● Thinking…'
+- 44 tests pass in tests/tui/test_p3_theme_extras.py
+---
+ .../src/agent_runtime_cockpit/tui/screen.py   |  5 +-
+ .../agent_runtime_cockpit/tui/theme_extras.py | 74 +++++++++++++++++
+ python/tests/tui/test_p3_theme_extras.py      | 81 +++++++++++++++++++
+ 3 files changed, 159 insertions(+), 1 deletion(-)
+ create mode 100644 python/src/agent_runtime_cockpit/tui/theme_extras.py
+ create mode 100644 python/tests/tui/test_p3_theme_extras.py
+
+diff --git a/python/src/agent_runtime_cockpit/tui/screen.py b/python/src/agent_runtime_cockpit/tui/screen.py
+index 95cd738..7f9228d 100644
+--- a/python/src/agent_runtime_cockpit/tui/screen.py
++++ b/python/src/agent_runtime_cockpit/tui/screen.py
+@@ -343,8 +343,11 @@ class ArcScreen(Screen):
+ 
+     def _handle_chat_message(self, text: str) -> None:
+         """Send a chat message. Streams via SwarmGraph if available."""
++        from .theme_extras import thinking_indicator
++
++        no_color = bool(getattr(self.theme.current, "no_color", False))
+         self.data.add_entry("user", text)
+-        self.data.add_entry("assistant", "● Thinking…")
++        self.data.add_entry("assistant", thinking_indicator(no_color=no_color))
+ 
+         def run_agent() -> None:
+             self.data.is_streaming = True
+diff --git a/python/src/agent_runtime_cockpit/tui/theme_extras.py b/python/src/agent_runtime_cockpit/tui/theme_extras.py
+new file mode 100644
+index 0000000..5a9467e
+--- /dev/null
++++ b/python/src/agent_runtime_cockpit/tui/theme_extras.py
+@@ -0,0 +1,74 @@
++"""Theme extras — NO_COLOR glyph fallbacks and ARC_REDUCED_MOTION helper.
++
++Implements UX_AUDIT P3 R-044 and R-045.
++
++Usage:
++    from agent_runtime_cockpit.tui.theme_extras import glyph, is_reduced_motion
++
++    status_icon = glyph("●", alt="[*]", no_color=no_color)
++    if not is_reduced_motion():
++        self._start_spinner()
++"""
++
++from __future__ import annotations
++
++import os
++
++# Maps Unicode glyph → ASCII/text fallback used when NO_COLOR is set.
++_FALLBACK: dict[str, str] = {
++    "●": "[*]",
++    "○": "[ ]",
++    "✓": "[OK]",
++    "✗": "[X]",
++    "⊘": "[/]",
++    "⚠": "[!]",
++    "ℹ": "[i]",
++    "▲": "(plan)",
++    "■": "(build)",
++    "▶": "(auto)",
++    "◆": "(review)",
++    "→": "->",
++    "←": "<-",
++    "…": "...",
++    "·": ".",
++    "┌": "+",
++    "┐": "+",
++    "└": "+",
++    "┘": "+",
++    "─": "-",
++    "│": "|",
++    "╭": "+",
++    "╮": "+",
++    "╰": "+",
++    "╯": "+",
++}
++
++
++def glyph(unicode_char: str, *, alt: str | None = None, no_color: bool = False) -> str:
++    """Return *unicode_char* unless NO_COLOR is active, in which case return the fallback.
++
++    *alt* overrides the built-in fallback table.
++    """
++    if not no_color:
++        return unicode_char
++    if alt is not None:
++        return alt
++    return _FALLBACK.get(unicode_char, unicode_char)
++
++
++def is_reduced_motion() -> bool:
++    """Return True when ARC_REDUCED_MOTION=1 (or any truthy value) is set."""
++    val = os.environ.get("ARC_REDUCED_MOTION", "0").strip().lower()
++    return val in ("1", "true", "yes", "on")
++
++
++def thinking_indicator(no_color: bool = False) -> str:
++    """Return the 'Thinking…' indicator string, respecting NO_COLOR and ARC_REDUCED_MOTION."""
++    if is_reduced_motion():
++        return "Thinking..."
++    if no_color:
++        return "[*] Thinking..."
++    return "● Thinking…"
++
++
++__all__ = ["glyph", "is_reduced_motion", "thinking_indicator", "_FALLBACK"]
+diff --git a/python/tests/tui/test_p3_theme_extras.py b/python/tests/tui/test_p3_theme_extras.py
+new file mode 100644
+index 0000000..3373d06
+--- /dev/null
++++ b/python/tests/tui/test_p3_theme_extras.py
+@@ -0,0 +1,81 @@
++"""Tests for P3 theme extras: NO_COLOR glyph fallbacks and ARC_REDUCED_MOTION."""
++
++from __future__ import annotations
++
++import pytest
++
++from agent_runtime_cockpit.tui.theme_extras import (
++    _FALLBACK,
++    glyph,
++    is_reduced_motion,
++    thinking_indicator,
++)
++
++
++# ── glyph() ───────────────────────────────────────────────────────────────────
++
++
++def test_glyph_color_returns_unicode() -> None:
++    assert glyph("●", no_color=False) == "●"
++
++
++def test_glyph_no_color_returns_fallback() -> None:
++    assert glyph("●", no_color=True) == "[*]"
++
++
++def test_glyph_no_color_custom_alt() -> None:
++    assert glyph("●", alt="(bullet)", no_color=True) == "(bullet)"
++
++
++def test_glyph_no_color_unknown_char_returns_itself() -> None:
++    assert glyph("★", no_color=True) == "★"
++
++
++@pytest.mark.parametrize("char", list(_FALLBACK.keys()))
++def test_all_fallbacks_are_ascii(char: str) -> None:
++    fallback = _FALLBACK[char]
++    assert fallback.isascii(), f"Fallback for {char!r} is not ASCII: {fallback!r}"
++
++
++# ── is_reduced_motion() ───────────────────────────────────────────────────────
++
++
++def test_reduced_motion_off_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
++    monkeypatch.delenv("ARC_REDUCED_MOTION", raising=False)
++    assert is_reduced_motion() is False
++
++
++@pytest.mark.parametrize("val", ["1", "true", "yes", "on", "True", "YES"])
++def test_reduced_motion_enabled(val: str, monkeypatch: pytest.MonkeyPatch) -> None:
++    monkeypatch.setenv("ARC_REDUCED_MOTION", val)
++    assert is_reduced_motion() is True
++
++
++@pytest.mark.parametrize("val", ["0", "false", "no", "off", ""])
++def test_reduced_motion_disabled(val: str, monkeypatch: pytest.MonkeyPatch) -> None:
++    monkeypatch.setenv("ARC_REDUCED_MOTION", val)
++    assert is_reduced_motion() is False
++
++
++# ── thinking_indicator() ─────────────────────────────────────────────────────
++
++
++def test_thinking_color_uses_unicode(monkeypatch: pytest.MonkeyPatch) -> None:
++    monkeypatch.delenv("ARC_REDUCED_MOTION", raising=False)
++    out = thinking_indicator(no_color=False)
++    assert "●" in out
++
++
++def test_thinking_no_color_uses_ascii(monkeypatch: pytest.MonkeyPatch) -> None:
++    monkeypatch.delenv("ARC_REDUCED_MOTION", raising=False)
++    out = thinking_indicator(no_color=True)
++    assert "[*]" in out
++    assert "●" not in out
++
++
++def test_thinking_reduced_motion_no_spinner(monkeypatch: pytest.MonkeyPatch) -> None:
++    monkeypatch.setenv("ARC_REDUCED_MOTION", "1")
++    out = thinking_indicator(no_color=False)
++    # Reduced motion: no animated glyph, plain text
++    assert "Thinking" in out
++    assert "●" not in out
+-- 
+2.50.1 (Apple Git-155)
+

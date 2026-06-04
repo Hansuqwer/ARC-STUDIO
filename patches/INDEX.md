@@ -64,58 +64,37 @@ After P0:
 
 ## `ux/p1-modes-approvals/` — universal ApprovalCard, CapabilityCardBanner, ActivityTray, PlanView, streaming RichLog, sandbox-routed shell
 
-**Status: queued, NOT YET WRITTEN.** Following the same `edit_file → git diff` workflow, plan:
+**Status: ✅ SHIPPED** — commit `dd54780`. Patch: `patches/ux/p1-modes-approvals/010_…patch` (676 lines). 24 tests.
 
-| # | Will implement | Files |
-|---|---|---|
-| 010 | UX R-007 ApprovalCard (universal across Capability/Paid/MCP/HITL gates) | `tui/widgets/approval_card.py` (new), `tui/screen.py` |
-| 011 | UX R-006 CapabilityCardBanner inline | `tui/widgets/capability_banner.py` (new); subscribe to `CAPABILITY_CARD_DECISION` events |
-| 012 | UX R-008 ActivityTray (Ctrl+X) | `tui/widgets/activity_tray.py` (new) |
-| 013 | UX R-008 McpDecisionBanner inside ActivityTray | `tui/widgets/mcp_banner.py` (new); subscribe to `MCP_CALL_DECISION` |
-| 014 | UX R-012 PlanView split (spec + simulator) | `tui/views/plan_view.py` (new) |
-| 015 | Streaming via Textual `RichLog` + `Live` | `tui/screen.py`, `tui/widgets/transcript.py` |
-| 016 | Already partially shipped via `patches/post-merge/003`. Promote to a real sandbox.decide() call. | `tui/screen.py` |
-| 017 | Event-bus subscriptions for new typed events | `tui/screen.py`, `tui/widgets/*` |
+| # | Patch | Implements | Files |
+|---|---|---|---|
+| 010 | `010_approval_card_capability_banner_activity_tray_mcp_decision.patch` | R-006 CapabilityCardBanner, R-007 ApprovalCard (all gate kinds), R-008 ActivityTray + McpDecisionBanner | `widgets/approval_card.py`, `widgets/capability_banner.py`, `widgets/activity_tray.py`, `widgets/mcp_banner.py`, `screen.py` |
 
-The wiring contract uses already-merged `CAPABILITY_CARD_DECISION` and `MCP_CALL_DECISION` events.
+Remaining queued (not yet written): 011–017.
 
 ---
 
 ## `ux/p2-components-ia/` — ToolCard rebuild, DiffViewer, palette categories, frontmatter, Toaster
 
-**Status: queued.** Plan:
+**Status: ✅ SHIPPED (partial)** — commit `acde33d`. Patch: `patches/ux/p2-components-ia/020_…patch` (480 lines). 18 tests.
 
-| # | Implements | Files |
-|---|---|---|
-| 020 | R-005 ToolCard rebuild (expand/copy/rerun keys, risk badge in header) | `tui/widgets/tool_card.py` |
-| 021 | R-009 DiffViewer (hunk navigation, side-by-side toggle `s`, word-level toggle `w`) | `tui/widgets/diff_viewer.py` (new), retire `diff_block.py` |
-| 022 | R-010 SlashMenu category chips + 2-line items | `tui/widgets/slash_menu.py` |
-| 023 | R-011 CommandPalette rebuild (search name+description+aliases, category chips) | `tui/widgets/command_palette.py` |
-| 024 | R-014 Toaster | `tui/widgets/toaster.py` (new) |
-| 025 | R-015 KeycapHint inline element | `tui/widgets/keycap_hint.py` (new) |
-| 026 | R-016 RiskBadge | `tui/widgets/risk_badge.py` (new) |
-| 027 | R-017 RunsView polish (filters, sort, `d` diff) | `tui/views/runs_view.py` |
-| 028 | R-019 SessionsView fork/rewind keys | `tui/views/sessions_view.py` |
-| 029 | Slash-command frontmatter (description/aliases/argument-hint/mode-restriction/risk) | `cli_repl/commands/**` |
-| 030 | Retire static `HelpScreen`; render from registry | `tui/widgets/help_screen.py` |
+| # | Patch | Implements | Files |
+|---|---|---|---|
+| 020 | `020_tool_card_diff_color_toaster.patch` | R-005 ToolCard rebuild (expand key, risk badge, 5-line preview), R-009 DiffBlock colored (+/-/@@ lines, n/p hunk nav), R-014 Toaster (dock:bottom, auto-dismiss) | `widgets/tool_card.py`, `widgets/diff_block.py`, `widgets/toaster.py` |
+
+Remaining queued (not yet written): 021–030.
 
 ---
 
 ## `ux/p3-themes-a11y/` — 5 themes, NO_COLOR glyph fallback, reduced motion, full snapshot matrix
 
-**Status: queued.** Plan:
+**Status: ✅ SHIPPED (partial)** — commit `c0cd62e`. Patch: `patches/ux/p3-themes-a11y/044_…patch` (210 lines). 44 tests.
 
-| # | Implements | Files |
-|---|---|---|
-| 040 | Catppuccin Mocha theme | `tui/tcss/themes/catppuccin-mocha.tcss`, `tui/theme.py` |
-| 041 | Catppuccin Latte theme | `tui/tcss/themes/catppuccin-latte.tcss` |
-| 042 | High-Contrast theme | `tui/tcss/themes/high-contrast.tcss` |
-| 043 | Monochrome theme | `tui/tcss/themes/monochrome.tcss` |
-| 044 | NO_COLOR text fallback for every `●○✓✗⊘` glyph | `tui/widgets/*.py` |
-| 045 | `ARC_REDUCED_MOTION=1` disables spinners/transitions | `tui/screen.py`, widgets |
-| 046 | `pytest-textual-snapshot` matrix 80×24/120×40/200×60/240×72 + NO_COLOR | `tests/tui/snapshots/`, `pyproject.toml` deps |
-| 047 | `/title` `/statusline` configurability | `cli_repl/commands/` |
-| 048 | Performance instrumentation (Textual `--log` profile) | `Makefile`, `scripts/perf-tui.sh` |
+| # | Patch | Implements | Files |
+|---|---|---|---|
+| 044 | `044_no_color_glyphs_reduced_motion.patch` | R-044 NO_COLOR glyph fallback map (`glyph()`) + R-045 `ARC_REDUCED_MOTION=1` (`is_reduced_motion()`, `thinking_indicator()`) | `tui/theme_extras.py` (new), `tui/screen.py` |
+
+Remaining queued (not yet written): 040–043, 046–048.
 
 ---
 

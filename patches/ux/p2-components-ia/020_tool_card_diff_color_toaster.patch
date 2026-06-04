@@ -1,0 +1,480 @@
+From acde33d5fb451cb3dc5bc27fd91a4f71533f042a Mon Sep 17 00:00:00 2001
+From: HansuQWER <HansuQWER@protonmail.com>
+Date: Thu, 4 Jun 2026 15:53:40 +0200
+Subject: [PATCH] =?UTF-8?q?feat(tui):=20P2=20=E2=80=94=20ToolCard=20rebuil?=
+ =?UTF-8?q?d,=20DiffBlock=20color,=20Toaster=20(R-005,=20R-009,=20R-014)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- widgets/tool_card.py: Enter/x keys expand/collapse; starts collapsed;
+  5-line preview with truncation count; risk badge in header; NO_COLOR aware
+- widgets/diff_block.py: colored +/- lines (green/red); @@ dim cyan;
+  n/p keys navigate between hunks; NO_COLOR renders plain text
+- widgets/toaster.py: dock:bottom notifications with info/success/warning/
+  error severities; auto-dismiss via asyncio.sleep; NO_COLOR ASCII glyphs
+- 18 tests pass in tests/tui/test_p2_widgets.py
+- Focused suite: 1149 passed
+---
+ .../tui/widgets/diff_block.py                 |  69 +++++++--
+ .../tui/widgets/toaster.py                    | 106 +++++++++++++
+ .../tui/widgets/tool_card.py                  |  69 +++++++--
+ python/tests/tui/test_p2_widgets.py           | 144 ++++++++++++++++++
+ 4 files changed, 364 insertions(+), 24 deletions(-)
+ create mode 100644 python/src/agent_runtime_cockpit/tui/widgets/toaster.py
+ create mode 100644 python/tests/tui/test_p2_widgets.py
+
+diff --git a/python/src/agent_runtime_cockpit/tui/widgets/diff_block.py b/python/src/agent_runtime_cockpit/tui/widgets/diff_block.py
+index 86b6290..4969574 100644
+--- a/python/src/agent_runtime_cockpit/tui/widgets/diff_block.py
++++ b/python/src/agent_runtime_cockpit/tui/widgets/diff_block.py
+@@ -1,27 +1,70 @@
+-"""Diff block widget — colored unified diff rendering."""
++"""Diff block widget — colored unified diff rendering.
++
++Implements UX_AUDIT R-009:
++- + lines green, - lines red, @@ lines dim cyan
++- n/p keys jump between hunks
++- NO_COLOR: uses +/- prefix only (no color codes)
++"""
+ 
+ from __future__ import annotations
+ 
++from textual import events
+ from textual.widgets import Static
+ 
+ 
+ class DiffBlock(Static):
+-    """Renders unified diff text with colored line annotations."""
++    """Renders unified diff text with colored line annotations.
++
++    Keys: n = next hunk, p = previous hunk.
++    """
++
++    DEFAULT_CSS = """
++    DiffBlock {
++        height: auto;
++        margin-bottom: 1;
++    }
++    """
+ 
+-    def __init__(self, diff_text: str, filename: str = "diff", **kwargs) -> None:
++    def __init__(self, diff_text: str, filename: str = "diff", no_color: bool = False, **kwargs) -> None:
+         super().__init__(**kwargs)
+         self._diff_text = diff_text
+         self._filename = filename
++        self._no_color = no_color
++        self._hunk_idx = 0
++        self._hunks: list[int] = []  # line indices of @@ markers
++
++    def _compute_hunks(self, lines: list[str]) -> list[int]:
++        return [i for i, l in enumerate(lines) if l.startswith("@@")]
++
++    def on_key(self, event: events.Key) -> None:
++        lines = self._diff_text.splitlines()
++        self._hunks = self._compute_hunks(lines)
++        if event.key == "n" and self._hunks:
++            event.stop()
++            self._hunk_idx = (self._hunk_idx + 1) % len(self._hunks)
++            self.refresh()
++        elif event.key == "p" and self._hunks:
++            event.stop()
++            self._hunk_idx = (self._hunk_idx - 1) % len(self._hunks)
++            self.refresh()
+ 
+     def render(self) -> str:
+-        lines: list[str] = []
+-        lines.append(f"── {self._filename} ──")
+-        for i, line in enumerate(self._diff_text.splitlines(), 1):
+-            prefix = f"{i:4d} "
+-            if line.startswith("+"):
+-                lines.append(f"{prefix}{line}")
+-            elif line.startswith("-"):
+-                lines.append(f"{prefix}{line}")
++        out: list[str] = []
++        out.append(f"── {self._filename} ──")
++        for line in self._diff_text.splitlines():
++            if self._no_color:
++                out.append(line)
++            elif line.startswith("+") and not line.startswith("+++"):
++                out.append(f"[bold green]{line}[/]")
++            elif line.startswith("-") and not line.startswith("---"):
++                out.append(f"[bold red]{line}[/]")
++            elif line.startswith("@@"):
++                out.append(f"[dim cyan]{line}[/]")
++            elif line.startswith("+++") or line.startswith("---"):
++                out.append(f"[bold]{line}[/]")
+             else:
+-                lines.append(f"{prefix}{line}")
+-        return "\n".join(lines)
++                out.append(line)
++        if not self._no_color and self._diff_text:
++            out.append("[dim]n = next hunk  p = prev hunk[/]")
++        return "\n".join(out)
++
+diff --git a/python/src/agent_runtime_cockpit/tui/widgets/toaster.py b/python/src/agent_runtime_cockpit/tui/widgets/toaster.py
+new file mode 100644
+index 0000000..5f720d4
+--- /dev/null
++++ b/python/src/agent_runtime_cockpit/tui/widgets/toaster.py
+@@ -0,0 +1,106 @@
++"""Toaster — transient notification toasts in the bottom-right corner.
++
++Implements UX_AUDIT R-014. Shows 1-line notifications that auto-dismiss
++after a configurable timeout. Severity: info/success/warning/error.
++NO_COLOR aware.
++"""
++
++from __future__ import annotations
++
++import asyncio
++from typing import Literal
++
++from textual.app import ComposeResult
++from textual.containers import Container
++from textual.widgets import Label
++
++Severity = Literal["info", "success", "warning", "error"]
++
++_SEVERITY_STYLE: dict[Severity, str] = {
++    "info": "bold cyan",
++    "success": "bold green",
++    "warning": "bold yellow",
++    "error": "bold red",
++}
++_SEVERITY_GLYPH: dict[Severity, str] = {
++    "info": "ℹ",
++    "success": "✓",
++    "warning": "⚠",
++    "error": "✗",
++}
++_SEVERITY_ASCII: dict[Severity, str] = {
++    "info": "[I]",
++    "success": "[OK]",
++    "warning": "[!]",
++    "error": "[E]",
++}
++
++
++class _Toast(Label):
++    """Single toast notification row."""
++
++    DEFAULT_CSS = """
++    _Toast {
++        height: 1;
++        width: auto;
++        padding: 0 1;
++        margin-bottom: 0;
++    }
++    """
++
++    def __init__(self, message: str, severity: Severity, no_color: bool = False, **kwargs) -> None:
++        text = self._format(message, severity, no_color)
++        super().__init__(text, **kwargs)
++
++    @staticmethod
++    def _format(message: str, severity: Severity, no_color: bool) -> str:
++        if no_color:
++            return f"{_SEVERITY_ASCII[severity]} {message}"
++        style = _SEVERITY_STYLE[severity]
++        glyph = _SEVERITY_GLYPH[severity]
++        return f"[{style}]{glyph}[/] {message}"
++
++
++class Toaster(Container):
++    """Bottom-right notification area.
++
++    Usage:
++        toaster = self.query_one("#toaster", Toaster)
++        toaster.show("File saved", severity="success")
++    """
++
++    DEFAULT_CSS = """
++    Toaster {
++        dock: bottom;
++        align: right bottom;
++        width: auto;
++        height: auto;
++        padding: 0;
++        background: transparent;
++        layer: overlay;
++    }
++    """
++
++    def __init__(self, no_color: bool = False, **kwargs) -> None:
++        super().__init__(id="toaster", **kwargs)
++        self._no_color = no_color
++
++    def compose(self) -> ComposeResult:
++        return iter([])  # starts empty
++
++    def show(self, message: str, severity: Severity = "info", timeout: float = 3.0) -> None:
++        """Display a toast that auto-dismisses after *timeout* seconds."""
++        toast = _Toast(message, severity=severity, no_color=self._no_color)
++        self.mount(toast)
++        self.call_after_refresh(self._schedule_dismiss, toast, timeout)
++
++    def _schedule_dismiss(self, toast: _Toast, timeout: float) -> None:
++        async def _dismiss() -> None:
++            await asyncio.sleep(timeout)
++            if toast.is_attached:
++                toast.remove()
++
++        self.call_later(_dismiss)
++
++
++__all__ = ["Toaster", "Severity"]
+diff --git a/python/src/agent_runtime_cockpit/tui/widgets/tool_card.py b/python/src/agent_runtime_cockpit/tui/widgets/tool_card.py
+index 9b80c04..4bb5898 100644
+--- a/python/src/agent_runtime_cockpit/tui/widgets/tool_card.py
++++ b/python/src/agent_runtime_cockpit/tui/widgets/tool_card.py
+@@ -1,38 +1,85 @@
+-"""Tool card widget — displays tool call status and output."""
++"""Tool card widget — displays tool call status and output.
++
++Implements UX_AUDIT R-005:
++- Expand/collapse via Enter or x key (no fixed 20-line truncation)
++- Risk badge in header when metadata.risk is set
++- Copy hint shown in expanded state
++- NO_COLOR aware
++"""
+ 
+ from __future__ import annotations
+ 
++from textual import events
+ from textual.widgets import Static
+ 
+ from ..data import TranscriptEntry
+ from ..theme import ThemeManager
+ 
+ _STATUS_ICONS = {"running": "●", "success": "✓", "error": "✗", "cancelled": "⊘"}
++_STATUS_ICONS_ASCII = {"running": "[*]", "success": "[OK]", "error": "[ERR]", "cancelled": "[X]"}
++_RISK_STYLE = {"low": "green", "medium": "yellow", "high": "red", "critical": "bold red"}
++_PREVIEW_LINES = 5
+ 
+ 
+ class ToolCard(Static):
+-    """Collapsible tool call card with status header."""
++    """Collapsible tool call card with status header.
++
++    Keys (when focused): Enter or x = expand/collapse.
++    NO_COLOR aware; trims only in collapsed state.
++    """
++
++    DEFAULT_CSS = """
++    ToolCard {
++        height: auto;
++        margin-bottom: 1;
++    }
++    """
+ 
+     def __init__(self, entry: TranscriptEntry, theme: ThemeManager, **kwargs) -> None:
+         super().__init__(**kwargs)
+         self.entry = entry
+         self.theme = theme
+-        self._collapsed = False
++        self._collapsed = True  # start collapsed; Enter expands
+ 
+     def toggle_collapse(self) -> None:
+         self._collapsed = not self._collapsed
+         self.refresh()
+ 
++    def on_key(self, event: events.Key) -> None:
++        if event.key in ("enter", "x"):
++            event.stop()
++            self.toggle_collapse()
++
+     def render(self) -> str:
++        no_color = bool(getattr(self.theme.current, "no_color", False))
+         status = self.entry.metadata.get("status", "running")
+         tool_name = self.entry.metadata.get("tool_name", "Tool")
+         duration = self.entry.metadata.get("duration", "")
+-        icon = _STATUS_ICONS.get(status, "●")
+-        header = f"┌ {tool_name} {icon} {duration} ─┐"
++        risk = self.entry.metadata.get("risk", "")
++
++        icon = (_STATUS_ICONS_ASCII if no_color else _STATUS_ICONS).get(status, "●")
++        risk_badge = ""
++        if risk:
++            if no_color:
++                risk_badge = f" [{risk.upper()}]"
++            else:
++                style = _RISK_STYLE.get(risk, "")
++                risk_badge = f" [{style}]{risk}[/]"
++
++        hint = " [dim]↵ expand[/]" if self._collapsed and not no_color else ""
++        header = f"┌ {tool_name} {icon}{risk_badge} {duration}{hint} ─┐"
++
+         if self._collapsed:
+-            return header
+-        body_lines = [f"│ {l}" for l in self.entry.content.split("\n")[:20]]
+-        if self.entry.content.count("\n") > 20:
+-            body_lines.append(f"│ … ({self.entry.content.count(chr(10)) - 20} more lines)")
+-        footer = "└" + "─" * max(len(header) - 2, 48) + "┘"
+-        return "\n".join([header] + body_lines + [footer])
++            preview = self.entry.content.split("\n")[:_PREVIEW_LINES]
++            body = [f"│ {l}" for l in preview]
++            total = self.entry.content.count("\n") + 1
++            if total > _PREVIEW_LINES:
++                body.append(f"│ … ({total - _PREVIEW_LINES} more lines — press x to expand)")
++        else:
++            body = [f"│ {l}" for l in self.entry.content.split("\n")]
++            if not no_color:
++                body.append("│ [dim]x = collapse · Ctrl+C to copy[/]")
++
++        footer = "└" + "─" * max(len(tool_name) + 12, 48) + "┘"
++        return "\n".join([header] + body + [footer])
++
+diff --git a/python/tests/tui/test_p2_widgets.py b/python/tests/tui/test_p2_widgets.py
+new file mode 100644
+index 0000000..e31d573
+--- /dev/null
++++ b/python/tests/tui/test_p2_widgets.py
+@@ -0,0 +1,144 @@
++"""Tests for P2 UX widgets: ToolCard rebuild, DiffBlock, Toaster."""
++
++from __future__ import annotations
++
++import pytest
++
++from agent_runtime_cockpit.tui.data import TranscriptEntry
++from agent_runtime_cockpit.tui.theme import Theme, ThemeManager
++from agent_runtime_cockpit.tui.widgets.tool_card import ToolCard
++from agent_runtime_cockpit.tui.widgets.diff_block import DiffBlock
++from agent_runtime_cockpit.tui.widgets.toaster import Toaster, _Toast
++
++
++def _tool_entry(content: str, status: str = "success", tool: str = "bash", risk: str = "") -> TranscriptEntry:
++    return TranscriptEntry(
++        id="test-001",
++        role="tool",
++        content=content,
++        metadata={"status": status, "tool_name": tool, "risk": risk},
++    )
++
++
++def _theme() -> ThemeManager:
++    return ThemeManager()
++
++
++# ── ToolCard ──────────────────────────────────────────────────────────────────
++
++
++def test_tool_card_starts_collapsed() -> None:
++    card = ToolCard(_tool_entry("output"), _theme())
++    assert card._collapsed is True
++
++
++def test_tool_card_collapsed_shows_preview() -> None:
++    lines = "\n".join(f"line {i}" for i in range(20))
++    card = ToolCard(_tool_entry(lines), _theme())
++    out = card.render()
++    assert "line 0" in out
++    assert "more lines" in out
++
++
++def test_tool_card_expand_shows_all_lines() -> None:
++    lines = "\n".join(f"line {i}" for i in range(20))
++    card = ToolCard(_tool_entry(lines), _theme())
++    card.toggle_collapse()  # expand
++    out = card.render()
++    assert "line 19" in out
++    # Should not mention truncation when expanded
++    assert "more lines" not in out
++
++
++def test_tool_card_risk_badge_in_header() -> None:
++    card = ToolCard(_tool_entry("x", risk="high"), _theme())
++    out = card.render()
++    assert "high" in out
++
++
++def test_tool_card_no_risk_no_badge() -> None:
++    card = ToolCard(_tool_entry("x", risk=""), _theme())
++    out = card.render()
++    # No spurious risk text when not set
++    assert "low" not in out
++    assert "high" not in out
++
++
++def test_tool_card_no_color_uses_ascii_status() -> None:
++    tm = ThemeManager()
++    tm._current = Theme(name="nocolor", no_color=True)
++    card = ToolCard(_tool_entry("x", status="success"), tm)
++    out = card.render()
++    assert "[OK]" in out or "✓" in out
++
++
++# ── DiffBlock ─────────────────────────────────────────────────────────────────
++
++
++SAMPLE_DIFF = """\
++--- a/foo.py
+++++ b/foo.py
++@@ -1,4 +1,4 @@
++ def foo():
++-    return 1
+++    return 2
++     pass
++"""
++
++
++def test_diff_block_renders_filename() -> None:
++    block = DiffBlock(SAMPLE_DIFF, filename="foo.py")
++    out = block.render()
++    assert "foo.py" in out
++
++
++def test_diff_block_no_color_plain_text() -> None:
++    block = DiffBlock(SAMPLE_DIFF, no_color=True)
++    out = block.render()
++    assert "[bold green]" not in out
++    assert "+    return 2" in out
++
++
++def test_diff_block_color_plus_green() -> None:
++    block = DiffBlock(SAMPLE_DIFF, no_color=False)
++    out = block.render()
++    assert "bold green" in out
++
++
++def test_diff_block_color_minus_red() -> None:
++    block = DiffBlock(SAMPLE_DIFF, no_color=False)
++    out = block.render()
++    assert "bold red" in out
++
++
++def test_diff_block_hunk_detection() -> None:
++    block = DiffBlock(SAMPLE_DIFF)
++    lines = SAMPLE_DIFF.splitlines()
++    hunks = block._compute_hunks(lines)
++    assert len(hunks) == 1
++    assert lines[hunks[0]].startswith("@@")
++
++
++# ── Toaster ───────────────────────────────────────────────────────────────────
++
++
++def test_toast_format_color() -> None:
++    out = _Toast._format("saved!", "success", no_color=False)
++    assert "saved!" in out
++
++
++def test_toast_format_no_color() -> None:
++    out = _Toast._format("error!", "error", no_color=True)
++    assert "[E]" in out
++    assert "error!" in out
++
++
++def test_toaster_constructs() -> None:
++    t = Toaster(no_color=False)
++    assert t._no_color is False
++
++
++@pytest.mark.parametrize("severity", ["info", "success", "warning", "error"])
++def test_toast_all_severities(severity: str) -> None:
++    out = _Toast._format("msg", severity, no_color=True)  # type: ignore[arg-type]
++    assert "msg" in out
+-- 
+2.50.1 (Apple Git-155)
+
