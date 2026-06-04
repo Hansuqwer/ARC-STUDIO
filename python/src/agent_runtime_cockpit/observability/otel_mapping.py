@@ -100,11 +100,15 @@ def _handle_tool_call(
     seq = str(event.get("sequence", 0))
     sid = _span_id(run_id, f"tool:{seq}")
     tokens = 0
+    tool_name = data.get("tool_name", data.get("name", ""))
     attrs: dict[str, Any] = {
-        "arc.tool.name": data.get("tool_name", data.get("name", "")),
+        "arc.tool.name": tool_name,
         "arc.tool.can_write": data.get("can_write", False),
         "arc.tool.can_network": data.get("can_network", False),
         "arc.tool.can_read_secrets": False,  # never expose
+        # OpenTelemetry GenAI semantic conventions
+        "gen_ai.tool.name": tool_name,
+        "gen_ai.tool.description": data.get("description", ""),
     }
     if cfg.redact_secrets:
         attrs, tokens = redact_attributes(attrs)
@@ -162,14 +166,23 @@ def _handle_model_call(
     seq = str(event.get("sequence", 0))
     sid = _span_id(run_id, f"model:{seq}")
     tokens = 0
+    usage = data.get("usage") or {}
+    finish_reasons = data.get("finish_reasons") or data.get("finish_reason")
+    if isinstance(finish_reasons, str):
+        finish_reasons = [finish_reasons]
     attrs: dict[str, Any] = {
         "arc.model.provider": data.get("provider", ""),
         "arc.model.name": data.get("model", ""),
         "arc.cost.requires_paid_calls": data.get("paid", False),
-        # LLM semantic conventions (OpenTelemetry GenAI)
+        # OpenTelemetry GenAI semantic conventions
         "gen_ai.system": data.get("provider", ""),
         "gen_ai.request.model": data.get("model", ""),
+        "gen_ai.usage.input_tokens": usage.get("input_tokens", usage.get("prompt_tokens", 0)),
+        "gen_ai.usage.output_tokens": usage.get("output_tokens", usage.get("completion_tokens", 0)),
+        "gen_ai.response.finish_reasons": finish_reasons or ["stop"],
     }
+    # NEVER log prompt/completion content by default (semconv compliance)
+    # gen_ai.request.* content and gen_ai.completion.* content are excluded.
     if cfg.redact_secrets:
         attrs, tokens = redact_attributes(attrs)
     spans.append(
@@ -289,6 +302,9 @@ def map_events_to_spans(
             "arc.runtime.name": trace.runtime or "",
             "arc.workflow_id": trace.workflow_id or "",
             "arc.run.status": trace.status or "",
+            # OpenTelemetry GenAI semantic conventions — agent
+            "gen_ai.agent.name": trace.runtime or "",
+            "gen_ai.agent.description": trace.workflow_id or "",
         },
         start_time=trace.started_at,
         end_time=trace.ended_at,
@@ -336,3 +352,65 @@ def map_events_to_spans(
             )
 
     return [root] + child_spans, warnings, total_tokens
+
+
+# ── Semconv conformance check ─────────────────────────────────────────────────
+
+# Required gen_ai.* attributes per span type
+GENAI_REQUIRED_ROOT = ("gen_ai.agent.name", "gen_ai.agent.description")
+GENAI_REQUIRED_MODEL = (
+    "gen_ai.system",
+    "gen_ai.request.model",
+    "gen_ai.usage.input_tokens",
+    "gen_ai.usage.output_tokens",
+    "gen_ai.response.finish_reasons",
+)
+GENAI_REQUIRED_TOOL = ("gen_ai.tool.name", "gen_ai.tool.description")
+
+# Content attributes that must NEVER be present by default
+GENAI_CONTENT_FORBIDDEN = (
+    "gen_ai.prompt",
+    "gen_ai.completion",
+    "gen_ai.request.messages",
+    "gen_ai.response.messages",
+)
+
+
+def check_genai_semconv(spans: list[ArcSpan]) -> list[dict[str, Any]]:
+    """Check spans for gen_ai.* semconv conformance.
+
+    Returns list of violations: [{"span_id", "span_name", "missing", "forbidden"}]
+    """
+    violations: list[dict[str, Any]] = []
+    for span in spans:
+        missing: list[str] = []
+        forbidden: list[str] = []
+
+        if span.name == "arc.run":
+            for attr in GENAI_REQUIRED_ROOT:
+                if attr not in span.attributes:
+                    missing.append(attr)
+        elif span.name == "arc.model.call":
+            for attr in GENAI_REQUIRED_MODEL:
+                if attr not in span.attributes:
+                    missing.append(attr)
+        elif span.name == "arc.tool.call":
+            for attr in GENAI_REQUIRED_TOOL:
+                if attr not in span.attributes:
+                    missing.append(attr)
+
+        # Check forbidden content attributes on all spans
+        for attr in GENAI_CONTENT_FORBIDDEN:
+            if attr in span.attributes:
+                forbidden.append(attr)
+
+        if missing or forbidden:
+            violations.append(
+                {
+                    "span_id": span.span_id,
+                    "span_name": span.name,
+                    "missing": missing,
+                    "forbidden": forbidden,
+                }
+            )
+    return violations
