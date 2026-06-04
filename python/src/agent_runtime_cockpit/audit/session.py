@@ -112,7 +112,7 @@ class AuditSession:
     """Context manager wrapping AuditChainStore for adapter use.
 
     Opens on enter, appends events during the run, and verifies on exit.
-    If the HMAC key is unavailable, events are still recorded (non-HMAC).
+    If the HMAC key is unavailable, appends fail closed.
     """
 
     def __init__(
@@ -261,9 +261,7 @@ class AuditSession:
     # -- Internal --
 
     def _append(self, event: AuditEvent) -> None:
-        result = self.store.append_event(redact_event(event, self._redaction))
-        if result is None:
-            pass  # no HMAC key available — event still recorded
+        self.store.append_event(redact_event(event, self._redaction))
 
     def verify(self) -> tuple[bool, str]:
         """Verify the audit chain for this run."""

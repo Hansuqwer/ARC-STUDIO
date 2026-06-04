@@ -89,10 +89,12 @@ class TestAuditChainStore:
         assert result["event"]["type"] == "run_started"
 
     def test_append_event_without_key(self, audit_dir):
+        from agent_runtime_cockpit.audit.key_manager import AuditSigningError
+
         store = self._store(audit_dir, key_available=False)
         event = RunStartedEvent(run_id="run_abc", runtime="swarmgraph")
-        result = store.append_event(event)
-        assert result is None
+        with pytest.raises(AuditSigningError, match="No key"):
+            store.append_event(event)
 
     def test_append_multiple_events(self, audit_dir):
         store = self._store(audit_dir)
@@ -118,8 +120,11 @@ class TestAuditChainStore:
         assert "not found" in msg
 
     def test_verify_run_no_key(self, audit_dir):
+        from agent_runtime_cockpit.audit.key_manager import AuditSigningError
+
         store = self._store(audit_dir, key_available=False)
-        store.append_event(RunStartedEvent(run_id="run_abc", runtime="swarmgraph"))
+        with pytest.raises(AuditSigningError):
+            store.append_event(RunStartedEvent(run_id="run_abc", runtime="swarmgraph"))
         ok, msg = store.verify_run("run_abc")
         assert ok is False
         assert "No audit key" in msg

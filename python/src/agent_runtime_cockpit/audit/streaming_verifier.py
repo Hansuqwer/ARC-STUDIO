@@ -23,7 +23,12 @@ from pydantic import BaseModel
 from agent_runtime_cockpit.events import get_bus
 from agent_runtime_cockpit.events.types import AuditVerified
 
-from .key_manager import sign_audit_record, verify_audit_signature
+from .key_manager import (
+    legacy_sign_audit_record,
+    sign_audit_record,
+    verify_audit_signature,
+    verify_legacy_audit_signature,
+)
 
 log = logging.getLogger(__name__)
 
@@ -160,18 +165,79 @@ class StreamingAuditVerifier:
                     # Verify HMAC signature
                     event = record.get("event", {})
                     signature = record.get("signature", "")
-                    expected_hash, _ = sign_audit_record(event, key, prev_hash)
-                    stored_hash = record.get("record_hash", "")
-                    if stored_hash != expected_hash:
+                    if not signature:
                         return VerificationResult(
                             ok=False,
                             mode="hmac",
                             records_checked=records_checked,
-                            reason=f"Record hash invalid at line {line_num}",
+                            reason=f"Unsigned record at line {line_num}",
                             duration_ms=int((time.time() - start_time) * 1000),
                             file_size_bytes=file_size,
                         )
-                    if not verify_audit_signature(event, signature, key, prev_hash):
+                    timestamp = str(record.get("timestamp", ""))
+                    key_id = str(record.get("key_id", ""))
+                    signed_seq = seq if timestamp or key_id else None
+                    expected_hash, _ = sign_audit_record(event, key, prev_hash)
+                    if timestamp or key_id:
+                        expected_hash, _ = sign_audit_record(
+                            event,
+                            key,
+                            prev_hash,
+                            seq=signed_seq,
+                            timestamp=timestamp,
+                            key_id=key_id,
+                        )
+                    stored_hash = record.get("record_hash", "")
+                    if not stored_hash:
+                        return VerificationResult(
+                            ok=False,
+                            mode="hmac",
+                            records_checked=records_checked,
+                            reason=f"Unsigned record at line {line_num}",
+                            duration_ms=int((time.time() - start_time) * 1000),
+                            file_size_bytes=file_size,
+                        )
+                    if stored_hash != expected_hash:
+                        if timestamp or key_id:
+                            return VerificationResult(
+                                ok=False,
+                                mode="hmac",
+                                records_checked=records_checked,
+                                reason=f"Record hash invalid at line {line_num}",
+                                duration_ms=int((time.time() - start_time) * 1000),
+                                file_size_bytes=file_size,
+                            )
+                        legacy_hash, _ = legacy_sign_audit_record(event, key, prev_hash)
+                        if stored_hash != legacy_hash:
+                            return VerificationResult(
+                                ok=False,
+                                mode="hmac",
+                                records_checked=records_checked,
+                                reason=f"Record hash invalid at line {line_num}",
+                                duration_ms=int((time.time() - start_time) * 1000),
+                                file_size_bytes=file_size,
+                            )
+                        if not verify_legacy_audit_signature(event, signature, key, prev_hash):
+                            return VerificationResult(
+                                ok=False,
+                                mode="hmac",
+                                records_checked=records_checked,
+                                reason=f"Signature invalid at line {line_num}",
+                                duration_ms=int((time.time() - start_time) * 1000),
+                                file_size_bytes=file_size,
+                            )
+                        prev_hash = stored_hash
+                        records_checked += 1
+                        continue
+                    if not verify_audit_signature(
+                        event,
+                        signature,
+                        key,
+                        prev_hash,
+                        seq=signed_seq,
+                        timestamp=timestamp,
+                        key_id=key_id,
+                    ):
                         return VerificationResult(
                             ok=False,
                             mode="hmac",

@@ -44,7 +44,15 @@ def make_repl_context():
         for k, v in overrides.items():
             setattr(ctx, k, v)
         return ctx
+
     return _factory
+
+
+@pytest.fixture(autouse=True)
+def _allow_unauthenticated_daemon_in_tests(monkeypatch: pytest.MonkeyPatch):
+    """Most daemon route tests target route behavior, not auth bootstrap."""
+    monkeypatch.setenv("ARC_DAEMON_ALLOW_UNAUTHENTICATED", "1")
+    monkeypatch.setenv("ARC_AUDIT_HMAC_KEY", "test-audit-hmac-key-32-bytes-long")
 
 
 def pytest_sessionfinish(session, exitstatus):  # noqa: ARG001

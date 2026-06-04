@@ -5,15 +5,23 @@ from __future__ import annotations
 import json
 import logging
 import os
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 try:
     import fcntl
 except ImportError:  # pragma: no cover - Windows unsupported for this phase.
     fcntl = None  # type: ignore[assignment]
 
-from .key_manager import AuditKeyManager, sign_audit_record, verify_audit_signature
+from .key_manager import (
+    AuditKeyManager,
+    AuditSigningError,
+    legacy_sign_audit_record,
+    sign_audit_record,
+    verify_audit_signature,
+    verify_legacy_audit_signature,
+)
 
 log = logging.getLogger(__name__)
 
@@ -61,23 +69,33 @@ class HmacAuditChainWriter:
             return 0, GENESIS
         return int(last["seq"]) + 1, str(last["record_hash"])
 
-    def append(self, event: dict[str, Any]) -> Optional[dict[str, Any]]:
-        """Append an event to the audit chain. Returns the signed record, or None if no key."""
+    def append(self, event: dict[str, Any]) -> dict[str, Any]:
+        """Append an HMAC-signed event to the audit chain."""
         key, status = self.key_manager.get_key()
         if key is None:
-            log.warning("No audit key available — skipping HMAC signing for seq %d", self._seq)
-            return None
+            raise AuditSigningError(status.warning or "No audit key available")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.path, "a+", encoding="utf-8") as f:
             with _FileLock(f):
                 self._seq, self._prev_hash = self._load_tail_state()
-                record_hash, signature = sign_audit_record(event, key, self._prev_hash)
+                timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                key_id = status.key_id or status.source
+                record_hash, signature = sign_audit_record(
+                    event,
+                    key,
+                    self._prev_hash,
+                    seq=self._seq,
+                    timestamp=timestamp,
+                    key_id=key_id,
+                )
                 record = {
                     "seq": self._seq,
                     "event": event,
                     "prev_hash": self._prev_hash,
                     "record_hash": record_hash,
                     "signature": signature,
+                    "timestamp": timestamp,
+                    "key_id": key_id,
                     "key_source": status.source,
                 }
                 f.seek(0, os.SEEK_END)
@@ -104,6 +122,7 @@ def verify_hmac_chain(chain_path: Path, key: bytes) -> tuple[bool, str]:
     if not lines:
         return True, "empty chain"
     prev_hash = GENESIS
+    records_checked = 0
     for i, line in enumerate(lines):
         if not line.strip():
             continue
@@ -115,10 +134,45 @@ def verify_hmac_chain(chain_path: Path, key: bytes) -> tuple[bool, str]:
         signature = record.get("signature", "")
         stored_prev = record.get("prev_hash", "")
         stored_hash = record.get("record_hash", "")
+        seq = record.get("seq")
+        timestamp = str(record.get("timestamp", ""))
+        key_id = str(record.get("key_id", ""))
+        if not isinstance(seq, int) or seq != records_checked:
+            return False, f"sequence mismatch at seq {records_checked}: got {seq}"
+        if not signature or not stored_hash:
+            return False, f"unsigned record at seq {records_checked}"
         if stored_prev != prev_hash:
-            return False, f"chain broken at seq {i}: prev_hash mismatch"
-        if not verify_audit_signature(event, signature, key, prev_hash):
-            return False, f"signature invalid at seq {i}"
+            return False, f"chain broken at seq {records_checked}: prev_hash mismatch"
+        signed_seq = seq if timestamp or key_id else None
+        expected_hash, _ = sign_audit_record(
+            event,
+            key,
+            prev_hash,
+            seq=signed_seq,
+            timestamp=timestamp,
+            key_id=key_id,
+        )
+        if stored_hash != expected_hash:
+            if timestamp or key_id:
+                return False, f"record hash invalid at seq {records_checked}"
+            legacy_hash, _ = legacy_sign_audit_record(event, key, prev_hash)
+            if stored_hash != legacy_hash:
+                return False, f"record hash invalid at seq {records_checked}"
+            if not verify_legacy_audit_signature(event, signature, key, prev_hash):
+                return False, f"signature invalid at seq {records_checked}"
+            prev_hash = stored_hash
+            records_checked += 1
+            continue
+        if not verify_audit_signature(
+            event,
+            signature,
+            key,
+            prev_hash,
+            seq=signed_seq,
+            timestamp=timestamp,
+            key_id=key_id,
+        ):
+            return False, f"signature invalid at seq {records_checked}"
         prev_hash = stored_hash
-    count = len([l for l in lines if l.strip()])
-    return True, f"verified {count} records"
+        records_checked += 1
+    return True, f"verified {records_checked} records"

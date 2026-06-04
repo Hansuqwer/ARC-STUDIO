@@ -1,4 +1,5 @@
 """HMAC audit key management with keychain storage and env fallback (ADR-005)."""
+
 from __future__ import annotations
 
 import hashlib
@@ -6,7 +7,7 @@ import hmac
 import json
 import logging
 import os
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -14,6 +15,10 @@ log = logging.getLogger(__name__)
 
 ARC_AUDIT_SERVICE = "arc-studio-audit"
 ARC_AUDIT_KEY_ID = "hmac-audit-key-v1"
+
+
+class AuditSigningError(RuntimeError):
+    """Raised when an HMAC audit record cannot be signed."""
 
 
 class AuditKeyStatus(BaseModel):
@@ -27,9 +32,7 @@ class AuditKeyStatus(BaseModel):
 class AuditKeyManager:
     """Manages HMAC-SHA256 audit keys with keychain preference and env fallback."""
 
-    def __init__(
-        self, service: str = ARC_AUDIT_SERVICE, key_id: str = ARC_AUDIT_KEY_ID
-    ) -> None:
+    def __init__(self, service: str = ARC_AUDIT_SERVICE, key_id: str = ARC_AUDIT_KEY_ID) -> None:
         self.service = service
         self.key_id = key_id
 
@@ -98,24 +101,95 @@ class AuditKeyManager:
         return None
 
 
+def _canonical_json(data: dict[str, Any]) -> bytes:
+    return json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def signed_audit_payload(
+    data: dict[str, Any],
+    prev_hash: str = "GENESIS",
+    *,
+    seq: int | None = None,
+    timestamp: str = "",
+    key_id: str = "",
+) -> dict[str, Any]:
+    """Build the canonical payload bound by the HMAC record hash."""
+    payload: dict[str, Any] = {
+        "event": data,
+        "prev_hash": prev_hash,
+    }
+    if seq is None and isinstance(data.get("seq"), int):
+        seq = data["seq"]
+    if seq is not None:
+        payload["seq"] = seq
+    if timestamp:
+        payload["timestamp"] = timestamp
+    if key_id:
+        payload["key_id"] = key_id
+    return payload
+
+
 def sign_audit_record(
-    data: dict, key: bytes, prev_hash: str = "GENESIS"
+    data: dict[str, Any],
+    key: bytes,
+    prev_hash: str = "GENESIS",
+    *,
+    seq: int | None = None,
+    timestamp: str = "",
+    key_id: str = "",
 ) -> tuple[str, str]:
     """Sign audit record data with HMAC-SHA256.
 
     Returns (record_hash, signature).
-    record_hash = SHA-256(canonical_json(data) + prev_hash)
+    record_hash = SHA-256(canonical_json(payload))
     signature = HMAC-SHA256(key, record_hash)
     """
-    payload = json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    record_hash = hashlib.sha256(payload + prev_hash.encode("utf-8")).hexdigest()
+    payload = signed_audit_payload(
+        data,
+        prev_hash,
+        seq=seq,
+        timestamp=timestamp,
+        key_id=key_id,
+    )
+    record_hash = hashlib.sha256(_canonical_json(payload)).hexdigest()
     signature = hmac.new(key, record_hash.encode("utf-8"), hashlib.sha256).hexdigest()
     return record_hash, signature
 
 
 def verify_audit_signature(
-    data: dict, signature: str, key: bytes, prev_hash: str = "GENESIS"
+    data: dict[str, Any],
+    signature: str,
+    key: bytes,
+    prev_hash: str = "GENESIS",
+    *,
+    seq: int | None = None,
+    timestamp: str = "",
+    key_id: str = "",
 ) -> bool:
     """Verify HMAC-SHA256 signature of audit record. Uses constant-time comparison."""
-    expected_hash, expected_sig = sign_audit_record(data, key, prev_hash)
+    _, expected_sig = sign_audit_record(
+        data,
+        key,
+        prev_hash,
+        seq=seq,
+        timestamp=timestamp,
+        key_id=key_id,
+    )
+    return hmac.compare_digest(expected_sig, signature)
+
+
+def legacy_sign_audit_record(
+    data: dict[str, Any], key: bytes, prev_hash: str = "GENESIS"
+) -> tuple[str, str]:
+    """Sign using the pre-seq-binding format for persisted legacy chains."""
+    payload = _canonical_json(data)
+    record_hash = hashlib.sha256(payload + prev_hash.encode("utf-8")).hexdigest()
+    signature = hmac.new(key, record_hash.encode("utf-8"), hashlib.sha256).hexdigest()
+    return record_hash, signature
+
+
+def verify_legacy_audit_signature(
+    data: dict[str, Any], signature: str, key: bytes, prev_hash: str = "GENESIS"
+) -> bool:
+    _, expected_sig = legacy_sign_audit_record(data, key, prev_hash)
     return hmac.compare_digest(expected_sig, signature)

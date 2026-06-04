@@ -26,7 +26,7 @@ Generated: 2026-05-14; truth notes refreshed 2026-05-18 against locked status do
 
 9. **Default test coverage is unit/contract/mock/offline.** An opt-in real-runtime smoke suite exists for release validation, including vendored SwarmGraph imports and a narrow `langgraph+swarmgraph` local-real fixture path. It requires explicit env flags, performs no provider/paid calls, and is not evidence for broad provider-backed adoption.
 
-10. **Security:** no auth by default (optional bearer token via `ARC_DAEMON_TOKEN`), subprocess env redaction exists, ARC adapter run paths generally use SHA-256 audit chains, and a separate keyed-audit CLI/key-management path exists. Do not claim concurrent-user readiness or adapter-wide keyed audit without run-specific evidence.
+10. **Security:** daemon auth now fails closed by default via `ARC_DAEMON_TOKEN`, subprocess env redaction exists, ARC adapter run paths generally use SHA-256 audit chains, and a separate keyed-audit CLI/key-management path exists. Do not claim concurrent-user readiness or adapter-wide keyed audit without run-specific evidence.
 
 ---
 

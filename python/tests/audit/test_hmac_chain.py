@@ -16,6 +16,7 @@ from agent_runtime_cockpit.audit.hmac_chain import (
 from agent_runtime_cockpit.audit.key_manager import (
     AuditKeyManager,
     AuditKeyStatus,
+    AuditSigningError,
     sign_audit_record,
     verify_audit_signature,
 )
@@ -94,6 +95,32 @@ def test_hmac_chain_writer_and_verify(tmp_path: Path):
     assert "verified 3 records" in reason
 
 
+def test_hmac_chain_writer_requires_key(tmp_path: Path):
+    with patch.dict(os.environ, {}, clear=True):
+        with patch.object(AuditKeyManager, "_try_keychain", return_value=None):
+            writer = HmacAuditChainWriter(tmp_path / "audit.jsonl", AuditKeyManager())
+            try:
+                writer.append({"action": "init"})
+            except AuditSigningError as exc:
+                assert "No audit key" in str(exc)
+            else:
+                raise AssertionError("unsigned append should fail closed")
+
+
+def test_hmac_chain_tampered_seq_detected(tmp_path: Path):
+    key = b"test-hmac-key-32-bytes-long!!"
+    chain_path = tmp_path / "audit.jsonl"
+    with patch.object(AuditKeyManager, "_try_keychain", return_value=key):
+        writer = HmacAuditChainWriter(chain_path, AuditKeyManager())
+        writer.append({"action": "init"})
+    record = json.loads(chain_path.read_text().splitlines()[0])
+    record["seq"] = 7
+    chain_path.write_text(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+    ok, reason = verify_hmac_chain(chain_path, key)
+    assert ok is False
+    assert "sequence mismatch" in reason
+
+
 def test_hmac_chain_tamper_detected(tmp_path: Path):
     key = b"test-hmac-key-32-bytes-long!!"
     chain_path = tmp_path / "audit.jsonl"
@@ -109,7 +136,7 @@ def test_hmac_chain_tamper_detected(tmp_path: Path):
     chain_path.write_text("\n".join(lines) + "\n")
     ok, reason = verify_hmac_chain(chain_path, key)
     assert ok is False
-    assert "signature invalid" in reason
+    assert "record hash invalid" in reason
 
 
 def test_hmac_chain_empty(tmp_path: Path):

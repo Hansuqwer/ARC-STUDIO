@@ -71,8 +71,15 @@ def _workspace(request: web.Request) -> Path:
         return request.app[WORKSPACE_KEY]
     try:
         return validate_workspace_path(ws)
-    except ValueError:
-        return request.app[WORKSPACE_KEY]
+    except ValueError as exc:
+        raise web.HTTPBadRequest(
+            text=json.dumps(
+                err(ArcErrorCode.INVALID_INPUT, f"invalid workspace: {exc}").model_dump(),
+                default=str,
+            ),
+            content_type="application/json",
+            headers={"Access-Control-Allow-Origin": _cors_origin()},
+        ) from exc
 
 
 def _json(data: dict, status: int = 200) -> web.Response:
@@ -85,7 +92,7 @@ def _json(data: dict, status: int = 200) -> web.Response:
 
 
 def _cors_origin() -> str:
-    return os.environ.get("ARC_CORS_ORIGIN", "http://127.0.0.1:3000")
+    return os.environ.get("ARC_CORS_ORIGIN", "http://127.0.0.1:3000").split(",")[0].strip()
 
 
 def _trace_store(request: web.Request) -> JsonlTraceStore:
