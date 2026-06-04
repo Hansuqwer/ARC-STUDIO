@@ -47,10 +47,59 @@ class AnthropicClient:
     def capabilities(self) -> ProviderCapability:
         model = os.environ.get("ARC_ANTHROPIC_DEFAULT_MODEL", DEFAULT_ANTHROPIC_MODEL)
         timeout = int(os.environ.get("ARC_ANTHROPIC_TIMEOUT_SECONDS", "60"))
+        # Current-gen model rates per pricing-snapshot-2026Q2.md §1
+        # Cache read = 0.10× input (90% off); cache write 5m = 1.25× input.
+        # Opus 4.7 has ~35% more tokens per char vs Opus 4.6 (same rate card).
+        _ANTHROPIC_RATES: dict[str, CostRates] = {
+            # Claude 4.x current-gen
+            "claude-haiku-4-5": CostRates(
+                input_per_million=1.0,
+                output_per_million=5.0,
+                cache_write_per_million=1.25,
+                cache_read_per_million=0.10,
+            ),
+            "claude-sonnet-4-6": CostRates(
+                input_per_million=3.0,
+                output_per_million=15.0,
+                cache_write_per_million=3.75,
+                cache_read_per_million=0.30,
+            ),
+            "claude-opus-4-6": CostRates(
+                input_per_million=5.0,
+                output_per_million=25.0,
+                cache_write_per_million=6.25,
+                cache_read_per_million=0.50,
+            ),
+            "claude-opus-4-7": CostRates(
+                input_per_million=5.0,
+                output_per_million=25.0,
+                cache_write_per_million=6.25,
+                cache_read_per_million=0.50,
+                # NOTE: Opus 4.7 tokenizer produces ~35% more tokens per char
+                # than Opus 4.6. Same rate card, but effective cost is higher.
+                # Wallet will surface this via tokenizer_version flag (v0.4.2).
+            ),
+            # Legacy — still available
+            "claude-haiku-3": CostRates(
+                input_per_million=0.25,
+                output_per_million=1.25,
+                cache_write_per_million=0.3125,
+                cache_read_per_million=0.025,
+            ),
+            "claude-opus-4-1": CostRates(
+                input_per_million=15.0,
+                output_per_million=75.0,
+                cache_write_per_million=18.75,
+                cache_read_per_million=1.50,
+            ),
+        }
+        # Add versioned aliases (API may accept -20250xxx suffixes)
+        for base_key in list(_ANTHROPIC_RATES):
+            _ANTHROPIC_RATES[f"{base_key}-20250101"] = _ANTHROPIC_RATES[base_key]
         return ProviderCapability(
             provider_id="anthropic",
             provider_name="Anthropic",
-            supported_models=[model],
+            supported_models=list(_ANTHROPIC_RATES.keys()),
             default_model=model,
             features=[
                 ProviderFeature.STREAMING,
@@ -59,14 +108,7 @@ class AnthropicClient:
                 ProviderFeature.SYSTEM_PROMPT,
             ],
             max_context_tokens=200_000,
-            cost_rates={
-                model: CostRates(
-                    input_per_million=3.0,
-                    output_per_million=15.0,
-                    cache_write_per_million=3.75,
-                    cache_read_per_million=0.30,
-                )
-            },
+            cost_rates=_ANTHROPIC_RATES,
             timeout_seconds=timeout,
         )
 

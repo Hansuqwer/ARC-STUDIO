@@ -60,7 +60,21 @@ VENDOR_CONFIGS = {
     "openai": {
         "base_url": "https://api.openai.com/v1",
         "default_model": "gpt-4o-mini",
-        "supported_models": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
+        "supported_models": [
+            "gpt-5.5",
+            "gpt-5.4",
+            "gpt-5.4-mini",
+            "gpt-5.4-nano",
+            "gpt-5.2",
+            "gpt-5",
+            "gpt-4.1",
+            "gpt-4.1-mini",
+            "gpt-4.1-nano",
+            "gpt-4o",
+            "gpt-4o-mini",
+            "gpt-4-turbo",
+            "gpt-3.5-turbo",
+        ],
         "features": [
             ProviderFeature.STREAMING,
             ProviderFeature.TOOL_USE,
@@ -68,8 +82,40 @@ VENDOR_CONFIGS = {
             ProviderFeature.JSON_MODE,
         ],
         "cost_rates": {
+            # GPT-5.x current-gen: 90% cache discount (0.10× input) per pricing-snapshot-2026Q2.md §1
+            "gpt-5.5": CostRates(
+                input_per_million=5.0, output_per_million=30.0, cache_read_per_million=0.50
+            ),
+            "gpt-5.4": CostRates(
+                input_per_million=2.5, output_per_million=15.0, cache_read_per_million=0.25
+            ),
+            "gpt-5.4-mini": CostRates(
+                input_per_million=0.75, output_per_million=4.50, cache_read_per_million=0.075
+            ),
+            "gpt-5.4-nano": CostRates(
+                input_per_million=0.20, output_per_million=1.25, cache_read_per_million=0.02
+            ),
+            "gpt-5.2": CostRates(
+                input_per_million=1.75, output_per_million=14.0, cache_read_per_million=0.175
+            ),
+            "gpt-5": CostRates(
+                input_per_million=1.25, output_per_million=10.0, cache_read_per_million=0.125
+            ),
+            # GPT-4.1 family: 75% cache discount (0.25× input)
+            "gpt-4.1": CostRates(
+                input_per_million=2.0, output_per_million=8.0, cache_read_per_million=0.50
+            ),
+            "gpt-4.1-mini": CostRates(
+                input_per_million=0.40, output_per_million=1.60, cache_read_per_million=0.10
+            ),
+            "gpt-4.1-nano": CostRates(
+                input_per_million=0.10, output_per_million=0.40, cache_read_per_million=0.025
+            ),
+            # Legacy: gpt-4o-mini retains 50% cache discount; gpt-4o legacy rates
             "gpt-4o": CostRates(input_per_million=2.50, output_per_million=10.0),
-            "gpt-4o-mini": CostRates(input_per_million=0.15, output_per_million=0.60),
+            "gpt-4o-mini": CostRates(
+                input_per_million=0.15, output_per_million=0.60, cache_read_per_million=0.075
+            ),
             "gpt-4-turbo": CostRates(input_per_million=10.0, output_per_million=30.0),
             "gpt-3.5-turbo": CostRates(input_per_million=0.50, output_per_million=1.50),
         },
