@@ -9,6 +9,7 @@ from textual.screen import Screen
 
 from .data import DataStore
 from .theme import ThemeManager
+from .widgets.activity_tray import ActivityTray  # UX R-008
 from .widgets.banner import Banner  # noqa: F401  # kept for backward compat / external imports
 from .widgets.header import Header  # UX R-001: modern header
 from .widgets.input_area import InputArea
@@ -67,6 +68,9 @@ class ArcScreen(Screen):
         yield SlashMenu()
         yield StatusBar(self.data, self.theme, id="status-bar")
         yield InputArea(self.data, self.theme, id="input-area")
+        # UX R-008: ActivityTray (Ctrl+X); hidden until toggled
+        no_color = bool(getattr(self.theme.current, "no_color", False))
+        yield ActivityTray(no_color=no_color)
 
     def on_mount(self) -> None:
         from agent_runtime_cockpit import __version__
@@ -424,7 +428,8 @@ class ArcScreen(Screen):
             self._show_help_inline()
 
     def action_toggle_activity(self) -> None:
-        self.data.add_entry("system", "Activity tray: coming in Phase 4.5.")
+        tray = self.query_one("#activity-tray", ActivityTray)
+        tray.toggle()
 
     def action_toggle_expand(self) -> None:
         pass
