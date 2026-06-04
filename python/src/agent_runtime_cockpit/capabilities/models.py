@@ -45,6 +45,9 @@ class EntityType(str, Enum):
     SEARCH_INDEX = "search_index"
     EVALUATOR = "evaluator"
     SIMULATOR = "simulator"
+    AGENTS_MD = "agents_md"
+    SKILL = "skill"
+    A2A_AGENT = "a2a_agent"
     UNKNOWN = "unknown"
 
 

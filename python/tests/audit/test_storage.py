@@ -89,10 +89,12 @@ class TestAuditChainStore:
         assert result["event"]["type"] == "run_started"
 
     def test_append_event_without_key(self, audit_dir):
+        from agent_runtime_cockpit.audit.key_manager import AuditSigningError
+
         store = self._store(audit_dir, key_available=False)
         event = RunStartedEvent(run_id="run_abc", runtime="swarmgraph")
-        result = store.append_event(event)
-        assert result is None
+        with pytest.raises(AuditSigningError, match="No key"):
+            store.append_event(event)
 
     def test_append_multiple_events(self, audit_dir):
         store = self._store(audit_dir)
@@ -118,8 +120,11 @@ class TestAuditChainStore:
         assert "not found" in msg
 
     def test_verify_run_no_key(self, audit_dir):
+        from agent_runtime_cockpit.audit.key_manager import AuditSigningError
+
         store = self._store(audit_dir, key_available=False)
-        store.append_event(RunStartedEvent(run_id="run_abc", runtime="swarmgraph"))
+        with pytest.raises(AuditSigningError):
+            store.append_event(RunStartedEvent(run_id="run_abc", runtime="swarmgraph"))
         ok, msg = store.verify_run("run_abc")
         assert ok is False
         assert "No audit key" in msg
@@ -177,19 +182,14 @@ class TestChainTamperDetection:
         assert ok is False
         assert "signature" in msg.lower() or "invalid" in msg.lower()
 
-    def test_truncated_chain_is_short_valid_chain(self, audit_dir):
-        """Truncation is a known limitation of simple HMAC chains.
-
-        A shorter chain with valid signatures is still valid. Detecting
-        truncation requires periodic integrity checkpoints (future work).
-        This test documents the current behavior.
-        """
+    def test_truncated_chain_detected_by_checkpoint(self, audit_dir):
+        """Writer checkpoint detects truncation of a previously longer chain."""
         store = _make_store(audit_dir)
         store.append_event(RunStartedEvent(run_id="run_abc", runtime="swarmgraph"))
         store.append_event(RunCompletedEvent(run_id="run_abc", runtime="swarmgraph"))
         path = audit_dir / "run_abc.audit.jsonl"
         lines = path.read_text().splitlines()
-        path.write_text("\n".join(lines[:1]))
+        path.write_text("\n".join(lines[:1]) + "\n")
         ok, msg = store.verify_run("run_abc")
-        assert ok is True  # shorter chain with valid HMACs is still valid
-        assert "1 records" in msg
+        assert ok is False
+        assert "checkpoint" in msg

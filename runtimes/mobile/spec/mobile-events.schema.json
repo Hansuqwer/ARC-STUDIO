@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arc.local/schemas/mobile-events.schema.json",
+  "title": "ARC Mobile Runtime Event",
+  "type": "object",
+  "required": ["schema_version", "event_id", "event_type", "plan_id", "timestamp", "sequence", "allowed", "mock", "payload_hash", "event_hash"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "event_id": { "type": "string" },
+    "event_type": { "enum": ["mobile.step.simulated"] },
+    "plan_id": { "type": "string" },
+    "step_id": { "type": ["string", "null"] },
+    "capability_id": { "type": ["string", "null"] },
+    "timestamp": { "type": "string" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "allowed": { "type": "boolean" },
+    "mock": { "type": "boolean" },
+    "payload_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "event_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "metadata": { "type": "object" }
+  }
+}

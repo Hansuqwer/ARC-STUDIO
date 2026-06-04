@@ -1,4 +1,5 @@
 """Tests for audit session (ADR-021 integration layer)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -68,9 +69,13 @@ class TestAuditSession:
         session = _make_session("run_abc", store)
         session.log_run_started()
         session.log_llm_request(provider="anthropic", model="claude-3-5-sonnet")
-        session.log_llm_response(provider="anthropic", model="claude-3-5-sonnet", response_id="msg_123")
+        session.log_llm_response(
+            provider="anthropic", model="claude-3-5-sonnet", response_id="msg_123"
+        )
         session.log_tool_call(tool_name="read_file", trust_level=TrustLevel.untrusted)
-        session.log_tool_result(tool_name="read_file", result={"content": "data"}, trust_level=TrustLevel.untrusted)
+        session.log_tool_result(
+            tool_name="read_file", result={"content": "data"}, trust_level=TrustLevel.untrusted
+        )
         session.log_run_completed()
         ok, msg = session.verify()
         assert ok is True
@@ -106,11 +111,13 @@ class TestAuditSession:
         ok, msg = session.verify()
         assert ok is False
 
-    def test_session_no_key_does_not_crash(self, audit_dir):
+    def test_session_no_key_fails_closed(self, audit_dir):
+        from agent_runtime_cockpit.audit.key_manager import AuditSigningError
+
         store = _store(audit_dir, key_available=False)
         session = _make_session("run_abc", store)
-        session.log_run_started()
-        session.log_run_completed()
+        with pytest.raises(AuditSigningError, match="No key"):
+            session.log_run_started()
         ok, msg = session.verify()
         assert ok is False
         assert "No audit key" in msg
@@ -129,6 +136,7 @@ class TestAuditSession:
 
 def _make_session(run_id, store):
     from agent_runtime_cockpit.audit.session import AuditSession
+
     s = AuditSession(run_id=run_id, store=store)
     s.store.ensure_run(run_id)
     return s

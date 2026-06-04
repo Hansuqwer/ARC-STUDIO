@@ -1,0 +1,7 @@
+{
+  "name": "@arc/mobile-expo",
+  "version": "0.1.0-alpha",
+  "private": true,
+  "description": "ARC Mobile Runtime Expo stub — simulator only",
+  "main": "src/index.ts"
+}

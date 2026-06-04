@@ -9,13 +9,16 @@ from pathlib import Path
 from unittest.mock import patch
 
 from agent_runtime_cockpit.audit.hmac_chain import (
+    AuditChainCorruptError,
     GENESIS,
     HmacAuditChainWriter,
+    checkpoint_path_for_chain,
     verify_hmac_chain,
 )
 from agent_runtime_cockpit.audit.key_manager import (
     AuditKeyManager,
     AuditKeyStatus,
+    AuditSigningError,
     sign_audit_record,
     verify_audit_signature,
 )
@@ -92,6 +95,33 @@ def test_hmac_chain_writer_and_verify(tmp_path: Path):
     ok, reason = verify_hmac_chain(chain_path, key)
     assert ok is True
     assert "verified 3 records" in reason
+    assert checkpoint_path_for_chain(chain_path).exists()
+
+
+def test_hmac_chain_writer_requires_key(tmp_path: Path):
+    with patch.dict(os.environ, {}, clear=True):
+        with patch.object(AuditKeyManager, "_try_keychain", return_value=None):
+            writer = HmacAuditChainWriter(tmp_path / "audit.jsonl", AuditKeyManager())
+            try:
+                writer.append({"action": "init"})
+            except AuditSigningError as exc:
+                assert "No audit key" in str(exc)
+            else:
+                raise AssertionError("unsigned append should fail closed")
+
+
+def test_hmac_chain_tampered_seq_detected(tmp_path: Path):
+    key = b"test-hmac-key-32-bytes-long!!"
+    chain_path = tmp_path / "audit.jsonl"
+    with patch.object(AuditKeyManager, "_try_keychain", return_value=key):
+        writer = HmacAuditChainWriter(chain_path, AuditKeyManager())
+        writer.append({"action": "init"})
+    record = json.loads(chain_path.read_text().splitlines()[0])
+    record["seq"] = 7
+    chain_path.write_text(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+    ok, reason = verify_hmac_chain(chain_path, key)
+    assert ok is False
+    assert "sequence mismatch" in reason
 
 
 def test_hmac_chain_tamper_detected(tmp_path: Path):
@@ -109,7 +139,21 @@ def test_hmac_chain_tamper_detected(tmp_path: Path):
     chain_path.write_text("\n".join(lines) + "\n")
     ok, reason = verify_hmac_chain(chain_path, key)
     assert ok is False
-    assert "signature invalid" in reason
+    assert "record hash invalid" in reason
+
+
+def test_hmac_chain_checkpoint_detects_truncation(tmp_path: Path):
+    key = b"test-hmac-key-32-bytes-long!!"
+    chain_path = tmp_path / "audit.jsonl"
+    with patch.object(AuditKeyManager, "_try_keychain", return_value=key):
+        writer = HmacAuditChainWriter(chain_path, AuditKeyManager())
+        writer.append({"action": "init"})
+        writer.append({"action": "step"})
+    first_line = chain_path.read_text(encoding="utf-8").splitlines()[0]
+    chain_path.write_text(first_line + "\n", encoding="utf-8")
+    ok, reason = verify_hmac_chain(chain_path, key)
+    assert ok is False
+    assert "checkpoint" in reason
 
 
 def test_hmac_chain_empty(tmp_path: Path):
@@ -164,6 +208,35 @@ def test_hmac_chain_partial_trailing_line_fails(tmp_path: Path):
     ok, reason = verify_hmac_chain(chain_path, b"test-hmac-key-32-bytes-long!!")
     assert ok is False
     assert "partial trailing line" in reason
+
+
+def test_hmac_chain_writer_rejects_corrupt_existing_chain(tmp_path: Path):
+    key = b"test-hmac-key-32-bytes-long!!"
+    chain_path = tmp_path / "audit.jsonl"
+    chain_path.write_text('{"seq":0,"record_hash":"abc"}\nnot json\n', encoding="utf-8")
+    manager = StaticAuditKeyManager(key)
+    try:
+        HmacAuditChainWriter(chain_path, manager)  # type: ignore[arg-type]
+    except AuditChainCorruptError as exc:
+        assert "invalid JSON" in str(exc)
+    else:
+        raise AssertionError("corrupt existing chain should fail closed")
+
+
+def test_hmac_chain_writer_revalidates_changed_chain_before_append(tmp_path: Path):
+    key = b"test-hmac-key-32-bytes-long!!"
+    chain_path = tmp_path / "audit.jsonl"
+    manager = StaticAuditKeyManager(key)
+    writer = HmacAuditChainWriter(chain_path, manager)  # type: ignore[arg-type]
+    writer.append({"action": "init"})
+    with open(chain_path, "a", encoding="utf-8") as f:
+        f.write("not json\n")
+    try:
+        writer.append({"action": "second"})
+    except AuditChainCorruptError as exc:
+        assert "invalid JSON" in str(exc)
+    else:
+        raise AssertionError("append should revalidate changed corrupt chain")
 
 
 def test_key_manager_generate_key():

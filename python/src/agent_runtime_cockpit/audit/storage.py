@@ -55,10 +55,10 @@ class AuditChainStore:
         if not path.exists():
             path.touch()
 
-    def append_event(self, event: AuditEvent) -> Optional[dict[str, Any]]:
+    def append_event(self, event: AuditEvent) -> dict[str, Any]:
         """Append a typed audit event to its run's chain.
 
-        Returns the signed record dict, or None if no HMAC key is available.
+        Returns the signed record dict. Raises AuditSigningError if no HMAC key is available.
         """
         writer = self._writer(event.run_id)
         return writer.append(event.to_audit_event())

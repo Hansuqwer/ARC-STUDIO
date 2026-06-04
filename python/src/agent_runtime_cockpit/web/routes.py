@@ -50,6 +50,7 @@ from ..provider_action import (
 )
 from ..security.profiles import enforce_profile, resolve_profile
 from ..security.redaction import Redactor
+from ..security.sandbox import is_path_within_root
 from ..security.validation import validate_workspace_path
 from ..security.enforcement import TrustEnforcementError, enforce_workspace_trust
 from ..storage.advisory_lock import AdvisoryLockUnavailable, advisory_lock
@@ -63,6 +64,7 @@ redactor = Redactor()
 ctx_gen = ContextPackGenerator()
 RUNTIME_IDS = set(runtime_router.KNOWN_RUNTIMES) | {"auto", "lmarena"}
 START_TIME = time.time()
+ALLOW_EXTERNAL_WORKSPACE_ENV = "ARC_DAEMON_ALLOW_EXTERNAL_WORKSPACE"
 
 
 def _workspace(request: web.Request) -> Path:
@@ -70,9 +72,25 @@ def _workspace(request: web.Request) -> Path:
     if not ws:
         return request.app[WORKSPACE_KEY]
     try:
-        return validate_workspace_path(ws)
-    except ValueError:
-        return request.app[WORKSPACE_KEY]
+        workspace = validate_workspace_path(ws)
+        daemon_root = Path(request.app[WORKSPACE_KEY]).resolve()
+        if os.environ.get(ALLOW_EXTERNAL_WORKSPACE_ENV) != "1" and not is_path_within_root(
+            workspace, daemon_root
+        ):
+            raise ValueError(
+                f"workspace {workspace} is outside daemon root {daemon_root}; "
+                f"set {ALLOW_EXTERNAL_WORKSPACE_ENV}=1 only for trusted local development"
+            )
+        return workspace
+    except ValueError as exc:
+        raise web.HTTPBadRequest(
+            text=json.dumps(
+                err(ArcErrorCode.INVALID_INPUT, f"invalid workspace: {exc}").model_dump(),
+                default=str,
+            ),
+            content_type="application/json",
+            headers={"Access-Control-Allow-Origin": _cors_origin()},
+        ) from exc
 
 
 def _json(data: dict, status: int = 200) -> web.Response:
@@ -85,7 +103,7 @@ def _json(data: dict, status: int = 200) -> web.Response:
 
 
 def _cors_origin() -> str:
-    return os.environ.get("ARC_CORS_ORIGIN", "http://127.0.0.1:3000")
+    return os.environ.get("ARC_CORS_ORIGIN", "http://127.0.0.1:3000").split(",")[0].strip()
 
 
 def _trace_store(request: web.Request) -> JsonlTraceStore:
@@ -258,17 +276,12 @@ async def sessions_update(request: web.Request) -> web.Response:
 
 
 async def health(request: web.Request) -> web.Response:
-    """Health check endpoint with daemon status."""
-    store = _trace_store(request)
-    all_runs = store.list_runs()
-    active_runs = [r for r in all_runs if r.status in ("running", "pending")]
-
+    """Health check endpoint with minimal unauthenticated status."""
     return _json(
         {
             "status": "healthy",
             "version": "0.1.0-alpha",
             "uptime_seconds": int(time.time() - START_TIME),
-            "active_runs": len(active_runs),
             "arc": True,
         }
     )

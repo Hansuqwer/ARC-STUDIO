@@ -38,14 +38,18 @@ def validate_otlp_endpoint(endpoint: str) -> tuple[bool, Optional[str]]:
         parsed = urlparse(endpoint)
         if not parsed.scheme or not parsed.netloc:
             return False, "Invalid endpoint URL format"
+        if parsed.scheme not in ("http", "https"):
+            return False, "Invalid endpoint URL scheme"
 
         # Check if localhost
         hostname = parsed.hostname or ""
         is_local = hostname in ("localhost", "127.0.0.1", "::1")
 
         if not is_local:
+            if os.environ.get("ARC_ALLOW_REMOTE_OTLP") != "1":
+                return False, "Remote OTLP endpoints require ARC_ALLOW_REMOTE_OTLP=1"
             warning = (
-                f"⚠️  Non-localhost endpoint: {endpoint}\n"
+                f"Non-localhost endpoint: {endpoint}\n"
                 f"Traces will be sent to a remote server. "
                 f"Ensure this endpoint is trusted and secure."
             )

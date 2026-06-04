@@ -2,7 +2,7 @@
 
 Starts a local aiohttp server on 127.0.0.1:7777.
 All endpoints return ARC protocol envelopes (JSON).
-Optional bearer token auth via ARC_DAEMON_TOKEN env var.
+Bearer token auth via ARC_DAEMON_TOKEN env var.
 """
 
 from __future__ import annotations
@@ -22,25 +22,39 @@ log = logging.getLogger(__name__)
 
 HEALTH_PATH = "/health"
 TOKEN_ENV = "ARC_DAEMON_TOKEN"
+ALLOW_UNAUTH_ENV = "ARC_DAEMON_ALLOW_UNAUTHENTICATED"
+MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+MUTATING_GET_PATHS = frozenset({"/api/runs/start"})
+MAX_REQUEST_BODY_BYTES = 512 * 1024
+
+
+def _allowed_origins() -> set[str]:
+    configured = os.environ.get("ARC_CORS_ORIGIN", "http://127.0.0.1:3000")
+    return {origin.strip() for origin in configured.split(",") if origin.strip()}
 
 
 @web.middleware
 async def bearer_token_middleware(
     request: web.Request, handler: web.RequestHandler
 ) -> web.Response:
-    """Optional bearer-token authentication.
+    """Bearer-token authentication.
 
-    When ARC_DAEMON_TOKEN is set, all requests except /health must
-    carry Authorization: Bearer <token>. The comparison is constant-time.
-    When the env var is unset, pass-through (local-only default).
+    All requests except /health must carry Authorization: Bearer <token> unless
+    ARC_DAEMON_ALLOW_UNAUTHENTICATED=1 is set for tests/local experiments.
     """
     token = os.environ.get(TOKEN_ENV)
-    if token is None:
+    if token is None and os.environ.get(ALLOW_UNAUTH_ENV) == "1":
         return await handler(request)
 
     # /health stays open for liveness probes
     if request.path == HEALTH_PATH:
         return await handler(request)
+
+    if token is None:
+        return web.json_response(
+            {"error": f"{TOKEN_ENV} required; set {ALLOW_UNAUTH_ENV}=1 only for local tests"},
+            status=401,
+        )
 
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
@@ -59,8 +73,32 @@ async def bearer_token_middleware(
     return await handler(request)
 
 
+@web.middleware
+async def request_security_middleware(
+    request: web.Request, handler: web.RequestHandler
+) -> web.StreamResponse:
+    if request.method in MUTATING_METHODS or request.path in MUTATING_GET_PATHS:
+        length = request.content_length
+        if length is not None and length > MAX_REQUEST_BODY_BYTES:
+            return web.json_response(
+                {"error": "payload exceeds 512 KB limit"},
+                status=413,
+            )
+        origin = request.headers.get("Origin")
+        referer = request.headers.get("Referer")
+        allowed = _allowed_origins()
+        if origin and origin not in allowed:
+            return web.json_response({"error": "origin not allowed"}, status=403)
+        if not origin and referer and not any(referer.startswith(base) for base in allowed):
+            return web.json_response({"error": "referer not allowed"}, status=403)
+    return await handler(request)
+
+
 async def create_app(workspace: Path | None = None) -> web.Application:
-    app = web.Application(middlewares=[bearer_token_middleware])
+    app = web.Application(
+        middlewares=[request_security_middleware, bearer_token_middleware],
+        client_max_size=MAX_REQUEST_BODY_BYTES,
+    )
     ws = workspace or Path.cwd()
     app[WORKSPACE_KEY] = ws
     setup_routes(app)

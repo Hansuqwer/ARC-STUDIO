@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import secrets
 from typing import Optional
 
 import typer
@@ -45,10 +47,23 @@ def serve(
     """Start the ARC HTTP daemon."""
     _setup_logging(debug)
     ws = _workspace(workspace)
+    _ensure_daemon_token()
     console.print(f"[bold cyan]ARC[/bold cyan] daemon starting on http://{host}:{port}")
     from ..web.server import run_server
 
     run_server(host=host, port=port, workspace=ws)
+
+
+def _ensure_daemon_token() -> None:
+    if (
+        os.environ.get("ARC_DAEMON_TOKEN")
+        or os.environ.get("ARC_DAEMON_ALLOW_UNAUTHENTICATED") == "1"
+    ):
+        return
+    token = secrets.token_urlsafe(32)
+    os.environ["ARC_DAEMON_TOKEN"] = token
+    console.print("[yellow]ARC_DAEMON_TOKEN was unset; generated a process-local token.[/yellow]")
+    console.print(f"ARC_DAEMON_TOKEN={token}")
 
 
 @app.command("run")

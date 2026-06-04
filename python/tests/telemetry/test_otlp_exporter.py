@@ -33,8 +33,17 @@ def test_validate_endpoint_localhost():
     assert warning is None
 
 
-def test_validate_endpoint_remote():
-    """Remote endpoints should be valid but with warning."""
+def test_validate_endpoint_remote_denied_by_default():
+    """Remote endpoints are denied unless explicitly enabled."""
+    is_valid, warning = validate_otlp_endpoint("http://example.com:4317")
+    assert not is_valid
+    assert warning is not None
+    assert "ARC_ALLOW_REMOTE_OTLP=1" in warning
+
+
+def test_validate_endpoint_remote_with_opt_in(monkeypatch):
+    """Remote endpoints return a warning only after explicit opt-in."""
+    monkeypatch.setenv("ARC_ALLOW_REMOTE_OTLP", "1")
     is_valid, warning = validate_otlp_endpoint("http://example.com:4317")
     assert is_valid
     assert warning is not None
@@ -175,8 +184,10 @@ def test_export_run_success():
     assert success
 
 
-def test_export_run_warns_remote():
-    """Export should succeed for remote endpoints (warning handled by caller)."""
+def test_export_run_denies_remote_by_default():
+    """Export rejects remote endpoints by default."""
+    import pytest
+
     run = RunRecord(
         id="test-run",
         workflow_id="test",
@@ -187,6 +198,22 @@ def test_export_run_warns_remote():
         metadata={},
     )
 
-    # Remote endpoints are valid, warning is returned by validate_otlp_endpoint
+    with pytest.raises(ValueError, match="ARC_ALLOW_REMOTE_OTLP=1"):
+        export_run_to_otlp(run, "http://example.com:4317")
+
+
+def test_export_run_warns_remote_with_opt_in(monkeypatch):
+    """Export can target remote endpoints only after explicit opt-in."""
+    monkeypatch.setenv("ARC_ALLOW_REMOTE_OTLP", "1")
+    run = RunRecord(
+        id="test-run",
+        workflow_id="test",
+        runtime="swarmgraph",
+        status="completed",
+        started_at="2026-05-12T17:00:00Z",
+        events=[],
+        metadata={},
+    )
+
     success = export_run_to_otlp(run, "http://example.com:4317")
     assert success

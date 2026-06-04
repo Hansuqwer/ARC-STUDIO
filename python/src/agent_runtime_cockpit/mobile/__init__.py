@@ -25,6 +25,8 @@ from .models import (
     MobileRuntimePackBridge,
     MobileSimulationStepResult,
 )
+from .policy import MobilePolicyDecision, explain_capability_policy, explain_plan_policy
+from .recorder import MobileRuntimeEvent, MobileTrace, append_trace, build_trace, read_trace
 from .simulator import simulate_action_plan
 from .validation import (
     MobileValidationReport,
@@ -51,6 +53,9 @@ __all__ = [
     "MobileActionSimulationReport",
     "MobileSimulationStepResult",
     "MobileRuntimePackBridge",
+    "MobileRuntimeEvent",
+    "MobileTrace",
+    "MobilePolicyDecision",
     "MobileManifestLoadError",
     "MobileValidationReport",
     "ValidationFinding",
@@ -62,6 +67,11 @@ __all__ = [
     "validate_manifest",
     "validate_action_plan",
     "simulate_action_plan",
+    "build_trace",
+    "append_trace",
+    "read_trace",
+    "explain_capability_policy",
+    "explain_plan_policy",
     "list_capabilities",
     "get_capability",
     "load_manifest",
