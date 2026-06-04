@@ -1,0 +1,146 @@
+diff --git a/packages/arc-protocol-ts/src/run-events.ts b/packages/arc-protocol-ts/src/run-events.ts
+index 2b5356b..55a545f 100644
+--- a/packages/arc-protocol-ts/src/run-events.ts
++++ b/packages/arc-protocol-ts/src/run-events.ts
+@@ -237,6 +237,8 @@ export interface SwarmGraphCostEvent extends RunEventBase {
+     node_id?: string;
+     message_id?: string;
+     evidence_refs?: string[];
++    cache_read_input_tokens?: number;
++    cache_creation_input_tokens?: number;
+   };
+ }
+ 
+diff --git a/python/src/agent_runtime_cockpit/observability/otel_mapping.py b/python/src/agent_runtime_cockpit/observability/otel_mapping.py
+index 8b8d35c..920d0e6 100644
+--- a/python/src/agent_runtime_cockpit/observability/otel_mapping.py
++++ b/python/src/agent_runtime_cockpit/observability/otel_mapping.py
+@@ -179,6 +179,8 @@ def _handle_model_call(
+         "gen_ai.request.model": data.get("model", ""),
+         "gen_ai.usage.input_tokens": usage.get("input_tokens", usage.get("prompt_tokens", 0)),
+         "gen_ai.usage.output_tokens": usage.get("output_tokens", usage.get("completion_tokens", 0)),
++        "gen_ai.usage.cache_read_input_tokens": usage.get("cache_read_input_tokens", 0),
++        "gen_ai.usage.cache_creation_input_tokens": usage.get("cache_creation_input_tokens", 0),
+         "gen_ai.response.finish_reasons": finish_reasons or ["stop"],
+     }
+     # NEVER log prompt/completion content by default (semconv compliance)
+@@ -363,6 +365,8 @@ GENAI_REQUIRED_MODEL = (
+     "gen_ai.request.model",
+     "gen_ai.usage.input_tokens",
+     "gen_ai.usage.output_tokens",
++    "gen_ai.usage.cache_read_input_tokens",
++    "gen_ai.usage.cache_creation_input_tokens",
+     "gen_ai.response.finish_reasons",
+ )
+ GENAI_REQUIRED_TOOL = ("gen_ai.tool.name", "gen_ai.tool.description")
+diff --git a/python/src/agent_runtime_cockpit/protocol/typed_events.py b/python/src/agent_runtime_cockpit/protocol/typed_events.py
+index 4034401..b022399 100644
+--- a/python/src/agent_runtime_cockpit/protocol/typed_events.py
++++ b/python/src/agent_runtime_cockpit/protocol/typed_events.py
+@@ -411,6 +411,8 @@ class SwarmGraphCostData(BaseModel):
+     totalCost: float | None = Field(None, alias="totalCost")
+     totalTokens: int | None = Field(None, alias="totalTokens")
+     currency: str | None = None
++    cache_read_input_tokens: int | None = None
++    cache_creation_input_tokens: int | None = None
+     items: list[Any] | None = None
+     source: str | None = None
+     runtime: str | None = None
+diff --git a/python/tests/observability/test_otel_cache_fields.py b/python/tests/observability/test_otel_cache_fields.py
+new file mode 100644
+index 0000000..5612b84
+--- /dev/null
++++ b/python/tests/observability/test_otel_cache_fields.py
+@@ -0,0 +1,48 @@
++"""R-03: OTel cache field surface tests."""
++from __future__ import annotations
++
++from agent_runtime_cockpit.observability.loaders import LoadedTrace
++from agent_runtime_cockpit.observability.models import ObservabilityExportConfig
++from agent_runtime_cockpit.observability.otel_mapping import GENAI_REQUIRED_MODEL, map_events_to_spans
++
++
++def _model_call_event(usage: dict) -> dict:
++    return {
++        "type": "llm.request",
++        "run_id": "r-cache-test",
++        "sequence": 1,
++        "data": {"provider": "anthropic", "model": "claude-3-haiku", "usage": usage},
++    }
++
++
++def _span_attrs(usage: dict) -> dict:
++    trace = LoadedTrace(
++        run_id="r-cache-test",
++        runtime="test",
++        workflow_id="wf-1",
++        status="completed",
++        started_at="2026-01-01T00:00:00Z",
++        ended_at="2026-01-01T00:01:00Z",
++        events=[_model_call_event(usage)],
++    )
++    cfg = ObservabilityExportConfig()
++    spans, _warnings, _count = map_events_to_spans(trace, cfg)
++    model_spans = [s for s in spans if "model" in s.name]
++    assert model_spans, f"no model span; all: {[s.name for s in spans]}"
++    return model_spans[0].attributes
++
++
++def test_cache_read_attr_set_when_present() -> None:
++    attrs = _span_attrs({"input_tokens": 100, "output_tokens": 50, "cache_read_input_tokens": 42})
++    assert attrs["gen_ai.usage.cache_read_input_tokens"] == 42
++
++
++def test_cache_attrs_default_to_zero_when_absent() -> None:
++    attrs = _span_attrs({"input_tokens": 100, "output_tokens": 50})
++    assert attrs["gen_ai.usage.cache_read_input_tokens"] == 0
++    assert attrs["gen_ai.usage.cache_creation_input_tokens"] == 0
++
++
++def test_genai_required_model_includes_cache_fields() -> None:
++    assert "gen_ai.usage.cache_read_input_tokens" in GENAI_REQUIRED_MODEL
++    assert "gen_ai.usage.cache_creation_input_tokens" in GENAI_REQUIRED_MODEL
+diff --git a/python/tests/protocol/test_swarmgraph_cost_cache_fields.py b/python/tests/protocol/test_swarmgraph_cost_cache_fields.py
+new file mode 100644
+index 0000000..0955f44
+--- /dev/null
++++ b/python/tests/protocol/test_swarmgraph_cost_cache_fields.py
+@@ -0,0 +1,38 @@
++"""R-03: SwarmGraphCostData cache field round-trip tests."""
++from __future__ import annotations
++
++from agent_runtime_cockpit.protocol.typed_events import SwarmGraphCostEvent
++
++
++def test_swarmgraph_cost_event_round_trips_cache_fields() -> None:
++    raw = {
++        "schema_version": 2,
++        "type": "SWARMGRAPH_COST",
++        "timestamp": "2026-01-01T00:00:00Z",
++        "run_id": "r-1",
++        "sequence": 1,
++        "data": {
++            "provider": "anthropic",
++            "model": "claude-3-haiku",
++            "cache_read_input_tokens": 48012,
++            "cache_creation_input_tokens": 1200,
++        },
++    }
++    event = SwarmGraphCostEvent.model_validate(raw)
++    assert event.data.cache_read_input_tokens == 48012
++    assert event.data.cache_creation_input_tokens == 1200
++
++
++def test_swarmgraph_cost_event_legacy_payload_parses_without_cache_fields() -> None:
++    """Older events without cache fields parse cleanly (forward-compat)."""
++    raw = {
++        "schema_version": 2,
++        "type": "SWARMGRAPH_COST",
++        "timestamp": "2026-01-01T00:00:00Z",
++        "run_id": "r-2",
++        "sequence": 1,
++        "data": {"provider": "openai", "totalCost": 0.01, "totalTokens": 500},
++    }
++    event = SwarmGraphCostEvent.model_validate(raw)
++    assert event.data.cache_read_input_tokens is None
++    assert event.data.cache_creation_input_tokens is None

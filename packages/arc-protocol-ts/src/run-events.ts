@@ -237,6 +237,8 @@ export interface SwarmGraphCostEvent extends RunEventBase {
     node_id?: string;
     message_id?: string;
     evidence_refs?: string[];
+    cache_read_input_tokens?: number;
+    cache_creation_input_tokens?: number;
   };
 }
 

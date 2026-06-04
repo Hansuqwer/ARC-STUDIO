@@ -411,6 +411,8 @@ class SwarmGraphCostData(BaseModel):
     totalCost: float | None = Field(None, alias="totalCost")
     totalTokens: int | None = Field(None, alias="totalTokens")
     currency: str | None = None
+    cache_read_input_tokens: int | None = None
+    cache_creation_input_tokens: int | None = None
     items: list[Any] | None = None
     source: str | None = None
     runtime: str | None = None
