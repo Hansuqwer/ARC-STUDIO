@@ -978,6 +978,16 @@ export interface AuditChainInfo {
     reason?: string;
     signature?: string;
     hmacAlgo?: string;
+    /** Verification mode used: sha256 or hmac */
+    mode?: 'sha256' | 'hmac';
+    /** Number of records actually checked by verifier */
+    recordsChecked?: number;
+    /** Verification duration in milliseconds */
+    durationMs?: number;
+    /** Audit chain file size in bytes */
+    fileSizeBytes?: number;
+    /** Peak memory usage during verification in MB */
+    peakMemoryMb?: number;
 }
 
 // ========== Replay ==========

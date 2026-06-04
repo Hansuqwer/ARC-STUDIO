@@ -559,11 +559,45 @@ export class ArcBackendService implements ArcService {
     // ========== Audit Methods (Slice 7) ==========
 
     /**
-     * Get audit chain info for a run by calling the Python CLI.
+     * Get audit chain info for a run.
+     * Prefers daemon HTTP when available, falls back to CLI subprocess.
      */
     async getAuditChainInfo(runId: string): Promise<AuditChainInfo | null> {
+        // Try daemon first
+        const daemonUrl = await this.discoverPythonDaemonUrl();
+        if (daemonUrl) {
+            try {
+                const resp = await fetch(`${daemonUrl}/api/audit/verify/${encodeURIComponent(runId)}?mode=auto`, {
+                    signal: AbortSignal.timeout(10000),
+                    headers: { 'X-ARC-Workspace': this.workspaceRoot },
+                });
+                if (resp.ok) {
+                    const envelope = await resp.json();
+                    if (envelope.ok && envelope.data) {
+                        const d = envelope.data;
+                        const chainVerified = Boolean(d.ok);
+                        return {
+                            runId,
+                            auditPath: d.chain_path || d.chainPath,
+                            chainVerified,
+                            recordCount: d.records_checked ?? d.recordsChecked ?? 0,
+                            state: chainVerified ? 'present' : 'degraded',
+                            reason: d.reason,
+                            mode: d.mode,
+                            recordsChecked: d.records_checked ?? d.recordsChecked,
+                            durationMs: d.duration_ms ?? d.durationMs,
+                            fileSizeBytes: d.file_size_bytes ?? d.fileSizeBytes,
+                            peakMemoryMb: d.peak_memory_mb ?? d.peakMemoryMb,
+                        };
+                    }
+                }
+            } catch {
+                // daemon unavailable or error — fall through to CLI
+            }
+        }
+
+        // CLI fallback
         try {
-            // First check if there's an audit path for this run
             const traceOutput = execFileSync('arc', ['runs', 'status', runId, '--workspace', this.workspaceRoot, '--json'], {
                 timeout: 10000,
                 encoding: 'utf-8',
@@ -593,17 +627,22 @@ export class ArcBackendService implements ArcService {
                 const parsed = JSON.parse(output);
                 if (parsed.ok && parsed.data) {
                     const data = parsed.data;
-                    const chainVerified = Boolean(data.chain_verified ?? data.chainVerified ?? data.verified);
+                    const chainVerified = Boolean(data.ok);
                     return {
                         runId,
                         auditPath,
                         chainVerified,
-                        recordCount: data.record_count ?? data.recordCount ?? this.extractAuditRecordCount(data.reason),
+                        recordCount: data.records_checked ?? data.record_count ?? data.recordCount ?? this.extractAuditRecordCount(data.reason),
                         state: data.state || (chainVerified ? 'present' : 'degraded'),
                         reason: data.reason || data.message,
                         signature: data.signature || undefined,
                         hmacAlgo: data.hmac_algo || data.hmacAlgo,
-                    } as AuditChainInfo;
+                        mode: data.mode,
+                        recordsChecked: data.records_checked ?? data.recordsChecked,
+                        durationMs: data.duration_ms ?? data.durationMs,
+                        fileSizeBytes: data.file_size_bytes ?? data.fileSizeBytes,
+                        peakMemoryMb: data.peak_memory_mb ?? data.peakMemoryMb,
+                    };
                 }
                 return {
                     runId,

@@ -1426,7 +1426,54 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_post("/api/arena/vote", arena_vote)
     app.router.add_post("/api/arena/adopt", arena_adopt)
     app.router.add_get("/api/arena/rankings", arena_rankings)
+    app.router.add_get("/api/audit/verify/{run_id}", audit_verify_route)
     app.router.add_post("/v1/ir/simulate", ir_simulate)
+
+
+async def audit_verify_route(request: web.Request) -> web.Response:
+    """GET /api/audit/verify/{run_id}?mode=sha256|hmac|auto — streaming audit verification."""
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "audit_verify", "daemon-audit-verify", 0)
+    except TrustEnforcementError as exc:
+        return _session_error(exc, 500)
+
+    run_id = request.match_info["run_id"]
+    mode = request.query.get("mode", "auto")
+    if mode not in ("auto", "sha256", "hmac"):
+        return _json(err(ArcErrorCode.INVALID_INPUT, f"Invalid mode: {mode}").model_dump(), 400)
+
+    audit_dir = workspace / ".arc" / "audit"
+    chain = audit_dir / f"{run_id}.audit.jsonl"
+    if not chain.exists():
+        chain = audit_dir / f"{run_id}.jsonl"
+    if not chain.exists():
+        return _json(
+            err(ArcErrorCode.RUN_NOT_FOUND, f"Audit chain not found for run {run_id}").model_dump(),
+            404,
+        )
+
+    from ..audit.key_manager import AuditKeyManager
+    from ..audit.streaming_verifier import StreamingAuditVerifier
+
+    verifier = StreamingAuditVerifier()
+    key = None
+    if mode in ("hmac", "auto"):
+        mgr = AuditKeyManager()
+        key, key_status = mgr.get_key()
+        if mode == "hmac" and not key_status.available:
+            return _json(
+                err(ArcErrorCode.INVALID_INPUT, "HMAC key not available").model_dump(), 400
+            )
+
+    if mode == "auto":
+        result = verifier.verify_auto(chain, key)
+    elif mode == "hmac":
+        result = verifier.verify_hmac(chain, key)  # type: ignore[arg-type]
+    else:
+        result = verifier.verify_sha256(chain)
+
+    return _json(ok(json.loads(result.model_dump_json())).model_dump())
 
 
 async def ir_simulate(request: web.Request) -> web.Response:
