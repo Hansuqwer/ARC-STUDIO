@@ -350,6 +350,7 @@ VENDOR_CONFIGS = {
                     "miss": "prompt_cache_miss_tokens",
                 },
                 auto_route_to="deepseek-v4-flash",
+                pricing_valid_until="2026-07-24",  # addendum §1: V3-era IDs retire 2026-07-24
             ),
         },
     },
