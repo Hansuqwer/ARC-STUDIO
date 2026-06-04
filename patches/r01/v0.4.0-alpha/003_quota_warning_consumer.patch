@@ -1,0 +1,131 @@
+From c98fccd9ed7c5791eb5bca148bfdd329a63b4311 Mon Sep 17 00:00:00 2001
+From: ARC Studio <arc-studio@local>
+Date: Thu, 4 Jun 2026 21:16:05 +0200
+Subject: [PATCH] feat(tui): QuotaWarning consumer in status bar
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Amber ⚠ chip when usage_pct < 1.0
+- Red 🛑 chip when usage_pct >= 1.0
+- No-color fallback: [WARN] / [CRITICAL]
+- quota_warnings list field on DataStore
+- 6 unit tests
+---
+ python/src/agent_runtime_cockpit/tui/data.py  |  3 +
+ .../tui/widgets/status_bar.py                 | 12 +++-
+ .../tui/test_status_bar_quota_warning.py      | 63 +++++++++++++++++++
+ 3 files changed, 77 insertions(+), 1 deletion(-)
+ create mode 100644 python/tests/tui/test_status_bar_quota_warning.py
+
+diff --git a/python/src/agent_runtime_cockpit/tui/data.py b/python/src/agent_runtime_cockpit/tui/data.py
+index 25c5dcd..40d8dc2 100644
+--- a/python/src/agent_runtime_cockpit/tui/data.py
++++ b/python/src/agent_runtime_cockpit/tui/data.py
+@@ -74,6 +74,9 @@ class DataStore:
+     input_history: list[str] = field(default_factory=list)
+     _history_index: int = -1
+ 
++    # ── budget/quota ─────────────────────────────────────────────────────
++    quota_warnings: list = field(default_factory=list)
++
+     def __post_init__(self) -> None:
+         if not self.session_id:
+             if self.seed is not None:
+diff --git a/python/src/agent_runtime_cockpit/tui/widgets/status_bar.py b/python/src/agent_runtime_cockpit/tui/widgets/status_bar.py
+index a34f8dd..63d8bc6 100644
+--- a/python/src/agent_runtime_cockpit/tui/widgets/status_bar.py
++++ b/python/src/agent_runtime_cockpit/tui/widgets/status_bar.py
+@@ -52,9 +52,19 @@ class StatusBar(Static):
+             p = getattr(self.data, "current_provider", "") or ""
+             m = (getattr(self.data, "current_model", "") or "").split("/")[-1][:20]
+             model_str = f" │ {p}/{m}" if p else f" │ {m}"
++        # QuotaWarning flash
++        warning_str = ""
++        warnings = getattr(self.data, "quota_warnings", [])
++        if warnings:
++            latest = warnings[-1]
++            pct = latest.usage_pct
++            if no_color:
++                warning_str = " [WARN]" if pct < 1.0 else " [CRITICAL]"
++            else:
++                warning_str = " [yellow]⚠[/]" if pct < 1.0 else " [bold red]🛑[/]"
+         line = (
+             f" {self.data.mode} │ {self.data.runtime_mode}{paid_indicator}{model_str} │ {ws} │ "
+-            f"{session_short} │ {cost} │ {tok_str} │"
++            f"{session_short} │ {cost} │ {tok_str}{warning_str} │"
+             f" {daemon_dot}{stream_indicator} │"
+             f" Esc:cancel  /:commands  Ctrl+P:palette"
+         )
+diff --git a/python/tests/tui/test_status_bar_quota_warning.py b/python/tests/tui/test_status_bar_quota_warning.py
+new file mode 100644
+index 0000000..4f0528f
+--- /dev/null
++++ b/python/tests/tui/test_status_bar_quota_warning.py
+@@ -0,0 +1,63 @@
++"""Tests for QuotaWarning consumer in status bar — R-01."""
++
++from __future__ import annotations
++
++from dataclasses import dataclass
++from pathlib import Path
++
++from agent_runtime_cockpit.tui.data import DataStore
++from agent_runtime_cockpit.tui.theme import Theme, ThemeManager
++from agent_runtime_cockpit.tui.widgets.status_bar import StatusBar
++
++
++@dataclass
++class _FakeWarning:
++    usage_pct: float
++    dimension: str = "session"
++    limit: float = 10.0
++    current: float = 0.0
++
++
++def _bar(*, warnings: list = None, no_color: bool = False) -> StatusBar:
++    ds = DataStore(seed=0)
++    ds.workspace = Path("/tmp")
++    ds.quota_warnings = warnings or []
++    tm = ThemeManager()
++    if no_color:
++        tm._current = Theme(name="nocolor", no_color=True)
++    return StatusBar(ds, tm)
++
++
++class TestStatusBarQuotaWarning:
++    def test_warn_event_renders_amber_chip(self):
++        out = _bar(warnings=[_FakeWarning(usage_pct=0.85)]).render()
++        assert "⚠" in out
++
++    def test_critical_event_renders_red_chip(self):
++        out = _bar(warnings=[_FakeWarning(usage_pct=1.0)]).render()
++        assert "🛑" in out
++
++    def test_no_color_renders_text_tags(self):
++        out = _bar(warnings=[_FakeWarning(usage_pct=0.85)], no_color=True).render()
++        assert "[WARN]" in out
++
++    def test_no_color_critical_renders_text_tags(self):
++        out = _bar(warnings=[_FakeWarning(usage_pct=1.0)], no_color=True).render()
++        assert "[CRITICAL]" in out
++
++    def test_no_warnings_no_warning_str(self):
++        out = _bar(warnings=[]).render()
++        assert "⚠" not in out
++        assert "🛑" not in out
++        assert "[WARN]" not in out
++        assert "[CRITICAL]" not in out
++
++    def test_multiple_warnings_shows_latest(self):
++        out = _bar(
++            warnings=[
++                _FakeWarning(usage_pct=0.85),
++                _FakeWarning(usage_pct=1.0),
++            ]
++        ).render()
++        # Latest is pct=1.0, so red
++        assert "🛑" in out
+-- 
+2.50.1 (Apple Git-155)
+
