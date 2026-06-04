@@ -20,9 +20,13 @@ The daemon binds to `127.0.0.1` by default, and Theia backend daemon calls use `
 
 All non-`/health` daemon routes require `Authorization: Bearer $ARC_DAEMON_TOKEN` by default. `ARC_DAEMON_ALLOW_UNAUTHENTICATED=1` is a local test/development bypass only and must not be used for shared or production-like sessions. Mutating requests, including legacy `GET /api/runs/start`, reject unexpected `Origin`/`Referer` headers and request bodies larger than 512 KiB.
 
-`X-ARC-Workspace` must resolve to an existing directory. Malformed or missing workspace paths return `400 INVALID_INPUT`; they do not silently fall back to the daemon working directory.
+`X-ARC-Workspace` must resolve to an existing directory inside the daemon root by default. Malformed, missing, or out-of-root workspace paths return `400 INVALID_INPUT`; they do not silently fall back to the daemon working directory. `ARC_DAEMON_ALLOW_EXTERNAL_WORKSPACE=1` is an explicit trusted-local-development escape hatch only.
 
 OTLP trace export is localhost-only by default. Remote OTLP endpoints require `ARC_ALLOW_REMOTE_OTLP=1` and should only be enabled for trusted endpoints.
+
+## HMAC Audit Chains
+
+New HMAC audit records fail closed if no audit key is available. New records bind `seq`, `timestamp`, `key_id`, `prev_hash`, and `event` into the signed hash. Verifiers keep a legacy compatibility path for already-written HMAC chains that lack the new metadata, but new writes always use the bound format. Existing corrupt chains are not extended; append fails instead of skipping over malformed lines.
 
 ## Secrets
 

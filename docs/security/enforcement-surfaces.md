@@ -296,7 +296,9 @@ Limits: this is policy/classifier hardening, not syscall or kernel sandboxing. M
 
 ## HMAC Audit Append Durability
 
-`HmacAuditChainWriter` now creates parent directories, uses advisory file locking where available, writes stable canonical JSON, flushes, and calls `os.fsync` per append. Verification rejects partial trailing lines clearly. The JSONL record shape is unchanged.
+`HmacAuditChainWriter` creates parent directories, uses advisory file locking where available, writes stable canonical JSON, flushes, and calls `os.fsync` per append. New records fail closed when no HMAC key is available and bind `seq`, `timestamp`, `key_id`, `prev_hash`, and `event` into the signed hash. Verification rejects partial trailing lines, missing signatures/hashes, sequence mismatches, and signed metadata tampering. Already-written legacy HMAC records that lack the new metadata remain verifiable through an explicit compatibility path.
+
+The writer caches tail state by file stat signature between appends and revalidates if the file changes. If an existing chain contains invalid JSON, missing `record_hash`, or sequence gaps, append fails rather than extending a corrupt chain.
 
 ## Adding Enforcement to New Code
 

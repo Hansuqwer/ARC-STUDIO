@@ -42,6 +42,13 @@ async def test_health_allows_without_token(client):
     assert r.status_code == 200
 
 
+async def test_health_omits_run_counts(client):
+    """Unauthenticated health should not disclose run inventory."""
+    r = await client.get("/health")
+    body = await r.json()
+    assert "active_runs" not in body
+
+
 async def test_request_without_token_rejected(app):
     """When token is set, requests without auth header get 401."""
     from aiohttp.test_utils import TestClient, TestServer
@@ -134,3 +141,20 @@ async def test_invalid_workspace_header_returns_400(client):
     assert r.status_code == 400
     body = await r.json()
     assert body["error"]["code"] == "INVALID_INPUT"
+
+
+async def test_workspace_header_outside_daemon_root_rejected(client, workspace):
+    outside = workspace.parent / f"{workspace.name}-outside"
+    outside.mkdir()
+    r = await client.get("/api/runs", headers={"X-ARC-Workspace": str(outside)})
+    assert r.status_code == 400
+    body = await r.json()
+    assert "outside daemon root" in body["error"]["message"]
+
+
+async def test_workspace_header_outside_daemon_root_opt_in(client, workspace, monkeypatch):
+    outside = workspace.parent / f"{workspace.name}-outside-opt-in"
+    outside.mkdir()
+    monkeypatch.setenv("ARC_DAEMON_ALLOW_EXTERNAL_WORKSPACE", "1")
+    r = await client.get("/api/runs", headers={"X-ARC-Workspace": str(outside)})
+    assert r.status_code == 200

@@ -791,7 +791,7 @@ bash scripts/check-pr.sh
 ## Phase 21 — Streaming Audit Verification + HMAC Signing
 
 **Roadmap:** R14 — Streaming Audit + HMAC  
-**Status:** Baseline Complete | Evidence: local worktree 2026-05-22 | 1463 Python tests passed (102 audit tests including 21 new streaming tests), TypeScript builds green, PR checks passed | Notes: Streaming verifier handles 100 MB+ traces with bounded memory; SHA-256 backward compatibility preserved; HMAC signing optional with key availability detection  
+**Status:** Baseline Complete | Evidence: local worktree 2026-06-04 | 4586 Python tests passed, 42 skipped, 3 xfailed; TypeScript build/typecheck green | Notes: Streaming verifier handles 100 MB+ traces with bounded memory; SHA-256 backward compatibility preserved; new HMAC appends fail closed without a key, bind `seq`/`timestamp`/`key_id`, keep legacy verify compatibility for already-written HMAC records, and refuse to extend corrupt chains
 **Depends on:** None (standalone foundation work)  
 **Design note:** Current `audit/chain.py` has `verify_audit_signature()` and `verify_hmac_chain()` but both use `read_text().splitlines()` which reads full files into memory. Architecture review requires streaming (line-by-line) verification for large traces (100 MB+).
 
@@ -802,7 +802,7 @@ bash scripts/check-pr.sh
 4. Add CLI command `arc audit verify <run-id> --mode sha256|hmac|auto --max-memory-mb 500`.
 5. Preserve existing SHA-256 default for backward compatibility with existing traces.
 6. Add signed `.audit.sig` or versioned record fields for new HMAC traces.
-7. Add HMAC signing to supported run paths (when key is available).
+7. Add HMAC signing to supported run paths; HMAC append fails closed when no key is available.
 8. Tests: 100 MB synthetic trace verification <30s and <500 MB RSS, old SHA-256 traces verify without migration, HMAC traces fail on content/chain/signature mutation, stable JSON output.
 
 ### Acceptance
@@ -822,7 +822,7 @@ bash scripts/check-pr.sh
 ```
 
 ### Known Risks
-- HMAC key management adds operational complexity; keep HMAC optional with SHA-256 as default.
+- HMAC key management adds operational complexity; keep SHA-256 trace compatibility and legacy HMAC verification, but do not append unsigned HMAC records.
 - Very large traces (>1 GB) may still need external tooling; document this boundary.
 
 ## Phase 22 — Discriminated RunEvent Unions + Protocol Conformance

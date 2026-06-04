@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,17 @@ from .key_manager import (
 log = logging.getLogger(__name__)
 
 GENESIS = "GENESIS"
+
+
+class AuditChainCorruptError(RuntimeError):
+    """Raised when an existing audit chain cannot be safely extended."""
+
+
+@dataclass(frozen=True)
+class _TailState:
+    seq: int
+    prev_hash: str
+    stat_signature: tuple[int, int, int] | None
 
 
 def _canonical_json(data: dict[str, Any]) -> str:
@@ -56,18 +68,51 @@ class HmacAuditChainWriter:
     def __init__(self, path: Path, key_manager: AuditKeyManager) -> None:
         self.path = path
         self.key_manager = key_manager
-        self._seq, self._prev_hash = self._load_tail_state()
+        tail = self._load_tail_state()
+        self._seq = tail.seq
+        self._prev_hash = tail.prev_hash
+        self._stat_signature = tail.stat_signature
 
-    def _load_tail_state(self) -> tuple[int, str]:
+    def _stat_signature_for_path(self) -> tuple[int, int, int] | None:
         if not self.path.exists():
-            return 0, GENESIS
+            return None
+        stat = self.path.stat()
+        return stat.st_size, stat.st_mtime_ns, stat.st_ino
+
+    def _load_tail_state(self) -> _TailState:
+        if not self.path.exists():
+            return _TailState(0, GENESIS, None)
         last: dict[str, Any] | None = None
-        for line in self.path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                last = json.loads(line)
+        expected_seq = 0
+        with open(self.path, "r", encoding="utf-8") as f:
+            for line_num, line in enumerate(f, start=1):
+                if not line.strip():
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise AuditChainCorruptError(f"invalid JSON at line {line_num}: {exc}") from exc
+                seq = record.get("seq")
+                record_hash = record.get("record_hash")
+                if seq != expected_seq:
+                    raise AuditChainCorruptError(
+                        f"sequence mismatch at line {line_num}: expected {expected_seq}, got {seq}"
+                    )
+                if not isinstance(record_hash, str) or not record_hash:
+                    raise AuditChainCorruptError(f"missing record_hash at line {line_num}")
+                last = record
+                expected_seq += 1
         if last is None:
-            return 0, GENESIS
-        return int(last["seq"]) + 1, str(last["record_hash"])
+            return _TailState(0, GENESIS, self._stat_signature_for_path())
+        return _TailState(
+            int(last["seq"]) + 1, str(last["record_hash"]), self._stat_signature_for_path()
+        )
+
+    def _current_tail_state(self) -> _TailState:
+        stat_signature = self._stat_signature_for_path()
+        if stat_signature == self._stat_signature:
+            return _TailState(self._seq, self._prev_hash, self._stat_signature)
+        return self._load_tail_state()
 
     def append(self, event: dict[str, Any]) -> dict[str, Any]:
         """Append an HMAC-signed event to the audit chain."""
@@ -77,7 +122,9 @@ class HmacAuditChainWriter:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.path, "a+", encoding="utf-8") as f:
             with _FileLock(f):
-                self._seq, self._prev_hash = self._load_tail_state()
+                tail = self._current_tail_state()
+                self._seq = tail.seq
+                self._prev_hash = tail.prev_hash
                 timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
                 key_id = status.key_id or status.source
                 record_hash, signature = sign_audit_record(
@@ -104,6 +151,7 @@ class HmacAuditChainWriter:
                 os.fsync(f.fileno())
                 self._prev_hash = record_hash
                 self._seq += 1
+                self._stat_signature = self._stat_signature_for_path()
         return record
 
 

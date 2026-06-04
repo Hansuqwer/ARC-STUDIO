@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from agent_runtime_cockpit.audit.hmac_chain import (
+    AuditChainCorruptError,
     GENESIS,
     HmacAuditChainWriter,
     verify_hmac_chain,
@@ -191,6 +192,35 @@ def test_hmac_chain_partial_trailing_line_fails(tmp_path: Path):
     ok, reason = verify_hmac_chain(chain_path, b"test-hmac-key-32-bytes-long!!")
     assert ok is False
     assert "partial trailing line" in reason
+
+
+def test_hmac_chain_writer_rejects_corrupt_existing_chain(tmp_path: Path):
+    key = b"test-hmac-key-32-bytes-long!!"
+    chain_path = tmp_path / "audit.jsonl"
+    chain_path.write_text('{"seq":0,"record_hash":"abc"}\nnot json\n', encoding="utf-8")
+    manager = StaticAuditKeyManager(key)
+    try:
+        HmacAuditChainWriter(chain_path, manager)  # type: ignore[arg-type]
+    except AuditChainCorruptError as exc:
+        assert "invalid JSON" in str(exc)
+    else:
+        raise AssertionError("corrupt existing chain should fail closed")
+
+
+def test_hmac_chain_writer_revalidates_changed_chain_before_append(tmp_path: Path):
+    key = b"test-hmac-key-32-bytes-long!!"
+    chain_path = tmp_path / "audit.jsonl"
+    manager = StaticAuditKeyManager(key)
+    writer = HmacAuditChainWriter(chain_path, manager)  # type: ignore[arg-type]
+    writer.append({"action": "init"})
+    with open(chain_path, "a", encoding="utf-8") as f:
+        f.write("not json\n")
+    try:
+        writer.append({"action": "second"})
+    except AuditChainCorruptError as exc:
+        assert "invalid JSON" in str(exc)
+    else:
+        raise AssertionError("append should revalidate changed corrupt chain")
 
 
 def test_key_manager_generate_key():
