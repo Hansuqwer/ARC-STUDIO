@@ -47,6 +47,7 @@ PHASE_41_COMMANDS = {
     "alias",
     "wallet",
     "budget",
+    "expand",
 }
 
 

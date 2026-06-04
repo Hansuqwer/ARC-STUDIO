@@ -370,6 +370,20 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         required_fields={"dimension", "usage_pct", "limit", "current"},
         optional_fields=set(),
     ),
+    # ── R-02 / QW-4 ─────────────────────────────────────────────────────
+    "CONTEXT_COMPACTED": EventTypeDef(
+        required_fields={"tokens_before", "tokens_after", "messages_evicted_count"},
+        optional_fields={"evicted_handles"},
+    ),
+    "TOOL_OUTPUT_VIRTUALIZED": EventTypeDef(
+        required_fields={
+            "tool_name",
+            "original_size_bytes",
+            "handle_uri",
+            "estimated_tokens_saved",
+        },
+        optional_fields=set(),
+    ),
 }
 
 

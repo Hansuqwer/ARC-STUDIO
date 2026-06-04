@@ -36,6 +36,24 @@ DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
 _ANTHROPIC_MAX_BREAKPOINTS = 4
 
 
+def _maybe_compact(request: ProviderRequest) -> ProviderRequest:
+    """Apply R-02 compaction if enabled and context is near the limit."""
+    import os
+
+    if os.environ.get("ARC_COMPACTION_ENABLED", "1") == "0":
+        return request
+    try:
+        from ..context.compaction import compact
+
+        context_limit = int(os.environ.get("ARC_CONTEXT_LIMIT", "200000"))
+        result = compact(request.messages, context_limit=context_limit)
+        if result.compacted:
+            return request.model_copy(update={"messages": list(result.messages_kept)})
+    except Exception:
+        pass  # compaction is best-effort; never block a request
+    return request
+
+
 class AnthropicClient:
     def __init__(self, *, sdk_factory: Callable[[], Any] | None = None) -> None:
         self._sdk_factory = sdk_factory
@@ -151,6 +169,7 @@ class AnthropicClient:
     ) -> ProviderResponse:
         try:
             cancellation_token.raise_if_cancelled()
+            request = _maybe_compact(request)
             kwargs = self._request_kwargs(request, stream=False)
             self._last_request_kwargs = kwargs
             response = self._client_instance().messages.create(**kwargs)
