@@ -149,6 +149,27 @@ are mandatory. Missing any of these fields is a schema violation.
 
 ---
 
+### 7. Known limitations — guest argv transport (kernel command line)
+
+The macOS VZ gated proof passes the requested `argv` (base64-CSV) and its 64-char
+command SHA256 to the guest on the **kernel command line**
+(`ARC_VZ_COMMAND_ARGV_B64CSV=…`, `ARC_VZ_COMMAND_SHA256=…`). The kernel command
+line has a fixed `COMMAND_LINE_SIZE` budget, so **long argv truncates the
+trailing SHA**, which then fails hash verification and prevents the teardown
+markers from being captured. Verified 2026-06-06: `pwd` and `/nope` run cleanly;
+a 31-char command (`/definitely-missing-arc-command`) truncated the SHA to ~50
+of 64 hex chars.
+
+Consequence: the gated proof is reliable only for **short commands**. This is
+acceptable for the default-off, not-production-grade proof, and the real-host
+proofs (`pwd`, timeout, SIGINT, command-failure) all use short argv. Removing
+the ceiling requires moving the argv/SHA transport off the kernel command line
+(e.g. a dedicated read-only virtiofs file the guest `init` reads), which would
+change the hash-pinned Swift runner + init contract + manifest validator and is
+tracked as a follow-up, not part of this gated proof.
+
+---
+
 ## Decision Table
 
 | Decision | Chosen approach | Alternatives considered | Reason | Files affected | Confidence |
