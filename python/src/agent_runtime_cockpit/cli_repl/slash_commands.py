@@ -825,6 +825,36 @@ def _build_registry():
             usage="/expand <handle-prefix>",
         )
     )
+    registry.register(
+        CommandDef(
+            name="models",
+            help_text="List models from committed catalog with capability filters",
+            category="providers",
+            handler=cmd_models,
+            gates_required=[],
+            mode_required=[],
+            renders=["present"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+            usage="/models [--vendor <v>] [--has <cap>] [--free] [--max-input <$/M>] [--search <q>]",
+        )
+    )
+    registry.register(
+        CommandDef(
+            name="model-info",
+            help_text="Show detailed catalog data for one model",
+            category="providers",
+            handler=cmd_model_info,
+            gates_required=[],
+            mode_required=[],
+            renders=["present", "not_found"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+            usage="/model-info <vendor/model-id>",
+        )
+    )
 
     return registry
 
@@ -2590,3 +2620,24 @@ def cmd_expand(arg: str, session: ChatSession) -> CommandResult:
         output=f"[expanded {len(content)} bytes from handle {prefix!r}]",
         metadata={"handle_prefix": prefix, "bytes": len(content)},
     )
+
+
+# ── Catalog picker handlers ────────────────────────────────────────────────────
+
+
+def cmd_models(arg: str, _session: ChatSession) -> CommandResult:
+    """List models from committed catalog with capability filters. No network."""
+    from ..cli_repl.slash.models import run as _models_run
+
+    output = _models_run(arg)
+    state = "present" if "model(s) listed" in output or "Usage:" in output else "present"
+    return CommandResult(state=state, output=output)
+
+
+def cmd_model_info(arg: str, _session: ChatSession) -> CommandResult:
+    """Show detailed catalog data for one model."""
+    from ..cli_repl.slash.model_info import run as _model_info_run
+
+    output = _model_info_run(arg)
+    state = "not_found" if "[not found]" in output else "present"
+    return CommandResult(state=state, output=output)
