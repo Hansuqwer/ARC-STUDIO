@@ -222,4 +222,61 @@ describe('run-events helpers', () => {
     });
     expect(isKnownEvent(event)).toBe(true);
   });
+
+  it('parseRunEvent recognizes PRICING_FEED_REFRESHED', () => {
+    const event = parseRunEvent({
+      ...baseEvent,
+      type: 'PRICING_FEED_REFRESHED',
+      data: { feed_url: 'https://openrouter.ai/api/v1/models', feed_hash: 'abc123', rows_seen: 91, source: 'openrouter' },
+    });
+    expect(isKnownEvent(event)).toBe(true);
+    expect(KNOWN_RUN_EVENT_TYPES).toContain('PRICING_FEED_REFRESHED');
+  });
+
+  it('PRICING_FEED_REFRESHED extra fields ignored (forward-compat)', () => {
+    const event = parseRunEvent({
+      ...baseEvent,
+      type: 'PRICING_FEED_REFRESHED',
+      data: { feed_url: 'x', feed_hash: 'y', rows_seen: 1, source: 'cache', future: 1 },
+    });
+    expect(isKnownEvent(event)).toBe(true);
+  });
+
+  it('parseRunEvent recognizes BUDGET_BROKER_SYNC', () => {
+    const event = parseRunEvent({
+      ...baseEvent,
+      type: 'BUDGET_BROKER_SYNC',
+      data: { scope: 'SESSION', amount_usd: 1.5, local_approved: true, remote_approved: true, fell_back: false },
+    });
+    expect(isKnownEvent(event)).toBe(true);
+    expect(KNOWN_RUN_EVENT_TYPES).toContain('BUDGET_BROKER_SYNC');
+  });
+
+  it('BUDGET_BROKER_SYNC extra fields ignored (forward-compat)', () => {
+    const event = parseRunEvent({
+      ...baseEvent,
+      type: 'BUDGET_BROKER_SYNC',
+      data: { scope: 'RUN', amount_usd: 1, local_approved: true, remote_approved: false, fell_back: true, future: 1 },
+    });
+    expect(isKnownEvent(event)).toBe(true);
+  });
+
+  it('parseRunEvent recognizes OBSERVABILITY_EXPORT_STARTED', () => {
+    const event = parseRunEvent({
+      ...baseEvent,
+      type: 'OBSERVABILITY_EXPORT_STARTED',
+      data: { destination: 'https://otlp.example', protocol: 'otlp', span_count: 3 },
+    });
+    expect(isKnownEvent(event)).toBe(true);
+    expect(KNOWN_RUN_EVENT_TYPES).toContain('OBSERVABILITY_EXPORT_STARTED');
+  });
+
+  it('OBSERVABILITY_EXPORT_STARTED extra fields ignored (forward-compat)', () => {
+    const event = parseRunEvent({
+      ...baseEvent,
+      type: 'OBSERVABILITY_EXPORT_STARTED',
+      data: { destination: 'x', protocol: 'langfuse', span_count: 1, future: 1 },
+    });
+    expect(isKnownEvent(event)).toBe(true);
+  });
 });
