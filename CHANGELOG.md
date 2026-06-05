@@ -5,6 +5,18 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 ## [Unreleased]
 
 ### Added
+- **Cloud (opt-in, OFF by default)**: Pricing feed (`cloud/pricing_feed.py`) — hash-pinned catalog refresh from OpenRouter (primary) or models.dev (fallback). Fail-closed on network/parse/hash-mismatch. `arc pricing-feed accept-new-hash` to adopt changes. `PricingFeedRefreshed` event. (v0.7)
+- **Cloud (opt-in, OFF by default)**: Shared budget broker (`cloud/budget_broker.py`) — team-mode remote budget cap. Sends only `{team_id, scope, amount}`. Fail-closed: unreachable + no-fallback → DENY. `BudgetBrokerSync` event. (v0.7)
+- **Cloud (opt-in, OFF by default)**: Observability bridge (`cloud/observability_bridge.py`) — exports sanitized semantic span metrics to user-chosen OTLP destination. Per-session consent required. `sanitize_attributes()` strips prompt/code/context. `ObservabilityExportStarted` event. otel-exporter-otlp is an optional extra. (v0.7)
+- **Protocol**: 3 new typed events (`PricingFeedRefreshed`, `BudgetBrokerSync`, `ObservabilityExportStarted`) across Python `EVENT_TYPES` + TS `run-events.ts` + registry fixture. (v0.7)
+- **TUI (/wallet)**: "Active opt-ins" section lists enabled cloud features (bearer token never shown). Status bar `cloud:` chip when any feature active. (v0.7)
+- **Docs**: `docs/threat-models/v0.7-opt-in.md` — per-feature threat model (required by local-first.md). (v0.7)
+
+### Inherited from main since v0.6-alpha tag (not v0.7 work)
+- `86043fe` — non-Chinese-lab capability backfill + models.dev catalog (109 providers) + `/models --max-context` filter (arena.ai follow-on)
+- `1aa2da5` — `capability_gates` fail-closed fix when vendor hint given but vendor not found
+
+### Added (prior)
 - **Budget persistence**: `SQLiteWALStorage` in `budget/storage.py` — SESSION + PROVIDER_DAY spend survive process restart via SQLite WAL. `InMemoryStorage` preserved as default for tests/back-compat. `BudgetEnforcer.__init__` accepts optional `storage` param. (v0.4.1)
 - **Pricing refresh**: Current-gen model rows added to `anthropic.py` (Haiku 4.5, Sonnet 4.6, Opus 4.6/4.7) and `openai_compatible.py` (GPT-5.5/5.4/5.4-mini/5.4-nano/5.2/5, GPT-4.1 family). (v0.4.1)
 - **QW-4 Handle store**: `context/handles.py` — `HandleStore` over SQLiteWAL. Tool outputs >8KB stored as `arc://output/sha256/<hex>` handles. Content-addressed dedup, LRU eviction, SHA computed post-redaction. (v0.5.0)
