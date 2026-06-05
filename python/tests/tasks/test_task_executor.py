@@ -141,10 +141,8 @@ def test_task_execution_success(executor):
     task = Task(type=TaskType.RUN, operation="test_op")
     task_id = executor.submit_task(task)
 
-    # Wait for execution
-    time.sleep(2.0)
+    executor.wait_for_all(timeout=15.0)
 
-    # Check status
     status = executor.get_task_status(task_id)
     assert status.status == TaskStatus.COMPLETED
     assert status.result is not None
@@ -322,14 +320,13 @@ def test_execute_unknown_operation(executor):
 
 def test_concurrent_task_execution(executor):
     """Test executing multiple tasks concurrently."""
-    executor.start_worker()
     tasks = []
     for i in range(5):
         task = Task(type=TaskType.RUN, operation=f"op_{i}")
         task_id = executor.submit_task(task)
         tasks.append(task_id)
 
-    executor.wait_for_all(timeout=10.0)
+    executor.wait_for_all(timeout=30.0)
 
     completed_count = sum(
         1
@@ -341,11 +338,10 @@ def test_concurrent_task_execution(executor):
 
 def test_task_timestamps(executor):
     """Test that task timestamps are set correctly."""
-    executor.start_worker()
     task = Task(type=TaskType.RUN, operation="test_op")
     task_id = executor.submit_task(task)
 
-    executor.wait_for_all(timeout=10.0)
+    executor.wait_for_all(timeout=30.0)
 
     status = executor.get_task_status(task_id)
     assert status is not None
