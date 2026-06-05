@@ -65,6 +65,11 @@ arch-studio-cli = "agent_runtime_cockpit.cli_studio:app"
 [tool.hatch.build.targets.wheel]
 packages = ["src/agent_runtime_cockpit"]
 
+[tool.uv]
+# Force a patched pip: PYSEC-2026-196 affects pip 26.1.1 (fixed in 26.1.2).
+# pip is only a transitive/dev tool here, but this keeps `pip-audit` clean in CI.
+constraint-dependencies = ["pip>=26.1.2"]
+
 [tool.uv.workspace]
 members = ["packages/*"]
 
