@@ -52,6 +52,22 @@ class StatusBar(Static):
             p = getattr(self.data, "current_provider", "") or ""
             m = (getattr(self.data, "current_model", "") or "").split("/")[-1][:20]
             model_str = f" │ {p}/{m}" if p else f" │ {m}"
+            # Append capability tags from catalog
+            try:
+                from .capability_gates import get_capabilities
+
+                current_model = getattr(self.data, "current_model", "") or ""
+                if current_model:
+                    caps = get_capabilities(current_model, vendor=p or None)
+                    tags = "".join(
+                        f"[{tag}]"
+                        for tag, enabled in caps.items()
+                        if enabled and tag in ("vision", "tools", "reasoning")
+                    )
+                    if tags:
+                        model_str += f" {tags}"
+            except Exception:
+                pass
         # QuotaWarning flash
         warning_str = ""
         warnings = getattr(self.data, "quota_warnings", [])
