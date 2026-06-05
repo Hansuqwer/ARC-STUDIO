@@ -1,3 +1,10 @@
+<!-- LOCKED: single source of truth. Do not create competing phase lists. -->
+> 🔒 **LOCKED — THE single ARC Studio phase list.** Locked at commit `ffa1e1f` (`spec/v0.8-r-ux2`), 2026-06-05.
+> All other phase/plan/status docs are archived under `docs/archive/`. **Finish the active phase 1 → 100% before broadening to any new scope.**
+> Update this file in place; never create a replacement phase/status markdown. Companion roadmap: `docs/roadmap.md`. Charter: `AGENTS.md`.
+>
+> **Active track (2026-06-05, `ffa1e1f`) — verified P0 hardening sprint from the five-way audit.** Verified state on this branch: `ruff` clean; `pytest` 5158 passed / **1 failed** (SQLite `database is locked` in budget storage); full `mypy` 278 errors (scoped CI mypy green); TS typecheck + build green; 3 SSE integration tests skipped. P0 order: (1) SQLite lock fix, (2) TUI shell-escape completion, (3) quarantine orphan `python/src/routes.py`, (4) `/api/runs/start` POST-only, (6) refresh `docs/security/enforcement-surfaces.md`, (7) reconcile `security/profiles.py` schema version. MicroVM execution (Phase 104/105) stays deferred / gated per the 2026-06-05 reprioritization below.
+
 # ARC Studio — Locked Phase Implementation Plan
 
 **Status:** Locked execution plan for remaining work.
