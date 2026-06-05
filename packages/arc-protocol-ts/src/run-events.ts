@@ -416,6 +416,39 @@ export interface ModelChangedEvent extends RunEventBase {
   };
 }
 
+export interface PricingFeedRefreshedEvent extends RunEventBase {
+  type: 'PRICING_FEED_REFRESHED';
+  data: {
+    feed_url: string;
+    feed_hash: string;
+    rows_seen: number;
+    source: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface BudgetBrokerSyncEvent extends RunEventBase {
+  type: 'BUDGET_BROKER_SYNC';
+  data: {
+    scope: string;
+    amount_usd: number;
+    local_approved: boolean;
+    remote_approved: boolean;
+    fell_back: boolean;
+    [key: string]: unknown;
+  };
+}
+
+export interface ObservabilityExportStartedEvent extends RunEventBase {
+  type: 'OBSERVABILITY_EXPORT_STARTED';
+  data: {
+    destination: string;
+    protocol: string;
+    span_count: number;
+    [key: string]: unknown;
+  };
+}
+
 // ─── Raw/Unknown Events ──────────────────────────────────────────────────────
 
 export interface RawEvent extends RunEventBase {
@@ -481,6 +514,9 @@ export type KnownRunEvent =
   | ContextCompactedEvent
   | ToolOutputVirtualizedEvent
   | ModelChangedEvent
+  | PricingFeedRefreshedEvent
+  | BudgetBrokerSyncEvent
+  | ObservabilityExportStartedEvent
   | RawEvent;
 
 /**
@@ -523,6 +559,9 @@ export const KNOWN_RUN_EVENT_TYPES = [
   'CONTEXT_COMPACTED',
   'TOOL_OUTPUT_VIRTUALIZED',
   'MODEL_CHANGED',
+  'PRICING_FEED_REFRESHED',
+  'BUDGET_BROKER_SYNC',
+  'OBSERVABILITY_EXPORT_STARTED',
   'RAW',
 ] as const satisfies readonly KnownRunEvent['type'][];
 

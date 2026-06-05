@@ -833,6 +833,24 @@
         "previous_model"
       ],
       "optionalFields": ["capabilities_added", "capabilities_removed"]
+    },
+    {
+      "type": "PRICING_FEED_REFRESHED",
+      "version": 2,
+      "requiredFields": ["feed_hash", "feed_url", "rows_seen", "source"],
+      "optionalFields": []
+    },
+    {
+      "type": "BUDGET_BROKER_SYNC",
+      "version": 2,
+      "requiredFields": ["amount_usd", "fell_back", "local_approved", "remote_approved", "scope"],
+      "optionalFields": []
+    },
+    {
+      "type": "OBSERVABILITY_EXPORT_STARTED",
+      "version": 2,
+      "requiredFields": ["destination", "protocol", "span_count"],
+      "optionalFields": []
     }
   ]
 }

@@ -388,6 +388,18 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         required_fields={"previous_model", "current_model"},
         optional_fields={"capabilities_added", "capabilities_removed"},
     ),
+    "PRICING_FEED_REFRESHED": EventTypeDef(
+        required_fields={"feed_url", "feed_hash", "rows_seen", "source"},
+        optional_fields=set(),
+    ),
+    "BUDGET_BROKER_SYNC": EventTypeDef(
+        required_fields={"scope", "amount_usd", "local_approved", "remote_approved", "fell_back"},
+        optional_fields=set(),
+    ),
+    "OBSERVABILITY_EXPORT_STARTED": EventTypeDef(
+        required_fields={"destination", "protocol", "span_count"},
+        optional_fields=set(),
+    ),
 }
 
 

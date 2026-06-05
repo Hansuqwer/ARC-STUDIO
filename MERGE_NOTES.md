@@ -1,100 +1,84 @@
-# v0.6-alpha Merge Notes
+# v0.7-alpha Merge Notes
 
-## What ships
+## What shipped in this sprint
 
-**Catalog-driven model picker — UI now reflects per-model capability data.**
+Three independent opt-in cloud features, **all default OFF**. With no env vars
+set, ARC makes zero outbound calls beyond the user's configured LLM vendor.
 
-v0.6 completes the capability pipeline started in v0.5.2 (backfill) by wiring
-the data into user-facing commands and the TUI status bar.
+### 1. Pricing feed (`cloud/pricing_feed.py`)
+- `ARC_PRICING_FEED_ENABLED=1` to activate
+- Primary: OpenRouter. Fallback: models.dev (`ARC_PRICING_FEED_SOURCE=models-dev`)
+- **Hash-pinning** (not Ed25519 — neither source signs their feed): any change
+  from the pinned SHA-256 is rejected; user runs `arc pricing-feed accept-new-hash`
+- Fail-closed: network down / parse fail / hash mismatch → keep local
+- 12 tests
 
-## New commands
+### 2. Budget broker (`cloud/budget_broker.py`)
+- Requires `ARC_BUDGET_BROKER_URL` + `_TOKEN` + `ARC_BUDGET_TEAM_ID`
+- Sends only `{team_id, scope, amount}` — no prompts, no code
+- Fail-closed: unreachable + `fallback_to_local=False` → DENY
+- Local cap always the floor; broker can only further-restrict
+- 12 tests
 
-### /models
+### 3. Observability bridge (`cloud/observability_bridge.py`)
+- Requires `ARC_OBSERVABILITY_BRIDGE_URL` + per-session consent
+- `sanitize_attributes()` strips prompt/code/context keys (defense-in-depth)
+- otel-exporter-otlp is an optional extra; missing → graceful no-op
+- 10 tests
 
-```
-/models [--vendor <name>] [--has <cap>] [--free] [--max-input <$/M>] [--search <q>]
-/models --vendor deepseek        # 6 models listed
-/models --has vision             # 11 models with image/video modality
-/models --has tools --max-input 1.0
-/models --free                   # only is_free_tier=True rows
-```
+### Cross-cutting
+- 3 typed events mirrored Python + TS (6 TS tests)
+- `/wallet` "Active opt-ins" section + status bar `cloud:` chip
+- `docs/threat-models/v0.7-opt-in.md` (required by local-first.md)
+- 6 default-off invariant tests
 
-Reads committed `CostRate` data — **no network fetch at runtime** (local-first.md).
-Per-model accuracy: `--has vision` uses `input_modalities` field from v0.5.2 backfill,
-not vendor-level `ProviderFeature` flags. Verified by
-`test_has_vision_filter_per_model_granularity`.
+## Inherited from main since v0.6-alpha tag (NOT v0.7 work)
 
-**Note on Anthropic:** `--vendor anthropic` returns 0 results. Anthropic uses a
-separate provider class (`AnthropicClient`) whose models are not in `VENDOR_CONFIGS`.
-This is correct — the command accurately reflects what the catalog has. v0.7 can
-backfill Anthropic cost rows into a unified catalog if needed.
+This branch was created from main HEAD `1aa2da5`, which is two commits past the
+v0.6-alpha tag (`4de0eae`). v0.7 inherits but did not author:
 
-### /model-info
+- `86043fe` — non-Chinese-lab capability backfill + models.dev catalog (109
+  providers) + `/models --max-context` filter (arena.ai follow-on session)
+- `1aa2da5` — `capability_gates` fail-closed fix when vendor hint given but
+  vendor not found
 
-```
-/model-info kimi/kimi-k2.6        # full catalog entry
-/model-info kimi-k2-0905          # shows ⚠ DEPRECATED banner + auto_route
-/model-info glm/glm-4.5-air       # shows FREE TIER
-```
-
-## Capability gating
-
-`capability_gates.py`: `get_capabilities(model_id, vendor) → dict[str, bool]`
-
-- Fail-closed invariant: unknown model → all gates `False` (never raises)
-- Prefer entry with actual capability data when model ID appears in multiple vendors
-  (e.g. `kimi-k2.6` exists in both `crofai` and `kimi` blocks; picks the one with
-  non-empty `input_modalities`)
-
-## Status bar chip
-
-Model chip extended: `│ kimi/kimi-k2.6 [vision][tools] │`
-
-Tags shown: vision, tools, reasoning (only when enabled). Hidden when unknown model.
-
-## ModelChanged event
-
-```python
-ModelChanged(
-    previous_model="gpt-4o",
-    current_model="kimi-k2.6",
-    capabilities_added=["vision"],    # features in new but not old
-    capabilities_removed=[],
-)
-```
-
-Diff semantics — consumer doesn't need to compute the delta.
+These are real changes that ride along to the v0.7 tag. They are not claimed
+as v0.7 sprint work.
 
 ## Test delta
 
-5030 (v0.5.2) → 5089 (+59). TS: 147 → 149 (+2).
+5091 baseline (1aa2da5) → 5131 (+40). TS: 149 → 155 (+6).
 
-## Invariant checks
+## Verification gates
 
-- Catalog NOT in connection path: `grep providers/ -rn "catalog"` → 0 hits
-- `/models` offline: `test_works_without_network` mocks `urllib.request.urlopen` — 0 calls
-- Capability gates fail-closed: `test_unknown_model_hides_all_capability_widgets` ✅
-- No LLM in `slash/models.py` or `capability_gates.py` (no openai/anthropic imports)
+| Gate | Result |
+|------|--------|
+| `ruff check src/ tests/` | ✅ clean |
+| `pytest` (Python) | ✅ 5131 passed |
+| TS build + test | ✅ 155 passed |
+| Threat model exists | ✅ `docs/threat-models/v0.7-opt-in.md`, 3 feature sections |
+| `test_no_outbound_calls_when_all_disabled` | ✅ |
+| `test_no_export_without_consent` | ✅ |
+| Protocol parity (Py ↔ TS) | ✅ |
 
 ## Behavior smokes
 
 | Smoke | Result |
-|---|---|
-| 1. `/models --vendor deepseek` | PASS — 6 models, all vendor=deepseek |
-| 2. `/models --has vision` | PASS — 11 models, all have image/video modality |
-| 3. Text-only model caps | PASS — `deepseek-v4-pro` vision=False |
-| 4. ModelChanged event | PASS — fired with capabilities_added=['tools'] |
-| 5. `/model-info kimi-k2-0905` | PASS — ⚠ DEPRECATED banner visible |
+|-------|--------|
+| 1. Default-off (no env) → 0 outbound calls | PASS (`test_no_outbound_calls_when_all_disabled`) |
+| 2. Pricing feed happy path | SKIP-no-feed-deployed (verified by 12 unit tests w/ mocked urlopen) |
+| 3. Budget broker | SKIP-no-broker-deployed (verified by 12 unit tests) |
+| 4. Observability export | SKIP-no-destination (verified by 10 unit tests + consent gating) |
 
-Note: Smoke 1 uses `deepseek` not `anthropic` — Anthropic is in a separate provider
-class outside VENDOR_CONFIGS (documented above).
+Live smokes deferred — no real feed/broker/OTLP endpoints deployed. All paths
+verified by unit tests with mocked network per honesty-over-polish.md.
 
 ## Pre-existing acceptable failures
 
-Same as v0.5.2: `test_concurrent_accumulation` env flake + 5 xfailed.
+Same as v0.6: `test_concurrent_accumulation` SQLite env flake + 5 xfailed.
 
 ## Branch
 
-`spec/v0.6-catalog-picker` — 5 commits — ready to merge.
+`spec/v0.7-opt-in-cloud-features` — 7 commits — ready to merge.
 
 **Do NOT tag yet. Awaiting your go.**
