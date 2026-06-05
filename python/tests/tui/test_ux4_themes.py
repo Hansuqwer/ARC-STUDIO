@@ -173,3 +173,46 @@ async def test_slash_statusline(monkeypatch):
         app.screen._handle_slash("/statusline")
         await pilot.pause()
         assert "Status-line slots" in _last_system(app.data)
+
+
+@pytest.mark.asyncio
+async def test_status_bar_no_color_has_no_dot_glyphs(monkeypatch):
+    """R-UX4 a11y: daemon/stream indicators must not use ●/○ in NO_COLOR mode."""
+    monkeypatch.setenv("NO_COLOR", "1")
+    from pathlib import Path
+
+    from agent_runtime_cockpit.tui.app import ArcApp
+    from agent_runtime_cockpit.tui.widgets.status_bar import StatusBar
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        app.data.workspace = Path("/tmp")  # short path so the line isn't truncated
+        app.data.daemon_online = True
+        app.data.is_streaming = True
+        bar = app.query_one("#status-bar", StatusBar)
+        out = bar.render()
+        assert "●" not in out
+        assert "○" not in out
+        assert "[on]" in out
+        assert "streaming" in out
+
+
+@pytest.mark.asyncio
+async def test_status_bar_color_keeps_dot_glyph(monkeypatch):
+    """Color mode still uses the ● daemon glyph (control for the NO_COLOR test)."""
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.delenv("ARC_THEME", raising=False)
+    from pathlib import Path
+
+    from agent_runtime_cockpit.tui.app import ArcApp
+    from agent_runtime_cockpit.tui.widgets.status_bar import StatusBar
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        app.data.workspace = Path("/tmp")  # short path so the line isn't truncated
+        app.data.daemon_online = True
+        bar = app.query_one("#status-bar", StatusBar)
+        out = bar.render()
+        assert "●" in out

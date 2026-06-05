@@ -28,11 +28,15 @@ class StatusBar(Static):
             ws = "…" + ws[-29:]
         cost = f"${self.data.total_cost_usd:.4f}" if self.data.total_cost_usd > 0 else "$0"
         session_short = self.data.session_id[:8] if self.data.session_id else "--------"
-        daemon_dot = "●" if self.data.daemon_online else "○"
-        stream_indicator = " ● streaming" if self.data.is_streaming else ""
+        no_color = bool(getattr(self.theme.current, "no_color", False))
+        if no_color:
+            daemon_dot = "[on]" if self.data.daemon_online else "[off]"
+            stream_indicator = " streaming" if self.data.is_streaming else ""
+        else:
+            daemon_dot = "●" if self.data.daemon_online else "○"
+            stream_indicator = " ● streaming" if self.data.is_streaming else ""
         paid_indicator = " $paid" if getattr(self.data, "allow_paid", False) else ""
         # P0-4: token usage meter
-        no_color = bool(getattr(self.theme.current, "no_color", False))
         tok = self.data.total_tokens
         lim = self.data.context_limit
         if lim > 0:
