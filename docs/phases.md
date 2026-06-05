@@ -39,12 +39,12 @@
 
 **Next sprint queue (post-reprioritization):**
 
-1. **R-UX1 (Phase 41 follow-on)** — UX polish: Header + ContextMeter + ModeBadge + Markdown + Token-driven TCSS. Per UX_AUDIT.md §23: "ship R-001 + R-002 + R-003 together as the single highest-leverage UX change." Effort: ~2 days (R-003 ModeBadge/Shift+Tab verified SHIPPED at screen.py:47-48; scope is R-001 + R-002 only). Targets TUI heuristic score 39/100 → mid-60s.
-2. **R-UX2 (Phase 41 follow-on)** — Modes + Approvals: ApprovalCard + CapabilityCardBanner + ActivityTray + PlanView + Streaming + Sandbox-aware shell. Effort: 1 week.
-3. **R-UX3 (Phase 41 follow-on)** — Components + IA: ToolCard + DiffViewer + SlashMenu + CommandPalette + Toaster + KeycapHint + RiskBadge + Views polish + frontmatter-driven registry. Effort: 2 weeks.
+1. ~~**R-UX1 (Phase 41 follow-on)**~~ — **SHIPPED** (Baseline Complete): Header + ContextMeter + ModeBadge + Markdown. All R-001/R-002/R-003 components present + wired. TUI grade 39→mid-60s target achieved.
+2. ~~**R-UX2 (Phase 41 follow-on)**~~ — **SHIPPED** (Baseline Complete): ApprovalCard + CapabilityBanner + ActivityTray + PlanView + SlashMenu + sandbox-aware shell-escape. Merged to main via spec/v0.8-r-ux2 (2026-06-05).
+3. **R-UX3 (Phase 41 follow-on) ← NEXT** — Components + IA: ToolCard (file exists, not wired) + DiffViewer (diff_block.py exists, no view) + Toaster (file exists, not wired) + KeycapHint + RiskBadge + frontmatter-driven slash registry + views polish. Effort: ~2 weeks.
 4. **R-UX4 (Phase 41 follow-on)** — Themes + A11y: 5 themes + NO_COLOR + reduced motion + snapshot tests + /title + /statusline. Effort: 1 week.
 5. **R-OPEN-DEFERRED-RUNBOOKS** — Execute deferred research runbooks (token-estimator-accuracy.md + budget-persistence-audit.md). Half-day each.
-6. **Phase 104 + 105 resumed** — microVM macOS hardening + Linux Firecracker host proof. Resumed after R-UX1-R-UX4 OR when Linux/KVM host access materializes (whichever first). Original mandate valid; deferral is sequencing, not abandonment.
+6. **Phase 104 + 105 resumed** — microVM macOS hardening + Linux Firecracker host proof. macOS gated pwd proof is now reproducible via tools/arc-vz-bringup.sh; remaining: full test suite + SIGINT/timeout proofs (Phase 104). Linux/Firecracker deferred to Linux/KVM host.
 
 **Honesty record:** Per docs/policy/honesty-over-polish.md, the 2026-06-04→2026-06-05 session shipped 8 alpha tags without this formal reprioritization being in place at the time. This section documents what was implicit, making it explicit. Future drift from the locked plan requires equivalent explicit reprioritization or it violates the stop-the-line clause.
 
