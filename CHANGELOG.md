@@ -20,6 +20,11 @@ All notable changes to ARC Studio are recorded here. The format follows [Keep a 
 - **Docs (research)**: `pricing-feed-sources-comparison.md` — OpenRouter vs models.dev decision rationale, locked for v0.5.1+. (v0.5.1)
 - **Providers**: `CostRates` extended with 2 capability fields: `supported_parameters: list[str]` (API params the model accepts, e.g. `["tools", "reasoning_effort"]`) and `input_modalities: list[str]` (e.g. `["text", "image", "audio"]`). Both default to `[]`; backward-compat. 48 Chinese-lab model rows populated from OpenRouter. (v0.5.2)
 - **Scripts**: `sync_from_pricing_feed.py` updated to emit `supported_parameters` + `input_modalities` in rendered vendor blocks. (v0.5.2)
+- **CLI (/models)**: Catalog-driven model picker. Filters: `--vendor`, `--has vision|tools|reasoning`, `--free`, `--max-input <$/M>`, `--search`. Reads committed `CostRate` data — no network at runtime. Per-model accuracy (not vendor-level coarse). (v0.6)
+- **CLI (/model-info)**: Detailed model view — pricing, modalities, capabilities, deprecation banner, free-tier indicator. Bare model ID or `vendor/model-id` lookup. (v0.6)
+- **TUI (capability_gates)**: `get_capabilities(model_id) → dict[str, bool]`. Fail-closed: unknown model → all False. Powers status bar chip and future widget gating. (v0.6)
+- **TUI (status bar)**: Model + capability chip appended — `kimi/kimi-k2.6 [vision][tools]`. Tags: vision, tools, reasoning. (v0.6)
+- **Protocol**: `ModelChanged` typed event — `previous_model`, `current_model`, `capabilities_added`, `capabilities_removed` (diff semantics). 3 Python protocol sites + TS mirror. (v0.6)
 
 ### Changed
 - **OpenAI cache multiplier**: GPT-5.x current-gen corrected from legacy 50% → 90% off (0.10× input). gpt-4o-mini legacy 50% preserved. GPT-4.1 family at 75% off (0.25×). (v0.4.1)
