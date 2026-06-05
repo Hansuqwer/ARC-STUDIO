@@ -115,7 +115,7 @@ def test_workspace_init_creates_config(tmp_path: Path):
     import yaml
 
     cfg = yaml.safe_load(config_path.read_text())
-    assert cfg["version"] == 1
+    assert cfg["version"] == 2
     assert cfg["workspace"]["name"] == "test-workspace"
 
 
@@ -179,7 +179,7 @@ def test_workspace_config_show(tmp_path: Path):
     )
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)["data"]
-    assert data["version"] == 1
+    assert data["version"] == 2
     assert data["runtime.default"] == "swarmgraph"
 
 

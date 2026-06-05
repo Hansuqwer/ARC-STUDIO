@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -1296,13 +1297,20 @@ def hitl_reject(
 
 @isolation_app.command("status")
 def isolation_status(
+    workspace: Optional[str] = WORKSPACE_FLAG,
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
-    """Show available isolation providers and their health status."""
+    """Show the active isolation backend plus provider health."""
     _setup_logging(debug)
+    from ..config.loader import load_config
     from ..isolation import NoneIsolationProvider, SubprocessIsolationProvider
     from ..isolation.docker_provider import DockerIsolationProvider
+    from ..isolation.selector import resolve_isolation_backend
+
+    config = load_config(Path(workspace).expanduser() if workspace else None)
+    configured = config.execution.isolation
+    active = resolve_isolation_backend(config)
 
     providers = [
         NoneIsolationProvider(),
@@ -1325,7 +1333,83 @@ def isolation_status(
                 "healthy": healthy,
             }
         )
-    _out(ok({"providers": results}), json_output)
+    _out(
+        ok({"configured": configured, "active": active, "providers": results}),
+        json_output,
+    )
+
+
+@isolation_app.command("use")
+def isolation_use(
+    backend: str = typer.Argument(..., help="Backend: auto, subprocess, docker, or microvm"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Persist the isolation backend choice (writes execution.isolation)."""
+    _setup_logging(debug)
+    from ..config.loader import USER_CONFIG_PATH, set_isolation_backend
+
+    name = backend.strip().lower()
+    selectable = ("auto", "subprocess", "docker", "microvm")
+    if name not in selectable:
+        hint = " (use `arc isolation off` to disable isolation)" if name == "none" else ""
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                f"Invalid backend {backend!r}; choose one of {', '.join(selectable)}.{hint}",
+            ),
+            json_output,
+        )
+        raise typer.Exit(2)
+    config_path = (
+        Path(workspace).expanduser() / ".arc" / "config.yaml" if workspace else USER_CONFIG_PATH
+    )
+    written = set_isolation_backend(name, config_path=config_path)
+    _out(ok({"isolation": name, "config_path": str(written)}), json_output)
+
+
+@isolation_app.command("off")
+def isolation_off(
+    yes: bool = typer.Option(False, "--yes", help="Skip the interactive typed confirmation"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Disable isolation (execution.isolation = none). Requires confirmation."""
+    _setup_logging(debug)
+    from ..config.loader import USER_CONFIG_PATH, set_isolation_backend
+
+    if not yes:
+        if json_output:
+            _out(
+                err(
+                    ArcErrorCode.INVALID_INPUT,
+                    "Refusing to disable isolation without --yes in JSON mode",
+                ),
+                json_output,
+            )
+            raise typer.Exit(2)
+        typer.echo(
+            "WARNING: disabling isolation runs sandbox/agent commands with NO isolation layer.\n"
+            "Deny-by-default policy checks still apply, but environment scrubbing and process\n"
+            "confinement are removed. This is not recommended."
+        )
+        confirm = typer.prompt("Type 'disable isolation' to confirm")
+        if confirm.strip().lower() != "disable isolation":
+            _out(
+                err(ArcErrorCode.INVALID_INPUT, "Confirmation text did not match; no change made"),
+                json_output,
+            )
+            raise typer.Exit(2)
+    config_path = (
+        Path(workspace).expanduser() / ".arc" / "config.yaml" if workspace else USER_CONFIG_PATH
+    )
+    written = set_isolation_backend("none", config_path=config_path)
+    _out(
+        ok({"isolation": "none", "config_path": str(written), "warning": "isolation disabled"}),
+        json_output,
+    )
 
 
 @isolation_app.command("doctor")
@@ -1373,7 +1457,20 @@ def isolation_doctor(
             close = getattr(p, "close", None)
             if callable(close):
                 close()
-    _out(ok({"diagnostics": results}), json_output)
+    from ..config.loader import load_config
+    from ..isolation.selector import resolve_isolation_backend
+
+    config = load_config(None)
+    _out(
+        ok(
+            {
+                "configured": config.execution.isolation,
+                "active": resolve_isolation_backend(config),
+                "diagnostics": results,
+            }
+        ),
+        json_output,
+    )
 
 
 @isolation_app.command("list")

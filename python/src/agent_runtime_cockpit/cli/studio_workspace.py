@@ -588,12 +588,18 @@ def workspace_untrust(
 def workspace_init(
     workspace: Optional[str] = WORKSPACE_FLAG,
     name: Optional[str] = typer.Option(None, "--name", help="Workspace name"),
+    isolation: Optional[str] = typer.Option(
+        None,
+        "--isolation",
+        help="Isolation backend: auto, subprocess, docker, microvm "
+        "(use `arc isolation off` to disable). Prompts when omitted interactively.",
+    ),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
     """Initialize ARC configuration in a workspace."""
     _setup_logging(debug)
-    from ..config.loader import init_config
+    from ..config.loader import init_config, set_isolation_backend
 
     ws = _workspace(workspace)
     config_path = ws / ".arc" / "config.yaml"
@@ -602,6 +608,33 @@ def workspace_init(
             err(ArcErrorCode.INVALID_INPUT, f"Config already exists at {config_path}"), json_output
         )
         raise typer.Exit(1)
+
+    # First-run isolation chooser: offer the alternatives at setup time.
+    selectable = ("auto", "subprocess", "docker", "microvm")
+    chosen = isolation.strip().lower() if isolation else None
+    if chosen is None and not json_output:
+        console.print("[bold]Choose an isolation backend[/bold] for sandboxed command execution:")
+        console.print("  [cyan]auto[/cyan]       recommended — hardened subprocess sandbox")
+        console.print(
+            "  [cyan]subprocess[/cyan] explicit subprocess sandbox (env scrub + path confinement)"
+        )
+        console.print(
+            "  [cyan]docker[/cyan]     container isolation (needs ARC_ENABLE_CONTAINER_SANDBOX + docker)"
+        )
+        console.print("  [cyan]microvm[/cyan]    experimental macOS VZ microVM (gated, unproven)")
+        console.print("  [dim]run `arc isolation off` later to disable isolation entirely[/dim]")
+        chosen = typer.prompt("Isolation backend", default="auto").strip().lower()
+    if chosen and chosen not in selectable:
+        hint = " (use `arc isolation off` to disable isolation)" if chosen == "none" else ""
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                f"Invalid isolation backend {chosen!r}; choose one of {', '.join(selectable)}.{hint}",
+            ),
+            json_output,
+        )
+        raise typer.Exit(2)
+
     init_config(ws)
     if name:
         import yaml
@@ -609,10 +642,13 @@ def workspace_init(
         data = yaml.safe_load(config_path.read_text()) or {}
         data.setdefault("workspace", {})["name"] = name
         config_path.write_text(yaml.dump(data, default_flow_style=False))
-    payload = {"created": str(config_path), "workspace": str(ws)}
+    if chosen and chosen != "auto":
+        set_isolation_backend(chosen, config_path=config_path)
+    payload = {"created": str(config_path), "workspace": str(ws), "isolation": chosen or "auto"}
     _out(ok(payload), json_output)
     if not json_output:
         console.print(f"[green]Created[/green] {config_path}")
+        console.print(f"[bold]Isolation:[/bold] {chosen or 'auto'}")
 
 
 @workspace_app.command("info")

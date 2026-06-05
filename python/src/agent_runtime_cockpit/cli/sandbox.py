@@ -10,12 +10,15 @@ from typing import Optional
 
 import typer
 
+from ..config.loader import load_config
+from ..isolation.base import IsolationProvider
 from ..isolation.microvm import (
     MicroVMIsolationProvider,
     build_microvm_run_plan,
     generate_firecracker_exec_artifacts,
     generate_firecracker_proof_artifacts,
 )
+from ..isolation.selector import build_execution_provider, resolve_isolation_backend
 from ..isolation.subprocess import SubprocessIsolationProvider
 from ..isolation.vz_provider import (
     VZNoNetworkProof,
@@ -590,8 +593,11 @@ def sandbox_vz_artifacts(
 def sandbox_run(
     ctx: typer.Context,
     policy: str = typer.Option("local-safe", "--policy", help="Sandbox policy profile"),
-    provider: str = typer.Option(
-        "subprocess", "--provider", help="Isolation provider (subprocess, microvm)"
+    provider: Optional[str] = typer.Option(
+        None,
+        "--provider",
+        help="Isolation backend override (auto, none, subprocess, docker, microvm); "
+        "defaults to the configured execution.isolation backend",
     ),
     ask: bool = typer.Option(False, "--ask", help="Prompt for network/install/unknown approval"),
     approval_token: Optional[str] = typer.Option(
@@ -610,6 +616,7 @@ def sandbox_run(
     command = list(ctx.args)
     ws = _workspace(workspace)
     try:
+        provider = resolve_isolation_backend(load_config(ws), override=provider)
         policy_model = _policy(policy, ws)
         cwd = ensure_workspace_cwd(Path.cwd(), ws)
         decision = decide(command, policy_model)
@@ -937,24 +944,13 @@ def _build_provider(
     ws: Path,
     *,
     read_write_workspace: bool = False,
-) -> "SubprocessIsolationProvider | MicroVMIsolationProvider":
-    if name == "microvm":
-        return MicroVMIsolationProvider(
-            workspace_root=ws, max_output_bytes=policy_model.max_output_bytes
-        )
-    if name == "container":
-        from ..isolation.docker_provider import SubprocessContainerProvider
-
-        return SubprocessContainerProvider(
-            workspace_root=ws,
-            max_output_bytes=policy_model.max_output_bytes,
-            read_write_workspace=read_write_workspace,
-            safe_env_keys=frozenset(policy_model.env_allowlist),
-        )
-    return SubprocessIsolationProvider(
-        safe_env_keys=frozenset(policy_model.env_allowlist),
+) -> IsolationProvider:
+    return build_execution_provider(
+        name,
         workspace_root=ws,
+        env_allowlist=frozenset(policy_model.env_allowlist),
         max_output_bytes=policy_model.max_output_bytes,
+        read_write_workspace=read_write_workspace,
     )
 
 

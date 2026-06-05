@@ -27,7 +27,7 @@ class RuntimeConfig(BaseModel):
 class ExecutionConfig(BaseModel):
     """Execution settings."""
 
-    isolation: str = "none"
+    isolation: str = "auto"  # auto|none|subprocess|docker|microvm (auto -> subprocess)
     default_profile: str = "local-safe"
     timeout_seconds: int = 300
     allow_paid_calls: bool = False
@@ -102,7 +102,7 @@ class SecurityConfig(BaseModel):
 class ArcConfig(BaseModel):
     """Top-level ARC workspace configuration (ADR-001)."""
 
-    version: int = 1
+    version: int = 2
     workspace: WorkspaceConfig = Field(default_factory=WorkspaceConfig)
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)

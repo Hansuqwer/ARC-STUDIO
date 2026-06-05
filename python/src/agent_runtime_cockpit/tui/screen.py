@@ -222,6 +222,15 @@ class ArcScreen(Screen):
                 self._add_error_entry("VIEW_ERROR", str(e))
             return
 
+        if cmd == "/settings":
+            try:
+                from .views.settings_view import SettingsView
+
+                self.app.push_screen(SettingsView(self.data.workspace))
+            except Exception as e:
+                self._add_error_entry("VIEW_ERROR", str(e))
+            return
+
         if cmd in ("/providers", "/connect"):
             try:
                 from .views.providers_view import ProvidersView

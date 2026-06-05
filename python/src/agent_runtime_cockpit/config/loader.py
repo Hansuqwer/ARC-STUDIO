@@ -10,6 +10,7 @@ Precedence order (highest wins):
 Secrets policy: config files must never contain API keys.
 All secret references use env var names.
 """
+
 from __future__ import annotations
 
 import logging
@@ -23,7 +24,7 @@ from .model import ArcConfig
 
 log = logging.getLogger(__name__)
 
-ARC_CONFIG_VERSION = 1
+ARC_CONFIG_VERSION = 2
 DEFAULT_CONFIG_PATH = Path(".arc") / "config.yaml"
 USER_CONFIG_PATH = Path.home() / ".arc" / "config.yaml"
 
@@ -35,10 +36,14 @@ ENV_TO_CONFIG: dict[str, str] = {
 }
 
 # Env vars that are read directly by adapters (not stored in config model)
-_IGNORED_ENV_KEYS = frozenset({
-    "ARC_HMAC_KEY", "ARC_DEBUG", "ARC_ALLOW_LIVE_ARENA",
-    "ARC_SWARMGRAPH_CLI",
-})
+_IGNORED_ENV_KEYS = frozenset(
+    {
+        "ARC_HMAC_KEY",
+        "ARC_DEBUG",
+        "ARC_ALLOW_LIVE_ARENA",
+        "ARC_SWARMGRAPH_CLI",
+    }
+)
 
 
 def load_config(
@@ -76,7 +81,29 @@ def load_config(
     # Step 4: Environment variable overrides
     config = _apply_env_overrides(config)
 
+    # Step 5: forward-compatible schema migrations
+    config = _migrate_config(config)
+
     return config
+
+
+def _migrate_config(config: ArcConfig) -> ArcConfig:
+    """Apply forward-compatible schema migrations.
+
+    v1 -> v2: ``execution.isolation`` was display-only and defaulted to
+    ``"none"`` (the YAML template wrote it into every workspace) but was never
+    wired to provider selection, so the effective behavior was always
+    ``subprocess``. Upgrade a legacy ``"none"`` to ``"auto"`` so wiring the
+    isolation selector does not silently disable isolation on already-
+    initialized workspaces. A deliberate opt-out is re-set via ``arc isolation off``.
+    """
+    if config.version >= ARC_CONFIG_VERSION:
+        return config
+    data = config.model_dump()
+    if config.version < 2 and data.get("execution", {}).get("isolation") == "none":
+        data["execution"]["isolation"] = "auto"
+    data["version"] = ARC_CONFIG_VERSION
+    return ArcConfig.model_validate(data)
 
 
 def init_config(workspace: Path) -> Path:
@@ -92,6 +119,24 @@ def init_config(workspace: Path) -> Path:
     default = _generate_default_yaml()
     config_path.write_text(default, encoding="utf-8")
     log.info("Created default config: %s", config_path)
+    return config_path
+
+
+def set_isolation_backend(name: str, *, config_path: Path) -> Path:
+    """Persist ``execution.isolation`` in ``config_path``, preserving other keys.
+
+    Creates the file (stamped with the current schema version) when absent.
+    Returns the path that was written.
+    """
+    data = _load_yaml(config_path) if config_path.exists() else {}
+    data.setdefault("version", ARC_CONFIG_VERSION)
+    execution = data.get("execution")
+    if not isinstance(execution, dict):
+        execution = {}
+    execution["isolation"] = name
+    data["execution"] = execution
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
     return config_path
 
 
@@ -162,7 +207,7 @@ def _coerce_value(value: str) -> Any:
 
 _YAML_TEMPLATE = """# ARC Studio workspace configuration (ADR-001)
 # Schema version for forward compatibility
-version: 1
+version: 2
 
 # Workspace identity
 workspace:
@@ -177,7 +222,7 @@ runtime:
 
 # Execution settings
 execution:
-  isolation: none
+  isolation: auto
   default_profile: local-safe
   timeout_seconds: 300
   allow_paid_calls: false
