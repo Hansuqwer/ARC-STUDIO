@@ -32,7 +32,9 @@ def _audit_spy(monkeypatch):
 
 
 def test_read_only_command_allowed(tmp_path, monkeypatch):
-    """A read-only command (ls) passes the sandbox gate and executes."""
+    """A read-only command (ls) passes the sandbox gate and executes via the provider."""
+    from unittest.mock import AsyncMock
+
     from agent_runtime_cockpit.security import trust
 
     # Force workspace trusted
@@ -41,11 +43,17 @@ def test_read_only_command_allowed(tmp_path, monkeypatch):
         lambda ws: MagicMock(level=trust.TrustLevel.TRUSTED),
     )
     screen = _screen(tmp_path)
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(stdout="file1\n", stderr="", returncode=0)
+    fake_iso = MagicMock(stdout="file1\n", stderr="", exit_code=0, killed=False, kill_reason=None)
+    provider = MagicMock()
+    provider.execute = AsyncMock(return_value=fake_iso)
+    with patch(
+        "agent_runtime_cockpit.isolation.selector.build_execution_provider",
+        return_value=provider,
+    ) as mock_build:
         screen._handle_shell_escape("!ls")
-    # subprocess.run was called → command was allowed
-    mock_run.assert_called_once()
+    # provider.execute was called → command was allowed and routed to the backend
+    provider.execute.assert_called_once()
+    mock_build.assert_called_once()
 
 
 def test_destructive_command_blocked(tmp_path, monkeypatch):
@@ -121,7 +129,9 @@ def test_sandbox_evaluation_failure_fails_closed(tmp_path, monkeypatch):
 
 
 def test_allowed_command_executes_argv_without_shell(tmp_path, monkeypatch, _audit_spy):
-    """Allowed commands run the classified argv list with shell disabled, and audit."""
+    """Allowed commands route the classified argv list to the provider, and audit."""
+    from unittest.mock import AsyncMock
+
     from agent_runtime_cockpit.security import trust
 
     monkeypatch.setattr(
@@ -129,11 +139,15 @@ def test_allowed_command_executes_argv_without_shell(tmp_path, monkeypatch, _aud
         lambda ws: MagicMock(level=trust.TrustLevel.TRUSTED),
     )
     screen = _screen(tmp_path)
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(stdout="ok\n", stderr="", returncode=0)
+    fake_iso = MagicMock(stdout="ok\n", stderr="", exit_code=0, killed=False, kill_reason=None)
+    provider = MagicMock()
+    provider.execute = AsyncMock(return_value=fake_iso)
+    with patch(
+        "agent_runtime_cockpit.isolation.selector.build_execution_provider",
+        return_value=provider,
+    ):
         screen._handle_shell_escape("!ls -la")
-    mock_run.assert_called_once()
-    args, kwargs = mock_run.call_args
-    assert args[0] == ["ls", "-la"], "must execute the classified argv list, not a shell string"
-    assert not kwargs.get("shell"), "shell must be disabled (no shell=True)"
+    provider.execute.assert_called_once()
+    args, _kwargs = provider.execute.call_args
+    assert args[0] == ["ls", "-la"], "must pass the classified argv list, not a shell string"
     _audit_spy.assert_called()  # audit event persisted on allow

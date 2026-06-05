@@ -93,3 +93,27 @@ def test_v2_none_config_is_preserved(tmp_path: Path) -> None:
     assert cfg.version == 2
     assert cfg.execution.isolation == "none"
     assert resolve_isolation_backend(cfg) == "none"
+
+
+def test_build_execution_provider_maps_backends_with_policy(tmp_path: Path) -> None:
+    """The policy-aware builder used by every execution path maps each backend name."""
+    from agent_runtime_cockpit.isolation.none import NoneIsolationProvider
+    from agent_runtime_cockpit.isolation.selector import build_execution_provider
+    from agent_runtime_cockpit.isolation.subprocess import SubprocessIsolationProvider
+
+    sub = build_execution_provider(
+        "subprocess",
+        workspace_root=tmp_path,
+        env_allowlist=frozenset({"PATH"}),
+        max_output_bytes=1024,
+    )
+    assert isinstance(sub, SubprocessIsolationProvider)
+    none = build_execution_provider(
+        "none", workspace_root=tmp_path, env_allowlist=frozenset(), max_output_bytes=1024
+    )
+    assert isinstance(none, NoneIsolationProvider)
+    for name in ("docker", "microvm"):
+        prov = build_execution_provider(
+            name, workspace_root=tmp_path, env_allowlist=frozenset(), max_output_bytes=1024
+        )
+        assert isinstance(prov, IsolationProvider)

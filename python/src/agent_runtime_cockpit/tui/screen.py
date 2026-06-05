@@ -301,10 +301,13 @@ class ArcScreen(Screen):
 
     def _handle_shell_escape(self, text: str) -> None:
         import shlex
-        import subprocess
         from datetime import datetime, timezone
 
-        from agent_runtime_cockpit.isolation.subprocess import SubprocessIsolationProvider
+        from agent_runtime_cockpit.config.loader import load_config
+        from agent_runtime_cockpit.isolation.selector import (
+            build_execution_provider,
+            resolve_isolation_backend,
+        )
         from agent_runtime_cockpit.security.sandbox import (
             SandboxDecision,
             SandboxPolicy,
@@ -313,10 +316,12 @@ class ArcScreen(Screen):
             persist_sandbox_audit_event,
         )
         from agent_runtime_cockpit.security.trust import TrustLevel, resolve_trust
+        from agent_runtime_cockpit.tools.shell import _run_coro_sync
 
         cmd = text[1:].strip()
         self.data.add_entry("user", f"!{cmd}")
         workspace = self.data.workspace
+        backend = "subprocess"
 
         def _block(message: str) -> None:
             self.data.add_entry(
@@ -334,7 +339,7 @@ class ArcScreen(Screen):
                     command=argv,
                     cwd=workspace,
                     decision=decision,
-                    provider="subprocess",
+                    provider=backend,
                     started_at=now,
                     ended_at=now,
                     exit_code=exit_code,
@@ -362,6 +367,7 @@ class ArcScreen(Screen):
             trust_state = resolve_trust(workspace)
             policy = SandboxPolicy(workspace_root=workspace)
             sandbox_decision = decide(argv, policy)
+            backend = resolve_isolation_backend(load_config(workspace))
         except Exception as exc:
             _block(f"Shell command blocked: sandbox evaluation failed ({exc})")
             return
@@ -385,38 +391,44 @@ class ArcScreen(Screen):
             )
             return
 
-        # Allowed: execute the EXACT classified argv — no shell, workspace cwd,
-        # env allowlist (secrets stripped), 30s timeout — then audit the outcome.
-        provider = SubprocessIsolationProvider(workspace_root=workspace)
+        # Allowed: execute the EXACT classified argv under the configured isolation
+        # backend — no shell, workspace cwd, env allowlist (secrets stripped),
+        # policy timeout — then audit the outcome.
+        provider = build_execution_provider(
+            backend,
+            workspace_root=workspace,
+            env_allowlist=frozenset(policy.env_allowlist),
+            max_output_bytes=policy.max_output_bytes,
+        )
         try:
-            result = subprocess.run(
-                argv,
-                cwd=str(workspace) if workspace else None,
-                env=provider.filter_env(),
-                capture_output=True,
-                text=True,
-                timeout=30,
+            iso = _run_coro_sync(
+                provider.execute(argv, cwd=workspace, timeout_seconds=policy.timeout_seconds)
             )
-        except subprocess.TimeoutExpired:
-            _audit(sandbox_decision, None)
-            self.data.add_entry("tool", "Command timed out after 30s", {"status": "error"})
-            return
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - surface runner errors to the TUI, never crash.
             self.data.add_entry("tool", str(e), {"status": "error"})
             return
 
-        output = result.stdout
-        if result.stderr:
-            output += "\n[stderr]\n" + result.stderr
+        if iso.killed and iso.kill_reason == "timeout":
+            _audit(sandbox_decision, None)
+            self.data.add_entry(
+                "tool",
+                f"Command timed out after {policy.timeout_seconds}s",
+                {"status": "error"},
+            )
+            return
+
+        output = iso.stdout
+        if iso.stderr:
+            output += "\n[stderr]\n" + iso.stderr
         self.data.add_entry(
             "tool",
             output[:2000],
             {
                 "tool_name": f"Bash: {cmd}",
-                "status": "success" if result.returncode == 0 else "error",
+                "status": "success" if iso.exit_code == 0 else "error",
             },
         )
-        _audit(sandbox_decision, result.returncode)
+        _audit(sandbox_decision, iso.exit_code)
 
     def _handle_chat_message(self, text: str) -> None:
         """Send a chat message. Streams via SwarmGraph if available."""

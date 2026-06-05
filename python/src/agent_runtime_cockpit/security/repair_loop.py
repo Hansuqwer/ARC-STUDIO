@@ -8,7 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from ..isolation.subprocess import SubprocessIsolationProvider
+from ..config.loader import load_config
+from ..isolation.selector import build_execution_provider, resolve_isolation_backend
 from .edit_loop import apply_edit_plan
 from .sandbox import (
     build_audit_event,
@@ -65,9 +66,10 @@ def _run_test(
         return RepairAttempt(step="test", ok=False, reason=decision.reason), audit
     validate_command_paths(command, policy)
     iso = asyncio.run(
-        SubprocessIsolationProvider(
-            safe_env_keys=frozenset(policy.env_allowlist),
+        build_execution_provider(
+            resolve_isolation_backend(load_config(workspace_root)),
             workspace_root=workspace_root,
+            env_allowlist=frozenset(policy.env_allowlist),
             max_output_bytes=policy.max_output_bytes,
         ).execute(command, cwd=cwd, timeout_seconds=policy.timeout_seconds)
     )
