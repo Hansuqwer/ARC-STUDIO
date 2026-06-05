@@ -1,4 +1,4 @@
-"""Command palette modal screen."""
+"""Command palette modal screen — searches name + description (R-011)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from textual.widgets import Input, Label, ListItem, ListView
 
 
 class CommandPalette(ModalScreen):
-    """Modal command palette: fuzzy-filter all commands, Enter executes, Esc dismisses."""
+    """Modal command palette: fuzzy-filter commands by name + description, Enter executes."""
 
     BINDINGS = [Binding("escape", "dismiss", "Close")]
 
@@ -19,25 +19,32 @@ class CommandPalette(ModalScreen):
         yield ListView(id="palette-list")
 
     def on_mount(self) -> None:
-        self._all: list[str] = []
+        # Each entry is (name, help_text, category) for searching + display.
+        self._cmds: list[tuple[str, str, str]] = []
         try:
             from agent_runtime_cockpit.cli_repl.commands import get_registry
 
-            self._all = [c.name for c in get_registry().list_commands()]
+            self._cmds = [(c.name, c.help_text, c.category) for c in get_registry().list_commands()]
         except Exception:
             pass
-        self._populate(self._all)
+        self._populate(self._cmds)
         self.query_one("#palette-input", Input).focus()
 
-    def _populate(self, names: list[str]) -> None:
+    def _populate(self, cmds: list[tuple[str, str, str]]) -> None:
         lv = self.query_one("#palette-list", ListView)
         lv.clear()
-        for name in names[:20]:
-            lv.append(ListItem(Label(f"/{name}"), id=f"pal-{name}"))
+        for name, help_text, category in cmds[:20]:
+            label_text = f"/{name}"
+            if help_text:
+                label_text += f"  [dim]{help_text[:60]}[/dim]"
+            lv.append(ListItem(Label(label_text, markup=True), id=f"pal-{name}"))
 
     def on_input_changed(self, event: Input.Changed) -> None:
         q = event.value.lstrip("/").lower()
-        filtered = [n for n in self._all if q in n] if q else self._all
+        if q:
+            filtered = [(n, h, c) for n, h, c in self._cmds if q in n or q in h.lower()]
+        else:
+            filtered = self._cmds
         self._populate(filtered)
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:

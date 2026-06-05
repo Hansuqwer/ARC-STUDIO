@@ -16,6 +16,7 @@ from .widgets.input_area import InputArea
 from .widgets.mode_badge import ModeBadge  # UX R-003
 from .widgets.slash_menu import SlashMenu
 from .widgets.status_bar import StatusBar
+from .widgets.toaster import Toaster  # UX R-014
 from .widgets.transcript import Transcript
 
 
@@ -71,6 +72,8 @@ class ArcScreen(Screen):
         # UX R-008: ActivityTray (Ctrl+X); hidden until toggled
         no_color = bool(getattr(self.theme.current, "no_color", False))
         yield ActivityTray(no_color=no_color)
+        # UX R-014: Toaster (bottom-right notification area)
+        yield Toaster(no_color=no_color)
 
     def on_mount(self) -> None:
         from agent_runtime_cockpit import __version__
@@ -105,6 +108,12 @@ class ArcScreen(Screen):
         if self.data.daemon_online and not self._daemon_was_online:
             if self._daemon_was_online is not None:  # skip first check
                 self.data.add_entry("system", "Daemon reconnected.")
+                try:
+                    self.query_one("#toaster", Toaster).show(
+                        "Daemon reconnected", severity="success"
+                    )
+                except Exception:
+                    pass
         self._daemon_was_online = self.data.daemon_online
 
     def _refresh_status(self) -> None:
@@ -329,6 +338,10 @@ class ArcScreen(Screen):
                 f"{message}\n  cmd: {cmd}",
                 {"tool_name": f"Bash: {cmd}", "status": "error"},
             )
+            try:
+                self.query_one("#toaster", Toaster).show(message[:80], severity="error")
+            except Exception:
+                pass
 
         def _audit(decision: SandboxDecision, exit_code: int | None) -> None:
             # Best-effort: the security decision is already enforced above, so a
