@@ -4762,7 +4762,7 @@ Known risks:
 - Fan-out heuristic may be too aggressive or too conservative — needs tuning with real prompts.
 - Priority 1 CLI parity track (Phases 97-105) takes precedence per roadmap rules; this phase must not block it.
 
-## Phase 110 — Mobile Runtime SDK Integration
+## Phase 111 — Mobile Runtime SDK Integration
 
 **Status:** Not Started (Planned) | Evidence: cross-repo analysis 2026-06-05 (`runtimes/Arc-Studio-Mobile-SDK/arc-runtime-sdk/docs/ARC_STUDIO_INTEGRATION_ANALYSIS.md`); ARC Studio contracts verified — `adapters/base.py` (RuntimeAdapter.detect/capabilities/CapabilityReport), `protocol/capabilities.py` (RuntimeCapabilities), `mobile/models.py` (MobileCapability/MobileRuntimeManifest), `runtime_packs/models.py` (RuntimePackManifest). Companion roadmap item: R79.
 
