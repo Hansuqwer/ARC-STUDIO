@@ -11,6 +11,8 @@ Notes on determinism:
   DataStore.seed pins the session ID correctly, but cannot pin the SVG class hash.
   Fix requires either normalizing the SVG before comparison (upstream feature request)
   or waiting for pytest-textual-snapshot to offer a stable-hash mode.
+- The same home chrome is covered deterministically (no SVG hash) by the Pilot-based
+  test_home_screen_mounts_rux2_chrome[_no_color] guards at the bottom of this file.
 """
 
 from __future__ import annotations
@@ -69,3 +71,43 @@ def test_snapshot_approval_card_capability_gate(snap_compare) -> None:
             await self.push_screen(ApprovalCard(request=req))
 
     assert snap_compare(_TestApp(), terminal_size=(120, 40))
+
+
+# ── Deterministic home-screen guards ─────────────────────────────────────────
+# Cover what the xfailed visual snapshots above intend (the R-UX2 home chrome
+# renders) without depending on the nondeterministic SVG class-hash.
+
+
+@pytest.mark.asyncio
+async def test_home_screen_mounts_rux2_chrome() -> None:
+    """Home screen mounts the R-UX2 header chrome (Header + ModeBadge + ContextMeter)."""
+    from agent_runtime_cockpit.tui.app import ArcApp
+    from agent_runtime_cockpit.tui.data import DataStore
+    from agent_runtime_cockpit.tui.widgets.context_meter import ContextMeter
+    from agent_runtime_cockpit.tui.widgets.header import Header
+    from agent_runtime_cockpit.tui.widgets.mode_badge import ModeBadge
+
+    app = ArcApp(data=DataStore(seed=0))
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        assert app.query_one(Header) is not None
+        assert app.query_one(ModeBadge) is not None
+        assert app.query_one(ContextMeter) is not None
+
+
+@pytest.mark.asyncio
+async def test_home_screen_mounts_rux2_chrome_no_color(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The same R-UX2 chrome mounts under NO_COLOR at 80x24."""
+    monkeypatch.setenv("NO_COLOR", "1")
+    from agent_runtime_cockpit.tui.app import ArcApp
+    from agent_runtime_cockpit.tui.data import DataStore
+    from agent_runtime_cockpit.tui.widgets.context_meter import ContextMeter
+    from agent_runtime_cockpit.tui.widgets.header import Header
+    from agent_runtime_cockpit.tui.widgets.mode_badge import ModeBadge
+
+    app = ArcApp(data=DataStore(seed=1))
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        assert app.query_one(Header) is not None
+        assert app.query_one(ModeBadge) is not None
+        assert app.query_one(ContextMeter) is not None
