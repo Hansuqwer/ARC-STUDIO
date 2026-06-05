@@ -4761,3 +4761,51 @@ Known risks:
 - Parallel execution introduces race conditions in state mutation (SwarmState is mutable).
 - Fan-out heuristic may be too aggressive or too conservative — needs tuning with real prompts.
 - Priority 1 CLI parity track (Phases 97-105) takes precedence per roadmap rules; this phase must not block it.
+
+## Phase 110 — Mobile Runtime SDK Integration
+
+**Status:** Not Started (Planned) | Evidence: cross-repo analysis 2026-06-05 (`runtimes/Arc-Studio-Mobile-SDK/arc-runtime-sdk/docs/ARC_STUDIO_INTEGRATION_ANALYSIS.md`); ARC Studio contracts verified — `adapters/base.py` (RuntimeAdapter.detect/capabilities/CapabilityReport), `protocol/capabilities.py` (RuntimeCapabilities), `mobile/models.py` (MobileCapability/MobileRuntimeManifest), `runtime_packs/models.py` (RuntimePackManifest). Companion roadmap item: R79.
+
+### Context
+The ARC Runtime SDK (`runtimes/Arc-Studio-Mobile-SDK/arc-runtime-sdk`) is a standalone, deterministic app substrate (TypeScript core + Expo/Flutter/KMP bindings + JSON schemas + a Python reference adapter/daemon). It is simulator/mock-only: no native bridge, no app-store automation. The goal is to consume it in ARC Studio as a runtime adapter that reuses the existing runtime/mobile/runtime-pack/protocol surfaces. Truth constraints: no native-execution, app-store, or production-grade mobile-runtime claims. The SDK default mode is always `fake`; `gated_local` requires explicit per-capability approval; runtime packs stay metadata-only.
+
+### Slice 110.1 — Adapter contract parity (P0)
+- Make `ArcRuntimeSDKAdapter` subclass `adapters/base.RuntimeAdapter` (currently duck-typed/standalone).
+- Keep `detect() -> tuple[bool, float, list[str]]` (already aligned; verify with the SDK example project).
+- `capabilities()` must return a real `protocol.capabilities.RuntimeCapabilities` instance (currently a dict); `can_run=False` in fake mode.
+- `capability_report()` must return `base.CapabilityReport` (currently a custom dict-shaped class).
+
+### Slice 110.2 — Registry registration (P0)
+- Vendor/import the adapter into the main repo and register it in `adapters/registry.py` so `arc runtimes` discovers it.
+- Resolve the gap that `arc runtime-pack install` is metadata-only and does NOT register an executable adapter.
+
+### Slice 110.3 — Mobile schema reconciliation (P0)
+- Reconcile SDK `CapabilityCard`/`ArcSdkManifest` with ARC Studio `mobile/models.MobileCapability`/`MobileRuntimeManifest`.
+- The SDK already ships `MOBILE_CAPABILITY_FIELD_MAP` + `mobile_capability_to_sdk_card()`; add the inverse and a single canonical mapping module with tests.
+
+### Slice 110.4 — Runtime-pack format parity (P1)
+- Ensure SDK `arc-runtime pack export` output validates against `runtime_packs/models.RuntimePackManifest` via `arc runtime-pack validate`.
+
+### Slice 110.5 — Daemon + protocol parity (P1)
+- Document that the SDK debug daemon (`:7842`) is a standalone tool, NOT the IDE path — ARC Studio talks to its own daemon (`:7777`) through the adapter.
+- If the SDK daemon is ever discovered, align `/health` shape (`status:"healthy"`, `arc:true`, `uptime_seconds`).
+- Map SDK `DaemonEventType` (~20) onto ARC Studio `AGUIEventType` (42+) as a strict, additive subset.
+
+### Slice 110.6 — Optional UI/UX surfacing (P2, follow-on)
+- Surface SDK artifacts read-only in the Theia IDE: State Atlas (markdown/mermaid), Native-Feel/Motion/Accessibility conformance, Divergence Ledger, capsule replay/diff, and capability-gate approval. TUI access via `arc runtimes`/`arc mobile`. No SDK-core ↔ Theia coupling.
+
+### Acceptance
+- `arc runtimes --json` lists `arc-runtime-sdk` with detect evidence and a `RuntimeCapabilities` (can_run=false in fake mode).
+- An `arc-sdk.json` example project is detected, capability-reported, and a simulator capsule streams through the adapter.
+- The SDK runtime pack passes `arc runtime-pack validate`.
+- The mobile capability mapping round-trips with tests.
+
+### Verification
+- New tests under `tests/adapters/` for the SDK adapter (detect/capabilities/report) using the SDK example project.
+- `uv run ruff check src tests` clean; targeted pytest green; banned-claims gate clean.
+
+### Known Risks
+- Native execution is out of scope (needs Xcode/Android SDK + device); keep fake/gated_local only.
+- Schema drift between the two repos — pin a canonical mapping + tests.
+- The SDK vendors its own copy of the `agent_runtime_cockpit` package — avoid import collisions when integrating.
+- `arc runtime-pack install` is metadata-only; adapter registration is a separate mechanism that must be added.

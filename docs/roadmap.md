@@ -1530,3 +1530,11 @@ P2 — Quality:
 **Current:** AgentCard generation writes to `.arc/a2a/agent-card.json`. Outbound client enforces `127.0.0.1`-only URLs, mandatory signature verification, and per-card approval via `.arc/a2a/approved.json`. CLI commands: `arc a2a generate|list|verify|inspect|approve|invoke`. No inbound HTTP server. HMAC-SHA256 signing. `EntityType.A2A_AGENT` added to capability card models.
 
 **Status:** Baseline Complete | Evidence: `tests/a2a/` passed; ruff clean | Notes: Loopback-only, disk-only. No remote A2A, no inbound server. ADR-029.
+
+## R79 — Mobile Runtime SDK Integration
+
+**Goal:** Wire the standalone ARC Runtime SDK (`runtimes/Arc-Studio-Mobile-SDK/arc-runtime-sdk`) into ARC Studio as a first-class runtime adapter, so an `arc-sdk.json` app project is detected, capability-reported, simulated/replayed, and surfaced through the existing runtime + mobile + runtime-pack surfaces — without coupling the SDK core to Theia.
+
+**Current:** The SDK is a separate polyglot monorepo (TypeScript core + Expo/Flutter/KMP bindings, JSON schemas, a Python reference adapter/daemon). Its own honest status is PLANNING/POC — deterministic simulator/mock only; no native bridge (file-picker stub); no app-store automation; 342 SDK tests claimed passing (not yet run in ARC Studio CI). The SDK ships `adapters/arc_runtime_sdk_adapter.py` whose `detect()` already matches `RuntimeAdapter.detect() -> tuple[bool, float, list[str]]`, plus a documented `MobileCapability` ↔ SDK `CapabilityCard` field map. It is NOT yet wired into ARC Studio: it lives in the SDK's own copy of the `agent_runtime_cockpit` package, is duck-typed (not a `RuntimeAdapter` subclass), `capabilities()` returns a dict (not `RuntimeCapabilities`), and it is not registered in `adapters/registry.py`.
+
+**Status:** Not Started | Evidence: cross-repo analysis (`runtimes/Arc-Studio-Mobile-SDK/arc-runtime-sdk/docs/ARC_STUDIO_INTEGRATION_ANALYSIS.md`); ARC Studio contracts verified in `adapters/base.py`, `protocol/capabilities.py`, `mobile/models.py`, `runtime_packs/models.py` | Notes: Headless adapter + schema + protocol reconciliation first; optional Theia/TUI surfacing is a later chunk. Simulator/mock only; no native-execution or app-store claims. Execution plan: `docs/phases.md` Phase 110.
