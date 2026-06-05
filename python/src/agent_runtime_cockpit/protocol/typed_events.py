@@ -815,6 +815,28 @@ class ToolOutputVirtualizedEvent(BaseModel):
     data: ToolOutputVirtualizedData
 
 
+class ModelChangedData(BaseModel):
+    """Data payload for MODEL_CHANGED event (v0.6)."""
+
+    model_config = {"extra": "ignore"}
+
+    previous_model: str
+    current_model: str
+    capabilities_added: list[str] = []
+    capabilities_removed: list[str] = []
+
+
+class ModelChangedEvent(BaseModel):
+    """MODEL_CHANGED event — emitted when active model switches in session."""
+
+    schema_version: int = 2
+    type: Literal["MODEL_CHANGED"]
+    timestamp: str
+    run_id: str
+    sequence: int
+    data: ModelChangedData
+
+
 # ─── Raw/Unknown Events ──────────────────────────────────────────────────────
 
 
@@ -937,6 +959,7 @@ KnownRunEvent = Union[
     QuotaWarningEvent,
     ContextCompactedEvent,
     ToolOutputVirtualizedEvent,
+    ModelChangedEvent,
     RawEvent,
 ]
 
@@ -1086,6 +1109,7 @@ def parse_typed_event(raw: dict[str, Any]) -> TypedRunEvent:
         "QUOTA_WARNING": QuotaWarningEvent,
         "CONTEXT_COMPACTED": ContextCompactedEvent,
         "TOOL_OUTPUT_VIRTUALIZED": ToolOutputVirtualizedEvent,
+        "MODEL_CHANGED": ModelChangedEvent,
         "RAW": RawEvent,
     }
 

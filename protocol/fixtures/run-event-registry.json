@@ -824,6 +824,15 @@
         "tool_name"
       ],
       "optionalFields": []
+    },
+    {
+      "type": "MODEL_CHANGED",
+      "version": 2,
+      "requiredFields": [
+        "current_model",
+        "previous_model"
+      ],
+      "optionalFields": ["capabilities_added", "capabilities_removed"]
     }
   ]
 }

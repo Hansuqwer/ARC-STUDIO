@@ -405,6 +405,17 @@ export interface ToolOutputVirtualizedEvent extends RunEventBase {
   };
 }
 
+export interface ModelChangedEvent extends RunEventBase {
+  type: 'MODEL_CHANGED';
+  data: {
+    previous_model: string;
+    current_model: string;
+    capabilities_added?: string[];
+    capabilities_removed?: string[];
+    [key: string]: unknown;
+  };
+}
+
 // ─── Raw/Unknown Events ──────────────────────────────────────────────────────
 
 export interface RawEvent extends RunEventBase {
@@ -469,6 +480,7 @@ export type KnownRunEvent =
   | QuotaWarningEvent
   | ContextCompactedEvent
   | ToolOutputVirtualizedEvent
+  | ModelChangedEvent
   | RawEvent;
 
 /**
@@ -510,6 +522,7 @@ export const KNOWN_RUN_EVENT_TYPES = [
   'QUOTA_WARNING',
   'CONTEXT_COMPACTED',
   'TOOL_OUTPUT_VIRTUALIZED',
+  'MODEL_CHANGED',
   'RAW',
 ] as const satisfies readonly KnownRunEvent['type'][];
 
