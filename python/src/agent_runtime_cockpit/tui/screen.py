@@ -292,35 +292,61 @@ class ArcScreen(Screen):
 
     def _handle_shell_escape(self, text: str) -> None:
         import subprocess
-        from ..security.trust import resolve_trust, TrustLevel
 
         cmd = text[1:].strip()
         self.data.add_entry("user", f"!{cmd}")
 
-        # D-03: route the bang-escape through trust + a conservative classifier.
-        # We do NOT call security.sandbox.decide() directly because the sandbox
-        # API is policy-oriented and would require a full SandboxRequest; this
-        # lighter wrapper still surfaces trust and a small denylist so unsafe
-        # commands are visibly refused rather than silently executed.
+        # UX R-UX2: route the bang-escape through the real sandbox decision
+        # engine (security/sandbox.decide) instead of an ad-hoc denylist.
+        # The command is parsed to argv and evaluated under the local-safe
+        # policy bound to the current workspace. Denied/approval-required
+        # commands are visibly refused with the policy's reason + reason_code.
+        import shlex
+
+        from agent_runtime_cockpit.security.sandbox import (
+            SandboxPolicy,
+            decide,
+        )
+        from agent_runtime_cockpit.security.trust import TrustLevel, resolve_trust
+
         try:
             trust_state = resolve_trust(self.data.workspace)
-            denylist = ("rm -rf", "sudo ", "mkfs", "dd if=", ":(){", "> /dev/")
-            lower = cmd.lower()
-            blocked_by_denylist = any(d in lower for d in denylist)
-            if trust_state.level == TrustLevel.UNTRUSTED or blocked_by_denylist:
-                reason = (
-                    "workspace untrusted (run /workspace trust)"
-                    if trust_state.level == TrustLevel.UNTRUSTED
-                    else "command matches sandbox denylist"
+            if trust_state.level == TrustLevel.UNTRUSTED:
+                self.data.add_entry(
+                    "tool",
+                    f"Shell command blocked: workspace untrusted (run /workspace trust)\n  cmd: {cmd}",
+                    {"tool_name": f"Bash: {cmd}", "status": "error"},
+                )
+                return
+
+            try:
+                argv = shlex.split(cmd)
+            except ValueError:
+                argv = []
+            policy = SandboxPolicy(workspace_root=self.data.workspace)
+            sandbox_decision = decide(argv, policy)
+            if not sandbox_decision.allowed:
+                code = (
+                    sandbox_decision.reason_code.value if sandbox_decision.reason_code else "denied"
                 )
                 self.data.add_entry(
                     "tool",
-                    f"Shell command blocked: {reason}\n  cmd: {cmd}",
+                    f"Shell command blocked: {sandbox_decision.reason} "
+                    f"[{sandbox_decision.classification.value} · {code}]\n  cmd: {cmd}",
+                    {"tool_name": f"Bash: {cmd}", "status": "error"},
+                )
+                return
+            if sandbox_decision.approval_required and not sandbox_decision.approved:
+                self.data.add_entry(
+                    "tool",
+                    f"Shell command requires approval: {sandbox_decision.reason} "
+                    f"[{sandbox_decision.classification.value}]\n  cmd: {cmd}\n"
+                    "  (run via `arc sandbox run --policy local-safe -- <cmd>` to approve)",
                     {"tool_name": f"Bash: {cmd}", "status": "error"},
                 )
                 return
         except Exception:
-            pass  # fall through if trust resolution itself fails
+            pass  # fall through if trust/sandbox resolution itself fails
         try:
             result = subprocess.run(  # noqa: S602
                 cmd, shell=True, capture_output=True, text=True, timeout=30
