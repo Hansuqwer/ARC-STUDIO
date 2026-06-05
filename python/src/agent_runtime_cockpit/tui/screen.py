@@ -291,81 +291,123 @@ class ArcScreen(Screen):
         return self._session
 
     def _handle_shell_escape(self, text: str) -> None:
-        import subprocess
-
-        cmd = text[1:].strip()
-        self.data.add_entry("user", f"!{cmd}")
-
-        # UX R-UX2: route the bang-escape through the real sandbox decision
-        # engine (security/sandbox.decide) instead of an ad-hoc denylist.
-        # The command is parsed to argv and evaluated under the local-safe
-        # policy bound to the current workspace. Denied/approval-required
-        # commands are visibly refused with the policy's reason + reason_code.
         import shlex
+        import subprocess
+        from datetime import datetime, timezone
 
+        from agent_runtime_cockpit.isolation.subprocess import SubprocessIsolationProvider
         from agent_runtime_cockpit.security.sandbox import (
+            SandboxDecision,
             SandboxPolicy,
+            build_audit_event,
             decide,
+            persist_sandbox_audit_event,
         )
         from agent_runtime_cockpit.security.trust import TrustLevel, resolve_trust
 
-        try:
-            trust_state = resolve_trust(self.data.workspace)
-            if trust_state.level == TrustLevel.UNTRUSTED:
-                self.data.add_entry(
-                    "tool",
-                    f"Shell command blocked: workspace untrusted (run /workspace trust)\n  cmd: {cmd}",
-                    {"tool_name": f"Bash: {cmd}", "status": "error"},
-                )
-                return
+        cmd = text[1:].strip()
+        self.data.add_entry("user", f"!{cmd}")
+        workspace = self.data.workspace
 
-            try:
-                argv = shlex.split(cmd)
-            except ValueError:
-                argv = []
-            policy = SandboxPolicy(workspace_root=self.data.workspace)
-            sandbox_decision = decide(argv, policy)
-            if not sandbox_decision.allowed:
-                code = (
-                    sandbox_decision.reason_code.value if sandbox_decision.reason_code else "denied"
-                )
-                self.data.add_entry(
-                    "tool",
-                    f"Shell command blocked: {sandbox_decision.reason} "
-                    f"[{sandbox_decision.classification.value} · {code}]\n  cmd: {cmd}",
-                    {"tool_name": f"Bash: {cmd}", "status": "error"},
-                )
-                return
-            if sandbox_decision.approval_required and not sandbox_decision.approved:
-                self.data.add_entry(
-                    "tool",
-                    f"Shell command requires approval: {sandbox_decision.reason} "
-                    f"[{sandbox_decision.classification.value}]\n  cmd: {cmd}\n"
-                    "  (run via `arc sandbox run --policy local-safe -- <cmd>` to approve)",
-                    {"tool_name": f"Bash: {cmd}", "status": "error"},
-                )
-                return
-        except Exception:
-            pass  # fall through if trust/sandbox resolution itself fails
-        try:
-            result = subprocess.run(  # noqa: S602
-                cmd, shell=True, capture_output=True, text=True, timeout=30
-            )
-            output = result.stdout
-            if result.stderr:
-                output += "\n[stderr]\n" + result.stderr
+        def _block(message: str) -> None:
             self.data.add_entry(
                 "tool",
-                output[:2000],
-                {
-                    "tool_name": f"Bash: {cmd}",
-                    "status": "success" if result.returncode == 0 else "error",
-                },
+                f"{message}\n  cmd: {cmd}",
+                {"tool_name": f"Bash: {cmd}", "status": "error"},
+            )
+
+        def _audit(decision: SandboxDecision, exit_code: int | None) -> None:
+            # Best-effort: the security decision is already enforced above, so a
+            # failure to persist the audit event must never crash the TUI.
+            try:
+                now = datetime.now(timezone.utc).isoformat()
+                event = build_audit_event(
+                    command=argv,
+                    cwd=workspace,
+                    decision=decision,
+                    provider="subprocess",
+                    started_at=now,
+                    ended_at=now,
+                    exit_code=exit_code,
+                    stdout_truncated=False,
+                    stderr_truncated=False,
+                    redaction_applied=False,
+                )
+                persist_sandbox_audit_event(event)
+            except Exception:
+                pass
+
+        # Fail-closed: parse to argv first; refuse anything unparseable or empty.
+        try:
+            argv = shlex.split(cmd)
+        except ValueError as exc:
+            _block(f"Shell command blocked: cannot parse ({exc})")
+            return
+        if not argv:
+            return
+
+        # Fail-closed: any error resolving trust/policy/decision BLOCKS execution.
+        # (Previously this swallowed exceptions and fell through to an unsandboxed
+        # `subprocess.run(cmd, shell=True)`, bypassing the sandbox entirely.)
+        try:
+            trust_state = resolve_trust(workspace)
+            policy = SandboxPolicy(workspace_root=workspace)
+            sandbox_decision = decide(argv, policy)
+        except Exception as exc:
+            _block(f"Shell command blocked: sandbox evaluation failed ({exc})")
+            return
+
+        if trust_state.level == TrustLevel.UNTRUSTED:
+            _block("Shell command blocked: workspace untrusted (run /workspace trust)")
+            return
+        if not sandbox_decision.allowed:
+            code = sandbox_decision.reason_code.value if sandbox_decision.reason_code else "denied"
+            _block(
+                f"Shell command blocked: {sandbox_decision.reason} "
+                f"[{sandbox_decision.classification.value} · {code}]"
+            )
+            _audit(sandbox_decision, None)
+            return
+        if sandbox_decision.approval_required and not sandbox_decision.approved:
+            _block(
+                f"Shell command requires approval: {sandbox_decision.reason} "
+                f"[{sandbox_decision.classification.value}]\n"
+                "  (run via `arc sandbox run --policy local-safe -- <cmd>` to approve)"
+            )
+            return
+
+        # Allowed: execute the EXACT classified argv — no shell, workspace cwd,
+        # env allowlist (secrets stripped), 30s timeout — then audit the outcome.
+        provider = SubprocessIsolationProvider(workspace_root=workspace)
+        try:
+            result = subprocess.run(
+                argv,
+                cwd=str(workspace) if workspace else None,
+                env=provider.filter_env(),
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
         except subprocess.TimeoutExpired:
+            _audit(sandbox_decision, None)
             self.data.add_entry("tool", "Command timed out after 30s", {"status": "error"})
+            return
         except Exception as e:
             self.data.add_entry("tool", str(e), {"status": "error"})
+            return
+
+        output = result.stdout
+        if result.stderr:
+            output += "\n[stderr]\n" + result.stderr
+        self.data.add_entry(
+            "tool",
+            output[:2000],
+            {
+                "tool_name": f"Bash: {cmd}",
+                "status": "success" if result.returncode == 0 else "error",
+            },
+        )
+        _audit(sandbox_decision, result.returncode)
 
     def _handle_chat_message(self, text: str) -> None:
         """Send a chat message. Streams via SwarmGraph if available."""

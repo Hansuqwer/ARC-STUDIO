@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from agent_runtime_cockpit.tui.data import DataStore
 from agent_runtime_cockpit.tui.screen import ArcScreen
 
@@ -19,6 +21,14 @@ def _screen(tmp_path: Path) -> ArcScreen:
 
 def _entries(screen) -> list:
     return [(e.role, e.content) for e in screen.data.entries]
+
+
+@pytest.fixture(autouse=True)
+def _audit_spy(monkeypatch):
+    """Spy on sandbox audit persistence; keeps it out of the real ~/.arc in tests."""
+    spy = MagicMock()
+    monkeypatch.setattr("agent_runtime_cockpit.security.sandbox.persist_sandbox_audit_event", spy)
+    return spy
 
 
 def test_read_only_command_allowed(tmp_path, monkeypatch):
@@ -82,3 +92,48 @@ def test_network_command_requires_approval_or_denied(tmp_path, monkeypatch):
         screen._handle_shell_escape("!curl https://example.com")
     # network is denied/approval-required under local-safe default → not executed
     mock_run.assert_not_called()
+
+
+def test_sandbox_evaluation_failure_fails_closed(tmp_path, monkeypatch):
+    """If the sandbox decision raises, the command is BLOCKED, never executed.
+
+    Regression for the prior ``except Exception: pass`` that fell through to an
+    unsandboxed ``subprocess.run(cmd, shell=True)``.
+    """
+    from agent_runtime_cockpit.security import trust
+
+    monkeypatch.setattr(
+        "agent_runtime_cockpit.security.trust.resolve_trust",
+        lambda ws: MagicMock(level=trust.TrustLevel.TRUSTED),
+    )
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("policy engine exploded")
+
+    monkeypatch.setattr("agent_runtime_cockpit.security.sandbox.decide", _boom)
+    screen = _screen(tmp_path)
+    with patch("subprocess.run") as mock_run:
+        screen._handle_shell_escape("!ls")
+    mock_run.assert_not_called()
+    assert [c for _r, c in _entries(screen) if "blocked" in c.lower()], (
+        "fail-closed: expected a 'blocked' entry when the gate errors"
+    )
+
+
+def test_allowed_command_executes_argv_without_shell(tmp_path, monkeypatch, _audit_spy):
+    """Allowed commands run the classified argv list with shell disabled, and audit."""
+    from agent_runtime_cockpit.security import trust
+
+    monkeypatch.setattr(
+        "agent_runtime_cockpit.security.trust.resolve_trust",
+        lambda ws: MagicMock(level=trust.TrustLevel.TRUSTED),
+    )
+    screen = _screen(tmp_path)
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(stdout="ok\n", stderr="", returncode=0)
+        screen._handle_shell_escape("!ls -la")
+    mock_run.assert_called_once()
+    args, kwargs = mock_run.call_args
+    assert args[0] == ["ls", "-la"], "must execute the classified argv list, not a shell string"
+    assert not kwargs.get("shell"), "shell must be disabled (no shell=True)"
+    _audit_spy.assert_called()  # audit event persisted on allow
