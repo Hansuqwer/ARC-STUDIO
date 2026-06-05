@@ -166,6 +166,21 @@ class ContextCompacted(ArcEvent):
     evicted_handles: list[str] = []
 
 
+class ModelChanged(ArcEvent):
+    """Emitted when the active model changes in the current session.
+
+    capabilities_added: features present in current_model but not previous_model.
+    capabilities_removed: features present in previous_model but not current_model.
+    Both lists use the same capability keys as capability_gates.py: vision, tools, reasoning, etc.
+    """
+
+    event_type: Literal["model_changed"] = "model_changed"
+    previous_model: str
+    current_model: str
+    capabilities_added: list[str] = []
+    capabilities_removed: list[str] = []
+
+
 EVENT_TYPE_MAP: dict[str, type[ArcEvent]] = {
     "hitl_required": HitlRequired,
     "hitl_decided": HitlDecided,
@@ -182,6 +197,7 @@ EVENT_TYPE_MAP: dict[str, type[ArcEvent]] = {
     "sandbox_command": SandboxCommandEvent,
     "tool_output_virtualized": ToolOutputVirtualized,
     "context_compacted": ContextCompacted,
+    "model_changed": ModelChanged,
 }
 
 

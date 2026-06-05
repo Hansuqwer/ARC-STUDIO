@@ -1,60 +1,100 @@
-# v0.5.2-alpha Merge Notes
+# v0.6-alpha Merge Notes
 
 ## What ships
 
-**CostRate capability fields backfill — prerequisite for v0.6-alpha /models picker.**
+**Catalog-driven model picker — UI now reflects per-model capability data.**
 
-Triggered by: Task 0 gap audit in v0.6-alpha sprint found that v0.5.1's `CostRate`
-extension didn't include `supported_parameters` or `input_modalities`. The v0.6
-`/models` picker requires per-model capability data for filtering (e.g.
-`--has vision`, `--has tools`).
+v0.6 completes the capability pipeline started in v0.5.2 (backfill) by wiring
+the data into user-facing commands and the TUI status bar.
 
-## Changes
+## New commands
 
-### CostRates schema (`base.py`)
+### /models
 
-Two new fields, both additive with empty-list defaults:
-
-```python
-supported_parameters: list[str] = Field(default_factory=list)
-input_modalities: list[str] = Field(default_factory=list)
+```
+/models [--vendor <name>] [--has <cap>] [--free] [--max-input <$/M>] [--search <q>]
+/models --vendor deepseek        # 6 models listed
+/models --has vision             # 11 models with image/video modality
+/models --has tools --max-input 1.0
+/models --free                   # only is_free_tier=True rows
 ```
 
-All existing rows are unaffected (default `[]`). No migration needed.
+Reads committed `CostRate` data — **no network fetch at runtime** (local-first.md).
+Per-model accuracy: `--has vision` uses `input_modalities` field from v0.5.2 backfill,
+not vendor-level `ProviderFeature` flags. Verified by
+`test_has_vision_filter_per_model_granularity`.
 
-### Vendor block backfill (`openai_compatible.py`)
+**Note on Anthropic:** `--vendor anthropic` returns 0 results. Anthropic uses a
+separate provider class (`AnthropicClient`) whose models are not in `VENDOR_CONFIGS`.
+This is correct — the command accurately reflects what the catalog has. v0.7 can
+backfill Anthropic cost rows into a unified catalog if needed.
 
-48 of 57 Chinese-lab model rows updated with capability data from OpenRouter
-(`architecture.input_modalities` + `supported_parameters`):
+### /model-info
 
-| Vendor | Rows updated | Notes |
-|---|---|---|
-| DeepSeek | 6 | All text-only; tools + reasoning + structured_outputs in params |
-| Qwen | ~9/10 | 7 multimodal [text,image,video]; legacy `qwen2.5-72b` missed suffix match |
-| Kimi | 5 | k2.5/k2.6 = [text,image]; k2 = [text] |
-| GLM | 12 | v/vl models = [image,text,video]; others text-only |
-| MiMo | 3 | mimo-v2.5 = [text,audio,image,video] — only model with audio in sprint |
-| MiniMax | 6 | minimax-m3 = [text,image,video] |
+```
+/model-info kimi/kimi-k2.6        # full catalog entry
+/model-info kimi-k2-0905          # shows ⚠ DEPRECATED banner + auto_route
+/model-info glm/glm-4.5-air       # shows FREE TIER
+```
 
-Non-Chinese-lab vendors (OpenAI, Anthropic, Groq, etc.) left with empty defaults.
-No OpenRouter data for these; v0.6 can backfill from native API schemas if needed.
+## Capability gating
 
-### Sync script update
+`capability_gates.py`: `get_capabilities(model_id, vendor) → dict[str, bool]`
 
-`scripts/sync_from_pricing_feed.py` now emits `supported_parameters` and
-`input_modalities` in `render_vendor_block()` output. Future syncs will
-automatically include capability data.
+- Fail-closed invariant: unknown model → all gates `False` (never raises)
+- Prefer entry with actual capability data when model ID appears in multiple vendors
+  (e.g. `kimi-k2.6` exists in both `crofai` and `kimi` blocks; picks the one with
+  non-empty `input_modalities`)
+
+## Status bar chip
+
+Model chip extended: `│ kimi/kimi-k2.6 [vision][tools] │`
+
+Tags shown: vision, tools, reasoning (only when enabled). Hidden when unknown model.
+
+## ModelChanged event
+
+```python
+ModelChanged(
+    previous_model="gpt-4o",
+    current_model="kimi-k2.6",
+    capabilities_added=["vision"],    # features in new but not old
+    capabilities_removed=[],
+)
+```
+
+Diff semantics — consumer doesn't need to compute the delta.
 
 ## Test delta
 
-5030 (v0.5.1) → 5039 (+9). 9 new capability field tests.
+5030 (v0.5.2) → 5089 (+59). TS: 147 → 149 (+2).
+
+## Invariant checks
+
+- Catalog NOT in connection path: `grep providers/ -rn "catalog"` → 0 hits
+- `/models` offline: `test_works_without_network` mocks `urllib.request.urlopen` — 0 calls
+- Capability gates fail-closed: `test_unknown_model_hides_all_capability_widgets` ✅
+- No LLM in `slash/models.py` or `capability_gates.py` (no openai/anthropic imports)
+
+## Behavior smokes
+
+| Smoke | Result |
+|---|---|
+| 1. `/models --vendor deepseek` | PASS — 6 models, all vendor=deepseek |
+| 2. `/models --has vision` | PASS — 11 models, all have image/video modality |
+| 3. Text-only model caps | PASS — `deepseek-v4-pro` vision=False |
+| 4. ModelChanged event | PASS — fired with capabilities_added=['tools'] |
+| 5. `/model-info kimi-k2-0905` | PASS — ⚠ DEPRECATED banner visible |
+
+Note: Smoke 1 uses `deepseek` not `anthropic` — Anthropic is in a separate provider
+class outside VENDOR_CONFIGS (documented above).
 
 ## Pre-existing acceptable failures
 
-Same as v0.5.1: `test_concurrent_accumulation` SQLite env flake + 5 xfailed.
+Same as v0.5.2: `test_concurrent_accumulation` env flake + 5 xfailed.
 
 ## Branch
 
-`spec/v0.5.2-capability-fields` — 4 commits — ready to merge.
+`spec/v0.6-catalog-picker` — 5 commits — ready to merge.
 
 **Do NOT tag yet. Awaiting your go.**

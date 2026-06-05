@@ -203,4 +203,23 @@ describe('run-events helpers', () => {
     });
     expect(isKnownEvent(event)).toBe(true);
   });
+
+  it('parseRunEvent recognizes MODEL_CHANGED', () => {
+    const event = parseRunEvent({
+      ...baseEvent,
+      type: 'MODEL_CHANGED',
+      data: { previous_model: 'gpt-4o', current_model: 'kimi-k2.6', capabilities_added: ['vision'], capabilities_removed: [] },
+    });
+    expect(isKnownEvent(event)).toBe(true);
+    expect(event.type).toBe('MODEL_CHANGED');
+  });
+
+  it('MODEL_CHANGED extra fields are ignored (forward-compat)', () => {
+    const event = parseRunEvent({
+      ...baseEvent,
+      type: 'MODEL_CHANGED',
+      data: { previous_model: 'a', current_model: 'b', future_field: 'ignored' },
+    });
+    expect(isKnownEvent(event)).toBe(true);
+  });
 });

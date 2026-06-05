@@ -48,6 +48,8 @@ PHASE_41_COMMANDS = {
     "wallet",
     "budget",
     "expand",
+    "models",
+    "model-info",
 }
 
 

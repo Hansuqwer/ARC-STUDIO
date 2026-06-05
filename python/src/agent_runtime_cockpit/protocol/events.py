@@ -384,6 +384,10 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         },
         optional_fields=set(),
     ),
+    "MODEL_CHANGED": EventTypeDef(
+        required_fields={"previous_model", "current_model"},
+        optional_fields={"capabilities_added", "capabilities_removed"},
+    ),
 }
 
 
