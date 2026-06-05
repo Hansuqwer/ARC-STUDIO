@@ -125,7 +125,10 @@ def save_custom_profile(profile: RunProfile, path: Path | None = None) -> Path:
     store_path = path or profile_store_path()
     profiles = load_custom_profiles(store_path)
     profiles[profile.id] = profile
-    payload = {"version": 1, "profiles": [_profile_to_json(p) for p in profiles.values()]}
+    payload = {
+        "version": PROFILE_SCHEMA_VERSION,
+        "profiles": [_profile_to_json(p) for p in profiles.values()],
+    }
     store_path.parent.mkdir(parents=True, exist_ok=True)
     store_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     return store_path
