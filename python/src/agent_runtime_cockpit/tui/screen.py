@@ -163,6 +163,13 @@ class ArcScreen(Screen):
         parts = text.split(maxsplit=1)
         cmd = parts[0].lower()
 
+        # UX R-010: remember the command so the slash menu surfaces it first
+        # on the next empty query (MRU ordering).
+        try:
+            self.query_one(SlashMenu).record_use(cmd)
+        except Exception:
+            pass
+
         if cmd in ("/exit", "/quit"):
             self._do_exit()
             return
