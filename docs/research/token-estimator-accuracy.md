@@ -1,8 +1,12 @@
 # Token Estimator Accuracy — Empirical Benchmark
 
-> **Status:** ⏳ **DEFERRED** to first R-01 dogfood week (cannot execute
-> from research-only environment — requires local ARC trace corpus).
-> **Date:** 2026-06-04
+> **Status:** ⏳ **DEFERRED (benchmark script shipped + run; corpus synthetic).**
+> The runnable benchmark now exists (`scripts/research/measure_estimator_accuracy.py`)
+> and was executed 2026-06-06 against the local corpus, but that corpus is
+> SwarmGraph fake-deterministic test fixtures (1 distinct string), so a
+> representative multi-category benchmark still awaits real dogfood traces.
+> See §3 for the run outcome and the single honest data point.
+> **Date:** 2026-06-04 (deferred) · 2026-06-06 (script run; corpus assessed)
 
 ---
 
@@ -223,7 +227,53 @@ uv run python ../scripts/research/measure_estimator_accuracy.py \
 
 ---
 
-## §3 — Results table (FILL IN AFTER RUNNING)
+## §3 — Results (RUN 2026-06-06 against `python/.arc/traces/`)
+
+**Outcome: benchmark script created + verified runnable; representative
+multi-category benchmark still DEFERRED — the only available local corpus is
+synthetic.**
+
+The script (`scripts/research/measure_estimator_accuracy.py`) was run against
+the local trace corpus (2,285 `*.jsonl` files, 8.9 MB). It executes end to end
+and emits the per-category table, CSV, and ASCII scatter. However, corpus
+inspection showed the traces are **SwarmGraph fake-deterministic test
+fixtures**, not real model output:
+
+```
+total content strings (>=50 chars): 398   (per 500-file sample)
+distinct content strings:           1
+distinct lengths:                   1
+most common (x398): "Fake deterministic response for: You are worker 1 of 1.
+                     Provide your independent analysis. ..."  (1 string, 132 chars)
+```
+
+So the "300-sample" run measured the **same synthetic string 300 times** →
+every row is category `prose` with identical error. That is not a representative
+benchmark, so the §4 priors remain unverified and the verdict (§5) stays
+**deferred to a real dogfood corpus**. Per the brief's hard rule, no
+per-category numbers are reported as if representative.
+
+**Single honest data point** (the fixture string, N=1 distinct):
+
+```
+content (132 chars):  "Fake deterministic response for: You are worker 1 of 1. …"
+tiktoken (cl100k):     27 tokens   (ground truth)
+ARC heuristic:         43 tokens   (default, no provider hint → _heuristic())
+relative error:        +59%        (heuristic OVER-counts)
+```
+
+Notes:
+- The default no-provider path (`estimate_tokens(text)` → `_heuristic`)
+  over-counts this short English string by ~50–60%. Over-counting is the
+  **wallet-safe** direction (you believe you spent more than you did, so you
+  stop earlier), but the magnitude is larger than the §4 prose prior (±5–10%).
+- A single synthetic sample cannot be generalised. **Re-run the script against
+  real traces** once R-01 dogfooding accumulates diverse content
+  (prose/code/json/cjk/base64). The script is ready and committed.
+- When ground-truth accuracy matters, callers should pass `provider="openai"`
+  (routes to tiktoken) or `provider="anthropic"` rather than the bare heuristic.
+
+### Original blank template (fill after a real-corpus run)
 
 ```
 CATEGORY      N    MEDIAN     MEAN      MAX
