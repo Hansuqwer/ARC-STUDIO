@@ -41,8 +41,8 @@
 
 1. ~~**R-UX1 (Phase 41 follow-on)**~~ — **SHIPPED** (Baseline Complete): Header + ContextMeter + ModeBadge + Markdown. All R-001/R-002/R-003 components present + wired. TUI grade 39→mid-60s target achieved.
 2. ~~**R-UX2 (Phase 41 follow-on)**~~ — **SHIPPED** (Baseline Complete): ApprovalCard + CapabilityBanner + ActivityTray + PlanView + SlashMenu + sandbox-aware shell-escape. Merged to main via spec/v0.8-r-ux2 (2026-06-05).
-3. **R-UX3 (Phase 41 follow-on) ← NEXT** — Components + IA: ToolCard (file exists, not wired) + DiffViewer (diff_block.py exists, no view) + Toaster (file exists, not wired) + KeycapHint + RiskBadge + frontmatter-driven slash registry + views polish. Effort: ~2 weeks.
-4. **R-UX4 (Phase 41 follow-on)** — Themes + A11y: 5 themes + NO_COLOR + reduced motion + snapshot tests + /title + /statusline. Effort: 1 week.
+3. ~~**R-UX3 (Phase 41 follow-on)**~~ — **SHIPPED** (Baseline Complete): ToolCard wired in transcript (Enter/x expand + risk badge), Toaster wired in screen (sandbox-deny + daemon-reconnect), KeycapHint + RiskBadge widgets (NO_COLOR fallbacks), CommandPalette name+description search, SlashMenu category chips + two-line items + MRU, DiffBlock color + n/p hunk nav, runs/hitl/sessions view polish (filter+sort, field-name fix + token-gated viewer, fork). Commits dd6818f + 17e8e84; 5219 Python passed. Deferred: per-command frontmatter .md files, DiffViewer side-by-side toggle, ToolCard rerun.
+4. **R-UX4 (Phase 41 follow-on) ← NEXT** — Themes + A11y: 5 themes + NO_COLOR + reduced motion + snapshot tests + /title + /statusline. Effort: 1 week.
 5. **R-OPEN-DEFERRED-RUNBOOKS** — Execute deferred research runbooks (token-estimator-accuracy.md + budget-persistence-audit.md). Half-day each.
 6. **Phase 104 + 105 resumed** — microVM macOS hardening + Linux Firecracker host proof. macOS gated pwd proof is now reproducible via tools/arc-vz-bringup.sh; remaining: full test suite + SIGINT/timeout proofs (Phase 104). Linux/Firecracker deferred to Linux/KVM host.
 
