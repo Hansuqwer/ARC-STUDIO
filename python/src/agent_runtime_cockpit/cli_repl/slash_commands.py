@@ -2535,6 +2535,17 @@ def cmd_wallet(_arg: str, session: ChatSession) -> CommandResult:
                     lines.extend(notes)
         except Exception:
             pass
+    # v0.7: Active opt-in cloud features
+    try:
+        from ..cloud.indicators import active_optins
+
+        optins = active_optins()
+        if optins:
+            lines.append("")
+            lines.append("Active opt-ins:")
+            lines.extend(f"  {line}" for line in optins)
+    except Exception:
+        pass
     return CommandResult(state="present", output="\n".join(lines))
 
 
