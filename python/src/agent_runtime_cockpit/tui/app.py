@@ -25,15 +25,53 @@ class ArcApp(App):
         theme: ThemeManager | None = None,
         **kwargs,
     ) -> None:
-        super().__init__(**kwargs)
+        # Assigned before super().__init__ because Textual's App init reads
+        # get_css_variables(), which needs the theme present.
         self._data = data or DataStore()
         self._theme = theme or ThemeManager()
+        super().__init__(**kwargs)
 
     def get_default_screen(self) -> Screen:
         # Return ArcScreen as the first screen on the stack. App.compose() must
         # yield widgets (not a Screen); yielding a Screen leaves the default
         # empty screen active → blank window.
         return ArcScreen(self._data, self._theme)
+
+    def get_css_variables(self) -> dict[str, str]:
+        """Inject the active theme's tokens so base.tcss ($background, …) re-skins.
+
+        Merged on top of Textual's built-ins; calling ``reskin()`` after a theme
+        change re-reads these.
+        """
+        variables = super().get_css_variables()
+        theme = getattr(self, "_theme", None)
+        if theme is None:
+            return variables
+        t = theme.current
+        variables.update(
+            {
+                "background": t.background,
+                "foreground": t.foreground,
+                "surface": t.surface,
+                "input-bg": t.input_bg,
+                "border": t.border,
+                "border-focus": t.border_focus,
+                "muted": t.muted,
+                "accent": t.accent,
+                "success": t.success,
+                "error": t.error,
+                "warning": t.warning,
+                "info": t.info,
+            }
+        )
+        return variables
+
+    def reskin(self) -> None:
+        """Re-apply CSS variables after a theme change (best-effort)."""
+        try:
+            self.refresh_css(animate=False)
+        except Exception:
+            pass
 
     @property
     def data(self) -> DataStore:

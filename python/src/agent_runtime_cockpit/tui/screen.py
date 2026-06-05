@@ -184,8 +184,56 @@ class ArcScreen(Screen):
             self.action_toggle_help()
             return
         if cmd == "/theme":
-            new_theme = self.theme.toggle()
+            from .theme import theme_names
+
+            arg = parts[1].strip().lower() if len(parts) > 1 else ""
+            if arg in ("list", "ls", "?"):
+                self.data.add_entry(
+                    "system",
+                    "Themes: "
+                    + ", ".join(theme_names())
+                    + f"  (current: {self.theme.current.name})",
+                )
+                return
+            if arg:
+                if self.theme.select(arg) is None:
+                    self._add_error_entry(
+                        "THEME_UNKNOWN",
+                        f"Unknown theme '{arg}'. Run /theme list to see options.",
+                    )
+                    return
+                new_theme = self.theme.current
+            else:
+                new_theme = self.theme.toggle()
+            # Re-apply CSS tokens so the chrome re-skins live (H24).
+            try:
+                self.app.reskin()  # type: ignore[attr-defined]
+                self.refresh()
+            except Exception:
+                pass
             self.data.add_entry("system", f"Theme: {new_theme.name}")
+            return
+        if cmd == "/title":
+            title = parts[1].strip() if len(parts) > 1 else ""
+            if title:
+                try:
+                    self.app.title = title
+                except Exception:
+                    pass
+                self.data.add_entry("system", f"Window title set: {title}")
+            else:
+                self.data.add_entry("system", f"Window title: {getattr(self.app, 'title', '')}")
+            return
+        if cmd == "/statusline":
+            # The status bar slots are currently fixed; this reports them.
+            slots = (
+                "mode · model · provider · workspace · context% · "
+                "session · cost · daemon · streaming"
+            )
+            self.data.add_entry(
+                "system",
+                f"Status-line slots: {slots}\n(slot ordering is fixed in this release)",
+            )
             return
         if cmd == "/version":
             from agent_runtime_cockpit import __version__

@@ -90,3 +90,86 @@ def test_toggle_still_dark_light(monkeypatch):
     assert tm.current.name == "dark"
     assert tm.toggle().name == "light"
     assert tm.toggle().name == "dark"
+
+
+# ── Slash commands: /theme <name>, /theme list, /title, /statusline ──────────
+
+import pytest  # noqa: E402
+
+
+def _last_system(data) -> str:
+    for entry in reversed(data.entries):
+        if entry.role == "system":
+            return entry.content
+    return ""
+
+
+@pytest.mark.asyncio
+async def test_slash_theme_select(monkeypatch):
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.delenv("ARC_THEME", raising=False)
+    from agent_runtime_cockpit.tui.app import ArcApp
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        screen = app.screen
+        screen._handle_slash("/theme mocha")
+        await pilot.pause()
+        assert app.theme_manager.current.name == "mocha"
+        assert "Theme: mocha" in _last_system(app.data)
+
+
+@pytest.mark.asyncio
+async def test_slash_theme_list(monkeypatch):
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    from agent_runtime_cockpit.tui.app import ArcApp
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        app.screen._handle_slash("/theme list")
+        await pilot.pause()
+        msg = _last_system(app.data)
+        assert "Themes:" in msg and "mocha" in msg
+
+
+@pytest.mark.asyncio
+async def test_slash_theme_unknown(monkeypatch):
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    from agent_runtime_cockpit.tui.app import ArcApp
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        app.screen._handle_slash("/theme not-a-real-theme")
+        await pilot.pause()
+        # current theme unchanged; an error/system entry mentions the unknown name
+        assert app.theme_manager.current.name == "dark"
+        assert "not-a-real-theme" in _last_system(app.data).lower()
+
+
+@pytest.mark.asyncio
+async def test_slash_title(monkeypatch):
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    from agent_runtime_cockpit.tui.app import ArcApp
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        app.screen._handle_slash("/title My Session")
+        await pilot.pause()
+        assert app.title == "My Session"
+
+
+@pytest.mark.asyncio
+async def test_slash_statusline(monkeypatch):
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    from agent_runtime_cockpit.tui.app import ArcApp
+
+    app = ArcApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        app.screen._handle_slash("/statusline")
+        await pilot.pause()
+        assert "Status-line slots" in _last_system(app.data)
