@@ -1061,9 +1061,9 @@ set +e
 BB=/usr/bin/busybox
 PATH=/usr/bin:/bin:/sbin:/usr/sbin
 echo ARC_VZ_PROOF booted=1
+$BB mkdir -p /proc /sys /workspace /tmp
 $BB mount -t proc proc /proc 2>/dev/null || true
 $BB mount -t sysfs sysfs /sys 2>/dev/null || true
-$BB mkdir -p /workspace /tmp
 if $BB grep -Eq "(^|[[:space:]])(eth|ens|enp|wlan)[0-9a-z]*:" /proc/net/dev 2>/dev/null; then echo ARC_VZ_PROOF no-guest-ethernet=0; else echo ARC_VZ_PROOF no-guest-ethernet=1; fi
 if $BB grep -q "00000000" /proc/net/route 2>/dev/null; then echo ARC_VZ_PROOF no-default-route=0; else echo ARC_VZ_PROOF no-default-route=1; fi
 if [ -x /usr/bin/wget ]; then echo ARC_VZ_PROOF wget-available=1; else echo ARC_VZ_PROOF wget-available=0; fi

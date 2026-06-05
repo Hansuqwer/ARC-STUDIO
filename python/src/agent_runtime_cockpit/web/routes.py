@@ -1388,8 +1388,12 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_get("/api/workflows", workflows)
     app.router.add_get("/api/schemas", schemas)
     app.router.add_get("/api/runs", list_runs)
-    app.router.add_get("/api/runs/start", start_run)
+    # POST is canonical for the mutating start_run. A mutating GET is a
+    # CSRF / ambient-trigger surface (links, prefetch, <img src>), so the legacy
+    # GET is registered only when explicitly opted in via env.
     app.router.add_post("/api/runs/start", start_run)
+    if os.environ.get("ARC_ALLOW_LEGACY_GET_RUN_START") == "1":
+        app.router.add_get("/api/runs/start", start_run)
     app.router.add_get("/api/runs/{run_id}", get_run)
     app.router.add_get("/api/runs/{run_id}/events", run_events_sse)
     app.router.add_get("/api/runs/{run_id}/links", run_links)

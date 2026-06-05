@@ -1,268 +1,55 @@
-You are taking over ARC Studio to implement the next sandbox/security phase.
+# AGENTS.md — ARC Studio Agent Charter
 
-Repository:
-https://github.com/Hansuqwer/arc-theia-studio
+🔒 **LOCKED CHARTER.** This is the single source of governance for agents working on ARC Studio.
 
-Branch:
-build/no-mockups-handoff
+## Single sources of truth
 
-User approval:
-Approved to research and implement. Use Context7, Vercel Grep/code search, and web search before coding.
+There is exactly **one** of each. Do not create competing or replacement copies.
 
-Primary goal:
-Turn ARC Studio's existing trust/isolation/security foundation into a production-grade CLI sandbox foundation, with a path to lightweight microVM execution on macOS and Linux. Skip Windows for now.
+| Concern | Canonical file |
+|---|---|
+| Roadmap | `docs/roadmap.md` |
+| Phase list / execution plan | `docs/phases.md` |
+| Agent charter | `AGENTS.md` (this file) |
 
-Do not fake completion.
-Do not claim production-grade microVM execution until it actually exists and tests prove it.
-Do not implement broad unsafe runtime execution without explicit gates.
-Do not remove existing alpha/mock/fallback labeling.
+Both `docs/roadmap.md` and `docs/phases.md` are CI-protected (`scripts/release_check.sh`). Update them **in place**. Never add a new roadmap/phase/status markdown — everything else is archived under `docs/archive/`.
 
-Current known foundation:
-- `python/src/agent_runtime_cockpit/security/trust.py`
-- `python/src/agent_runtime_cockpit/security/profiles.py`
-- `python/src/agent_runtime_cockpit/security/enforcement.py`
-- `python/src/agent_runtime_cockpit/isolation/base.py`
-- `python/src/agent_runtime_cockpit/isolation/none.py`
-- `python/src/agent_runtime_cockpit/isolation/subprocess.py`
-- `python/src/agent_runtime_cockpit/orchestration/supervisor.py`
-- `python/src/agent_runtime_cockpit/cli/_helpers.py`
-- `docs/security/enforcement-surfaces.md`
-- `docs/roadmap.md` R16
+## Working discipline
 
-Target outcome:
-Implement a first-class `arc sandbox` CLI and policy layer now. Design microVM provider interface now. Implement lightweight microVM support only if feasible with clear macOS/Linux constraints and tests. If not feasible, document exact blockers and land the provider stub with doctor/preflight only.
+1. **Finish 1 → 100% before broadening.** Complete the active phase end to end — with tests and evidence — before starting any new phase, feature, or roadmap item. No new top-level scope while the active phase is incomplete.
+2. **Single source.** All roadmap/phase/status updates go into the two canonical docs above.
+3. **Evidence over claims.** State what was actually run/verified. Do not claim tests pass unless they were run.
+4. **Additive protocol only.** Do not remove or rename existing events, CLI commands, or public API surfaces unless explicitly proposing a breaking change for a future major.
+5. **Deterministic security.** Sandbox, trust, policy, budget, audit, and capability decisions are deterministic. No LLM-based security judgement.
+6. **Immutable `EnforcementContext`.** Route new runtime state through immutable copies / `ContextVar`, never by mutating the frozen context.
+7. **No commits unless asked.** Leave changes in the working tree for review unless the owner explicitly requests a commit.
 
-Research-first gate:
-Before implementation, research and record notes in docs.
+## Active track (2026-06-05, `spec/v0.8-r-ux2` @ `ffa1e1f`)
 
-Required research sources:
-1. Context7 docs:
-   - Python subprocess/process-group timeout best practices
-   - Typer CLI subcommands/testing patterns
-   - Pydantic config/model patterns
-2. Vercel Grep/code search:
-   - Examples of CLI sandbox command classification
-   - Examples of Firecracker/Lima/Cloud Hypervisor wrapper patterns
-   - Examples of policy-based command approval UX
-3. Web search:
-   - Codex CLI sandbox architecture: macOS Seatbelt, Linux Landlock/seccomp/namespaces, approval policies
-   - Firecracker current Linux requirements and limitations
-   - Lima/Apple Virtualization.framework options for macOS lightweight VM execution
-   - Cloud Hypervisor lightweight Linux VM usage
-   - Kata Containers tradeoffs
-   - macOS sandbox-exec/Seatbelt status and limitations
+P0 hardening sprint from the five-way audit, in order:
 
-Docs to create/update:
-- `docs/research/sandbox-and-microvm.md`
-- `docs/security/enforcement-surfaces.md`
-- `docs/architecture/overview.md`
-- `docs/BOOTSTRAP.md`
-- `docs/roadmap.md` only if status genuinely changes
-- `docs/phases.md` only if phase status genuinely changes
+1. SQLite `database is locked` in budget storage (confirmed failing test).
+2. TUI shell-escape completion (remove `shell=True`, fail-closed gate, audit on allow).
+3. Quarantine orphan `python/src/routes.py` (`0.0.0.0` FastAPI).
+4. `/api/runs/start` POST-only (deprecate mutating GET).
+5. Refresh `docs/security/enforcement-surfaces.md` (stale paths).
+6. Reconcile `security/profiles.py` schema version (1 vs 2).
 
-Research notes must include:
-- source
-- link
-- what was learned
-- implementation consequence
-- confidence
-- unresolved questions
+Then resume the v0.8 R-UX2 track. See `docs/phases.md` for full status.
 
-Implementation decision table:
-Create/update `docs/adr/` if ADR pattern exists, otherwise add a section in `docs/research/sandbox-and-microvm.md`.
+## Sandbox / microVM truth constraints (still in force)
 
-Decision table format:
-| Decision | Chosen approach | Alternatives considered | Reason | Files affected | Confidence |
+- **No microVM execution claims** beyond what is proven. macOS direct VZ is a gated public CLI proof passed once for guest-available `pwd` (default-off, not production-grade). Linux/Firecracker is preflight/baseline only, host-unproven (Linux/KVM only). Windows is out of scope.
+- **Container is a gated fallback only** — disabled unless `ARC_ENABLE_CONTAINER_SANDBOX=1`.
+- **Do not remove** existing alpha/mock/fallback labeling.
+- Allowed wording: "production-ready foundation", "microVM preflight/doctor support", "container fallback (gated)". Forbidden until proven: "production-grade microVM execution", "production-ready sandbox", broad "VZ command runner".
 
-Required architecture:
-Add/extend a sandbox abstraction with these conceptual providers:
-
-```text
-IsolationProvider
-├── none
-├── subprocess
-├── container     # design only unless already present and safe
-└── microvm       # macOS/Linux design; implementation only if feasible
-```
-
-Core implementation scope P0:
-1. Add a user-facing CLI:
-   - `arc sandbox doctor`
-   - `arc sandbox run --policy <profile> -- <cmd...>`
-   - `arc policy explain -- <cmd...>` or equivalent if command group already exists
-2. Add/extend models:
-   - `SandboxPolicy`
-   - `SandboxDecision`
-   - `CommandClassification`
-   - `SandboxResult`
-3. Command classification categories:
-   - `read_only`
-   - `writes_workspace`
-   - `network`
-   - `install`
-   - `destructive`
-   - `privileged`
-   - `unknown`
-4. Policy behavior:
-   - auto-allow safe read-only commands
-   - deny destructive/privileged by default
-   - network denied by default unless policy enables it
-   - writes allowed only inside workspace
-   - package install requires explicit approval/policy flag
-5. Harden subprocess provider:
-   - workspace-bound cwd
-   - symlink/path traversal guard
-   - env allowlist only
-   - remove secret-looking env vars
-   - timeout
-   - kill process group/tree on timeout
-   - max stdout/stderr bytes
-   - structured JSON result
-   - no shell by default; list argv only
-6. Emit trace/audit events for sandbox commands:
-   - command
-   - cwd
-   - classification
-   - decision
-   - policy
-   - sandbox provider
-   - allowed/denied reason
-   - start/end timestamps
-   - exit code
-   - stdout/stderr truncation flags
-   - redaction applied flag
-
-MicroVM requirement:
-User prefers lightweight microVM for macOS/Linux, skip Windows.
-
-Research and implement as follows:
-
-Linux preferred candidates:
-- Firecracker
-- Cloud Hypervisor
-- Kata Containers only if it fits local CLI use
-
-macOS preferred candidates:
-- Lima/Apple Virtualization.framework
-- Tart if research supports it
-- Avoid Docker Desktop as "microVM" unless documented as container fallback only
-
-MicroVM P0 implementation decision:
-If full microVM execution is too large for this phase, implement:
-- `MicroVMIsolationProvider` as preflight/doctor-only
-- provider detection:
-  - Linux: check `firecracker`, `/dev/kvm`, kernel support
-  - macOS: check `limactl`, virtualization support where detectable
-- clear status:
-  - unavailable
-  - installed_not_configured
-  - ready
-  - blocked
-- no fake run success
-- tests for doctor/preflight states
-
-If feasible to implement minimal real run:
-- create disposable VM/session
-- mount workspace through controlled path
-- network disabled by default
-- run argv command
-- collect stdout/stderr/exit code
-- destroy VM/session
-- tests must be opt-in and skipped unless local runtime is installed
-- normal CI must not require microVM runtime
-
-CLI examples desired:
-
-```bash
-arc sandbox doctor --json
-
-arc policy explain -- ls -la
-
-arc sandbox run --policy local-safe -- ls -la
-
-arc sandbox run --policy local-safe -- python -c "print('hello')"
-
-arc sandbox run --policy local-safe -- curl https://example.com
-# should deny network by default
-
-arc sandbox run --policy local-safe -- rm -rf .
-# should deny destructive by default
-```
-
-Test requirements:
-Add Python tests covering:
-1. read-only command allowed
-2. network command denied by default
-3. destructive command denied by default
-4. command writing outside workspace denied
-5. symlink escape denied
-6. env secret stripped
-7. timeout kills process
-8. stdout/stderr capped
-9. JSON output stable
-10. audit/trace event emitted for allowed command
-11. denial event emitted for denied command
-12. microVM doctor reports unavailable gracefully if no runtime installed
-13. Linux microVM preflight checks `/dev/kvm` and binary presence
-14. macOS microVM preflight checks `limactl` or selected runtime
-15. Windows explicitly unsupported with clear message
-
-Do not depend on live network in tests.
-Do not require Docker/Firecracker/Lima in CI.
-Use monkeypatch/fakes for doctor/preflight tests.
-
-Code quality:
-- Keep changes small and reviewable.
-- Prefer extending existing `isolation/` and `security/` modules instead of creating parallel systems.
-- Preserve existing CLI behavior.
-- Do not break existing tests.
-- Maintain stable JSON envelopes.
-- Use existing `ok(...)` / `err(...)` envelope patterns if available.
-- Use existing redaction utilities.
-
-Verification commands:
-Run all:
+## Verification commands
 
 ```bash
 cd python && uv run ruff check src tests
 cd python && uv run pytest tests/ -q
-pnpm build
-pnpm typecheck
+pnpm typecheck && pnpm build
 ```
 
-If any command fails:
-- fix it if in scope
-- otherwise document exact failure and reason
-- do not hide failures
-
-Expected deliverables:
-1. Research doc: `docs/research/sandbox-and-microvm.md`
-2. CLI commands implemented:
-   - `arc sandbox doctor`
-   - `arc sandbox run`
-   - `arc policy explain` or documented equivalent
-3. Sandbox models/provider hardening
-4. MicroVM provider/preflight/doctor for macOS/Linux
-5. Tests listed above
-6. Docs updated
-7. Final report:
-   - files changed
-   - commands run
-   - pass/fail matrix
-   - what is real
-   - what is design-only
-   - what remains blocked
-   - next PR queue
-
-Important wording:
-- "microVM preflight/doctor support" if only detection is implemented.
-- "microVM execution" only if commands actually run inside microVM and tests prove it.
-- "container fallback" only if Docker/Podman path exists.
-- "production-ready foundation" is okay.
-- "production-ready sandbox" only if subprocess/container/microVM isolation is complete and verified.
-
-Active sandbox truth constraints:
-- No microVM execution exists yet.
-- Lima remains template-only unless a later implementation actually creates/runs/destroys a VM and tests prove it.
-- Firecracker remains preflight-only unless a later implementation actually boots/runs/destroys a microVM and tests prove it.
-- Container remains a gated fallback only; it is disabled unless `ARC_ENABLE_CONTAINER_SANDBOX=1` is set.
+Document failures honestly; do not hide them.

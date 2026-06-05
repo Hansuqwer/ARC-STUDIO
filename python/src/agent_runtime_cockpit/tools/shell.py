@@ -12,7 +12,11 @@ from typing import Any, Coroutine, TypeVar
 from pydantic import BaseModel, Field
 
 from agent_runtime_cockpit.cli_repl.cancellation import CancellationToken
-from agent_runtime_cockpit.isolation.subprocess import SubprocessIsolationProvider
+from agent_runtime_cockpit.config.loader import load_config
+from agent_runtime_cockpit.isolation.selector import (
+    build_execution_provider,
+    resolve_isolation_backend,
+)
 from agent_runtime_cockpit.security.sandbox import (
     SandboxPolicy,
     classify_command,
@@ -113,9 +117,11 @@ class BashTool:
                     "classification": decision.classification.value,
                 }
             )
-        provider = SubprocessIsolationProvider(
-            safe_env_keys=frozenset(self.policy.env_allowlist),
+        backend = resolve_isolation_backend(load_config(self.workspace_root))
+        provider = build_execution_provider(
+            backend,
             workspace_root=self.workspace_root,
+            env_allowlist=frozenset(self.policy.env_allowlist),
             max_output_bytes=self.policy.max_output_bytes,
         )
         iso = _run_coro_sync(

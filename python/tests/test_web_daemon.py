@@ -207,8 +207,10 @@ async def test_start_run_runtime_body_rejects_unknown(tmp_path, unused_tcp_port)
 
 
 async def test_start_run_get_runtime_query_uses_same_router(monkeypatch, tmp_path, unused_tcp_port):
+    # Legacy mutating GET is opt-in only now (POST is canonical); enable it here.
     _write_langgraph_export(tmp_path)
     monkeypatch.setenv("ARC_LANGGRAPH_EXPORT", "graph_module:build_graph")
+    monkeypatch.setenv("ARC_ALLOW_LEGACY_GET_RUN_START", "1")
 
     app = await create_app(tmp_path)
     runner = AppRunner(app)
@@ -322,5 +324,24 @@ async def test_start_run_runtime_body_auto_selects_only_langgraph(
                 assert response.status == 200
                 assert payload["data"]["runtime_selection"]["chosen_by"] == "auto"
                 assert payload["data"]["runtime_selection"]["runtime"] == "langgraph"
+    finally:
+        await runner.cleanup()
+
+
+async def test_start_run_get_rejected_by_default(tmp_path, unused_tcp_port):
+    """Without the legacy opt-in, the mutating GET /api/runs/start is not served (POST-only)."""
+    app = await create_app(tmp_path)
+    runner = AppRunner(app)
+    await runner.setup()
+    site = TCPSite(runner, "127.0.0.1", unused_tcp_port)
+    await site.start()
+    try:
+        async with ClientSession() as session:
+            async with session.get(
+                f"http://127.0.0.1:{unused_tcp_port}/api/runs/start?runtime=auto",
+            ) as response:
+                # 405 (method not allowed) / 404 (no GET resource) / 403 (trust or
+                # origin guard) are all acceptable — the point is the GET never starts a run.
+                assert response.status in (403, 404, 405)
     finally:
         await runner.cleanup()

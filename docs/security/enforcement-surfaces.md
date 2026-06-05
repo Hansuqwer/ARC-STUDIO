@@ -75,15 +75,16 @@ records gate).      unless user consents
 
 #### S-23.1 · JobSupervisor job submission
 - **What:** Every job submitted to JobSupervisor is gated by its declared resource needs.
-- **Where:** `orchestration/job_supervisor.py`
+- **Where:** `orchestration/supervisor.py` (class `JobSupervisor`)
 - **Gates:** `enforce_workspace_trust` (startup), `enforce_paid_call_gate`/`enforce_shell_gate`/`enforce_network_gate` per job
 - **Denial event:** Any Phase 23 typed denial with `{"surface": "orchestration.job_supervisor"}`
 
 #### S-23.2 · Daemon MCP server start
-- **What:** ARC daemon's own MCP-exposing socket requires workspace trust + network gate.
-- **Where:** `extensions/<mcp-server-module>.py`
-- **Gates:** `enforce_workspace_trust`, `enforce_network_gate`
-- **Denial event:** `TRUST_DENIED` or `NETWORK_DENIED` with `{"surface": "daemon.mcp_server_start"}`
+- **What:** ARC's local MCP control plane. *(Superseded by S-26.MCP.1 — the current
+  implementation is stdio-only and does not open a network socket.)*
+- **Where:** `mcp/server.py`, `cli/mcp.py`
+- **Gate:** `ensure_trusted()` at server creation and per tool/resource call (see S-26.MCP.1)
+- **Denial event:** `TRUST_DENIED` with `{"surface": "daemon.mcp_server_start"}`
 
 #### S-23.3 · Workspace prompt loading
 - **What:** Loading prompts/agents from workspace passes trust + symlink-escape check.

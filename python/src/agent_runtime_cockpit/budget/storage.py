@@ -25,6 +25,8 @@ import abc
 import os
 import sqlite3
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -157,13 +159,33 @@ class SQLiteWALStorage(BudgetStorage):
         self._init_db()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self._path), timeout=5)
+        conn = sqlite3.connect(str(self._path), timeout=5.0)
+        # busy_timeout MUST be set before any contended statement (including the
+        # journal_mode switch below) so concurrent writers wait up to 5s instead
+        # of failing immediately with "database is locked".
+        conn.execute("PRAGMA busy_timeout = 5000")
         conn.execute("PRAGMA journal_mode = WAL")
         conn.execute("PRAGMA synchronous = NORMAL")  # WAL safe, faster than FULL
         return conn
 
+    @contextmanager
+    def _conn(self) -> Iterator[sqlite3.Connection]:
+        """Connection scope: commit on success, roll back on error, always close.
+
+        ``with conn:`` only manages the transaction; it does NOT close the
+        connection. Leaving connections open leaks WAL read/write marks and was
+        the cause of concurrent writers hitting SQLITE_BUSY. Closing promptly
+        (plus the explicit busy_timeout above) serialises writers cleanly.
+        """
+        conn = self._connect()
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
+
     def _init_db(self) -> None:
-        with self._connect() as conn:
+        with self._conn() as conn:
             conn.executescript(_CREATE_SQL)
             cur = conn.execute("SELECT value FROM budget_meta WHERE key = 'schema_version'")
             row = cur.fetchone()
@@ -178,7 +200,7 @@ class SQLiteWALStorage(BudgetStorage):
         return datetime.now(timezone.utc).isoformat()
 
     def load_session(self) -> Decimal:
-        with self._connect() as conn:
+        with self._conn() as conn:
             cur = conn.execute(
                 "SELECT amount_usd FROM budget_spend WHERE scope='SESSION' AND provider_key='' AND date_key=''"
             )
@@ -186,7 +208,7 @@ class SQLiteWALStorage(BudgetStorage):
             return Decimal(row[0]) if row else Decimal("0")
 
     def load_provider_day(self, provider_key: str, date_key: str) -> Decimal:
-        with self._connect() as conn:
+        with self._conn() as conn:
             cur = conn.execute(
                 "SELECT amount_usd FROM budget_spend WHERE scope='PROVIDER_DAY' AND provider_key=? AND date_key=?",
                 (provider_key, date_key),
@@ -195,17 +217,17 @@ class SQLiteWALStorage(BudgetStorage):
             return Decimal(row[0]) if row else Decimal("0")
 
     def save_session(self, amount_usd: Decimal) -> None:
-        with self._connect() as conn:
+        with self._conn() as conn:
             conn.execute(_UPSERT_SQL, ("SESSION", "", "", str(amount_usd), self._now()))
 
     def save_provider_day(self, provider_key: str, date_key: str, amount_usd: Decimal) -> None:
-        with self._connect() as conn:
+        with self._conn() as conn:
             conn.execute(
                 _UPSERT_SQL, ("PROVIDER_DAY", provider_key, date_key, str(amount_usd), self._now())
             )
 
     def reset_session(self) -> None:
-        with self._connect() as conn:
+        with self._conn() as conn:
             conn.execute("DELETE FROM budget_spend WHERE scope='SESSION'")
 
     # ── Handle store methods ───────────────────────────────────────────────
@@ -213,7 +235,7 @@ class SQLiteWALStorage(BudgetStorage):
     def handle_store(self, sha256: str, content: bytes, mime_type: str) -> None:
         """Insert handle (INSERT OR IGNORE — dedup by sha256)."""
         now = self._now()
-        with self._connect() as conn:
+        with self._conn() as conn:
             conn.execute(
                 """INSERT OR IGNORE INTO handles
                    (sha256, size_bytes, mime_type, created_ts, last_access_ts, content)
@@ -224,7 +246,7 @@ class SQLiteWALStorage(BudgetStorage):
     def handle_fetch(self, sha256: str) -> Optional[bytes]:
         """Return content for exact sha256, updating last_access_ts. None if missing."""
         now = self._now()
-        with self._connect() as conn:
+        with self._conn() as conn:
             cur = conn.execute("SELECT content FROM handles WHERE sha256 = ?", (sha256,))
             row = cur.fetchone()
             if row is None:
@@ -234,7 +256,7 @@ class SQLiteWALStorage(BudgetStorage):
 
     def handle_resolve_prefix(self, prefix: str) -> Optional[str]:
         """Return full sha256 matching prefix. None if missing; raises if ambiguous."""
-        with self._connect() as conn:
+        with self._conn() as conn:
             cur = conn.execute("SELECT sha256 FROM handles WHERE sha256 LIKE ?", (prefix + "%",))
             rows = cur.fetchall()
         if not rows:
@@ -245,13 +267,13 @@ class SQLiteWALStorage(BudgetStorage):
 
     def handle_total_bytes(self) -> int:
         """Return total bytes stored in handles table."""
-        with self._connect() as conn:
+        with self._conn() as conn:
             cur = conn.execute("SELECT COALESCE(SUM(size_bytes), 0) FROM handles")
             return int(cur.fetchone()[0])
 
     def handle_count(self) -> int:
         """Return number of handles stored."""
-        with self._connect() as conn:
+        with self._conn() as conn:
             cur = conn.execute("SELECT COUNT(*) FROM handles")
             return int(cur.fetchone()[0])
 
@@ -259,7 +281,7 @@ class SQLiteWALStorage(BudgetStorage):
         """Evict LRU handles until total_bytes <= max_bytes. Return bytes freed."""
         freed = 0
         while self.handle_total_bytes() > max_bytes:
-            with self._connect() as conn:
+            with self._conn() as conn:
                 cur = conn.execute(
                     "SELECT sha256, size_bytes FROM handles ORDER BY last_access_ts ASC LIMIT 1"
                 )

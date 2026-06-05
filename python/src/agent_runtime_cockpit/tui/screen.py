@@ -222,6 +222,15 @@ class ArcScreen(Screen):
                 self._add_error_entry("VIEW_ERROR", str(e))
             return
 
+        if cmd == "/settings":
+            try:
+                from .views.settings_view import SettingsView
+
+                self.app.push_screen(SettingsView(self.data.workspace))
+            except Exception as e:
+                self._add_error_entry("VIEW_ERROR", str(e))
+            return
+
         if cmd in ("/providers", "/connect"):
             try:
                 from .views.providers_view import ProvidersView
@@ -291,55 +300,135 @@ class ArcScreen(Screen):
         return self._session
 
     def _handle_shell_escape(self, text: str) -> None:
-        import subprocess
-        from ..security.trust import resolve_trust, TrustLevel
+        import shlex
+        from datetime import datetime, timezone
+
+        from agent_runtime_cockpit.config.loader import load_config
+        from agent_runtime_cockpit.isolation.selector import (
+            build_execution_provider,
+            resolve_isolation_backend,
+        )
+        from agent_runtime_cockpit.security.sandbox import (
+            SandboxDecision,
+            SandboxPolicy,
+            build_audit_event,
+            decide,
+            persist_sandbox_audit_event,
+        )
+        from agent_runtime_cockpit.security.trust import TrustLevel, resolve_trust
+        from agent_runtime_cockpit.tools.shell import _run_coro_sync
 
         cmd = text[1:].strip()
         self.data.add_entry("user", f"!{cmd}")
+        workspace = self.data.workspace
+        backend = "subprocess"
 
-        # D-03: route the bang-escape through trust + a conservative classifier.
-        # We do NOT call security.sandbox.decide() directly because the sandbox
-        # API is policy-oriented and would require a full SandboxRequest; this
-        # lighter wrapper still surfaces trust and a small denylist so unsafe
-        # commands are visibly refused rather than silently executed.
-        try:
-            trust_state = resolve_trust(self.data.workspace)
-            denylist = ("rm -rf", "sudo ", "mkfs", "dd if=", ":(){", "> /dev/")
-            lower = cmd.lower()
-            blocked_by_denylist = any(d in lower for d in denylist)
-            if trust_state.level == TrustLevel.UNTRUSTED or blocked_by_denylist:
-                reason = (
-                    "workspace untrusted (run /workspace trust)"
-                    if trust_state.level == TrustLevel.UNTRUSTED
-                    else "command matches sandbox denylist"
-                )
-                self.data.add_entry(
-                    "tool",
-                    f"Shell command blocked: {reason}\n  cmd: {cmd}",
-                    {"tool_name": f"Bash: {cmd}", "status": "error"},
-                )
-                return
-        except Exception:
-            pass  # fall through if trust resolution itself fails
-        try:
-            result = subprocess.run(  # noqa: S602
-                cmd, shell=True, capture_output=True, text=True, timeout=30
-            )
-            output = result.stdout
-            if result.stderr:
-                output += "\n[stderr]\n" + result.stderr
+        def _block(message: str) -> None:
             self.data.add_entry(
                 "tool",
-                output[:2000],
-                {
-                    "tool_name": f"Bash: {cmd}",
-                    "status": "success" if result.returncode == 0 else "error",
-                },
+                f"{message}\n  cmd: {cmd}",
+                {"tool_name": f"Bash: {cmd}", "status": "error"},
             )
-        except subprocess.TimeoutExpired:
-            self.data.add_entry("tool", "Command timed out after 30s", {"status": "error"})
-        except Exception as e:
+
+        def _audit(decision: SandboxDecision, exit_code: int | None) -> None:
+            # Best-effort: the security decision is already enforced above, so a
+            # failure to persist the audit event must never crash the TUI.
+            try:
+                now = datetime.now(timezone.utc).isoformat()
+                event = build_audit_event(
+                    command=argv,
+                    cwd=workspace,
+                    decision=decision,
+                    provider=backend,
+                    started_at=now,
+                    ended_at=now,
+                    exit_code=exit_code,
+                    stdout_truncated=False,
+                    stderr_truncated=False,
+                    redaction_applied=False,
+                )
+                persist_sandbox_audit_event(event)
+            except Exception:
+                pass
+
+        # Fail-closed: parse to argv first; refuse anything unparseable or empty.
+        try:
+            argv = shlex.split(cmd)
+        except ValueError as exc:
+            _block(f"Shell command blocked: cannot parse ({exc})")
+            return
+        if not argv:
+            return
+
+        # Fail-closed: any error resolving trust/policy/decision BLOCKS execution.
+        # (Previously this swallowed exceptions and fell through to an unsandboxed
+        # `subprocess.run(cmd, shell=True)`, bypassing the sandbox entirely.)
+        try:
+            trust_state = resolve_trust(workspace)
+            policy = SandboxPolicy(workspace_root=workspace)
+            sandbox_decision = decide(argv, policy)
+            backend = resolve_isolation_backend(load_config(workspace))
+        except Exception as exc:
+            _block(f"Shell command blocked: sandbox evaluation failed ({exc})")
+            return
+
+        if trust_state.level == TrustLevel.UNTRUSTED:
+            _block("Shell command blocked: workspace untrusted (run /workspace trust)")
+            return
+        if not sandbox_decision.allowed:
+            code = sandbox_decision.reason_code.value if sandbox_decision.reason_code else "denied"
+            _block(
+                f"Shell command blocked: {sandbox_decision.reason} "
+                f"[{sandbox_decision.classification.value} · {code}]"
+            )
+            _audit(sandbox_decision, None)
+            return
+        if sandbox_decision.approval_required and not sandbox_decision.approved:
+            _block(
+                f"Shell command requires approval: {sandbox_decision.reason} "
+                f"[{sandbox_decision.classification.value}]\n"
+                "  (run via `arc sandbox run --policy local-safe -- <cmd>` to approve)"
+            )
+            return
+
+        # Allowed: execute the EXACT classified argv under the configured isolation
+        # backend — no shell, workspace cwd, env allowlist (secrets stripped),
+        # policy timeout — then audit the outcome.
+        provider = build_execution_provider(
+            backend,
+            workspace_root=workspace,
+            env_allowlist=frozenset(policy.env_allowlist),
+            max_output_bytes=policy.max_output_bytes,
+        )
+        try:
+            iso = _run_coro_sync(
+                provider.execute(argv, cwd=workspace, timeout_seconds=policy.timeout_seconds)
+            )
+        except Exception as e:  # noqa: BLE001 - surface runner errors to the TUI, never crash.
             self.data.add_entry("tool", str(e), {"status": "error"})
+            return
+
+        if iso.killed and iso.kill_reason == "timeout":
+            _audit(sandbox_decision, None)
+            self.data.add_entry(
+                "tool",
+                f"Command timed out after {policy.timeout_seconds}s",
+                {"status": "error"},
+            )
+            return
+
+        output = iso.stdout
+        if iso.stderr:
+            output += "\n[stderr]\n" + iso.stderr
+        self.data.add_entry(
+            "tool",
+            output[:2000],
+            {
+                "tool_name": f"Bash: {cmd}",
+                "status": "success" if iso.exit_code == 0 else "error",
+            },
+        )
+        _audit(sandbox_decision, iso.exit_code)
 
     def _handle_chat_message(self, text: str) -> None:
         """Send a chat message. Streams via SwarmGraph if available."""

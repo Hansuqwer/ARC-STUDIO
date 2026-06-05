@@ -16,10 +16,10 @@ class TestArcConfigModel:
 
     def test_default_config(self):
         config = ArcConfig()
-        assert config.version == 1
+        assert config.version == 2
         assert config.workspace.trust_level == "auto"
         assert config.runtime.default == "auto"
-        assert config.execution.isolation == "none"
+        assert config.execution.isolation == "auto"
         assert config.execution.default_profile == "local-safe"
         assert config.providers.default_provider == "openai"
         assert config.swarmgraph.run_backend == "stub"
@@ -39,7 +39,7 @@ class TestArcConfigModel:
         flat = config.flatten()
         assert flat["workspace.name"] == "test-ws"
         assert flat["execution.timeout_seconds"] == 600
-        assert flat["version"] == 1
+        assert flat["version"] == 2
 
 
 class TestLoadConfig:
@@ -47,7 +47,7 @@ class TestLoadConfig:
 
     def test_load_defaults_with_no_files(self, tmp_path: Path):
         config = load_config(tmp_path)
-        assert config.version == 1
+        assert config.version == 2
         assert config.runtime.default == "auto"
 
     def test_load_workspace_config(self, tmp_path: Path):
@@ -117,7 +117,7 @@ providers:
         (ws / ".arc" / "config.yaml").write_text("{{invalid yaml")
         # Should not raise — falls back to defaults with warning
         config = load_config(ws)
-        assert config.version == 1
+        assert config.version == 2
 
 
 class TestInitConfig:
@@ -129,7 +129,7 @@ class TestInitConfig:
         config_path = init_config(ws)
         assert config_path.exists()
         content = config_path.read_text()
-        assert "version: 1" in content
+        assert "version: 2" in content
         assert "execution:" in content
         assert "swarmgraph:" in content
 
@@ -173,5 +173,5 @@ class TestCLIConfig:
         import json
 
         data = json.loads(result.output)["data"]
-        assert data["version"] == 1
+        assert data["version"] == 2
         assert data["runtime.default"] == "auto"

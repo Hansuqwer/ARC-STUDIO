@@ -13,7 +13,8 @@ from typing import Optional
 
 import typer
 
-from ..isolation.subprocess import SubprocessIsolationProvider
+from ..config.loader import load_config
+from ..isolation.selector import build_execution_provider, resolve_isolation_backend
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
 from ..security.plan import (
@@ -251,9 +252,10 @@ def plan_apply(
     started_path = persist_plan_event(started_event, ws)
     events = [{**started_event, "audit_path": str(started_path)}]
     results = []
-    provider = SubprocessIsolationProvider(
-        safe_env_keys=frozenset(policy_model.env_allowlist),
+    provider = build_execution_provider(
+        resolve_isolation_backend(load_config(ws)),
         workspace_root=ws,
+        env_allowlist=frozenset(policy_model.env_allowlist),
         max_output_bytes=policy_model.max_output_bytes,
     )
     for step in plan.steps:

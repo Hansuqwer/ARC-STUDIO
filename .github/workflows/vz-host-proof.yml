@@ -26,6 +26,11 @@ on:
         required: false
         default: '["sleep","30"]'
         type: string
+      auto_bringup:
+        description: One-shot self-contained bring-up via tools/arc-vz-bringup.sh (build BusyBox + fetch Kata kernel + pack/sign/run); ignores kernel_path/busybox_path
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -101,3 +106,24 @@ jobs:
             tests/isolation/test_vz_proof.py::test_vz_public_real_host_timeout \
             tests/isolation/test_vz_proof.py::test_vz_public_real_host_sigint \
             -q
+
+  vz-proof-bringup:
+    # One-shot, self-contained bring-up: builds the static BusyBox, fetches the
+    # Kata vmlinux.container kernel, packs the initrd, builds + ad-hoc-signs the
+    # runner, and runs the gated `pwd` proof — no operator-supplied paths needed.
+    # Requires a running Docker engine on the runner (for the busybox-static build).
+    if: ${{ inputs.auto_bringup }}
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
+      - name: Sync dependencies
+        working-directory: python
+        run: uv sync --all-extras --dev
+      - name: Bring up microVM artifacts + run gated pwd proof
+        run: tools/arc-vz-bringup.sh --run-proof
