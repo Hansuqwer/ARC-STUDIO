@@ -1,17 +1,134 @@
-                                 Apache License
-                           Version 2.0, January 2004
-                        http://www.apache.org/licenses/
+ARC STUDIO PROPRIETARY LICENSE
 
-Copyright 2025 ARC Studio Contributors
+Copyright (c) 2025–2026 Hans Vilund. All rights reserved.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+NOTICE: THIS IS NOT AN OPEN SOURCE LICENSE.
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This license governs the use of ARC Studio and all associated source code,
+documentation, assets, scripts, configuration files, and other materials
+contained in this repository (collectively, the "Software").
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+--------------------------------------------------------------------------------
+1. GRANT OF LIMITED VIEW ACCESS
+--------------------------------------------------------------------------------
+
+Subject to the terms and conditions of this License, the copyright holder
+grants you a limited, non-exclusive, non-transferable, revocable right to view
+the source code of the Software solely for the purpose of personal evaluation
+on your own device.
+
+This grant does NOT include any right to:
+
+  (a) copy, reproduce, or duplicate the Software or any portion thereof,
+      except as strictly necessary for local evaluation purposes;
+  (b) modify, adapt, translate, alter, transform, or create derivative works
+      based on the Software;
+  (c) merge the Software or any portion thereof into any other software,
+      product, or service;
+  (d) distribute, publish, transmit, sublicense, or make available the
+      Software or any portion thereof to any third party by any means;
+  (e) sell, resell, rent, lease, lend, or otherwise transfer the Software
+      or any rights therein;
+  (f) rebrand, rename, or otherwise present the Software or any derivative
+      work under a different name, identity, or branding;
+  (g) use the Software, in whole or in part, as the basis for any product or
+      service offered to third parties, whether commercially or otherwise;
+  (h) upload, mirror, fork (for redistribution), or otherwise copy the
+      Software to any external system, repository, service, or platform for
+      distribution or public access;
+  (i) remove, alter, obscure, or circumvent any copyright notice, license
+      notice, attribution, or other proprietary marking in the Software;
+  (j) reverse engineer, decompile, disassemble, or attempt to extract the
+      source code of any compiled component of the Software, except to the
+      extent expressly permitted by applicable law and only then upon prior
+      written notice to the copyright holder.
+
+--------------------------------------------------------------------------------
+2. COMMERCIAL USE
+--------------------------------------------------------------------------------
+
+Any commercial use of the Software — including but not limited to use in a
+commercial product, service, SaaS offering, internal enterprise tooling, or
+consulting engagement — requires a separate, written commercial license
+agreement executed by the copyright holder.
+
+To inquire about commercial licensing, contact the copyright holder directly.
+
+--------------------------------------------------------------------------------
+3. NO IMPLIED LICENSES
+--------------------------------------------------------------------------------
+
+Nothing in this License grants any right, license, or interest in any
+trademark, trade name, service mark, or logo of the copyright holder. No
+implied licenses are granted by this License.
+
+--------------------------------------------------------------------------------
+4. RESERVATION OF RIGHTS
+--------------------------------------------------------------------------------
+
+All rights not expressly granted in Section 1 are reserved by the copyright
+holder. Making this source code publicly viewable on GitHub does not waive any
+rights or create any open source or public domain dedication.
+
+--------------------------------------------------------------------------------
+5. TERMINATION
+--------------------------------------------------------------------------------
+
+This License and the limited view access granted hereunder terminate
+automatically and immediately upon any breach of its terms by you. Upon
+termination, you must destroy all copies of the Software in your possession
+or control. The copyright holder may also terminate this License at any time
+upon written notice.
+
+--------------------------------------------------------------------------------
+6. DISCLAIMER OF WARRANTIES
+--------------------------------------------------------------------------------
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. THE COPYRIGHT
+HOLDER MAKES NO WARRANTY THAT THE SOFTWARE WILL MEET YOUR REQUIREMENTS, OPERATE
+WITHOUT INTERRUPTION, OR BE FREE OF ERRORS OR DEFECTS.
+
+--------------------------------------------------------------------------------
+7. LIMITATION OF LIABILITY
+--------------------------------------------------------------------------------
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, PUNITIVE, OR CONSEQUENTIAL DAMAGES (INCLUDING BUT NOT LIMITED TO
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+BUSINESS INTERRUPTION; OR LOSS OF GOODWILL) HOWEVER CAUSED AND ON ANY THEORY
+OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE), ARISING OUT OF OR IN CONNECTION WITH THE SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+--------------------------------------------------------------------------------
+8. GOVERNING LAW
+--------------------------------------------------------------------------------
+
+This License shall be governed by and construed in accordance with the laws of
+the jurisdiction of the copyright holder's residence, without regard to conflict
+of law principles. Any disputes arising under or in connection with this License
+shall be subject to the exclusive jurisdiction of the courts of that
+jurisdiction.
+
+--------------------------------------------------------------------------------
+9. ENTIRE AGREEMENT
+--------------------------------------------------------------------------------
+
+This License constitutes the entire agreement between you and the copyright
+holder with respect to the subject matter hereof and supersedes all prior or
+contemporaneous understandings, agreements, representations, or warranties,
+whether written or oral, relating to such subject matter.
+
+If any provision of this License is held to be invalid or unenforceable, the
+remaining provisions shall continue in full force and effect.
+
+--------------------------------------------------------------------------------
+
+For permissions beyond the scope of this License, contact:
+  Hans Vilund — via GitHub at https://github.com/Hansuqwer
+
+THIS IS NOT LEGAL ADVICE. If you need legal guidance regarding this software,
+consult a qualified attorney.
