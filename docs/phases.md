@@ -6,6 +6,41 @@
 **Current evidence anchor:** local worktree | VZ exec-init local initrd packer/static-BusyBox guard/manual host-CI slice; `cd python && uv run arc sandbox vz-artifacts --json --exec-init --pack-initrd --busybox /var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-busybox-extract/usr/bin/busybox --output /var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-packed-initrd-attempt` blocked with `ARC_VZ_BUSYBOX must be a static Linux BusyBox binary`; prior gated VZ public CLI proof: `cd python && ARC_MICROVM_EXEC_ENABLED=1 ARC_MICROVM_INTEGRATION=1 ARC_VZ_REAL_EXEC=1 ARC_VZ_ARTIFACT_MANIFEST=/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-vz-artifacts-exec/vz-artifacts-manifest.json ARC_VZ_TIMEOUT_SECONDS=45 uv run arc sandbox run --json --provider microvm --policy local-safe -- pwd` OK.
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
+## Reprioritization 2026-06-05 — Token-Saving Series + UX Audit Backlog
+
+**Authority:** Hans Vilund, project owner.
+
+**Decision:** Token-saving alpha series (v0.3.0-alpha through v0.7-alpha, shipped 2026-06-04 to 2026-06-05) and UX_AUDIT.md follow-on work **explicitly reprioritize ahead of Phases 104+105 microVM execution proof.**
+
+**Reason:** Token-saving series shipped against session momentum, not against this locked plan. Per the stop-the-line clause above ("Do not advance unrelated product work until the Priority 1 track is complete **or explicitly reprioritized**"), this is the explicit reprioritization the clause anticipates.
+
+**Phase 104 + 105 status:** Deferred to v0.8+ pending Linux/KVM host access. Not abandoned. macOS-only proof remains "Gated Public CLI Proof Passed Once / Default Off" per Phase 104 evidence. Linux/Firecracker remains "Baseline Complete (host-unproven)" per Phase 105 evidence.
+
+**Token-saving series — completed out-of-plan but documented:**
+
+| Tag | SHA | Source |
+|---|---|---|
+| v0.3.0-alpha | 7d5570f | R-TS1 + R-TS2 (research + P0 baseline complete) |
+| v0.3.1-alpha | (CI debt) | aiohttp CVE + TS coverage backfill |
+| v0.4.0-alpha | 8affdd0c | R-TS4 (R-01 wallet + /wallet + /budget + OTel alias) |
+| v0.4.1-alpha | b6c4beb | R-TS5 (persistence + Tier-1 pricing) |
+| v0.5.0-alpha | 0069735 | R-TS7 (R-02 compaction + QW-4 handles — first behavior change) |
+| v0.5.1-alpha | d667550 | R-TS8 (Chinese-labs adoption via OpenRouter) |
+| v0.5.2-alpha | 5c05df5 | R-TS8 continued (capability backfill — precursor to v0.6) |
+| v0.6-alpha | 4de0eae | R-TS9 (catalog-driven model picker) |
+| v0.7-alpha | 83568b3 | R-TS10 (opt-in cloud features) |
+
+**Next sprint queue (post-reprioritization):**
+
+1. **R-UX1 (Phase 41 follow-on)** — UX polish: Header + ContextMeter + ModeBadge + Markdown + Token-driven TCSS. Per UX_AUDIT.md §23: "ship R-001 + R-002 + R-003 together as the single highest-leverage UX change." Effort: ~2 days (R-003 ModeBadge/Shift+Tab verified SHIPPED at screen.py:47-48; scope is R-001 + R-002 only). Targets TUI heuristic score 39/100 → mid-60s.
+2. **R-UX2 (Phase 41 follow-on)** — Modes + Approvals: ApprovalCard + CapabilityCardBanner + ActivityTray + PlanView + Streaming + Sandbox-aware shell. Effort: 1 week.
+3. **R-UX3 (Phase 41 follow-on)** — Components + IA: ToolCard + DiffViewer + SlashMenu + CommandPalette + Toaster + KeycapHint + RiskBadge + Views polish + frontmatter-driven registry. Effort: 2 weeks.
+4. **R-UX4 (Phase 41 follow-on)** — Themes + A11y: 5 themes + NO_COLOR + reduced motion + snapshot tests + /title + /statusline. Effort: 1 week.
+5. **R-OPEN-DEFERRED-RUNBOOKS** — Execute deferred research runbooks (token-estimator-accuracy.md + budget-persistence-audit.md). Half-day each.
+6. **Phase 104 + 105 resumed** — microVM macOS hardening + Linux Firecracker host proof. Resumed after R-UX1-R-UX4 OR when Linux/KVM host access materializes (whichever first). Original mandate valid; deferral is sequencing, not abandonment.
+
+**Honesty record:** Per docs/policy/honesty-over-polish.md, the 2026-06-04→2026-06-05 session shipped 8 alpha tags without this formal reprioritization being in place at the time. This section documents what was implicit, making it explicit. Future drift from the locked plan requires equivalent explicit reprioritization or it violates the stop-the-line clause.
+
 ## Execution Preference
 
 Prefer larger coherent implementation chunks over tiny slices. A chunk may include multiple listed slices when they share files/tests and can be completed safely in one session. Keep the no-destructive-actions, no-secret-commits, preserve-unrelated-work, and green-verification rules.
