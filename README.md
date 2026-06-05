@@ -23,7 +23,7 @@ arc serve    # starts the HTTP daemon on 127.0.0.1:7777
 | **Python CLI** | 85+ `arc` subcommands — runs, traces, sandbox, audit, HITL, eval, providers, MCP, isolation |
 | **HTTP Daemon** | Local loopback API at `127.0.0.1:7777` — single-user, no auth, no remote access |
 | **Browser IDE** | Eclipse Theia app with workflow, trace, audit, HITL, SwarmGraph insight, and config views |
-| **Provider Catalog** | 13+ providers bundled (OpenAI, Groq, Cerebras, OpenRouter, GitHub Models, DeepSeek, and more); live models.dev catalog opt-in (75+ providers) |
+| **Provider Catalog** | 109 OpenAI-compatible providers bundled — see [Provider Catalog](#provider-catalog) below; live models.dev catalog opt-in |
 | **Sandbox** | Policy-based command sandbox — deny-by-default, path confinement, env allowlist, audit chain |
 | **Isolation Backend** | Selectable execution isolation: `auto` / `none` / `subprocess` / `docker` (gated) / `microvm` (gated, macOS arm64 only) |
 | **Runtime Adapters** | SwarmGraph (native), LangGraph, CrewAI, OpenAI Agents SDK, AG2, LlamaIndex, LM Arena (stub) |
@@ -84,19 +84,9 @@ Open `http://127.0.0.1:3000`.
 
 ---
 
-## Provider Setup
+## Provider Catalog
 
-ARC bundles a catalog of 13+ OpenAI-compatible providers from [models.dev](https://models.dev). Free-tier providers require no billing setup.
-
-### Free-tier providers (no payment needed)
-
-| Provider | Key | Free models |
-|---|---|---|
-| **GitHub Models** | `GITHUB_TOKEN` | GPT-4.1 Mini, Llama 3.3 70B, DeepSeek V3 |
-| **OpenRouter** | `OPENROUTER_API_KEY` | `*:free` variants (DeepSeek R1, Llama 3.3 70B, Mistral 7B) |
-| **Cerebras** | `CEREBRAS_API_KEY` | GPT-OSS 120B |
-| **Z.AI** | `ZHIPU_API_KEY` | GLM-4.5 Flash |
-| **NVIDIA** | `NVIDIA_API_KEY` | Nemotron models |
+ARC bundles **109 OpenAI-compatible providers** from [models.dev](https://models.dev) — no network required to browse them. A live catalog opt-in fetches the latest snapshot at startup.
 
 ### Configure in the TUI
 
@@ -105,19 +95,112 @@ arc
 /providers    →  select a provider  →  enter API key  →  pick a model
 ```
 
-Or set environment variables:
+Or export environment variables directly:
 
 ```bash
-export OPENROUTER_API_KEY=sk-or-...
-export GROQ_API_KEY=gsk_...
 export GITHUB_TOKEN=ghp_...
+export OPENROUTER_API_KEY=sk-or-...
+export DEEPSEEK_API_KEY=...
 ```
+
+### Free / no-billing providers
+
+| Provider | Env Key | Notes |
+|---|---|---|
+| **GitHub Models** | `GITHUB_TOKEN` | GPT-4.1 Mini, Llama 3.3 70B, DeepSeek V3 — free with GitHub account |
+| **OpenRouter** | `OPENROUTER_API_KEY` | `*:free` model variants — DeepSeek R1, Llama 3.3 70B, Mistral 7B |
+| **NVIDIA** | `NVIDIA_API_KEY` | Nemotron + community models — free tier available |
+| **Hugging Face** | `HF_TOKEN` | Inference API free tier |
+| **LM Studio** | `LMSTUDIO_API_KEY` | Local models via LM Studio server |
+| **Ollama Cloud** | `OLLAMA_API_KEY` | Cloud-hosted Ollama endpoint |
+
+### Major paid providers (bundled)
+
+| Provider | Env Key | Notable Models |
+|---|---|---|
+| **OpenAI** | `OPENAI_API_KEY` | GPT-4.1, GPT-5, GPT-5.4, o-series |
+| **Anthropic** | `ANTHROPIC_API_KEY` | Claude Opus 4.x, Claude Sonnet 4.x, Claude Haiku 4.x |
+| **Google / DeepMind** | `GOOGLE_API_KEY` | Gemini 2.5 Flash/Pro, Gemini 3 Flash/Pro |
+| **DeepSeek** | `DEEPSEEK_API_KEY` | DeepSeek V3.2, DeepSeek-R1, DeepSeek Reasoner |
+| **xAI** | `XAI_API_KEY` | Grok 4.1, Grok 4.20, Grok 4-fast series |
+| **Groq** | `GROQ_API_KEY` | Llama 3.3 70B, Mixtral, Gemma |
+| **Fireworks AI** | `FIREWORKS_API_KEY` | Llama, Mixtral, CodeLlama |
+| **Cerebras** | `CEREBRAS_API_KEY` | Ultra-fast inference |
+| **Mistral** | `MISTRAL_API_KEY` | Mistral Large 2512, Ministral 14B |
+| **Perplexity** | `PERPLEXITY_API_KEY` | Sonar models with web search |
+| **Novita AI** | `NOVITA_API_KEY` | Large model zoo |
+| **NVIDIA** | `NVIDIA_API_KEY` | Nemotron, community models |
+| **Nebius** | `NEBIUS_API_KEY` | EU-based inference |
+| **Databricks** | `DATABRICKS_HOST` + `DATABRICKS_TOKEN` | Enterprise model serving |
+| **Snowflake Cortex** | `SNOWFLAKE_ACCOUNT` + `SNOWFLAKE_CORTEX_PAT` | Enterprise |
+| **Upstage** | `UPSTAGE_API_KEY` | Solar models |
+| **Sarvam** | `SARVAM_API_KEY` | Indic language models |
+
+### Chinese-ecosystem providers (bundled)
+
+| Provider | Env Key | Notable Models |
+|---|---|---|
+| **Alibaba (DashScope)** | `DASHSCOPE_API_KEY` | Qwen3-235B, Qwen-Flash, Qwen-Max |
+| **ZhipuAI** | `ZHIPU_API_KEY` | GLM-4.5, GLM-4.6, GLM-4.7, GLM-5, GLM-5.1 |
+| **Moonshot AI** | `MOONSHOT_API_KEY` | Kimi K2, Kimi K2 Thinking |
+| **302.AI** | `302AI_API_KEY` | Aggregator — GPT, Claude, Gemini, GLM, DeepSeek |
+| **SiliconFlow** | `SILICONFLOW_API_KEY` | Qwen3, DeepSeek, InternLM |
+| **Stepfun** | `STEPFUN_API_KEY` | Step series models |
+| **Baidu / Bailing** | `BAILING_API_TOKEN` | ERNIE / Bailing series |
+| **ModelScope** | `MODELSCOPE_API_KEY` | Community models (Alibaba) |
+| **Xiaomi** | `XIAOMI_API_KEY` | MiLM models |
+| **Tencent** | `TENCENT_TOKENHUB_API_KEY` | Hunyuan models |
+| **Drun** | `DRUN_API_KEY` | Chinese cloud inference |
+| **iFlow** | `IFLOW_API_KEY` | Chinese inference platform |
+| **Qiniu AI** | `QINIU_API_KEY` | Qiniu cloud models |
+
+### Routing / aggregator providers (bundled)
+
+| Provider | Env Key | Notes |
+|---|---|---|
+| **OpenRouter** | `OPENROUTER_API_KEY` | 300+ models via single API |
+| **CrofAI** | `CROF_API_KEY` | Multi-model routing |
+| **LLM Gateway** | `LLMGATEWAY_API_KEY` | Unified gateway |
+| **Helicone** | `HELICONE_API_KEY` | Proxy + observability |
+| **FastRouter** | `FASTROUTER_API_KEY` | Speed-optimized routing |
+| **Requesty** | `REQUESTY_API_KEY` | Request routing |
+| **Zenmux** | `ZENMUX_API_KEY` | Multi-provider mux |
+| **NanoGPT** | `NANO_GPT_API_KEY` | Pay-per-token aggregator |
+| **Wandb** | `WANDB_API_KEY` | Weave LLM proxy |
+
+### Specialty / infrastructure providers (bundled)
+
+| Provider | Env Key | Notes |
+|---|---|---|
+| **Cloudflare Workers AI** | `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_KEY` | Edge inference |
+| **Digital Ocean** | `DIGITALOCEAN_ACCESS_TOKEN` | GPU Droplets |
+| **Vultr** | `VULTR_API_KEY` | Cloud GPU inference |
+| **OVHcloud** | `OVHCLOUD_API_KEY` | EU cloud |
+| **Scaleway** | `SCALEWAY_API_KEY` | EU cloud |
+| **STACKIT** | `STACKIT_API_KEY` | German cloud |
+| **Evroc** | `EVROC_API_KEY` | EU sovereign cloud |
+| **Berget** | `BERGET_API_KEY` | Nordic cloud |
+| **Baseten** | `BASETEN_API_KEY` | ML model deployment |
+| **Friendli** | `FRIENDLI_TOKEN` | High-throughput inference |
+| **HPC-AI** | `HPC_AI_API_KEY` | HPC-optimised serving |
+| **GMI Cloud** | `GMICLOUD_API_KEY` | GPU cloud |
+| **io.net** | `IOINTELLIGENCE_API_KEY` | Decentralised GPU |
+| **Near AI** | `NEARAI_API_KEY` | Web3-native inference |
+| **Inception** | `INCEPTION_API_KEY` | Mercury Coder series |
+| **Poolside** | `POOLSIDE_API_KEY` | Code-focused models |
+| **Morph** | `MORPH_API_KEY` | Fast inference |
+| **Clarifai** | `CLARIFAI_PAT` | Vision + LLM platform |
+| **PrivateMode** | `PRIVATEMODE_API_KEY` + `PRIVATEMODE_ENDPOINT` | On-prem / private |
+| **Wafer.ai** | `WAFER_API_KEY` | Inference as a service |
+| **Chutes** | `CHUTES_API_KEY` | Inference platform |
 
 ### Live catalog (opt-in)
 
 ```bash
 ARC_MODELS_DEV_LIVE=1 uv run arc
 ```
+
+Fetches the latest models.dev snapshot at startup. Requires network access.
 
 ---
 
