@@ -21,15 +21,25 @@ class ModelRow(NamedTuple):
     input_modalities: list
     supported_parameters: list
     pricing_valid_until: str | None
+    max_context: int
 
 
 def _all_models() -> list[ModelRow]:
     """Return every model from every vendor in VENDOR_CONFIGS. No network."""
     from ...providers.openai_compatible import VENDOR_CONFIGS
 
+    _DEFAULTS = {
+        "gemini": 2000000,
+        "deepseek": 1000000,
+        "kimi": 1000000,
+        "anthropic": 200000,
+        "llamacpp": 8192,
+    }
+
     rows: list[ModelRow] = []
     for vendor, cfg in VENDOR_CONFIGS.items():
         cost_rates = cfg.get("cost_rates", {})
+        max_context = cfg.get("max_context_tokens") or _DEFAULTS.get(vendor, 128000)
         for model_id, rates in cost_rates.items():
             rows.append(
                 ModelRow(
@@ -41,6 +51,7 @@ def _all_models() -> list[ModelRow]:
                     input_modalities=getattr(rates, "input_modalities", []),
                     supported_parameters=getattr(rates, "supported_parameters", []),
                     pricing_valid_until=getattr(rates, "pricing_valid_until", None),
+                    max_context=max_context,
                 )
             )
     return rows
@@ -68,6 +79,12 @@ def _parse_args(arg: str) -> dict:
         elif t == "--max-input" and i + 1 < len(tokens):
             try:
                 opts["max_input"] = float(tokens[i + 1])
+            except ValueError:
+                pass
+            i += 2
+        elif t == "--max-context" and i + 1 < len(tokens):
+            try:
+                opts["max_context"] = int(tokens[i + 1])
             except ValueError:
                 pass
             i += 2
@@ -101,6 +118,8 @@ def _apply_filters(rows: list[ModelRow], opts: dict) -> list[ModelRow]:
         rows = [r for r in rows if r.is_free_tier]
     if max_input := opts.get("max_input"):
         rows = [r for r in rows if r.input_per_million <= max_input]
+    if max_context := opts.get("max_context"):
+        rows = [r for r in rows if r.max_context >= max_context]
     for cap in opts.get("has", []):
         if cap == "vision":
             rows = [
@@ -127,12 +146,13 @@ def run(arg: str) -> str:
     if arg.strip() in ("--help", "-h", ""):
         return (
             "Usage: /models [--vendor <name>] [--has <capability>] [--free] "
-            "[--max-input <$/M>] [--search <query>]\n"
+            "[--max-input <$/M>] [--max-context <tokens>] [--search <query>]\n"
             "Capabilities: vision, tools, reasoning\n"
             "Examples:\n"
             "  /models --vendor kimi\n"
             "  /models --has vision\n"
             "  /models --has tools --max-input 1.0\n"
+            "  /models --max-context 200000\n"
             "  /models --free"
         )
 

@@ -27,6 +27,9 @@ class TestParseArgs:
     def test_max_input_flag(self):
         assert _parse_args("--max-input 1.0")["max_input"] == 1.0
 
+    def test_max_context_flag(self):
+        assert _parse_args("--max-context 200000")["max_context"] == 200000
+
     def test_search_flag(self):
         assert _parse_args("--search flash")["search"] == "flash"
 
@@ -45,6 +48,12 @@ class TestFilters:
     def test_max_input_filter(self):
         rows = _apply_filters(_all_models(), {"max_input": 0.5})
         assert all(r.input_per_million <= 0.5 for r in rows)
+
+    def test_max_context_filter(self):
+        rows = _apply_filters(_all_models(), {"max_context": 1000000})
+        # Gemini, DeepSeek, and Kimi have >= 1M context
+        assert len(rows) > 0
+        assert all(r.max_context >= 1000000 for r in rows)
 
     def test_has_vision_filter(self):
         rows = _apply_filters(_all_models(), {"has": ["vision"]})

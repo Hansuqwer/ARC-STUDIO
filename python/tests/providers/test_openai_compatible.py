@@ -34,7 +34,7 @@ class TestVendorConfiguration:
             "cost_rates",
         }
         for vendor, config in VENDOR_CONFIGS.items():
-            assert set(config.keys()) == required_fields, f"Vendor {vendor} missing fields"
+            assert required_fields.issubset(config.keys()), f"Vendor {vendor} missing fields"
 
     def test_vendor_cost_rates_cover_supported_models(self):
         """Cost rates must cover all supported models."""

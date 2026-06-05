@@ -30,13 +30,14 @@ def test_cost_rates_defaults_empty_capability_fields():
 
 
 def test_existing_rows_unaffected():
-    """Non-Chinese-lab vendors have empty capability fields by default."""
+    """Non-Chinese-lab vendors have backfilled capability fields."""
     caps = OpenAICompatibleClient(vendor="openai").capabilities()
     for model in ["gpt-4o", "gpt-4o-mini"]:
         r = (caps.cost_rates or {}).get(model)
         if r:
-            assert r.supported_parameters == []
-            assert r.input_modalities == []
+            assert "tools" in r.supported_parameters
+            assert "response_format" in r.supported_parameters
+            assert "image" in r.input_modalities
 
 
 # ── 2. Multimodal models have image/video in input_modalities ─────────────

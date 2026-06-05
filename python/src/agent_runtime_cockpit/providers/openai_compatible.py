@@ -61,6 +61,7 @@ VendorName = Literal[
     "glm",
     "mimo",
     "minimax",
+    "anthropic",
 ]
 
 VENDOR_CONFIGS = {
@@ -91,40 +92,95 @@ VENDOR_CONFIGS = {
         "cost_rates": {
             # GPT-5.x current-gen: 90% cache discount (0.10× input) per pricing-snapshot-2026Q2.md §1
             "gpt-5.5": CostRates(
-                input_per_million=5.0, output_per_million=30.0, cache_read_per_million=0.50
+                input_per_million=5.0,
+                output_per_million=30.0,
+                cache_read_per_million=0.50,
+                supported_parameters=["tools", "reasoning_effort", "response_format"],
+                input_modalities=["text", "image"],
             ),
             "gpt-5.4": CostRates(
-                input_per_million=2.5, output_per_million=15.0, cache_read_per_million=0.25
+                input_per_million=2.5,
+                output_per_million=15.0,
+                cache_read_per_million=0.25,
+                supported_parameters=["tools", "reasoning_effort", "response_format"],
+                input_modalities=["text", "image"],
             ),
             "gpt-5.4-mini": CostRates(
-                input_per_million=0.75, output_per_million=4.50, cache_read_per_million=0.075
+                input_per_million=0.75,
+                output_per_million=4.50,
+                cache_read_per_million=0.075,
+                supported_parameters=["tools", "reasoning_effort", "response_format"],
+                input_modalities=["text", "image"],
             ),
             "gpt-5.4-nano": CostRates(
-                input_per_million=0.20, output_per_million=1.25, cache_read_per_million=0.02
+                input_per_million=0.20,
+                output_per_million=1.25,
+                cache_read_per_million=0.02,
+                supported_parameters=["tools", "reasoning_effort", "response_format"],
+                input_modalities=["text", "image"],
             ),
             "gpt-5.2": CostRates(
-                input_per_million=1.75, output_per_million=14.0, cache_read_per_million=0.175
+                input_per_million=1.75,
+                output_per_million=14.0,
+                cache_read_per_million=0.175,
+                supported_parameters=["tools", "reasoning_effort", "response_format"],
+                input_modalities=["text", "image"],
             ),
             "gpt-5": CostRates(
-                input_per_million=1.25, output_per_million=10.0, cache_read_per_million=0.125
+                input_per_million=1.25,
+                output_per_million=10.0,
+                cache_read_per_million=0.125,
+                supported_parameters=["tools", "reasoning_effort", "response_format"],
+                input_modalities=["text", "image"],
             ),
             # GPT-4.1 family: 75% cache discount (0.25× input)
             "gpt-4.1": CostRates(
-                input_per_million=2.0, output_per_million=8.0, cache_read_per_million=0.50
+                input_per_million=2.0,
+                output_per_million=8.0,
+                cache_read_per_million=0.50,
+                supported_parameters=["tools", "response_format"],
+                input_modalities=["text", "image"],
             ),
             "gpt-4.1-mini": CostRates(
-                input_per_million=0.40, output_per_million=1.60, cache_read_per_million=0.10
+                input_per_million=0.40,
+                output_per_million=1.60,
+                cache_read_per_million=0.10,
+                supported_parameters=["tools", "response_format"],
+                input_modalities=["text", "image"],
             ),
             "gpt-4.1-nano": CostRates(
-                input_per_million=0.10, output_per_million=0.40, cache_read_per_million=0.025
+                input_per_million=0.10,
+                output_per_million=0.40,
+                cache_read_per_million=0.025,
+                supported_parameters=["tools", "response_format"],
+                input_modalities=["text", "image"],
             ),
             # Legacy: gpt-4o-mini retains 50% cache discount; gpt-4o legacy rates
-            "gpt-4o": CostRates(input_per_million=2.50, output_per_million=10.0),
-            "gpt-4o-mini": CostRates(
-                input_per_million=0.15, output_per_million=0.60, cache_read_per_million=0.075
+            "gpt-4o": CostRates(
+                input_per_million=2.50,
+                output_per_million=10.0,
+                supported_parameters=["tools", "response_format"],
+                input_modalities=["text", "image"],
             ),
-            "gpt-4-turbo": CostRates(input_per_million=10.0, output_per_million=30.0),
-            "gpt-3.5-turbo": CostRates(input_per_million=0.50, output_per_million=1.50),
+            "gpt-4o-mini": CostRates(
+                input_per_million=0.15,
+                output_per_million=0.60,
+                cache_read_per_million=0.075,
+                supported_parameters=["tools", "response_format"],
+                input_modalities=["text", "image"],
+            ),
+            "gpt-4-turbo": CostRates(
+                input_per_million=10.0,
+                output_per_million=30.0,
+                supported_parameters=["tools", "response_format"],
+                input_modalities=["text", "image"],
+            ),
+            "gpt-3.5-turbo": CostRates(
+                input_per_million=0.50,
+                output_per_million=1.50,
+                supported_parameters=["tools", "response_format"],
+                input_modalities=["text"],
+            ),
         },
     },
     "together": {
@@ -137,10 +193,16 @@ VENDOR_CONFIGS = {
         "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE],
         "cost_rates": {
             "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo": CostRates(
-                input_per_million=0.20, output_per_million=0.20
+                input_per_million=0.20,
+                output_per_million=0.20,
+                supported_parameters=["tools"],
+                input_modalities=["text"],
             ),
             "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo": CostRates(
-                input_per_million=0.88, output_per_million=0.88
+                input_per_million=0.88,
+                output_per_million=0.88,
+                supported_parameters=["tools"],
+                input_modalities=["text"],
             ),
         },
     },
@@ -150,8 +212,18 @@ VENDOR_CONFIGS = {
         "supported_models": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
         "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE],
         "cost_rates": {
-            "llama-3.3-70b-versatile": CostRates(input_per_million=0.59, output_per_million=0.79),
-            "llama-3.1-8b-instant": CostRates(input_per_million=0.05, output_per_million=0.08),
+            "llama-3.3-70b-versatile": CostRates(
+                input_per_million=0.59,
+                output_per_million=0.79,
+                supported_parameters=["tools"],
+                input_modalities=["text"],
+            ),
+            "llama-3.1-8b-instant": CostRates(
+                input_per_million=0.05,
+                output_per_million=0.08,
+                supported_parameters=["tools"],
+                input_modalities=["text"],
+            ),
         },
     },
     "deepinfra": {
@@ -161,7 +233,10 @@ VENDOR_CONFIGS = {
         "features": [ProviderFeature.STREAMING],
         "cost_rates": {
             "meta-llama/Meta-Llama-3.1-8B-Instruct": CostRates(
-                input_per_million=0.08, output_per_million=0.08
+                input_per_million=0.08,
+                output_per_million=0.08,
+                supported_parameters=[],
+                input_modalities=["text"],
             )
         },
     },
@@ -172,7 +247,10 @@ VENDOR_CONFIGS = {
         "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE],
         "cost_rates": {
             "accounts/fireworks/models/llama-v3p1-8b-instruct": CostRates(
-                input_per_million=0.20, output_per_million=0.20
+                input_per_million=0.20,
+                output_per_million=0.20,
+                supported_parameters=["tools"],
+                input_modalities=["text"],
             )
         },
     },
@@ -181,7 +259,14 @@ VENDOR_CONFIGS = {
         "default_model": "local-model",
         "supported_models": ["local-model"],
         "features": [ProviderFeature.STREAMING],
-        "cost_rates": {"local-model": CostRates(input_per_million=0.0, output_per_million=0.0)},
+        "cost_rates": {
+            "local-model": CostRates(
+                input_per_million=0.0,
+                output_per_million=0.0,
+                supported_parameters=[],
+                input_modalities=["text"],
+            )
+        },
     },
     "9router": {
         "base_url": "http://127.0.0.1:20128/v1",
@@ -195,11 +280,29 @@ VENDOR_CONFIGS = {
         "features": [ProviderFeature.STREAMING, ProviderFeature.TOOL_USE],
         "cost_rates": {
             "ag/gemini-3.5-flash-extra-low": CostRates(
-                input_per_million=0.0, output_per_million=0.0
+                input_per_million=0.0,
+                output_per_million=0.0,
+                supported_parameters=["tools"],
+                input_modalities=["text", "image"],
             ),
-            "qwen/qwen3-coder": CostRates(input_per_million=0.0, output_per_million=0.0),
-            "qwen/qwen-plus": CostRates(input_per_million=0.0, output_per_million=0.0),
-            "qwen/qwen-max": CostRates(input_per_million=0.0, output_per_million=0.0),
+            "qwen/qwen3-coder": CostRates(
+                input_per_million=0.0,
+                output_per_million=0.0,
+                supported_parameters=["tools"],
+                input_modalities=["text"],
+            ),
+            "qwen/qwen-plus": CostRates(
+                input_per_million=0.0,
+                output_per_million=0.0,
+                supported_parameters=["tools"],
+                input_modalities=["text"],
+            ),
+            "qwen/qwen-max": CostRates(
+                input_per_million=0.0,
+                output_per_million=0.0,
+                supported_parameters=["tools"],
+                input_modalities=["text"],
+            ),
         },
     },
     "crofai": {
@@ -1540,16 +1643,155 @@ VENDOR_CONFIGS = {
                 input_modalities=["text"],
             ),
             "gemini-2.5-flash": CostRates(
-                input_per_million=0.30, output_per_million=2.50, cache_read_per_million=0.03
+                input_per_million=0.30,
+                output_per_million=2.50,
+                cache_read_per_million=0.03,
+                supported_parameters=["tools"],
+                input_modalities=["text", "image"],
             ),
             "gemini-2.5-flash-lite": CostRates(
-                input_per_million=0.10, output_per_million=0.40, cache_read_per_million=0.01
+                input_per_million=0.10,
+                output_per_million=0.40,
+                cache_read_per_million=0.01,
+                supported_parameters=["tools"],
+                input_modalities=["text", "image"],
             ),
             "gemini-3-flash": CostRates(
-                input_per_million=0.50, output_per_million=3.00, cache_read_per_million=0.05
+                input_per_million=0.50,
+                output_per_million=3.00,
+                cache_read_per_million=0.05,
+                supported_parameters=["tools"],
+                input_modalities=["text", "image"],
             ),
             "gemini-3.5-flash": CostRates(
-                input_per_million=1.50, output_per_million=9.00, cache_read_per_million=0.15
+                input_per_million=1.50,
+                output_per_million=9.00,
+                cache_read_per_million=0.15,
+                supported_parameters=["tools"],
+                input_modalities=["text", "image"],
+            ),
+        },
+    },
+    "anthropic": {
+        "base_url": "https://api.anthropic.com/v1",
+        "default_model": "claude-sonnet-4-6",
+        "supported_models": [
+            "claude-haiku-4-5",
+            "claude-sonnet-4-6",
+            "claude-opus-4-6",
+            "claude-opus-4-7",
+            "claude-haiku-3",
+            "claude-opus-4-1",
+            "claude-haiku-4-5-20250101",
+            "claude-sonnet-4-6-20250101",
+            "claude-opus-4-6-20250101",
+            "claude-opus-4-7-20250101",
+            "claude-haiku-3-20250101",
+            "claude-opus-4-1-20250101",
+        ],
+        "features": [
+            ProviderFeature.STREAMING,
+            ProviderFeature.PROMPT_CACHING,
+            ProviderFeature.TOOL_USE,
+            ProviderFeature.SYSTEM_PROMPT,
+        ],
+        "max_context_tokens": 200_000,
+        "cost_rates": {
+            "claude-haiku-4-5": CostRates(
+                input_per_million=1.0,
+                output_per_million=5.0,
+                cache_write_per_million=1.25,
+                cache_read_per_million=0.10,
+                supported_parameters=["tools"],
+                input_modalities=["text", "image"],
+            ),
+            "claude-sonnet-4-6": CostRates(
+                input_per_million=3.0,
+                output_per_million=15.0,
+                cache_write_per_million=3.75,
+                cache_read_per_million=0.30,
+                supported_parameters=["tools"],
+                input_modalities=["text", "image"],
+            ),
+            "claude-opus-4-6": CostRates(
+                input_per_million=5.0,
+                output_per_million=25.0,
+                cache_write_per_million=6.25,
+                cache_read_per_million=0.50,
+                supported_parameters=["tools"],
+                input_modalities=["text", "image"],
+            ),
+            "claude-opus-4-7": CostRates(
+                input_per_million=5.0,
+                output_per_million=25.0,
+                cache_write_per_million=6.25,
+                cache_read_per_million=0.50,
+                supported_parameters=["tools"],
+                input_modalities=["text", "image"],
+            ),
+            "claude-haiku-3": CostRates(
+                input_per_million=0.25,
+                output_per_million=1.25,
+                cache_write_per_million=0.3125,
+                cache_read_per_million=0.025,
+                supported_parameters=["tools"],
+                input_modalities=["text"],
+            ),
+            "claude-opus-4-1": CostRates(
+                input_per_million=15.0,
+                output_per_million=75.0,
+                cache_write_per_million=18.75,
+                cache_read_per_million=1.50,
+                supported_parameters=["tools"],
+                input_modalities=["text", "image"],
+            ),
+            "claude-haiku-4-5-20250101": CostRates(
+                input_per_million=1.0,
+                output_per_million=5.0,
+                cache_write_per_million=1.25,
+                cache_read_per_million=0.10,
+                supported_parameters=["tools"],
+                input_modalities=["text", "image"],
+            ),
+            "claude-sonnet-4-6-20250101": CostRates(
+                input_per_million=3.0,
+                output_per_million=15.0,
+                cache_write_per_million=3.75,
+                cache_read_per_million=0.30,
+                supported_parameters=["tools"],
+                input_modalities=["text", "image"],
+            ),
+            "claude-opus-4-6-20250101": CostRates(
+                input_per_million=5.0,
+                output_per_million=25.0,
+                cache_write_per_million=6.25,
+                cache_read_per_million=0.50,
+                supported_parameters=["tools"],
+                input_modalities=["text", "image"],
+            ),
+            "claude-opus-4-7-20250101": CostRates(
+                input_per_million=5.0,
+                output_per_million=25.0,
+                cache_write_per_million=6.25,
+                cache_read_per_million=0.50,
+                supported_parameters=["tools"],
+                input_modalities=["text", "image"],
+            ),
+            "claude-haiku-3-20250101": CostRates(
+                input_per_million=0.25,
+                output_per_million=1.25,
+                cache_write_per_million=0.3125,
+                cache_read_per_million=0.025,
+                supported_parameters=["tools"],
+                input_modalities=["text"],
+            ),
+            "claude-opus-4-1-20250101": CostRates(
+                input_per_million=15.0,
+                output_per_million=75.0,
+                cache_write_per_million=18.75,
+                cache_read_per_million=1.50,
+                supported_parameters=["tools"],
+                input_modalities=["text", "image"],
             ),
         },
     },
