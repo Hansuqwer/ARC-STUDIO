@@ -267,12 +267,20 @@ def test_provider_statuses_fallback_to_stored_creds(tmp_path, monkeypatch):
 
     # Save a stored credential for openai
     auth_path = tmp_path / "auth.json"
-
     cred = _make_cred("openai", "sk-stored-key")
     save_credential(cred, auth_path)
 
     # Trust the workspace
     monkeypatch.setattr(_auth_mgr, "_is_workspace_trusted", lambda workspace=None: True)
+
+    # Redirect the get_credential call in provider_statuses to our tmp_path store
+    # so CI runners without ~/.arc/auth.json still find the credential.
+    # provider_statuses uses a local `from .auth.manager import get_credential`,
+    # so we patch the function at its source module.
+    monkeypatch.setattr(
+        "agent_runtime_cockpit.auth.manager.get_credential",
+        lambda provider_id, **_kw: get_credential(provider_id, path=auth_path),
+    )
 
     # No env vars set, but stored cred exists
     env: dict[str, str] = {}

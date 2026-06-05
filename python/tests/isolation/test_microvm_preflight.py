@@ -70,10 +70,21 @@ class TestMicroVMPreflightStates:
 
     def test_installed_not_configured_linux_missing_kvm(self, monkeypatch, tmp_path):
         """Linux with firecracker binary but no /dev/kvm → installed_not_configured."""
+        from pathlib import Path as _Path
+
         monkeypatch.setattr(
             shutil, "which", lambda name: "/usr/bin/firecracker" if name == "firecracker" else None
         )
-        # /dev/kvm does not exist in test environment
+        # Hide /dev/kvm even if present on the CI runner (GitHub Actions Linux has it).
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.security.sandbox.os.access", lambda *_a, **_k: False
+        )
+        _orig = _Path.exists
+
+        def _fake(self):  # type: ignore[override]
+            return False if str(self) == "/dev/kvm" else _orig(self)
+
+        monkeypatch.setattr(_Path, "exists", _fake)
         data = microvm_preflight("Linux")
         assert data["status"] == "installed_not_configured"
         assert data["binary"] == "/usr/bin/firecracker"
@@ -510,9 +521,31 @@ class TestLimaIntegrationHarness:
 class TestFirecrackerDoctorPreflight:
     """Firecracker doctor covers unavailable / installed_not_configured / missing_kvm states."""
 
+    def _no_kvm(self, monkeypatch) -> None:
+        """Helper: hide /dev/kvm even if present on the CI runner.
+
+        Patches os.access in the sandbox module (so kvm_rw=False) and patches
+        Path.exists to return False for '/dev/kvm' only, leaving Path.home()
+        and all other path operations intact.
+        """
+        from pathlib import Path as _Path
+
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.security.sandbox.os.access", lambda *_a, **_k: False
+        )
+        original_exists = _Path.exists
+
+        def _fake_exists(self):  # type: ignore[override]
+            if str(self) == "/dev/kvm":
+                return False
+            return original_exists(self)
+
+        monkeypatch.setattr(_Path, "exists", _fake_exists)
+
     def test_firecracker_doctor_unavailable_no_binary(self, monkeypatch):
         """No firecracker/cloud-hypervisor binary → unavailable."""
         monkeypatch.setattr(shutil, "which", lambda _name: None)
+        self._no_kvm(monkeypatch)
         data = firecracker_doctor("Linux")
         assert data["status"] == "unavailable"
         assert data["binary"] is None
@@ -523,6 +556,7 @@ class TestFirecrackerDoctorPreflight:
         monkeypatch.setattr(
             shutil, "which", lambda name: "/usr/bin/firecracker" if name == "firecracker" else None
         )
+        self._no_kvm(monkeypatch)
         data = firecracker_doctor("Linux")
         assert data["status"] == "installed_not_configured"
         assert data["binary"] == "/usr/bin/firecracker"

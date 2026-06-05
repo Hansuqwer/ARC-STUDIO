@@ -322,44 +322,40 @@ def test_execute_unknown_operation(executor):
 
 def test_concurrent_task_execution(executor):
     """Test executing multiple tasks concurrently."""
+    executor.start_worker()
     tasks = []
     for i in range(5):
         task = Task(type=TaskType.RUN, operation=f"op_{i}")
         task_id = executor.submit_task(task)
         tasks.append(task_id)
 
-    # Wait for all tasks to complete
-    time.sleep(3.0)
+    executor.wait_for_all(timeout=10.0)
 
-    # Check all tasks completed
-    completed_count = 0
-    for task_id in tasks:
-        status = executor.get_task_status(task_id)
-        if status and status.status == TaskStatus.COMPLETED:
-            completed_count += 1
-
-    # At least some tasks should have completed
+    completed_count = sum(
+        1
+        for task_id in tasks
+        if (s := executor.get_task_status(task_id)) and s.status == TaskStatus.COMPLETED
+    )
     assert completed_count >= 3
 
 
 def test_task_timestamps(executor):
     """Test that task timestamps are set correctly."""
+    executor.start_worker()
     task = Task(type=TaskType.RUN, operation="test_op")
     task_id = executor.submit_task(task)
 
-    # Wait for execution
-    time.sleep(2.0)
+    executor.wait_for_all(timeout=10.0)
 
     status = executor.get_task_status(task_id)
+    assert status is not None
     assert status.created_at is not None
     assert status.started_at is not None
     assert status.ended_at is not None
 
-    # Verify timestamps are in order
     from datetime import datetime
 
     created = datetime.fromisoformat(status.created_at)
     started = datetime.fromisoformat(status.started_at)
     ended = datetime.fromisoformat(status.ended_at)
-
     assert created <= started <= ended
