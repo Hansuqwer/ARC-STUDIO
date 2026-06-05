@@ -25,6 +25,8 @@ def get_capabilities(model_id: str, vendor: str | None = None) -> dict[str, bool
             cfg = VENDOR_CONFIGS.get(vendor)
             if cfg:
                 rates = cfg.get("cost_rates", {}).get(model_id)
+            else:
+                return result  # vendor hint given but vendor unknown → fail-closed
 
         if rates is None:
             # Search all vendors — prefer entry with non-empty capability data
