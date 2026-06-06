@@ -199,6 +199,14 @@ class TurnManager:
                 for handler in self._tool_registry.all_handlers()
                 if session.available_tools is None or handler.name in session.available_tools
             ]
+            # Add tools breakpoint (breakpoint 1 of 4) when caching is enabled
+            # and tools are present. Anthropic caches the tools block separately
+            # from the system block; breakpoints are additive.
+            if os.environ.get("ARC_ENABLE_PROMPT_CACHING") == "1" and request.tools:
+                request.cache_control = [
+                    *request.cache_control,
+                    CacheBreakpoint(position="tools", index=0),
+                ]
         return request
 
     async def _run_tool_loop(

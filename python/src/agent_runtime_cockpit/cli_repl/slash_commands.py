@@ -1462,6 +1462,10 @@ def _store_context_metadata(session: Any, capability: Any, cost_summary: dict[st
             "usage_pct": pct,
             "source": "provider_usage",
         }
+        # Accumulate session-level cache token totals for wallet display.
+        ct = metadata.setdefault("cache_tokens", {"read": 0, "write": 0})
+        ct["read"] = ct.get("read", 0) + cache_read
+        ct["write"] = ct.get("write", 0) + cache_write
 
 
 def cmd_summary(_arg: str, session: ChatSession) -> str:
@@ -2535,6 +2539,23 @@ def cmd_wallet(_arg: str, session: ChatSession) -> CommandResult:
                     lines.extend(notes)
         except Exception:
             pass
+    # Cache token display: show session-accumulated read/write counts with ~$ qualifier.
+    # The ~ prefix follows the R-01 wallet spec: cost backed by heuristic or indirect
+    # measurement carries an approximation marker.
+    cache_tokens = (session.metadata or {}).get("cache_tokens")
+    if cache_tokens and (cache_tokens.get("read") or cache_tokens.get("write")):
+        cache_read_tok = cache_tokens.get("read", 0)
+        cache_write_tok = cache_tokens.get("write", 0)
+        lines.append("")
+        lines.append(
+            f"Cache (this session):  read {cache_read_tok:,} tok  write {cache_write_tok:,} tok"
+        )
+        # Estimate savings: cache-read tokens are served at ~10% of the input price.
+        # We don't have per-model pricing here so we show token counts with the ~ flag.
+        if cache_read_tok > 0:
+            lines.append(
+                f"  ~${cache_read_tok * 0.0000030:.4f} estimated savings (cache reads, approx)"
+            )
     # v0.7: Active opt-in cloud features
     try:
         from ..cloud.indicators import active_optins
