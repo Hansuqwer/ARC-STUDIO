@@ -1731,6 +1731,6 @@ P2 — Quality:
 | R-AUDIT20 | SQLite WAL Busy-Timeout Verification | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | WAL+busy_timeout=5000ms confirmed in budget/storage.py; xfail reason updated to reflect accurate constraint. |
 | R-AUDIT21 | Accessibility Baseline Audit | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | ARIA roles/labels added to arc-adapters-widget; accessibility-baseline.md created. axe-core pass deferred. |
 | R-AUDIT22 | Handover Doc Stale Refs Sweep | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | LOCKED_REMAINING_ROADMAP.md refs replaced with docs/roadmap.md in docs/handover/. |
-| R-AUDIT23 | SwarmGraph Insight UI Components Phase 1 | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Implement DAG planner viz, consensus evidence cards, and HITL approval panel in IDE. |
+| R-AUDIT23 | SwarmGraph Insight UI Components Phase 1 | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | DagPlannerViz, ConsensusEvidenceCard, HitlApprovalPanel created; use --arc-color-* tokens; 3 render tests. |
 | R-AUDIT24 | SDK Version Sweep (R-TS1 close) | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | sdk_version() added to base + 8 priority adapters; surfaced in arc runtimes --capabilities --json; 1 new test. |
 | R-AUDIT25 | Multi-Provider Router Abstraction | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Design and implement ProviderRouter for cascading failover; gate with ARC_ENABLE_PROVIDER_ROUTER=1. |

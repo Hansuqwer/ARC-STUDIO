@@ -5613,7 +5613,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Implement DAG planner visualisation, consensus evidence cards, and HITL approval panel as IDE components in the SwarmGraph Insight tab, backed by existing event producers and honest absent/degraded states where data is missing.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Builds on existing SwarmGraph topology/consensus event infrastructure; no new backend producers required for Phase 1.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: DagPlannerViz.tsx, ConsensusEvidenceCard.tsx, HitlApprovalPanel.tsx created in browser/swarmgraph/; use tokens.css vars; exported from index.ts. 3 component render tests.
 
 ---
 
