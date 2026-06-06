@@ -5453,7 +5453,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Bind port 3000 to 127.0.0.1 in docker-compose.yml (and any related compose overrides) to match the single-user local workstation model and prevent unintended external exposure.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: One-line config change; aligns compose with daemon loopback posture documented in README and SECURITY.md.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: docker-compose.yml port 3000 changed from "3000:3000" to "127.0.0.1:3000:3000". nginx.conf listen 0.0.0.0 noted but not changed (container-internal only).
 
 ---
 

@@ -1711,7 +1711,7 @@ P2 — Quality:
 |---|---|---|---|---|
 | R-AUDIT1 | Release Checklist Refresh | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | docs/release/checklist.md updated to v0.8-r-ux2/aa788f3/5537 tests/Phase 131. |
 | R-AUDIT2 | Enforcement Surfaces Doc Refresh | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Catalogue all security surfaces added in Phases 55-131 into enforcement-surfaces.md. |
-| R-AUDIT3 | docker-compose 127.0.0.1 Binding | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Bind port 3000 to 127.0.0.1 in docker-compose.yml to match single-user model. |
+| R-AUDIT3 | docker-compose 127.0.0.1 Binding | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | docker-compose.yml port 3000 bound to 127.0.0.1. |
 | R-AUDIT4 | config-service apiKeySource Snake/Camel Fix | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add api_key_source fallback in config-service.ts so IDE provider source badge shows correctly. |
 | R-AUDIT5 | MCP Proxy Env Secret-Strip Gate | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Strip secret-bearing env vars before passing env to upstream MCP subprocess. |
 | R-AUDIT6 | Gateway Client Paid-Call Gate | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Resolve TODO at gateway_client.py:28 — wire BudgetEnforcer.preflight() or document exemption. |

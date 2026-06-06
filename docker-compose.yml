@@ -4,7 +4,7 @@ services:
   arc-studio:
     build: .
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - NODE_ENV=production
       - ARC_SWARMGRAPH_CLI=/usr/local/bin/swarmgraph
