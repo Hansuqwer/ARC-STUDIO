@@ -167,40 +167,13 @@ class TestEventHandler:
 class TestRunAgentWithStreaming:
     """Test run_agent_with_streaming function."""
 
-    def test_emits_start_and_end_events(self):
-        """Should emit start and end events for successful run."""
-        emit_event = Mock()
-        agent = Mock()
-        agent.name = "test_agent"
+    def test_raises_not_implemented(self):
+        """Should raise NotImplementedError until the real runner is implemented."""
+        import pytest
 
-        # Call function (result not used in this test)
-        run_agent_with_streaming(
-            agent,
-            {"input": "test"},
-            "run-123",
-            emit_event,
-        )
-
-        # Should emit start and end events
-        assert emit_event.call_count == 2
-
-        # First event should be start
-        assert emit_event.call_args_list[0][0][1] == "AGENT_RUN_START"
-
-        # Second event should be end
-        assert emit_event.call_args_list[1][0][1] == "AGENT_RUN_END"
+        with pytest.raises(NotImplementedError, match="pydantic_ai runner is not yet implemented"):
+            run_agent_with_streaming(Mock(), {}, "run-123", Mock())
 
     def test_emits_error_event_on_exception(self):
-        """Should emit error event when agent run fails."""
-        # Note: This test documents expected behavior for error handling.
-        # In actual implementation with real Pydantic AI integration,
-        # this would test that exceptions during agent.run() emit error events.
-
-        # Placeholder test - in production this would be:
-        # _emit_event = Mock()
-        # agent = Mock()
-        # agent.run.side_effect = ValueError("Test error")
-        # with pytest.raises(ValueError):
-        #     run_agent_with_streaming(agent, {}, "run-123", _emit_event)
-        # assert any("AGENT_RUN_ERROR" in str(call) for call in _emit_event.call_args_list)
+        """Placeholder — will test error-event emission once the runner is implemented."""
         pass

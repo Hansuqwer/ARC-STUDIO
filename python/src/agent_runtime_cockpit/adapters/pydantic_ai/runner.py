@@ -149,35 +149,15 @@ def run_agent_with_streaming(
 ) -> Any:
     """Run a Pydantic AI agent with live event streaming.
 
-    Args:
-        agent: Pydantic AI Agent instance
-        input_data: Input data for the agent
-        run_id: Run identifier
-        emit_event: Callback to emit events
-
-    Returns:
-        Agent run result
+    Not yet implemented. Will call ``agent.run_sync()`` / ``agent.run()``
+    with ``PydanticAIEventHandler`` once the pydantic_ai SDK is vendored.
+    Use ``pydantic_ai.models.test.TestModel`` for offline testing.
 
     Raises:
-        Exception: If agent run fails
+        NotImplementedError: Always — runner is not yet implemented.
 
     """
-    handler = PydanticAIEventHandler(run_id, emit_event)
-    agent_name = getattr(agent, "name", "unknown_agent")
-
-    try:
-        handler.on_run_start(agent_name, input_data)
-
-        # Note: Actual Pydantic AI integration would hook into the agent's
-        # event system here. This is a simplified implementation.
-        # In production, this would use agent.run() with event callbacks.
-
-        # Placeholder for actual agent execution
-        result = None  # Would be: agent.run(input_data, callbacks=[handler])
-
-        handler.on_run_end(agent_name, result)
-        return result
-
-    except Exception as e:
-        handler.on_run_error(agent_name, e)
-        raise
+    raise NotImplementedError(
+        "pydantic_ai runner is not yet implemented. "
+        "Implement using agent.run_sync(prompt, deps=...) with TestModel for offline tests."
+    )
