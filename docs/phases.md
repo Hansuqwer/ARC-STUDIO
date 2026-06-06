@@ -5432,3 +5432,203 @@ This is the final slice. The full provider-resilience surface is now implemented
 > Context / What was done / Verification / Known Risks. When an item reaches
 > Baseline Complete, also add a one-line row to **Completed Phases — Master Index**
 > at the top of this file. Highest phase currently shipped: **131**.
+
+## Phase 132 — Release Checklist Refresh (R-AUDIT1)
+
+**Goal:** Update docs/release/checklist.md to accurately reflect current HEAD: v0.8-r-ux2 internal / v0.1.0a0 published, commit 4979aff, 5537 tests, Phase 131, all shipped feature groups.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Doc-only slice; zero-risk; release-blocking.
+
+---
+
+## Phase 133 — Enforcement Surfaces Doc Refresh (R-AUDIT2)
+
+**Goal:** Catalogue all security enforcement surfaces added in Phases 55–131 into docs/security/enforcement-surfaces.md so the doc is not stale relative to the current codebase.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Security doc refresh; no code changes required; pairs with any sandbox hardening work.
+
+---
+
+## Phase 134 — docker-compose 127.0.0.1 Binding (R-AUDIT3)
+
+**Goal:** Bind port 3000 to 127.0.0.1 in docker-compose.yml (and any related compose overrides) to match the single-user local workstation model and prevent unintended external exposure.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: One-line config change; aligns compose with daemon loopback posture documented in README and SECURITY.md.
+
+---
+
+## Phase 135 — config-service apiKeySource Snake/Camel Fix (R-AUDIT4)
+
+**Goal:** Add api_key_source / apiKeySource fallback handling in packages/arc-extension config-service.ts so the IDE provider source badge shows the correct value regardless of snake_case or camelCase field name from the Python daemon.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: TypeScript-only fix; no Python changes; affects provider status badge display in IDE.
+
+---
+
+## Phase 136 — MCP Proxy Env Secret-Strip Gate (R-AUDIT5)
+
+**Goal:** Strip secret-bearing environment variables (matching the existing ARC env allowlist/secret-strip patterns) before passing the env dict to upstream MCP subprocess invocations in the MCP proxy layer.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Security hardening; applies existing sandbox secret-strip logic to MCP proxy path; no new policy needed.
+
+---
+
+## Phase 137 — Gateway Client Paid-Call Gate (R-AUDIT6)
+
+**Goal:** Resolve the TODO at gateway_client.py line 28 by either wiring BudgetEnforcer.preflight() into the gateway client call path or documenting an explicit exemption with rationale in the code and enforcement-surfaces.md.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Closes an open TODO; either wires the existing enforcer or documents why this path is exempt.
+
+---
+
+## Phase 138 — DataStore allow_paid Default Warning (R-AUDIT7)
+
+**Goal:** Warn the user in the TUI when allow_paid=True is active and no wallet budget limit is configured, so accidental uncapped spending is surfaced before any provider call.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: TUI-only UX warning; uses existing wallet/budget state; no enforcement change required.
+
+---
+
+## Phase 139 — EXTENSION_MIGRATION Stale Ref Fix (R-AUDIT8)
+
+**Goal:** Replace the reference to LOCKED_REMAINING_ROADMAP.md (archived doc) with docs/roadmap.md in docs/EXTENSION_MIGRATION.md so readers are directed to the single source of truth.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Doc-only find-and-replace; zero-risk; prevents developer confusion from stale doc pointer.
+
+---
+
+## Phase 140 — Budget Durability Under Error (R-AUDIT9)
+
+**Goal:** Verify and harden the token spend commit path in the degraded turn path (provider error, retryable=False, turn.denied) to ensure spend is correctly persisted or zeroed and does not leave the wallet in an inconsistent state.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Remaining R-OPEN-HARDEN slice; targets the edge case where a turn fails after partial token spend is recorded.
+
+---
+
+## Phase 141 — SwarmGraph Topology Shape Verification (R-AUDIT10)
+
+**Goal:** Verify and fix any topology event shape mismatch between what the SwarmGraph SDK emits and what the IDE workflow graph view expects, so the SwarmGraph Insight topology panel renders correctly end-to-end.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Cross-layer contract verification; may be Python-only, TypeScript-only, or both depending on where the mismatch is found.
+
+---
+
+## Phase 142 — Notifications Outbox MVP (R-AUDIT11)
+
+**Goal:** Create a notifications/ module with a JSONL outbox, TTL-based garbage collection, and durable delivery semantics, replacing the current fire-and-forget event emitters that can silently drop notifications.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Reliability improvement for HITL, audit, and run-completion notifications; no new notification types required.
+
+---
+
+## Phase 143 — UI Design Token Foundation (R-AUDIT12)
+
+**Goal:** Introduce CSS custom properties for color, spacing, and typography in the Theia extension so theme values are centralised and consistent across all IDE panels.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: TypeScript/CSS only; foundation for future theme consistency work; does not change existing R-UX4 theme behaviour.
+
+---
+
+## Phase 144 — HMAC README Wording Tighten (R-AUDIT13)
+
+**Goal:** Add an honest single-user caveat to the HMAC signing wording in README.md and docs/SECURITY.md, clarifying that HMAC is a local workstation audit chain and does not provide shared-host or concurrent-user audit guarantees.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Doc-only wording fix; ensures README does not overstate the HMAC signing posture beyond what is proven for a local single-user install.
+
+---
+
+## Phase 145 — Mutating GET /api/runs/start Removal (R-AUDIT14)
+
+**Goal:** Return HTTP 410 Gone for GET /api/runs/start (previously POST-only hardened in the P0 audit sprint) and remove or gate the route entirely, keeping only the POST endpoint.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Completes the P0 audit sprint item; the GET handler should already be unused but the 410 response makes the deprecation explicit and auditable.
+
+---
+
+## Phase 146 — SwarmGraph MetaPathFinder Bridge Docs (R-AUDIT15)
+
+**Goal:** Document the MetaPathFinder bridge architecture (used to make SwarmGraph importable in restricted environments) in docs/research/ so future maintainers understand the import hook and its security implications.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Doc-only research note; zero-risk; prevents the bridge from appearing as unexplained magic in code review.
+
+---
+
+## Phase 147 — IDE Context Drawer / AGENTS.md Surface (R-AUDIT16)
+
+**Goal:** Add a minimal Context drawer in the Theia IDE that surfaces the workspace AGENTS.md and SKILL.md capability cards so agents and developers can inspect the active charter and skill catalog without leaving the IDE.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Builds on existing arc agents-md discover and arc skills discover CLI commands; read-only display only.
+
+---
+
+## Phase 148 — R79 TUI/Theia Surfacing (R-AUDIT17)
+
+**Goal:** Surface at least one R79-deferred CLI output (e.g. arc runs budget) as a TUI panel or IDE tab, closing the slice 110.6 follow-up from Phase 111.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Completes the R79 Mobile Runtime SDK Integration follow-up; exact surface (TUI vs Theia tab) to be decided at implementation time.
+
+---
+
+## Phase 149 — Workspace Search CLI + IDE Panel (R-AUDIT18)
+
+**Goal:** Add arc workspace search <query> CLI command that searches workspace files and metadata, plus a corresponding IDE search-result panel that displays results with file/line provenance.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Builds on existing arc workspace inventory infrastructure; results must be workspace-local and sandbox-safe.
+
+---
+
+## Phase 150 — Eval Metrics Honest Labelling (R-AUDIT19)
+
+**Goal:** Add a synthetic:true flag to eval result JSON envelopes and a [synthetic/simulated] label to TUI and IDE eval display so users cannot mistake offline deterministic eval results for provider-backed measurements.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Honesty/evidence-over-claims fix; applies to all eval output surfaces; no eval logic changes.
+
+---
+
+## Phase 151 — SQLite WAL Busy-Timeout Verification (R-AUDIT20)
+
+**Goal:** Confirm that the WAL mode and busy_timeout fix (applied in R-OPEN-DEFERRED-RUNBOOKS / Phase 120) is correctly applied to all SQLite stores that were affected by the database is locked failure, and verify that the xfail reason strings in the test suite accurately describe the remaining known limitation.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Verification-only slice; no new code unless a gap is found; closes the open question from the deferred runbook evidence.
+
+---
+
+## Phase 152 — Accessibility Baseline Audit (R-AUDIT21)
+
+**Goal:** Run an axe-core accessibility audit on the Theia IDE extension panels and fix all zero-effort ARIA label gaps (missing aria-label, role, or landmark attributes) identified by the audit.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Targets only zero-effort fixes; complex keyboard-navigation or screen-reader flows are deferred; aligns with R-UX4 accessibility baseline.
+
+---
+
+## Phase 153 — Handover Doc Stale Refs Sweep (R-AUDIT22)
+
+**Goal:** Remove all references to LOCKED_REMAINING_ROADMAP.md from docs/handover/ and replace them with pointers to docs/roadmap.md, ensuring handover docs direct readers to the single source of truth.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Doc-only sweep; extends the R-AUDIT8 EXTENSION_MIGRATION fix to cover all handover docs.
+
+---
+
+## Phase 154 — SwarmGraph Insight UI Components Phase 1 (R-AUDIT23)
+
+**Goal:** Implement DAG planner visualisation, consensus evidence cards, and HITL approval panel as IDE components in the SwarmGraph Insight tab, backed by existing event producers and honest absent/degraded states where data is missing.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Builds on existing SwarmGraph topology/consensus event infrastructure; no new backend producers required for Phase 1.
+
+---
+
+## Phase 155 — SDK Version Sweep (R-AUDIT24 / R-TS1 close)
+
+**Goal:** Add sdk_version() to all 20 adapters in the default registry and surface the version in arc runtimes --capabilities --json output, closing the R-TS1 token-saving research follow-up item for adapter version visibility.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Requires touching all 20 adapter modules; sdk_version() should return None gracefully when the SDK is not installed.
+
+---
+
+## Phase 156 — Multi-Provider Router Abstraction (R-AUDIT25)
+
+**Goal:** Design and implement a ProviderRouter class that supports cascading failover across an ordered list of configured providers, gated by ARC_ENABLE_PROVIDER_ROUTER=1, building on the existing ARC_FALLBACK_PROVIDERS env wiring from Phase 127.
+
+**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Extends R-OPEN-HARDEN failover baseline; gate prevents any change to default single-provider behaviour.
+
+---
