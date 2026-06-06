@@ -4965,3 +4965,33 @@ The pydantic_ai package had detection, AST-based export, and a PydanticAIEventHa
 
 - `agent.run_sync()` is a synchronous call; the adapter's `run_workflow` is `async` but blocks the event loop during the sync call. For long-running agents consider wrapping in `asyncio.to_thread()` in a future slice.
 - The `google.generativeai` fix in `detect.py` suppresses `ModuleNotFoundError` — verify this doesn't mask real import failures for other providers if the check is extended.
+
+---
+
+## Phase 117 — Letta (MemGPT) Adapter (R-OPEN-ADAPTERS-LETTA)
+
+**Status:** Baseline Complete (2026-06-06) | Evidence: adapters/letta.py, 12 tests, 5482 passed. Commit ec47569. Companion roadmap item: R-OPEN-ADAPTERS-LETTA.
+
+### Context
+
+Letta (formerly MemGPT) is a stateful-agent framework with persistent memory. Unlike every other adapter, Letta is server-backed — the agent lives on a running Letta server and retains memory across sessions. Execution is a REST call (`client.agents.messages.create`) rather than loading Python code from the workspace. API verified against letta-client v1.12.1 via context7 (`/letta-ai/letta-python`).
+
+### What was done
+
+- `adapters/letta.py`: `LettaAdapter` registered as adapter #18. Detection via `find_spec("letta_client")` + `LETTA_API_KEY`/`LETTA_BASE_URL` env vars + workspace import scan (`from letta`, `import letta_client`) + dependency evidence + `.af` agent files. `export_workflow` returns a single-node `WorkflowInfo`. `run_workflow` calls `client.agents.messages.create(agent_id, messages=[{"role":"user","content":prompt}])`, extracts `assistant_message` content from the typed response, dual-gated by `ARC_LETTA_AGENT_ID` + `ARC_LETTA_ALLOW_COSTS=true`. `_LettaClient` imported at module level with `try/except ImportError` so it is patchable in tests.
+- `registry.py`: `LettaAdapter` registered as #18 in `build_default()`.
+- `tests/adapters/test_letta.py`: 12 offline tests (detect, capabilities, export, run gating, run success).
+- `test_adapter_status.py`: expected set + idempotent count 17→18.
+- `docs/research/letta-adapter-plan.md`: verified API facts.
+
+### Verification
+
+- 5482 passed, 42 skipped, 5 xfailed. Ruff clean. CI all 6 jobs green on ec47569.
+- `can_run=False` by default; requires `ARC_LETTA_AGENT_ID` + `ARC_LETTA_ALLOW_COSTS=true` + `LETTA_API_KEY` or `LETTA_BASE_URL`.
+- Zero real API calls in tests.
+
+### Known Risks
+
+- Requires a running Letta server — local (`LETTA_BASE_URL=http://localhost:8283`) or cloud (`LETTA_API_KEY`). No built-in server health check.
+- `agent_id` must be created externally (via Letta UI or API) before `run_workflow` can be used.
+- `response.messages` structure assumes `message_type` attribute on message objects; if the SDK changes this field name, the content extraction falls back to `str(response.messages)`.
