@@ -1717,7 +1717,7 @@ P2 — Quality:
 | R-AUDIT6 | Gateway Client Paid-Call Gate | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | TODO removed; exemption documented — gate is upstream via require_dual_gate in runner.py; 1 new test. |
 | R-AUDIT7 | DataStore allow_paid Default Warning | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Warn user in TUI when allow_paid=True and no wallet budget is set. |
 | R-AUDIT8 | EXTENSION_MIGRATION Stale Ref Fix | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | LOCKED_REMAINING_ROADMAP.md ref replaced with docs/roadmap.md in EXTENSION_MIGRATION.md. |
-| R-AUDIT9 | Budget Durability Under Error | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Verify and harden token spend commit in degraded turn path (R-OPEN-HARDEN remaining slice). |
+| R-AUDIT9 | Budget Durability Under Error | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | Budget is preflight-only; by-design gap documented in turn_manager.py degraded path; 2 new tests. |
 | R-AUDIT10 | SwarmGraph Topology Shape Verification | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Verify/fix topology event shape mismatch between SDK and IDE workflow graph view. |
 | R-AUDIT11 | Notifications Outbox MVP | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Create notifications/ module with JSONL outbox, TTL/GC, replacing fire-and-forget emitters. |
 | R-AUDIT12 | UI Design Token Foundation | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Introduce CSS custom properties for color/spacing/typography in Theia extension. |

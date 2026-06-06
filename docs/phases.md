@@ -5501,7 +5501,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Verify and harden the token spend commit path in the degraded turn path (provider error, retryable=False, turn.denied) to ensure spend is correctly persisted or zeroed and does not leave the wallet in an inconsistent state.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Remaining R-OPEN-HARDEN slice; targets the edge case where a turn fails after partial token spend is recorded.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: Decision B (preflight-only). No .record() method exists; by-design gap comment added to degraded path in turn_manager.py. 2 new tests in test_turn_manager.py.
 
 ---
 

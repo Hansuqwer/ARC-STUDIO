@@ -259,6 +259,9 @@ class TurnManager:
         except ProviderError as exc:
             # Retries are exhausted (or the error was non-retryable). Degrade
             # gracefully instead of crashing the turn — mirror the Cancelled path.
+            # Budget gap (by-design): preflight-only. No usage_payload available
+            # on failure, so no post-hoc spend record is committed. Tracking
+            # post-error spend requires a .record() method in BudgetEnforcer.
             if partial:
                 session.history.append({"role": "assistant", "content": partial, "partial": "true"})
             reason = exc.user_facing_reason or str(exc) or type(exc).__name__

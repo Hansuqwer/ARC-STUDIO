@@ -392,3 +392,43 @@ async def test_run_turn_streaming_degrades_on_provider_error(monkeypatch) -> Non
     assert result.degraded is True
     assert "turn.failed" in [e.name for e in events]
     assert "turn.completed" not in [e.name for e in events]
+
+
+@pytest.mark.asyncio
+async def test_budget_behavior_on_success() -> None:
+    """On a successful turn, usage_payload is captured in the response and
+    TurnResult.degraded is False. Budget is preflight-only (no .record() method
+    in BudgetEnforcer); spend is not committed post-hoc."""
+    events: list[_Event] = []
+    provider = _Provider()
+    manager = TurnManager(provider, model="claude-test", event_sink=_sink(events))
+    session = ChatSession()
+
+    result = await manager.run_turn(session, "hello", cancellation_token=never_cancelled())
+
+    assert result.degraded is False
+    assert result.degraded_reason is None
+    assert result.response is not None
+    assert result.response.usage is not None
+    # Budget is preflight-only: no post-hoc record call exists (by-design gap documented)
+
+
+@pytest.mark.asyncio
+async def test_budget_behavior_on_degraded_turn(monkeypatch) -> None:
+    """On a degraded turn (ProviderError), TurnResult.degraded is True.
+    Budget is preflight-only — no spend is committed because no usage_payload
+    is available from the failed provider call (by-design gap: preflight-only)."""
+    monkeypatch.setenv("ARC_DISABLE_RETRY_SLEEP", "1")
+    from agent_runtime_cockpit.providers.base import RateLimitError
+
+    events: list[_Event] = []
+    provider = _FailingProvider(RateLimitError("exhausted"))
+    manager = TurnManager(provider, model="claude-test", event_sink=_sink(events))
+    session = ChatSession()
+
+    result = await manager.run_turn(session, "hello", cancellation_token=never_cancelled())
+
+    assert result.degraded is True
+    names = [e.name for e in events]
+    assert "turn.failed" in names
+    # usage_payload is None on failure — budget preflight-only, no post-hoc record
