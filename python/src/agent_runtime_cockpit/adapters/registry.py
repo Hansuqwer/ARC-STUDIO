@@ -85,6 +85,7 @@ class AdapterRegistry:
     def build_default(self) -> "AdapterRegistry":
         """Build registry with all built-in adapters."""
         from .ag2_adapter import AG2Adapter
+        from .arc_runtime_sdk import ArcRuntimeSDKAdapter
         from .crewai import CrewAIAdapter
         from .dspy import DSPyAdapter
         from .haystack import HaystackAdapter
@@ -113,6 +114,7 @@ class AdapterRegistry:
         self.register(SemanticKernelAdapter())
         self.register(GoogleADKAdapter())
         self.register(MCPSDKAdapter())
+        self.register(ArcRuntimeSDKAdapter())
         return self
 
 
