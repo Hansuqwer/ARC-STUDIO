@@ -4852,3 +4852,85 @@ These are backlog items surfaced by the audit, each its own future bounded slice
 ### Known Risks
 - The duplicate checkout can mislead future automation into treating its stale docs as canonical; the audit flags it explicitly.
 - SDK API specs are external-sourced; any adapter work derived from them must re-verify against the installed package before claiming behaviour.
+
+---
+
+## Phase 113 — Adapter Shared Helpers + pydantic_ai Cleanup (R-OPEN-ADAPTERS-SHARED / R-OPEN-ADAPTERS-PYDANTIC-AI)
+
+**Status:** Baseline Complete (2026-06-06) | Evidence: adapters/_shared.py (make_event + workspace_import_path), 4 adapters repointed, pydantic_ai placeholder replaced with NotImplementedError. Commits 82c8799 + f367dac.
+
+### Context
+
+Two bounded adapter quality items shipped together. First: the adapters audit (Phase 112) identified ~8 duplicated helper copies. Second: pydantic_ai/runner.py had a silent `result = None` placeholder that would return None without error if called.
+
+### What was done
+
+**Shared helpers:** created `adapters/_shared.py` with `make_event()` (consolidates 4 identical `_event()` instance methods in crewai, langgraph, swarmgraph, openai_agents) and `workspace_import_path()` (consolidates 2 identical module-level functions in crewai + langgraph). Each adapter's `_event` method now delegates to `make_event`. Unused `sys`/`contextmanager`/`Iterator` imports removed as a consequence. 6 new tests in `tests/adapters/test_shared_helpers.py`.
+
+**pydantic_ai placeholder:** replaced `result = None  # Would be: agent.run()` with `raise NotImplementedError(...)` carrying an actionable message. `PydanticAIEventHandler` kept intact. Test updated to assert `NotImplementedError`. Adapter remains unregistered in `build_default()` — registration deferred until the real `agent.run_sync()` implementation.
+
+### Verification
+
+- 5443 passed (82c8799) / 5443 passed (f367dac). Ruff clean. CI green (all 6 jobs).
+- `adapters/_shared.py` imports verified used by 4 adapter files.
+- `pydantic_ai` runner.py line 173: no silent placeholder remains.
+
+### Known Risks
+
+- pydantic_ai export and detection are still valid; only the run path is gated behind NotImplementedError.
+- Shared helpers introduce a new internal import; circular import risk is low (no cross-module state).
+
+---
+
+## Phase 114 — Strands Agents (AWS) Adapter (R-OPEN-ADAPTERS-STRANDS)
+
+**Status:** Baseline Complete (2026-06-06) | Evidence: adapters/strands.py, 14 tests, 5457 passed. Commit 1fc034d. Companion roadmap item: R-OPEN-ADAPTERS-STRANDS.
+
+### Context
+
+Strands Agents is AWS's official agent framework (strands-agents v1.42.0, Apache-2.0), powering Amazon Bedrock AgentCore. It is production-stable and the most relevant adapter for the AWS enterprise market. API grounded in verified SDK source: `Agent("prompt") → AgentResult`; `str(result)` extracts text content.
+
+### What was done
+
+- `adapters/strands.py`: `StrandsAdapter` — detect via `find_spec("strands")` + workspace import scanning (`from strands`, `import strands`) + dependency evidence (`strands-agents` in requirements/pyproject); `capabilities()` always `can_inspect=True` + `can_export_workflow=True`; `can_run=True` only when `ARC_STRANDS_ALLOW_COSTS=true` + `ARC_STRANDS_EXPORT=module:attr` set; `export_workflow` returns single-node `WorkflowInfo`; `run_workflow` loads agent via export target, calls `agent(prompt)`, maps `AgentResult` to `RunRecord`, dual-gated.
+- `registry.py`: registered as adapter #16 in `build_default()`.
+- `tests/adapters/test_strands.py`: 14 fully offline tests (detect, capabilities, export, run gating, run success, run error).
+- `test_adapter_status.py`: expected set + idempotent count updated (15→16).
+- Research: `docs/prompts/strands-adapter-research.md` + `docs/research/strands-adapter-plan.md`.
+
+### Verification
+
+- 5457 passed, 42 skipped, 5 xfailed. Ruff clean. CI green (all 6 jobs).
+- `can_run=False` by default; `True` only when both gate env vars set.
+- Zero real API calls in tests.
+
+### Known Risks
+
+- Default model is `BedrockModel` (requires AWS credentials). Non-Bedrock providers (Anthropic, OpenAI, Gemini, Ollama) are supported but require their own keys.
+- `AgentResult.message["content"]` structure is external-sourced (SDK v1.42.0); verify against future SDK versions if the content schema changes.
+
+---
+
+## Phase 115 — Sandbox Approval-Hint Fix + Verification Pass (R-OPEN-SANDBOX-APPROVAL)
+
+**Status:** Baseline Complete (2026-06-06) | Evidence: screen.py dead branch removed, 12 tests pass. Commits 9423d58 + 0965807. Companion roadmap item: R-OPEN-SANDBOX-APPROVAL.
+
+### Context
+
+The R-OPEN-SANDBOX shell-escape hardening was already complete (shipped R-UX2 — no `shell=True`, fail-closed gate, audit-on-allow). Phase 115 covers the verification pass that confirmed this, filled test-coverage gaps, and fixed a logic issue: the handler had a dead branch (`allowed=True + approval_required=True + approved=False`) that `decide()` can never produce, while the actionable approval hint for network/install denials was unreachable.
+
+### What was done
+
+**Verification (9423d58):** Confirmed zero `shell=True` in `src/` (grep). Added 6 edge-case tests to `tests/tui/test_sandbox_shell_escape.py` (12 total): unparseable command (shlex ValueError), empty command (noop), approval-required path, timeout, provider-execute error, argv-oversized (ARGV_OVERSIZED). Reconciled `R-OPEN-SANDBOX` roadmap entry from "Research Intake" (stale `shell=True` claim) to "Baseline Complete" with evidence. Research prompt + plan in `docs/prompts/sandbox-shell-hardening.md` + `docs/research/sandbox-shell-hardening-plan.md`. Pattern confirmed against Python docs + real-world usage.
+
+**Logic fix (0965807):** `decide()` produces `allowed=False + approval_required=True` (mutually exclusive — not `allowed=True + approval_required=True`). The dead `approval_required and not approved` handler branch was removed. The `arc sandbox run` approval hint moved into the `not allowed` block, conditioned on `approval_required=True`, so network/install denials now surface actionable guidance to users.
+
+### Verification
+
+- 5463 passed, 42 skipped, 5 xfailed. Ruff clean. CI green (all 6 jobs including e2e).
+- `approve_decision()` path (`allowed=True + approved=True`) preserved; `decide()` contract unchanged.
+- Banned-claims gate passed.
+
+### Known Risks
+
+- The interactive approval UX (`approve_decision` → `allowed=True + approved=True`) is implemented but not surfaced in the TUI — it requires a future HITL-style approval flow to be useful. This is a future scope item, not a regression.
