@@ -82,7 +82,11 @@ class DataStore:
     @property
     def allow_paid_warning(self) -> str | None:
         """Return a warning string if paid calls are on with no budget set, else None."""
-        if getattr(self, "allow_paid", False) and self.wallet_budget_usd is None:
+        if (
+            getattr(self, "allow_paid", False)
+            and self.wallet_budget_usd is not None
+            and self.wallet_budget_usd <= 0
+        ):
             return "⚠ Paid calls unrestricted — set a budget with /wallet"
         return None
 

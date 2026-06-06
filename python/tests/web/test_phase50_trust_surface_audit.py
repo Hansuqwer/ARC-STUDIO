@@ -71,16 +71,14 @@ async def test_start_run_post_untrusted_returns_403(tmp_path: Path) -> None:
 
 
 async def test_start_run_get_untrusted_returns_403(tmp_path: Path) -> None:
-    """GET /api/runs/start returns 403 PERMISSION_DENIED before any run logic."""
+    """GET /api/runs/start returns 410 Gone (removed route; 403 no longer reachable)."""
     client = await _client(tmp_path)
     try:
-        with patch(TRUST, side_effect=_UNTRUSTED):
-            resp = await client.get("/api/runs/start?runtime=auto")
-            body = await resp.json()
+        resp = await client.get("/api/runs/start?runtime=auto")
+        await resp.json()
     finally:
         await client.close()
-    assert resp.status == 403
-    _permission_denied(body)
+    assert resp.status == 410
 
 
 # ── list_runs ─────────────────────────────────────────────────────────────────

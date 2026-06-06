@@ -207,10 +207,8 @@ async def test_start_run_runtime_body_rejects_unknown(tmp_path, unused_tcp_port)
 
 
 async def test_start_run_get_runtime_query_uses_same_router(monkeypatch, tmp_path, unused_tcp_port):
-    # Legacy mutating GET is opt-in only now (POST is canonical); enable it here.
-    _write_langgraph_export(tmp_path)
-    monkeypatch.setenv("ARC_LANGGRAPH_EXPORT", "graph_module:build_graph")
-    monkeypatch.setenv("ARC_ALLOW_LEGACY_GET_RUN_START", "1")
+    # GET /api/runs/start is removed (410 Gone). ARC_ALLOW_LEGACY_GET_RUN_START no longer works.
+    monkeypatch.setenv("ARC_ALLOW_LEGACY_GET_RUN_START", "1")  # ignored now
 
     app = await create_app(tmp_path)
     runner = AppRunner(app)
@@ -222,10 +220,7 @@ async def test_start_run_get_runtime_query_uses_same_router(monkeypatch, tmp_pat
             async with session.get(
                 f"http://127.0.0.1:{unused_tcp_port}/api/runs/start?workflow_id=wf-get-lg&runtime=langgraph",
             ) as response:
-                payload = await response.json()
-                assert response.status == 200
-                assert payload["data"]["runtime"] == "langgraph"
-                assert payload["data"]["runtime_selection"]["runtime"] == "langgraph"
+                assert response.status == 410
     finally:
         await runner.cleanup()
 
