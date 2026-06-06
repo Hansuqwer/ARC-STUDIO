@@ -151,3 +151,134 @@ def test_allowed_command_executes_argv_without_shell(tmp_path, monkeypatch, _aud
     args, _kwargs = provider.execute.call_args
     assert args[0] == ["ls", "-la"], "must pass the classified argv list, not a shell string"
     _audit_spy.assert_called()  # audit event persisted on allow
+
+
+# ─── Edge-case branch coverage (R-OPEN-SANDBOX verification pass) ──────────────
+
+
+def test_unparseable_command_blocked(tmp_path, monkeypatch):
+    """An unbalanced quote makes shlex.split raise → fail-closed block, no execution."""
+    from agent_runtime_cockpit.security import trust
+
+    monkeypatch.setattr(
+        "agent_runtime_cockpit.security.trust.resolve_trust",
+        lambda ws: MagicMock(level=trust.TrustLevel.TRUSTED),
+    )
+    screen = _screen(tmp_path)
+    with patch("subprocess.run") as mock_run:
+        screen._handle_shell_escape('!echo "unterminated')
+    mock_run.assert_not_called()
+    assert [c for _r, c in _entries(screen) if "cannot parse" in c.lower()], (
+        "expected a parse-failure block entry"
+    )
+
+
+def test_empty_command_is_noop(tmp_path, monkeypatch):
+    """A bang with only whitespace parses to empty argv → silent no-op, no execution."""
+    from agent_runtime_cockpit.security import trust
+
+    monkeypatch.setattr(
+        "agent_runtime_cockpit.security.trust.resolve_trust",
+        lambda ws: MagicMock(level=trust.TrustLevel.TRUSTED),
+    )
+    screen = _screen(tmp_path)
+    before = len(screen.data.entries)
+    with patch("subprocess.run") as mock_run:
+        screen._handle_shell_escape("!   ")
+    mock_run.assert_not_called()
+    # Only the echoed "user" entry is added; no tool/block entry follows.
+    tool_entries = [c for r, c in _entries(screen) if r == "tool"]
+    assert tool_entries == [], "empty command must not produce a tool entry"
+    assert len(screen.data.entries) >= before  # no crash
+
+
+def test_approval_required_blocks_without_executing(tmp_path, monkeypatch):
+    """A decision that is allowed BUT approval-required (and not approved) is blocked.
+
+    Defense-in-depth: the handler must not execute an unapproved approval-gated
+    decision even if `allowed` is True.
+    """
+    from agent_runtime_cockpit.security import sandbox, trust
+
+    monkeypatch.setattr(
+        "agent_runtime_cockpit.security.trust.resolve_trust",
+        lambda ws: MagicMock(level=trust.TrustLevel.TRUSTED),
+    )
+    gated = sandbox.SandboxDecision(
+        allowed=True,
+        classification=sandbox.CommandClassification.NETWORK,
+        reason="network policy",
+        policy="local-safe",
+        approval_required=True,
+        approved=False,
+        reason_code=sandbox.SandboxReasonCode.ALLOW_NETWORK,
+    )
+    monkeypatch.setattr("agent_runtime_cockpit.security.sandbox.decide", lambda *a, **k: gated)
+    screen = _screen(tmp_path)
+    with patch("subprocess.run") as mock_run:
+        screen._handle_shell_escape("!curl https://example.com")
+    mock_run.assert_not_called()
+    assert [c for _r, c in _entries(screen) if "requires approval" in c.lower()], (
+        "expected an approval-required block entry"
+    )
+
+
+def test_timeout_surfaced_and_audited(tmp_path, monkeypatch, _audit_spy):
+    """When the provider reports a timeout kill, the TUI reports it and audits."""
+    from unittest.mock import AsyncMock
+
+    from agent_runtime_cockpit.security import trust
+
+    monkeypatch.setattr(
+        "agent_runtime_cockpit.security.trust.resolve_trust",
+        lambda ws: MagicMock(level=trust.TrustLevel.TRUSTED),
+    )
+    screen = _screen(tmp_path)
+    timed_out = MagicMock(stdout="", stderr="", exit_code=None, killed=True, kill_reason="timeout")
+    provider = MagicMock()
+    provider.execute = AsyncMock(return_value=timed_out)
+    with patch(
+        "agent_runtime_cockpit.isolation.selector.build_execution_provider",
+        return_value=provider,
+    ):
+        screen._handle_shell_escape("!ls")
+    assert [c for _r, c in _entries(screen) if "timed out" in c.lower()], "expected a timeout entry"
+    _audit_spy.assert_called()
+
+
+def test_provider_execute_error_does_not_crash(tmp_path, monkeypatch):
+    """If the isolation provider raises, the error surfaces as a tool entry, no crash."""
+    from unittest.mock import AsyncMock
+
+    from agent_runtime_cockpit.security import trust
+
+    monkeypatch.setattr(
+        "agent_runtime_cockpit.security.trust.resolve_trust",
+        lambda ws: MagicMock(level=trust.TrustLevel.TRUSTED),
+    )
+    screen = _screen(tmp_path)
+    provider = MagicMock()
+    provider.execute = AsyncMock(side_effect=RuntimeError("runner boom"))
+    with patch(
+        "agent_runtime_cockpit.isolation.selector.build_execution_provider",
+        return_value=provider,
+    ):
+        screen._handle_shell_escape("!ls")
+    assert [c for r, c in _entries(screen) if r == "tool" and "boom" in c.lower()], (
+        "expected the runner error surfaced as a tool entry"
+    )
+
+
+def test_oversized_argv_denied_at_decide_level():
+    """decide() denies an argv that exceeds the size bounds (ARGV_OVERSIZED)."""
+    from agent_runtime_cockpit.security.sandbox import (
+        MAX_ARGV_COUNT,
+        SandboxPolicy,
+        SandboxReasonCode,
+        decide,
+    )
+
+    oversized = ["echo"] + ["x"] * (MAX_ARGV_COUNT + 1)
+    decision = decide(oversized, SandboxPolicy())
+    assert not decision.allowed
+    assert decision.reason_code == SandboxReasonCode.ARGV_OVERSIZED
