@@ -5225,3 +5225,17 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 - `ruff check src tests` — clean.
 - `pytest -q -p no:cacheprovider` — **5552 passed, 0 failed**.
+
+## Phase 129 — ToolCard Rerun Key (R-UX3 deferred slice)
+
+**Status:** Baseline Complete (2026-06-06) | Evidence: tool_card.py RerunRequested + r key, 2 new tests, 5554 passed.
+
+### What was done
+
+- `tui/widgets/tool_card.py`: added `RerunRequested(Message)` inner class; added `elif event.key == "r"` handler in `on_key` that calls `event.stop()` and `self.post_message(self.RerunRequested(self.entry))`; updated collapsed hint to `[dim]↵ expand · r rerun[/]`.
+- `tests/tui/test_tool_card_rerun.py`: 2 new tests — `test_r_key_posts_rerun_requested` (asserts post_message called with RerunRequested containing the entry), `test_rerun_hint_in_collapsed_render` (asserts 'rerun' appears in collapsed render output).
+
+### Verification
+
+- `ruff check src tests` — clean.
+- `pytest -q -p no:cacheprovider` — **5554 passed, 0 failed**.

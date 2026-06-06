@@ -10,6 +10,7 @@ Implements UX_AUDIT R-005:
 from __future__ import annotations
 
 from textual import events
+from textual.message import Message
 from textual.widgets import Static
 
 from ..data import TranscriptEntry
@@ -24,9 +25,14 @@ _PREVIEW_LINES = 5
 class ToolCard(Static):
     """Collapsible tool call card with status header.
 
-    Keys (when focused): Enter or x = expand/collapse.
+    Keys (when focused): Enter or x = expand/collapse; r = rerun.
     NO_COLOR aware; trims only in collapsed state.
     """
+
+    class RerunRequested(Message):
+        def __init__(self, entry: TranscriptEntry) -> None:
+            super().__init__()
+            self.entry = entry
 
     DEFAULT_CSS = """
     ToolCard {
@@ -49,6 +55,9 @@ class ToolCard(Static):
         if event.key in ("enter", "x"):
             event.stop()
             self.toggle_collapse()
+        elif event.key == "r":
+            event.stop()
+            self.post_message(self.RerunRequested(self.entry))
 
     def render(self) -> str:
         no_color = bool(getattr(self.theme.current, "no_color", False))
@@ -66,7 +75,7 @@ class ToolCard(Static):
                 style = _RISK_STYLE.get(risk, "")
                 risk_badge = f" [{style}]{risk}[/]"
 
-        hint = " [dim]↵ expand[/]" if self._collapsed and not no_color else ""
+        hint = " [dim]↵ expand · r rerun[/]" if self._collapsed and not no_color else ""
         header = f"┌ {tool_name} {icon}{risk_badge} {duration}{hint} ─┐"
 
         if self._collapsed:
@@ -82,4 +91,3 @@ class ToolCard(Static):
 
         footer = "└" + "─" * max(len(tool_name) + 12, 48) + "┘"
         return "\n".join([header] + body + [footer])
-
