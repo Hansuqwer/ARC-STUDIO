@@ -88,7 +88,13 @@ def _handle_run_end(event: dict, root: ArcSpan, cfg: ObservabilityExportConfig) 
     root.end_time = event.get("timestamp")
     data = event.get("data") or {}
     status = data.get("status", "")
-    root.status = "ERROR" if "fail" in status.lower() else "OK"
+    is_error = "fail" in status.lower()
+    root.status = "ERROR" if is_error else "OK"
+    if is_error:
+        # error.type: Conditionally Required per spec when operation ended in error.
+        root.attributes["error.type"] = data.get(
+            "error_type", data.get("error", status or "_OTHER")
+        )
     return 0
 
 
@@ -179,11 +185,21 @@ def _handle_model_call(
         "arc.model.provider": data.get("provider", ""),
         "arc.model.name": data.get("model", ""),
         "arc.cost.requires_paid_calls": data.get("paid", False),
-        # OpenTelemetry GenAI semantic conventions
+        # OpenTelemetry GenAI semantic conventions (semconv 1.41.1)
+        # gen_ai.operation.name: Required — "chat" is the canonical value for
+        # conversational model calls (see gen-ai-spans spec).
+        "gen_ai.operation.name": "chat",
+        # gen_ai.provider.name: Required — canonical discriminator (new spec name);
+        # gen_ai.system is the prior stable name kept for back-compat.
+        "gen_ai.provider.name": data.get("provider", ""),
         "gen_ai.system": data.get("provider", ""),
         "gen_ai.request.model": data.get("model", ""),
         "gen_ai.usage.input_tokens": total_input,
         "gen_ai.usage.output_tokens": usage.get("output_tokens", usage.get("completion_tokens", 0)),
+        # reasoning tokens (Recommended when applicable — o-series / extended thinking)
+        "gen_ai.usage.reasoning.output_tokens": usage.get(
+            "reasoning_output_tokens", usage.get("reasoning", 0)
+        ),
         # Underscored form (R-03). Both forms emitted during migration.
         # Underscored form deprecated — removal target v0.6.0-alpha.
         "gen_ai.usage.cache_read_input_tokens": cache_read,
@@ -371,6 +387,10 @@ def map_events_to_spans(
 # Required gen_ai.* attributes per span type
 GENAI_REQUIRED_ROOT = ("gen_ai.agent.name", "gen_ai.agent.description")
 GENAI_REQUIRED_MODEL = (
+    # Required per spec (semconv 1.41.1)
+    "gen_ai.operation.name",
+    "gen_ai.provider.name",
+    # Back-compat alias (pre-1.41 stable name)
     "gen_ai.system",
     "gen_ai.request.model",
     "gen_ai.usage.input_tokens",
