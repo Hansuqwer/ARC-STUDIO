@@ -25,6 +25,7 @@ import shutil
 from pathlib import Path
 
 from ..protocol.capabilities import RuntimeCapabilities
+from ..mobile_sdk_mapping import mobile_capability_to_sdk_card, sdk_card_to_mobile_capability  # noqa: F401 — canonical mapping
 from .base import CapabilityReport, DoctorAction, RuntimeAdapter
 
 _SDK_MANIFEST = "arc-sdk.json"
