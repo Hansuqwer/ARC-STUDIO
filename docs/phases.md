@@ -5541,7 +5541,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Return HTTP 410 Gone for GET /api/runs/start (previously POST-only hardened in the P0 audit sprint) and remove or gate the route entirely, keeping only the POST endpoint.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Completes the P0 audit sprint item; the GET handler should already be unused but the 410 response makes the deprecation explicit and auditable.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: _get_runs_start_gone() handler added to routes.py; ARC_ALLOW_LEGACY_GET_RUN_START shim removed; existing test updated to expect 410. POST unaffected.
 
 ---
 

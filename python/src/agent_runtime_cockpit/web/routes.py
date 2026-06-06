@@ -378,8 +378,16 @@ async def schemas(request: web.Request) -> web.Response:
     return _json(envelope.model_dump())
 
 
+async def _get_runs_start_gone(request: web.Request) -> web.Response:
+    """GET /api/runs/start is removed. Returns 410 Gone unconditionally."""
+    return web.json_response(
+        {"error": "GET /api/runs/start is removed. Use POST /api/runs/start."},
+        status=410,
+    )
+
+
 async def start_run(request: web.Request) -> web.Response:
-    """Start a run. GET is legacy; POST JSON is canonical. Both share runtime routing."""
+    """Start a run. POST JSON is canonical."""
     t0 = time.time()
     workspace = _workspace(request)
     try:
@@ -1388,12 +1396,10 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_get("/api/workflows", workflows)
     app.router.add_get("/api/schemas", schemas)
     app.router.add_get("/api/runs", list_runs)
-    # POST is canonical for the mutating start_run. A mutating GET is a
-    # CSRF / ambient-trigger surface (links, prefetch, <img src>), so the legacy
-    # GET is registered only when explicitly opted in via env.
+    # POST is canonical for the mutating start_run.
+    # GET /api/runs/start is removed — returns 410 Gone unconditionally.
     app.router.add_post("/api/runs/start", start_run)
-    if os.environ.get("ARC_ALLOW_LEGACY_GET_RUN_START") == "1":
-        app.router.add_get("/api/runs/start", start_run)
+    app.router.add_get("/api/runs/start", _get_runs_start_gone)
     app.router.add_get("/api/runs/{run_id}", get_run)
     app.router.add_get("/api/runs/{run_id}/events", run_events_sse)
     app.router.add_get("/api/runs/{run_id}/links", run_links)

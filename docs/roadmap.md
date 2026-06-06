@@ -1722,7 +1722,7 @@ P2 — Quality:
 | R-AUDIT11 | Notifications Outbox MVP | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Create notifications/ module with JSONL outbox, TTL/GC, replacing fire-and-forget emitters. |
 | R-AUDIT12 | UI Design Token Foundation | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Introduce CSS custom properties for color/spacing/typography in Theia extension. |
 | R-AUDIT13 | HMAC README Wording Tighten | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | Scope caveat added to README and SECURITY.md HMAC sections. |
-| R-AUDIT14 | Mutating GET /api/runs/start Removal | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Return HTTP 410 for GET /api/runs/start and remove the route; keep POST. |
+| R-AUDIT14 | Mutating GET /api/runs/start Removal | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | GET /api/runs/start returns 410 Gone; POST unaffected; legacy env shim removed. |
 | R-AUDIT15 | SwarmGraph MetaPathFinder Bridge Docs | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Document the MetaPathFinder bridge architecture in docs/research/. |
 | R-AUDIT16 | IDE Context Drawer / AGENTS.md Surface | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add minimal Context drawer in Theia IDE showing AGENTS.md + SKILL.md capability cards. |
 | R-AUDIT17 | R79 TUI/Theia Surfacing | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Surface at least one R79-deferred CLI output (e.g. arc runs budget) as a TUI panel. |

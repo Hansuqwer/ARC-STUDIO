@@ -329,7 +329,7 @@ async def test_start_run_runtime_body_auto_selects_only_langgraph(
 
 
 async def test_start_run_get_rejected_by_default(tmp_path, unused_tcp_port):
-    """Without the legacy opt-in, the mutating GET /api/runs/start is not served (POST-only)."""
+    """GET /api/runs/start returns 410 Gone — the route is removed."""
     app = await create_app(tmp_path)
     runner = AppRunner(app)
     await runner.setup()
@@ -340,8 +340,6 @@ async def test_start_run_get_rejected_by_default(tmp_path, unused_tcp_port):
             async with session.get(
                 f"http://127.0.0.1:{unused_tcp_port}/api/runs/start?runtime=auto",
             ) as response:
-                # 405 (method not allowed) / 404 (no GET resource) / 403 (trust or
-                # origin guard) are all acceptable — the point is the GET never starts a run.
-                assert response.status in (403, 404, 405)
+                assert response.status == 410
     finally:
         await runner.cleanup()
