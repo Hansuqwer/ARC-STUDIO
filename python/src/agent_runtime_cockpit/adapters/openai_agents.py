@@ -36,6 +36,7 @@ from ..protocol.schemas import (
     RunStatus,
     WorkflowInfo,
 )
+from ._shared import make_event
 from ._static import dependency_evidence, import_evidence, static_workflow
 from .base import CapabilityReport, DoctorAction, RuntimeAdapter
 
@@ -574,11 +575,4 @@ class OpenAIAgentsAdapter(RuntimeAdapter):
             )
 
     def _event(self, run_id: str, seq: int, event_type: str, data: dict[str, Any]) -> RunEvent:
-        """Helper to create a RunEvent."""
-        return RunEvent(
-            type=event_type,
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            run_id=run_id,
-            sequence=seq,
-            data=data,
-        )
+        return make_event(run_id, seq, event_type, data)

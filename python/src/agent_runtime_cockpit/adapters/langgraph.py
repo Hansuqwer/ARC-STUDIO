@@ -11,13 +11,11 @@ import importlib
 import inspect
 import logging
 import os
-import sys
 import uuid
 import warnings
-from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from ..adapters.base import CapabilityReport, DoctorAction
 from ..protocol.capabilities import RuntimeCapabilities
@@ -32,6 +30,7 @@ from ..protocol.schemas import (
     WorkflowNode,
 )
 from ..workspace import iter_workspace_files
+from ._shared import make_event, workspace_import_path
 from .base import RuntimeAdapter
 
 log = logging.getLogger(__name__)
@@ -179,9 +178,7 @@ class LangGraphAdapter(RuntimeAdapter):
         run_id = f"run-lg-{uuid.uuid4().hex[:8]}"
         # D-01: Capability Card enforcement (default mode=warn; never blocks)
         try:
-            _cc_payload = self.enforce_capability_card(
-                workflow_id=workflow_id, workspace=workspace
-            )
+            _cc_payload = self.enforce_capability_card(workflow_id=workflow_id, workspace=workspace)
             log.debug("capability_card_decision: %s", _cc_payload)
             inputs.setdefault("_capability_card_decision", _cc_payload)
         except Exception as exc:  # pragma: no cover
@@ -359,7 +356,7 @@ class LangGraphAdapter(RuntimeAdapter):
 
     def _resolve_export(self, workspace: Path, target: str, load_target: bool) -> Any:
         module_name, attr_name = self._parse_export_target(target)
-        with _workspace_import_path(workspace):
+        with workspace_import_path(workspace):
             spec = importlib.util.find_spec(module_name)
             if spec is None:
                 raise LangGraphRunError(
@@ -443,13 +440,7 @@ class LangGraphAdapter(RuntimeAdapter):
         )
 
     def _event(self, run_id: str, sequence: int, event_type: str, data: dict[str, Any]) -> RunEvent:
-        return RunEvent(
-            type=event_type,
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            run_id=run_id,
-            sequence=sequence,
-            data=data,
-        )
+        return make_event(run_id, sequence, event_type, data)
 
     def _redact(self, text: str, cap: int = 4000) -> str:
         lowered = text.lower()
@@ -650,22 +641,3 @@ class LangGraphRunError(Exception):
         super().__init__(message)
         self.code = code
         self.message = message
-
-
-@contextmanager
-def _workspace_import_path(workspace: Path) -> Iterator[None]:
-    added: list[str] = []
-    for candidate in (workspace, workspace / "src"):
-        if candidate.exists():
-            value = str(candidate.resolve())
-            if value not in sys.path:
-                sys.path.insert(0, value)
-                added.append(value)
-    try:
-        yield
-    finally:
-        for value in added:
-            try:
-                sys.path.remove(value)
-            except ValueError:
-                pass

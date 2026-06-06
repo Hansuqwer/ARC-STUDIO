@@ -4,16 +4,15 @@ import asyncio
 import importlib
 import importlib.util
 import os
-import sys
 import uuid
-from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from ..adapters.base import CapabilityReport, DoctorAction
 from ..protocol.capabilities import RuntimeCapabilities
 from ..protocol.schemas import RunEvent, RunRecord, RunStatus, WorkflowInfo
+from ._shared import make_event, workspace_import_path
 from ._static import dependency_evidence, import_evidence, static_workflow
 from .base import RuntimeAdapter
 
@@ -197,7 +196,7 @@ class CrewAIAdapter(RuntimeAdapter):
         if ":" not in target:
             raise ValueError(f"{EXPORT_ENV} must be module:attribute")
         module_name, attr_name = target.split(":", 1)
-        with _workspace_import_path(workspace):
+        with workspace_import_path(workspace):
             module = importlib.import_module(module_name)
         obj = getattr(module, attr_name)
         if callable(obj):
@@ -332,13 +331,7 @@ class CrewAIAdapter(RuntimeAdapter):
         )
 
     def _event(self, run_id: str, sequence: int, event_type: str, data: dict[str, Any]) -> RunEvent:
-        return RunEvent(
-            type=event_type,
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            run_id=run_id,
-            sequence=sequence,
-            data=data,
-        )
+        return make_event(run_id, sequence, event_type, data)
 
     def _redact(self, text: str, cap: int = 4000) -> str:
         lowered = text.lower()
@@ -347,22 +340,3 @@ class CrewAIAdapter(RuntimeAdapter):
         ):
             return "[redacted: message contained possible secret material]"
         return text[:cap]
-
-
-@contextmanager
-def _workspace_import_path(workspace: Path) -> Iterator[None]:
-    added: list[str] = []
-    for candidate in (workspace, workspace / "src"):
-        if candidate.exists():
-            value = str(candidate.resolve())
-            if value not in sys.path:
-                sys.path.insert(0, value)
-                added.append(value)
-    try:
-        yield
-    finally:
-        for value in added:
-            try:
-                sys.path.remove(value)
-            except ValueError:
-                pass
