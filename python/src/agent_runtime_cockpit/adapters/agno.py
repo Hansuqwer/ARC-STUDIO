@@ -50,6 +50,11 @@ class AgnoAdapter(RuntimeAdapter):
     def adapter_name(self) -> str:
         return "Agno"
 
+    def sdk_version(self) -> str:
+        from .base import _sdk_version_for
+
+        return _sdk_version_for("agno")
+
     def capabilities(self) -> RuntimeCapabilities:
         export_set = bool(os.environ.get(_EXPORT_ENV))
         allow_costs = os.environ.get(_ALLOW_ENV, "").strip().lower() == "true"

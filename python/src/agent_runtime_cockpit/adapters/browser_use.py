@@ -67,6 +67,11 @@ class BrowserUseAdapter(RuntimeAdapter):
     def adapter_name(self) -> str:
         return "Browser Use"
 
+    def sdk_version(self) -> str:
+        from .base import _sdk_version_for
+
+        return _sdk_version_for("browser-use")
+
     def capabilities(self) -> RuntimeCapabilities:
         allow_costs = os.environ.get(_ALLOW_COSTS_ENV, "").strip().lower() == "true"
         allow_browser = os.environ.get(_ALLOW_BROWSER_ENV, "").strip().lower() == "true"

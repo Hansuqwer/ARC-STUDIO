@@ -64,6 +64,11 @@ class PydanticAIAdapter(RuntimeAdapter):
     def adapter_name(self) -> str:
         return "Pydantic AI"
 
+    def sdk_version(self) -> str:
+        from .base import _sdk_version_for
+
+        return _sdk_version_for("pydantic-ai")
+
     def capabilities(self) -> RuntimeCapabilities:
         installed, _ = _pydantic_ai_installed()
         export_set = bool(os.environ.get(_EXPORT_ENV))

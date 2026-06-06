@@ -5621,7 +5621,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Add sdk_version() to all 20 adapters in the default registry and surface the version in arc runtimes --capabilities --json output, closing the R-TS1 token-saving research follow-up item for adapter version visibility.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Requires touching all 20 adapter modules; sdk_version() should return None gracefully when the SDK is not installed.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: sdk_version() default added to base.py; _sdk_version_for() helper; 8 priority adapters override (langgraph, crewai, pydantic-ai, letta, browser-use, agno, strands, llamaindex); surfaced in arc runtimes CLI. 1 new test. R-TS1 closed.
 
 ---
 

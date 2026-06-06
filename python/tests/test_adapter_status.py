@@ -203,3 +203,12 @@ def test_all_adapters_detect_swarmgraph_project(tmp_path):
             assert any("swarmgraph" not in e.lower() for e in evidence), (
                 f"{adapter.adapter_id} incorrectly detected swarmgraph project"
             )
+
+
+def test_all_adapters_have_sdk_version():
+    """All adapters in the default registry must return a non-empty str from sdk_version()."""
+    registry = AdapterRegistry().build_default()
+    for adapter in registry.all():
+        version = adapter.sdk_version()
+        assert isinstance(version, str), f"{adapter.adapter_id}.sdk_version() must return str"
+        assert len(version) > 0, f"{adapter.adapter_id}.sdk_version() must not be empty"

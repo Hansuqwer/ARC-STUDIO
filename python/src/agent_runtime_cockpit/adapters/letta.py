@@ -69,6 +69,11 @@ class LettaAdapter(RuntimeAdapter):
     def adapter_name(self) -> str:
         return "Letta (MemGPT)"
 
+    def sdk_version(self) -> str:
+        from .base import _sdk_version_for
+
+        return _sdk_version_for("letta")
+
     def capabilities(self) -> RuntimeCapabilities:
         agent_id = os.environ.get(_AGENT_ID_ENV)
         allow_costs = os.environ.get(_ALLOW_ENV, "").strip().lower() == "true"

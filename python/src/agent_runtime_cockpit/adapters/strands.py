@@ -69,6 +69,11 @@ class StrandsAdapter(RuntimeAdapter):
     def adapter_name(self) -> str:
         return "Strands Agents (AWS)"
 
+    def sdk_version(self) -> str:
+        from .base import _sdk_version_for
+
+        return _sdk_version_for("strands-agents")
+
     def capabilities(self) -> RuntimeCapabilities:
         installed, _ = _strands_installed()
         export_set = bool(os.environ.get(_EXPORT_ENV))

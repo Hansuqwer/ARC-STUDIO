@@ -63,11 +63,18 @@ def runtimes(
         return
 
     if capabilities:
+        reg = default_registry()
         reports = runtime_router.list_runtimes(ws)
+        runtime_rows = []
+        for report in reports:
+            row = report.model_dump()
+            adapter = reg.get(report.runtime_id)
+            row["sdk_version"] = adapter.sdk_version() if adapter else "unknown"
+            runtime_rows.append(row)
         payload = {
             "workspace": str(ws),
             "auto_priority": list(runtime_router.AUTO_PRIORITY),
-            "runtimes": [report.model_dump() for report in reports],
+            "runtimes": runtime_rows,
         }
         if json_output:
             _out(ok(payload, workspace=str(ws)), json_output)

@@ -125,6 +125,24 @@ class RuntimeAdapter(abc.ABC):
         """Subclasses may override to return runtime-specific fix actions."""
         return []
 
+    def sdk_version(self) -> str:
+        """Return the SDK version string for this adapter's underlying library.
+
+        Default returns 'unknown'. Override in subclasses to return the actual
+        installed package version via importlib.metadata.version or __version__.
+        """
+        return "unknown"
+
+
+def _sdk_version_for(package_name: str) -> str:
+    """Return installed version of *package_name*, or 'unknown' if not installed."""
+    try:
+        from importlib.metadata import version
+
+        return version(package_name)
+    except Exception:
+        return "unknown"
+
     @abc.abstractmethod
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
         """Detect whether this adapter's runtime is present in the workspace.
@@ -189,11 +207,7 @@ class RuntimeAdapter(abc.ABC):
         from ..capabilities.enforcement import enforce_card, resolve_mode
         from ..capabilities.registry import CardRegistry
 
-        env = {
-            "ARC_CAPABILITIES_ENFORCE": os.environ.get(
-                "ARC_CAPABILITIES_ENFORCE", ""
-            )
-        }
+        env = {"ARC_CAPABILITIES_ENFORCE": os.environ.get("ARC_CAPABILITIES_ENFORCE", "")}
         mode = resolve_mode(env=env)
 
         try:

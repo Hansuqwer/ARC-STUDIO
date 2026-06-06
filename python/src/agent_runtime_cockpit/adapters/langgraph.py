@@ -56,6 +56,11 @@ class LangGraphAdapter(RuntimeAdapter):
     def adapter_name(self) -> str:
         return "LangGraph"
 
+    def sdk_version(self) -> str:
+        from .base import _sdk_version_for
+
+        return _sdk_version_for("langgraph")
+
     def capabilities(self) -> RuntimeCapabilities:
         return RuntimeCapabilities(
             can_inspect=True,

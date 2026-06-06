@@ -28,6 +28,11 @@ class CrewAIAdapter(RuntimeAdapter):
     def adapter_name(self) -> str:
         return "CrewAI"
 
+    def sdk_version(self) -> str:
+        from .base import _sdk_version_for
+
+        return _sdk_version_for("crewai")
+
     def capabilities(self) -> RuntimeCapabilities:
         return RuntimeCapabilities(can_inspect=True, can_run=False, can_export_workflow=True)
 

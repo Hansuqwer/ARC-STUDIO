@@ -160,7 +160,7 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 
 | ID | Title | Status |
 |---|---|---|
-| R-TS1 | Token-Saving Research | Research Intake (planning only) |
+| R-TS1 | Token-Saving Research | Baseline Complete (sdk_version sweep done — R-AUDIT24 Phase 155) |
 | R79 | Mobile Runtime SDK Integration | Partial — slices 110.1–110.5 done; 110.6 Theia/TUI surfacing follow-up |
 | R34.6 / Battle Arena | Provider-Backed Battle Arena | Blocked (no default paid/live calls) |
 
@@ -1732,5 +1732,5 @@ P2 — Quality:
 | R-AUDIT21 | Accessibility Baseline Audit | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Run axe-core audit on Theia IDE extension and fix zero-effort ARIA label gaps. |
 | R-AUDIT22 | Handover Doc Stale Refs Sweep | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | LOCKED_REMAINING_ROADMAP.md refs replaced with docs/roadmap.md in docs/handover/. |
 | R-AUDIT23 | SwarmGraph Insight UI Components Phase 1 | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Implement DAG planner viz, consensus evidence cards, and HITL approval panel in IDE. |
-| R-AUDIT24 | SDK Version Sweep (R-TS1 close) | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add sdk_version() to all 20 adapters and surface in arc runtimes --capabilities --json. |
+| R-AUDIT24 | SDK Version Sweep (R-TS1 close) | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | sdk_version() added to base + 8 priority adapters; surfaced in arc runtimes --capabilities --json; 1 new test. |
 | R-AUDIT25 | Multi-Provider Router Abstraction | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Design and implement ProviderRouter for cascading failover; gate with ARC_ENABLE_PROVIDER_ROUTER=1. |
