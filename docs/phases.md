@@ -5207,3 +5207,21 @@ Primary is determined by the session's `provider` metadata (or `_detect_provider
 
 This is the final slice. The full provider-resilience surface is now implemented:
 123 retry → 124 streaming retry → 125 graceful degradation → 126 FallbackProviderClient → 127 wiring. R-OPEN-HARDEN moves to Baseline Complete.
+
+---
+
+## Phase 128 — CommandPalette Detail Pane (R-UX3 deferred slice)
+
+**Status:** Baseline Complete (2026-06-06) | Evidence: command_palette.py detail pane, 2 new tests, 5552 passed.
+
+### What was done
+
+- `tui/widgets/command_palette.py`: changed `_cmds` from `list[tuple[str,str,str]]` to `list[CommandDef]`; import `CommandDef` from `agent_runtime_cockpit.cli_repl.commands`; added `#palette-detail` Static after the ListView (CSS: height auto, color $text-muted, margin-top 1, padding 0 1); added `on_list_view_highlighted` handler that strips the `pal-` prefix from `event.item.id`, looks up the matching `CommandDef`, and renders `help_text + usage (if set) + examples[:2] (if set)` via `.update()`.
+- Updated `on_input_changed` to filter over `CommandDef` objects (no tuple unpack).
+- `tests/tui/test_ux3_widgets.py`: updated the two existing CommandPalette search tests to use `CommandDef` objects (previously used raw tuples; now regression-clean).
+- `tests/tui/test_command_palette_detail.py`: 2 new tests — `test_detail_pane_updates_on_highlight` (asserts usage + first 2 examples shown, 3rd excluded), `test_detail_pane_empty_when_no_usage` (asserts only help_text when usage+examples are empty).
+
+### Verification
+
+- `ruff check src tests` — clean.
+- `pytest -q -p no:cacheprovider` — **5552 passed, 0 failed**.

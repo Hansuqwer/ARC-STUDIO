@@ -63,28 +63,45 @@ def test_keycap_hint_markup_has_brackets():
 @pytest.mark.asyncio
 async def test_command_palette_searches_description():
     """CommandPalette._populate filters on help_text when query matches description."""
-    from agent_runtime_cockpit.tui.widgets.command_palette import CommandPalette
+    from unittest.mock import MagicMock
 
-    palette = CommandPalette()
-    # Seed with one command whose help_text matches the query but name doesn't.
-    palette._cmds = [("providers", "Manage API key providers and model selection", "provider")]
+    from agent_runtime_cockpit.cli_repl.commands import CommandDef
+
+    cmd = CommandDef(
+        name="providers",
+        help_text="Manage API key providers and model selection",
+        category="provider",
+        handler=MagicMock(),
+    )
+    palette_cmds = [cmd]
     q = "api key"
-    filtered = [(n, h, c) for n, h, c in palette._cmds if q in n or q in h.lower()]
+    filtered = [c for c in palette_cmds if q in c.name or q in c.help_text.lower()]
     # "api key" is NOT in name "providers" but IS in help_text
     assert len(filtered) == 1
-    assert filtered[0][0] == "providers"
+    assert filtered[0].name == "providers"
 
 
 @pytest.mark.asyncio
 async def test_command_palette_name_search_still_works():
     """CommandPalette still returns results when query matches the name."""
+    from unittest.mock import MagicMock
+
+    from agent_runtime_cockpit.cli_repl.commands import CommandDef
+
     palette_cmds = [
-        ("providers", "Manage API key providers", "provider"),
-        ("runs", "Browse run history", "run"),
+        CommandDef(
+            name="providers",
+            help_text="Manage API key providers",
+            category="provider",
+            handler=MagicMock(),
+        ),
+        CommandDef(
+            name="runs", help_text="Browse run history", category="run", handler=MagicMock()
+        ),
     ]
     q = "runs"
-    filtered = [(n, h, c) for n, h, c in palette_cmds if q in n or q in h.lower()]
-    assert any(n == "runs" for n, _, _ in filtered)
+    filtered = [c for c in palette_cmds if q in c.name or q in c.help_text.lower()]
+    assert any(c.name == "runs" for c in filtered)
 
 
 # ── Toaster wired in screen ───────────────────────────────────────────────────
