@@ -1710,7 +1710,7 @@ P2 — Quality:
 | ID | Title | Status | Evidence | Notes |
 |---|---|---|---|---|
 | R-AUDIT1 | Release Checklist Refresh | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | docs/release/checklist.md updated to v0.8-r-ux2/aa788f3/5537 tests/Phase 131. |
-| R-AUDIT2 | Enforcement Surfaces Doc Refresh | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Catalogue all security surfaces added in Phases 55-131 into enforcement-surfaces.md. |
+| R-AUDIT2 | Enforcement Surfaces Doc Refresh | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | enforcement-surfaces.md updated to Phase 131; new surfaces for sandbox P0, hash chain, adapter gates, retry, TurnManager hook. |
 | R-AUDIT3 | docker-compose 127.0.0.1 Binding | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | docker-compose.yml port 3000 bound to 127.0.0.1. |
 | R-AUDIT4 | config-service apiKeySource Snake/Camel Fix | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add api_key_source fallback in config-service.ts so IDE provider source badge shows correctly. |
 | R-AUDIT5 | MCP Proxy Env Secret-Strip Gate | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Strip secret-bearing env vars before passing env to upstream MCP subprocess. |

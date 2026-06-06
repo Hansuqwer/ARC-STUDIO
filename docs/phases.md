@@ -5445,7 +5445,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Catalogue all security enforcement surfaces added in Phases 55–131 into docs/security/enforcement-surfaces.md so the doc is not stale relative to the current codebase.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Security doc refresh; no code changes required; pairs with any sandbox hardening work.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: enforcement-surfaces.md updated to Phase 131; added surfaces S-60.1-3 (sandbox P0), S-80.1-2 (hash chain), S-100.1-2 (adapter gates), S-116.1-3 (retry/degradation), S-126.1 (TurnManager gate hook).
 
 ---
 

@@ -2,8 +2,9 @@
 
 This document catalogs all security-sensitive surfaces in ARC Studio and their enforcement status. It is the **single source of truth** for every execution surface that routes through the typed enforcement helpers introduced in Phase 23 (and the bypass-warning helper from ADR-0022.1).
 
-**Last updated:** 2026-05-27  
-**Phase:** 23.3 (Baseline Complete) + extended by Phases 25.5, 26, 32, 35, 50, 52, 55 + sandbox/MCP hardening  
+**Last updated:** 2026-06-07
+**Phase:** 131 (Baseline Complete) — extended from Phase 23 baseline through Phase 131
+**HEAD:** aa788f3
 **Audit script:** `scripts/audit-enforcement-surfaces.sh`
 
 If a code path performs a subprocess call, a file read in a user-controlled location, a socket bind, or an HTTP call and is **not** listed here, that is a bug. Either the path needs a row in this document, or it needs a `# enforcement: not-applicable` annotation that the audit script can verify.
@@ -245,6 +246,93 @@ records gate).      unless user consents
 - **What:** Each `ClientSession.call_tool(name, args)` against a connected MCP server.
 - **Gate:** Re-evaluates EnforcementContext (TOCTOU defense).
 - **Denial event:** `TRUST_DENIED` if trust revoked mid-session.
+
+---
+
+### Phases 60-65 — Sandbox P0 Hardening
+
+#### S-60.1 · Env-filter before subprocess launch
+- **What:** All environment variables are filtered before passing to child processes. Variables matching secret patterns (`*_API_KEY`, `*_TOKEN`, `*_SECRET`, `*_PASSWORD`, `AWS_*`, `OPENAI_*`, `ANTHROPIC_*`) are stripped.
+- **Where:** `security/sandbox.py` (env allowlist), `security/enforcement.py`
+- **Gate:** `enforce_shell_gate` with env sanitisation applied unconditionally.
+- **Status:** Enforced in subprocess path.
+
+#### S-60.2 · Path confinement (symlink-escape reject)
+- **What:** All workspace file writes are confined to the declared workspace root. Symlink traversal that would escape the workspace root is rejected.
+- **Where:** `security/sandbox.py`, `workspace.py`
+- **Gate:** `enforce_workspace_trust` with path-confine check.
+- **Denial event:** `TRUST_DENIED` with `{"reason": "symlink_escape"}`.
+- **Status:** Enforced.
+
+#### S-60.3 · Shell-string removal (shell=True removal)
+- **What:** All subprocess invocations use argument arrays. `shell=True` is prohibited. The TUI shell-escape command uses a fail-closed gate that requires explicit sandbox allow-list match.
+- **Where:** `cli/sandbox.py`, `tui/` shell handlers.
+- **Gate:** `enforce_shell_gate` + argument-array contract; `shell=True` usage triggers audit.
+- **Status:** Enforced in P0 audit sprint (Phase 62).
+
+---
+
+### Phases 80-90 — HMAC Audit Chain
+
+#### S-80.1 · HMAC-signed audit append
+- **What:** Every sandbox policy decision, HITL event, and run trace is appended to the local SHA-256 hash chain with a bound hash over seq+timestamp+key_id+prev_hash+event. HMAC signing applies where an audit key is available.
+- **Where:** `audit/chain.py`, `audit/verifier.py`
+- **Gate:** Fail-closed if no audit key available. Existing corrupt chains not extended.
+- **Scope:** Tamper-evident for single-session local runs. Does not protect against a local attacker with write access to `~/.arc/audit/`.
+- **Audit coverage:** `python/tests/audit/`
+
+#### S-80.2 · Audit chain checkpoint sidecar
+- **What:** `.checkpoint.json` sidecar tracks terminal hash, record count, and file size. Truncation of a previously longer chain is detected during verification.
+- **Where:** `audit/chain.py`
+- **Gate:** Written on every append. Mismatch during verify raises `ChainTampered`.
+
+---
+
+### Phases 100-115 — Adapter Conformance Gates
+
+#### S-100.1 · CapabilityCard enforcement gate
+- **What:** Every adapter must declare a CapabilityCard with its declared capabilities. Adapters without a valid card fail the conformance gate at registration.
+- **Where:** `adapters/registry.py`, `adapters/base.py`
+- **Gate:** `enforce_paid_call_gate` for adapters that declare paid capability.
+- **Status:** Enforced. Adapters: pydantic-ai, letta, browser-use, agno, strands — all gated.
+
+#### S-100.2 · Adapter paid-call gate
+- **What:** Adapters that may make paid LLM calls (pydantic-ai, letta, browser-use, agno, strands, crewai, langgraph) are gated behind `enforce_paid_call_gate`.
+- **Where:** Per-adapter `runner.py` files in `adapters/`.
+- **Gate:** `enforce_paid_call_gate` with estimated token count.
+- **Status:** Enforced (default fake/offline deterministic; real path requires env gate).
+
+---
+
+### Phases 116-125 — Retry and Graceful Degradation
+
+#### S-116.1 · _call_with_retry enforcement boundary
+- **What:** All provider call-with-retry paths route through the enforcement context. Retry logic does not bypass the budget preflight gate on retries.
+- **Where:** `runtime/turn_manager.py` (`_call_with_retry`, `_stream_with_retry`)
+- **Gate:** `enforce_paid_call_gate` called once before retry loop, not per-retry.
+- **Status:** Enforced.
+
+#### S-116.2 · ProviderError.retryable classification
+- **What:** `ProviderError.retryable` distinguishes transient errors (retry safe) from permanent errors (do not retry). Permanent errors propagate immediately without additional paid calls.
+- **Where:** `providers/errors.py`, `runtime/turn_manager.py`
+- **Gate:** Permanent errors short-circuit retry loop; budget is not debited for failed retries.
+- **Status:** Enforced.
+
+#### S-116.3 · turn.failed graceful degradation
+- **What:** When all retry attempts are exhausted, the turn emits `turn.failed` event rather than crashing. The run continues to the next turn if configured.
+- **Where:** `runtime/turn_manager.py`
+- **Gate:** `turn.failed` event carries error context; downstream run logic can inspect and decide.
+- **Status:** Enforced (documented/tested in Phase 124-125).
+
+---
+
+### Phases 126-131 — R-UX3 TurnManager Gate Hook
+
+#### S-126.1 · ApprovalCard gate hook in TurnManager
+- **What:** Before each turn, TurnManager checks for a pending `approval-required` hint from the previous turn. If present and HITL approval is pending, the turn blocks until approved or times out.
+- **Where:** `runtime/turn_manager.py` (gate hook introduced Phase 129-131)
+- **Gate:** HITL approval state from `hitl/store.py`. Gate is a hook — approval-required hint does not block unless hook is registered.
+- **Status:** Hook wired (Phase 131). Production-grade HITL timeout handling is a follow-on.
 
 ---
 
