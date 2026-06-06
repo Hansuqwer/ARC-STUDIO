@@ -5573,7 +5573,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Add arc workspace search <query> CLI command that searches workspace files and metadata, plus a corresponding IDE search-result panel that displays results with file/line provenance.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Builds on existing arc workspace inventory infrastructure; results must be workspace-local and sandbox-safe.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: workspace_search command added to studio_workspace.py; rg first, pathlib fallback; path-confined; --json output. 3 new tests. IDE panel is a follow-on.
 
 ---
 

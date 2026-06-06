@@ -1726,7 +1726,7 @@ P2 — Quality:
 | R-AUDIT15 | SwarmGraph MetaPathFinder Bridge Docs | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | docs/research/swarmgraph-metapathfinder-bridge.md created with architecture, gates, and honest limits. |
 | R-AUDIT16 | IDE Context Drawer / AGENTS.md Surface | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | ArcContextDrawer widget created; registered in frontend module; stub data (CLI proxy wiring follow-on); 1 test. |
 | R-AUDIT17 | R79 TUI/Theia Surfacing | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | /budget [run-id] slash command added to TUI screen; wallet fallback when no run-id; 2 new tests. |
-| R-AUDIT18 | Workspace Search CLI + IDE Panel | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add arc workspace search CLI command and corresponding IDE search-result panel. |
+| R-AUDIT18 | Workspace Search CLI + IDE Panel | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | arc workspace search command added; ripgrep/pathlib fallback; path-confined; 3 new tests. IDE panel follow-on. |
 | R-AUDIT19 | Eval Metrics Honest Labelling | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | synthetic:bool=True added to EvalResult; [synthetic/simulated] prefix in CLI eval display; 2 new tests. |
 | R-AUDIT20 | SQLite WAL Busy-Timeout Verification | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | WAL+busy_timeout=5000ms confirmed in budget/storage.py; xfail reason updated to reflect accurate constraint. |
 | R-AUDIT21 | Accessibility Baseline Audit | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Run axe-core audit on Theia IDE extension and fix zero-effort ARIA label gaps. |

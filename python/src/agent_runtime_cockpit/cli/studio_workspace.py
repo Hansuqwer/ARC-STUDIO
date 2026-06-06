@@ -884,3 +884,90 @@ def workspace_inventory(
         "symbols": symbol_inventory.model_dump(mode="json", by_alias=True),
     }
     _out(ok(payload, workspace=str(ws)), json_output)
+
+
+@workspace_app.command("search")
+def workspace_search(
+    query: str = typer.Argument(..., help="Text to search for in workspace files"),
+    path: Optional[str] = typer.Option(None, "--path", help="Sub-path to restrict search"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+) -> None:
+    """Search workspace files for a text pattern (ripgrep with pathlib fallback)."""
+    import json as _json
+    import shutil
+    import subprocess
+
+    ws = _workspace(workspace)
+    search_root = ws
+    if path:
+        candidate = (ws / path).resolve()
+        # Path confinement: reject symlink escapes and out-of-workspace paths
+        try:
+            candidate.relative_to(ws.resolve())
+        except ValueError:
+            _out(err(ArcErrorCode.INVALID_INPUT, f"Path escapes workspace: {path}"), json_output)
+            return
+        if not candidate.exists():
+            _out(err(ArcErrorCode.INVALID_INPUT, f"Path not found: {path}"), json_output)
+            return
+        search_root = candidate
+
+    results: list[dict] = []
+
+    # Try ripgrep first
+    if shutil.which("rg"):
+        try:
+            proc = subprocess.run(
+                ["rg", "--json", "--", query, str(search_root)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            for line in proc.stdout.splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    obj = _json.loads(line)
+                    if obj.get("type") == "match":
+                        data = obj.get("data", {})
+                        results.append(
+                            {
+                                "file": data.get("path", {}).get("text", ""),
+                                "line": data.get("line_number", 0),
+                                "match": data.get("lines", {}).get("text", "").rstrip("\n"),
+                            }
+                        )
+                except _json.JSONDecodeError:
+                    pass
+        except (subprocess.TimeoutExpired, OSError):
+            pass  # fall through to pathlib
+
+    # Pathlib fallback
+    if not results:
+        for f in search_root.rglob("*"):
+            if not f.is_file():
+                continue
+            try:
+                text = f.read_text(errors="replace")
+            except OSError:
+                continue
+            for i, line_text in enumerate(text.splitlines(), start=1):
+                if query in line_text:
+                    results.append(
+                        {
+                            "file": str(f.relative_to(ws)),
+                            "line": i,
+                            "match": line_text.strip(),
+                        }
+                    )
+
+    payload = {"workspace": str(ws), "query": query, "results": results}
+    if json_output:
+        _out(ok(payload, workspace=str(ws)), json_output)
+        return
+    if not results:
+        console.print(f"No matches for {query!r}")
+        return
+    for r in results:
+        console.print(f"{r['file']}:{r['line']}: {r['match']}")
