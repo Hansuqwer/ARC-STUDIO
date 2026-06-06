@@ -98,6 +98,7 @@ class AdapterRegistry:
         from .mcp_sdk import MCPSDKAdapter
         from .semantic_kernel import SemanticKernelAdapter
         from .smolagents import SmolagentsAdapter
+        from .strands import StrandsAdapter
         from .swarmgraph import SwarmGraphAdapter
 
         self.register(SwarmGraphAdapter())
@@ -115,6 +116,7 @@ class AdapterRegistry:
         self.register(GoogleADKAdapter())
         self.register(MCPSDKAdapter())
         self.register(ArcRuntimeSDKAdapter())
+        self.register(StrandsAdapter())
         return self
 
 
