@@ -98,6 +98,7 @@ class AdapterRegistry:
         from .mcp_sdk import MCPSDKAdapter
         from .semantic_kernel import SemanticKernelAdapter
         from .smolagents import SmolagentsAdapter
+        from .browser_use import BrowserUseAdapter
         from .letta import LettaAdapter
         from .pydantic_ai_adapter import PydanticAIAdapter
         from .strands import StrandsAdapter
@@ -121,6 +122,7 @@ class AdapterRegistry:
         self.register(StrandsAdapter())
         self.register(PydanticAIAdapter())
         self.register(LettaAdapter())
+        self.register(BrowserUseAdapter())
         return self
 
 
