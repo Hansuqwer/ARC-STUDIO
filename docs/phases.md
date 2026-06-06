@@ -5239,3 +5239,17 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 - `ruff check src tests` — clean.
 - `pytest -q -p no:cacheprovider` — **5554 passed, 0 failed**.
+
+## Phase 130 — DiffBlock Side-by-Side Toggle (R-UX3 deferred slice)
+
+**Status:** Baseline Complete (2026-06-06) | Evidence: diff_block.py _side_by_side + s key + _render_side_by_side(), 2 new tests, 5556 passed.
+
+### What was done
+
+- `tui/widgets/diff_block.py`: added `_side_by_side: bool = False` attribute; added `elif event.key == "s"` handler in `on_key` that calls `event.stop()`, toggles the flag, and calls `self.refresh()`; added `_render_side_by_side()` method that parses the diff into hunks, collects removed/added lines per hunk, zips them into pairs (padding the shorter side), and renders each pair as `f'{left:<40} │ {right}'`; `render()` delegates to `_render_side_by_side()` when flag is set.
+- `tests/tui/test_diff_block_sbs.py`: 2 new tests — `test_s_key_toggles_side_by_side` (asserts render() output contains '│' after s key), `test_unified_default_no_pipe` (asserts default render has no '│' separator).
+
+### Verification
+
+- `ruff check src tests` — clean.
+- `pytest -q -p no:cacheprovider` — **5556 passed, 0 failed**.
