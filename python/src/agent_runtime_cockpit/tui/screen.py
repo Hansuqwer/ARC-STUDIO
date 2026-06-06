@@ -445,18 +445,16 @@ class ArcScreen(Screen):
             return
         if not sandbox_decision.allowed:
             code = sandbox_decision.reason_code.value if sandbox_decision.reason_code else "denied"
+            hint = (
+                "\n  (run via `arc sandbox run --policy local-safe -- <cmd>` to approve)"
+                if sandbox_decision.approval_required
+                else ""
+            )
             _block(
                 f"Shell command blocked: {sandbox_decision.reason} "
-                f"[{sandbox_decision.classification.value} · {code}]"
+                f"[{sandbox_decision.classification.value} · {code}]{hint}"
             )
             _audit(sandbox_decision, None)
-            return
-        if sandbox_decision.approval_required and not sandbox_decision.approved:
-            _block(
-                f"Shell command requires approval: {sandbox_decision.reason} "
-                f"[{sandbox_decision.classification.value}]\n"
-                "  (run via `arc sandbox run --policy local-safe -- <cmd>` to approve)"
-            )
             return
 
         # Allowed: execute the EXACT classified argv under the configured isolation
