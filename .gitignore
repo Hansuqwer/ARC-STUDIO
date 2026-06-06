@@ -9,6 +9,15 @@
 python/.arc/traces/
 python/.arc/audit/
 python/.arc/events/
+python/.arc/plans/
+python/.arc/*.db
+python/tasks.db
+python/snapshot_report.html
+docs/reports/
+runtimes/
+TOKEN_SAVING_PLAN-2.md
+docs/UX_AUDIT.md
+docs/UX_AUDIT_PROMPT.md
 node_modules/
 dist/
 lib/
