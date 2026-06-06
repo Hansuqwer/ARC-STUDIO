@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, AsyncIterator, Callable
 
 from agent_runtime_cockpit.cli_repl.cancellation import CancellationToken, Cancelled
 from agent_runtime_cockpit.cli_repl.session import ChatSession
@@ -51,6 +51,38 @@ async def _call_with_retry(
             if not disable_sleep:
                 await asyncio.sleep(delay)
     raise last_exc  # type: ignore[misc]
+
+
+async def _stream_with_retry(
+    stream_fn: Callable[[], AsyncIterator[Any]],
+    max_retries: int = _DEFAULT_MAX_RETRIES,
+) -> AsyncIterator[Any]:
+    """Yield chunks from a provider stream, retrying ONLY before the first chunk.
+
+    Streaming retry has a hard correctness boundary: once any chunk has been
+    yielded to the consumer, the partial output is already visible and LLM calls
+    are non-idempotent (temperature/sampling) — retrying would duplicate or
+    diverge the output the user already saw. So a retryable ProviderError is
+    retried only while no chunk has been emitted yet; after the first chunk, the
+    error propagates.
+
+    Set ARC_DISABLE_RETRY_SLEEP=1 to skip the sleep in tests.
+    """
+    disable_sleep = os.environ.get("ARC_DISABLE_RETRY_SLEEP", "").strip() == "1"
+    for attempt in range(max_retries + 1):
+        emitted = False
+        try:
+            async for chunk in stream_fn():
+                emitted = True
+                yield chunk
+            return
+        except ProviderError as exc:
+            # Once any chunk is emitted, never retry — would duplicate output.
+            if emitted or not exc.retryable or attempt >= max_retries:
+                raise
+            delay = 2**attempt
+            if not disable_sleep:
+                await asyncio.sleep(delay)
 
 
 @dataclass(frozen=True)
@@ -108,8 +140,10 @@ class TurnManager:
                 chunks: list[StreamChunk] = []
                 tool_calls: list[dict[str, Any]] = []
                 usage_payload: dict[str, Any] | None = None
-                async for chunk in self._provider_client.stream(
-                    request, cancellation_token=cancellation_token
+                async for chunk in _stream_with_retry(
+                    lambda: self._provider_client.stream(
+                        request, cancellation_token=cancellation_token
+                    )
                 ):
                     chunks.append(chunk)
                     self._emit("stream.chunk." + chunk.chunk_type, chunk.model_dump(mode="json"))

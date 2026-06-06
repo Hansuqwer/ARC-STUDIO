@@ -85,3 +85,103 @@ async def test_non_provider_exception_propagates_immediately():
     with pytest.raises(ValueError):
         await _call_with_retry(fn, max_retries=2)
     assert fn.call_count == 1
+
+
+# ─── _stream_with_retry (R-OPEN-HARDEN slice 2) ───────────────────────────────
+
+
+async def _make_stream(chunks):
+    """An async generator that yields the given chunks."""
+    for c in chunks:
+        yield c
+
+
+async def _failing_before_first(exc):
+    """An async generator that raises before yielding anything."""
+    raise exc
+    yield  # pragma: no cover — unreachable, makes this an async generator
+
+
+async def _failing_after_first(chunks, exc):
+    """An async generator that yields some chunks then raises."""
+    for c in chunks:
+        yield c
+    raise exc
+
+
+@pytest.mark.asyncio
+async def test_stream_success_no_retry():
+    from agent_runtime_cockpit.runtime.turn_manager import _stream_with_retry
+
+    out = [c async for c in _stream_with_retry(lambda: _make_stream(["a", "b", "c"]))]
+    assert out == ["a", "b", "c"]
+
+
+@pytest.mark.asyncio
+async def test_stream_retries_before_first_chunk():
+    """A retryable error before the first chunk triggers a retry."""
+    from agent_runtime_cockpit.runtime.turn_manager import _stream_with_retry
+
+    attempts = {"n": 0}
+
+    def factory():
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            return _failing_before_first(RateLimitError("429"))
+        return _make_stream(["ok"])
+
+    out = [c async for c in _stream_with_retry(factory, max_retries=2)]
+    assert out == ["ok"]
+    assert attempts["n"] == 2
+
+
+@pytest.mark.asyncio
+async def test_stream_does_not_retry_after_first_chunk():
+    """Once a chunk is emitted, a failure propagates — no duplicate output."""
+    from agent_runtime_cockpit.runtime.turn_manager import _stream_with_retry
+
+    attempts = {"n": 0}
+
+    def factory():
+        attempts["n"] += 1
+        return _failing_after_first(["partial"], RateLimitError("429 mid-stream"))
+
+    collected = []
+    with pytest.raises(RateLimitError):
+        async for c in _stream_with_retry(factory, max_retries=2):
+            collected.append(c)
+    # The one chunk emitted before the error is kept; no retry/duplication.
+    assert collected == ["partial"]
+    assert attempts["n"] == 1
+
+
+@pytest.mark.asyncio
+async def test_stream_non_retryable_propagates_before_first_chunk():
+    from agent_runtime_cockpit.runtime.turn_manager import _stream_with_retry
+
+    attempts = {"n": 0}
+
+    def factory():
+        attempts["n"] += 1
+        return _failing_before_first(AuthError("bad key"))
+
+    with pytest.raises(AuthError):
+        async for _ in _stream_with_retry(factory, max_retries=2):
+            pass
+    assert attempts["n"] == 1  # auth error not retried
+
+
+@pytest.mark.asyncio
+async def test_stream_raises_after_max_retries():
+    from agent_runtime_cockpit.runtime.turn_manager import _stream_with_retry
+
+    attempts = {"n": 0}
+
+    def factory():
+        attempts["n"] += 1
+        return _failing_before_first(RateLimitError("always"))
+
+    with pytest.raises(RateLimitError):
+        async for _ in _stream_with_retry(factory, max_retries=2):
+            pass
+    assert attempts["n"] == 3  # initial + 2 retries

@@ -5079,3 +5079,35 @@ The retry infrastructure in `providers/base.py` (`RateLimitError.retryable=True`
 
 - Lambda closures capture `request` by reference in the retry wrapper. If `request` is mutated between retries, the retried call will use the mutated version. Current code does not mutate `request` between calls, so this is safe.
 - Default `max_retries=2` is hardcoded. Future work: make it configurable per-provider or via env var.
+
+---
+
+## Phase 124 — Streaming-Path Retry Hardening (R-OPEN-HARDEN slice 2)
+
+**Status:** Baseline Complete (2026-06-06) | Evidence: _stream_with_retry in turn_manager.py, 5 new tests (13 retry tests total). Research: docs/research/roadmap-status-analysis.md §4.
+
+### Context
+
+Phase 123 added retry to the non-streaming `complete()` path but deferred the streaming path. The roadmap status analysis (Phase analysis) identified this as the single clear "activate now" deferred item and deep-researched the correctness boundary.
+
+### Research finding (correctness boundary)
+
+Streaming retry is **only safe before the first chunk is emitted**. Once any chunk has been yielded to the consumer, the partial output is already visible, and LLM calls are non-idempotent (temperature/sampling) — retrying would duplicate or diverge the output the user already saw. Industry sources (idempotency-in-LLM-pipelines, streaming chunk-handling/error-recovery) confirm this.
+
+### What was done
+
+- Added `_stream_with_retry(stream_fn, max_retries=2)` async generator to `turn_manager.py`. It tracks an `emitted` flag; a retryable `ProviderError` raised **before** the first chunk triggers a retry with `2^attempt` backoff (re-calling `stream_fn()` for a fresh iterator). Once `emitted=True`, any error propagates — no retry, no duplicate output.
+- Wired at the streaming call site (turn_manager.py ~111).
+- Also corrected the stale pydantic_ai roadmap note ("registration deferred" → superseded by Phase 116 which registered it as #17).
+- `tests/runtime/test_retry_hardening.py`: +5 streaming tests (success, retry-before-first-chunk, no-retry-after-first-chunk with chunk-count assertion, non-retryable propagates, max-retries exhausted).
+
+### Verification
+
+- 5534 passed. Ruff clean.
+- The "no-retry-after-first-chunk" test asserts the partial chunk is kept and the factory is called exactly once — proving no duplicate emission.
+- `ARC_DISABLE_RETRY_SLEEP=1` skips sleep in tests.
+
+### Known Risks
+
+- `stream_fn` lambda captures `request` by reference; current code does not mutate it between retries.
+- Retry re-establishes the stream from scratch (no resumption token); acceptable because retry only happens pre-first-chunk where no state has been consumed.
