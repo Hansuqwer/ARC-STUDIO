@@ -130,9 +130,23 @@ class TurnManager:
                     degraded_reason=response.degraded_reason,
                 )
 
-            response = await self._provider_client.complete(
-                request, cancellation_token=cancellation_token
-            )
+            # MT-3: deterministic response cache (default-off; temperature==0 only).
+            # Only the simple non-tools path is cacheable as a single response.
+            from .response_cache import DeterministicResponseCache
+
+            cache = DeterministicResponseCache()
+            response = None
+            if not session.tools_enabled:
+                cached = cache.get(request)
+                if cached is not None:
+                    self._emit("turn.cache_hit", {"session_id": session.id})
+                    response = cached
+            if response is None:
+                response = await self._provider_client.complete(
+                    request, cancellation_token=cancellation_token
+                )
+                if not session.tools_enabled:
+                    cache.put(request, response)
             if session.tools_enabled:
                 response = await self._run_tool_loop(
                     session, response, cancellation_token=cancellation_token
