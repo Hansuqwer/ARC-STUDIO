@@ -148,6 +148,10 @@ function isInsightEvent(event: TraceEvent, name: 'topology' | 'consensus' | 'cos
     );
 }
 
+// Shape contract (R-AUDIT10 Phase 141): Python emitter in adoption/langgraph_runner.py
+// _topology_payload() emits {nodes: [...], edges: [...], source: "..."} — flat, no nesting.
+// This function reads source.nodes and source.edges directly; nested shapes like
+// {topology: {nodes}} are explicitly ignored (see test: rejects nested topology key).
 function extractTopology(events: TraceEvent[], degraded: boolean): SwarmGraphTopologyInsight {
     const source = events.find(event => isInsightEvent(event, 'topology'))?.data;
     if (!source) {

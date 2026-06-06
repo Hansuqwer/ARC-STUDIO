@@ -5509,7 +5509,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Verify and fix any topology event shape mismatch between what the SwarmGraph SDK emits and what the IDE workflow graph view expects, so the SwarmGraph Insight topology panel renders correctly end-to-end.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Cross-layer contract verification; may be Python-only, TypeScript-only, or both depending on where the mismatch is found.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: No mismatch. Python _topology_payload() emits flat {nodes, edges}; TS extractTopology() reads flat. Shape contract comment added to swarmgraph-insight-model.ts. 1 new Python test.
 
 ---
 

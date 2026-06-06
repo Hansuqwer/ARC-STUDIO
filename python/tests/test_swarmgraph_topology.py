@@ -4,6 +4,7 @@ Verifies that the SwarmGraph adapter emits SWARMGRAPH_TOPOLOGY and
 SWARMGRAPH_CONSENSUS events when executing workflows, not just the
 LangGraph adoption runner.
 """
+
 from __future__ import annotations
 
 import json
@@ -18,9 +19,7 @@ def _make_swarmgraph_cli(tmp_path: Path, output: dict[str, Any]) -> Path:
     """Create a fake SwarmGraph CLI script (Python) that returns given JSON."""
     cli = tmp_path / "swarmgraph"
     cli.write_text(
-        "#!/usr/bin/env python3\n"
-        "import json\n"
-        f"print(json.dumps({json.dumps(output)}))\n"
+        f"#!/usr/bin/env python3\nimport json\nprint(json.dumps({json.dumps(output)}))\n"
     )
     cli.chmod(cli.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     return cli
@@ -35,6 +34,7 @@ def test_swarmgraph_adapter_rejects_explicit_invalid_cli(monkeypatch, tmp_path):
     monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(tmp_path / "missing-swarmgraph"))
 
     import asyncio
+
     adapter = SwarmGraphAdapter()
     with pytest.raises(FileNotFoundError):
         asyncio.run(adapter.run_workflow("wf-test", {"workspace": str(ws), "prompt": "test"}))
@@ -49,8 +49,11 @@ def test_swarmgraph_adapter_native_events_not_duplicated(monkeypatch, tmp_path):
     ws.mkdir()
 
     import asyncio
+
     adapter = SwarmGraphAdapter()
-    result = asyncio.run(adapter.run_workflow("wf-native", {"workspace": str(ws), "prompt": "test"}))
+    result = asyncio.run(
+        adapter.run_workflow("wf-native", {"workspace": str(ws), "prompt": "test"})
+    )
 
     topology_events = [e for e in result.events if e.type == "SWARMGRAPH_TOPOLOGY"]
     consensus_events = [e for e in result.events if e.type == "SWARMGRAPH_CONSENSUS"]
@@ -67,16 +70,20 @@ def test_swarmgraph_adapter_emits_topology_event(monkeypatch, tmp_path):
     ws.mkdir()
     (ws / "swarmgraph.yaml").write_text("name: test\n")
 
-    cli = _make_swarmgraph_cli(tmp_path, {
-        "swarm_id": "sg-test-1",
-        "status": "completed",
-        "worker_count": 3,
-        "final_output": "Topology test complete",
-    })
+    cli = _make_swarmgraph_cli(
+        tmp_path,
+        {
+            "swarm_id": "sg-test-1",
+            "status": "completed",
+            "worker_count": 3,
+            "final_output": "Topology test complete",
+        },
+    )
     monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))
     monkeypatch.setenv("ARC_SWARMGRAPH_RUN_BACKEND", "stub")
 
     import asyncio
+
     adapter = SwarmGraphAdapter()
     result = asyncio.run(adapter.run_workflow("wf-test", {"workspace": str(ws), "prompt": "test"}))
 
@@ -97,16 +104,20 @@ def test_swarmgraph_adapter_emits_consensus_event(monkeypatch, tmp_path):
     ws.mkdir()
     (ws / "swarmgraph.yaml").write_text("name: test\n")
 
-    cli = _make_swarmgraph_cli(tmp_path, {
-        "swarm_id": "sg-consensus-1",
-        "status": "completed",
-        "worker_count": 2,
-        "final_output": "Consensus reached",
-    })
+    cli = _make_swarmgraph_cli(
+        tmp_path,
+        {
+            "swarm_id": "sg-consensus-1",
+            "status": "completed",
+            "worker_count": 2,
+            "final_output": "Consensus reached",
+        },
+    )
     monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))
     monkeypatch.setenv("ARC_SWARMGRAPH_RUN_BACKEND", "stub")
 
     import asyncio
+
     adapter = SwarmGraphAdapter()
     result = asyncio.run(adapter.run_workflow("wf-consensus", {"workspace": str(ws)}))
 
@@ -128,16 +139,20 @@ def test_swarmgraph_adapter_topology_with_no_workers(monkeypatch, tmp_path):
     ws.mkdir()
     (ws / "swarmgraph.yaml").write_text("name: test\n")
 
-    cli = _make_swarmgraph_cli(tmp_path, {
-        "swarm_id": "sg-zero",
-        "status": "completed",
-        "worker_count": 0,
-        "final_output": "No workers needed",
-    })
+    cli = _make_swarmgraph_cli(
+        tmp_path,
+        {
+            "swarm_id": "sg-zero",
+            "status": "completed",
+            "worker_count": 0,
+            "final_output": "No workers needed",
+        },
+    )
     monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))
     monkeypatch.setenv("ARC_SWARMGRAPH_RUN_BACKEND", "stub")
 
     import asyncio
+
     adapter = SwarmGraphAdapter()
     result = asyncio.run(adapter.run_workflow("wf-zero", {"workspace": str(ws)}))
 
@@ -156,16 +171,20 @@ def test_swarmgraph_adapter_failed_run_still_emits_topology(monkeypatch, tmp_pat
     ws.mkdir()
     (ws / "swarmgraph.yaml").write_text("name: test\n")
 
-    cli = _make_swarmgraph_cli(tmp_path, {
-        "swarm_id": "sg-fail",
-        "status": "failed",
-        "worker_count": 1,
-        "final_output": "",
-    })
+    cli = _make_swarmgraph_cli(
+        tmp_path,
+        {
+            "swarm_id": "sg-fail",
+            "status": "failed",
+            "worker_count": 1,
+            "final_output": "",
+        },
+    )
     monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))
     monkeypatch.setenv("ARC_SWARMGRAPH_RUN_BACKEND", "stub")
 
     import asyncio
+
     adapter = SwarmGraphAdapter()
     result = asyncio.run(adapter.run_workflow("wf-fail", {"workspace": str(ws)}))
 
@@ -185,23 +204,31 @@ def test_swarmgraph_adapter_topology_event_order(monkeypatch, tmp_path):
     ws.mkdir()
     (ws / "swarmgraph.yaml").write_text("name: test\n")
 
-    cli = _make_swarmgraph_cli(tmp_path, {
-        "swarm_id": "sg-order",
-        "status": "completed",
-        "worker_count": 2,
-        "final_output": "Order test",
-    })
+    cli = _make_swarmgraph_cli(
+        tmp_path,
+        {
+            "swarm_id": "sg-order",
+            "status": "completed",
+            "worker_count": 2,
+            "final_output": "Order test",
+        },
+    )
     monkeypatch.setenv("ARC_SWARMGRAPH_CLI", str(cli))
     monkeypatch.setenv("ARC_SWARMGRAPH_RUN_BACKEND", "stub")
 
     import asyncio
+
     adapter = SwarmGraphAdapter()
     result = asyncio.run(adapter.run_workflow("wf-order", {"workspace": str(ws)}))
 
     event_types = [e.type for e in result.events]
 
-    topo_idx = event_types.index("SWARMGRAPH_TOPOLOGY") if "SWARMGRAPH_TOPOLOGY" in event_types else -1
-    cons_idx = event_types.index("SWARMGRAPH_CONSENSUS") if "SWARMGRAPH_CONSENSUS" in event_types else -1
+    topo_idx = (
+        event_types.index("SWARMGRAPH_TOPOLOGY") if "SWARMGRAPH_TOPOLOGY" in event_types else -1
+    )
+    cons_idx = (
+        event_types.index("SWARMGRAPH_CONSENSUS") if "SWARMGRAPH_CONSENSUS" in event_types else -1
+    )
     completed_idx = event_types.index("RUN_COMPLETED") if "RUN_COMPLETED" in event_types else -1
 
     assert topo_idx >= 0, "SWARMGRAPH_TOPOLOGY not found"
@@ -209,3 +236,23 @@ def test_swarmgraph_adapter_topology_event_order(monkeypatch, tmp_path):
     assert completed_idx >= 0, "RUN_COMPLETED not found"
     assert topo_idx < completed_idx, "Topology should precede RUN_COMPLETED"
     assert cons_idx < completed_idx, "Consensus should precede RUN_COMPLETED"
+
+
+def test_topology_event_shape_is_flat_not_nested(monkeypatch, tmp_path):
+    """R-AUDIT10 Phase 141: topology payload must be flat {nodes, edges}, not nested
+    under a 'topology' key, so the IDE model in swarmgraph-insight-model.ts can
+    consume it directly (it reads source.nodes, not source.topology.nodes)."""
+    from agent_runtime_cockpit.adoption.langgraph_runner import LangGraphAdoptionRunner
+
+    runner = LangGraphAdoptionRunner.__new__(LangGraphAdoptionRunner)
+    tasks = [
+        {"worker_id": "worker-1", "role": "worker"},
+        {"worker_id": "worker-2", "role": "worker"},
+    ]
+    payload = runner._topology_payload(tasks)
+
+    # Shape must be flat: nodes and edges at the top level
+    assert "nodes" in payload
+    assert "edges" in payload
+    # Must NOT be nested under a 'topology' key
+    assert "topology" not in payload

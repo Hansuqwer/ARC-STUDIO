@@ -1718,7 +1718,7 @@ P2 — Quality:
 | R-AUDIT7 | DataStore allow_paid Default Warning | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | allow_paid_warning property added to DataStore; surfaced in StatusBar; 3 new tests. |
 | R-AUDIT8 | EXTENSION_MIGRATION Stale Ref Fix | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | LOCKED_REMAINING_ROADMAP.md ref replaced with docs/roadmap.md in EXTENSION_MIGRATION.md. |
 | R-AUDIT9 | Budget Durability Under Error | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | Budget is preflight-only; by-design gap documented in turn_manager.py degraded path; 2 new tests. |
-| R-AUDIT10 | SwarmGraph Topology Shape Verification | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Verify/fix topology event shape mismatch between SDK and IDE workflow graph view. |
+| R-AUDIT10 | SwarmGraph Topology Shape Verification | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | No mismatch found; shapes consistent (flat {nodes,edges}); comment added to TS; 1 new Python test. |
 | R-AUDIT11 | Notifications Outbox MVP | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Create notifications/ module with JSONL outbox, TTL/GC, replacing fire-and-forget emitters. |
 | R-AUDIT12 | UI Design Token Foundation | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Introduce CSS custom properties for color/spacing/typography in Theia extension. |
 | R-AUDIT13 | HMAC README Wording Tighten | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | Scope caveat added to README and SECURITY.md HMAC sections. |
