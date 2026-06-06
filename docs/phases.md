@@ -5629,6 +5629,6 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Design and implement a ProviderRouter class that supports cascading failover across an ordered list of configured providers, gated by ARC_ENABLE_PROVIDER_ROUTER=1, building on the existing ARC_FALLBACK_PROVIDERS env wiring from Phase 127.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Extends R-OPEN-HARDEN failover baseline; gate prevents any change to default single-provider behaviour.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: providers/router.py with ProviderRouter class; gated ARC_ENABLE_PROVIDER_ROUTER=1; retryable/non-retryable failover; 5 new tests. turn_manager wiring is a follow-on slice.
 
 ---
