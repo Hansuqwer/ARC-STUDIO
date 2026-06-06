@@ -48,3 +48,4 @@ CLAUDE.md
 # Theia-generated webpack config in packages/
 packages/*/gen-webpack.config.js
 packages/*/gen-webpack.node.config.js
+python/.arc/flight/
