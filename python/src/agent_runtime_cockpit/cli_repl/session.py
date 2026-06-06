@@ -356,3 +356,75 @@ def microcompact_tool_results(
         sha256=digest,
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
+
+
+# ── MT-5 Deterministic Sliding-Window History Compaction ──────────────────────
+
+
+def sliding_window_compact(
+    session: "ChatSession",
+    *,
+    keep_last_turns: int = 20,
+) -> CompactionReceipt:
+    """Focus-preserving sliding-window reducer over conversational turns (in-place).
+
+    Complements ``microcompact_tool_results`` (which owns ``role=="tool"``
+    messages). This reducer operates on ``user``/``assistant`` turns:
+
+    - All ``system`` messages are kept verbatim (instructions never elided).
+    - The **first** ``user`` message is kept verbatim (the task anchor).
+    - The last ``keep_last_turns`` user/assistant messages are kept verbatim.
+    - Older user/assistant messages in the middle have their content replaced
+      with a one-line stub ``[Earlier turn elided — N chars]``.
+    - ``tool`` messages are left untouched (handled by microcompact).
+
+    This is the **deterministic** MT-5 core. LLM-assisted summarization of the
+    elided span is a separate, opt-in slice (not implemented here) — this path
+    makes no provider calls.
+
+    Returns a :class:`CompactionReceipt`. No-op when there are
+    ≤ ``keep_last_turns`` + 1 conversational turns (nothing to elide).
+    """
+    import hashlib
+    from datetime import datetime, timezone
+
+    # Conversational turns = user/assistant (NOT system, NOT tool).
+    turn_indices = [
+        i for i, m in enumerate(session.history) if m.get("role") in ("user", "assistant")
+    ]
+
+    # Keep the first turn (task anchor) + the last keep_last_turns turns.
+    # The middle (between index 1 and the trailing window) is elided.
+    if len(turn_indices) <= keep_last_turns + 1:
+        return CompactionReceipt(
+            cleared_count=0,
+            cleared_chars=0,
+            kept_count=len(turn_indices),
+            sha256=hashlib.sha256(b"").hexdigest(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+
+    to_elide = turn_indices[1:-keep_last_turns]  # skip first, keep trailing window
+
+    cleared_content: list[str] = []
+    cleared_chars = 0
+    for idx in to_elide:
+        content = session.history[idx].get("content", "")
+        # Skip already-elided stubs so repeated /compact is idempotent.
+        if content.startswith("[Earlier turn elided"):
+            continue
+        cleared_content.append(content)
+        cleared_chars += len(content)
+        session.history[idx] = {
+            **session.history[idx],
+            "content": f"[Earlier turn elided — {len(content)} chars]",
+        }
+
+    digest = hashlib.sha256("\n---\n".join(cleared_content).encode("utf-8")).hexdigest()
+    return CompactionReceipt(
+        cleared_count=len(cleared_content),
+        cleared_chars=cleared_chars,
+        kept_count=len(turn_indices) - len(cleared_content),
+        sha256=digest,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )

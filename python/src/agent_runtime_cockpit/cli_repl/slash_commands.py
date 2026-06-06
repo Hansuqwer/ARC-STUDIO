@@ -1017,22 +1017,32 @@ def cmd_clear(_arg: str, session: ChatSession) -> str:
 
 
 def cmd_compact(_arg: str, session: ChatSession) -> CommandResult:
-    """Compact old tool outputs: keep last 5 verbatim, replace older with stub."""
-    from .session import microcompact_tool_results
+    """Compact the session: trim old tool outputs (last 5 kept) and elide old
+    conversational turns (first turn + last 20 kept). Deterministic, no LLM."""
+    from .session import microcompact_tool_results, sliding_window_compact
 
-    receipt = microcompact_tool_results(session, keep_last=5)
-    if receipt.cleared_count == 0:
+    tools = microcompact_tool_results(session, keep_last=5)
+    turns = sliding_window_compact(session, keep_last_turns=20)
+
+    total_cleared = tools.cleared_count + turns.cleared_count
+    total_chars = tools.cleared_chars + turns.cleared_chars
+
+    if total_cleared == 0:
         return CommandResult(
             state="present",
-            output=f"Nothing to compact — {receipt.kept_count} tool message(s) kept.",
+            output=(
+                f"Nothing to compact — {tools.kept_count} tool message(s), "
+                f"{turns.kept_count} turn(s) kept."
+            ),
         )
+    parts = []
+    if tools.cleared_count:
+        parts.append(f"{tools.cleared_count} tool output(s) (sha256:{tools.sha256[:12]}…)")
+    if turns.cleared_count:
+        parts.append(f"{turns.cleared_count} earlier turn(s) (sha256:{turns.sha256[:12]}…)")
     return CommandResult(
         state="present",
-        output=(
-            f"Compacted {receipt.cleared_count} tool message(s) "
-            f"({receipt.cleared_chars:,} chars removed, {receipt.kept_count} kept). "
-            f"Receipt: sha256:{receipt.sha256[:12]}…"
-        ),
+        output=(f"Compacted {' + '.join(parts)} — {total_chars:,} chars removed."),
     )
 
 
