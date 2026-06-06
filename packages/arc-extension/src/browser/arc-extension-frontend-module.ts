@@ -30,6 +30,7 @@ import { ArcServicePath, ArcService } from '../common/arc-protocol';
 import type { ArcService as IArcService } from '../common/arc-protocol';
 import './style/arc-widget.css';
 import './style/arc-studio-widget.css';
+import { ArcContextDrawer } from './arc-context-drawer';
 
 export default new ContainerModule(bind => {
     bind(PreferenceContribution).toConstantValue({ schema: ArcPreferenceSchema });
@@ -135,4 +136,11 @@ export default new ContainerModule(bind => {
     })).inSingletonScope();
     bindViewContribution(bind, ArcWelcomeContribution);
     bind(FrontendApplicationContribution).toService(ArcWelcomeContribution);
+
+    // Bind the ARC Context Drawer (shows AGENTS.md capability cards)
+    bind(ArcContextDrawer).toSelf();
+    bind(WidgetFactory).toDynamicValue(ctx => ({
+        id: ArcContextDrawer.ID,
+        createWidget: () => ctx.container.get<ArcContextDrawer>(ArcContextDrawer),
+    })).inSingletonScope();
 });

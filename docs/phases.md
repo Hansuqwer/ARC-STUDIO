@@ -5557,7 +5557,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Add a minimal Context drawer in the Theia IDE that surfaces the workspace AGENTS.md and SKILL.md capability cards so agents and developers can inspect the active charter and skill catalog without leaving the IDE.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Builds on existing arc agents-md discover and arc skills discover CLI commands; read-only display only.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: ArcContextDrawer.tsx created; registered in arc-extension-frontend-module.ts; stub data path (arc agents-md CLI proxy is a follow-on). 1 render test.
 
 ---
 

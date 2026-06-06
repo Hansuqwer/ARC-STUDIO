@@ -1724,7 +1724,7 @@ P2 — Quality:
 | R-AUDIT13 | HMAC README Wording Tighten | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | Scope caveat added to README and SECURITY.md HMAC sections. |
 | R-AUDIT14 | Mutating GET /api/runs/start Removal | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | GET /api/runs/start returns 410 Gone; POST unaffected; legacy env shim removed. |
 | R-AUDIT15 | SwarmGraph MetaPathFinder Bridge Docs | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | docs/research/swarmgraph-metapathfinder-bridge.md created with architecture, gates, and honest limits. |
-| R-AUDIT16 | IDE Context Drawer / AGENTS.md Surface | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add minimal Context drawer in Theia IDE showing AGENTS.md + SKILL.md capability cards. |
+| R-AUDIT16 | IDE Context Drawer / AGENTS.md Surface | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | ArcContextDrawer widget created; registered in frontend module; stub data (CLI proxy wiring follow-on); 1 test. |
 | R-AUDIT17 | R79 TUI/Theia Surfacing | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Surface at least one R79-deferred CLI output (e.g. arc runs budget) as a TUI panel. |
 | R-AUDIT18 | Workspace Search CLI + IDE Panel | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add arc workspace search CLI command and corresponding IDE search-result panel. |
 | R-AUDIT19 | Eval Metrics Honest Labelling | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | synthetic:bool=True added to EvalResult; [synthetic/simulated] prefix in CLI eval display; 2 new tests. |
