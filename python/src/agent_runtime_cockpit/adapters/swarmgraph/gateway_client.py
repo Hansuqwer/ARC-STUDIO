@@ -25,7 +25,8 @@ class GatewayClient:
         return cls(base, token)
 
     async def __aenter__(self) -> "GatewayClient":
-        # enforcement: not-applicable - TODO: Add paid-call gate at actual API call sites
+        # Budget preflight applied upstream in SwarmGraphRunner.run() via require_dual_gate("SWARMGRAPH")
+        # — exempt here; GatewayClient is only reachable after that gate passes.
         self._client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, read=None))
         return self
 

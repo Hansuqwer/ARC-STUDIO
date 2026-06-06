@@ -5477,7 +5477,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Resolve the TODO at gateway_client.py line 28 by either wiring BudgetEnforcer.preflight() into the gateway client call path or documenting an explicit exemption with rationale in the code and enforcement-surfaces.md.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Closes an open TODO; either wires the existing enforcer or documents why this path is exempt.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: Decision: Option A (exempt). Gate is applied upstream via require_dual_gate("SWARMGRAPH") in SwarmGraphRunner.run(). TODO replaced with exemption comment. 1 new test documenting the exemption.
 
 ---
 
