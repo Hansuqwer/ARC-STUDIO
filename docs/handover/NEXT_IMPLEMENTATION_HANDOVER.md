@@ -7,7 +7,7 @@
 
 Use these files for current ordered work:
 
-- `docs/LOCKED_REMAINING_ROADMAP.md`
+- `docs/roadmap.md`
 - `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`
 
 Do not treat this file as a competing plan. If this file conflicts with the locked docs, the locked docs win.
@@ -33,7 +33,7 @@ Deferred from v0.2 unless the locked docs are explicitly changed:
 Before implementation:
 
 - `AGENTS.md`
-- `docs/LOCKED_REMAINING_ROADMAP.md`
+- `docs/roadmap.md`
 - `docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md`
 - `docs/research/IMPLEMENTATION_RESEARCH.md`
 - Relevant `docs/adr/*.md`
@@ -59,7 +59,7 @@ pnpm --filter @arc-studio/e2e-tests test
 If release-facing docs touched:
 
 ```bash
-bash scripts/check-banned-claims.sh AGENTS.md README.md docs/LOCKED_REMAINING_ROADMAP.md docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md docs/REALITY_AUDIT.md docs/RELEASE_CHECKLIST.md docs/EXTENSION_MIGRATION.md docs/handover/HANDOVER.md
+bash scripts/check-banned-claims.sh AGENTS.md README.md docs/roadmap.md docs/LOCKED_PHASE_IMPLEMENTATION_PLAN.md docs/REALITY_AUDIT.md docs/RELEASE_CHECKLIST.md docs/EXTENSION_MIGRATION.md docs/handover/HANDOVER.md
 ```
 
 ## Safety

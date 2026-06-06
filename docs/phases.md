@@ -5493,7 +5493,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Replace the reference to LOCKED_REMAINING_ROADMAP.md (archived doc) with docs/roadmap.md in docs/EXTENSION_MIGRATION.md so readers are directed to the single source of truth.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Doc-only find-and-replace; zero-risk; prevents developer confusion from stale doc pointer.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: LOCKED_REMAINING_ROADMAP.md ref replaced with docs/roadmap.md in EXTENSION_MIGRATION.md.
 
 ---
 
@@ -5605,7 +5605,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Remove all references to LOCKED_REMAINING_ROADMAP.md from docs/handover/ and replace them with pointers to docs/roadmap.md, ensuring handover docs direct readers to the single source of truth.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Doc-only sweep; extends the R-AUDIT8 EXTENSION_MIGRATION fix to cover all handover docs.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: LOCKED_REMAINING_ROADMAP.md refs replaced with docs/roadmap.md in docs/handover/NEXT_IMPLEMENTATION_HANDOVER.md.
 
 ---
 

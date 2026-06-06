@@ -1716,7 +1716,7 @@ P2 — Quality:
 | R-AUDIT5 | MCP Proxy Env Secret-Strip Gate | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Strip secret-bearing env vars before passing env to upstream MCP subprocess. |
 | R-AUDIT6 | Gateway Client Paid-Call Gate | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Resolve TODO at gateway_client.py:28 — wire BudgetEnforcer.preflight() or document exemption. |
 | R-AUDIT7 | DataStore allow_paid Default Warning | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Warn user in TUI when allow_paid=True and no wallet budget is set. |
-| R-AUDIT8 | EXTENSION_MIGRATION Stale Ref Fix | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Replace LOCKED_REMAINING_ROADMAP.md reference with docs/roadmap.md in EXTENSION_MIGRATION.md. |
+| R-AUDIT8 | EXTENSION_MIGRATION Stale Ref Fix | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | LOCKED_REMAINING_ROADMAP.md ref replaced with docs/roadmap.md in EXTENSION_MIGRATION.md. |
 | R-AUDIT9 | Budget Durability Under Error | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Verify and harden token spend commit in degraded turn path (R-OPEN-HARDEN remaining slice). |
 | R-AUDIT10 | SwarmGraph Topology Shape Verification | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Verify/fix topology event shape mismatch between SDK and IDE workflow graph view. |
 | R-AUDIT11 | Notifications Outbox MVP | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Create notifications/ module with JSONL outbox, TTL/GC, replacing fire-and-forget emitters. |
@@ -1730,7 +1730,7 @@ P2 — Quality:
 | R-AUDIT19 | Eval Metrics Honest Labelling | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add synthetic:true flag to eval result JSON and [synthetic/simulated] label to TUI display. |
 | R-AUDIT20 | SQLite WAL Busy-Timeout Verification | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Confirm WAL+busy_timeout fix is applied and xfail reason string is accurate. |
 | R-AUDIT21 | Accessibility Baseline Audit | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Run axe-core audit on Theia IDE extension and fix zero-effort ARIA label gaps. |
-| R-AUDIT22 | Handover Doc Stale Refs Sweep | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Remove all references to LOCKED_REMAINING_ROADMAP.md from docs/handover/. |
+| R-AUDIT22 | Handover Doc Stale Refs Sweep | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | LOCKED_REMAINING_ROADMAP.md refs replaced with docs/roadmap.md in docs/handover/. |
 | R-AUDIT23 | SwarmGraph Insight UI Components Phase 1 | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Implement DAG planner viz, consensus evidence cards, and HITL approval panel in IDE. |
 | R-AUDIT24 | SDK Version Sweep (R-TS1 close) | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add sdk_version() to all 20 adapters and surface in arc runtimes --capabilities --json. |
 | R-AUDIT25 | Multi-Provider Router Abstraction | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Design and implement ProviderRouter for cascading failover; gate with ARC_ENABLE_PROVIDER_ROUTER=1. |
