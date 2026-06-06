@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import os
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -15,10 +17,40 @@ from agent_runtime_cockpit.providers import (
     StreamChunk,
     UsageRecord,
 )
+from agent_runtime_cockpit.providers.base import ProviderError
 from agent_runtime_cockpit.security.injection_patterns import Severity, scan_structured
 from agent_runtime_cockpit.tools import ToolRegistry, wrap_tool_result
 
 EventSink = Callable[[str, dict[str, Any]], None]
+
+_DEFAULT_MAX_RETRIES = 2
+
+
+async def _call_with_retry(
+    coro_fn: Callable[[], Any],
+    max_retries: int = _DEFAULT_MAX_RETRIES,
+) -> Any:
+    """Call an async provider fn, retrying on retryable errors with exponential backoff.
+
+    Non-retryable ProviderErrors (AuthError, ValidationError, etc.) propagate
+    immediately. Retryable errors (RateLimitError, NetworkError) are retried up
+    to max_retries times with 2^attempt-second backoff.
+
+    Set ARC_DISABLE_RETRY_SLEEP=1 to skip the sleep in tests.
+    """
+    disable_sleep = os.environ.get("ARC_DISABLE_RETRY_SLEEP", "").strip() == "1"
+    last_exc: ProviderError | None = None
+    for attempt in range(max_retries + 1):
+        try:
+            return await coro_fn()
+        except ProviderError as exc:
+            if not exc.retryable or attempt >= max_retries:
+                raise
+            last_exc = exc
+            delay = 2**attempt
+            if not disable_sleep:
+                await asyncio.sleep(delay)
+    raise last_exc  # type: ignore[misc]
 
 
 @dataclass(frozen=True)
@@ -142,8 +174,10 @@ class TurnManager:
                     self._emit("turn.cache_hit", {"session_id": session.id})
                     response = cached
             if response is None:
-                response = await self._provider_client.complete(
-                    request, cancellation_token=cancellation_token
+                response = await _call_with_retry(
+                    lambda: self._provider_client.complete(
+                        request, cancellation_token=cancellation_token
+                    )
                 )
                 if not session.tools_enabled:
                     cache.put(request, response)
@@ -338,8 +372,10 @@ class TurnManager:
                         },
                     )
             request = self._request_from_session(session)
-            current = await self._provider_client.complete(
-                request, cancellation_token=cancellation_token
+            current = await _call_with_retry(
+                lambda: self._provider_client.complete(
+                    request, cancellation_token=cancellation_token
+                )
             )
         return current
 

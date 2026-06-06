@@ -5041,3 +5041,41 @@ Browser Use (97K GitHub stars) enables AI agents to control web browsers. API ve
 - Requires Playwright + Chromium installed (`playwright install chromium`).
 - Any LLM key must be set separately; the adapter creates `Agent(task=task)` without a model argument — relies on browser_use defaults (typically OpenAI).
 - Browser automation is inherently non-deterministic; `max_steps=50` limits runaway agents.
+
+---
+
+## Phase 122 — Agno Adapter + Docs Reconcile (R-OPEN-ADAPTERS-AGNO / Phases 118-121)
+
+**Status:** Baseline Complete (2026-06-06) | Evidence: adapters/agno.py, 11 tests, 5521 passed. Commit 61a2f42.
+
+Agno (ex-Phidata) API verified via context7 `/agno-agi/docs`: `await agent.arun(prompt)` → `RunOutput.content`. Adapter #20, with AG-UI mapper (`AGNO_RUN_*` events), dual-gated via `ARC_AGNO_ALLOW_COSTS=true` + `ARC_AGNO_EXPORT=module:attr`. Same commit also reconciled docs for Phases 118–121 (AG-UI gaps, CI flakes ×2, Browser Use).
+
+All 20 adapters pass 8/8 conformance suite.
+
+---
+
+## Phase 123 — Provider Retry Hardening (R-OPEN-HARDEN slice 1)
+
+**Status:** Baseline Complete (2026-06-06) | Evidence: runtime/turn_manager.py _call_with_retry, 8 tests, 5529 passed. Research prompt: docs/prompts/harden-retry-plan.md.
+
+### Context
+
+The retry infrastructure in `providers/base.py` (`RateLimitError.retryable=True`, `NetworkError.retryable=True`, `ProviderError.retryable=False` for non-retryable classes) existed and was tested in isolation (`test_harden_retry.py`) but was never called. `runtime/turn_manager.py` had zero references to `RateLimitError` or retry — provider errors propagated raw to the caller.
+
+### What was done
+
+- Added `_call_with_retry(coro_fn, max_retries=2)` to `turn_manager.py`: catches `ProviderError` with `exc.retryable=True`, sleeps `2^attempt` seconds (skipped via `ARC_DISABLE_RETRY_SLEEP=1` in tests), retries up to `max_retries` times.
+- Non-retryable errors (`AuthError`, `ValidationError`, `ModelError`, `CancelledError`) propagate immediately — `call_count==1`.
+- Wired at both `complete()` call sites: the non-streaming path and the tool-loop path.
+- `tests/runtime/test_retry_hardening.py`: 8 tests covering success, RateLimit retry, NetworkError retry, max-retries exhausted, non-retryable immediate propagation, max_retries=0, non-ProviderError pass-through.
+
+### Verification
+
+- 5529 passed. Ruff clean. CI pending.
+- `ARC_DISABLE_RETRY_SLEEP=1` skips `asyncio.sleep` in all tests — no wall-clock delay.
+- No fabricated benchmark numbers. Streaming path not retried (out of scope for this slice).
+
+### Known Risks
+
+- Lambda closures capture `request` by reference in the retry wrapper. If `request` is mutated between retries, the retried call will use the mutated version. Current code does not mutate `request` between calls, so this is safe.
+- Default `max_retries=2` is hardcoded. Future work: make it configurable per-provider or via env var.
