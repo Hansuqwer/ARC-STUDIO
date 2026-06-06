@@ -16,6 +16,24 @@ from .anthropic_estimator import build_estimate_fn, select_estimator
 from .base import CostExtractionError
 
 
+class CapabilityBudgetExceeded(Exception):
+    """Raised when a Capability Card's max_cost_usd ceiling would be exceeded.
+
+    Deterministic, no LLM in path. Raised by preflight_with_estimator before
+    BudgetEnforcer scope checks so the capability gate takes priority.
+    """
+
+    def __init__(
+        self, estimated_usd: Decimal, max_usd: float, provider_id: str, model: str
+    ) -> None:
+        self.estimated_usd = estimated_usd
+        self.max_usd = max_usd
+        super().__init__(
+            f"Capability cost ceiling exceeded: estimated ${estimated_usd} > "
+            f"cap ${max_usd} for {provider_id}/{model}"
+        )
+
+
 def preflight_with_estimator(
     enforcer: BudgetEnforcer,
     *,
@@ -27,12 +45,18 @@ def preflight_with_estimator(
     workflow_active: bool = False,
     prefer_sdk_estimator: bool = False,
     sdk_client: Any = None,
+    capability_max_cost_usd: float | None = None,
 ) -> None:
     """Estimate request cost and run ``BudgetEnforcer.preflight``.
 
     Uses ``TiktokenApproximateEstimator`` by default (local, no network).
     Pass ``prefer_sdk_estimator=True`` and *sdk_client* to use the Anthropic
     SDK's ``messages.count_tokens`` instead.
+
+    ``capability_max_cost_usd`` wires the ``CostCapability.max_cost_usd`` field
+    (MT-4): if the estimated cost exceeds the capability-declared ceiling, a
+    ``CapabilityBudgetExceeded`` is raised *before* the BudgetEnforcer scopes are
+    checked. Pass ``None`` (default) to skip the capability gate.
     """
     estimator = select_estimator(
         prefer_sdk=prefer_sdk_estimator,
@@ -49,9 +73,26 @@ def preflight_with_estimator(
             configured_models=list(provider_capability.cost_rates.keys()),
         )
 
-    input_cost = (Decimal(str(input_tokens)) * Decimal(str(cost_rates.input_per_million))) / Decimal("1_000_000")
-    output_cost = (Decimal(str(output_tokens)) * Decimal(str(cost_rates.output_per_million))) / Decimal("1_000_000")
-    estimated_cost_usd = (input_cost + output_cost).quantize(Decimal("1.00000000"), rounding=ROUND_HALF_EVEN)
+    input_cost = (
+        Decimal(str(input_tokens)) * Decimal(str(cost_rates.input_per_million))
+    ) / Decimal("1_000_000")
+    output_cost = (
+        Decimal(str(output_tokens)) * Decimal(str(cost_rates.output_per_million))
+    ) / Decimal("1_000_000")
+    estimated_cost_usd = (input_cost + output_cost).quantize(
+        Decimal("1.00000000"), rounding=ROUND_HALF_EVEN
+    )
+
+    # MT-4: Capability-Card cost gate — checked before BudgetEnforcer scopes.
+    if capability_max_cost_usd is not None and estimated_cost_usd > Decimal(
+        str(capability_max_cost_usd)
+    ):
+        raise CapabilityBudgetExceeded(
+            estimated_usd=estimated_cost_usd,
+            max_usd=capability_max_cost_usd,
+            provider_id=provider_id,
+            model=request_model,
+        )
 
     enforcer.preflight(
         estimated_cost_usd,
