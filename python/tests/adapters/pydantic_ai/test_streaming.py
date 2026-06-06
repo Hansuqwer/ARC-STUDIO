@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 from agent_runtime_cockpit.adapters.pydantic_ai.runner import (
     PydanticAIEventHandler,
@@ -167,13 +167,33 @@ class TestEventHandler:
 class TestRunAgentWithStreaming:
     """Test run_agent_with_streaming function."""
 
-    def test_raises_not_implemented(self):
-        """Should raise NotImplementedError until the real runner is implemented."""
-        import pytest
+    def test_calls_run_sync_and_emits_events(self):
+        """run_agent_with_streaming calls agent.run_sync and emits start/end events."""
+        emit_event = Mock()
+        mock_result = MagicMock()
+        mock_result.output = "hello"
+        agent = MagicMock()
+        agent.name = "test_agent"
+        agent.run_sync = MagicMock(return_value=mock_result)
 
-        with pytest.raises(NotImplementedError, match="pydantic_ai runner is not yet implemented"):
-            run_agent_with_streaming(Mock(), {}, "run-123", Mock())
+        result = run_agent_with_streaming(agent, {"prompt": "hi"}, "run-1", emit_event)
+
+        agent.run_sync.assert_called_once_with("hi")
+        assert result is mock_result
+        assert emit_event.call_count == 2
+        assert emit_event.call_args_list[0][0][1] == "AGENT_RUN_START"
+        assert emit_event.call_args_list[1][0][1] == "AGENT_RUN_END"
 
     def test_emits_error_event_on_exception(self):
-        """Placeholder — will test error-event emission once the runner is implemented."""
-        pass
+        """run_agent_with_streaming emits error event and re-raises on failure."""
+        import pytest
+
+        emit_event = Mock()
+        agent = MagicMock()
+        agent.name = "test_agent"
+        agent.run_sync = MagicMock(side_effect=RuntimeError("model error"))
+
+        with pytest.raises(RuntimeError, match="model error"):
+            run_agent_with_streaming(agent, {"prompt": "fail"}, "run-2", emit_event)
+
+        assert any(call[0][1] == "AGENT_RUN_ERROR" for call in emit_event.call_args_list)

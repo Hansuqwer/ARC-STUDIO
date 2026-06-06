@@ -68,7 +68,10 @@ def detect_model_providers() -> list[str]:
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore")
         for provider in providers:
-            spec = importlib.util.find_spec(provider)
+            try:
+                spec = importlib.util.find_spec(provider)
+            except (ModuleNotFoundError, ValueError):
+                spec = None
             if spec is not None:
                 detected.append(provider)
 

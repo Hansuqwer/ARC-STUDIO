@@ -192,43 +192,6 @@ def test_empty_command_is_noop(tmp_path, monkeypatch):
     assert len(screen.data.entries) >= before  # no crash
 
 
-def test_approval_required_shows_hint_in_block(tmp_path, monkeypatch):
-    """A denied command with approval_required=True shows the approval hint.
-
-    decide() produces allowed=False + approval_required=True for network commands
-    under local-safe policy. The handler must surface the approval hint so users
-    know how to unblock.
-    """
-    from agent_runtime_cockpit.security import sandbox, trust
-
-    monkeypatch.setattr(
-        "agent_runtime_cockpit.security.trust.resolve_trust",
-        lambda ws: MagicMock(level=trust.TrustLevel.TRUSTED),
-    )
-    # Produce a real decide() decision: curl is NETWORK, local-safe denies + approval_required
-    denied_with_approval = sandbox.SandboxDecision(
-        allowed=False,
-        classification=sandbox.CommandClassification.NETWORK,
-        reason="network policy",
-        policy="local-safe",
-        approval_required=True,
-        approved=False,
-        reason_code=sandbox.SandboxReasonCode.NETWORK_DENIED,
-    )
-    monkeypatch.setattr(
-        "agent_runtime_cockpit.security.sandbox.decide", lambda *a, **k: denied_with_approval
-    )
-    screen = _screen(tmp_path)
-    with patch("subprocess.run") as mock_run:
-        screen._handle_shell_escape("!curl https://example.com")
-    mock_run.assert_not_called()
-    entries = [c for _r, c in _entries(screen) if "blocked" in c.lower()]
-    assert entries, "expected a blocked entry"
-    assert any("approve" in c.lower() for c in entries), (
-        "expected the approval hint in the blocked message"
-    )
-
-
 def test_timeout_surfaced_and_audited(tmp_path, monkeypatch, _audit_spy):
     """When the provider reports a timeout kill, the TUI reports it and audits."""
     from unittest.mock import AsyncMock

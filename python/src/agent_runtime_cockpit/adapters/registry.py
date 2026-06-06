@@ -98,6 +98,7 @@ class AdapterRegistry:
         from .mcp_sdk import MCPSDKAdapter
         from .semantic_kernel import SemanticKernelAdapter
         from .smolagents import SmolagentsAdapter
+        from .pydantic_ai_adapter import PydanticAIAdapter
         from .strands import StrandsAdapter
         from .swarmgraph import SwarmGraphAdapter
 
@@ -117,6 +118,7 @@ class AdapterRegistry:
         self.register(MCPSDKAdapter())
         self.register(ArcRuntimeSDKAdapter())
         self.register(StrandsAdapter())
+        self.register(PydanticAIAdapter())
         return self
 
 
