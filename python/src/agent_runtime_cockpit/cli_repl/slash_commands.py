@@ -1320,6 +1320,7 @@ def _run_provider_turn(
     cancellation_token: CancellationToken,
     event_sink: Any,
     runtime: Any,
+    hitl_gate_fn: Any = None,
 ) -> Any:
     client = _provider_client_for_run(runtime, session)
     capability = (
@@ -1337,6 +1338,7 @@ def _run_provider_turn(
         tool_registry=default_tool_registry(Path.cwd())
         if getattr(session, "tools_enabled", False)
         else None,
+        hitl_gate_fn=hitl_gate_fn,
     )
     return _run_coro_sync(manager.run_turn(session, prompt, cancellation_token=cancellation_token))
 

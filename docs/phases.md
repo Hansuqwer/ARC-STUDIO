@@ -5253,3 +5253,18 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 - `ruff check src tests` — clean.
 - `pytest -q -p no:cacheprovider` — **5556 passed, 0 failed**.
+
+## Phase 131 — ApprovalCard Gate Hook in TurnManager (R-UX3 deferred slice)
+
+**Status:** Baseline Complete (2026-06-06) | Evidence: turn_manager.py hitl_gate_fn + turn.denied event, 3 new tests, 5559 passed. Closes all R-UX3 deferred items.
+
+### What was done
+
+- `runtime/turn_manager.py`: added `hitl_gate_fn: Callable[[Any], str] | None = None` parameter to `TurnManager.__init__`; stored as `self._hitl_gate_fn`; in `run_turn`, immediately after emitting `turn.started`, calls `self._hitl_gate_fn(ApprovalRequest(kind='hitl', prompt_id=session.id, detail=prompt[:120]))` when the gate is set; if the decision is `'deny'`, emits `turn.denied` and raises `ProviderError('turn denied by gate', retryable=False)`; default `None` preserves existing behaviour unchanged.
+- `cli_repl/slash_commands.py`: added `hitl_gate_fn: Any = None` parameter to `_run_provider_turn`; threaded it through to `TurnManager(...)` so callers (e.g. TUI screen.py via `call_from_thread(push_screen_wait, ApprovalCard(req))`) can pass a gate function.
+- `tests/runtime/test_hitl_gate.py`: 3 new tests — `test_gate_allow_proceeds` (gate returns 'allow', turn completes normally), `test_gate_deny_raises_provider_error` (gate returns 'deny', raises `ProviderError(retryable=False)` and emits `turn.denied`), `test_no_gate_fn_no_change` (gate=None, existing behaviour unchanged).
+
+### Verification
+
+- `ruff check src tests` — clean.
+- `pytest -q -p no:cacheprovider` — **5559 passed, 0 failed**.

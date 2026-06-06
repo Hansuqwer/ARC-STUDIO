@@ -109,6 +109,7 @@ class TurnManager:
         temperature: float = 1.0,
         event_sink: EventSink | None = None,
         tool_registry: ToolRegistry | None = None,
+        hitl_gate_fn: Callable[[Any], str] | None = None,
     ) -> None:
         self._provider_client = provider_client
         self._model = model
@@ -116,6 +117,7 @@ class TurnManager:
         self._temperature = temperature
         self._event_sink = event_sink
         self._tool_registry = tool_registry or ToolRegistry()
+        self._hitl_gate_fn = hitl_gate_fn
 
     async def run_turn(
         self,
@@ -131,6 +133,15 @@ class TurnManager:
         are added in slice 6.
         """
         self._emit("turn.started", {"session_id": session.id, "prompt_chars": len(prompt)})
+        if self._hitl_gate_fn is not None:
+            from agent_runtime_cockpit.tui.widgets.approval_card import ApprovalRequest
+
+            decision = self._hitl_gate_fn(
+                ApprovalRequest(kind="hitl", prompt_id=session.id, detail=prompt[:120])
+            )
+            if decision == "deny":
+                self._emit("turn.denied", {"session_id": session.id})
+                raise ProviderError("turn denied by gate", retryable=False)
         session.add_message("user", prompt)
         request = self._request_from_session(session)
         partial = ""
