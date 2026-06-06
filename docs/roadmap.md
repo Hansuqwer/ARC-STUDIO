@@ -27,6 +27,145 @@ Use only these values in roadmap status lines:
 
 Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test anchor> | Notes: <one sentence>`.
 
+---
+
+## Completed Roadmap — Master Ledger
+
+> Single scannable list of every roadmap item that has reached Complete / Baseline Complete.
+> This is navigation; the authoritative status + evidence live in each item's detailed section
+> below. Items NOT complete are in the next table. New roadmap items: append under the
+> **NEW INTAKE** marker at the end of this file, then add a row here once Baseline Complete.
+>
+> Note: roadmap IDs were reused across eras (e.g. there are two R45–R55 blocks). The detailed
+> sections remain the disambiguator; rows below are grouped by era to stay unambiguous.
+
+### Core product track (R1–R13)
+
+| ID | Title | Status |
+|---|---|---|
+| R1 | Live Run Streaming Product Path | Complete |
+| R2 | IDE Runtime Setup + Config Wizard | Complete (polished UI baseline) |
+| R3 | Provider, Quota, Cost Controls UI | Baseline Complete |
+| R4 | Dedicated HITL + Audit UX | Complete |
+| R5 | SwarmGraph Insight Baseline | Complete |
+| R6 | Real Adoption Productization | Complete (local-real baseline) |
+| R7 | Release Operations + History Hygiene | Complete |
+| R8 | IDE Provider/Quota Completion | Baseline Complete |
+| R9 | IDE Live Stream Polish | Baseline Complete |
+| R10 | Doctor/Daemon Parity Closure | Baseline Complete |
+| R11 | SwarmGraph Cost Producer | Baseline Complete |
+| R12 | Packaging/Optional Features | Baseline Complete |
+| R13 | SwarmGraph Native Runtime | P1–P4 Baseline Complete |
+
+### Protocol / platform track (R14–R37, R77)
+
+| ID | Title | Status |
+|---|---|---|
+| R14 | Streaming Audit Verification + HMAC Signing | Baseline Complete |
+| R15 | Discriminated RunEvent Unions + Protocol Conformance | Baseline Complete |
+| R16 | Enforced Workspace Trust + Paid-Call Gates | Baseline Complete; Active Hardening |
+| R17 | Trace Viewer Virtualization + Daemon Resilience | Baseline Complete |
+| R18 | CLI Decomposition + Stable JSON Contracts | Baseline Complete |
+| R19 | MCP Local Control Plane for ARC | Baseline Complete |
+| R20 | MCP Tasks for Async Execution | Baseline Complete |
+| R21 | LangGraph Durable Execution + Replay Contract | Baseline Complete |
+| R22 | Persistent HITL + Inspect-Style Eval Artifacts | Baseline Complete (HITL only) |
+| R23 | Consensus Escrow (Commit-Reveal Voting) | Complete |
+| R24 | Adaptive Consensus Protocol | Complete |
+| R25 | Event-Driven Audit/HITL Notifications | Baseline Complete |
+| R26 | Swarm Memory Graph | Baseline Complete (research prototype + privacy/eval gates) |
+| R27 | LangChain Adapter | Baseline Complete |
+| R28 | Anthropic Provider + Registry | Baseline Complete |
+| R29 | OpenAI-Compatible Provider | Baseline Complete |
+| R30 | Pydantic AI Adapter | Baseline Complete |
+| R31 | DSPy Adapter | Baseline Complete |
+| R32 | Haystack Adapter | Baseline Complete |
+| R33 | Smolagents Adapter | Baseline Complete |
+| R34 | Semantic Kernel Adapter | Baseline Complete |
+| R35 | Google ADK Adapter | Baseline Complete |
+| R36 | MCP Python SDK Adapter | Baseline Complete |
+| R37 | Provider Management System | Baseline Complete |
+| R77 | SwarmGraph Runtime Hardening | Baseline Complete + Live Smoke Proven |
+
+### CLI/UX + sandbox + edit-loop track (R39–R76)
+
+| ID | Title | Status |
+|---|---|---|
+| R39 | Interactive CLI/UX Foundation | Baseline Complete |
+| R40 | CLI/UX Polish & Advanced Features | Baseline Complete |
+| R41 | Advisory Locking + IDE Session Bridge | Baseline Complete |
+| R42 | Slash Registry Expansion + REPL Error Boundary | Baseline Complete |
+| R43 | Approval + Progress + Error UX | Baseline Complete |
+| R44 | IDE Write Bridge / Daemon Protocol | Baseline Complete |
+| R45–R55 (era-2) | Trace-Aware Review, Plan/Apply, Command/Approval Centre, MCP Workbench, Workspace Intelligence, Theia cleanup, Capability/MCP risk gates, CI Guardrails, Consensus differentiators, Notifications+DAG planner, Eval→Policy, AGENTS.md/SKILL.md | Baseline Complete |
+| R53 (era-3) | Local Sandbox Audit Query + Compaction | Baseline Complete |
+| R54 (era-3) | Container Isolation Provider | Baseline Complete |
+| R55 (era-3) | Local Sandbox Policy YAML | Baseline Complete |
+| R56 | Agentic CLI Edit Loop | Baseline Complete |
+| R57 | Interactive CLI UX Polish | Baseline Complete |
+| R58 | Tool Runtime Unification | Baseline Complete |
+| R59 | Edit Preview Staleness Guard | Baseline Complete |
+| R60 | Saved Edit Plan Apply Flow | Baseline Complete |
+| R61 | Edit Bundle Approval Bridge | Baseline Complete |
+| R62 | IDE Edit Plan Review Surface | Baseline Complete |
+| R63 | Sandboxed Diff/Apply/Test Loop | Baseline Complete |
+| R64 | Patch Engine Hardening v2 | Baseline Complete |
+| R65 | Sandbox/MicroVM Truth Audit Guard | Baseline Complete |
+| R66 | Sandbox Classifier + Path-Intent Hardening v3 | Baseline Complete |
+| R67 | MicroVM Proof-Harness Truth Guards | Baseline Complete |
+| R68 | Priority 1 CLI Parity Research + Acceptance Matrix | Baseline Complete |
+| R69 | Autonomous Edit-Test-Repair Loop | Baseline Complete |
+| R70 | Git-Backed Undo/Redo Transactions | Baseline Complete |
+| R71 | Rich IDE Diff Review/Apply Flow | Baseline Complete |
+| R72 | Provider-Backed Runtime Shell | Baseline Complete |
+| R73 | Live Terminal/Event Streaming UX | Baseline Complete |
+| R74 | Broad CLI CI Orchestration | Baseline Complete |
+| R75 | macOS MicroVM Execution + Strict No-Network Proof | Gated proof passed once; default-off |
+| R76 | Linux Firecracker Execution Proof | Baseline Complete (host-unproven) |
+| R78 | A2A Local AgentCard Generator + Loopback Client | Baseline Complete |
+
+### Token-saving + UX + open-hardening track (R-TS / R-UX / R-OPEN)
+
+| ID | Title | Status |
+|---|---|---|
+| R-TS2 | Token-Saving P0 | Baseline Complete |
+| R-TS3 | arc-protocol-ts coverage backfill | Baseline Complete |
+| R-TS4 | R-01 TokenWallet | Baseline Complete |
+| R-TS5 | Budget Persistence + Pricing Refresh | Baseline Complete |
+| R-TS7 | R-02 + QW-4 feature sprint | Baseline Complete |
+| R-TS8 | Chinese-labs vendor adoption + capability backfill | Baseline Complete |
+| R-TS9 | Catalog-driven model picker + capability gating | Baseline Complete |
+| R-TS10 | Opt-in cloud features | Baseline Complete |
+| R-UX1 | UX Polish — Header + ContextMeter + ModeBadge + Markdown | Baseline Complete |
+| R-UX2 | UX Modes + Approvals | Baseline Complete |
+| R-UX3 | UX Components + Information Architecture | Baseline Complete (all deferred items resolved) |
+| R-UX4 | UX Themes + Accessibility | Baseline Complete |
+| R-OPEN-HARDEN | Production Hardening (retry + degrade + failover + wiring) | Baseline Complete |
+| R-OPEN-SANDBOX | MicroVM / Sandbox Layer (shell-escape hardening) | Baseline Complete |
+| R-OPEN-DEFERRED-RUNBOOKS | Execute Deferred Research Runbooks | Baseline Complete |
+| R-OPEN-ADAPTERS-AUDIT | Audit External Adapters Research Folder | Baseline Complete |
+| R-OPEN-ADAPTERS-SHARED | Adapter Shared Helpers Consolidation | Baseline Complete |
+| R-OPEN-ADAPTERS-PYDANTIC-AI | pydantic_ai Placeholder Cleanup | Baseline Complete |
+| R-OPEN-ADAPTERS-STRANDS | Strands Agents (AWS) Adapter | Baseline Complete |
+| R-OPEN-ADAPTERS-PYDANTIC-AI-RUNNER | pydantic_ai Real Runner | Baseline Complete |
+| R-OPEN-ADAPTERS-LETTA | Letta (MemGPT) Adapter | Baseline Complete |
+| R-OPEN-ADAPTERS-BROWSER-USE | Browser Use Adapter | Baseline Complete |
+| R-OPEN-ADAPTERS-AGNO | Agno Adapter | Baseline Complete |
+| R-OPEN-SANDBOX-APPROVAL | Sandbox Approval Hint + Dead Branch Removal | Baseline Complete |
+| R-OPEN-AG-UI-GAPS | AG-UI Mapper Registration | Baseline Complete |
+| R-OPEN-CI-FLAKES-119 | CI Flakes — HMAC+SIGINT xfail | Baseline Complete |
+| R-OPEN-CI-FLAKES-120 | CI Flakes — SQLite concurrent accumulation xfail | Baseline Complete |
+
+### Not-yet-Complete / Blocked / Deferred / Research Intake
+
+| ID | Title | Status |
+|---|---|---|
+| R-TS1 | Token-Saving Research | Research Intake (planning only) |
+| R79 | Mobile Runtime SDK Integration | Partial — slices 110.1–110.5 done; 110.6 Theia/TUI surfacing follow-up |
+| R34.6 / Battle Arena | Provider-Backed Battle Arena | Blocked (no default paid/live calls) |
+
+---
+
 ## Current Baseline
 
 - Canonical app: `applications/browser` + `packages/arc-extension`.
@@ -1549,3 +1688,17 @@ P2 — Quality:
 **Current:** The SDK is a separate polyglot monorepo (TypeScript core + Expo/Flutter/KMP bindings, JSON schemas, a Python reference adapter/daemon). Its own honest status is PLANNING/POC — deterministic simulator/mock only; no native bridge (file-picker stub); no app-store automation; 342 SDK tests claimed passing (not yet run in ARC Studio CI). The SDK ships `adapters/arc_runtime_sdk_adapter.py` whose `detect()` already matches `RuntimeAdapter.detect() -> tuple[bool, float, list[str]]`, plus a documented `MobileCapability` ↔ SDK `CapabilityCard` field map. It is NOT yet wired into ARC Studio: it lives in the SDK's own copy of the `agent_runtime_cockpit` package, is duck-typed (not a `RuntimeAdapter` subclass), `capabilities()` returns a dict (not `RuntimeCapabilities`), and it is not registered in `adapters/registry.py`.
 
 **Status:** Partial — Slices 110.1–110.5 shipped; 110.6 follow-up | Evidence: 2026-06-06 ArcRuntimeSDKAdapter (registered, discovered via arc runtimes), mobile_sdk_mapping (bidirectional, 25 tests), arc_runtime_sdk_pack (arc-sdk.json→RuntimePack validator, 13 tests), arc_runtime_sdk_protocol (DaemonEventType→AGUIEventType mapping + /health parity, 11 tests); 49 R79 tests total; CI python strict-mode green (fixed Pydantic field-shadow via Field alias rename). | Notes: Slice 110.6 (optional Theia/TUI surfacing) is a P2 follow-on. Simulator/mock only; no native-execution or app-store claims. Execution plan: `docs/phases.md` Phase 111.
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════
+# NEW INTAKE — Roadmap Entries (append below this line)
+# ═══════════════════════════════════════════════════════════════════════
+
+> Incoming roadmap items go here, either as a table row using the standard status line
+> (`Status: <value> | Evidence: <anchor> | Notes: <one sentence>`) or as a full
+> `## R<n> — <title>` section. Use a fresh, non-colliding ID (next free core ID is high;
+> prefer a namespaced ID like `R-OPEN-<topic>` or `R-<track><n>` to avoid the historical
+> R45–R55 reuse). When an item reaches Baseline Complete, add its row to the matching
+> **Completed Roadmap — Master Ledger** group at the top of this file, and add the
+> companion phase to `docs/phases.md`.

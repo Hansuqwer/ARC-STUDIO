@@ -13,6 +13,159 @@
 **Current evidence anchor:** local worktree | VZ exec-init initrd packer/static-BusyBox guard + reproducible bring-up scripts (`tools/build-arc-vz-busybox.sh`, `tools/arc-vz-bringup.sh`) + manual host-CI slice. The packed-initrd path now WORKS end to end: `tools/arc-vz-bringup.sh --run-proof` builds a static aarch64 BusyBox, fetches the open-source Kata `vmlinux.container` (6.18.28) kernel, packs the initrd, builds + ad-hoc-signs the runner, and runs the gated `uv run arc sandbox run --json --provider microvm -- pwd` → `ok:true`, `errors:[]`, with booted/no-network/virtiofs-workspace-mount/sentinel/symlink-escape markers proven and clean teardown (macOS 26.4 arm64; default-off; not production-grade). The earlier `ARC_VZ_BUSYBOX must be a static Linux BusyBox binary` block is resolved by the build script; ad-hoc signing is sufficient for the VZ entitlement (the real wall was a compressed EFI-zboot `vmlinuz` + virtiofs-as-modules, fixed by the Kata kernel and the `/proc` mount-point init fix, commit f6b3922).
 **Update rule:** Update this file in the same commit whenever a phase/chunk changes status. Do not create new roadmap/implementation/status markdowns.
 
+---
+
+## Completed Phases — Master Index
+
+> Single scannable list of every phase. Status is extracted from each phase's detailed
+> entry below — this index is navigation, not a new source of truth. Phases not listed as
+> Complete/Baseline Complete are broken out in the next table. New phases: append under the
+> **NEW INTAKE** marker at the end of this file, then add a row here once Baseline Complete.
+
+| Phase | Title | Status |
+|---|---|---|
+| 0 | Docs Baseline Inventory | Complete |
+| 1 | Active Live Streaming | Complete |
+| 2 | IDE Runtime Setup + Config | Complete (polished UI baseline) |
+| 3 | Provider/Quota/Cost UI | Baseline Complete (3.1–3.3 hardened) |
+| 4 | HITL + Audit Dedicated UX | Complete (baseline) |
+| 5 | SwarmGraph Insight Baseline | Complete (baseline + first producer events) |
+| 6 | Narrow Real Adoption Path | Complete (local-real hardening baseline) |
+| 7 | Release Operations | Complete |
+| 8 | Live Stream Productization | Baseline Complete |
+| 8.1 | IDE-to-Daemon E2E Harness | Complete |
+| 9 | BudgetVector Post-Hoc Accounting | Complete |
+| 10 | Assurance Polish | Baseline Complete |
+| 11 | Discipline Audits | Baseline Complete |
+| 12 | Provider/Quota UX Completion | Baseline Complete |
+| 13 | Live Stream UX Polish | Baseline Complete |
+| 14 | Doctor/Daemon Parity Closure | Baseline Complete |
+| 15 | SwarmGraph Cost Producer + Cost UX | Baseline Complete |
+| 16 | Packaging/Optional Feature Decisions | Baseline Complete |
+| 17 | SwarmGraph Native Runtime | P1–P4 Baseline Complete |
+| 18 | CLI Consolidation | Baseline Complete |
+| 19 | Provider-Backed Runtime Foundations | Baseline Complete |
+| 20 | Streaming, Tool Use, Multi-Turn Sessions | Baseline Complete |
+| 21 | Streaming Audit Verification + HMAC Signing | Baseline Complete |
+| 22 | Discriminated RunEvent Unions + Protocol Conformance | Baseline Complete |
+| 23 | Enforced Workspace Trust + Paid-Call Gates | Baseline Complete |
+| 24 | Trace Viewer Virtualization + Daemon Resilience | Baseline Complete |
+| 25 | CLI Decomposition into Command Modules | Baseline Complete |
+| 26 | MCP Local Control Plane for ARC | Baseline Complete |
+| 27 | MCP Tasks for Async Execution | Baseline Complete |
+| 28 | LangGraph Durable Execution + Replay Contract | Baseline Complete |
+| 29 | Persistent HITL + Inspect-Style Eval Artifacts | Baseline Complete (HITL only) |
+| 30 | Consensus Escrow (Commit-Reveal Voting) | Complete |
+| 30 (Adapter) | DSPy Adapter | Baseline Complete |
+| 30B (Adapter) | Haystack Adapter | Baseline Complete |
+| 30C (Adapter) | Smolagents Adapter | Baseline Complete |
+| 30D (Adapter) | Semantic Kernel Adapter | Baseline Complete |
+| 31 | Adaptive Consensus Protocol | Complete |
+| 32 | Event-Driven Audit/HITL Notifications | Baseline Complete |
+| 34 | ARC Battle Mode (Arena CLI/IDE) | Baseline Complete (run/trace inspection) |
+| 34.2 | IDE Battle Tab | Complete |
+| 34.3 | Battle Replay Determinism | Complete |
+| 34.4 | Persistent HITL Prompt Wiring | Baseline Complete |
+| 34.5 | Commit-Reveal Escrow Verification | Baseline Complete |
+| 36.1 | Provider Discovery & Interactive UX | Baseline Complete |
+| 36.2 | Credential Storage & OAuth | Baseline Complete |
+| 38 | Google ADK Adapter | Baseline Complete |
+| 39 | MCP Python SDK Adapter | Baseline Complete |
+| 41 | Interactive CLI/UX Foundation | Baseline Complete |
+| 42 | Advanced CLI Features | Baseline Complete |
+| 43 | Advisory Locking + IDE Read-Only Session Bridge | Baseline Complete |
+| 44 | Slash Registry Expansion + REPL Error Boundary | Baseline Complete |
+| 45 | Approval + Progress + Error UX | Baseline Complete |
+| 46 | IDE Write Bridge / Advisory Lock Integration | Baseline Complete |
+| 47 | Daemon HTTP Write Protocol for IDE Session Writes | Baseline Complete |
+| 48 | Streaming Audit Refresh + HMAC Evidence Tightening | Baseline Complete |
+| 49 | RunEvent Union Hardening + Cross-Language Evidence | Baseline Complete |
+| 50 | Trust Enforcement Surface Audit + Daemon Write Policy | Baseline Complete |
+| 51 | Adaptive Consensus Protocol | Baseline Complete |
+| 52 | Event Notification Hardening (SSE Push Upgrade) | Baseline Complete |
+| 53 | Eval Artifact Schema + Batch Eval CLI | Baseline Complete |
+| 54 | Task Daemon Integration + SSE Notifications | Baseline Complete |
+| 55 | Event Log Rotation + Provider Workspace Isolation | Baseline Complete |
+| 56 | Daemon Task CLI and Event Log Browser | Baseline Complete |
+| 57 | Provider Config IDE Bridge and REPL Integration | Baseline Complete |
+| 58 | Cross-Session Eval Workflow and Trend Tracking | Baseline Complete |
+| 59 | Swarm Memory Graph Research Prototype | Baseline Complete (research prototype) |
+| 60 | Memory Graph Privacy Guardrails + Run Deletion | Baseline Complete |
+| 61 | Memory Graph Evaluation Gate + Go/No-Go Report | Baseline Complete |
+| 62 | Firecracker Strict Proof Harness + Sandbox Gap Closure | Baseline Complete |
+| 63 | Event Notification Reliability + IDE Badge Truth | Baseline Complete |
+| 64 | Memory Evaluation Evidence Packs | Baseline Complete |
+| 65 | Event Replay/Summary Regression Closure | Baseline Complete |
+| 68 | Firecracker Proof Runner Hardening | Baseline Complete |
+| 69 | Sandbox Audit Trail Hardening | Baseline Complete |
+| 71 | Sandbox Audit Query UX And Stability | Baseline Complete |
+| 72 | Firecracker Proof Artifact Builder Hardening | Baseline Complete |
+| 73 | Subprocess Sandbox Regression/Fuzz Suite | Baseline Complete |
+| 78 | MCP Workbench Phase 1 | Baseline Complete |
+| 79 | Workspace Intelligence + Test Bench MVP | Baseline Complete |
+| 80 | ARC CI Guardrails MVP | Baseline Complete |
+| 82 | Local Sandbox Audit Query + Compaction | Baseline Complete |
+| 83 | Container Isolation Provider (Subprocess-Based) | Baseline Complete |
+| 84 | Local Sandbox Policy YAML | Baseline Complete |
+| 85 | Agentic CLI Edit Loop | Baseline Complete |
+| 86 | Interactive CLI UX Polish | Baseline Complete |
+| 87 | Tool Runtime Unification | Baseline Complete |
+| 88 | Edit Preview Staleness Guard | Baseline Complete |
+| 89 | Saved Edit Plan Apply Flow | Baseline Complete |
+| 90 | Edit Bundle Approval Bridge | Baseline Complete |
+| 91 | IDE Edit Plan Review Surface | Baseline Complete |
+| 92 | Sandboxed Diff/Apply/Test Loop | Baseline Complete |
+| 93 | Patch Engine Hardening v2 | Baseline Complete |
+| 94 | Sandbox/MicroVM Truth Audit Guard | Baseline Complete |
+| 95 | Sandbox Classifier And Path-Intent Hardening v3 | Baseline Complete |
+| 96 | MicroVM Proof-Harness Truth Guards | Baseline Complete |
+| 97 | Priority 1 CLI Parity Research + Acceptance Matrix | Baseline Complete |
+| 98 | Autonomous Edit-Test-Repair Loop | Baseline Complete |
+| 99 | Git-Backed Undo/Redo Transactions | Baseline Complete |
+| 100 | Rich IDE Diff Review/Apply Flow | Baseline Complete |
+| 101 | Provider-Backed Runtime Shell | Baseline Complete |
+| 102 | Live Terminal/Event Streaming UX | Baseline Complete |
+| 103 | Broad CLI CI Orchestration | Baseline Complete |
+| 106 | SwarmGraph Runtime Hardening | Baseline Complete + Live Smoke Proven |
+| 110 | SwarmGraph Notifications + Deterministic DAG Planner | Baseline Complete + Narrow Live E2E |
+| 112 | External Adapters Research Folder Audit | Baseline Complete |
+| 113 | Adapter Shared Helpers + pydantic_ai Cleanup | Baseline Complete |
+| 114 | Strands Agents (AWS) Adapter | Baseline Complete |
+| 115 | Sandbox Approval-Hint Fix + Verification Pass | Baseline Complete |
+| 116 | pydantic_ai Real Runner | Baseline Complete |
+| 117 | Letta (MemGPT) Adapter | Baseline Complete |
+| 118 | AG-UI Mapper Registration (letta/strands/pydantic-ai) | Baseline Complete |
+| 119 | CI Flakes: HMAC Chain + SIGINT Timing | Baseline Complete |
+| 120 | CI Flakes: SQLite Concurrent Accumulation | Baseline Complete |
+| 121 | Browser Use Adapter | Baseline Complete |
+| 122 | Agno Adapter + Docs Reconcile | Baseline Complete |
+| 123 | Provider Retry Hardening (R-OPEN-HARDEN s1) | Baseline Complete |
+| 124 | Streaming-Path Retry Hardening (R-OPEN-HARDEN s2) | Baseline Complete |
+| 125 | Graceful Turn-Level Provider-Error Degradation (s3) | Baseline Complete |
+| 126 | Multi-Provider Failover (R-OPEN-HARDEN s4) | Baseline Complete |
+| 127 | Failover Wiring via ARC_FALLBACK_PROVIDERS (s5) | Baseline Complete |
+| 128 | CommandPalette Detail Pane (R-UX3) | Baseline Complete |
+| 129 | ToolCard Rerun Key (R-UX3) | Baseline Complete |
+| 130 | DiffBlock Side-by-Side Toggle (R-UX3) | Baseline Complete |
+| 131 | ApprovalCard Gate Hook in TurnManager (R-UX3) | Baseline Complete |
+
+### Not-yet-Complete / Blocked / Deferred / Superseded
+
+| Phase | Title | Status |
+|---|---|---|
+| 3R | Runtime Semantics Unification | Implementation complete; final merge SHA pending |
+| 33 | Swarm Memory Graph (Research) | Superseded — delivered as research prototype in Phases 59–61 |
+| 34.6 | Provider-Backed Battle Arena | Blocked (no default paid/live provider calls) |
+| 37 | CLI Sandbox Hardening + IDE Integration | Active Hardening (extended by later sandbox phases 69/71/73/82–84/93–96) |
+| 66 | Firecracker Opt-In Host Proof Evidence | Blocked (needs Linux/KVM host) |
+| 67 | Reviewed Memory Evidence Fixture Pack | Blocked |
+| 70 | Reviewed Memory Evidence Pack Gate | Blocked |
+| 104 | macOS MicroVM Execution + Strict No-Network Proof | Gated public CLI proof passed once; default-off; not production-grade |
+| 105 | Linux Firecracker Execution Proof | Baseline Complete (host-unproven; Linux/KVM only) |
+| 111 | Mobile Runtime SDK Integration | Partial — slices 110.1–110.5 done; 110.6 Theia/TUI surfacing follow-up |
+
+---
+
 ## Reprioritization 2026-06-05 — Token-Saving Series + UX Audit Backlog
 
 **Authority:** Hans Vilund, project owner.
@@ -5268,3 +5421,14 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 - `ruff check src tests` — clean.
 - `pytest -q -p no:cacheprovider` — **5559 passed, 0 failed**.
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════
+# NEW INTAKE — Phase Tasks (append below this line)
+# ═══════════════════════════════════════════════════════════════════════
+
+> Incoming phase tasks go here as `## Phase <n> — <title>` sections, each with
+> Context / What was done / Verification / Known Risks. When an item reaches
+> Baseline Complete, also add a one-line row to **Completed Phases — Master Index**
+> at the top of this file. Highest phase currently shipped: **131**.
