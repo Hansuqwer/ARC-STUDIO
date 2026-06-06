@@ -270,3 +270,80 @@ def test_wallet_no_cache_line_when_no_cache_tokens():
 
     assert result.state == "present"
     assert "Cache (this session)" not in result.output
+
+
+# ── Message breakpoints (bp 3+4 of 4) ────────────────────────────────────────
+
+
+def _session_with_history(system: str, turns: list[tuple[str, str]]) -> ChatSession:
+    s = ChatSession()
+    s.add_message("system", system)
+    for role, content in turns:
+        s.add_message(role, content)
+    return s
+
+
+def test_no_message_breakpoints_with_too_few_messages(monkeypatch):
+    """Fewer than 3 non-system messages → no message breakpoints."""
+    monkeypatch.setenv("ARC_ENABLE_PROMPT_CACHING", "1")
+    session = _session_with_history("s" * 2500, [("user", "hi")])
+    req = _manager()._request_from_session(session)
+    assert "messages" not in {bp.position for bp in req.cache_control}
+
+
+def test_message_breakpoints_added_with_prior_exchange(monkeypatch):
+    monkeypatch.setenv("ARC_ENABLE_PROMPT_CACHING", "1")
+    session = _session_with_history(
+        "s" * 2500,
+        [
+            ("user", "first"),
+            ("assistant", "reply"),
+            ("user", "second"),
+        ],
+    )
+    req = _manager()._request_from_session(session)
+    assert "messages" in {bp.position for bp in req.cache_control}
+
+
+def test_message_breakpoints_do_not_exceed_budget(monkeypatch):
+    """Total breakpoints never exceed 4 (Anthropic limit)."""
+    from agent_runtime_cockpit.tools import ToolRegistry
+    from agent_runtime_cockpit.tools.builtin import GetCurrentTimeTool
+
+    monkeypatch.setenv("ARC_ENABLE_PROMPT_CACHING", "1")
+    registry = ToolRegistry()
+    registry.register(GetCurrentTimeTool())
+    session = _session_with_history(
+        "s" * 2500,
+        [
+            ("user", "u1"),
+            ("assistant", "a1"),
+            ("user", "u2"),
+            ("assistant", "a2"),
+            ("user", "u3"),
+        ],
+    )
+    session.tools_enabled = True
+    mgr = TurnManager(_Provider(), model="claude-3-5", tool_registry=registry)
+    req = mgr._request_from_session(session)
+    assert len(req.cache_control) <= 4
+
+
+def test_message_breakpoints_exclude_current_user_turn(monkeypatch):
+    """The very last message (current turn) must not receive a breakpoint."""
+    monkeypatch.setenv("ARC_ENABLE_PROMPT_CACHING", "1")
+    session = _session_with_history(
+        "s" * 2500,
+        [
+            ("user", "past"),
+            ("assistant", "reply"),
+            ("user", "current"),
+        ],
+    )
+    msgs_list = [
+        m for m in session.history if m.get("role") in {"system", "user", "assistant", "tool"}
+    ]
+    last_idx = len(msgs_list) - 1
+    req = _manager()._request_from_session(session)
+    msg_bp_indices = {bp.index for bp in req.cache_control if bp.position == "messages"}
+    assert last_idx not in msg_bp_indices

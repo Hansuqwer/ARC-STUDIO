@@ -207,6 +207,27 @@ class TurnManager:
                     *request.cache_control,
                     CacheBreakpoint(position="tools", index=0),
                 ]
+
+        # Message breakpoints (bp 3+4 of 4): mark the last two non-system message
+        # indices so Anthropic caches the conversation prefix up to those turns.
+        # Only added when there are ≥3 non-system messages (at least one full prior
+        # exchange of user+assistant that is worth caching as a prefix). With fewer
+        # messages there is no stable prefix to cache — adding a breakpoint on the
+        # current user message would be wasteful.
+        # We stay within the 4-breakpoint budget: system(1) + tools(1) + msgs(2) = 4.
+        if os.environ.get("ARC_ENABLE_PROMPT_CACHING") == "1":
+            ns_indices = [i for i, m in enumerate(messages) if m.role != "system"]
+            if len(ns_indices) >= 3:
+                slots_used = len(request.cache_control)
+                slots_available = 4 - slots_used
+                # Mark the last `slots_available` non-system messages as breakpoints,
+                # excluding the very last one (the current user turn being submitted).
+                candidates = ns_indices[-(slots_available + 1) : -1]
+                for idx in candidates:
+                    request.cache_control = [
+                        *request.cache_control,
+                        CacheBreakpoint(position="messages", index=idx),
+                    ]
         return request
 
     async def _run_tool_loop(
