@@ -616,7 +616,7 @@ def eval_run(
     if not json_output:
         color = "green" if result.passed else "red"
         console.print(
-            f"Eval [bold {color}]{'PASS' if result.passed else 'FAIL'}[/bold {color}]  score={result.score}"
+            f"{'[synthetic/simulated] ' if getattr(result, 'synthetic', True) else ''}Eval [bold {color}]{'PASS' if result.passed else 'FAIL'}[/bold {color}]  score={result.score}"
         )
         console.print(
             f"  status_match={result.status_match}  event_type_match={result.event_type_match}  output_contains_match={result.output_contains_match}"
@@ -955,7 +955,7 @@ def eval_run_new(
     if not json_output:
         color = "green" if result.passed else "red"
         console.print(
-            f"Eval [bold {color}]{'PASS' if result.passed else 'FAIL'}[/bold {color}]  score={result.score}"
+            f"{'[synthetic/simulated] ' if getattr(result, 'synthetic', True) else ''}Eval [bold {color}]{'PASS' if result.passed else 'FAIL'}[/bold {color}]  score={result.score}"
         )
         console.print(
             f"  status_match={result.status_match}  event_type_match={result.event_type_match}  output_contains_match={result.output_contains_match}"

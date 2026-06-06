@@ -1727,7 +1727,7 @@ P2 — Quality:
 | R-AUDIT16 | IDE Context Drawer / AGENTS.md Surface | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add minimal Context drawer in Theia IDE showing AGENTS.md + SKILL.md capability cards. |
 | R-AUDIT17 | R79 TUI/Theia Surfacing | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Surface at least one R79-deferred CLI output (e.g. arc runs budget) as a TUI panel. |
 | R-AUDIT18 | Workspace Search CLI + IDE Panel | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add arc workspace search CLI command and corresponding IDE search-result panel. |
-| R-AUDIT19 | Eval Metrics Honest Labelling | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add synthetic:true flag to eval result JSON and [synthetic/simulated] label to TUI display. |
+| R-AUDIT19 | Eval Metrics Honest Labelling | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | synthetic:bool=True added to EvalResult; [synthetic/simulated] prefix in CLI eval display; 2 new tests. |
 | R-AUDIT20 | SQLite WAL Busy-Timeout Verification | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Confirm WAL+busy_timeout fix is applied and xfail reason string is accurate. |
 | R-AUDIT21 | Accessibility Baseline Audit | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Run axe-core audit on Theia IDE extension and fix zero-effort ARIA label gaps. |
 | R-AUDIT22 | Handover Doc Stale Refs Sweep | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | LOCKED_REMAINING_ROADMAP.md refs replaced with docs/roadmap.md in docs/handover/. |

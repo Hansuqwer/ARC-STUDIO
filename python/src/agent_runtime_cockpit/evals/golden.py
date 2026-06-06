@@ -1,4 +1,5 @@
 """Golden trace evaluation — compare a run against an expected golden trace."""
+
 from __future__ import annotations
 
 import json
@@ -27,6 +28,8 @@ class EvalResult(BaseModel):
     output_contains_match: bool
     score: float = 0.0
     details: str = ""
+    # synthetic=True means this result is from offline/deterministic eval, not a live provider run.
+    synthetic: bool = True
 
 
 def eval_run(run: RunRecord, golden: GoldenTrace) -> EvalResult:

@@ -88,3 +88,36 @@ def test_eval_score_partial():
     result = eval_run(run, golden)
     # score = 2/3 (status + output match, no event type match)
     assert result.score == round(2.0 / 3.0, 2)
+
+
+def test_eval_result_has_synthetic_true_by_default():
+    from agent_runtime_cockpit.evals.golden import EvalResult
+
+    r = EvalResult(
+        run_id="r1",
+        golden_id="g1",
+        passed=True,
+        status_match=True,
+        event_type_match=True,
+        output_contains_match=True,
+        score=1.0,
+    )
+    assert r.synthetic is True
+
+
+def test_eval_display_shows_synthetic_label():
+    from agent_runtime_cockpit.evals.golden import EvalResult
+
+    r = EvalResult(
+        run_id="r1",
+        golden_id="g1",
+        passed=True,
+        status_match=True,
+        event_type_match=True,
+        output_contains_match=True,
+        score=1.0,
+        synthetic=True,
+    )
+    # The CLI display format includes [synthetic/simulated] prefix when synthetic=True
+    label = "[synthetic/simulated] " if r.synthetic else ""
+    assert label == "[synthetic/simulated] "

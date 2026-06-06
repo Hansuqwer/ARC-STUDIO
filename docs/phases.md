@@ -5581,7 +5581,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Add a synthetic:true flag to eval result JSON envelopes and a [synthetic/simulated] label to TUI and IDE eval display so users cannot mistake offline deterministic eval results for provider-backed measurements.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Honesty/evidence-over-claims fix; applies to all eval output surfaces; no eval logic changes.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: synthetic:bool=True field added to EvalResult in golden.py; [synthetic/simulated] prefix added to CLI eval run output in mgmt.py (both display sites). 2 new tests in test_golden.py.
 
 ---
 
