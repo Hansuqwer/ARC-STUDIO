@@ -1728,7 +1728,7 @@ P2 — Quality:
 | R-AUDIT17 | R79 TUI/Theia Surfacing | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Surface at least one R79-deferred CLI output (e.g. arc runs budget) as a TUI panel. |
 | R-AUDIT18 | Workspace Search CLI + IDE Panel | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add arc workspace search CLI command and corresponding IDE search-result panel. |
 | R-AUDIT19 | Eval Metrics Honest Labelling | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | synthetic:bool=True added to EvalResult; [synthetic/simulated] prefix in CLI eval display; 2 new tests. |
-| R-AUDIT20 | SQLite WAL Busy-Timeout Verification | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Confirm WAL+busy_timeout fix is applied and xfail reason string is accurate. |
+| R-AUDIT20 | SQLite WAL Busy-Timeout Verification | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | WAL+busy_timeout=5000ms confirmed in budget/storage.py; xfail reason updated to reflect accurate constraint. |
 | R-AUDIT21 | Accessibility Baseline Audit | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Run axe-core audit on Theia IDE extension and fix zero-effort ARIA label gaps. |
 | R-AUDIT22 | Handover Doc Stale Refs Sweep | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | LOCKED_REMAINING_ROADMAP.md refs replaced with docs/roadmap.md in docs/handover/. |
 | R-AUDIT23 | SwarmGraph Insight UI Components Phase 1 | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Implement DAG planner viz, consensus evidence cards, and HITL approval panel in IDE. |

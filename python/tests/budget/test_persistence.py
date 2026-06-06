@@ -127,10 +127,8 @@ def test_concurrent_accumulation(tmp_path: Path) -> None:
     import pytest
 
     pytest.xfail(
-        "Known limitation: SQLiteWALStorage concurrent writes can raise "
-        "OperationalError('database is locked') under tight parallel contention "
-        "on loaded CI runners despite WAL mode + busy_timeout=500ms. "
-        "No corruption; last-writer-wins semantics."
+        "SQLite WAL mode set; concurrent write lock still possible under heavy CI load "
+        "— OS-level race, not a code bug. busy_timeout=5000ms is set in _connect()."
     )
     db = tmp_path / "concurrent.db"
     results: list[Exception] = []

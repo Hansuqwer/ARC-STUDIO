@@ -5589,7 +5589,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Confirm that the WAL mode and busy_timeout fix (applied in R-OPEN-DEFERRED-RUNBOOKS / Phase 120) is correctly applied to all SQLite stores that were affected by the database is locked failure, and verify that the xfail reason strings in the test suite accurately describe the remaining known limitation.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Verification-only slice; no new code unless a gap is found; closes the open question from the deferred runbook evidence.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: Verified WAL=ON and busy_timeout=5000ms in budget/storage.py _connect(). xfail reason in test_persistence.py updated to accurately describe OS-level race constraint.
 
 ---
 
