@@ -5549,7 +5549,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Document the MetaPathFinder bridge architecture (used to make SwarmGraph importable in restricted environments) in docs/research/ so future maintainers understand the import hook and its security implications.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Doc-only research note; zero-risk; prevents the bridge from appearing as unexplained magic in code review.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: docs/research/swarmgraph-metapathfinder-bridge.md created; documents what/when/what it intercepts, honest limits, and security gating upstream.
 
 ---
 
