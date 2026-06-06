@@ -1713,7 +1713,7 @@ P2 — Quality:
 | R-AUDIT2 | Enforcement Surfaces Doc Refresh | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | enforcement-surfaces.md updated to Phase 131; new surfaces for sandbox P0, hash chain, adapter gates, retry, TurnManager hook. |
 | R-AUDIT3 | docker-compose 127.0.0.1 Binding | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | docker-compose.yml port 3000 bound to 127.0.0.1. |
 | R-AUDIT4 | config-service apiKeySource Snake/Camel Fix | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add api_key_source fallback in config-service.ts so IDE provider source badge shows correctly. |
-| R-AUDIT5 | MCP Proxy Env Secret-Strip Gate | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Strip secret-bearing env vars before passing env to upstream MCP subprocess. |
+| R-AUDIT5 | MCP Proxy Env Secret-Strip Gate | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | _sanitise_env() added to mcp/proxy.py; wired in start(); 4 new tests. |
 | R-AUDIT6 | Gateway Client Paid-Call Gate | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Resolve TODO at gateway_client.py:28 — wire BudgetEnforcer.preflight() or document exemption. |
 | R-AUDIT7 | DataStore allow_paid Default Warning | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Warn user in TUI when allow_paid=True and no wallet budget is set. |
 | R-AUDIT8 | EXTENSION_MIGRATION Stale Ref Fix | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | LOCKED_REMAINING_ROADMAP.md ref replaced with docs/roadmap.md in EXTENSION_MIGRATION.md. |

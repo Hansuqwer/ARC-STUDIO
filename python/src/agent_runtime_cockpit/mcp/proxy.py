@@ -21,6 +21,31 @@ log = logging.getLogger(__name__)
 
 _MAX_OUTPUT_BYTES = 1_048_576  # 1 MB
 
+_SECRET_KEY_PATTERNS = (
+    "_API_KEY",
+    "_TOKEN",
+    "_SECRET",
+    "_PASSWORD",
+    "_CREDENTIAL",
+    "OPENAI_",
+    "ANTHROPIC_",
+    "AWS_",
+    "GOOGLE_API",
+)
+
+
+def _sanitise_env(env: dict[str, str] | None) -> dict[str, str] | None:
+    """Strip secret env vars before passing to upstream subprocess."""
+    if env is None:
+        return None
+    clean = {}
+    for k, v in env.items():
+        if any(pat in k.upper() for pat in _SECRET_KEY_PATTERNS):
+            log.debug("mcp.proxy: stripped secret key %s from upstream env", k)
+        else:
+            clean[k] = v
+    return clean
+
 
 class McpProxy:
     """Async stdio MCP proxy with risk gating."""
@@ -48,7 +73,7 @@ class McpProxy:
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=self._env,
+            env=_sanitise_env(self._env),
             start_new_session=True,
         )
 

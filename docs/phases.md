@@ -5469,7 +5469,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Strip secret-bearing environment variables (matching the existing ARC env allowlist/secret-strip patterns) before passing the env dict to upstream MCP subprocess invocations in the MCP proxy layer.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Security hardening; applies existing sandbox secret-strip logic to MCP proxy path; no new policy needed.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: _sanitise_env() added to mcp/proxy.py; wired in McpProxy.start(); strips *_API_KEY/*_TOKEN/*_SECRET patterns. 4 new tests in tests/mcp/test_proxy_env.py.
 
 ---
 
