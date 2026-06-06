@@ -5597,7 +5597,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Run an axe-core accessibility audit on the Theia IDE extension panels and fix all zero-effort ARIA label gaps (missing aria-label, role, or landmark attributes) identified by the audit.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Targets only zero-effort fixes; complex keyboard-navigation or screen-reader flows are deferred; aligns with R-UX4 accessibility baseline.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: arc-adapters-widget.tsx: role=main/list/listitem/status + aria-labels added. docs/research/accessibility-baseline.md created. axe-core automated pass deferred.
 
 ---
 

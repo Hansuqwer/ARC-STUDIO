@@ -84,19 +84,19 @@ export class ArcAdaptersWidget extends ReactWidget {
     }
 
     protected render(): React.ReactNode {
-        if (this.state.loading) return <div style={{ padding: 24 }}>Loading adapters...</div>;
+        if (this.state.loading) return <div style={{ padding: 24 }} role="status">Loading adapters...</div>;
         const runtimeIds = this.state.capabilities.map(c => c.runtime_id);
         return (
             <div style={{
                 padding: 16, fontFamily: 'var(--theia-ui-font-family)',
                 color: 'var(--theia-foreground)', height: '100%', overflow: 'auto',
-            }}>
+            }} role="main" aria-label="ARC Runtime Readiness">
                 <div style={{
                     display: 'flex', justifyContent: 'space-between',
                     alignItems: 'center', marginBottom: 16,
                 }}>
                     <h2 style={{ margin: 0, fontSize: 15 }}>Runtime Readiness</h2>
-                    <button style={refreshBtnStyle} onClick={() => this.load()}>Refresh</button>
+                    <button style={refreshBtnStyle} onClick={() => this.load()} aria-label="Refresh runtime adapters">Refresh</button>
                 </div>
                 {this.renderWorkspaceInfo()}
                 <CapabilityDiffViewer
@@ -108,7 +108,9 @@ export class ArcAdaptersWidget extends ReactWidget {
                     onCompare={(from, to) => this.handleCompare(from, to)}
                     availableRuntimes={runtimeIds}
                 />
+                <div role="list" aria-label="Runtime adapter cards">
                 {this.state.capabilities.map(cap => this.renderCard(cap))}
+                </div>
                 {this.state.capabilities.length === 0 && !this.state.runtimeError && (
                     <div style={{
                         padding: 20, textAlign: 'center',
@@ -145,7 +147,7 @@ export class ArcAdaptersWidget extends ReactWidget {
         const color = isReady ? 'var(--theia-charts-green)' : 'var(--theia-editorWarning-foreground)';
         const icon = isReady ? '\u2713' : '\u26A0';
         return (
-            <div key={cap.runtime_id} style={{
+            <div key={cap.runtime_id} role="listitem" aria-label={`Runtime adapter: ${cap.runtime_id}`} style={{
                 marginBottom: 10, padding: '10px 14px',
                 backgroundColor: 'var(--theia-editor-background)',
                 border: `1px solid ${color}`,
