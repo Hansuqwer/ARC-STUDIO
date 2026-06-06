@@ -1709,7 +1709,7 @@ P2 — Quality:
 
 | ID | Title | Status | Evidence | Notes |
 |---|---|---|---|---|
-| R-AUDIT1 | Release Checklist Refresh | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Update docs/release/checklist.md to v0.8-alpha/4979aff/5537 tests/Phase 125. |
+| R-AUDIT1 | Release Checklist Refresh | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | docs/release/checklist.md updated to v0.8-r-ux2/aa788f3/5537 tests/Phase 131. |
 | R-AUDIT2 | Enforcement Surfaces Doc Refresh | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Catalogue all security surfaces added in Phases 55-131 into enforcement-surfaces.md. |
 | R-AUDIT3 | docker-compose 127.0.0.1 Binding | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Bind port 3000 to 127.0.0.1 in docker-compose.yml to match single-user model. |
 | R-AUDIT4 | config-service apiKeySource Snake/Camel Fix | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add api_key_source fallback in config-service.ts so IDE provider source badge shows correctly. |

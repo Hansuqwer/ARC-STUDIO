@@ -5437,7 +5437,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Update docs/release/checklist.md to accurately reflect current HEAD: v0.8-r-ux2 internal / v0.1.0a0 published, commit 4979aff, 5537 tests, Phase 131, all shipped feature groups.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Doc-only slice; zero-risk; release-blocking.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: checklist.md updated to v0.8-r-ux2/aa788f3/5609 collected/5537 passed/Phase 131. All alpha labels preserved.
 
 ---
 
