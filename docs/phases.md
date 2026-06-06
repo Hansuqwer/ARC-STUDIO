@@ -5565,7 +5565,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Surface at least one R79-deferred CLI output (e.g. arc runs budget) as a TUI panel or IDE tab, closing the slice 110.6 follow-up from Phase 111.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Completes the R79 Mobile Runtime SDK Integration follow-up; exact surface (TUI vs Theia tab) to be decided at implementation time.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: /budget [run-id] slash command added to TUI screen; calls arc runs budget CLI; falls back to /wallet when no run-id. 2 new tests.
 
 ---
 

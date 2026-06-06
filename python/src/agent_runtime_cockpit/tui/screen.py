@@ -329,6 +329,11 @@ class ArcScreen(Screen):
                 self._add_error_entry("VIEW_ERROR", str(e))
             return
 
+        if cmd == "/budget":
+            run_id = parts[1].strip() if len(parts) > 1 else ""
+            self._handle_budget_command(run_id)
+            return
+
         # Delegate remaining slash commands to backend
         self.query_one(SlashMenu).hide()
         try:
@@ -647,6 +652,36 @@ class ArcScreen(Screen):
             content += f"│ {suggestion}\n"
         content += f"└{border}─┘"
         self.data.add_entry("system", content, {"type": "error", "code": code})
+
+    def _handle_budget_command(self, run_id: str) -> None:
+        """Handle /budget [run-id] — show run budget report or wallet summary."""
+        import subprocess
+
+        if run_id:
+            try:
+                result = subprocess.run(
+                    ["uv", "run", "arc", "runs", "budget", run_id],
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                )
+                out = result.stdout.strip() or result.stderr.strip() or "(no output)"
+            except Exception as e:
+                out = f"[budget] Error: {e}"
+        else:
+            # No run-id: show wallet summary via slash_commands
+            try:
+                from agent_runtime_cockpit.cli_repl.slash_commands import (
+                    SlashCommandHandler,
+                    _result_text,
+                )
+
+                handler = SlashCommandHandler()
+                result = handler.handle("/wallet", self._get_session())
+                out = _result_text(result) or "(wallet: no output)"
+            except Exception as e:
+                out = f"[wallet] Error: {e}"
+        self.data.add_entry("system", out)
 
     def _do_exit(self) -> None:
         self.data.add_entry("system", "Goodbye!")

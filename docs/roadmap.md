@@ -1725,7 +1725,7 @@ P2 — Quality:
 | R-AUDIT14 | Mutating GET /api/runs/start Removal | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | GET /api/runs/start returns 410 Gone; POST unaffected; legacy env shim removed. |
 | R-AUDIT15 | SwarmGraph MetaPathFinder Bridge Docs | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | docs/research/swarmgraph-metapathfinder-bridge.md created with architecture, gates, and honest limits. |
 | R-AUDIT16 | IDE Context Drawer / AGENTS.md Surface | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | ArcContextDrawer widget created; registered in frontend module; stub data (CLI proxy wiring follow-on); 1 test. |
-| R-AUDIT17 | R79 TUI/Theia Surfacing | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Surface at least one R79-deferred CLI output (e.g. arc runs budget) as a TUI panel. |
+| R-AUDIT17 | R79 TUI/Theia Surfacing | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | /budget [run-id] slash command added to TUI screen; wallet fallback when no run-id; 2 new tests. |
 | R-AUDIT18 | Workspace Search CLI + IDE Panel | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add arc workspace search CLI command and corresponding IDE search-result panel. |
 | R-AUDIT19 | Eval Metrics Honest Labelling | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | synthetic:bool=True added to EvalResult; [synthetic/simulated] prefix in CLI eval display; 2 new tests. |
 | R-AUDIT20 | SQLite WAL Busy-Timeout Verification | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | WAL+busy_timeout=5000ms confirmed in budget/storage.py; xfail reason updated to reflect accurate constraint. |
