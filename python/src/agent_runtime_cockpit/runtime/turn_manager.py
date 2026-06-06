@@ -308,6 +308,21 @@ class TurnManager:
                             },
                         )
                 session.history.append({"role": "tool", "content": wrapped})
+                # MT-1: deterministic microcompact — keep last 5 tool results verbatim.
+                from ..cli_repl.session import microcompact_tool_results
+
+                receipt = microcompact_tool_results(session, keep_last=5)
+                if receipt.cleared_count > 0:
+                    self._emit(
+                        "tool.compaction",
+                        {
+                            "cleared_count": receipt.cleared_count,
+                            "cleared_chars": receipt.cleared_chars,
+                            "kept_count": receipt.kept_count,
+                            "sha256": receipt.sha256,
+                            "timestamp": receipt.timestamp,
+                        },
+                    )
             request = self._request_from_session(session)
             current = await self._provider_client.complete(
                 request, cancellation_token=cancellation_token

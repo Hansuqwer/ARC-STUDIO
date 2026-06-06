@@ -195,6 +195,20 @@ def _build_registry():
     )
     registry.register(
         CommandDef(
+            name="compact",
+            help_text="Compact old tool outputs — keep last 5 verbatim, replace older with stub",
+            category="session",
+            handler=cmd_compact,
+            gates_required=[],
+            mode_required=[],
+            renders=["present"],
+            requires_events=[],
+            privileged=False,
+            trust_required="user",
+        )
+    )
+    registry.register(
+        CommandDef(
             name="session",
             help_text="Show current session summary",
             category="session",
@@ -1000,6 +1014,26 @@ def cmd_help(_arg: str, _session: ChatSession) -> str:
 def cmd_clear(_arg: str, session: ChatSession) -> str:
     session.history.clear()
     return "Session history cleared."
+
+
+def cmd_compact(_arg: str, session: ChatSession) -> CommandResult:
+    """Compact old tool outputs: keep last 5 verbatim, replace older with stub."""
+    from .session import microcompact_tool_results
+
+    receipt = microcompact_tool_results(session, keep_last=5)
+    if receipt.cleared_count == 0:
+        return CommandResult(
+            state="present",
+            output=f"Nothing to compact — {receipt.kept_count} tool message(s) kept.",
+        )
+    return CommandResult(
+        state="present",
+        output=(
+            f"Compacted {receipt.cleared_count} tool message(s) "
+            f"({receipt.cleared_chars:,} chars removed, {receipt.kept_count} kept). "
+            f"Receipt: sha256:{receipt.sha256[:12]}…"
+        ),
+    )
 
 
 def cmd_model(arg: str, session: ChatSession) -> CommandResult:

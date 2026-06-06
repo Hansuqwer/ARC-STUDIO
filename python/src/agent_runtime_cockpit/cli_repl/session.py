@@ -4,6 +4,7 @@ import json
 import os
 import re
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -287,3 +288,71 @@ class ChatSession(BaseModel):
     def latest(cls) -> ChatSession | None:
         all_sessions = cls.list_sessions()
         return all_sessions[0] if all_sessions else None
+
+
+# ── MT-1 Deterministic Tool-Result Microcompact ───────────────────────────────
+
+
+@dataclass(frozen=True)
+class CompactionReceipt:
+    """Audit record for a microcompact operation."""
+
+    cleared_count: int  # number of tool messages replaced
+    cleared_chars: int  # total characters removed
+    kept_count: int  # tool messages kept verbatim
+    sha256: str  # SHA-256 of the cleared content (hex)
+    timestamp: str  # ISO-8601 UTC
+
+
+def microcompact_tool_results(
+    session: "ChatSession",
+    *,
+    keep_last: int = 5,
+) -> CompactionReceipt:
+    """Replace old tool-role messages with a compact placeholder (in-place).
+
+    Keeps the ``keep_last`` most recent ``role=="tool"`` messages verbatim.
+    Older tool messages are replaced with a one-line stub:
+        ``[Tool output cleared — N chars removed]``
+
+    A SHA-256 receipt of the removed content is returned so the audit chain
+    can verify that compaction was deterministic and nothing was silently lost.
+
+    Returns a :class:`CompactionReceipt`. No-op (receipt with zero counts)
+    when ≤ ``keep_last`` tool messages exist.
+    """
+    import hashlib
+    from datetime import datetime, timezone
+
+    # Collect all tool-message positions
+    tool_indices = [i for i, m in enumerate(session.history) if m.get("role") == "tool"]
+    to_clear = tool_indices[:-keep_last] if len(tool_indices) > keep_last else []
+
+    if not to_clear:
+        return CompactionReceipt(
+            cleared_count=0,
+            cleared_chars=0,
+            kept_count=len(tool_indices),
+            sha256=hashlib.sha256(b"").hexdigest(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+
+    cleared_content = []
+    cleared_chars = 0
+    for idx in to_clear:
+        content = session.history[idx].get("content", "")
+        cleared_content.append(content)
+        cleared_chars += len(content)
+        session.history[idx] = {
+            **session.history[idx],
+            "content": f"[Tool output cleared — {len(content)} chars removed]",
+        }
+
+    digest = hashlib.sha256("\n---\n".join(cleared_content).encode("utf-8")).hexdigest()
+    return CompactionReceipt(
+        cleared_count=len(to_clear),
+        cleared_chars=cleared_chars,
+        kept_count=len(tool_indices) - len(to_clear),
+        sha256=digest,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )

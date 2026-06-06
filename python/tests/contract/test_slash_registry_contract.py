@@ -7,6 +7,7 @@ PHASE_41_COMMANDS = {
     "version",
     "exit",
     "clear",
+    "compact",
     "summary",
     "session",
     "sessions",
