@@ -23,6 +23,10 @@ class SimulationConfig(_Base):
     include_eval_recommendations: bool = False
     redact_secrets: bool = True
     workspace: Optional[str] = None
+    # MT-2: per-call cost estimate from live CostRates. When set, replaces the
+    # hardcoded _PAID_CALL_COST_FLOOR constant in the simulator. Callers can
+    # populate this via simulation_cost_per_call(provider_id, model).
+    cost_per_paid_call_usd: Optional[float] = None
 
 
 class SimulatedSideEffect(_Base):

@@ -357,10 +357,15 @@ def simulate_graph(
 
     # 10. Cost estimate
     paid_calls = [se for se in all_se if se.paid]
+    per_call = (
+        cfg.cost_per_paid_call_usd
+        if cfg.cost_per_paid_call_usd is not None
+        else _PAID_CALL_COST_FLOOR
+    )
     cost = SimulatedCost(
         has_paid_calls=bool(paid_calls),
         estimated_paid_call_count=len(paid_calls),
-        estimated_cost_floor_usd=round(len(paid_calls) * _PAID_CALL_COST_FLOOR, 6),
+        estimated_cost_floor_usd=round(len(paid_calls) * per_call, 6),
     )
 
     # 11. Eval recommendations
