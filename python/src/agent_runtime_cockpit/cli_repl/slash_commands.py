@@ -1282,11 +1282,35 @@ def _provider_client_for_run(runtime: Any, session: Any = None) -> Any:
     metadata = getattr(session, "metadata", {}) or {}
     provider_name = str(metadata.get("provider") or _detect_provider_name() or "anthropic")
     try:
-        return get_provider_client(provider_name)
+        primary = get_provider_client(provider_name)
     except Exception:
         if provider_name == "openai":
-            return OpenAICompatibleClient(vendor="openai")
-        return AnthropicClient()
+            primary = OpenAICompatibleClient(vendor="openai")
+        else:
+            primary = AnthropicClient()
+
+    # Opt-in multi-provider failover: ARC_FALLBACK_PROVIDERS=name1,name2
+    import os as _os
+
+    fallback_names_raw = _os.environ.get("ARC_FALLBACK_PROVIDERS", "").strip()
+    if fallback_names_raw:
+        import logging as _logging
+
+        _log = _logging.getLogger(__name__)
+        from ..providers.fallback import FallbackProviderClient
+
+        fallbacks = []
+        for name in (n.strip() for n in fallback_names_raw.split(",") if n.strip()):
+            if name == provider_name:
+                continue  # skip duplicate of primary
+            try:
+                fallbacks.append(get_provider_client(name))
+            except Exception as exc:  # noqa: BLE001
+                _log.warning("ARC_FALLBACK_PROVIDERS: skipping %r — %s", name, exc)
+        if fallbacks:
+            return FallbackProviderClient([primary] + fallbacks)
+
+    return primary
 
 
 def _run_provider_turn(

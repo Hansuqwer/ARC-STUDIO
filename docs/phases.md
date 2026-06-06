@@ -5184,3 +5184,26 @@ The roadmap status analysis flagged "cascading multi-provider failover" as remai
   but slightly redundant; for a single failover pass, call `complete()` directly.
 - No automatic wiring into provider selection yet — that (and a config surface for
   declaring fallback chains) is future scope.
+
+---
+
+## Phase 127 — Failover Wiring via ARC_FALLBACK_PROVIDERS (R-OPEN-HARDEN slice 5)
+
+**Status:** Baseline Complete (2026-06-06) | Evidence: slash_commands.py _provider_client_for_run wired, 4 tests, 5550 passed. Companion: R-OPEN-HARDEN.
+
+### What was done
+
+`_provider_client_for_run` in `cli_repl/slash_commands.py` now reads `ARC_FALLBACK_PROVIDERS=name1,name2`. If set, it builds `[primary] + [fallbacks]` and wraps them in `FallbackProviderClient`. Unavailable fallback providers (missing key / unregistered) are skipped with a warning rather than crashing. The duplicate-primary guard prevents wrapping the same provider twice.
+
+**Usage:**
+```
+ARC_FALLBACK_PROVIDERS=openai,groq uv run arc
+```
+Primary is determined by the session's `provider` metadata (or `_detect_provider_name()`). Fallbacks are tried in order on a retryable failure.
+
+4 tests cover: no-env returns plain client; env wraps in FallbackProviderClient with correct order; duplicate primary is skipped; unavailable fallback is skipped gracefully.
+
+### Closes R-OPEN-HARDEN
+
+This is the final slice. The full provider-resilience surface is now implemented:
+123 retry → 124 streaming retry → 125 graceful degradation → 126 FallbackProviderClient → 127 wiring. R-OPEN-HARDEN moves to Baseline Complete.
