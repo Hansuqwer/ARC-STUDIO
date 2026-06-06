@@ -37,6 +37,7 @@ from ..protocol.schemas import RunEvent, RunRecord, RunStatus
 from ._shared import make_event
 from ._static import dependency_evidence, import_evidence
 from .base import DoctorAction, RuntimeAdapter
+from . import letta_mapping  # noqa: F401 — registers AG-UI mapper on import
 
 log = logging.getLogger(__name__)
 

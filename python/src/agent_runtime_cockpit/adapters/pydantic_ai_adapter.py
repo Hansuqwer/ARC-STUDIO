@@ -33,6 +33,7 @@ from ._shared import make_event, workspace_import_path
 from .base import DoctorAction, RuntimeAdapter
 from .pydantic_ai import PydanticAIDetectionResult, detect_pydantic_ai, export_pydantic_ai_agents
 from .pydantic_ai.runner import PydanticAIEventHandler
+from . import pydantic_ai_mapping  # noqa: F401 — registers AG-UI mapper on import
 
 log = logging.getLogger(__name__)
 

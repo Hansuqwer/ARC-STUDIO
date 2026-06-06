@@ -37,6 +37,7 @@ from ..protocol.schemas import (
 from ._shared import make_event, workspace_import_path
 from ._static import dependency_evidence, import_evidence
 from .base import DoctorAction, RuntimeAdapter
+from . import strands_mapping  # noqa: F401 — registers AG-UI mapper on import
 
 log = logging.getLogger(__name__)
 
