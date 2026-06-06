@@ -147,19 +147,19 @@ class RuntimeEntrypoints(BaseModel):
     rejected by ``validation.py``.
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     inspect: Optional[str] = None
     export: Optional[str] = None
     compile_to_ir: Optional[str] = None
     simulate: Optional[str] = None
-    validate: Optional[str] = None
+    validate_entrypoint: Optional[str] = Field(default=None, alias="validate")
     run: Optional[str] = None
     eval: Optional[str] = None
 
     def as_mapping(self) -> dict[str, str]:
         """Return only the declared (non-null) entrypoints."""
-        return {k: v for k, v in self.model_dump().items() if isinstance(v, str) and v}
+        return {k: v for k, v in self.model_dump(by_alias=True).items() if isinstance(v, str) and v}
 
 
 class RuntimePermission(BaseModel):
@@ -206,11 +206,11 @@ class RuntimeCapability(BaseModel):
 class RuntimeToolDeclaration(BaseModel):
     """A tool the runtime exposes. Schemas are recorded but tools are never run."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     name: str
     kind: ToolKind = ToolKind.UNKNOWN
-    schema: Optional[dict[str, Any]] = None
+    schema_def: Optional[dict[str, Any]] = Field(default=None, alias="schema")
     side_effects: list[str] = Field(default_factory=list)
     requires_hitl: bool = False
     requires_trust: bool = False

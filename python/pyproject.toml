@@ -94,6 +94,9 @@ filterwarnings = [
     "ignore::pytest.PytestUnraisableExceptionWarning",
     # Ignore intentional deprecation warnings for legacy runtime mode migration
     "ignore:Legacy runtime mode.*:DeprecationWarning",
+    # Pre-existing: RuntimeEntrypoints.validate and RuntimeToolDeclaration.schema
+    # shadow Pydantic BaseModel attributes. Renaming would break the manifest schema.
+    "ignore:Field name.*shadows an attribute in parent.*BaseModel:UserWarning",
 ]
 
 [tool.ruff]
