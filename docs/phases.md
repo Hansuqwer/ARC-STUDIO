@@ -5533,7 +5533,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Add an honest single-user caveat to the HMAC signing wording in README.md and docs/SECURITY.md, clarifying that HMAC is a local workstation audit chain and does not provide shared-host or concurrent-user audit guarantees.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Doc-only wording fix; ensures README does not overstate the HMAC signing posture beyond what is proven for a local single-user install.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: Scope caveat added to README.md (2 locations) and docs/SECURITY.md HMAC section. No feature description removed.
 
 ---
 

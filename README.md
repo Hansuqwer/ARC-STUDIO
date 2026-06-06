@@ -28,7 +28,7 @@ arc serve    # starts the HTTP daemon on 127.0.0.1:7777
 | **Isolation Backend** | Selectable execution isolation: `auto` / `none` / `subprocess` / `docker` (gated) / `microvm` (gated, macOS arm64 only) |
 | **Runtime Adapters** | SwarmGraph (native), LangGraph, CrewAI, OpenAI Agents SDK, AG2, LlamaIndex, LM Arena (stub) |
 | **MCP Control Plane** | Local stdio MCP server — 11 tools, 3 resources, task registry, per-call risk gate |
-| **Audit Chain** | HMAC-signed streaming audit verifier; `arc audit verify` CLI; 100 MB trace < 30s |
+| **Audit Chain** | HMAC-signed streaming audit verifier; `arc audit verify` CLI; 100 MB trace < 30s (tamper-evident for single-session local runs; does not protect against a local attacker with write access to ~/.arc/audit/) |
 | **Token-Saving Suite** | Wallet, budget enforcement, compaction, model picker, Chinese-labs support, opt-in cloud features |
 | **TUI Themes** | dark / light / mocha / latte / high-contrast / mono; live re-skin via `/theme`; `NO_COLOR` fallback |
 
@@ -212,7 +212,7 @@ ARC runs a policy-based command sandbox on every tool execution:
 - **Path confinement** — writes confined to workspace; symlink escapes rejected
 - **Env allowlist** — only safe env vars pass to child processes; secrets stripped
 - **Audit chain** — every sandbox decision appended to `~/.arc/audit/sandbox.audit.jsonl`
-- **HMAC signing** — tamper-evident streaming audit verification for run traces
+- **HMAC signing** — tamper-evident streaming audit verification for run traces (tamper-evident for single-session local runs; does not protect against a local attacker with write access to ~/.arc/audit/)
 - **Landlock detection** — Linux Landlock LSM ABI probed at startup
 
 ```bash

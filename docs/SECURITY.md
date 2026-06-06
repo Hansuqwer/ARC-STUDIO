@@ -26,9 +26,11 @@ The Python daemon `/health` response is intentionally not an ARC envelope. Its s
 
 OTLP trace export is localhost-only by default. Remote OTLP endpoints require `ARC_ALLOW_REMOTE_OTLP=1` and should only be enabled for trusted endpoints.
 
-## HMAC Audit Chains
+## HMAC Signing and Audit Chain
 
-New HMAC audit records fail closed if no audit key is available. New records bind `seq`, `timestamp`, `key_id`, `prev_hash`, and `event` into the signed hash. Verifiers keep a legacy compatibility path for already-written HMAC chains that lack the new metadata, but new writes always use the bound format. Existing corrupt chains are not extended; append fails instead of skipping over malformed lines. Writer-owned chains also maintain a signed `.checkpoint.json` sidecar with the terminal hash, record count, and file size so truncation of a previously longer chain is detected during verification.
+New HMAC-signed audit records fail closed if no audit key is available. New records bind `seq`, `timestamp`, `key_id`, `prev_hash`, and `event` into the signed hash. Verifiers keep a legacy compatibility path for already-written HMAC chains that lack the new metadata, but new writes always use the bound format. Existing corrupt chains are not extended; append fails instead of skipping over malformed lines. Writer-owned chains also maintain a signed `.checkpoint.json` sidecar with the terminal hash, record count, and file size so truncation of a previously longer chain is detected during verification.
+
+> **Scope caveat:** HMAC signing provides tamper-evidence for single-session local runs only. It does not protect against a local attacker with write access to `~/.arc/audit/`.
 
 ## Secrets
 
