@@ -5146,3 +5146,41 @@ as an **unhandled exception** — `run_turn` only caught `Cancelled`. A caller
 - Tool-loop errors inside `_run_tool_loop` are covered transitively (the loop calls
   `_call_with_retry`), but a tool *execution* exception (not a ProviderError) still
   propagates — out of scope for this slice, which targets provider-call failures.
+
+---
+
+## Phase 126 — Multi-Provider Failover (R-OPEN-HARDEN slice 4)
+
+**Status:** Baseline Complete (2026-06-06) | Evidence: providers/fallback.py FallbackProviderClient, 9 tests, 5546 passed. Research: LiteLLM/Portkey ordered fallback-chain pattern.
+
+### Context
+
+The roadmap status analysis flagged "cascading multi-provider failover" as remaining R-OPEN-HARDEN scope. Research (LiteLLM fallbacks, Portkey failover routing) confirms the standard pattern: an ordered list of providers; on a retryable failure of the primary, switch to the next.
+
+### What was done
+
+- `providers/fallback.py`: `FallbackProviderClient(clients: list[ProviderClient])` — a
+  `ProviderClient` that tries each client in order. On a **retryable** `ProviderError`
+  it fails over to the next; non-retryable errors (AuthError/ValidationError) propagate
+  immediately (failover won't help a bad key). If all providers fail, the last error is raised.
+- `stream()` honors the Phase 124 correctness boundary: failover only **before the first
+  chunk** is emitted; once a chunk is yielded, the error propagates (no duplicate output).
+- `cancel()` is best-effort across all providers.
+- **Additive / opt-in**: nothing constructs this by default. Build it explicitly with a
+  primary + fallbacks and pass it as the TurnManager provider.
+- `tests/providers/test_fallback.py`: 9 tests (primary success, failover on retryable,
+  3-provider chain, non-retryable no-failover, all-exhausted, stream failover pre-chunk,
+  stream no-failover post-chunk with no-duplicate assertion, cancel-all, empty-rejected).
+
+### Verification
+
+- 5546 passed. Ruff clean.
+
+### Known Risks / composition note
+
+- If a `FallbackProviderClient` is used as a TurnManager provider, the manager's
+  `_call_with_retry` wraps the whole chain → a fully-failed chain is retried
+  (retry-of-failover), so the primary may be tried again across retry rounds. Correct
+  but slightly redundant; for a single failover pass, call `complete()` directly.
+- No automatic wiring into provider selection yet — that (and a config surface for
+  declaring fallback chains) is future scope.
