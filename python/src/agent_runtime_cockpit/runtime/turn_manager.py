@@ -165,6 +165,10 @@ class TurnManager:
             )
 
     def _request_from_session(self, session: ChatSession) -> ProviderRequest:
+        import os
+
+        from ..providers.base import CacheBreakpoint
+
         messages = [
             ProviderMessage(role=message.get("role", "user"), content=message.get("content", ""))
             for message in session.history
@@ -176,6 +180,15 @@ class TurnManager:
             max_tokens=self._max_tokens,
             temperature=self._temperature,
         )
+        # Populate the system-prompt cache breakpoint when opt-in env flag is set.
+        # Anthropic requires ≥1024 tokens to benefit from caching; we proxy that
+        # with a ≥2000-character system message so the breakpoint is only added
+        # when it's actually cacheable. The flag must be explicitly set — default-off.
+        if os.environ.get("ARC_ENABLE_PROMPT_CACHING") == "1":
+            system_content = next((m.content for m in messages if m.role == "system"), "")
+            if len(system_content) >= 2000:
+                request.cache_control = [CacheBreakpoint(position="system", index=0)]
+
         if session.tools_enabled and self._tool_registry:
             request.tools = [
                 {
