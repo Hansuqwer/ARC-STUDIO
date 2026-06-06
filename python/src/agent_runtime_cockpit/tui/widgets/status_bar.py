@@ -82,6 +82,11 @@ class StatusBar(Static):
                 warning_str = " [WARN]" if pct < 1.0 else " [CRITICAL]"
             else:
                 warning_str = " [yellow]⚠[/]" if pct < 1.0 else " [bold red]🛑[/]"
+        elif getattr(self.data, "allow_paid_warning", None):
+            if no_color:
+                warning_str = " [PAID-UNBUDGETED]"
+            else:
+                warning_str = " [yellow]⚠ unbudgeted[/]"
         line = (
             f" {self.data.mode} │ {self.data.runtime_mode}{paid_indicator}{model_str} │ {ws} │ "
             f"{session_short} │ {cost} │ {tok_str}{warning_str} │"

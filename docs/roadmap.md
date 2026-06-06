@@ -1715,7 +1715,7 @@ P2 — Quality:
 | R-AUDIT4 | config-service apiKeySource Snake/Camel Fix | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add api_key_source fallback in config-service.ts so IDE provider source badge shows correctly. |
 | R-AUDIT5 | MCP Proxy Env Secret-Strip Gate | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | _sanitise_env() added to mcp/proxy.py; wired in start(); 4 new tests. |
 | R-AUDIT6 | Gateway Client Paid-Call Gate | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | TODO removed; exemption documented — gate is upstream via require_dual_gate in runner.py; 1 new test. |
-| R-AUDIT7 | DataStore allow_paid Default Warning | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Warn user in TUI when allow_paid=True and no wallet budget is set. |
+| R-AUDIT7 | DataStore allow_paid Default Warning | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | allow_paid_warning property added to DataStore; surfaced in StatusBar; 3 new tests. |
 | R-AUDIT8 | EXTENSION_MIGRATION Stale Ref Fix | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | LOCKED_REMAINING_ROADMAP.md ref replaced with docs/roadmap.md in EXTENSION_MIGRATION.md. |
 | R-AUDIT9 | Budget Durability Under Error | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | Budget is preflight-only; by-design gap documented in turn_manager.py degraded path; 2 new tests. |
 | R-AUDIT10 | SwarmGraph Topology Shape Verification | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Verify/fix topology event shape mismatch between SDK and IDE workflow graph view. |

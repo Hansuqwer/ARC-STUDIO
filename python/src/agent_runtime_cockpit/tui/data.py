@@ -76,6 +76,15 @@ class DataStore:
 
     # ── budget/quota ─────────────────────────────────────────────────────
     quota_warnings: list = field(default_factory=list)
+    # Optional budget limit in USD; None means no budget set.
+    wallet_budget_usd: float | None = None
+
+    @property
+    def allow_paid_warning(self) -> str | None:
+        """Return a warning string if paid calls are on with no budget set, else None."""
+        if getattr(self, "allow_paid", False) and self.wallet_budget_usd is None:
+            return "⚠ Paid calls unrestricted — set a budget with /wallet"
+        return None
 
     def __post_init__(self) -> None:
         if not self.session_id:

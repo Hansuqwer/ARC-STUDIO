@@ -5485,7 +5485,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Warn the user in the TUI when allow_paid=True is active and no wallet budget limit is configured, so accidental uncapped spending is surfaced before any provider call.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: TUI-only UX warning; uses existing wallet/budget state; no enforcement change required.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: allow_paid_warning property on DataStore; wallet_budget_usd field added; StatusBar surfaces "⚠ unbudgeted" when triggered. 3 new tests.
 
 ---
 
