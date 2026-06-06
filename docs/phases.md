@@ -5517,7 +5517,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Create a notifications/ module with a JSONL outbox, TTL-based garbage collection, and durable delivery semantics, replacing the current fire-and-forget event emitters that can silently drop notifications.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: Reliability improvement for HITL, audit, and run-completion notifications; no new notification types required.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: notifications/__init__.py + outbox.py created with NotificationOutbox class (append/read_all/gc with TTL). 4 new tests in tests/notifications/test_outbox.py.
 
 ---
 

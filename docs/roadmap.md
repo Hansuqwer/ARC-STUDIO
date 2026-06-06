@@ -1719,7 +1719,7 @@ P2 — Quality:
 | R-AUDIT8 | EXTENSION_MIGRATION Stale Ref Fix | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | LOCKED_REMAINING_ROADMAP.md ref replaced with docs/roadmap.md in EXTENSION_MIGRATION.md. |
 | R-AUDIT9 | Budget Durability Under Error | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | Budget is preflight-only; by-design gap documented in turn_manager.py degraded path; 2 new tests. |
 | R-AUDIT10 | SwarmGraph Topology Shape Verification | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | No mismatch found; shapes consistent (flat {nodes,edges}); comment added to TS; 1 new Python test. |
-| R-AUDIT11 | Notifications Outbox MVP | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Create notifications/ module with JSONL outbox, TTL/GC, replacing fire-and-forget emitters. |
+| R-AUDIT11 | Notifications Outbox MVP | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | notifications/outbox.py created; append/read_all/gc with TTL; 4 new tests. |
 | R-AUDIT12 | UI Design Token Foundation | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | tokens.css created with color/spacing/typography/radius tokens; additive only. |
 | R-AUDIT13 | HMAC README Wording Tighten | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | Scope caveat added to README and SECURITY.md HMAC sections. |
 | R-AUDIT14 | Mutating GET /api/runs/start Removal | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | GET /api/runs/start returns 410 Gone; POST unaffected; legacy env shim removed. |
