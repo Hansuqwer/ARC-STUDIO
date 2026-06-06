@@ -1,0 +1,28 @@
+/* ARC Studio Design Tokens — additive; do not override existing rules */
+:root {
+  /* Color */
+  --arc-color-primary: var(--theia-brand-color0, #3794ff);
+  --arc-color-success: var(--theia-notificationsOkIconForeground, #73c991);
+  --arc-color-warning: var(--theia-notificationsWarningIconForeground, #cca700);
+  --arc-color-error: var(--theia-notificationsErrorIconForeground, #f14c4c);
+  --arc-color-surface: var(--theia-sideBar-background, #252526);
+  --arc-color-border: var(--theia-widget-border, #454545);
+
+  /* Spacing */
+  --arc-space-1: 4px;
+  --arc-space-2: 8px;
+  --arc-space-3: 12px;
+  --arc-space-4: 16px;
+  --arc-space-6: 24px;
+
+  /* Typography */
+  --arc-font-size-sm: 11px;
+  --arc-font-size-md: 13px;
+  --arc-font-size-lg: 15px;
+  --arc-font-weight-normal: 400;
+  --arc-font-weight-semibold: 600;
+
+  /* Border radius */
+  --arc-radius-sm: 2px;
+  --arc-radius-md: 4px;
+}

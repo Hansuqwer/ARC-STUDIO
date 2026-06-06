@@ -5525,7 +5525,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Introduce CSS custom properties for color, spacing, and typography in the Theia extension so theme values are centralised and consistent across all IDE panels.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: TypeScript/CSS only; foundation for future theme consistency work; does not change existing R-UX4 theme behaviour.
+**Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: tokens.css created with --arc-color-*, --arc-space-*, --arc-font-*, --arc-radius-* tokens. Additive; no existing CSS modified.
 
 ---
 
