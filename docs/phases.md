@@ -4809,3 +4809,46 @@ The ARC Runtime SDK (`runtimes/Arc-Studio-Mobile-SDK/arc-runtime-sdk`) is a stan
 - Schema drift between the two repos — pin a canonical mapping + tests.
 - The SDK vendors its own copy of the `agent_runtime_cockpit` package — avoid import collisions when integrating.
 - `arc runtime-pack install` is metadata-only; adapter registration is a separate mechanism that must be added.
+
+---
+
+## Phase 112 — External Adapters Research Folder Audit (R-OPEN-ADAPTERS-AUDIT)
+
+**Status:** Baseline Complete (executed 2026-06-06) | Evidence: `docs/research/adapters-folder-audit.md` findings + reusable prompt `docs/prompts/adapters-folder-audit.md`; verify-don't-trust reconciliation of the out-of-tree `WorkSpace/ARC/adapters` folder against the live repo; external folder left untouched. Companion roadmap item: R-OPEN-ADAPTERS-AUDIT.
+
+### Context
+A sibling folder `WorkSpace/ARC/adapters/` (outside this git repo) accumulated agent-generated research: an adapter-by-adapter "deep analysis", a "next steps" doc, three sprint findings files, a 50 KB cross-platform-mobile report, a full stale duplicate checkout of `arc-theia-studio`, and assorted tool caches (`.dspy_cache`, `.haystack`, `crewai`). The task was to audit that folder, separate verified facts from aspirational/stale claims, and register the result in the canonical docs without acting on unverified numbers.
+
+### What was done
+- Inventoried the folder and classified every item (duplicate-checkout / research-doc / tool-cache).
+- Read the substantive research docs and reconciled each load-bearing claim against `python/src/agent_runtime_cockpit/adapters/` with `grep`/`ls`.
+- Produced `docs/research/adapters-folder-audit.md` with a per-claim VERIFIED / STALE / OVERSTATED table and proving commands.
+- Wrote a reusable audit prompt so the same method can be re-run on any external research folder.
+
+### Verified findings
+- The registry wires 15 adapters via `build_default()` (the research's "14/17" framing is stale; pydantic_ai is intentionally unregistered).
+- `pydantic_ai/` exists (detect/export/runner) but its runner is still a placeholder at `runner.py:173` — VERIFIED, matches the research.
+- No `adapters/_shared.py` exists, so the helper-consolidation recommendation is still open — VERIFIED.
+- The research's "60+ duplicated helpers" figure is OVERSTATED roughly seven-fold: the live tree has ~8 copies (`_event` ×4, `_workspace_import_path` ×2, `_redact` ×2). Real, but a much smaller slice than implied.
+- sprint3 SDK API specs (Pydantic AI v1.106, Google ADK 2.0, LlamaIndex Workflow) are recorded as external-sourced reference, explicitly labelled unverified against the installed SDKs.
+
+### Candidate follow-up slices (not started)
+These are backlog items surfaced by the audit, each its own future bounded slice with tests — none are claimed as done:
+- A scoped `adapters/_shared.py` extraction covering the ~8 verified helper copies.
+- A decision on the pydantic_ai placeholder runner (implement the real call with a test model, or keep it honestly unregistered).
+- Candidate new adapters (Strands Agents, Letta, Browser Use), each gated and detection-first.
+- Per-adapter AG-UI mapping and audit-chain gaps, re-verified at implementation time rather than taken from the doc.
+
+### Discarded / down-weighted
+- The "60+ duplicated helpers" figure (overstated ~7x).
+- The stale duplicate-checkout roadmap/phases under `adapters/arc-theia-studio/` (must not be merged into the canonical docs).
+- The "17 adapters" framing (use the registry count of 15).
+
+### Verification
+- Findings doc and prompt are file-grounded with exact paths and line numbers.
+- Banned-claims gate clean on `docs/roadmap.md` + `docs/phases.md`.
+- No code changes in this phase; the external folder is read-only input and was not modified.
+
+### Known Risks
+- The duplicate checkout can mislead future automation into treating its stale docs as canonical; the audit flags it explicitly.
+- SDK API specs are external-sourced; any adapter work derived from them must re-verify against the installed package before claiming behaviour.
