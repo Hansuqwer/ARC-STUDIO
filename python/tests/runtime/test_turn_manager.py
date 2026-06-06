@@ -308,3 +308,87 @@ async def test_untrusted_tool_result_scanned_before_history() -> None:
         event.name == "tool.result.blocked" and event.payload["reason"] == "injection_detected"
         for event in events
     )
+
+
+# ─── R-OPEN-HARDEN slice 3: graceful turn-level provider-error degradation ────
+
+
+class _FailingProvider(_Provider):
+    """Provider whose complete()/stream() raise a ProviderError."""
+
+    def __init__(self, exc: Exception, *, fail_stream_before_chunk: bool = True) -> None:
+        super().__init__()
+        self._exc = exc
+        self._fail_stream_before_chunk = fail_stream_before_chunk
+
+    async def complete(self, request, *, cancellation_token):
+        self.complete_requests.append(request)
+        raise self._exc
+
+    async def stream(self, request, *, cancellation_token):
+        self.stream_request = request
+        if self._fail_stream_before_chunk:
+            raise self._exc
+        yield  # pragma: no cover
+
+
+@pytest.mark.asyncio
+async def test_run_turn_degrades_on_nonretryable_provider_error(monkeypatch) -> None:
+    """A non-retryable ProviderError (e.g. AuthError) degrades, never crashes."""
+    monkeypatch.setenv("ARC_DISABLE_RETRY_SLEEP", "1")
+    from agent_runtime_cockpit.providers.base import AuthError
+
+    events: list[_Event] = []
+    provider = _FailingProvider(AuthError("bad key"))
+    manager = TurnManager(provider, model="claude-test", event_sink=_sink(events))
+    session = ChatSession()
+
+    result = await manager.run_turn(session, "hello", cancellation_token=never_cancelled())
+
+    assert result.degraded is True
+    assert "authentication" in result.degraded_reason.lower()
+    names = [e.name for e in events]
+    assert "turn.started" in names
+    assert "turn.failed" in names
+    assert "turn.completed" not in names
+    failed = next(e for e in events if e.name == "turn.failed")
+    assert failed.payload["error_type"] == "AuthError"
+
+
+@pytest.mark.asyncio
+async def test_run_turn_degrades_on_exhausted_retryable_error(monkeypatch) -> None:
+    """A retryable error that survives all retries degrades gracefully."""
+    monkeypatch.setenv("ARC_DISABLE_RETRY_SLEEP", "1")
+    from agent_runtime_cockpit.providers.base import RateLimitError
+
+    events: list[_Event] = []
+    provider = _FailingProvider(RateLimitError("429 forever"))
+    manager = TurnManager(provider, model="claude-test", event_sink=_sink(events))
+    session = ChatSession()
+
+    result = await manager.run_turn(session, "hello", cancellation_token=never_cancelled())
+
+    assert result.degraded is True
+    assert "turn.failed" in [e.name for e in events]
+    # 3 attempts (initial + 2 retries) on the non-streaming complete() path.
+    assert len(provider.complete_requests) == 3
+
+
+@pytest.mark.asyncio
+async def test_run_turn_streaming_degrades_on_provider_error(monkeypatch) -> None:
+    """A streaming provider error before the first chunk degrades gracefully."""
+    monkeypatch.setenv("ARC_DISABLE_RETRY_SLEEP", "1")
+    from agent_runtime_cockpit.providers.base import AuthError
+
+    events: list[_Event] = []
+    provider = _FailingProvider(AuthError("bad key"))
+    manager = TurnManager(provider, model="claude-test", event_sink=_sink(events))
+    session = ChatSession()
+
+    result = await manager.run_turn(
+        session, "hello", cancellation_token=never_cancelled(), stream=True
+    )
+
+    assert result.degraded is True
+    assert "turn.failed" in [e.name for e in events]
+    assert "turn.completed" not in [e.name for e in events]

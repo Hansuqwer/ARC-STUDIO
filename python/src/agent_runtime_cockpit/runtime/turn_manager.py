@@ -245,6 +245,27 @@ class TurnManager:
             return TurnResult(
                 content=partial, degraded=True, degraded_reason="cancelled", partial=True
             )
+        except ProviderError as exc:
+            # Retries are exhausted (or the error was non-retryable). Degrade
+            # gracefully instead of crashing the turn — mirror the Cancelled path.
+            if partial:
+                session.history.append({"role": "assistant", "content": partial, "partial": "true"})
+            reason = exc.user_facing_reason or str(exc) or type(exc).__name__
+            self._emit(
+                "turn.failed",
+                {
+                    "session_id": session.id,
+                    "error_type": type(exc).__name__,
+                    "reason": reason,
+                    "partial_chars": len(partial),
+                },
+            )
+            return TurnResult(
+                content=partial,
+                degraded=True,
+                degraded_reason=reason,
+                partial=bool(partial),
+            )
 
     def _request_from_session(self, session: ChatSession) -> ProviderRequest:
         import os

@@ -5111,3 +5111,38 @@ Streaming retry is **only safe before the first chunk is emitted**. Once any chu
 
 - `stream_fn` lambda captures `request` by reference; current code does not mutate it between retries.
 - Retry re-establishes the stream from scratch (no resumption token); acceptable because retry only happens pre-first-chunk where no state has been consumed.
+
+---
+
+## Phase 125 — Graceful Turn-Level Provider-Error Degradation (R-OPEN-HARDEN slice 3)
+
+**Status:** Baseline Complete (2026-06-06) | Evidence: run_turn ProviderError except block, 3 new tests, 5537 passed.
+
+### Context
+
+Phases 123–124 added retry. But when retries are exhausted (or the error is
+non-retryable like `AuthError`), the `ProviderError` propagated out of `run_turn`
+as an **unhandled exception** — `run_turn` only caught `Cancelled`. A caller
+(`slash_commands.py`, `chat_repl.py`) would crash rather than show a degraded turn.
+
+### What was done
+
+- Added an `except ProviderError` block to `run_turn`, mirroring the existing
+  `Cancelled` handler: appends any partial content to history, emits a new
+  `turn.failed` event (`error_type`, `reason`, `partial_chars`), and returns a
+  degraded `TurnResult` with `degraded_reason = exc.user_facing_reason`.
+- `turn.failed` is additive — does not remove/rename existing turn events.
+- 3 new tests in `test_turn_manager.py`: non-retryable degradation (AuthError),
+  exhausted-retryable degradation (3 attempts then degrade), streaming degradation.
+
+### Verification
+
+- 5537 passed. Ruff clean.
+- Tests assert `turn.failed` emitted, `turn.completed` NOT emitted, `degraded=True`.
+- The exhausted-retryable test asserts exactly 3 `complete()` calls (initial + 2 retries).
+
+### Known Risks
+
+- Tool-loop errors inside `_run_tool_loop` are covered transitively (the loop calls
+  `_call_with_retry`), but a tool *execution* exception (not a ProviderError) still
+  propagates — out of scope for this slice, which targets provider-call failures.
