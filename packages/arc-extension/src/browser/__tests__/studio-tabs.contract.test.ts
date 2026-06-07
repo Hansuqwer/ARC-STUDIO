@@ -322,10 +322,14 @@ describe('Studio Tabs Contracts', () => {
             expect(source).not.toMatch(/selectedRun\?\.status\s*===\s*'failed'/);
         });
 
-        it('should tolerate missing run detail artifacts', () => {
-            expect(source).toMatch(/getRunReceipt\(runId\)\.catch\(\(\) => null\)/);
-            expect(source).toMatch(/getRunAutopsy\(runId\)\.catch\(\(\) => null\)/);
-            expect(source).toMatch(/getRunContract\(runId\)\.catch\(\(\) => null\)/);
+        it('should tolerate missing run detail artifacts (absent -> null via allSettled)', () => {
+            // Absent artifacts resolve to null and are tolerated; only a real
+            // fetch *rejection* surfaces as an error (no silent swallow).
+            expect(source).toMatch(/Promise\.allSettled/);
+            expect(source).toMatch(/receiptR\.status === 'fulfilled' \? receiptR\.value : null/);
+            expect(source).toMatch(/autopsyR\.status === 'fulfilled' \? autopsyR\.value : null/);
+            expect(source).toMatch(/contractR\.status === 'fulfilled' \? contractR\.value : null/);
+            expect(source).not.toMatch(/\.catch\(\(\) => null\)/);
         });
 
         it('should render contract card conditionally', () => {

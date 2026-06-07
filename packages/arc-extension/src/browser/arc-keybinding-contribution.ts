@@ -2,7 +2,8 @@
  * ARC Keybinding Contribution
  * 
  * Registers global keyboard shortcuts for ARC Studio commands.
- * These shortcuts work application-wide, not just when the widget has focus.
+ * Shortcuts are guarded with `when: '!editorTextFocus'` so they remain available
+ * application-wide but never override editor text-editing keys.
  */
 
 import { injectable, inject } from '@theia/core/shared/inversify';
@@ -34,8 +35,12 @@ export class ArcKeybindingContribution implements KeybindingContribution, Comman
     }
 
     registerKeybindings(registry: KeybindingRegistry): void {
-        registry.registerKeybinding({ command: ArcCommands.EXECUTE.id, keybinding: 'ctrlcmd+e' });
-        registry.registerKeybinding({ command: ArcCommands.SCAN_WORKSPACE.id, keybinding: 'ctrlcmd+shift+s' });
-        registry.registerKeybinding({ command: ArcCommands.SHOW_SHORTCUTS.id, keybinding: 'ctrlcmd+h' });
+        // Guarded with `when: '!editorTextFocus'` (Theia idiom — cf. core terminal/
+        // debug/search contributions and opensumi `!editorFocus`). This keeps the
+        // ARC shortcuts available application-wide EXCEPT while typing in a text
+        // editor, so they no longer clobber editor Ctrl+E / Ctrl+H / Ctrl+Shift+S.
+        registry.registerKeybinding({ command: ArcCommands.EXECUTE.id, keybinding: 'ctrlcmd+e', when: '!editorTextFocus' });
+        registry.registerKeybinding({ command: ArcCommands.SCAN_WORKSPACE.id, keybinding: 'ctrlcmd+shift+s', when: '!editorTextFocus' });
+        registry.registerKeybinding({ command: ArcCommands.SHOW_SHORTCUTS.id, keybinding: 'ctrlcmd+h', when: '!editorTextFocus' });
     }
 }

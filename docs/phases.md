@@ -5670,3 +5670,16 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `workspace.py`, `workspace/__init__.py`, `context/providers/local_repo.py`, `providers/anthropic.py`, `providers/openai_compatible.py`, `storage/jsonl.py` + tests `tests/test_workspace.py`, `tests/test_storage.py`, `tests/test_provider_error_redaction.py`. Verified: `ruff check src tests` clean; targeted **106 passed**; blast-radius (context/providers/security/capabilities/audit/web) **744 passed, 1 skipped**. | Notes: deterministic security (no LLM); additive only; no protocol/CLI removals. DoD gates 1/4/6/8 cited; full elevation (a11y/parity for related UI) tracked separately.
 
 ---
+
+## Phase 160 — DoD Elevation: IDE Honest States + ErrorBoundary + Keybinding Guards (R-POLISH2)
+
+**Goal:** Second DoD-elevation slice (CR-011, CR-013, CR-020 from the critical-review v2 pass). Verified against the real TypeScript before editing; external Theia docs (Context7 `/eclipse-theia/theia`) + 8 OSS contributions confirmed the keybinding `when`-guard idiom.
+
+**Implemented:**
+- **CR-011 — RunsTab honest states.** Replaced three silent `.catch(() => null)` detail fetches with `Promise.allSettled`, so an absent artifact resolves to `null` (tolerated) while a real fetch rejection surfaces a distinct error state with a Retry action. Fixed two empty `catch {}` blocks (audit verify, replay) to set visible `auditError`/`replayError`. Empty state now also checks `!contract`.
+- **CR-020 — per-tab ErrorBoundary.** Added reusable `components/ErrorBoundary.tsx` (class component; `getDerivedStateFromError`+`componentDidCatch`; reuses `arc-error-*` styles). `ArcStudioWidget` wraps the active tab content with `<ErrorBoundary key={activeTab}>` so one tab's render error shows a recoverable fallback instead of blanking the widget, and switching tabs auto-recovers.
+- **CR-013 — keybinding guards.** `arc-keybinding-contribution.ts` adds `when: '!editorTextFocus'` to `ctrlcmd+e`/`ctrlcmd+shift+s`/`ctrlcmd+h` (Theia idiom) so ARC shortcuts stay app-wide but no longer clobber editor text-editing keys.
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `components/ErrorBoundary.tsx` (new), `components/index.ts`, `arc-studio-widget.tsx`, `tabs/RunsTab.tsx`, `arc-keybinding-contribution.ts` + tests `__tests__/ide-honest-states.contract.test.ts` (new), `__tests__/studio-tabs.contract.test.ts` (updated off the removed anti-pattern). Verified: `pnpm --filter arc-extension build` clean; tests **918 passed, 3 skipped, 0 failed** (30 suites); `pnpm typecheck` clean. | Notes: additive only; no protocol fields removed; no new tabs. DoD gates 1/2/3/7 cited.
+
+---

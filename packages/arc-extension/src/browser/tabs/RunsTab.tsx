@@ -25,11 +25,14 @@ interface RunsTabState {
     isLoadingRuns: boolean;
     isLoadingDetails: boolean;
     error: string | null;
+    detailsError: string | null;
     // Slice 7 additions
     auditInfo: AuditChainInfo | null;
     isVerifyingAudit: boolean;
+    auditError: string | null;
     replayEvents: ReplayEvent[] | null;
     isReplaying: boolean;
+    replayError: string | null;
     hitlPrompts: HitlPromptInfo[];
     isListHitl: boolean;
     hitlError: string | null;
@@ -63,10 +66,13 @@ export const RunsTab: React.FC<RunsTabProps> = ({ arcService, initialRunId }) =>
         isLoadingRuns: false,
         isLoadingDetails: false,
         error: null,
+        detailsError: null,
         auditInfo: null,
         isVerifyingAudit: false,
+        auditError: null,
         replayEvents: null,
         isReplaying: false,
+        replayError: null,
         hitlPrompts: [],
         isListHitl: false,
         hitlError: null,
@@ -106,48 +112,61 @@ export const RunsTab: React.FC<RunsTabProps> = ({ arcService, initialRunId }) =>
             contract: null,
             isLoadingDetails: true,
             error: null,
+            detailsError: null,
         }));
         try {
-            const [receipt, autopsy, contract] = await Promise.all([
-                arcService.getRunReceipt(runId).catch(() => null),
-                arcService.getRunAutopsy(runId).catch(() => null),
-                arcService.getRunContract(runId).catch(() => null),
+            const [receiptR, autopsyR, contractR] = await Promise.allSettled([
+                arcService.getRunReceipt(runId),
+                arcService.getRunAutopsy(runId),
+                arcService.getRunContract(runId),
             ]);
+            const receipt = receiptR.status === 'fulfilled' ? receiptR.value : null;
+            const autopsy = autopsyR.status === 'fulfilled' ? autopsyR.value : null;
+            const contract = contractR.status === 'fulfilled' ? contractR.value : null;
+            // An absent artifact resolves to null; only a *rejection* is a real
+            // transport/daemon error. Surface it instead of silently nulling.
+            const failed = [receiptR, autopsyR, contractR].filter(
+                (r): r is PromiseRejectedResult => r.status === 'rejected'
+            );
+            const detailsError = failed.length > 0
+                ? `Failed to load some run details: ${failed[0].reason?.message ?? String(failed[0].reason)}`
+                : null;
             setState(prev => ({
                 ...prev,
                 receipt,
                 autopsy,
                 contract,
                 isLoadingDetails: false,
+                detailsError,
             }));
         } catch (err: any) {
             setState(prev => ({
                 ...prev,
                 isLoadingDetails: false,
-                error: `Failed to load run details: ${err.message}`,
+                detailsError: `Failed to load run details: ${err.message}`,
             }));
         }
     }, [arcService]);
 
     const verifyAudit = React.useCallback(async (runId: string) => {
         if (!arcService.getAuditChainInfo) return;
-        setState(prev => ({ ...prev, isVerifyingAudit: true, auditInfo: null }));
+        setState(prev => ({ ...prev, isVerifyingAudit: true, auditInfo: null, auditError: null }));
         try {
             const info = await arcService.getAuditChainInfo(runId);
             setState(prev => ({ ...prev, auditInfo: info, isVerifyingAudit: false }));
-        } catch {
-            setState(prev => ({ ...prev, isVerifyingAudit: false }));
+        } catch (err: any) {
+            setState(prev => ({ ...prev, isVerifyingAudit: false, auditError: err?.message ?? 'Audit verification failed' }));
         }
     }, [arcService]);
 
     const handleReplay = React.useCallback(async (runId: string) => {
         if (!arcService.replayRun) return;
-        setState(prev => ({ ...prev, isReplaying: true, replayEvents: null }));
+        setState(prev => ({ ...prev, isReplaying: true, replayEvents: null, replayError: null }));
         try {
             const result = await arcService.replayRun(runId);
             setState(prev => ({ ...prev, replayEvents: result.events, isReplaying: false }));
-        } catch {
-            setState(prev => ({ ...prev, isReplaying: false }));
+        } catch (err: any) {
+            setState(prev => ({ ...prev, isReplaying: false, replayError: err?.message ?? 'Replay failed' }));
         }
     }, [arcService]);
 
@@ -206,7 +225,8 @@ export const RunsTab: React.FC<RunsTabProps> = ({ arcService, initialRunId }) =>
     }, [initialRunId, state.runs, selectRun]);
 
     const { runs, selectedRunId, receipt, autopsy, contract, isLoadingRuns, isLoadingDetails, error,
-        auditInfo, isVerifyingAudit, replayEvents, isReplaying, hitlPrompts, isListHitl, hitlError,
+        detailsError, auditInfo, isVerifyingAudit, auditError, replayEvents, isReplaying, replayError,
+        hitlPrompts, isListHitl, hitlError,
         diffRunAId, diffRunBId, diffResult, isDiffing, diffError } = state;
 
     return (
@@ -379,7 +399,20 @@ export const RunsTab: React.FC<RunsTabProps> = ({ arcService, initialRunId }) =>
                         </div>
                     )}
 
-                    {selectedRunId && !isLoadingDetails && !receipt && !autopsy && (
+                    {selectedRunId && !isLoadingDetails && detailsError && (
+                        <div className='arc-studio-runs__error' role='alert'>
+                            <span>{detailsError}</span>
+                            <button
+                                className='theia-button secondary'
+                                onClick={() => selectRun(selectedRunId)}
+                                aria-label='Retry loading run details'
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    )}
+
+                    {selectedRunId && !isLoadingDetails && !detailsError && !receipt && !autopsy && !contract && (
                         <div className='arc-studio-runs__detail-placeholder'>
                             <p>No details available for this run.</p>
                         </div>
@@ -410,6 +443,9 @@ export const RunsTab: React.FC<RunsTabProps> = ({ arcService, initialRunId }) =>
                             >
                                 {isVerifyingAudit ? 'Verifying…' : 'Verify Audit'}
                             </button>
+                            {auditError && (
+                                <div className='arc-studio-runs__error' role='alert'>Audit error: {auditError}</div>
+                            )}
                             {auditInfo && (
                                 <div className='arc-studio-runs__audit-info' aria-label='Audit chain status'>
                                     <p>
@@ -444,6 +480,9 @@ export const RunsTab: React.FC<RunsTabProps> = ({ arcService, initialRunId }) =>
                             >
                                 {isReplaying ? 'Replaying…' : 'Replay Events'}
                             </button>
+                            {replayError && (
+                                <div className='arc-studio-runs__error' role='alert'>Replay error: {replayError}</div>
+                            )}
                             {replayEvents && replayEvents.length > 0 && (
                                 <div className='arc-studio-runs__replay-events'>
                                     <strong>{replayEvents.length} events replayed</strong>

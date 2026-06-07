@@ -11,6 +11,7 @@ import { MessageService } from '@theia/core/lib/common/message-service';
 import * as React from '@theia/core/shared/react';
 import { ArcService, ConfigStatus, WorkflowInfo } from '../common/arc-protocol';
 import { AssuranceTab, BattleTab, ChatTab, CiGuardrailsTab, CommandCentreTab, ConfigTab, EditPlansTab, McpWorkbenchTab, RunsTab, SwarmGraphInsightTab, TestBenchTab, WorkflowsTab } from './tabs';
+import { ErrorBoundary } from './components';
 
 type StudioTabId = 'chat' | 'runs' | 'workflows' | 'assurance' | 'swarmgraph-insight' | 'battle' | 'config' | 'command-centre' | 'mcp-workbench' | 'testbench' | 'edit-plans' | 'ci-guardrails';
 
@@ -106,6 +107,8 @@ export class ArcStudioWidget extends ReactWidget {
             { id: 'config', label: 'Config' }
         ];
 
+        const activeTabLabel = tabs.find(t => t.id === activeTab)?.label ?? activeTab;
+
         return (
             <div className='arc-studio-widget-container' role='main' aria-label='ARC Studio'>
                 <div className='arc-studio-header'>
@@ -130,6 +133,7 @@ export class ArcStudioWidget extends ReactWidget {
                 </div>
 
                 <div className='arc-studio-content'>
+                    <ErrorBoundary key={activeTab} surface={activeTabLabel}>
                     <div
                         id={`arc-studio-panel-chat`}
                         role='tabpanel'
@@ -250,6 +254,7 @@ export class ArcStudioWidget extends ReactWidget {
                     >
                         {activeTab === 'swarmgraph-insight' && <SwarmGraphInsightTab arcService={this.arcService} />}
                     </div>
+                    </ErrorBoundary>
                 </div>
 
                 <div className='arc-studio-status' role='status' aria-live='polite'>

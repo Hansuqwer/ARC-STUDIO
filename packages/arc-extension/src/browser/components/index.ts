@@ -28,6 +28,9 @@ export type { WorkflowDetectionSectionProps } from './WorkflowDetectionSection';
 export { ErrorBanner } from './ErrorBanner';
 export type { ErrorBannerProps } from './ErrorBanner';
 
+export { ErrorBoundary } from './ErrorBoundary';
+export type { ErrorBoundaryProps } from './ErrorBoundary';
+
 export { RunContractCard } from './RunContractCard';
 export type { RunContractCardProps } from './RunContractCard';
 
