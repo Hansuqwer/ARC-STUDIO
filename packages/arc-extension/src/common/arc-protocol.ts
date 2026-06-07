@@ -6,6 +6,9 @@
 
 // Import battle protocol types (Phase 34.2)
 import type { BattleRun, BattleCandidate, BattleVote, BattleOutcome, EloRating, BattleDetails } from './battle-protocol';
+// Replay & Run Diff types live in ./protocol/replay-diff (CR-027); imported here for local
+// use in the StreamEnvelope and ArcService declarations below. Re-exported via `export *` below.
+import type { ReplayEvent, ReplayResult, RunDiffResult, CapabilityDiffResponse } from './protocol/replay-diff';
 
 export const ArcServicePath = '/services/arc';
 
@@ -990,83 +993,8 @@ export interface AuditChainInfo {
     peakMemoryMb?: number;
 }
 
-// ========== Replay ==========
-
-/**
- * Replay event from stored trace.
- */
-export interface ReplayEvent {
-    type: string;
-    timestamp: string;
-    runId: string;
-    sequence: number;
-    data: Record<string, unknown>;
-    category?: 'lifecycle' | 'message' | 'tool' | 'error' | 'hitl' | 'audit' | 'unknown';
-    annotations?: string[];
-    metadata?: Record<string, unknown>;
-}
-
-/**
- * Replay result for a run.
- */
-export interface ReplayResult {
-    runId: string;
-    events: ReplayEvent[];
-    totalEvents: number;
-    annotations?: string[];
-    metadata?: Record<string, unknown>;
-}
-
-// ========== Run Diff ==========
-
-export interface RunDiffResult {
-    runAId: string;
-    runBId: string;
-    statusA: string;
-    statusB: string;
-    runtimeA: string;
-    runtimeB: string;
-    durationAMs?: number | null;
-    durationBMs?: number | null;
-    eventCountA: number;
-    eventCountB: number;
-    typesOnlyInA: string[];
-    typesOnlyInB: string[];
-    typesCommon: string[];
-    finalOutputA?: string | null;
-    finalOutputB?: string | null;
-    errorEventsA: Record<string, unknown>[];
-    errorEventsB: Record<string, unknown>[];
-    toolCallsA: number;
-    toolCallsB: number;
-}
-
-/**
- * Capability diff produced when runtime capabilities change.
- */
-export interface CapabilityDiff {
-    schemaVersion: number;
-    diffId: string;
-    runtimeId: string;
-    beforeSnapshotId: string;
-    afterSnapshotId: string;
-    addedCapabilities: string[];
-    removedCapabilities: string[];
-    changedFlags: Record<string, { before: unknown; after: unknown }>;
-    requiresConfirmation: boolean;
-    timestamp: string;
-}
-
-/**
- * Response envelope for capability diff between two runtimes.
- */
-export interface CapabilityDiffResponse {
-    diff: CapabilityDiff;
-    fromRuntime: string;
-    toRuntime: string;
-    trustBoundaryWidened: boolean;
-    trustSensitiveChanges: string[];
-}
+// ========== Replay & Run Diff (extracted to ./protocol/replay-diff) ==========
+export * from './protocol/replay-diff';
 
 /**
  * Degradation manifest when stable IDs are missing.

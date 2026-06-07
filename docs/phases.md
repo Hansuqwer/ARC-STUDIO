@@ -5910,3 +5910,18 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `tabs/CiGuardrailsTab.tsx`, `tabs/McpWorkbenchTab.tsx`, `__tests__/studio-tabs.contract.test.ts`. Verified: `pnpm --filter arc-extension build` (tsc) clean; **169** studio-tabs + useAsyncState tests pass. | Notes: 3 tabs now on the shared hook (TestBench, CiGuardrails, McpWorkbench). EditPlans/SwarmGraphInsight/Config have multiple or atypical async states and are deferred (additive). DoD gates 1, 4 cited.
 
 ---
+
+## Phase 180 — Refactor: Split arc-protocol.ts — Barrel Infra + Replay/Diff (R-POLISH22)
+
+**Goal:** CR-027 (part 1) — begin decomposing the 1867-line `common/arc-protocol.ts` into cohesive `common/protocol/*` modules, re-exported via a barrel so all 54 importers keep working unchanged.
+
+**Approach (careful, incremental):** these are type-only declarations, so modules are extracted and re-exported with `export * from './protocol/X'`; names still referenced locally by `ArcService`/`StreamEnvelope` are re-imported with `import type` (type-only cycles are erased at compile time — no runtime risk). Mirrors the existing `battle-protocol` barrel precedent. Each module is verified with `tsc` (which enumerates every missed reference) before commit.
+
+**Implemented (part 1):**
+- New `common/protocol/replay-diff.ts` — the self-contained Replay (`ReplayEvent`, `ReplayResult`) and Run Diff (`RunDiffResult`, `CapabilityDiff`, `CapabilityDiffResponse`) types.
+- `arc-protocol.ts` re-exports the module and back-imports the four names used by `ArcService` (`replayRun`/`diffRuns`/`getCapabilityDiff`) and `StreamEnvelope`.
+- Updated `protocol-extensions.contract.test.ts` to assert the moved type shapes against the module source while keeping the `ArcService` method assertions on `arc-protocol`.
+
+**Status:** Baseline Complete (part 1 of N) | Evidence: local worktree | Files: `common/protocol/replay-diff.ts`, `common/arc-protocol.ts`, `__tests__/protocol-extensions.contract.test.ts`. Verified: `pnpm --filter arc-extension build` (tsc) clean; protocol-extensions + studio-tabs **250 passed**. arc-protocol.ts trimmed (1867 → ~1790). | Notes: in progress — further cohesive sections (config, schema-contracts, streaming, preflight, etc.) extract in subsequent commits. DoD gates 3, 4 cited.
+
+---

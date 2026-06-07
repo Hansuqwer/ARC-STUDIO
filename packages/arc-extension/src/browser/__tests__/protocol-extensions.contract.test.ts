@@ -9,10 +9,16 @@ import * as path from 'path';
 
 describe('Protocol Extensions (Session B + B7)', () => {
     const protocolFile = path.join(__dirname, '..', '..', '..', 'src', 'common', 'arc-protocol.ts');
+    const replayDiffFile = path.join(__dirname, '..', '..', '..', 'src', 'common', 'protocol', 'replay-diff.ts');
     let source: string;
+    let replayDiffSource: string;
 
     beforeAll(async () => {
         source = await fs.readFile(protocolFile, 'utf-8');
+        // CR-027: Replay & Run Diff types were extracted to ./protocol/replay-diff (re-exported
+        // from arc-protocol via `export *`). Type definitions are asserted against the module;
+        // ArcService methods that use them remain asserted against arc-protocol.
+        replayDiffSource = await fs.readFile(replayDiffFile, 'utf-8');
     });
 
     describe('Config Tab Types (Session B)', () => {
@@ -237,20 +243,20 @@ describe('Protocol Extensions (Session B + B7)', () => {
         });
 
         it('should export ReplayResult', () => {
-            expect(source).toMatch(/export interface ReplayResult/);
+            expect(replayDiffSource).toMatch(/export interface ReplayResult/);
         });
 
         it('should have ReplayResult with runId, events, totalEvents', () => {
-            expect(source).toMatch(/ReplayResult/);
-            expect(source).toMatch(/runId:\s*string/);
-            expect(source).toMatch(/events:\s*ReplayEvent\[\]/);
-            expect(source).toMatch(/totalEvents:\s*number/);
+            expect(replayDiffSource).toMatch(/ReplayResult/);
+            expect(replayDiffSource).toMatch(/runId:\s*string/);
+            expect(replayDiffSource).toMatch(/events:\s*ReplayEvent\[\]/);
+            expect(replayDiffSource).toMatch(/totalEvents:\s*number/);
         });
 
         it('should have optional replay category annotations and metadata fields', () => {
-            expect(source).toMatch(/category\?:\s*'lifecycle' \| 'message' \| 'tool' \| 'error' \| 'hitl' \| 'audit' \| 'unknown'/);
-            expect(source).toMatch(/annotations\?:\s*string\[\]/);
-            expect(source).toMatch(/metadata\?:\s*Record<string, unknown>/);
+            expect(replayDiffSource).toMatch(/category\?:\s*'lifecycle' \| 'message' \| 'tool' \| 'error' \| 'hitl' \| 'audit' \| 'unknown'/);
+            expect(replayDiffSource).toMatch(/annotations\?:\s*string\[\]/);
+            expect(replayDiffSource).toMatch(/metadata\?:\s*Record<string, unknown>/);
         });
 
         it('should have ArcService HITL/audit/replay methods', () => {
@@ -261,11 +267,11 @@ describe('Protocol Extensions (Session B + B7)', () => {
         });
 
         it('should expose run diff protocol types and method', () => {
-            expect(source).toMatch(/export interface RunDiffResult/);
-            expect(source).toMatch(/runAId:\s*string/);
-            expect(source).toMatch(/typesOnlyInA:\s*string\[\]/);
-            expect(source).toMatch(/errorEventsA:\s*Record<string, unknown>\[\]/);
-            expect(source).toMatch(/toolCallsA:\s*number/);
+            expect(replayDiffSource).toMatch(/export interface RunDiffResult/);
+            expect(replayDiffSource).toMatch(/runAId:\s*string/);
+            expect(replayDiffSource).toMatch(/typesOnlyInA:\s*string\[\]/);
+            expect(replayDiffSource).toMatch(/errorEventsA:\s*Record<string, unknown>\[\]/);
+            expect(replayDiffSource).toMatch(/toolCallsA:\s*number/);
             expect(source).toMatch(/diffRuns\(runAId:\s*string,\s*runBId:\s*string\):\s*Promise<RunDiffResult>/);
         });
 
