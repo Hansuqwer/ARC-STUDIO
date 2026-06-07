@@ -10,7 +10,6 @@
  */
 
 import { injectable, inject } from '@theia/core/shared/inversify';
-import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -38,7 +37,7 @@ import {
     ArcError,
     ArcErrorCode,
 } from '../../common/arc-protocol';
-import { buildArcCliEnv, execArcCliAsync, SAFE_CONFIG_KEYS, UNSAFE_CONFIG_KEY_PATTERN } from './arc-cli-utils';
+import { execArcCliAsync, SAFE_CONFIG_KEYS, UNSAFE_CONFIG_KEY_PATTERN } from './arc-cli-utils';
 
 @injectable()
 export class ConfigService {
@@ -48,12 +47,7 @@ export class ConfigService {
 
     async getProviderStatus(provider: string, baseUrl?: string): Promise<ProviderStatus> {
         try {
-            const output = execFileSync('arc', ['providers', 'status', '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
+            const output = await execArcCliAsync(['providers', 'status', '--json'], { timeout: 10000 });
             const parsed = JSON.parse(output);
             if (parsed.ok && Array.isArray(parsed.data)) {
                 const found = parsed.data.find((p: { provider: string }) => p.provider === provider);
@@ -233,12 +227,7 @@ export class ConfigService {
 
     async listProfiles(): Promise<ArcProfileInfo[]> {
         try {
-            const output = execFileSync('arc', ['profiles', 'list', '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
+            const output = await execArcCliAsync(['profiles', 'list', '--json'], { timeout: 10000 });
             const parsed = JSON.parse(output);
             const profiles = Array.isArray(parsed?.data) ? parsed.data : Array.isArray(parsed?.profiles) ? parsed.profiles : [];
             return profiles.map((profile: any) => ({
@@ -261,12 +250,7 @@ export class ConfigService {
 
     async getIsolationStatus(): Promise<IsolationStatus> {
         try {
-            const output = execFileSync('arc', ['isolation', 'status', '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
+            const output = await execArcCliAsync(['isolation', 'status', '--json'], { timeout: 10000 });
             const parsed = JSON.parse(output);
             const data = parsed?.data || parsed || {};
             return {
@@ -287,12 +271,7 @@ export class ConfigService {
 
     async listIsolationProviders(): Promise<IsolationProviderInfo[]> {
         try {
-            const output = execFileSync('arc', ['isolation', 'list', '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
+            const output = await execArcCliAsync(['isolation', 'list', '--json'], { timeout: 10000 });
             const parsed = JSON.parse(output);
             const providers = Array.isArray(parsed?.data) ? parsed.data : Array.isArray(parsed?.providers) ? parsed.providers : [];
             return this.mapIsolationProviders(providers);
@@ -302,12 +281,7 @@ export class ConfigService {
     }
 
     async getProviderCatalog(): Promise<ProviderCatalogEntry[]> {
-        const output = execFileSync('arc', ['providers', 'catalog', '--json'], {
-            timeout: 10000,
-            encoding: 'utf-8',
-            windowsHide: true,
-            env: buildArcCliEnv(),
-        });
+        const output = await execArcCliAsync(['providers', 'catalog', '--json'], { timeout: 10000 });
         const parsed = JSON.parse(output);
         if (parsed.ok && Array.isArray(parsed.data)) {
             return parsed.data.map((p: any) => ({
@@ -325,12 +299,7 @@ export class ConfigService {
 
     async getProviderDiagnostics(): Promise<ProviderDiagnosticsInfo> {
         try {
-            const output = execFileSync('arc', ['providers', 'diagnostics', '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
+            const output = await execArcCliAsync(['providers', 'diagnostics', '--json'], { timeout: 10000 });
             const parsed = JSON.parse(output);
             if (!parsed.ok) {
                 throw new ArcError(
@@ -356,12 +325,7 @@ export class ConfigService {
                 args.push('--provider', provider);
             }
             args.push('--json');
-            const output = execFileSync('arc', args, {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
+            const output = await execArcCliAsync(args, { timeout: 10000 });
             const parsed = JSON.parse(output);
             if (!parsed.ok) {
                 throw new ArcError(
@@ -382,12 +346,7 @@ export class ConfigService {
 
     async resetProviderQuota(): Promise<ProviderQuotaResetResult> {
         try {
-            const output = execFileSync('arc', ['providers', 'quota', 'reset', '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
+            const output = await execArcCliAsync(['providers', 'quota', 'reset', '--json'], { timeout: 10000 });
             const parsed = JSON.parse(output);
             if (!parsed.ok) {
                 throw new ArcError(
@@ -430,12 +389,7 @@ export class ConfigService {
         }
 
         try {
-            const output = execFileSync('arc', args, {
-                timeout: 30000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
+            const output = await execArcCliAsync(args, { timeout: 30000 });
             return this.mapGatedProviderActionOutput(output, dryRun, { ...request, model });
         } catch (error: any) {
             const output = String(error?.stdout || error?.stderr || '');
@@ -465,33 +419,18 @@ export class ConfigService {
         if (request.model) {
             args.push('--model', request.model);
         }
-        execFileSync('arc', args, {
-            timeout: 10000,
-            encoding: 'utf-8',
-            windowsHide: true,
-            env: buildArcCliEnv(),
-        });
+        await execArcCliAsync(args, { timeout: 10000 });
         return { success: true, message: `Saved ${request.provider} key reference (${request.envVar}).` };
     }
 
     async unsetProviderKeyRef(providerOrAccountId: string): Promise<{ success: boolean; message: string }> {
-        execFileSync('arc', ['providers', 'key', 'unset', providerOrAccountId, '--json'], {
-            timeout: 10000,
-            encoding: 'utf-8',
-            windowsHide: true,
-            env: buildArcCliEnv(),
-        });
+        await execArcCliAsync(['providers', 'key', 'unset', providerOrAccountId, '--json'], { timeout: 10000 });
         return { success: true, message: `Removed provider key reference: ${providerOrAccountId}.` };
     }
 
     async testProvider(providerId: string): Promise<ProviderTestResult> {
         try {
-            const output = execFileSync('arc', ['providers', 'test', providerId, '--json'], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
+            const output = await execArcCliAsync(['providers', 'test', providerId, '--json'], { timeout: 10000 });
             const parsed = JSON.parse(output);
             
             if (parsed.ok && parsed.data) {
@@ -567,12 +506,7 @@ export class ConfigService {
                 args.push('--provider', providerId);
             }
             
-            const output = execFileSync('arc', args, {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
+            const output = await execArcCliAsync(args, { timeout: 10000 });
             const parsed = JSON.parse(output);
             
             if (parsed.ok && Array.isArray(parsed.data)) {

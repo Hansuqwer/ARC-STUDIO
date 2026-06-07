@@ -5811,3 +5811,13 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `browser/__tests__/accessibility.test.tsx`. Verified: `pnpm --filter arc-extension test` → **927 passed / 3 skipped** (32 suites, coverage thresholds met); the accessibility suite alone runs **15** real assertions. | Notes: follow-up — migrate the inline mock components to the real shipped components once their Theia imports resolve cleanly under jsdom. DoD gate 2 cited.
 
 ---
+
+## Phase 172 — DoD Elevation: Finish Async Config-Service Backend (R-POLISH14)
+
+**Goal:** CR-012a — convert the remaining synchronous `execFileSync` calls in `config-service.ts` to the non-blocking `execArcCliAsync` helper added in R-POLISH7 (Phase 165), so the Node backend never blocks the event loop on a config/provider/isolation CLI call.
+
+**Implemented:** AST-rewrote all 13 remaining `execFileSync('arc', ARGS, { timeout, encoding:'utf-8', windowsHide:true, env: buildArcCliEnv() })` calls to `await execArcCliAsync(ARGS, { timeout })`. The helper returns the stdout string (same shape as the encoded `execFileSync`), so no downstream `JSON.parse(output)` changed. Dropped the now-unused `execFileSync` and `buildArcCliEnv` imports.
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `node/services/config-service.ts`. Verified: `pnpm --filter arc-extension build` clean; tests **927 passed / 3 skipped** (incl. the config-service integration test via a real fake binary); `pnpm typecheck` clean. | Notes: completes CR-012 (hot paths were done in R-POLISH7); additive; deterministic; AST rewrite (no behavior change). DoD gate 5 cited.
+
+---
