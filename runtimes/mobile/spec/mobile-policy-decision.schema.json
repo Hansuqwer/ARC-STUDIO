@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arc.local/schemas/mobile-policy-decision.schema.json",
+  "title": "ARC Mobile Policy Decision",
+  "type": "object",
+  "required": ["allowed", "approval_required", "reason", "denied_rules", "required_approvals", "mcp_exposable"],
+  "additionalProperties": false,
+  "properties": {
+    "allowed": { "type": "boolean" },
+    "approval_required": { "type": "boolean" },
+    "capability_id": { "type": ["string", "null"] },
+    "plan_id": { "type": ["string", "null"] },
+    "reason": { "type": "string" },
+    "denied_rules": { "type": "array", "items": { "type": "string" } },
+    "required_approvals": { "type": "array", "items": { "type": "string" } },
+    "mcp_exposable": { "type": "boolean" }
+  }
+}

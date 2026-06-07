@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arc.local/schemas/mobile-simulation-report.schema.json",
+  "title": "ARC Mobile Simulation Report",
+  "type": "object",
+  "required": ["schema_version", "plan_id", "overall_allowed", "steps", "blocked_steps",
+               "requires_permissions", "requires_approvals", "risk_level", "warnings"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "plan_id": { "type": "string" },
+    "overall_allowed": { "type": "boolean" },
+    "steps": { "type": "array" },
+    "blocked_steps": { "type": "array", "items": { "type": "string" } },
+    "requires_permissions": { "type": "array", "items": { "type": "string" } },
+    "requires_approvals": { "type": "array", "items": { "type": "string" } },
+    "risk_level": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "report_hash": { "type": ["string", "null"] }
+  }
+}

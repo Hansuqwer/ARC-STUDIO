@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arc.local/schemas/mobile-trace.schema.json",
+  "title": "ARC Mobile Trace",
+  "type": "object",
+  "required": ["schema_version", "plan_id", "events", "trace_hash"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "plan_id": { "type": "string" },
+    "events": {
+      "type": "array",
+      "items": { "$ref": "mobile-events.schema.json" }
+    },
+    "trace_hash": { "type": "string" }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arc.local/schemas/mobile-action-plan.schema.json",
+  "title": "ARC Mobile Action Plan",
+  "type": "object",
+  "required": ["schema_version", "plan_id", "steps", "requires_network", "requires_background"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "plan_id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string" },
+    "requires_network": { "const": false },
+    "requires_background": { "const": false },
+    "plan_hash": { "type": ["string", "null"] },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["step_id", "capability_id", "mock"],
+        "additionalProperties": true,
+        "properties": {
+          "step_id": { "type": "string", "minLength": 1 },
+          "capability_id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9_]*)+$" },
+          "mock": { "const": true },
+          "description": { "type": "string" },
+          "inputs": { "type": "object" },
+          "expected_outputs": { "type": "object" }
+        }
+      }
+    }
+  }
+}
