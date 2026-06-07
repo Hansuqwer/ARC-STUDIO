@@ -8,6 +8,8 @@ import * as path from 'path';
 
 describe('ConfigTab runtime remediation contract', () => {
     let source: string;
+    let stateSource: string;
+    let combined: string;
     let helperSource: string;
     let wizardSource: string;
 
@@ -20,15 +22,20 @@ describe('ConfigTab runtime remediation contract', () => {
             path.join(__dirname, '..', '..', '..', 'src', 'browser', 'tabs', 'runtime-remediation.ts'),
             'utf-8'
         );
+        stateSource = await fs.readFile(
+            path.join(__dirname, '..', '..', '..', 'src', 'browser', 'tabs', 'useConfigTabState.ts'),
+            'utf-8'
+        );
+        combined = `${source}\n${stateSource}`;
         const wizardStart = source.indexOf('arc-studio-config__runtime-setup-wizard');
         const wizardEnd = source.indexOf("<div className='arc-studio-config__section'", wizardStart + 1);
         wizardSource = source.slice(wizardStart, wizardEnd);
     });
 
     it('imports and uses the runtime remediation planner', () => {
-        expect(source).toMatch(/buildRuntimeRemediationPlan/);
-        expect(source).toMatch(/from '\.\/runtime-remediation'/);
-        expect(source).toMatch(/buildRuntimeRemediationPlan\(/);
+        expect(stateSource).toMatch(/buildRuntimeRemediationPlan/);
+        expect(stateSource).toMatch(/from '\.\/runtime-remediation'/);
+        expect(stateSource).toMatch(/buildRuntimeRemediationPlan\(/);
     });
 
     it('renders the runtime setup wizard with exact safety copy and classes', () => {
@@ -42,19 +49,19 @@ describe('ConfigTab runtime remediation contract', () => {
     });
 
     it('derives the selected capability by runtime id', () => {
-        expect(source).toMatch(/runtime_id === selectedRuntime/);
+        expect(stateSource).toMatch(/runtime_id === selectedRuntime/);
     });
 
     it('copies only safe remediation step text', () => {
         expect(source).toMatch(/copyText/);
         expect(source).toMatch(/safe/);
         expect(source).toMatch(/step\.(?:command|text|summary|details|copyText)/);
-        expect(source).not.toMatch(/navigator\.clipboard\.writeText\([^)]*process\.env/);
-        expect(source).not.toMatch(/navigator\.clipboard\.writeText\([^)]*required_env/);
+        expect(combined).not.toMatch(/navigator\.clipboard\.writeText\([^)]*process\.env/);
+        expect(combined).not.toMatch(/navigator\.clipboard\.writeText\([^)]*required_env/);
     });
 
     it('does not add network/provider/live-call or raw-secret persistence claims', () => {
-        expect(source).not.toMatch(/fetch\(/);
+        expect(combined).not.toMatch(/fetch\(/);
         expect(wizardSource).not.toMatch(/provider proxy/i);
         expect(wizardSource).not.toMatch(/live API calls/i);
         expect(wizardSource).not.toMatch(/persist(?:s|ed|ing)? raw (?:secret|credential|key|token|password)s?/i);
@@ -67,7 +74,7 @@ describe('ConfigTab runtime remediation contract', () => {
         expect(source).toMatch(/Metadata keys/);
         expect(source).toMatch(/Trace metadata keys/);
         expect(source).toMatch(/Runtime gates/);
-        expect(source).not.toMatch(/provider ready/i);
+        expect(combined).not.toMatch(/provider ready/i);
     });
 
     it('exports runtime remediation helper contracts', () => {
