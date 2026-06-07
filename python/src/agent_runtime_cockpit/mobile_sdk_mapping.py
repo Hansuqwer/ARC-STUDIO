@@ -7,7 +7,8 @@ Implements R79/Phase 111 Slice 110.3. Provides two public functions:
 
 The mapping is intentionally explicit: every field is named, default-filled
 where no equivalent exists, and documented with the source/target key. No
-lossy silent discards — unmapped fields are carried in ``metadata`` on the
+lossy silent discards — mobile-only fields are carried in ``metadata`` on the
+SDK card side and SDK-only fields are carried in ``metadata`` on the
 MobileCapability side.
 
 Truth: the SDK CapabilityCard format is a plain dict/JSON schema (no Pydantic
@@ -24,6 +25,8 @@ from .mobile.models import (
     MobileCapability,
     MobileCapabilityCategory,
     MobileDataSensitivity,
+    MobilePlatform,
+    MobilePermissionRequirement,
 )
 
 # ── Category mapping ──────────────────────────────────────────────────────────
@@ -67,6 +70,12 @@ _SDK_SENS_TO_MOBILE: dict[str, str] = {
     "pii": "critical",  # map back to highest sensitivity
 }
 
+_MOBILE_METADATA_KEY = "arc_mobile"
+
+
+def _enum_value(value: Any) -> Any:
+    return value.value if hasattr(value, "value") else value
+
 
 # ── Forward: MobileCapability → SDK CapabilityCard dict ──────────────────────
 
@@ -74,9 +83,9 @@ _SDK_SENS_TO_MOBILE: dict[str, str] = {
 def mobile_capability_to_sdk_card(cap: MobileCapability) -> dict[str, Any]:
     """Convert an ARC Studio ``MobileCapability`` to an SDK CapabilityCard dict.
 
-    Fields with no SDK equivalent are silently dropped (documented in the map
-    below). The inverse function ``sdk_card_to_mobile_capability`` can
-    reconstruct a MobileCapability from the result.
+    SDK CapabilityCard does not have first-class equivalents for several mobile
+    governance fields. Those fields are preserved under ``metadata.arc_mobile``
+    so security-relevant context is not silently lost.
     """
     category_value = cap.category.value if hasattr(cap.category, "value") else str(cap.category)
     sensitivity_value = (
@@ -84,6 +93,21 @@ def mobile_capability_to_sdk_card(cap: MobileCapability) -> dict[str, Any]:
         if hasattr(cap.data_sensitivity, "value")
         else str(cap.data_sensitivity)
     )
+    metadata = dict(cap.metadata or {})
+    metadata[_MOBILE_METADATA_KEY] = {
+        "schema_version": cap.schema_version,
+        "platforms": [_enum_value(p) for p in cap.platforms],
+        "required_permissions": [p.model_dump(mode="json") for p in cap.required_permissions],
+        "reads": cap.reads,
+        "writes": cap.writes,
+        "network": cap.network,
+        "background": cap.background,
+        "mcp_exposable": cap.mcp_exposable,
+        "test_fixture_supported": cap.test_fixture_supported,
+        "requires_trust": cap.requires_trust,
+        "requires_hitl": cap.requires_hitl,
+        "capability_hash": cap.capability_hash,
+    }
     return {
         # direct id/name/description
         "id": cap.id,
@@ -109,10 +133,9 @@ def mobile_capability_to_sdk_card(cap: MobileCapability) -> dict[str, Any]:
             if cap.approval_mode in (MobileApprovalMode.BLOCKING, MobileApprovalMode.REQUIRED)
             else "none"
         ),
-        # no SDK equivalents: mcp_exposable, requires_hitl, platforms,
-        # required_permissions, background, network, reads, writes, requires_trust
         "ai_consent_required": False,
         "enterprise_only": False,
+        "metadata": metadata,
     }
 
 
@@ -122,9 +145,9 @@ def mobile_capability_to_sdk_card(cap: MobileCapability) -> dict[str, Any]:
 def sdk_card_to_mobile_capability(card: dict[str, Any]) -> MobileCapability:
     """Convert an SDK CapabilityCard dict to an ARC Studio ``MobileCapability``.
 
-    Fields that exist only on the SDK side (``auth_required``,
-    ``ai_consent_required``, ``enterprise_only``, ``default_decision``) are
-    preserved in the ``metadata`` dict so no information is silently lost.
+    SDK-only fields are preserved in ``metadata`` using the ``sdk_`` prefix.
+    Mobile governance fields from ``metadata.arc_mobile`` are restored when
+    present.
     """
     sdk_cat = str(card.get("category", "plugin"))
     sdk_sens = str(card.get("data_sensitivity", "none"))
@@ -140,21 +163,51 @@ def sdk_card_to_mobile_capability(card: dict[str, Any]) -> MobileCapability:
 
     # Carry SDK-only fields in metadata to avoid silent information loss.
     metadata: dict[str, Any] = {}
+    card_metadata = card.get("metadata", {})
+    if isinstance(card_metadata, dict):
+        metadata.update({k: v for k, v in card_metadata.items() if k != _MOBILE_METADATA_KEY})
+        mobile_meta = card_metadata.get(_MOBILE_METADATA_KEY, {})
+    else:
+        mobile_meta = {}
+    if not isinstance(mobile_meta, dict):
+        mobile_meta = {}
+
     for key in ("auth_required", "ai_consent_required", "enterprise_only", "default_decision"):
         if key in card:
             metadata[f"sdk_{key}"] = card[key]
 
+    platforms = [
+        MobilePlatform(str(platform)) for platform in mobile_meta.get("platforms", ["all"])
+    ]
+    required_permissions = [
+        MobilePermissionRequirement.model_validate(item)
+        for item in mobile_meta.get("required_permissions", [])
+        if isinstance(item, dict)
+    ]
+
     return MobileCapability(
+        schema_version=int(mobile_meta.get("schema_version", 1)),
         id=str(card.get("id", "")),
         name=str(card.get("name", "")),
         description=str(card.get("description", "")),
         category=MobileCapabilityCategory(mobile_cat_str),
         data_sensitivity=MobileDataSensitivity(mobile_sens_str),
+        platforms=platforms,
+        required_permissions=required_permissions,
         paid=bool(card.get("allow_paid_calls", False)),
         replayable=bool(card.get("replay_safe", True)),
         auditable=bool(card.get("audit_required", True)),
         simulator_supported=bool(card.get("fixture_required_in_simulator", True)),
         approval_mode=approval_mode,
+        reads=bool(mobile_meta.get("reads", False)),
+        writes=bool(mobile_meta.get("writes", False)),
+        network=bool(mobile_meta.get("network", False)),
+        background=bool(mobile_meta.get("background", False)),
+        mcp_exposable=bool(mobile_meta.get("mcp_exposable", False)),
+        test_fixture_supported=bool(mobile_meta.get("test_fixture_supported", True)),
+        requires_trust=bool(mobile_meta.get("requires_trust", False)),
+        requires_hitl=bool(mobile_meta.get("requires_hitl", False)),
+        capability_hash=mobile_meta.get("capability_hash"),
         metadata=metadata,
     )
 
