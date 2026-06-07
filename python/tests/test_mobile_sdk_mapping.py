@@ -185,3 +185,56 @@ def test_round_trip_core_fields_preserved():
     assert restored.auditable == cap.auditable
     assert restored.simulator_supported == cap.simulator_supported
     assert restored.approval_mode == cap.approval_mode
+
+
+# ── PR3: Dropped-field metadata round-trip ────────────────────────────────────
+
+
+def test_forward_records_dropped_fields_in_metadata():
+    """Forward mapping preserves governance fields in metadata.arc_dropped_fields."""
+    cap = _make_cap(
+        category=MobileCapabilityCategory.DEVICE,
+        background=False,
+        network=False,
+        reads=True,
+        writes=False,
+        requires_trust=True,
+    )
+    card = mobile_capability_to_sdk_card(cap)
+    dropped = card["metadata"]["arc_dropped_fields"]
+    assert dropped["reads"] is True
+    assert dropped["writes"] is False
+    assert dropped["background"] is False
+    assert dropped["network"] is False
+    assert dropped["requires_trust"] is True
+    assert isinstance(dropped["platforms"], list)
+    assert isinstance(dropped["required_permissions"], list)
+
+
+def test_round_trip_restores_governance_fields():
+    """Forward then inverse restores background/network/reads/writes/requires_trust."""
+    cap = _make_cap(
+        id="device.sensor.test.mock",
+        category=MobileCapabilityCategory.SENSOR,
+        reads=True,
+        writes=False,
+        background=False,
+        network=False,
+        requires_trust=True,
+    )
+    card = mobile_capability_to_sdk_card(cap)
+    restored = sdk_card_to_mobile_capability(card)
+    assert restored.reads is True
+    assert restored.writes is False
+    assert restored.background is False
+    assert restored.network is False
+    assert restored.requires_trust is True
+
+
+def test_docstring_says_lossy_forward():
+    """Verify the docstring no longer says 'no lossy silent discards'."""
+    from agent_runtime_cockpit import mobile_sdk_mapping
+
+    doc = mobile_sdk_mapping.__doc__ or ""
+    assert "no lossy silent discards" not in doc.lower()
+    assert "intentionally lossy" in doc.lower() or "lossy" in doc.lower()

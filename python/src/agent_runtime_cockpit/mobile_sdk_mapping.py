@@ -5,10 +5,16 @@ Implements R79/Phase 111 Slice 110.3. Provides two public functions:
 - ``mobile_capability_to_sdk_card(cap)``  → dict (forward, for SDK export)
 - ``sdk_card_to_mobile_capability(card)``  → MobileCapability (inverse, for import)
 
-The mapping is intentionally explicit: every field is named, default-filled
-where no equivalent exists, and documented with the source/target key. No
-lossy silent discards — unmapped fields are carried in ``metadata`` on the
-MobileCapability side.
+Forward direction (Mobile → SDK) is **intentionally lossy**: seven governance fields have
+no equivalent in the SDK CapabilityCard schema and cannot be represented there:
+  ``platforms``, ``required_permissions``, ``background``, ``network``,
+  ``reads``, ``writes``, ``requires_trust``.
+These values are preserved in the SDK card's ``metadata["arc_dropped_fields"]`` dict so
+the inverse direction can reconstruct them without silent loss.
+
+Inverse direction (SDK → Mobile) preserves all SDK-only fields in ``metadata`` under the
+``sdk_`` prefix (``auth_required``, ``ai_consent_required``, ``enterprise_only``,
+``default_decision``).
 
 Truth: the SDK CapabilityCard format is a plain dict/JSON schema (no Pydantic
 model on the SDK side at this integration level). This module owns the
@@ -74,9 +80,10 @@ _SDK_SENS_TO_MOBILE: dict[str, str] = {
 def mobile_capability_to_sdk_card(cap: MobileCapability) -> dict[str, Any]:
     """Convert an ARC Studio ``MobileCapability`` to an SDK CapabilityCard dict.
 
-    Fields with no SDK equivalent are silently dropped (documented in the map
-    below). The inverse function ``sdk_card_to_mobile_capability`` can
-    reconstruct a MobileCapability from the result.
+    Seven governance fields have no SDK equivalent and are captured in
+    ``metadata["arc_dropped_fields"]`` for lossless round-tripping:
+    ``platforms``, ``required_permissions``, ``background``, ``network``,
+    ``reads``, ``writes``, ``requires_trust``.
     """
     category_value = cap.category.value if hasattr(cap.category, "value") else str(cap.category)
     sensitivity_value = (
@@ -84,6 +91,28 @@ def mobile_capability_to_sdk_card(cap: MobileCapability) -> dict[str, Any]:
         if hasattr(cap.data_sensitivity, "value")
         else str(cap.data_sensitivity)
     )
+
+    # Capture governance fields that have no SDK-card equivalent
+    platforms_val = [p.value if hasattr(p, "value") else str(p) for p in cap.platforms]
+    perms_val = [
+        {
+            "id": p.id,
+            "platform": p.platform.value if hasattr(p.platform, "value") else str(p.platform),
+            "required": p.required,
+            "mock_safe": p.mock_safe,
+        }
+        for p in cap.required_permissions
+    ]
+    arc_dropped: dict[str, Any] = {
+        "platforms": platforms_val,
+        "required_permissions": perms_val,
+        "background": cap.background,
+        "network": cap.network,
+        "reads": cap.reads,
+        "writes": cap.writes,
+        "requires_trust": cap.requires_trust,
+    }
+
     return {
         # direct id/name/description
         "id": cap.id,
@@ -109,10 +138,10 @@ def mobile_capability_to_sdk_card(cap: MobileCapability) -> dict[str, Any]:
             if cap.approval_mode in (MobileApprovalMode.BLOCKING, MobileApprovalMode.REQUIRED)
             else "none"
         ),
-        # no SDK equivalents: mcp_exposable, requires_hitl, platforms,
-        # required_permissions, background, network, reads, writes, requires_trust
         "ai_consent_required": False,
         "enterprise_only": False,
+        # Governance fields with no SDK equivalent — preserved for round-trip
+        "metadata": {"arc_dropped_fields": arc_dropped},
     }
 
 
@@ -122,9 +151,12 @@ def mobile_capability_to_sdk_card(cap: MobileCapability) -> dict[str, Any]:
 def sdk_card_to_mobile_capability(card: dict[str, Any]) -> MobileCapability:
     """Convert an SDK CapabilityCard dict to an ARC Studio ``MobileCapability``.
 
-    Fields that exist only on the SDK side (``auth_required``,
-    ``ai_consent_required``, ``enterprise_only``, ``default_decision``) are
-    preserved in the ``metadata`` dict so no information is silently lost.
+    SDK-only fields (``auth_required``, ``ai_consent_required``, ``enterprise_only``,
+    ``default_decision``) are preserved in ``metadata`` under the ``sdk_`` prefix.
+
+    If the card was produced by ``mobile_capability_to_sdk_card``, the seven
+    governance fields stored in ``metadata["arc_dropped_fields"]`` are restored
+    directly onto the returned ``MobileCapability``.
     """
     sdk_cat = str(card.get("category", "plugin"))
     sdk_sens = str(card.get("data_sensitivity", "none"))
@@ -138,11 +170,23 @@ def sdk_card_to_mobile_capability(card: dict[str, Any]) -> MobileCapability:
         else MobileApprovalMode.NONE
     )
 
+    # Restore dropped governance fields if present
+    dropped: dict[str, Any] = (card.get("metadata") or {}).get("arc_dropped_fields", {})
+
     # Carry SDK-only fields in metadata to avoid silent information loss.
     metadata: dict[str, Any] = {}
     for key in ("auth_required", "ai_consent_required", "enterprise_only", "default_decision"):
         if key in card:
             metadata[f"sdk_{key}"] = card[key]
+
+    from .mobile.models import MobilePermissionRequirement
+
+    restored_permissions: list[MobilePermissionRequirement] = []
+    for p in dropped.get("required_permissions", []):
+        try:
+            restored_permissions.append(MobilePermissionRequirement.model_validate(p))
+        except Exception:
+            pass
 
     return MobileCapability(
         id=str(card.get("id", "")),
@@ -155,6 +199,14 @@ def sdk_card_to_mobile_capability(card: dict[str, Any]) -> MobileCapability:
         auditable=bool(card.get("audit_required", True)),
         simulator_supported=bool(card.get("fixture_required_in_simulator", True)),
         approval_mode=approval_mode,
+        # Restored governance fields
+        platforms=dropped.get("platforms") or [],
+        required_permissions=restored_permissions,
+        background=bool(dropped.get("background", False)),
+        network=bool(dropped.get("network", False)),
+        reads=bool(dropped.get("reads", False)),
+        writes=bool(dropped.get("writes", False)),
+        requires_trust=bool(dropped.get("requires_trust", False)),
         metadata=metadata,
     )
 
