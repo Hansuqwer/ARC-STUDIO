@@ -5461,7 +5461,7 @@ This is the final slice. The full provider-resilience surface is now implemented
 
 **Goal:** Add api_key_source / apiKeySource fallback handling in packages/arc-extension config-service.ts so the IDE provider source badge shows the correct value regardless of snake_case or camelCase field name from the Python daemon.
 
-**Status:** Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Notes: TypeScript-only fix; no Python changes; affects provider status badge display in IDE.
+**Status:** Baseline Complete | Evidence: config-service.ts + arc-service.integration.test.ts | Notes: TypeScript-only fix; no Python changes; affects provider status badge display in IDE.
 
 ---
 

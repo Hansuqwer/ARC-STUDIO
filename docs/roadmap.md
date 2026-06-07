@@ -1712,7 +1712,7 @@ P2 — Quality:
 | R-AUDIT1 | Release Checklist Refresh | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | docs/release/checklist.md updated to v0.8-r-ux2/aa788f3/5537 tests/Phase 131. |
 | R-AUDIT2 | Enforcement Surfaces Doc Refresh | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | enforcement-surfaces.md updated to Phase 131; new surfaces for sandbox P0, hash chain, adapter gates, retry, TurnManager hook. |
 | R-AUDIT3 | docker-compose 127.0.0.1 Binding | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | docker-compose.yml port 3000 bound to 127.0.0.1. |
-| R-AUDIT4 | config-service apiKeySource Snake/Camel Fix | Status: Research Intake | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add api_key_source fallback in config-service.ts so IDE provider source badge shows correctly. |
+| R-AUDIT4 | config-service apiKeySource Snake/Camel Fix | Status: Baseline Complete | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add api_key_source fallback in config-service.ts so IDE provider source badge shows correctly. |
 | R-AUDIT5 | MCP Proxy Env Secret-Strip Gate | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | _sanitise_env() added to mcp/proxy.py; wired in start(); 4 new tests. |
 | R-AUDIT6 | Gateway Client Paid-Call Gate | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | TODO removed; exemption documented — gate is upstream via require_dual_gate in runner.py; 1 new test. |
 | R-AUDIT7 | DataStore allow_paid Default Warning | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | allow_paid_warning property added to DataStore; surfaced in StatusBar; 3 new tests. |

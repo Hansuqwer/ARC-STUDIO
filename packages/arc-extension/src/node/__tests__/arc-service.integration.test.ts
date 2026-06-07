@@ -797,6 +797,23 @@ exit 2
             expect(JSON.stringify(result)).not.toContain('sk-ant-should-not-surface');
         });
 
+        it('should map snake_case api_key_source from Python daemon to source field (R-AUDIT4)', async () => {
+            await installArcFixture(`#!/bin/sh
+if [ "$1 $2 $3" = "providers status --json" ]; then
+  printf '%s' '{"ok":true,"data":[{"provider":"openai","display_name":"OpenAI","api_key_configured":true,"api_key_source":"env","api_key_env":"OPENAI_API_KEY","default_model":"gpt-4o"}]}'
+  exit 0
+fi
+if [ "$1 $2 $3" = "config show --json" ]; then
+  printf '%s' '{"ok":true,"data":{"runtime":{"default":"langgraph","auto_detect":false,"fallback":"stub"},"execution":{"isolation":"subprocess","timeout_seconds":120,"allow_paid_calls":true},"providers":{"dry_run":false,"routing_mode":"auto"},"profiles":{"selected_profile":"local-dev"},"workspace":{"trust_level":"trusted"}}}'
+  exit 0
+fi
+exit 2
+`);
+            const result = await service.getConfigStatus();
+            expect(result.providers[0].source).toBe('env');
+            expect(result.providers[0].configured).toBe(true);
+        });
+
         it('should return degraded provider status when providers CLI fails but keep config defaults', async () => {
             await installArcFixture(`#!/bin/sh
 if [ "$1 $2 $3" = "providers status --json" ]; then

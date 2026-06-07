@@ -123,7 +123,7 @@ export class ConfigService {
                     provider: p.provider || 'unknown',
                     displayName: p.display_name || p.provider || 'Unknown',
                     configured: !!p.apiKeyConfigured || !!p.api_key_configured,
-                    source: p.apiKeySource || (p.apiKeyConfigured ? 'env' : 'unset'),
+                    source: p.apiKeySource || p.api_key_source || (p.apiKeyConfigured || p.api_key_configured ? 'env' : 'unset'),
                     defaultModel: p.default_model,
                     envOverride: p.api_key_env,
                 })) as SafeProviderKeyStatus[];
