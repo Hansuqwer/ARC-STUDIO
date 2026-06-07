@@ -9,6 +9,8 @@ from agent_runtime_cockpit.mobile.models import (
     MobileCapability,
     MobileCapabilityCategory,
     MobileDataSensitivity,
+    MobilePermissionRequirement,
+    MobilePlatform,
 )
 from agent_runtime_cockpit.mobile_sdk_mapping import (
     _MOBILE_CAT_TO_SDK,
@@ -79,6 +81,41 @@ def test_forward_simulator_supported_maps_to_fixture():
     cap = _make_cap(simulator_supported=False)
     card = mobile_capability_to_sdk_card(cap)
     assert card["fixture_required_in_simulator"] is False
+
+
+def test_forward_preserves_mobile_only_fields_in_metadata():
+    cap = _make_cap(
+        platforms=[MobilePlatform.IOS, MobilePlatform.ANDROID],
+        required_permissions=[
+            MobilePermissionRequirement(
+                id="ios.camera", platform=MobilePlatform.IOS, required=True, mock_safe=True
+            )
+        ],
+        reads=True,
+        writes=True,
+        network=True,
+        background=True,
+        mcp_exposable=True,
+        test_fixture_supported=False,
+        requires_trust=True,
+        requires_hitl=True,
+        capability_hash="a" * 64,
+    )
+
+    card = mobile_capability_to_sdk_card(cap)
+    mobile_meta = card["metadata"]["arc_mobile"]
+
+    assert mobile_meta["platforms"] == ["ios", "android"]
+    assert mobile_meta["required_permissions"][0]["id"] == "ios.camera"
+    assert mobile_meta["reads"] is True
+    assert mobile_meta["writes"] is True
+    assert mobile_meta["network"] is True
+    assert mobile_meta["background"] is True
+    assert mobile_meta["mcp_exposable"] is True
+    assert mobile_meta["test_fixture_supported"] is False
+    assert mobile_meta["requires_trust"] is True
+    assert mobile_meta["requires_hitl"] is True
+    assert mobile_meta["capability_hash"] == "a" * 64
 
 
 # ── Inverse: SDK card → MobileCapability ─────────────────────────────────────
@@ -185,3 +222,37 @@ def test_round_trip_core_fields_preserved():
     assert restored.auditable == cap.auditable
     assert restored.simulator_supported == cap.simulator_supported
     assert restored.approval_mode == cap.approval_mode
+
+
+def test_round_trip_mobile_governance_fields_preserved():
+    cap = _make_cap(
+        platforms=[MobilePlatform.IOS, MobilePlatform.ANDROID],
+        required_permissions=[
+            MobilePermissionRequirement(
+                id="ios.camera", platform=MobilePlatform.IOS, required=True, mock_safe=True
+            )
+        ],
+        reads=True,
+        writes=True,
+        network=True,
+        background=True,
+        mcp_exposable=True,
+        test_fixture_supported=False,
+        requires_trust=True,
+        requires_hitl=True,
+        capability_hash="b" * 64,
+    )
+
+    restored = sdk_card_to_mobile_capability(mobile_capability_to_sdk_card(cap))
+
+    assert restored.platforms == cap.platforms
+    assert restored.required_permissions == cap.required_permissions
+    assert restored.reads is True
+    assert restored.writes is True
+    assert restored.network is True
+    assert restored.background is True
+    assert restored.mcp_exposable is True
+    assert restored.test_fixture_supported is False
+    assert restored.requires_trust is True
+    assert restored.requires_hitl is True
+    assert restored.capability_hash == "b" * 64
