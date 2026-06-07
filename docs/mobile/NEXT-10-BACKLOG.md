@@ -103,3 +103,9 @@ All 10 committed to `main`, each with tests; full Python suite + `@arc-studio/pr
 `pnpm typecheck` green; `check-banned-claims.sh` green; `docs/phases.md` + `docs/roadmap.md` updated per task.
 Posture unchanged: **Simulator Preview**, mock-native only, no production/native claims. Phase 11 (real
 native capabilities) stays **out of scope** until its per-capability entry gates are met.
+
+---
+
+## Progress log (Batch 5)
+
+- **T1 ✅ (Phase 6)** Expo config plugin — `app.plugin.js` + `plugin/arc-permission-map.json` (advisory iOS usage strings + Android permissions from capability permission IDs; allowlist-only, simulator-preview labeled, no real device APIs). Test: `python/tests/test_mobile_expo_config_plugin.py` (6 passed incl. node behavioral injection; map-completeness drift guard vs `capabilities.py`). ruff clean.

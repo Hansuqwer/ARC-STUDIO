@@ -1,0 +1,16 @@
+{
+  "_comment": "ARC Mobile Runtime — capability permission -> platform manifest entry map. Advisory only (simulator preview). Native code returns fixtures; these declarations exist so developers see what real permissions a capability WOULD require. Requires human review before any store submission.",
+  "ios.camera": { "platform": "ios", "manifestKey": "NSCameraUsageDescription", "label": "Camera capture (ARC simulated capability)" },
+  "ios.microphone": { "platform": "ios", "manifestKey": "NSMicrophoneUsageDescription", "label": "Microphone capture (ARC simulated capability)" },
+  "ios.location.whenInUse": { "platform": "ios", "manifestKey": "NSLocationWhenInUseUsageDescription", "label": "Location while in use (ARC simulated capability)" },
+  "ios.calendars": { "platform": "ios", "manifestKey": "NSCalendarsUsageDescription", "label": "Calendar access (ARC simulated capability)" },
+  "ios.contacts": { "platform": "ios", "manifestKey": "NSContactsUsageDescription", "label": "Contacts access (ARC simulated capability)" },
+  "ios.photoLibrary": { "platform": "ios", "manifestKey": "NSPhotoLibraryUsageDescription", "label": "Photo library access (ARC simulated capability)" },
+  "android.CAMERA": { "platform": "android", "manifestKey": "android.permission.CAMERA" },
+  "android.RECORD_AUDIO": { "platform": "android", "manifestKey": "android.permission.RECORD_AUDIO" },
+  "android.ACCESS_FINE_LOCATION": { "platform": "android", "manifestKey": "android.permission.ACCESS_FINE_LOCATION" },
+  "android.READ_CALENDAR": { "platform": "android", "manifestKey": "android.permission.READ_CALENDAR" },
+  "android.WRITE_CALENDAR": { "platform": "android", "manifestKey": "android.permission.WRITE_CALENDAR" },
+  "android.READ_CONTACTS": { "platform": "android", "manifestKey": "android.permission.READ_CONTACTS" },
+  "android.READ_MEDIA_IMAGES": { "platform": "android", "manifestKey": "android.permission.READ_MEDIA_IMAGES" }
+}
