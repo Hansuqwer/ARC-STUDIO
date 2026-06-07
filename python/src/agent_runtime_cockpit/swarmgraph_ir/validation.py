@@ -9,6 +9,35 @@ from __future__ import annotations
 from .models import IRGraph, IRValidationReport
 
 
+def _has_cycle(adjacency: dict[str, list[str]], node_ids: list[str]) -> bool:
+    """Return True if the directed graph contains a cycle (iterative 3-colour DFS).
+
+    Iterative (explicit stack) so deep graphs cannot overflow the recursion
+    limit. ``color``: 0=unvisited, 1=on current path, 2=done.
+    """
+    color: dict[str, int] = dict.fromkeys(node_ids, 0)
+    for root in node_ids:
+        if color[root] != 0:
+            continue
+        stack: list[tuple[str, bool]] = [(root, False)]
+        while stack:
+            node, post_visit = stack.pop()
+            if post_visit:
+                color[node] = 2
+                continue
+            if color[node] == 1:
+                continue
+            color[node] = 1
+            stack.append((node, True))  # mark for post-visit (→ black)
+            for nxt in adjacency.get(node, ()):
+                nxt_color = color.get(nxt, 0)
+                if nxt_color == 1:
+                    return True  # back-edge to a node on the current path
+                if nxt_color == 0:
+                    stack.append((nxt, False))
+    return False
+
+
 def validate_graph(graph: IRGraph) -> IRValidationReport:
     """Structurally validate an IRGraph.
 
@@ -23,6 +52,8 @@ def validate_graph(graph: IRGraph) -> IRValidationReport:
       - graph has no nodes
       - graph has no entry points (but has nodes)
       - node has no incoming/outgoing edges (isolated), excluding start/end
+      - graph contains a directed cycle (advisory: legitimate for loop-capable
+        runtimes such as LangGraph; DAG-only compilers may escalate to an error)
     """
     errors: list[str] = []
     warnings: list[str] = []
@@ -71,6 +102,15 @@ def validate_graph(graph: IRGraph) -> IRValidationReport:
     for n in graph.nodes:
         if n.id not in connected and n.kind.value not in ("start", "end"):
             warnings.append(f"node {n.id!r} is isolated (no edges)")
+
+    # Cycle detection (advisory). A directed cycle makes execution
+    # non-terminating for DAG runtimes; loop-capable runtimes may allow it.
+    adjacency: dict[str, list[str]] = {nid: [] for nid in node_id_set}
+    for e in graph.edges:
+        if e.from_node in adjacency and e.to_node in node_id_set:
+            adjacency[e.from_node].append(e.to_node)
+    if _has_cycle(adjacency, node_ids):
+        warnings.append("graph contains a directed cycle (not a DAG)")
 
     return IRValidationReport(
         ok=not errors,

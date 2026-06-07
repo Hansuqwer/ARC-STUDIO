@@ -5745,3 +5745,15 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `services/notification-service.ts`, `services/arc-cli-utils.ts`, `services/config-service.ts`, `services/run-lifecycle-service.ts` + `__tests__/notification-service.test.ts` (updated spawn assertion off `{shell:false}`-only; +secret-exclusion test). Verified: `pnpm --filter arc-extension build` clean; tests **919 passed / 3 skipped / 0 failed** (30 suites; integration test exercises the async path via a real fake binary); `pnpm typecheck` clean. | Notes: config-service retains 13 lower-traffic sync calls (follow-up); additive. DoD gates 5/6/7 cited.
 
 ---
+
+## Phase 166 — DoD Elevation: Profile Schema Guard + IR Cycle Detection (R-POLISH8)
+
+**Goal:** CR-019 + CR-017 (Python correctness). Verified against the real code first.
+
+**Implemented:**
+- **CR-019 — profile schema version guard.** `load_custom_profiles` read the store with **no version check**. Added a guard (following the `cost_record.py` idiom): an unknown *future* `version` (> `PROFILE_SCHEMA_VERSION`) is rejected fail-closed; v1→v2 is additive (new optional fields default-fill), so older stores load unchanged.
+- **CR-017 — IR cycle detection.** `validate_graph` checked duplicates/dangling-edges/entry-points/isolation but **not cycles**. Added an iterative 3-colour DFS (`_has_cycle`, stack-based — no recursion-limit risk). A directed cycle is reported as a **warning, not an error**, because loop-capable runtimes (e.g. LangGraph agent loops) legitimately use cycles and `validate_graph` is runtime-agnostic; DAG-only compilers may escalate it.
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `security/profiles.py`, `swarmgraph_ir/validation.py` + tests `tests/security/test_profiles.py` (+3 version-guard), `tests/swarmgraph_ir/test_validation.py` (+4 cycle: cycle=warning, self-loop, linear-no-warn, diamond-no-false-positive). Verified: `uv run pytest tests/swarmgraph_ir tests/security -q` → **330 passed, 1 skipped**; `uv run ruff check src tests` clean. | Notes: additive; deterministic; cycle is advisory (non-breaking for loop runtimes). DoD gate 7 cited.
+
+---

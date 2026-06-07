@@ -98,6 +98,15 @@ def load_custom_profiles(path: Path | None = None) -> dict[str, RunProfile]:
     if not store_path.exists():
         return {}
     raw = json.loads(store_path.read_text())
+    # Schema-version guard. v1 → v2 is additive (new optional fields default-fill
+    # below), so older stores load unchanged. An unknown *future* version is
+    # rejected fail-closed rather than silently mis-read.
+    version = int(raw.get("version", 1))
+    if version > PROFILE_SCHEMA_VERSION:
+        raise ValueError(
+            f"Unsupported profile schema version {version}; this build supports up to "
+            f"{PROFILE_SCHEMA_VERSION}. Upgrade ARC to read this profile store."
+        )
     profiles: dict[str, RunProfile] = {}
     for item in raw.get("profiles", []):
         backend = BackendMode(item.get("backend", BackendMode.STUB.value))

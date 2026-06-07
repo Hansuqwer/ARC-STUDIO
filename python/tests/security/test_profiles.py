@@ -91,3 +91,61 @@ def test_enforce_local_backend_allows_network_denied_profile(monkeypatch):
     monkeypatch.setenv("ARC_SWARMGRAPH_ALLOW_COSTS", "true")
 
     enforce_profile(profile, "SWARMGRAPH")
+
+
+# ─── CR-019: profile schema version guard ───────────────────────────────────
+
+
+def test_load_custom_profiles_rejects_future_schema(tmp_path):
+    import json
+
+    import pytest
+
+    from agent_runtime_cockpit.security.profiles import (
+        PROFILE_SCHEMA_VERSION,
+        load_custom_profiles,
+    )
+
+    store = tmp_path / "profiles.json"
+    store.write_text(json.dumps({"version": PROFILE_SCHEMA_VERSION + 1, "profiles": []}))
+    with pytest.raises(ValueError, match="Unsupported profile schema version"):
+        load_custom_profiles(store)
+
+
+def test_load_custom_profiles_accepts_v1_additively(tmp_path):
+    import json
+
+    from agent_runtime_cockpit.security.profiles import load_custom_profiles
+
+    # A v1 store missing newer optional fields loads with safe defaults.
+    store = tmp_path / "profiles.json"
+    store.write_text(
+        json.dumps({"version": 1, "profiles": [{"id": "old", "name": "Old", "backend": "stub"}]})
+    )
+    profiles = load_custom_profiles(store)
+    assert "old" in profiles
+    assert profiles["old"].allow_paid_calls is False
+    assert profiles["old"].env_allowlist == ()
+
+
+def test_load_custom_profiles_accepts_current_version(tmp_path):
+    import json
+
+    from agent_runtime_cockpit.security.profiles import (
+        PROFILE_SCHEMA_VERSION,
+        load_custom_profiles,
+    )
+
+    store = tmp_path / "profiles.json"
+    store.write_text(
+        json.dumps(
+            {
+                "version": PROFILE_SCHEMA_VERSION,
+                "profiles": [
+                    {"id": "p2", "name": "P2", "backend": "local", "allow_paid_calls": True}
+                ],
+            }
+        )
+    )
+    profiles = load_custom_profiles(store)
+    assert profiles["p2"].allow_paid_calls is True

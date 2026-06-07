@@ -73,3 +73,61 @@ def test_isolated_node_is_warning_not_error() -> None:
     r = validate_graph(g)
     assert r.ok is True  # warnings do not block
     assert any("isolated" in w for w in r.warnings)
+
+
+# ─── CR-017: cycle detection (advisory) ──────────────────────────────────────
+
+
+def test_cycle_is_warning_not_error() -> None:
+    # a -> b -> a is a directed cycle. Advisory only — loop-capable runtimes
+    # (e.g. LangGraph) legitimately use cycles, so it must not block.
+    g = _base(
+        [IRNode(id="a", kind=IRNodeKind.AGENT), IRNode(id="b", kind=IRNodeKind.AGENT)],
+        [
+            IREdge(id="a2b", from_node="a", to_node="b"),
+            IREdge(id="b2a", from_node="b", to_node="a"),
+        ],
+        entry=["a"],
+    )
+    r = validate_graph(g)
+    assert r.ok is True
+    assert any("cycle" in w.lower() for w in r.warnings)
+
+
+def test_self_loop_is_cycle_warning() -> None:
+    g = _base(
+        [IRNode(id="a", kind=IRNodeKind.AGENT)],
+        [IREdge(id="a2a", from_node="a", to_node="a")],
+        entry=["a"],
+    )
+    r = validate_graph(g)
+    assert any("cycle" in w.lower() for w in r.warnings)
+
+
+def test_acyclic_linear_graph_has_no_cycle_warning() -> None:
+    g = _base(
+        [IRNode(id=x, kind=IRNodeKind.AGENT) for x in ("a", "b", "c")],
+        [
+            IREdge(id="a2b", from_node="a", to_node="b"),
+            IREdge(id="b2c", from_node="b", to_node="c"),
+        ],
+        entry=["a"],
+    )
+    r = validate_graph(g)
+    assert not any("cycle" in w.lower() for w in r.warnings)
+
+
+def test_diamond_dag_is_not_a_cycle() -> None:
+    # a->b, a->c, b->d, c->d revisits d but is acyclic (no false positive).
+    g = _base(
+        [IRNode(id=x, kind=IRNodeKind.AGENT) for x in ("a", "b", "c", "d")],
+        [
+            IREdge(id="a2b", from_node="a", to_node="b"),
+            IREdge(id="a2c", from_node="a", to_node="c"),
+            IREdge(id="b2d", from_node="b", to_node="d"),
+            IREdge(id="c2d", from_node="c", to_node="d"),
+        ],
+        entry=["a"],
+    )
+    r = validate_graph(g)
+    assert not any("cycle" in w.lower() for w in r.warnings)
