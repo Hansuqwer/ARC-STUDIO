@@ -5781,3 +5781,13 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `tests/adapters/test_swarmgraph_ide_event_contract.py` (new, 3 tests). Verified: `uv run pytest tests/adapters/test_swarmgraph_ide_event_contract.py -q` → **3 passed**; `uv run ruff check src tests` clean. | Notes: **no bridge/producer fabricated** — the bridge already existed and the IDE was already truthful; this locks the contract. Scoped follow-ups (NOT done, not claimed): live SDK-runner streaming path to the IDE; cost-event naming (adapter emits `BUDGET_UPDATE` vs the IDE cost panel's `swarmgraph_cost` marker). DoD gate 1 (producer-truth) cited.
 
 ---
+
+## Phase 169 — DoD Elevation: TraceParser Memory Caps (R-POLISH11)
+
+**Goal:** CR-015 — bound TraceParser memory. Verified against the real code first.
+
+**Implemented:** `parseTrace` read the whole file via `fs.readFile` with no size check (OOM risk on large traces); `streamTrace`'s `lineBuffer += chunk` could grow unbounded on a delimiter-less line. Added `MAX_TRACE_FILE_BYTES = 64 MB` (full-parse guard: `fs.stat` first, throw a structured `INVALID_INPUT` "too large; stream it instead" before reading) and `MAX_LINE_BYTES = 4 MB` (drop a pathological delimiter-less line in `streamTrace` to bound the buffer).
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `node/services/trace-parser.ts` + tests `node/services/__tests__/trace-parser.test.ts` (new: happy-path parse, sparse-file size-guard rejection, streaming happy-path). Verified: `pnpm --filter arc-extension build` clean; tests **926 passed / 3 skipped** (32 suites); `pnpm typecheck` clean. | Notes: additive; structured error; streaming still works for large traces. DoD gates 5/7 cited.
+
+---

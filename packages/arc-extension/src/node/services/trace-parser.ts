@@ -22,6 +22,12 @@ export interface ParseOptions {
     skipInvalid?: boolean;
 }
 
+/** Reject a full in-memory parse above this size; callers should stream instead. */
+const MAX_TRACE_FILE_BYTES = 64 * 1024 * 1024; // 64 MB
+/** Drop a single delimiter-less line larger than this so the stream buffer
+ *  cannot grow unbounded (a valid JSONL event line is far smaller). */
+const MAX_LINE_BYTES = 4 * 1024 * 1024; // 4 MB
+
 @injectable()
 export class TraceParser {
     /**
@@ -40,6 +46,15 @@ export class TraceParser {
                     ArcErrorCode.RUN_NOT_FOUND,
                     `Trace file not found: ${tracePath}`,
                     { tracePath }
+                );
+            }
+
+            const stat = await fs.stat(tracePath);
+            if (stat.size > MAX_TRACE_FILE_BYTES) {
+                throw new ArcError(
+                    ArcErrorCode.INVALID_INPUT,
+                    `Trace file too large to parse fully (${stat.size} bytes > ${MAX_TRACE_FILE_BYTES} cap); stream it instead.`,
+                    { tracePath, size: stat.size, cap: MAX_TRACE_FILE_BYTES }
                 );
             }
 
@@ -109,6 +124,12 @@ export class TraceParser {
 
         for await (const chunk of readStream) {
             lineBuffer += chunk;
+            // Bound the buffer: a single line with no newline must not grow
+            // without limit. Drop the pathological oversized line and resync.
+            if (lineBuffer.length > MAX_LINE_BYTES && !lineBuffer.includes('\n')) {
+                lineBuffer = '';
+                continue;
+            }
             const lines = lineBuffer.split('\n');
             lineBuffer = lines.pop() || '';
 
