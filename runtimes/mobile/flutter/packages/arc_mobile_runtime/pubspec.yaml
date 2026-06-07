@@ -1,5 +1,5 @@
 name: arc_mobile_runtime
-description: ARC Mobile Runtime SDK — Flutter stub (MVP, types only, no real native bridges).
+description: "ARC Mobile Runtime — Flutter simulator stub (preview; pubspec only, zero Dart source, no platform plugin, not publishable to pub.dev)."
 version: 0.1.0
 
 environment:
