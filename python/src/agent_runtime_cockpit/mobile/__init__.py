@@ -44,6 +44,7 @@ from .policy import (
     explain_plan_policy,
 )
 from .privacy_budget import PrivacyBudget, compute_privacy_budget
+from .signing import SignedPlanEnvelope, sign_plan, verify_plan
 from .recorder import MobileRuntimeEvent, MobileTrace, append_trace, build_trace, read_trace
 from .replay import ReplayDiff, replay_trace
 from .simulator import simulate_action_plan
@@ -80,6 +81,9 @@ __all__ = [
     "MOBILE_POLICY_VERSION",
     "PrivacyBudget",
     "compute_privacy_budget",
+    "SignedPlanEnvelope",
+    "sign_plan",
+    "verify_plan",
     "MobileManifestLoadError",
     "MobileValidationReport",
     "ValidationFinding",
