@@ -381,3 +381,92 @@ def mobile_pin_cmd(
     _out(
         ok({"id": manifest.id, "manifest_hash": new_hash, "path": str(manifest_file)}), json_output
     )
+
+
+mobile_plan_app = typer.Typer(name="plan", help="Mobile action plan commands")
+mobile_app.add_typer(mobile_plan_app)
+
+
+@mobile_plan_app.command("sign")
+def mobile_plan_sign_cmd(
+    plan_file: str = typer.Argument(..., help="Path to action plan JSON."),
+    key_hex: str = typer.Option(
+        None, "--key", help="32-byte signing key as hex (generated if omitted)."
+    ),
+    out: str | None = typer.Option(None, "--out", help="Output envelope JSON path."),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Sign an action plan and produce a SignedPlanEnvelope."""
+    _setup_logging(debug)
+    import secrets as _secrets
+    from ..mobile import MobileActionPlan, sign_plan
+
+    p = Path(plan_file)
+    if not p.is_file():
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Plan file not found: {plan_file}"), json_output)
+        raise typer.Exit(1)
+    try:
+        import json as _json
+
+        plan = MobileActionPlan.model_validate(_json.loads(p.read_text()))
+    except Exception as exc:  # noqa: BLE001
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid plan: {exc}"), json_output)
+        raise typer.Exit(1) from exc
+
+    if key_hex:
+        try:
+            key = bytes.fromhex(key_hex)
+        except ValueError as exc:
+            _out(err(ArcErrorCode.INVALID_INPUT, "key must be valid hex"), json_output)
+            raise typer.Exit(1) from exc
+    else:
+        key = _secrets.token_bytes(32)
+
+    envelope = sign_plan(plan, key)
+    data = envelope.model_dump(mode="json")
+    if out:
+        Path(out).write_text(_json.dumps(data, indent=2), encoding="utf-8")
+    _out(
+        ok({**data, "key_hex": key.hex(), "note": "Store key_hex securely; needed for verify."}),
+        json_output,
+    )
+
+
+@mobile_plan_app.command("verify")
+def mobile_plan_verify_cmd(
+    envelope_file: str = typer.Argument(..., help="Path to signed envelope JSON."),
+    key_hex: str = typer.Option(..., "--key", help="32-byte signing key as hex."),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Verify a SignedPlanEnvelope. Exits 1 if invalid."""
+    _setup_logging(debug)
+    from ..mobile import SignedPlanEnvelope, verify_plan
+
+    p = Path(envelope_file)
+    if not p.is_file():
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, f"Envelope file not found: {envelope_file}"),
+            json_output,
+        )
+        raise typer.Exit(1)
+    try:
+        import json as _json
+
+        envelope = SignedPlanEnvelope.model_validate(_json.loads(p.read_text()))
+        key = bytes.fromhex(key_hex)
+    except Exception as exc:  # noqa: BLE001
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Cannot parse envelope or key: {exc}"), json_output)
+        raise typer.Exit(1) from exc
+
+    valid = verify_plan(envelope, key)
+    payload = {"ok": valid, "plan_id": envelope.plan_id, "algorithm": envelope.algorithm}
+    if valid:
+        _out(ok(payload), json_output)
+    else:
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, "Plan signature verification failed", payload),
+            json_output,
+        )
+        raise typer.Exit(1)

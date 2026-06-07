@@ -26,6 +26,7 @@ from .models import (
     MobileSimulationStepResult,
 )
 from .policy import MobilePolicyDecision, explain_capability_policy, explain_plan_policy
+from .signing import SignedPlanEnvelope, sign_plan, verify_plan
 from .recorder import MobileRuntimeEvent, MobileTrace, append_trace, build_trace, read_trace
 from .simulator import simulate_action_plan
 from .validation import (
@@ -56,6 +57,9 @@ __all__ = [
     "MobileRuntimeEvent",
     "MobileTrace",
     "MobilePolicyDecision",
+    "SignedPlanEnvelope",
+    "sign_plan",
+    "verify_plan",
     "MobileManifestLoadError",
     "MobileValidationReport",
     "ValidationFinding",
