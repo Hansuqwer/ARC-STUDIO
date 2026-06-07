@@ -386,6 +386,7 @@ class ArcScreen(Screen):
         )
         from agent_runtime_cockpit.security.trust import TrustLevel, resolve_trust
         from agent_runtime_cockpit.tools.shell import _run_coro_sync
+        from agent_runtime_cockpit.security.redaction import redact_secrets
 
         cmd = text[1:].strip()
         self.data.add_entry("user", f"!{cmd}")
@@ -403,7 +404,9 @@ class ArcScreen(Screen):
             except Exception:
                 pass
 
-        def _audit(decision: SandboxDecision, exit_code: int | None) -> None:
+        def _audit(
+            decision: SandboxDecision, exit_code: int | None, redaction_applied: bool = False
+        ) -> None:
             # Best-effort: the security decision is already enforced above, so a
             # failure to persist the audit event must never crash the TUI.
             try:
@@ -418,7 +421,7 @@ class ArcScreen(Screen):
                     exit_code=exit_code,
                     stdout_truncated=False,
                     stderr_truncated=False,
-                    redaction_applied=False,
+                    redaction_applied=redaction_applied,
                 )
                 persist_sandbox_audit_event(event)
             except Exception:
@@ -488,9 +491,14 @@ class ArcScreen(Screen):
             )
             return
 
-        output = iso.stdout
+        raw = iso.stdout
         if iso.stderr:
-            output += "\n[stderr]\n" + iso.stderr
+            raw += "\n[stderr]\n" + iso.stderr
+        # Defense-in-depth: the isolation provider already redacts, but the TUI is
+        # the display surface and must guarantee redaction regardless of provider
+        # config. redact_secrets is idempotent, so re-running it is safe.
+        output = redact_secrets(raw)
+        redaction_applied = bool(getattr(iso, "redaction_applied", False)) or output != raw
         self.data.add_entry(
             "tool",
             output[:2000],
@@ -499,7 +507,7 @@ class ArcScreen(Screen):
                 "status": "success" if iso.exit_code == 0 else "error",
             },
         )
-        _audit(sandbox_decision, iso.exit_code)
+        _audit(sandbox_decision, iso.exit_code, redaction_applied)
 
     def _handle_chat_message(self, text: str) -> None:
         """Send a chat message. Streams via SwarmGraph if available."""

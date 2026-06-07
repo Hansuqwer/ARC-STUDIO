@@ -18,27 +18,52 @@ class Transcript(VerticalScroll):
         self.theme = theme
         self._rendered_count = 0
         self._auto_scroll = True
+        # CR-009: the last assistant entry is mutated in place by
+        # DataStore.append_to_last during streaming (the entry count does not
+        # change), so we track its MarkdownBlock to re-render it on growth.
+        self._last_block = None
+        self._last_block_index = -1
+        self._last_block_text = ""
 
     def on_mount(self) -> None:
         self.set_interval(0.1, self._check_new_entries)
 
     def _check_new_entries(self) -> None:
-        if len(self.data.entries) > self._rendered_count:
-            for entry in self.data.entries[self._rendered_count :]:
-                self._render_entry(entry)
-            self._rendered_count = len(self.data.entries)
+        entries = self.data.entries
+        if len(entries) > self._rendered_count:
+            for index in range(self._rendered_count, len(entries)):
+                self._render_entry(entries[index], index)
+            self._rendered_count = len(entries)
+            if self._auto_scroll:
+                self.scroll_end(animate=False)
+        # CR-009: reflect in-place streaming growth of the last assistant entry.
+        self._refresh_streaming_block()
+
+    def _refresh_streaming_block(self) -> None:
+        block = self._last_block
+        if block is None or self._last_block_index < 0:
+            return
+        entries = self.data.entries
+        if self._last_block_index >= len(entries):
+            return
+        entry = entries[self._last_block_index]
+        if entry.role == "assistant" and entry.content != self._last_block_text:
+            self._last_block_text = entry.content
+            block.update_body(entry.content)
             if self._auto_scroll:
                 self.scroll_end(animate=False)
 
-    def _render_entry(self, entry: TranscriptEntry) -> None:
+    def _render_entry(self, entry: TranscriptEntry, index: int = -1) -> None:
         if entry.metadata.get("type") == "diff":
             from .diff_block import DiffBlock
 
             self.mount(DiffBlock(entry.content, entry.metadata.get("filename", "diff")))
+            self._last_block = None
         elif entry.role == "tool":
             from .tool_card import ToolCard
 
             self.mount(ToolCard(entry, self.theme))
+            self._last_block = None
         elif entry.role == "assistant":
             # UX R-004: assistant body gets markdown + syntax via MarkdownBlock.
             # We still emit a small role header above it so timestamps stay visible.
@@ -46,10 +71,16 @@ class Transcript(VerticalScroll):
 
             self.mount(MessageHeader(entry, self.theme))
             no_color = bool(getattr(self.theme.current, "no_color", False))
-            self.mount(MarkdownBlock(entry.content, no_color=no_color))
+            block = MarkdownBlock(entry.content, no_color=no_color)
+            self.mount(block)
+            # Track this block so streaming deltas re-render it (CR-009).
+            self._last_block = block
+            self._last_block_index = index
+            self._last_block_text = entry.content
         else:
             msg = MessageWidget(entry, self.theme, self.data)
             self.mount(msg)
+            self._last_block = None
 
     def scroll_to_bottom(self) -> None:
         self._auto_scroll = True

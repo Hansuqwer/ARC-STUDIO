@@ -5683,3 +5683,15 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `components/ErrorBoundary.tsx` (new), `components/index.ts`, `arc-studio-widget.tsx`, `tabs/RunsTab.tsx`, `arc-keybinding-contribution.ts` + tests `__tests__/ide-honest-states.contract.test.ts` (new), `__tests__/studio-tabs.contract.test.ts` (updated off the removed anti-pattern). Verified: `pnpm --filter arc-extension build` clean; tests **918 passed, 3 skipped, 0 failed** (30 suites); `pnpm typecheck` clean. | Notes: additive only; no protocol fields removed; no new tabs. DoD gates 1/2/3/7 cited.
 
 ---
+
+## Phase 161 — DoD Elevation: TUI Streaming Transcript + Shell-Output Redaction (R-POLISH3)
+
+**Goal:** Third DoD-elevation slice (CR-009, CR-024). Verified against the real TUI code before editing — which corrected CR-024's premise.
+
+**Implemented:**
+- **CR-009 — streaming transcript refresh.** `DataStore.append_to_last` mutates the last assistant entry's `content` in place during streaming, but `Transcript` only rendered *new* entries and `MarkdownBlock` was static, so streamed growth never appeared. Added `MarkdownBlock.update_body()` (re-runs `render()`, guarded by `is_mounted`) and made `Transcript` track the last assistant block (`_last_block`/`_last_block_index`/`_last_block_text`) and re-render it via `_refresh_streaming_block()` on each poll when the content grows.
+- **CR-024 — shell-output redaction.** Verification correction: the isolation provider **already** redacts stdout/stderr (`subprocess.py` `redact_output` = canonical `redact_secrets`) and sets `IsolationResult.redaction_applied`. The real bugs were that the TUI's `_audit` hardcoded `redaction_applied=False` (inaccurate record) and the TUI relied entirely on the provider. Fix: `screen.py` now redacts shell output at the display boundary with idempotent `redact_secrets` (defense-in-depth regardless of provider config) and threads the true `redaction_applied` into the audit event.
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `tui/widgets/markdown_block.py`, `tui/widgets/transcript.py`, `tui/screen.py` + tests `tests/tui/test_transcript_streaming.py` (new), `tests/tui/test_sandbox_shell_escape.py` (extended, +2). Verified: `uv run pytest tests/tui -q` → **232 passed, 2 xfailed** (xfails are pre-existing headless SVG-snapshot mismatches); `uv run ruff check src tests` clean. | Notes: deterministic redaction (no LLM); additive; reuses the canonical redactor (no new redaction code). DoD gates 1/6 cited.
+
+---

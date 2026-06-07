@@ -251,3 +251,77 @@ def test_oversized_argv_denied_at_decide_level():
     decision = decide(oversized, SandboxPolicy())
     assert not decision.allowed
     assert decision.reason_code == SandboxReasonCode.ARGV_OVERSIZED
+
+
+# ─── CR-024: shell output redaction at the display boundary ───────────────────
+
+
+def test_shell_output_secrets_redacted_and_audited(tmp_path, monkeypatch, _audit_spy):
+    """A secret in shell stdout is redacted in the transcript even if the provider
+    did not redact, and the audit event records redaction_applied=True."""
+    from unittest.mock import AsyncMock
+
+    from agent_runtime_cockpit.security import trust
+
+    monkeypatch.setattr(
+        "agent_runtime_cockpit.security.trust.resolve_trust",
+        lambda ws: MagicMock(level=trust.TrustLevel.TRUSTED),
+    )
+    screen = _screen(tmp_path)
+    secret = "sk-ant-SECRET1234567890abcdef"
+    # redaction_applied=False simulates a provider that did NOT redact, proving
+    # the TUI applies its own display-boundary redaction.
+    fake_iso = MagicMock(
+        stdout=f"export TOKEN={secret}\n",
+        stderr="",
+        exit_code=0,
+        killed=False,
+        kill_reason=None,
+        redaction_applied=False,
+    )
+    provider = MagicMock()
+    provider.execute = AsyncMock(return_value=fake_iso)
+    with patch(
+        "agent_runtime_cockpit.isolation.selector.build_execution_provider",
+        return_value=provider,
+    ):
+        screen._handle_shell_escape("!ls")
+    tool_out = "\n".join(c for r, c in _entries(screen) if r == "tool")
+    assert tool_out, "expected a tool output entry"
+    assert secret not in tool_out, "secret must be redacted from the transcript"
+    assert "[REDACTED]" in tool_out
+    _audit_spy.assert_called()
+    event = _audit_spy.call_args[0][0]
+    assert event["redaction_applied"] is True
+
+
+def test_shell_stderr_is_also_redacted(tmp_path, monkeypatch, _audit_spy):
+    """Secrets in stderr are redacted too (stderr is appended to the output)."""
+    from unittest.mock import AsyncMock
+
+    from agent_runtime_cockpit.security import trust
+
+    monkeypatch.setattr(
+        "agent_runtime_cockpit.security.trust.resolve_trust",
+        lambda ws: MagicMock(level=trust.TrustLevel.TRUSTED),
+    )
+    screen = _screen(tmp_path)
+    secret = "sk-ant-STDERRSECRET1234567890"
+    fake_iso = MagicMock(
+        stdout="ok\n",
+        stderr=f"warning: key {secret}",
+        exit_code=0,
+        killed=False,
+        kill_reason=None,
+        redaction_applied=False,
+    )
+    provider = MagicMock()
+    provider.execute = AsyncMock(return_value=fake_iso)
+    with patch(
+        "agent_runtime_cockpit.isolation.selector.build_execution_provider",
+        return_value=provider,
+    ):
+        screen._handle_shell_escape("!ls")
+    tool_out = "\n".join(c for r, c in _entries(screen) if r == "tool")
+    assert secret not in tool_out
+    assert "[REDACTED]" in tool_out

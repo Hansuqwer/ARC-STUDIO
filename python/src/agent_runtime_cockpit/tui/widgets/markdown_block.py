@@ -22,6 +22,17 @@ class MarkdownBlock(Static):
         self._body = body
         self._no_color = no_color
 
+    def update_body(self, body: str) -> None:
+        """Replace the rendered body in place (used for streaming deltas).
+
+        Re-runs ``render()`` so an assistant message that grows mid-stream is
+        reflected without remounting the widget. Refresh is guarded so this is
+        also safe to call on an unmounted widget (e.g. in unit tests).
+        """
+        self._body = body
+        if self.is_mounted:
+            self.refresh(layout=True)
+
     def render(self):  # type: ignore[override]
         if self._no_color:
             return self._body
