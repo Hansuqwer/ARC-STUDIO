@@ -1759,6 +1759,24 @@ export interface ArcService {
     getCapabilityCardSummary(runId: string): Promise<CapabilityCardSummary>;
     /** Recent MCP outbound call decisions (MCP_CALL_DECISION events) from .arc/mcp/decisions.jsonl */
     getMcpDecisions(opts?: { limit?: number; since?: string }): Promise<McpDecisionList>;
+    /** Mobile Runtime SDK status: capabilities list + doctor health (simulator/mock only). */
+    getMobileStatus(): Promise<MobileStatus>;
+}
+
+export interface MobileCapabilityEntry {
+    id: string;
+    name: string;
+    category: string;
+    platforms: string[];
+    approval_mode: string;
+    simulator_supported: boolean;
+}
+
+export interface MobileStatus {
+    available: boolean;
+    capabilities: MobileCapabilityEntry[];
+    doctor: { ok: boolean; message: string };
+    error?: string;
 }
 
 export interface CapabilityCardDecision {

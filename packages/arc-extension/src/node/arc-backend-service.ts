@@ -1253,4 +1253,28 @@ export class ArcBackendService implements ArcService {
             return { decisions: [], total: 0 };
         }
     }
+
+    async getMobileStatus(): Promise<import('../common/arc-protocol').MobileStatus> {
+        const env = buildArcCliEnv();
+        try {
+            const capsOutput = execFileSync('arc', ['mobile', 'capabilities', '--json'], {
+                encoding: 'utf-8', timeout: 10000, windowsHide: true, env,
+            });
+            const capsParsed = JSON.parse(capsOutput);
+            const capabilities = Array.isArray(capsParsed?.data?.capabilities)
+                ? capsParsed.data.capabilities
+                : [];
+            let doctor = { ok: true, message: 'simulator/mock mode' };
+            try {
+                const docOutput = execFileSync('arc', ['mobile', 'doctor', '--json'], {
+                    encoding: 'utf-8', timeout: 10000, windowsHide: true, env,
+                });
+                const docParsed = JSON.parse(docOutput);
+                doctor = { ok: !!docParsed?.ok, message: docParsed?.data?.message ?? docParsed?.error ?? 'ok' };
+            } catch { /* doctor failure is non-fatal */ }
+            return { available: true, capabilities, doctor };
+        } catch (err) {
+            return { available: false, capabilities: [], doctor: { ok: false, message: 'arc mobile CLI unavailable' }, error: String(err) };
+        }
+    }
 }

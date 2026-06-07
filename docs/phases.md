@@ -5632,3 +5632,11 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: aa788f3 2026-06-07 | Notes: providers/router.py with ProviderRouter class; gated ARC_ENABLE_PROVIDER_ROUTER=1; retryable/non-retryable failover; 5 new tests. turn_manager wiring is a follow-on slice.
 
 ---
+
+## Phase 157 — Mobile Runtime IDE Tab (R79 slice 110.6)
+
+**Goal:** Surface the ARC Mobile Runtime SDK read-only in the Theia IDE: capabilities list + doctor status, proxied via `arc mobile capabilities --json` and `arc mobile doctor --json`. No SDK-core ↔ Theia coupling. Simulator/mock only.
+
+**Status:** Baseline Complete | Evidence: arc-mobile-widget.tsx + arc-mobile-contribution.ts + getMobileStatus() in arc-backend-service.ts | Notes: Read-only tab; no native-execution or app-store claims. Closes R79 slice 110.6.
+
+---

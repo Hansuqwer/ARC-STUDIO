@@ -161,7 +161,7 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 | ID | Title | Status |
 |---|---|---|
 | R-TS1 | Token-Saving Research | Baseline Complete (sdk_version sweep done — R-AUDIT24 Phase 155) |
-| R79 | Mobile Runtime SDK Integration | Partial — slices 110.1–110.5 done; 110.6 Theia/TUI surfacing follow-up |
+| R79 | Mobile Runtime SDK Integration | Baseline Complete | Evidence: Phase 111 + Phase 148 + Phase 157 | Slices 110.1–110.5 + TUI /budget + Theia Mobile Runtime IDE tab (simulator/mock only; no native-execution claims). |
 | R34.6 / Battle Arena | Provider-Backed Battle Arena | Blocked (no default paid/live calls) |
 
 ---

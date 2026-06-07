@@ -6,6 +6,8 @@ import { ArcWidget } from './arc-widget';
 import { ArcWidgetContribution } from './arc-widget-contribution';
 import { ArcAdaptersWidget } from './arc-adapters-widget';
 import { ArcAdaptersContribution } from './arc-adapters-contribution';
+import { ArcMobileWidget } from './arc-mobile-widget';
+import { ArcMobileContribution } from './arc-mobile-contribution';
 import { ArcWorkflowGraphWidget } from './arc-workflow-graph-widget';
 import { ArcWorkflowContribution } from './arc-workflow-contribution';
 import { ArcRunTimelineWidget } from './arc-run-timeline-widget';
@@ -82,6 +84,15 @@ export default new ContainerModule(bind => {
     })).inSingletonScope();
     bindViewContribution(bind, ArcAdaptersContribution);
     bind(FrontendApplicationContribution).toService(ArcAdaptersContribution);
+
+    // Mobile Runtime widget (R79 slice 110.6 — simulator/mock only)
+    bind(ArcMobileWidget).toSelf();
+    bind(WidgetFactory).toDynamicValue(ctx => ({
+        id: ArcMobileWidget.ID,
+        createWidget: () => ctx.container.get<ArcMobileWidget>(ArcMobileWidget),
+    })).inSingletonScope();
+    bindViewContribution(bind, ArcMobileContribution);
+    bind(FrontendApplicationContribution).toService(ArcMobileContribution);
 
     // Bind the ARC Workflow Graph widget
     bind(ArcWorkflowGraphWidget).toSelf();
