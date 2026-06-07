@@ -419,6 +419,8 @@ def mobile_trace_verify_cmd(
             json_output,
         )
         raise typer.Exit(1)
+
+
 mobile_schema_app = typer.Typer(name="schema", help="Mobile schema commands")
 mobile_app.add_typer(mobile_schema_app)
 
@@ -535,6 +537,43 @@ def mobile_schema_export_cmd(
             shutil.copy2(src, out_path / src.name)
             copied.append(src.name)
     _out(ok({"copied": copied, "out": str(out_path)}), json_output)
+
+
+@mobile_app.command("siem-export")
+def mobile_siem_export_cmd(
+    trace_file: str = typer.Argument(..., help="Path to a mobile simulator JSONL trace."),
+    fmt: str = typer.Option("json", "--format", help="SIEM format: json|cef."),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Export a trace to a SIEM format (CEF or JSON). Payloads stay hash-only and event
+    metadata is exported as key names only — no raw payloads or secret values leave."""
+    _setup_logging(debug)
+    from ..mobile import export_trace, read_trace
+
+    p = Path(trace_file)
+    if not p.is_file():
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Trace file not found: {trace_file}"), json_output)
+        raise typer.Exit(1)
+    try:
+        trace = read_trace(p)
+        rendered = export_trace(trace, fmt)
+    except ValueError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(1) from exc
+    except Exception as exc:  # noqa: BLE001
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid trace file: {exc}"), json_output)
+        raise typer.Exit(1) from exc
+
+    if json_output:
+        _out(
+            ok({"format": fmt.lower(), "event_count": len(trace.events), "rendered": rendered}),
+            json_output,
+        )
+    else:
+        typer.echo(rendered)
+
+
 @mobile_app.command("replay")
 def mobile_replay_cmd(
     trace_file: str = typer.Argument(..., help="Recorded trace JSONL to compare."),
@@ -574,6 +613,8 @@ def mobile_replay_cmd(
             json_output,
         )
         raise typer.Exit(1)
+
+
 mobile_generate_app = typer.Typer(name="generate", help="Generate advisory compliance artifacts")
 mobile_app.add_typer(mobile_generate_app)
 
@@ -674,6 +715,8 @@ def mobile_gen_review_notes_cmd(
         ok({"advisory": True, "requires_human_review": True, "manifest_id": m.id, "notes": notes}),
         json_output,
     )
+
+
 @mobile_app.command("privacy-budget")
 def mobile_privacy_budget_cmd(
     manifest: str | None = typer.Option(None, "--manifest", help="Path to manifest file/dir."),
@@ -697,6 +740,8 @@ def mobile_privacy_budget_cmd(
 
     budget = compute_privacy_budget(m)
     _out(ok(budget.as_dict()), json_output)
+
+
 mobile_plan_app = typer.Typer(name="plan", help="Mobile action plan commands")
 mobile_app.add_typer(mobile_plan_app)
 

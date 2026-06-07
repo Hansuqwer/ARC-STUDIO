@@ -53,6 +53,7 @@ from .secure_store import (
     SecureStoreError,
 )
 from .signing import SignedPlanEnvelope, sign_plan, verify_plan
+from .siem_export import export_trace, export_trace_cef, export_trace_json
 from .replay import ReplayDiff, replay_trace
 from .simulator import simulate_action_plan
 from .validation import (
@@ -99,6 +100,9 @@ __all__ = [
     "SignedPlanEnvelope",
     "sign_plan",
     "verify_plan",
+    "export_trace",
+    "export_trace_cef",
+    "export_trace_json",
     "ApprovalGrant",
     "issue_grant",
     "revoke_grant",

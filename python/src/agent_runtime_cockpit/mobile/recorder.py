@@ -39,8 +39,7 @@ class MobileRuntimeEvent(BaseModel):
     allowed: bool
     mock: bool = True
     payload_hash: str
-    prev_event_hash: str = _ZERO_HASH  # hash of preceding event; _ZERO_HASH for first
-    prev_event_hash: str = "0" * 64  # PR17: SHA-256 of preceding event; zeros for first
+    prev_event_hash: str = _ZERO_HASH  # SHA-256 of the preceding event; _ZERO_HASH for the first
     event_hash: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
 
