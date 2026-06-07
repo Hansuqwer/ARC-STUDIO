@@ -35,6 +35,8 @@ from .recorder import (
     read_trace,
     verify_trace,
 )
+from .recorder import MobileRuntimeEvent, MobileTrace, append_trace, build_trace, read_trace
+from .replay import ReplayDiff, replay_trace
 from .simulator import simulate_action_plan
 from .validation import (
     MobileValidationReport,
@@ -80,6 +82,8 @@ __all__ = [
     "append_trace",
     "read_trace",
     "verify_trace",
+    "replay_trace",
+    "ReplayDiff",
     "explain_capability_policy",
     "explain_plan_policy",
     "list_capabilities",
