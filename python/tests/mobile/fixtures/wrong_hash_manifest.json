@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "test.bad.hash",
+  "name": "Wrong Hash Test",
+  "version": "0.1.0",
+  "capabilities": [],
+  "background_execution": false,
+  "network_by_default": false,
+  "simulator_mode": true,
+  "manifest_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+}

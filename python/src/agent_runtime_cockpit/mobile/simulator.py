@@ -49,7 +49,15 @@ def simulate_action_plan(
 
     catalog.update(_CATALOG)
     for cap in extra_capabilities or []:
-        catalog[cap.id] = cap
+        # Guard: extra sensitive capabilities (HIGH/CRITICAL) must end .mock
+        if cap.data_sensitivity.value in ("high", "critical") and not cap.id.endswith(".mock"):
+            warnings.append(
+                f"EXTRAS_SENSITIVITY_GUARD: extra capability '{cap.id}' has "
+                f"{cap.data_sensitivity.value} sensitivity but is not mock-only — blocked"
+            )
+            # Do not add to catalog so steps using it are blocked as unknown
+        else:
+            catalog[cap.id] = cap
 
     # Top-level blocks
     if plan.requires_background:
