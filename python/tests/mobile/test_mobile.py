@@ -383,3 +383,183 @@ class TestSafety:
                 if compiled.search(line):
                     violations.append(f"{f.name}:{i}: {line.rstrip()}")
         assert not violations, f"Forbidden {pattern!r}:\n" + "\n".join(violations)
+
+
+# ── PR2: Strict validation, duplicate IDs, capability-ID regex ────────────────
+
+
+class TestStrictMode:
+    def test_strict_load_rejects_unknown_field(self, tmp_path):
+        from agent_runtime_cockpit.mobile.manifest import load_manifest, MANIFEST_FILENAME
+
+        data = {
+            "schema_version": 1,
+            "id": "test.strict",
+            "name": "Strict Test",
+            "version": "0.1.0",
+            "capabilities": [],
+            "background_execution": False,
+            "network_by_default": False,
+            "simulator_mode": True,
+            "unknown_surprise_field": "evil",
+        }
+        import json
+
+        p = tmp_path / MANIFEST_FILENAME
+        p.write_text(json.dumps(data))
+        from agent_runtime_cockpit.mobile.manifest import MobileManifestLoadError
+
+        with pytest.raises(MobileManifestLoadError, match="unknown"):
+            load_manifest(tmp_path, strict=True)
+
+    def test_lenient_load_accepts_unknown_field(self, tmp_path):
+        from agent_runtime_cockpit.mobile.manifest import load_manifest, MANIFEST_FILENAME
+
+        data = {
+            "schema_version": 1,
+            "id": "test.lenient",
+            "name": "Lenient",
+            "version": "0.1.0",
+            "capabilities": [],
+            "background_execution": False,
+            "network_by_default": False,
+            "simulator_mode": True,
+            "unknown_field": "ignored",
+        }
+        import json
+
+        p = tmp_path / MANIFEST_FILENAME
+        p.write_text(json.dumps(data))
+        m = load_manifest(tmp_path)
+        assert m.id == "test.lenient"
+
+    def test_v4_write_is_error_in_strict_mode(self):
+        from agent_runtime_cockpit.mobile import validate_capability, MobileCapability
+
+        cap = MobileCapability(
+            id="app.custom.write.mock",
+            name="Custom Write",
+            writes=True,
+            auditable=True,
+            requires_hitl=False,
+            requires_trust=False,
+        )
+        report_strict = validate_capability(cap, strict=True)
+        report_lenient = validate_capability(cap, strict=False)
+        assert not report_strict.ok
+        assert any(
+            f.rule == "write_requires_hitl_or_trust" and f.severity == "error"
+            for f in report_strict.errors
+        )
+        # In lenient mode it is a warning, not an error
+        assert report_lenient.ok
+        assert any(
+            f.rule == "write_requires_hitl_or_trust" and f.severity == "warning"
+            for f in report_lenient.warnings
+        )
+
+
+class TestDuplicateIds:
+    def test_duplicate_capability_id_rejected_in_validate(self):
+        from agent_runtime_cockpit.mobile import (
+            MobileCapability,
+            MobileRuntimeManifest,
+            validate_manifest,
+        )
+
+        cap = MobileCapability(id="app.memory.write.mock", name="Write")
+        m = MobileRuntimeManifest(id="test.dup", name="Dup", capabilities=[cap, cap])
+        report = validate_manifest(m)
+        assert not report.ok
+        assert any("duplicate_capability_id" in f.rule for f in report.errors)
+
+    def test_duplicate_capability_id_rejected_in_load(self, tmp_path):
+        from agent_runtime_cockpit.mobile.manifest import (
+            load_manifest,
+            MANIFEST_FILENAME,
+            MobileManifestLoadError,
+        )
+        import json
+
+        cap = {
+            "schema_version": 1,
+            "id": "app.memory.write.mock",
+            "name": "W",
+            "approval_mode": "none",
+            "data_sensitivity": "low",
+            "background": False,
+            "network": False,
+            "mcp_exposable": False,
+            "simulator_supported": True,
+        }
+        data = {
+            "schema_version": 1,
+            "id": "test.dup",
+            "name": "Dup",
+            "version": "0.1.0",
+            "capabilities": [cap, cap],
+            "background_execution": False,
+            "network_by_default": False,
+            "simulator_mode": True,
+        }
+        (tmp_path / MANIFEST_FILENAME).write_text(json.dumps(data))
+        with pytest.raises(MobileManifestLoadError, match="duplicate"):
+            load_manifest(tmp_path)
+
+    def test_duplicate_step_id_rejected(self):
+        from agent_runtime_cockpit.mobile import (
+            MobileActionPlan,
+            MobileActionStep,
+            validate_action_plan,
+            list_capabilities,
+        )
+
+        plan = MobileActionPlan(
+            plan_id="plan-dup-steps",
+            steps=[
+                MobileActionStep(step_id="s1", capability_id="app.memory.write.mock", mock=True),
+                MobileActionStep(step_id="s1", capability_id="app.memory.retrieve.mock", mock=True),
+            ],
+        )
+        report = validate_action_plan(plan, list_capabilities())
+        assert not report.ok
+        assert any("duplicate_step_id" in f.rule for f in report.errors)
+
+
+class TestCapabilityIdRegex:
+    def test_valid_id_passes(self):
+        from agent_runtime_cockpit.mobile import validate_capability, MobileCapability
+
+        cap = MobileCapability(id="device.camera.capture.mock", name="Cam")
+        r = validate_capability(cap)
+        assert not any(f.rule == "capability_id_invalid_pattern" for f in r.errors)
+
+    def test_invalid_id_uppercase_fails(self):
+        from agent_runtime_cockpit.mobile import validate_capability, MobileCapability
+
+        cap = MobileCapability(id="Device.Camera", name="Bad")
+        r = validate_capability(cap)
+        assert any(f.rule == "capability_id_invalid_pattern" for f in r.errors)
+
+    def test_invalid_id_spaces_fails(self):
+        from agent_runtime_cockpit.mobile import validate_capability, MobileCapability
+
+        cap = MobileCapability(id="device camera", name="Bad")
+        r = validate_capability(cap)
+        assert any(f.rule == "capability_id_invalid_pattern" for f in r.errors)
+
+    def test_invalid_id_no_dot_fails(self):
+        from agent_runtime_cockpit.mobile import validate_capability, MobileCapability
+
+        cap = MobileCapability(id="devicecamera", name="Bad")
+        r = validate_capability(cap)
+        assert any(f.rule == "capability_id_invalid_pattern" for f in r.errors)
+
+
+class TestCatalogUniqueness:
+    def test_catalog_has_no_duplicate_ids(self):
+        from agent_runtime_cockpit.mobile import list_capabilities
+
+        caps = list_capabilities()
+        ids = [c.id for c in caps]
+        assert len(ids) == len(set(ids)), f"Duplicate IDs: {[x for x in ids if ids.count(x) > 1]}"

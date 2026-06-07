@@ -9,6 +9,7 @@ from .hashing import capability_hash, manifest_hash, plan_hash, report_hash
 from .manifest import MobileManifestLoadError, build_default_manifest, load_manifest
 from .models import (
     MOBILE_SCHEMA_VERSION,
+    MOBILE_CAPABILITY_ID_PATTERN,
     MobileActionPlan,
     MobileActionSimulationReport,
     MobileActionStep,
@@ -38,6 +39,7 @@ from .validation import (
 
 __all__ = [
     "MOBILE_SCHEMA_VERSION",
+    "MOBILE_CAPABILITY_ID_PATTERN",
     "MobileCapability",
     "MobileCapabilityCategory",
     "MobilePlatform",

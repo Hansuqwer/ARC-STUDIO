@@ -301,6 +301,12 @@ MOCK_CAPABILITIES: list[MobileCapability] = [
 
 _CATALOG: dict[str, MobileCapability] = {c.id: c for c in MOCK_CAPABILITIES}
 
+# Fail fast at import if the catalog has duplicate IDs (programming error)
+assert len(_CATALOG) == len(MOCK_CAPABILITIES), (
+    f"Duplicate capability IDs in MOCK_CAPABILITIES: "
+    f"{[c.id for c in MOCK_CAPABILITIES if MOCK_CAPABILITIES.count(c) > 1]}"
+)
+
 
 def get_capability(capability_id: str) -> MobileCapability | None:
     return _CATALOG.get(capability_id)
