@@ -381,3 +381,44 @@ def mobile_pin_cmd(
     _out(
         ok({"id": manifest.id, "manifest_hash": new_hash, "path": str(manifest_file)}), json_output
     )
+
+
+@mobile_app.command("replay")
+def mobile_replay_cmd(
+    trace_file: str = typer.Argument(..., help="Recorded trace JSONL to compare."),
+    golden: str = typer.Option(..., "--golden", help="Golden trace JSONL to compare against."),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Replay a trace against a golden trace; exits 1 on divergence."""
+    _setup_logging(debug)
+    from ..mobile import read_trace, replay_trace
+
+    for fpath in (trace_file, golden):
+        if not Path(fpath).is_file():
+            _out(err(ArcErrorCode.INVALID_INPUT, f"File not found: {fpath}"), json_output)
+            raise typer.Exit(1)
+    try:
+        recorded = read_trace(trace_file)
+        gold = read_trace(golden)
+    except Exception as exc:  # noqa: BLE001
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Cannot read trace: {exc}"), json_output)
+        raise typer.Exit(1) from exc
+
+    diff = replay_trace(recorded, gold)
+    payload = {
+        "match": diff.match,
+        "summary": diff.summary,
+        "recorded_count": diff.recorded_count,
+        "golden_count": diff.golden_count,
+        "first_diff_index": diff.first_diff_index,
+        "diffs": diff.diffs,
+    }
+    if diff.match:
+        _out(ok(payload), json_output)
+    else:
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, f"Replay divergence: {diff.summary}", payload),
+            json_output,
+        )
+        raise typer.Exit(1)
