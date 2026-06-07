@@ -12,10 +12,18 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 MOBILE_SCHEMA_VERSION = 1
+# Capability IDs must be dot-separated lowercase alphanumeric segments, e.g. "device.camera.capture.mock"
+MOBILE_CAPABILITY_ID_PATTERN = r"^[a-z][a-z0-9]*(\.[a-z][a-z0-9_]*)+$"
 
 
 class _Base(BaseModel):
     model_config = ConfigDict(extra="ignore")
+
+
+class _StrictBase(BaseModel):
+    """Strict variant — rejects unknown fields. Use via load_manifest(strict=True)."""
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class MobilePlatform(str, Enum):

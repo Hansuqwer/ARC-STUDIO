@@ -1,10 +1,11 @@
 """Fail-closed validation for mobile runtime manifests and capabilities.
 
 Rules:
+  V_ID capability ID required and must match pattern
   V1  capability ID required
   V2  platform support required
   V3  sensitive capabilities require approval_mode
-  V4  write capabilities require audit + hitl/trust
+  V4  write capabilities require audit + hitl/trust (error in strict mode, warning otherwise)
   V5  sensitive native capabilities must be mock-only in MVP
   V6  background execution blocked in MVP
   V7  network blocked unless mock
@@ -12,10 +13,12 @@ Rules:
   V9  no secrets in manifests
   V10 capability_hash must match content when set
   V11 manifest_hash must match content when set
+  V12 duplicate step IDs not allowed
 """
 
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -23,6 +26,7 @@ from pydantic import BaseModel, Field
 from .models import (
     MobileActionPlan,
     MobileCapability,
+    MOBILE_CAPABILITY_ID_PATTERN,
     MobileDataSensitivity,
     MobileRuntimeManifest,
 )
@@ -66,7 +70,7 @@ class MobileValidationReport(BaseModel):
         return self.errors + self.warnings
 
 
-def _validate_capability(cap: MobileCapability) -> list[ValidationFinding]:
+def _validate_capability(cap: MobileCapability, *, strict: bool = False) -> list[ValidationFinding]:
     findings = []
 
     # V1: ID required
@@ -78,6 +82,20 @@ def _validate_capability(cap: MobileCapability) -> list[ValidationFinding]:
                 severity="error",
                 message="Capability ID is required.",
                 remediation="Set a stable, namespaced ID e.g. 'device.camera.capture.mock'.",
+            )
+        )
+    elif not re.match(MOBILE_CAPABILITY_ID_PATTERN, cap.id):
+        # V_ID: regex
+        findings.append(
+            ValidationFinding(
+                rule="capability_id_invalid_pattern",
+                field="id",
+                severity="error",
+                message=(
+                    f"Capability ID '{cap.id}' does not match required pattern "
+                    f"(lowercase dot-separated segments, e.g. 'device.camera.capture.mock')."
+                ),
+                remediation="Use lowercase alphanumeric dot-separated IDs.",
             )
         )
 
@@ -123,7 +141,7 @@ def _validate_capability(cap: MobileCapability) -> list[ValidationFinding]:
                 ValidationFinding(
                     rule="write_requires_hitl_or_trust",
                     field="requires_hitl",
-                    severity="warning",
+                    severity="error" if strict else "warning",
                     message=f"Write capability '{cap.id}' should require HITL or trust.",
                     remediation="Set requires_hitl=True or requires_trust=True.",
                 )
@@ -198,8 +216,8 @@ def _validate_capability(cap: MobileCapability) -> list[ValidationFinding]:
     return findings
 
 
-def validate_capability(cap: MobileCapability) -> MobileValidationReport:
-    findings = _validate_capability(cap)
+def validate_capability(cap: MobileCapability, *, strict: bool = False) -> MobileValidationReport:
+    findings = _validate_capability(cap, strict=strict)
     errors = [f for f in findings if f.severity == "error"]
     warnings = [f for f in findings if f.severity == "warning"]
     return MobileValidationReport(
@@ -210,7 +228,9 @@ def validate_capability(cap: MobileCapability) -> MobileValidationReport:
     )
 
 
-def validate_manifest(manifest: MobileRuntimeManifest) -> MobileValidationReport:
+def validate_manifest(
+    manifest: MobileRuntimeManifest, *, strict: bool = False
+) -> MobileValidationReport:
     errors: list[ValidationFinding] = []
     warnings: list[ValidationFinding] = []
 
@@ -292,10 +312,27 @@ def validate_manifest(manifest: MobileRuntimeManifest) -> MobileValidationReport
         )
 
     # Validate each capability
+    cap_ids: list[str] = []
     for cap in manifest.capabilities:
-        sub = _validate_capability(cap)
+        sub = _validate_capability(cap, strict=strict)
         errors.extend(f for f in sub if f.severity == "error")
         warnings.extend(f for f in sub if f.severity == "warning")
+        cap_ids.append(cap.id)
+
+    # Duplicate capability IDs
+    seen_ids: set[str] = set()
+    for cid in cap_ids:
+        if cid in seen_ids:
+            errors.append(
+                ValidationFinding(
+                    rule="duplicate_capability_id",
+                    field="capabilities",
+                    severity="error",
+                    message=f"Duplicate capability ID '{cid}' in manifest '{manifest.id}'.",
+                    remediation="Each capability must have a unique ID.",
+                )
+            )
+        seen_ids.add(cid)
 
     return MobileValidationReport(
         ok=not errors,
@@ -306,7 +343,7 @@ def validate_manifest(manifest: MobileRuntimeManifest) -> MobileValidationReport
 
 
 def validate_action_plan(
-    plan: MobileActionPlan, known_capabilities: list[MobileCapability]
+    plan: MobileActionPlan, known_capabilities: list[MobileCapability], *, strict: bool = False
 ) -> MobileValidationReport:
     errors: list[ValidationFinding] = []
     warnings: list[ValidationFinding] = []
@@ -332,6 +369,21 @@ def validate_action_plan(
                 remediation="Set requires_network=False.",
             )
         )
+
+    # Duplicate step IDs
+    seen_steps: set[str] = set()
+    for step in plan.steps:
+        if step.step_id in seen_steps:
+            errors.append(
+                ValidationFinding(
+                    rule="duplicate_step_id",
+                    field=f"steps[{step.step_id}].step_id",
+                    severity="error",
+                    message=f"Duplicate step ID '{step.step_id}' in plan '{plan.plan_id}'.",
+                    remediation="Each step must have a unique step_id.",
+                )
+            )
+        seen_steps.add(step.step_id)
 
     for step in plan.steps:
         if step.capability_id not in known_ids:
