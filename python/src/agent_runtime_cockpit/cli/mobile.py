@@ -381,3 +381,45 @@ def mobile_pin_cmd(
     _out(
         ok({"id": manifest.id, "manifest_hash": new_hash, "path": str(manifest_file)}), json_output
     )
+
+
+mobile_trace_app = typer.Typer(name="trace", help="Mobile trace sub-commands")
+mobile_app.add_typer(mobile_trace_app)
+
+
+@mobile_trace_app.command("verify")
+def mobile_trace_verify_cmd(
+    trace_file: str = typer.Argument(..., help="Path to mobile simulator JSONL trace."),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Verify the prev_event_hash chain of a trace. Exits 1 if tampered."""
+    _setup_logging(debug)
+    from ..mobile import read_trace, verify_trace
+
+    p = Path(trace_file)
+    if not p.is_file():
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Trace file not found: {trace_file}"), json_output)
+        raise typer.Exit(1)
+    try:
+        trace = read_trace(p)
+    except Exception as exc:  # noqa: BLE001
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid trace file: {exc}"), json_output)
+        raise typer.Exit(1) from exc
+
+    chain_ok, message = verify_trace(trace)
+    payload = {
+        "ok": chain_ok,
+        "plan_id": trace.plan_id,
+        "event_count": len(trace.events),
+        "trace_hash": trace.trace_hash,
+        "message": message,
+    }
+    if chain_ok:
+        _out(ok(payload), json_output)
+    else:
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, f"Trace verification failed: {message}", payload),
+            json_output,
+        )
+        raise typer.Exit(1)
