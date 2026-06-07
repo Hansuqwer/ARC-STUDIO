@@ -10,9 +10,11 @@ import type {
   MobileCapability,
   MobileRuntimeManifest,
   MobileActionPlan,
+} from './mobile-runtime';
+import type {
   MobileRuntimeEvent,
   MobilePolicyDecision,
-} from './mobile-runtime';
+} from './mobile-events';
 
 export class ArcValidationError extends Error {
   constructor(
