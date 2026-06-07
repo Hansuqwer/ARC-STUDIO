@@ -1,0 +1,17 @@
+{
+  "name": "arc-mobile-runtime-example",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ARC Mobile Runtime Expo example (simulator preview, fixtures only)",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "prebuild": "expo prebuild --no-install"
+  },
+  "dependencies": {
+    "arc-mobile-runtime": "file:..",
+    "expo": ">=50",
+    "react": "*",
+    "react-native": "*"
+  }
+}

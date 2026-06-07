@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "arc-mobile-runtime-example",
+    "slug": "arc-mobile-runtime-example",
+    "version": "0.1.0",
+    "platforms": ["ios", "android"],
+    "plugins": [
+      [
+        "arc-mobile-runtime",
+        {
+          "permissions": ["device.camera.capture.mock"]
+        }
+      ]
+    ],
+    "_comment": "Simulator preview. The arc-mobile-runtime plugin injects ADVISORY permission declarations only; the native module returns fixtures and accesses no real device APIs. Requires human review before any store submission."
+  }
+}

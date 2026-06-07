@@ -1,0 +1,47 @@
+name: mobile-expo
+
+# Native-safety gate for the Expo simulator-preview package. The authoritative check is the
+# recursive forbidden-symbol scan (fails the build if any real device/sensor API appears).
+# Full native builds (xcodebuild/gradle) require platform toolchains not present on this
+# runner, so `expo prebuild` runs best-effort only and never blocks the gate.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  expo-safety-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
+      - name: Sync dependencies
+        working-directory: python
+        run: uv sync --all-extras --dev
+      - name: Expo native-safety + contract gate (authoritative)
+        working-directory: python
+        run: >
+          uv run pytest -q
+          tests/test_mobile_expo_scaffold.py
+          tests/test_mobile_expo_api.py
+          tests/test_mobile_expo_config_plugin.py
+          tests/test_mobile_expo_example.py
+      - name: Expo prebuild readiness (best-effort, simulator preview)
+        continue-on-error: true
+        working-directory: runtimes/mobile/expo/packages/arc-mobile-runtime/example
+        run: |
+          echo "Simulator preview: native prebuild is a preview/manual step."
+          echo "The authoritative CI gate is the recursive forbidden-symbol scan above."
+          npx --yes expo prebuild --no-install --platform all || \
+            echo "::notice::expo prebuild skipped (toolchain/network unavailable) — preview only"

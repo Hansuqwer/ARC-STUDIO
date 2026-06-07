@@ -6007,3 +6007,16 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `tabs/ConfigTab.tsx` + 2 new `tabs/*.ts` + 3 retargeted contract tests. Verified: `pnpm --filter arc-extension build` (tsc) clean; the 4 ConfigTab-related suites **229 passed**; full arc-extension suite **933 passed / 3 skipped / 33 suites**; `pnpm typecheck` (workspace) clean; eslint clean on all 6 files. | Notes: closes CR-028 (last refactor-track item). Security copy stays pinned to the rendered component via the two dedicated contract tests; logic contracts now correctly target the hook. DoD gates 3, 4 cited.
 
 ---
+
+## Phase 187 — Mobile SDK: Expo Module Buildable (Mobile Roadmap Phase 6; Batch 5 T1–T3)
+
+**Goal:** Complete the Expo framework target as a buildable, mock-native simulator preview (Mobile Roadmap Phase 6). No real device access; native returns fixtures.
+
+**Implemented (T1–T3):**
+- **T1** Expo config plugin (`app.plugin.js` + `plugin/arc-permission-map.json`): real `(config, props) => config` that injects **advisory** iOS usage strings + Android permissions from ARC capability permission IDs (allowlist-only, deterministic, simulator-preview labeled).
+- **T2** Expo TS API (`src/index.ts`): routes through `requireNativeModule("ArcMobileRuntime")` with an identical deterministic JS fixture fallback; `getCapabilities()` (13-cap catalog), `simulate(plan)`, `addSimulationListener` + Expo `EventEmitter`; Swift/Kotlin declare `Events("onSimulate")` + emit (fixtures only).
+- **T3** Example app (`example/App.tsx` + `app.json` using the config plugin) + dedicated CI gate (`.github/workflows/mobile-expo.yml`) whose authoritative check is a **recursive forbidden-symbol scan** of every Swift/Kotlin/TS/JS file (future-proof); `expo prebuild` is best-effort only.
+
+**Status:** Baseline Complete (Mobile Roadmap Phase 6) | Evidence: local worktree 2026-06-07 | Files: `runtimes/mobile/expo/packages/arc-mobile-runtime/{app.plugin.js,plugin/arc-permission-map.json,src/index.ts,ios,android,example}` + `.github/workflows/mobile-expo.yml`. Verified: `test_mobile_expo_{scaffold,api,config_plugin,example}.py` — 28 passed (incl. node behavioral inject + TS↔Swift↔Kotlin contract parity + 13-cap drift guard vs `capabilities.py`). | Notes: simulator-preview only; no real device APIs anywhere (recursive gate). Phase 11 (real native) stays gated/out-of-scope.
+
+---
