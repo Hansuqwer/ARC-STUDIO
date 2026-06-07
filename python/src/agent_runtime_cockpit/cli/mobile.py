@@ -465,6 +465,44 @@ def mobile_schema_check_cmd(
                 ArcErrorCode.INVALID_INPUT,
                 f"Schema validation failed ({len(errors)} error(s))",
                 {"errors": errors},
+mobile_approval_app = typer.Typer(name="approval", help="Mobile approval grant commands")
+mobile_app.add_typer(mobile_approval_app)
+
+
+@mobile_approval_app.command("issue")
+def mobile_approval_issue_cmd(
+    capability: str = typer.Option(..., "--cap", help="Capability ID to approve."),
+    scope: str = typer.Option("execute:once", "--scope", help="Approval scope string."),
+    ttl: int = typer.Option(300, "--ttl", help="TTL in seconds."),
+    subject: str | None = typer.Option(None, "--subject"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Issue a scoped approval grant for a capability."""
+    _setup_logging(debug)
+    from ..mobile.approval import issue_grant
+
+    grant = issue_grant(capability, scope, ttl, subject=subject)
+    _out(ok(grant.model_dump(mode="json")), json_output)
+
+
+@mobile_approval_app.command("revoke")
+def mobile_approval_revoke_cmd(
+    grant_id: str = typer.Argument(..., help="Grant ID to revoke."),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Revoke an approval grant. Exits 1 if grant not found."""
+    _setup_logging(debug)
+    from ..mobile.approval import revoke_grant
+
+    revoked = revoke_grant(grant_id)
+    if revoked:
+        _out(ok({"revoked": True, "grant_id": grant_id}), json_output)
+    else:
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT, f"Grant '{grant_id}' not found", {"grant_id": grant_id}
             ),
             json_output,
         )
