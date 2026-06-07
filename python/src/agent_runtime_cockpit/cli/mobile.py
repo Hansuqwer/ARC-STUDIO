@@ -534,3 +534,103 @@ def mobile_replay_cmd(
             json_output,
         )
         raise typer.Exit(1)
+mobile_generate_app = typer.Typer(name="generate", help="Generate advisory compliance artifacts")
+mobile_app.add_typer(mobile_generate_app)
+
+
+def _load_manifest_for_generate(manifest_path: str | None, json_output: bool):
+    from ..mobile.manifest import load_manifest as _load
+    from ..mobile import build_default_manifest, MobileManifestLoadError
+
+    if manifest_path:
+        try:
+            return _load(manifest_path)
+        except MobileManifestLoadError as exc:
+            _out(err(ArcErrorCode.INVALID_INPUT, f"Cannot load manifest: {exc}"), json_output)
+            raise typer.Exit(1) from exc
+    return build_default_manifest("arc.mobile.runtime", "ARC Mobile Runtime")
+
+
+@mobile_generate_app.command("ios-privacy")
+def mobile_gen_ios_privacy_cmd(
+    manifest: str | None = typer.Option(None, "--manifest"),
+    out: str | None = typer.Option(None, "--out", help="Output file path (default: stdout/json)"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Generate advisory Apple PrivacyInfo.xcprivacy from a manifest."""
+    _setup_logging(debug)
+    from ..mobile.compliance.ios import generate_privacy_manifest, generate_usage_strings
+
+    m = _load_manifest_for_generate(manifest, json_output)
+    xml = generate_privacy_manifest(m)
+    if out:
+        Path(out).write_text(xml, encoding="utf-8")
+    _out(
+        ok(
+            {
+                "advisory": True,
+                "requires_human_review": True,
+                "manifest_id": m.id,
+                "output": xml,
+                "usage_strings": generate_usage_strings(m),
+            }
+        ),
+        json_output,
+    )
+
+
+@mobile_generate_app.command("android-manifest")
+def mobile_gen_android_manifest_cmd(
+    manifest: str | None = typer.Option(None, "--manifest"),
+    out: str | None = typer.Option(None, "--out"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Generate advisory Android manifest permission fragment."""
+    _setup_logging(debug)
+    from ..mobile.compliance.android import generate_manifest_permissions
+
+    m = _load_manifest_for_generate(manifest, json_output)
+    xml = generate_manifest_permissions(m)
+    if out:
+        Path(out).write_text(xml, encoding="utf-8")
+    _out(
+        ok({"advisory": True, "requires_human_review": True, "manifest_id": m.id, "output": xml}),
+        json_output,
+    )
+
+
+@mobile_generate_app.command("data-safety")
+def mobile_gen_data_safety_cmd(
+    manifest: str | None = typer.Option(None, "--manifest"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Generate advisory Android Data Safety notes."""
+    _setup_logging(debug)
+    from ..mobile.compliance.android import generate_data_safety_notes
+
+    m = _load_manifest_for_generate(manifest, json_output)
+    _out(ok(generate_data_safety_notes(m)), json_output)
+
+
+@mobile_generate_app.command("review-notes")
+def mobile_gen_review_notes_cmd(
+    manifest: str | None = typer.Option(None, "--manifest"),
+    out: str | None = typer.Option(None, "--out"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Generate advisory app-store review notes."""
+    _setup_logging(debug)
+    from ..mobile.compliance.review_notes import generate_review_notes
+
+    m = _load_manifest_for_generate(manifest, json_output)
+    notes = generate_review_notes(m)
+    if out:
+        Path(out).write_text(notes, encoding="utf-8")
+    _out(
+        ok({"advisory": True, "requires_human_review": True, "manifest_id": m.id, "notes": notes}),
+        json_output,
+    )
