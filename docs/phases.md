@@ -5938,3 +5938,16 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete (part 2 of N) | Evidence: local worktree | Files: `common/protocol/run-execution.ts`, `common/arc-protocol.ts`, `__tests__/protocol-extensions.contract.test.ts`. Verified: `tsc` clean; protocol-extensions + studio-tabs **250 passed**. arc-protocol.ts 1795 → 1665. | Notes: 2 modules extracted (replay-diff, run-execution); ~202 lines moved. Config/schema-contracts/stable-ids/runtime-adapter sections remain. DoD gates 3, 4 cited.
 
 ---
+
+## Phase 182 — Refactor: Split arc-protocol.ts — Config Types Module (R-POLISH24)
+
+**Goal:** CR-027 (part 3) — extract the largest section (Config Tab Types).
+
+**Implemented:**
+- New `common/protocol/config-types.ts` (~19 self-contained types): provider key/catalog/account status, provider test/model info, `TrustStatus`, `SafeRuntimeConfig`, `ConfigStatus`, `SafeConfigUpdate`, `ArcProfileInfo`, isolation status. Moved byte-exact (anchored on the section banners) to avoid transcription drift.
+- `arc-protocol.ts` re-exports it + back-imports the 14 names used by `ArcService` config/provider/isolation methods.
+- `protocol-extensions.contract.test.ts`: the Config type-shape assertions (incl. the no-raw-key / non-secret negative checks) now read the module source; all `ArcService` method assertions stay on `arc-protocol`.
+
+**Status:** Baseline Complete (part 3 of N) | Evidence: local worktree | Files: `common/protocol/config-types.ts`, `common/arc-protocol.ts`, `__tests__/protocol-extensions.contract.test.ts`. Verified: `tsc` clean; protocol-extensions + studio-tabs **250 passed**. arc-protocol.ts 1665 → 1439 (3 modules, ~428 lines / ~23% moved). | Notes: cockpit-schema-contracts, stable-ids/graph-linkage, runtime-adapter, run-links, HITL, audit sections remain. DoD gates 3, 4, 6 (non-secret config checks preserved) cited.
+
+---

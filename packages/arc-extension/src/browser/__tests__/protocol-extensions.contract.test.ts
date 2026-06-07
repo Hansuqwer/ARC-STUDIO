@@ -11,9 +11,11 @@ describe('Protocol Extensions (Session B + B7)', () => {
     const protocolFile = path.join(__dirname, '..', '..', '..', 'src', 'common', 'arc-protocol.ts');
     const replayDiffFile = path.join(__dirname, '..', '..', '..', 'src', 'common', 'protocol', 'replay-diff.ts');
     const runExecutionFile = path.join(__dirname, '..', '..', '..', 'src', 'common', 'protocol', 'run-execution.ts');
+    const configTypesFile = path.join(__dirname, '..', '..', '..', 'src', 'common', 'protocol', 'config-types.ts');
     let source: string;
     let replayDiffSource: string;
     let runExecutionSource: string;
+    let configTypesSource: string;
 
     beforeAll(async () => {
         source = await fs.readFile(protocolFile, 'utf-8');
@@ -23,63 +25,65 @@ describe('Protocol Extensions (Session B + B7)', () => {
         replayDiffSource = await fs.readFile(replayDiffFile, 'utf-8');
         // CR-027: Streaming / Run Preflight / Start types were extracted to ./protocol/run-execution.
         runExecutionSource = await fs.readFile(runExecutionFile, 'utf-8');
+        // CR-027: Config Tab types were extracted to ./protocol/config-types.
+        configTypesSource = await fs.readFile(configTypesFile, 'utf-8');
     });
 
     describe('Config Tab Types (Session B)', () => {
         it('should export SafeProviderKeyStatus', () => {
-            expect(source).toMatch(/export interface SafeProviderKeyStatus/);
+            expect(configTypesSource).toMatch(/export interface SafeProviderKeyStatus/);
         });
 
         it('should have SafeProviderKeyStatus with source field, no raw key', () => {
-            expect(source).toMatch(/SafeProviderKeyStatus/);
-            expect(source).toMatch(/source:\s*'keyring'\s*\|\s*'env'\s*\|\s*'file'\s*\|\s*'unset'/);
-            expect(source).not.toMatch(/SafeProviderKeyStatus[\s\S]*?rawKey/);
-            expect(source).not.toMatch(/SafeProviderKeyStatus[\s\S]*?api_key:\s*string/);
+            expect(configTypesSource).toMatch(/SafeProviderKeyStatus/);
+            expect(configTypesSource).toMatch(/source:\s*'keyring'\s*\|\s*'env'\s*\|\s*'file'\s*\|\s*'unset'/);
+            expect(configTypesSource).not.toMatch(/SafeProviderKeyStatus[\s\S]*?rawKey/);
+            expect(configTypesSource).not.toMatch(/SafeProviderKeyStatus[\s\S]*?api_key:\s*string/);
         });
 
         it('should export TrustStatus', () => {
-            expect(source).toMatch(/export interface TrustStatus/);
+            expect(configTypesSource).toMatch(/export interface TrustStatus/);
         });
 
         it('should have TrustStatus with trusted and trustLevel fields', () => {
-            expect(source).toMatch(/TrustStatus/);
-            expect(source).toMatch(/trusted:\s*boolean/);
-            expect(source).toMatch(/trustLevel/);
+            expect(configTypesSource).toMatch(/TrustStatus/);
+            expect(configTypesSource).toMatch(/trusted:\s*boolean/);
+            expect(configTypesSource).toMatch(/trustLevel/);
         });
 
         it('should export SafeRuntimeConfig', () => {
-            expect(source).toMatch(/export interface SafeRuntimeConfig/);
+            expect(configTypesSource).toMatch(/export interface SafeRuntimeConfig/);
         });
 
         it('should have SafeRuntimeConfig with mode/routing fields', () => {
-            expect(source).toMatch(/SafeRuntimeConfig/);
-            expect(source).toMatch(/defaultRuntime/);
-            expect(source).toMatch(/routingMode/);
-            expect(source).toMatch(/dryRun/);
-            expect(source).toMatch(/isolation/);
+            expect(configTypesSource).toMatch(/SafeRuntimeConfig/);
+            expect(configTypesSource).toMatch(/defaultRuntime/);
+            expect(configTypesSource).toMatch(/routingMode/);
+            expect(configTypesSource).toMatch(/dryRun/);
+            expect(configTypesSource).toMatch(/isolation/);
         });
 
         it('should export ConfigStatus', () => {
-            expect(source).toMatch(/export interface ConfigStatus/);
+            expect(configTypesSource).toMatch(/export interface ConfigStatus/);
         });
 
         it('should have ConfigStatus with backendAvailable field', () => {
-            expect(source).toMatch(/ConfigStatus/);
-            expect(source).toMatch(/backendAvailable:\s*boolean/);
+            expect(configTypesSource).toMatch(/ConfigStatus/);
+            expect(configTypesSource).toMatch(/backendAvailable:\s*boolean/);
         });
 
         it('should export SafeConfigUpdate', () => {
-            expect(source).toMatch(/export interface SafeConfigUpdate/);
+            expect(configTypesSource).toMatch(/export interface SafeConfigUpdate/);
         });
 
         it('should have SafeConfigUpdate with only safe fields', () => {
-            expect(source).toMatch(/SafeConfigUpdate/);
-            expect(source).toMatch(/defaultRuntime\?/);
-            expect(source).toMatch(/mode\?/);
-            expect(source).toMatch(/isolation\?/);
-            expect(source).toMatch(/allowPaidCalls\?/);
-            expect(source).toMatch(/routingMode\?/);
-            expect(source).toMatch(/selectedProfile\?/);
+            expect(configTypesSource).toMatch(/SafeConfigUpdate/);
+            expect(configTypesSource).toMatch(/defaultRuntime\?/);
+            expect(configTypesSource).toMatch(/mode\?/);
+            expect(configTypesSource).toMatch(/isolation\?/);
+            expect(configTypesSource).toMatch(/allowPaidCalls\?/);
+            expect(configTypesSource).toMatch(/routingMode\?/);
+            expect(configTypesSource).toMatch(/selectedProfile\?/);
         });
 
         it('should have getConfigStatus method on ArcService', () => {
@@ -91,18 +95,18 @@ describe('Protocol Extensions (Session B + B7)', () => {
         });
 
         it('should expose profile and isolation service methods', () => {
-            expect(source).toMatch(/export interface ArcProfileInfo/);
-            expect(source).toMatch(/export interface IsolationStatus/);
-            expect(source).toMatch(/export interface IsolationProviderInfo/);
+            expect(configTypesSource).toMatch(/export interface ArcProfileInfo/);
+            expect(configTypesSource).toMatch(/export interface IsolationStatus/);
+            expect(configTypesSource).toMatch(/export interface IsolationProviderInfo/);
             expect(source).toMatch(/listProfiles\(\):\s*Promise<ArcProfileInfo\[\]>/);
             expect(source).toMatch(/getIsolationStatus\(\):\s*Promise<IsolationStatus>/);
             expect(source).toMatch(/listIsolationProviders\(\):\s*Promise<IsolationProviderInfo\[\]>/);
         });
 
         it('should export provider catalog and key-ref protocol types', () => {
-            expect(source).toMatch(/export interface ProviderCatalogEntry/);
-            expect(source).toMatch(/export interface ProviderKeyRefRequest/);
-            expect(source).toMatch(/ProviderAuthKind/);
+            expect(configTypesSource).toMatch(/export interface ProviderCatalogEntry/);
+            expect(configTypesSource).toMatch(/export interface ProviderKeyRefRequest/);
+            expect(configTypesSource).toMatch(/ProviderAuthKind/);
         });
 
         it('should expose provider catalog and key-ref service methods', () => {
@@ -112,16 +116,16 @@ describe('Protocol Extensions (Session B + B7)', () => {
         });
 
         it('should export provider diagnostics and quota protocol types', () => {
-            expect(source).toMatch(/export interface ProviderDiagnosticsInfo/);
-            expect(source).toMatch(/export interface ProviderQuotaInfo/);
-            expect(source).toMatch(/export interface ProviderQuotaResetResult/);
-            expect(source).toMatch(/success:\s*boolean/);
-            expect(source).toMatch(/message:\s*string/);
-            expect(source).toMatch(/providers\?:\s*Record<string, unknown>\[\]/);
-            expect(source).toMatch(/routing\?:\s*Record<string, unknown>/);
-            expect(source).toMatch(/accounts\?:\s*Record<string, unknown>\[\]/);
-            expect(source).toMatch(/quota\?:\s*Record<string, unknown>/);
-            expect(source).toMatch(/counters\?:\s*Record<string, unknown>/);
+            expect(configTypesSource).toMatch(/export interface ProviderDiagnosticsInfo/);
+            expect(configTypesSource).toMatch(/export interface ProviderQuotaInfo/);
+            expect(configTypesSource).toMatch(/export interface ProviderQuotaResetResult/);
+            expect(configTypesSource).toMatch(/success:\s*boolean/);
+            expect(configTypesSource).toMatch(/message:\s*string/);
+            expect(configTypesSource).toMatch(/providers\?:\s*Record<string, unknown>\[\]/);
+            expect(configTypesSource).toMatch(/routing\?:\s*Record<string, unknown>/);
+            expect(configTypesSource).toMatch(/accounts\?:\s*Record<string, unknown>\[\]/);
+            expect(configTypesSource).toMatch(/quota\?:\s*Record<string, unknown>/);
+            expect(configTypesSource).toMatch(/counters\?:\s*Record<string, unknown>/);
         });
 
         it('should export SandboxInspectResult', () => {
@@ -133,12 +137,12 @@ describe('Protocol Extensions (Session B + B7)', () => {
         });
 
         it('should keep provider telemetry protocol generic and non-secret', () => {
-            expect(source).toMatch(/ProviderDiagnosticsInfo/);
-            expect(source).toMatch(/ProviderQuotaInfo/);
-            expect(source).not.toMatch(/ProviderDiagnosticsInfo[\s\S]*?api[_-]?key/i);
-            expect(source).not.toMatch(/ProviderQuotaInfo[\s\S]*?api[_-]?key/i);
-            expect(source).not.toMatch(/ProviderQuotaInfo[\s\S]*?rawSecret/i);
-            expect(source).not.toMatch(/ProviderDiagnosticsInfo[\s\S]*?rawSecret/i);
+            expect(configTypesSource).toMatch(/ProviderDiagnosticsInfo/);
+            expect(configTypesSource).toMatch(/ProviderQuotaInfo/);
+            expect(configTypesSource).not.toMatch(/ProviderDiagnosticsInfo[\s\S]*?api[_-]?key/i);
+            expect(configTypesSource).not.toMatch(/ProviderQuotaInfo[\s\S]*?api[_-]?key/i);
+            expect(configTypesSource).not.toMatch(/ProviderQuotaInfo[\s\S]*?rawSecret/i);
+            expect(configTypesSource).not.toMatch(/ProviderDiagnosticsInfo[\s\S]*?rawSecret/i);
         });
 
         it('should expose provider diagnostics and quota service methods', () => {
