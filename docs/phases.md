@@ -6033,3 +6033,15 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete (Mobile Roadmap Phase 8) | Evidence: local worktree 2026-06-07 | Files: `mobile/{secure_store,offline_queue}.py`, `mobile/privacy_budget.py`, `mobile/__init__.py`. Verified: `test_mobile_{secure_store,egress_guard,offline_queue}.py` — 22 passed (no-plaintext-at-rest, tamper/wrong-key fail-closed, deterministic over-budget + per-class + critical-block denials, TTL expiry, FIFO retention, hash-only at rest, integrity verify). | Notes: deterministic security (no LLM); simulator preview; no real network egress (accounting only).
 
 ---
+
+## Phase 189 — Mobile SDK: React Native + Flutter Scaffolds (Mobile Roadmap Phases 9–10; Batch 5 T7–T8)
+
+**Goal:** Stand up the remaining framework targets as mock-native, fixtures-only scaffolds (Mobile Roadmap Phase 9 RN + Phase 10 Flutter). No real device access; native/platform layers return fixtures.
+
+**Implemented (T7–T8):**
+- **T7 (RN, Phase 9)** New-Architecture **TurboModule** Codegen spec (`src/NativeArcMobileRuntime.ts`) + `codegenConfig`; TS API routes through the TurboModule with an identical JS fixture fallback + `getCapabilities`/`simulate` (13-cap catalog drift-guarded); iOS `.mm` + Android Kotlin fixture stubs.
+- **T8 (Flutter, Phase 10)** Federated **platform interface** (`ArcMobileRuntimePlatform`) + Dart models (capability/action-plan/result with `fromJson`/`toJson`) + method-channel default impl (fixtures on `MissingPluginException`) + `ArcMobileRuntime` facade + 13-cap catalog.
+
+**Status:** Baseline Complete (Mobile Roadmap Phases 9–10) | Evidence: local worktree 2026-06-07 | Files: `runtimes/mobile/react-native/packages/arc-mobile-runtime/*`, `runtimes/mobile/flutter/packages/arc_mobile_runtime/lib/*`. Verified: `test_mobile_rn.py` (7) + `test_mobile_flutter.py` (7) — Codegen spec/`codegenConfig`, platform interface, JSON round-trips, catalog drift-guards vs `capabilities.py`, recursive forbidden-symbol scans, TS↔iOS↔Android parity. **Flutter toolchain (local):** `flutter analyze` clean + `flutter test` 5/5 pass. | Notes: fixtures only; no real device APIs anywhere (recursive gates). Native/platform impls are gated future work (Phase 11).
+
+---
