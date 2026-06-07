@@ -5801,3 +5801,13 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `cli/studio_workspace.py` + tests `tests/cli/test_workspace_search.py` (+3: sensitive-file exclusion, ignored-dir exclusion, result cap). Verified: `uv run pytest tests/cli/test_workspace_search.py tests/cli/test_workspace_inventory.py -q` → **13 passed**; `uv run ruff check src tests` clean. | Notes: additive; deterministic; producer-truth (secrets never surfaced). DoD gates 5/6 cited.
 
 ---
+
+## Phase 171 — DoD Elevation: Real jest-axe A11y Assertions (R-POLISH13)
+
+**Goal:** CR-042 — replace no-op a11y test blocks with real automated assertions. Verified the infra first: `jest-axe ^10`, `@types/jest-axe`, and `jest-environment-jsdom` are installed and the jest env is jsdom, so axe is feasible.
+
+**Finding & implementation:** `accessibility.test.tsx` already ran real `axe()` on mock components, but its last three `describe` blocks (Keyboard Navigation, Screen Reader, Color Contrast) were placeholders asserting `expect(true).toBe(true)`. Replaced them with real assertions: an interactive form fixture run through `axe` + accessible-name checks (`toHaveAccessibleName`); a live-status region run through `axe` + `aria-live` assertion; and an honest color-contrast test that runs `axe` with the `color-contrast` rule disabled (jsdom does no layout/painting, so contrast can only be evaluated in a real browser — documented, not faked).
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `browser/__tests__/accessibility.test.tsx`. Verified: `pnpm --filter arc-extension test` → **927 passed / 3 skipped** (32 suites, coverage thresholds met); the accessibility suite alone runs **15** real assertions. | Notes: follow-up — migrate the inline mock components to the real shipped components once their Theia imports resolve cleanly under jsdom. DoD gate 2 cited.
+
+---

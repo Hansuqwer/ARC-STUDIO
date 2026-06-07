@@ -173,38 +173,53 @@ describe('Accessibility - Basic Components', () => {
 });
 
 describe('Accessibility - Keyboard Navigation', () => {
-    it('should document keyboard navigation requirements', () => {
-        // This test documents what should be manually tested:
-        // 1. All interactive elements should be reachable via Tab key
-        // 2. Tab order should follow visual order
-        // 3. Focus indicators should be visible
-        // 4. Modal dialogs should trap focus
-        // 5. Escape key should close modals
-        // 6. Enter/Space should activate buttons
-        expect(true).toBe(true);
+    const FilterForm = () => (
+        <form aria-label="Run filter">
+            <label htmlFor="q">Query</label>
+            <input id="q" type="text" />
+            <button type="submit">Search</button>
+            <button type="button" aria-label="Clear">×</button>
+        </form>
+    );
+
+    it('interactive form has no axe violations', async () => {
+        const { container } = render(<FilterForm />);
+        expect(await axe(container)).toHaveNoViolations();
+    });
+
+    it('every interactive control exposes an accessible name', () => {
+        const { getAllByRole } = render(<FilterForm />);
+        for (const btn of getAllByRole('button')) {
+            expect(btn).toHaveAccessibleName();
+        }
+        expect(getAllByRole('textbox')[0]).toHaveAccessibleName('Query');
     });
 });
 
 describe('Accessibility - Screen Reader', () => {
-    it('should document screen reader testing requirements', () => {
-        // This test documents what should be manually tested:
-        // 1. All content should be announced by screen readers
-        // 2. ARIA labels should provide context
-        // 3. Dynamic content updates should be announced (aria-live)
-        // 4. Form fields should have associated labels
-        // 5. Error messages should be announced
-        expect(true).toBe(true);
+    const LiveStatus = ({ msg }: { msg: string }) => (
+        <div role="status" aria-live="polite">{msg}</div>
+    );
+
+    it('live status region passes axe and announces politely', async () => {
+        const { container } = render(<LiveStatus msg="Run completed" />);
+        expect(await axe(container)).toHaveNoViolations();
+        expect(container.querySelector('[role="status"]')).toHaveAttribute('aria-live', 'polite');
     });
 });
 
 describe('Accessibility - Color Contrast', () => {
-    it('should document color contrast requirements', () => {
-        // This test documents what should be manually tested:
-        // 1. Text should have 4.5:1 contrast ratio (WCAG AA)
-        // 2. Large text (18pt+) should have 3:1 contrast ratio
-        // 3. UI components should have 3:1 contrast ratio
-        // 4. Focus indicators should be visible
-        // 5. Test with browser dev tools or contrast checker
-        expect(true).toBe(true);
+    // jsdom performs no layout or painting, so axe's color-contrast rule cannot
+    // evaluate here (it needs computed colors from a real browser). We disable
+    // that single rule and still enforce the rest of the structural a11y rules,
+    // rather than asserting a no-op. Contrast itself is verified in-browser.
+    it('passes axe with color-contrast deferred to the browser', async () => {
+        const { container } = render(
+            <button className="theia-button" type="button">Apply</button>
+        );
+        const results = await axe(container, {
+            rules: { 'color-contrast': { enabled: false } },
+        });
+        expect(results).toHaveNoViolations();
     });
 });
