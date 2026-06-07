@@ -45,6 +45,12 @@ from .recorder import (
     verify_trace,
 )
 from .privacy_budget import PrivacyBudget, compute_privacy_budget
+from .secure_store import (
+    InMemoryKeyProvider,
+    KeyProvider,
+    SecureLocalStore,
+    SecureStoreError,
+)
 from .signing import SignedPlanEnvelope, sign_plan, verify_plan
 from .replay import ReplayDiff, replay_trace
 from .simulator import simulate_action_plan
@@ -81,6 +87,10 @@ __all__ = [
     "MOBILE_POLICY_VERSION",
     "PrivacyBudget",
     "compute_privacy_budget",
+    "SecureLocalStore",
+    "InMemoryKeyProvider",
+    "KeyProvider",
+    "SecureStoreError",
     "SignedPlanEnvelope",
     "sign_plan",
     "verify_plan",
