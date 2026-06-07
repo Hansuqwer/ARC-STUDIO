@@ -25,6 +25,7 @@ from .models import (
     MobileRuntimePackBridge,
     MobileSimulationStepResult,
 )
+from .approval import ApprovalGrant, issue_grant, revoke_grant, get_grant, list_active_grants
 from .policy import MobilePolicyDecision, explain_capability_policy, explain_plan_policy
 from .recorder import MobileRuntimeEvent, MobileTrace, append_trace, build_trace, read_trace
 from .simulator import simulate_action_plan
@@ -56,6 +57,11 @@ __all__ = [
     "MobileRuntimeEvent",
     "MobileTrace",
     "MobilePolicyDecision",
+    "ApprovalGrant",
+    "issue_grant",
+    "revoke_grant",
+    "get_grant",
+    "list_active_grants",
     "MobileManifestLoadError",
     "MobileValidationReport",
     "ValidationFinding",
