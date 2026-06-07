@@ -381,3 +381,28 @@ def mobile_pin_cmd(
     _out(
         ok({"id": manifest.id, "manifest_hash": new_hash, "path": str(manifest_file)}), json_output
     )
+
+
+@mobile_app.command("privacy-budget")
+def mobile_privacy_budget_cmd(
+    manifest: str | None = typer.Option(None, "--manifest", help="Path to manifest file/dir."),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Summarise the privacy budget declared by a manifest."""
+    _setup_logging(debug)
+    from ..mobile.manifest import load_manifest as _load, MobileManifestLoadError
+    from ..mobile import build_default_manifest
+    from ..mobile.privacy_budget import compute_privacy_budget
+
+    if manifest:
+        try:
+            m = _load(manifest)
+        except MobileManifestLoadError as exc:
+            _out(err(ArcErrorCode.INVALID_INPUT, f"Cannot load manifest: {exc}"), json_output)
+            raise typer.Exit(1) from exc
+    else:
+        m = build_default_manifest("arc.mobile.runtime", "ARC Mobile Runtime")
+
+    budget = compute_privacy_budget(m)
+    _out(ok(budget.as_dict()), json_output)
