@@ -5767,3 +5767,17 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `arc-event-stream-widget.tsx` + tests `__tests__/event-stream-bounded.contract.test.ts` (new, 4 assertions), `__tests__/ui-components.contract.test.ts` (updated off the unbounded-append pattern). Verified: `pnpm --filter arc-extension build` clean; tests **923 passed / 3 skipped / 0 failed** (31 suites); `pnpm typecheck` clean. | Notes: additive; producer-truth preserved (banner names the eviction). DoD gate 5 cited.
 
 ---
+
+## Phase 168 — DoD Elevation: SwarmGraph SDK→IDE Event Contract Lock (R-POLISH10)
+
+**Goal:** CR-016 — SwarmGraph SDK events reaching the IDE, **producer-gated** (no invented data). Verified against the real code first, which materially corrected the premise.
+
+**Findings (verify-before-claim):**
+- The IDE `SwarmGraphInsightTab` is **already producer-truthful**: panels derive only from real trace events via `buildSwarmGraphInsight`; explicit present/degraded/absent badges; "No SwarmGraph topology events found" when absent; runtime metadata explicitly *not* promoted to insight. No invented-data violation exists to fix.
+- The SDK→ARC bridge **already exists**: `SwarmGraphAdapter._map_swarmgraph_event` translates vendored-SDK `SwarmGraphEvent`s into ARC `RunEvent`s (`SWARMGRAPH_TOPOLOGY`/`SWARMGRAPH_CONSENSUS`), whose lowercased form matches the IDE's `isInsightEvent` markers (`swarmgraph_topology`/`swarmgraph_consensus`). So native SwarmGraph topology/consensus already render in the IDE.
+
+**Implemented (honest, non-inventing slice):** a cross-language **contract regression test** (`tests/adapters/test_swarmgraph_ide_event_contract.py`) locking the SDK-event→IDE-marker naming so a rename can't silently degrade the panels, plus a **producer-truth assertion** that a non-insight SDK event (worker) does not masquerade as topology/consensus. Used the public `swarmgraph` SDK API (ARC↔SDK boundary guard, TID251).
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `tests/adapters/test_swarmgraph_ide_event_contract.py` (new, 3 tests). Verified: `uv run pytest tests/adapters/test_swarmgraph_ide_event_contract.py -q` → **3 passed**; `uv run ruff check src tests` clean. | Notes: **no bridge/producer fabricated** — the bridge already existed and the IDE was already truthful; this locks the contract. Scoped follow-ups (NOT done, not claimed): live SDK-runner streaming path to the IDE; cost-event naming (adapter emits `BUDGET_UPDATE` vs the IDE cost panel's `swarmgraph_cost` marker). DoD gate 1 (producer-truth) cited.
+
+---
