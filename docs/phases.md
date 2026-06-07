@@ -5733,3 +5733,15 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `cli/sandbox.py` + tests `tests/isolation/test_sandbox_audit_query.py` (+3 gate tests; 2 pre-existing CLI tests updated to pass `--yes`). Verified: `uv run pytest tests/isolation/test_sandbox_audit_query.py -q` → **22 passed**; `uv run ruff check src tests` clean. | Notes: additive (`--yes` preserves scriptability); chain preserved by the underlying prune. DoD gate 6 cited. Follow-up: consider gating `policy revoke` (mutating, but safe-direction).
 
 ---
+
+## Phase 165 — DoD Elevation: Theia Notification Env Allowlist + Async Node Backend (R-POLISH7)
+
+**Goal:** CR-007 + CR-012 (Theia/Node backend). Verified against the real code first.
+
+**Implemented:**
+- **CR-007 — notification env leak.** `NotificationBackendService.#execCli` used `spawn('arc', args, { shell: false })` with **no `env`**, so the child inherited the full `process.env` (secrets included) — unlike every other service. Now passes `env: buildArcCliEnv()` (the existing allowlist). Already had `shell:false` + 5s timeout + 64 KB cap.
+- **CR-012 — blocking Node backend.** `ConfigService.getConfigStatus`/`saveConfig` and `RunLifecycleService.startRun` (120 s timeout), `listRuntimeCapabilities`, `preflightRun`, `replayRun` used synchronous `execFileSync`, blocking the single-threaded event loop. Added a shared non-blocking `execArcCliAsync()` helper to `arc-cli-utils.ts` (lazy `promisify(execFile)`, argv-only, sanitised env, timeout, bounded buffer) and converted those methods to `await` it. Lazy promisify avoids breaking tests that mock `child_process` without `execFile`.
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `services/notification-service.ts`, `services/arc-cli-utils.ts`, `services/config-service.ts`, `services/run-lifecycle-service.ts` + `__tests__/notification-service.test.ts` (updated spawn assertion off `{shell:false}`-only; +secret-exclusion test). Verified: `pnpm --filter arc-extension build` clean; tests **919 passed / 3 skipped / 0 failed** (30 suites; integration test exercises the async path via a real fake binary); `pnpm typecheck` clean. | Notes: config-service retains 13 lower-traffic sync calls (follow-up); additive. DoD gates 5/6/7 cited.
+
+---

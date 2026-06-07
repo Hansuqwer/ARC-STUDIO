@@ -11,7 +11,6 @@
  */
 
 import { injectable, inject } from '@theia/core/shared/inversify';
-import { execFileSync } from 'child_process';
 import {
     ExecutionOptions,
     ExecutionResult,
@@ -37,7 +36,7 @@ import { WorkflowExecutor } from './workflow-executor';
 import { TraceParser } from './trace-parser';
 import { WorkflowDetector } from './workflow-detector';
 import { FileManager } from './file-manager';
-import { buildArcCliEnv } from './arc-cli-utils';
+import { execArcCliAsync } from './arc-cli-utils';
 import { validateTraceId, validateRunId } from '../security-utils';
 
 const ARC_PYTHON_DAEMON_URL_ENV = 'ARC_PYTHON_DAEMON_URL';
@@ -266,7 +265,7 @@ export class RunLifecycleService {
 
     async listRuntimeCapabilities(): Promise<RuntimeCapabilitiesResponse> {
         try {
-            const output = execFileSync('arc', [
+            const output = await execArcCliAsync([
                 'runtimes',
                 '--capabilities',
                 '--workspace',
@@ -274,9 +273,6 @@ export class RunLifecycleService {
                 '--json',
             ], {
                 timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
             });
             const parsed = JSON.parse(output);
             if (parsed.ok && parsed.data) {
@@ -319,11 +315,8 @@ export class RunLifecycleService {
             if (paidCallAllowed) {
                 args.push('--allow-paid-calls');
             }
-            const output = execFileSync('arc', args, {
+            const output = await execArcCliAsync(args, {
                 timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
             });
             const parsed = JSON.parse(output);
             if (!parsed.ok || !parsed.data) {
@@ -384,11 +377,8 @@ export class RunLifecycleService {
             if (paidCallAllowed) {
                 args.push('--allow-paid-calls');
             }
-            const output = execFileSync('arc', args, {
+            const output = await execArcCliAsync(args, {
                 timeout: 120000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
             });
             const parsed = JSON.parse(output);
             if (!parsed.ok || !parsed.data) {
@@ -754,11 +744,8 @@ export class RunLifecycleService {
 
     private async replayRun(runId: string): Promise<ReplayResult> {
         try {
-            const output = execFileSync('arc', ['runs', 'replay', runId, '--workspace', this.workspaceRoot, '--json'], {
+            const output = await execArcCliAsync(['runs', 'replay', runId, '--workspace', this.workspaceRoot, '--json'], {
                 timeout: 30000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
             });
             const parsed = JSON.parse(output);
             if (parsed.ok && parsed.data) {

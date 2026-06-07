@@ -42,10 +42,31 @@ describe('NotificationBackendService', () => {
             kill: jest.fn(),
         }));
         const counts = await service.getCounts();
-        expect(spawn).toHaveBeenCalledWith('arc', ['events', 'summary', '--json'], { shell: false });
+        expect(spawn).toHaveBeenCalledWith(
+            'arc',
+            ['events', 'summary', '--json'],
+            expect.objectContaining({ shell: false }),
+        );
         expect(counts.hitl).toBe(2);
         expect(counts.runFailures).toBe(1);
         expect(counts.auditAlerts).toBe(1);
         expect(counts.protocol).toBe('sse');
+    });
+
+    it('spawns with a sanitised env that excludes secrets (CR-007)', async () => {
+        process.env.OPENAI_API_KEY = 'sk-should-not-leak';
+        try {
+            (spawn as unknown as jest.Mock).mockImplementation(() => ({
+                stdout: { on: (event: string, cb: Function) => event === 'data' && cb(Buffer.from('{"data":{}}')) },
+                on: (event: string, cb: Function) => event === 'close' && cb(0),
+                kill: jest.fn(),
+            }));
+            await service.getCounts();
+            const opts = (spawn as unknown as jest.Mock).mock.calls[0][2];
+            expect(opts.env).toBeDefined();
+            expect(opts.env.OPENAI_API_KEY).toBeUndefined();
+        } finally {
+            delete process.env.OPENAI_API_KEY;
+        }
     });
 });

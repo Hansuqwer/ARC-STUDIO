@@ -6,6 +6,9 @@
  * the Python CLI via execFileSync.
  */
 
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
 /**
  * Environment variables allowed when calling the ARC CLI.
  * This allowlist ensures only safe, non-secret environment variables are passed.
@@ -37,6 +40,36 @@ export function buildArcCliEnv(): NodeJS.ProcessEnv {
         }
     }
     return env;
+}
+
+let _execFileAsync: ReturnType<typeof promisify> | undefined;
+
+/**
+ * Non-blocking ARC CLI invocation.
+ *
+ * Use this on hot backend paths (startRun, getConfigStatus, saveConfig) so a
+ * slow CLI call never blocks the single-threaded Node event loop the way
+ * execFileSync does. argv-only (no shell), sanitised env, timeout, and a
+ * bounded output buffer.
+ *
+ * ``promisify(execFile)`` is created lazily so importing this module never
+ * fails in tests that mock ``child_process`` without an ``execFile`` member.
+ */
+export async function execArcCliAsync(
+    args: string[],
+    opts: { timeout?: number; maxBuffer?: number } = {},
+): Promise<string> {
+    if (!_execFileAsync) {
+        _execFileAsync = promisify(execFile);
+    }
+    const { stdout } = (await _execFileAsync('arc', args, {
+        timeout: opts.timeout ?? 10000,
+        maxBuffer: opts.maxBuffer ?? 1024 * 1024,
+        windowsHide: true,
+        encoding: 'utf-8',
+        env: buildArcCliEnv(),
+    })) as { stdout: string | Buffer };
+    return typeof stdout === 'string' ? stdout : Buffer.from(stdout).toString('utf-8');
 }
 
 /**

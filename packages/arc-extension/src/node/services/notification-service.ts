@@ -7,6 +7,7 @@
 import { injectable } from '@theia/core/shared/inversify';
 import { spawn } from 'child_process';
 import type { NotificationCounts } from '../../common/notification-protocol';
+import { buildArcCliEnv } from './arc-cli-utils';
 
 @injectable()
 export class NotificationBackendService implements NotificationCounts {
@@ -25,7 +26,7 @@ export class NotificationBackendService implements NotificationCounts {
 
     async #execCli(args: string[]): Promise<string> {
         return new Promise<string>((resolve, reject) => {
-            const child = spawn('arc', args, { shell: false });
+            const child = spawn('arc', args, { shell: false, env: buildArcCliEnv() });
             const chunks: Buffer[] = [];
             const timer = setTimeout(() => {
                 child.kill('SIGTERM');

@@ -38,7 +38,7 @@ import {
     ArcError,
     ArcErrorCode,
 } from '../../common/arc-protocol';
-import { buildArcCliEnv, SAFE_CONFIG_KEYS, UNSAFE_CONFIG_KEY_PATTERN } from './arc-cli-utils';
+import { buildArcCliEnv, execArcCliAsync, SAFE_CONFIG_KEYS, UNSAFE_CONFIG_KEY_PATTERN } from './arc-cli-utils';
 
 @injectable()
 export class ConfigService {
@@ -111,11 +111,8 @@ export class ConfigService {
         let selectedProfile: string | undefined;
 
         try {
-            const output = execFileSync('arc', ['providers', 'status', '--json'], {
+            const output = await execArcCliAsync(['providers', 'status', '--json'], {
                 timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
             });
             const parsed = JSON.parse(output);
             if (parsed.ok && Array.isArray(parsed.data)) {
@@ -139,11 +136,8 @@ export class ConfigService {
         }
 
         try {
-            const configOutput = execFileSync('arc', ['config', 'show', '--json'], {
+            const configOutput = await execArcCliAsync(['config', 'show', '--json'], {
                 timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
             });
             const configParsed = JSON.parse(configOutput);
             if (configParsed.ok && configParsed.data) {
@@ -226,12 +220,7 @@ export class ConfigService {
                 args.push(`profiles.selected_profile=${update.selectedProfile}`);
             }
 
-            execFileSync('arc', args, {
-                timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-            });
+            await execArcCliAsync(args, { timeout: 10000 });
 
             return { success: true, message: 'Configuration saved.' };
         } catch (error) {
