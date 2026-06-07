@@ -52,3 +52,45 @@ def test_workspace_search_json_flag(tmp_path):
     data = json.loads(result.output)
     # Top-level arc envelope has 'ok' or 'data' key containing results
     assert data.get("ok") is True or "results" in str(data)
+
+
+def _search_json(ws: Path, query: str) -> dict:
+    import json
+
+    result = runner.invoke(app, ["workspace", "search", query, "--json", "--workspace", str(ws)])
+    assert result.exit_code == 0, result.output
+    envelope = json.loads(result.output)
+    return envelope.get("data", envelope)
+
+
+def test_workspace_search_excludes_sensitive_files(tmp_path):
+    ws = _ws(tmp_path)
+    (ws / "notes.txt").write_text("the SECRETPATTERN is here\n")
+    (ws / ".env").write_text("API_KEY=SECRETPATTERN\n")
+    (ws / "credentials.json").write_text('{"k": "SECRETPATTERN"}\n')
+    data = _search_json(ws, "SECRETPATTERN")
+    files = {r["file"] for r in data["results"]}
+    assert any("notes.txt" in f for f in files)
+    assert not any(".env" in f for f in files), f"secret file leaked: {files}"
+    assert not any("credentials.json" in f for f in files), f"secret file leaked: {files}"
+
+
+def test_workspace_search_excludes_ignored_dirs(tmp_path):
+    ws = _ws(tmp_path)
+    (ws / "real.txt").write_text("FINDME here\n")
+    nm = ws / "node_modules" / "pkg"
+    nm.mkdir(parents=True)
+    (nm / "dep.txt").write_text("FINDME in a dependency\n")
+    data = _search_json(ws, "FINDME")
+    files = {r["file"] for r in data["results"]}
+    assert any("real.txt" in f for f in files)
+    assert not any("node_modules" in f for f in files), f"ignored dir leaked: {files}"
+
+
+def test_workspace_search_caps_results(tmp_path):
+    ws = _ws(tmp_path)
+    # 1500 matching lines > the 1000 result cap.
+    (ws / "many.txt").write_text("\n".join("MATCHLINE" for _ in range(1500)) + "\n")
+    data = _search_json(ws, "MATCHLINE")
+    assert len(data["results"]) <= 1000
+    assert data["truncated"] is True

@@ -914,26 +914,45 @@ def workspace_search(
         search_root = candidate
 
     results: list[dict] = []
+    truncated = False
+    from pathlib import Path as _Path
+
+    from ..workspace import IGNORED_DIRS, is_sensitive_file
+
+    _MAX_RESULTS = 1000
+    _MAX_FILE_BYTES = 2 * 1024 * 1024  # skip files larger than 2 MB in the fallback
 
     # Try ripgrep first
     if shutil.which("rg"):
         try:
             proc = subprocess.run(
-                ["rg", "--json", "--", query, str(search_root)],
+                ["rg", "--json", "--max-columns", "1000", "--", query, str(search_root)],
                 capture_output=True,
                 text=True,
                 timeout=30,
             )
             for line in proc.stdout.splitlines():
+                if len(results) >= _MAX_RESULTS:
+                    truncated = True
+                    break
                 if not line.strip():
                     continue
                 try:
                     obj = _json.loads(line)
                     if obj.get("type") == "match":
                         data = obj.get("data", {})
+                        file_text = data.get("path", {}).get("text", "")
+                        # Never surface secret-bearing files or dependency/build
+                        # dirs in search results (consistent with the fallback).
+                        if file_text:
+                            fpath = _Path(file_text)
+                            if is_sensitive_file(fpath) or any(
+                                part in IGNORED_DIRS for part in fpath.parts
+                            ):
+                                continue
                         results.append(
                             {
-                                "file": data.get("path", {}).get("text", ""),
+                                "file": file_text,
                                 "line": data.get("line_number", 0),
                                 "match": data.get("lines", {}).get("text", "").rstrip("\n"),
                             }
@@ -943,12 +962,22 @@ def workspace_search(
         except (subprocess.TimeoutExpired, OSError):
             pass  # fall through to pathlib
 
-    # Pathlib fallback
+    # Pathlib fallback — confined: skips symlinks, ignored/dependency dirs,
+    # secret-bearing files, oversized files, and is capped at _MAX_RESULTS.
     if not results:
         for f in search_root.rglob("*"):
-            if not f.is_file():
+            if len(results) >= _MAX_RESULTS:
+                truncated = True
+                break
+            if f.is_symlink() or not f.is_file():
+                continue
+            if any(part in IGNORED_DIRS for part in f.relative_to(search_root).parts[:-1]):
+                continue
+            if is_sensitive_file(f):
                 continue
             try:
+                if f.stat().st_size > _MAX_FILE_BYTES:
+                    continue
                 text = f.read_text(errors="replace")
             except OSError:
                 continue
@@ -961,8 +990,11 @@ def workspace_search(
                             "match": line_text.strip(),
                         }
                     )
+                    if len(results) >= _MAX_RESULTS:
+                        truncated = True
+                        break
 
-    payload = {"workspace": str(ws), "query": query, "results": results}
+    payload = {"workspace": str(ws), "query": query, "results": results, "truncated": truncated}
     if json_output:
         _out(ok(payload, workspace=str(ws)), json_output)
         return

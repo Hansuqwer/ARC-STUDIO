@@ -5791,3 +5791,13 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `node/services/trace-parser.ts` + tests `node/services/__tests__/trace-parser.test.ts` (new: happy-path parse, sparse-file size-guard rejection, streaming happy-path). Verified: `pnpm --filter arc-extension build` clean; tests **926 passed / 3 skipped** (32 suites); `pnpm typecheck` clean. | Notes: additive; structured error; streaming still works for large traces. DoD gates 5/7 cited.
 
 ---
+
+## Phase 170 — DoD Elevation: Workspace Search Confinement + Result Cap (R-POLISH12)
+
+**Goal:** CR-022 — bound and confine `arc workspace search`. Verified against the real code first.
+
+**Findings & implementation:** the `--path` arg was already confined (`resolve()` + `relative_to`), but the search itself had **no result cap** (rg + pathlib both appended unbounded) and the **pathlib fallback walked everything** — including `.git`/`node_modules` and reading secret-bearing files (`.env`, `credentials.json`) into results, and following symlinks. Added `_MAX_RESULTS=1000` (with a `truncated` flag), reused `IGNORED_DIRS` + `is_sensitive_file` (from CR-001) to exclude dependency/build dirs and secret files in **both** the ripgrep and pathlib paths, and the fallback now skips symlinks and files > 2 MB.
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `cli/studio_workspace.py` + tests `tests/cli/test_workspace_search.py` (+3: sensitive-file exclusion, ignored-dir exclusion, result cap). Verified: `uv run pytest tests/cli/test_workspace_search.py tests/cli/test_workspace_inventory.py -q` → **13 passed**; `uv run ruff check src tests` clean. | Notes: additive; deterministic; producer-truth (secrets never surfaced). DoD gates 5/6 cited.
+
+---
