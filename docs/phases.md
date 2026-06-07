@@ -6069,3 +6069,17 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete (Mobile Roadmap Phases 11 + 12b) | Evidence: local worktree 2026-06-07 | Files: `mobile/{feature_flags,capability_gate}.py`, `mobile/__init__.py`. Verified: `test_mobile_feature_flags.py` (4) + `test_mobile_capability_gate.py` (6) — default-denied, per-requirement denials, kill-switch override, eligible-but-still-fixtures, grant/cap mismatch. | Notes: deterministic (no LLM); **no real device access anywhere** — the gate enforces eligibility but execution stays fixtures-only.
 
 ---
+
+## Phase 192 — Mobile SDK: Enterprise Remainder + MCP Dev-Bridge (Mobile Roadmap Phases 12c–12e + 20)
+
+**Goal:** Complete the remaining Mobile Roadmap Phase 12 enterprise governance (audit retention, compliance report, SBOM) and the Phase 20 MCP dev-bridge — deterministic, offline, fail-closed.
+
+**Implemented:**
+- **12c** `mobile/audit_retention.py` — `apply_retention(max_age_seconds, max_entries)` (TTL + keep-newest, undated entries kept) + `rotate_if_oversized` for the JSONL decisions audit log.
+- **12d** `mobile/compliance/report.py` — `generate_compliance_report` aggregates iOS usage strings + PrivacyInfo.xcprivacy, Android permissions + Data Safety, and review notes into one advisory report (`requires_human_review`) + `arc mobile generate compliance-report`.
+- **12e** `mobile/sbom.py` — deterministic CycloneDX-1.5 SBOM (Python submodules via `pkgutil` + Expo/RN/Flutter bindings) + `arc mobile sbom`.
+- **20** `mobile/mcp_bridge.py` — `MobileMcpDevBridge`: default-OFF, fail-closed admission guard for a loopback MCP dev bridge (requires explicit enable + loopback host + matching token (constant-time) + non-expired TTL). Opens no socket/listener.
+
+**Status:** Baseline Complete (Mobile Roadmap Phases 12c–12e + 20) | Evidence: local worktree 2026-06-07 | Files: `mobile/{audit_retention,sbom,mcp_bridge}.py`, `mobile/compliance/report.py`, `cli/mobile.py`. Verified: `test_mobile_{audit_retention(5),compliance_report(3),sbom(4),mcp_bridge(7)}.py` — retention TTL/count/rotation, report aggregation + CLI, SBOM shape/modules/determinism + CLI, bridge default-off/loopback/token/TTL fail-closed. | Notes: deterministic (no LLM); no network listener (bridge is a guard only). **Mobile Roadmap Phases 0–12 + 20 now implemented in simulator-preview posture; Phase 11 enforced as an entry-gate that always routes to fixtures (no real device access).**
+
+---

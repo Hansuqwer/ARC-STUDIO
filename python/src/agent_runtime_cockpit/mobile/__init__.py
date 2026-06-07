@@ -55,6 +55,7 @@ from .recorder import (
     verify_trace,
 )
 from .offline_queue import OfflineQueue, QueueEntry
+from .mcp_bridge import BridgeDecision, MobileMcpDevBridge
 from .privacy_budget import EgressDecision, EgressGuard, PrivacyBudget, compute_privacy_budget
 from .secure_store import (
     InMemoryKeyProvider,
@@ -109,6 +110,8 @@ __all__ = [
     "EgressDecision",
     "OfflineQueue",
     "QueueEntry",
+    "MobileMcpDevBridge",
+    "BridgeDecision",
     "SecureLocalStore",
     "InMemoryKeyProvider",
     "KeyProvider",
