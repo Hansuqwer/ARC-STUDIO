@@ -290,7 +290,14 @@ class ArcScreen(Screen):
             try:
                 from .views.settings_view import SettingsView
 
-                self.app.push_screen(SettingsView(self.data.workspace))
+                self.app.push_screen(
+                    SettingsView(
+                        self.data.workspace,
+                        current_theme=getattr(self.theme.current, "name", None),
+                        current_mode=getattr(self.data, "mode", "build"),
+                    ),
+                    self._apply_settings,
+                )
             except Exception as e:
                 self._add_error_entry("VIEW_ERROR", str(e))
             return
@@ -368,6 +375,28 @@ class ArcScreen(Screen):
             self._session = ChatSession(id=self.data.session_id)
         self._session.allow_paid_calls = bool(getattr(self.data, "allow_paid", False))
         return self._session
+
+    def _apply_settings(self, result: object) -> None:
+        """Apply the theme + mode chosen in the SettingsView (CR-044).
+
+        Isolation is persisted by the view itself; theme/mode are applied live
+        here because the modal has no access to the theme manager / mode badge.
+        """
+        if not isinstance(result, dict):
+            return
+        theme_name = result.get("theme")
+        if theme_name and self.theme.select(theme_name) is not None:
+            try:
+                self.app.reskin()  # type: ignore[attr-defined]
+                self.refresh()
+            except Exception:
+                pass
+        mode = result.get("mode")
+        if mode:
+            try:
+                self.query_one(ModeBadge).set_mode(mode)  # type: ignore[arg-type]
+            except Exception:
+                self.data.mode = mode
 
     def _handle_shell_escape(self, text: str) -> None:
         import shlex

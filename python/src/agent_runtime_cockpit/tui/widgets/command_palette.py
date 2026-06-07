@@ -33,11 +33,21 @@ class CommandPalette(ModalScreen):
     def on_mount(self) -> None:
         self._cmds: list[CommandDef] = []
         try:
-            from agent_runtime_cockpit.cli_repl.commands import get_registry
+            # Ensure the global command registry is populated. _build_registry is
+            # idempotent (returns the existing registry if already built) and is the
+            # single source that registers all slash commands. Without this, opening
+            # the palette before any other registry consumer (slash menu / REPL) has
+            # run shows an empty list (CR-023).
+            from agent_runtime_cockpit.cli_repl.slash_commands import _build_registry
 
-            self._cmds = get_registry().list_commands()
+            self._cmds = _build_registry().list_commands()
         except Exception:
-            pass
+            try:
+                from agent_runtime_cockpit.cli_repl.commands import get_registry
+
+                self._cmds = get_registry().list_commands()
+            except Exception:
+                pass
         self._populate(self._cmds)
         self.query_one("#palette-input", Input).focus()
 

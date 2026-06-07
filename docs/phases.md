@@ -5843,3 +5843,16 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `protocol/denial_events.py`, `protocol/typed_events.py`, `protocol/events.py`, `protocol/fixtures/run-event-registry.json`, `arc-protocol-ts/src/run-events.ts` + test `tests/protocol/test_typed_events.py` (+5 parametrized denial cases). Verified: Python `tests/protocol` **73 passed** (incl. the cross-language parity test, previously failing), broad sweep `tests/protocol tests/security tests/audit` **479 passed / 1 skipped / 1 xfailed**, `ruff` clean; TS `@arc-studio/protocol` **155 passed**, `pnpm typecheck` clean. | Notes: additive (no fields removed); cross-language parity maintained; circular import resolved cleanly. DoD gates 3/4 cited.
 
 ---
+
+## Phase 175 — DoD Elevation: P2 UX Batch (CommandPalette, ContextMeter, Settings) (R-POLISH17)
+
+**Goal:** CR-023 + CR-035 + CR-044 (TUI UX polish). Verified each against the real code first.
+
+**Implemented:**
+- **CR-023 — command palette empty on first open.** Correction: the IDE `CommandCentreTab` already loads on mount; the real surface is the TUI `command_palette.py`, which read `get_registry()` — an *empty* singleton unless `_build_registry()` ran first. Now `on_mount` calls the idempotent `_build_registry()` (as `slash_menu` already does), so the palette is populated even as the first action after launch.
+- **CR-035 — context meter default.** Bumped `_DEFAULT_CONTEXT_LIMIT` 64k→200k (modern baseline). The model-aware `DataStore.context_limit` override still wins when set.
+- **CR-044 — settings persist theme/mode.** `SettingsView` Apply previously only persisted isolation. Now it offers all themes (`theme_names()`, was just Dark/Light), pre-selects the current theme + mode, and returns the selection via `dismiss(...)`; the screen pushes it with an `_apply_settings` callback that applies the theme live (`theme.select` + `app.reskin`) and the mode (`ModeBadge.set_mode`).
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `tui/widgets/command_palette.py`, `tui/widgets/context_meter.py`, `tui/views/settings_view.py`, `tui/screen.py` + tests `tests/tui/test_context_meter_default.py` (new), `test_command_palette_detail.py` (+1), `test_settings_isolation.py` (+2). Verified: targeted **10 passed**; regression `test_tui_core.py`/`test_slash_expand.py`/`test_status_bar_context_meter.py` green (74 total); `ruff` clean. | Notes: additive; theme/mode applied live (not yet persisted to disk — config fields are a follow-up). DoD gate 1 cited.
+
+---

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.widgets import Button, Label, RadioButton, RadioSet
@@ -15,6 +17,28 @@ class SettingsView(SidePanel):
     BINDINGS = [Binding("escape", "dismiss", "Close")]
 
     _ISOLATION_CHOICES = ("auto", "subprocess", "docker", "microvm", "none")
+    _MODE_CHOICES = ("build", "plan", "auto", "review")
+
+    def __init__(
+        self,
+        workspace: Path | None = None,
+        *,
+        current_theme: str | None = None,
+        current_mode: str | None = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(workspace=workspace, **kwargs)
+        self._current_theme = current_theme
+        self._current_mode = current_mode or "build"
+
+    def _theme_choices(self) -> list[str]:
+        from ..theme import theme_names
+
+        try:
+            names = theme_names()
+            return names or ["dark", "light"]
+        except Exception:
+            return ["dark", "light"]
 
     def _current_isolation(self) -> str:
         from ...config.loader import load_config
@@ -28,14 +52,15 @@ class SettingsView(SidePanel):
     def compose(self) -> ComposeResult:
         yield Label("Settings")
         yield Label("Theme")
+        themes = self._theme_choices()
+        current_theme = self._current_theme if self._current_theme in themes else themes[0]
         with RadioSet(id="theme-radio"):
-            yield RadioButton("Dark", id="dark", value=True)
-            yield RadioButton("Light", id="light")
+            for name in themes:
+                yield RadioButton(name, id=f"theme-{name}", value=(name == current_theme))
         yield Label("Mode")
         with RadioSet(id="mode-radio"):
-            yield RadioButton("build", id="build", value=True)
-            yield RadioButton("plan", id="plan")
-            yield RadioButton("auto", id="auto")
+            for mode in self._MODE_CHOICES:
+                yield RadioButton(mode, id=f"mode-{mode}", value=(mode == self._current_mode))
         current = self._current_isolation()
         yield Label("Isolation backend")
         with RadioSet(id="isolation-radio"):
@@ -58,7 +83,21 @@ class SettingsView(SidePanel):
         set_isolation_backend(name, config_path=self.workspace / ".arc" / "config.yaml")
         return name
 
+    def _selected(self, radio_id: str, prefix: str) -> str | None:
+        radio = self.query_one(radio_id, RadioSet)
+        pressed = radio.pressed_button
+        if pressed is None or pressed.id is None:
+            return None
+        return pressed.id.removeprefix(prefix)
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "apply-btn":
             self._persist_isolation()
-            self.dismiss()
+            # Theme + mode are applied live by the screen via the dismiss result
+            # (the modal has no access to the theme manager / mode badge).
+            self.dismiss(
+                {
+                    "theme": self._selected("#theme-radio", "theme-"),
+                    "mode": self._selected("#mode-radio", "mode-"),
+                }
+            )

@@ -74,3 +74,26 @@ async def test_detail_pane_empty_when_no_usage():
     assert "Does bar things" in call_arg
     # No usage line, no examples — only help_text
     assert call_arg.strip() == "Does bar things"
+
+
+@pytest.mark.asyncio
+async def test_palette_populates_on_mount_with_fresh_registry():
+    """CR-023: opening the palette before any other registry consumer has run
+    still shows commands — on_mount builds the (idempotent) registry rather than
+    reading a possibly-empty global singleton."""
+    from textual.app import App
+
+    from agent_runtime_cockpit.cli_repl.commands import reset_registry
+    from agent_runtime_cockpit.tui.widgets.command_palette import CommandPalette
+
+    reset_registry()  # simulate fresh launch: global registry is empty
+    palette = CommandPalette()
+
+    class _Harness(App):
+        async def on_mount(self) -> None:
+            await self.push_screen(palette)
+
+    app = _Harness()
+    async with app.run_test(size=(80, 40)) as pilot:
+        await pilot.pause()
+        assert len(palette._cmds) > 0, "palette should list commands even on first open"

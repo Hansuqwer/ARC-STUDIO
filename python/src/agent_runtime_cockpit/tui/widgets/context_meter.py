@@ -11,9 +11,10 @@ from textual.widgets import Static
 from ..data import DataStore
 from ..theme import ThemeManager
 
-# Conservative default. Real provider limits should be wired via DataStore
-# once an active model is selected; until then this is a soft baseline.
-_DEFAULT_CONTEXT_LIMIT = 64_000
+# Soft baseline used only until an active model's real limit is wired via
+# DataStore.context_limit. 200k reflects current mainstream model context
+# windows (Claude/GPT-class) far better than the old 64k guess.
+_DEFAULT_CONTEXT_LIMIT = 200_000
 
 
 class ContextMeter(Static):
@@ -40,15 +41,7 @@ class ContextMeter(Static):
             return f"tok {used}"
         pct = min(100, int(used * 100 / max(1, limit)))
         no_color = bool(getattr(self.theme.current, "no_color", False))
-        bucket = (
-            "calm"
-            if pct < 60
-            else "notice"
-            if pct < 80
-            else "warn"
-            if pct < 95
-            else "danger"
-        )
+        bucket = "calm" if pct < 60 else "notice" if pct < 80 else "warn" if pct < 95 else "danger"
         if no_color:
             return f"ctx {pct}% [{bucket}] {used:>5}/{limit}"
         style_map = {
