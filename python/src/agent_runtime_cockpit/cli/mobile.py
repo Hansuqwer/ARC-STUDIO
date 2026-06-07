@@ -381,3 +381,77 @@ def mobile_pin_cmd(
     _out(
         ok({"id": manifest.id, "manifest_hash": new_hash, "path": str(manifest_file)}), json_output
     )
+
+
+mobile_schema_app = typer.Typer(name="schema", help="Mobile schema commands")
+mobile_app.add_typer(mobile_schema_app)
+
+
+@mobile_schema_app.command("check")
+def mobile_schema_check_cmd(
+    file: str = typer.Argument(..., help="Path to JSON file to validate."),
+    kind: str = typer.Option(
+        ...,
+        "--kind",
+        help="Schema kind: manifest|action_plan|simulation_report|event|trace|policy_decision",
+    ),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Validate a JSON file against a mobile protocol schema."""
+    _setup_logging(debug)
+    from ..mobile.schema_validator import validate_against_schema
+    import json as _json
+
+    p = Path(file)
+    if not p.is_file():
+        _out(err(ArcErrorCode.INVALID_INPUT, f"File not found: {file}"), json_output)
+        raise typer.Exit(1)
+    try:
+        data = _json.loads(p.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Cannot parse JSON: {exc}"), json_output)
+        raise typer.Exit(1) from exc
+
+    try:
+        errors = validate_against_schema(data, kind)
+    except ValueError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(1) from exc
+
+    if errors:
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                f"Schema validation failed ({len(errors)} error(s))",
+                {"errors": errors},
+            ),
+            json_output,
+        )
+        raise typer.Exit(1)
+    _out(ok({"ok": True, "kind": kind, "file": file}), json_output)
+
+
+@mobile_schema_app.command("export")
+def mobile_schema_export_cmd(
+    out: str = typer.Option(".", "--out", help="Output directory for schema files."),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Copy all mobile protocol schemas to the output directory."""
+    _setup_logging(debug)
+    from ..mobile.schema_validator import _find_spec_dir, list_schema_kinds
+    import shutil
+
+    spec_dir = _find_spec_dir()
+    out_path = Path(out)
+    out_path.mkdir(parents=True, exist_ok=True)
+    copied = []
+    for kind in list_schema_kinds():
+        from ..mobile.schema_validator import _SCHEMA_FILES
+
+        src = spec_dir / _SCHEMA_FILES[kind]
+        if src.exists():
+            shutil.copy2(src, out_path / src.name)
+            copied.append(src.name)
+    _out(ok({"copied": copied, "out": str(out_path)}), json_output)

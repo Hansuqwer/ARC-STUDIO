@@ -19,7 +19,7 @@ class MobileManifestLoadError(ValueError):
     pass
 
 
-def load_manifest(path: str | Path) -> MobileRuntimeManifest:
+def load_manifest(path: str | Path, *, strict: bool = False) -> MobileRuntimeManifest:
     p = Path(path)
     if p.is_dir():
         p = p / MANIFEST_FILENAME
@@ -27,9 +27,35 @@ def load_manifest(path: str | Path) -> MobileRuntimeManifest:
         raise MobileManifestLoadError(f"Manifest not found: {p}")
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
-        return MobileRuntimeManifest.model_validate(data)
+        if strict:
+            from .schema_validator import validate_against_schema
+
+            errors = validate_against_schema(data, "manifest")
+            if errors:
+                raise MobileManifestLoadError(
+                    f"Manifest failed JSON Schema validation (strict mode): {errors[0]}"
+                )
+            known = set(MobileRuntimeManifest.model_fields)
+            unknown = set(data) - known - {"manifest_hash"}
+            if unknown:
+                raise MobileManifestLoadError(
+                    f"Manifest has unknown fields (strict mode): {sorted(unknown)}"
+                )
+        manifest = MobileRuntimeManifest.model_validate(data)
+    except MobileManifestLoadError:
+        raise
     except Exception as exc:
         raise MobileManifestLoadError(f"Cannot load manifest: {exc}") from exc
+
+    # Always check for duplicate capability IDs
+    ids = [c.id for c in manifest.capabilities]
+    seen: set[str] = set()
+    dups = [cid for cid in ids if cid in seen or seen.add(cid)]  # type: ignore[func-returns-value]
+    if dups:
+        raise MobileManifestLoadError(
+            f"Manifest '{manifest.id}' contains duplicate capability IDs: {sorted(set(dups))}"
+        )
+    return manifest
 
 
 def build_default_manifest(
