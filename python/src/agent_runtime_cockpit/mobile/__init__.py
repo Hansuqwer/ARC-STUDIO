@@ -44,7 +44,7 @@ from .recorder import (
     read_trace,
     verify_trace,
 )
-from .privacy_budget import PrivacyBudget, compute_privacy_budget
+from .privacy_budget import EgressDecision, EgressGuard, PrivacyBudget, compute_privacy_budget
 from .secure_store import (
     InMemoryKeyProvider,
     KeyProvider,
@@ -87,6 +87,8 @@ __all__ = [
     "MOBILE_POLICY_VERSION",
     "PrivacyBudget",
     "compute_privacy_budget",
+    "EgressGuard",
+    "EgressDecision",
     "SecureLocalStore",
     "InMemoryKeyProvider",
     "KeyProvider",
