@@ -507,6 +507,6 @@
   "background_execution": false,
   "network_by_default": false,
   "simulator_mode": true,
-  "privacy_manifest": true,
-  "manifest_hash": "9987a61ae4797b32838162a7c469d3b345ea44d7aa9cc6b2641974efc1748d7f"
+  "privacy_manifest_intent": true,
+  "manifest_hash": "6b2b448a69ea39e978540250482547e6159ba79627b0a828ee1c79838b199c8d"
 }

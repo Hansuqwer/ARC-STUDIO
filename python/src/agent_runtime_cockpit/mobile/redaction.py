@@ -65,6 +65,22 @@ def redact_list(lst: list[Any]) -> tuple[list[Any], int]:
             r, n = redact_dict(item)
             out.append(r)
             total += n
+        elif isinstance(item, list):
+            r, n = redact_list(item)
+            out.append(r)
+            total += n
+        elif isinstance(item, str) and item:
+            try:
+                from ..security.redaction import Redactor
+
+                redactor = Redactor()
+                safe = redactor.is_safe(item)
+                out.append(item if safe else _REDACTED)
+                if not safe:
+                    total += 1
+            except Exception:
+                out.append(_REDACTED)
+                total += 1
         else:
             out.append(item)
     return out, total

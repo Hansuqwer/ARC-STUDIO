@@ -118,8 +118,13 @@ class MobileRuntimeManifest(_Base):
     background_execution: bool = False  # blocked in MVP
     network_by_default: bool = False  # blocked in MVP
     simulator_mode: bool = True  # True = simulator-first
-    privacy_manifest: bool = True  # declares Apple/Google privacy compliance
+    privacy_manifest_intent: bool = True  # developer declares intent; no file is generated
     manifest_hash: Optional[str] = None  # computed on seal
+
+    @property
+    def privacy_manifest(self) -> bool:
+        """Deprecated alias for privacy_manifest_intent. Use privacy_manifest_intent."""
+        return self.privacy_manifest_intent
 
 
 class MobileActionStep(_Base):
