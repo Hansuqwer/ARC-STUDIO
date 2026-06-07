@@ -1,7 +1,10 @@
 """Deterministic hashing for ARC Mobile Runtime models.
 
-Excludes volatile fields (*_hash, schema_version) before hashing.
-Canonical: sorted keys, compact separators, stable list ordering by id.
+Excludes only volatile hash fields before hashing: capability_hash,
+manifest_hash, plan_hash, and report_hash. ``schema_version`` is intentionally
+included so schema-version changes produce different hashes.
+
+Canonical form: sorted keys and compact separators.
 """
 
 from __future__ import annotations
