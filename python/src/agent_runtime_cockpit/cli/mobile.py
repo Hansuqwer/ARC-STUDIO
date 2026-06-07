@@ -383,11 +383,7 @@ def mobile_pin_cmd(
     )
 
 
-mobile_trace_app = typer.Typer(name="trace", help="Mobile trace sub-commands")
-mobile_app.add_typer(mobile_trace_app)
-
-
-@mobile_trace_app.command("verify")
+@mobile_app.command("trace-verify")
 def mobile_trace_verify_cmd(
     trace_file: str = typer.Argument(..., help="Path to mobile simulator JSONL trace."),
     json_output: bool = JSON_FLAG,
@@ -465,6 +461,13 @@ def mobile_schema_check_cmd(
                 ArcErrorCode.INVALID_INPUT,
                 f"Schema validation failed ({len(errors)} error(s))",
                 {"errors": errors},
+            ),
+            json_output,
+        )
+        raise typer.Exit(1)
+    _out(ok({"ok": True, "kind": kind, "file": file}), json_output)
+
+
 mobile_approval_app = typer.Typer(name="approval", help="Mobile approval grant commands")
 mobile_app.add_typer(mobile_approval_app)
 
@@ -507,7 +510,6 @@ def mobile_approval_revoke_cmd(
             json_output,
         )
         raise typer.Exit(1)
-    _out(ok({"ok": True, "kind": kind, "file": file}), json_output)
 
 
 @mobile_schema_app.command("export")
