@@ -44,6 +44,7 @@ from .recorder import (
     read_trace,
     verify_trace,
 )
+from .offline_queue import OfflineQueue, QueueEntry
 from .privacy_budget import EgressDecision, EgressGuard, PrivacyBudget, compute_privacy_budget
 from .secure_store import (
     InMemoryKeyProvider,
@@ -89,6 +90,8 @@ __all__ = [
     "compute_privacy_budget",
     "EgressGuard",
     "EgressDecision",
+    "OfflineQueue",
+    "QueueEntry",
     "SecureLocalStore",
     "InMemoryKeyProvider",
     "KeyProvider",

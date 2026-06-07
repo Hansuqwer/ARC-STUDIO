@@ -6020,3 +6020,16 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete (Mobile Roadmap Phase 6) | Evidence: local worktree 2026-06-07 | Files: `runtimes/mobile/expo/packages/arc-mobile-runtime/{app.plugin.js,plugin/arc-permission-map.json,src/index.ts,ios,android,example}` + `.github/workflows/mobile-expo.yml`. Verified: `test_mobile_expo_{scaffold,api,config_plugin,example}.py` — 28 passed (incl. node behavioral inject + TS↔Swift↔Kotlin contract parity + 13-cap drift guard vs `capabilities.py`). | Notes: simulator-preview only; no real device APIs anywhere (recursive gate). Phase 11 (real native) stays gated/out-of-scope.
 
 ---
+
+## Phase 188 — Mobile SDK: Secure Storage + Egress + Offline Queue (Mobile Roadmap Phase 8; Batch 5 T4–T6)
+
+**Goal:** Local-first storage + egress control + durable offline capture (Mobile Roadmap Phase 8). Deterministic, offline, no network; data at rest encrypted; egress over budget blocked.
+
+**Implemented (T4–T6):**
+- **T4** `mobile/secure_store.py` — `SecureLocalStore`: real encryption-at-rest via Fernet (AES-128-CBC + HMAC); `KeyProvider` abstraction (Keychain/Keystore seam; `InMemoryKeyProvider` preview); `MobileDataSensitivity` classification; data-subject `export(include_values)`/`delete`/`wipe` (restricted classes redacted). Persisted file holds ciphertext only; tamper/wrong-key fail closed.
+- **T5** `mobile/privacy_budget.py` — `EgressGuard`/`EgressDecision`: deterministic deny when an egress exceeds the overall byte budget or a per-class limit; critical class blocked by default; `check` pure, `record` applies only on allow; every decision carries classification + byte cost.
+- **T6** `mobile/offline_queue.py` — `OfflineQueue`: durable, bounded (FIFO eviction), TTL retention; entries are **hash-only** (SHA-256 + redacted metadata, no raw payload at rest); `flush`/`gc`/`verify` (replay integrity).
+
+**Status:** Baseline Complete (Mobile Roadmap Phase 8) | Evidence: local worktree 2026-06-07 | Files: `mobile/{secure_store,offline_queue}.py`, `mobile/privacy_budget.py`, `mobile/__init__.py`. Verified: `test_mobile_{secure_store,egress_guard,offline_queue}.py` — 22 passed (no-plaintext-at-rest, tamper/wrong-key fail-closed, deterministic over-budget + per-class + critical-block denials, TTL expiry, FIFO retention, hash-only at rest, integrity verify). | Notes: deterministic security (no LLM); simulator preview; no real network egress (accounting only).
+
+---
