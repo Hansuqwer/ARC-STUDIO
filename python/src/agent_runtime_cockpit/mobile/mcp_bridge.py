@@ -1,7 +1,7 @@
 """MCP dev-bridge guard for ARC Mobile Runtime (Phase 20).
 
 A **default-OFF**, fail-closed admission guard for a future local MCP dev bridge. It does NOT
-open any socket or network listener — it only decides, deterministically, whether a
+open any network connection or listener — it only decides, deterministically, whether a
 connection *would* be admitted. Admission requires ALL of: the bridge explicitly enabled, a
 loopback-only host, a matching token (constant-time compare), and a non-expired TTL. Any
 missing/failed condition denies. No production MCP gateway, no remote listener.

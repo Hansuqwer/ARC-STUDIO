@@ -5,6 +5,7 @@ All sensitive capabilities are mock-only in MVP. No real native bridges.
 """
 
 from .capabilities import get_capability, list_capabilities
+from .compliance import generate_compliance_report
 from .audit_retention import apply_retention, rotate_if_oversized
 from .capability_gate import CapabilityEntryGate, FIXTURES_ROUTE, GateDecision
 from .feature_flags import FeatureFlags
@@ -149,6 +150,7 @@ __all__ = [
     "explain_plan_policy",
     "list_capabilities",
     "get_capability",
+    "generate_compliance_report",
     "FeatureFlags",
     "CapabilityEntryGate",
     "GateDecision",
