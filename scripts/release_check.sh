@@ -168,12 +168,16 @@ fi
 
 if [ "$SKIP_PNPM" -eq 1 ]; then
     skip_gate "pnpm:build" "--skip-pnpm requested"
+    skip_gate "pnpm:build:prod" "--skip-pnpm requested"
     skip_gate "pnpm:typecheck" "--skip-pnpm requested"
 elif command -v pnpm >/dev/null 2>&1; then
     run_gate "pnpm:build" "pnpm build 2>&1"
+    # Validate the actual release artifact: the browser app in production mode.
+    run_gate "pnpm:build:prod" "pnpm --filter @arc-studio/browser build:prod 2>&1"
     run_gate "pnpm:typecheck" "pnpm typecheck 2>&1"
 else
     skip_gate "pnpm:build" "pnpm not installed"
+    skip_gate "pnpm:build:prod" "pnpm not installed"
     skip_gate "pnpm:typecheck" "pnpm not installed"
 fi
 

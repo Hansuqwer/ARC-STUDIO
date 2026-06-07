@@ -56,18 +56,22 @@ Raising the quality bar raises the **work required**, not the **words allowed**.
 - `scripts/check-banned-claims.sh` is authoritative for release-facing wording. "Production ready", "multi-user", "tenant-isolated", broad provider-backed SwarmGraph adoption, and production-grade sandbox/microVM execution stay forbidden until proven by tests and evidence.
 - ARC Studio stays a single-user, loopback-only alpha workstation tool until proven otherwise. The Definition of Done elevates engineering quality; it does not change the product's safety posture or unlock new product claims.
 
-## Active track (2026-06-05, `spec/v0.8-r-ux2` @ `ffa1e1f`)
+## Active track (2026-06-07)
 
-P0 hardening sprint from the five-way audit, in order:
+The 2026-06-05 P0 hardening sprint (six five-way-audit items: SQLite budget-lock,
+TUI shell-escape fail-closed, orphan FastAPI quarantine, POST-only `/api/runs/start`,
+enforcement-surface refresh, profile schema version) is **complete**.
 
-1. SQLite `database is locked` in budget storage (confirmed failing test).
-2. TUI shell-escape completion (remove `shell=True`, fail-closed gate, audit on allow).
-3. Quarantine orphan `python/src/routes.py` (`0.0.0.0` FastAPI).
-4. `/api/runs/start` POST-only (deprecate mutating GET).
-5. Refresh `docs/security/enforcement-surfaces.md` (stale paths).
-6. Reconcile `security/profiles.py` schema version (1 vs 2).
+Current track: **DoD elevation (R-POLISH1–18 / Phases 159–176).** Slices landed, each
+with cited evidence in `docs/phases.md`: security P0 batch (sensitive-file exclusion,
+provider/MCP/TUI redaction, proxy env + structured errors, run-ID guard), paid-call
+fail-closed default, CLI mutation confirmation gates, IDE honest states + per-tab
+ErrorBoundary + keybinding `when`-guards, TUI streaming refresh, async Node backend,
+bounded trace/event buffers, workspace-search confinement, profile-schema + IR-cycle
+guards, denial-events protocol typing (cross-language), real jest-axe a11y, and cleanup
+(dead `eval run` dedupe, `arc-studio-cli` entrypoint). Suite: 5600+ tests, ruff clean.
 
-Then resume the v0.8 R-UX2 track. See `docs/phases.md` for full status.
+See `docs/phases.md` (Phases 159–176) and `docs/roadmap.md` (R-POLISH1–18) for status.
 
 ## Sandbox / microVM truth constraints (still in force)
 

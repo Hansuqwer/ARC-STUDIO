@@ -375,7 +375,7 @@ Full reference: `uv run arc --help`
 
 ```bash
 cd python
-uv run pytest -q                   # 5192+ tests
+uv run pytest -q                   # 5600+ tests
 uv run ruff check src tests        # lint
 uv run mypy src                    # type check
 ```

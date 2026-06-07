@@ -69,7 +69,11 @@ fi
 # ── Install Node.js deps ───────────────────────────────────────────────────────
 echo -e "\n${BOLD}[4/5] Installing Node.js dependencies...${NC}"
 echo "  This may take a few minutes (Theia is large)..."
-pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+if ! pnpm install --frozen-lockfile; then
+    echo -e "${YELLOW}⚠ 'pnpm install --frozen-lockfile' failed — pnpm-lock.yaml is out of sync with package.json.${NC}"
+    echo -e "${YELLOW}  Falling back to a non-frozen install; commit the updated pnpm-lock.yaml afterward.${NC}"
+    pnpm install
+fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo -e "\n${BOLD}[5/5] Bootstrap complete!${NC}"

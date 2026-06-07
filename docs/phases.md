@@ -5869,3 +5869,18 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `cli/mgmt.py`. Verified: `uv run ruff check src tests` clean; `arc eval run --help` resolves to the superset signature; `tests/cli/test_cli_eval.py` **9 passed**; `tests/evals` **112 passed**. | Notes: additive cleanup (dead code removed, no behavior change — superset command preserved). DoD gate 8 cited.
 
 ---
+
+## Phase 177 — Release/Docs Hygiene (R-POLISH19)
+
+**Goal:** CR-032 + CR-039 + CR-040 + CR-041 + CR-038. Verified each against the real code first.
+
+**Implemented:**
+- **CR-032 — license mismatch.** `python/pyproject.toml` declared `license = { text = "Apache-2.0" }` while `LICENSE` is the ARC Studio Proprietary License. Changed to `{ text = "Proprietary" }` + added the `License :: Other/Proprietary License` classifier. (`{ file = "LICENSE" }` fails the build because LICENSE lives at the repo root, not in `python/`.) `uv sync` succeeds; metadata now reports `License: Proprietary`.
+- **CR-039 — release gate prod build.** `scripts/release_check.sh` only ran `pnpm build` (dev-mode browser). Added a `pnpm:build:prod` gate (`pnpm --filter @arc-studio/browser build:prod`, i.e. `theia build --mode production`) so the gate validates the actual release artifact, with matching `skip_gate`s for `--skip-pnpm` / pnpm-absent.
+- **CR-040 — bootstrap lockfile drift.** `scripts/bootstrap.sh` did `pnpm install --frozen-lockfile 2>/dev/null || pnpm install` (silent non-frozen fallback). Now it prints a visible warning that the lockfile is out of sync before falling back, so drift isn't masked.
+- **CR-041 — test-count drift.** `README.md` said "5192+ tests"; updated to "5600+ tests" (current floor: 5693 collected). The `docs/phases.md`/`docs/roadmap.md` "5192 passed" lines are preserved — they are historical 2026-06-05 evidence anchors at commit ffa1e1f.
+- **CR-038 — stale Active track.** `AGENTS.md` Active track listed the already-complete P0 sprint. Refreshed to mark P0 complete and describe the current DoD-elevation track (R-POLISH1–18 / Phases 159–176), pointing at the canonical phase list.
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `python/pyproject.toml`, `scripts/release_check.sh`, `scripts/bootstrap.sh`, `README.md`, `AGENTS.md`. Verified: `bash -n` clean on both scripts; `uv sync` succeeds with `License: Proprietary`; `check-banned-claims.sh` clean on AGENTS/README/docs. | Notes: the new `build:prod` gate runs at release time (a full Theia production build, minutes) — not exercised in this session; the `build:prod` script and gate syntax were verified. DoD gate 8 cited.
+
+---
