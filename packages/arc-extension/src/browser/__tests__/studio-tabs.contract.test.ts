@@ -411,7 +411,14 @@ describe('Studio Tabs Contracts', () => {
         let source: string;
 
         beforeAll(async () => {
-            source = await fs.readFile(path.join(tabsDir, 'ConfigTab.tsx'), 'utf-8');
+            // ConfigTab was split into presentation (ConfigTab.tsx), state/logic
+            // (useConfigTabState.ts), and pure helpers (config-tab-helpers.ts). This
+            // structural contract spans the whole feature, so it reads the union of all
+            // three: positives may live in any file; negatives must hold across all three.
+            const configTab = await fs.readFile(path.join(tabsDir, 'ConfigTab.tsx'), 'utf-8');
+            const stateHook = await fs.readFile(path.join(tabsDir, 'useConfigTabState.ts'), 'utf-8');
+            const helpers = await fs.readFile(path.join(tabsDir, 'config-tab-helpers.ts'), 'utf-8');
+            source = `${configTab}\n${stateHook}\n${helpers}`;
         });
 
         it('should export ConfigTabProps interface', () => {

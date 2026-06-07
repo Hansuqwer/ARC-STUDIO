@@ -5963,3 +5963,19 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete (part 4 of N) | Evidence: local worktree | Files: `common/protocol/contracts-graph.ts`, `common/arc-protocol.ts`, `__tests__/ui-components.contract.test.ts`. Verified: `tsc` clean; **full** `pnpm --filter arc-extension test` = 33 suites, **933 passed / 3 skipped**. arc-protocol.ts 1439 → 1216 (4 modules, ~651 lines / ~35% moved). | Notes: runtime-adapter, run-links, HITL, audit sections remain. DoD gates 3, 4 cited.
 
 ---
+
+## Phase 186 — Refactor: Split ConfigTab.tsx (Logic/Presentation) (CR-028, R-POLISH28)
+
+**Goal:** CR-028 — decompose the 1253-line `tabs/ConfigTab.tsx` (a fat React FC: ~33 `useState`, data loading, derived state, gated-action handlers, and ~750 lines of JSX) into cohesive modules without changing behavior or the public surface.
+
+**Approach:** Verbatim logic/presentation split (the pure-logic helpers — `provider-telemetry`, `export-target`, `runtime-remediation` — were already extracted in prior phases). State + effects + handlers + derived computations moved into a `useConfigTabState` hook; pure helpers + display constants into `config-tab-helpers.ts`. The hook returns a view-model whose completeness is enforced by `tsc` (the JSX won't compile if a consumed value is missing). The component-vs-hook name set was computed mechanically (declared-in-hook ∩ used-in-render) so the destructure has no unused names.
+
+**Implemented:**
+- `tabs/useConfigTabState.ts` (502) — `useConfigTabState({ arcService })`: all state/loadConfig/handlers/derived logic + the `DEFAULT_PROVIDER_ACTION_*` constants and `OptionalProviderTelemetryService` type; returns a 73-field view-model. No provider network calls.
+- `tabs/config-tab-helpers.ts` (73) — pure `asObject`/`providerSourceBadge`/`providerSourceColor`/`formatMetadataKeys` + display constants (`RUNTIME_DISPLAY`/`MODE_OPTIONS`/`FALLBACK_*`/`PROVIDER_DISPLAY`) + `JsonObject`.
+- `tabs/ConfigTab.tsx` (1253 → 860) — presentation only: calls the hook, renders the verbatim JSX, keeps `ConfigTabProps` + `ConfigTabWidget`. Public surface unchanged (`tabs/index.ts` re-exports unaffected).
+- Contract tests retargeted (strengthen, not weaken): `config-tab-provider-parsing` (20 logic asserts → hook source; 17 negatives → `combined = source+stateSource`), `config-tab-remediation` (4 logic → hook; 4 negatives → combined), and the `studio-tabs` ConfigTab block (its `source` is now the union of the 3 files — positives may live in any file; negatives must hold across all three).
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `tabs/ConfigTab.tsx` + 2 new `tabs/*.ts` + 3 retargeted contract tests. Verified: `pnpm --filter arc-extension build` (tsc) clean; the 4 ConfigTab-related suites **229 passed**; full arc-extension suite **933 passed / 3 skipped / 33 suites**; `pnpm typecheck` (workspace) clean; eslint clean on all 6 files. | Notes: closes CR-028 (last refactor-track item). Security copy stays pinned to the rendered component via the two dedicated contract tests; logic contracts now correctly target the hook. DoD gates 3, 4 cited.
+
+---
