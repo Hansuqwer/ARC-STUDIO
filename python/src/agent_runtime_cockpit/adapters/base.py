@@ -133,16 +133,6 @@ class RuntimeAdapter(abc.ABC):
         """
         return "unknown"
 
-
-def _sdk_version_for(package_name: str) -> str:
-    """Return installed version of *package_name*, or 'unknown' if not installed."""
-    try:
-        from importlib.metadata import version
-
-        return version(package_name)
-    except Exception:
-        return "unknown"
-
     @abc.abstractmethod
     def detect(self, workspace: Path) -> tuple[bool, float, list[str]]:
         """Detect whether this adapter's runtime is present in the workspace.
@@ -230,3 +220,13 @@ def _sdk_version_for(package_name: str) -> str:
             "correlation_id": result.correlation_id,
             "details": result.details,
         }
+
+
+def _sdk_version_for(package_name: str) -> str:
+    """Return installed version of *package_name*, or 'unknown' if not installed."""
+    try:
+        from importlib.metadata import version
+
+        return version(package_name)
+    except Exception:
+        return "unknown"
