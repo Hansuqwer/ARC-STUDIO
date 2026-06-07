@@ -717,6 +717,26 @@ def mobile_gen_review_notes_cmd(
     )
 
 
+@mobile_generate_app.command("compliance-report")
+def mobile_gen_compliance_report_cmd(
+    manifest: str | None = typer.Option(None, "--manifest"),
+    out: str | None = typer.Option(None, "--out"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Generate an aggregated advisory compliance report (iOS + Android + review notes)."""
+    _setup_logging(debug)
+    import json as _json
+
+    from ..mobile.compliance import generate_compliance_report
+
+    m = _load_manifest_for_generate(manifest, json_output)
+    report = generate_compliance_report(m)
+    if out:
+        Path(out).write_text(_json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    _out(ok(report), json_output)
+
+
 @mobile_app.command("privacy-budget")
 def mobile_privacy_budget_cmd(
     manifest: str | None = typer.Option(None, "--manifest", help="Path to manifest file/dir."),
