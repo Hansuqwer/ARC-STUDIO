@@ -5640,3 +5640,20 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: arc-mobile-widget.tsx + arc-mobile-contribution.ts + getMobileStatus() in arc-backend-service.ts | Notes: Read-only tab; no native-execution or app-store claims. Closes R79 slice 110.6.
 
 ---
+
+## Phase 158 — Cleanup & Refactor Audit + Entrypoint Alias (R-CLEAN1)
+
+**Goal:** Run a comprehensive, multi-signal cleanup/refactor audit (dead code, refactor hotspots, nested-command depth, performance) and execute the smallest safe slice without overclaiming. Record a complete cleanup slice backlog as research-findings (not a competing roadmap doc).
+
+**Audit findings (Phase 1, audit-only):**
+- `ruff check src tests` is clean — Python imports already have zero unused/dead-import findings (ruff is in the release gate).
+- Multi-signal analysis **disproved** all three previously-suspected dead-code targets: `NotificationOutbox` (has `tests/notifications/test_outbox.py`), `ArcRunTimelineWidget` (wired via `arc-runs-contribution.ts` → `FrontendApplicationContribution`, command `arc:open-run-timeline`, contract tests), and `arena-frontend-module.ts` (active uncommitted arena work + docs reference). **Zero safe deletions.**
+- Refactor hotspots by LOC: `cli/mgmt.py` 1794 (duplicate `eval run` registration), `arc-protocol.ts` 1867 (72-method interface), `ConfigTab.tsx` 1253, `cli/sandbox.py` 1183, `cli/providers.py` 1178.
+- Max CLI command depth is 3 (`mcp workbench *`, `studio sessions *`, `providers accounts/quota/routing *`, `sandbox audit *`) — acceptable; flat aliases deferred to a Phase 3 slice with JSON-equivalence tests; `sandbox audit-verify`/`sandbox audit verify` dual path should be consolidated.
+- Complete 57-slice cleanup + fix backlog recorded in `docs/research-findings/cleanup-refactor-audit-2026-06-07.md`.
+
+**Executed slice (smallest safe Phase 2):** Added `arc-studio-cli` console-script entrypoint (additive) to fix the `arch-studio-cli` typo, keeping the typo'd alias for backward compatibility. Both register via `importlib.metadata`; `arc-studio-cli --help` resolves.
+
+**Status:** Baseline Complete | Evidence: local worktree | `python/pyproject.toml` `[project.scripts]` adds `arc-studio-cli`; `arch-studio-cli` retained as deprecated compat alias; `uv sync` re-registers; entrypoints verified `['arc','arc-studio','arc-studio-cli','arch-studio-cli']`. | Notes: Audit-only otherwise; no deletions, no protocol/CLI removals, no formatting churn. Backlog is research-findings only, not a competing roadmap/status doc.
+
+---

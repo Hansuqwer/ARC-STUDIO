@@ -60,6 +60,8 @@ dev = [
 [project.scripts]
 arc = "agent_runtime_cockpit.cli:app"
 arc-studio = "agent_runtime_cockpit.cli_studio:app"
+arc-studio-cli = "agent_runtime_cockpit.cli_studio:app"
+# Deprecated typo alias kept for backward compatibility; prefer `arc-studio-cli`.
 arch-studio-cli = "agent_runtime_cockpit.cli_studio:app"
 
 [tool.hatch.build.targets.wheel]

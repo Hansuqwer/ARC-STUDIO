@@ -23,6 +23,38 @@ Both `docs/roadmap.md` and `docs/phases.md` are CI-protected (`scripts/release_c
 5. **Deterministic security.** Sandbox, trust, policy, budget, audit, and capability decisions are deterministic. No LLM-based security judgement.
 6. **Immutable `EnforcementContext`.** Route new runtime state through immutable copies / `ContextVar`, never by mutating the frozen context.
 7. **No commits unless asked.** Leave changes in the working tree for review unless the owner explicitly requests a commit.
+8. **Baseline is not the finish line.** `Baseline Complete` is a checkpoint, not a destination. Every phase is driven to `Polished Complete` against the Definition of Done below before it is considered done. Do not open new scope to avoid finishing the elevation of an in-flight phase (this is rule 1 applied to polish, not just baseline).
+
+## Definition of Done — Baseline Complete → Polished Complete
+
+The quality bar for ARC Studio is an **enterprise-quality engineering bar expressed as measurable gates** — not an adjective. `Baseline Complete` means the happy path works and has tests. `Polished Complete` means the surface is coherent, accessible, safe, fast enough, parity-complete, and documented. A phase reaches `Polished Complete` only when **every gate below has cited evidence** recorded in `docs/phases.md`.
+
+**Status ladder — labels follow evidence, never the reverse:**
+
+| Status | Meaning | Required evidence |
+|---|---|---|
+| In Progress | Actively being built | — |
+| Baseline Complete | Happy path works; core tests exist; evidence anchored | tests run + commit/worktree anchor |
+| Polished Complete | Meets the full Definition of Done | every DoD gate has cited evidence |
+
+**Definition of Done gates (each needs cited evidence before the status changes):**
+
+1. **UX states.** Every user-visible surface (CLI output, TUI view, IDE tab/widget) has explicit loading, empty, error, degraded, and success states. No silent `.catch(() => null)`. No invented data — every card, metric, timeline, and badge names its real producer or renders a degraded state (producer-truth).
+2. **Accessibility.** Keyboard-reachable, visible focus, ARIA roles/labels on IDE widgets, sufficient color contrast, and `NO_COLOR` / high-contrast TUI parity. Run available axe / contract checks.
+3. **Parity.** CLI ↔ TUI ↔ IDE behavior is consistent; JSON output is stable and documented; equivalent actions produce equivalent results across surfaces.
+4. **Tests.** Unit + integration; contract/e2e if a UI/IDE surface changed; CLI snapshot if a command changed; protocol test if the protocol changed. Deterministic, offline, no provider calls unless explicitly gated.
+5. **Performance.** Bounded in-memory buffers, virtualized long lists, no sync filesystem I/O in hot UI paths, async backend bridges, debounced inputs. Measure before/after whenever a performance claim is made.
+6. **Security.** Paid calls explicitly gated; secrets redacted in logs/UI/audit; destructive or mutating actions confirmation-gated; security decisions deterministic (no LLM allow/deny); audit appended on allow.
+7. **Reliability.** Timeouts, cancellation, and structured error envelopes on every long-running or backend-bridged action.
+8. **Docs.** README, `--help`, `docs/roadmap.md`, and `docs/phases.md` updated in place; all claims pass `bash scripts/check-banned-claims.sh`.
+
+### Do Not Overclaim
+
+Raising the quality bar raises the **work required**, not the **words allowed**. Status always follows evidence:
+
+- Do not label a phase "Polished Complete", "complete", "hardened", "enterprise-grade", or "Production ready" until every DoD gate has cited evidence and `scripts/check-banned-claims.sh` passes.
+- `scripts/check-banned-claims.sh` is authoritative for release-facing wording. "Production ready", "multi-user", "tenant-isolated", broad provider-backed SwarmGraph adoption, and production-grade sandbox/microVM execution stay forbidden until proven by tests and evidence.
+- ARC Studio stays a single-user, loopback-only alpha workstation tool until proven otherwise. The Definition of Done elevates engineering quality; it does not change the product's safety posture or unlock new product claims.
 
 ## Active track (2026-06-05, `spec/v0.8-r-ux2` @ `ffa1e1f`)
 
