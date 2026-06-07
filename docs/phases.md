@@ -5821,3 +5821,15 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `node/services/config-service.ts`. Verified: `pnpm --filter arc-extension build` clean; tests **927 passed / 3 skipped** (incl. the config-service integration test via a real fake binary); `pnpm typecheck` clean. | Notes: completes CR-012 (hot paths were done in R-POLISH7); additive; deterministic; AST rewrite (no behavior change). DoD gate 5 cited.
 
 ---
+
+## Phase 173 — DoD Elevation: Native SwarmGraph Cost → IDE Cost Panel (R-POLISH15)
+
+**Goal:** CR-016a — surface native SwarmGraph run cost to the IDE cost panel. Verified the producer chain first.
+
+**Findings:** `SWARMGRAPH_COST` is a registered typed event with a producer in `adoption/langgraph_runner.py` (producer-gated on measured cost), but the **native** `SwarmGraphAdapter` mapped the SDK `budget` event to `BUDGET_UPDATE` (budget/wallet ≠ cost-insight), so native runs' cost never reached the IDE cost panel (which matches `swarmgraph_cost`). The SDK budget event **does** carry measured cost (`emit_budget_event` → `cost_usd` + `accumulated`).
+
+**Implemented:** added `SwarmGraphAdapter._accumulated_cost(sw_events)` (returns the last budget event's `accumulated`, or None) and emit a **single** `SWARMGRAPH_COST` event after the event loop with `{totalCost, currency, source, runtime}`. Producer-truth: only the measured cumulative cost is populated (provider/model/tokens stay null → "not reported"); if no budget cost was measured, no event is emitted and the panel stays honestly degraded. One event (not per-budget) because the IDE's `extractCost` takes the first match. `SWARMGRAPH_COST` is already registered, so no cross-language parity change.
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `adapters/swarmgraph.py` + tests `tests/adapters/test_swarmgraph_ide_event_contract.py` (+4: last-budget total, none-without-budget, $0-surfaced, marker). Verified: `uv run pytest tests/adapters tests/swarmgraph -q` → **1030 passed, 1 skipped**; `uv run ruff check src tests` clean. | Notes: additive; producer-gated (no invented cost). DoD gate 1 cited.
+
+---

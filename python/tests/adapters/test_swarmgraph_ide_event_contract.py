@@ -48,3 +48,36 @@ def test_non_insight_event_does_not_masquerade_as_insight():
     markers = {e.type.lower() for e in events}
     assert _IDE_TOPOLOGY_MARKER not in markers
     assert _IDE_CONSENSUS_MARKER not in markers
+
+
+# ─── CR-016a: native SwarmGraph cost surfaces to the IDE cost panel ───────────
+
+
+def _budget(acc) -> SwarmGraphEvent:
+    return SwarmGraphEvent(
+        kind=SwarmGraphEventKind.budget, swarm_id="s1", data={"accumulated": acc, "cost_usd": 0.1}
+    )
+
+
+def test_accumulated_cost_uses_last_budget_event():
+    events = [_budget(0.1), _budget(0.35), _budget(0.72)]
+    assert SwarmGraphAdapter._accumulated_cost(events) == 0.72
+
+
+def test_accumulated_cost_none_without_budget_events():
+    # producer-truth: no measured cost → None → IDE cost panel stays degraded.
+    worker = SwarmGraphEvent(
+        kind=SwarmGraphEventKind.worker, swarm_id="s1", data={"worker_id": "w"}
+    )
+    assert SwarmGraphAdapter._accumulated_cost([worker]) is None
+    assert SwarmGraphAdapter._accumulated_cost([]) is None
+
+
+def test_accumulated_cost_zero_is_surfaced():
+    # a measured $0 (stub/free run) is honest cost data, not "no cost".
+    assert SwarmGraphAdapter._accumulated_cost([_budget(0.0)]) == 0.0
+
+
+def test_swarmgraph_cost_event_type_matches_ide_marker():
+    # The emitted ARC event type lowercases to the IDE's isInsightEvent('cost') marker.
+    assert "SWARMGRAPH_COST".lower() == "swarmgraph_cost"

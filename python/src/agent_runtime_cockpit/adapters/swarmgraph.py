@@ -376,6 +376,28 @@ class SwarmGraphAdapter(RuntimeAdapter):
             proto_events = self._map_swarmgraph_event(sw_evt, run_id, i)
             events.extend(proto_events)
 
+        # CR-016a: surface the measured cumulative cost to the IDE cost panel as a
+        # single SWARMGRAPH_COST event (the IDE's extractCost takes the first cost
+        # event, so we emit the final accumulated total once — not per budget event).
+        # Producer-truth: only the field the budget tracker actually measured is
+        # populated; provider/model/tokens are unknown here and stay null. If budget
+        # tracking produced no cost, no event is emitted and the panel stays degraded.
+        final_cost = self._accumulated_cost(sw_events)
+        if final_cost is not None:
+            events.append(
+                self._event(
+                    run_id,
+                    len(events),
+                    "SWARMGRAPH_COST",
+                    {
+                        "totalCost": final_cost,
+                        "currency": "USD",
+                        "source": "swarmgraph_budget",
+                        "runtime": "swarmgraph",
+                    },
+                )
+            )
+
         worker_count = num_workers
         swarm_status = result.get("status", "completed")
 
@@ -414,6 +436,22 @@ class SwarmGraphAdapter(RuntimeAdapter):
                 "results": result.get("results", []),
             },
         )
+
+    @staticmethod
+    def _accumulated_cost(sw_events: list[SwarmGraphEvent]) -> float | None:
+        """Final measured cumulative cost from the budget-event stream, or None.
+
+        Returns the last budget event's ``accumulated`` value (the running total
+        of measured worker cost). None when no budget event carries a numeric
+        accumulated cost, so the IDE cost panel stays honestly degraded.
+        """
+        final: float | None = None
+        for sw_evt in sw_events:
+            if sw_evt.kind == SwarmGraphEventKind.budget:
+                acc = dict(sw_evt.data).get("accumulated")
+                if isinstance(acc, (int, float)) and not isinstance(acc, bool):
+                    final = float(acc)
+        return final
 
     def _map_swarmgraph_event(
         self,
