@@ -6057,3 +6057,15 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete (Mobile Roadmap Phase 12, slice 1) | Evidence: local worktree 2026-06-07 | Files: `mobile/{siem_export,policy_context}.py`, `mobile/recorder.py`, `cli/mobile.py`, `mobile/__init__.py`. Verified: `test_mobile_siem_export.py` (6) + `test_mobile_policy_context.py` (7) — CEF/JSON format + redaction + CLI; sign/verify, RBAC/ABAC/tenant/bad-sig denials, policy integration. | Notes: deterministic security (no LLM); no real network. Phase 12 remainder (audit retention, feature flags + remote kill switch, compliance report, SBOM) follows; Phase 11 native-capability entry-gate next.
 
 ---
+
+## Phase 191 — Mobile SDK: Native Capability Entry-Gate + Feature Flags/Kill Switch (Mobile Roadmap Phases 11 + 12b)
+
+**Goal:** Deterministic enablement-control layer for native capabilities (Mobile Roadmap Phase 11) + its feature-flag/kill-switch dependency (Phase 12b). Proves the gate WITHOUT enabling real device access.
+
+**Implemented:**
+- **Phase 12b** `mobile/feature_flags.py` — default-OFF flag store; unknown flags disabled; global **kill switch** overrides all flags to OFF; optional persistence.
+- **Phase 11** `mobile/capability_gate.py` — `CapabilityEntryGate`: a capability is *eligible* only when ALL hold (default DENIED): feature flag ON + kill switch OFF, valid signed plan (HMAC verify), valid/unexpired/matching approval grant, compliance artifact present. **Safety invariant: route is always `fixtures` and `executed_real_device` is always `False`, even when eligible** — flipping to real device APIs is deliberately out of scope / human-gated.
+
+**Status:** Baseline Complete (Mobile Roadmap Phases 11 + 12b) | Evidence: local worktree 2026-06-07 | Files: `mobile/{feature_flags,capability_gate}.py`, `mobile/__init__.py`. Verified: `test_mobile_feature_flags.py` (4) + `test_mobile_capability_gate.py` (6) — default-denied, per-requirement denials, kill-switch override, eligible-but-still-fixtures, grant/cap mismatch. | Notes: deterministic (no LLM); **no real device access anywhere** — the gate enforces eligibility but execution stays fixtures-only.
+
+---

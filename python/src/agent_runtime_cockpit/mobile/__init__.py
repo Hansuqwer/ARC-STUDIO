@@ -5,6 +5,7 @@ All sensitive capabilities are mock-only in MVP. No real native bridges.
 """
 
 from .capabilities import get_capability, list_capabilities
+from .capability_gate import CapabilityEntryGate, FIXTURES_ROUTE, GateDecision
 from .feature_flags import FeatureFlags
 from .hashing import capability_hash, manifest_hash, plan_hash, report_hash
 from .manifest import MobileManifestLoadError, build_default_manifest, load_manifest
@@ -143,6 +144,9 @@ __all__ = [
     "list_capabilities",
     "get_capability",
     "FeatureFlags",
+    "CapabilityEntryGate",
+    "GateDecision",
+    "FIXTURES_ROUTE",
     "load_manifest",
     "build_default_manifest",
     "get_fixture",
