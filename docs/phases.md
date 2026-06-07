@@ -5925,3 +5925,16 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete (part 1 of N) | Evidence: local worktree | Files: `common/protocol/replay-diff.ts`, `common/arc-protocol.ts`, `__tests__/protocol-extensions.contract.test.ts`. Verified: `pnpm --filter arc-extension build` (tsc) clean; protocol-extensions + studio-tabs **250 passed**. arc-protocol.ts trimmed (1867 → ~1790). | Notes: in progress — further cohesive sections (config, schema-contracts, streaming, preflight, etc.) extract in subsequent commits. DoD gates 3, 4 cited.
 
 ---
+
+## Phase 181 — Refactor: Split arc-protocol.ts — Run Execution Module (R-POLISH23)
+
+**Goal:** CR-027 (part 2) — continue the barrel decomposition.
+
+**Implemented:**
+- New `common/protocol/run-execution.ts` — Streaming (`TraceEventChunk`, `ActiveTraceStream*`, `ActiveTraceEventChunk`, terminal/state unions) + Run Preflight/Start (`RunBlocker`, `RunCostMetadata`, `RunPreflight*`, `GatedProviderAction*`, `StartRun*`). Back-imports `TraceEvent` from the barrel and `ReplayEvent` from the sibling replay-diff module (type-only).
+- `arc-protocol.ts` re-exports it + back-imports the 8 names used by `ArcService` (`streamActiveTrace`/`preflightRun`/`startRun`/gated action). Removed the now-unused local `ReplayEvent` import (still re-exported via `export *`).
+- `protocol-extensions.contract.test.ts` reads the module source for the moved type shapes; `ArcService` method assertions stay on `arc-protocol`.
+
+**Status:** Baseline Complete (part 2 of N) | Evidence: local worktree | Files: `common/protocol/run-execution.ts`, `common/arc-protocol.ts`, `__tests__/protocol-extensions.contract.test.ts`. Verified: `tsc` clean; protocol-extensions + studio-tabs **250 passed**. arc-protocol.ts 1795 → 1665. | Notes: 2 modules extracted (replay-diff, run-execution); ~202 lines moved. Config/schema-contracts/stable-ids/runtime-adapter sections remain. DoD gates 3, 4 cited.
+
+---

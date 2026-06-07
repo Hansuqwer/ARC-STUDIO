@@ -10,8 +10,10 @@ import * as path from 'path';
 describe('Protocol Extensions (Session B + B7)', () => {
     const protocolFile = path.join(__dirname, '..', '..', '..', 'src', 'common', 'arc-protocol.ts');
     const replayDiffFile = path.join(__dirname, '..', '..', '..', 'src', 'common', 'protocol', 'replay-diff.ts');
+    const runExecutionFile = path.join(__dirname, '..', '..', '..', 'src', 'common', 'protocol', 'run-execution.ts');
     let source: string;
     let replayDiffSource: string;
+    let runExecutionSource: string;
 
     beforeAll(async () => {
         source = await fs.readFile(protocolFile, 'utf-8');
@@ -19,6 +21,8 @@ describe('Protocol Extensions (Session B + B7)', () => {
         // from arc-protocol via `export *`). Type definitions are asserted against the module;
         // ArcService methods that use them remain asserted against arc-protocol.
         replayDiffSource = await fs.readFile(replayDiffFile, 'utf-8');
+        // CR-027: Streaming / Run Preflight / Start types were extracted to ./protocol/run-execution.
+        runExecutionSource = await fs.readFile(runExecutionFile, 'utf-8');
     });
 
     describe('Config Tab Types (Session B)', () => {
@@ -144,11 +148,11 @@ describe('Protocol Extensions (Session B + B7)', () => {
         });
 
         it('should export run preflight protocol types', () => {
-            expect(source).toMatch(/export interface RunPreflightRequest/);
-            expect(source).toMatch(/export interface RunPreflightResponse/);
-            expect(source).toMatch(/export interface RunBlocker/);
-            expect(source).toMatch(/export interface StartRunRequest/);
-            expect(source).toMatch(/export interface StartRunResponse/);
+            expect(runExecutionSource).toMatch(/export interface RunPreflightRequest/);
+            expect(runExecutionSource).toMatch(/export interface RunPreflightResponse/);
+            expect(runExecutionSource).toMatch(/export interface RunBlocker/);
+            expect(runExecutionSource).toMatch(/export interface StartRunRequest/);
+            expect(runExecutionSource).toMatch(/export interface StartRunResponse/);
         });
 
         it('should expose preflightRun service method', () => {
@@ -276,15 +280,15 @@ describe('Protocol Extensions (Session B + B7)', () => {
         });
 
         it('should expose active stream protocol types and methods', () => {
-            expect(source).toMatch(/export type ActiveTraceStreamMode\s*=\s*'live'\s*\|\s*'replay'/);
-            expect(source).toMatch(/export interface ActiveTraceStreamRequest/);
-            expect(source).toMatch(/export interface ActiveTraceStreamStatus/);
-            expect(source).toMatch(/export interface ActiveTraceEventChunk/);
-            expect(source).toMatch(/RUN_COMPLETED/);
-            expect(source).toMatch(/RUN_FAILED/);
-            expect(source).toMatch(/RUN_CANCELLED/);
-            expect(source).toMatch(/STREAM_END/);
-            expect(source).toMatch(/state:\s*ActiveTraceStreamState/);
+            expect(runExecutionSource).toMatch(/export type ActiveTraceStreamMode\s*=\s*'live'\s*\|\s*'replay'/);
+            expect(runExecutionSource).toMatch(/export interface ActiveTraceStreamRequest/);
+            expect(runExecutionSource).toMatch(/export interface ActiveTraceStreamStatus/);
+            expect(runExecutionSource).toMatch(/export interface ActiveTraceEventChunk/);
+            expect(runExecutionSource).toMatch(/RUN_COMPLETED/);
+            expect(runExecutionSource).toMatch(/RUN_FAILED/);
+            expect(runExecutionSource).toMatch(/RUN_CANCELLED/);
+            expect(runExecutionSource).toMatch(/STREAM_END/);
+            expect(runExecutionSource).toMatch(/state:\s*ActiveTraceStreamState/);
             expect(source).toMatch(/streamActiveTrace\(request:\s*ActiveTraceStreamRequest\)/);
             expect(source).toMatch(/cancelActiveTraceStream\(runId:\s*string\)/);
             expect(source).toMatch(/getPythonDaemonUrl\(\):\s*Promise<string \| undefined>/);
