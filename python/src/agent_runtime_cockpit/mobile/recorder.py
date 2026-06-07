@@ -1,4 +1,13 @@
-"""Append-only trace recorder for mobile simulator events."""
+"""Append-only trace recorder for mobile simulator events.
+
+Timestamps use wall-clock UTC by default. Pass ``deterministic=True`` to
+``events_from_report()`` / ``build_trace()`` for reproducible test output
+(fixes timestamp to 2026-01-01T00:00:00Z).
+
+Tamper-evident chain: each event carries ``prev_event_hash`` — the
+``event_hash`` of the preceding event, or ``"0" * 64`` for the first event.
+This means reordering or deleting events is detectable by ``verify_trace()``.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +20,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .hashing import _hash
 from .models import MOBILE_SCHEMA_VERSION, MobileActionSimulationReport
+
+_DETERMINISTIC_TS = "2026-01-01T00:00:00Z"
+_ZERO_HASH = "0" * 64
 
 
 class MobileRuntimeEvent(BaseModel):
@@ -27,6 +39,7 @@ class MobileRuntimeEvent(BaseModel):
     allowed: bool
     mock: bool = True
     payload_hash: str
+    prev_event_hash: str = _ZERO_HASH  # hash of preceding event; _ZERO_HASH for first
     event_hash: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -50,9 +63,51 @@ def trace_hash(events: list[MobileRuntimeEvent]) -> str:
     return _hash([event.event_hash for event in events])
 
 
-def events_from_report(report: MobileActionSimulationReport) -> list[MobileRuntimeEvent]:
-    timestamp = datetime(2026, 1, 1, tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
+def verify_trace(trace: MobileTrace) -> tuple[bool, str]:
+    """Verify the prev_event_hash chain and event_hashes.
+
+    Returns (ok, message). ok=False means the trace has been tampered with.
+    """
+    prev_hash = _ZERO_HASH
+    for event in trace.events:
+        # Check prev_event_hash
+        if event.prev_event_hash != prev_hash:
+            return (
+                False,
+                f"Chain broken at sequence {event.sequence}: "
+                f"expected prev_hash={prev_hash!r}, got {event.prev_event_hash!r}",
+            )
+        # Check event_hash
+        recomputed = event_hash(event)
+        if recomputed != event.event_hash:
+            return (
+                False,
+                f"Event hash mismatch at sequence {event.sequence}: "
+                f"expected {recomputed!r}, stored {event.event_hash!r}",
+            )
+        prev_hash = event.event_hash
+
+    # Check trace_hash
+    expected_trace_hash = trace_hash(trace.events)
+    if trace.trace_hash and trace.trace_hash != expected_trace_hash:
+        return False, f"Trace hash mismatch: expected {expected_trace_hash!r}"
+
+    return True, "ok"
+
+
+def events_from_report(
+    report: MobileActionSimulationReport,
+    *,
+    deterministic: bool = False,
+) -> list[MobileRuntimeEvent]:
+    if deterministic:
+        timestamp = _DETERMINISTIC_TS
+    else:
+        timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
     events: list[MobileRuntimeEvent] = []
+    prev_hash = _ZERO_HASH
+
     for index, step in enumerate(report.steps):
         payload = {
             "plan_id": report.plan_id,
@@ -75,15 +130,21 @@ def events_from_report(report: MobileActionSimulationReport) -> list[MobileRunti
             allowed=step.allowed,
             mock=step.mock,
             payload_hash=_hash(payload),
+            prev_event_hash=prev_hash,
             metadata={"risk_level": report.risk_level},
         )
         event.event_hash = event_hash(event)
+        prev_hash = event.event_hash
         events.append(event)
     return events
 
 
-def build_trace(report: MobileActionSimulationReport) -> MobileTrace:
-    events = events_from_report(report)
+def build_trace(
+    report: MobileActionSimulationReport,
+    *,
+    deterministic: bool = False,
+) -> MobileTrace:
+    events = events_from_report(report, deterministic=deterministic)
     return MobileTrace(plan_id=report.plan_id, events=events, trace_hash=trace_hash(events))
 
 

@@ -1,6 +1,8 @@
 """Deterministic hashing for ARC Mobile Runtime models.
 
-Excludes volatile fields (*_hash, schema_version) before hashing.
+Excludes volatile fields (*_hash fields) before hashing.
+Note: ``schema_version`` IS included in hashes (it is not in _VOLATILE).
+Changing schema_version will invalidate all existing hashes — handle via migration.
 Canonical: sorted keys, compact separators, stable list ordering by id.
 """
 
