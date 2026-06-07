@@ -28,3 +28,4 @@ export * from './mobile-capability';
 export * from './mobile-action-plan';
 export * from './mobile-events';
 export * from './mobile-trace';
+export * from './mobile-validators';
