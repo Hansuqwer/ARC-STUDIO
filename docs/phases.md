@@ -5721,3 +5721,15 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `tui/data.py`, `tui/screen.py` + tests `tests/test_tui_core.py` (default→off, opt-in env, deny-precedence, status-bar shows/hides). Verified: `uv run pytest tests/test_tui_core.py tests/tui/test_allow_paid_warning.py -q` → **64 passed**; `uv run ruff check src tests` clean. | Notes: behavior change (flips a previously-deliberate default); inverts env semantics opt-out→opt-in (back-compat retained). DoD gate 6 cited.
 
 ---
+
+## Phase 164 — DoD Elevation: CLI Mutation Confirmation Gate (R-POLISH6)
+
+**Goal:** CR-010 — confirmation-gate destructive/mutating CLI ops. Verified against the real CLI first.
+
+**Finding (correction):** `arc policy rule-add`/`rule-remove` **do not exist** — the `policy` group is `explain`/`approve`/`revoke` (`approve` already requires an explicit `--token` + command, i.e. deliberate). The real destructive op matching the intent is **`arc sandbox audit-compact`** (and its nested alias `arc sandbox audit compact`), which rewrites the sandbox audit events file.
+
+**Implemented:** added a `--yes` flag + confirmation gate to the shared `_sandbox_audit_compact_impl` (matching the repo's `mgmt.py`/`runs.py` convention): in JSON mode it refuses without `--yes` (`CONFIRMATION_REQUIRED`, exit 2); interactively it prompts via `typer.confirm` and cancels cleanly on "no". Both the flat (`audit-compact`) and nested (`audit compact`) commands carry `--yes`.
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `cli/sandbox.py` + tests `tests/isolation/test_sandbox_audit_query.py` (+3 gate tests; 2 pre-existing CLI tests updated to pass `--yes`). Verified: `uv run pytest tests/isolation/test_sandbox_audit_query.py -q` → **22 passed**; `uv run ruff check src tests` clean. | Notes: additive (`--yes` preserves scriptability); chain preserved by the underlying prune. DoD gate 6 cited. Follow-up: consider gating `policy revoke` (mutating, but safe-direction).
+
+---

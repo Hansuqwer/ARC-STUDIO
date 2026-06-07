@@ -359,7 +359,7 @@ def test_cli_audit_compact_json_valid(tmp_path, monkeypatch):
     monkeypatch.setenv("ARC_SANDBOX_AUDIT_DIR", str(audit_dir))
     _write_events(audit_dir, [_make_event("2026-01-01T00:00:00Z")])
 
-    result = CliRunner().invoke(app, ["sandbox", "audit-compact", "--json", "--keep", "1"])
+    result = CliRunner().invoke(app, ["sandbox", "audit-compact", "--json", "--keep", "1", "--yes"])
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
@@ -374,9 +374,74 @@ def test_cli_audit_compact_invalid_before_exits_2(tmp_path, monkeypatch):
     _write_events(audit_dir, [_make_event("2026-01-01T00:00:00Z")])
 
     result = CliRunner().invoke(
-        app, ["sandbox", "audit-compact", "--json", "--before", "not-a-time"]
+        app, ["sandbox", "audit-compact", "--json", "--before", "not-a-time", "--yes"]
     )
 
     assert result.exit_code == 2
     payload = json.loads(result.output)
     assert payload["ok"] is False
+
+
+# ---------------------------------------------------------------------------
+# CR-010: audit-compact confirmation gate
+# ---------------------------------------------------------------------------
+
+
+def test_audit_compact_refuses_without_yes_in_json_mode(tmp_path):
+    audit_dir = tmp_path / "audit"
+    _write_events(
+        audit_dir,
+        [_make_event("2026-01-01T00:00:00Z"), _make_event("2026-02-01T00:00:00Z")],
+    )
+    result = CliRunner().invoke(
+        app,
+        ["sandbox", "audit-compact", "--audit-dir", str(audit_dir), "--keep", "1", "--json"],
+    )
+    assert result.exit_code == 2
+    assert "CONFIRMATION_REQUIRED" in result.stdout
+    # Nothing was pruned.
+    kept = [
+        line
+        for line in (audit_dir / "sandbox.events.jsonl").read_text().splitlines()
+        if line.strip()
+    ]
+    assert len(kept) == 2
+
+
+def test_audit_compact_runs_with_yes(tmp_path):
+    audit_dir = tmp_path / "audit"
+    _write_events(audit_dir, [_make_event(f"2026-0{i}-01T00:00:00Z") for i in range(1, 6)])
+    result = CliRunner().invoke(
+        app,
+        [
+            "sandbox",
+            "audit-compact",
+            "--audit-dir",
+            str(audit_dir),
+            "--keep",
+            "2",
+            "--yes",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0
+
+
+def test_audit_compact_interactive_cancel_keeps_events(tmp_path):
+    audit_dir = tmp_path / "audit"
+    _write_events(
+        audit_dir,
+        [_make_event("2026-01-01T00:00:00Z"), _make_event("2026-02-01T00:00:00Z")],
+    )
+    result = CliRunner().invoke(
+        app,
+        ["sandbox", "audit-compact", "--audit-dir", str(audit_dir), "--keep", "1"],
+        input="n\n",
+    )
+    assert result.exit_code == 0
+    kept = [
+        line
+        for line in (audit_dir / "sandbox.events.jsonl").read_text().splitlines()
+        if line.strip()
+    ]
+    assert len(kept) == 2

@@ -384,11 +384,12 @@ def sandbox_audit_compact(
     ),
     keep: int = typer.Option(1000, "--keep", help="Keep newest N events when --before omitted"),
     audit_dir: Optional[str] = typer.Option(None, "--audit-dir", help="Sandbox audit directory"),
+    yes: bool = typer.Option(False, "--yes", help="Skip the confirmation prompt"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
     """Prune old sandbox audit events (events file only; chain is preserved)."""
-    _sandbox_audit_compact_impl(before, keep, audit_dir, json_output, debug)
+    _sandbox_audit_compact_impl(before, keep, audit_dir, json_output, debug, yes)
 
 
 @sandbox_audit_app.command("compact")
@@ -398,11 +399,12 @@ def sandbox_audit_compact_nested(
     ),
     keep: int = typer.Option(1000, "--keep", help="Keep newest N events when --before omitted"),
     audit_dir: Optional[str] = typer.Option(None, "--audit-dir", help="Sandbox audit directory"),
+    yes: bool = typer.Option(False, "--yes", help="Skip the confirmation prompt"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
     """Prune old sandbox audit events (events file only; chain is preserved)."""
-    _sandbox_audit_compact_impl(before, keep, audit_dir, json_output, debug)
+    _sandbox_audit_compact_impl(before, keep, audit_dir, json_output, debug, yes)
 
 
 def _sandbox_audit_compact_impl(
@@ -411,8 +413,28 @@ def _sandbox_audit_compact_impl(
     audit_dir: Optional[str],
     json_output: bool,
     debug: bool,
+    yes: bool = False,
 ) -> None:
     _setup_logging(debug)
+    # Destructive: rewrites the sandbox audit events file. Confirmation-gated.
+    if not yes:
+        if json_output:
+            _out(
+                err(
+                    ArcErrorCode.INVALID_INPUT,
+                    "Refusing to prune sandbox audit events without --yes in JSON mode.",
+                    details={"code": "CONFIRMATION_REQUIRED"},
+                ),
+                json_output,
+            )
+            raise typer.Exit(2)
+        target = f"before {before}" if before else f"all but the newest {keep}"
+        if not typer.confirm(
+            f"Prune sandbox audit events ({target})? The events file is rewritten "
+            "(the hash chain is preserved)."
+        ):
+            _out(ok({"ok": True, "cancelled": True, "pruned": 0}), json_output)
+            raise typer.Exit(0)
     try:
         result = compact_sandbox_audit_events(
             before=before,
