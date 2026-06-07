@@ -85,7 +85,7 @@ def build_default_manifest(
         background_execution=False,
         network_by_default=False,
         simulator_mode=True,
-        privacy_manifest=True,
+        privacy_manifest_intent=True,
     )
     manifest.manifest_hash = _manifest_hash(manifest)
     return manifest
