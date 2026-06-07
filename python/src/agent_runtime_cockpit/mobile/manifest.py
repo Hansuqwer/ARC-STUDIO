@@ -33,6 +33,13 @@ def load_manifest(path: str | Path, *, strict: bool = False) -> MobileRuntimeMan
             # Validate with strict model to catch unknown fields
             manifest = MobileRuntimeManifest.model_validate(data, strict=False)
             # Check for unknown top-level keys
+            from .schema_validator import validate_against_schema
+
+            errors = validate_against_schema(data, "manifest")
+            if errors:
+                raise MobileManifestLoadError(
+                    f"Manifest failed JSON Schema validation (strict mode): {errors[0]}"
+                )
             known = set(MobileRuntimeManifest.model_fields)
             unknown = set(data) - known - {"manifest_hash"}
             if unknown:
@@ -41,6 +48,7 @@ def load_manifest(path: str | Path, *, strict: bool = False) -> MobileRuntimeMan
                 )
         else:
             manifest = MobileRuntimeManifest.model_validate(data)
+        manifest = MobileRuntimeManifest.model_validate(data)
     except MobileManifestLoadError:
         raise
     except Exception as exc:
