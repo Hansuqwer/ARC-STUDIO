@@ -5951,3 +5951,15 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete (part 3 of N) | Evidence: local worktree | Files: `common/protocol/config-types.ts`, `common/arc-protocol.ts`, `__tests__/protocol-extensions.contract.test.ts`. Verified: `tsc` clean; protocol-extensions + studio-tabs **250 passed**. arc-protocol.ts 1665 → 1439 (3 modules, ~428 lines / ~23% moved). | Notes: cockpit-schema-contracts, stable-ids/graph-linkage, runtime-adapter, run-links, HITL, audit sections remain. DoD gates 3, 4, 6 (non-secret config checks preserved) cited.
 
 ---
+
+## Phase 183 — Refactor: Split arc-protocol.ts — Contracts + Graph Linkage (R-POLISH25)
+
+**Goal:** CR-027 (part 4) — extract Cockpit Schema Contracts + Stable IDs/Graph Linkage; run the FULL arc-extension suite.
+
+**Implemented:**
+- New `common/protocol/contracts-graph.ts` — `RunContract`, `RunReceipt`, `FailureAutopsy`, `TrustDiff`, `EvidenceRef`/`EvidenceKind`, `BudgetVector`, `FileChange`, `RetryOption` + `StableIdKind`, `GraphNodeData`, `GraphEdgeData`, `CrossLinkState`, `CapabilitySnapshot`. Byte-exact move; self-contained. `arc-protocol.ts` re-exports it + back-imports the 5 names used locally (`EvidenceRef`, `FailureAutopsy`, `GraphNodeData`, `RunContract`, `RunReceipt`).
+- **Fixed a latent test miss:** `ui-components.contract.test.ts`’s `CapabilityDiff Protocol Type` block asserted `CapabilityDiffResponse` against `arc-protocol` source — but that type moved to replay-diff in R-POLISH22 (part 1), where only targeted tests were run. Retargeted those type assertions to the replay-diff module (the `getCapabilityDiff` method stays on `arc-protocol`). From here the full suite is the gate.
+
+**Status:** Baseline Complete (part 4 of N) | Evidence: local worktree | Files: `common/protocol/contracts-graph.ts`, `common/arc-protocol.ts`, `__tests__/ui-components.contract.test.ts`. Verified: `tsc` clean; **full** `pnpm --filter arc-extension test` = 33 suites, **933 passed / 3 skipped**. arc-protocol.ts 1439 → 1216 (4 modules, ~651 lines / ~35% moved). | Notes: runtime-adapter, run-links, HITL, audit sections remain. DoD gates 3, 4 cited.
+
+---

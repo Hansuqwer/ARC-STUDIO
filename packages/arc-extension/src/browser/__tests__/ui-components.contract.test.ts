@@ -1189,24 +1189,27 @@ describe('ArcAdaptersWidget Capability Diff Integration', () => {
 
 describe('CapabilityDiff Protocol Type', () => {
     let source: string;
+    let replayDiffSource: string;
 
     beforeAll(async () => {
         source = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'common', 'arc-protocol.ts'), 'utf-8');
+        // CR-027: CapabilityDiff* types were extracted to ./protocol/replay-diff (re-exported via barrel).
+        replayDiffSource = await fs.readFile(path.join(__dirname, '..', '..', '..', 'src', 'common', 'protocol', 'replay-diff.ts'), 'utf-8');
     });
 
     it('should define CapabilityDiffResponse interface', () => {
-        expect(source).toMatch(/export interface CapabilityDiffResponse/);
+        expect(replayDiffSource).toMatch(/export interface CapabilityDiffResponse/);
     });
 
     it('should have diff, fromRuntime, toRuntime fields', () => {
-        expect(source).toMatch(/diff:\s*CapabilityDiff/);
-        expect(source).toMatch(/fromRuntime:\s*string/);
-        expect(source).toMatch(/toRuntime:\s*string/);
+        expect(replayDiffSource).toMatch(/diff:\s*CapabilityDiff/);
+        expect(replayDiffSource).toMatch(/fromRuntime:\s*string/);
+        expect(replayDiffSource).toMatch(/toRuntime:\s*string/);
     });
 
     it('should have trustBoundaryWidened and trustSensitiveChanges', () => {
-        expect(source).toMatch(/trustBoundaryWidened:\s*boolean/);
-        expect(source).toMatch(/trustSensitiveChanges:\s*string\[\]/);
+        expect(replayDiffSource).toMatch(/trustBoundaryWidened:\s*boolean/);
+        expect(replayDiffSource).toMatch(/trustSensitiveChanges:\s*string\[\]/);
     });
 
     it('should define getCapabilityDiff on ArcService', () => {
