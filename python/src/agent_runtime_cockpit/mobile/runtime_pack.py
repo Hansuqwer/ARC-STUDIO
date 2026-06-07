@@ -30,6 +30,42 @@ def build_runtime_pack_manifest(
     from ..runtime_packs.scaffold import MANIFEST_FILENAME as PACK_MANIFEST_FILENAME
 
     cap_ids = [c.id for c in mobile_manifest.capabilities]
+    # Full capability cards — governance detail preserved, not just IDs
+    cap_detail = [
+        {
+            "id": c.id,
+            "name": c.name,
+            "category": c.category.value if hasattr(c.category, "value") else str(c.category),
+            "data_sensitivity": c.data_sensitivity.value
+            if hasattr(c.data_sensitivity, "value")
+            else str(c.data_sensitivity),
+            "approval_mode": c.approval_mode.value
+            if hasattr(c.approval_mode, "value")
+            else str(c.approval_mode),
+            "reads": c.reads,
+            "writes": c.writes,
+            "network": c.network,
+            "background": c.background,
+            "requires_trust": c.requires_trust,
+            "requires_hitl": c.requires_hitl,
+            "replayable": c.replayable,
+            "auditable": c.auditable,
+            "mcp_exposable": c.mcp_exposable,
+            "simulator_supported": c.simulator_supported,
+            "capability_hash": c.capability_hash,
+        }
+        for c in mobile_manifest.capabilities
+    ]
+    # Platform support detail
+    platform_detail = [
+        {
+            "platform": p.platform.value if hasattr(p.platform, "value") else str(p.platform),
+            "stub_only": p.stub_only,
+            "framework": p.framework,
+            "min_os_version": p.min_os_version,
+        }
+        for p in mobile_manifest.platforms
+    ]
 
     identity = RuntimeIdentity(
         runtime_name=mobile_manifest.id,
@@ -48,6 +84,8 @@ def build_runtime_pack_manifest(
         metadata={
             "mobile_manifest_hash": mobile_manifest.manifest_hash or "",
             "mobile_capabilities": cap_ids,
+            "capabilities_detail": cap_detail,
+            "platform_support": platform_detail,
             "simulator_mode": mobile_manifest.simulator_mode,
             "background_execution": mobile_manifest.background_execution,
             "network_by_default": mobile_manifest.network_by_default,
