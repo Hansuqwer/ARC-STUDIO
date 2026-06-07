@@ -27,9 +27,20 @@ def load_manifest(path: str | Path) -> MobileRuntimeManifest:
         raise MobileManifestLoadError(f"Manifest not found: {p}")
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
-        return MobileRuntimeManifest.model_validate(data)
+        manifest = MobileRuntimeManifest.model_validate(data)
+    except MobileManifestLoadError:
+        raise
     except Exception as exc:
         raise MobileManifestLoadError(f"Cannot load manifest: {exc}") from exc
+
+    ids = [c.id for c in manifest.capabilities]
+    seen: set[str] = set()
+    dups = [cid for cid in ids if cid in seen or seen.add(cid)]  # type: ignore[func-returns-value]
+    if dups:
+        raise MobileManifestLoadError(
+            f"Manifest '{manifest.id}' contains duplicate capability IDs: {sorted(set(dups))}"
+        )
+    return manifest
 
 
 def build_default_manifest(

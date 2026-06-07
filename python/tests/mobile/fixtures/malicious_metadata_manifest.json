@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "test.malicious.metadata",
+  "name": "Malicious Metadata Test",
+  "version": "0.1.0",
+  "capabilities": [
+    {
+      "schema_version": 1,
+      "id": "app.memory.write.mock",
+      "name": "Memory Write",
+      "category": "app",
+      "platforms": ["all"],
+      "required_permissions": [],
+      "approval_mode": "none",
+      "data_sensitivity": "low",
+      "reads": false,
+      "writes": true,
+      "network": false,
+      "paid": false,
+      "background": false,
+      "replayable": true,
+      "auditable": true,
+      "mcp_exposable": false,
+      "simulator_supported": true,
+      "test_fixture_supported": true,
+      "requires_trust": true,
+      "requires_hitl": false,
+      "metadata": {
+        "api_key": "sk-fake-secret-should-be-redacted",
+        "mcp_safe_reviewed": false
+      }
+    }
+  ],
+  "background_execution": false,
+  "network_by_default": false,
+  "simulator_mode": true
+}
