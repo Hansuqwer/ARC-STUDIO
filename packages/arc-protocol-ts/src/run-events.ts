@@ -470,6 +470,78 @@ export interface UnknownEvent extends RunEventBase {
   data: Record<string, unknown>;
 }
 
+// ─── Security denial events (Phase 23 enforcement) ──────────────────────────
+
+export interface TrustDeniedEvent extends RunEventBase {
+  type: 'TRUST_DENIED';
+  data: {
+    action: string;
+    workspace_path: string;
+    reason: string;
+    trust_level: string;
+    required_trust_level?: string;
+    remediation?: string;
+    correlation_id?: string | null;
+    [key: string]: unknown;
+  };
+}
+
+export interface PaidCallDeniedEvent extends RunEventBase {
+  type: 'PAID_CALL_DENIED';
+  data: {
+    action: string;
+    reason: string;
+    profile_id: string;
+    provider?: string | null;
+    model?: string | null;
+    allow_paid_calls?: boolean;
+    remediation?: string;
+    correlation_id?: string | null;
+    [key: string]: unknown;
+  };
+}
+
+export interface ShellDeniedEvent extends RunEventBase {
+  type: 'SHELL_DENIED';
+  data: {
+    action: string;
+    reason: string;
+    profile_id: string;
+    command?: string | null;
+    allow_shell?: boolean;
+    remediation?: string;
+    correlation_id?: string | null;
+    [key: string]: unknown;
+  };
+}
+
+export interface NetworkDeniedEvent extends RunEventBase {
+  type: 'NETWORK_DENIED';
+  data: {
+    action: string;
+    reason: string;
+    profile_id: string;
+    url?: string | null;
+    allow_network?: boolean;
+    remediation?: string;
+    correlation_id?: string | null;
+    [key: string]: unknown;
+  };
+}
+
+export interface PermissionDeniedEvent extends RunEventBase {
+  type: 'PERMISSION_DENIED';
+  data: {
+    action: string;
+    reason: string;
+    permission_type: string;
+    context?: Record<string, string> | null;
+    remediation?: string | null;
+    correlation_id?: string | null;
+    [key: string]: unknown;
+  };
+}
+
 // ─── Discriminated Union ─────────────────────────────────────────────────────
 
 /**
@@ -517,6 +589,11 @@ export type KnownRunEvent =
   | PricingFeedRefreshedEvent
   | BudgetBrokerSyncEvent
   | ObservabilityExportStartedEvent
+  | TrustDeniedEvent
+  | PaidCallDeniedEvent
+  | ShellDeniedEvent
+  | NetworkDeniedEvent
+  | PermissionDeniedEvent
   | RawEvent;
 
 /**
@@ -562,6 +639,11 @@ export const KNOWN_RUN_EVENT_TYPES = [
   'PRICING_FEED_REFRESHED',
   'BUDGET_BROKER_SYNC',
   'OBSERVABILITY_EXPORT_STARTED',
+  'TRUST_DENIED',
+  'PAID_CALL_DENIED',
+  'SHELL_DENIED',
+  'NETWORK_DENIED',
+  'PERMISSION_DENIED',
   'RAW',
 ] as const satisfies readonly KnownRunEvent['type'][];
 

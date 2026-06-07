@@ -6,11 +6,14 @@ when actions are blocked by trust or paid-call gates.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel
 
-from .typed_events import RunEventBase
+if TYPE_CHECKING:
+    # Annotation-only (PEP 563); guarded to avoid a circular import now that
+    # typed_events.py imports the denial events into its KnownRunEvent union.
+    from .typed_events import RunEventBase
 
 # ─── Trust Denial Events ─────────────────────────────────────────────────────
 

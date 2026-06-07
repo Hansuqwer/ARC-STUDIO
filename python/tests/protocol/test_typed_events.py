@@ -325,3 +325,42 @@ class TestRawEventFallback:
         assert event.type == "RAW"
         assert event.data.raw == {"unknown": "data"}
         assert event.data.source == "external"
+
+
+# ─── CR-037: denial events are first-class KnownRunEvents ────────────────────
+
+
+class TestDenialEventsAreKnown:
+    """Denial events (Phase 23 enforcement) must parse to typed models and be
+    recognised as known events — not fall through to UnknownEvent."""
+
+    _CASES = [
+        (
+            "TRUST_DENIED",
+            {
+                "action": "run",
+                "workspace_path": "/w",
+                "reason": "untrusted",
+                "trust_level": "untrusted",
+            },
+        ),
+        (
+            "PAID_CALL_DENIED",
+            {"action": "provider_call", "reason": "no paid", "profile_id": "local-safe"},
+        ),
+        ("SHELL_DENIED", {"action": "shell", "reason": "no shell", "profile_id": "local-safe"}),
+        ("NETWORK_DENIED", {"action": "http", "reason": "no net", "profile_id": "local-safe"}),
+        ("PERMISSION_DENIED", {"action": "x", "reason": "denied", "permission_type": "other"}),
+    ]
+
+    @pytest.mark.parametrize("event_type,data", _CASES)
+    def test_denial_event_parses_typed_and_known(self, event_type, data):
+        from agent_runtime_cockpit.protocol.typed_events import is_known_event, parse_typed_event
+
+        event = parse_typed_event(
+            {"type": event_type, "timestamp": "t", "run_id": "r", "sequence": 0, "data": data}
+        )
+        assert event.type == event_type
+        assert is_known_event(event)
+        # parsed into a typed model, not the UnknownEvent fallback
+        assert type(event).__name__ != "UnknownEvent"

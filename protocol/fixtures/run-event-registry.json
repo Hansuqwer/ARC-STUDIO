@@ -544,6 +544,58 @@
       ]
     },
     {
+      "type": "CONSENSUS_DIFFERENTIATOR",
+      "version": 2,
+      "requiredFields": [
+        "decision",
+        "protocol",
+        "votes"
+      ],
+      "optionalFields": [
+        "disagreement_rate",
+        "evidence_refs",
+        "message_id",
+        "node_id",
+        "quality_score",
+        "round"
+      ]
+    },
+    {
+      "type": "CONSENSUS_EVAL",
+      "version": 2,
+      "requiredFields": [
+        "num_rounds",
+        "num_workers",
+        "protocols"
+      ],
+      "optionalFields": [
+        "consensus_escrow",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
+      "type": "CONSENSUS_EVAL_RUN",
+      "version": 2,
+      "requiredFields": [
+        "consensus_reached",
+        "protocol",
+        "total_votes"
+      ],
+      "optionalFields": [
+        "approval_count",
+        "cost_score",
+        "disagreement_rate",
+        "duration_ms",
+        "escalation_rate",
+        "evidence_refs",
+        "latency_ms",
+        "message_id",
+        "node_id",
+        "quality_score"
+      ]
+    },
+    {
       "type": "BATTLE_STARTED",
       "version": 2,
       "requiredFields": [
@@ -651,82 +703,6 @@
       ]
     },
     {
-      "type": "RAW",
-      "version": 2,
-      "requiredFields": [
-        "raw"
-      ],
-      "optionalFields": [
-        "message_id",
-        "node_id",
-        "source"
-      ]
-    },
-    {
-      "type": "CUSTOM",
-      "version": 2,
-      "requiredFields": [
-        "custom_type"
-      ],
-      "optionalFields": [
-        "data",
-        "message_id",
-        "node_id"
-      ]
-    },
-    {
-      "type": "CONSENSUS_DIFFERENTIATOR",
-      "version": 2,
-      "requiredFields": [
-        "decision",
-        "protocol",
-        "votes"
-      ],
-      "optionalFields": [
-        "disagreement_rate",
-        "evidence_refs",
-        "message_id",
-        "node_id",
-        "quality_score",
-        "round"
-      ]
-    },
-    {
-      "type": "CONSENSUS_EVAL",
-      "version": 2,
-      "requiredFields": [
-        "num_rounds",
-        "num_workers",
-        "protocols"
-      ],
-      "optionalFields": [
-        "consensus_escrow",
-        "message_id",
-        "node_id"
-      ]
-    },
-    {
-      "type": "CONSENSUS_EVAL_RUN",
-      "version": 2,
-      "requiredFields": [
-        "consensus_reached",
-        "protocol",
-        "total_votes"
-      ],
-      "optionalFields": [
-        "approval_count",
-        "cost_score",
-        "disagreement_rate",
-        "duration_ms",
-        "escalation_rate",
-        "evidence_refs",
-        "latency_ms",
-        "message_id",
-        "node_id",
-        "quality_score"
-      ]
-    },
-    {
       "type": "CAPABILITY_CARD_DECISION",
       "version": 2,
       "requiredFields": [
@@ -794,6 +770,30 @@
       ]
     },
     {
+      "type": "RAW",
+      "version": 2,
+      "requiredFields": [
+        "raw"
+      ],
+      "optionalFields": [
+        "message_id",
+        "node_id",
+        "source"
+      ]
+    },
+    {
+      "type": "CUSTOM",
+      "version": 2,
+      "requiredFields": [
+        "custom_type"
+      ],
+      "optionalFields": [
+        "data",
+        "message_id",
+        "node_id"
+      ]
+    },
+    {
       "type": "QUOTA_WARNING",
       "version": 2,
       "requiredFields": [
@@ -812,7 +812,9 @@
         "tokens_after",
         "tokens_before"
       ],
-      "optionalFields": ["evicted_handles"]
+      "optionalFields": [
+        "evicted_handles"
+      ]
     },
     {
       "type": "TOOL_OUTPUT_VIRTUALIZED",
@@ -832,25 +834,118 @@
         "current_model",
         "previous_model"
       ],
-      "optionalFields": ["capabilities_added", "capabilities_removed"]
+      "optionalFields": [
+        "capabilities_added",
+        "capabilities_removed"
+      ]
     },
     {
       "type": "PRICING_FEED_REFRESHED",
       "version": 2,
-      "requiredFields": ["feed_hash", "feed_url", "rows_seen", "source"],
+      "requiredFields": [
+        "feed_hash",
+        "feed_url",
+        "rows_seen",
+        "source"
+      ],
       "optionalFields": []
     },
     {
       "type": "BUDGET_BROKER_SYNC",
       "version": 2,
-      "requiredFields": ["amount_usd", "fell_back", "local_approved", "remote_approved", "scope"],
+      "requiredFields": [
+        "amount_usd",
+        "fell_back",
+        "local_approved",
+        "remote_approved",
+        "scope"
+      ],
       "optionalFields": []
     },
     {
       "type": "OBSERVABILITY_EXPORT_STARTED",
       "version": 2,
-      "requiredFields": ["destination", "protocol", "span_count"],
+      "requiredFields": [
+        "destination",
+        "protocol",
+        "span_count"
+      ],
       "optionalFields": []
+    },
+    {
+      "type": "TRUST_DENIED",
+      "version": 2,
+      "requiredFields": [
+        "action",
+        "reason",
+        "trust_level",
+        "workspace_path"
+      ],
+      "optionalFields": [
+        "correlation_id",
+        "remediation",
+        "required_trust_level"
+      ]
+    },
+    {
+      "type": "PAID_CALL_DENIED",
+      "version": 2,
+      "requiredFields": [
+        "action",
+        "profile_id",
+        "reason"
+      ],
+      "optionalFields": [
+        "allow_paid_calls",
+        "correlation_id",
+        "model",
+        "provider",
+        "remediation"
+      ]
+    },
+    {
+      "type": "SHELL_DENIED",
+      "version": 2,
+      "requiredFields": [
+        "action",
+        "profile_id",
+        "reason"
+      ],
+      "optionalFields": [
+        "allow_shell",
+        "command",
+        "correlation_id",
+        "remediation"
+      ]
+    },
+    {
+      "type": "NETWORK_DENIED",
+      "version": 2,
+      "requiredFields": [
+        "action",
+        "profile_id",
+        "reason"
+      ],
+      "optionalFields": [
+        "allow_network",
+        "correlation_id",
+        "remediation",
+        "url"
+      ]
+    },
+    {
+      "type": "PERMISSION_DENIED",
+      "version": 2,
+      "requiredFields": [
+        "action",
+        "permission_type",
+        "reason"
+      ],
+      "optionalFields": [
+        "context",
+        "correlation_id",
+        "remediation"
+      ]
     }
   ]
 }

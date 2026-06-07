@@ -5833,3 +5833,13 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `adapters/swarmgraph.py` + tests `tests/adapters/test_swarmgraph_ide_event_contract.py` (+4: last-budget total, none-without-budget, $0-surfaced, marker). Verified: `uv run pytest tests/adapters tests/swarmgraph -q` → **1030 passed, 1 skipped**; `uv run ruff check src tests` clean. | Notes: additive; producer-gated (no invented cost). DoD gate 1 cited.
 
 ---
+
+## Phase 174 — DoD Elevation: Denial Events in the KnownRunEvent Union (R-POLISH16)
+
+**Goal:** CR-037 — make security denial events first-class typed events across both languages. Research: Context7 (`/pydantic/pydantic`) confirmed the `Literal`-discriminator union pattern; Vercel Grep confirmed the TS literal-`type` event-union idiom — both validated the change is purely additive.
+
+**Findings & implementation:** `TRUST_DENIED`/`PAID_CALL_DENIED`/`SHELL_DENIED`/`NETWORK_DENIED`/`PERMISSION_DENIED` were defined in `denial_events.py` and emitted by `security/enforcement.py`, but absent from `EVENT_TYPES`, the registry fixture, the Python `KnownRunEvent` union, and the TS union — so they parsed as `UnknownEvent`/`RawEvent`. The blocker was a circular import (`denial_events.py` imported `RunEventBase` from `typed_events.py`); since that reference is annotation-only under PEP 563, it was moved under `TYPE_CHECKING`, breaking the cycle. Then: added the 5 events to `typed_events.py` (union + `is_known_event` + `parse_typed_event` map), to `protocol/events.py` `EVENT_TYPES`, regenerated `protocol/fixtures/run-event-registry.json` from `EVENT_TYPES`, and added 5 typed interfaces to `arc-protocol-ts/src/run-events.ts` (`KnownRunEvent` union + `KNOWN_RUN_EVENT_TYPES`).
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `protocol/denial_events.py`, `protocol/typed_events.py`, `protocol/events.py`, `protocol/fixtures/run-event-registry.json`, `arc-protocol-ts/src/run-events.ts` + test `tests/protocol/test_typed_events.py` (+5 parametrized denial cases). Verified: Python `tests/protocol` **73 passed** (incl. the cross-language parity test, previously failing), broad sweep `tests/protocol tests/security tests/audit` **479 passed / 1 skipped / 1 xfailed**, `ruff` clean; TS `@arc-studio/protocol` **155 passed**, `pnpm typecheck` clean. | Notes: additive (no fields removed); cross-language parity maintained; circular import resolved cleanly. DoD gates 3/4 cited.
+
+---

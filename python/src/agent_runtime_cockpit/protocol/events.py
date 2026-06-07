@@ -400,6 +400,27 @@ EVENT_TYPES: dict[str, EventTypeDef] = {
         required_fields={"destination", "protocol", "span_count"},
         optional_fields=set(),
     ),
+    # ── Security denial events (Phase 23 enforcement) ────────────────────
+    "TRUST_DENIED": EventTypeDef(
+        required_fields={"action", "workspace_path", "reason", "trust_level"},
+        optional_fields={"required_trust_level", "remediation", "correlation_id"},
+    ),
+    "PAID_CALL_DENIED": EventTypeDef(
+        required_fields={"action", "reason", "profile_id"},
+        optional_fields={"provider", "model", "allow_paid_calls", "remediation", "correlation_id"},
+    ),
+    "SHELL_DENIED": EventTypeDef(
+        required_fields={"action", "reason", "profile_id"},
+        optional_fields={"command", "allow_shell", "remediation", "correlation_id"},
+    ),
+    "NETWORK_DENIED": EventTypeDef(
+        required_fields={"action", "reason", "profile_id"},
+        optional_fields={"url", "allow_network", "remediation", "correlation_id"},
+    ),
+    "PERMISSION_DENIED": EventTypeDef(
+        required_fields={"action", "reason", "permission_type"},
+        optional_fields={"context", "remediation", "correlation_id"},
+    ),
 }
 
 

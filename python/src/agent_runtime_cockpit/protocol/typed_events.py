@@ -16,6 +16,13 @@ from pydantic import BaseModel, Field
 
 from ._bypass import PolicyBypassWarning
 from .capability_card_events import CapabilityCardDecisionEvent
+from .denial_events import (
+    NetworkDeniedEvent,
+    PaidCallDeniedEvent,
+    PermissionDeniedEvent,
+    ShellDeniedEvent,
+    TrustDeniedEvent,
+)
 from .mcp_decision_events import McpCallDecisionEvent
 
 # ─── Base Event Model ────────────────────────────────────────────────────────
@@ -960,6 +967,11 @@ KnownRunEvent = Union[
     ContextCompactedEvent,
     ToolOutputVirtualizedEvent,
     ModelChangedEvent,
+    TrustDeniedEvent,
+    PaidCallDeniedEvent,
+    ShellDeniedEvent,
+    NetworkDeniedEvent,
+    PermissionDeniedEvent,
     RawEvent,
 ]
 
@@ -1044,6 +1056,11 @@ def is_known_event(event: TypedRunEvent) -> TypeGuard[KnownRunEvent]:
         "EVAL_POLICY_RECOMMENDED",
         "EVAL_POLICY_APPLIED",
         "QUOTA_WARNING",
+        "TRUST_DENIED",
+        "PAID_CALL_DENIED",
+        "SHELL_DENIED",
+        "NETWORK_DENIED",
+        "PERMISSION_DENIED",
         "RAW",
     }
     return event.type in known_types
@@ -1110,6 +1127,11 @@ def parse_typed_event(raw: dict[str, Any]) -> TypedRunEvent:
         "CONTEXT_COMPACTED": ContextCompactedEvent,
         "TOOL_OUTPUT_VIRTUALIZED": ToolOutputVirtualizedEvent,
         "MODEL_CHANGED": ModelChangedEvent,
+        "TRUST_DENIED": TrustDeniedEvent,
+        "PAID_CALL_DENIED": PaidCallDeniedEvent,
+        "SHELL_DENIED": ShellDeniedEvent,
+        "NETWORK_DENIED": NetworkDeniedEvent,
+        "PERMISSION_DENIED": PermissionDeniedEvent,
         "RAW": RawEvent,
     }
 
