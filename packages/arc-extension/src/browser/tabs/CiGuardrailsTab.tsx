@@ -8,32 +8,18 @@
 
 import * as React from '@theia/core/shared/react';
 import type { ArcService, CiCheckStatus } from '../../common/arc-protocol';
+import { useAsyncState } from '../hooks/useAsyncState';
 
 export interface CiGuardrailsTabProps {
     arcService: ArcService;
 }
 
 export const CiGuardrailsTab: React.FC<CiGuardrailsTabProps> = ({ arcService }) => {
-    const [status, setStatus] = React.useState<CiCheckStatus | null>(null);
-    const [loading, setLoading] = React.useState<boolean>(true);
-    const [error, setError] = React.useState<string | null>(null);
-
-    const load = React.useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const s = await arcService.getCiCheckStatus();
-            setStatus(s);
-        } catch (err: any) {
-            setError(err.message || 'Failed to load CI guardrails status');
-        } finally {
-            setLoading(false);
-        }
-    }, [arcService]);
-
-    React.useEffect(() => {
-        load();
-    }, [load]);
+    const { data: status, loading, error, reload: load } = useAsyncState<CiCheckStatus>(
+        () => arcService.getCiCheckStatus(),
+        [arcService],
+        { errorMessage: 'Failed to load CI guardrails status' },
+    );
 
     const overallPassed = status?.overall === 'pass';
 

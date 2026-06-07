@@ -8,6 +8,7 @@
 
 import * as React from '@theia/core/shared/react';
 import type { ArcService, McpDecisionEntry, McpWorkbenchStatus } from '../../common/arc-protocol';
+import { useAsyncState } from '../hooks/useAsyncState';
 
 const DECISION_LIMIT = 20;
 const RISK_VARIANT: Record<string, string> = {
@@ -19,25 +20,14 @@ export interface McpWorkbenchTabProps {
 }
 
 export const McpWorkbenchTab: React.FC<McpWorkbenchTabProps> = ({ arcService }) => {
-    const [status, setStatus] = React.useState<McpWorkbenchStatus | null>(null);
-    const [loading, setLoading] = React.useState<boolean>(true);
-    const [error, setError] = React.useState<string | null>(null);
+    const { data: status, loading, error, reload: load } = useAsyncState<McpWorkbenchStatus>(
+        () => arcService.getMcpWorkbenchStatus(),
+        [arcService],
+        { errorMessage: 'Failed to load MCP workbench status' },
+    );
 
     const [decisions, setDecisions] = React.useState<McpDecisionEntry[]>([]);
     const [decisionsLoading, setDecisionsLoading] = React.useState(false);
-
-    const load = React.useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const s = await arcService.getMcpWorkbenchStatus();
-            setStatus(s);
-        } catch (err: any) {
-            setError(err.message || 'Failed to load MCP workbench status');
-        } finally {
-            setLoading(false);
-        }
-    }, [arcService]);
 
     const loadDecisions = React.useCallback(async () => {
         setDecisionsLoading(true);
@@ -50,9 +40,9 @@ export const McpWorkbenchTab: React.FC<McpWorkbenchTabProps> = ({ arcService }) 
     }, [arcService]);
 
     React.useEffect(() => {
-        load();
+        // status loads via useAsyncState (immediate); only decisions need an explicit kick here.
         loadDecisions();
-    }, [load, loadDecisions]);
+    }, [loadDecisions]);
 
     if (loading) {
         return (

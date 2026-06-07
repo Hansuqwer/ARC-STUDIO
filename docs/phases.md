@@ -5897,3 +5897,16 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `hooks/useAsyncState.ts` (+test), `tabs/TestBenchTab.tsx`, `__tests__/studio-tabs.contract.test.ts`. Verified: `pnpm --filter arc-extension build` (tsc) clean; targeted suites **169 passed** (useAsyncState + TestBench + studio-tabs). | Notes: additive — the hook is proven in one tab; adopting it in the remaining ~5 tabs (Config/CiGuardrails/EditPlans/McpWorkbench/SwarmGraphInsight) is incremental behavior-preserving follow-up. DoD gates 1, 4 cited.
 
 ---
+
+## Phase 179 — Refactor: Broaden useAsyncState Adoption (R-POLISH21)
+
+**Goal:** CR-029 (cont.) — adopt the shared `useAsyncState` hook in more IDE tabs to retire the duplicated data/loading/error pattern.
+
+**Implemented:**
+- **CiGuardrailsTab** — fully converted: the `status`/`loading`/`error` triple + `load` callback + mount effect collapsed to a single `useAsyncState<CiCheckStatus>` call (behavior-preserving: same initial states, same Retry `load`, same error fallback).
+- **McpWorkbenchTab** — main `status` flow converted to `useAsyncState<McpWorkbenchStatus>`; the secondary `decisions` list keeps its own `React.useState`/`useCallback`. Removed `load()` from the mount effect (the hook runs it via `immediate`) so the status is fetched exactly once — no double-fetch.
+- Contracts updated in `studio-tabs.contract.test.ts`: CiGuardrails now asserts `useAsyncState` + `reload: load` (fully converted); McpWorkbench asserts `useAsyncState` **and** retains the `React.useState/useEffect/useCallback` assertion for its decisions flow.
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `tabs/CiGuardrailsTab.tsx`, `tabs/McpWorkbenchTab.tsx`, `__tests__/studio-tabs.contract.test.ts`. Verified: `pnpm --filter arc-extension build` (tsc) clean; **169** studio-tabs + useAsyncState tests pass. | Notes: 3 tabs now on the shared hook (TestBench, CiGuardrails, McpWorkbench). EditPlans/SwarmGraphInsight/Config have multiple or atypical async states and are deferred (additive). DoD gates 1, 4 cited.
+
+---

@@ -967,6 +967,9 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/React\.useState/);
             expect(source).toMatch(/React\.useEffect/);
             expect(source).toMatch(/React\.useCallback/);
+            // CR-029: status loads via the shared useAsyncState hook; the decisions list
+            // retains its own React.useState/useEffect/useCallback.
+            expect(source).toMatch(/useAsyncState/);
         });
     });
 
@@ -1076,10 +1079,11 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/aria-label='CI Guardrails'/);
         });
 
-        it('should use React.useState and React.useEffect', () => {
-            expect(source).toMatch(/React\.useState/);
-            expect(source).toMatch(/React\.useEffect/);
-            expect(source).toMatch(/React\.useCallback/);
+        it('should manage async load state via the shared useAsyncState hook', () => {
+            // CR-029: fully converted from the React.useState/useEffect/useCallback triple
+            // to the shared, tested useAsyncState hook.
+            expect(source).toMatch(/useAsyncState/);
+            expect(source).toMatch(/reload: load/);
         });
     });
 
