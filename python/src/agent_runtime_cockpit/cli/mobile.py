@@ -539,6 +539,27 @@ def mobile_schema_export_cmd(
     _out(ok({"copied": copied, "out": str(out_path)}), json_output)
 
 
+@mobile_app.command("sbom")
+def mobile_sbom_cmd(
+    out: str | None = typer.Option(None, "--out", help="Write the SBOM JSON to this path."),
+    component_version: str = typer.Option(
+        "0.1.0", "--component-version", help="SBOM component version."
+    ),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Generate a CycloneDX-style SBOM for the mobile SDK (modules + framework bindings)."""
+    _setup_logging(debug)
+    import json as _json
+
+    from ..mobile import generate_sbom
+
+    sbom = generate_sbom(component_version)
+    if out:
+        Path(out).write_text(_json.dumps(sbom, indent=2, sort_keys=True), encoding="utf-8")
+    _out(ok(sbom), json_output)
+
+
 @mobile_app.command("siem-export")
 def mobile_siem_export_cmd(
     trace_file: str = typer.Argument(..., help="Path to a mobile simulator JSONL trace."),
