@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from ...protocol.schemas import ContextPackEntry, SourceType
+from ...workspace import is_sensitive_file
 
 
 class LocalRepoProvider:
@@ -30,6 +31,9 @@ class LocalRepoProvider:
         files = []
         for ext in extensions:
             files.extend(workspace.rglob(f"*{ext}"))
+        # Never read secret-bearing files (e.g. credentials.json, secrets.yaml,
+        # .env*) into a context pack.
+        files = [f for f in files if not is_sensitive_file(f)]
 
         # Score and sort files
         scored: list[tuple[float, Path]] = []

@@ -5657,3 +5657,16 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | `python/pyproject.toml` `[project.scripts]` adds `arc-studio-cli`; `arch-studio-cli` retained as deprecated compat alias; `uv sync` re-registers; entrypoints verified `['arc','arc-studio','arc-studio-cli','arch-studio-cli']`. | Notes: Audit-only otherwise; no deletions, no protocol/CLI removals, no formatting churn. Backlog is research-findings only, not a competing roadmap/status doc.
 
 ---
+
+## Phase 159 — Security P0 Batch: Sensitive-File Exclusion + Provider Error Redaction + Run-ID Traversal Guard (R-POLISH1)
+
+**Goal:** Close the three confirmed P0 security findings from the critical-review v2 pass (CR-001, CR-003, CR-006) as the first DoD-elevation slice. Each was verified against the real code before any edit.
+
+**Implemented:**
+- **CR-001 — sensitive-file exclusion.** Added `is_sensitive_file()` + `SENSITIVE_FILENAMES`/`SENSITIVE_SUFFIXES` to `workspace.py` (precise: exact names, `.env*`, credential suffixes — does not exclude ordinary source files). Wired into `iter_workspace_files()` and into `LocalRepoProvider`, which reads file *content*; re-exported via the `workspace/__init__.py` compat shim.
+- **CR-003 — provider error redaction.** Both `OpenAICompatibleClient._map_error` and `AnthropicClient._map_error` now run the canonical `security.redaction.redact_secrets()` over `str(exc)` before wrapping (reuses the single redaction source of truth; no new redactor). Error-type classification is preserved.
+- **CR-006 — run-ID path-traversal guard.** Added fail-closed `_safe_run_id()` to `storage/jsonl.py`, applied in `_run_path`/`_artifact_path`/`_receipt_path`; rejects `/`, `\`, `..`, null, empty. Defense-in-depth behind the existing MCP-layer `INVALID_MCP_ARGUMENT` check. Legit IDs (UUID, `run-001`, `run_abc`) unchanged.
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `workspace.py`, `workspace/__init__.py`, `context/providers/local_repo.py`, `providers/anthropic.py`, `providers/openai_compatible.py`, `storage/jsonl.py` + tests `tests/test_workspace.py`, `tests/test_storage.py`, `tests/test_provider_error_redaction.py`. Verified: `ruff check src tests` clean; targeted **106 passed**; blast-radius (context/providers/security/capabilities/audit/web) **744 passed, 1 skipped**. | Notes: deterministic security (no LLM); additive only; no protocol/CLI removals. DoD gates 1/4/6/8 cited; full elevation (a11y/parity for related UI) tracked separately.
+
+---

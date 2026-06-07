@@ -17,5 +17,15 @@ if workspace_module_path.exists():
         spec.loader.exec_module(_workspace_compat)
         iter_workspace_files = _workspace_compat.iter_workspace_files
         IGNORED_DIRS = _workspace_compat.IGNORED_DIRS
+        is_sensitive_file = _workspace_compat.is_sensitive_file
+        SENSITIVE_FILENAMES = _workspace_compat.SENSITIVE_FILENAMES
+        SENSITIVE_SUFFIXES = _workspace_compat.SENSITIVE_SUFFIXES
 
-__all__ = ["resolve_python_entrypoint", "iter_workspace_files", "IGNORED_DIRS"]
+__all__ = [
+    "resolve_python_entrypoint",
+    "iter_workspace_files",
+    "IGNORED_DIRS",
+    "is_sensitive_file",
+    "SENSITIVE_FILENAMES",
+    "SENSITIVE_SUFFIXES",
+]

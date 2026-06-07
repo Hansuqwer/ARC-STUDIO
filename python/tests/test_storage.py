@@ -1,4 +1,5 @@
 """Tests: Storage — JSONL trace store and SQLite index (ADR-003)."""
+
 import datetime
 import tempfile
 from pathlib import Path
@@ -97,7 +98,9 @@ class TestSqliteStore:
             db.init_db()
             db.insert_run("run-001", "wf-1", "swarmgraph", "running", "2026-01-01T00:00:00Z")
             db.update_run_status(
-                "run-001", "completed", "2026-01-01T01:00:00Z",
+                "run-001",
+                "completed",
+                "2026-01-01T01:00:00Z",
                 duration_ms=3600000,
             )
             run = db.get_run("run-001")
@@ -262,11 +265,45 @@ class TestComputeDuration:
         assert result == 3600000  # 1 hour
 
     def test_duration_with_offset(self):
-        result = _compute_duration_ms(
-            "2026-01-01T00:00:00+00:00", "2026-01-01T00:30:00+00:00"
-        )
+        result = _compute_duration_ms("2026-01-01T00:00:00+00:00", "2026-01-01T00:30:00+00:00")
         assert result == 1800000  # 30 minutes
 
     def test_duration_with_invalid_date(self):
         result = _compute_duration_ms("not-a-date", "2026-01-01T00:00:00Z")
         assert result is None
+
+
+# ─── CR-006: run-ID path-traversal guard ────────────────────────────────────
+
+
+class TestJsonlRunIdGuard:
+    def test_trace_path_rejects_traversal(self):
+        import pytest
+
+        with tempfile.TemporaryDirectory() as td:
+            store = JsonlTraceStore(Path(td))
+            for bad in ("../secret", "../../etc/passwd", "a/b", "x\\y", ".."):
+                with pytest.raises(ValueError):
+                    store.trace_path(bad)
+
+    def test_trace_path_allows_legit_ids(self):
+        with tempfile.TemporaryDirectory() as td:
+            store = JsonlTraceStore(Path(td))
+            assert store.trace_path("run-001").name == "run-001.jsonl"
+            assert store.trace_path("run_abc").name == "run_abc.jsonl"
+            uuid_id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            assert store.trace_path(uuid_id).name == f"{uuid_id}.jsonl"
+
+    def test_load_returns_none_for_traversal(self):
+        with tempfile.TemporaryDirectory() as td:
+            store = JsonlTraceStore(Path(td))
+            assert store.load("../secret") is None
+
+    def test_save_does_not_write_outside_base_dir(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td) / "traces"
+            store = JsonlTraceStore(base)
+            store.save(make_run("../../evil"))  # swallowed + logged, not written
+            # Nothing escaped the base dir.
+            assert not (Path(td) / "evil.jsonl").exists()
+            assert list(Path(td).rglob("evil.jsonl")) == []

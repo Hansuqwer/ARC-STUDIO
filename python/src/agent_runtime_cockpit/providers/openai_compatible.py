@@ -32,6 +32,7 @@ from .base import (
     UsageRecord,
     ValidationError,
 )
+from ..security.redaction import redact_secrets
 from .models_dev import (
     ModelsDevProviderConfig,
     cost_rates,
@@ -2118,7 +2119,7 @@ class OpenAICompatibleClient:
     def _map_error(exc: Exception) -> Exception:
         """Map OpenAI SDK exceptions to ProviderError types."""
         name = type(exc).__name__.lower()
-        text = str(exc)
+        text = redact_secrets(str(exc))
 
         if "rate" in name or "rate" in text.lower() or "429" in text:
             return RateLimitError(text)

@@ -17,6 +17,21 @@ log = logging.getLogger(__name__)
 DEFAULT_STORE_PATH = Path(".arc") / "traces"
 
 
+def _safe_run_id(run_id: str) -> str:
+    """Validate a run ID before it is used as a filename stem.
+
+    Run IDs are interpolated into trace/artifact/receipt paths. A crafted ID
+    containing path separators or parent references (``../``) would let a
+    caller read or write outside ``base_dir``. Deterministic and fail-closed:
+    raises ``ValueError`` on anything unsafe. Legitimate IDs (UUIDs,
+    ``run-001``, ``run_abc``) are returned unchanged.
+    """
+    rid = str(run_id)
+    if not rid or rid in (".", "..") or "/" in rid or "\\" in rid or "\x00" in rid or ".." in rid:
+        raise ValueError(f"unsafe run_id: {run_id!r}")
+    return rid
+
+
 class JsonlTraceStore:
     """Appends run events to JSONL files; one file per run_id."""
 
@@ -25,17 +40,17 @@ class JsonlTraceStore:
         self._lock = threading.Lock()
 
     def _run_path(self, run_id: str) -> Path:
-        return self.base_dir / f"{run_id}.jsonl"
+        return self.base_dir / f"{_safe_run_id(run_id)}.jsonl"
 
     def trace_path(self, run_id: str) -> Path:
         """Return the trace path used for a run ID."""
         return self._run_path(run_id)
 
     def _artifact_path(self, run_id: str, suffix: str) -> Path:
-        return self.base_dir / f"{run_id}.{suffix}.json"
+        return self.base_dir / f"{_safe_run_id(run_id)}.{suffix}.json"
 
     def _receipt_path(self, run_id: str) -> Path:
-        return self.base_dir.parent / "receipts" / f"{run_id}.receipt.json"
+        return self.base_dir.parent / "receipts" / f"{_safe_run_id(run_id)}.receipt.json"
 
     def save_contract(self, contract: RunContract) -> None:
         self.base_dir.mkdir(parents=True, exist_ok=True)
