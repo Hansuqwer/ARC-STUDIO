@@ -23,6 +23,10 @@ const EVENT_COLORS: Record<string, string> = {
     CUSTOM: '#607d8b',
 };
 
+/** Bound the in-memory live event buffer so a long-running stream can't grow
+ * unbounded (memory + O(n) re-render cost). Keeps the newest N events. */
+const MAX_LIVE_EVENTS = 2000;
+
 @injectable()
 export class ArcEventStreamWidget extends ReactWidget {
     static readonly ID = 'arc:event-stream';
@@ -35,6 +39,7 @@ export class ArcEventStreamWidget extends ReactWidget {
     protected selectedTrace: TraceData | null = null;
     protected selectedEvent: TraceEvent | null = null;
     protected liveEvents: TraceEvent[] = [];
+    protected evictedEventCount: number = 0;
     protected lastEventId: number = 0;
     protected streamMode: StreamMode = 'replay-trace';
     protected filter = '';
@@ -79,6 +84,7 @@ export class ArcEventStreamWidget extends ReactWidget {
         this.selectedEvent = null;
         this.selectedTrace = await this.arcService.readTrace(trace.id);
         this.liveEvents = [];
+        this.evictedEventCount = 0;
         this.lastEventId = 0;
         this.streamMode = this.hasLiveStream() ? 'live-available' : 'replay-trace';
         this.update();
@@ -89,6 +95,7 @@ export class ArcEventStreamWidget extends ReactWidget {
             return;
         }
         this.liveEvents = [];
+        this.evictedEventCount = 0;
         this.lastEventId = 0;
         this.streamMode = 'live-connecting';
         this.error = '';
@@ -128,7 +135,13 @@ export class ArcEventStreamWidget extends ReactWidget {
                     continue;
                 }
                 const event = chunk.event as TraceEvent;
-                this.liveEvents = [...this.liveEvents, event];
+                const next = [...this.liveEvents, event];
+                if (next.length > MAX_LIVE_EVENTS) {
+                    this.evictedEventCount += next.length - MAX_LIVE_EVENTS;
+                    this.liveEvents = next.slice(next.length - MAX_LIVE_EVENTS);
+                } else {
+                    this.liveEvents = next;
+                }
                 const eventId = (chunk.event as Record<string, unknown>).event_id;
                 if (typeof eventId === 'number' && eventId > 0) {
                     this.lastEventId = eventId;
@@ -180,6 +193,14 @@ export class ArcEventStreamWidget extends ReactWidget {
                         </div>
                     )}
                     {this.error && <div style={errorStyle}>{this.error}</div>}
+                    {this.evictedEventCount > 0 && (
+                        <div
+                            role='status'
+                            style={{ padding: '4px 12px', fontSize: '11px', color: 'var(--theia-descriptionForeground)' }}
+                        >
+                            Showing the latest {MAX_LIVE_EVENTS.toLocaleString()} live events — {this.evictedEventCount.toLocaleString()} older event(s) evicted to bound memory.
+                        </div>
+                    )}
                     <VirtualizedEventList
                         events={events}
                         estimateSize={64}

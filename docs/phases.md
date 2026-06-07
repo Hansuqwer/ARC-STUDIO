@@ -5757,3 +5757,13 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `security/profiles.py`, `swarmgraph_ir/validation.py` + tests `tests/security/test_profiles.py` (+3 version-guard), `tests/swarmgraph_ir/test_validation.py` (+4 cycle: cycle=warning, self-loop, linear-no-warn, diamond-no-false-positive). Verified: `uv run pytest tests/swarmgraph_ir tests/security -q` → **330 passed, 1 skipped**; `uv run ruff check src tests` clean. | Notes: additive; deterministic; cycle is advisory (non-breaking for loop runtimes). DoD gate 7 cited.
 
 ---
+
+## Phase 167 — DoD Elevation: Bounded Live Event Buffer (R-POLISH9)
+
+**Goal:** CR-014 — bound the IDE's in-memory live event buffer. Verified against the real widget first.
+
+**Finding & implementation:** `ArcEventStreamWidget` appended via `this.liveEvents = [...this.liveEvents, event]` with no cap — unbounded memory growth and an O(n) copy per event on a long-running stream. Added `MAX_LIVE_EVENTS = 2000`; the append now keeps the newest N (`next.slice(next.length - MAX_LIVE_EVENTS)`), tracks an `evictedEventCount`, and renders a non-blocking eviction banner ("Showing the latest N live events — M older event(s) evicted to bound memory"). The list is already virtualized (`VirtualizedEventList`). `evictedEventCount` resets wherever the buffer is cleared.
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `arc-event-stream-widget.tsx` + tests `__tests__/event-stream-bounded.contract.test.ts` (new, 4 assertions), `__tests__/ui-components.contract.test.ts` (updated off the unbounded-append pattern). Verified: `pnpm --filter arc-extension build` clean; tests **923 passed / 3 skipped / 0 failed** (31 suites); `pnpm typecheck` clean. | Notes: additive; producer-truth preserved (banner names the eviction). DoD gate 5 cited.
+
+---

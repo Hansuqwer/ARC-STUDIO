@@ -680,7 +680,9 @@ describe('ArcEventStreamWidget', () => {
 
     it('should append live events separately from selected replay trace', () => {
         expect(source).toMatch(/protected liveEvents: TraceEvent\[\] = \[\]/);
-        expect(source).toMatch(/this\.liveEvents = \[\.\.\.this\.liveEvents, event\]/);
+        // CR-014: append is now bounded (newest MAX_LIVE_EVENTS kept) rather than
+        // an unbounded spread, but live events stay separate from the replay trace.
+        expect(source).toMatch(/const next = \[\.\.\.this\.liveEvents, event\]/);
         expect(source).toMatch(/return \[\.\.\.\(this\.selectedTrace\?\.events \?\? \[\]\), \.\.\.this\.liveEvents\]/);
     });
 
