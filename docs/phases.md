@@ -5884,3 +5884,16 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `python/pyproject.toml`, `scripts/release_check.sh`, `scripts/bootstrap.sh`, `README.md`, `AGENTS.md`. Verified: `bash -n` clean on both scripts; `uv sync` succeeds with `License: Proprietary`; `check-banned-claims.sh` clean on AGENTS/README/docs. | Notes: the new `build:prod` gate runs at release time (a full Theia production build, minutes) — not exercised in this session; the `build:prod` script and gate syntax were verified. DoD gate 8 cited.
 
 ---
+
+## Phase 178 — Refactor: Extract `useAsyncState` Hook (R-POLISH20)
+
+**Goal:** CR-029 — replace the hand-rolled `useState(data/loading/error)` + `load` callback + `useEffect` async pattern (duplicated across ~6 IDE tabs) with one shared, tested hook.
+
+**Implemented:**
+- Added `browser/hooks/useAsyncState.ts` — `useAsyncState<T>(fetcher, deps, { immediate, errorMessage })` returning `{ data, loading, error, reload, setData }`. Behavior matches the duplicated pattern exactly: `loading` starts `true` under `immediate` (default), every `reload` clears the error first, and `loading` is always cleared in `finally`. Matches the existing `useDenialHandler` hook convention (imports from `react`).
+- Adopted it in `TestBenchTab.tsx` as the first proof: 19 lines of state/callback/effect collapsed to a 5-line hook call, fully behavior-preserving (same initial states, same retry/refresh `load`, same error fallback string).
+- Tests: new `useAsyncState.test.tsx` (6 cases — success, error message, fallback message, `immediate:false` lazy, reload-clears-error, imperative `setData`). Updated the `studio-tabs` contract for TestBenchTab from asserting `React.useState/useEffect/useCallback` to asserting `useAsyncState` + `reload: load` (strengthened to lock the canonical pattern, not weakened).
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `hooks/useAsyncState.ts` (+test), `tabs/TestBenchTab.tsx`, `__tests__/studio-tabs.contract.test.ts`. Verified: `pnpm --filter arc-extension build` (tsc) clean; targeted suites **169 passed** (useAsyncState + TestBench + studio-tabs). | Notes: additive — the hook is proven in one tab; adopting it in the remaining ~5 tabs (Config/CiGuardrails/EditPlans/McpWorkbench/SwarmGraphInsight) is incremental behavior-preserving follow-up. DoD gates 1, 4 cited.
+
+---

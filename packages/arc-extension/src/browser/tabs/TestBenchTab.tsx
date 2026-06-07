@@ -8,32 +8,18 @@
 
 import * as React from '@theia/core/shared/react';
 import type { ArcService, TestbenchDetection } from '../../common/arc-protocol';
+import { useAsyncState } from '../hooks/useAsyncState';
 
 export interface TestBenchTabProps {
     arcService: ArcService;
 }
 
 export const TestBenchTab: React.FC<TestBenchTabProps> = ({ arcService }) => {
-    const [detection, setDetection] = React.useState<TestbenchDetection | null>(null);
-    const [loading, setLoading] = React.useState<boolean>(true);
-    const [error, setError] = React.useState<string | null>(null);
-
-    const load = React.useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const d = await arcService.detectTestbench();
-            setDetection(d);
-        } catch (err: any) {
-            setError(err.message || 'Failed to detect testbench');
-        } finally {
-            setLoading(false);
-        }
-    }, [arcService]);
-
-    React.useEffect(() => {
-        load();
-    }, [load]);
+    const { data: detection, loading, error, reload: load } = useAsyncState<TestbenchDetection>(
+        () => arcService.detectTestbench(),
+        [arcService],
+        { errorMessage: 'Failed to detect testbench' },
+    );
 
     if (loading) {
         return (

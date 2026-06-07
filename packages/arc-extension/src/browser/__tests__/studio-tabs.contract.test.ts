@@ -1018,10 +1018,12 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/aria-label='Test Bench'/);
         });
 
-        it('should use React.useState and React.useEffect', () => {
-            expect(source).toMatch(/React\.useState/);
-            expect(source).toMatch(/React\.useEffect/);
-            expect(source).toMatch(/React\.useCallback/);
+        it('should manage async load state via the shared useAsyncState hook', () => {
+            // CR-029: refactored from a hand-rolled React.useState/useEffect/useCallback
+            // triple to the shared, tested useAsyncState hook. The contract now locks the
+            // tab to the canonical async-state pattern (data/loading/error + reload).
+            expect(source).toMatch(/useAsyncState/);
+            expect(source).toMatch(/reload: load/);
         });
     });
 
