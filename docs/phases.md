@@ -5856,3 +5856,16 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `tui/widgets/command_palette.py`, `tui/widgets/context_meter.py`, `tui/views/settings_view.py`, `tui/screen.py` + tests `tests/tui/test_context_meter_default.py` (new), `test_command_palette_detail.py` (+1), `test_settings_isolation.py` (+2). Verified: targeted **10 passed**; regression `test_tui_core.py`/`test_slash_expand.py`/`test_status_bar_context_meter.py` green (74 total); `ruff` clean. | Notes: additive; theme/mode applied live (not yet persisted to disk — config fields are a follow-up). DoD gate 1 cited.
 
 ---
+
+## Phase 176 — Cleanup: Dedupe `eval run` Command (R-POLISH18)
+
+**Goal:** CR-025 + verify CR-030 + CR-031. Verified each against the real code first.
+
+**Findings & implementation:**
+- **CR-025 — REAL.** `cli/mgmt.py` had two `@eval_app.command("run")` registrations: `eval_run` (older, simpler) and `eval_run_new` (a superset adding `--golden-file`/`--golden-dir`/`--batch`/`--run-id`). Typer last-wins, so `eval_run` was already dead/shadowed. Removed it via AST rewrite (left a provenance comment); `eval_run_new` is now the sole `eval run`. The old function was not imported by name anywhere (the `eval_run` references elsewhere are `evals.golden.eval_run`, a different function).
+- **CR-030 — FALSE POSITIVE (no change).** `slash_menu._FALLBACK` lists `theme` and `runtimes`; both are dispatchable (`screen.py` handles `/theme` and `/runtimes` → `RuntimesView`), so they are not phantom.
+- **CR-031 — ALREADY CONSOLIDATED (no change).** `sandbox audit-verify` (flat) and `sandbox audit verify` (nested) both delegate to a shared `_sandbox_audit_verify_impl` — already the intended "one impl, two registrations" backward-compat pattern.
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `cli/mgmt.py`. Verified: `uv run ruff check src tests` clean; `arc eval run --help` resolves to the superset signature; `tests/cli/test_cli_eval.py` **9 passed**; `tests/evals` **112 passed**. | Notes: additive cleanup (dead code removed, no behavior change — superset command preserved). DoD gate 8 cited.
+
+---
