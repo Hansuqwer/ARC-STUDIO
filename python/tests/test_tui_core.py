@@ -466,15 +466,26 @@ async def test_headless_known_slash_non_silent():
         assert app.data.entries[-1].content.strip() != ""
 
 
-# ── Paid on by default (Issue 3) ───────────────────────────────────────────
+# ── Paid fail-closed by default (CR-002) ────────────────────────────────────
 
 
 class TestPaidDefault:
-    def test_paid_on_by_default(self, monkeypatch):
+    def test_paid_off_by_default(self, monkeypatch):
         monkeypatch.delenv("ARC_TUI_NO_PAID", raising=False)
+        monkeypatch.delenv("ARC_TUI_ALLOW_PAID", raising=False)
+        assert DataStore().allow_paid is False
+
+    def test_paid_opt_in_env(self, monkeypatch):
+        monkeypatch.delenv("ARC_TUI_NO_PAID", raising=False)
+        monkeypatch.setenv("ARC_TUI_ALLOW_PAID", "1")
         assert DataStore().allow_paid is True
 
     def test_paid_opt_out_env(self, monkeypatch):
+        monkeypatch.setenv("ARC_TUI_NO_PAID", "1")
+        assert DataStore().allow_paid is False
+
+    def test_paid_deny_wins_when_both_env_set(self, monkeypatch):
+        monkeypatch.setenv("ARC_TUI_ALLOW_PAID", "1")
         monkeypatch.setenv("ARC_TUI_NO_PAID", "1")
         assert DataStore().allow_paid is False
 
@@ -483,8 +494,17 @@ class TestPaidDefault:
         from agent_runtime_cockpit.tui.widgets.status_bar import StatusBar
 
         ds = DataStore()
+        ds.allow_paid = True  # fail-closed default is off; enable to show the indicator
         bar = StatusBar(ds, ThemeManager())
         assert "$paid" in bar.render()
+
+    def test_status_bar_hides_paid_when_fail_closed(self, monkeypatch):
+        monkeypatch.delenv("ARC_TUI_NO_PAID", raising=False)
+        monkeypatch.delenv("ARC_TUI_ALLOW_PAID", raising=False)
+        from agent_runtime_cockpit.tui.widgets.status_bar import StatusBar
+
+        bar = StatusBar(DataStore(), ThemeManager())
+        assert "$paid" not in bar.render()
 
 
 # ── Enter-key routing regression tests ────────────────────────────────────────

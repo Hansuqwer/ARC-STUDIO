@@ -358,14 +358,15 @@ class ArcScreen(Screen):
     def _get_session(self):
         """Return a persistent ChatSession bound to this TUI session.
 
-        Paid calls are enabled by default (data.allow_paid); provider-key and
-        trust gates still apply downstream.
+        Paid calls are OFF by default (data.allow_paid is fail-closed); enable
+        via ARC_TUI_ALLOW_PAID=1 or /settings. Provider-key and trust gates
+        still apply downstream.
         """
         if self._session is None:
             from agent_runtime_cockpit.cli_repl.session import ChatSession
 
             self._session = ChatSession(id=self.data.session_id)
-        self._session.allow_paid_calls = bool(getattr(self.data, "allow_paid", True))
+        self._session.allow_paid_calls = bool(getattr(self.data, "allow_paid", False))
         return self._session
 
     def _handle_shell_escape(self, text: str) -> None:

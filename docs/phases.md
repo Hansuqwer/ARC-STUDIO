@@ -5709,3 +5709,15 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `mcp/proxy.py`, `cli/mcp.py` + tests `tests/mcp/test_proxy.py` (+4), `tests/mcp/test_proxy_env.py` (updated off the insecure passthrough), `tests/mcp/test_mcp_serve_stdout.py` (new). Verified: `uv run pytest tests/mcp -q` → **123 passed**; `uv run ruff check src tests` clean. | Notes: deterministic; additive; reuses existing risk gate. DoD gates 1/4/6/7 cited.
 
 ---
+
+## Phase 163 — DoD Elevation: TUI Paid-Call Fail-Closed Default (R-POLISH5)
+
+**Goal:** CR-002 — make the TUI's paid-call default fail-closed (DoD gate 6: paid calls explicitly gated). Verified against the real code first.
+
+**Finding (design change, not a pure bug):** `DataStore.allow_paid` defaulted to `True` *by deliberate design* — the comment said "Paid provider calls are ON by default; opt out with `ARC_TUI_NO_PAID=1`", with a test (`test_tui_core.py::test_paid_on_by_default`) asserting it. Downstream gates (provider-key, workspace-trust, dual-gate, budget warning) already applied, but the *default intent* was permissive. Per the owner's explicit fail-closed directive, this flips the default.
+
+**Implemented:** `allow_paid: bool = False` (fail-closed) in `tui/data.py`; env opt-in `ARC_TUI_ALLOW_PAID=1` added; `ARC_TUI_NO_PAID=1` still honoured and takes precedence if both set. `screen.py::_get_session` fallback flipped to `False` with updated docstring. Comments updated. `_get_session` re-applies `data.allow_paid` to the session each turn, so the flag is the single source of truth.
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `tui/data.py`, `tui/screen.py` + tests `tests/test_tui_core.py` (default→off, opt-in env, deny-precedence, status-bar shows/hides). Verified: `uv run pytest tests/test_tui_core.py tests/tui/test_allow_paid_warning.py -q` → **64 passed**; `uv run ruff check src tests` clean. | Notes: behavior change (flips a previously-deliberate default); inverts env semantics opt-out→opt-in (back-compat retained). DoD gate 6 cited.
+
+---
