@@ -6045,3 +6045,15 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete (Mobile Roadmap Phases 9–10) | Evidence: local worktree 2026-06-07 | Files: `runtimes/mobile/react-native/packages/arc-mobile-runtime/*`, `runtimes/mobile/flutter/packages/arc_mobile_runtime/lib/*`. Verified: `test_mobile_rn.py` (7) + `test_mobile_flutter.py` (7) — Codegen spec/`codegenConfig`, platform interface, JSON round-trips, catalog drift-guards vs `capabilities.py`, recursive forbidden-symbol scans, TS↔iOS↔Android parity. **Flutter toolchain (local):** `flutter analyze` clean + `flutter test` 5/5 pass. | Notes: fixtures only; no real device APIs anywhere (recursive gates). Native/platform impls are gated future work (Phase 11).
 
 ---
+
+## Phase 190 — Mobile SDK: Enterprise Governance Slice 1 — SIEM + RBAC/Tenant (Mobile Roadmap Phase 12; Batch 5 T9–T10)
+
+**Goal:** Begin Mobile Roadmap Phase 12 (enterprise governance) with the deterministic, locally-testable slices: SIEM export + signed org/tenant RBAC/ABAC policy.
+
+**Implemented (T9–T10):**
+- **T9** `mobile/siem_export.py` + `arc mobile siem-export --format cef|json`: deterministic CEF (SOC severity by allow/deny) + structured JSON from the prev-hash trace; redaction preserved (payloads hash-only, metadata exported as key names only). Also deduped a latent union-merge duplicate `prev_event_hash` field in `recorder.py`.
+- **T10** `mobile/policy_context.py`: signed `OrgPolicyBundle` (HMAC), `OrgPolicyContext` (tenant/role/attributes), `TenantPolicyHook` implementing `EnterprisePolicyHook` — deterministic RBAC + ABAC + tenant-scoping denials; **fail-closed** on unsigned/forged bundle; composes with `explain_capability_policy`.
+
+**Status:** Baseline Complete (Mobile Roadmap Phase 12, slice 1) | Evidence: local worktree 2026-06-07 | Files: `mobile/{siem_export,policy_context}.py`, `mobile/recorder.py`, `cli/mobile.py`, `mobile/__init__.py`. Verified: `test_mobile_siem_export.py` (6) + `test_mobile_policy_context.py` (7) — CEF/JSON format + redaction + CLI; sign/verify, RBAC/ABAC/tenant/bad-sig denials, policy integration. | Notes: deterministic security (no LLM); no real network. Phase 12 remainder (audit retention, feature flags + remote kill switch, compliance report, SBOM) follows; Phase 11 native-capability entry-gate next.
+
+---
