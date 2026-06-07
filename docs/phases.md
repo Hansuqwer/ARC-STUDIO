@@ -5977,3 +5977,17 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete (CR-027 done) | Evidence: local worktree | Files: 3 new `protocol/*` modules, `common/arc-protocol.ts`, `__tests__/protocol-extensions.contract.test.ts`. Verified: `pnpm typecheck` (full workspace `tsc -b`) clean; **full** `pnpm --filter arc-extension test` = 33 suites, **933 passed / 3 skipped**. | Notes: closes CR-027. DoD gates 3, 4, 6 cited. Remaining backlog refactors: CR-026 (mgmt.py), CR-028 (ConfigTab.tsx).
 
 ---
+
+## Phase 185 — Refactor: Split cli/mgmt.py into Cohesive Modules (CR-026, R-POLISH27)
+
+**Goal:** CR-026 — decompose the 1693-line `cli/mgmt.py` (6 unrelated command groups) into per-group modules, behavior-preserving, with Typer registration intact.
+
+**Approach:** The `*_app` Typer objects are defined in `cli/_subapps.py`; `mgmt.py` only registered commands on them via decorators (registration is an import side-effect triggered by `cli/__init__.py`). Confirmed first: every `def` in `mgmt.py` is a command handler (no shared module-level helpers — all come from `._helpers`), and nothing imports symbols from `mgmt.py`. So each group's commands were moved byte-exact into its own module; `ruff --fix` trimmed the per-module unused header imports.
+
+**Implemented:**
+- New `cli/mgmt_doctor.py` (5), `cli/mgmt_eval.py` (10), `cli/mgmt_hitl.py` (4), `cli/mgmt_isolation.py` (7), `cli/mgmt_storage.py` (2), `cli/mgmt_config.py` (2) — each imports its `*_app` + helpers and defines its commands.
+- `cli/mgmt.py` reduced from 1693 → 17 lines: a thin aggregator importing the 6 submodules so `cli/__init__.py`'s `import mgmt` still triggers all registration. No CLI/protocol surface removed.
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `cli/mgmt.py` + 6 new `cli/mgmt_*.py`. Verified: **command parity PASS** (identical 30 commands across all 6 sub-apps, name-for-name vs pre-split baseline); `uv run ruff check` clean; `tests/cli` **163 passed / 6 skipped**; broad eval/doctor/isolation/hitl/storage/config sweep **359 passed**; `arc --help` + all 6 group `--help` exit 0. | Notes: closes CR-026. Refactor track remaining: CR-028 (ConfigTab.tsx). DoD gates 3, 4 cited.
+
+---
