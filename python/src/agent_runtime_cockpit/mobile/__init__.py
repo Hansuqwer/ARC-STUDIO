@@ -26,6 +26,8 @@ from .models import (
     MobileRuntimePackBridge,
     MobileSimulationStepResult,
 )
+from .fixtures_registry import get_fixture, list_fixtures, register
+from .mock_store import MockStore, get_default_store, reset_default_store
 from .policy import MobilePolicyDecision, explain_capability_policy, explain_plan_policy
 from .recorder import (
     MobileRuntimeEvent,
@@ -90,4 +92,12 @@ __all__ = [
     "get_capability",
     "load_manifest",
     "build_default_manifest",
+    "get_fixture",
+    "list_fixtures",
+    "register",
+    "MockStore",
+    "get_default_store",
+    "reset_default_store",
+    "ReplayDiff",
+    "replay_trace",
 ]
