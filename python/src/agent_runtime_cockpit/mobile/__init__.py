@@ -43,6 +43,7 @@ from .policy import (
     explain_capability_policy,
     explain_plan_policy,
 )
+from .privacy_budget import PrivacyBudget, compute_privacy_budget
 from .recorder import MobileRuntimeEvent, MobileTrace, append_trace, build_trace, read_trace
 from .replay import ReplayDiff, replay_trace
 from .simulator import simulate_action_plan
@@ -77,6 +78,8 @@ __all__ = [
     "MobilePolicyDecision",
     "EnterprisePolicyHook",
     "MOBILE_POLICY_VERSION",
+    "PrivacyBudget",
+    "compute_privacy_budget",
     "MobileManifestLoadError",
     "MobileValidationReport",
     "ValidationFinding",
