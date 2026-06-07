@@ -13,8 +13,18 @@ def test_keeps_safe_keys():
     assert _sanitise_env({"PATH": "/bin", "HOME": "/root"}) == {"PATH": "/bin", "HOME": "/root"}
 
 
-def test_none_passthrough():
-    assert _sanitise_env(None) is None
+def test_none_sanitises_current_environment(monkeypatch):
+    """env=None must sanitise the *current* environment, not return None.
+
+    Returning None would make create_subprocess_exec inherit the full parent
+    environment (secrets included). The proxy instead passes a sanitised copy.
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-leak")
+    monkeypatch.setenv("PATH", "/usr/bin")
+    result = _sanitise_env(None)
+    assert isinstance(result, dict)
+    assert "OPENAI_API_KEY" not in result
+    assert result.get("PATH") == "/usr/bin"
 
 
 def test_does_not_log_value(caplog):

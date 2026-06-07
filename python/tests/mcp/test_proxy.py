@@ -188,3 +188,64 @@ async def test_proxy_passthrough_unknown_method(workspace: Path):
         assert len(proxy.decisions) == 0
     finally:
         await proxy.stop()
+
+
+# ─── CR-018: structured error envelopes on timeout / oversize ─────────────────
+
+
+def test_error_envelope_preserves_request_id():
+    env = McpProxy._error_envelope(b'{"jsonrpc":"2.0","id":99,"method":"x"}', -32001, "boom")
+    data = json.loads(env)
+    assert data["jsonrpc"] == "2.0"
+    assert data["id"] == 99
+    assert data["error"]["code"] == -32001
+    assert data["error"]["message"] == "boom"
+
+
+def test_error_envelope_handles_unparseable_request():
+    data = json.loads(McpProxy._error_envelope(b"not json", -32002, "boom"))
+    assert data["id"] is None
+    assert data["error"]["code"] == -32002
+
+
+@pytest.mark.asyncio
+async def test_send_raw_oversize_returns_structured_error(workspace: Path):
+    """A response over the 1 MB cap returns a JSON-RPC error, not truncated bytes."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    proxy = McpProxy(_FAKE_UPSTREAM, workspace=workspace)
+    proxy._proc = MagicMock()
+    proxy._proc.stdin.write = MagicMock()
+    proxy._proc.stdin.drain = AsyncMock()
+
+    async def _readline():
+        return b"x" * (1_048_576 + 10)
+
+    proxy._proc.stdout.readline = _readline
+    msg = json.dumps({"jsonrpc": "2.0", "id": 42, "method": "x"}).encode("utf-8")
+    data = json.loads(await proxy.send_raw(msg))
+    assert data["id"] == 42
+    assert data["error"]["code"] == -32002
+
+
+@pytest.mark.asyncio
+async def test_send_raw_timeout_returns_structured_error(workspace: Path, monkeypatch):
+    """A hung upstream returns a JSON-RPC error instead of raising TimeoutError."""
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock
+
+    monkeypatch.setattr("agent_runtime_cockpit.mcp.proxy._READ_TIMEOUT", 0.01)
+    proxy = McpProxy(_FAKE_UPSTREAM, workspace=workspace)
+    proxy._proc = MagicMock()
+    proxy._proc.stdin.write = MagicMock()
+    proxy._proc.stdin.drain = AsyncMock()
+
+    async def _hang():
+        await asyncio.sleep(10)
+        return b"never"
+
+    proxy._proc.stdout.readline = _hang
+    msg = json.dumps({"jsonrpc": "2.0", "id": 7, "method": "x"}).encode("utf-8")
+    data = json.loads(await proxy.send_raw(msg))
+    assert data["id"] == 7
+    assert data["error"]["code"] == -32001

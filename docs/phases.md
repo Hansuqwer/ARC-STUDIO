@@ -5695,3 +5695,17 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree | Files: `tui/widgets/markdown_block.py`, `tui/widgets/transcript.py`, `tui/screen.py` + tests `tests/tui/test_transcript_streaming.py` (new), `tests/tui/test_sandbox_shell_escape.py` (extended, +2). Verified: `uv run pytest tests/tui -q` → **232 passed, 2 xfailed** (xfails are pre-existing headless SVG-snapshot mismatches); `uv run ruff check src tests` clean. | Notes: deterministic redaction (no LLM); additive; reuses the canonical redactor (no new redaction code). DoD gates 1/6 cited.
 
 ---
+
+## Phase 162 — DoD Elevation: MCP Security Batch (R-POLISH4)
+
+**Goal:** Fourth DoD-elevation slice — the MCP P0 cluster (CR-004, CR-005, CR-008, CR-018). Each was verified against the real code first (Context7 `/modelcontextprotocol/python-sdk` confirmed stdout is the JSON-RPC channel on stdio).
+
+**Findings & implementation:**
+- **CR-004 — FALSE POSITIVE (no change).** The MCP resources (`arc://runs|traces|audit/{run_id}`) delegate to `arc_run_status`/`arc_trace_read`/`arc_audit_verify`, which each `return _tool_result(...)` — so they already pass through the per-call risk gate + trust + audit. Verified at `mcp/server.py:409/502/558`.
+- **CR-005 — proxy env leak (real).** `_sanitise_env(None)` returned `None`, and `create_subprocess_exec(env=None)` inherits the full parent environment (secrets included). Now sanitises `os.environ` when `env is None`, returning a stripped copy.
+- **CR-008 — stdio frame corruption (real).** `arc mcp serve` printed startup banners to **stdout** right before `mcp_server.run(transport="stdio")`. Routed to `err_console` (stderr); stdout is reserved for JSON-RPC frames. Dropped the now-unused `console` import.
+- **CR-018 — structured proxy errors (partial correction).** A 30s timeout and 1 MB cap already existed but **raised `TimeoutError`** (crash) / **truncated JSON** (garbage). Now both return a structured JSON-RPC error envelope keyed to the request id (`-32001` timeout, `-32002` oversize).
+
+**Status:** Baseline Complete | Evidence: local worktree | Files: `mcp/proxy.py`, `cli/mcp.py` + tests `tests/mcp/test_proxy.py` (+4), `tests/mcp/test_proxy_env.py` (updated off the insecure passthrough), `tests/mcp/test_mcp_serve_stdout.py` (new). Verified: `uv run pytest tests/mcp -q` → **123 passed**; `uv run ruff check src tests` clean. | Notes: deterministic; additive; reuses existing risk gate. DoD gates 1/4/6/7 cited.
+
+---

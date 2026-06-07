@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ from .manifests import ManifestStore
 log = logging.getLogger(__name__)
 
 _MAX_OUTPUT_BYTES = 1_048_576  # 1 MB
+_READ_TIMEOUT = 30.0  # seconds to await an upstream response before failing closed
 
 _SECRET_KEY_PATTERNS = (
     "_API_KEY",
@@ -34,12 +36,18 @@ _SECRET_KEY_PATTERNS = (
 )
 
 
-def _sanitise_env(env: dict[str, str] | None) -> dict[str, str] | None:
-    """Strip secret env vars before passing to upstream subprocess."""
-    if env is None:
-        return None
-    clean = {}
-    for k, v in env.items():
+def _sanitise_env(env: dict[str, str] | None) -> dict[str, str]:
+    """Strip secret env vars before passing to upstream subprocess.
+
+    When ``env`` is None we sanitise the *current* process environment rather
+    than returning None: passing ``env=None`` to ``create_subprocess_exec``
+    makes the upstream inherit the full parent environment (secrets included),
+    which defeats the strip. Returning a sanitised copy keeps PATH/HOME/etc.
+    while removing secret-looking keys.
+    """
+    source = env if env is not None else dict(os.environ)
+    clean: dict[str, str] = {}
+    for k, v in source.items():
         if any(pat in k.upper() for pat in _SECRET_KEY_PATTERNS):
             log.debug("mcp.proxy: stripped secret key %s from upstream env", k)
         else:
@@ -88,15 +96,40 @@ class McpProxy:
                 await self._proc.wait()
 
     async def send_raw(self, msg: bytes) -> bytes | None:
-        """Send raw JSONRPC message to upstream and read response."""
+        """Send raw JSONRPC message to upstream and read response.
+
+        On read timeout or oversize, returns a structured JSON-RPC error
+        envelope keyed to the request id, rather than raising
+        ``asyncio.TimeoutError`` (which would crash the proxy loop) or
+        forwarding a truncated, invalid-JSON line.
+        """
         if not self._proc or not self._proc.stdin or not self._proc.stdout:
             return None
         self._proc.stdin.write(msg + b"\n")
         await self._proc.stdin.drain()
-        line = await asyncio.wait_for(self._proc.stdout.readline(), timeout=30.0)
+        try:
+            line = await asyncio.wait_for(self._proc.stdout.readline(), timeout=_READ_TIMEOUT)
+        except asyncio.TimeoutError:
+            return self._error_envelope(
+                msg, -32001, f"upstream MCP server timed out after {_READ_TIMEOUT:.0f}s"
+            )
         if len(line) > _MAX_OUTPUT_BYTES:
-            line = line[:_MAX_OUTPUT_BYTES]
+            return self._error_envelope(
+                msg, -32002, f"upstream MCP response exceeded {_MAX_OUTPUT_BYTES}-byte cap"
+            )
         return line
+
+    @staticmethod
+    def _error_envelope(original: bytes, code: int, message: str) -> bytes:
+        """Build a JSON-RPC error response carrying the original request id."""
+        msg_id = None
+        try:
+            msg_id = json.loads(original).get("id")
+        except Exception:
+            msg_id = None
+        return json.dumps(
+            {"jsonrpc": "2.0", "id": msg_id, "error": {"code": code, "message": message}}
+        ).encode("utf-8")
 
     async def handle_message(self, raw: bytes) -> bytes:
         """Intercept and gate tool_call requests."""

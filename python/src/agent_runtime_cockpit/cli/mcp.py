@@ -42,7 +42,7 @@ from ..security.sandbox import (
     validate_command_paths,
 )
 from ..security.trust import WorkspaceUntrusted, ensure_trusted, resolve_trust
-from ._app import console, err_console
+from ._app import err_console
 from ._helpers import DEBUG_FLAG, JSON_FLAG, WORKSPACE_FLAG, _out, _setup_logging, _workspace
 from ._subapps import mcp_app, mcp_workbench_app
 
@@ -701,7 +701,7 @@ def workbench_session_cleanup(
     _out(ok({"cleaned": cleaned, "count": len(cleaned)}, workspace=str(ws)), json_output)
 
 
-# ── serve command (unchanged) ───────────────────────────────────────────────
+# ── serve command (CR-008: logs to stderr; stdout is the JSON-RPC channel) ───
 
 
 @mcp_app.command("serve")
@@ -759,12 +759,14 @@ def mcp_serve(
         )
         raise typer.Exit(1)
 
-    console.print("[dim]ARC MCP server starting on stdio...[/dim]")
-    console.print("[dim]Trusted workspace:[/dim]", str(ws))
+    # stdout is reserved for the JSON-RPC protocol frames on the stdio
+    # transport; all human-facing logs must go to stderr or they corrupt it.
+    err_console.print("[dim]ARC MCP server starting on stdio...[/dim]")
+    err_console.print("[dim]Trusted workspace:[/dim]", str(ws))
     try:
         mcp_server.run(transport="stdio")
     except KeyboardInterrupt:
-        console.print("\n[dim]MCP server stopped.[/dim]")
+        err_console.print("\n[dim]MCP server stopped.[/dim]")
         raise typer.Exit(0)
 
 
