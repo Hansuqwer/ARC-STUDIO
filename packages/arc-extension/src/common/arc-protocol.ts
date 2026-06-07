@@ -49,6 +49,11 @@ import type {
     RunContract,
     RunReceipt,
 } from './protocol/contracts-graph';
+// Runtime status, run-links, and HITL/audit types live in their own ./protocol modules (CR-027);
+// imported here for local use in ArcService. Re-exported via `export *` below.
+import type { ProviderStatus, RuntimeCapabilitiesResponse } from './protocol/runtime-status';
+import type { RunLinksResponse } from './protocol/run-links';
+import type { AuditChainInfo, HitlPromptInfo, HitlRespondRequest } from './protocol/hitl-audit';
 
 export const ArcServicePath = '/services/arc';
 
@@ -406,165 +411,20 @@ export interface WorkflowInfo {
     description?: string;
 }
 
-// ========== Runtime Adapter Status (ported from arc-core) ==========
-
-/**
- * A doctor action for a runtime capability report.
- */
-export interface DoctorAction {
-    id: string;
-    label: string;
-    description: string;
-    command: string;
-    safe_to_auto_run: boolean;
-}
-
-/**
- * Capability report for a runtime adapter.
- */
-export interface RuntimeCapabilityReport {
-    runtime_id: string;
-    runtimeId?: string;
-    detected: boolean;
-    can_run: boolean;
-    canRun?: boolean;
-    availability: string;
-    reason?: string | null;
-    detected_artifacts: string[];
-    detectedArtifacts?: string[];
-    required_env: string[];
-    requiredEnv?: string[];
-    version?: string | null;
-    requires_paid_calls: boolean;
-    requiresPaidCalls?: boolean;
-    doctor_actions: DoctorAction[];
-    doctorActions?: DoctorAction[];
-    metadata?: Record<string, unknown>;
-    traceMetadata?: Record<string, unknown>;
-    gates?: Record<string, unknown>;
-    realRuntimeGate?: boolean;
-    providerBacked?: boolean;
-}
-
-/**
- * Response envelope for runtime capability listing.
- */
-export interface RuntimeCapabilitiesResponse {
-    workspace: string;
-    auto_priority: string[];
-    runtimes: RuntimeCapabilityReport[];
-}
-
-/**
- * Provider configuration status for the adapter status widget.
- * Secrets are never exposed as raw values — only source/status metadata.
- */
-export interface ProviderStatus {
-    provider: string;
-    display_name?: string;
-    enabled?: boolean;
-    dry_run?: boolean;
-    base_url_configured?: boolean;
-    baseUrlConfigured: boolean;
-    api_key_configured?: boolean;
-    apiKeyConfigured: boolean;
-    apiKeySource?: string;
-    runtimeAvailable: boolean;
-    message: string;
-}
+// ========== Runtime Adapter Status (extracted to ./protocol/runtime-status) ==========
+export * from './protocol/runtime-status';
 
 // ========== Config Tab Types (extracted to ./protocol/config-types) ==========
 export * from './protocol/config-types';
 
-// ========== Run Links Types (Session B7) ==========
-
-/**
- * Linked event chain for a single stable ID.
- */
-export interface LinkedEventChain {
-    stableId: string;
-    events: TraceEvent[];
-}
-
-/**
- * Run links response from /api/runs/{id}/links.
- * Contains cross-referenced event chains keyed by stable ID type.
- */
-export interface RunLinksResponse {
-    nodeChains: Record<string, TraceEvent[]>;
-    messageChains: Record<string, TraceEvent[]>;
-    toolCallChains: Record<string, TraceEvent[]>;
-    evidenceChains: Record<string, TraceEvent[]>;
-    hasStableIds: boolean;
-    stableIdCount: number;
-}
-
-/**
- * Evidence selection event emitted when EvidenceChip is opened.
- */
-export interface EvidenceSelectionEvent {
-    evidenceRef: EvidenceRef;
-    source: 'chip-click' | 'keyboard' | 'context-menu';
-    timestamp: string;
-}
+// ========== Run Links Types (extracted to ./protocol/run-links) ==========
+export * from './protocol/run-links';
 
 // ========== Cockpit Schema Contracts + Stable IDs/Graph (extracted to ./protocol/contracts-graph) ==========
 export * from './protocol/contracts-graph';
 
-// ========== HITL (Human-in-the-Loop) ==========
-
-/**
- * HITL prompt info for IDE display.
- */
-export interface HitlPromptInfo {
-    promptId: string;
-    runId: string;
-    prompt: string;
-    createdAt: string;
-    expiresAt?: string;
-    promptType?: string;
-    token?: string;
-    status?: 'pending' | 'approved' | 'rejected' | 'modified' | 'expired' | 'used' | 'unknown';
-    expired?: boolean;
-    singleUse?: boolean;
-    usedAt?: string;
-}
-
-/**
- * Request to respond to a HITL prompt.
- */
-export interface HitlRespondRequest {
-    promptId: string;
-    decision: 'approve' | 'reject' | 'modify';
-    response?: string;
-    token: string;
-}
-
-// ========== Audit ==========
-
-/**
- * Audit chain info for a run.
- */
-export interface AuditChainInfo {
-    runId: string;
-    auditPath?: string;
-    chainVerified: boolean;
-    recordCount: number;
-    state?: 'present' | 'missing' | 'degraded';
-    reason?: string;
-    signature?: string;
-    hmacAlgo?: string;
-    /** Verification mode used: sha256 or hmac */
-    mode?: 'sha256' | 'hmac';
-    /** Number of records actually checked by verifier */
-    recordsChecked?: number;
-    /** Verification duration in milliseconds */
-    durationMs?: number;
-    /** Audit chain file size in bytes */
-    fileSizeBytes?: number;
-    /** Peak memory usage during verification in MB */
-    peakMemoryMb?: number;
-}
+// ========== HITL + Audit (extracted to ./protocol/hitl-audit) ==========
+export * from './protocol/hitl-audit';
 
 // ========== Replay & Run Diff (extracted to ./protocol/replay-diff) ==========
 export * from './protocol/replay-diff';

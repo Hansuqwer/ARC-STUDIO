@@ -12,10 +12,16 @@ describe('Protocol Extensions (Session B + B7)', () => {
     const replayDiffFile = path.join(__dirname, '..', '..', '..', 'src', 'common', 'protocol', 'replay-diff.ts');
     const runExecutionFile = path.join(__dirname, '..', '..', '..', 'src', 'common', 'protocol', 'run-execution.ts');
     const configTypesFile = path.join(__dirname, '..', '..', '..', 'src', 'common', 'protocol', 'config-types.ts');
+    const runtimeStatusFile = path.join(__dirname, '..', '..', '..', 'src', 'common', 'protocol', 'runtime-status.ts');
+    const runLinksFile = path.join(__dirname, '..', '..', '..', 'src', 'common', 'protocol', 'run-links.ts');
+    const hitlAuditFile = path.join(__dirname, '..', '..', '..', 'src', 'common', 'protocol', 'hitl-audit.ts');
     let source: string;
     let replayDiffSource: string;
     let runExecutionSource: string;
     let configTypesSource: string;
+    let runtimeStatusSource: string;
+    let runLinksSource: string;
+    let hitlAuditSource: string;
 
     beforeAll(async () => {
         source = await fs.readFile(protocolFile, 'utf-8');
@@ -27,6 +33,10 @@ describe('Protocol Extensions (Session B + B7)', () => {
         runExecutionSource = await fs.readFile(runExecutionFile, 'utf-8');
         // CR-027: Config Tab types were extracted to ./protocol/config-types.
         configTypesSource = await fs.readFile(configTypesFile, 'utf-8');
+        // CR-027: Runtime adapter status, run-links, and HITL/audit types extracted to their modules.
+        runtimeStatusSource = await fs.readFile(runtimeStatusFile, 'utf-8');
+        runLinksSource = await fs.readFile(runLinksFile, 'utf-8');
+        hitlAuditSource = await fs.readFile(hitlAuditFile, 'utf-8');
     });
 
     describe('Config Tab Types (Session B)', () => {
@@ -167,31 +177,31 @@ describe('Protocol Extensions (Session B + B7)', () => {
 
     describe('Run Links Types (Session B7)', () => {
         it('should export RunLinksResponse', () => {
-            expect(source).toMatch(/export interface RunLinksResponse/);
+            expect(runLinksSource).toMatch(/export interface RunLinksResponse/);
         });
 
         it('should have RunLinksResponse with chain fields', () => {
-            expect(source).toMatch(/RunLinksResponse/);
-            expect(source).toMatch(/nodeChains/);
-            expect(source).toMatch(/messageChains/);
-            expect(source).toMatch(/toolCallChains/);
-            expect(source).toMatch(/evidenceChains/);
+            expect(runLinksSource).toMatch(/RunLinksResponse/);
+            expect(runLinksSource).toMatch(/nodeChains/);
+            expect(runLinksSource).toMatch(/messageChains/);
+            expect(runLinksSource).toMatch(/toolCallChains/);
+            expect(runLinksSource).toMatch(/evidenceChains/);
         });
 
         it('should have RunLinksResponse with stable ID metadata', () => {
-            expect(source).toMatch(/hasStableIds:\s*boolean/);
-            expect(source).toMatch(/stableIdCount:\s*number/);
+            expect(runLinksSource).toMatch(/hasStableIds:\s*boolean/);
+            expect(runLinksSource).toMatch(/stableIdCount:\s*number/);
         });
 
         it('should export EvidenceSelectionEvent', () => {
-            expect(source).toMatch(/export interface EvidenceSelectionEvent/);
+            expect(runLinksSource).toMatch(/export interface EvidenceSelectionEvent/);
         });
 
         it('should have EvidenceSelectionEvent with source and timestamp', () => {
-            expect(source).toMatch(/EvidenceSelectionEvent/);
-            expect(source).toMatch(/evidenceRef:\s*EvidenceRef/);
-            expect(source).toMatch(/source:\s*'chip-click'\s*\|\s*'keyboard'\s*\|\s*'context-menu'/);
-            expect(source).toMatch(/timestamp:\s*string/);
+            expect(runLinksSource).toMatch(/EvidenceSelectionEvent/);
+            expect(runLinksSource).toMatch(/evidenceRef:\s*EvidenceRef/);
+            expect(runLinksSource).toMatch(/source:\s*'chip-click'\s*\|\s*'keyboard'\s*\|\s*'context-menu'/);
+            expect(runLinksSource).toMatch(/timestamp:\s*string/);
         });
 
         it('should have getRunLinks method on ArcService', () => {
@@ -206,48 +216,48 @@ describe('Protocol Extensions (Session B + B7)', () => {
         });
 
         it('should export HitlPromptInfo', () => {
-            expect(source).toMatch(/export interface HitlPromptInfo/);
+            expect(hitlAuditSource).toMatch(/export interface HitlPromptInfo/);
         });
 
         it('should have HitlPromptInfo with promptId, runId, prompt fields', () => {
-            expect(source).toMatch(/HitlPromptInfo/);
-            expect(source).toMatch(/promptId:\s*string/);
-            expect(source).toMatch(/runId:\s*string/);
-            expect(source).toMatch(/prompt:\s*string/);
+            expect(hitlAuditSource).toMatch(/HitlPromptInfo/);
+            expect(hitlAuditSource).toMatch(/promptId:\s*string/);
+            expect(hitlAuditSource).toMatch(/runId:\s*string/);
+            expect(hitlAuditSource).toMatch(/prompt:\s*string/);
         });
 
         it('should have optional HITL status expiry and single-use fields', () => {
-            expect(source).toMatch(/status\?:\s*'pending' \| 'approved' \| 'rejected' \| 'modified' \| 'expired' \| 'used' \| 'unknown'/);
-            expect(source).toMatch(/expired\?:\s*boolean/);
-            expect(source).toMatch(/singleUse\?:\s*boolean/);
-            expect(source).toMatch(/usedAt\?:\s*string/);
+            expect(hitlAuditSource).toMatch(/status\?:\s*'pending' \| 'approved' \| 'rejected' \| 'modified' \| 'expired' \| 'used' \| 'unknown'/);
+            expect(hitlAuditSource).toMatch(/expired\?:\s*boolean/);
+            expect(hitlAuditSource).toMatch(/singleUse\?:\s*boolean/);
+            expect(hitlAuditSource).toMatch(/usedAt\?:\s*string/);
         });
 
         it('should export HitlRespondRequest', () => {
-            expect(source).toMatch(/export interface HitlRespondRequest/);
+            expect(hitlAuditSource).toMatch(/export interface HitlRespondRequest/);
         });
 
         it('should have HitlRespondRequest with promptId and decision', () => {
-            expect(source).toMatch(/HitlRespondRequest/);
-            expect(source).toMatch(/promptId:\s*string/);
-            expect(source).toMatch(/decision:\s*'approve'\s*\|\s*'reject'\s*\|\s*'modify'/);
-            expect(source).toMatch(/token:\s*string/);
+            expect(hitlAuditSource).toMatch(/HitlRespondRequest/);
+            expect(hitlAuditSource).toMatch(/promptId:\s*string/);
+            expect(hitlAuditSource).toMatch(/decision:\s*'approve'\s*\|\s*'reject'\s*\|\s*'modify'/);
+            expect(hitlAuditSource).toMatch(/token:\s*string/);
         });
 
         it('should export AuditChainInfo', () => {
-            expect(source).toMatch(/export interface AuditChainInfo/);
+            expect(hitlAuditSource).toMatch(/export interface AuditChainInfo/);
         });
 
         it('should have AuditChainInfo with chainVerified, recordCount, signature', () => {
-            expect(source).toMatch(/AuditChainInfo/);
-            expect(source).toMatch(/chainVerified:\s*boolean/);
-            expect(source).toMatch(/recordCount:\s*number/);
-            expect(source).toMatch(/signature/);
+            expect(hitlAuditSource).toMatch(/AuditChainInfo/);
+            expect(hitlAuditSource).toMatch(/chainVerified:\s*boolean/);
+            expect(hitlAuditSource).toMatch(/recordCount:\s*number/);
+            expect(hitlAuditSource).toMatch(/signature/);
         });
 
         it('should have optional audit state and reason fields', () => {
-            expect(source).toMatch(/state\?:\s*'present' \| 'missing' \| 'degraded'/);
-            expect(source).toMatch(/reason\?:\s*string/);
+            expect(hitlAuditSource).toMatch(/state\?:\s*'present' \| 'missing' \| 'degraded'/);
+            expect(hitlAuditSource).toMatch(/reason\?:\s*string/);
         });
 
         it('should export ReplayResult', () => {
@@ -300,18 +310,18 @@ describe('Protocol Extensions (Session B + B7)', () => {
         });
 
         it('should expose optional capability metadata without provider readiness claims', () => {
-            expect(source).toMatch(/metadata\?:\s*Record<string, unknown>/);
-            expect(source).toMatch(/traceMetadata\?:\s*Record<string, unknown>/);
-            expect(source).toMatch(/gates\?:\s*Record<string, unknown>/);
-            expect(source).toMatch(/realRuntimeGate\?:\s*boolean/);
-            expect(source).toMatch(/providerBacked\?:\s*boolean/);
-            expect(source).not.toMatch(/providerReady\?:\s*true/);
+            expect(runtimeStatusSource).toMatch(/metadata\?:\s*Record<string, unknown>/);
+            expect(runtimeStatusSource).toMatch(/traceMetadata\?:\s*Record<string, unknown>/);
+            expect(runtimeStatusSource).toMatch(/gates\?:\s*Record<string, unknown>/);
+            expect(runtimeStatusSource).toMatch(/realRuntimeGate\?:\s*boolean/);
+            expect(runtimeStatusSource).toMatch(/providerBacked\?:\s*boolean/);
+            expect(runtimeStatusSource).not.toMatch(/providerReady\?:\s*true/);
         });
     });
 
     describe('ProviderStatus safety', () => {
         it('should document that secrets are never exposed', () => {
-            expect(source).toMatch(/Secrets are never exposed as raw values/);
+            expect(runtimeStatusSource).toMatch(/Secrets are never exposed as raw values/);
         });
     });
 });

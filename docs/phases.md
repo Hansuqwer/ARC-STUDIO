@@ -5963,3 +5963,17 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete (part 4 of N) | Evidence: local worktree | Files: `common/protocol/contracts-graph.ts`, `common/arc-protocol.ts`, `__tests__/ui-components.contract.test.ts`. Verified: `tsc` clean; **full** `pnpm --filter arc-extension test` = 33 suites, **933 passed / 3 skipped**. arc-protocol.ts 1439 → 1216 (4 modules, ~651 lines / ~35% moved). | Notes: runtime-adapter, run-links, HITL, audit sections remain. DoD gates 3, 4 cited.
 
 ---
+
+## Phase 184 — Refactor: Split arc-protocol.ts — Final Sections (CR-027 COMPLETE, R-POLISH26)
+
+**Goal:** CR-027 (final) — extract the last sections and complete the decomposition.
+
+**Implemented:**
+- New `common/protocol/runtime-status.ts` (`DoctorAction`, `RuntimeCapabilityReport`, `RuntimeCapabilitiesResponse`, `ProviderStatus`), `run-links.ts` (`LinkedEventChain`, `RunLinksResponse`, `EvidenceSelectionEvent`; back-imports `TraceEvent` + `EvidenceRef`), and `hitl-audit.ts` (`HitlPromptInfo`, `HitlRespondRequest`, `AuditChainInfo`). Byte-exact moves; `arc-protocol.ts` re-exports all + back-imports the 6 names used locally.
+- `protocol-extensions.contract.test.ts`: Run Links / HITL / Audit / ProviderStatus type-shape assertions (incl. the non-secret ProviderStatus check and the no-`providerReady:true` capability check) now read their module sources; all `ArcService` method assertions stay on `arc-protocol`.
+
+**CR-027 outcome:** `common/arc-protocol.ts` **1867 → 1086 lines (~42% extracted)** into **7 cohesive `protocol/*` modules** (replay-diff, run-execution, config-types, contracts-graph, runtime-status, run-links, hitl-audit), all re-exported via the barrel so the 54 import sites are unchanged. The cross-referenced core (Enums, Error Class, Execution, Traces, Workflows, Session Bridge) and the `ArcService` interface stay in `arc-protocol.ts` as the hub. Type-only moves — zero runtime change.
+
+**Status:** Baseline Complete (CR-027 done) | Evidence: local worktree | Files: 3 new `protocol/*` modules, `common/arc-protocol.ts`, `__tests__/protocol-extensions.contract.test.ts`. Verified: `pnpm typecheck` (full workspace `tsc -b`) clean; **full** `pnpm --filter arc-extension test` = 33 suites, **933 passed / 3 skipped**. | Notes: closes CR-027. DoD gates 3, 4, 6 cited. Remaining backlog refactors: CR-026 (mgmt.py), CR-028 (ConfigTab.tsx).
+
+---
