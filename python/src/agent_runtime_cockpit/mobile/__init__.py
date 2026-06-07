@@ -36,6 +36,12 @@ from .recorder import (
     build_trace,
     read_trace,
     verify_trace,
+from .policy import (
+    EnterprisePolicyHook,
+    MOBILE_POLICY_VERSION,
+    MobilePolicyDecision,
+    explain_capability_policy,
+    explain_plan_policy,
 )
 from .recorder import MobileRuntimeEvent, MobileTrace, append_trace, build_trace, read_trace
 from .replay import ReplayDiff, replay_trace
@@ -69,6 +75,8 @@ __all__ = [
     "MobileRuntimeEvent",
     "MobileTrace",
     "MobilePolicyDecision",
+    "EnterprisePolicyHook",
+    "MOBILE_POLICY_VERSION",
     "MobileManifestLoadError",
     "MobileValidationReport",
     "ValidationFinding",
