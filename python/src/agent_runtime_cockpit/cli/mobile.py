@@ -41,13 +41,19 @@ def mobile_doctor_cmd(
         ok(
             {
                 "schema_version": MOBILE_SCHEMA_VERSION,
+                "runtime_mode": "simulator_preview",
                 "capability_count": len(caps),
                 "mock_only_count": mock_count,
+                "mock_only": mock_count == len(caps),
                 "simulator_mode": True,
+                "native_bridges": False,
+                "production_ready": False,
+                "enterprise_ready": False,
                 "background_execution": False,
                 "network_by_default": False,
+                "mcp_gateway": False,
                 "status": "ok",
-                "note": "MVP: all capabilities are mock/simulator-only. No real native bridges.",
+                "note": "Simulator preview: all built-in capabilities are mock-only. No production native mobile bridges or real device access exist.",
             }
         ),
         json_output,
