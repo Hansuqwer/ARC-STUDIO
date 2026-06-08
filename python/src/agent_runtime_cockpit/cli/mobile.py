@@ -870,3 +870,31 @@ def mobile_plan_verify_cmd(
             json_output,
         )
         raise typer.Exit(1)
+
+
+mobile_gate_app = typer.Typer(
+    name="gate", help="Native capability entry-gate (default-denied, fixtures-only)"
+)
+mobile_app.add_typer(mobile_gate_app)
+
+
+@mobile_gate_app.command("evaluate")
+def mobile_gate_evaluate_cmd(
+    capability_id: str = typer.Argument(..., help="Capability id to evaluate."),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Evaluate the native capability entry-gate for a capability.
+
+    With the default (off) feature flags and no signed plan/approval/compliance, the gate is
+    DENIED. Even an eligible capability is routed to fixtures in this build — no real device
+    access is performed (that flip is human-gated and out of scope).
+    """
+    _setup_logging(debug)
+    import secrets
+
+    from ..mobile import CapabilityEntryGate, FeatureFlags
+
+    gate = CapabilityEntryGate(FeatureFlags(), secrets.token_bytes(32))
+    decision = gate.evaluate(capability_id)
+    _out(ok(decision.as_dict()), json_output)
