@@ -6218,3 +6218,11 @@ Driving selected Batch 7 `Baseline Complete` items to `Polished Complete` agains
 - **Gate 8 (docs):** ✓ `route_fates.py` registry is the documented source of fate truth; this entry + roadmap row; banned-claims clean.
 - **N/A:** 1 UX-states, 2 a11y, 5 perf — no user-visible surface. 6 security, 7 reliability — audit guard over static route metadata, no runtime decision/action.
 
+### B2P-19 — keyed run audit → Polished Complete
+
+- **Gate 4 (tests):** ✓ `uv run pytest tests/audit/test_run_keyed_audit.py` → 5 passed (verifiable keyed chain, no-key no-op, tamper detected, run-path best-effort containment, helper-never-raises-without-key).
+- **Gate 6 (security):** ✓ Deterministic HMAC checkpoint, **key-gated** — no key ⇒ no-op (ADR-005), never silently unsigned; tamper is detected by `verify_hmac_chain`. No LLM in the path. The Non-Negotiable boundary (no adapter-wide keyed-audit claim until every run path writes/verifies) is preserved.
+- **Gate 7 (reliability):** ✓ Wired into `tasks/executor._execute_run` inside a best-effort `try/except` ("never break the run") so a keyed-audit failure cannot abort a run; the helper itself never raises on the missing-key path. Both locked by tests.
+- **Gate 8 (docs):** ✓ Module docstring states the key-gating + scope boundary; this entry + roadmap row; banned-claims clean.
+- **N/A:** 1 UX-states, 2 a11y, 5 perf — no user-visible surface (internal audit mechanism; checkpoint write is O(1) per run). 3 parity — no cross-surface equivalent action; verification is via `verify_hmac_chain`.
+
