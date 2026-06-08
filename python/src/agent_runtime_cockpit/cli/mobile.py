@@ -1151,3 +1151,28 @@ def mobile_ss_delete_cmd(
     """Delete a stored key."""
     _setup_logging(debug)
     _out(ok({"deleted": _secure_store(store, key_file).delete(key), "key": key}), json_output)
+
+
+@mobile_app.command("audit-retention")
+def mobile_audit_retention_cmd(
+    file: str = typer.Option(
+        str(Path.home() / ".arc" / "audit" / "mobile_decisions.jsonl"),
+        "--file",
+        help="JSONL decisions audit log to prune.",
+    ),
+    max_age_seconds: int = typer.Option(
+        None, "--max-age", help="Drop entries older than N seconds."
+    ),
+    max_entries: int = typer.Option(None, "--max-entries", help="Keep only the newest N entries."),
+    rotate_bytes: int = typer.Option(None, "--rotate-bytes", help="Rotate to .1 past this size."),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Apply TTL/count retention (and optional size rotation) to the decisions audit log."""
+    _setup_logging(debug)
+    from ..mobile import apply_retention, rotate_if_oversized
+
+    rotated = rotate_if_oversized(file, rotate_bytes) if rotate_bytes is not None else False
+    summary = apply_retention(file, max_age_seconds=max_age_seconds, max_entries=max_entries)
+    summary["rotated"] = rotated
+    _out(ok(summary), json_output)

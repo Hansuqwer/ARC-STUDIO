@@ -140,3 +140,15 @@ def test_secure_store_get_missing(tmp_path) -> None:
         ],
     )
     assert res.exit_code == 1
+
+
+def test_audit_retention_prune(tmp_path) -> None:
+    log = tmp_path / "decisions.jsonl"
+    log.write_text("".join(json.dumps({"i": i}) + "\n" for i in range(10)), encoding="utf-8")
+    res = runner.invoke(
+        mobile_app, ["audit-retention", "--file", str(log), "--max-entries", "3", "--json"]
+    )
+    assert res.exit_code == 0, res.output
+    data = _json(res)["data"]
+    assert data["before"] == 10 and data["after"] == 3 and data["removed"] == 7
+    assert len(log.read_text().strip().splitlines()) == 3
