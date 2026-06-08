@@ -6397,3 +6397,11 @@ Re-audit during the "go" gap-closing pass **corrected** the earlier kept-Baselin
 - **Clarification:** `swarmgraph-insight-model.ts` / `SwarmGraphInsightTab.tsx` intentionally keep the loose `TraceEvent` *object* type because they defensively parse **loosely-shaped payloads** (e.g. nodes `id|name`, edges `source|from`) emitted by the adoption layer. The event type names are registered + parity-guarded; only the payloads are loose by necessity — migrating these to a strict discriminated-data union would break that tolerance. This is the documented intentional pattern (cf. B2P-10), not incomplete migration.
 - **N/A:** 1,2,5,6,7 — cross-language type contract, no new user surface.
 
+### B2P-09 — adapter budget enforcement → confirmed Baseline (architectural reason refined)
+
+Follow-up to the "go" pass: assessed whether an enforcer can reach an adapter effect boundary without serialized params. Confirmed it cannot be done as a safe polish-pass additive change.
+
+- **Why blocked:** `security/context.py::EnforcementContext` (the run-scoped `ContextVar`) is a frozen dataclass deliberately scoped to trust / paid-call / shell / network gates — it carries **no** budget enforcer, and `adapters/base.py::run_workflow` is per-adapter (there is **no shared effect-boundary hook**). Wiring per-effect budget enforcement would require either extending that core security primitive with an enforcer field + reading it inside each adapter's effect path, or per-adapter/per-SDK plumbing — an `L`-effort architectural change.
+- **What is already real:** budget enforcement runs at the **provider-call boundary** (`preflight_with_estimator`, deterministic, tested) for runs that go through ARC's provider client; adapters that call providers via their own external SDK bypass that point — the precise residual gap.
+- **Decision:** Stays **Baseline Complete**. The `budget_checkpoint` primitive + exhaustion-interrupt tests remain; per-effect adapter adoption is deferred to a scoped phase (not a polish bolt-on that mutates a frozen security type).
+
