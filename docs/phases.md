@@ -6190,3 +6190,12 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: commits e9bf808 + this; 4 provenance + 5 posture tests; `arc mobile provenance`/`posture` register | Notes: simulator-preview, fixtures-only, no real device access; real posture/MDM/attestation providers + external signing infra stay human-gated.
 
 ---
+
+## Phase 202 — Batch 7 Track G: daemon parity + Electron packaging (T28–T30)
+
+- **T28 (B2P-18):** orphan-route fate registry (`web/route_fates.py`) + parity guard (every orphan route has a terminal fate; no unresolved orphans).
+- **T29/T30 (B2P-17):** verified Electron app shell + daemon lifecycle (`DaemonManager` start/stop/spawn), signing-gated release packaging (`require-electron-signing.mjs`, `forceCodeSigning`, mac/win/linux targets); added the auto-update `publish` feed (GitHub Releases, opt-in). Structure-guard tests; full `theia build`/`electron-builder` runs in CI.
+
+**Status:** Baseline Complete | Evidence: commits b7a1fb0 + this; 3 route-fate + 3 electron guard tests | Notes: browser app remains the canonical release target; Electron desktop + auto-update are post-v0.1. **Batch 7 COMPLETE (30/30).**
+
+---

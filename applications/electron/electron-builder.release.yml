@@ -7,6 +7,14 @@ copyright: "Copyright 2025 ARC Studio Contributors"
 
 forceCodeSigning: true
 
+# Auto-update feed (electron-updater). Updates are only pushed when electron-builder runs with
+# --publish; package:release does not auto-publish. The browser app remains the canonical release
+# target — Electron desktop packaging + auto-update are post-v0.1.
+publish:
+  provider: github
+  owner: Hansuqwer
+  repo: arc-theia-studio
+
 directories:
   output: dist
   buildResources: resources
