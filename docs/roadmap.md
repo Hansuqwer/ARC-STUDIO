@@ -203,7 +203,7 @@ GATED items (auth / native-device / paid-live provider / Linux-KVM host) are int
 
 - Canonical app: `applications/browser` + `packages/arc-extension`.
 - Legacy `theia-extensions/*` and `packages/arc-browser-app` are archived under `docs/archive/`.
-- GitHub CI green on `7a300fe` (python, node, ARC Roadmap Gate, signing-preflight, e2e). Commit `4b0f6b5` implements all 6 previously-deferred items from the Active Work Ledger. All Baseline Complete phases evaluated for polish; all ship at current status for v0.1 (polish deferred to v0.2).
+- GitHub CI green on `7a300fe` (python, node, ARC Roadmap Gate, signing-preflight, e2e). Commit `4b0f6b5` implements all 6 previously-deferred items from the Active Work Ledger. v0.2 polish elevation has begun (Phase 203): 17 Batch-7 items reached `Polished Complete` with cited per-gate evidence; 5 stay `Baseline Complete` with documented gaps (B2P-02/03/09/17, R-AUDIT26).
 - Release-scope CLI/IDE basics are implemented and tested.
 - Remaining work is product depth, not repo stabilization.
 

@@ -86,7 +86,9 @@ async def test_client_can_list_tools(trusted_workspace: Path):
         assert "arc_task_status" in tool_names
         assert "arc_task_cancel" in tool_names
         assert "arc_task_result" in tool_names
-        assert len(tool_names) == 11
+        assert "arc_swarmgraph_plan" in tool_names
+        assert "arc_swarmgraph_assess_risk" in tool_names
+        assert len(tool_names) == 13
 
     await _run_with_client(trusted_workspace, _test)
 
