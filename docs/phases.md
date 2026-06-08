@@ -6405,3 +6405,18 @@ Follow-up to the "go" pass: assessed whether an enforcer can reach an adapter ef
 - **What is already real:** budget enforcement runs at the **provider-call boundary** (`preflight_with_estimator`, deterministic, tested) for runs that go through ARC's provider client; adapters that call providers via their own external SDK bypass that point — the precise residual gap.
 - **Decision:** Stays **Baseline Complete**. The `budget_checkpoint` primitive + exhaustion-interrupt tests remain; per-effect adapter adoption is deferred to a scoped phase (not a polish bolt-on that mutates a frozen security type).
 
+
+## Phase 204 — Batch 8 Tier 1: R-AUDIT1–25 v0.2 polish elevation
+
+Driving the R-AUDIT audit-fix set to `Polished Complete` against the full DoD. **Labels follow evidence** — narrow audit fixes are elevated only when every *applicable* gate is evidenced (most close 1–2 gates; the rest are N/A by nature). 5 items stay `Baseline Complete` with documented gaps (recorded at the end).
+
+### Docs-accuracy batch (gate 8) → Polished Complete
+
+- **R-AUDIT1 (Release Checklist Refresh):** ✓ `docs/release/checklist.md` current; gate 8. N/A 1–7 (release doc).
+- **R-AUDIT2 (Enforcement Surfaces Doc Refresh):** ✓ `enforcement-surfaces.md` reflects the current gate surfaces; gate 8. N/A 1–7.
+- **R-AUDIT8 (EXTENSION_MIGRATION Stale Ref Fix):** ✓ stale `LOCKED_REMAINING_ROADMAP.md` ref → `docs/roadmap.md`; gate 8. N/A 1–7.
+- **R-AUDIT13 (HMAC README Wording Tighten):** ✓ scope caveat in README + SECURITY.md (keyed-audit is tamper-evident for single-session local runs only); gate 6-doc + 8. N/A 1–5,7.
+- **R-AUDIT15 (MetaPathFinder Bridge Docs):** ✓ `docs/research/swarmgraph-metapathfinder-bridge.md` with architecture/gates/honest-limits; gate 8. N/A 1–7.
+- **R-AUDIT22 (Handover Doc Stale Refs Sweep):** ✓ handover docs point to `docs/roadmap.md`; gate 8. N/A 1–7.
+- **Evidence:** `bash scripts/check-banned-claims.sh` clean across the touched docs.
+
