@@ -173,6 +173,30 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 | R-AUDIT28 | Remove orphaned IDE dead code | Not Started | Evidence: — | Notes: `browser/arena/arena-frontend-module.ts` + `browser/arc-run-timeline-widget.tsx` remain unreferenced (no contribution); ArcContextDrawer was wired (R-AUDIT16), not removed. Source: unified-backlog SLICE 15 (P1). |
 | R-AUDIT29 | TestBenchTab Run button (CLI↔IDE parity) | Not Started | Evidence: — | Notes: IDE TestBenchTab is detection-only (R49); `arc testbench run` exists in the CLI — add a sandbox-policy-gated Run action in the tab. Source: unified-backlog SLICE 19 (P1). |
 
+### Baseline → Polished Backlog (none-posture · v0.2 polish track)
+
+Full per-item specs (work, files, tests) in `docs/research-findings/baseline-to-polished-backlog-2026-06-08.md`.
+All `Not Started`. DoD gates: 1 UX-states · 2 a11y · 3 parity · 4 tests · 5 perf · 6 security · 7 reliability · 8 docs. Effort S/M/L.
+GATED items (auth / native-device / paid-live provider / Linux-KVM host) are intentionally **not** promoted here; they stay in the research doc + R79.1/R79.2.
+
+| ID | Item | Status | DoD · Effort |
+|---|---|---|---|
+| B2P-01 | TUI `/statusline` slot reordering | Not Started | 1,3 · S |
+| B2P-02 | arc-extension `TraceEvent` → typed-event consumer migration | Not Started | 3,4 · M |
+| B2P-03 | Real-component jest-axe a11y coverage (not mocks) | Not Started | 2,4 · M |
+| B2P-04 | MCP live invocation from IDE (loopback client through risk gate) | Not Started | 1,3,6,7 · L |
+| B2P-05 | SwarmGraph MCP tool wrappers | Not Started | 3,4,6 · M |
+| B2P-07 | MCP task notifications + real task exec (replace placeholder ops) | Not Started | 1,4,7 · M |
+| B2P-08 | Runtime-wide high/critical confirmation enforcement | Not Started | 6 · M |
+| B2P-09 | Real-time budget enforcement at adapter effect boundaries | Not Started | 5,6,7 · L |
+| B2P-10 | Type the intentionally-untyped run events | Not Started | 4 · S |
+| B2P-11 | Eval artifact schema + Inspect-AI export + two-run report compare | Not Started | 3,4,8 · M |
+| B2P-12 | Memory runtime wiring (extract/query during runs, redaction-first) | Not Started | 3,4 · M |
+| B2P-13 | IDE write bridge (Phase 42; depends on advisory lock) | Not Started | 6,7 · M |
+| B2P-17 | Full Electron app packaging (browser stays canonical) | Not Started | 4,8 · L |
+| B2P-18 | Doctor/daemon parity remainder (resolve fate-labeled orphan routes) | Not Started | 3,8 · M |
+| B2P-19 | Keyed audit material across every adapter run path | Not Started | 4,6 · M |
+
 ---
 
 ## Current Baseline
