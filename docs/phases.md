@@ -6114,3 +6114,18 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree 2026-06-08 | Files: `cli/mobile.py`, `tests/test_mobile_cli_batch6.py` (7). Verified: 31 mobile-CLI tests pass; all 6 sub-apps register cleanly (`arc mobile --help`); secure-store test asserts plaintext never appears in output or at-rest file. | Notes: deterministic; simulator-preview; secure-store CLI never reveals plaintext.
 
 ---
+
+## Phase 195 — Batch 6 Track D: mobile integration + DoD elevation (D1–D5)
+
+**Goal:** Integrate the new hardening modules into the simulate/policy paths, type-gate them, refresh docs, and fuzz the safety-critical invariants.
+
+**Implemented:**
+- **D1** `arc mobile simulate` routes every step through `CapabilityEntryGate` and records the decision in a `gate` block (`all_fixtures=true`; no real device access; report model/hash unchanged).
+- **D2** `arc mobile policy explain` gains `--org-bundle/--tenant/--role/--bundle-key-file` — a signed `TenantPolicyHook` RBAC/ABAC overlay; unsigned/forged bundle, tenant mismatch, or disallowed role fails closed.
+- **D3** the 9 new mobile modules added to the scoped mypy gate (`python.yml` + `arc-roadmap-gate.yml`); verified clean.
+- **D4** `docs/mobile/REAL_VS_MOCK.md` refreshed — hardening-modules matrix + native rows updated to fixtures-only scaffold; banned-claims green.
+- **D5** hypothesis property/fuzz tests for the safety invariants (secure-store round-trip/ciphertext-at-rest/tamper-fail-closed; egress determinism + budget never exceeded; gate route ALWAYS fixtures + `executed_real_device` ALWAYS false).
+
+**Status:** Baseline Complete | Evidence: local worktree 2026-06-08 | Files: `cli/mobile.py`, `.github/workflows/{python,arc-roadmap-gate}.yml`, `docs/mobile/REAL_VS_MOCK.md`, `tests/test_mobile_cli_batch6.py`, `tests/test_mobile_property_batch6.py`. Verified: 115 mobile tests pass (incl. 7 property tests); mypy clean over 51 files (incl. 9 new modules); ruff clean; banned-claims green. | Notes: deterministic; simulator-preview; native device access remains fixtures-only and human-gated.
+
+---
