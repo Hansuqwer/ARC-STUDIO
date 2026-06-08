@@ -6866,3 +6866,19 @@ Evidence-based elevation for three roadmap items.
 - **Gate 6 (security):** LangGraph execution gated (paid-call guard + ARC_LANGGRAPH_EXPORT). No paid calls without explicit opt-in.
 - **Gate 7 (reliability):** Structured error on missing `ARC_LANGGRAPH_EXPORT`. Error states documented.
 - **Gate 8 (docs):** README Runtime Adapters section. `arc runtimes --capabilities --help`. Banned-claims clean.
+
+
+## Phase 226 — R-AUDIT-SWEEP4: R25 → Polished Complete (B2P-07/B2P-08 already Polished)
+
+B2P-07 and B2P-08 were already Polished Complete in prior phases. Only R25 needed elevation.
+
+### R25 (Event-Driven Audit/HITL Notifications) → Polished Complete
+
+- **Gate 1 (UX states):** Notifications outbox has typed event types; CLI watch mode shows pending/delivered/dead-letter states. HITL notification → AssuranceTab HITL inbox badge. R-AUDIT11 outbox: append/read_all/gc with TTL (Polished Complete, Phase 204).
+- **Gate 2 (a11y):** N/A — event bus/webhook is a backend component. IDE notification badge uses ARIA labels.
+- **Gate 3 (parity):** Notification events wired to HITL store, audit verifier, run supervisor, budget enforcer. SwarmGraph optional webhook/EventBroker hooks. Event names match across Python bus and TypeScript IDE badge protocol types.
+- **Gate 4 (tests):** 15 notification tests (tests/notifications + tests/swarmgraph). R-AUDIT11 outbox 4 tests (R-AUDIT11 → Polished Complete, Phase 204). MCP_CALL_DECISION producer wired test (Phase 193 R-CR-BACKLOG).
+- **Gate 5 (perf):** Durable JSONL outbox (bounded file, append-only). Bounded retry (max retries configurable). Dead-letter log prevents unbounded retry loops.
+- **Gate 6 (security):** HMAC-SHA256 signed webhook delivery. Webhook URL is explicit opt-in. No secrets in notification payloads (redaction applied).
+- **Gate 7 (reliability):** Bounded retry with dead-letter. Durable JSONL outbox survives process restart. TTL-based GC on outbox (R-AUDIT11).
+- **Gate 8 (docs):** README Audit Chain section mentions audit events. `--help` on watch/webhook commands. Banned-claims clean.

@@ -72,7 +72,7 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 | R22 | Persistent HITL + Inspect-Style Eval Artifacts | Baseline Complete (HITL only) |
 | R23 | Consensus Escrow (Commit-Reveal Voting) | Complete |
 | R24 | Adaptive Consensus Protocol | Complete |
-| R25 | Event-Driven Audit/HITL Notifications | Baseline Complete |
+| R25 | Event-Driven Audit/HITL Notifications | Polished Complete |
 | R26 | Swarm Memory Graph | Baseline Complete (research prototype + privacy/eval gates) |
 | R27 | LangChain Adapter | Baseline Complete |
 | R28 | Anthropic Provider + Registry | Baseline Complete |
