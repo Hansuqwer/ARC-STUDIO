@@ -244,6 +244,22 @@ class TaskExecutor:
         allow_paid_calls = task.params.get("allow_paid_calls", False)
 
         routed = runtime_router.resolve(workspace, runtime, allow_paid_calls=allow_paid_calls)
+
+        # B2P-09 (L-H1): run-boundary budget gate. No-op unless a run-budget scope is active
+        # (ContextVar enforcer); when active + already exhausted it raises BudgetExceeded BEFORE the
+        # adapter runs (so no cost is incurred), surfaced as a FAILED task by _execute_task_sync.
+        from decimal import Decimal as _Decimal
+
+        from ..adapters._shared import budget_checkpoint
+
+        budget_checkpoint(
+            None,
+            _Decimal("0"),
+            provider_id=f"run:{runtime}",
+            run_active=False,
+            workflow_active=False,
+        )
+
         coro = routed.adapter.run_workflow(workflow_id, task.params)
 
         # Adapter.run_workflow is async; run in a fresh event loop in this thread

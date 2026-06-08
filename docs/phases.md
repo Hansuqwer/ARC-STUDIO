@@ -6476,3 +6476,14 @@ Complements L-G1 with a fully-local, deterministic check (`packages/arc-extensio
 
 **Scope:** L-G2 gives real AA evidence for ARC's *hardcoded-pair* surfaces (alerts, primary button). The theme-**delegated** colors (risk badges via `--theia-charts-*`) and full rendered surfaces still need the L-G1 browser scan, so **B2P-03, R-AUDIT21, R-AUDIT23, R-AUDIT26 remain Baseline** — L-G2 narrows the unmeasured surface but does not flip them.
 
+
+### Tier-2 L-H1 — B2P-09 adapter budget enforcement → Polished Complete (supersedes the Baseline gap)
+
+Closed the B2P-09 gap (the `budget_checkpoint` primitive had **no caller** and was unwired). Now:
+
+- **Wiring (gate 6):** `budget/runtime_context.py` carries an optional `BudgetEnforcer` via a **`ContextVar`** (`run_budget_scope`) — routed immutably, **never** by mutating the frozen `EnforcementContext` or threading through trace-serialized params (the two original blockers; charter rule 6). `adapters._shared.budget_checkpoint` falls back to it, and `tasks/executor._execute_run` calls the gate **before** the adapter runs, so an exhausted budget interrupts the run before cost is incurred.
+- **Gate 7 (reliability):** a `BudgetExceeded` at the boundary surfaces as a FAILED task via `_execute_task_sync`; default (no scope active) is a pure no-op, so normal runs are unaffected.
+- **Gate 4 (tests):** `tests/adapters/test_run_budget_scope.py` — exhausted-scope interrupt at the boundary, default no-op, and a wiring guard that `budget_checkpoint` precedes `run_workflow` in `_execute_run`; plus existing `test_budget_checkpoint.py` (8 passed).
+- **Honest scoping:** enforcement is wired at the **run** effect boundary (the cost-incurring unit) and is **opt-in** (a caller enters `run_budget_scope` with a configured enforcer) — same posture as the opt-in B2P-12/B2P-19 run-path mechanisms. Per-effect granularity *within* a run remains a documented refinement. Real provider-call enforcement also continues via `preflight_with_estimator`.
+- **N/A:** 1,2,3,8 (internal mechanism; budget UX/docs already shipped).
+

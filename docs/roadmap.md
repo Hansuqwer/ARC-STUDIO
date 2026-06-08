@@ -188,7 +188,7 @@ GATED items (auth / native-device / paid-live provider / Linux-KVM host) are int
 | B2P-05 | SwarmGraph MCP tool wrappers | Polished Complete | 3,4,6 · M |
 | B2P-07 | MCP task notifications + real task exec (replace placeholder ops) | Polished Complete | 1,4,7 · M |
 | B2P-08 | Runtime-wide high/critical confirmation enforcement | Polished Complete | 6 · M |
-| B2P-09 | Real-time budget enforcement at adapter effect boundaries | Baseline Complete | 5,6,7 · L |
+| B2P-09 | Real-time budget enforcement at adapter effect boundaries | Polished Complete | 5,6,7 · L |
 | B2P-10 | Type the intentionally-untyped run events | Polished Complete | 4 · S |
 | B2P-11 | Eval artifact schema + Inspect-AI export + two-run report compare | Polished Complete | 3,4,8 · M |
 | B2P-12 | Memory runtime wiring (extract/query during runs, redaction-first) | Polished Complete | 3,4 · M |

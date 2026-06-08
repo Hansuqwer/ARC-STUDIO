@@ -31,13 +31,18 @@ def budget_checkpoint(
     run_active: bool = True,
     workflow_active: bool = True,
 ) -> None:
-    """Shared adapter effect-boundary budget gate (B2P-09a).
+    """Shared adapter effect-boundary budget gate (B2P-09).
 
-    Adapters call this immediately before a cost-incurring effect. With a `BudgetEnforcer` present
-    it runs `preflight`, which raises `BudgetExceeded` (real-time exhaustion interrupt) or
-    `ConfirmationRequired`. A ``None`` enforcer is a no-op (budget disabled / fake-offline runs),
-    so adapters can call it unconditionally at every effect boundary.
+    Adapters/run paths call this immediately before a cost-incurring effect. With a `BudgetEnforcer`
+    present it runs `preflight`, which raises `BudgetExceeded` (real-time exhaustion interrupt) or
+    `ConfirmationRequired`. When ``enforcer`` is ``None`` it falls back to the run-scoped enforcer
+    (``budget.runtime_context``); if that is also ``None`` it is a no-op (budget disabled), so callers
+    can invoke it unconditionally at every effect boundary.
     """
+    if enforcer is None:
+        from ..budget.runtime_context import current_run_budget_enforcer
+
+        enforcer = current_run_budget_enforcer()
     if enforcer is None:
         return
     cost = (
