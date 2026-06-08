@@ -28,4 +28,16 @@ describe('KnownTraceEventType registry parity (B2P-02)', () => {
             expect(known.has(t)).toBe(true);
         }
     });
+
+    it('SwarmGraph insight event types are registered (consumers parse loose payloads of typed events)', () => {
+        // The SwarmGraph insight consumers (swarmgraph-insight-model.ts) keep the loose `TraceEvent`
+        // object type ON PURPOSE: they defensively parse loosely-shaped payloads (e.g. nodes with
+        // id|name, edges with source|from) emitted by the adoption layer. The event TYPE NAMES are
+        // nonetheless registered + parity-guarded above — so this is an intentional pattern, not
+        // unmigrated debt.
+        const known = new Set<string>(KNOWN_TRACE_EVENT_TYPES);
+        for (const t of ['SWARMGRAPH_TOPOLOGY', 'SWARMGRAPH_CONSENSUS', 'SWARMGRAPH_COST']) {
+            expect(known.has(t)).toBe(true);
+        }
+    });
 });

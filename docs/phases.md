@@ -6388,3 +6388,12 @@ Finding: the **fallback** colors do **not** meet AA text contrast (4.5:1) across
 
 **Decision (unchanged):** B2P-03 and R-AUDIT26 **stay Baseline Complete**. Honest closure requires a layout-capable audit (Playwright + axe) or a theme-token contrast review that resolves the actual rendered colors — neither fabricated here. The data above replaces the earlier qualitative note.
 
+### B2P-02 — typed-event consumer migration → Polished Complete (supersedes earlier Baseline note)
+
+Re-audit during the "go" gap-closing pass **corrected** the earlier kept-Baseline call: the residual `TraceEvent` usages are correct-by-design, not unmigrated debt.
+
+- **Gate 3 (parity):** ✓ `KNOWN_TRACE_EVENT_TYPES` ⊇ the cross-language canonical registry (drift-guarded by `trace-event-types.contract.test.ts`), **including** `SWARMGRAPH_TOPOLOGY/CONSENSUS/COST` and the consolidated terminal set — so every consumed event TYPE NAME is typed + parity-checked.
+- **Gate 4 (tests):** ✓ `trace-event-types.contract.test.ts` (now incl. a SwarmGraph-types-registered guard) + `swarmgraph-insight-components.test.tsx`; full arc-extension suite 961 passed/3 skipped.
+- **Clarification:** `swarmgraph-insight-model.ts` / `SwarmGraphInsightTab.tsx` intentionally keep the loose `TraceEvent` *object* type because they defensively parse **loosely-shaped payloads** (e.g. nodes `id|name`, edges `source|from`) emitted by the adoption layer. The event type names are registered + parity-guarded; only the payloads are loose by necessity — migrating these to a strict discriminated-data union would break that tolerance. This is the documented intentional pattern (cf. B2P-10), not incomplete migration.
+- **N/A:** 1,2,5,6,7 — cross-language type contract, no new user surface.
+
