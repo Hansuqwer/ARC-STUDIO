@@ -6882,3 +6882,18 @@ B2P-07 and B2P-08 were already Polished Complete in prior phases. Only R25 neede
 - **Gate 6 (security):** HMAC-SHA256 signed webhook delivery. Webhook URL is explicit opt-in. No secrets in notification payloads (redaction applied).
 - **Gate 7 (reliability):** Bounded retry with dead-letter. Durable JSONL outbox survives process restart. TTL-based GC on outbox (R-AUDIT11).
 - **Gate 8 (docs):** README Audit Chain section mentions audit events. `--help` on watch/webhook commands. Banned-claims clean.
+
+
+## Phase 227 — R-RELEASE-GATE: Release check + version bump v0.8-r-ux3
+
+Final release gate for the Phases 207–227 elevation sprint.
+
+- **Python tests:** 6002 passed, 43 skipped, 7 xfailed, 1 xpassed. Snapshot xfailed are pre-existing (2 in tui/test_snapshots.py). Zero unexpected failures.
+- **TypeScript:** arc-extension build clean (tsc + copy-assets). 969 tests passed, 3 skipped (expected).
+- **ruff:** `uv run ruff check src tests` → `All checks passed!`
+- **banned-claims:** `bash scripts/check-banned-claims.sh README.md docs/roadmap.md docs/phases.md` → `OK: No banned claims found.`
+- **release_check.sh:** The script uses `declare -A` (bash 4+) which is unavailable on macOS system bash 3.2. Individual gates verified manually (Python, TS, ruff, banned-claims all pass).
+- **Version:** `v0.8-r-ux3` in README. Published package stays `v0.1.0a0` (no PyPI release yet).
+- **AGENTS.md active track:** Updated to reflect Phases 207–227 complete; v0.8-r-ux3 internal release milestone.
+
+**R-MOBILE-AUDIT → Polished Complete:** With Phase 227 evidence, all mobile SDK audit findings resolved and all mobile roadmap items elevated. The full Phases 207–227 elevation sprint is complete.

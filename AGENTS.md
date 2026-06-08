@@ -56,22 +56,28 @@ Raising the quality bar raises the **work required**, not the **words allowed**.
 - `scripts/check-banned-claims.sh` is authoritative for release-facing wording. "Production ready", "multi-user", "tenant-isolated", broad provider-backed SwarmGraph adoption, and production-grade sandbox/microVM execution stay forbidden until proven by tests and evidence.
 - ARC Studio stays a single-user, loopback-only alpha workstation tool until proven otherwise. The Definition of Done elevates engineering quality; it does not change the product's safety posture or unlock new product claims.
 
-## Active track (2026-06-07)
+## Active track (2026-06-08)
 
 The 2026-06-05 P0 hardening sprint (six five-way-audit items: SQLite budget-lock,
 TUI shell-escape fail-closed, orphan FastAPI quarantine, POST-only `/api/runs/start`,
 enforcement-surface refresh, profile schema version) is **complete**.
 
-Current track: **DoD elevation (R-POLISH1–18 / Phases 159–176).** Slices landed, each
-with cited evidence in `docs/phases.md`: security P0 batch (sensitive-file exclusion,
-provider/MCP/TUI redaction, proxy env + structured errors, run-ID guard), paid-call
-fail-closed default, CLI mutation confirmation gates, IDE honest states + per-tab
-ErrorBoundary + keybinding `when`-guards, TUI streaming refresh, async Node backend,
-bounded trace/event buffers, workspace-search confinement, profile-schema + IR-cycle
-guards, denial-events protocol typing (cross-language), real jest-axe a11y, and cleanup
-(dead `eval run` dedupe, `arc-studio-cli` entrypoint). Suite: 5600+ tests, ruff clean.
+The DoD elevation track (R-POLISH1–18 / Phases 159–176 + Phases 177–227) is **complete**
+for the v0.8-r-ux3 internal release. All 22 phases of the Phases 207–227 elevation sprint
+landed with cited per-gate DoD evidence:
 
-See `docs/phases.md` (Phases 159–176) and `docs/roadmap.md` (R-POLISH1–18) for status.
+- **Mobile SDK hardening** (Phases 207–222): `_Base` extra=forbid, write caps require trust,
+  TS type guards strengthened, Expo/RN package.json fixed, AUDIT_REPORT committed, R-AUDIT21
+  adapters widget moved to left panel (Polished Complete), bounded live event buffers,
+  Mobile DoD gates 1/3/6/7 evidenced, R-MOBILE-B5-P6/P8/CLI/HARDEN → Polished Complete.
+- **Roadmap elevations** (Phases 223–226): R3/R8/R9/R10/R14/R15/R18/R19/R20/R21/R25 →
+  Polished Complete with per-gate evidence.
+- **Infrastructure** (Phases 213–217): VercelGrepProvider gated, ContextPackEntry line_number,
+  README Mobile SDK section, --help parity.
+- **Release gate** (Phase 227): 6002 Python + 969 TS tests, ruff clean, banned-claims clean.
+  Version bumped to v0.8-r-ux3.
+
+See `docs/phases.md` (Phases 159–227) and `docs/roadmap.md` for full evidence records.
 
 ## Sandbox / microVM truth constraints (still in force)
 
