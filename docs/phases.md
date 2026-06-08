@@ -6443,3 +6443,10 @@ Driving the R-AUDIT audit-fix set to `Polished Complete` against the full DoD. *
 - **R-AUDIT24 (SDK Version Sweep):** ✓ `sdk_version()` on the base adapter + 8 priority adapters, surfaced in `arc runtimes --capabilities --json` (stable JSON parity); gate 3 + 4 (`tests/adapters/test_arc_runtime_sdk.py`). N/A 1,2,5,6,7.
 - **Evidence:** `test_swarmgraph_topology`, `test_eval_synthetic_labelling`, `test_arc_runtime_sdk` green.
 
+### Feature batch → Polished Complete
+
+- **R-AUDIT4 (config-service apiKeySource Snake/Camel Fix):** ✓ `api_key_source` fallback in `config-service.ts` so the IDE provider-source badge renders correctly (gate 1 UX) across snake/camel shapes (gate 3 parity); covered by the arc-extension suite (961 passed/3 skipped). N/A 5,6,7.
+- **R-AUDIT12 (UI Design Token Foundation):** ✓ `tokens.css` (color/spacing/typography/radius), additive; gate 8 (documented foundation) + build-clean. Per-theme **contrast** of token *values* is tracked separately (Tier-2 L-G2 theme-token audit), so no contrast claim is made here. N/A 1,3,5,6,7.
+- **R-AUDIT17 (R79 TUI/Theia Surfacing):** ✓ `/budget [run-id]` TUI slash command with wallet fallback when no run-id (explicit states); gate 1 + 3 (CLI↔TUI parity) + 4 (`tests/tui/test_budget_slash_command.py`). N/A 2,5,6,7.
+- **Evidence:** arc-extension suite green (R-AUDIT4); `tests/tui/test_budget_slash_command.py` green (R-AUDIT17); build clean (R-AUDIT12).
+
