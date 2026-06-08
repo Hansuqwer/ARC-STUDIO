@@ -62,22 +62,24 @@ The 2026-06-05 P0 hardening sprint (six five-way-audit items: SQLite budget-lock
 TUI shell-escape fail-closed, orphan FastAPI quarantine, POST-only `/api/runs/start`,
 enforcement-surface refresh, profile schema version) is **complete**.
 
-The DoD elevation track (R-POLISH1–18 / Phases 159–176 + Phases 177–227) is **complete**
-for the v0.8-r-ux3 internal release. All 22 phases of the Phases 207–227 elevation sprint
+The DoD elevation track (R-POLISH1–18 / Phases 159–176 + Phases 177–252) is **complete**
+for the v0.8-r-ux4 internal release. All 25 phases of the Phases 228–252 elevation sprint
 landed with cited per-gate DoD evidence:
 
-- **Mobile SDK hardening** (Phases 207–222): `_Base` extra=forbid, write caps require trust,
-  TS type guards strengthened, Expo/RN package.json fixed, AUDIT_REPORT committed, R-AUDIT21
-  adapters widget moved to left panel (Polished Complete), bounded live event buffers,
-  Mobile DoD gates 1/3/6/7 evidenced, R-MOBILE-B5-P6/P8/CLI/HARDEN → Polished Complete.
-- **Roadmap elevations** (Phases 223–226): R3/R8/R9/R10/R14/R15/R18/R19/R20/R21/R25 →
-  Polished Complete with per-gate evidence.
-- **Infrastructure** (Phases 213–217): VercelGrepProvider gated, ContextPackEntry line_number,
-  README Mobile SDK section, --help parity.
-- **Release gate** (Phase 227): 6002 Python + 969 TS tests, ruff clean, banned-claims clean.
-  Version bumped to v0.8-r-ux3.
+- **R-POLISH1–28 elevation** (Phases 228–231): All 28 R-POLISH items → Polished Complete
+  with per-gate DoD evidence. Security P0 batch, honest states, TUI streaming, MCP security,
+  paid-call gate, CLI mutation gate, bounded buffers, protocol parity, refactors.
+- **Mobile SDK elevation** (Phases 232–233): R-MOBILE-AUDIT/TS, B5-P9-10/P12a,
+  P11-12b/P12-20 → Polished Complete.
+- **Roadmap elevations** (Phases 234–249): R-CR-BACKLOG, R11-R77 (cost/packaging/native
+  runtime/trust/trace/HITL/memory/adapters/hardening), R39-R65 era batches, R-CLEAN1,
+  R-OPEN items → Polished Complete.
+- **Infrastructure** (Phases 250–251): B2P-17 terminal-gated honest no-op. Shared
+  `map_provider_error` extracted. `arc mobile gate check` alias added.
+- **Release gate** (Phase 252): 6003 Python + 969 TS tests, ruff clean, banned-claims clean.
+  Version bumped to v0.8-r-ux4.
 
-See `docs/phases.md` (Phases 159–227) and `docs/roadmap.md` for full evidence records.
+See `docs/phases.md` (Phases 159–252) and `docs/roadmap.md` for full evidence records.
 
 ## Sandbox / microVM truth constraints (still in force)
 

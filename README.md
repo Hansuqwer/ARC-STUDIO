@@ -9,7 +9,7 @@ arc          # launches the interactive Textual TUI
 arc serve    # starts the HTTP daemon on 127.0.0.1:7777
 ```
 
-**Current Release:** `v0.8-r-ux3` (internal track) · Published package: `v0.1.0a0`
+**Current Release:** `v0.8-r-ux4` (internal track) · Published package: `v0.1.0a0`
 
 > ⚠️ **Alpha software.** ARC Studio is a single-user local workstation tool. It is not production-grade, multi-tenant, or safe on shared hosts.
 

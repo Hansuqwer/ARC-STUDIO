@@ -7383,3 +7383,16 @@ All other B2P items have been elevated in prior phases (Phases 203-226) or are d
 - **Gate 3 (parity):** Both providers now use the same error-mapping logic. No behavior change — identical classification logic.
 - **Gate 4 (tests):** 516 provider tests passed; ruff clean. No regressions.
 - **N/A:** 1, 2, 5, 6, 7, 8.
+
+
+## Phase 252 — R-RELEASE-GATE: Release gate v0.8-r-ux4
+
+Final release gate for the Phases 228–252 elevation sprint.
+
+- **Python tests:** 6003 passed, 43 skipped, 7 xfailed, 1 xpassed. Zero unexpected failures. Snapshot xfailed are pre-existing (2 in tui/test_snapshots.py).
+- **TypeScript:** arc-extension build clean (tsc + copy-assets). 969 tests passed, 3 skipped (expected).
+- **ruff:** `uv run ruff check src tests` → `All checks passed!`
+- **banned-claims:** `bash scripts/check-banned-claims.sh README.md docs/roadmap.md docs/phases.md AGENTS.md` → `OK: No banned claims found.`
+- **Version:** `v0.8-r-ux4` in README. Published package stays `v0.1.0a0`.
+- **AGENTS.md active track:** Updated to reflect Phases 228–252 complete; v0.8-r-ux4 internal release milestone.
+- **Baseline Complete items remaining:** Only B2P-17 (terminal-gated: code-signing certs) and the ~190-row shipped-Baseline horizon (v0.1 posture items not yet evidence-gate-elevated to v0.2 Polished). No fabricated elevations.
