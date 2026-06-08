@@ -27,7 +27,7 @@ export class ArcAdaptersContribution extends AbstractViewContribution<ArcAdapter
         // Deep-link parity with the other ARC views (e.g. ?arc-view=event-stream).
         const params = new URLSearchParams(window.location.search);
         if (params.get('arc-view') === 'adapters') {
-            await this.openView({ activate: true });
+            await this.openView({ activate: true, reveal: true });
         }
     }
 }

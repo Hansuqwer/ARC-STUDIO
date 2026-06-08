@@ -6543,3 +6543,10 @@ Wired the e2e harness to open the ARC Studio view (`?arc-view=arc-studio` render
 
 **R-AUDIT21 (Accessibility Baseline Audit / adapters widget) — stays Baseline:** added a `?arc-view=adapters` deep-link to `ArcAdaptersContribution` (parity with other views), but the adapters widget — like the other non-tabbed `AbstractViewContribution` views — does not render via deep-link in the local e2e app mode (only the `arc-studio` tabbed view does). Its ARIA is in place; the rendered axe scan of the adapters widget remains pending the view being routable in the harness. The scan is wired and skips gracefully until then.
 
+
+### Phase 206 addendum — R-AUDIT21 adapters scan: investigated, stays Baseline (harness limitation)
+
+Tried to bring the adapters widget into the L-G1 rendered scan to reach 4/4. Added a `?arc-view=adapters` deep-link to `ArcAdaptersContribution` (parity with the other views; a real improvement) and confirmed the widget **is created/attached** (`#arc:adapters-status` in the DOM). But it stays **non-visible** in the headless e2e: it opens in the `area: 'main'` editor area, which the headless harness never activates (Lumino gives the inactive tab 0 size; `reveal: true` + removing the hidden classes did not lay it out). Only the `area: 'left'` `arc-studio` view renders via deep-link — so **all** ARC main-area views share this harness limitation, not the adapters widget specifically. axe skips non-laid-out elements, so the scan cannot measure it here.
+
+**Decision:** R-AUDIT21 stays **Baseline Complete** (its ARIA roles/labels are in place; the rendered color-contrast pass is the open item). Reaching 4/4 needs a deliberate choice — either move the adapters status view to the `left` panel (a product-placement decision, not a test hack) or enhance the harness to activate main-area widgets via the Theia shell. The scan is wired (`tests/e2e/arc-a11y-contrast.spec.ts`) and skips gracefully until then. **Contrast cluster: 3/4 closed (B2P-03, R-AUDIT23, R-AUDIT26).**
+
