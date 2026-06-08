@@ -27,7 +27,7 @@ arc serve    # starts the HTTP daemon on 127.0.0.1:7777
 | **Sandbox** | Policy-based command sandbox — deny-by-default, path confinement, env allowlist, audit chain |
 | **Isolation Backend** | Selectable execution isolation: `auto` / `none` / `subprocess` / `docker` (gated) / `microvm` (gated, macOS arm64 only) |
 | **Runtime Adapters** | SwarmGraph (native), LangGraph, CrewAI, OpenAI Agents SDK, AG2, LlamaIndex, LM Arena (stub) |
-| **MCP Control Plane** | Local stdio MCP server — 11 tools, 3 resources, task registry, per-call risk gate |
+| **MCP Control Plane** | Local stdio MCP server — 13 tools, 3 resources, task registry, per-call risk gate |
 | **Audit Chain** | HMAC-signed streaming audit verifier; `arc audit verify` CLI; 100 MB trace < 30s (tamper-evident for single-session local runs; does not protect against a local attacker with write access to ~/.arc/audit/) |
 | **Token-Saving Suite** | Wallet, budget enforcement, compaction, model picker, Chinese-labs support, opt-in cloud features |
 | **TUI Themes** | dark / light / mocha / latte / high-contrast / mono; live re-skin via `/theme`; `NO_COLOR` fallback |
@@ -282,7 +282,7 @@ uv run arc mcp decisions                   # view per-call audit log
 uv run arc mcp policy-explain              # explain risk policy
 ```
 
-- 11 tools, 3 resources, task registry with state machine and retry
+- 13 tools, 3 resources, task registry with state machine and retry
 - Per-call deterministic risk scorer (critical/high/medium/low) — no LLM judgment
 - Decisions logged to `~/.arc/audit/decisions.jsonl`
 - Stdio-only; no HTTP listener; no external server auto-start

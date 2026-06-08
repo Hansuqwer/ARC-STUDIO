@@ -6226,3 +6226,11 @@ Driving selected Batch 7 `Baseline Complete` items to `Polished Complete` agains
 - **Gate 8 (docs):** ✓ Module docstring states the key-gating + scope boundary; this entry + roadmap row; banned-claims clean.
 - **N/A:** 1 UX-states, 2 a11y, 5 perf — no user-visible surface (internal audit mechanism; checkpoint write is O(1) per run). 3 parity — no cross-surface equivalent action; verification is via `verify_hmac_chain`.
 
+### B2P-05 — SwarmGraph MCP tool wrappers → Polished Complete
+
+- **Gate 3 (parity):** ✓ `arc_swarmgraph_plan` / `arc_swarmgraph_assess_risk` and the CLI (`arc swarmgraph plan` / `assess-risk`) delegate to the **same** deterministic core (`swarmgraph.decomposition.plan_dag`, `swarmgraph.adaptive_consensus.assess_risk`). `tests/mcp/test_mcp_server.py::test_swarmgraph_mcp_cli_parity` asserts both surfaces import the shared core and that the MCP tools respond deterministically (`provider_backed: false`).
+- **Gate 4 (tests):** ✓ `uv run pytest tests/mcp/test_mcp_server.py` → 32 passed (registration + returns-JSON + parity for both tools).
+- **Gate 6 (security):** ✓ Both tools route through `_tool_result`, applying the D-02 deterministic (LLM-free) per-call risk gate (`decide_call`), persisting the decision + emitting the typed `MCP_CALL_DECISION` run-event, with a DENY path (allow/deny covered by existing decision-event tests). No provider calls.
+- **Gate 8 (docs):** ✓ Corrected the stale MCP tool count in README (**11 → 13 tools**, both occurrences) after T11 added the two SwarmGraph tools; this entry + roadmap row; banned-claims clean.
+- **N/A:** 1 UX-states, 2 a11y, 5 perf — no user-visible IDE/TUI surface (stdio MCP tools); plans/assessments are bounded deterministic in-process calls. 7 reliability — synchronous deterministic tool, no long-running/bridged action (errors surface as the structured `{ok:false}` envelope via `_tool_result`).
+

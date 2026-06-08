@@ -480,3 +480,40 @@ def test_arc_swarmgraph_assess_risk_tool(tmp_path: Path):
     assert parsed["ok"] is True
     assert "risk_level" in parsed["data"]
     assert parsed["data"]["provider_backed"] is False
+
+
+def test_swarmgraph_mcp_cli_parity(tmp_path: Path):
+    """Parity (gate 3): MCP tools and the CLI both delegate to the SAME deterministic core
+    (decomposition.plan_dag / adaptive_consensus.assess_risk); both surfaces respond
+    deterministically with no provider calls."""
+    import inspect
+
+    from agent_runtime_cockpit.cli import swarmgraph as cli_swarmgraph
+    from agent_runtime_cockpit.mcp import server as mcp_server
+    from agent_runtime_cockpit.mcp.server import create_mcp_server
+
+    trust_workspace(tmp_path, note="test")
+    server = create_mcp_server(workspace=tmp_path)
+
+    # both MCP tools respond deterministically (provider-free)
+    mcp_plan = json.loads(
+        _get_tool_fn(server, "arc_swarmgraph_plan")(task="build a REST API and write tests")
+    )["data"]
+    assert mcp_plan["planner"] == "deterministic" and mcp_plan["topological_order"]
+    assert mcp_plan["provider_backed"] is False
+    mcp_risk = json.loads(
+        _get_tool_fn(server, "arc_swarmgraph_assess_risk")(
+            task="delete prod db", target_runtime="production"
+        )
+    )["data"]
+    assert mcp_risk["risk_level"] and mcp_risk["provider_backed"] is False
+
+    # source parity: MCP server and CLI import the SAME deterministic core modules
+    server_src = inspect.getsource(mcp_server)
+    cli_src = inspect.getsource(cli_swarmgraph)
+    for core in (
+        "swarmgraph.decomposition import plan_dag",
+        "swarmgraph.adaptive_consensus import assess_risk",
+    ):
+        assert core in server_src, f"MCP server missing shared core: {core}"
+        assert core in cli_src, f"CLI missing shared core: {core}"
