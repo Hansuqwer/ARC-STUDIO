@@ -6450,3 +6450,13 @@ Driving the R-AUDIT audit-fix set to `Polished Complete` against the full DoD. *
 - **R-AUDIT17 (R79 TUI/Theia Surfacing):** ✓ `/budget [run-id]` TUI slash command with wallet fallback when no run-id (explicit states); gate 1 + 3 (CLI↔TUI parity) + 4 (`tests/tui/test_budget_slash_command.py`). N/A 2,5,6,7.
 - **Evidence:** arc-extension suite green (R-AUDIT4); `tests/tui/test_budget_slash_command.py` green (R-AUDIT17); build clean (R-AUDIT12).
 
+### Kept at Baseline Complete (documented gaps) — labels follow evidence
+
+- **R-AUDIT16 (IDE Context Drawer / AGENTS.md Surface):** the `ArcContextDrawer` has correct loading/empty/error states but **no producer wiring** — it always renders the empty state because no backend discovers AGENTS.md. Gate 1 producer-truth unmet. **Closure:** wire it to a real `arc agents-md discover` producer (relates to Tier-2 L-D3 context packing).
+- **R-AUDIT18 (Workspace Search CLI + IDE Panel):** the `arc workspace search` CLI is done + tested, but the row's **IDE panel** does not exist. **Closure:** build the IDE search panel with full states (relates to Tier-2 L-D2). The CLI portion is solid; the row stays Baseline until the IDE panel ships.
+- **R-AUDIT21 (Accessibility Baseline Audit):** ARIA roles/labels landed, but `accessibility-baseline.md` states the **axe-core pass is deferred / not automated**. Gate 2 automated check unmet. **Closure:** Tier-2 **L-G1** (Playwright + axe layout-capable harness).
+- **R-AUDIT23 (SwarmGraph Insight UI Components):** `DagPlannerViz`/`ConsensusEvidenceCard`/`HitlApprovalPanel` render + have tests, but they introduce custom `--arc-color-*` colors whose **contrast can't be measured in jsdom**. Gate 2 contrast unmet. **Closure:** Tier-2 **L-G1 + L-G2**.
+- **R-AUDIT25 (Multi-Provider Router Abstraction):** `ProviderRouter` is implemented + tested behind `ARC_ENABLE_PROVIDER_ROUTER=1`, but it is **not wired into the runtime router / executor** (turn-manager wiring is follow-on) — its value isn't realized. **Closure:** a scoped wiring phase (analogous to B2P-09).
+
+**Tier 1 result:** 20 of 25 R-AUDIT items → `Polished Complete`; 5 stay `Baseline Complete` with the documented gaps + closure paths above.
+
