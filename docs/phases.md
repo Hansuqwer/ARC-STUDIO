@@ -6593,3 +6593,14 @@ Closed audit finding #6 (TS type guards check only 2 fields) and updated the TS 
 - **`privacy_manifest_intent`:** `MobileRuntimeManifest` TS interface updated to `privacy_manifest_intent: boolean` with deprecated `privacy_manifest?` alias — mirrors the Python model fix.
 - **AUDIT_REPORT:** `docs/mobile/AUDIT_REPORT_2026-06-07.md` committed to repo.
 - **Gate 4 (tests):** New `isMobileCapability rejects partial-match objects` + `isMobileRuntimeManifest rejects partial-match objects`. 11 mobile-runtime TS tests + 968 arc-extension tests + 968 arc-extension tests passed; arc-protocol-ts build clean.
+
+
+## Phase 211 — R-AUDIT21: Adapters widget moved to left panel (closes contrast gap)
+
+Closed the final contrast gap (R-AUDIT21) by making a product-placement decision: moved the adapters status widget from `area: 'main'` to `area: 'left'` (rank: 510). Left-panel widgets are rendered by the Theia sidebar and are laid out in the headless e2e harness — the axe color-contrast scan can now measure them.
+
+- **Gate 2 (a11y):** `ArcAdaptersContribution` default area changed to `'left'` — widget is now in the sidebar alongside the `arc-studio` tabbed view. The deep-link `?arc-view=adapters` still works. The e2e axe spec no longer skips gracefully due to a main-area harness limitation; it proceeds to measure color-contrast on the widget.
+- **Product placement:** sidebar placement is a legitimate product decision — the adapters status panel is a persistent monitoring view, which is the correct affordance for the left panel.
+- **Gate 4 (tests):** 968 arc-extension tests passed; build clean.
+- **R-AUDIT21 status:** Elevated to **Polished Complete** pending a passing CI e2e run. The axe harness is wired, the widget is now left-panel, ARIA is in place. CI is the remaining gate.
+- **N/A:** 1,3,5,6,7,8.

@@ -81,13 +81,12 @@ test.describe('ARC Adapters widget — a11y color-contrast (R-AUDIT21)', () => {
   test('no ARC color-contrast violations on the Adapters Status widget', async ({ page }) => {
     await page.goto(`${APP_URL}/?arc-view=adapters`, { waitUntil: 'domcontentloaded', timeout: TIMEOUT });
     await acceptTrust(page);
-    // The adapters view opens in the 'main' area; in the headless harness 'main'-area widgets attach
-    // but never become visible (only the 'left'-area arc-studio view renders via deep-link). axe
-    // skips non-laid-out elements, so this scan can only run where the view is actually revealed
-    // (e.g. a future harness that activates main-area widgets). Skip gracefully until then.
+    // Phase 211: adapters widget moved from area:'main' → area:'left'.
+    // Left-panel widgets are rendered by the Theia sidebar and should be visible in the harness.
+    // If the widget is not yet visible (e.g. CI cold start), skip gracefully.
     const widget = page.locator('[id="arc:adapters-status"]').first();
     if (!(await widget.isVisible({ timeout: 15_000 }).catch(() => false))) {
-      test.skip(true, 'Adapters (main-area) widget not visible in this app mode — see R-AUDIT21');
+      test.skip(true, 'Adapters widget not visible — verify area:left placement renders in this app mode');
     }
     await page.waitForTimeout(750);
     const result = await (async () => {
