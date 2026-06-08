@@ -7,43 +7,27 @@
 
 import * as React from '@theia/core/shared/react';
 import type { ArcService, EditPlanInfo } from '../../common/arc-protocol';
+import { useAsyncState } from '../hooks/useAsyncState';
 
 export interface EditPlansTabProps {
     arcService: ArcService;
 }
 
 export const EditPlansTab: React.FC<EditPlansTabProps> = ({ arcService }) => {
-    const [plans, setPlans] = React.useState<EditPlanInfo[]>([]);
+    const { data: plansResult, loading, error, reload: load } = useAsyncState(
+        () => arcService.listEditPlans(50),
+        [arcService],
+    );
+    const plans = plansResult?.plans ?? [];
     const [selected, setSelected] = React.useState<EditPlanInfo | null>(null);
     const [token, setToken] = React.useState('');
     const [content, setContent] = React.useState('');
     const [diff, setDiff] = React.useState<string | null>(null);
-    const [loading, setLoading] = React.useState(true);
     const [message, setMessage] = React.useState<string | null>(null);
-    const [error, setError] = React.useState<string | null>(null);
-
-    const load = React.useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const result = await arcService.listEditPlans(50);
-            setPlans(result.plans);
-            if (result.plans.length && !selected) {
-                setSelected(result.plans[0]);
-            }
-        } catch (err: any) {
-            setError(err.message || 'Failed to load edit plans');
-        } finally {
-            setLoading(false);
-        }
-    }, [arcService, selected]);
-
-    React.useEffect(() => {
-        load();
-    }, [load]);
+    const [mutationError, setMutationError] = React.useState<string | null>(null);
 
     const showPlan = async (planId: string) => {
-        setError(null);
+        setMutationError(null);
         setMessage(null);
         try {
             const plan = await arcService.showEditPlan(planId);
@@ -51,37 +35,37 @@ export const EditPlansTab: React.FC<EditPlansTabProps> = ({ arcService }) => {
             const diffResult = await arcService.diffEditPlan(planId, 131072);
             setDiff(diffResult.binary ? 'Binary diff blocked.' : diffResult.diff + (diffResult.diff_truncated ? '\n[diff truncated]' : ''));
         } catch (err: any) {
-            setError(err.message || 'Failed to show edit plan');
+            setMutationError(err.message || 'Failed to show edit plan');
         }
     };
 
     const apply = async () => {
         if (!selected || !token.trim()) {
-            setError('Approval token required.');
+            setMutationError('Approval token required.');
             return;
         }
-        setError(null);
+        setMutationError(null);
         try {
             const result = await arcService.applyEditPlan(selected.plan_id, content, token.trim());
             setMessage(result.applied ? `Applied ${selected.plan_id} transaction ${result.transaction_id || 'n/a'}.` : `Not applied: ${result.reason}`);
-            await load();
+            load();
         } catch (err: any) {
-            setError(err.message || 'Failed to apply edit plan');
+            setMutationError(err.message || 'Failed to apply edit plan');
         }
     };
 
     const approve = async () => {
         if (!selected || !token.trim()) {
-            setError('Approval token required.');
+            setMutationError('Approval token required.');
             return;
         }
-        setError(null);
+        setMutationError(null);
         try {
             const result = await arcService.approveEditPlan(selected.plan_id, token.trim());
             setMessage(`Approved ${result.plan_id}. Apply still uses existing CLI hash/staleness checks.`);
             setToken('');
         } catch (err: any) {
-            setError(err.message || 'Failed to approve edit plan');
+            setMutationError(err.message || 'Failed to approve edit plan');
         }
     };
 
@@ -96,6 +80,7 @@ export const EditPlansTab: React.FC<EditPlansTabProps> = ({ arcService }) => {
             </p>
             {loading && <p className='arc-edit-plans__loading'>Loading saved edit plans...</p>}
             {error && <div className='arc-edit-plans__error' role='alert'>Error: {error}</div>}
+            {mutationError && <div className='arc-edit-plans__error' role='alert'>Error: {mutationError}</div>}
             {message && <div className='arc-edit-plans__message' role='status'>{message}</div>}
             {!loading && plans.length === 0 && <p className='arc-edit-plans__empty'>No saved edit plans.</p>}
             {!loading && plans.length > 0 && (

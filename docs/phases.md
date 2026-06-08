@@ -6604,3 +6604,14 @@ Closed the final contrast gap (R-AUDIT21) by making a product-placement decision
 - **Gate 4 (tests):** 968 arc-extension tests passed; build clean.
 - **R-AUDIT21 status:** Elevated to **Polished Complete** pending a passing CI e2e run. The axe harness is wired, the widget is now left-panel, ARIA is in place. CI is the remaining gate.
 - **N/A:** 1,3,5,6,7,8.
+
+
+## Phase 212 — R-POLISH20 cont.: Broaden useAsyncState adoption — EditPlansTab
+
+Extended the shared `useAsyncState` hook (introduced in Phase 178) to `EditPlansTab`:
+
+- **`EditPlansTab`:** Initial load triple (`loading`/`error`/`plans` useState+useEffect+setLoading) replaced with `useAsyncState(() => arcService.listEditPlans(50), [arcService])`. Mutation errors (showPlan/apply/approve) use a separate `mutationError` state (they are user-triggered, not async-initial). `load` is now the hook's `reload` callback.
+- **Contract:** `studio-tabs.contract.test.ts` updated to assert `EditPlansTab` uses `useAsyncState`. 4 tabs now use the shared hook: TestBenchTab, CiGuardrailsTab, McpWorkbenchTab, EditPlansTab.
+- **Remaining (intentionally deferred):** AssuranceTab (4 independent async flows, high render-ripple risk), SwarmGraphInsightTab (2 interdependent triples — selection drives detail load), ChatTab (streaming, not a simple async-initial).
+- **Gate 4 (tests):** 969 arc-extension tests passed; build clean.
+- **N/A:** 1,2,3,5,6,7,8.

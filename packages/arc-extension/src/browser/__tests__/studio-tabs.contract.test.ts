@@ -81,6 +81,11 @@ describe('Studio Tabs Contracts', () => {
             expect(source).toMatch(/applyEditPlan/);
             expect(source).toMatch(/Python sandbox and ARC transaction gates/);
         });
+
+        it('should manage initial load state via the shared useAsyncState hook', () => {
+            // CR-029: EditPlansTab load triple migrated to the shared useAsyncState hook.
+            expect(source).toMatch(/useAsyncState/);
+        });
     });
 
     describe('CommandCentreTab', () => {
