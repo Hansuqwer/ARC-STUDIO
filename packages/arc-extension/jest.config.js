@@ -30,6 +30,8 @@ module.exports = {
         '!src/**/node_modules/**'
     ],
     moduleNameMapper: {
-        '\\.(css|less|scss|sass)$': 'identity-obj-proxy'
+        '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+        '^@theia/core/shared/react$': 'react',
+        '^@theia/core/shared/react-dom$': 'react-dom'
     }
 };
