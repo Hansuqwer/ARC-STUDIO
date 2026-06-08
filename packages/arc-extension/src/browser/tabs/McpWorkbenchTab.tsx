@@ -7,7 +7,7 @@
  */
 
 import * as React from '@theia/core/shared/react';
-import type { ArcService, McpDecisionEntry, McpWorkbenchStatus } from '../../common/arc-protocol';
+import type { ArcService, McpDecisionEntry, McpWorkbenchStatus, McpToolInvokeResult } from '../../common/arc-protocol';
 import { useAsyncState } from '../hooks/useAsyncState';
 import { riskBadgeVariant } from './mcp-risk';
 
@@ -26,6 +26,43 @@ export const McpWorkbenchTab: React.FC<McpWorkbenchTabProps> = ({ arcService }) 
 
     const [decisions, setDecisions] = React.useState<McpDecisionEntry[]>([]);
     const [decisionsLoading, setDecisionsLoading] = React.useState(false);
+
+    // B2P-04b: in-IDE MCP tool invocation (loopback, risk-gated via the backend).
+    const [invokeTool, setInvokeTool] = React.useState('');
+    const [invokeArgs, setInvokeArgs] = React.useState('{}');
+    const [invoking, setInvoking] = React.useState(false);
+    const [invokeResult, setInvokeResult] = React.useState<McpToolInvokeResult | null>(null);
+    const [invokeError, setInvokeError] = React.useState<string | null>(null);
+
+    const runInvoke = React.useCallback(async () => {
+        const tool = invokeTool.trim();
+        if (!tool) {
+            return;
+        }
+        let parsedArgs: Record<string, unknown>;
+        try {
+            parsedArgs = invokeArgs.trim() ? JSON.parse(invokeArgs) : {};
+        } catch {
+            setInvokeResult(null);
+            setInvokeError('Arguments must be valid JSON.');
+            return;
+        }
+        // Invoking a tool executes it (risk-gated): confirm first.
+        // eslint-disable-next-line no-alert
+        if (!window.confirm(`Invoke MCP tool "${tool}" through the risk gate?`)) {
+            return;
+        }
+        setInvoking(true);
+        setInvokeError(null);
+        setInvokeResult(null);
+        try {
+            setInvokeResult(await arcService.invokeMcpTool(tool, parsedArgs));
+        } catch (e) {
+            setInvokeError(e instanceof Error ? e.message : String(e));
+        } finally {
+            setInvoking(false);
+        }
+    }, [arcService, invokeTool, invokeArgs]);
 
     const loadDecisions = React.useCallback(async () => {
         setDecisionsLoading(true);
@@ -128,6 +165,60 @@ export const McpWorkbenchTab: React.FC<McpWorkbenchTabProps> = ({ arcService }) 
                         ))}
                     </ul>
                 )}
+            </section>
+
+            <section className='arc-mcp-workbench__section'>
+                <h4>Invoke Tool</h4>
+                <div className='arc-mcp-workbench__invoke'>
+                    <label className='arc-mcp-workbench__label' htmlFor='mcp-invoke-tool'>Tool</label>
+                    <select
+                        id='mcp-invoke-tool'
+                        value={invokeTool}
+                        onChange={e => setInvokeTool(e.target.value)}
+                    >
+                        <option value=''>Select a tool…</option>
+                        {status.tools.map((t, i) => (
+                            <option key={i} value={t}>{t}</option>
+                        ))}
+                    </select>
+                    <label className='arc-mcp-workbench__label' htmlFor='mcp-invoke-args'>Arguments (JSON)</label>
+                    <textarea
+                        id='mcp-invoke-args'
+                        className='arc-mcp-workbench__args'
+                        value={invokeArgs}
+                        onChange={e => setInvokeArgs(e.target.value)}
+                        rows={3}
+                        spellCheck={false}
+                    />
+                    <button
+                        className='arc-mcp-workbench__invoke-btn'
+                        disabled={!invokeTool || invoking}
+                        aria-label={`Invoke MCP tool ${invokeTool || ''}`}
+                        onClick={runInvoke}
+                    >
+                        {invoking ? 'Invoking…' : 'Invoke (risk-gated)'}
+                    </button>
+                    {invokeError && (
+                        <div className='arc-mcp-workbench__invoke-error' role='alert'>Error: {invokeError}</div>
+                    )}
+                    {invokeResult && (
+                        <div
+                            className={`arc-mcp-workbench__invoke-result arc-mcp-workbench__invoke-result--${invokeResult.ok ? 'ok' : 'denied'}`}
+                            role='status'
+                        >
+                            <div>
+                                <strong>{invokeResult.ok ? 'OK' : 'Denied / failed'}</strong>
+                                {invokeResult.riskLevel && (
+                                    <span className='arc-mcp-workbench__badge'> risk:{invokeResult.riskLevel}</span>
+                                )}
+                            </div>
+                            {invokeResult.error && <div>{invokeResult.error}</div>}
+                            {invokeResult.ok && (
+                                <pre className='arc-mcp-workbench__invoke-data'>{JSON.stringify(invokeResult.data, null, 2)}</pre>
+                            )}
+                        </div>
+                    )}
+                </div>
             </section>
 
             <section className='arc-mcp-workbench__section'>
