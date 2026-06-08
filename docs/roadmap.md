@@ -61,11 +61,11 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 
 | ID | Title | Status |
 |---|---|---|
-| R14 | Streaming Audit Verification + HMAC Signing | Baseline Complete |
-| R15 | Discriminated RunEvent Unions + Protocol Conformance | Baseline Complete |
+| R14 | Streaming Audit Verification + HMAC Signing | Polished Complete |
+| R15 | Discriminated RunEvent Unions + Protocol Conformance | Polished Complete |
 | R16 | Enforced Workspace Trust + Paid-Call Gates | Baseline Complete; Active Hardening |
 | R17 | Trace Viewer Virtualization + Daemon Resilience | Baseline Complete |
-| R18 | CLI Decomposition + Stable JSON Contracts | Baseline Complete |
+| R18 | CLI Decomposition + Stable JSON Contracts | Polished Complete |
 | R19 | MCP Local Control Plane for ARC | Baseline Complete |
 | R20 | MCP Tasks for Async Execution | Baseline Complete |
 | R21 | LangGraph Durable Execution + Replay Contract | Baseline Complete |

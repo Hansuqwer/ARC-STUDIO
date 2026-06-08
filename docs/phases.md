@@ -6792,3 +6792,41 @@ Same gate evidence as R3 (R8 is the IDE-facing completion of R3): ConfigTab full
 - **Gate 6 (security):** Doctor never exposes secrets or keys. Local read-only.
 - **Gate 7 (reliability):** Doctor subsystems fail gracefully (degraded state, not crash). Error per subsystem, not global failure.
 - **Gate 8 (docs):** README doctor section. `arc doctor all --help`. ADR-009 in docs/research. Banned-claims clean.
+
+
+## Phase 224 — R-AUDIT-SWEEP2: Baseline→Polished: R14/R15/R18
+
+Evidence-based elevation for three roadmap items.
+
+### R14 (Streaming Audit Verification + HMAC Signing) → Polished Complete
+
+- **Gate 1 (UX states):** `arc audit verify <run-id>` outputs structured JSON with ok/error/tamper-detected states. `arc doctor all --json` includes audit chain status.
+- **Gate 2 (a11y):** N/A — CLI/daemon surface.
+- **Gate 3 (parity):** HMAC signing and `arc audit verify` match across Python and TypeScript (cross-language parity test, R-POLISH16 Phase 174). Streaming verifier and CLI verifier agree.
+- **Gate 4 (tests):** Phase 21 + Phase 174 HMAC tests. Python audit tests passing (5980+ test suite). Trail hash + prev_event_hash chain tests (Phase 195 mobile, same algorithm).
+- **Gate 5 (perf):** README: "100 MB trace < 30s". Streaming verifier (no full-load before verify).
+- **Gate 6 (security):** HMAC is deterministic (SHA-256, no LLM). Tamper detection: hash chain broken → exit 1. Scope caveat in README + SECURITY.md (Phase 159/177 R-AUDIT13).
+- **Gate 7 (reliability):** Streaming verifier handles partial traces. Error on corrupted input.
+- **Gate 8 (docs):** README Audit Chain section with scope caveat. SECURITY.md. `--help` on `arc audit verify`. Banned-claims clean.
+
+### R15 (Discriminated RunEvent Unions + Protocol Conformance) → Polished Complete
+
+- **Gate 1 (UX states):** TypedRunEvent consumer migration: event type shown correctly in TUI/IDE (not raw objects). R-POLISH16 denial events (Phase 174) surfaced in IDE event stream.
+- **Gate 2 (a11y):** N/A — protocol layer.
+- **Gate 3 (parity):** Cross-language parity: Python `KnownRunEvent` union ↔ TypeScript `KNOWN_RUN_EVENT_TYPES` + interfaces. Parity guard test (Phase 174 R-POLISH16). 5 denial events added to both sides simultaneously.
+- **Gate 4 (tests):** Python protocol 73 + TS protocol 155 tests (Phase 174). Parity 7 tests. `TypedRunEvent` exported alongside legacy for backward compatibility.
+- **Gate 5 (perf):** Discriminated unions enable fast type narrowing without runtime overhead.
+- **Gate 6 (security):** Denial events (TRUST/PAID_CALL/SHELL/NETWORK/PERMISSION_DENIED) in the typed union ensure denials are protocol-typed (not just logged). No LLM-based security decisions.
+- **Gate 7 (reliability):** `RAW` fallback for unknown event types (backward compat). Circular import resolved via TYPE_CHECKING.
+- **Gate 8 (docs):** Protocol documented in `arc-protocol.ts` and `schemas.py`. Event registry regenerated. Banned-claims clean.
+
+### R18 (CLI Decomposition + Stable JSON Contracts) → Polished Complete
+
+- **Gate 1 (UX states):** All CLI commands return structured JSON via `ok()`/`err()` envelopes. No silent stdout without structure.
+- **Gate 2 (a11y):** N/A — CLI.
+- **Gate 3 (parity):** 15 command modules maintain identical command parity (Phase 185 R-POLISH27 verified 30 commands identical). JSON output stable: snapshot tests for key commands.
+- **Gate 4 (tests):** CLI snapshot tests (tests/cli/test_cli_snapshots.py 5 passed). 163 CLI tests + 359 broad sweep (Phase 185). All group --help verified identical.
+- **Gate 5 (perf):** 4225-line cli.py → 15 modules. Lazy imports in command bodies reduce startup cost.
+- **Gate 6 (security):** `--yes` gate on `sandbox audit-compact` (Phase 164 R-POLISH6). Secrets not echoed in CLI output.
+- **Gate 7 (reliability):** Thin aggregator pattern — module failures isolated. Structured error envelopes on all commands.
+- **Gate 8 (docs):** `uv run arc --help` shows all commands. README CLI Reference. Banned-claims clean.
