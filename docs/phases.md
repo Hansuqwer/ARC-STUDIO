@@ -6171,3 +6171,13 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: commits e12484e / c0318dc / f39fbf5 / a70484a + this; 6 confirmation + 5 budget-gate + 3 keyed-audit + 25 task-executor tests | Notes: deterministic; none-posture. The non-negotiable scope boundary stands — **no adapter-wide keyed-audit claim**; per-run-path adoption of the shared helper proceeds incrementally.
 
 ---
+
+## Phase 200 — Batch 7 Track E: eval artifacts, memory wiring, advisory lock + write bridge (T20–T25)
+
+- **T20–T22 (B2P-11):** versioned eval artifact schema + Inspect-AI export (`arc eval export`) + two-run compare (`arc eval compare`) — verified already implemented; added `schema_version`; stale "deferred" notes corrected.
+- **T23 (B2P-12):** opt-in redaction-first memory extraction wired into the run path (`ARC_MEMORY_AUTO_EXTRACT`, default off; Redactor before node-build).
+- **T24/T25 (B2P-13):** advisory lock primitive (`storage/advisory_lock.py`, fcntl; explicit contended-timeout + no-stale-reacquire tests) + IDE session write bridge on the lock (`arc studio sessions write`, Phase 46) — verified; Phase-42 deferral note corrected.
+
+**Status:** Baseline Complete | Evidence: commits 45a0a28 / 63c67c4 + this; 20 eval + 2 memory + 3 advisory-lock + 34 lock/write-bridge tests | Notes: deterministic; none-posture; dedicated HTTP/SSE endpoints stay out of scope.
+
+---
