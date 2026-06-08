@@ -329,9 +329,11 @@ export const SwarmGraphInsightTab: React.FC<SwarmGraphInsightTabProps> = ({ arcS
                 if (isTraceEvent(chunk.event)) {
                     setLiveEvents(current => {
                         const next = [...current, chunk.event as TraceEvent];
-                        setInsight(buildSwarmGraphInsight(buildActiveTrace(runId, next)));
+                        // Bounded buffer — cap at 2000, keep newest (R-PERF1).
+                        const bounded = next.length > 2000 ? next.slice(next.length - 2000) : next;
+                        setInsight(buildSwarmGraphInsight(buildActiveTrace(runId, bounded)));
                         setInsightSource('live-stream');
-                        return next;
+                        return bounded;
                     });
                 }
                 if (chunk.done) {

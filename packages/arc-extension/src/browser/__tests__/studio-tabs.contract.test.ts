@@ -1169,7 +1169,7 @@ describe('Studio Tabs Contracts', () => {
             expect(insightSource).toMatch(/setInsightSource\('stored-trace'\)/);
             expect(insightSource).toMatch(/setLiveEvents\(\[\]\)/);
             expect(insightSource).toMatch(/setInsightSource\('live-stream'\)/);
-            expect(insightSource).toMatch(/setInsight\(buildSwarmGraphInsight\(buildActiveTrace\(runId, next\)\)\)/);
+            expect(insightSource).toMatch(/setInsight\(buildSwarmGraphInsight\(buildActiveTrace\(runId, bounded\)\)\)/);
             expect(insightSource).toMatch(/Insight source: stored trace replay\/read; not live\./);
             expect(insightSource).toMatch(/Insight source: live Python SSE events captured in memory/);
             expect(insightSource).toMatch(/setLiveState\('disconnected'\)/);

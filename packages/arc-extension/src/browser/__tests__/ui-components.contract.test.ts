@@ -601,7 +601,8 @@ describe('ArcRunTimelineWidget', () => {
 
     it('should append live events separately from selected replay trace', () => {
         expect(source).toMatch(/protected liveEvents: TraceEvent\[\] = \[\]/);
-        expect(source).toMatch(/this\.liveEvents = \[\.\.\.this\.liveEvents, event\]/);
+        // Bounded buffer (R-PERF1): liveEvents capped at MAX_LIVE_EVENTS, not unbounded append.
+        expect(source).toMatch(/MAX_LIVE_EVENTS/);
         expect(source).toMatch(/\[\.\.\.trace\.events, \.\.\.this\.liveEvents\]/);
     });
 

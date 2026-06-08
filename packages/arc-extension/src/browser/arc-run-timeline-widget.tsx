@@ -4,6 +4,9 @@ import { inject, injectable, postConstruct } from '@theia/core/shared/inversify'
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { ActiveTraceEventChunk, ArcService, TraceData, TraceEvent, TraceFile } from '../common/arc-protocol';
 
+/** Maximum live events to buffer in memory; oldest are evicted beyond this cap (R-PERF1). */
+const MAX_LIVE_EVENTS = 2000;
+
 const EVENT_ICONS: Record<string, string> = {
     RUN_STARTED: '>',
     RUN_COMPLETED: 'OK',
@@ -110,7 +113,11 @@ export class ArcRunTimelineWidget extends ReactWidget {
                 if (!event) {
                     continue;
                 }
-                this.liveEvents = [...this.liveEvents, event];
+                const next = [...this.liveEvents, event];
+                // Bounded buffer — cap at MAX_LIVE_EVENTS, keep newest (R-PERF1).
+                this.liveEvents = next.length > MAX_LIVE_EVENTS
+                    ? next.slice(next.length - MAX_LIVE_EVENTS)
+                    : next;
                 this.streamStatus = TERMINAL_EVENT_TYPES.has(event.type) ? 'live-terminal' : 'live-active';
                 this.update();
                 if (TERMINAL_EVENT_TYPES.has(event.type)) {

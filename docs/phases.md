@@ -6635,3 +6635,14 @@ Executed the next safe slice from the cleanup-refactor backlog (slice 24 / P1):
 - **`LocalRepoProvider`:** `_extract_snippet` updated to return `(snippet, 1-based_line_number)` tuple; `line_number` populated in the returned `ContextPackEntry`. Previously the start line of the best-scoring snippet was computed but discarded.
 - **Gate 4 (tests):** `tests/context/test_context_pack_line_number.py` — 3 tests (field present, optional, provider populates). All passed. Ruff clean.
 - **N/A:** 1,2,3,5,6,7,8.
+
+
+## Phase 215 — R-PERF1: Bound live event buffers in ArcRunTimelineWidget + SwarmGraphInsightTab
+
+B2P-02 typed-event migration was already Polished Complete (clarification recorded in phases.md Phase 203). Phase 215 executes the next concrete improvement — bounding the previously unbounded live event buffers:
+
+- **`arc-run-timeline-widget.tsx`:** `connectLiveStream()` was accumulating live events with `this.liveEvents = [...this.liveEvents, event]` unbounded (no cap). Added `MAX_LIVE_EVENTS = 2000` constant and cap logic: oldest events evicted when exceeded, keeping newest. Mirrors the existing `MAX_LIVE_EVENTS` pattern in `arc-event-stream-widget.tsx` (Phase 167).
+- **`SwarmGraphInsightTab.tsx`:** `setLiveEvents(current => [...current, event])` was also unbounded. Capped at 2000 with `bounded = next.length > 2000 ? next.slice(...)  : next`; `setInsight` now uses `bounded` not `next`.
+- **Gate 5 (performance):** In-memory live event buffers now bounded at 2000 events in all three live-streaming widgets. No async filesystem I/O added.
+- **Gate 4 (tests):** Contract tests updated to reflect bounded-buffer pattern. 969 arc-extension tests passed; build clean.
+- **N/A:** 1,2,3,6,7,8.
