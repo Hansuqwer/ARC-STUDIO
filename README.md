@@ -341,6 +341,8 @@ uv run arc hitl pending
 # Evaluation & CI
 uv run arc eval run --batch
 uv run arc eval recommend-apply --profile <id> --dry-run
+uv run arc eval export <run-id> --format inspect    # Inspect-AI-compatible artifact export
+uv run arc eval compare <run-a> <run-b>             # two-run report comparison (JSON)
 uv run arc ci check --json --private
 uv run arc ci summary --format markdown
 

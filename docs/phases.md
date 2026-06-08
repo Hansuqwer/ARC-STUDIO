@@ -6267,3 +6267,10 @@ Verify-first DoD audit: **not elevated** — the row's specific claim ("real-tim
 - **The gap:** The shared adapter hook `adapters/_shared.budget_checkpoint` (B2P-09a) + its exhaustion-interrupt tests (`tests/adapters/test_budget_checkpoint.py`) exist, but **no adapter calls it** — per-adapter adoption is blocked because a `BudgetEnforcer` cannot be threaded through the trace-serialized adapter params (T18). Until at least one adapter enforces per-effect via `budget_checkpoint`, the "at adapter effect boundaries" claim is not met.
 - **Decision:** Stays **Baseline Complete**. Closing the gap requires plumbing an enforcer into the adapter execution context (an `L`-effort change), deferred — not a polish-pass additive fix.
 
+### B2P-11 — eval artifact schema + Inspect export + two-run compare → Polished Complete
+
+- **Gate 3 (parity):** ✓ Stable, cross-tool-compatible surfaces: `EvalArtifact` (versioned `schema_version`) at a repeatable path (`_artifact_path`), `build_inspect_export` (Inspect-AI-compatible JSON), `diff_runs` (two-run compare); exposed via `arc eval export --format inspect` + `arc eval compare` with stable JSON output.
+- **Gate 4 (tests):** ✓ `uv run pytest tests/evals/` → 116 passed (incl. `test_eval_artifact_b2p11`, trending, diff).
+- **Gate 8 (docs):** ✓ Added `arc eval export` / `arc eval compare` to the README CLI reference; stale "deferred" eval notes were corrected in T20–22; this entry; banned-claims clean.
+- **N/A:** 1 UX-states, 2 a11y — CLI/JSON surface (covered by stable output). 5 perf (bounded artifact I/O), 6 security (no paid call; local artifacts), 7 reliability (synchronous file ops).
+

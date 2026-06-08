@@ -190,7 +190,7 @@ GATED items (auth / native-device / paid-live provider / Linux-KVM host) are int
 | B2P-08 | Runtime-wide high/critical confirmation enforcement | Polished Complete | 6 · M |
 | B2P-09 | Real-time budget enforcement at adapter effect boundaries | Baseline Complete | 5,6,7 · L |
 | B2P-10 | Type the intentionally-untyped run events | Polished Complete | 4 · S |
-| B2P-11 | Eval artifact schema + Inspect-AI export + two-run report compare | Baseline Complete | 3,4,8 · M |
+| B2P-11 | Eval artifact schema + Inspect-AI export + two-run report compare | Polished Complete | 3,4,8 · M |
 | B2P-12 | Memory runtime wiring (extract/query during runs, redaction-first) | Baseline Complete | 3,4 · M |
 | B2P-13 | IDE write bridge (Phase 42; depends on advisory lock) | Baseline Complete | 6,7 · M |
 | B2P-17 | Full Electron app packaging (browser stays canonical) | Baseline Complete | 4,8 · L |
