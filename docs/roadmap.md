@@ -194,7 +194,7 @@ GATED items (auth / native-device / paid-live provider / Linux-KVM host) are int
 | B2P-12 | Memory runtime wiring (extract/query during runs, redaction-first) | Baseline Complete | 3,4 · M |
 | B2P-13 | IDE write bridge (Phase 42; depends on advisory lock) | Baseline Complete | 6,7 · M |
 | B2P-17 | Full Electron app packaging (browser stays canonical) | Not Started | 4,8 · L |
-| B2P-18 | Doctor/daemon parity remainder (resolve fate-labeled orphan routes) | Not Started | 3,8 · M |
+| B2P-18 | Doctor/daemon parity remainder (resolve fate-labeled orphan routes) | Baseline Complete | 3,8 · M |
 | B2P-19 | Keyed audit material across every adapter run path | Baseline Complete | 4,6 · M |
 
 ---
