@@ -39,3 +39,22 @@ def test_exhaustion_interrupt_propagates() -> None:
     fake = _FakeEnforcer(raise_exc=exc)
     with pytest.raises(BudgetExceeded):
         budget_checkpoint(fake, 5.0, provider_id="openai")
+
+
+def test_real_enforcer_exhaustion_interrupt() -> None:
+    """B2P-09b: with a REAL BudgetEnforcer over its cap, the shared gate raises BudgetExceeded."""
+    from agent_runtime_cockpit.budget import BudgetConfig, BudgetEnforcer, BudgetState
+
+    enforcer = BudgetEnforcer(BudgetConfig(first_launch_confirmed=True, caps=[]), BudgetState())
+    # Drive any positive estimate over the cap (mirrors tests/unit/test_budget_preflight_estimator.py).
+    enforcer._config.effective_cap = lambda *a, **kw: Decimal("0.000001")  # type: ignore[attr-defined]
+    with pytest.raises(BudgetExceeded):
+        budget_checkpoint(enforcer, 5.0, provider_id="anthropic")
+
+
+def test_real_enforcer_under_cap_passes() -> None:
+    from agent_runtime_cockpit.budget import BudgetConfig, BudgetEnforcer, BudgetState
+
+    enforcer = BudgetEnforcer(BudgetConfig(first_launch_confirmed=True, caps=[]), BudgetState())
+    enforcer._config.effective_cap = lambda *a, **kw: Decimal("1000")  # type: ignore[attr-defined]
+    budget_checkpoint(enforcer, 0.001, provider_id="anthropic")  # must not raise
