@@ -4,12 +4,26 @@
   "private": true,
   "description": "ARC Mobile Runtime — React Native TurboModule simulator preview (mock-native, fixtures only, not publishable without build)",
   "main": "src/index.ts",
+  "source": "src/index.ts",
   "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --outDir dist",
+    "clean": "rm -rf dist"
+  },
   "license": "Apache-2.0",
   "keywords": ["arc", "mobile", "runtime", "react-native", "turbomodule", "simulator-preview"],
   "peerDependencies": {
     "react": "*",
     "react-native": ">=0.72"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
   },
   "codegenConfig": {
     "name": "ArcMobileRuntimeSpec",

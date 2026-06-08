@@ -116,3 +116,16 @@ class TestRnTurboModule:
     def test_simulator_preview_labeled(self) -> None:
         for f in [SPEC, IOS, ANDROID]:
             assert "simulator preview" in f.read_text(encoding="utf-8").lower()
+
+    def test_rn_package_json_has_build_script(self) -> None:
+        pkg_json = RN_PKG / "package.json"
+        if not pkg_json.exists():
+            pytest.skip("package.json not present")
+        import json
+
+        pkg = json.loads(pkg_json.read_text())
+        assert "build" in pkg.get("scripts", {}), "RN package must have build script"
+
+    def test_rn_package_has_tsconfig(self) -> None:
+        tsconfig = RN_PKG / "tsconfig.json"
+        assert tsconfig.exists(), "RN package must have tsconfig.json"

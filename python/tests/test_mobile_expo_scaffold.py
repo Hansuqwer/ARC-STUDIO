@@ -121,3 +121,15 @@ class TestExpoTsApi:
 
         pkg = json.loads(pkg_json_path.read_text())
         assert "build" in pkg.get("scripts", {}), "Expo package must have a build script"
+
+    def test_expo_stub_package_json_main_not_src(self):
+        """@arc/mobile-expo stub package.json must point main to dist (not src/index.ts)."""
+        stub_pkg = EXPO_PKG.parent.parent / "arc-mobile-expo" / "package.json"
+        if not stub_pkg.exists():
+            pytest.skip("arc-mobile-expo package.json not present")
+        import json
+
+        pkg = json.loads(stub_pkg.read_text())
+        assert pkg.get("main") != "src/index.ts", (
+            "arc-mobile-expo main must point to dist/, not src/index.ts"
+        )

@@ -6561,3 +6561,35 @@ Closed three remaining High/Medium audit findings from `AUDIT_REPORT_2026-06-07.
 - **Capability compliance:** Two mock write capabilities (`device.notifications.schedule.mock`, `app.memory.write.mock`) were missing `requires_trust=True` — now added. Fixture JSON regenerated. Policy/CLI tests updated to use read-only capability where write-without-trust was incorrectly expected to pass.
 - **Gate 4 (tests):** 308 mobile tests passed; ruff clean.
 - **N/A:** 1 (UX states — internal model change), 2 (a11y), 3 (parity — behavior-preserving), 5 (perf), 7 (reliability), 8 (docs).
+
+
+## Phase 208 — Mobile Audit Items #4/#9/#10 + privacy_manifest: Verified Complete (prior phases)
+
+Scoping pass against remaining audit findings from `AUDIT_REPORT_2026-06-07.md`:
+
+- **Audit #4 — 7-field drop in `mobile_capability_to_sdk_card`:** Already fixed in Phase 193 (R-CR-BACKLOG). All 7 fields (`platforms`, `required_permissions`, `background`, `network`, `reads`, `writes`, `requires_trust`) are preserved in `metadata["arc_dropped_fields"]` and restored in the inverse direction. 28 sdk_mapping tests pass.
+- **Audit #9 — `schema_version` not in `_VOLATILE`:** Already corrected in Phase 195 (R-MOBILE-HARDEN). The docstring now correctly states schema_version IS included in hashes (not _VOLATILE). The code was always correct; the docstring was the bug.
+- **Audit #10 — No duplicate capability ID validation:** Already fixed in Phase 193. `validate_manifest` checks `seen_ids`; `load_manifest` raises `MobileManifestLoadError` on duplicates.
+- **Audit #7 — `privacy_manifest: true` misleading boolean:** Already fixed. `MobileRuntimeManifest` now uses `privacy_manifest_intent: bool` with a deprecated `privacy_manifest` property alias and clear docstring that no `PrivacyInfo.xcprivacy` is generated.
+- **Audit: `redact_list` string items:** Already handled — `redact_list` applies `Redactor.is_safe()` to string items.
+- **No new code changes needed** — all items verified complete by code read. 308 mobile tests passing.
+
+
+## Phase 209 — Expo/RN package.json main → dist + Flutter pubspec accurate description
+
+Fixed audit finding #5 (Expo/RN `package.json main: "src/index.ts"` not publishable):
+
+- **`@arc/mobile-expo` package.json:** `main` changed from `src/index.ts` → `dist/index.js`; added `module`, `types`, `source`, `scripts.build`, `tsconfig.json`. Both are `private: true` so not publishable, but pointing to built output is correct posture.
+- **`arc-mobile-runtime` (RN) package.json:** Added `exports` map, `source` field, `scripts.build`, `tsconfig.json`. `main` kept as `src/index.ts` for Metro bundler compatibility (idiomatic for RN New Arch packages); documented in description.
+- **Flutter `pubspec.yaml`:** Description corrected from "zero Dart source" to reflect that `lib/` with Dart source exists (platform-interface + method-channel + models).
+- **Gate 4 (tests):** New `test_expo_stub_package_json_main_not_src` + `test_rn_package_has_tsconfig` + `test_rn_package_has_build_script`. 26 passed, 1 skipped.
+
+## Phase 210 — TS type guards strengthened + AUDIT_REPORT committed + privacy_manifest_intent mirror
+
+Closed audit finding #6 (TS type guards check only 2 fields) and updated the TS protocol mirror:
+
+- **`isMobileCapability`:** Now checks `typeof id === "string"`, `typeof name === "string"`, `typeof schema_version === "number"`, `typeof simulator_supported === "boolean"`, `Array.isArray(platforms)`, `typeof auditable === "boolean"` — 6 discriminants instead of 2.
+- **`isMobileRuntimeManifest`:** Now checks `id`, `name`, `schema_version`, `simulator_mode`, `capabilities` (Array), `background_execution` — 6 discriminants.
+- **`privacy_manifest_intent`:** `MobileRuntimeManifest` TS interface updated to `privacy_manifest_intent: boolean` with deprecated `privacy_manifest?` alias — mirrors the Python model fix.
+- **AUDIT_REPORT:** `docs/mobile/AUDIT_REPORT_2026-06-07.md` committed to repo.
+- **Gate 4 (tests):** New `isMobileCapability rejects partial-match objects` + `isMobileRuntimeManifest rejects partial-match objects`. 11 mobile-runtime TS tests + 968 arc-extension tests + 968 arc-extension tests passed; arc-protocol-ts build clean.

@@ -64,7 +64,10 @@ export interface MobileRuntimeManifest {
   background_execution: boolean;
   network_by_default: boolean;
   simulator_mode: boolean;
-  privacy_manifest: boolean;
+  /** Developer declares intent to provide a PrivacyInfo.xcprivacy; no file is auto-generated. */
+  privacy_manifest_intent: boolean;
+  /** @deprecated Use privacy_manifest_intent. */
+  privacy_manifest?: boolean;
   manifest_hash?: string;
 }
 
@@ -114,12 +117,34 @@ export interface MobileActionSimulationReport {
 
 // ── Type guards ───────────────────────────────────────────────────────────────
 
+/** Narrow an unknown value to MobileCapability.
+ * Checks all required primitive-type discriminants so accidental collisions are rejected.
+ */
 export function isMobileCapability(obj: unknown): obj is MobileCapability {
-  return typeof obj === "object" && obj !== null && "id" in obj && "simulator_supported" in obj;
+  if (typeof obj !== "object" || obj === null) return false;
+  const o = obj as Record<string, unknown>;
+  return (
+    typeof o["id"] === "string" &&
+    typeof o["name"] === "string" &&
+    typeof o["schema_version"] === "number" &&
+    typeof o["simulator_supported"] === "boolean" &&
+    Array.isArray(o["platforms"]) &&
+    typeof o["auditable"] === "boolean"
+  );
 }
 
+/** Narrow an unknown value to MobileRuntimeManifest. */
 export function isMobileRuntimeManifest(obj: unknown): obj is MobileRuntimeManifest {
-  return typeof obj === "object" && obj !== null && "capabilities" in obj && "simulator_mode" in obj;
+  if (typeof obj !== "object" || obj === null) return false;
+  const o = obj as Record<string, unknown>;
+  return (
+    typeof o["id"] === "string" &&
+    typeof o["name"] === "string" &&
+    typeof o["schema_version"] === "number" &&
+    typeof o["simulator_mode"] === "boolean" &&
+    Array.isArray(o["capabilities"]) &&
+    typeof o["background_execution"] === "boolean"
+  );
 }
 
 export function isMockCapability(cap: MobileCapability): boolean {

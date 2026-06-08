@@ -62,6 +62,18 @@ describe("ARC Mobile Runtime TypeScript mirror", () => {
     expect(isMockCapability(real)).toBe(false);
   });
 
+  it("isMobileCapability rejects partial-match objects (stronger guard)", () => {
+    // Audit finding: old guard checked only 2 fields; any object with id+simulator_supported passed.
+    // New guard requires schema_version:number, name:string, platforms:array, auditable:boolean.
+    expect(isMobileCapability({ id: "x", simulator_supported: true })).toBe(false);
+    expect(isMobileCapability({ id: "x", name: "y", schema_version: 1, simulator_supported: true, platforms: [], auditable: true })).toBe(true);
+  });
+
+  it("isMobileRuntimeManifest rejects partial-match objects (stronger guard)", () => {
+    expect(isMobileRuntimeManifest({ capabilities: [], simulator_mode: true })).toBe(false);
+    expect(isMobileRuntimeManifest({ id: "x", name: "y", schema_version: 1, simulator_mode: true, capabilities: [], background_execution: false })).toBe(true);
+  });
+
   it("isMobileRuntimeManifest accepts valid manifest", () => {
     const manifest: MobileRuntimeManifest = {
       schema_version: 1,
@@ -74,7 +86,7 @@ describe("ARC Mobile Runtime TypeScript mirror", () => {
       background_execution: false,
       network_by_default: false,
       simulator_mode: true,
-      privacy_manifest: true,
+      privacy_manifest_intent: true,
     };
     expect(isMobileRuntimeManifest(manifest)).toBe(true);
   });
