@@ -803,4 +803,59 @@ def create_mcp_server(
         """
         return arc_audit_verify(run_id)
 
+    @mcp.tool()
+    def arc_swarmgraph_plan(task: str, max_nodes: int | None = None) -> str:
+        """Deterministically decompose a task into a SwarmGraph DAG plan (no provider calls).
+
+        Args:
+            task: Task text to decompose.
+            max_nodes: Optional maximum number of plan nodes.
+
+        Returns:
+            JSON with the DAG nodes + topological order (planner='deterministic').
+        """
+
+        def run() -> dict[str, Any]:
+            from ..swarmgraph.decomposition import plan_dag
+
+            plan = plan_dag(task, max_nodes=max_nodes)
+            return {
+                "strategy": "dag",
+                "planner": "deterministic",
+                "provider_backed": False,
+                "nodes": [node.model_dump(mode="json") for node in plan.nodes],
+                "topological_order": plan.topological_order(),
+            }
+
+        return _tool_result("arc_swarmgraph_plan", run, {"task": task, "max_nodes": max_nodes})
+
+    @mcp.tool()
+    def arc_swarmgraph_assess_risk(task: str, target_runtime: str | None = None) -> str:
+        """Deterministically assess a task's consensus risk (LLM-free; no provider calls).
+
+        Args:
+            task: Task text to assess.
+            target_runtime: Optional target-runtime hint (e.g. 'production').
+
+        Returns:
+            JSON with risk_level, recommended_protocol, worker_count, hitl_required.
+        """
+
+        def run() -> dict[str, Any]:
+            from ..swarmgraph.adaptive_consensus import assess_risk
+
+            assessment = assess_risk(task_text=task, target_runtime=target_runtime)
+            return {
+                "task": task,
+                "risk_level": assessment.risk_level,
+                "recommended_protocol": assessment.recommended_protocol.value,
+                "worker_count": assessment.worker_count,
+                "hitl_required": assessment.hitl_required,
+                "provider_backed": False,
+            }
+
+        return _tool_result(
+            "arc_swarmgraph_assess_risk", run, {"task": task, "target_runtime": target_runtime}
+        )
+
     return mcp

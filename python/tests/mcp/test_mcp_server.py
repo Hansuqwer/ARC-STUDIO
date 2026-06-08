@@ -451,3 +451,32 @@ def _last_mcp_audit_event(workspace: Path) -> dict:
     lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert lines
     return json.loads(lines[-1])
+
+
+def test_arc_swarmgraph_plan_tool(tmp_path: Path):
+    """arc_swarmgraph_plan is registered + returns a deterministic DAG plan (risk-gated)."""
+    from agent_runtime_cockpit.mcp.server import create_mcp_server
+
+    trust_workspace(tmp_path, note="test")
+    server = create_mcp_server(workspace=tmp_path)
+    assert "arc_swarmgraph_plan" in _get_tool_names(server)
+    tool = _get_tool_fn(server, "arc_swarmgraph_plan")
+    parsed = json.loads(tool(task="build a REST API and write tests"))
+    assert parsed["ok"] is True
+    assert parsed["data"]["planner"] == "deterministic"
+    assert parsed["data"]["provider_backed"] is False
+    assert isinstance(parsed["data"]["nodes"], list)
+
+
+def test_arc_swarmgraph_assess_risk_tool(tmp_path: Path):
+    """arc_swarmgraph_assess_risk is registered + returns a deterministic risk assessment."""
+    from agent_runtime_cockpit.mcp.server import create_mcp_server
+
+    trust_workspace(tmp_path, note="test")
+    server = create_mcp_server(workspace=tmp_path)
+    assert "arc_swarmgraph_assess_risk" in _get_tool_names(server)
+    tool = _get_tool_fn(server, "arc_swarmgraph_assess_risk")
+    parsed = json.loads(tool(task="delete the production database"))
+    assert parsed["ok"] is True
+    assert "risk_level" in parsed["data"]
+    assert parsed["data"]["provider_backed"] is False
