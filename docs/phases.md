@@ -6274,3 +6274,11 @@ Verify-first DoD audit: **not elevated** — the row's specific claim ("real-tim
 - **Gate 8 (docs):** ✓ Added `arc eval export` / `arc eval compare` to the README CLI reference; stale "deferred" eval notes were corrected in T20–22; this entry; banned-claims clean.
 - **N/A:** 1 UX-states, 2 a11y — CLI/JSON surface (covered by stable output). 5 perf (bounded artifact I/O), 6 security (no paid call; local artifacts), 7 reliability (synchronous file ops).
 
+### B2P-12 — memory runtime wiring → Polished Complete
+
+- **Gate 6 (security):** ✓ **Redaction-first** — `_trace_text` runs `Redactor().redact_dict` on every trace line *before* `_candidate_memories` builds nodes, and the snapshot records a `redaction_applied` guardrail. `test_memory_extraction_is_redaction_first` injects a real `sk-…` secret and asserts it never appears in the serialized graph. The run-path hook is **opt-in, default-off** (`ARC_MEMORY_AUTO_EXTRACT=1`), so there is no surprise data capture.
+- **Gate 3 (parity):** ✓ The run-path wiring (`tasks/executor._execute_run`) and the `arc memory extract` CLI both call the **same** `extract_memories_from_runs` + `MemoryGraphStore.merge` — equivalent behavior across surfaces.
+- **Gate 4 (tests):** ✓ `uv run pytest tests/memory/test_memory_runtime_wiring.py` → 2 passed (redaction-first + opt-in/documented-intent).
+- **Gate 7 (reliability):** ✓ The executor hook is wrapped best-effort (`except Exception … memory extraction is best-effort; never break the run`).
+- **N/A:** 1 UX-states (backend hook; surfaced via `arc memory` CLI), 2 a11y, 5 perf (bounded `limit=5`), 8 docs-surface (opt-in advanced hook; inline security-intent docs + this entry).
+
