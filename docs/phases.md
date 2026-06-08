@@ -6518,3 +6518,13 @@ Closed the "IDE panel follow-on" gap — the CLI shipped at Baseline; the IDE pa
 - **Gate 4 (tests):** `arc-workspace-search.test.tsx` (ReactWidget + searchWorkspace + states + backend/protocol + frontend-module binding); `pnpm --filter arc-extension build` clean + suite 968 passed/3 skipped (41 suites).
 - **N/A:** 2 a11y-contrast (jsdom), 5,7,8.
 
+
+### Phase 205 closeout — non-gated gap status (honest end state)
+
+Worked the documented **gaps** (the genuinely "not done" items) to closure:
+
+- **Closed → Polished this pass:** B2P-09 (run-boundary budget enforcement, L-H1), R-AUDIT25 (ProviderRouter wired into the run path), R-AUDIT16 (Context Drawer real producer + ReactWidget render fix), R-AUDIT18 (IDE workspace-search panel). Overall `Polished Complete` rows: 43 (R-AUDIT 23/25).
+- **Contrast cluster (B2P-03, R-AUDIT21, R-AUDIT23, R-AUDIT26) — stays Baseline:** the L-G1 layout-capable Playwright+axe harness and the L-G2 deterministic hardcoded-pair guard are landed, but the *rendered* color-contrast measurement needs ARC views routable in the e2e run (CI), which the local app mode does not provide. Not fabricated; closure = a passing L-G1 run in CI + fixing any reported violations.
+- **Terminal-gated (cannot be "done" without a human gate; remain explicitly gated):** B2P-17 (code-signing certs / Apple ID), B2P-06 (MCP HTTP — auth design + decision), B2P-14/15 (live adapter T3), B2P-16 (broad provider-backed SwarmGraph — paid/live), B2P-20 (human-reviewed memory evidence), B2P-21 (Firecracker Linux/KVM host), B2P-22 (live Battle Arena), R75/R79.1/R79.2 (macOS VZ depth / native device builds + execution). These stay forbidden as claims until proven by tests + evidence (see Tier-2 backlog for the bounded non-posture slices).
+- **Shipped-Baseline horizon (~190 rows):** the remaining `Baseline Complete` rows are shipped + tested at the Baseline bar (the roadmap's stated v0.1 posture). Their v0.2 `Polished Complete` elevation is **evidence-gated** — each requires its own per-gate DoD evidence and is **not** rubber-stamped. They are complete-at-Baseline for v0.1; elevation continues in evidence-backed batches (Phases 203–205 are the pattern).
+
