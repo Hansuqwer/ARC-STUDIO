@@ -225,14 +225,31 @@ class ArcScreen(Screen):
                 self.data.add_entry("system", f"Window title: {getattr(self.app, 'title', '')}")
             return
         if cmd == "/statusline":
-            # The status bar slots are currently fixed; this reports them.
-            slots = (
-                "mode · model · provider · workspace · context% · "
-                "session · cost · daemon · streaming"
-            )
+            from .data import STATUSLINE_SLOTS
+
+            arg = parts[1].strip() if len(parts) > 1 else ""
+            if not arg:
+                self.data.add_entry(
+                    "system",
+                    "Status-line slots (current order): "
+                    + " · ".join(self.data.statusline_order)
+                    + "\nAvailable: "
+                    + ", ".join(STATUSLINE_SLOTS)
+                    + "\nReorder: /statusline mode,cost,workspace …   Reset: /statusline reset",
+                )
+                return
+            if arg.lower() in ("reset", "default"):
+                self.data.reset_statusline_order()
+                self.data.add_entry(
+                    "system",
+                    "Status-line order reset to: " + " · ".join(self.data.statusline_order),
+                )
+                return
+            order = [s.strip().lower() for s in arg.replace(" ", ",").split(",") if s.strip()]
+            ok, msg = self.data.set_statusline_order(order)
             self.data.add_entry(
                 "system",
-                f"Status-line slots: {slots}\n(slot ordering is fixed in this release)",
+                ("Status-line order: " + msg) if ok else f"Cannot set status-line order: {msg}",
             )
             return
         if cmd == "/version":

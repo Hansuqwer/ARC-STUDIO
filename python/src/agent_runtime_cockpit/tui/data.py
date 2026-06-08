@@ -28,6 +28,10 @@ class TranscriptEntry:
             return ""
 
 
+# Canonical status-line slot order. `/statusline` can reorder these per session (B2P-01).
+STATUSLINE_SLOTS: tuple[str, ...] = ("mode", "runtime", "workspace", "session", "cost", "hint")
+
+
 @dataclass
 class DataStore:
     """Central reactive state for the ARC TUI."""
@@ -39,6 +43,8 @@ class DataStore:
     runtime_mode: str = "fake"
     profile_id: str = "default"
     workspace: Path = field(default_factory=Path.cwd)
+    # Status-line slot order (B2P-01); defaults to STATUSLINE_SLOTS, reorderable via /statusline.
+    statusline_order: list[str] = field(default_factory=lambda: list(STATUSLINE_SLOTS))
 
     # ── transcript ───────────────────────────────────────────────────────
     entries: list[TranscriptEntry] = field(default_factory=list)
@@ -177,15 +183,36 @@ class DataStore:
             ws = "…" + ws[-29:]
         cost = f"${self.total_cost_usd:.4f}" if self.total_cost_usd > 0 else "$0"
         session_short = self.session_id[:8] if self.session_id else "--------"
-        segments = [
-            f" {self.mode} ",
-            f" {self.runtime_mode} ",
-            f" {ws} ",
-            f" {session_short} ",
-            f" {cost} ",
-            " Esc:cancel  /:commands ",
-        ]
+        slot_text = {
+            "mode": f" {self.mode} ",
+            "runtime": f" {self.runtime_mode} ",
+            "workspace": f" {ws} ",
+            "session": f" {session_short} ",
+            "cost": f" {cost} ",
+            "hint": " Esc:cancel  /:commands ",
+        }
+        order = [s for s in (self.statusline_order or STATUSLINE_SLOTS) if s in slot_text]
+        if not order:
+            order = list(STATUSLINE_SLOTS)
+        segments = [slot_text[s] for s in order]
         line = "│".join(segments)
         if len(line) > width:
             line = line[: width - 1] + "…"
         return line
+
+    def set_statusline_order(self, order: list[str]) -> tuple[bool, str]:
+        """Set the status-line slot order (B2P-01). Returns (ok, message). Unknown slots rejected; order de-duped."""
+        if not order:
+            return False, "order must list at least one slot"
+        unknown = [s for s in order if s not in STATUSLINE_SLOTS]
+        if unknown:
+            return (
+                False,
+                f"unknown slot(s): {', '.join(unknown)} (valid: {', '.join(STATUSLINE_SLOTS)})",
+            )
+        self.statusline_order = list(dict.fromkeys(order))
+        return True, " ".join(self.statusline_order)
+
+    def reset_statusline_order(self) -> None:
+        """Restore the default status-line slot order."""
+        self.statusline_order = list(STATUSLINE_SLOTS)
