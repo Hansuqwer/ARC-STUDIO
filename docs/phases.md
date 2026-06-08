@@ -6282,3 +6282,10 @@ Verify-first DoD audit: **not elevated** — the row's specific claim ("real-tim
 - **Gate 7 (reliability):** ✓ The executor hook is wrapped best-effort (`except Exception … memory extraction is best-effort; never break the run`).
 - **N/A:** 1 UX-states (backend hook; surfaced via `arc memory` CLI), 2 a11y, 5 perf (bounded `limit=5`), 8 docs-surface (opt-in advanced hook; inline security-intent docs + this entry).
 
+### B2P-13 — advisory-lock write bridge → Polished Complete
+
+- **Gate 7 (reliability):** ✓ `storage/advisory_lock.py` uses `fcntl.flock(LOCK_EX|LOCK_NB)` with a bounded spin-wait (`timeout_ms`, default 5s) that raises `AdvisoryLockUnavailable` on contention, releases in `finally` (`LOCK_UN` — no deadlock), and documents a Windows no-op fallback. Tests: `test_contended_lock_times_out`, `test_no_stale_lock_reacquire_after_release`.
+- **Gate 6 (security):** ✓ Concurrent-write integrity — the session write bridge (Phase 46) serializes mutating writes through the lock so shared session state cannot be corrupted by concurrent writers; the lock file is adjacent, never the data file (`test_lockfile_is_adjacent_not_the_data_file`).
+- **Gate 4 (tests):** ✓ `uv run pytest tests/test_advisory_lock_b2p13.py tests/test_phase46_session_write_bridge.py` → 30 passed.
+- **N/A:** 1 UX-states, 2 a11y (storage primitive; surfaced via `arc studio sessions`), 3 parity (internal concurrency primitive shared by IDE+CLI session writes), 5 perf (bounded spin-wait), 8 docs-surface (inline + this entry).
+
