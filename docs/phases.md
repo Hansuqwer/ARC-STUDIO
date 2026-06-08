@@ -6244,3 +6244,10 @@ Driving selected Batch 7 `Baseline Complete` items to `Polished Complete` agains
 - **Gate 8 (docs):** ✓ Added `/statusline` to the README command table; **corrected the stale R-UX4 note** ("slot reordering not yet configurable" → config-driven, B2P-01); this entry; banned-claims clean.
 - **N/A:** 6 security, 7 reliability — synchronous local display, no mutating/bridged action.
 
+### B2P-07 — MCP real task exec + notifications → Polished Complete
+
+- **Gate 1 (UX states):** ✓ Explicit `TaskStatus` state machine (PENDING/RUNNING/COMPLETED/FAILED/CANCELLED) with guarded `transition_to`/`can_transition_to`; success carries `result`, failure carries a non-null `error`, surfaced via `arc_task_status`/`arc_task_result` (producer-truth, not placeholders). Tests: `test_task_execution_success` (COMPLETED, error None), `test_task_execution_failure` (FAILED, error set).
+- **Gate 4 (tests):** ✓ `uv run pytest tests/tasks/` → 60 passed (executor, models, storage, `test_task_real_ops`, `test_task_sse_events`).
+- **Gate 7 (reliability):** ✓ Cancellation (`cancel_task` + terminal-state guard: `test_cancel_pending_task`/`test_cancel_completed_task`/`test_cancel_nonexistent_task`), structured error envelope (`task.error` + FAILED state), retry logic (`test_task_retry_logic`), bounded thread joins with timeouts (`wait_for_all(timeout=…)`); lifecycle events published on every transition (`test_task_sse_events`).
+- **N/A:** 2 a11y, 3 parity, 5 perf, 6 security, 8 docs-surface — backend task engine consumed via the stdio MCP tools (covered by B2P-05's gates); execution itself runs real run/trace/audit/eval (no provider calls unless gated).
+
