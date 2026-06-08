@@ -19,6 +19,7 @@ describe('ArcContextDrawer (static contract)', () => {
 
     it('wires a REAL producer (R-AUDIT16): injects ArcService + calls discoverAgentsMd (no stub)', () => {
         const src = read('browser/arc-context-drawer.tsx');
+        expect(src).toMatch(/extends ReactWidget/); // BaseWidget does not render React
         expect(src).toMatch(/@inject\(ArcService\)/);
         expect(src).toMatch(/this\.arcService\.discoverAgentsMd\(\)/);
         expect(src).not.toMatch(/Stub:|Returning empty list/); // the stub is gone

@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { BaseWidget, Message } from '@theia/core/lib/browser';
-import { injectable, inject } from '@theia/core/shared/inversify';
+import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
+import { injectable, inject, postConstruct } from '@theia/core/shared/inversify';
 import { ArcService, AgentsMdEntry } from '../common/arc-protocol';
 
 interface ContextDrawerState {
@@ -10,25 +10,21 @@ interface ContextDrawerState {
 }
 
 @injectable()
-export class ArcContextDrawer extends BaseWidget {
+export class ArcContextDrawer extends ReactWidget {
     static readonly ID = 'arc-context-drawer';
     static readonly LABEL = 'ARC Context';
 
     @inject(ArcService) private readonly arcService!: ArcService;
 
-    private state: ContextDrawerState = { entries: [], loading: false, error: null };
+    private state: ContextDrawerState = { entries: [], loading: true, error: null };
 
-    constructor() {
-        super();
+    @postConstruct()
+    protected init(): void {
         this.id = ArcContextDrawer.ID;
         this.title.label = ArcContextDrawer.LABEL;
         this.title.caption = ArcContextDrawer.LABEL;
         this.title.closable = true;
         this.addClass('arc-context-drawer');
-    }
-
-    protected onAfterAttach(msg: Message): void {
-        super.onAfterAttach(msg);
         this.loadEntries();
     }
 
@@ -45,7 +41,7 @@ export class ArcContextDrawer extends BaseWidget {
         this.update();
     }
 
-    render(): React.ReactNode {
+    protected render(): React.ReactNode {
         const { entries, loading, error } = this.state;
         if (loading) {
             return <div className="arc-context-drawer__loading">Loading…</div>;
