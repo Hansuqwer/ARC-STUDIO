@@ -6181,3 +6181,12 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: commits 45a0a28 / 63c67c4 + this; 20 eval + 2 memory + 3 advisory-lock + 34 lock/write-bridge tests | Notes: deterministic; none-posture; dedicated HTTP/SSE endpoints stay out of scope.
 
 ---
+
+## Phase 201 — Batch 7 Track F: mobile provenance + device posture (T26–T27)
+
+- **T26 (R79.4):** supply-chain provenance attestation — `mobile/provenance.py` (SBOM + build metadata + digest, local HMAC sign/verify, fail-closed) + `arc mobile provenance [--sign]` + `mobile:provenance` release gate.
+- **T27 (R79.3):** device posture / MDM hook interface — `mobile/device_posture.py` (`DevicePosture`/`PosturePolicy`/`evaluate_posture` + `FixtureDevicePostureHook`) + `arc mobile posture check`. Deterministic, fail-closed.
+
+**Status:** Baseline Complete | Evidence: commits e9bf808 + this; 4 provenance + 5 posture tests; `arc mobile provenance`/`posture` register | Notes: simulator-preview, fixtures-only, no real device access; real posture/MDM/attestation providers + external signing infra stay human-gated.
+
+---

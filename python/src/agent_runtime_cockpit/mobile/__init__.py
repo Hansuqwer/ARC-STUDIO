@@ -67,6 +67,14 @@ from .secure_store import (
 from .signing import SignedPlanEnvelope, sign_plan, verify_plan
 from .sbom import generate_sbom
 from .provenance import build_provenance, sign_provenance, verify_provenance
+from .device_posture import (
+    DevicePosture,
+    DevicePostureHook,
+    FixtureDevicePostureHook,
+    PostureDecision,
+    PosturePolicy,
+    evaluate_posture,
+)
 from .siem_export import export_trace, export_trace_cef, export_trace_json
 from .replay import ReplayDiff, replay_trace
 from .simulator import simulate_action_plan
@@ -125,6 +133,12 @@ __all__ = [
     "build_provenance",
     "sign_provenance",
     "verify_provenance",
+    "DevicePosture",
+    "DevicePostureHook",
+    "FixtureDevicePostureHook",
+    "PostureDecision",
+    "PosturePolicy",
+    "evaluate_posture",
     "export_trace",
     "export_trace_cef",
     "export_trace_json",

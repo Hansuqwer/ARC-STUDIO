@@ -1252,3 +1252,36 @@ def mobile_provenance_cmd(
         _out(ok(sign_provenance(provenance, key)), json_output)
     else:
         _out(ok(provenance), json_output)
+
+
+mobile_posture_app = typer.Typer(
+    name="posture", help="Device posture / MDM evaluation (simulator-preview, fixtures)"
+)
+mobile_app.add_typer(mobile_posture_app)
+
+
+@mobile_posture_app.command("check")
+def mobile_posture_check_cmd(
+    require_mdm: bool = typer.Option(False, "--require-mdm", help="Require MDM enrollment."),
+    require_passcode: bool = typer.Option(
+        False, "--require-passcode", help="Require a device passcode."
+    ),
+    jailbroken: bool = typer.Option(
+        False, "--jailbroken", help="Simulate a jailbroken device (fixture)."
+    ),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Evaluate (fixture) device posture against a policy. Deterministic; no real device access."""
+    _setup_logging(debug)
+    from ..mobile import (
+        DevicePosture,
+        FixtureDevicePostureHook,
+        PosturePolicy,
+        evaluate_posture,
+    )
+
+    hook = FixtureDevicePostureHook(DevicePosture(jailbroken=jailbroken))
+    policy = PosturePolicy(require_mdm=require_mdm, require_passcode=require_passcode)
+    decision = evaluate_posture(hook.read(), policy)
+    _out(ok(decision.model_dump()), json_output)
