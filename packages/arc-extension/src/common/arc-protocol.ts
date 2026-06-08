@@ -996,6 +996,8 @@ export interface ArcService {
     runTestbench(command: string): Promise<TestbenchRunResult>;
     /** Discover AGENTS.md files in the workspace (R-AUDIT16) — real producer for ArcContextDrawer. */
     discoverAgentsMd(): Promise<AgentsMdEntry[]>;
+    /** Path-confined workspace text search (R-AUDIT18) — real producer for the IDE search panel. */
+    searchWorkspace(query: string): Promise<WorkspaceSearchHit[]>;
     /** Read-only CI check status via CLI bridge */
     getCiCheckStatus(): Promise<CiCheckStatus>;
 
@@ -1141,6 +1143,13 @@ export interface AgentsMdEntry {
     overCap: boolean;
     isOverride: boolean;
     likelyLlmGenerated: boolean;
+}
+
+/** A single path-confined workspace-search hit (R-AUDIT18). */
+export interface WorkspaceSearchHit {
+    file: string;
+    line: number;
+    match: string;
 }
 
 export interface CiCheckStatus {

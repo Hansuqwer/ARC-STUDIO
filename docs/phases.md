@@ -6507,3 +6507,14 @@ Closed the "stub data / CLI proxy wiring follow-on" gap — the drawer no longer
 - **Gate 4 (tests):** `arc-context-drawer.test.tsx` asserts the injection + `discoverAgentsMd` call + no-stub + states, and the backend/protocol wiring; `pnpm --filter arc-extension build` clean + suite 965 passed/3 skipped.
 - **N/A:** 2 a11y-contrast (text/role only), 5,6,7,8.
 
+
+### Tier-2 R-AUDIT18 — IDE Workspace Search panel → Polished Complete
+
+Closed the "IDE panel follow-on" gap — the CLI shipped at Baseline; the IDE panel now exists.
+
+- **Gate 1 (UX states):** `ArcWorkspaceSearchWidget` (a `ReactWidget`) renders an accessible search input + button and explicit idle / loading (`Searching…`) / error (`role="alert"`) / empty (`No matches found`) / results states.
+- **Gate 3 (parity):** backend `searchWorkspace` runs the path-confined `arc workspace search <q> --json` — the IDE surfaces the same hits (file:line + match) as the CLI.
+- **Gate 6 (security):** search is path-confined by the CLI (skips symlinks/ignored/secret-bearing/oversized files, capped) — inherited, deterministic.
+- **Gate 4 (tests):** `arc-workspace-search.test.tsx` (ReactWidget + searchWorkspace + states + backend/protocol + frontend-module binding); `pnpm --filter arc-extension build` clean + suite 968 passed/3 skipped (41 suites).
+- **N/A:** 2 a11y-contrast (jsdom), 5,7,8.
+

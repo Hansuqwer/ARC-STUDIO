@@ -33,6 +33,7 @@ import type { ArcService as IArcService } from '../common/arc-protocol';
 import './style/arc-widget.css';
 import './style/arc-studio-widget.css';
 import { ArcContextDrawer } from './arc-context-drawer';
+import { ArcWorkspaceSearchWidget } from './arc-workspace-search-widget';
 
 export default new ContainerModule(bind => {
     bind(PreferenceContribution).toConstantValue({ schema: ArcPreferenceSchema });
@@ -153,5 +154,12 @@ export default new ContainerModule(bind => {
     bind(WidgetFactory).toDynamicValue(ctx => ({
         id: ArcContextDrawer.ID,
         createWidget: () => ctx.container.get<ArcContextDrawer>(ArcContextDrawer),
+    })).inSingletonScope();
+
+    // Bind the ARC Workspace Search panel (R-AUDIT18; wired to `arc workspace search`)
+    bind(ArcWorkspaceSearchWidget).toSelf();
+    bind(WidgetFactory).toDynamicValue(ctx => ({
+        id: ArcWorkspaceSearchWidget.ID,
+        createWidget: () => ctx.container.get<ArcWorkspaceSearchWidget>(ArcWorkspaceSearchWidget),
     })).inSingletonScope();
 });

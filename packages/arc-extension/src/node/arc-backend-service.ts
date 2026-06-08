@@ -76,6 +76,7 @@ import {
     TestbenchDetection,
     TestbenchRunResult,
     AgentsMdEntry,
+    WorkspaceSearchHit,
     CiCheckStatus,
     SandboxInspectResult,
     EditPlanApprovalResult,
@@ -1209,6 +1210,37 @@ export class ArcBackendService implements ArcService {
 
     async detectTestbench(commandOverride?: string): Promise<TestbenchDetection> {
         return this.localTelemetryService.detectTestbench(commandOverride);
+    }
+
+    async searchWorkspace(query: string): Promise<WorkspaceSearchHit[]> {
+        // R-AUDIT18: real producer — path-confined `arc workspace search <q> --json`.
+        const q = (query ?? '').trim();
+        if (!q) {
+            return [];
+        }
+        const args = ['workspace', 'search', q, '--workspace', this.workspaceRoot, '--json'];
+        let raw = '';
+        try {
+            raw = await execArcCliAsync(args, { timeout: 30000, maxBuffer: 8 * 1024 * 1024 });
+        } catch (e) {
+            const err = e as { stdout?: string | Buffer };
+            raw = typeof err?.stdout === 'string' ? err.stdout : err?.stdout ? String(err.stdout) : '';
+            if (!raw) {
+                return [];
+            }
+        }
+        try {
+            const parsed = JSON.parse(raw);
+            const data = (parsed.data ?? {}) as Record<string, unknown>;
+            const hits = ((data.results ?? data.hits ?? []) as Array<Record<string, unknown>>);
+            return hits.map((h) => ({
+                file: String(h.file ?? ''),
+                line: Number(h.line ?? 0),
+                match: String(h.match ?? ''),
+            }));
+        } catch {
+            return [];
+        }
     }
 
     async discoverAgentsMd(): Promise<AgentsMdEntry[]> {
