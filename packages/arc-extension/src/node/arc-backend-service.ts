@@ -73,6 +73,7 @@ import {
     McpWorkbenchStatus,
     WorkspaceInventory,
     TestbenchDetection,
+    TestbenchRunResult,
     CiCheckStatus,
     SandboxInspectResult,
     EditPlanApprovalResult,
@@ -85,6 +86,7 @@ import {
 } from '../common/arc-protocol';
 import { validateWorkspaceRoot, validateTraceId, validateRunId } from './security-utils';
 import { WorkflowExecutor } from './services/workflow-executor';
+import { execArcCliAsync } from './services/arc-cli-utils';
 import { TraceParser } from './services/trace-parser';
 import { WorkflowDetector } from './services/workflow-detector';
 import { FileManager } from './services/file-manager';
@@ -1170,6 +1172,52 @@ export class ArcBackendService implements ArcService {
 
     async detectTestbench(commandOverride?: string): Promise<TestbenchDetection> {
         return this.localTelemetryService.detectTestbench(commandOverride);
+    }
+
+    async runTestbench(command: string): Promise<TestbenchRunResult> {
+        const parts = command.trim().split(/\s+/).filter(Boolean);
+        if (parts.length === 0) {
+            return { command, allowed: false, error: 'empty command' };
+        }
+        const args = [
+            'testbench', 'run', '--policy', 'local-safe',
+            '--workspace', this.workspaceRoot, '--json', '--', ...parts,
+        ];
+        let raw = '';
+        let exitCode: number | null = 0;
+        try {
+            raw = await execArcCliAsync(args, { timeout: 120000, maxBuffer: 4 * 1024 * 1024 });
+        } catch (e) {
+            // `arc testbench run` exits non-zero on policy-deny (3), usage (2), or test failure —
+            // the JSON envelope is still on stdout and the exit code is on the error.
+            const err = e as { stdout?: string | Buffer; code?: number; message?: string };
+            raw = typeof err?.stdout === 'string' ? err.stdout : err?.stdout ? String(err.stdout) : '';
+            exitCode = typeof err?.code === 'number' ? err.code : null;
+            if (!raw) {
+                return {
+                    command,
+                    allowed: false,
+                    exitCode,
+                    error: (err?.message ? String(err.message) : 'testbench run failed').slice(0, 500),
+                };
+            }
+        }
+        try {
+            const parsed = JSON.parse(raw);
+            const data = (parsed.data ?? {}) as Record<string, unknown>;
+            const audit = (data.audit_event ?? {}) as Record<string, unknown>;
+            const decision = (data.decision ?? {}) as Record<string, unknown>;
+            return {
+                command,
+                ok: parsed.ok !== false,
+                allowed: Boolean(decision.allowed),
+                classification: data.classification as string | undefined,
+                exitCode: (audit.exit_code as number | null | undefined) ?? exitCode ?? null,
+                auditPath: (audit.audit_path as string | undefined),
+            };
+        } catch {
+            return { command, allowed: false, exitCode, error: 'could not parse testbench output' };
+        }
     }
 
     async getCiCheckStatus(): Promise<CiCheckStatus> {

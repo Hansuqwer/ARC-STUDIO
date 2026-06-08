@@ -7,7 +7,7 @@
  */
 
 import * as React from '@theia/core/shared/react';
-import type { ArcService, TestbenchDetection } from '../../common/arc-protocol';
+import type { ArcService, TestbenchDetection, TestbenchRunResult } from '../../common/arc-protocol';
 import { useAsyncState } from '../hooks/useAsyncState';
 
 export interface TestBenchTabProps {
@@ -20,6 +20,27 @@ export const TestBenchTab: React.FC<TestBenchTabProps> = ({ arcService }) => {
         [arcService],
         { errorMessage: 'Failed to detect testbench' },
     );
+
+    const [runState, setRunState] = React.useState<
+        Record<number, { running?: boolean; result?: TestbenchRunResult; error?: string }>
+    >({});
+    const runCommand = React.useCallback(async (i: number, command: string) => {
+        if (!command) {
+            return;
+        }
+        // Confirm gate: executing a command, even sandbox-policy-gated, is a mutating action.
+        // eslint-disable-next-line no-alert
+        if (!window.confirm(`Run "${command}" through the local-safe sandbox?\nNetwork and destructive operations are denied.`)) {
+            return;
+        }
+        setRunState(s => ({ ...s, [i]: { running: true } }));
+        try {
+            const result = await arcService.runTestbench(command);
+            setRunState(s => ({ ...s, [i]: { result } }));
+        } catch (e) {
+            setRunState(s => ({ ...s, [i]: { error: e instanceof Error ? e.message : String(e) } }));
+        }
+    }, [arcService]);
 
     if (loading) {
         return (
@@ -89,6 +110,34 @@ export const TestBenchTab: React.FC<TestBenchTabProps> = ({ arcService }) => {
                         {entry.reason && (
                             <div className='arc-testbench__card-reason'>{entry.reason}</div>
                         )}
+                        <div className='arc-testbench__card-actions'>
+                            <button
+                                className='arc-testbench__run'
+                                disabled={!entry.command || runState[i]?.running}
+                                aria-label={`Run ${entry.command || 'command'} in the local-safe sandbox`}
+                                onClick={() => entry.command && runCommand(i, entry.command)}
+                            >
+                                {runState[i]?.running ? 'Running…' : 'Run (local-safe)'}
+                            </button>
+                            {runState[i]?.error && (
+                                <span className='arc-testbench__run-error' role='alert'>
+                                    Error: {runState[i]!.error}
+                                </span>
+                            )}
+                            {runState[i]?.result && !runState[i]!.result!.allowed && (
+                                <span className='arc-testbench__run-result arc-testbench__run-result--blocked'>
+                                    Blocked by policy
+                                </span>
+                            )}
+                            {runState[i]?.result && runState[i]!.result!.allowed && (
+                                <span
+                                    className={`arc-testbench__run-result arc-testbench__run-result--${runState[i]!.result!.exitCode === 0 ? 'pass' : 'fail'}`}
+                                >
+                                    Exit {runState[i]!.result!.exitCode ?? '?'}
+                                    {runState[i]!.result!.exitCode === 0 ? ' ✓' : ''}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 ))}
             </div>

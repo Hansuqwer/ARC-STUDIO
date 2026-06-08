@@ -957,6 +957,8 @@ export interface ArcService {
     getWorkspaceInventory(options?: { suffix?: string; maxEntries?: number }): Promise<WorkspaceInventory>;
     /** Read-only testbench detection via CLI bridge */
     detectTestbench(commandOverride?: string): Promise<TestbenchDetection>;
+    /** Run a detected test command through the local-safe sandbox policy (network/destructive denied). */
+    runTestbench(command: string): Promise<TestbenchRunResult>;
     /** Read-only CI check status via CLI bridge */
     getCiCheckStatus(): Promise<CiCheckStatus>;
 
@@ -1064,6 +1066,18 @@ export interface TestbenchDetection {
     workspace: string;
     detected: Array<{ command?: string; source: string; cwd?: string; confidence: string; runner?: string; reason?: string; script?: string }>;
     count: number;
+}
+
+export interface TestbenchRunResult {
+    command: string;
+    ok?: boolean;
+    /** Whether the sandbox policy allowed the command (false => blocked, not executed). */
+    allowed: boolean;
+    classification?: string;
+    /** Process exit code when executed; null when blocked or unknown. */
+    exitCode?: number | null;
+    auditPath?: string;
+    error?: string;
 }
 
 export interface CiCheckStatus {
