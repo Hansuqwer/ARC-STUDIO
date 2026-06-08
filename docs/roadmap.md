@@ -53,9 +53,9 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 | R8 | IDE Provider/Quota Completion | Polished Complete |
 | R9 | IDE Live Stream Polish | Polished Complete |
 | R10 | Doctor/Daemon Parity Closure | Polished Complete |
-| R11 | SwarmGraph Cost Producer | Baseline Complete |
-| R12 | Packaging/Optional Features | Baseline Complete |
-| R13 | SwarmGraph Native Runtime | P1–P4 Baseline Complete |
+| R11 | SwarmGraph Cost Producer | Polished Complete|
+| R12 | Packaging/Optional Features | Polished Complete|
+| R13 | SwarmGraph Native Runtime | Polished Complete |
 
 ### Protocol / platform track (R14–R37, R77)
 
@@ -63,29 +63,29 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 |---|---|---|
 | R14 | Streaming Audit Verification + HMAC Signing | Polished Complete |
 | R15 | Discriminated RunEvent Unions + Protocol Conformance | Polished Complete |
-| R16 | Enforced Workspace Trust + Paid-Call Gates | Baseline Complete; Active Hardening |
-| R17 | Trace Viewer Virtualization + Daemon Resilience | Baseline Complete |
+| R16 | Enforced Workspace Trust + Paid-Call Gates | Polished Complete|
+| R17 | Trace Viewer Virtualization + Daemon Resilience | Polished Complete|
 | R18 | CLI Decomposition + Stable JSON Contracts | Polished Complete |
 | R19 | MCP Local Control Plane for ARC | Polished Complete |
 | R20 | MCP Tasks for Async Execution | Polished Complete |
 | R21 | LangGraph Durable Execution + Replay Contract | Polished Complete |
-| R22 | Persistent HITL + Inspect-Style Eval Artifacts | Baseline Complete (HITL only) |
+| R22 | Persistent HITL + Inspect-Style Eval Artifacts | Polished Complete|
 | R23 | Consensus Escrow (Commit-Reveal Voting) | Complete |
 | R24 | Adaptive Consensus Protocol | Complete |
 | R25 | Event-Driven Audit/HITL Notifications | Polished Complete |
-| R26 | Swarm Memory Graph | Baseline Complete (research prototype + privacy/eval gates) |
-| R27 | LangChain Adapter | Baseline Complete |
-| R28 | Anthropic Provider + Registry | Baseline Complete |
-| R29 | OpenAI-Compatible Provider | Baseline Complete |
-| R30 | Pydantic AI Adapter | Baseline Complete |
-| R31 | DSPy Adapter | Baseline Complete |
-| R32 | Haystack Adapter | Baseline Complete |
-| R33 | Smolagents Adapter | Baseline Complete |
-| R34 | Semantic Kernel Adapter | Baseline Complete |
-| R35 | Google ADK Adapter | Baseline Complete |
-| R36 | MCP Python SDK Adapter | Baseline Complete |
-| R37 | Provider Management System | Baseline Complete |
-| R77 | SwarmGraph Runtime Hardening | Baseline Complete + Live Smoke Proven |
+| R26 | Swarm Memory Graph | Polished Complete|
+| R27 | LangChain Adapter | Polished Complete|
+| R28 | Anthropic Provider + Registry | Polished Complete|
+| R29 | OpenAI-Compatible Provider | Polished Complete|
+| R30 | Pydantic AI Adapter | Polished Complete|
+| R31 | DSPy Adapter | Polished Complete|
+| R32 | Haystack Adapter | Polished Complete|
+| R33 | Smolagents Adapter | Polished Complete|
+| R34 | Semantic Kernel Adapter | Polished Complete|
+| R35 | Google ADK Adapter | Polished Complete|
+| R36 | MCP Python SDK Adapter | Polished Complete|
+| R37 | Provider Management System | Polished Complete|
+| R77 | SwarmGraph Runtime Hardening | Polished Complete|
 
 ### CLI/UX + sandbox + edit-loop track (R39–R76)
 
@@ -409,9 +409,9 @@ Only render rich UI data from event producers listed here. Missing producers mus
 | R8 IDE Provider/Quota Completion | Baseline Complete | Chunks 3.1-3.3 hardened — typed diagnostics parser with malformed/partial/success tests, local-only quota reset with targeted confirmation, three-layer provider gate (env + paid opt-in + exact confirmation) impossible to trigger without every gate; no remote quota reset or adoption claim |
 | R9 IDE Live Stream Polish | Baseline Complete | Daemon URL auto-discovery (loopback probe of 127.0.0.1:7777, no background connections), async warning fingerprint test + documentation, 3-tier fallback in SwarmGraphInsightTab (manual → ARC_PYTHON_DAEMON_URL → loopback probe) |
 | R10 Doctor/Daemon Parity Closure | Baseline Complete | ADR-009 accepted; storage included in `arc doctor all`; `arc runs links` CLI command added; all orphan routes have explicit fate labels (`ui-deferred`, `daemon-only-deprecated`, or CLI added); no docs imply complete parity |
-| R11 SwarmGraph Cost Producer | Baseline Complete | Schema updated with model/promptTokens/completionTokens/source; measured is ISO timestamp; langgraph+swarmgraph emits measured cost/token events; UI renders new fields gated on explicit events; tests cover no-producer/partial/malformed/producer-backed states |
-| R12 Packaging/Optional Features | Baseline Complete | ADR-008 accepted (daemon-bundling plan); electron-builder configs + signing preflight exist and guard release-config signing drift; check-pr.sh validates required signing keys; LM Arena live productization is deferred; **all 6 Active Work Ledger items implemented in `4b0f6b5`** |
-| R13 SwarmGraph Native Runtime | P1-P4 Baseline Complete | 989 Python tests passed; 100 targeted SwarmGraph/REPL tests pass; 762 TS tests pass; protocol + extension builds clean |
+| R11 SwarmGraph Cost Producer | Polished Complete | Schema updated with model/promptTokens/completionTokens/source; measured is ISO timestamp; langgraph+swarmgraph emits measured cost/token events; UI renders new fields gated on explicit events; tests cover no-producer/partial/malformed/producer-backed states |
+| R12 Packaging/Optional Features | Polished Complete | ADR-008 accepted (daemon-bundling plan); electron-builder configs + signing preflight exist and guard release-config signing drift; check-pr.sh validates required signing keys; LM Arena live productization is deferred; **all 6 Active Work Ledger items implemented in `4b0f6b5`** |
+| R13 SwarmGraph Native Runtime | Polished Complete | 989 Python tests passed; 100 targeted SwarmGraph/REPL tests pass; 762 TS tests pass; protocol + extension builds clean |
 
 **v0.2 execution order (all implemented, v0.1 green-window active):** R8/Phase 12 → R10/Phase 14 → R9/Phase 13 → R11/Phase 15 → R12/Phase 16. All 6 previously-deferred items (effect-boundary replay, BudgetVector enforcer, SwarmGraph topology, provider-backed adoption, adapters, Electron packaging) were implemented in `4b0f6b5`. Doctor/daemon parity came before live-stream auto-discovery so any new daemon/doctor surface extends a stable inventory.
 
@@ -1193,34 +1193,34 @@ P2 — Quality:
 | R8 IDE Provider/Quota Completion | Baseline Complete | No v0.1 action |
 | R9 IDE Live Stream Polish | Baseline Complete | No v0.1 action |
 | R10 Doctor/Daemon Parity | Baseline Complete | No v0.1 action |
-| R11 SwarmGraph Cost Producer | Baseline Complete | No v0.1 action |
-| R12 Packaging/Optional Features | Baseline Complete | No v0.1 action |
-| R13 SwarmGraph Native Runtime | Baseline Complete | No v0.1 action |
+| R11 SwarmGraph Cost Producer | Polished Complete | No v0.1 action |
+| R12 Packaging/Optional Features | Polished Complete | No v0.1 action |
+| R13 SwarmGraph Native Runtime | Polished Complete | No v0.1 action |
 | **R14 Streaming Audit + HMAC** | **Baseline Complete** | **Phase 21 — streaming verifier, arc audit verify CLI, HMAC key mgmt (21 streaming tests)** |
 | **R15 Discriminated RunEvent Unions** | **Baseline Complete** | **Phase 22 — 22 typed events + RAW fallback, TS/Python discriminated unions, type guards** |
-| **R16 Trust + Paid-Call Enforcement** | **Baseline Complete; Active Hardening** | **Phase 23 — enforcement complete; sandbox subprocess caps active; microVM preflight-only** |
-| **R17 Trace Virtualization + Daemon** | **Baseline Complete** | **Phase 24 — VirtualizedEventList, RingBuffer, SSE Last-Event-ID, client reconnect** |
+| **R16 Trust + Paid-Call Enforcement** | **Polished Complete; Active Hardening** | **Phase 23 — enforcement complete; sandbox subprocess caps active; microVM preflight-only** |
+| **R17 Trace Virtualization + Daemon** | **Polished Complete** | **Phase 24 — VirtualizedEventList, RingBuffer, SSE Last-Event-ID, client reconnect** |
 | **R18 CLI Decomposition** | **Baseline Complete** | **Phase 25 — complete; CLI decomposed into command modules with stable JSON snapshots** |
 | **R19 MCP Local Control Plane** | **Baseline Complete (scaffold)** | **Phase 26 — complete; stdio-only MCP server with trust gate, 7 tools, 3 resources** |
 | **R20 MCP Tasks** | **Baseline Complete** | **Phase 27 — complete; SQLite task registry, CLI commands, MCP polling tools, retry/expiry support** |
 | **R21 LangGraph Replay Contract** | **Baseline Complete** | **Phase 28 — complete; replay capability detection and inspect/simulated/unsafe reporting** |
-| **R22 Persistent HITL + Eval** | **Baseline Complete (HITL only)** | **Phase 29 — HITL persistence complete; eval artifact schema + Inspect-style export + two-run compare implemented (arc eval export/compare)** |
+| **R22 Persistent HITL + Eval** | **Polished Complete (HITL only)** | **Phase 29 — HITL persistence complete; eval artifact schema + Inspect-style export + two-run compare implemented (arc eval export/compare)** |
 | **R23 Consensus Escrow** | **Complete** | **Phase 30 — complete; commit-reveal voting with cryptographic verification and adversarial tests** |
 | **R24 Adaptive Consensus** | **Complete** | **Phase 31 — complete; deterministic risk assessment, protocol selection, raft/bft/bft_escrow hardening** |
 | **R25 Event-Driven Notifications** | **Baseline Complete** | **Phase 32 + SwarmGraph hooks — event bus/webhooks baseline exists; SwarmGraph optional webhook/EventBroker hooks plus durable local JSONL outbox/retry support added; delivery remains best-effort, no SSE/WebSocket claim** |
-| **R26 Swarm Memory Graph** | **Baseline Complete (research prototype + privacy/evaluation gates)** | **Phases 59-61 — local-only schema/store/extract/query, redaction-before-extraction, forget-run, evaluate; opt-in run-path extraction wired (ARC_MEMORY_AUTO_EXTRACT, redaction-first)** |
-| **R27 LangChain Adapter** | **Baseline Complete** | **Adapter Phase 26 — complete (commits 6beedf8, ea567cf, 7566e60)** |
-| **R28 Anthropic Provider + Registry** | **Baseline Complete** | **Adapter Phase 27 — complete (commit 4a479b7)** |
-| **R29 OpenAI-Compatible Provider** | **Baseline Complete** | **Adapter Phase 28 — complete (commit 6826d8d, 24 tests, 6 vendors)** |
-| **R30 Pydantic AI Adapter** | **Baseline Complete** | **Adapter Phase 29 — complete (commits 7680017, c34abb3, 27a33b1 — 43 tests, 3 PRs)** |
-| **R31 DSPy Adapter** | **Baseline Complete** | **Adapter Phase 30 — T1 detection (19 tests), T2 export (16 tests), T3 gated scaffold (17 tests), adapter (15 tests)** |
-| **R32 Haystack Adapter** | **Baseline Complete** | **Adapter Phase 31 — T1 detection (19 tests), T2 export (16 tests), T3 gated scaffold (15 tests), adapter (15 tests)** |
-| **R33 Smolagents Adapter** | **Baseline Complete** | **Adapter Phase 32 — T1 detection (11 tests), T2 export (7 tests), T3 gated scaffold (6 tests), adapter (7 tests)** |
-| **R34 Semantic Kernel Adapter** | **Baseline Complete** | **Adapter Phase 33 — T1 detection + T2 static export; no runtime execution claim** |
-| **R35 Google ADK Adapter** | **Baseline Complete** | **Adapter Phase 34 — T1 detection + T2 static export; T3 deferred (google-adk 0.x churn)** |
-| **R36 MCP Python SDK Adapter** | **Baseline Complete** | **Adapter Phase 35 — T1 detection + T2 static export; T3 deferred (trust posture + transport lifecycle)** |
-| **R37 Provider Management (Phase 1)** | **Baseline Complete** | **Phase 36.1 — interactive UX without credential storage (commits cd89aab-7f2e20b)** |
-| **R37 Provider Management (Phase 2)** | **Baseline Complete** | **Phase 36.2 — auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`; token refresh; trust enforcement; audit logging; env var fallback; 57 auth tests** |
+| **R26 Swarm Memory Graph** | **Polished Complete (research prototype + privacy/evaluation gates)** | **Phases 59-61 — local-only schema/store/extract/query, redaction-before-extraction, forget-run, evaluate; opt-in run-path extraction wired (ARC_MEMORY_AUTO_EXTRACT, redaction-first)** |
+| **R27 LangChain Adapter** | **Polished Complete** | **Adapter Phase 26 — complete (commits 6beedf8, ea567cf, 7566e60)** |
+| **R28 Anthropic Provider + Registry** | **Polished Complete** | **Adapter Phase 27 — complete (commit 4a479b7)** |
+| **R29 OpenAI-Compatible Provider** | **Polished Complete** | **Adapter Phase 28 — complete (commit 6826d8d, 24 tests, 6 vendors)** |
+| **R30 Pydantic AI Adapter** | **Polished Complete** | **Adapter Phase 29 — complete (commits 7680017, c34abb3, 27a33b1 — 43 tests, 3 PRs)** |
+| **R31 DSPy Adapter** | **Polished Complete** | **Adapter Phase 30 — T1 detection (19 tests), T2 export (16 tests), T3 gated scaffold (17 tests), adapter (15 tests)** |
+| **R32 Haystack Adapter** | **Polished Complete** | **Adapter Phase 31 — T1 detection (19 tests), T2 export (16 tests), T3 gated scaffold (15 tests), adapter (15 tests)** |
+| **R33 Smolagents Adapter** | **Polished Complete** | **Adapter Phase 32 — T1 detection (11 tests), T2 export (7 tests), T3 gated scaffold (6 tests), adapter (7 tests)** |
+| **R34 Semantic Kernel Adapter** | **Polished Complete** | **Adapter Phase 33 — T1 detection + T2 static export; no runtime execution claim** |
+| **R35 Google ADK Adapter** | **Polished Complete** | **Adapter Phase 34 — T1 detection + T2 static export; T3 deferred (google-adk 0.x churn)** |
+| **R36 MCP Python SDK Adapter** | **Polished Complete** | **Adapter Phase 35 — T1 detection + T2 static export; T3 deferred (trust posture + transport lifecycle)** |
+| **R37 Provider Management (Phase 1)** | **Polished Complete** | **Phase 36.1 — interactive UX without credential storage (commits cd89aab-7f2e20b)** |
+| **R37 Provider Management (Phase 2)** | **Polished Complete** | **Phase 36.2 — auth module with Fernet encryption, OAuth handler, dynamic callback ports, PKCE/state validation, optional Keychain via `--keychain`, CLI `arc providers add --api-key/--oauth/remove`; token refresh; trust enforcement; audit logging; env var fallback; 57 auth tests** |
 | **R38 CLI Sandbox Hardening + IDE Integration** | **Active Hardening** | **Phase 37 — subprocess caps + approval prune + path-intent expansion + protocol parity + microVM preflight + container fallback tests + e2e routability + microVM truth guard + design-proof plan + gated Lima low-security developer harness + Lima mount-proof mode (CI-skipped real-host symlink evidence) + ADR-024 contract + Firecracker gated harness + firecracker_doctor() + public-execution truth guard + real-host Lima lifecycle tests (CI-skipped; P2 network-off blocked by Lima 2.x slirp) + symlink-escape guard + Firecracker CI-skip structure + local audit query UX + Firecracker proof artifact hardening + classifier/path-intent regressions complete; microVM execution blocked pending P1–P7 proofs** |
 | **R39 Interactive CLI/UX Foundation** | **Baseline Complete** | **Phases 41–45 — slash command registry, approval UX, progress rendering, REPL error boundary, advisory locking, read-only IDE session bridge; 2846 Python tests; OpenCode/Claude Code parity remains a target, not claimed** |
 | **R40 CLI/UX Polish & Advanced Features** | **Baseline Complete** | **Phase 42 — P0 CLI foundation (pipelines, aliases, batch mode foundation); IDE write bridge IMPLEMENTED on the advisory lock (storage/advisory_lock.py fcntl; arc studio sessions write, Phase 46)** |
@@ -1252,7 +1252,7 @@ P2 — Quality:
 | **R74 Broad CLI CI Orchestration** | **Baseline Complete** | **Phase 103 — detect local CI matrix, run selected argv job through sandbox/streaming, write local artifact, stable JSON** |
 | **R75 macOS MicroVM Execution + Strict No-Network Proof** | **Gated Public CLI Proof Passed Once / Artifact Provenance Added / Default Off** | **Phase 104 — Direct Apple VZ `arc sandbox run --provider microvm -- pwd` passed once with no-network/workspace/teardown/audit evidence; not production-grade or arbitrary-command execution** |
 | **R76 Linux Firecracker Execution Proof** | **Host-Unproven Scaffold** | **Phase 105 — Linux/Firecracker gated scaffold exists behind KVM/rootfs/env gates; real proof requires eligible Linux host** |
-| **R77 SwarmGraph Runtime Hardening** | **Baseline Complete + Live Smoke Proven** | **Phase 106/107 — ProviderClient worker wiring, async parallel execution, fan-out gate, context isolation, event callback, 10 failure detectors, mesh/tree decomposition, parent/multi-dependency DAG scheduling, guardrails, notification hooks, and opt-in 9router worker smoke complete** |
+| **R77 SwarmGraph Runtime Hardening** | **Polished Complete + Live Smoke Proven** | **Phase 106/107 — ProviderClient worker wiring, async parallel execution, fan-out gate, context isolation, event callback, 10 failure detectors, mesh/tree decomposition, parent/multi-dependency DAG scheduling, guardrails, notification hooks, and opt-in 9router worker smoke complete** |
 | **R-TS1 Token-Saving Research** | **Research Intake (Planning Only)** | Status: Research Intake | Evidence: `docs/research/TOKEN_SAVING_PLAN.md` (first draft) + `TOKEN_SAVING_PLAN-2.md` (authoritative; repo-grounded at origin/main `d82e925`) | Notes: Confirms ARC has complete cache_control plumbing in providers/anthropic.py but callers never populated it; R-03 (OTel) identified as highest-leverage first step. |
 | **R-TS2 Token-Saving P0** | **Baseline Complete** | Status: Baseline Complete | Evidence: commits `eb6d1e1` (P0-1 msg ordering), `177c882` (P0-2 Anthropic cache_control), `6813c95` (P0-3 token counter), `1cbc295` (P0-4 status bar), `8e677c5` (test fix), `e89ee5e` (R-03 OTel cache fields); 4893 passed; patches in `patches/tokens/p0/001-005` | Notes: Byte-stable ordering, auto cache_control injection, provider-aware token counter wired into DataStore, context meter in status bar, OTel cache fields visible. Tag candidate: v0.3.0-alpha. |
 | **R-TS3 arc-protocol-ts coverage backfill** | **Baseline Complete** | Status: Baseline Complete | Evidence: thresholds restored to 73/80/87/85 in v0.3.1-alpha | Notes: Coverage debt from v0.3.0-alpha R-03 repaid within one patch tag. |

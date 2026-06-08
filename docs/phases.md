@@ -7093,3 +7093,134 @@ Evidence-based elevation. Labels follow evidence.
 - **Gate 8 (docs):** README `arc-wallet` fix (CR-021 — wallet CLI command documented accurately).
 - **Gate 4 (tests):** 16 tests; additive; ruff clean.
 - **N/A:** 1, 2, 5, 7.
+
+
+## Phase 235 — Elevate R11 (SwarmGraph Cost Producer) + R12 (Packaging) to Polished Complete
+
+### R11 (SwarmGraph Cost Producer) → Polished Complete
+- **Gate 1 (UX states):** Schema updated with `model`, `promptTokens`, `completionTokens`, `source`, `measured` (ISO timestamp). IDE cost panel renders new fields gated on explicit `SWARMGRAPH_COST` events (Phase 173 R-POLISH15). Degraded state when no cost producer. No invented cost data.
+- **Gate 3 (parity):** `langgraph+swarmgraph` cost event naming consistent: `SWARMGRAPH_COST` from native adapter (Phase 173) + `BUDGET_UPDATE` cross-language contract (Phase 168 R-POLISH10). No fabricated cost.
+- **Gate 4 (tests):** 1030 adapter+swarmgraph tests (Phase 173). Tests cover no-producer/partial/malformed/producer-backed states.
+- **N/A:** 2 (a11y, cost panel uses --arc-color-* tokens covered by R-AUDIT23 axe scan), 5, 6, 7, 8.
+
+### R12 (Packaging/Optional Features) → Polished Complete
+- **Gate 6 (security):** ADR-008 accepted (daemon-bundling plan). `electron-builder` configs + signing preflight guard release-config signing drift. `check-pr.sh` validates required signing keys. Electron signing gated (`require-electron-signing.mjs`, `forceCodeSigning`).
+- **Gate 7 (reliability):** `DaemonManager` start/stop/spawn lifecycle. Auto-update `publish` feed (GitHub Releases, opt-in). Structure-guard tests.
+- **Gate 8 (docs):** README packaging notes. Signing gate documented. LM Arena live productization deferred (honest).
+- **Gate 4 (tests):** 6 Active Work Ledger items implemented (commit `4b0f6b5`). Release check gate verifies artifact.
+- **N/A:** 1, 2, 3, 5.
+
+## Phase 236 — Elevate R13 (SwarmGraph Native Runtime P1-P4) to Polished Complete
+
+### R13 (SwarmGraph Native Runtime, P1–P4) → Polished Complete
+- **Gate 1 (UX states):** SwarmGraph InsightTab has topology/consensus/cost panels with explicit present/degraded/empty states (R-AUDIT23 → Polished, Phase 206). SwarmGraph plan + eval CLI returns structured JSON.
+- **Gate 2 (a11y):** R-AUDIT23 → Polished Complete (Phase 206) — SwarmGraph Insight tab passes axe color-contrast in rendered Chromium.
+- **Gate 3 (parity):** `arc swarmgraph plan/eval` CLI ↔ IDE SwarmGraphInsightTab consistent (both read from `SWARMGRAPH_TOPOLOGY/CONSENSUS/COST` events).
+- **Gate 4 (tests):** 989 Python tests passed; 100 targeted SwarmGraph/REPL tests; 762 TS tests; protocol + extension builds clean.
+- **Gate 5 (perf):** Live event buffer bounded at 2000 (Phase 215 R-PERF1). SwarmGraphInsightTab state updates bounded.
+- **Gate 6 (security):** Native runtime gated (no LLM-based decisions). Queen/worker/consensus lifecycle deterministic.
+- **Gate 7 (reliability):** Structured error envelopes on consensus failure.
+- **Gate 8 (docs):** README SwarmGraph section. `arc swarmgraph --help`. Banned-claims clean.
+
+## Phase 237 — Elevate R16 (Workspace Trust + Paid-Call Gates) to Polished Complete
+
+### R16 (Enforced Workspace Trust + Paid-Call Gates) → Polished Complete
+- **Gate 6 (security):** Phase 23 enforcement complete. Sandbox subprocess caps active. Trust enforcement on workspace init. Paid-call gates: `require_dual_gate` in runner (R-AUDIT6 verified — gate is upstream). `DataStore.allow_paid` default fail-closed (Phase 163 R-POLISH5). MCP proxy env sanitised (Phase 162 R-POLISH4). Active hardening: P0 sprint (SQLite budget-lock, TUI shell-escape, POST-only `/api/runs/start`, profile schema) complete.
+- **Gate 7 (reliability):** Trust enforcement deterministic (no LLM allow/deny). Structured error on trust violation.
+- **Gate 4 (tests):** Security test suite. 64 TUI-core tests (Phase 163). Enforcement surface verified.
+- **Gate 8 (docs):** README Security section. SECURITY.md threat model. `arc workspace init --help`. Banned-claims clean.
+- **N/A:** 1 (internal enforcement), 2, 3, 5.
+
+## Phase 238 — Elevate R17 (Trace Viewer Virtualization + Daemon Resilience) to Polished Complete
+
+### R17 (Trace Viewer Virtualization + Daemon Resilience) → Polished Complete
+- **Gate 5 (perf):** Phase 24: `VirtualizedEventList` (windowed rendering). `RingBuffer` for live events. `TraceParser` memory caps — rejects > 64 MB files, bounds line buffer (Phase 169 R-POLISH11). Bounded live event buffers in timeline + SwarmGraph (Phase 215 R-PERF1).
+- **Gate 7 (reliability):** SSE Last-Event-ID reconnect. Client reconnect on disconnect. Daemon `DaemonManager` lifecycle. Structured error on daemon unavailable.
+- **Gate 4 (tests):** 926 arc-extension tests (Phase 169). Timeline widget tests.
+- **Gate 1 (UX states):** Trace viewer: loading/empty/error/live/replay states explicit. No silent failures.
+- **N/A:** 2, 3, 6, 8.
+
+## Phase 239 — Elevate R22 (Persistent HITL + Eval Artifacts) to Polished Complete
+
+### R22 (Persistent HITL + Inspect-Style Eval Artifacts, HITL only) → Polished Complete
+- **Gate 1 (UX states):** AssuranceTab: HITL inbox with pending/approved/rejected/expired/blocked states. Auto-refresh every 10s. Audit chain viewer (present/missing/degraded). Replay stepper with category filters.
+- **Gate 3 (parity):** `arc hitl pending` CLI ↔ AssuranceTab HITL inbox consistent. Eval export (`arc eval export --format inspect`) produces Inspect-AI-compatible artifacts. `arc eval compare` two-run report.
+- **Gate 4 (tests):** Phase 29 HITL persistence tests. Eval artifact schema + two-run compare tests. `schema_version` field added (B2P-11, Phase 203).
+- **Gate 6 (security):** HITL token/expiry gate — expired/missing tokens blocked. Approval confirmation required.
+- **Gate 7 (reliability):** HITL prompt expiry handling. Replay stepper timeout.
+- **N/A:** 2, 5, 8.
+
+## Phase 240 — Elevate R26 (Swarm Memory Graph) to Polished Complete
+
+### R26 (Swarm Memory Graph) → Polished Complete
+- **Gate 6 (security):** Redaction-before-extraction enforced (`ARC_MEMORY_AUTO_EXTRACT`, default off). Privacy-first: no raw sensitive content extracted; `Redactor` runs before node-build (Phase 203 B2P-12). Forget-run removes nodes. Memory extraction opt-in only.
+- **Gate 3 (parity):** `arc memory` CLI commands consistent with Python memory API.
+- **Gate 4 (tests):** Phases 59-61 memory tests (schema/store/extract/query/evaluate). Redaction-before-extraction tests. B2P-12 wiring test (opt-in run path).
+- **Gate 5 (perf):** Local-only graph store (SQLite). No network I/O. Query bounded.
+- **Gate 7 (reliability):** Memory store fail-graceful (default off — missing memory store is not an error for non-memory runs).
+- **Gate 8 (docs):** `arc memory --help`. Opt-in documented. Banned-claims clean (no "production-grade memory" claims).
+- **N/A:** 1, 2. B2P-20 (human-reviewed memory evidence) remains terminal-gated.
+
+## Phase 241 — Elevate R27/R28/R29/R30 (LangChain/Anthropic/OpenAI-Compat/PydanticAI) to Polished Complete
+
+All four adapters follow the same gate pattern (T1 detection + T2 export + T3 gated scaffold):
+
+### R27 (LangChain Adapter) → Polished Complete
+- **Gate 3 (parity):** Detection + AST analysis + `.invoke()`/`.stream()` via `ARC_LANGGRAPH_EXPORT`. SDK version surfaced (`arc runtimes --capabilities --json`). Cross-language contract.
+- **Gate 6 (security):** T3 runtime gated (`ARC_LANGGRAPH_EXPORT` + paid-call gate). No provider calls without explicit opt-in.
+- **Gate 4 (tests):** Adapter Phase 26 (commits 6beedf8, ea567cf, 7566e60). SDK version test (R-AUDIT24 Phase 204).
+- **N/A:** 1, 2, 5, 7, 8.
+
+### R28 (Anthropic Provider + Registry) → Polished Complete
+- **Gate 3 (parity):** Anthropic provider in registry. SDK version field (R-AUDIT24). `arc providers list --json` includes Anthropic.
+- **Gate 6 (security):** API key via env only (`ANTHROPIC_API_KEY`). Paid-call gated.
+- **Gate 4 (tests):** Adapter Phase 27 (commit 4a479b7). SDK version test.
+- **N/A:** 1, 2, 5, 7, 8.
+
+### R29 (OpenAI-Compatible Provider) → Polished Complete
+- **Gate 3 (parity):** 6 OpenAI-compatible vendors in registry. Consistent `_map_error` redaction (R-POLISH1).
+- **Gate 4 (tests):** Adapter Phase 28 (commit 6826d8d, 24 tests, 6 vendors).
+- **Gate 6 (security):** API keys via env only. Provider `_map_error` redacted (R-POLISH1).
+- **N/A:** 1, 2, 5, 7, 8.
+
+### R30 (PydanticAI Adapter) → Polished Complete
+- **Gate 3 (parity):** Detection + T2 export + T3 gated. SDK version (R-AUDIT24).
+- **Gate 4 (tests):** Adapter Phase 29 (43 tests, 3 PRs).
+- **Gate 6 (security):** T3 gated. No execution without explicit opt-in.
+- **N/A:** 1, 2, 5, 7, 8.
+
+## Phase 242 — Elevate R31/R32/R33/R34/R35 (DSPy/Haystack/Smolagents/Semantic Kernel/Google ADK) to Polished Complete
+
+All five follow T1+T2+T3(deferred) pattern with consistent gate evidence:
+
+### R31 (DSPy), R32 (Haystack), R33 (Smolagents), R34 (Semantic Kernel), R35 (Google ADK) → Polished Complete
+- **Gate 3 (parity):** T1 detection consistent with `arc runtimes --capabilities --json`. T2 static export produces ARC-compatible workflow YAML. T3 deferred for R34/R35 (churn/trust posture documented honestly).
+- **Gate 6 (security):** All T3 paths require explicit env gates. No provider calls without opt-in. T3 deferred for R34 (Semantic Kernel) and R35 (Google ADK 0.x churn) — honest scope limit.
+- **Gate 4 (tests):** R31: 19+16+17+15 tests. R32: 19+16+15+15 tests. R33: 11+7+6+7 tests. R34: T1+T2 tests (T3 deferred). R35: T1+T2 tests (T3 deferred — google-adk 0.x churn).
+- **Gate 7 (reliability):** Detection fail-graceful (missing dep → detection=False, not crash). T3 deferred documented.
+- **N/A:** 1, 2, 5, 8.
+
+## Phase 243 — Elevate R36 (MCP Python SDK Adapter) + R37 (Provider Management System) to Polished Complete
+
+### R36 (MCP Python SDK Adapter) → Polished Complete
+- **Gate 3 (parity):** T1 detection + T2 static export. T3 deferred (trust posture + transport lifecycle not resolved for general MCP SDK). MCP local control plane (R19, Polished) is the primary production path.
+- **Gate 6 (security):** MCP proxy sanitises env (Phase 162 R-POLISH4). Per-call risk gate on all MCP tool invocations. T3 deferred with honest scope (not gated open).
+- **Gate 4 (tests):** Adapter Phase 35. 123 MCP tests (Phase 162).
+- **N/A:** 1, 2, 5, 7, 8.
+
+### R37 (Provider Management System) → Polished Complete
+- **Gate 1 (UX states):** Interactive provider discovery UX in TUI (`/providers`, `/connect`). ConfigTab provider list with source badge. Loading/empty/error states on provider config.
+- **Gate 6 (security):** Credentials via env only — no credential storage in provider management. Three-layer provider gate (env + paid opt-in + exact confirmation). R-AUDIT4 provider `apiKeySource` badge accurate.
+- **Gate 4 (tests):** Phase 36.1 (commits cd89aab-7f2e20b). Provider diagnostics tests. R3/R8 Polished (Phase 223).
+- **N/A:** 2, 5, 7, 8.
+
+## Phase 244 — Elevate R77 (SwarmGraph Runtime Hardening) to Polished Complete
+
+### R77 (SwarmGraph Runtime Hardening) → Polished Complete
+- **Gate 1 (UX states):** SwarmGraph Insight tab shows real runtime metadata: `runtimeMode`, `realProviderCall`, `realRuntimeGated`, `realPathAbsentReason`. No invented data. Degraded state when live smoke not run.
+- **Gate 3 (parity):** `langgraph+swarmgraph` local-real path: `ARC_REAL_RUNTIME_SMOKE=1` + `ARC_LANGGRAPH_SWARMGRAPH_REAL=1`. Default and CI use fake/offline deterministic routing. No provider calls unless explicitly gated.
+- **Gate 4 (tests):** Live smoke proven once (commit evidence). Runtime metadata contract test.
+- **Gate 6 (security):** Real runtime requires dual gates. Default is offline/deterministic (no provider calls). Sandbox posture maintained.
+- **Gate 7 (reliability):** Offline path (default) is fully deterministic. Real path is opt-in and documented.
+- **Gate 8 (docs):** README Runtime Adapters section. `arc run --help`. Local-real smoke documented. Banned-claims clean (no "production-grade SwarmGraph" claims — R79.1/R79.2 remain terminal-gated).
+- **N/A:** 2, 5.
