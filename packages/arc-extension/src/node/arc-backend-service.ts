@@ -75,6 +75,7 @@ import {
     WorkspaceInventory,
     TestbenchDetection,
     TestbenchRunResult,
+    AgentsMdEntry,
     CiCheckStatus,
     SandboxInspectResult,
     EditPlanApprovalResult,
@@ -1208,6 +1209,35 @@ export class ArcBackendService implements ArcService {
 
     async detectTestbench(commandOverride?: string): Promise<TestbenchDetection> {
         return this.localTelemetryService.detectTestbench(commandOverride);
+    }
+
+    async discoverAgentsMd(): Promise<AgentsMdEntry[]> {
+        // R-AUDIT16: real producer — `arc agents-md discover --json` over the workspace.
+        const args = ['agents-md', 'discover', '--workspace', this.workspaceRoot, '--json'];
+        let raw = '';
+        try {
+            raw = await execArcCliAsync(args, { timeout: 30000, maxBuffer: 4 * 1024 * 1024 });
+        } catch (e) {
+            const err = e as { stdout?: string | Buffer };
+            raw = typeof err?.stdout === 'string' ? err.stdout : err?.stdout ? String(err.stdout) : '';
+            if (!raw) {
+                return [];
+            }
+        }
+        try {
+            const parsed = JSON.parse(raw);
+            const entries = ((parsed.data ?? {}).entries ?? []) as Array<Record<string, unknown>>;
+            return entries.map((e) => ({
+                path: String(e.path ?? ''),
+                sha256: String(e.sha256 ?? ''),
+                sizeBytes: Number(e.size_bytes ?? 0),
+                overCap: Boolean(e.over_cap),
+                isOverride: Boolean(e.is_override),
+                likelyLlmGenerated: Boolean(e.likely_llm_generated),
+            }));
+        } catch {
+            return [];
+        }
     }
 
     async runTestbench(command: string): Promise<TestbenchRunResult> {

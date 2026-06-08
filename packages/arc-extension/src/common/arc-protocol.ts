@@ -994,6 +994,8 @@ export interface ArcService {
     detectTestbench(commandOverride?: string): Promise<TestbenchDetection>;
     /** Run a detected test command through the local-safe sandbox policy (network/destructive denied). */
     runTestbench(command: string): Promise<TestbenchRunResult>;
+    /** Discover AGENTS.md files in the workspace (R-AUDIT16) — real producer for ArcContextDrawer. */
+    discoverAgentsMd(): Promise<AgentsMdEntry[]>;
     /** Read-only CI check status via CLI bridge */
     getCiCheckStatus(): Promise<CiCheckStatus>;
 
@@ -1129,6 +1131,16 @@ export interface TestbenchRunResult {
     exitCode?: number | null;
     auditPath?: string;
     error?: string;
+}
+
+/** A discovered AGENTS.md file + its metadata (R-AUDIT16). */
+export interface AgentsMdEntry {
+    path: string;
+    sha256: string;
+    sizeBytes: number;
+    overCap: boolean;
+    isOverride: boolean;
+    likelyLlmGenerated: boolean;
 }
 
 export interface CiCheckStatus {

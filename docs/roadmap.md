@@ -1757,7 +1757,7 @@ P2 — Quality:
 | R-AUDIT13 | HMAC README Wording Tighten | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | Scope caveat added to README and SECURITY.md HMAC sections. |
 | R-AUDIT14 | Mutating GET /api/runs/start Removal | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | GET /api/runs/start returns 410 Gone; POST unaffected; legacy env shim removed. |
 | R-AUDIT15 | SwarmGraph MetaPathFinder Bridge Docs | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | docs/research/swarmgraph-metapathfinder-bridge.md created with architecture, gates, and honest limits. |
-| R-AUDIT16 | IDE Context Drawer / AGENTS.md Surface | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | ArcContextDrawer widget created; registered in frontend module; stub data (CLI proxy wiring follow-on); 1 test. |
+| R-AUDIT16 | IDE Context Drawer / AGENTS.md Surface | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | ArcContextDrawer widget created; registered in frontend module; stub data (CLI proxy wiring follow-on); 1 test. |
 | R-AUDIT17 | R79 TUI/Theia Surfacing | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | /budget [run-id] slash command added to TUI screen; wallet fallback when no run-id; 2 new tests. |
 | R-AUDIT18 | Workspace Search CLI + IDE Panel | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | arc workspace search command added; ripgrep/pathlib fallback; path-confined; 3 new tests. IDE panel follow-on. |
 | R-AUDIT19 | Eval Metrics Honest Labelling | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | synthetic:bool=True added to EvalResult; [synthetic/simulated] prefix in CLI eval display; 2 new tests. |

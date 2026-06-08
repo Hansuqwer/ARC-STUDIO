@@ -6497,3 +6497,13 @@ Closed the "ProviderRouter created but not wired (turn_manager wiring follow-on)
 - **Gate 4 (tests):** `tests/runtime/test_provider_router_wiring.py` (failover-when-enabled + default-off-propagates) + existing `test_turn_manager.py`/`test_agent_loop.py`/`test_router.py` (26 passed).
 - **Honest scoping:** wiring covers the **completion** path; streaming-path failover (mid-stream) is a documented refinement. Opt-in/default-off (single-user alpha posture unchanged). **N/A:** 1,2,5,6,8.
 
+
+### Tier-2 R-AUDIT16 — IDE Context Drawer real producer → Polished Complete
+
+Closed the "stub data / CLI proxy wiring follow-on" gap — the drawer no longer always renders empty.
+
+- **Gate 1 (UX states / producer-truth):** `ArcContextDrawer` now `@inject(ArcService)` and calls `discoverAgentsMd()` (real producer); renders real discovered AGENTS.md entries (path + override/over-cap/LLM-generated/size badges) with explicit loading / error (`role="alert"`) / empty / populated states. The stub (`agents: []` always) is removed.
+- **Gate 3 (parity):** backend `discoverAgentsMd` runs `arc agents-md discover --workspace … --json` — the IDE surfaces the same data as the CLI.
+- **Gate 4 (tests):** `arc-context-drawer.test.tsx` asserts the injection + `discoverAgentsMd` call + no-stub + states, and the backend/protocol wiring; `pnpm --filter arc-extension build` clean + suite 965 passed/3 skipped.
+- **N/A:** 2 a11y-contrast (text/role only), 5,6,7,8.
+
