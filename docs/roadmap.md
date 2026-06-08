@@ -191,7 +191,7 @@ GATED items (auth / native-device / paid-live provider / Linux-KVM host) are int
 | B2P-09 | Real-time budget enforcement at adapter effect boundaries | Baseline Complete | 5,6,7 · L |
 | B2P-10 | Type the intentionally-untyped run events | Baseline Complete | 4 · S |
 | B2P-11 | Eval artifact schema + Inspect-AI export + two-run report compare | Baseline Complete | 3,4,8 · M |
-| B2P-12 | Memory runtime wiring (extract/query during runs, redaction-first) | Not Started | 3,4 · M |
+| B2P-12 | Memory runtime wiring (extract/query during runs, redaction-first) | Baseline Complete | 3,4 · M |
 | B2P-13 | IDE write bridge (Phase 42; depends on advisory lock) | Not Started | 6,7 · M |
 | B2P-17 | Full Electron app packaging (browser stays canonical) | Not Started | 4,8 · L |
 | B2P-18 | Doctor/daemon parity remainder (resolve fate-labeled orphan routes) | Not Started | 3,8 · M |
@@ -1208,7 +1208,7 @@ P2 — Quality:
 | **R23 Consensus Escrow** | **Complete** | **Phase 30 — complete; commit-reveal voting with cryptographic verification and adversarial tests** |
 | **R24 Adaptive Consensus** | **Complete** | **Phase 31 — complete; deterministic risk assessment, protocol selection, raft/bft/bft_escrow hardening** |
 | **R25 Event-Driven Notifications** | **Baseline Complete** | **Phase 32 + SwarmGraph hooks — event bus/webhooks baseline exists; SwarmGraph optional webhook/EventBroker hooks plus durable local JSONL outbox/retry support added; delivery remains best-effort, no SSE/WebSocket claim** |
-| **R26 Swarm Memory Graph** | **Baseline Complete (research prototype + privacy/evaluation gates)** | **Phases 59-61 — local-only schema/store/extract/query, redaction-before-extraction, forget-run, evaluate; runtime wiring deferred** |
+| **R26 Swarm Memory Graph** | **Baseline Complete (research prototype + privacy/evaluation gates)** | **Phases 59-61 — local-only schema/store/extract/query, redaction-before-extraction, forget-run, evaluate; opt-in run-path extraction wired (ARC_MEMORY_AUTO_EXTRACT, redaction-first)** |
 | **R27 LangChain Adapter** | **Baseline Complete** | **Adapter Phase 26 — complete (commits 6beedf8, ea567cf, 7566e60)** |
 | **R28 Anthropic Provider + Registry** | **Baseline Complete** | **Adapter Phase 27 — complete (commit 4a479b7)** |
 | **R29 OpenAI-Compatible Provider** | **Baseline Complete** | **Adapter Phase 28 — complete (commit 6826d8d, 24 tests, 6 vendors)** |

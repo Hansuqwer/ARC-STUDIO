@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from typing import Any, Optional
@@ -264,6 +265,18 @@ class TaskExecutor:
             )
         except Exception:  # noqa: BLE001 - audit is best-effort; never break the run
             log.debug("keyed run audit checkpoint skipped", exc_info=True)
+
+        # B2P-12: opt-in memory extraction from the run path (redaction-first; default off via env).
+        # The extractor applies the canonical Redactor before building memory nodes, so no raw
+        # secret/PII text enters the memory graph. Enable with ARC_MEMORY_AUTO_EXTRACT=1.
+        if os.environ.get("ARC_MEMORY_AUTO_EXTRACT") == "1":
+            try:
+                from ..memory_graph.store import MemoryGraphStore, extract_memories_from_runs
+
+                snapshot = extract_memories_from_runs(workspace / ".arc" / "traces", limit=5)
+                MemoryGraphStore(workspace / ".arc" / "memory" / "graph.json").merge(snapshot)
+            except Exception:  # noqa: BLE001 - memory extraction is best-effort; never break the run
+                log.debug("memory extraction skipped", exc_info=True)
 
         return {
             "run_id": run.id,
