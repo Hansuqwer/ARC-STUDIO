@@ -6199,3 +6199,15 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: commits b7a1fb0 + this; 3 route-fate + 3 electron guard tests | Notes: browser app remains the canonical release target; Electron desktop + auto-update are post-v0.1. **Batch 7 COMPLETE (30/30).**
 
 ---
+
+## Phase 203 — v0.2 Polished elevation (selected Batch 7 items)
+
+Driving selected Batch 7 `Baseline Complete` items to `Polished Complete` against the full Definition of Done. **Labels follow evidence**; gates that do not apply to a backend/protocol surface are marked N/A with a reason (per the DoD allowance for N/A gates).
+
+### B2P-10 — typed run events → Polished Complete
+
+- **Gate 3 (parity):** ✓ Bidirectional, drift-proof. `tests/protocol/test_run_event_parity.py`: Python `EVENT_TYPES` ↔ machine-readable `protocol/fixtures/run-event-registry.json` (type/version/required/optional fields), TS `run-events.ts` literals ∪ intentionally-untyped == registry, and TS ∩ untyped == ∅ (no double-typing). Every TS-untyped event carries a documented rationale (no silent omission).
+- **Gate 4 (tests):** ✓ `uv run pytest tests/protocol/test_run_event_parity.py` → 8 passed.
+- **Gate 8 (docs):** ✓ `INTENTIONALLY_UNTYPED_TS_EVENTS` rationale map is self-documenting; this entry + roadmap row updated; `check-banned-claims.sh` clean.
+- **N/A:** 1 UX-states, 2 a11y, 5 perf — no user-visible surface (cross-language protocol contract). 6 security, 7 reliability — no security decision or long-running/bridged action.
+
