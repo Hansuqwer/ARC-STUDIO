@@ -31,3 +31,5 @@ jobs:
       - name: React Native native-safety + TurboModule contract gate
         working-directory: python
         run: uv run pytest -q tests/test_mobile_rn.py
+      - name: Mobile dependency vuln scan (R79.5, best-effort)
+        run: bash scripts/mobile-deps-audit.sh

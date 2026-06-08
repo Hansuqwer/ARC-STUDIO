@@ -6129,3 +6129,14 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree 2026-06-08 | Files: `cli/mobile.py`, `.github/workflows/{python,arc-roadmap-gate}.yml`, `docs/mobile/REAL_VS_MOCK.md`, `tests/test_mobile_cli_batch6.py`, `tests/test_mobile_property_batch6.py`. Verified: 115 mobile tests pass (incl. 7 property tests); mypy clean over 51 files (incl. 9 new modules); ruff clean; banned-claims green. | Notes: deterministic; simulator-preview; native device access remains fixtures-only and human-gated.
 
 ---
+
+## Phase 196 — Batch 7 Track A: Baseline→Polished quick wins (T1–T4)
+
+- **T1 (R-AUDIT28):** removed dead duplicate `arena-frontend-module.ts`; verify-first correction — `arc-run-timeline-widget.tsx` is live (factory + ArcRunsContribution + contract test), kept.
+- **T2 (B2P-10):** documented `{event: rationale}` map for intentionally-untyped TS events + parity test enforcing rationale/no-drift.
+- **T3 (B2P-01):** config-driven `/statusline` slot reordering (DataStore.statusline_order; default preserved).
+- **T4 (R79.5):** `scripts/mobile-deps-audit.sh` (npm/pnpm + OSV-Scanner) wired as `mobile:deps-audit` release gate + mobile CI steps.
+
+**Status:** Baseline Complete | Evidence: commits 436c5b1 / 9d23490 / aae4272 + this; tsc + arc-extension 937 passed/3 skipped, 8 parity + 22 TUI tests, mobile-deps-audit dry-run OK (Flutter via OSV) | Notes: deterministic; additive; banned-claims green; none-posture.
+
+---

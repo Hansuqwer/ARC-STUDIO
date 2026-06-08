@@ -40,3 +40,5 @@ jobs:
           else
             echo "::notice::flutter toolchain not present — Python static gate is authoritative"
           fi
+      - name: Mobile dependency vuln scan (R79.5, best-effort)
+        run: bash scripts/mobile-deps-audit.sh

@@ -45,3 +45,5 @@ jobs:
           echo "The authoritative CI gate is the recursive forbidden-symbol scan above."
           npx --yes expo prebuild --no-install --platform all || \
             echo "::notice::expo prebuild skipped (toolchain/network unavailable) — preview only"
+      - name: Mobile dependency vuln scan (R79.5, best-effort)
+        run: bash scripts/mobile-deps-audit.sh
