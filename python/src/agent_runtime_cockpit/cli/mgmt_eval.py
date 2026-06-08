@@ -21,6 +21,19 @@ from ._helpers import (
 from ._subapps import eval_app
 
 
+def _batch_synthetic(results: list[dict]) -> bool:
+    """True when every result in the batch is a synthetic (offline/deterministic) eval.
+
+    Synthetic results are not from live provider runs; surfacing this on the aggregate keeps
+    the batch summary honest (CR-034).
+    """
+    return bool(results) and all(r.get("synthetic", False) for r in results)
+
+
+def _synthetic_prefix(results: list[dict]) -> str:
+    return "[synthetic] " if _batch_synthetic(results) else ""
+
+
 @eval_app.command("save")
 def eval_save(
     golden_id: str = typer.Argument(..., help="Golden trace ID to save"),
@@ -201,11 +214,14 @@ def eval_run_new(
             "passed": passed,
             "failed": failed,
             "total": len(all_results),
+            "synthetic": _batch_synthetic(all_results),
             "artifacts": artifacts,
         }
         _out(ok(payload, workspace=str(ws)), json_output)
         if not json_output:
-            console.print(f"[bold]Batch Eval:[/bold] {passed}/{len(all_results)} passed")
+            console.print(
+                f"[bold]Batch Eval:[/bold] {_synthetic_prefix(all_results)}{passed}/{len(all_results)} passed"
+            )
             for r in all_results:
                 color = "green" if r.get("passed") else "red"
                 console.print(
@@ -274,11 +290,14 @@ def eval_run_new(
             "passed": passed,
             "failed": failed,
             "total": len(all_results),
+            "synthetic": _batch_synthetic(all_results),
             "artifacts": artifacts,
         }
         _out(ok(payload, workspace=str(ws)), json_output)
         if not json_output:
-            console.print(f"[bold]Batch Eval (dir):[/bold] {passed}/{len(all_results)} passed")
+            console.print(
+                f"[bold]Batch Eval (dir):[/bold] {_synthetic_prefix(all_results)}{passed}/{len(all_results)} passed"
+            )
             for r in all_results:
                 color = "green" if r.get("passed") else "red"
                 console.print(
@@ -317,11 +336,14 @@ def eval_run_new(
             "total": len(results),
             "passed": passed,
             "failed": len(results) - passed,
+            "synthetic": _batch_synthetic(results),
             "results": results,
         }
         _out(ok(payload, workspace=str(ws)), json_output)
         if not json_output:
-            console.print(f"[bold]Batch Eval:[/bold] {passed}/{len(results)} passed")
+            console.print(
+                f"[bold]Batch Eval:[/bold] {_synthetic_prefix(results)}{passed}/{len(results)} passed"
+            )
             for r in results:
                 color = "green" if r["passed"] else "red"
                 console.print(
