@@ -898,3 +898,73 @@ def mobile_gate_evaluate_cmd(
     gate = CapabilityEntryGate(FeatureFlags(), secrets.token_bytes(32))
     decision = gate.evaluate(capability_id)
     _out(ok(decision.as_dict()), json_output)
+
+
+mobile_flags_app = typer.Typer(
+    name="flags", help="Mobile feature flags + kill switch (default-off)"
+)
+mobile_app.add_typer(mobile_flags_app)
+
+_DEFAULT_FLAGS_STORE = ".arc/mobile/feature_flags.json"
+
+
+def _flags(store: str):
+    from ..mobile import FeatureFlags
+
+    return FeatureFlags(path=Path(store))
+
+
+@mobile_flags_app.command("list")
+def mobile_flags_list_cmd(
+    store: str = typer.Option(_DEFAULT_FLAGS_STORE, "--store"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show the feature-flag snapshot (effective state honours the kill switch)."""
+    _setup_logging(debug)
+    _out(ok(_flags(store).snapshot()), json_output)
+
+
+@mobile_flags_app.command("enable")
+def mobile_flags_enable_cmd(
+    name: str = typer.Argument(...),
+    store: str = typer.Option(_DEFAULT_FLAGS_STORE, "--store"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Enable a feature flag (still gated by the kill switch)."""
+    _setup_logging(debug)
+    ff = _flags(store)
+    ff.enable(name)
+    _out(ok(ff.snapshot()), json_output)
+
+
+@mobile_flags_app.command("disable")
+def mobile_flags_disable_cmd(
+    name: str = typer.Argument(...),
+    store: str = typer.Option(_DEFAULT_FLAGS_STORE, "--store"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Disable a feature flag."""
+    _setup_logging(debug)
+    ff = _flags(store)
+    ff.disable(name)
+    _out(ok(ff.snapshot()), json_output)
+
+
+@mobile_flags_app.command("kill-switch")
+def mobile_flags_kill_switch_cmd(
+    state: str = typer.Argument(..., help="on|off"),
+    store: str = typer.Option(_DEFAULT_FLAGS_STORE, "--store"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Engage/disengage the global kill switch (overrides all flags to off when on)."""
+    _setup_logging(debug)
+    if state not in ("on", "off"):
+        _out(err(ArcErrorCode.INVALID_INPUT, "state must be 'on' or 'off'"), json_output)
+        raise typer.Exit(1)
+    ff = _flags(store)
+    ff.set_kill_switch(state == "on")
+    _out(ok(ff.snapshot()), json_output)
