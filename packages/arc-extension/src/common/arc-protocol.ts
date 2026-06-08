@@ -281,13 +281,35 @@ export interface TraceFile {
  * Each event represents a discrete action during workflow execution.
  * Trace files are JSONL: one TraceEvent JSON object per line.
  */
-export type KnownTraceEventType =
-    | 'RUN_STARTED'
-    | 'NODE_COMPLETED'
-    | 'MESSAGE'
-    | 'RUN_COMPLETED'
-    | 'RUN_FAILED'
-    | 'ERROR';
+/**
+ * Canonical IDE trace-event types. Mirrors the cross-language event registry
+ * (`protocol/fixtures/run-event-registry.json`) so IDE consumers get autocomplete +
+ * exhaustiveness over the full event set, not just a handful. `NODE_COMPLETED` and `ERROR`
+ * are retained as legacy IDE-only aliases. `TraceEvent.type` keeps a `(string & {})` escape
+ * hatch for adapter-specific events. A parity test guards this against registry drift (B2P-02).
+ */
+export const KNOWN_TRACE_EVENT_TYPES = [
+    'AGENT_END', 'AGENT_START', 'BATTLE_CANDIDATE_READY', 'BATTLE_COMPLETED',
+    'BATTLE_CONSENSUS_REACHED', 'BATTLE_HITL_REQUIRED', 'BATTLE_STARTED', 'BATTLE_VOTE_COMMITTED',
+    'BATTLE_VOTE_REVEALED', 'BUDGET_BROKER_SYNC', 'CAPABILITY_CARD_DECISION',
+    'CONSENSUS_DIFFERENTIATOR', 'CONSENSUS_EVAL', 'CONSENSUS_EVAL_RUN', 'CONTEXT_COMPACTED',
+    'CONTRACT_ACCEPTED', 'CONTRACT_FULFILLED', 'CONTRACT_PROPOSED', 'CONTRACT_VIOLATED', 'CUSTOM',
+    'EVAL_POLICY_APPLIED', 'EVAL_POLICY_RECOMMENDED', 'EVIDENCE_REF_CREATED',
+    'FAILURE_AUTOPSY_GENERATED', 'HANDOFF', 'HITL_PROMPT', 'HITL_RESPONSE', 'HITL_TIMEOUT',
+    'MCP_CALL_DECISION', 'MESSAGE', 'MESSAGE_CHUNK', 'MODEL_CHANGED', 'NETWORK_DENIED',
+    'NODE_FAILED', 'NODE_STARTED', 'NODE_UPDATE', 'OBSERVABILITY_EXPORT_STARTED', 'PAID_CALL_DENIED',
+    'PERMISSION_DENIED', 'POLICY_BYPASS_WARNING', 'PRICING_FEED_REFRESHED', 'QUOTA_WARNING', 'RAW',
+    'RECEIPT_GENERATED', 'RUN_CANCELLED', 'RUN_COMPLETED', 'RUN_FAILED', 'RUN_STARTED',
+    'SHELL_DENIED', 'STATE_SNAPSHOT', 'STEP_COMPLETED', 'STEP_FAILED', 'STEP_STARTED',
+    'SWARMGRAPH_CONSENSUS', 'SWARMGRAPH_COST', 'SWARMGRAPH_TOPOLOGY', 'TEXT_MESSAGE_CHUNK',
+    'TEXT_MESSAGE_CONTENT', 'TEXT_MESSAGE_END', 'TEXT_MESSAGE_START', 'TOOL_CALL', 'TOOL_CALL_ARGS',
+    'TOOL_CALL_END', 'TOOL_CALL_ERROR', 'TOOL_CALL_RESULT', 'TOOL_CALL_START', 'TOOL_END',
+    'TOOL_OUTPUT_VIRTUALIZED', 'TRUST_DENIED',
+    // Legacy IDE-only aliases (not in the canonical registry, retained for back-compat):
+    'NODE_COMPLETED', 'ERROR',
+] as const;
+
+export type KnownTraceEventType = (typeof KNOWN_TRACE_EVENT_TYPES)[number];
 
 export interface TraceEvent {
     /**
