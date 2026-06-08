@@ -33,6 +33,9 @@ export const McpWorkbenchTab: React.FC<McpWorkbenchTabProps> = ({ arcService }) 
     const [invoking, setInvoking] = React.useState(false);
     const [invokeResult, setInvokeResult] = React.useState<McpToolInvokeResult | null>(null);
     const [invokeError, setInvokeError] = React.useState<string | null>(null);
+    // Generation guard: a Cancel (or a superseding invoke) bumps the counter so a stale/cancelled
+    // in-flight result is discarded. The backend call is additionally bounded by a 30s timeout.
+    const invokeGen = React.useRef(0);
 
     const runInvoke = React.useCallback(async () => {
         const tool = invokeTool.trim();
@@ -52,17 +55,32 @@ export const McpWorkbenchTab: React.FC<McpWorkbenchTabProps> = ({ arcService }) 
         if (!window.confirm(`Invoke MCP tool "${tool}" through the risk gate?`)) {
             return;
         }
+        const gen = ++invokeGen.current;
         setInvoking(true);
         setInvokeError(null);
         setInvokeResult(null);
         try {
-            setInvokeResult(await arcService.invokeMcpTool(tool, parsedArgs));
+            const result = await arcService.invokeMcpTool(tool, parsedArgs);
+            if (invokeGen.current === gen) {
+                setInvokeResult(result);
+            }
         } catch (e) {
-            setInvokeError(e instanceof Error ? e.message : String(e));
+            if (invokeGen.current === gen) {
+                setInvokeError(e instanceof Error ? e.message : String(e));
+            }
         } finally {
-            setInvoking(false);
+            if (invokeGen.current === gen) {
+                setInvoking(false);
+            }
         }
     }, [arcService, invokeTool, invokeArgs]);
+
+    const cancelInvoke = React.useCallback(() => {
+        // Supersede the in-flight invocation: its result will be discarded on resolve.
+        invokeGen.current++;
+        setInvoking(false);
+        setInvokeError('Invocation cancelled.');
+    }, []);
 
     const loadDecisions = React.useCallback(async () => {
         setDecisionsLoading(true);
@@ -198,6 +216,15 @@ export const McpWorkbenchTab: React.FC<McpWorkbenchTabProps> = ({ arcService }) 
                     >
                         {invoking ? 'Invoking…' : 'Invoke (risk-gated)'}
                     </button>
+                    {invoking && (
+                        <button
+                            className='arc-mcp-workbench__invoke-cancel'
+                            aria-label='Cancel MCP tool invocation'
+                            onClick={cancelInvoke}
+                        >
+                            Cancel
+                        </button>
+                    )}
                     {invokeError && (
                         <div className='arc-mcp-workbench__invoke-error' role='alert'>Error: {invokeError}</div>
                     )}
