@@ -6646,3 +6646,14 @@ B2P-02 typed-event migration was already Polished Complete (clarification record
 - **Gate 5 (performance):** In-memory live event buffers now bounded at 2000 events in all three live-streaming widgets. No async filesystem I/O added.
 - **Gate 4 (tests):** Contract tests updated to reflect bounded-buffer pattern. 969 arc-extension tests passed; build clean.
 - **N/A:** 1,2,3,6,7,8.
+
+
+## Phase 217 — R-DOCS1: Mobile SDK CLI Reference + README Mobile section
+
+Added Mobile Runtime SDK documentation to close gate 8 (docs) for mobile CLI:
+
+- **README CLI reference:** Added `# Mobile Runtime SDK` block with 13 key commands (`doctor`, `capabilities`, `validate`, `simulate`, `trace`, `trace-verify`, `pin`, `policy explain`, `gate check`, `sbom`, `siem-export`, `audit-retention`) — matches actual available commands.
+- **README "What's in the box" table:** Added `Mobile Runtime SDK` row describing the simulator-preview governance layer, 13 mock capabilities, Expo/RN/Flutter scaffolds, SIEM/SBOM/RBAC/audit-retention features.
+- **banned-claims:** `check-banned-claims.sh` passes on updated README.
+- **Gate 8 (docs):** README now accurately reflects the Mobile SDK CLI surface.
+- **N/A:** 1,2,3,4,5,6,7.

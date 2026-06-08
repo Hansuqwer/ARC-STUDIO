@@ -31,6 +31,7 @@ arc serve    # starts the HTTP daemon on 127.0.0.1:7777
 | **Audit Chain** | HMAC-signed streaming audit verifier; `arc audit verify` CLI; 100 MB trace < 30s (tamper-evident for single-session local runs; does not protect against a local attacker with write access to ~/.arc/audit/) |
 | **Token-Saving Suite** | Wallet, budget enforcement, compaction, model picker, Chinese-labs support, opt-in cloud features |
 | **TUI Themes** | dark / light / mocha / latte / high-contrast / mono; live re-skin via `/theme`; `NO_COLOR` fallback |
+| **Mobile Runtime SDK** | Simulator-preview mobile governance layer — 13 mock capabilities, manifest validation, action-plan simulator, SIEM export, SBOM, RBAC/ABAC, audit retention; Expo, React Native, Flutter scaffolds (no real device access) |
 
 ---
 
@@ -364,6 +365,20 @@ uv run arc runtime-pack install ./my-pack/
 # SwarmGraph
 uv run arc swarmgraph plan --strategy dag --json
 uv run arc swarmgraph eval --compare --json
+
+# Mobile Runtime SDK (simulator-preview, no real device access)
+uv run arc mobile doctor --json                    # SDK health + capability catalog
+uv run arc mobile capabilities --json              # list all mock capabilities
+uv run arc mobile validate ./manifest.json         # validate a manifest
+uv run arc mobile simulate --plan ./plan.json      # simulate an action plan (no execution)
+uv run arc mobile trace inspect ./trace.jsonl      # inspect a simulator trace
+uv run arc mobile trace-verify ./trace.jsonl       # verify prev_event_hash chain
+uv run arc mobile pin ./manifest.json              # recompute + write manifest_hash
+uv run arc mobile policy explain --capability device.camera.capture.mock --json
+uv run arc mobile gate check --plan ./plan.json    # capability entry-gate check
+uv run arc mobile sbom --json                      # generate CycloneDX SBOM
+uv run arc mobile siem-export ./trace.jsonl        # export trace to SIEM (CEF/JSON)
+uv run arc mobile audit-retention --ttl-days 30    # apply TTL to decisions log
 
 # Doctor
 uv run arc doctor all --json
