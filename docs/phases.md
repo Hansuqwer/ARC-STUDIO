@@ -6373,3 +6373,18 @@ Verify-first DoD audit: **not elevated** — color-contrast of the new per-level
 - **Gate 4 (tests):** ✓ `bash -n` syntax-clean; dry-run scanned Flutter deps cleanly (T4).
 - **N/A:** 1,2,3,5,7 — best-effort CI/release supply-chain gate.
 
+### Contrast gap refinement (B2P-03 + R-AUDIT26) — confirmed Baseline (data-backed)
+
+Follow-up to the "go" gap-closing pass: I computed real WCAG 2.1 contrast ratios for the risk-badge colors (their hardcoded **fallback** hex, with the rgba tint composited over the default Theia dark/light widget backgrounds):
+
+| Level | fallback fg | dark ratio | light ratio |
+|---|---|---|---|
+| low | `#2f8f46` | 3.27 | 3.21 |
+| medium | `#cca700` | 5.17 | **1.88** |
+| high | `#d67a00` | 3.86 | **2.43** |
+| critical | `#c93c37` | 2.64 | 3.51 |
+
+Finding: the **fallback** colors do **not** meet AA text contrast (4.5:1) across themes — so contrast cannot be claimed from the static values. In practice the rendered colors come from **theme tokens** (`--theia-charts-yellow/orange`, `--arc-success/error-color`), which each theme tunes; the true ratio is only knowable once those tokens resolve in a real browser. Non-color redundancy (text label + `aria-label` + bold `critical`) is in place (WCAG 1.4.1).
+
+**Decision (unchanged):** B2P-03 and R-AUDIT26 **stay Baseline Complete**. Honest closure requires a layout-capable audit (Playwright + axe) or a theme-token contrast review that resolves the actual rendered colors — neither fabricated here. The data above replaces the earlier qualitative note.
+
