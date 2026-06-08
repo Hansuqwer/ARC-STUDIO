@@ -6528,3 +6528,18 @@ Worked the documented **gaps** (the genuinely "not done" items) to closure:
 - **Terminal-gated (cannot be "done" without a human gate; remain explicitly gated):** B2P-17 (code-signing certs / Apple ID), B2P-06 (MCP HTTP — auth design + decision), B2P-14/15 (live adapter T3), B2P-16 (broad provider-backed SwarmGraph — paid/live), B2P-20 (human-reviewed memory evidence), B2P-21 (Firecracker Linux/KVM host), B2P-22 (live Battle Arena), R75/R79.1/R79.2 (macOS VZ depth / native device builds + execution). These stay forbidden as claims until proven by tests + evidence (see Tier-2 backlog for the bounded non-posture slices).
 - **Shipped-Baseline horizon (~190 rows):** the remaining `Baseline Complete` rows are shipped + tested at the Baseline bar (the roadmap's stated v0.1 posture). Their v0.2 `Polished Complete` elevation is **evidence-gated** — each requires its own per-gate DoD evidence and is **not** rubber-stamped. They are complete-at-Baseline for v0.1; elevation continues in evidence-backed batches (Phases 203–205 are the pattern).
 
+
+## Phase 206 — Tier-2 L-G1: rendered color-contrast measured → 3 contrast gaps closed
+
+Wired the e2e harness to open the ARC Studio view (`?arc-view=arc-studio` renders `#arc-studio-widget` + all tabs) and ran the layout-capable axe-core `color-contrast` scan (`tests/e2e/arc-a11y-contrast.spec.ts`, Chromium) per tab. The scan **found real WCAG 1.4.3 violations** on the light theme and they were **fixed**:
+
+- ARC muted text used Theia's borderline tokens — `--theia-ui-font-color2` (placeholder #999 = **2.56:1**), `--theia-descriptionForeground` (#717171 = **4.39:1**) — and the live-badge used `--arc-success-color` green on a tint (#2f8f46 = **3.21:1**). Fix: an a11y override block in `arc-studio-widget.css` routes those specific small-text/badge surfaces to the AA-guaranteed `var(--theia-foreground)` (correct on every theme; no theme-scoping class exists in Theia). `ConfigTab.tsx` loading state used an **inline** `descriptionForeground` (beats CSS) → switched to `--theia-foreground`.
+- **Result:** 5 ARC Studio tabs — **SwarmGraph Insight (R-AUDIT23)**, **MCP Workbench (R-AUDIT26)**, Assurance, Runs, **Config (B2P-03)** — pass axe `color-contrast` in rendered Chromium. arc-extension jest 968 passed/3 skipped (no regression).
+
+**Elevated → Polished Complete** (cited rendered-axe evidence + the fixes above):
+- **B2P-03** (real-component a11y) — contrast now measured + clean on the rendered tabs (the jsdom gap is closed by the e2e scan).
+- **R-AUDIT23** (SwarmGraph Insight UI components) — clean on the rendered SwarmGraph Insight tab.
+- **R-AUDIT26** (MCP risk-badge a11y) — clean on the rendered MCP Workbench tab.
+
+**R-AUDIT21 (Accessibility Baseline Audit / adapters widget) — stays Baseline:** added a `?arc-view=adapters` deep-link to `ArcAdaptersContribution` (parity with other views), but the adapters widget — like the other non-tabbed `AbstractViewContribution` views — does not render via deep-link in the local e2e app mode (only the `arc-studio` tabbed view does). Its ARIA is in place; the rendered axe scan of the adapters widget remains pending the view being routable in the harness. The scan is wired and skips gracefully until then.
+

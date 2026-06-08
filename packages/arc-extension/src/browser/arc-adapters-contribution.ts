@@ -22,4 +22,12 @@ export class ArcAdaptersContribution extends AbstractViewContribution<ArcAdapter
             toggleCommandId: OpenAdaptersCommand.id,
         });
     }
+
+    async initializeLayout(): Promise<void> {
+        // Deep-link parity with the other ARC views (e.g. ?arc-view=event-stream).
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('arc-view') === 'adapters') {
+            await this.openView({ activate: true });
+        }
+    }
 }

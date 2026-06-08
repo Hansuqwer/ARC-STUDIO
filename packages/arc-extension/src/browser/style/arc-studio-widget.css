@@ -1424,3 +1424,27 @@
     outline: 2px solid var(--theia-focusBorder, #0066cc);
     outline-offset: 2px;
 }
+
+/* L-G1 (Tier-2 a11y): WCAG 1.4.3 — small secondary text + status badges must meet 4.5:1 on EVERY
+   theme. The muted --theia-descriptionForeground / --theia-ui-font-color2 tokens are borderline
+   sub-AA on the light theme (4.0–4.4:1) and --arc-success-color green is 3.2:1 on its tint badge,
+   so these specific surfaces use the AA-guaranteed primary foreground. Verified by
+   tests/e2e/arc-a11y-contrast.spec.ts (axe color-contrast, rendered Chromium). */
+.arc-studio-runs__placeholder,
+.arc-studio-runs__placeholder > p,
+.arc-studio-swarmgraph__note,
+.arc-studio-swarmgraph__empty,
+.arc-studio-swarmgraph__loading,
+.arc-studio-swarmgraph__reasons,
+.arc-studio-swarmgraph__reasons > div,
+.arc-mcp-workbench__loading,
+.arc-studio-config__loading,
+.arc-studio-assurance__state-title,
+.arc-studio-assurance__state-detail {
+    color: var(--theia-foreground);
+}
+.arc-studio-swarmgraph__badge--empty.arc-studio-swarmgraph__badge,
+.arc-studio-assurance__button--secondary.arc-studio-assurance__button,
+.arc-studio-assurance__live-badge {
+    color: var(--theia-foreground);
+}

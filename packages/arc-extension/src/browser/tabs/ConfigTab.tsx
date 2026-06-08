@@ -104,7 +104,7 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ arcService, onSave }) => {
     if (loading) {
         return (
             <div className='arc-studio-config' role='region' aria-label='Config panel'>
-                <div className='arc-studio-config__loading' style={{ padding: '16px', color: 'var(--theia-descriptionForeground)', textAlign: 'center' }}>
+                <div className='arc-studio-config__loading' style={{ padding: '16px', color: 'var(--theia-foreground)', textAlign: 'center' }}>
                     Loading configuration...
                 </div>
             </div>
