@@ -43,18 +43,30 @@ def test_exhaustion_interrupt_propagates() -> None:
 
 def test_real_enforcer_exhaustion_interrupt() -> None:
     """B2P-09b: with a REAL BudgetEnforcer over its cap, the shared gate raises BudgetExceeded."""
-    from agent_runtime_cockpit.budget import BudgetConfig, BudgetEnforcer, BudgetState
+    from agent_runtime_cockpit.budget.schema import (
+        BudgetCap,
+        BudgetConfig,
+        BudgetEnforcer,
+        BudgetScope,
+        BudgetState,
+    )
 
-    enforcer = BudgetEnforcer(BudgetConfig(first_launch_confirmed=True, caps=[]), BudgetState())
-    # Drive any positive estimate over the cap (mirrors tests/unit/test_budget_preflight_estimator.py).
-    enforcer._config.effective_cap = lambda *a, **kw: Decimal("0.000001")  # type: ignore[attr-defined]
+    config = BudgetConfig(
+        first_launch_confirmed=True,
+        caps=[BudgetCap(scope=BudgetScope.SESSION, amount_usd=Decimal("0.000001"))],
+    )
+    enforcer = BudgetEnforcer(config, BudgetState())
     with pytest.raises(BudgetExceeded):
-        budget_checkpoint(enforcer, 5.0, provider_id="anthropic")
+        budget_checkpoint(
+            enforcer, 5.0, provider_id="anthropic", run_active=False, workflow_active=False
+        )
 
 
 def test_real_enforcer_under_cap_passes() -> None:
-    from agent_runtime_cockpit.budget import BudgetConfig, BudgetEnforcer, BudgetState
+    from agent_runtime_cockpit.budget.schema import BudgetConfig, BudgetEnforcer, BudgetState
 
     enforcer = BudgetEnforcer(BudgetConfig(first_launch_confirmed=True, caps=[]), BudgetState())
-    enforcer._config.effective_cap = lambda *a, **kw: Decimal("1000")  # type: ignore[attr-defined]
-    budget_checkpoint(enforcer, 0.001, provider_id="anthropic")  # must not raise
+    # Zero estimated cost can never exceed any cap → must pass through.
+    budget_checkpoint(
+        enforcer, 0.0, provider_id="anthropic", run_active=False, workflow_active=False
+    )
