@@ -45,14 +45,14 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 |---|---|---|
 | R1 | Live Run Streaming Product Path | Complete |
 | R2 | IDE Runtime Setup + Config Wizard | Complete (polished UI baseline) |
-| R3 | Provider, Quota, Cost Controls UI | Baseline Complete |
+| R3 | Provider, Quota, Cost Controls UI | Polished Complete |
 | R4 | Dedicated HITL + Audit UX | Complete |
 | R5 | SwarmGraph Insight Baseline | Complete |
 | R6 | Real Adoption Productization | Complete (local-real baseline) |
 | R7 | Release Operations + History Hygiene | Complete |
-| R8 | IDE Provider/Quota Completion | Baseline Complete |
-| R9 | IDE Live Stream Polish | Baseline Complete |
-| R10 | Doctor/Daemon Parity Closure | Baseline Complete |
+| R8 | IDE Provider/Quota Completion | Polished Complete |
+| R9 | IDE Live Stream Polish | Polished Complete |
+| R10 | Doctor/Daemon Parity Closure | Polished Complete |
 | R11 | SwarmGraph Cost Producer | Baseline Complete |
 | R12 | Packaging/Optional Features | Baseline Complete |
 | R13 | SwarmGraph Native Runtime | P1–P4 Baseline Complete |

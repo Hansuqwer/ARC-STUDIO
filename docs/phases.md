@@ -6750,3 +6750,45 @@ Phase 194 delivered: deterministic CLI over CapabilityEntryGate/FeatureFlags/Egr
 - **Gate 6 (security):** Gate requires signed plan (capability_gate.py). Secrets redacted in secure store display (redacted=true). Audit appended on gate execute (Phase 220). Deterministic (no LLM).
 - **Gate 7 (reliability):** Simulate step count limit (Phase 219). All CLI commands handle structured errors via `_out(err(...))`.
 - **Gate 8 (docs):** README Mobile SDK CLI reference (Phase 217). All commands have accurate `--help`. banned-claims passing.
+
+
+## Phase 223 — R-AUDIT-SWEEP1: Baseline→Polished: R3/R8/R9/R10
+
+Evidence-based elevation for four roadmap items that were Baseline Complete. Labels follow evidence.
+
+### R3 (Provider, Quota, Cost Controls UI) → Polished Complete
+
+- **Gate 1 (UX states):** ConfigTab has loading/empty/error/degraded/success states (R-POLISH28, Phase 186). Provider source badge shows correct source (R-AUDIT4). Provider diagnostics return typed ok/error/degraded states.
+- **Gate 2 (a11y):** ConfigTab is in the rendered axe color-contrast scan — B2P-03 → Polished Complete (Phase 206). ARIA labels on all form fields.
+- **Gate 3 (parity):** Provider config CLI ↔ IDE parity: typed diagnostics parser validates malformed/partial/success across surfaces. `arc providers status` matches IDE provider status.
+- **Gate 4 (tests):** 4 ConfigTab suites 229 passed (Phase 186). config-tab-provider-parsing.contract.test.ts. R3 targeted tests in R-AUDIT4.
+- **Gate 5 (perf):** ConfigTab uses useAsyncState (Phase 186); config-service fully async (Phase 172 R-POLISH14). No sync filesystem I/O in hot path.
+- **Gate 6 (security):** Provider action is 3-layer gated (env + paid opt-in + exact confirmation). No API keys in UI output. Secrets stripped from provider env (Phase 165 R-POLISH7).
+- **Gate 7 (reliability):** Typed diagnostics parser handles malformed/partial inputs. All config backend calls are async (Phase 172). Error states on all config operations.
+- **Gate 8 (docs):** README provider catalog. `--help` on all provider commands. Banned-claims clean.
+
+### R8 (IDE Provider/Quota Completion) → Polished Complete
+
+Same gate evidence as R3 (R8 is the IDE-facing completion of R3): ConfigTab full async + axe clean + typed diagnostics. N/A: gate 2 already cited via B2P-03 Polished Complete (Phase 206).
+
+### R9 (IDE Live Stream Polish) → Polished Complete
+
+- **Gate 1 (UX states):** SwarmGraphInsightTab has live/disconnected/error/degraded/idle states with `buildLiveInsightStatus`. 3-tier fallback: manual → ARC_PYTHON_DAEMON_URL → loopback probe. No silent `.catch(() => null)`.
+- **Gate 2 (a11y):** R-AUDIT23 → Polished Complete (Phase 206) — SwarmGraph Insight tab passes axe color-contrast in rendered Chromium.
+- **Gate 3 (parity):** Daemon URL loopback probe matches `arc serve` default bind. SSE stream events match Python event protocol (B2P-10/R-POLISH10 cross-language contract).
+- **Gate 4 (tests):** SwarmGraph insight model tests (Phase 168). Async warning fingerprint test (R9 baseline). 969 arc-extension tests.
+- **Gate 5 (perf):** Live event buffer bounded at 2000 (Phase 215 R-PERF1, SwarmGraphInsightTab + arc-event-stream-widget). No unbounded SSE buffering.
+- **Gate 6 (security):** Daemon URL loopback-only (127.0.0.1:7777, no remote). No credentials in live stream path.
+- **Gate 7 (reliability):** Bounded event buffer (Phase 215). Connection timeout (daemon URL probe). Disconnect/error states handled.
+- **Gate 8 (docs):** README live stream section. `--help` on daemon commands. Banned-claims clean.
+
+### R10 (Doctor/Daemon Parity Closure) → Polished Complete
+
+- **Gate 1 (UX states):** `arc doctor all --json` returns structured ok/degraded/error per subsystem. Daemon status shows connected/disconnected explicitly.
+- **Gate 2 (a11y):** N/A — CLI-only surface.
+- **Gate 3 (parity):** ADR-009 accepted — `arc doctor all` includes storage. Orphan routes all have explicit fate labels. `arc runs links` CLI added. No docs imply complete parity.
+- **Gate 4 (tests):** Doctor test suite. Orphan route fate parity guard (B2P-18 Phase 203).
+- **Gate 5 (perf):** Doctor subsystems run independently, no blocking chains.
+- **Gate 6 (security):** Doctor never exposes secrets or keys. Local read-only.
+- **Gate 7 (reliability):** Doctor subsystems fail gracefully (degraded state, not crash). Error per subsystem, not global failure.
+- **Gate 8 (docs):** README doctor section. `arc doctor all --help`. ADR-009 in docs/research. Banned-claims clean.
