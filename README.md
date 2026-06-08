@@ -292,8 +292,10 @@ uv run arc mcp policy-explain              # explain risk policy
 ## Token Budget & Wallet
 
 ```bash
-uv run arc wallet                           # view wallet + budget
-uv run arc wallet budget                    # show budget limits
+# Wallet + budget are interactive TUI commands — run `uv run arc`, then:
+#   /wallet                                   # view token budget and usage
+#   /budget                                   # show budget limits
+uv run arc runs budget <run-id>             # post-hoc per-run budget report (CLI)
 uv run arc providers quota reset --json     # reset local quota counters (local only, not provider)
 ```
 

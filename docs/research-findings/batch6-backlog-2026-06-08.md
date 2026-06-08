@@ -95,3 +95,4 @@ entry-gate that routes to fixtures.
 ## Progress log (Batch 6)
 
 - **A1 ✅ (CR-036)** Aligned typed `MessageData` to the MESSAGE event registry + TS shape: body field is `text` (+ source/coalesced/node_id/message_id/tool_call_id/evidence_refs optionals); dropped the diverged, unused `content`/`role`. Regression guard `tests/protocol/test_message_event_registry_parity.py` (4) locks registry==typed==TS. 82 protocol tests pass.
+- **A2 ✅ (CR-021)** README documented a non-existent `arc wallet`/`arc wallet budget` CLI; wallet/budget are TUI (`/wallet`,`/budget`) + CLI `arc runs budget <run-id>`. Corrected the Token Budget section + added guard `tests/test_readme_cli_parity.py` (3).
