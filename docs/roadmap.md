@@ -182,7 +182,7 @@ GATED items (auth / native-device / paid-live provider / Linux-KVM host) are int
 | ID | Item | Status | DoD · Effort |
 |---|---|---|---|
 | B2P-01 | TUI `/statusline` slot reordering | Baseline Complete | 1,3 · S |
-| B2P-02 | arc-extension `TraceEvent` → typed-event consumer migration | In Progress | 3,4 · M |
+| B2P-02 | arc-extension `TraceEvent` → typed-event consumer migration | Baseline Complete | 3,4 · M |
 | B2P-03 | Real-component jest-axe a11y coverage (not mocks) | Baseline Complete | 2,4 · M |
 | B2P-04 | MCP live invocation from IDE (loopback client through risk gate) | Not Started | 1,3,6,7 · L |
 | B2P-05 | SwarmGraph MCP tool wrappers | Not Started | 3,4,6 · M |

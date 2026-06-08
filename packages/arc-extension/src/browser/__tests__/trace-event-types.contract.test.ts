@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { KNOWN_TRACE_EVENT_TYPES } from '../../common/arc-protocol';
+import { KNOWN_TRACE_EVENT_TYPES, TERMINAL_TRACE_EVENT_TYPES } from '../../common/arc-protocol';
 
 describe('KnownTraceEventType registry parity (B2P-02)', () => {
     const root = path.join(__dirname, '..', '..', '..', '..', '..');
@@ -17,5 +17,15 @@ describe('KnownTraceEventType registry parity (B2P-02)', () => {
 
     it('has no duplicate literals', () => {
         expect(new Set(KNOWN_TRACE_EVENT_TYPES).size).toBe(KNOWN_TRACE_EVENT_TYPES.length);
+    });
+
+    it('terminal event types are valid canonical types (except the STREAM_END sentinel)', () => {
+        const known = new Set<string>(KNOWN_TRACE_EVENT_TYPES);
+        for (const t of TERMINAL_TRACE_EVENT_TYPES) {
+            if (t === 'STREAM_END') {
+                continue;
+            }
+            expect(known.has(t)).toBe(true);
+        }
     });
 });

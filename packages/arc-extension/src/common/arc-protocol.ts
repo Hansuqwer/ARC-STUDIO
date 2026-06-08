@@ -311,6 +311,19 @@ export const KNOWN_TRACE_EVENT_TYPES = [
 
 export type KnownTraceEventType = (typeof KNOWN_TRACE_EVENT_TYPES)[number];
 
+/**
+ * Terminal stream markers. The literal list is typed against the canonical event union so a typo
+ * is a compile error (B2P-02b); the exported Set is `ReadonlySet<string>` so `.has(event.type)`
+ * still accepts adapter-specific event strings. `STREAM_END` is a stream-control sentinel.
+ */
+const TERMINAL_TRACE_EVENT_LIST: readonly (KnownTraceEventType | 'STREAM_END')[] = [
+    'RUN_COMPLETED',
+    'RUN_FAILED',
+    'RUN_CANCELLED',
+    'STREAM_END',
+];
+export const TERMINAL_TRACE_EVENT_TYPES: ReadonlySet<string> = new Set(TERMINAL_TRACE_EVENT_LIST);
+
 export interface TraceEvent {
     /**
      * Type of event.

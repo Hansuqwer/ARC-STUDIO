@@ -670,11 +670,10 @@ describe('ArcEventStreamWidget', () => {
         expect(source).toMatch(/Live stream terminal/);
     });
 
-    it('should treat terminal live event types as stream terminal', () => {
-        expect(source).toMatch(/RUN_COMPLETED/);
-        expect(source).toMatch(/RUN_FAILED/);
-        expect(source).toMatch(/RUN_CANCELLED/);
-        expect(source).toMatch(/STREAM_END/);
+    it('should treat terminal live event types as stream terminal (shared typed set)', () => {
+        // B2P-02b: terminal event types are consolidated into the canonical protocol
+        // (TERMINAL_TRACE_EVENT_TYPES); literal validity is guarded by trace-event-types.contract.test.ts.
+        expect(source).toMatch(/TERMINAL_TRACE_EVENT_TYPES/);
         expect(source).toMatch(/TERMINAL_EVENT_TYPES\.has\(event\.type\)/);
     });
 

@@ -2,14 +2,14 @@
 import * as React from 'react';
 import { inject, injectable, postConstruct } from '@theia/core/shared/inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
-import { ArcService, ActiveTraceEventChunk, TraceData, TraceEvent, TraceFile } from '../common/arc-protocol';
+import { ArcService, ActiveTraceEventChunk, TraceData, TraceEvent, TraceFile, TERMINAL_TRACE_EVENT_TYPES } from '../common/arc-protocol';
 import { VirtualizedEventList } from './components/VirtualizedEventList';
 import { PolicyBypassBanner } from './components/PolicyBypassBanner';
 
 type StreamMode = 'replay-trace' | 'live-available' | 'live-connecting' | 'live' | 'reconnecting' | 'live-disconnected' | 'live-error' | 'live-terminal';
 type LiveArcService = ArcService & { streamActiveTrace?: (request: { runId: string; mode: 'live'; lastEventId?: number }) => Promise<AsyncIterable<ActiveTraceEventChunk>> };
 
-const TERMINAL_EVENT_TYPES = new Set(['RUN_COMPLETED', 'RUN_FAILED', 'RUN_CANCELLED', 'STREAM_END']);
+const TERMINAL_EVENT_TYPES = TERMINAL_TRACE_EVENT_TYPES;
 
 const EVENT_COLORS: Record<string, string> = {
     RUN_STARTED: '#4caf50',

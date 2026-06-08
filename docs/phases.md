@@ -6140,3 +6140,14 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: commits 436c5b1 / 9d23490 / aae4272 + this; tsc + arc-extension 937 passed/3 skipped, 8 parity + 22 TUI tests, mobile-deps-audit dry-run OK (Flutter via OSV) | Notes: deterministic; additive; banned-claims green; none-posture.
 
 ---
+
+## Phase 197 — Batch 7 Track B: IDE coherence, a11y, typed events (T5–T10)
+
+- **T5 (R-AUDIT29):** TestBenchTab Run button — local-safe sandbox via async `execArcCliAsync`, confirm gate + running/blocked/exit/error states + aria-label.
+- **T6 (R-AUDIT27):** status rail — daemon·mode·trust·runtime·profile from one `getConfigStatus`; degrades to unknown/offline; ARIA on every entry.
+- **T7/T8 (B2P-03):** real-component jest-axe across 9 tabs (render the actual components, color-contrast deferred to browser).
+- **T9/T10 (B2P-02):** `KnownTraceEventType` expanded to the full 69-type canonical registry via a runtime const array; consolidated `TERMINAL_TRACE_EVENT_TYPES` into the shared protocol; registry-parity guard test.
+
+**Status:** Baseline Complete | Evidence: commits 1bed47e / 909ac08 / 60355fa / 23b709e / 933e035 + this; `pnpm --filter arc-extension` build clean + 956 passed/3 skipped | Notes: additive; none-posture; banned-claims green.
+
+---
