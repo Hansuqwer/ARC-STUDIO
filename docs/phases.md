@@ -6352,3 +6352,24 @@ Verify-first DoD audit: **not elevated** — color-contrast of the new per-level
 - **The gap (gate 2):** This item *introduces custom colors*, so contrast ratio (WCAG 1.4.3) is the central concern — and it cannot be measured in jsdom (color-contrast disabled). Not auto-evidenced.
 - **Decision:** Stays **Baseline Complete**. Needs a layout-capable contrast check or a computed ratio over the badge color tokens — deferred.
 
+### R79.3 — device posture / MDM hook → Polished Complete (within fixtures-only scope)
+
+- **Gate 6 (security):** ✓ `evaluate_posture` is deterministic (`deterministic: true`) and **fail-closed** — `forbid_jailbroken`/encryption/passcode/MDM violations ⇒ `allowed=false`; no LLM. `FixtureDevicePostureHook` is simulator-preview only.
+- **Gate 4 (tests):** ✓ `tests/test_mobile_device_posture.py` → 5 passed (within the 9-test mobile run).
+- **Gate 1 (UX) / Gate 8 (docs):** ✓ `arc mobile posture check` surfaces the decision; module docstring + roadmap Notes state the **hard boundary**: real posture/MDM/attestation providers stay **human-gated**.
+- **Scope note:** "Polished" applies to the deterministic fixtures-only hook interface; the real-device feature is intentionally out of scope. **N/A:** 2,3,5,7.
+
+### R79.4 — mobile supply-chain provenance → Polished Complete (local-HMAC scope)
+
+- **Gate 6 (security):** ✓ `sign_provenance`/`verify_provenance` use local HMAC-SHA256 with `hmac.compare_digest` and are **fail-closed** (verify returns `False` on missing/mismatched signature). Explicitly **no external sigstore/cosign** infrastructure.
+- **Gate 4 (tests):** ✓ `tests/test_mobile_provenance.py` → 4 passed; sign↔verify round-trip + tamper-reject.
+- **Gate 8 (docs):** ✓ `arc mobile provenance [--sign]` + `mobile:provenance` release gate; module docstring states the local-only scope; roadmap Notes mark it advisory/simulator-preview.
+- **Scope note:** "Polished" applies to the local advisory provenance attestation; external keyless signing stays human-gated. **N/A:** 1,2,3,5,7.
+
+### R79.5 — mobile dependency vulnerability scanning → Polished Complete
+
+- **Gate 6 (security):** ✓ `scripts/mobile-deps-audit.sh` runs `pnpm/npm audit` at `--audit-level high` (override via `ARC_MOBILE_AUDIT_LEVEL`), failing only on high/critical; **self-skips cleanly (exit 0)** when `runtimes/mobile`, toolchains, or lockfiles are absent.
+- **Gate 8 (docs):** ✓ Wired as the `mobile:deps-audit` release gate (`release_check.sh`, with a skip branch) + a CI step in `mobile-{expo,rn,flutter}.yml`; documented in the script header.
+- **Gate 4 (tests):** ✓ `bash -n` syntax-clean; dry-run scanned Flutter deps cleanly (T4).
+- **N/A:** 1,2,3,5,7 — best-effort CI/release supply-chain gate.
+
