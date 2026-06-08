@@ -7396,3 +7396,107 @@ Final release gate for the Phases 228–252 elevation sprint.
 - **Version:** `v0.8-r-ux4` in README. Published package stays `v0.1.0a0`.
 - **AGENTS.md active track:** Updated to reflect Phases 228–252 complete; v0.8-r-ux4 internal release milestone.
 - **Baseline Complete items remaining:** Only B2P-17 (terminal-gated: code-signing certs) and the ~190-row shipped-Baseline horizon (v0.1 posture items not yet evidence-gate-elevated to v0.2 Polished). No fabricated elevations.
+
+## Phase 253 — R-TS1, R-TS2, R-TS3, R-TS4, R-TS5 → Polished Complete
+
+Evidence-citation elevation. No new code. All items reach Polished Complete.
+
+### R-TS1 — Token-Saving Research (sdk_version sweep done R-AUDIT24)
+
+- **Gate 4 (tests):** `sdk_version()` implemented on 8 priority adapters (SwarmGraph, LangGraph, CrewAI, OpenAI Agents SDK, AG2, LlamaIndex, Anthropic, OpenAI-compatible); surfaced in `arc runtimes --capabilities --json` (R-AUDIT24, Phase 155, commit aa788f3). Test `test_sdk_version_sweep` passes.
+- **Gate 3 (parity):** `uv run arc runtimes --capabilities --json` returns `sdk_version` for all wired adapters; CLI ↔ JSON output parity confirmed.
+- **Gate 8 (docs):** `docs/research/` sdk-version sweep research documented; `arc runtimes --capabilities --json` schema updated in R-AUDIT24. README `arc runtimes --capabilities --json` reference accurate.
+- **N/A:** 1 (no user-visible surface change beyond existing runtimes output), 2 (CLI-only), 5 (no hot-path change), 6 (no security decisions), 7 (no long-running action).
+
+### R-TS2 — Token-Saving P0
+
+- **Gate 1 (UX states):** Byte-stable canonical key ordering on every outbound request; context meter wired in TUI status bar showing used/max tokens live. States: loading (meter shows `…`), active (shows tokens), degraded (model reports no context → `?/? tok`), success.
+- **Gate 5 (perf):** `cache_control` prefix caching header emitted for supported providers (Anthropic, OpenAI); per-turn token counter wired to `TokenWallet` so every response updates the displayed budget without a separate poll.
+- **Gate 4 (tests):** 4893 passed (commits eb6d1e1 / 177c882 / 6813c95 / 1cbc295). Targeted tests: `test_byte_stable_ordering`, `test_cache_control_header`, `test_context_meter_update`.
+- **N/A:** 2 (a11y N/A for internal token ordering), 3 (no cross-surface parity change), 6 (no new security decision), 7 (no long-running action), 8 (no doc change required).
+
+### R-TS3 — arc-protocol-ts coverage backfill
+
+- **Gate 4 (tests):** Coverage thresholds restored: lines 73, functions 80, branches 87, statements 85 — all enforced in `jest.config.js`. Tag `v0.3.1-alpha` marks the passing baseline. Zero coverage regressions from this point forward.
+- **N/A:** 1, 2, 3 (coverage config only), 5, 6, 7, 8.
+
+### R-TS4 — R-01 TokenWallet
+
+- **Gate 1 (UX states):** `/wallet` slash command renders live token budget (used / remaining / limit); `/budget` slash command shows tier breakdown. `QuotaWarning` widget fires when usage crosses 80% of session budget. Loading, empty (no wallet yet), active, and over-budget states all handled.
+- **Gate 3 (parity):** TUI `/wallet` reads from the same `TokenWallet` Python object as `arc runs budget <run-id>` CLI output; both surfaces reflect identical SESSION and PROVIDER_DAY buckets. Parity test `test_wallet_tui_cli_parity` confirms field equality.
+- **Gate 4 (tests):** 4922 passed; 4 patch commits in `v0.4.0-alpha`. Targeted tests: `test_wallet_slash_command`, `test_budget_slash_command`, `test_quota_warning_threshold`, `test_wallet_tui_cli_parity`.
+- **N/A:** 2 (TUI slash command, no ARIA required), 5 (no perf concern), 6 (wallet is read-only display), 7 (no long-running action), 8 (no separate doc change).
+
+### R-TS5 — Budget Persistence + Pricing Refresh
+
+- **Gate 5 (perf):** `SQLiteWALStorage` persistence layer: SESSION and PROVIDER_DAY budget buckets survive process restart. WAL mode + `busy_timeout=5000ms` confirmed. No sync I/O in hot path (writes are async WAL appends).
+- **Gate 4 (tests):** 4937 passed (+15 vs R-TS4). Tests: `test_session_survives_restart`, `test_provider_day_survives_restart`, `test_wal_busy_timeout`.
+- **Gate 6 (security):** OpenAI cache-discount rate corrected from 50% to 90% for GPT-5.x family (matches OpenAI pricing page). Prevents overcharging users in budget enforcement. Deterministic pricing — no LLM involved.
+- **N/A:** 1 (no new UX surface), 2 (N/A), 3 (persistence is internal), 7 (WAL commits are not long-running), 8 (no doc change).
+
+
+## Phase 254 — R-TS7, R-TS8, R-TS9, R-TS10 → Polished Complete
+
+Evidence-citation elevation. No new code. All items reach Polished Complete.
+
+### R-TS7 — R-02 + QW-4 feature sprint
+
+- **Gate 1 (UX states):** `/expand` slash command expands the current conversation context window (invokes compaction + context reload). States: idle, expanding (spinner), expanded (shows new token headroom), error (compact failed → structured message, no silent swallow).
+- **Gate 3 (parity):** `HandleStore` uses `SQLiteWAL` for durability (same storage layer as budget); tool virtualization (handle→real call indirection) passes through the same policy gate as direct calls; `compact()` output is byte-identical whether called from TUI `/expand` or CLI `arc compact`. Parity test `test_compact_tui_cli_byte_parity` passes.
+- **Gate 4 (tests):** 4979 Python (+42 vs R-TS5); 147 TS (+4). Tests include: `test_expand_slash_command`, `test_handle_store_wal`, `test_tool_virtualization_gate`, `test_compact_tui_cli_byte_parity`.
+- **Gate 6 (security):** `compact()` is deterministic — no LLM call inside the compaction path; handle resolution path is also LLM-free. Policy gate (sandbox `decide()`) applies to virtualized tool calls identically to direct calls.
+- **N/A:** 2 (slash command), 5 (perf not regressed; WAL is async), 7 (no long-running action beyond existing tool calls), 8 (no new doc required).
+
+### R-TS8 — Chinese-labs vendor adoption
+
+- **Gate 3 (parity):** 91 model rows synced from OpenRouter catalog across 6 Chinese-ecosystem vendors (Alibaba/DashScope, ZhipuAI, Moonshot AI, SiliconFlow, Stepfun, Baidu/Bailing). All rows appear in `arc providers list --json` and are browsable via `/providers` TUI. Catalog parity test `test_chinese_vendor_model_count` confirms ≥91 rows.
+- **Gate 4 (tests):** Tags `v0.5.1-alpha` (commit d667550) and `v0.5.2-alpha` (commit 5c05df5) mark the passing baseline. Test suite green at both tags.
+- **Gate 8 (docs):** `docs/research/pricing-feed-sources-comparison.md` created with per-vendor pricing feed source, update frequency, and coverage gaps for all 6 vendors plus the OpenRouter sync mechanism.
+- **N/A:** 1 (providers list is existing surface, no new state), 2 (N/A), 5 (catalog load is startup-time, not hot path), 6 (no security decision change), 7 (catalog sync is synchronous startup read, not long-running).
+
+### R-TS9 — Catalog-driven model picker + capability gating
+
+- **Gate 1 (UX states):** `/models` with filter flags (`--vision`, `--tool-use`, `--context-length`) renders a filtered list from the live catalog. `/model-info <id>` shows full capability card. Capability chip in TUI status bar shows active model's top capability (e.g. `[vision]`). States: loading, no-results (filter too narrow → "No models match filters"), active, degraded (catalog unavailable → falls back to bundled snapshot).
+- **Gate 3 (parity):** `/models` filter results match `arc providers list --json` catalog data exactly. Parity test `test_models_filter_matches_catalog` confirms field-level equality for vision, tool-use, and context-length filters.
+- **Gate 4 (tests):** `v0.6-alpha` tag at commit 4de0eae. Test `test_has_vision_filter_per_model_granularity` confirms per-model vision flag granularity (not provider-level). Full suite green.
+- **Gate 6 (security):** `capability_gates` are fail-closed: requesting a model capability not present in the catalog entry returns a structured denial (no silent fallback to a capable model without user confirmation).
+- **N/A:** 2 (TUI slash command), 5 (filter is in-memory over bundled catalog), 7 (no long-running action), 8 (no separate doc needed; `/help` updated).
+
+### R-TS10 — Opt-in cloud features
+
+- **Gate 6 (security):** All 3 opt-in cloud features (live catalog sync `ARC_MODELS_DEV_LIVE`, telemetry, and cloud backup) are default OFF. Per-session consent gating: each feature requires explicit env var or TUI prompt confirmation before any outbound call. Threat model documented at `docs/threat-models/v0.7-opt-in.md` covering data exposure surface, consent flow, and revocation.
+- **Gate 4 (tests):** 5131 Python (+40 vs R-TS9); 155 TS (+6); `v0.7-alpha` tag at commit 83568b3. Tests: `test_live_catalog_default_off`, `test_telemetry_default_off`, `test_cloud_backup_default_off`, `test_per_session_consent_gate`.
+- **Gate 8 (docs):** `docs/threat-models/v0.7-opt-in.md` created with full threat model for all 3 opt-in cloud features.
+- **N/A:** 1 (no new UX surface beyond consent prompt), 2 (N/A), 3 (opt-in features are additive), 5 (default-off → zero perf impact when disabled), 7 (consent gate is synchronous).
+
+
+## Phase 255 — R-UX1, R-UX2, R-UX3, R-UX4 → Polished Complete
+
+Evidence-citation elevation. No new code. All items reach Polished Complete.
+
+### R-UX1 — UX Polish — Header + ContextMeter + ModeBadge + Markdown
+
+- **Gate 1 (UX states):** `tui/header.py` renders app title + current provider/model. `tui/widgets/mode_badge.py` shows current mode (`CHAT` / `AGENT` / `PLAN`) with color coding. `tui/widgets/context_meter.py` shows token usage bar. `Shift+Tab` cycles through modes via `cycle_mode()`. All widgets have loading (spinner), active, and degraded (provider unreachable → `[offline]`) states.
+- **Gate 4 (tests):** 5131 passed; commit `0b03f41`; `tests/tui/test_mode_cycle.py` covers all 3 mode transitions and the `Shift+Tab` key binding. No regressions.
+- **N/A:** 2 (TUI widgets, no ARIA needed; `NO_COLOR` handled in R-UX4), 3 (header/badge are TUI-only surfaces), 5 (widgets are pure reactive renders, no sync I/O), 6 (no security decision), 7 (no long-running action), 8 (no separate doc).
+
+### R-UX2 — UX Modes + Approvals
+
+- **Gate 1 (UX states):** New widgets shipped: `approval_card` (HITL approval request with approve/deny buttons), `capability_banner` (shows capability request in context), `activity_tray` (running tool calls with cancel), `mcp_banner` (MCP server status), `plan_view` (agent plan steps with status), `slash_menu` (autocomplete popup). Shell-escape (`!<cmd>`) is sandbox-aware: calls `sandbox.decide()` before execution; blocked commands show denial reason in the TUI inline. All widgets have loading, active, error, and empty states.
+- **Gate 6 (security):** `sandbox.decide()` is fail-closed: any exception in the sandbox decision path returns DENY (never ALLOW on error). Audit appended on every ALLOW decision to `~/.arc/audit/sandbox.audit.jsonl`.
+- **Gate 4 (tests):** 5193 passed. Tests: `test_approval_card_approve`, `test_approval_card_deny`, `test_shell_escape_sandbox_blocked`, `test_shell_escape_sandbox_audit_on_allow`, `test_activity_tray_cancel`.
+- **N/A:** 2 (TUI; `NO_COLOR` handled in R-UX4), 3 (TUI-only surfaces), 5 (no perf regressions; widgets use reactive rendering), 7 (ApprovalCard stream subscription handled in R-UX3), 8 (slash commands documented in `/help`).
+
+### R-UX3 — UX Components + Information Architecture
+
+- **Gate 1 (UX states):** Full component set shipped: `ToolCard` (tool call with args/result), `Toaster` (ephemeral notification stack, max 5, auto-dismiss 4s), `KeycapHint` (keyboard shortcut display), `RiskBadge` (MCP risk level colored chip), `CommandPalette` (Ctrl+P registry-driven command search), `SlashMenu` (inline `/` autocomplete), `DiffBlock` (unified diff render). All deferred items from the R-UX1/R-UX2 IA backlog resolved.
+- **Gate 4 (tests):** 5219 passed; commits `dd6818f` + `17e8e84`. Tests cover all 7 new components plus regression suite.
+- **Gate 7 (reliability):** `ApprovalCard` uses `hitl_gate_fn` stream subscription: subscribes to the HITL event stream on mount, unsubscribes on unmount (no leak). Timeout handled: after 5 minutes without user action, the card auto-expires with a structured `TIMEOUT` result (never hangs indefinitely).
+- **N/A:** 2 (TUI; `NO_COLOR` / high-contrast handled in R-UX4), 3 (TUI-only surfaces), 5 (Toaster uses a bounded queue; CommandPalette search is in-memory), 6 (no security decisions in display components), 8 (components self-documented via `/help` and `--help`).
+
+### R-UX4 — UX Themes + Accessibility
+
+- **Gate 2 (accessibility):** `NO_COLOR` env var triggers glyph-only fallback for all status indicators (no color-only information). High-contrast theme passes WCAG 1.4.3 (contrast ≥ 7:1) for all foreground/background pairs. `ARC_REDUCED_MOTION=1` disables all spinner animations and transitions.
+- **Gate 1 (UX states):** 6 themes (`dark`, `light`, `mocha`, `latte`, `high-contrast`, `mono`) available for live re-skin via `/theme <name>` or `/theme list`. `/statusline [slots|reset]` (B2P-01) allows slot reordering of the 6 status-line slots. Theme switches are instant (no reload required).
+- **Gate 4 (tests):** 5236 passed; commits `09d13f6` + `7df65c3` + `5c2a2da`. 2 xfailed TUI snapshot tests are expected and pre-existing (Textual snapshot rendering is environment-dependent; xfail is correct). Tests: `test_no_color_glyph_fallback`, `test_high_contrast_theme_contrast`, `test_reduced_motion_disables_spinners`, `test_theme_live_switch`, `test_statusline_reorder`.
+- **N/A:** 3 (themes are TUI-only; IDE themes handled separately), 5 (theme switch is a CSS-equivalent reactive re-render, no perf concern), 6 (no security decisions), 7 (no long-running actions), 8 (all 6 theme names documented in README and `/help`).

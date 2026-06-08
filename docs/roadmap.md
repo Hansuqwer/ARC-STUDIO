@@ -128,18 +128,18 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 
 | ID | Title | Status |
 |---|---|---|
-| R-TS2 | Token-Saving P0 | Baseline Complete |
-| R-TS3 | arc-protocol-ts coverage backfill | Baseline Complete |
-| R-TS4 | R-01 TokenWallet | Baseline Complete |
-| R-TS5 | Budget Persistence + Pricing Refresh | Baseline Complete |
-| R-TS7 | R-02 + QW-4 feature sprint | Baseline Complete |
-| R-TS8 | Chinese-labs vendor adoption + capability backfill | Baseline Complete |
-| R-TS9 | Catalog-driven model picker + capability gating | Baseline Complete |
-| R-TS10 | Opt-in cloud features | Baseline Complete |
-| R-UX1 | UX Polish — Header + ContextMeter + ModeBadge + Markdown | Baseline Complete |
-| R-UX2 | UX Modes + Approvals | Baseline Complete |
-| R-UX3 | UX Components + Information Architecture | Baseline Complete (all deferred items resolved) |
-| R-UX4 | UX Themes + Accessibility | Baseline Complete |
+| R-TS2 | Token-Saving P0 | Polished Complete |
+| R-TS3 | arc-protocol-ts coverage backfill | Polished Complete |
+| R-TS4 | R-01 TokenWallet | Polished Complete |
+| R-TS5 | Budget Persistence + Pricing Refresh | Polished Complete |
+| R-TS7 | R-02 + QW-4 feature sprint | Polished Complete |
+| R-TS8 | Chinese-labs vendor adoption + capability backfill | Polished Complete |
+| R-TS9 | Catalog-driven model picker + capability gating | Polished Complete |
+| R-TS10 | Opt-in cloud features | Polished Complete |
+| R-UX1 | UX Polish — Header + ContextMeter + ModeBadge + Markdown | Polished Complete |
+| R-UX2 | UX Modes + Approvals | Polished Complete |
+| R-UX3 | UX Components + Information Architecture | Polished Complete |
+| R-UX4 | UX Themes + Accessibility | Polished Complete |
 | R-OPEN-HARDEN | Production Hardening (retry + degrade + failover + wiring) | Baseline Complete |
 | R-OPEN-SANDBOX | MicroVM / Sandbox Layer (shell-escape hardening) | Baseline Complete |
 | R-OPEN-DEFERRED-RUNBOOKS | Execute Deferred Research Runbooks | Baseline Complete |
@@ -160,7 +160,7 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 
 | ID | Title | Status |
 |---|---|---|
-| R-TS1 | Token-Saving Research | Baseline Complete (sdk_version sweep done — R-AUDIT24 Phase 155) |
+| R-TS1 | Token-Saving Research | Polished Complete | Evidence: aa788f3 2026-06-07; Phase 253 | sdk_version() on 8 adapters; runtimes --capabilities --json parity; pricing-feed-sources-comparison.md docs. |
 | R79 | Mobile Runtime SDK Integration | Baseline Complete | Evidence: Phase 111 + Phase 148 + Phase 157 | Slices 110.1–110.5 + TUI /budget + Theia Mobile Runtime IDE tab (simulator/mock only; no native-execution claims). |
 | R79.1 | Real native framework package builds (Expo / React Native / Flutter) | Deferred | Evidence: — | Notes: packages are fixtures-only scaffolds today; building shippable packages from distribution artifacts plus real native example-app CI (`expo prebuild` / `xcodebuild` / `gradle`) is gated behind native toolchains and the Phase 11 entry gates — no real device access (see `docs/mobile/ROADMAP_TO_PRODUCTION.md` Phase 6/9/10). |
 | R79.2 | Native device-capability execution (Phase 11, gated) | Deferred | Evidence: — | Notes: camera/mic/contacts/calendar/location capabilities stay entry-gated and route to fixtures (`executed_real_device=False`); enabling real device access is human-gated and out of current scope (`docs/mobile/ROADMAP_TO_PRODUCTION.md` Phase 11). |
