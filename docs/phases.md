@@ -6083,3 +6083,18 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete (Mobile Roadmap Phases 12c–12e + 20) | Evidence: local worktree 2026-06-07 | Files: `mobile/{audit_retention,sbom,mcp_bridge}.py`, `mobile/compliance/report.py`, `cli/mobile.py`. Verified: `test_mobile_{audit_retention(5),compliance_report(3),sbom(4),mcp_bridge(7)}.py` — retention TTL/count/rotation, report aggregation + CLI, SBOM shape/modules/determinism + CLI, bridge default-off/loopback/token/TTL fail-closed. | Notes: deterministic (no LLM); no network listener (bridge is a guard only). **Mobile Roadmap Phases 0–12 + 20 now implemented in simulator-preview posture; Phase 11 enforced as an entry-gate that always routes to fixtures (no real device access).**
 
 ---
+
+## Phase 193 — Batch 6 Track A: Close the critical-review-v2 CR backlog (CR-036/021/034/043/045)
+
+**Goal:** Resolve the remaining open CRs from `docs/research-findings/critical-review-v2-execution-2026-06-07.md` (verify-first; additive).
+
+**Implemented:**
+- **CR-036** Aligned the typed `MessageData` to the MESSAGE event registry + TS shape (`text` body + optionals); dropped the diverged, unused `content`/`role`. Registry↔typed parity guard added.
+- **CR-021** Corrected the README's non-existent `arc wallet`/`arc wallet budget` CLI → TUI `/wallet`+`/budget` and CLI `arc runs budget <run-id>`; parity guard added.
+- **CR-034** Added the aggregate `synthetic` flag + `[synthetic]` header to the 3 batch eval summaries (individual results already carried it).
+- **CR-043** The defined-but-unwritten `McpCallDecisionEvent` is now produced: `to_call_decision_event` + `persist_decision_event` wired into the MCP per-call decision path.
+- **CR-045** New `.github/workflows/dod-gate.yml` enforces `check-banned-claims.sh` on the canonical docs + asserts roadmap/phases presence (was a manual release_check step only).
+
+**Status:** Baseline Complete | Evidence: local worktree 2026-06-08 | Tests: `test_message_event_registry_parity.py` (4), `test_readme_cli_parity.py` (3), `test_eval_synthetic_labelling.py` (4), `test_mcp_call_decision_event.py` (5); 82 protocol + 128 MCP + 13 eval-CLI tests pass; dod-gate YAML valid + banned-claims clean. | Notes: additive; deterministic; closes the critical-review-v2 backlog.
+
+---

@@ -1,0 +1,40 @@
+name: dod-gate
+
+# CR-045: enforce the Definition-of-Done wording gate in CI (previously only a manual
+# release_check step). Fails the build on any banned/overclaiming wording in the canonical
+# docs, and asserts the single-source-of-truth docs exist.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dod-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Canonical docs present (single source of truth)
+        run: |
+          set -e
+          for f in AGENTS.md README.md docs/roadmap.md docs/phases.md; do
+            test -f "$f" || { echo "::error::missing canonical doc: $f"; exit 1; }
+          done
+          echo "canonical docs present"
+
+      - name: Banned-claims gate (DoD wording)
+        run: |
+          TARGETS="AGENTS.md README.md docs/roadmap.md docs/phases.md"
+          [ -f docs/release/checklist.md ] && TARGETS="$TARGETS docs/release/checklist.md"
+          bash scripts/check-banned-claims.sh $TARGETS
