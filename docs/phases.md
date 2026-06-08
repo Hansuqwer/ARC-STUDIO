@@ -6719,3 +6719,34 @@ Phase 195 delivered: simulate-through-gate, signed tenant RBAC/ABAC overlay, myp
 - **Gate 6 (security):** Signed plan required (capability_gate.py). RBAC/ABAC via EnterprisePolicyHook. Audit on execute (Phase 220). Deterministic (no LLM). Fixtures-only (`executed_real_device: false`).
 - **Gate 7 (reliability):** Step count limit (Phase 219). Gate evaluate fail-closed on missing criteria (Phase 195). Property tests confirm edge-case reliability.
 - **Gate 8 (docs):** README + CLI reference (Phase 217). mypy clean + banned-claims passing.
+
+
+## Phase 222 — R-MOBILE-POLISH5: Elevate R-MOBILE-B5-P6 + R-MOBILE-CLI to Polished Complete
+
+All DoD gates cited for both roadmap items.
+
+### R-MOBILE-B5-P6 → Polished Complete
+
+Phase 187 delivered: Expo config plugin (advisory permission injection), TS API over fixtures-only native bridge, events + getCapabilities/simulate API, example app, forbidden-symbol CI gate.
+
+- **Gate 1 (UX states):** TS API returns structured responses (ok/error); `getCapabilities()` returns empty-aware list; `simulate()` returns step results with `allowed` state. N/A for Expo-native (stub only).
+- **Gate 2 (a11y):** N/A — native Expo/RN SDK scaffolds have no UI widgets.
+- **Gate 3 (parity):** TS `getCapabilities()` mirrors Python `list_capabilities()` via fixture data (shared fixture). Forbidden-symbol CI gate enforces no real OS APIs in scaffolds.
+- **Gate 4 (tests):** 28 expo tests (Phase 187) + 9 expo scaffold tests (test_mobile_expo_scaffold.py, including Phase 209 package.json main fix). Ruff clean. Flutter/RN tests: 7+9 (Phase 189).
+- **Gate 5 (perf):** Expo/RN scaffolds are fixtures-only (no native I/O in hot path). No unbounded buffers.
+- **Gate 6 (security):** All native APIs forbidden (forbidden-symbol CI gate). `ARC_MOBILE_MOCK_MODE` constant prevents accidental real-device calls. Package.json `private: true`.
+- **Gate 7 (reliability):** `simulate()` step count limit inherited from Python simulator (Phase 219). Fixture calls are synchronous + deterministic.
+- **Gate 8 (docs):** README Mobile SDK section (Phase 217). `package.json` description accurate (Phase 209). Expo/RN: `private: true`, no publishable without build (documented).
+
+### R-MOBILE-CLI → Polished Complete
+
+Phase 194 delivered: deterministic CLI over CapabilityEntryGate/FeatureFlags/EgressGuard/OfflineQueue/SecureLocalStore (redacted)/audit_retention. 31 CLI tests.
+
+- **Gate 1 (UX states):** All CLI commands use `ok()`/`err()` envelopes. Explicit `"state"` fields on doctor + validate (Phase 218). Empty/error/degraded states on all surfaces.
+- **Gate 2 (a11y):** N/A — CLI-only.
+- **Gate 3 (parity):** CLI `--json` output structurally matches Python API (Phase 218 gate 3 parity tests). `arc mobile gate evaluate` matches `CapabilityEntryGate.evaluate()`.
+- **Gate 4 (tests):** 31 CLI tests (Phase 194) + 23 CLI tests (test_mobile_cli.py) + 7 gate 1/3 parity tests (Phase 218) + 3 gate 7 reliability tests (Phase 219) + 4 gate 6 security tests (Phase 220). 324 mobile tests total.
+- **Gate 5 (perf):** CLI commands are synchronous CLI calls with bounded inputs (max_steps=500 on simulate). Secure store + egress guard are deterministic in-memory operations.
+- **Gate 6 (security):** Gate requires signed plan (capability_gate.py). Secrets redacted in secure store display (redacted=true). Audit appended on gate execute (Phase 220). Deterministic (no LLM).
+- **Gate 7 (reliability):** Simulate step count limit (Phase 219). All CLI commands handle structured errors via `_out(err(...))`.
+- **Gate 8 (docs):** README Mobile SDK CLI reference (Phase 217). All commands have accurate `--help`. banned-claims passing.
