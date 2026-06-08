@@ -52,29 +52,37 @@ PYTHON_ONLY_EVENT_TYPES = {
     "CONSENSUS_EVAL_RUN",
 }
 
-INTENTIONALLY_UNTYPED_TS_EVENT_TYPES = {
-    "AGENT_START",
-    "AGENT_END",
-    "TOOL_CALL_ARGS",
-    "TOOL_CALL_END",
-    "TOOL_END",
-    "HANDOFF",
-    "NODE_UPDATE",
-    "MESSAGE_CHUNK",
-    "TEXT_MESSAGE_START",
-    "TEXT_MESSAGE_CONTENT",
-    "TEXT_MESSAGE_END",
-    "TEXT_MESSAGE_CHUNK",
-    "STATE_SNAPSHOT",
-    "CONTRACT_PROPOSED",
-    "CONTRACT_ACCEPTED",
-    "CONTRACT_FULFILLED",
-    "CONTRACT_VIOLATED",
-    "RECEIPT_GENERATED",
-    "FAILURE_AUTOPSY_GENERATED",
-    "EVIDENCE_REF_CREATED",
-    "CUSTOM",
-} | PYTHON_ONLY_EVENT_TYPES
+# Registry events deliberately NOT given a dedicated TS interface in run-events.ts, each with the
+# reason it is intentional follow-up debt rather than an omission (B2P-10). The IDE still receives
+# them via the generic RawEvent/UnknownEvent path — they are neither invented nor dropped.
+INTENTIONALLY_UNTYPED_TS_EVENTS: dict[str, str] = {
+    "AGENT_START": "AG-UI streaming lifecycle event; consumed generically by the event stream, modeled in the AG-UI layer, not re-typed in run-events.ts.",
+    "AGENT_END": "AG-UI streaming lifecycle event; consumed generically by the event stream, modeled in the AG-UI layer.",
+    "TOOL_CALL_ARGS": "AG-UI tool-call streaming delta; rendered generically, not re-typed in run-events.ts.",
+    "TOOL_CALL_END": "AG-UI tool-call streaming delta; rendered generically.",
+    "TOOL_END": "AG-UI tool streaming delta; rendered generically.",
+    "HANDOFF": "AG-UI agent-handoff streaming event; rendered generically.",
+    "NODE_UPDATE": "AG-UI node-update streaming delta; rendered generically.",
+    "MESSAGE_CHUNK": "Streaming message delta; coalesced into MESSAGE for display, no standalone TS interface.",
+    "TEXT_MESSAGE_START": "AG-UI text-message streaming delta; coalesced into MESSAGE for display.",
+    "TEXT_MESSAGE_CONTENT": "AG-UI text-message streaming delta; coalesced into MESSAGE for display.",
+    "TEXT_MESSAGE_END": "AG-UI text-message streaming delta; coalesced into MESSAGE for display.",
+    "TEXT_MESSAGE_CHUNK": "AG-UI text-message streaming delta; coalesced into MESSAGE for display.",
+    "STATE_SNAPSHOT": "AG-UI state-snapshot streaming event; consumed generically by the event stream.",
+    "CONTRACT_PROPOSED": "Auditability event; rendered from stored RunContract records, not the live typed run-event union.",
+    "CONTRACT_ACCEPTED": "Auditability event; rendered from stored RunContract records.",
+    "CONTRACT_FULFILLED": "Auditability event; rendered from stored RunContract records.",
+    "CONTRACT_VIOLATED": "Auditability event; rendered from stored RunContract records.",
+    "RECEIPT_GENERATED": "Auditability event; rendered from stored RunReceipt records.",
+    "FAILURE_AUTOPSY_GENERATED": "Auditability event; rendered from stored FailureAutopsy records.",
+    "EVIDENCE_REF_CREATED": "Auditability event; rendered from stored EvidenceRef records.",
+    "CUSTOM": "Open-ended user/custom event with an arbitrary payload; intentionally untyped.",
+}
+
+# Back-compat: the parity assertions below operate on the set of untyped TS event types.
+INTENTIONALLY_UNTYPED_TS_EVENT_TYPES = (
+    set(INTENTIONALLY_UNTYPED_TS_EVENTS) | PYTHON_ONLY_EVENT_TYPES
+)
 
 
 def _repo_root() -> Path:
@@ -154,6 +162,24 @@ def test_typescript_known_and_intentionally_untyped_events_cover_registry():
 
     assert ts_types | INTENTIONALLY_UNTYPED_TS_EVENT_TYPES == registry_types
     assert ts_types & INTENTIONALLY_UNTYPED_TS_EVENT_TYPES == set()
+
+
+def test_every_intentionally_untyped_event_has_a_documented_rationale():
+    """B2P-10: each TS-untyped registry event must carry an explicit rationale, so the debt is
+    intentional and documented rather than a silent omission."""
+    for event_type, rationale in INTENTIONALLY_UNTYPED_TS_EVENTS.items():
+        assert isinstance(rationale, str) and len(rationale.strip()) >= 20, (
+            f"{event_type} needs a documented rationale for being untyped in TS"
+        )
+    # No drift: every registry event not typed in TS (and not Python-only) must be documented here.
+    ts_types = _extract_ts_event_types()
+    registry_types = {entry["type"] for entry in _registry_fixture()["eventTypes"]}
+    undocumented = (registry_types - ts_types - PYTHON_ONLY_EVENT_TYPES) - set(
+        INTENTIONALLY_UNTYPED_TS_EVENTS
+    )
+    assert undocumented == set(), (
+        f"registry events neither typed in TS nor documented as intentional debt: {sorted(undocumented)}"
+    )
 
 
 def test_core_event_types_exist_in_python():
