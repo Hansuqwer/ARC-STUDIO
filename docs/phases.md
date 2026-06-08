@@ -6420,3 +6420,12 @@ Driving the R-AUDIT audit-fix set to `Polished Complete` against the full DoD. *
 - **R-AUDIT22 (Handover Doc Stale Refs Sweep):** ✓ handover docs point to `docs/roadmap.md`; gate 8. N/A 1–7.
 - **Evidence:** `bash scripts/check-banned-claims.sh` clean across the touched docs.
 
+### Security batch (gate 6 + tests) → Polished Complete
+
+- **R-AUDIT3 (docker-compose 127.0.0.1 binding):** ✓ port 3000 bound to loopback (no remote exposure); gate 6 + 8. N/A 1–5,7.
+- **R-AUDIT5 (MCP Proxy Env Secret-Strip):** ✓ `_sanitise_env()` strips secrets before proxy start; gate 6 + 4 (`tests/mcp/test_proxy_env.py`). N/A 1,2,3,5,7.
+- **R-AUDIT6 (Gateway Client Paid-Call Gate):** ✓ paid-call gated upstream via `require_dual_gate` in the runner; gate 6 + 4 (`tests/adapters/swarmgraph/test_gateway_backend.py`). N/A 1,2,3,5,7.
+- **R-AUDIT7 (allow_paid Default Warning):** ✓ `allow_paid_warning` on `DataStore` surfaced in the TUI status bar (gate 1 UX) + deterministic warn (gate 6) + 4 (`tests/tui/test_allow_paid_warning.py`). N/A 2,3,5,7.
+- **R-AUDIT14 (Mutating GET /api/runs/start Removal):** ✓ GET returns `410 Gone`, POST unaffected, legacy env shim removed; gate 6 + 3 (parity, ties to B2P-18 route-fate registry) + 4 (`tests/web/test_route_fate_parity.py`). N/A 1,2,5,7.
+- **Evidence:** Python security tests green (`test_proxy_env`, `test_gateway_backend`, `test_allow_paid_warning`, `test_route_fate_parity`); deterministic gates, no LLM.
+

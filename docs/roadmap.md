@@ -1744,18 +1744,18 @@ P2 — Quality:
 |---|---|---|---|---|
 | R-AUDIT1 | Release Checklist Refresh | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | docs/release/checklist.md updated to v0.8-r-ux2/aa788f3/5537 tests/Phase 131. |
 | R-AUDIT2 | Enforcement Surfaces Doc Refresh | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | enforcement-surfaces.md updated to Phase 131; new surfaces for sandbox P0, hash chain, adapter gates, retry, TurnManager hook. |
-| R-AUDIT3 | docker-compose 127.0.0.1 Binding | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | docker-compose.yml port 3000 bound to 127.0.0.1. |
+| R-AUDIT3 | docker-compose 127.0.0.1 Binding | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | docker-compose.yml port 3000 bound to 127.0.0.1. |
 | R-AUDIT4 | config-service apiKeySource Snake/Camel Fix | Status: Baseline Complete | Evidence: audit-synthesis-backlog.md 2026-06-07 | Add api_key_source fallback in config-service.ts so IDE provider source badge shows correctly. |
-| R-AUDIT5 | MCP Proxy Env Secret-Strip Gate | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | _sanitise_env() added to mcp/proxy.py; wired in start(); 4 new tests. |
-| R-AUDIT6 | Gateway Client Paid-Call Gate | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | TODO removed; exemption documented — gate is upstream via require_dual_gate in runner.py; 1 new test. |
-| R-AUDIT7 | DataStore allow_paid Default Warning | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | allow_paid_warning property added to DataStore; surfaced in StatusBar; 3 new tests. |
+| R-AUDIT5 | MCP Proxy Env Secret-Strip Gate | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | _sanitise_env() added to mcp/proxy.py; wired in start(); 4 new tests. |
+| R-AUDIT6 | Gateway Client Paid-Call Gate | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | TODO removed; exemption documented — gate is upstream via require_dual_gate in runner.py; 1 new test. |
+| R-AUDIT7 | DataStore allow_paid Default Warning | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | allow_paid_warning property added to DataStore; surfaced in StatusBar; 3 new tests. |
 | R-AUDIT8 | EXTENSION_MIGRATION Stale Ref Fix | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | LOCKED_REMAINING_ROADMAP.md ref replaced with docs/roadmap.md in EXTENSION_MIGRATION.md. |
 | R-AUDIT9 | Budget Durability Under Error | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | Budget is preflight-only; by-design gap documented in turn_manager.py degraded path; 2 new tests. |
 | R-AUDIT10 | SwarmGraph Topology Shape Verification | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | No mismatch found; shapes consistent (flat {nodes,edges}); comment added to TS; 1 new Python test. |
 | R-AUDIT11 | Notifications Outbox MVP | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | notifications/outbox.py created; append/read_all/gc with TTL; 4 new tests. |
 | R-AUDIT12 | UI Design Token Foundation | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | tokens.css created with color/spacing/typography/radius tokens; additive only. |
 | R-AUDIT13 | HMAC README Wording Tighten | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | Scope caveat added to README and SECURITY.md HMAC sections. |
-| R-AUDIT14 | Mutating GET /api/runs/start Removal | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | GET /api/runs/start returns 410 Gone; POST unaffected; legacy env shim removed. |
+| R-AUDIT14 | Mutating GET /api/runs/start Removal | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | GET /api/runs/start returns 410 Gone; POST unaffected; legacy env shim removed. |
 | R-AUDIT15 | SwarmGraph MetaPathFinder Bridge Docs | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | docs/research/swarmgraph-metapathfinder-bridge.md created with architecture, gates, and honest limits. |
 | R-AUDIT16 | IDE Context Drawer / AGENTS.md Surface | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | ArcContextDrawer widget created; registered in frontend module; stub data (CLI proxy wiring follow-on); 1 test. |
 | R-AUDIT17 | R79 TUI/Theia Surfacing | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | /budget [run-id] slash command added to TUI screen; wallet fallback when no run-id; 2 new tests. |
