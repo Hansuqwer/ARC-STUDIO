@@ -9,11 +9,9 @@
 import * as React from '@theia/core/shared/react';
 import type { ArcService, McpDecisionEntry, McpWorkbenchStatus } from '../../common/arc-protocol';
 import { useAsyncState } from '../hooks/useAsyncState';
+import { riskBadgeVariant } from './mcp-risk';
 
 const DECISION_LIMIT = 20;
-const RISK_VARIANT: Record<string, string> = {
-    low: 'success', medium: 'warning', high: 'info', critical: 'info',
-};
 
 export interface McpWorkbenchTabProps {
     arcService: ArcService;
@@ -167,7 +165,10 @@ export const McpWorkbenchTab: React.FC<McpWorkbenchTabProps> = ({ arcService }) 
                             <li key={i} className={`arc-mcp-workbench__decision arc-mcp-workbench__decision--${d.decision}`}>
                                 <span className='arc-mcp-workbench__decision-badge'>{d.decision.toUpperCase()}</span>
                                 <span className='arc-mcp-workbench__decision-tool'>{d.serverId}/{d.toolName}</span>
-                                <span className={`arc-mcp-workbench__badge arc-mcp-workbench__badge--${RISK_VARIANT[d.riskScore] ?? 'ok'}`}>
+                                <span
+                                    className={`arc-mcp-workbench__badge arc-mcp-workbench__badge--${riskBadgeVariant(d.riskScore)}`}
+                                    aria-label={`risk level ${d.riskScore}`}
+                                >
                                     risk:{d.riskScore}
                                 </span>
                                 <span className='arc-mcp-workbench__decision-reason'>{d.reason}</span>

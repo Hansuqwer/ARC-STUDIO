@@ -1075,6 +1075,28 @@
     color: var(--arc-error-color, #c93c37);
 }
 
+/* Risk-level badge variants — each visually distinct so critical != high (R-AUDIT26, WCAG 1.4.1). */
+.arc-mcp-workbench__badge--risk-low {
+    background: rgba(47, 143, 70, 0.12);
+    color: var(--arc-success-color, #2f8f46);
+}
+
+.arc-mcp-workbench__badge--risk-medium {
+    background: rgba(204, 167, 0, 0.14);
+    color: var(--theia-charts-yellow, #cca700);
+}
+
+.arc-mcp-workbench__badge--risk-high {
+    background: rgba(214, 122, 0, 0.16);
+    color: var(--theia-charts-orange, #d67a00);
+}
+
+.arc-mcp-workbench__badge--risk-critical {
+    background: rgba(201, 60, 55, 0.18);
+    color: var(--arc-error-color, #c93c37);
+    font-weight: 700;
+}
+
 .arc-mcp-workbench__warning {
     color: var(--theia-charts-yellow, #cca700);
 }
