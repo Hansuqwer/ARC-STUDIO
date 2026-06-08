@@ -68,6 +68,7 @@ Opens the full-screen Textual TUI. From there:
 | `/help` | Show all keybindings and slash commands |
 | `/runs` | Browse stored run history |
 | `/status` | Show workspace, daemon, cost |
+| `/statusline [slots\|reset]` | Show or reorder the status-line slots (mode/runtime/workspace/session/cost/hint) |
 | `!<cmd>` | Run a shell command inline (sandbox-gated) |
 | `Ctrl+P` | Command palette |
 | `Ctrl+C` twice | Exit |

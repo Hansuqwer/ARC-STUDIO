@@ -6234,3 +6234,13 @@ Driving selected Batch 7 `Baseline Complete` items to `Polished Complete` agains
 - **Gate 8 (docs):** ✓ Corrected the stale MCP tool count in README (**11 → 13 tools**, both occurrences) after T11 added the two SwarmGraph tools; this entry + roadmap row; banned-claims clean.
 - **N/A:** 1 UX-states, 2 a11y, 5 perf — no user-visible IDE/TUI surface (stdio MCP tools); plans/assessments are bounded deterministic in-process calls. 7 reliability — synchronous deterministic tool, no long-running/bridged action (errors surface as the structured `{ok:false}` envelope via `_tool_result`).
 
+### B2P-01 — TUI `/statusline` slot reordering → Polished Complete
+
+- **Gate 1 (UX states):** ✓ `status_line()` always renders producer-truth fields (mode/runtime/workspace/session/cost/hint); no session ⇒ `--------`, zero cost ⇒ `$0`, over-width ⇒ truncated with `…`; empty/unknown order falls back to defaults. (`test_status_line_degraded_and_bounded`.)
+- **Gate 2 (a11y):** ✓ Output is plain text with **no ANSI color escapes** — all meaning is textual, not color-encoded (WCAG 1.4.1), so it is identical under `NO_COLOR`; the host status widget already carries the `NO_COLOR` glyph fallback (R-UX4). (`test_status_line_is_no_color_safe`.)
+- **Gate 3 (parity):** ✓ `/statusline` report / set / reset is consistent and validated — unknown slots rejected, empty order rejected, duplicates de-duped, reset restores defaults. (TUI-only display surface; no CLI/IDE equivalent action.)
+- **Gate 4 (tests):** ✓ `uv run pytest tests/tui/test_statusline_order.py` → 8 passed.
+- **Gate 5 (perf):** ✓ Render is O(slots) and bounded to the requested width (no unbounded string).
+- **Gate 8 (docs):** ✓ Added `/statusline` to the README command table; **corrected the stale R-UX4 note** ("slot reordering not yet configurable" → config-driven, B2P-01); this entry; banned-claims clean.
+- **N/A:** 6 security, 7 reliability — synchronous local display, no mutating/bridged action.
+
