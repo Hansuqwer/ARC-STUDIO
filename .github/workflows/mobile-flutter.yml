@@ -1,0 +1,42 @@
+name: mobile-flutter
+
+# Native-safety + contract gate for the Flutter simulator-preview package. The authoritative
+# check is the Python static gate (platform-interface/model/catalog-drift + no real device
+# packages). `flutter analyze`/`flutter test` run best-effort when the toolchain is present.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter-safety-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
+      - name: Sync dependencies
+        working-directory: python
+        run: uv sync --all-extras --dev
+      - name: Flutter native-safety + platform-interface gate (authoritative)
+        working-directory: python
+        run: uv run pytest -q tests/test_mobile_flutter.py
+      - name: flutter analyze + test (best-effort, when toolchain present)
+        continue-on-error: true
+        working-directory: runtimes/mobile/flutter/packages/arc_mobile_runtime
+        run: |
+          if command -v flutter >/dev/null 2>&1; then
+            flutter pub get && flutter analyze && flutter test
+          else
+            echo "::notice::flutter toolchain not present — Python static gate is authoritative"
+          fi

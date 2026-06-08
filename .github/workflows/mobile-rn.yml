@@ -1,0 +1,33 @@
+name: mobile-rn
+
+# Native-safety + contract gate for the React Native (TurboModule) simulator-preview package.
+# The RN package is standalone/gitignored, so the authoritative check is the Python static
+# gate (recursive forbidden-symbol scan + TurboModule Codegen-spec contract + catalog drift).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rn-safety-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v5
+      - name: Sync dependencies
+        working-directory: python
+        run: uv sync --all-extras --dev
+      - name: React Native native-safety + TurboModule contract gate
+        working-directory: python
+        run: uv run pytest -q tests/test_mobile_rn.py
