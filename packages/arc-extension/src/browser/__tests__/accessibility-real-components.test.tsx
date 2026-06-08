@@ -13,6 +13,13 @@ import '@testing-library/jest-dom';
 
 import { TestBenchTab } from '../tabs/TestBenchTab';
 import { McpWorkbenchTab } from '../tabs/McpWorkbenchTab';
+import { AssuranceTab } from '../tabs/AssuranceTab';
+import { BattleTab } from '../tabs/BattleTab';
+import { CiGuardrailsTab } from '../tabs/CiGuardrailsTab';
+import { CommandCentreTab } from '../tabs/CommandCentreTab';
+import { EditPlansTab } from '../tabs/EditPlansTab';
+import { RunsTab } from '../tabs/RunsTab';
+import { SwarmGraphInsightTab } from '../tabs/SwarmGraphInsightTab';
 import type { ArcService } from '../../common/arc-protocol';
 
 const AXE_OPTS = { rules: { 'color-contrast': { enabled: false } } };
@@ -34,6 +41,12 @@ function stubService(): ArcService {
             diagnostic: 'ok',
         }),
         getMcpDecisions: jest.fn().mockResolvedValue({ decisions: [] }),
+        listPendingHitlPrompts: jest.fn().mockResolvedValue([]),
+        listBattles: jest.fn().mockResolvedValue([]),
+        getCiCheckStatus: jest.fn().mockResolvedValue({ private: false, workspace: '/ws', checks: {}, overall: 'skip' }),
+        listChatSessions: jest.fn().mockResolvedValue([]),
+        listEditPlans: jest.fn().mockResolvedValue({ plans: [], count: 0 }),
+        getTraces: jest.fn().mockResolvedValue([]),
     } as unknown as ArcService;
 }
 
@@ -47,6 +60,24 @@ describe('Real-component a11y (B2P-03a)', () => {
     it('McpWorkbenchTab (real) has no axe violations once status loads', async () => {
         const { container } = render(<McpWorkbenchTab arcService={stubService()} />);
         await waitFor(() => expect(screen.queryByText(/Detecting|Loading/i)).not.toBeInTheDocument());
+        expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
+    });
+
+    // Remaining tabs rendered as REAL components with an empty-but-valid stub; axe their settled
+    // (empty/populated) state. Covers the rest of the tab surface for B2P-03b.
+    const REMAINING: Array<[string, React.ComponentType<{ arcService: ArcService }>]> = [
+        ['AssuranceTab', AssuranceTab as React.ComponentType<{ arcService: ArcService }>],
+        ['BattleTab', BattleTab as React.ComponentType<{ arcService: ArcService }>],
+        ['CiGuardrailsTab', CiGuardrailsTab as React.ComponentType<{ arcService: ArcService }>],
+        ['CommandCentreTab', CommandCentreTab as React.ComponentType<{ arcService: ArcService }>],
+        ['EditPlansTab', EditPlansTab as React.ComponentType<{ arcService: ArcService }>],
+        ['RunsTab', RunsTab as React.ComponentType<{ arcService: ArcService }>],
+        ['SwarmGraphInsightTab', SwarmGraphInsightTab as React.ComponentType<{ arcService: ArcService }>],
+    ];
+
+    it.each(REMAINING)('%s (real) has no axe violations once settled', async (_name, Component) => {
+        const { container } = render(<Component arcService={stubService()} />);
+        await waitFor(() => expect(screen.queryByText(/Loading|Detecting/i)).not.toBeInTheDocument());
         expect(await axe(container, AXE_OPTS)).toHaveNoViolations();
     });
 });
