@@ -7304,3 +7304,23 @@ This batch covers: Trace-Aware Review, Plan/Apply, Command/Approval Centre, MCP 
 - **Gate 7 (reliability):** Edit apply checks original/replacement hashes before writing (R60). Doctor/preflight separates runtime readiness from public execution readiness (R65). Hunk range validation fail-closed (R64).
 - **Gate 4 (tests):** Phases 85-94: agentic edit loop, UX polish, tool unification, staleness guard, plan apply, bundle approval, IDE review, diff/apply/test REPL, patch engine, sandbox truth audit guard.
 - **N/A:** 2, 3, 5, 8.
+
+
+## Phase 248 — R-CLEAN1 → Polished Complete + Cleanup Safe Slice #3
+
+### R-CLEAN1 (Cleanup & Refactor Audit) → Polished Complete
+
+- **Gate 4 (tests):** Multi-signal cleanup audit: 3 suspected dead-code targets disproved (all live/tested/wired). 57-slice cleanup backlog documented in `docs/research-findings/cleanup-refactor-audit-2026-06-07.md`. Smallest safe slice executed (`arc-studio-cli` entrypoint alias). Ruff clean; 5600+ tests passing. Zero deletions, zero protocol/CLI removals.
+- **Gate 3 (parity):** `arc-studio-cli` entrypoint is an additive alias (keeps `arch-studio-cli` compat). Command parity verified (no regressions).
+- **Gate 8 (docs):** Cleanup backlog documented. Every non-executed slice has an honest reason recorded. No hidden debt.
+- **N/A:** 1, 2, 5, 6, 7.
+
+### Cleanup Safe Slice #3 — `arc mobile gate check` alias (slice 53 from 57-slice backlog)
+
+The README and `arc mobile` help text reference `arc mobile gate check --plan ./plan.json`, but the actual command was `arc mobile gate evaluate`. Flat alias added:
+
+- **`mobile_gate_app.command("check")(mobile_gate_evaluate_cmd)`:** Additive alias — `arc mobile gate check <cap-id>` routes to the identical implementation as `arc mobile gate evaluate`. Original `evaluate` command preserved; no deletions.
+- **JSON-equivalence test:** `tests/test_gate_check_alias.py` verifies `check` and `evaluate` return identical data structure and values.
+- **Gate 3 (parity):** README now matches CLI. `arc mobile gate check` and `arc mobile gate evaluate` produce equivalent JSON output.
+- **Gate 4 (tests):** 1 equivalence test passed; 23 CLI tests passed; ruff clean.
+- **N/A:** 1, 2, 5, 6, 7, 8.

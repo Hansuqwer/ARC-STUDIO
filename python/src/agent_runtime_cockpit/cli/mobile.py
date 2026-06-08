@@ -973,6 +973,10 @@ def mobile_gate_evaluate_cmd(
     _out(ok(decision.as_dict()), json_output)
 
 
+# Flat alias: 'arc mobile gate check' → README-documented name (parity with docs).
+mobile_gate_app.command("check")(mobile_gate_evaluate_cmd)
+
+
 mobile_flags_app = typer.Typer(
     name="flags", help="Mobile feature flags + kill switch (default-off)"
 )
