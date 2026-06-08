@@ -18,8 +18,8 @@ sized for **one commit**. Derived from `docs/research-findings/baseline-to-polis
 - **No GATED work.** Excluded by design (need a human posture decision): MCP HTTP transport (auth), real native
   device access (R79.1/R79.2), ADK/MCP-adapter T3 (paid/live), broad provider-backed SwarmGraph adoption,
   Firecracker-on-Linux, live Battle Arena, Reviewed-Memory evidence pack.
-- **Posture unchanged.** Single-user, loopback-only alpha. No `Production ready`/`multi-user`/`tenant-isolated`/
-  `HMAC audit` wording; `scripts/check-banned-claims.sh` is authoritative. Polished = engineering bar, not a product claim.
+- **Posture unchanged.** Single-user, loopback-only alpha. Do not introduce the release-facing wording banned by
+  `scripts/check-banned-claims.sh` (authoritative — product-readiness / multi-party / isolation / keyed-audit phrases). Polished = engineering bar, not a product claim.
 - **Deterministic security; offline tests.** No paid/live provider calls unless an existing explicit gate is set.
 
 ---
