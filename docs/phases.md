@@ -6259,3 +6259,11 @@ Driving selected Batch 7 `Baseline Complete` items to `Polished Complete` agains
 - **Gate 4 (tests):** ✓ `uv run pytest tests/security/test_adaptive_confirmation.py tests/mcp/test_mcp_server.py` → 39 passed.
 - **N/A:** 2 a11y (CLI/stdio text), 5 perf (synchronous deterministic gate), 7 reliability (no long-running/bridged action), 8 docs-surface (module docstring + this entry). Real execution-entrypoint enforcement beyond the assessment surfaces remains incremental (the gate is the shared primitive entrypoints call).
 
+### B2P-09 — adapter budget enforcement → kept at Baseline Complete (documented gap)
+
+Verify-first DoD audit: **not elevated** — the row's specific claim ("real-time budget enforcement at *adapter* effect boundaries") is not fully realized, so labels follow evidence.
+
+- **What is real (gate 6 partial):** Budget enforcement runs at the **provider-call boundary** — `providers/budget_preflight.preflight_with_estimator` (deterministic, LLM-free, raises on exhaustion) is invoked before provider calls in the chat REPL (`cli_repl/slash_commands.py`), covered by `test_budget_preflight_estimator.py` + the budget suite.
+- **The gap:** The shared adapter hook `adapters/_shared.budget_checkpoint` (B2P-09a) + its exhaustion-interrupt tests (`tests/adapters/test_budget_checkpoint.py`) exist, but **no adapter calls it** — per-adapter adoption is blocked because a `BudgetEnforcer` cannot be threaded through the trace-serialized adapter params (T18). Until at least one adapter enforces per-effect via `budget_checkpoint`, the "at adapter effect boundaries" claim is not met.
+- **Decision:** Stays **Baseline Complete**. Closing the gap requires plumbing an enforcer into the adapter execution context (an `L`-effort change), deferred — not a polish-pass additive fix.
+
