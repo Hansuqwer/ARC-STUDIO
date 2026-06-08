@@ -66,9 +66,9 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 | R16 | Enforced Workspace Trust + Paid-Call Gates | Baseline Complete; Active Hardening |
 | R17 | Trace Viewer Virtualization + Daemon Resilience | Baseline Complete |
 | R18 | CLI Decomposition + Stable JSON Contracts | Polished Complete |
-| R19 | MCP Local Control Plane for ARC | Baseline Complete |
-| R20 | MCP Tasks for Async Execution | Baseline Complete |
-| R21 | LangGraph Durable Execution + Replay Contract | Baseline Complete |
+| R19 | MCP Local Control Plane for ARC | Polished Complete |
+| R20 | MCP Tasks for Async Execution | Polished Complete |
+| R21 | LangGraph Durable Execution + Replay Contract | Polished Complete |
 | R22 | Persistent HITL + Inspect-Style Eval Artifacts | Baseline Complete (HITL only) |
 | R23 | Consensus Escrow (Commit-Reveal Voting) | Complete |
 | R24 | Adaptive Consensus Protocol | Complete |

@@ -6830,3 +6830,39 @@ Evidence-based elevation for three roadmap items.
 - **Gate 6 (security):** `--yes` gate on `sandbox audit-compact` (Phase 164 R-POLISH6). Secrets not echoed in CLI output.
 - **Gate 7 (reliability):** Thin aggregator pattern — module failures isolated. Structured error envelopes on all commands.
 - **Gate 8 (docs):** `uv run arc --help` shows all commands. README CLI Reference. Banned-claims clean.
+
+
+## Phase 225 — R-AUDIT-SWEEP3: Baseline→Polished: R19/R20/R21
+
+### R19 (MCP Local Control Plane for ARC) → Polished Complete
+
+- **Gate 1 (UX states):** `arc mcp workbench status --json` returns structured ok/error with tool list, trust, diagnostic. McpWorkbenchTab has loading/error/empty/populated states (Phase 167, R-POLISH9). Per-call risk decisions logged with deterministic risk scores.
+- **Gate 2 (a11y):** R-AUDIT26 → Polished Complete (Phase 206) — MCP Workbench tab passes axe color-contrast in rendered Chromium. ARIA risk badge labels.
+- **Gate 3 (parity):** `arc mcp decisions --json` matches IDE McpWorkbenchTab decisions list. Risk scorer output matches across CLI and IDE.
+- **Gate 4 (tests):** 266 MCP tests (Phase 162 hardening + Phase 26 baseline). MCP proxy timeout/oversize structured errors (Phase 162 R-POLISH4). R-AUDIT5 MCP proxy env secret-strip (4 tests).
+- **Gate 5 (perf):** McpWorkbenchTab decisions state bounded (not live-streamed). Async Node backend (Phase 165 R-POLISH7).
+- **Gate 6 (security):** Per-call deterministic risk gate (critical/high/medium/low). `arc mcp serve` logs to stderr (Phase 162). Proxy sanitises os.environ (Phase 162 R-POLISH4). Decisions logged to `~/.arc/audit/decisions.jsonl`. MCP_CALL_DECISION event producer wired (Phase 193 R-CR-BACKLOG).
+- **Gate 7 (reliability):** Proxy timeout/oversize return structured JSON-RPC error envelopes (Phase 162). Server non-creatable states handled gracefully.
+- **Gate 8 (docs):** README MCP Control Plane section. `arc mcp --help` on all subcommands. Banned-claims clean.
+
+### R20 (MCP Tasks for Async Execution) → Polished Complete
+
+- **Gate 1 (UX states):** Task state machine: PENDING→RUNNING→COMPLETED/FAILED/CANCELLED. CLI `arc mcp workbench status` shows task counts. All terminal states have explicit handling.
+- **Gate 2 (a11y):** N/A — MCP tasks are backend/CLI surface.
+- **Gate 3 (parity):** MCP task registry state matches across CLI and MCP tool responses.
+- **Gate 4 (tests):** 65 MCP task tests (Phase 27). SQLite registry tests. Retry + cancellation tests.
+- **Gate 5 (perf):** SQLite task registry with WAL mode + busy timeout (Phase 141 R-AUDIT20, verified + xfail updated).
+- **Gate 6 (security):** Task IDs validated (no path traversal). Task output capped.
+- **Gate 7 (reliability):** Retry mechanism. Task cancellation. SQLite WAL busy-timeout 5000ms.
+- **Gate 8 (docs):** README MCP section. `arc mcp serve --help`. Banned-claims clean.
+
+### R21 (LangGraph Durable Execution + Replay Contract) → Polished Complete
+
+- **Gate 1 (UX states):** LangGraph runner produces structured run events (RUN_STARTED/COMPLETED/FAILED). Replay contract: replay step events visible in AssuranceTab. Error states surfaced.
+- **Gate 2 (a11y):** N/A — runtime adapter.
+- **Gate 3 (parity):** LangGraph adapter detection consistent across CLI (`arc runtimes --capabilities --json`) and IDE runtimes tab. `ARC_LANGGRAPH_EXPORT` gating documented.
+- **Gate 4 (tests):** LangGraph adapter tests (Phase 28 + adapter test suite). Replay contract test (R-POLISH10 cross-language contract, Phase 168).
+- **Gate 5 (perf):** `.invoke()`/`.stream()` via opt-in `ARC_LANGGRAPH_EXPORT`. Default is offline/deterministic.
+- **Gate 6 (security):** LangGraph execution gated (paid-call guard + ARC_LANGGRAPH_EXPORT). No paid calls without explicit opt-in.
+- **Gate 7 (reliability):** Structured error on missing `ARC_LANGGRAPH_EXPORT`. Error states documented.
+- **Gate 8 (docs):** README Runtime Adapters section. `arc runtimes --capabilities --help`. Banned-claims clean.
