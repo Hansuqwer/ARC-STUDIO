@@ -968,3 +968,26 @@ def mobile_flags_kill_switch_cmd(
     ff = _flags(store)
     ff.set_kill_switch(state == "on")
     _out(ok(ff.snapshot()), json_output)
+
+
+mobile_egress_app = typer.Typer(
+    name="egress", help="Mobile data-egress guard (budget-bound, deterministic)"
+)
+mobile_app.add_typer(mobile_egress_app)
+
+
+@mobile_egress_app.command("check")
+def mobile_egress_check_cmd(
+    cost: int = typer.Argument(..., help="Byte cost of the egress."),
+    budget: int = typer.Option(..., "--budget", help="Total egress byte budget."),
+    classification: str = typer.Option("low", "--classification", help="Data sensitivity class."),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Check whether a simulated egress is permitted (deterministic; critical class blocked)."""
+    _setup_logging(debug)
+    from ..mobile import EgressGuard
+
+    guard = EgressGuard(budget_bytes=budget)
+    decision = guard.check(cost, classification)
+    _out(ok(decision.as_dict()), json_output)

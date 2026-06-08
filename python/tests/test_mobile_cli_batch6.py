@@ -45,3 +45,18 @@ def test_flags_killswitch_bad_state(tmp_path) -> None:
         mobile_app, ["flags", "kill-switch", "maybe", "--store", str(tmp_path / "f.json")]
     )
     assert res.exit_code == 1
+
+
+def test_egress_check_allow_deny_block() -> None:
+    ok_res = runner.invoke(mobile_app, ["egress", "check", "100", "--budget", "1000", "--json"])
+    assert _json(ok_res)["data"]["allowed"] is True
+
+    over = runner.invoke(mobile_app, ["egress", "check", "2000", "--budget", "1000", "--json"])
+    assert _json(over)["data"]["allowed"] is False
+
+    crit = runner.invoke(
+        mobile_app,
+        ["egress", "check", "10", "--budget", "1000", "--classification", "critical", "--json"],
+    )
+    assert _json(crit)["data"]["allowed"] is False
+    assert "blocked" in _json(crit)["data"]["reason"]
