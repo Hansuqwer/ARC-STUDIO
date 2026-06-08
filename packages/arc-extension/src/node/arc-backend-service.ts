@@ -71,6 +71,7 @@ import {
     ChatSessionSummary,
     ChatSessionDetail,
     McpWorkbenchStatus,
+    McpToolInvokeResult,
     WorkspaceInventory,
     TestbenchDetection,
     TestbenchRunResult,
@@ -1164,6 +1165,41 @@ export class ArcBackendService implements ArcService {
 
     async getMcpWorkbenchStatus(): Promise<McpWorkbenchStatus> {
         return this.localTelemetryService.getMcpWorkbenchStatus();
+    }
+
+    async invokeMcpTool(tool: string, args: Record<string, unknown> = {}): Promise<McpToolInvokeResult> {
+        const cliArgs = [
+            'mcp', 'call', tool, '--args', JSON.stringify(args ?? {}),
+            '--workspace', this.workspaceRoot, '--json',
+        ];
+        let raw = '';
+        try {
+            // 30s timeout bounds a long-running tool; loopback in-process call (no network).
+            raw = await execArcCliAsync(cliArgs, { timeout: 30000, maxBuffer: 4 * 1024 * 1024 });
+        } catch (e) {
+            // `arc mcp call` exits non-zero on unknown tool / bad args / deny — JSON is on stdout.
+            const err = e as { stdout?: string | Buffer; message?: string };
+            raw = typeof err?.stdout === 'string' ? err.stdout : err?.stdout ? String(err.stdout) : '';
+            if (!raw) {
+                return { tool, ok: false, error: (err?.message ? String(err.message) : 'mcp call failed').slice(0, 500) };
+            }
+        }
+        try {
+            const parsed = JSON.parse(raw);
+            const data = parsed.data as Record<string, unknown> | undefined;
+            if (parsed.ok === false) {
+                const errEnvelope = parsed.error as { message?: string } | undefined;
+                return { tool, ok: false, error: errEnvelope?.message || 'tool denied or failed' };
+            }
+            return {
+                tool,
+                ok: true,
+                data,
+                riskLevel: (parsed.riskLevel as string | undefined) ?? (data?.risk_level as string | undefined),
+            };
+        } catch {
+            return { tool, ok: false, error: 'could not parse mcp call output' };
+        }
     }
 
     async getWorkspaceInventory(options?: { suffix?: string; maxEntries?: number }): Promise<WorkspaceInventory> {

@@ -1015,6 +1015,11 @@ export interface ArcService {
     getCapabilityCardSummary(runId: string): Promise<CapabilityCardSummary>;
     /** Recent MCP outbound call decisions (MCP_CALL_DECISION events) from .arc/mcp/decisions.jsonl */
     getMcpDecisions(opts?: { limit?: number; since?: string }): Promise<McpDecisionList>;
+    /**
+     * Invoke a single MCP tool in-process through the per-call risk gate (loopback, no network).
+     * Requires workspace trust; returns the tool's structured result + risk metadata.
+     */
+    invokeMcpTool(tool: string, args?: Record<string, unknown>): Promise<McpToolInvokeResult>;
     /** Mobile Runtime SDK status: capabilities list + doctor health (simulator/mock only). */
     getMobileStatus(): Promise<MobileStatus>;
 }
@@ -1070,6 +1075,17 @@ export interface McpDecisionList {
 }
 
 // Phase 78/79/80 follow-up: read-only telemetry types
+export interface McpToolInvokeResult {
+    tool: string;
+    /** True when the tool ran and returned an ok envelope; false on deny/error. */
+    ok: boolean;
+    /** The tool's `data` payload when ok. */
+    data?: unknown;
+    /** Risk level from the per-call risk gate, when present. */
+    riskLevel?: string;
+    error?: string;
+}
+
 export interface McpWorkbenchStatus {
     workspace: string;
     serverCreatable: boolean;

@@ -773,6 +773,63 @@ def mcp_serve(
 # ── MCP outbound risk gate commands (Item 2) ────────────────────────────────
 
 
+@mcp_app.command("call")
+def mcp_call(
+    tool: str = typer.Argument(..., help="MCP tool name to invoke (e.g. arc_doctor)."),
+    args: str = typer.Option("{}", "--args", help="JSON object of tool arguments."),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Invoke a single MCP tool in-process through the per-call risk gate.
+
+    Loopback only — no network sockets are opened and no separate process is spawned. The tool
+    runs through the same D-02 risk gate + workspace-trust enforcement + audit as the stdio server,
+    and returns its `{ok, data, ...}` envelope verbatim. Designed for the IDE MCP client bridge.
+    """
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    try:
+        tool_args = json.loads(args)
+        if not isinstance(tool_args, dict):
+            raise ValueError("--args must be a JSON object")
+    except (json.JSONDecodeError, ValueError) as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid --args JSON: {exc}"), json_output)
+        raise typer.Exit(2)
+
+    from ..mcp.server import MCPServerError, create_mcp_server
+
+    try:
+        server = create_mcp_server(workspace=ws)
+    except MCPServerError as exc:
+        _out(err(ArcErrorCode.PERMISSION_DENIED, str(exc)), json_output)
+        raise typer.Exit(1)
+    tm = getattr(server, "_tool_manager", None)
+    tools = getattr(tm, "_tools", {}) if tm is not None else {}
+    tool_obj = tools.get(tool)
+    fn = getattr(tool_obj, "fn", None) if tool_obj is not None else None
+    if fn is None:
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                f"Unknown MCP tool: {tool}",
+                details={"available": sorted(tools.keys())},
+            ),
+            json_output,
+        )
+        raise typer.Exit(1)
+
+    try:
+        result = fn(**tool_args)
+    except TypeError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Bad arguments for '{tool}': {exc}"), json_output)
+        raise typer.Exit(2)
+
+    # The tool already returns a JSON envelope string ({ok,data,...}) via _tool_result —
+    # echo it verbatim so the risk-gate metadata is preserved.
+    typer.echo(result if isinstance(result, str) else json.dumps(result))
+
+
 @mcp_app.command("risk-scan")
 def mcp_risk_scan(
     server_id: str = typer.Argument(..., help="MCP server ID to scan"),
