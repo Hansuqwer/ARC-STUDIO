@@ -6305,3 +6305,34 @@ Verify-first DoD audit: **not elevated** — the literal "consumer migration" is
 - **The gap:** Several consumers still type-annotate with the legacy `TraceEvent` object type — `browser/tabs/swarmgraph-insight-model.ts` (≈7 functions) and `SwarmGraphInsightTab.tsx`. Migrating them to the discriminated typed union requires per-event type-narrowing for `.data` access (a non-trivial refactor with rendering-ripple risk), so it stays incremental.
 - **Decision:** Stays **Baseline Complete**. The safety-critical part (typed registry + no-drift parity guard) is Polished-grade; full consumer type-migration is deferred (not a safe polish-pass additive change). `TraceEvent` remains an intentional back-compat alias.
 
+### B2P-04 — IDE MCP client (loopback invoke) → Polished Complete
+
+- **Gate 1 (UX states):** ✓ `McpWorkbenchTab` renders invoking → result (`OK` + data), risk badge (`risk:low`), and an explicit `Invocation cancelled` state (`mcp-invoke.contract.test.tsx`).
+- **Gate 3 (parity):** ✓ Protocol declares `invokeMcpTool`; backend runs `arc mcp call` — IDE invocation mirrors the CLI through the same risk-gated path.
+- **Gate 6 (security):** ✓ Invocation is `window.confirm`-gated (mutating) and routes through `arc mcp call` (D-02 risk gate); risk level surfaced in the UI.
+- **Gate 7 (reliability):** ✓ Backend `timeout: 30000`, non-zero exit tolerated via `err?.stdout` (structured), and a generation-guard cancellation discards stale in-flight results (tested).
+- **Gate 4 (tests):** ✓ 4 contract/interaction tests; full arc-extension suite 960 passed/3 skipped.
+- **N/A:** 2 a11y-contrast (jsdom no layout), 5 perf, 8 docs-surface.
+
+### R-AUDIT27 — IDE status rail → Polished Complete
+
+- **Gate 1 (UX states):** ✓ Degrades to `unknown`/`daemon offline` when the daemon is unreachable (producer-truth, no invented data).
+- **Gate 2 (a11y):** ✓ `accessibilityInformation: { label, role: 'status' }` on every entry (ARIA); uses theme-default styling (no custom colors introduced, so no new contrast risk).
+- **Gate 3 (parity):** ✓ All slots (mode/trust/runtime/daemon/profile) derive from a single `getConfigStatus()` — the same producer the CLI/IDE share.
+- **Gate 4 (tests):** ✓ `arc-status-rail.contract.test.ts` (4); suite green.
+- **N/A:** 5 perf (single poll), 6 security, 7 reliability (read-only display), 8 docs-surface.
+
+### R-AUDIT28 — orphaned IDE dead-code removal → Polished Complete
+
+- **Gate 8 (docs/cleanliness):** ✓ The dead duplicate `browser/arena/arena-frontend-module.ts` is removed (confirmed absent); `pnpm --filter arc-extension build` clean + suite 960 passed/3 skipped. The verify-first correction (kept the live `arc-run-timeline-widget.tsx`) is recorded in the roadmap row.
+- **N/A:** 1,2,3,5,6,7 — pure dead-code removal, no behavior surface.
+
+### R-AUDIT29 — TestBenchTab Run button → Polished Complete
+
+- **Gate 1 (UX states):** ✓ Explicit `Running…`, `Blocked by policy`, `role='alert'` error, and exit-code states per command (`testbench-run.contract.test.ts`).
+- **Gate 3 (parity):** ✓ `runTestbench` runs `arc testbench run --policy local-safe` — CLI↔IDE parity.
+- **Gate 6 (security):** ✓ `window.confirm`-gated mutating action + `local-safe` sandbox policy.
+- **Gate 7 (reliability):** ✓ Async `execArcCliAsync` (non-blocking); non-zero exit surfaced via `err?.stdout` + `exitCode` (structured, not swallowed).
+- **Gate 4 (tests):** ✓ 3 contract tests; suite green.
+- **N/A:** 2 a11y-contrast (jsdom), 5 perf, 8 docs-surface.
+
