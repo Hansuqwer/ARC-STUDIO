@@ -6297,3 +6297,11 @@ Verify-first DoD audit: **not elevated** — "full Electron app packaging" canno
 - **The gap (gate 4 e2e + gate 5 perf):** A verified, **signed** end-to-end packaged build requires code-signing certs (**human-gated**) and the full `theia build` + `electron-builder` run (CI-only; not executed/measured locally). Without a verified signed artifact + startup-perf measurement, the "full packaging" claim is not met.
 - **Decision:** Stays **Baseline Complete**. The browser app remains the canonical release target; Electron desktop + signed packaging are post-v0.1 and gated on signing infrastructure.
 
+### B2P-02 — typed-event consumer migration → kept at Baseline Complete (documented gap)
+
+Verify-first DoD audit: **not elevated** — the literal "consumer migration" is incomplete.
+
+- **What is real (gates 3, 4):** `KnownTraceEventType` is derived from the runtime registry and `TERMINAL_TRACE_EVENT_TYPES` is consolidated in `common/arc-protocol.ts`; `trace-event-types.contract.test.ts` guards drift-proof cross-language parity (TS ⊇ canonical registry) and `arc-event-stream-widget.tsx` consumes the typed terminal set.
+- **The gap:** Several consumers still type-annotate with the legacy `TraceEvent` object type — `browser/tabs/swarmgraph-insight-model.ts` (≈7 functions) and `SwarmGraphInsightTab.tsx`. Migrating them to the discriminated typed union requires per-event type-narrowing for `.data` access (a non-trivial refactor with rendering-ripple risk), so it stays incremental.
+- **Decision:** Stays **Baseline Complete**. The safety-critical part (typed registry + no-drift parity guard) is Polished-grade; full consumer type-migration is deferred (not a safe polish-pass additive change). `TraceEvent` remains an intentional back-compat alias.
+
