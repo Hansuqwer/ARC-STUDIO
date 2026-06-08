@@ -178,3 +178,64 @@ def test_simulate_routes_through_gate(tmp_path) -> None:
         "device.camera.capture.mock",
     }
     assert all(e["route"] == "fixtures" for e in gate["evaluated"])
+
+
+def test_policy_explain_with_signed_org_bundle_rbac_denied(tmp_path) -> None:
+    from agent_runtime_cockpit.mobile import OrgPolicyBundle, sign_org_bundle
+
+    key = b"k" * 32
+    key_file = tmp_path / "bundle.key"
+    key_file.write_bytes(key)
+    cap = "device.camera.capture.mock"
+    bundle = sign_org_bundle(OrgPolicyBundle(tenant_id="acme", allowed_roles={cap: ["admin"]}), key)
+    bundle_file = tmp_path / "bundle.json"
+    bundle_file.write_text(bundle.model_dump_json(), encoding="utf-8")
+
+    res = runner.invoke(
+        mobile_app,
+        [
+            "policy",
+            "explain",
+            "--capability",
+            cap,
+            "--org-bundle",
+            str(bundle_file),
+            "--tenant",
+            "acme",
+            "--role",
+            "intern",
+            "--bundle-key-file",
+            str(key_file),
+            "--json",
+        ],
+    )
+    assert res.exit_code == 1  # denied
+    data = _json(res)["data"]
+    assert data["allowed"] is False
+    assert "rbac_role_denied" in data["denied_rules"]
+
+
+def test_policy_explain_unsigned_bundle_fails_closed(tmp_path) -> None:
+    from agent_runtime_cockpit.mobile import OrgPolicyBundle
+
+    cap = "app.memory.write.mock"
+    bundle_file = tmp_path / "bundle.json"
+    bundle_file.write_text(
+        OrgPolicyBundle(tenant_id="acme").model_dump_json(), encoding="utf-8"
+    )  # no signature
+    res = runner.invoke(
+        mobile_app,
+        [
+            "policy",
+            "explain",
+            "--capability",
+            cap,
+            "--org-bundle",
+            str(bundle_file),
+            "--tenant",
+            "acme",
+            "--json",
+        ],
+    )
+    assert res.exit_code == 1
+    assert "org_bundle_signature_invalid" in _json(res)["data"]["denied_rules"]

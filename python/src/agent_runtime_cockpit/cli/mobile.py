@@ -245,10 +245,22 @@ def mobile_policy_explain_cmd(
     manifest: str | None = typer.Option(
         None, "--manifest", help="Optional manifest file/directory."
     ),
+    org_bundle: str | None = typer.Option(
+        None, "--org-bundle", help="Signed OrgPolicyBundle JSON (RBAC/ABAC overlay)."
+    ),
+    tenant: str | None = typer.Option(None, "--tenant", help="Tenant id for the org bundle."),
+    role: str | None = typer.Option(None, "--role", help="Caller role for RBAC."),
+    bundle_key_file: str | None = typer.Option(
+        None, "--bundle-key-file", help="Key file to verify the org bundle signature."
+    ),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
-    """Explain mobile policy for a capability or action plan."""
+    """Explain mobile policy for a capability or action plan.
+
+    Pass --org-bundle (+ --tenant/--role/--bundle-key-file) to apply a signed tenant RBAC/ABAC
+    overlay; an unsigned/forged bundle, tenant mismatch, or disallowed role fails closed.
+    """
     _setup_logging(debug)
     from ..mobile import (
         MobileActionPlan,
@@ -259,6 +271,21 @@ def mobile_policy_explain_cmd(
         list_capabilities,
     )
     from ..mobile.manifest import load_manifest
+
+    # D2: optional signed org/tenant RBAC/ABAC overlay.
+    enterprise_hook = None
+    if org_bundle:
+        from ..mobile import OrgPolicyBundle, OrgPolicyContext, TenantPolicyHook
+
+        try:
+            bundle = OrgPolicyBundle.model_validate_json(Path(org_bundle).read_text())
+        except Exception as exc:  # noqa: BLE001
+            _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid org bundle: {exc}"), json_output)
+            raise typer.Exit(1) from exc
+        key = Path(bundle_key_file).read_bytes() if bundle_key_file else b""
+        enterprise_hook = TenantPolicyHook(
+            bundle, key, OrgPolicyContext(tenant or bundle.tenant_id, role or "", {})
+        )
 
     if bool(capability) == bool(plan):
         _out(
@@ -291,7 +318,7 @@ def mobile_policy_explain_cmd(
                 json_output,
             )
             raise typer.Exit(1)
-        decision = explain_capability_policy(cap)
+        decision = explain_capability_policy(cap, enterprise_hook=enterprise_hook)
     else:
         assert plan is not None
         p = Path(plan)
