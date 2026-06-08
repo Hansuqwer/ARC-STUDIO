@@ -51,8 +51,8 @@ class LocalRepoProvider:
         for score, fpath in scored[: self.MAX_FILES]:
             try:
                 text = fpath.read_text(errors="ignore")
-                # Extract best matching snippet
-                snippet = self._extract_snippet(text, keywords)
+                # Extract best matching snippet and its 1-based start line number
+                snippet, line_number = self._extract_snippet(text, keywords)
                 rel = str(fpath.relative_to(workspace))
                 results.append(
                     ContextPackEntry(
@@ -63,6 +63,7 @@ class LocalRepoProvider:
                         content=snippet,
                         url=None,
                         relevance_score=min(score / 10.0, 1.0),
+                        line_number=line_number,
                     )
                 )
             except Exception:
@@ -70,8 +71,11 @@ class LocalRepoProvider:
 
         return sorted(results, key=lambda e: -e.relevance_score)
 
-    def _extract_snippet(self, text: str, keywords: list[str]) -> str:
-        """Find the most relevant snippet in the text."""
+    def _extract_snippet(self, text: str, keywords: list[str]) -> tuple[str, int]:
+        """Find the most relevant snippet in the text.
+
+        Returns (snippet, 1-based start line number).
+        """
         lines = text.splitlines()
         best_start = 0
         best_score = 0
@@ -83,4 +87,4 @@ class LocalRepoProvider:
                 best_start = max(0, i - 2)
 
         snippet_lines = lines[best_start : best_start + 15]
-        return "\n".join(snippet_lines)[: self.MAX_SNIPPET_CHARS]
+        return "\n".join(snippet_lines)[: self.MAX_SNIPPET_CHARS], best_start + 1

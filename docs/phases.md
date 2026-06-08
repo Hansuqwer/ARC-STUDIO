@@ -6625,3 +6625,13 @@ Executed the next safe slice from the cleanup-refactor backlog (slice 28):
 - **Gate 6 (security):** Outbound network calls are now explicitly opt-in — consistent with the single-user local workstation posture where unexpected outbound requests are a risk.
 - **Gate 4 (tests):** `tests/context/test_vercel_grep_gate.py` — 3 tests: gate-off default, gate-on respected, env var name. All passed. Ruff clean.
 - **N/A:** 1,2,3,5,7,8.
+
+
+## Phase 214 — R-CLEAN2 CLI cleanup safe slice #2: ContextPackEntry line_number
+
+Executed the next safe slice from the cleanup-refactor backlog (slice 24 / P1):
+
+- **`ContextPackEntry.line_number`:** Added `line_number: Optional[int] = None` field to `ContextPackEntry` (additive, no existing code broken). Enables IDE navigation to the exact line in the source file that matched.
+- **`LocalRepoProvider`:** `_extract_snippet` updated to return `(snippet, 1-based_line_number)` tuple; `line_number` populated in the returned `ContextPackEntry`. Previously the start line of the best-scoring snippet was computed but discarded.
+- **Gate 4 (tests):** `tests/context/test_context_pack_line_number.py` — 3 tests (field present, optional, provider populates). All passed. Ruff clean.
+- **N/A:** 1,2,3,5,6,7,8.

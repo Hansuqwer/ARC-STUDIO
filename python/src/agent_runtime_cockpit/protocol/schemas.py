@@ -183,3 +183,4 @@ class ContextPackEntry(BaseModel):
     url: Optional[str] = None
     freshness: Optional[str] = None
     relevance_score: float = 0.0
+    line_number: Optional[int] = None  # source line for IDE navigation (None = not available)
