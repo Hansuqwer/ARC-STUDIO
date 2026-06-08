@@ -25,7 +25,15 @@ from mcp.server.fastmcp import FastMCP
 from .. import __version__ as arc_version
 from ..protocol.errors import ArcErrorCode
 from ..protocol.event_envelope import err, ok
-from .sandbox import McpDecision, McpPolicy, decide_call, persist_decision
+from .sandbox import (
+    McpDecision,
+    McpPolicy,
+    decide_call,
+    next_decision_sequence,
+    persist_decision,
+    persist_decision_event,
+    to_call_decision_event,
+)
 from ..security.redaction import Redactor
 from ..security.trust import WorkspaceUntrusted, ensure_trusted
 
@@ -164,9 +172,7 @@ def create_mcp_server(
             _trusted()
             # D-02: Outbound per-call risk gate (LLM-free; deterministic).
             try:
-                policy_value = os.environ.get(
-                    "ARC_MCP_POLICY", McpPolicy.STRICT.value
-                )
+                policy_value = os.environ.get("ARC_MCP_POLICY", McpPolicy.STRICT.value)
                 policy = McpPolicy(policy_value)
             except ValueError:
                 policy = McpPolicy.STRICT
@@ -181,6 +187,17 @@ def create_mcp_server(
             )
             try:
                 persist_decision(ws, mcp_decision)
+                # CR-043: also emit the typed MCP_CALL_DECISION run-event (was never written).
+                persist_decision_event(
+                    ws,
+                    to_call_decision_event(
+                        mcp_decision,
+                        run_id="mcp-stdio",
+                        sequence=next_decision_sequence(),
+                        timestamp=base_audit.get("started_at"),
+                        correlation_id=base_audit.get("args_hash"),
+                    ),
+                )
             except Exception:  # pragma: no cover
                 pass
             if mcp_decision.decision == McpDecision.DENY:

@@ -6,6 +6,7 @@ Decisions persisted to .arc/mcp/decisions.jsonl (workspace-local).
 
 from __future__ import annotations
 
+import itertools
 import json
 import time
 from enum import StrEnum
@@ -101,6 +102,59 @@ def persist_decision(workspace: Path, decision: McpCallDecision) -> Path:
     path = decisions_dir / "decisions.jsonl"
     with path.open("a", encoding="utf-8") as fp:
         fp.write(decision.model_dump_json() + "\n")
+    return path
+
+
+# ── Typed MCP_CALL_DECISION run-event producer (CR-043) ──────────────────────
+# The McpCallDecisionEvent protocol event was defined + registered but never written.
+# These build it from a sandbox McpCallDecision and persist it to a workspace-local stream.
+
+_DECISION_SEQ = itertools.count()
+
+
+def next_decision_sequence() -> int:
+    """Monotonic per-process sequence for MCP_CALL_DECISION events."""
+    return next(_DECISION_SEQ)
+
+
+def to_call_decision_event(
+    decision: McpCallDecision,
+    *,
+    run_id: str,
+    sequence: int,
+    timestamp: str | None = None,
+    correlation_id: str | None = None,
+):
+    """Build the typed MCP_CALL_DECISION run-event from a sandbox decision."""
+    from datetime import datetime, timezone
+
+    from ..protocol.mcp_decision_events import McpCallDecisionData, McpCallDecisionEvent
+
+    ts = timestamp or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return McpCallDecisionEvent(
+        type="MCP_CALL_DECISION",
+        timestamp=ts,
+        run_id=run_id,
+        sequence=sequence,
+        data=McpCallDecisionData(
+            server_id=decision.server_id,
+            tool_name=decision.tool_name,
+            decision=decision.decision.value,
+            risk_level=decision.risk_score.level.value,
+            policy=decision.policy.value,
+            reason=decision.reason,
+            correlation_id=correlation_id,
+        ),
+    )
+
+
+def persist_decision_event(workspace: Path, event) -> Path:
+    """Append a typed MCP_CALL_DECISION event to .arc/mcp/decision-events.jsonl."""
+    decisions_dir = workspace / ".arc" / "mcp"
+    decisions_dir.mkdir(parents=True, exist_ok=True)
+    path = decisions_dir / "decision-events.jsonl"
+    with path.open("a", encoding="utf-8") as fp:
+        fp.write(event.model_dump_json() + "\n")
     return path
 
 
