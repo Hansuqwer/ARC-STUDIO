@@ -6336,3 +6336,19 @@ Verify-first DoD audit: **not elevated** — the literal "consumer migration" is
 - **Gate 4 (tests):** ✓ 3 contract tests; suite green.
 - **N/A:** 2 a11y-contrast (jsdom), 5 perf, 8 docs-surface.
 
+### B2P-03 — real-component jest-axe a11y → kept at Baseline Complete (documented gap)
+
+Verify-first DoD audit: **not elevated** — the one a11y sub-gate that defines this item can't be auto-verified in the test env.
+
+- **What is real:** `accessibility-real-components.test.tsx` renders 9 **real** tab components and runs jest-axe clean (roles, names, ARIA, structure) — real-component coverage, not mocks.
+- **The gap (gate 2):** axe runs with `'color-contrast': { enabled: false }` because jsdom has no layout engine, so **color-contrast ratio is not measured**. Since contrast is a defining part of this a11y item, gate 2 is not fully evidenced by an automated check here.
+- **Decision:** Stays **Baseline Complete**. Closing it requires a layout-capable a11y run (e.g. Playwright + axe) or a deterministic contrast-ratio computation over the theme palette — deferred.
+
+### R-AUDIT26 — risk-badge color + aria-label (a11y) → kept at Baseline Complete (documented gap)
+
+Verify-first DoD audit: **not elevated** — color-contrast of the new per-level colors is unmeasured in jsdom.
+
+- **What is real:** The badge carries `aria-label={`risk level ${riskScore}`}` (meaning is in text, not color alone → WCAG 1.4.1) and distinct per-level variants (low/medium/high/critical), locked by `mcp-risk.test.ts` (5).
+- **The gap (gate 2):** This item *introduces custom colors*, so contrast ratio (WCAG 1.4.3) is the central concern — and it cannot be measured in jsdom (color-contrast disabled). Not auto-evidenced.
+- **Decision:** Stays **Baseline Complete**. Needs a layout-capable contrast check or a computed ratio over the badge color tokens — deferred.
+
