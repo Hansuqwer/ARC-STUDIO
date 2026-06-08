@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Callable
+from typing import Any, AsyncIterator, Callable, Sequence
 
 from agent_runtime_cockpit.cli_repl.cancellation import CancellationToken, Cancelled
 from agent_runtime_cockpit.cli_repl.session import ChatSession
@@ -17,7 +17,9 @@ from agent_runtime_cockpit.providers import (
     StreamChunk,
     UsageRecord,
 )
+from agent_runtime_cockpit.providers import router as _router_mod
 from agent_runtime_cockpit.providers.base import ProviderError
+from agent_runtime_cockpit.providers.router import ProviderRouter
 from agent_runtime_cockpit.security.injection_patterns import Severity, scan_structured
 from agent_runtime_cockpit.tools import ToolRegistry, wrap_tool_result
 
@@ -110,14 +112,35 @@ class TurnManager:
         event_sink: EventSink | None = None,
         tool_registry: ToolRegistry | None = None,
         hitl_gate_fn: Callable[[Any], str] | None = None,
+        fallback_clients: Sequence[ProviderClient] = (),
     ) -> None:
         self._provider_client = provider_client
+        self._fallback_clients = list(fallback_clients)
         self._model = model
         self._max_tokens = max_tokens
         self._temperature = temperature
         self._event_sink = event_sink
         self._tool_registry = tool_registry or ToolRegistry()
         self._hitl_gate_fn = hitl_gate_fn
+
+    async def _complete_with_failover(
+        self, request: "ProviderRequest", cancellation_token: CancellationToken
+    ) -> "ProviderResponse":
+        """Complete the request. Default path = retry against the primary client. When
+        ARC_ENABLE_PROVIDER_ROUTER is on AND fallback clients are configured, route through
+        ProviderRouter for cascading failover across primary + fallbacks (R-AUDIT25)."""
+
+        def _primary() -> Any:
+            return self._provider_client.complete(request, cancellation_token=cancellation_token)
+
+        if not (_router_mod.ENABLED and self._fallback_clients):
+            return await _call_with_retry(_primary)
+
+        def _mk(client: ProviderClient) -> Callable[[], Any]:
+            return lambda: client.complete(request, cancellation_token=cancellation_token)
+
+        provider_fns = [_primary] + [_mk(c) for c in self._fallback_clients]
+        return await ProviderRouter(provider_fns).call()
 
     async def run_turn(
         self,
@@ -219,11 +242,7 @@ class TurnManager:
                     self._emit("turn.cache_hit", {"session_id": session.id})
                     response = cached
             if response is None:
-                response = await _call_with_retry(
-                    lambda: self._provider_client.complete(
-                        request, cancellation_token=cancellation_token
-                    )
-                )
+                response = await self._complete_with_failover(request, cancellation_token)
                 if not session.tools_enabled:
                     cache.put(request, response)
             if session.tools_enabled:

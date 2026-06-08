@@ -6487,3 +6487,13 @@ Closed the B2P-09 gap (the `budget_checkpoint` primitive had **no caller** and w
 - **Honest scoping:** enforcement is wired at the **run** effect boundary (the cost-incurring unit) and is **opt-in** (a caller enters `run_budget_scope` with a configured enforcer) — same posture as the opt-in B2P-12/B2P-19 run-path mechanisms. Per-effect granularity *within* a run remains a documented refinement. Real provider-call enforcement also continues via `preflight_with_estimator`.
 - **N/A:** 1,2,3,8 (internal mechanism; budget UX/docs already shipped).
 
+
+### Tier-2 R-AUDIT25 — Multi-Provider Router wired into the run path → Polished Complete
+
+Closed the "ProviderRouter created but not wired (turn_manager wiring follow-on)" gap.
+
+- **Gate 3 (parity) / wiring:** `TurnManager` gained an optional `fallback_clients` param; `_complete_with_failover` routes the completion through `ProviderRouter` (cascading failover across primary + fallbacks) **only when** `ARC_ENABLE_PROVIDER_ROUTER` is on AND fallbacks are configured — otherwise it is byte-for-byte today's `_call_with_retry(primary)` path (default unchanged).
+- **Gate 7 (reliability):** failover is exercised end-to-end — a failing (retryable) primary routes to a working fallback.
+- **Gate 4 (tests):** `tests/runtime/test_provider_router_wiring.py` (failover-when-enabled + default-off-propagates) + existing `test_turn_manager.py`/`test_agent_loop.py`/`test_router.py` (26 passed).
+- **Honest scoping:** wiring covers the **completion** path; streaming-path failover (mid-stream) is a documented refinement. Opt-in/default-off (single-user alpha posture unchanged). **N/A:** 1,2,5,6,8.
+
