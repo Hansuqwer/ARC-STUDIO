@@ -162,6 +162,11 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 |---|---|---|
 | R-TS1 | Token-Saving Research | Baseline Complete (sdk_version sweep done — R-AUDIT24 Phase 155) |
 | R79 | Mobile Runtime SDK Integration | Baseline Complete | Evidence: Phase 111 + Phase 148 + Phase 157 | Slices 110.1–110.5 + TUI /budget + Theia Mobile Runtime IDE tab (simulator/mock only; no native-execution claims). |
+| R79.1 | Real native framework package builds (Expo / React Native / Flutter) | Deferred | Evidence: — | Notes: packages are fixtures-only scaffolds today; building shippable packages from distribution artifacts plus real native example-app CI (`expo prebuild` / `xcodebuild` / `gradle`) is gated behind native toolchains and the Phase 11 entry gates — no real device access (see `docs/mobile/ROADMAP_TO_PRODUCTION.md` Phase 6/9/10). |
+| R79.2 | Native device-capability execution (Phase 11, gated) | Deferred | Evidence: — | Notes: camera/mic/contacts/calendar/location capabilities stay entry-gated and route to fixtures (`executed_real_device=False`); enabling real device access is human-gated and out of current scope (`docs/mobile/ROADMAP_TO_PRODUCTION.md` Phase 11). |
+| R79.3 | Device posture / MDM hooks (enterprise track) | Not Started | Evidence: — | Notes: no posture/MDM/attestation implementation in `mobile/`; buildable within the simulator-preview posture as deterministic hooks; no slice begun (`docs/mobile/ROADMAP_TO_PRODUCTION.md` Phase 12). |
+| R79.4 | Mobile package supply-chain provenance (SLSA / sigstore) | Not Started | Evidence: — | Notes: deterministic plan signing exists; package-level supply-chain provenance/attestation for the mobile packages is not implemented (`docs/mobile/ROADMAP_TO_PRODUCTION.md` Phase 12). |
+| R79.5 | Mobile-package dependency vulnerability scanning | Not Started | Evidence: — | Notes: Python deps are scanned via `pip-audit` in CI; no `npm audit` / Dart `pub` audit for the mobile JS/Dart package trees in `release_check`/CI (`docs/mobile/ROADMAP_TO_PRODUCTION.md` Phase 12). |
 | R34.6 / Battle Arena | Provider-Backed Battle Arena | Blocked (no default paid/live calls) |
 
 ---
