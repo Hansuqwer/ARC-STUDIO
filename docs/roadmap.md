@@ -1750,9 +1750,9 @@ P2 — Quality:
 | R-AUDIT6 | Gateway Client Paid-Call Gate | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | TODO removed; exemption documented — gate is upstream via require_dual_gate in runner.py; 1 new test. |
 | R-AUDIT7 | DataStore allow_paid Default Warning | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | allow_paid_warning property added to DataStore; surfaced in StatusBar; 3 new tests. |
 | R-AUDIT8 | EXTENSION_MIGRATION Stale Ref Fix | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | LOCKED_REMAINING_ROADMAP.md ref replaced with docs/roadmap.md in EXTENSION_MIGRATION.md. |
-| R-AUDIT9 | Budget Durability Under Error | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | Budget is preflight-only; by-design gap documented in turn_manager.py degraded path; 2 new tests. |
+| R-AUDIT9 | Budget Durability Under Error | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | Budget is preflight-only; by-design gap documented in turn_manager.py degraded path; 2 new tests. |
 | R-AUDIT10 | SwarmGraph Topology Shape Verification | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | No mismatch found; shapes consistent (flat {nodes,edges}); comment added to TS; 1 new Python test. |
-| R-AUDIT11 | Notifications Outbox MVP | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | notifications/outbox.py created; append/read_all/gc with TTL; 4 new tests. |
+| R-AUDIT11 | Notifications Outbox MVP | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | notifications/outbox.py created; append/read_all/gc with TTL; 4 new tests. |
 | R-AUDIT12 | UI Design Token Foundation | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | tokens.css created with color/spacing/typography/radius tokens; additive only. |
 | R-AUDIT13 | HMAC README Wording Tighten | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | Scope caveat added to README and SECURITY.md HMAC sections. |
 | R-AUDIT14 | Mutating GET /api/runs/start Removal | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | GET /api/runs/start returns 410 Gone; POST unaffected; legacy env shim removed. |
@@ -1761,7 +1761,7 @@ P2 — Quality:
 | R-AUDIT17 | R79 TUI/Theia Surfacing | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | /budget [run-id] slash command added to TUI screen; wallet fallback when no run-id; 2 new tests. |
 | R-AUDIT18 | Workspace Search CLI + IDE Panel | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | arc workspace search command added; ripgrep/pathlib fallback; path-confined; 3 new tests. IDE panel follow-on. |
 | R-AUDIT19 | Eval Metrics Honest Labelling | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | synthetic:bool=True added to EvalResult; [synthetic/simulated] prefix in CLI eval display; 2 new tests. |
-| R-AUDIT20 | SQLite WAL Busy-Timeout Verification | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | WAL+busy_timeout=5000ms confirmed in budget/storage.py; xfail reason updated to reflect accurate constraint. |
+| R-AUDIT20 | SQLite WAL Busy-Timeout Verification | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | WAL+busy_timeout=5000ms confirmed in budget/storage.py; xfail reason updated to reflect accurate constraint. |
 | R-AUDIT21 | Accessibility Baseline Audit | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | ARIA roles/labels added to arc-adapters-widget; accessibility-baseline.md created. axe-core pass deferred. |
 | R-AUDIT22 | Handover Doc Stale Refs Sweep | Status: Polished Complete | Evidence: aa788f3 2026-06-07 | LOCKED_REMAINING_ROADMAP.md refs replaced with docs/roadmap.md in docs/handover/. |
 | R-AUDIT23 | SwarmGraph Insight UI Components Phase 1 | Status: Baseline Complete | Evidence: aa788f3 2026-06-07 | DagPlannerViz, ConsensusEvidenceCard, HitlApprovalPanel created; use --arc-color-* tokens; 3 render tests. |

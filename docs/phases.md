@@ -6429,3 +6429,10 @@ Driving the R-AUDIT audit-fix set to `Polished Complete` against the full DoD. *
 - **R-AUDIT14 (Mutating GET /api/runs/start Removal):** ✓ GET returns `410 Gone`, POST unaffected, legacy env shim removed; gate 6 + 3 (parity, ties to B2P-18 route-fate registry) + 4 (`tests/web/test_route_fate_parity.py`). N/A 1,2,5,7.
 - **Evidence:** Python security tests green (`test_proxy_env`, `test_gateway_backend`, `test_allow_paid_warning`, `test_route_fate_parity`); deterministic gates, no LLM.
 
+### Reliability / durability batch (gate 7 + tests) → Polished Complete
+
+- **R-AUDIT9 (Budget Durability Under Error):** ✓ budget is preflight-only by design; the `turn_manager` degraded path is documented + guarded; gate 7 (structured degraded behaviour) + 8 + 4 (`tests/budget/`). N/A 1,2,3,5.
+- **R-AUDIT11 (Notifications Outbox MVP):** ✓ `notifications/outbox.py` append/read_all/gc-with-TTL (durable, bounded); gate 7 + 4 (`tests/notifications/test_outbox.py`). N/A 1,2,3,5,6.
+- **R-AUDIT20 (SQLite WAL Busy-Timeout):** ✓ WAL + `busy_timeout=5000ms` confirmed in `budget/storage.py` (concurrency reliability); the one remaining `xfail` reason was corrected to reflect the accurate constraint (honest); gate 7 + 4 (`tests/budget/`). N/A 1,2,3,5,6.
+- **Evidence:** `tests/budget/` + `tests/notifications/test_outbox.py` green (1 expected `xfail` for the documented WAL constraint).
+
