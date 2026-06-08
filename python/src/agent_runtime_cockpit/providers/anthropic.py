@@ -20,18 +20,13 @@ from .base import (
     AuthError,
     CancelledError,
     CostRates,
-    ModelError,
-    NetworkError,
     ProviderCapability,
     ProviderFeature,
     ProviderRequest,
     ProviderResponse,
-    RateLimitError,
     StreamChunk,
     UsageRecord,
-    ValidationError,
 )
-from ..security.redaction import redact_secrets
 
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
 _ANTHROPIC_MAX_BREAKPOINTS = 4
@@ -495,14 +490,6 @@ class AnthropicClient:
 
     @staticmethod
     def _map_error(exc: Exception) -> Exception:
-        name = type(exc).__name__.lower()
-        text = redact_secrets(str(exc))
-        if "rate" in name or "rate" in text.lower():
-            return RateLimitError(text)
-        if "auth" in name or "401" in text or "api key" in text.lower():
-            return AuthError(text)
-        if "validation" in name or "400" in text:
-            return ValidationError(text)
-        if "connection" in name or "network" in name or "timeout" in name:
-            return NetworkError(text)
-        return ModelError(text)
+        from .redaction import map_provider_error
+
+        return map_provider_error(exc)

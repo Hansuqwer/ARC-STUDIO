@@ -7349,3 +7349,37 @@ The README and `arc mobile` help text reference `arc mobile gate check --plan ./
 - **Gate 4 (tests):** 12 offline tests; 5510 passed (commit b1e60e3). All tests offline/deterministic.
 - **Gate 8 (docs):** Triple-gate documented. `--help` accurate.
 - **N/A:** 1, 2, 5, 7.
+
+
+## Phase 250 — B2P Baseline Sweep: Terminal-Gated Items (Honest No-Op)
+
+Reviewed all remaining B2P items. Only B2P-17 remains at Baseline Complete in the roadmap:
+
+### B2P-17 (Full Electron App Packaging) — Stays Baseline Complete (terminal-gated)
+
+B2P-17 cannot be elevated without code-signing certs (Apple ID / Windows cert) — a human gate. The gap was documented in Phase 203:
+
+- **What is real and tested:** App shell + `DaemonManager` lifecycle, signing-gated release config (`forceCodeSigning: true` + `require-electron-signing.mjs`), mac/win/linux targets, auto-update `publish` feed — 3 structure-guard tests pass (`tests/test_electron_packaging_b2p17.py`). `signing-preflight` CI workflow guards drift.
+- **Honest gap:** A verified *signed* end-to-end packaged build requires code-signing certs. Without a signed artifact and startup-perf measurement, the "full packaging" claim is not met.
+- **Decision:** B2P-17 **stays Baseline Complete**. Browser app remains canonical release target. Electron desktop + signed packaging are post-v0.1 and gated on signing infrastructure. No fabricated elevation.
+
+### B2P-22 (Live Battle Arena) — Terminal-Gated (not in roadmap summary table)
+
+B2P-22 is terminal-gated on a live LM Arena productization decision. LM Arena stub exists (offline battle + direct modes); live productization is explicitly deferred. Stays forbidden as a claim.
+
+### All other B2P items
+
+All other B2P items have been elevated in prior phases (Phases 203-226) or are documented as terminal-gated in `docs/phases.md` Phase 205 closeout. No additional elevation actions needed for this sweep.
+
+
+## Phase 251 — Cleanup Safe Slice #4: Shared `map_provider_error` + B2P-17 honest no-op
+
+### Cleanup Slice #4 — Extract shared `map_provider_error` (slice 50 of 57)
+
+`openai_compatible.py` and `anthropic.py` had identical `_map_error` static methods using `redact_secrets`. Extracted to `providers/redaction.py`:
+
+- **`providers/redaction.py`:** New module with `map_provider_error(exc)` — maps any provider SDK exception to an ARC `ProviderError` type (RateLimitError/AuthError/ValidationError/NetworkError/ModelError) with `redact_secrets` applied.
+- **`openai_compatible.py` and `anthropic.py`:** `_map_error` now delegates to `map_provider_error`. 10 unused imports (error types + `redact_secrets`) removed by `ruff --fix`. Behavior-preserving.
+- **Gate 3 (parity):** Both providers now use the same error-mapping logic. No behavior change — identical classification logic.
+- **Gate 4 (tests):** 516 provider tests passed; ruff clean. No regressions.
+- **N/A:** 1, 2, 5, 6, 7, 8.

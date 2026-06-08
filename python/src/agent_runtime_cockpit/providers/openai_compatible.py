@@ -20,19 +20,14 @@ from .base import (
     AuthError,
     CancelledError,
     CostRates,
-    ModelError,
-    NetworkError,
     ProviderCapability,
     ProviderMessage,
     ProviderFeature,
     ProviderRequest,
     ProviderResponse,
-    RateLimitError,
     StreamChunk,
     UsageRecord,
-    ValidationError,
 )
-from ..security.redaction import redact_secrets
 from .models_dev import (
     ModelsDevProviderConfig,
     cost_rates,
@@ -2118,19 +2113,9 @@ class OpenAICompatibleClient:
     @staticmethod
     def _map_error(exc: Exception) -> Exception:
         """Map OpenAI SDK exceptions to ProviderError types."""
-        name = type(exc).__name__.lower()
-        text = redact_secrets(str(exc))
+        from .redaction import map_provider_error
 
-        if "rate" in name or "rate" in text.lower() or "429" in text:
-            return RateLimitError(text)
-        if "auth" in name or "401" in text or "api key" in text.lower():
-            return AuthError(text)
-        if "validation" in name or "400" in text:
-            return ValidationError(text)
-        if "connection" in name or "network" in name or "timeout" in name:
-            return NetworkError(text)
-
-        return ModelError(text)
+        return map_provider_error(exc)
 
 
 def _openai_message(message: ProviderMessage) -> dict[str, str]:
