@@ -195,6 +195,20 @@ else
     skip_gate "banned-claims" "scripts/check-banned-claims.sh not found"
 fi
 
+# ─── Mobile SDK gates (native-safety + SBOM + compliance) ───────────────────
+if command -v uv >/dev/null 2>&1 && [ -d "runtimes/mobile" ]; then
+    run_gate "mobile:native-safety" \
+        "cd python && uv run pytest -q tests/test_mobile_expo_scaffold.py tests/test_mobile_expo_example.py tests/test_mobile_rn.py tests/test_mobile_flutter.py 2>&1"
+    run_gate "mobile:sbom" \
+        "cd python && uv run arc mobile sbom --json 2>&1 | grep -q CycloneDX"
+    run_gate "mobile:compliance" \
+        "cd python && uv run arc mobile generate compliance-report --json 2>&1 | grep -q requires_human_review"
+else
+    skip_gate "mobile:native-safety" "uv not installed or no runtimes/mobile"
+    skip_gate "mobile:sbom" "uv not installed or no runtimes/mobile"
+    skip_gate "mobile:compliance" "uv not installed or no runtimes/mobile"
+fi
+
 # ─── Spec citation verification ─────────────────────────────────────────────
 if [ -x "scripts/spec_verify.py" ] || [ -f "scripts/spec_verify.py" ]; then
     SPEC_FILES=()
