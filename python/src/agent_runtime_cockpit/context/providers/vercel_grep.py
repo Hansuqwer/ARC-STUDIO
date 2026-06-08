@@ -2,11 +2,16 @@
 
 Searches public GitHub repos via grep.app for real-world usage examples.
 Source: https://grep.app/
+
+Gated by ``ARC_VERCEL_GREP_ENABLED=1``. The provider is disabled by default
+because it makes outbound network requests to an unofficial third-party API
+(grep.app). Opt in explicitly when network access is acceptable.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -14,14 +19,22 @@ from ...protocol.schemas import ContextPackEntry, SourceType
 
 log = logging.getLogger(__name__)
 
+_GATE_ENV = "ARC_VERCEL_GREP_ENABLED"
+
 
 class VercelGrepProvider:
-    """Grep.app code search provider using its public search endpoint."""
+    """Grep.app code search provider using its public search endpoint.
+
+    Disabled unless ``ARC_VERCEL_GREP_ENABLED=1`` is set.
+    """
 
     source_type = SourceType.VERCEL_GREP
 
     def retrieve(self, task: str, workspace: Optional[Path] = None) -> list[ContextPackEntry]:
-        """Try grep.app; return no results when unavailable."""
+        """Try grep.app; return no results when gate is off or unavailable."""
+        if not os.getenv(_GATE_ENV):
+            log.debug("VercelGrepProvider disabled (set %s=1 to enable)", _GATE_ENV)
+            return []
         try:
             return self._scrape(task)
         except Exception as e:

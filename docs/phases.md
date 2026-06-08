@@ -6615,3 +6615,13 @@ Extended the shared `useAsyncState` hook (introduced in Phase 178) to `EditPlans
 - **Remaining (intentionally deferred):** AssuranceTab (4 independent async flows, high render-ripple risk), SwarmGraphInsightTab (2 interdependent triples — selection drives detail load), ChatTab (streaming, not a simple async-initial).
 - **Gate 4 (tests):** 969 arc-extension tests passed; build clean.
 - **N/A:** 1,2,3,5,6,7,8.
+
+
+## Phase 213 — R-CLEAN1 safe slice #2: VercelGrepProvider env gate
+
+Executed the next safe slice from the cleanup-refactor backlog (slice 28):
+
+- **`VercelGrepProvider` env gate:** Provider now returns `[]` unless `ARC_VERCEL_GREP_ENABLED=1` is set. Previously it always tried to make outbound requests to the unofficial grep.app API. Gate is fail-closed (default off); opt-in with `ARC_VERCEL_GREP_ENABLED=1`. `_GATE_ENV = "ARC_VERCEL_GREP_ENABLED"` constant exported for test assertions.
+- **Gate 6 (security):** Outbound network calls are now explicitly opt-in — consistent with the single-user local workstation posture where unexpected outbound requests are a risk.
+- **Gate 4 (tests):** `tests/context/test_vercel_grep_gate.py` — 3 tests: gate-off default, gate-on respected, env var name. All passed. Ruff clean.
+- **N/A:** 1,2,3,5,7,8.
