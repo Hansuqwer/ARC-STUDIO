@@ -6657,3 +6657,13 @@ Added Mobile Runtime SDK documentation to close gate 8 (docs) for mobile CLI:
 - **banned-claims:** `check-banned-claims.sh` passes on updated README.
 - **Gate 8 (docs):** README now accurately reflects the Mobile SDK CLI surface.
 - **N/A:** 1,2,3,4,5,6,7.
+
+
+## Phase 218 — R-MOBILE-POLISH1: Mobile DoD gate 1 (UX states) + gate 3 (parity)
+
+Closes DoD gates 1 and 3 for the mobile CLI surface:
+
+- **Gate 1 (UX states):** Added explicit `"state"` field to `arc mobile doctor` and `arc mobile validate` JSON responses. Doctor: `"ok"` when capabilities registered, `"empty"` when empty. Validate: `"ok"` on success, `"error"` or `"degraded"` on failure (degraded = warnings only, error = validation errors). Both `"status"` (legacy) and `"state"` (explicit DoD gate 1 field) present on doctor response.
+- **Gate 3 (parity):** CLI `--json` output structurally consistent with Python API: `arc mobile capabilities --json` count matches `list_capabilities()`, `arc mobile validate --json` `ok` matches `validate_manifest().ok`.
+- **Gate 4 (tests):** `test_mobile_dod_gate1_gate3.py` — 7 tests (state=ok, state=error, empty state, 2 parity checks). All passed. Ruff clean.
+- **N/A:** 2,5,6,7,8.

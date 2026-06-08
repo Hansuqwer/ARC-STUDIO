@@ -37,6 +37,8 @@ def mobile_doctor_cmd(
 
     caps = list_capabilities()
     mock_count = sum(1 for c in caps if c.id.endswith(".mock"))
+    # Explicit UX states (DoD gate 1): "ok" | "empty" (no capabilities registered)
+    ux_state = "ok" if caps else "empty"
     _out(
         ok(
             {
@@ -46,7 +48,8 @@ def mobile_doctor_cmd(
                 "simulator_mode": True,
                 "background_execution": False,
                 "network_by_default": False,
-                "status": "ok",
+                "status": ux_state,
+                "state": ux_state,
                 "note": "MVP: all capabilities are mock/simulator-only. No real native bridges.",
             }
         ),
@@ -113,8 +116,15 @@ def mobile_validate_cmd(
         raise typer.Exit(1) from exc
 
     report = validate_manifest(manifest)
+    # Explicit UX state (DoD gate 1): "ok" | "degraded" | "error"
+    ux_state = (
+        "ok"
+        if report.ok
+        else ("degraded" if report.warning_count > 0 and report.error_count == 0 else "error")
+    )
     payload = {
         "ok": report.ok,
+        "state": ux_state,
         "manifest_id": report.manifest_id,
         "error_count": report.error_count,
         "warning_count": report.warning_count,
