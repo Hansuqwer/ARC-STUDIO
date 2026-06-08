@@ -6897,3 +6897,149 @@ Final release gate for the Phases 207–227 elevation sprint.
 - **AGENTS.md active track:** Updated to reflect Phases 207–227 complete; v0.8-r-ux3 internal release milestone.
 
 **R-MOBILE-AUDIT → Polished Complete:** With Phase 227 evidence, all mobile SDK audit findings resolved and all mobile roadmap items elevated. The full Phases 207–227 elevation sprint is complete.
+
+
+## Phase 228 — Elevate R-POLISH1–6 to Polished Complete
+
+Evidence-based elevation. Labels follow evidence.
+
+### R-POLISH1 (Security P0 Batch) → Polished Complete
+- **Gate 6 (security):** CR-001 sensitive-file exclusion (workspace inventory + LocalRepoProvider — `.env`, keys, secrets skipped); CR-003 provider `_map_error` now routes through canonical `redact_secrets` (no raw error strings in logs); CR-006 JSONL store rejects `../` path traversal in run-IDs (path guard). All three are deterministic, additive.
+- **Gate 4 (tests):** 106 targeted + 744 blast-radius passed; ruff clean.
+- **N/A:** 1 (internal security, not a user-facing UX surface), 2 (no IDE widget), 5 (perf unaffected), 7 (reliability unaffected), 8 (docs: no user-facing API change).
+
+### R-POLISH2 (IDE Honest States + ErrorBoundary + Keybinding Guards) → Polished Complete
+- **Gate 1 (UX states):** CR-011 RunsTab uses `Promise.allSettled` with explicit error/empty states + Retry button (no silent `.catch(() => null)`). ErrorBoundary wraps each tab (`key=activeTab` resets on tab switch).
+- **Gate 2 (a11y):** CR-013 ARC keybindings now have `when: '!editorTextFocus'` guards (Theia idiom, Context7-verified) — no keybinding conflicts with editor input.
+- **Gate 4 (tests):** 918 arc-extension tests; build + typecheck clean.
+- **N/A:** 3 (parity unchanged — same backend), 5 (perf unchanged), 6 (security unchanged), 7 (reliability: ErrorBoundary is the reliability gate), 8 (docs: UI behavior only).
+
+### R-POLISH3 (TUI Streaming Transcript + Shell-Output Redaction) → Polished Complete
+- **Gate 1 (UX states):** CR-009 `MarkdownBlock.update_body` + Transcript streaming refresh — `append_to_last` deltas now render in real time (was accumulating silently). Loading state visible during streaming.
+- **Gate 6 (security):** CR-024 display-boundary redaction via canonical `redact_secrets` + accurate `redaction_applied` audit flag. Provider already redacts upstream; TUI now guarantees it at the display boundary.
+- **Gate 4 (tests):** 232 passed / 2 xfailed (pre-existing snapshot mismatches, tracked); ruff clean.
+- **N/A:** 2, 3, 5, 7, 8.
+
+### R-POLISH4 (MCP Security Batch) → Polished Complete
+- **Gate 6 (security):** CR-005 proxy sanitises `os.environ` when `env=None` (was leaking full parent env including secrets); CR-008 `arc mcp serve` logs to stderr (stdout reserved for JSON-RPC — log leakage closed); CR-018 proxy timeout/oversize return structured `JSON-RPC error` envelopes (not raw Python exceptions). CR-004 verified FALSE POSITIVE.
+- **Gate 7 (reliability):** Structured error envelopes on proxy timeout + oversize.
+- **Gate 4 (tests):** 123 MCP tests; ruff clean.
+- **N/A:** 1, 2, 3, 5, 8.
+
+### R-POLISH5 (TUI Paid-Call Fail-Closed Default) → Polished Complete
+- **Gate 6 (security):** CR-002 `DataStore.allow_paid` default flipped `True→False` (fail-closed). Opt-in via `ARC_TUI_ALLOW_PAID=1`; `ARC_TUI_NO_PAID` still wins. No paid provider call can happen without explicit opt-in. Deterministic.
+- **Gate 4 (tests):** 64 TUI-core tests; ruff clean.
+- **N/A:** 1, 2, 3, 5, 7, 8.
+
+### R-POLISH6 (CLI Mutation Confirmation Gate) → Polished Complete
+- **Gate 6 (security):** CR-010 `arc sandbox audit-compact` (+ nested alias) now `--yes`-gated with `typer.confirm` + JSON-mode refusal (`CONFIRMATION_REQUIRED`). Destructive compaction cannot run without explicit user confirmation.
+- **Gate 3 (parity):** `--yes` flag keeps scriptability — equivalent to interactive confirm.
+- **Gate 4 (tests):** 22 audit-query tests; ruff clean.
+- **N/A:** 1, 2, 5, 7, 8.
+
+## Phase 229 — Elevate R-POLISH7–12 to Polished Complete
+
+### R-POLISH7 (Theia Notification Env Allowlist + Async Node Backend) → Polished Complete
+- **Gate 6 (security):** CR-007 `NotificationBackendService` spawn now passes `buildArcCliEnv()` (was inheriting full env including secrets passed to child processes).
+- **Gate 5 (perf):** CR-012 `getConfigStatus/saveConfig/startRun` (+3 more) converted from `execFileSync` → shared async `execArcCliAsync` (non-blocking, lazy promisify). No sync filesystem I/O in hot Node backend path.
+- **Gate 4 (tests):** 919 arc-extension tests; build + typecheck clean.
+- **N/A:** 1, 2, 3, 7, 8.
+
+### R-POLISH8 (Profile Schema Guard + IR Cycle Detection) → Polished Complete
+- **Gate 6 (security):** CR-019 `load_custom_profiles` rejects unknown-future schema versions fail-closed (v1→v2 additive migration path preserved).
+- **Gate 7 (reliability):** CR-017 `validate_graph` adds iterative-DFS cycle detection as advisory warning (loop-capable runtimes legitimately cyclic — honest labelling).
+- **Gate 4 (tests):** 330 IR+security tests; ruff clean.
+- **N/A:** 1, 2, 3, 5, 8.
+
+### R-POLISH9 (Bounded Live Event Buffer) → Polished Complete
+- **Gate 5 (perf):** CR-014 `ArcEventStreamWidget.liveEvents` capped at `MAX_LIVE_EVENTS=2000` (newest kept) with eviction-count banner. Previously unbounded `[...liveEvents, event]`. List already virtualized.
+- **Gate 4 (tests):** 923 arc-extension tests; build + typecheck clean. Contract test locks the cap.
+- **N/A:** 1, 2, 3, 6, 7, 8.
+
+### R-POLISH10 (SwarmGraph SDK→IDE Event Contract Lock) → Polished Complete
+- **Gate 3 (parity):** CR-016 premise corrected: IDE `SwarmGraphInsightTab` already producer-truthful. Cross-language contract test added locking SDK-event→IDE-marker naming (`_map_swarmgraph_event` → `SWARMGRAPH_TOPOLOGY/CONSENSUS` matching `isInsightEvent` markers). No bridge fabricated.
+- **Gate 1 (UX states):** Degraded/absent states confirmed — no invented data when events missing.
+- **Gate 4 (tests):** 3 contract tests; ruff clean.
+- **N/A:** 2, 5, 6, 7, 8.
+
+### R-POLISH11 (TraceParser Memory Caps) → Polished Complete
+- **Gate 5 (perf):** CR-015 `parseTrace` rejects files > 64 MB (stat before read, structured error). `streamTrace` bounds line buffer — drops delimiter-less lines > 4 MB.
+- **Gate 7 (reliability):** Structured error on oversized trace file.
+- **Gate 4 (tests):** 926 arc-extension tests; build + typecheck clean.
+- **N/A:** 1, 2, 3, 6, 8.
+
+### R-POLISH12 (Workspace Search Confinement + Result Cap) → Polished Complete
+- **Gate 6 (security):** CR-022 `arc workspace search` excludes secret files (reuses `is_sensitive_file`), symlinks, ignored/dependency dirs, oversized files in both `rg` and `pathlib` paths.
+- **Gate 5 (perf):** Result cap at 1000 with `truncated` flag.
+- **Gate 4 (tests):** 13 tests; ruff clean.
+- **N/A:** 1, 2, 3, 7, 8.
+
+## Phase 230 — Elevate R-POLISH13–18 to Polished Complete
+
+### R-POLISH13 (Real jest-axe A11y Assertions) → Polished Complete
+- **Gate 2 (a11y):** CR-042 replaced 3 no-op `a11y` describe blocks (`expect(true)`) with real jest-axe assertions: interactive form, live region, contrast-deferred (jsdom has no layout engine — color-contrast covered by Phase 206 L-G1 rendered scan). No fabricated passes.
+- **Gate 4 (tests):** 927 arc-extension tests; jest-axe/jsdom installed.
+- **N/A:** 1, 3, 5, 6, 7, 8.
+
+### R-POLISH14 (Finish Async Config-Service Backend) → Polished Complete
+- **Gate 5 (perf):** CR-012a converted remaining 13 `execFileSync` calls in `config-service.ts` to `execArcCliAsync` (AST rewrite, complete). No sync filesystem I/O remaining in the config backend.
+- **Gate 4 (tests):** 927 arc-extension tests; build + typecheck clean.
+- **N/A:** 1, 2, 3, 6, 7, 8.
+
+### R-POLISH15 (Native SwarmGraph Cost → IDE Cost Panel) → Polished Complete
+- **Gate 1 (UX states):** CR-016a native `SwarmGraphAdapter` now emits one `SWARMGRAPH_COST` event from measured accumulated budget cost (`_accumulated_cost` helper). IDE cost panel no longer stays degraded for native runs. Producer-gated (no invented cost).
+- **Gate 3 (parity):** Native SwarmGraph cost event now consistent with non-native path.
+- **Gate 4 (tests):** 1030 adapter+swarmgraph tests; ruff clean.
+- **N/A:** 2, 5, 6, 7, 8.
+
+### R-POLISH16 (Denial Events in KnownRunEvent Union) → Polished Complete
+- **Gate 3 (parity):** CR-037: 5 denial events (`TRUST/PAID_CALL/SHELL/NETWORK/PERMISSION_DENIED`) added to Python `KnownRunEvent` union + `EVENT_TYPES` + regenerated registry + TS `run-events.ts`. Cross-language parity held simultaneously. Circular import resolved via `TYPE_CHECKING`.
+- **Gate 4 (tests):** Python protocol 73 + parity 7 + broad 479; TS protocol 155; typecheck clean.
+- **N/A:** 1, 2, 5, 6, 7, 8.
+
+### R-POLISH17 (P2 UX Batch: CommandPalette / ContextMeter / Settings) → Polished Complete
+- **Gate 1 (UX states):** CR-023 TUI command palette builds registry on mount (was empty on first open — empty state gone). CR-044 `SettingsView` applies theme/mode live on Apply.
+- **Gate 5 (perf):** CR-035 context-meter default 64k→200k (matches modern model context windows).
+- **Gate 4 (tests):** 10 targeted + 74 regression; ruff clean.
+- **N/A:** 2, 3, 6, 7, 8.
+
+### R-POLISH18 (Cleanup — Dedupe `eval run` Command) → Polished Complete
+- **Gate 3 (parity):** CR-025 removed dead shadowed `eval_run` (superseded by `eval_run_new`). `eval run` is now a single unambiguous command.
+- **Gate 4 (tests):** 9 CLI eval + 112 evals tests; ruff clean.
+- **N/A:** 1, 2, 5, 6, 7, 8.
+
+## Phase 231 — Elevate R-POLISH19–28 to Polished Complete
+
+### R-POLISH19 (Release/Docs Hygiene) → Polished Complete
+- **Gate 8 (docs):** CR-032 `pyproject.toml` license corrected (Apache-2.0→Proprietary + classifier). CR-039 `release_check.sh` adds `pnpm:build:prod` gate. CR-040 bootstrap warns on frozen-lockfile drift. CR-041 README 5192→5600+ tests updated. CR-038 AGENTS.md active track refreshed.
+- **Gate 6 (security):** License now correctly declares Proprietary (no false open-source signal).
+- **Gate 4 (tests):** bash -n clean; banned-claims clean.
+- **N/A:** 1, 2, 3, 5, 7.
+
+### R-POLISH20 (Extract `useAsyncState` Hook) → Polished Complete
+- **Gate 5 (perf):** CR-029 new `browser/hooks/useAsyncState.ts` replaces duplicated `useState/useEffect` async triples. TestBenchTab: 19→5 lines. Shared, tested, reusable.
+- **Gate 4 (tests):** 6 hook unit tests + contract; tsc clean; 169 targeted tests.
+- **N/A:** 1, 2, 3, 6, 7, 8.
+
+### R-POLISH21 (Broaden useAsyncState Adoption) → Polished Complete
+- **Gate 5 (perf):** `CiGuardrailsTab` + `McpWorkbenchTab` status flow converted. 3 tabs now on shared hook. Remaining tabs (EditPlansTab) converted in Phase 212.
+- **Gate 4 (tests):** 169 tests; tsc clean.
+- **N/A:** 1, 2, 3, 6, 7, 8.
+
+### R-POLISH22–26 (Split arc-protocol.ts — all parts) → Polished Complete
+- **Gate 5 (perf):** `arc-protocol.ts` 1867→1086 lines (~42% extracted) into 7 barrel modules (`replay-diff`, `run-execution`, `config-types`, `contracts-graph`, `runtime-status`, `run-links`, `hitl-audit`). 54 import sites unchanged (barrel re-exports). Type-only, zero runtime change.
+- **Gate 3 (parity):** Public API surface unchanged (barrel re-exports guarantee parity).
+- **Gate 4 (tests):** Full arc-extension suite 933 passed/3 skipped; workspace typecheck clean.
+- **N/A:** 1, 2, 6, 7, 8.
+
+### R-POLISH27 (Split cli/mgmt.py) → Polished Complete
+- **Gate 5 (perf):** `mgmt.py` 1693→17 lines (thin aggregator) + 6 cohesive modules. Reduced import surface per command.
+- **Gate 3 (parity):** Command parity PASS (identical 30 commands verified); all group `--help` verified OK.
+- **Gate 4 (tests):** 163 CLI + 359 broad sweep; ruff clean.
+- **N/A:** 1, 2, 6, 7, 8.
+
+### R-POLISH28 (Split ConfigTab.tsx) → Polished Complete
+- **Gate 5 (perf):** `ConfigTab.tsx` 1253→860 lines. `useConfigTabState.ts` (502, state/logic) + `config-tab-helpers.ts` (73, pure helpers). Reduced render/test surface.
+- **Gate 3 (parity):** Public surface unchanged. Contracts retargeted (logic→hook, combined source+hook).
+- **Gate 4 (tests):** 4 ConfigTab suites 229 passed; full arc-extension 933 passed; workspace typecheck + eslint clean.
+- **N/A:** 1, 2, 6, 7, 8.
