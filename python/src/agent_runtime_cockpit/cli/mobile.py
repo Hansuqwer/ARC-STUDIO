@@ -1058,3 +1058,96 @@ def mobile_queue_gc_cmd(
     """Drop expired entries. Returns the number removed."""
     _setup_logging(debug)
     _out(ok({"removed": _queue(store).gc()}), json_output)
+
+
+mobile_secure_store_app = typer.Typer(
+    name="secure-store", help="Mobile encrypted local store (redacted output, no plaintext)"
+)
+mobile_app.add_typer(mobile_secure_store_app)
+
+_DEFAULT_SS_STORE = ".arc/mobile/secure_store.json"
+_DEFAULT_SS_KEY = ".arc/mobile/secure_store.key"
+
+
+def _secure_store(store: str, key_path: str):
+    from cryptography.fernet import Fernet
+
+    from ..mobile import InMemoryKeyProvider, SecureLocalStore
+
+    kp = Path(key_path)
+    if kp.exists():
+        key = kp.read_bytes()
+    else:
+        key = Fernet.generate_key()
+        kp.parent.mkdir(parents=True, exist_ok=True)
+        kp.write_bytes(key)
+    return SecureLocalStore(key_provider=InMemoryKeyProvider(key), path=Path(store))
+
+
+@mobile_secure_store_app.command("put")
+def mobile_ss_put_cmd(
+    key: str = typer.Argument(...),
+    value: str = typer.Argument(..., help="Value to encrypt at rest (never echoed)."),
+    classification: str = typer.Option("low", "--classification"),
+    store: str = typer.Option(_DEFAULT_SS_STORE, "--store"),
+    key_file: str = typer.Option(_DEFAULT_SS_KEY, "--key-file"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Encrypt-and-store a value. The value is never echoed back."""
+    _setup_logging(debug)
+    ss = _secure_store(store, key_file)
+    ss.put(key, value, classification)
+    _out(ok({"stored": True, "key": key, "classification": classification}), json_output)
+
+
+@mobile_secure_store_app.command("get")
+def mobile_ss_get_cmd(
+    key: str = typer.Argument(...),
+    store: str = typer.Option(_DEFAULT_SS_STORE, "--store"),
+    key_file: str = typer.Option(_DEFAULT_SS_KEY, "--key-file"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Confirm a key exists + its classification. The plaintext value is NEVER printed."""
+    _setup_logging(debug)
+    ss = _secure_store(store, key_file)
+    if key not in ss.keys():
+        _out(err(ArcErrorCode.INVALID_INPUT, f"key not found: {key}"), json_output)
+        raise typer.Exit(1)
+    _out(
+        ok(
+            {
+                "key": key,
+                "exists": True,
+                "classification": ss.classification_of(key).value,
+                "value": "[REDACTED]",
+            }
+        ),
+        json_output,
+    )
+
+
+@mobile_secure_store_app.command("export")
+def mobile_ss_export_cmd(
+    store: str = typer.Option(_DEFAULT_SS_STORE, "--store"),
+    key_file: str = typer.Option(_DEFAULT_SS_KEY, "--key-file"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Export entry metadata only (no values)."""
+    _setup_logging(debug)
+    _out(ok(_secure_store(store, key_file).export(include_values=False)), json_output)
+
+
+@mobile_secure_store_app.command("delete")
+def mobile_ss_delete_cmd(
+    key: str = typer.Argument(...),
+    store: str = typer.Option(_DEFAULT_SS_STORE, "--store"),
+    key_file: str = typer.Option(_DEFAULT_SS_KEY, "--key-file"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Delete a stored key."""
+    _setup_logging(debug)
+    _out(ok({"deleted": _secure_store(store, key_file).delete(key), "key": key}), json_output)

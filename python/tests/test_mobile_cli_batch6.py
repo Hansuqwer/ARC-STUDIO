@@ -93,3 +93,50 @@ def test_queue_enqueue_status_flush_hash_only(tmp_path) -> None:
         ]
         == 0
     )
+
+
+def test_secure_store_never_prints_plaintext(tmp_path) -> None:
+    store = str(tmp_path / "ss.json")
+    key_file = str(tmp_path / "ss.key")
+    secret = "TOP-SECRET-CLI-VALUE-42x"
+    common = ["--store", store, "--key-file", key_file, "--json"]
+
+    put = runner.invoke(
+        mobile_app,
+        ["secure-store", "put", "api_key", secret, "--classification", "critical", *common],
+    )
+    assert put.exit_code == 0, put.output
+    assert secret not in put.output  # value never echoed
+    assert _json(put)["data"]["stored"] is True
+
+    # at-rest file holds ciphertext only
+    assert secret not in (tmp_path / "ss.json").read_text()
+
+    get = runner.invoke(mobile_app, ["secure-store", "get", "api_key", *common])
+    assert get.exit_code == 0
+    assert secret not in get.output
+    assert _json(get)["data"]["value"] == "[REDACTED]"
+    assert _json(get)["data"]["classification"] == "critical"
+
+    exp = runner.invoke(mobile_app, ["secure-store", "export", *common])
+    assert secret not in exp.output
+    assert all("value" not in e for e in _json(exp)["data"]["entries"])
+
+    dele = runner.invoke(mobile_app, ["secure-store", "delete", "api_key", *common])
+    assert _json(dele)["data"]["deleted"] is True
+
+
+def test_secure_store_get_missing(tmp_path) -> None:
+    res = runner.invoke(
+        mobile_app,
+        [
+            "secure-store",
+            "get",
+            "nope",
+            "--store",
+            str(tmp_path / "s.json"),
+            "--key-file",
+            str(tmp_path / "s.key"),
+        ],
+    )
+    assert res.exit_code == 1
