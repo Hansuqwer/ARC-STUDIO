@@ -177,6 +177,26 @@ def mobile_simulate_cmd(
             raise typer.Exit(1) from exc
     report = simulate_action_plan(plan, extra_capabilities=extra_capabilities)
     payload = report.model_dump(mode="json")
+
+    # D1: route the simulate path through the capability entry-gate. The gate decision is
+    # recorded per step; with default-off flags every capability routes to fixtures, which
+    # matches the simulator's behaviour (no real device access).
+    import secrets as _secrets
+
+    from ..mobile import CapabilityEntryGate, FeatureFlags
+
+    _gate = CapabilityEntryGate(FeatureFlags(), _secrets.token_bytes(32))
+    gate_routes = [
+        {"capability_id": s.capability_id, "eligible": _d.eligible, "route": _d.route}
+        for s in report.steps
+        for _d in (_gate.evaluate(s.capability_id),)
+    ]
+    payload["gate"] = {
+        "route": "fixtures",  # this build never routes a native capability to a real device
+        "all_fixtures": all(r["route"] == "fixtures" for r in gate_routes),
+        "evaluated": gate_routes,
+    }
+
     if trace:
         mobile_trace = build_trace(report)
         append_trace(trace, mobile_trace)

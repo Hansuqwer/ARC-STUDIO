@@ -152,3 +152,29 @@ def test_audit_retention_prune(tmp_path) -> None:
     data = _json(res)["data"]
     assert data["before"] == 10 and data["after"] == 3 and data["removed"] == 7
     assert len(log.read_text().strip().splitlines()) == 3
+
+
+def test_simulate_routes_through_gate(tmp_path) -> None:
+    from agent_runtime_cockpit.mobile import MobileActionPlan
+    from agent_runtime_cockpit.mobile.models import MobileActionStep
+
+    plan = MobileActionPlan(
+        plan_id="gate-demo",
+        steps=[
+            MobileActionStep(step_id="s1", capability_id="app.memory.write.mock"),
+            MobileActionStep(step_id="s2", capability_id="device.camera.capture.mock"),
+        ],
+    )
+    plan_file = tmp_path / "plan.json"
+    plan_file.write_text(plan.model_dump_json(), encoding="utf-8")
+
+    res = runner.invoke(mobile_app, ["simulate", str(plan_file), "--json"])
+    assert res.exit_code in (0, 1), res.output  # exit 1 only if a step blocked
+    gate = _json(res)["data"]["gate"]
+    assert gate["route"] == "fixtures"
+    assert gate["all_fixtures"] is True
+    assert {e["capability_id"] for e in gate["evaluated"]} == {
+        "app.memory.write.mock",
+        "device.camera.capture.mock",
+    }
+    assert all(e["route"] == "fixtures" for e in gate["evaluated"])
