@@ -205,11 +205,14 @@ if command -v uv >/dev/null 2>&1 && [ -d "runtimes/mobile" ]; then
         "cd python && uv run arc mobile generate compliance-report --json 2>&1 | grep -q requires_human_review"
     run_gate "mobile:deps-audit" \
         "bash scripts/mobile-deps-audit.sh"
+    run_gate "mobile:provenance" \
+        "cd python && uv run arc mobile provenance --json 2>&1 | grep -q arc-mobile-provenance"
 else
     skip_gate "mobile:native-safety" "uv not installed or no runtimes/mobile"
     skip_gate "mobile:sbom" "uv not installed or no runtimes/mobile"
     skip_gate "mobile:compliance" "uv not installed or no runtimes/mobile"
     skip_gate "mobile:deps-audit" "uv not installed or no runtimes/mobile"
+    skip_gate "mobile:provenance" "uv not installed or no runtimes/mobile"
 fi
 
 # ─── Spec citation verification ─────────────────────────────────────────────

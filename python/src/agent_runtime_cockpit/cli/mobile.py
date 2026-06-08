@@ -1223,3 +1223,32 @@ def mobile_audit_retention_cmd(
     summary = apply_retention(file, max_age_seconds=max_age_seconds, max_entries=max_entries)
     summary["rotated"] = rotated
     _out(ok(summary), json_output)
+
+
+@mobile_app.command("provenance")
+def mobile_provenance_cmd(
+    version: str = typer.Option("0.1.0", "--version", help="Package version for the attestation."),
+    sign: bool = typer.Option(
+        False, "--sign", help="Locally sign the attestation (needs --key-file)."
+    ),
+    key_file: str = typer.Option(None, "--key-file", help="Key file for local signing."),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Build a mobile supply-chain provenance attestation (SBOM + build metadata).
+
+    With --sign + --key-file the attestation is signed locally (deterministic HMAC; no external
+    signing infrastructure). Verifiable offline. Simulator-preview posture; advisory.
+    """
+    _setup_logging(debug)
+    from ..mobile import build_provenance, sign_provenance
+
+    provenance = build_provenance(version)
+    if sign:
+        if not key_file:
+            _out(err(ArcErrorCode.INVALID_INPUT, "--sign requires --key-file"), json_output)
+            raise typer.Exit(1)
+        key = Path(key_file).read_bytes()
+        _out(ok(sign_provenance(provenance, key)), json_output)
+    else:
+        _out(ok(provenance), json_output)
