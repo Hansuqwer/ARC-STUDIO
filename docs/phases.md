@@ -7043,3 +7043,53 @@ Evidence-based elevation. Labels follow evidence.
 - **Gate 3 (parity):** Public surface unchanged. Contracts retargeted (logic→hook, combined source+hook).
 - **Gate 4 (tests):** 4 ConfigTab suites 229 passed; full arc-extension 933 passed; workspace typecheck + eslint clean.
 - **N/A:** 1, 2, 6, 7, 8.
+
+
+## Phase 232 — Elevate R-MOBILE-AUDIT + R-MOBILE-AUDIT-TS to Polished Complete
+
+### R-MOBILE-AUDIT (Phase 207) → Polished Complete
+- **Gate 6 (security):** `models._Base` changed from `extra="ignore"` → `extra="forbid"` — unknown fields in any mobile model now raise `ValidationError` (unknown-field injection path closed). `write_requires_hitl_or_trust` always severity=`"error"` regardless of strict mode (governance fail-closed). Two write capabilities (`device.notifications.schedule.mock`, `app.memory.write.mock`) now require `requires_trust=True`.
+- **Gate 7 (reliability):** `manifest.load_manifest(strict=False)` strips unknown top-level keys before `model_validate` (forward-compat for schema migration). Lenient load path preserved.
+- **Gate 4 (tests):** 308 mobile tests; ruff clean. New `test_base_rejects_unknown_fields`, `test_v4_write_is_error_in_all_modes`. Fixture regenerated; policy + CLI tests updated.
+- **N/A:** 1 (internal model change), 2 (a11y, no UI), 3 (parity: behavior-preserving), 5 (perf), 8 (docs).
+
+### R-MOBILE-AUDIT-TS (Phases 209-210) → Polished Complete
+- **Gate 6 (security):** TS `isMobileCapability` checks 6 discriminant fields (was 2 — trivially fooled). `isMobileRuntimeManifest` checks 6 discriminants. Rejects partial-match objects. Expo/RN `package.json` `main` → `dist/` (not publishable without build posture enforced).
+- **Gate 8 (docs):** `MobileRuntimeManifest` TS interface updated to `privacy_manifest_intent` (mirrors Python model). Flutter `pubspec.yaml` description accurate (Dart `lib/` exists). `AUDIT_REPORT_2026-06-07.md` committed to `docs/mobile/`.
+- **Gate 4 (tests):** 968 arc-extension + 11 mobile-runtime TS tests; arc-protocol-ts build clean. New stronger type guard tests.
+- **N/A:** 1, 2, 3, 5, 7.
+
+## Phase 233 — Elevate R-MOBILE-B5-P9-10 + R-MOBILE-B5-P12a + R-MOBILE-P11-12b + R-MOBILE-P12-20 to Polished Complete
+
+### R-MOBILE-B5-P9-10 (Phase 189) → Polished Complete
+- **Gate 6 (security):** RN TurboModule Codegen spec + fixtures bridge are fixtures-only; no real device APIs (forbidden-symbol CI gate applies to RN too). `tsconfig.json` added; `package.json` exports map added.
+- **Gate 4 (tests):** flutter analyze clean + flutter test 5/5; 14 Python static tests; 9 RN scaffold tests (test_mobile_rn.py, including Phase 209 tsconfig + build-script tests). Fixtures only, no real device access.
+- **Gate 8 (docs):** Flutter `pubspec.yaml` description accurate (Phase 209 fix). Package.json `private: true`, `main` → `dist/` (Phase 209).
+- **N/A:** 1, 2, 3, 5, 7.
+
+### R-MOBILE-B5-P12a (Phase 190) → Polished Complete
+- **Gate 6 (security):** Deterministic CEF/JSON SIEM export (redaction preserved — payload fields hash-only, no raw data). Signed `OrgPolicyBundle` with fail-closed RBAC/ABAC/tenant denials via `EnterprisePolicyHook`. Deterministic (no LLM).
+- **Gate 7 (reliability):** Signed bundle required; `EnterprisePolicyHook` fail-closed on missing or invalid bundle.
+- **Gate 4 (tests):** 13 tests; deterministic, offline.
+- **N/A:** 1, 2, 3, 5, 8.
+
+### R-MOBILE-P11-12b (Phase 191) → Polished Complete
+- **Gate 6 (security):** Default-off feature flags + global kill switch. `CapabilityEntryGate` requires all 4 criteria (flag + signed plan + approval + compliance) — ALWAYS routes to fixtures (`executed_real_device=False`). Gate audit appended on every `execute()` call (Phase 220).
+- **Gate 4 (tests):** 10 tests + 4 gate 6 security tests (Phase 220).
+- **N/A:** 1, 2, 3, 5, 7, 8.
+
+### R-MOBILE-P12-20 (Phase 192) → Polished Complete
+- **Gate 6 (security):** Audit TTL/rotation (bounded retention). CycloneDX SBOM (no secrets in SBOM). Default-off fail-closed loopback MCP dev-bridge guard.
+- **Gate 7 (reliability):** Audit retention enforces TTL on decisions log. Offline queue TTL+FIFO.
+- **Gate 4 (tests):** 19 tests; deterministic, offline.
+- **Gate 8 (docs):** README Mobile SDK section (Phase 217). CLI reference (Phase 217). `arc mobile sbom --json` and `arc mobile audit-retention` documented.
+- **N/A:** 1, 2, 3, 5.
+
+## Phase 234 — Elevate R-CR-BACKLOG to Polished Complete
+
+### R-CR-BACKLOG (Phase 193) → Polished Complete
+- **Gate 3 (parity):** MESSAGE registry/typed parity (CR-036 — `MESSAGE` event in both Python `KnownRunEvent` registry + TS typed union); `MCP_CALL_DECISION` producer wired (CR-043 — `McpDecisionEntry` events emit from the real MCP decision log, not a stub).
+- **Gate 6 (security):** `eval synthetic batch labelling` (CR-034 — synthetic eval results marked `synthetic: true`; no fabricated production claims). `dod-gate CI` (CR-045 — `check-banned-claims.sh` runs in CI).
+- **Gate 8 (docs):** README `arc-wallet` fix (CR-021 — wallet CLI command documented accurately).
+- **Gate 4 (tests):** 16 tests; additive; ruff clean.
+- **N/A:** 1, 2, 5, 7.
