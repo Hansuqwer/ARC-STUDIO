@@ -91,3 +91,7 @@ All 20 committed to `main` with tests; full Python suite + `@arc-studio/protocol
 `pnpm typecheck` + `check-banned-claims` green; each recorded in `docs/phases.md` + `docs/
 roadmap.md`. Posture unchanged: Simulator Preview; no real device access; Phase 11 stays an
 entry-gate that routes to fixtures.
+
+## Progress log (Batch 6)
+
+- **A1 ✅ (CR-036)** Aligned typed `MessageData` to the MESSAGE event registry + TS shape: body field is `text` (+ source/coalesced/node_id/message_id/tool_call_id/evidence_refs optionals); dropped the diverged, unused `content`/`role`. Regression guard `tests/protocol/test_message_event_registry_parity.py` (4) locks registry==typed==TS. 82 protocol tests pass.

@@ -444,12 +444,18 @@ class SwarmGraphCostEvent(BaseModel):
 
 
 class MessageData(BaseModel):
-    """Data payload for MESSAGE event."""
+    """Data payload for MESSAGE event.
 
-    message_id: str
-    role: str
-    content: str
+    Mirrors the MESSAGE entry in the event registry (protocol/events.py) and the TS
+    MessageEvent.data shape: ``text`` is the message body; the rest are optional.
+    """
+
+    text: str
+    source: str | None = None
+    coalesced: bool | None = None
     node_id: str | None = None
+    message_id: str | None = None
+    tool_call_id: str | None = None
     evidence_refs: list[str] | None = None
 
 
