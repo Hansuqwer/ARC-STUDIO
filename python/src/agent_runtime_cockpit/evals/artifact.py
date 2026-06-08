@@ -24,6 +24,7 @@ EVALS_DIR = ".arc/evals"
 
 
 class EvalArtifact(BaseModel):
+    schema_version: int = 1
     run_id: str
     golden_id: str
     eval_timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())

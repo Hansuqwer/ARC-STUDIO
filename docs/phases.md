@@ -1374,9 +1374,9 @@ bash scripts/check-pr.sh
 ### Implementation
 1. ✅ Store HITL prompts and decisions in SQLite with: run ID, timestamp, actor, decision, reason, audit hash.
 2. ✅ Add CLI: `arc hitl pending --json`, `arc hitl respond <id> --decision <approve|reject|modify|skip> --reason`.
-3. ⚠️ Define ARC eval artifact schema — deferred for future work.
+3. ✅ ARC eval artifact schema implemented (versioned EvalArtifact + repeatable paths).
 4. ⚠️ Add `arc eval run --batch --json` — deferred for future work.
-5. ⚠️ Optional export to Inspect AI-compatible directory/log shape — deferred.
+5. ✅ Inspect-AI-compatible export via `arc eval export --format inspect`.
 6. ✅ Tests: HITL prompt survives daemon restart and is answerable by CLI or IDE.
 
 ### Evidence
@@ -1402,8 +1402,8 @@ cd python && uv run pytest tests/hitl/ -q
 ### Acceptance
 1. ✅ HITL prompt survives daemon restart and is answerable by CLI or IDE (SQLite persistence).
 2. ✅ HITL decisions are audit-linked (audit_hash field in responses table).
-3. ⚠️ `arc eval run --batch --json` produces repeatable artifact paths — deferred.
-4. ⚠️ Eval reports can compare two runs on same dataset — deferred.
+3. ⚠️ `arc eval run --batch --json` produces repeatable artifact paths — DONE.
+4. ✅ Eval reports compare two runs via `arc eval compare`.
 5. ✅ All existing Phase 4 HITL tests remain green.
 
 ### Verification

@@ -190,7 +190,7 @@ GATED items (auth / native-device / paid-live provider / Linux-KVM host) are int
 | B2P-08 | Runtime-wide high/critical confirmation enforcement | Baseline Complete | 6 · M |
 | B2P-09 | Real-time budget enforcement at adapter effect boundaries | Baseline Complete | 5,6,7 · L |
 | B2P-10 | Type the intentionally-untyped run events | Baseline Complete | 4 · S |
-| B2P-11 | Eval artifact schema + Inspect-AI export + two-run report compare | Not Started | 3,4,8 · M |
+| B2P-11 | Eval artifact schema + Inspect-AI export + two-run report compare | Baseline Complete | 3,4,8 · M |
 | B2P-12 | Memory runtime wiring (extract/query during runs, redaction-first) | Not Started | 3,4 · M |
 | B2P-13 | IDE write bridge (Phase 42; depends on advisory lock) | Not Started | 6,7 · M |
 | B2P-17 | Full Electron app packaging (browser stays canonical) | Not Started | 4,8 · L |
@@ -711,7 +711,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 
 **Goal:** Convert HITL and eval from transient UI state into persistent, audit-linked evidence.
 
-**Current:** Baseline Complete (HITL only). HITL prompts and decisions now persist in SQLite with audit linking. Eval artifacts deferred for future work.
+**Current:** Baseline Complete (HITL only). HITL prompts and decisions now persist in SQLite with audit linking. Eval artifacts implemented (versioned EvalArtifact + repeatable .arc/evals/<run_id>/ paths).
 
 **Deliverables:**
 - ✅ Store HITL prompts and decisions in SQLite with run IDs, timestamps, actor, decision, reason, audit hash
@@ -724,7 +724,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 **Acceptance:**
 - ✅ HITL prompt survives daemon restart and is answerable by CLI or IDE (SQLite persistence)
 - ✅ HITL decisions are audit-linked (audit_hash field in responses table)
-- ⚠️ `arc eval run --batch --json` produces repeatable artifact paths — deferred
+- ⚠️ `arc eval run --batch --json` produces repeatable artifact paths — DONE
 - ⚠️ Eval reports can compare two runs on same dataset — deferred
 
 **Status:** Baseline Complete (HITL only) | Evidence: `python/src/agent_runtime_cockpit/audit/hitl_sqlite_store.py`, `python/src/agent_runtime_cockpit/cli/hitl.py`, 20 tests in `python/tests/hitl/test_hitl_sqlite_store.py` | Notes: HITL persistence complete with SQLite storage, CLI commands, and audit linking. Eval artifacts component deferred for separate phase. CLI commands: `arc hitl pending`, `arc hitl respond`, `arc hitl show`, `arc hitl prune`.
@@ -1204,7 +1204,7 @@ P2 — Quality:
 | **R19 MCP Local Control Plane** | **Baseline Complete (scaffold)** | **Phase 26 — complete; stdio-only MCP server with trust gate, 7 tools, 3 resources** |
 | **R20 MCP Tasks** | **Baseline Complete** | **Phase 27 — complete; SQLite task registry, CLI commands, MCP polling tools, retry/expiry support** |
 | **R21 LangGraph Replay Contract** | **Baseline Complete** | **Phase 28 — complete; replay capability detection and inspect/simulated/unsafe reporting** |
-| **R22 Persistent HITL + Eval** | **Baseline Complete (HITL only)** | **Phase 29 — HITL persistence complete; eval artifact schema and Inspect-style export deferred** |
+| **R22 Persistent HITL + Eval** | **Baseline Complete (HITL only)** | **Phase 29 — HITL persistence complete; eval artifact schema + Inspect-style export + two-run compare implemented (arc eval export/compare)** |
 | **R23 Consensus Escrow** | **Complete** | **Phase 30 — complete; commit-reveal voting with cryptographic verification and adversarial tests** |
 | **R24 Adaptive Consensus** | **Complete** | **Phase 31 — complete; deterministic risk assessment, protocol selection, raft/bft/bft_escrow hardening** |
 | **R25 Event-Driven Notifications** | **Baseline Complete** | **Phase 32 + SwarmGraph hooks — event bus/webhooks baseline exists; SwarmGraph optional webhook/EventBroker hooks plus durable local JSONL outbox/retry support added; delivery remains best-effort, no SSE/WebSocket claim** |
