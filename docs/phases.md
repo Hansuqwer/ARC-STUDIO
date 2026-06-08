@@ -6289,3 +6289,11 @@ Verify-first DoD audit: **not elevated** — the row's specific claim ("real-tim
 - **Gate 4 (tests):** ✓ `uv run pytest tests/test_advisory_lock_b2p13.py tests/test_phase46_session_write_bridge.py` → 30 passed.
 - **N/A:** 1 UX-states, 2 a11y (storage primitive; surfaced via `arc studio sessions`), 3 parity (internal concurrency primitive shared by IDE+CLI session writes), 5 perf (bounded spin-wait), 8 docs-surface (inline + this entry).
 
+### B2P-17 — Electron packaging → kept at Baseline Complete (documented gap)
+
+Verify-first DoD audit: **not elevated** — "full Electron app packaging" cannot be fully evidenced in this environment.
+
+- **What is real:** App shell + `DaemonManager` lifecycle, signing-gated release config (`forceCodeSigning: true` + `require-electron-signing.mjs`), mac/win/linux targets, and the auto-update `publish` feed — locked by 3 structure-guard tests (`tests/test_electron_packaging_b2p17.py`, 3 passed) + the `signing-preflight` CI workflow.
+- **The gap (gate 4 e2e + gate 5 perf):** A verified, **signed** end-to-end packaged build requires code-signing certs (**human-gated**) and the full `theia build` + `electron-builder` run (CI-only; not executed/measured locally). Without a verified signed artifact + startup-perf measurement, the "full packaging" claim is not met.
+- **Decision:** Stays **Baseline Complete**. The browser app remains the canonical release target; Electron desktop + signed packaging are post-v0.1 and gated on signing infrastructure.
+
