@@ -6251,3 +6251,11 @@ Driving selected Batch 7 `Baseline Complete` items to `Polished Complete` agains
 - **Gate 7 (reliability):** ✓ Cancellation (`cancel_task` + terminal-state guard: `test_cancel_pending_task`/`test_cancel_completed_task`/`test_cancel_nonexistent_task`), structured error envelope (`task.error` + FAILED state), retry logic (`test_task_retry_logic`), bounded thread joins with timeouts (`wait_for_all(timeout=…)`); lifecycle events published on every transition (`test_task_sse_events`).
 - **N/A:** 2 a11y, 3 parity, 5 perf, 6 security, 8 docs-surface — backend task engine consumed via the stdio MCP tools (covered by B2P-05's gates); execution itself runs real run/trace/audit/eval (no provider calls unless gated).
 
+### B2P-08 — runtime confirmation enforcement → Polished Complete
+
+- **Gate 6 (security):** ✓ `security/adaptive_confirmation.py` is deterministic + LLM-free (`deterministic: true`, fixed `_CONFIRM_LEVELS`): a high/critical (or `hitl_required`) decision is **fail-closed** — not allowed unless `approved=True` — and `enforce_confirmation` appends the verdict to `.arc/audit/adaptive_confirmation.events.jsonl`. Tests: blocked-without-approval, allowed-with-approval, hitl-forces-confirmation, audits-confirmation-decisions, no-audit-otherwise.
+- **Gate 3 (parity):** ✓ Closed a gap — both the CLI (`arc swarmgraph assess-risk`, via `enforce_confirmation` + `--approve`) **and** the MCP `arc_swarmgraph_assess_risk` tool now surface the **same** deterministic confirmation verdict (`confirmation` field via `evaluate_confirmation`). `test_assess_risk_surfaces_confirmation_verdict` asserts high/critical ⇒ `requires_confirmation` + not `allowed`.
+- **Gate 1 (UX states):** ✓ Both surfaces render the verdict (allowed / requires_confirmation / reason / approved); the assess-risk CLI shows it under `confirmation`.
+- **Gate 4 (tests):** ✓ `uv run pytest tests/security/test_adaptive_confirmation.py tests/mcp/test_mcp_server.py` → 39 passed.
+- **N/A:** 2 a11y (CLI/stdio text), 5 perf (synchronous deterministic gate), 7 reliability (no long-running/bridged action), 8 docs-surface (module docstring + this entry). Real execution-entrypoint enforcement beyond the assessment surfaces remains incremental (the gate is the shared primitive entrypoints call).
+

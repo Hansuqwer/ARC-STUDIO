@@ -842,15 +842,20 @@ def create_mcp_server(
         """
 
         def run() -> dict[str, Any]:
+            from ..security.adaptive_confirmation import evaluate_confirmation
             from ..swarmgraph.adaptive_consensus import assess_risk
 
             assessment = assess_risk(task_text=task, target_runtime=target_runtime)
+            # Surface the SAME deterministic confirmation verdict the CLI assess-risk surfaces
+            # (read-only here; the actionable CLI path audits via enforce_confirmation).
+            confirmation = evaluate_confirmation(assessment.risk_level, assessment.hitl_required)
             return {
                 "task": task,
                 "risk_level": assessment.risk_level,
                 "recommended_protocol": assessment.recommended_protocol.value,
                 "worker_count": assessment.worker_count,
                 "hitl_required": assessment.hitl_required,
+                "confirmation": confirmation.as_dict(),
                 "provider_backed": False,
             }
 

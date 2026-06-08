@@ -517,3 +517,22 @@ def test_swarmgraph_mcp_cli_parity(tmp_path: Path):
     ):
         assert core in server_src, f"MCP server missing shared core: {core}"
         assert core in cli_src, f"CLI missing shared core: {core}"
+
+
+def test_assess_risk_surfaces_confirmation_verdict(tmp_path: Path):
+    """B2P-08 parity: the MCP assess_risk tool surfaces the SAME deterministic confirmation
+    verdict as the gate — high/critical (or hitl_required) requires confirmation and is not
+    allowed without explicit approval."""
+    from agent_runtime_cockpit.mcp.server import create_mcp_server
+
+    trust_workspace(tmp_path, note="test")
+    server = create_mcp_server(workspace=tmp_path)
+    data = json.loads(
+        _get_tool_fn(server, "arc_swarmgraph_assess_risk")(task="delete the production database")
+    )["data"]
+    conf = data["confirmation"]
+    assert conf["deterministic"] is True
+    # if the assessment requires confirmation, it must not be auto-allowed (fail-closed)
+    if data["hitl_required"] or data["risk_level"] in {"high", "critical"}:
+        assert conf["requires_confirmation"] is True
+        assert conf["allowed"] is False
