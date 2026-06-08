@@ -176,7 +176,7 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 ### Baseline → Polished Backlog (none-posture · v0.2 polish track)
 
 Full per-item specs (work, files, tests) in `docs/research-findings/baseline-to-polished-backlog-2026-06-08.md`.
-All `Not Started`. DoD gates: 1 UX-states · 2 a11y · 3 parity · 4 tests · 5 perf · 6 security · 7 reliability · 8 docs. Effort S/M/L.
+All rows below reached `Baseline Complete` in Batch 7 (Phases 196–202); v0.2 `Polished Complete` elevation is tracked per row. DoD gates: 1 UX-states · 2 a11y · 3 parity · 4 tests · 5 perf · 6 security · 7 reliability · 8 docs. Effort S/M/L.
 GATED items (auth / native-device / paid-live provider / Linux-KVM host) are intentionally **not** promoted here; they stay in the research doc + R79.1/R79.2.
 
 | ID | Item | Status | DoD · Effort |
