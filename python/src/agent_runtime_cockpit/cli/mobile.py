@@ -149,6 +149,9 @@ def mobile_simulate_cmd(
         None, "--manifest", help="Optional manifest file/directory."
     ),
     trace: str | None = typer.Option(None, "--trace", help="Optional JSONL trace output path."),
+    max_steps: int = typer.Option(
+        500, "--max-steps", help="Maximum steps to simulate (DoD gate 7 reliability cap)."
+    ),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
@@ -177,6 +180,19 @@ def mobile_simulate_cmd(
     except Exception as exc:  # noqa: BLE001
         _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid plan file: {exc}"), json_output)
         raise typer.Exit(1) from exc
+
+    # Gate 7 (reliability): enforce step count limit before simulation to prevent
+    # unbounded CPU/memory use on malformed or adversarially large plans.
+    if len(plan.steps) > max_steps:
+        _out(
+            err(
+                ArcErrorCode.PERMISSION_DENIED,
+                f"Plan has {len(plan.steps)} steps; limit is {max_steps} (use --max-steps to override).",
+                {"step_count": len(plan.steps), "max_steps": max_steps},
+            ),
+            json_output,
+        )
+        raise typer.Exit(1)
 
     extra_capabilities = None
     if manifest:

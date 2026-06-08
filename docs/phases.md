@@ -6667,3 +6667,13 @@ Closes DoD gates 1 and 3 for the mobile CLI surface:
 - **Gate 3 (parity):** CLI `--json` output structurally consistent with Python API: `arc mobile capabilities --json` count matches `list_capabilities()`, `arc mobile validate --json` `ok` matches `validate_manifest().ok`.
 - **Gate 4 (tests):** `test_mobile_dod_gate1_gate3.py` — 7 tests (state=ok, state=error, empty state, 2 parity checks). All passed. Ruff clean.
 - **N/A:** 2,5,6,7,8.
+
+
+## Phase 219 — R-MOBILE-POLISH2: Mobile DoD gate 7 (reliability: timeouts/cancellation)
+
+Closes DoD gate 7 for the mobile CLI surface:
+
+- **Gate 7 (reliability — step count limit):** `arc mobile simulate` now enforces a `--max-steps` limit (default 500) before running the simulation. A plan exceeding the limit returns a structured error envelope (`ok: false`, `error.code: PERMISSION_DENIED`, `error.details.step_count`) and exits 1. Prevents unbounded CPU/memory use on malformed or adversarially large plans. `--max-steps` is documented in `--help`.
+- **Reasoning:** The simulator is pure synchronous static analysis (no network, no I/O) — it doesn't need wall-clock timeouts. The meaningful reliability bound is per-step count, which bounds both time and memory for the simulator loop.
+- **Gate 4 (tests):** `test_mobile_dod_gate7.py` — 3 tests: step limit enforced, passes under limit, option in --help. All passed. Ruff clean.
+- **N/A:** 1,2,3,5,6,8.
