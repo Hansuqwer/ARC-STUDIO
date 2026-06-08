@@ -6460,3 +6460,12 @@ Driving the R-AUDIT audit-fix set to `Polished Complete` against the full DoD. *
 
 **Tier 1 result:** 20 of 25 R-AUDIT items → `Polished Complete`; 5 stay `Baseline Complete` with the documented gaps + closure paths above.
 
+
+## Phase 205 — Tier-2 L-G1: layout-capable a11y color-contrast harness
+
+Built the real-browser color-contrast scan that jsdom (jest-axe) cannot do — `tests/e2e/arc-a11y-contrast.spec.ts`. It boots the Theia IDE via the existing e2e webServer, injects the already-present `axe-core` (3.5.6) via `page.addScriptTag` (no new dependency / no network), runs the `color-contrast` rule, and filters violations to ARC-owned nodes (class `arc-`). This is the reusable harness that can measure WCAG 1.4.3 contrast on the rendered widgets.
+
+- **Result in this environment:** the ARC views/widgets were **not routable** in the local e2e app mode (the existing `arc-smoke.spec.ts` deep-link/tab tests skip on the same condition; they assert in CI where the views route). So the scan **skipped** the target surfaces here — **no passing measurement was obtained against them**.
+- **Decision (labels follow evidence):** **B2P-03, R-AUDIT21, R-AUDIT23, R-AUDIT26 stay `Baseline Complete`.** The L-G1 harness is landed (the hard part), but the contrast gate is only closed once this spec **passes against the target surfaces** — which requires the ARC views routable in the e2e run (CI, or a follow-on that opens the tabbed ARC Studio view in the harness). No contrast claim is made until then.
+- **Closure path:** run this spec where ARC views route (CI e2e), triage any reported ARC color-contrast violations, fix the offending `--arc-*`/badge tokens, then elevate the four gaps with the passing axe evidence.
+
