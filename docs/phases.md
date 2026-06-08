@@ -6469,3 +6469,10 @@ Built the real-browser color-contrast scan that jsdom (jest-axe) cannot do — `
 - **Decision (labels follow evidence):** **B2P-03, R-AUDIT21, R-AUDIT23, R-AUDIT26 stay `Baseline Complete`.** The L-G1 harness is landed (the hard part), but the contrast gate is only closed once this spec **passes against the target surfaces** — which requires the ARC views routable in the e2e run (CI, or a follow-on that opens the tabbed ARC Studio view in the harness). No contrast claim is made until then.
 - **Closure path:** run this spec where ARC views route (CI e2e), triage any reported ARC color-contrast violations, fix the offending `--arc-*`/badge tokens, then elevate the four gaps with the passing axe evidence.
 
+
+### Tier-2 L-G2 — deterministic ARC hardcoded-color contrast guard
+
+Complements L-G1 with a fully-local, deterministic check (`packages/arc-extension/src/browser/__tests__/arc-contrast.test.ts`): ARC's **hardcoded** fg/bg pairs are theme-independent, so their WCAG 2.1 ratios are computed + asserted ≥ AA (4.5:1). Measured: alert-warning 4.96, alert-success 6.99, alert-error 8.25, alert-error-on-tint 10.29, primary-button 7.68 — **all pass AA**. A second guard fails if any un-audited bare-hex `color:` is added to ARC CSS, so hardcoded contrast can't silently regress. arc-extension suite 963 passed/3 skipped (40 suites).
+
+**Scope:** L-G2 gives real AA evidence for ARC's *hardcoded-pair* surfaces (alerts, primary button). The theme-**delegated** colors (risk badges via `--theia-charts-*`) and full rendered surfaces still need the L-G1 browser scan, so **B2P-03, R-AUDIT21, R-AUDIT23, R-AUDIT26 remain Baseline** — L-G2 narrows the unmeasured surface but does not flip them.
+
