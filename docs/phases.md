@@ -1307,8 +1307,8 @@ bash scripts/check-pr.sh
 ### Known Risks
 - Task expiry may cause confusion if users expect long-lived tasks.
 - Retry policy must be idempotent-safe (retry should not cause duplicate side effects).
-- SSE notifications deferred — clients must poll for status updates.
-- Task execution currently uses placeholder operations (TODO: integrate with actual run/trace/audit commands).
+- Task lifecycle events are published to the event bus (subscribable); a dedicated HTTP SSE endpoint stays out of scope (stdio MCP; HTTP gated).
+- Task execution runs REAL run/trace/audit/eval operations (runtime_router + JsonlTraceStore); guarded by test_task_real_ops.py.
 
 ## Phase 28 — LangGraph Durable Execution + Replay Contract
 
@@ -6149,5 +6149,15 @@ This is the final slice. The full provider-resilience surface is now implemented
 - **T9/T10 (B2P-02):** `KnownTraceEventType` expanded to the full 69-type canonical registry via a runtime const array; consolidated `TERMINAL_TRACE_EVENT_TYPES` into the shared protocol; registry-parity guard test.
 
 **Status:** Baseline Complete | Evidence: commits 1bed47e / 909ac08 / 60355fa / 23b709e / 933e035 + this; `pnpm --filter arc-extension` build clean + 956 passed/3 skipped | Notes: additive; none-posture; banned-claims green.
+
+---
+
+## Phase 198 — Batch 7 Track C: MCP control plane (T11–T15)
+
+- **T11 (B2P-05):** SwarmGraph MCP tool wrappers (`arc_swarmgraph_plan` + `arc_swarmgraph_assess_risk`) routed through the D-02 risk gate.
+- **T12–T14 (B2P-04):** IDE MCP client — `arc mcp call` (in-process, risk-gated, fail-closed) + `ArcService.invokeMcpTool` + McpWorkbench Invoke panel + generation-guard cancellation + contract/e2e tests.
+- **T15 (B2P-07):** verified MCP task execution is REAL (run/trace/audit/eval via runtime_router + JsonlTraceStore) and publishes lifecycle events to the event bus (subscribable; `test_task_sse_events.py`); corrected stale placeholder/SSE-deferred notes; added `test_task_real_ops.py` regression guard.
+
+**Status:** Baseline Complete | Evidence: commits 28c4540 / f45c004 / daf30c7 / d46a20b + this; MCP server 31 + `arc mcp call` 4 + invoke 4 + task 29 tests; arc-extension 960 passed/3 skipped | Notes: stdio MCP control plane; deterministic; none-posture; HTTP transport stays gated.
 
 ---

@@ -186,7 +186,7 @@ GATED items (auth / native-device / paid-live provider / Linux-KVM host) are int
 | B2P-03 | Real-component jest-axe a11y coverage (not mocks) | Baseline Complete | 2,4 · M |
 | B2P-04 | MCP live invocation from IDE (loopback client through risk gate) | Baseline Complete | 1,3,6,7 · L |
 | B2P-05 | SwarmGraph MCP tool wrappers | Baseline Complete | 3,4,6 · M |
-| B2P-07 | MCP task notifications + real task exec (replace placeholder ops) | Not Started | 1,4,7 · M |
+| B2P-07 | MCP task notifications + real task exec (replace placeholder ops) | Baseline Complete | 1,4,7 · M |
 | B2P-08 | Runtime-wide high/critical confirmation enforcement | Not Started | 6 · M |
 | B2P-09 | Real-time budget enforcement at adapter effect boundaries | Not Started | 5,6,7 · L |
 | B2P-10 | Type the intentionally-untyped run events | Baseline Complete | 4 · S |
@@ -671,7 +671,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - ✅ Task result storage (SQLite)
 - ✅ Configurable task expiry (default 24 hours)
 - ✅ Retry policy support (exponential backoff, max 3 retries)
-- ⚠️ SSE notifications for task state changes — deferred (polling-based for baseline)
+- ✅ Task lifecycle events (state-changed/completed/failed) published to the in-process event bus (subscribable; replaces pure polling). A dedicated HTTP SSE endpoint stays out of scope — the MCP control plane is stdio-only (HTTP transport gated).
 
 **Acceptance:**
 - ✅ Client creates task and receives task ID immediately
@@ -680,7 +680,7 @@ Daemon parity audit: core inspection/runtime/workflow/schema/run/provider/diff/e
 - ✅ Failed tasks retry with exponential backoff
 - ✅ Works via CLI and MCP (daemon API integration deferred)
 
-**Status:** Baseline Complete | Evidence: `python/src/agent_runtime_cockpit/tasks/` (models.py, storage.py, executor.py), `python/src/agent_runtime_cockpit/cli/task.py`, MCP tools in server.py, 65 tests in `python/tests/tasks/` | Notes: Core task system complete. SSE notifications and full daemon API integration deferred. Task execution uses placeholder operations (integration with actual run/trace/audit commands pending).
+**Status:** Baseline Complete | Evidence: `python/src/agent_runtime_cockpit/tasks/` (models.py, storage.py, executor.py), `python/src/agent_runtime_cockpit/cli/task.py`, MCP tools in server.py, 65 tests in `python/tests/tasks/` | Notes: Core task system complete; task execution runs REAL run/trace/audit/eval operations (runtime_router + JsonlTraceStore) and publishes lifecycle events to the event bus (subscribable; test_task_sse_events.py). A dedicated HTTP SSE endpoint + full daemon API integration stay out of scope (stdio MCP; HTTP gated).
 
 **Source:** Feature List F2.2
 
