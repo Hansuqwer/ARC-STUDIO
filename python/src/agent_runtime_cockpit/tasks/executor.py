@@ -251,6 +251,20 @@ class TaskExecutor:
         store = JsonlTraceStore(workspace / ".arc" / "traces")
         store.save(run)
 
+        # B2P-19: write a keyed (HMAC) audit checkpoint for this run path (no-op without a key).
+        try:
+            from ..audit.run_keyed_audit import write_run_keyed_audit
+
+            write_run_keyed_audit(
+                run.id,
+                status=run.status.value,
+                workflow_id=run.workflow_id,
+                event_count=len(run.events),
+                workspace_root=workspace,
+            )
+        except Exception:  # noqa: BLE001 - audit is best-effort; never break the run
+            log.debug("keyed run audit checkpoint skipped", exc_info=True)
+
         return {
             "run_id": run.id,
             "status": run.status.value,

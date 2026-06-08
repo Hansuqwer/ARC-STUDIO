@@ -6161,3 +6161,13 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: commits 28c4540 / f45c004 / daf30c7 / d46a20b + this; MCP server 31 + `arc mcp call` 4 + invoke 4 + task 29 tests; arc-extension 960 passed/3 skipped | Notes: stdio MCP control plane; deterministic; none-posture; HTTP transport stays gated.
 
 ---
+
+## Phase 199 — Batch 7 Track D: runtime confirmation, budget, keyed audit (T16–T19)
+
+- **T16 (B2P-08):** deterministic high/critical adaptive-confirmation gate + audit (`security/adaptive_confirmation.py`); wired into `arc swarmgraph assess-risk`.
+- **T17/T18 (B2P-09):** shared budget effect-boundary gate `budget_checkpoint` (`adapters/_shared.py`) + real-`BudgetEnforcer` exhaustion-interrupt tests.
+- **T19 (B2P-19):** shared keyed (HMAC) run-audit checkpoint helper `write_run_keyed_audit` (`audit/run_keyed_audit.py`) wired into the task-executor run path; write→verify + tamper-detect + no-key-noop tests.
+
+**Status:** Baseline Complete | Evidence: commits e12484e / c0318dc / f39fbf5 / a70484a + this; 6 confirmation + 5 budget-gate + 3 keyed-audit + 25 task-executor tests | Notes: deterministic; none-posture. The non-negotiable scope boundary stands — **no adapter-wide keyed-audit claim**; per-run-path adoption of the shared helper proceeds incrementally.
+
+---
