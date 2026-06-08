@@ -202,6 +202,11 @@ def assess_risk_cmd(
         "--workspace-trusted/--no-workspace-trusted",
         help="Whether the workspace is trusted (default: true)",
     ),
+    approve: bool = typer.Option(
+        False,
+        "--approve",
+        help="Explicitly approve a high/critical adaptive decision (required for it to proceed).",
+    ),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
@@ -234,6 +239,14 @@ def assess_risk_cmd(
         "cost_estimate_tokens": assessment.cost_estimate_tokens,
         "rationale": assessment.rationale,
     }
+
+    # B2P-08: enforce confirmation for high/critical adaptive decisions (deterministic + audited).
+    from ..security.adaptive_confirmation import enforce_confirmation
+
+    confirmation = enforce_confirmation(
+        assessment.risk_level, assessment.hitl_required, approved=approve
+    )
+    result["confirmation"] = confirmation.as_dict()
 
     # Handle override
     if override_protocol is not None:
