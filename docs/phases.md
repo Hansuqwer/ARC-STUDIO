@@ -6098,3 +6098,19 @@ This is the final slice. The full provider-resilience surface is now implemented
 **Status:** Baseline Complete | Evidence: local worktree 2026-06-08 | Tests: `test_message_event_registry_parity.py` (4), `test_readme_cli_parity.py` (3), `test_eval_synthetic_labelling.py` (4), `test_mcp_call_decision_event.py` (5); 82 protocol + 128 MCP + 13 eval-CLI tests pass; dod-gate YAML valid + banned-claims clean. | Notes: additive; deterministic; closes the critical-review-v2 backlog.
 
 ---
+
+## Phase 194 — Batch 6 Track C: CLI surfaces for the new mobile modules (C1–C6)
+
+**Goal:** Make the Phase 8/11/12 mobile modules reachable from `arc mobile` (deterministic; simulator-preview).
+
+**Implemented (cli/mobile.py):**
+- **C1** `arc mobile gate evaluate <cap>` — `CapabilityEntryGate` (default-denied; `route=fixtures`).
+- **C2** `arc mobile flags list/enable/disable/kill-switch` — `FeatureFlags` (default-off + kill switch; `--store`).
+- **C3** `arc mobile egress check <cost> --budget` — `EgressGuard` (deterministic; critical class blocked).
+- **C4** `arc mobile queue enqueue/status/flush/gc` — `OfflineQueue` (hash-only, TTL, `--store`).
+- **C5** `arc mobile secure-store put/get/export/delete` — `SecureLocalStore`; **redacted** (value never echoed; `get` → `[REDACTED]`; ciphertext at rest).
+- **C6** `arc mobile audit-retention` — `apply_retention` (TTL/count) + optional rotation on the decisions log.
+
+**Status:** Baseline Complete | Evidence: local worktree 2026-06-08 | Files: `cli/mobile.py`, `tests/test_mobile_cli_batch6.py` (7). Verified: 31 mobile-CLI tests pass; all 6 sub-apps register cleanly (`arc mobile --help`); secure-store test asserts plaintext never appears in output or at-rest file. | Notes: deterministic; simulator-preview; secure-store CLI never reveals plaintext.
+
+---
