@@ -6436,3 +6436,10 @@ Driving the R-AUDIT audit-fix set to `Polished Complete` against the full DoD. *
 - **R-AUDIT20 (SQLite WAL Busy-Timeout):** ✓ WAL + `busy_timeout=5000ms` confirmed in `budget/storage.py` (concurrency reliability); the one remaining `xfail` reason was corrected to reflect the accurate constraint (honest); gate 7 + 4 (`tests/budget/`). N/A 1,2,3,5,6.
 - **Evidence:** `tests/budget/` + `tests/notifications/test_outbox.py` green (1 expected `xfail` for the documented WAL constraint).
 
+### Parity / honest-labelling batch (gate 3/8 + tests) → Polished Complete
+
+- **R-AUDIT10 (SwarmGraph Topology Shape Verification):** ✓ Py↔TS shape parity confirmed (flat `{nodes,edges}`); shape contract commented in the TS consumer; gate 3 + 4 (`tests/test_swarmgraph_topology.py`). N/A 1,2,5,6,7.
+- **R-AUDIT19 (Eval Metrics Honest Labelling):** ✓ `synthetic: bool` on `EvalResult` + `[synthetic/simulated]` prefix in the CLI eval display (no misleading metrics); gate 8 (honest labelling) + 1 (UX) + 4 (`tests/test_eval_synthetic_labelling.py`). N/A 2,5,6,7.
+- **R-AUDIT24 (SDK Version Sweep):** ✓ `sdk_version()` on the base adapter + 8 priority adapters, surfaced in `arc runtimes --capabilities --json` (stable JSON parity); gate 3 + 4 (`tests/adapters/test_arc_runtime_sdk.py`). N/A 1,2,5,6,7.
+- **Evidence:** `test_swarmgraph_topology`, `test_eval_synthetic_labelling`, `test_arc_runtime_sdk` green.
+
