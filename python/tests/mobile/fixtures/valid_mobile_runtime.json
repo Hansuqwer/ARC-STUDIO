@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "test.mobile.runtime",
-  "name": "Test Mobile Runtime",
+  "name": "ARC Mobile Runtime Test",
   "version": "0.1.0",
   "description": "",
   "platforms": [
@@ -390,10 +390,10 @@
       "mcp_exposable": false,
       "simulator_supported": true,
       "test_fixture_supported": true,
-      "requires_trust": false,
+      "requires_trust": true,
       "requires_hitl": false,
       "metadata": {},
-      "capability_hash": "69faa8a42ce9c095fa7ab4bac7f05933582771c963715030be1389fe149cdb1d"
+      "capability_hash": "1780c86e0df85cfe7d1649754635b816cd1661c7140010040c4e57f9bcb0c63f"
     },
     {
       "schema_version": 1,
@@ -417,10 +417,10 @@
       "mcp_exposable": false,
       "simulator_supported": true,
       "test_fixture_supported": true,
-      "requires_trust": false,
+      "requires_trust": true,
       "requires_hitl": false,
       "metadata": {},
-      "capability_hash": "625723fd865c60d72c62ffb0404eae9d9ebbd41345534d3447b79c92815b2f53"
+      "capability_hash": "c81e5b13620c9607f542790aa5888484deba265529b298e219b8bce9bedb9fc2"
     },
     {
       "schema_version": 1,
@@ -508,5 +508,5 @@
   "network_by_default": false,
   "simulator_mode": true,
   "privacy_manifest_intent": true,
-  "manifest_hash": "6b2b448a69ea39e978540250482547e6159ba79627b0a828ee1c79838b199c8d"
+  "manifest_hash": "15d7c2f0056d099254a11594509790efec1e29dcce1d525ffabae992c291b411"
 }

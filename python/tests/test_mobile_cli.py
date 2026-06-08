@@ -167,7 +167,7 @@ class TestMobilePolicyExplain:
                 "policy",
                 "explain",
                 "--capability",
-                "app.memory.write.mock",
+                "app.memory.retrieve.mock",
                 "--json",
             ],
         )

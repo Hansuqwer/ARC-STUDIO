@@ -100,7 +100,8 @@ class TestEnterprisePolicyHook:
             def evaluate(self, decision, context):
                 return None  # defer
 
-        cap = get_capability("app.memory.write.mock")
+        # Use a read-only capability that passes validation without requires_trust
+        cap = get_capability("app.memory.retrieve.mock")
         decision = explain_capability_policy(
             cap, enterprise_hook=PassthroughHook(), log_decision=False
         )

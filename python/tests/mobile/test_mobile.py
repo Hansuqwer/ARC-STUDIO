@@ -433,7 +433,7 @@ class TestStrictMode:
         m = load_manifest(tmp_path)
         assert m.id == "test.lenient"
 
-    def test_v4_write_is_error_in_strict_mode(self):
+    def test_v4_write_is_error_in_all_modes(self):
         from agent_runtime_cockpit.mobile import validate_capability, MobileCapability
 
         cap = MobileCapability(
@@ -446,20 +446,32 @@ class TestStrictMode:
         )
         report_strict = validate_capability(cap, strict=True)
         report_lenient = validate_capability(cap, strict=False)
+        # write_requires_hitl_or_trust is always an error regardless of strict mode
         assert not report_strict.ok
         assert any(
             f.rule == "write_requires_hitl_or_trust" and f.severity == "error"
             for f in report_strict.errors
         )
-        # In lenient mode it is a warning, not an error
-        assert report_lenient.ok
+        assert not report_lenient.ok
         assert any(
-            f.rule == "write_requires_hitl_or_trust" and f.severity == "warning"
-            for f in report_lenient.warnings
+            f.rule == "write_requires_hitl_or_trust" and f.severity == "error"
+            for f in report_lenient.errors
         )
 
 
 class TestDuplicateIds:
+    def test_base_rejects_unknown_fields(self):
+        """_Base uses extra='forbid' — unknown fields must raise ValidationError."""
+        from pydantic import ValidationError
+        from agent_runtime_cockpit.mobile.models import MobileCapability
+
+        with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+            MobileCapability(
+                id="app.custom.mock",
+                name="Test",
+                unknown_surprise_field="evil",
+            )
+
     def test_duplicate_capability_id_rejected_in_validate(self):
         from agent_runtime_cockpit.mobile import (
             MobileCapability,
@@ -563,6 +575,8 @@ class TestCatalogUniqueness:
         caps = list_capabilities()
         ids = [c.id for c in caps]
         assert len(ids) == len(set(ids)), f"Duplicate IDs: {[x for x in ids if ids.count(x) > 1]}"
+
+
 # ── PR4: Trace chain, real timestamps, verify ─────────────────────────────────
 
 
@@ -640,6 +654,8 @@ class TestTraceChain:
         from agent_runtime_cockpit.mobile import hashing
 
         assert "schema_version" not in (hashing.__doc__ or "").lower().split("excludes")[-1][:50]
+
+
 # ── PR5: Redaction list fix + privacy_manifest_intent rename ──────────────────
 
 

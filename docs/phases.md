@@ -6550,3 +6550,14 @@ Tried to bring the adapters widget into the L-G1 rendered scan to reach 4/4. Add
 
 **Decision:** R-AUDIT21 stays **Baseline Complete** (its ARIA roles/labels are in place; the rendered color-contrast pass is the open item). Reaching 4/4 needs a deliberate choice — either move the adapters status view to the `left` panel (a product-placement decision, not a test hack) or enhance the harness to activate main-area widgets via the Theia shell. The scan is wired (`tests/e2e/arc-a11y-contrast.spec.ts`) and skips gracefully until then. **Contrast cluster: 3/4 closed (B2P-03, R-AUDIT23, R-AUDIT26).**
 
+
+
+## Phase 207 — Mobile SDK Audit Hardening: extra=forbid + write_requires_hitl ERROR + capability trust gates
+
+Closed three remaining High/Medium audit findings from `AUDIT_REPORT_2026-06-07.md`:
+
+- **Audit #1 — `_Base` extra=forbid:** `models._Base` changed from `extra="ignore"` to `extra="forbid"` — unknown fields in any mobile model now raise `ValidationError` rather than silently dropping. `manifest.load_manifest(strict=False)` updated to strip unknown top-level keys before `model_validate` (preserving lenient-load forward-compat for schema migration). `_StrictBase` kept as an alias. Gate 6 (security): unknown-field injection path closed. New test `test_base_rejects_unknown_fields` asserts the guard.
+- **Audit #8 — `write_requires_hitl_or_trust` always ERROR:** Removed the `if strict else "warning"` branch — write capabilities without HITL or trust now always produce a severity=`"error"` finding regardless of strict mode. Updated `test_v4_write_is_error_in_all_modes` to assert both strict and lenient paths fail. Gate 6 (security): governance rule is now fail-closed.
+- **Capability compliance:** Two mock write capabilities (`device.notifications.schedule.mock`, `app.memory.write.mock`) were missing `requires_trust=True` — now added. Fixture JSON regenerated. Policy/CLI tests updated to use read-only capability where write-without-trust was incorrectly expected to pass.
+- **Gate 4 (tests):** 308 mobile tests passed; ruff clean.
+- **N/A:** 1 (UX states — internal model change), 2 (a11y), 3 (parity — behavior-preserving), 5 (perf), 7 (reliability), 8 (docs).

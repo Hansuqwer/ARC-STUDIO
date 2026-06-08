@@ -141,7 +141,7 @@ def _validate_capability(cap: MobileCapability, *, strict: bool = False) -> list
                 ValidationFinding(
                     rule="write_requires_hitl_or_trust",
                     field="requires_hitl",
-                    severity="error" if strict else "warning",
+                    severity="error",
                     message=f"Write capability '{cap.id}' should require HITL or trust.",
                     remediation="Set requires_hitl=True or requires_trust=True.",
                 )

@@ -219,6 +219,7 @@ MOCK_CAPABILITIES: list[MobileCapability] = [
             network=False,
             background=False,
             auditable=True,
+            requires_trust=True,
             simulator_supported=True,
             test_fixture_supported=True,
         )
@@ -238,6 +239,7 @@ MOCK_CAPABILITIES: list[MobileCapability] = [
             background=False,
             auditable=True,
             replayable=True,
+            requires_trust=True,
             simulator_supported=True,
             test_fixture_supported=True,
         )

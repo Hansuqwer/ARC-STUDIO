@@ -17,11 +17,16 @@ MOBILE_CAPABILITY_ID_PATTERN = r"^[a-z][a-z0-9]*(\.[a-z][a-z0-9_]*)+$"
 
 
 class _Base(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    """Base model — rejects unknown fields. Use model_validate(data) directly.
+    For lenient loading (ignoring unknown keys), strip them before validation —
+    see manifest.load_manifest(strict=False) which pre-filters unknown keys.
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class _StrictBase(BaseModel):
-    """Strict variant — rejects unknown fields. Use via load_manifest(strict=True)."""
+    """Strict variant — rejects unknown fields. Alias of _Base; kept for compat."""
 
     model_config = ConfigDict(extra="forbid")
 

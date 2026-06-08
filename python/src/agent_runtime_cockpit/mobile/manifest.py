@@ -19,6 +19,12 @@ class MobileManifestLoadError(ValueError):
     pass
 
 
+def _strip_unknown_keys(data: dict, model_class: type) -> dict:  # type: ignore[type-arg]
+    """Return a copy of data with keys not in model_class.model_fields removed."""
+    known = set(model_class.model_fields)
+    return {k: v for k, v in data.items() if k in known}
+
+
 def load_manifest(path: str | Path, *, strict: bool = False) -> MobileRuntimeManifest:
     p = Path(path)
     if p.is_dir():
@@ -47,7 +53,9 @@ def load_manifest(path: str | Path, *, strict: bool = False) -> MobileRuntimeMan
                     f"Manifest has unknown fields (strict mode): {sorted(unknown)}"
                 )
         else:
-            manifest = MobileRuntimeManifest.model_validate(data)
+            # Lenient: strip unknown top-level keys before validation so _Base extra="forbid"
+            # doesn't reject forward-compat manifests from newer schema versions.
+            data = _strip_unknown_keys(data, MobileRuntimeManifest)
         manifest = MobileRuntimeManifest.model_validate(data)
     except MobileManifestLoadError:
         raise
