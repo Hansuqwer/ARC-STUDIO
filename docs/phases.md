@@ -7224,3 +7224,83 @@ All five follow T1+T2+T3(deferred) pattern with consistent gate evidence:
 - **Gate 7 (reliability):** Offline path (default) is fully deterministic. Real path is opt-in and documented.
 - **Gate 8 (docs):** README Runtime Adapters section. `arc run --help`. Local-real smoke documented. Banned-claims clean (no "production-grade SwarmGraph" claims — R79.1/R79.2 remain terminal-gated).
 - **N/A:** 2, 5.
+
+
+## Phase 245 — Elevate R39/R40/R41/R42/R43 to Polished Complete
+
+All five items delivered in Phases 41–45. Shared gate pattern: CLI-only or TUI surfaces, deterministic, offline-first.
+
+### R39 (Interactive CLI/UX Foundation) → Polished Complete
+- **Gate 1 (UX states):** Slash command registry, approval UX, progress rendering, REPL error boundary — explicit states on all REPL commands.
+- **Gate 3 (parity):** Advisory locking + read-only IDE session bridge consistent across CLI and IDE.
+- **Gate 4 (tests):** 2846 Python tests (Phase 41-45). Slash command registry tests. OpenCode/Claude Code parity: target, not claimed.
+- **Gate 7 (reliability):** REPL error boundary catches all command errors. Advisory lock on write operations.
+- **N/A:** 2, 5, 6, 8.
+
+### R40 (CLI/UX Polish & Advanced Features) → Polished Complete
+- **Gate 1 (UX states):** P0 CLI: pipelines, aliases, batch mode. IDE write bridge on advisory lock.
+- **Gate 7 (reliability):** IDE write bridge (Phase 46) uses `arc studio sessions write` → daemon with fcntl fallback.
+- **Gate 4 (tests):** Phase 42 tests; 2846+ passing.
+- **N/A:** 2, 5, 6, 8.
+
+### R41 (Advisory Locking + IDE Session Bridge) → Polished Complete
+- **Gate 7 (reliability):** POSIX `fcntl.flock` advisory lock. Atomic writes. Daemon-first session writes with CLI fallback. `LOCK_CONTENTION` error code. Windows: single-writer best-effort (ADR-025).
+- **Gate 6 (security):** Atomic write pattern — no partial writes visible. Lock prevents concurrent corruption.
+- **Gate 4 (tests):** Phase 43+46+47. Lock contention tests.
+- **N/A:** 1, 2, 3, 5, 8.
+
+### R42 (Slash Registry Expansion + REPL Error Boundary) → Polished Complete
+- **Gate 1 (UX states):** `/help` rebuilt as grouped palette (SESSION/RUN/SANDBOX/POLICY/WORKSPACE/PROVIDERS/AUDIT/TASKS/MCP). Per-command error boundary. Empty palette state gone (Phase 175 R-POLISH17).
+- **Gate 4 (tests):** Phase 44. 2828 Python tests. All P0/P1 commands verified.
+- **N/A:** 2, 3, 5, 6, 7, 8.
+
+### R43 (Approval + Progress + Error UX) → Polished Complete
+- **Gate 1 (UX states):** Render-state prefixes: `[ok]`/`[denied]`/`[blocked]`/`[empty]`/`[error]`. Interactive y/N prompt for NETWORK/INSTALL/UNKNOWN. DESTRUCTIVE/PRIVILEGED hard-denied.
+- **Gate 6 (security):** Audit events for all deny paths. DESTRUCTIVE hard-denied without override.
+- **Gate 4 (tests):** Phase 45. 2846 Python tests.
+- **N/A:** 2, 3, 5, 7, 8.
+
+## Phase 246 — Elevate R44 + R45-R55 era-2 batch to Polished Complete
+
+### R44 (IDE Write Bridge / Daemon Protocol) → Polished Complete
+- **Gate 7 (reliability):** Phase 46 CLI bridge + Phase 47 daemon HTTP bridge. `arc studio sessions write/delete/update` with daemon-first + CLI fallback. `session_changed` event. ADR-025 Windows lock posture.
+- **Gate 6 (security):** Session writes confined to workspace path. Daemon HTTP bridge is loopback-only.
+- **Gate 4 (tests):** Phase 46+47 tests. Session bridge tests.
+- **N/A:** 1, 2, 3, 5, 8.
+
+### R45-R55 (era-2 batch) → Polished Complete
+This batch covers: Trace-Aware Review, Plan/Apply, Command/Approval Centre, MCP Workbench, Workspace Intelligence, Theia cleanup, Capability/MCP risk gates, CI Guardrails, Consensus differentiators, Notifications+DAG planner, Eval→Policy, AGENTS.md/SKILL.md.
+
+- **Gate 1 (UX states):** All IDE tabs have explicit loading/empty/error/populated states (RunsTab, McpWorkbenchTab, CiGuardrailsTab, AssuranceTab — all with ErrorBoundary and useAsyncState). ARC CI Guardrails: structured pass/fail/degraded states. Eval-to-policy: dry-run state explicit.
+- **Gate 2 (a11y):** B2P-03/R-AUDIT23/R-AUDIT26 → Polished Complete (Phase 206). All tabs in rendered axe scan.
+- **Gate 3 (parity):** `arc eval recommend-apply` CLI ↔ IDE eval policy tab. `arc agents-md discover` ↔ IDE context drawer (ArcContextDrawer — R-AUDIT16 Polished). `arc workspace search` ↔ IDE workspace search panel (R-AUDIT18 Polished). CI guardrails: `arc ci check --json --private` ↔ IDE CI tab.
+- **Gate 4 (tests):** R53 (Phase 53+107-109): 3705 Python tests, SwarmGraph notification/DAG tests. R54 (Phase 54): eval-to-policy 22 apply tests. R55 (Phase 55): context 32 tests. Capability/risk gate: 266 MCP tests. CI guardrails tests.
+- **Gate 5 (perf):** McpWorkbenchTab decisions bounded. Workspace search capped at 1000. Live event buffers bounded (Phases 167/215).
+- **Gate 6 (security):** MCP per-call deterministic risk gate. CI guardrails (`--private` flag). Eval profiles append-only (no overwrite of builtins). AGENTS.md ingestion: path-confined, redaction-applied.
+- **Gate 7 (reliability):** Notification outbox durable JSONL with TTL (R-AUDIT11 Polished). DAG planner deterministic. Eval policy apply idempotent.
+- **Gate 8 (docs):** `arc agents-md --help`, `arc ci check --help`, `arc eval recommend-apply --help`. Banned-claims: no broad provider-backed adoption claims.
+
+## Phase 247 — Elevate R53-R65 era-3 batch to Polished Complete
+
+### R53 (era-3: Local Sandbox Audit Query + Compaction) → Polished Complete
+- **Gate 6 (security):** `arc sandbox audit-compact` now `--yes`-gated (Phase 164 R-POLISH6). Audit query is read-only.
+- **Gate 4 (tests):** Audit query + compaction tests. 22 audit-query tests.
+- **N/A:** 1, 2, 3, 5, 7, 8.
+
+### R54 (era-3: Container Isolation Provider) → Polished Complete
+- **Gate 6 (security):** Container sandbox disabled unless `ARC_ENABLE_CONTAINER_SANDBOX=1`. Gated fallback only — not default.
+- **Gate 7 (reliability):** Isolation doctor preflight checks.
+- **Gate 4 (tests):** Isolation status + doctor tests. `arc isolation status` + `arc isolation doctor`.
+- **N/A:** 1, 2, 3, 5, 8.
+
+### R55 (era-3: Local Sandbox Policy YAML) → Polished Complete
+- **Gate 6 (security):** Policy YAML deny-by-default. `arc policy explain` shows what a command would do. Path confinement inherited from sandbox.
+- **Gate 4 (tests):** Policy explain tests.
+- **N/A:** 1, 2, 3, 5, 7, 8.
+
+### R56–R65 (Edit Loop / Patch Engine batch) → Polished Complete
+- **Gate 1 (UX states):** EditPlansTab: loading/empty/error/populated states with useAsyncState (Phase 212). Edit loop CLI: `[ok]`/`[denied]`/`[blocked]` prefixes (R43). `/diff`, `/apply`, `/test` REPL commands with structured states.
+- **Gate 6 (security):** Edit apply safety-gated (sandbox plan policy + existing audit helpers — R56). Hash-based staleness guard — stale edit denied before writing (R59). Multi-file bundle scoped approval token (R61). MicroVM blocking emits denial audit events (R65). Text-only patch, fail-closed on malformed/binary (R64).
+- **Gate 7 (reliability):** Edit apply checks original/replacement hashes before writing (R60). Doctor/preflight separates runtime readiness from public execution readiness (R65). Hunk range validation fail-closed (R64).
+- **Gate 4 (tests):** Phases 85-94: agentic edit loop, UX polish, tool unification, staleness guard, plan apply, bundle approval, IDE review, diff/apply/test REPL, patch engine, sandbox truth audit guard.
+- **N/A:** 2, 3, 5, 8.
