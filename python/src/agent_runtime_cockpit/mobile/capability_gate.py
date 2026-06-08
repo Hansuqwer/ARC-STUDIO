@@ -16,7 +16,11 @@ No LLM, no network.
 
 from __future__ import annotations
 
+import json
+import logging
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from .approval import get_grant
@@ -25,6 +29,28 @@ from .signing import SignedPlanEnvelope, verify_plan
 
 # The only route this build will ever use. Real-device routing is intentionally absent.
 FIXTURES_ROUTE = "fixtures"
+
+_GATE_AUDIT_LOG = Path.home() / ".arc" / "mobile" / "gate_decisions.jsonl"
+_log = logging.getLogger(__name__)
+
+
+def _append_gate_audit(capability_id: str, decision: "GateDecision") -> None:
+    """Append a gate decision entry to the audit log (gate 6: deterministic, non-blocking)."""
+    try:
+        _GATE_AUDIT_LOG.parent.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "capability_id": capability_id,
+            "eligible": decision.eligible,
+            "route": decision.route,
+            "missing": decision.missing,
+            "reason": decision.reason,
+            "simulator_preview": decision.simulator_preview,
+            "logged_at": datetime.now(timezone.utc).isoformat(),
+        }
+        with _GATE_AUDIT_LOG.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry) + "\n")
+    except Exception as exc:  # noqa: BLE001
+        _log.debug("Gate audit append failed (non-fatal): %s", exc)
 
 
 @dataclass
@@ -100,12 +126,19 @@ class CapabilityEntryGate:
 
     def execute(self, capability_id: str, **kwargs: Any) -> dict[str, Any]:
         """Always returns a fixtures route descriptor. Even an eligible capability does NOT
-        reach real device APIs in this build — that flip is human-gated and out of scope."""
+        reach real device APIs in this build — that flip is human-gated and out of scope.
+
+        Gate 6 (security): appends a deterministic audit entry to the decisions log on every
+        execute call, whether eligible or denied.
+        """
         decision = self.evaluate(capability_id, **kwargs)
-        return {
+        result = {
             "capability_id": capability_id,
             "route": FIXTURES_ROUTE,  # never real device
             "eligible": decision.eligible,
             "executed_real_device": False,
             "decision": decision.as_dict(),
         }
+        # Append to decisions audit log (gate 6: audit on every execute)
+        _append_gate_audit(capability_id, decision)
+        return result

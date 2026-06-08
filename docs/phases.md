@@ -6677,3 +6677,14 @@ Closes DoD gate 7 for the mobile CLI surface:
 - **Reasoning:** The simulator is pure synchronous static analysis (no network, no I/O) — it doesn't need wall-clock timeouts. The meaningful reliability bound is per-step count, which bounds both time and memory for the simulator loop.
 - **Gate 4 (tests):** `test_mobile_dod_gate7.py` — 3 tests: step limit enforced, passes under limit, option in --help. All passed. Ruff clean.
 - **N/A:** 1,2,3,5,6,8.
+
+
+## Phase 220 — R-MOBILE-POLISH3: Mobile DoD gate 6 (security: signed plan + RBAC audit)
+
+Closes DoD gate 6 for the mobile capability gate:
+
+- **Gate 6 (security — audit appended on execute):** `CapabilityEntryGate.execute()` now appends a deterministic audit entry to `~/.arc/mobile/gate_decisions.jsonl` on every call — both eligible and denied. Previously the gate was not appended to any audit log. Entry includes `capability_id`, `eligible`, `route`, `missing`, `reason`, `logged_at`. Non-blocking: any I/O error is debug-logged, never fatal.
+- **Gate 6 (security — deterministic):** Confirmed: gate evaluate/execute never calls LLM, never uses probabilistic scoring — the decision is a pure deterministic boolean over flags + signed_plan + grant + compliance. `signed_plan_invalid` is the default missing reason (deny without signed plan).
+- **Gate 6 (security — fixtures-only):** `executed_real_device: false` always asserted in execute result. No real device APIs reachable in this build.
+- **Gate 4 (tests):** `test_mobile_dod_gate6.py` — 4 tests: gate denies without signed plan, always routes fixtures, audit appended on execute, audit appended on both allow and deny. All passed. Ruff clean.
+- **N/A:** 1,2,3,5,7,8.
