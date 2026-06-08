@@ -6688,3 +6688,34 @@ Closes DoD gate 6 for the mobile capability gate:
 - **Gate 6 (security — fixtures-only):** `executed_real_device: false` always asserted in execute result. No real device APIs reachable in this build.
 - **Gate 4 (tests):** `test_mobile_dod_gate6.py` — 4 tests: gate denies without signed plan, always routes fixtures, audit appended on execute, audit appended on both allow and deny. All passed. Ruff clean.
 - **N/A:** 1,2,3,5,7,8.
+
+
+## Phase 221 — R-MOBILE-POLISH4: Elevate R-MOBILE-B5-P8 + R-MOBILE-HARDEN to Polished Complete
+
+All DoD gates cited for both roadmap items. Labels follow evidence.
+
+### R-MOBILE-B5-P8 → Polished Complete
+
+Phase 188 delivered: real encryption-at-rest (Fernet), budget-bound egress guard (critical blocked), durable hash-only offline queue (TTL+FIFO). Per-gate evidence:
+
+- **Gate 1 (UX states):** `arc mobile` CLI outputs use `ok()`/`err()` envelopes with explicit `"state"` fields (Phase 218). Egress guard and offline queue expose `"state": "ok"/"error"` via CLI (Phases 218, batch 6 track C). Loading/empty/error/success states present on all surfaces.
+- **Gate 2 (a11y):** N/A — CLI-only surface; no IDE widget or TUI view for this component.
+- **Gate 3 (parity):** CLI `--json` output structurally matches Python API (Phase 218 gate 3 parity tests). `egress-guard check` and `offline-queue` commands match Python EgressGuard/OfflineQueue behavior.
+- **Gate 4 (tests):** 22 tests (Phase 188) + 7 DoD gate 1/3 parity tests (Phase 218) + 3 gate 7 tests (Phase 219) + 4 gate 6 tests (Phase 220). 324 mobile tests passing.
+- **Gate 5 (perf):** Offline queue bounded: TTL+FIFO retention with configurable max. EgressGuard is deterministic budget check (no I/O in hot path). No unbounded buffers.
+- **Gate 6 (security):** Fernet encryption-at-rest (no plaintext). Budget-bound egress (critical blocked deterministically). Audit appended on gate execute (Phase 220). Secrets redacted in audit/log (redaction.py). Write capabilities require trust (Phase 207).
+- **Gate 7 (reliability):** Simulate step count limit (Phase 219). Queue TTL/FIFO prevents unbounded growth. EgressGuard fail-closed on budget exhaustion.
+- **Gate 8 (docs):** README Mobile SDK section + CLI reference (Phase 217). `--help` accurate on all mobile commands.
+
+### R-MOBILE-HARDEN → Polished Complete
+
+Phase 195 delivered: simulate-through-gate, signed tenant RBAC/ABAC overlay, mypy gate for 9 modules, REAL_VS_MOCK refresh, property/fuzz tests (7 hypothesis tests). Per-gate evidence:
+
+- **Gate 1 (UX states):** Same as R-MOBILE-B5-P8 (shared CLI surface with explicit state fields).
+- **Gate 2 (a11y):** N/A — CLI-only.
+- **Gate 3 (parity):** Gate evaluate routes to fixtures deterministically; CLI matches Python API (Phase 218).
+- **Gate 4 (tests):** 115 mobile tests (Phase 195, 7 property/fuzz) + 324 passing now. mypy clean (Phase 195).
+- **Gate 5 (perf):** Simulate-through-gate is bounded (max_steps=500, Phase 219). Property tests cover edge cases.
+- **Gate 6 (security):** Signed plan required (capability_gate.py). RBAC/ABAC via EnterprisePolicyHook. Audit on execute (Phase 220). Deterministic (no LLM). Fixtures-only (`executed_real_device: false`).
+- **Gate 7 (reliability):** Step count limit (Phase 219). Gate evaluate fail-closed on missing criteria (Phase 195). Property tests confirm edge-case reliability.
+- **Gate 8 (docs):** README + CLI reference (Phase 217). mypy clean + banned-claims passing.
