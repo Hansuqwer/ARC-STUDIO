@@ -6211,3 +6211,10 @@ Driving selected Batch 7 `Baseline Complete` items to `Polished Complete` agains
 - **Gate 8 (docs):** ✓ `INTENTIONALLY_UNTYPED_TS_EVENTS` rationale map is self-documenting; this entry + roadmap row updated; `check-banned-claims.sh` clean.
 - **N/A:** 1 UX-states, 2 a11y, 5 perf — no user-visible surface (cross-language protocol contract). 6 security, 7 reliability — no security decision or long-running/bridged action.
 
+### B2P-18 — doctor/daemon orphan-route fates → Polished Complete
+
+- **Gate 3 (parity):** ✓ `tests/web/test_route_fate_parity.py` now ties the registry to real code: every registry route resolves to a literal prefix present in `web/routes.py` (no phantom entries), and each `cli-added` fate is backed by an actual CLI command (`arc runs links`). The polish pass also **caught and corrected a mislabel** — `/api/context/pack` was `cli-added` but has no CLI/canonical-IDE consumer (only the archived legacy extension), so it is now `daemon-only-deprecated`.
+- **Gate 4 (tests):** ✓ `uv run pytest tests/web/test_route_fate_parity.py` → 5 passed (every orphan terminal-fated, no unresolved orphans, 410-in-code, registry↔routes parity, cli-added backing).
+- **Gate 8 (docs):** ✓ `route_fates.py` registry is the documented source of fate truth; this entry + roadmap row; banned-claims clean.
+- **N/A:** 1 UX-states, 2 a11y, 5 perf — no user-visible surface. 6 security, 7 reliability — audit guard over static route metadata, no runtime decision/action.
+

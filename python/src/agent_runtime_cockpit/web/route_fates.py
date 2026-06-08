@@ -18,7 +18,7 @@ VALID_FATES: frozenset[str] = frozenset(
 ORPHAN_ROUTE_FATES: dict[str, str] = {
     "GET /api/runs/start": "removed-410",  # GET removed (410 Gone); use POST /api/runs/start
     "/api/runs/{run_id}/links": "cli-added",  # arc runs links
-    "/api/context/pack": "cli-added",  # arc context pack
+    "/api/context/pack": "daemon-only-deprecated",  # no active CLI/canonical-IDE consumer (only the archived legacy extension)
     "/api/telemetry/export/{run_id}": "daemon-only-deprecated",
     "/api/providers/accounts/{account_id}/test": "daemon-only-deprecated",
     "/api/sse/proof": "daemon-only-deprecated",

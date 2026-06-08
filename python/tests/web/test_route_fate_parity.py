@@ -27,3 +27,39 @@ def test_get_runs_start_is_gone_410_in_code() -> None:
     src = routes.read_text(encoding="utf-8")
     assert "/api/runs/start is removed" in src
     assert "410" in src
+
+
+def _routes_src() -> str:
+    from pathlib import Path
+
+    routes = Path(__file__).parents[2] / "src" / "agent_runtime_cockpit" / "web" / "routes.py"
+    return routes.read_text(encoding="utf-8")
+
+
+def _literal_prefix(route_key: str) -> str:
+    """Strip the optional 'GET '/'POST ' verb and any '{param}'/'*' tail to a literal prefix."""
+    path = route_key.split(" ", 1)[1] if route_key[:1].isalpha() else route_key
+    for sep in ("{", "*"):
+        if sep in path:
+            path = path.split(sep, 1)[0]
+    return path.rstrip("/") or path
+
+
+def test_every_registry_route_exists_in_daemon_source() -> None:
+    # Parity (gate 3): the fate registry must reference REAL daemon routes — no phantom entries.
+    src = _routes_src()
+    for route in ORPHAN_ROUTE_FATES:
+        prefix = _literal_prefix(route)
+        assert prefix in src, f"registry route {route!r} (prefix {prefix!r}) not found in routes.py"
+
+
+def test_cli_added_routes_have_a_real_cli_analog() -> None:
+    # Parity (gate 3): a 'cli-added' fate must be backed by an actual CLI command, not aspiration.
+    from pathlib import Path
+
+    cli = Path(__file__).parents[2] / "src" / "agent_runtime_cockpit" / "cli"
+    cli_added = [r for r, f in ORPHAN_ROUTE_FATES.items() if f == "cli-added"]
+    # /api/runs/{run_id}/links -> `arc runs links`
+    assert "/api/runs/{run_id}/links" in cli_added
+    runs_src = (cli / "runs.py").read_text(encoding="utf-8")
+    assert '@runs_app.command("links")' in runs_src
