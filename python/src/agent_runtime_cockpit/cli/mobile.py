@@ -991,3 +991,70 @@ def mobile_egress_check_cmd(
     guard = EgressGuard(budget_bytes=budget)
     decision = guard.check(cost, classification)
     _out(ok(decision.as_dict()), json_output)
+
+
+mobile_queue_app = typer.Typer(name="queue", help="Mobile offline queue (durable, hash-only, TTL)")
+mobile_app.add_typer(mobile_queue_app)
+
+_DEFAULT_QUEUE_STORE = ".arc/mobile/offline_queue.json"
+
+
+def _queue(store: str, max_entries: int = 1000):
+    from ..mobile import OfflineQueue
+
+    return OfflineQueue(path=Path(store), max_entries=max_entries)
+
+
+@mobile_queue_app.command("enqueue")
+def mobile_queue_enqueue_cmd(
+    capability_id: str = typer.Argument(...),
+    payload: str = typer.Option("{}", "--payload", help="JSON payload (stored hash-only)."),
+    ttl: int = typer.Option(None, "--ttl", help="TTL seconds (optional)."),
+    store: str = typer.Option(_DEFAULT_QUEUE_STORE, "--store"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Enqueue an action (only a SHA-256 hash + metadata is stored — no raw payload)."""
+    _setup_logging(debug)
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid --payload JSON: {exc}"), json_output)
+        raise typer.Exit(1) from exc
+    entry = _queue(store).enqueue(capability_id, data, ttl_seconds=ttl)
+    _out(ok(entry.as_dict()), json_output)
+
+
+@mobile_queue_app.command("status")
+def mobile_queue_status_cmd(
+    store: str = typer.Option(_DEFAULT_QUEUE_STORE, "--store"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show pending queue entries (hash-only)."""
+    _setup_logging(debug)
+    q = _queue(store)
+    _out(ok({"pending": len(q), "entries": [e.as_dict() for e in q.pending()]}), json_output)
+
+
+@mobile_queue_app.command("flush")
+def mobile_queue_flush_cmd(
+    store: str = typer.Option(_DEFAULT_QUEUE_STORE, "--store"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Flush all ready (non-expired) entries and clear the queue."""
+    _setup_logging(debug)
+    flushed = _queue(store).flush()
+    _out(ok({"flushed": len(flushed), "entries": [e.as_dict() for e in flushed]}), json_output)
+
+
+@mobile_queue_app.command("gc")
+def mobile_queue_gc_cmd(
+    store: str = typer.Option(_DEFAULT_QUEUE_STORE, "--store"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Drop expired entries. Returns the number removed."""
+    _setup_logging(debug)
+    _out(ok({"removed": _queue(store).gc()}), json_output)

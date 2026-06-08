@@ -60,3 +60,36 @@ def test_egress_check_allow_deny_block() -> None:
     )
     assert _json(crit)["data"]["allowed"] is False
     assert "blocked" in _json(crit)["data"]["reason"]
+
+
+def test_queue_enqueue_status_flush_hash_only(tmp_path) -> None:
+    store = str(tmp_path / "q.json")
+    secret = "RAW-CLI-PAYLOAD-7q"
+    enq = runner.invoke(
+        mobile_app,
+        [
+            "queue",
+            "enqueue",
+            "app.memory.write.mock",
+            "--payload",
+            json.dumps({"v": secret}),
+            "--store",
+            store,
+            "--json",
+        ],
+    )
+    assert enq.exit_code == 0, enq.output
+    assert secret not in enq.output  # hash-only, no raw payload
+    assert len(_json(enq)["data"]["payload_hash"]) == 64
+
+    st = runner.invoke(mobile_app, ["queue", "status", "--store", store, "--json"])
+    assert _json(st)["data"]["pending"] == 1
+
+    fl = runner.invoke(mobile_app, ["queue", "flush", "--store", store, "--json"])
+    assert _json(fl)["data"]["flushed"] == 1
+    assert (
+        _json(runner.invoke(mobile_app, ["queue", "status", "--store", store, "--json"]))["data"][
+            "pending"
+        ]
+        == 0
+    )
