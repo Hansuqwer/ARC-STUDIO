@@ -56,30 +56,32 @@ Raising the quality bar raises the **work required**, not the **words allowed**.
 - `scripts/check-banned-claims.sh` is authoritative for release-facing wording. "Production ready", "multi-user", "tenant-isolated", broad provider-backed SwarmGraph adoption, and production-grade sandbox/microVM execution stay forbidden until proven by tests and evidence.
 - ARC Studio stays a single-user, loopback-only alpha workstation tool until proven otherwise. The Definition of Done elevates engineering quality; it does not change the product's safety posture or unlock new product claims.
 
-## Active track (2026-06-08)
+## Active track (2026-06-09)
 
 The 2026-06-05 P0 hardening sprint (six five-way-audit items: SQLite budget-lock,
 TUI shell-escape fail-closed, orphan FastAPI quarantine, POST-only `/api/runs/start`,
 enforcement-surface refresh, profile schema version) is **complete**.
 
-The DoD elevation track (R-POLISH1–18 / Phases 159–176 + Phases 177–252) is **complete**
-for the v0.8-r-ux4 internal release. All 25 phases of the Phases 228–252 elevation sprint
+The DoD elevation track (R-POLISH1–18 / Phases 159–176 + Phases 177–270) is **complete**
+for the v0.8-r-ux5 internal release. All 18 phases of the Phases 253–270 elevation sprint
 landed with cited per-gate DoD evidence:
 
-- **R-POLISH1–28 elevation** (Phases 228–231): All 28 R-POLISH items → Polished Complete
-  with per-gate DoD evidence. Security P0 batch, honest states, TUI streaming, MCP security,
-  paid-call gate, CLI mutation gate, bounded buffers, protocol parity, refactors.
-- **Mobile SDK elevation** (Phases 232–233): R-MOBILE-AUDIT/TS, B5-P9-10/P12a,
-  P11-12b/P12-20 → Polished Complete.
-- **Roadmap elevations** (Phases 234–249): R-CR-BACKLOG, R11-R77 (cost/packaging/native
-  runtime/trust/trace/HITL/memory/adapters/hardening), R39-R65 era batches, R-CLEAN1,
-  R-OPEN items → Polished Complete.
-- **Infrastructure** (Phases 250–251): B2P-17 terminal-gated honest no-op. Shared
-  `map_provider_error` extracted. `arc mobile gate check` alias added.
-- **Release gate** (Phase 252): 6003 Python + 969 TS tests, ruff clean, banned-claims clean.
-  Version bumped to v0.8-r-ux4.
+- **R-TS1–R-TS10 + R-UX1–R-UX4 elevation** (Phases 253–255): All token-saving and UX
+  roadmap items → Polished Complete with per-gate DoD evidence.
+- **R-OPEN-* adapters + R66–R79 elevation** (Phases 256–261): Production hardening,
+  sandbox shell-escape, research runbooks, all adapter items, R66-R74 CLI/sandbox/edit
+  phases, R78 A2A, R79 Mobile SDK Integration.
+- **R46–R52 + IDE producer rows** (Phases 262–264): Plan/Apply, MCP Workbench, Workspace
+  Intelligence, Capability Card Gate, MCP Risk Gate, CI Guardrails, Consensus
+  Differentiators, all IDE producer-table rows.
+- **Cleanup + final sweep** (Phases 265–269): trace-verify state field, validation.py
+  docstring fix, all duplicate Baseline rows resolved.
+- **Terminal-gated (2 items stay Baseline):** R76 (Linux/KVM Firecracker), B2P-17
+  (Electron code-signing). All other roadmap items are Polished Complete.
+- **Release gate** (Phase 270): 6003 Python + 969 TS tests, ruff clean, banned-claims
+  clean. Version bumped to v0.8-r-ux5.
 
-See `docs/phases.md` (Phases 159–252) and `docs/roadmap.md` for full evidence records.
+See `docs/phases.md` (Phases 159–270) and `docs/roadmap.md` for full evidence records.
 
 ## Sandbox / microVM truth constraints (still in force)
 

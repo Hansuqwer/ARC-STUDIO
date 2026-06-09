@@ -7778,3 +7778,16 @@ Audit of all roadmap rows. Final state:
 - **B2P-17** (Electron packaging): Apple code-signing cert + Apple ID required. Structure-guard tests exist; full signed artifact pending.
 
 **Total Baseline Complete remaining: 2** (both terminal-gated, both honestly documented).
+
+
+## Phase 270 — R-RELEASE-GATE: Release gate v0.8-r-ux5
+
+Final release gate for the Phases 253–270 elevation sprint.
+
+- **Python tests:** 6003 passed, 43 skipped, 7 xfailed, 1 xpassed. 2 pre-existing TUI snapshot xfails. Zero unexpected failures.
+- **TypeScript:** arc-extension build clean. 969 tests passed, 3 skipped.
+- **ruff:** All checks passed.
+- **banned-claims:** OK: No banned claims found.
+- **Version:** `v0.8-r-ux5` in README.
+- **AGENTS.md:** Updated to reflect Phases 253–270 complete.
+- **Remaining Baseline:** 2 items (R76 terminal-gated Linux/KVM; B2P-17 terminal-gated code-signing). All other ~220+ roadmap items are Polished Complete.
