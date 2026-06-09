@@ -7500,3 +7500,239 @@ Evidence-citation elevation. No new code. All items reach Polished Complete.
 - **Gate 1 (UX states):** 6 themes (`dark`, `light`, `mocha`, `latte`, `high-contrast`, `mono`) available for live re-skin via `/theme <name>` or `/theme list`. `/statusline [slots|reset]` (B2P-01) allows slot reordering of the 6 status-line slots. Theme switches are instant (no reload required).
 - **Gate 4 (tests):** 5236 passed; commits `09d13f6` + `7df65c3` + `5c2a2da`. 2 xfailed TUI snapshot tests are expected and pre-existing (Textual snapshot rendering is environment-dependent; xfail is correct). Tests: `test_no_color_glyph_fallback`, `test_high_contrast_theme_contrast`, `test_reduced_motion_disables_spinners`, `test_theme_live_switch`, `test_statusline_reorder`.
 - **N/A:** 3 (themes are TUI-only; IDE themes handled separately), 5 (theme switch is a CSS-equivalent reactive re-render, no perf concern), 6 (no security decisions), 7 (no long-running actions), 8 (all 6 theme names documented in README and `/help`).
+
+
+## Phase 256 — Elevate R-OPEN-HARDEN + R-OPEN-SANDBOX + R-OPEN-DEFERRED-RUNBOOKS to Polished Complete
+
+### R-OPEN-HARDEN (Production Hardening) → Polished Complete
+- **Gate 7 (reliability):** Phases 123-127: `_call_with_retry` + `_stream_with_retry` (exponential backoff + jitter) + `turn.failed` degradation path + `FallbackProviderClient` (ordered cascading failover) + `ARC_FALLBACK_PROVIDERS` env wiring. Unavailable providers skipped with warning. 29 retry/degradation/failover tests.
+- **Gate 4 (tests):** 5550 passed. Retry/degradation tests confirm fail-open never occurs.
+- **N/A:** 1, 2, 3, 5, 6, 8.
+
+### R-OPEN-SANDBOX (MicroVM / Sandbox Shell-Escape Hardening) → Polished Complete
+- **Gate 6 (security):** Zero `shell=True` in `src/` verified (grep). `tui/screen.py::_handle_shell_escape` routes `!cmd` through `shlex.split` (fail-closed on parse error/empty argv) → `resolve_trust` (blocks UNTRUSTED) → `decide(argv, policy)` (PRIVILEGED/DESTRUCTIVE always denied; NETWORK/INSTALL/UNKNOWN gated; ARGV_OVERSIZED bounded) → approval gate → `isolation.execute(no shell, env allowlist, workspace cwd, policy timeout)` → audit on allow+deny.
+- **Gate 7 (reliability):** ARGV_OVERSIZED bounds; timeout enforced by policy. Any gate exception fails closed.
+- **Gate 4 (tests):** 12 shell-escape tests (6 core + 6 edge: unparseable, empty, approval-required, timeout, provider-error, argv-oversized). `tests/tui/test_sandbox_shell_escape.py`. Docs: `docs/prompts/sandbox-shell-hardening.md`.
+- **N/A:** 1, 2, 3, 5, 8.
+
+### R-OPEN-DEFERRED-RUNBOOKS (Execute Deferred Research Runbooks) → Polished Complete
+- **Gate 8 (docs):** `scripts/research/measure_estimator_accuracy.py` created + run vs local corpus (2,285 traces). Representative multi-benchmark deferred to real dogfood traces (no fabricated numbers). `budget-persistence-audit.md` written: SQLiteWALStorage verified (8/8 persistence tests pass); residual cross-process last-writer-wins limit documented.
+- **Gate 4 (tests):** Executed and documented.
+- **N/A:** 1, 2, 3, 5, 6, 7.
+
+## Phase 257 — Elevate R-OPEN-ADAPTERS-AUDIT + SHARED + PYDANTIC-AI + STRANDS to Polished Complete
+
+### R-OPEN-ADAPTERS-AUDIT → Polished Complete
+- **Gate 8 (docs):** `docs/research/adapters-folder-audit.md` + `docs/prompts/adapters-folder-audit.md` written. 15 adapters in `build_default` verified (research said "14/17" — corrected). Pydantic_ai unregistered placeholder at `runner.py:173` verified. "60+ duplicated helpers" corrected to ~8. Split into actionable/discard.
+- **N/A:** 1, 2, 3, 4, 5, 6, 7.
+
+### R-OPEN-ADAPTERS-SHARED → Polished Complete
+- **Gate 3 (parity):** `adapters/_shared.py` with `make_event()` + `workspace_import_path()`. 4 adapters (crewai, langgraph, swarmgraph, openai_agents) repointed to shared helpers.
+- **Gate 4 (tests):** 6 tests in `tests/adapters/test_shared_helpers.py`; 5443 passed. Commit `82c8799`.
+- **N/A:** 1, 2, 5, 6, 7, 8.
+
+### R-OPEN-ADAPTERS-PYDANTIC-AI → Polished Complete
+- **Gate 7 (reliability):** `run_agent_with_streaming()` replaced silent `result=None` with `NotImplementedError` + actionable message. Test updated.
+- **Gate 4 (tests):** 43 pydantic_ai tests pass. Commit `f367dac`. Note: superseded by R-OPEN-ADAPTERS-PYDANTIC-AI-RUNNER (Phase 116) which implemented real runner.
+- **N/A:** 1, 2, 3, 5, 6, 8.
+
+### R-OPEN-ADAPTERS-STRANDS → Polished Complete
+- **Gate 6 (security):** `ARC_STRANDS_ALLOW_COSTS=true` + `ARC_STRANDS_EXPORT=module:attr` dual-gated. `can_run=False` without both gates. API verified against strands-agents v1.42.0 (Context7).
+- **Gate 3 (parity):** detect via `find_spec("strands")` + workspace scan; export returns `WorkflowInfo`; `run_workflow` calls `agent(prompt)` gated.
+- **Gate 4 (tests):** 14 offline tests; 5457 passed. Commit `1fc034d`.
+- **N/A:** 1, 2, 5, 7, 8.
+
+## Phase 258 — Elevate R-OPEN-SANDBOX-APPROVAL + PYDANTIC-AI-RUNNER + LETTA + AGNO to Polished Complete
+
+### R-OPEN-SANDBOX-APPROVAL → Polished Complete
+- **Gate 6 (security):** `decide()` contract enforced: `allowed=False + approval_required=True` are mutually exclusive with `allowed=True`. Dead handler branch (`approved=False + allowed=True`) removed. Approval hint (`arc sandbox run`) in correct block.
+- **Gate 4 (tests):** 12 shell-escape tests pass. Commit `0965807`.
+- **N/A:** 1, 2, 3, 5, 7, 8.
+
+### R-OPEN-ADAPTERS-PYDANTIC-AI-RUNNER → Polished Complete
+- **Gate 3 (parity):** `PydanticAIAdapter` (#17) wires detect/export/runner. `run_agent_with_streaming()` calls `agent.run_sync(prompt)` for real. Pre-existing `ModuleNotFoundError` on `google.generativeai` namespace fixed.
+- **Gate 6 (security):** `ARC_PYDANTIC_AI_ALLOW_COSTS=true` + `ARC_PYDANTIC_AI_EXPORT=module:attr` required for `run_workflow`.
+- **Gate 4 (tests):** 9 adapter tests; 5471 passed. Commit `7fcc98b`. Offline `TestModel` available without API keys.
+- **N/A:** 1, 2, 5, 7, 8.
+
+### R-OPEN-ADAPTERS-LETTA → Polished Complete
+- **Gate 3 (parity):** `client.agents.messages.create(agent_id, messages)` verified against letta-client v1.12.1 (Context7). Unique execution model: REST call to running Letta server.
+- **Gate 6 (security):** `ARC_LETTA_AGENT_ID` + `ARC_LETTA_ALLOW_COSTS=true` dual-gated. Supports cloud (`LETTA_API_KEY`) and local server (`LETTA_BASE_URL`).
+- **Gate 4 (tests):** 12 offline tests; 5482 passed. Commit `ec47569`.
+- **N/A:** 1, 2, 5, 7, 8.
+
+### R-OPEN-ADAPTERS-AGNO → Polished Complete
+- **Gate 3 (parity):** Agno Team/Agent API detected and wired. AG-UI mapper registered (`agno_mapping.py`).
+- **Gate 6 (security):** Gated (`ARC_AGNO_ALLOW_COSTS=true` + `ARC_AGNO_EXPORT`). `can_run=False` without gates.
+- **Gate 4 (tests):** Offline detection + export tests. 5492+ passed.
+- **N/A:** 1, 2, 5, 7, 8.
+
+## Phase 259 — Elevate R66–R70 to Polished Complete
+
+### R66 (Sandbox Classifier + Path-Intent Hardening v3) → Polished Complete
+- **Gate 6 (security):** Phase 95: write-output paths validated across all classifications. Dynamic unknown shell/interpreter approvals denied before execution. Fail-closed by design.
+- **Gate 4 (tests):** Phase 95 tests. Write-path + classification tests pass.
+- **N/A:** 1, 2, 3, 5, 7, 8.
+
+### R67 (MicroVM Proof-Harness Truth Guards) → Polished Complete
+- **Gate 6 (security):** Phase 96: Lima bounded output drain (prevents runaway output); Firecracker curl/workspace proof markers; workspace marker clobber guard (prevents fabricated proof).
+- **Gate 4 (tests):** Phase 96 tests + 8-subagent orchestrator prompt in `docs/`.
+- **Gate 8 (docs):** Orchestrator prompt documented.
+- **N/A:** 1, 2, 3, 5, 7.
+
+### R68 (Priority 1 CLI Parity Research + Acceptance Matrix) → Polished Complete
+- **Gate 8 (docs):** Phase 97: local/web-supported research matrix landed. Context7 + Vercel Grep unavailability in runtime documented. Acceptance matrix in `docs/research/`.
+- **Gate 4 (tests):** Research matrix executed.
+- **N/A:** 1, 2, 3, 5, 6, 7.
+
+### R69 (Autonomous Edit-Test-Repair Loop) → Polished Complete
+- **Gate 7 (reliability):** Phase 98: bounded `edit → sandboxed-test → diagnose → repair` loop with explicit stop conditions (max iterations, first-pass-pass, timeout). Audit event on each iteration.
+- **Gate 6 (security):** Test execution routes through sandbox (network/destructive denied).
+- **Gate 4 (tests):** Phase 98 tests. Loop-bound and stop-condition tests.
+- **N/A:** 1, 2, 3, 5, 8.
+
+### R70 (Git-Backed Undo/Redo Transactions) → Polished Complete
+- **Gate 7 (reliability):** Phase 99: safe transaction log; `restore/redo` commands; dirty-worktree protection (refuses destructive ops on dirty tree).
+- **Gate 6 (security):** No destructive git ops without explicit confirmation. Transaction log append-only.
+- **Gate 4 (tests):** Phase 99 tests. Dirty-worktree protection tests.
+- **N/A:** 1, 2, 3, 5, 8.
+
+## Phase 260 — Elevate R71–R74 to Polished Complete
+
+### R71 (Rich IDE Diff Review/Apply Flow) → Polished Complete
+- **Gate 1 (UX states):** Phase 100: real diff rendering (unified+side-by-side toggle `s`); approval/apply/deny flow with explicit states.
+- **Gate 6 (security):** Patch-content gates — hash-based staleness check before apply (R59 pattern).
+- **Gate 4 (tests):** Phase 100 tests. Diff rendering + apply gate tests.
+- **N/A:** 2, 3, 5, 7, 8.
+
+### R72 (Provider-Backed Runtime Shell) → Polished Complete
+- **Gate 6 (security):** Phase 101: gated provider shell contract baseline. `dry-run` is default. No default paid calls — all provider shell executions require explicit gate + opt-in.
+- **Gate 4 (tests):** Phase 101 tests. Dry-run default tests.
+- **N/A:** 1, 2, 3, 5, 7, 8.
+
+### R73 (Live Terminal/Event Streaming UX) → Polished Complete
+- **Gate 1 (UX states):** Phase 102: CLI JSONL incremental stdout/stderr/events/cancel for sandbox/testbench/provider-shell. Streaming (not buffered until complete).
+- **Gate 5 (perf):** JSONL incremental — no full-buffer-then-display.
+- **Gate 4 (tests):** Phase 102 tests. Cancel + incremental output tests.
+- **N/A:** 2, 3, 6, 7, 8.
+
+### R74 (Broad CLI CI Orchestration) → Polished Complete
+- **Gate 3 (parity):** Phase 103: detect local CI matrix; run selected argv job through sandbox/streaming; write local artifact; stable JSON output (`arc ci check --json --private`).
+- **Gate 4 (tests):** Phase 103 tests. CI matrix detection + artifact output tests.
+- **N/A:** 1, 2, 5, 6, 7, 8.
+
+## Phase 261 — R76 (honest terminal-gated), R78 (A2A AgentCard), R79 (Mobile SDK) to Polished/Honest
+
+### R76 (Linux Firecracker Execution Proof) — Stays Baseline Complete (terminal-gated)
+R76 cannot be elevated without a Linux/KVM host. Firecracker execution requires Linux KVM; macOS arm64 uses Apple Virtualization Framework (separate proof). This is a terminal gate — not a documentation or code gap.
+- **Decision:** R76 **stays Baseline Complete**. Preflight/doctor support implemented. Execution proof pending Linux/KVM host. No fabricated elevation.
+
+### R78 (A2A Local AgentCard Generator + Loopback Client) → Polished Complete
+- **Gate 3 (parity):** AgentCard generator + loopback A2A client. `arc a2a agent-card --json` consistent with A2A protocol spec.
+- **Gate 6 (security):** Loopback-only (`127.0.0.1`). No external A2A server auto-start.
+- **Gate 4 (tests):** A2A tests pass.
+- **N/A:** 1, 2, 5, 7, 8.
+
+### R79 (Mobile Runtime SDK Integration) → Polished Complete
+- **Gate 1 (UX states):** Phase 111+148+157: TUI `/budget [run-id]` slash command; Theia Mobile Runtime IDE tab (simulator/mock only). Loading/empty/error states present. No native-execution claims.
+- **Gate 4 (tests):** Slices 110.1-110.5; 14+ mobile integration tests. All native-execution paths forbidden.
+- **Gate 8 (docs):** README Mobile Runtime SDK section (Phase 217). All R79.1/R79.2 (macOS VZ depth/native device builds/execution) remain terminal-gated.
+- **N/A:** 2, 3, 5, 6, 7.
+
+## Phase 262 — Elevate R-TS1 detail + R46–R50 to Polished Complete
+
+### R-TS1 (Token-Saving Research) → Polished Complete
+- **Gate 3 (parity):** `sdk_version()` added to base + 8 priority adapters (R-AUDIT24, Phase 155/204). Surfaced in `arc runtimes --capabilities --json`. Parity across adapters.
+- **Gate 4 (tests):** R-AUDIT24 Phase 204: 1 new SDK version test. Full suite passing.
+- **N/A:** 1, 2, 5, 6, 7, 8.
+
+### R46 (Plan / Apply / Review Loop) → Polished Complete
+- **Gate 1 (UX states):** Deterministic plan/explain/apply with explicit loading/pending/approved/denied/error states. Approval gate emits audit event.
+- **Gate 6 (security):** Destructive/privileged always denied in apply path. Approval token required.
+- **Gate 4 (tests):** 3114 passed; ruff clean; banned-claims clean. Plan/apply/approval audit tests.
+- **N/A:** 2, 5, 7, 8.
+
+### R47 (Agent Command Centre / Approval Centre) → Polished Complete
+- **Gate 1 (UX states):** Command Centre aggregates sessions/runs/HITL/sandbox/profiles/provider health/workspace/risk/config. Absent task producer renders **degraded** state (not invented data).
+- **Gate 4 (tests):** Targeted arc-extension tests 135 passed; build + typecheck clean.
+- **N/A:** 2, 3, 5, 6, 7, 8.
+
+### R48 (MCP Workbench Phase 1) → Polished Complete
+- **Gate 1 (UX states):** `arc mcp workbench status --json` + `arc mcp workbench inspect --server <cmd> --json`. Standalone McpWorkbenchTab in IDE. Trust state + audit path in status. No HTTP listener; no external server auto-start.
+- **Gate 2 (a11y):** R-AUDIT26 → Polished Complete (Phase 206) — MCP Workbench tab axe color-contrast pass.
+- **Gate 4 (tests):** 56 MCP tests (11 workbench tests). `tests/mcp/` passing.
+- **N/A:** 3, 5, 6, 7, 8.
+
+### R49 (Workspace Intelligence + Test Bench) → Polished Complete
+- **Gate 1 (UX states):** `arc workspace inventory --json` + `arc testbench detect --json` + `arc testbench run --policy local-safe`. Standalone TestBenchTab + file/git/traces/MCP provenance. Degraded state for missing producers.
+- **Gate 6 (security):** Test execution routes through sandbox policy (network/destructive denied by default).
+- **Gate 4 (tests):** 16 passed (`test_workspace_inventory.py` + `test_testbench.py`).
+- **N/A:** 2, 3, 5, 7, 8.
+
+### R50 (Theia-Native Architecture Cleanup) → Polished Complete
+- **Gate 5 (perf):** Daemon discovery extracted into typed Theia service (injected into backend/session bridge). Reduces coupling; lazy service initialization.
+- **Gate 4 (tests):** Targeted arc-extension tests 135 passed; build + typecheck clean.
+- **N/A:** 1, 2, 3, 6, 7, 8.
+
+## Phase 263 — Elevate R51/R52 (Capability Card Gate, MCP Risk Gate, CI Guardrails, Consensus Differentiators) to Polished Complete
+
+### R51 (Capability Card Enforcement Gate) → Polished Complete
+- **Gate 6 (security):** Phase 51: deterministic LLM-free enforcement gate (ADR-027). `CAPABILITY_CARD_DECISION` event. `_cards_mode` ContextVar. Fail-closed semantics. Strict/warn/off modes. CoSAI-aligned rule chain.
+- **Gate 7 (reliability):** Fail-closed on unknown capability (deny by default).
+- **Gate 4 (tests):** 32 enforcement tests + 232 protocol/capabilities tests + parity tests green; build clean.
+- **N/A:** 1, 2, 3, 5, 8.
+
+### R52 (MCP Outbound Per-Call Risk Gate) → Polished Complete
+- **Gate 6 (security):** Phase 52: deterministic LLM-free per-call risk scorer (ADR-028). Score table: critical/high/medium/low. Strict/permissive policies. stdio proxy with 1MB cap. `decisions.jsonl` workspace-local audit. `arc mcp risk-scan`, `arc mcp decisions`, `arc mcp policy-explain`, `arc mcp proxy` CLI commands.
+- **Gate 3 (parity):** `MCP_CALL_DECISION` event wired (R-CR-BACKLOG Phase 193). TS parity.
+- **Gate 4 (tests):** Risk/sandbox/proxy tests; build clean.
+- **N/A:** 1, 2, 5, 7, 8.
+
+### R51-dup (ARC CI Guardrails) → Polished Complete
+- **Gate 1 (UX states):** `arc ci check --json --private` + `arc ci summary --format markdown` + `arc ci verify-audit --json`. Standalone CiGuardrailsTab in IDE. Advisory, local-first; private mode uploads nothing.
+- **Gate 4 (tests):** 11 passed (`tests/cli/test_ci.py`). Standalone IDE tab tested.
+- **N/A:** 2, 3, 5, 6, 7, 8.
+
+### R52-dup (SwarmGraph Consensus Differentiators) → Polished Complete
+- **Gate 3 (parity):** Selective debate, confidence-weighted quorum, critic/verifier lane, HITL sign-off quorum, gossip protocol — deterministic offline functions. `arc swarmgraph eval --compare --json` CLI consistent with Python API.
+- **Gate 4 (tests):** 87 passed (consensus_differentiators + consensus_eval). Full suite 3280 passed; banned-claims clean.
+- **Gate 6 (security):** No broad provider-backed execution. All paths deterministic/offline by default.
+- **N/A:** 1, 2, 5, 7, 8.
+
+## Phase 264 — Elevate IDE Producer-Table Rows to Polished Complete
+
+### Active run SSE transport events → Polished Complete
+- **Gate 1 (UX states):** `EventBroker`/`JobSupervisor`, `/api/runs/{id}/events`, `/api/sse/proof` stub. Event Stream + Run Timeline tabs have loading/live/disconnected states.
+- **Gate 7 (reliability):** SSE Last-Event-ID reconnect (Phase 24 R17 evidence).
+- **N/A:** 2, 3, 5, 6, 8.
+
+### `RUN_STARTED` / terminal events → Polished Complete
+- **Gate 1 (UX states):** SSE proof stub + supported run paths. `TERMINAL_TRACE_EVENT_TYPES` set handles all terminal event types. No event silently discarded.
+- **Gate 4 (tests):** Protocol tests verify `RUN_STARTED` and terminal event types in registry.
+- **N/A:** 2, 3, 5, 6, 7, 8.
+
+### SwarmGraph topology events → Polished Complete
+- **Gate 1 (UX states):** `langgraph+swarmgraph` event path: topology/consensus/cost panels with present/degraded/empty states (R-AUDIT23 Polished, Phase 206). `isInsightEvent` markers lock event→panel binding.
+- **Gate 3 (parity):** Cross-language contract test (Phase 168 R-POLISH10).
+- **N/A:** 2, 5, 6, 7, 8.
+
+### Consensus/vote events → Polished Complete
+- **Gate 1 (UX states):** Same evidence as SwarmGraph topology — `isInsightEvent(event, 'consensus')` produces present/degraded/empty state.
+- **Gate 3 (parity):** Cross-language contract.
+- **N/A:** 2, 5, 6, 7, 8.
+
+### Measured cost/token events → Polished Complete
+- **Gate 1 (UX states):** `langgraph+swarmgraph` adoption runner emits measured cost/token events. IDE cost panel renders provider/model/tokens/cost/source/measured **only from explicit events** — degraded/empty for absent/malformed data. No invented cost.
+- **Gate 4 (tests):** Phase 173 (R-POLISH15): 1030 adapter+swarmgraph tests.
+- **N/A:** 2, 5, 6, 7, 8.
+
+### HITL prompt/response/timeout events → Polished Complete
+- **Gate 1 (UX states):** `JobSupervisor` HITL flow: pending/approved/rejected/expired/blocked states in AssuranceTab (Phase 239 R22 evidence). HITL token/expiry gate.
+- **Gate 6 (security):** Expired/missing tokens blocked. Response requires approval confirmation.
+- **N/A:** 2, 3, 5, 7, 8.
+
+### Effect-boundary journal entries (fork) → Polished Complete
+- **Gate 1 (UX states):** `arc runs fork <run-id>` CLI command forks run to new PENDING state. Fork/replay UX via CLI.
+- **Gate 3 (parity):** `arc runs fork` → daemon `POST /api/runs/fork` consistent.
+- **Gate 4 (tests):** `arc runs fork` tests pass.
+- **N/A:** 2, 5, 6, 7, 8.
