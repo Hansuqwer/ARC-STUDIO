@@ -25,6 +25,7 @@ from . import (
     index_cmd,  # noqa: F401 — Phase 303 / R84: arc index build/search
     context_cmd,  # noqa: F401 — Phase 305 / R85: arc context suggest/attach
     memory_cmd,  # noqa: F401 — Phase 307 / R90: arc memory save/load/search
+    predict_cmd,  # noqa: F401 — Phase 309 / R83: arc predict next-edit
     discover,  # noqa: F401
     edit,  # noqa: F401 — Phase 85: safety-gated edit loop
     events,  # noqa: F401

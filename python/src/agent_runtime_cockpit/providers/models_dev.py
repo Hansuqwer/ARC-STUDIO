@@ -30944,7 +30944,9 @@ async def fetch_models_dev_catalog() -> dict[str, ModelsDevProviderConfig]:
     try:
         import aiohttp  # aiohttp is a standard ARC dep
 
-        async with aiohttp.ClientSession() as session:
+        # R-PERF8: Use TCPConnector with connection pooling (10 concurrent per host).
+        connector = aiohttp.TCPConnector(limit_per_host=10)
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
                 raw = await resp.json(content_type=None)
         return load_models_dev_catalog(raw)

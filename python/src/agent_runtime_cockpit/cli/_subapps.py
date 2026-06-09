@@ -23,6 +23,10 @@ index_app = typer.Typer(
     name="index",
     help="Local codebase index — build + search (R84)",
 )
+predict_app = typer.Typer(
+    name="predict",
+    help="Next-edit autocomplete predictions (R83)",
+)
 arena_app = typer.Typer(name="arena", help="LM Arena model battle and comparison")
 doctor_app = typer.Typer(name="doctor", help="ARC diagnostics")
 workspace_app = typer.Typer(name="workspace", help="Workspace configuration and trust management")

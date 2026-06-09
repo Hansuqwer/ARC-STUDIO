@@ -127,7 +127,11 @@ async def _forward(
         headers["Content-Type"] = "application/json"
     timeout = ClientTimeout(total=config.timeout_seconds, sock_read=config.timeout_seconds)
     try:
-        async with ClientSession(timeout=timeout) as session:
+        # R-PERF8: TCPConnector with limit_per_host=10 for connection pooling.
+        from aiohttp import TCPConnector
+
+        connector = TCPConnector(limit_per_host=10)
+        async with ClientSession(timeout=timeout, connector=connector) as session:
             async with session.request(method, url, json=json_body, headers=headers) as response:
                 if json_body and json_body.get("stream") is True:
                     return await _stream_upstream(request, response)

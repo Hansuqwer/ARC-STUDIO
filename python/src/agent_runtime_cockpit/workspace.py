@@ -100,3 +100,57 @@ def iter_workspace_files(
                 break
             results.append(path)
     return results
+
+
+async def aiter_workspace_files(
+    workspace: Path,
+    suffixes: tuple[str, ...],
+    *,
+    max_files: int = 100_000,
+    yield_every: int = 200,
+):
+    """Async generator variant of iter_workspace_files (R-PERF1).
+
+    Yields Path objects without blocking the event loop between directory
+    scans. Uses asyncio.sleep(0) to yield control periodically.
+    Target: < 5s for 100K files on local SSD.
+    """
+    import asyncio
+    import os
+
+    count = 0
+    dirs = [workspace]
+
+    while dirs:
+        batch, dirs = dirs[:10], dirs[10:]
+
+        def _scan(d: Path) -> tuple[list[Path], list[Path]]:
+            files, subdirs = [], []
+            try:
+                with os.scandir(d) as it:
+                    for e in it:
+                        if e.is_symlink():
+                            continue
+                        p = Path(e.path)
+                        if e.is_dir(follow_symlinks=False):
+                            if e.name not in IGNORED_DIRS:
+                                subdirs.append(p)
+                        elif e.is_file(follow_symlinks=False):
+                            if p.suffix in suffixes and not is_sensitive_file(p):
+                                files.append(p)
+            except PermissionError:
+                pass
+            return files, subdirs
+
+        loop = asyncio.get_event_loop()
+        results = await asyncio.gather(*[loop.run_in_executor(None, _scan, d) for d in batch])
+
+        for files, subdirs in results:
+            dirs.extend(subdirs)
+            for p in files:
+                yield p
+                count += 1
+                if count >= max_files:
+                    return
+                if count % yield_every == 0:
+                    await asyncio.sleep(0)
