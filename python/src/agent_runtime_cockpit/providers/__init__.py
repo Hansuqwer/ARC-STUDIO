@@ -81,11 +81,44 @@ register("crofai", lambda: OpenAICompatibleClient(vendor="crofai"))
 # Register Arena provider (Copilot Arena integration)
 register("arena", ArenaProvider)
 
-for _provider_id, _provider_config in bundled_openai_compatible_providers().items():
-    if _provider_id not in _FACTORIES:  # skip if already registered (e.g. groq, together)
-        register(
-            _provider_id,
-            lambda config=_provider_config: OpenAICompatibleClient(
-                config=config_from_models_dev(config)
-            ),
-        )
+# R-PERF3: Lazy registration of the 109-provider bundled catalog.
+# Deferred until first get() or known() call so `arc --help` and other
+# CLI commands that don't need providers don't pay the parse cost.
+_BUNDLED_REGISTERED = False
+
+
+def _ensure_bundled_registered() -> None:
+    """Register bundled OpenAI-compatible providers on first use (lazy)."""
+    global _BUNDLED_REGISTERED
+    if _BUNDLED_REGISTERED:
+        return
+    _BUNDLED_REGISTERED = True
+    for _provider_id, _provider_config in bundled_openai_compatible_providers().items():
+        if _provider_id not in _FACTORIES:
+            register(
+                _provider_id,
+                lambda config=_provider_config: OpenAICompatibleClient(
+                    config=config_from_models_dev(config)
+                ),
+            )
+
+
+# Monkey-patch registry functions to trigger lazy registration on first use.
+import agent_runtime_cockpit.providers.registry as _reg  # noqa: E402
+
+_orig_get = _reg.get
+_orig_known = _reg.known
+
+
+def _lazy_get(name: str):  # type: ignore[no-untyped-def]
+    _ensure_bundled_registered()
+    return _orig_get(name)
+
+
+def _lazy_known() -> list[str]:
+    _ensure_bundled_registered()
+    return _orig_known()
+
+
+_reg.get = _lazy_get
+_reg.known = _lazy_known
