@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re as _re
 import threading
 from pathlib import Path
 from typing import Optional
@@ -17,6 +18,11 @@ log = logging.getLogger(__name__)
 DEFAULT_STORE_PATH = Path(".arc") / "traces"
 
 
+# R-SEC4: Allowlist for run IDs used as filename stems.
+# Matches UUIDs, run-001, run_abc, arbitrary alphanumeric with safe separators.
+_RUN_ID_RE = _re.compile(r"^[A-Za-z0-9_.\-]{1,128}$")
+
+
 def _safe_run_id(run_id: str) -> str:
     """Validate a run ID before it is used as a filename stem.
 
@@ -27,8 +33,8 @@ def _safe_run_id(run_id: str) -> str:
     ``run-001``, ``run_abc``) are returned unchanged.
     """
     rid = str(run_id)
-    if not rid or rid in (".", "..") or "/" in rid or "\\" in rid or "\x00" in rid or ".." in rid:
-        raise ValueError(f"unsafe run_id: {run_id!r}")
+    if not rid or not _RUN_ID_RE.fullmatch(rid):
+        raise ValueError(f"unsafe run_id: {run_id!r} — must match {_RUN_ID_RE.pattern}")
     return rid
 
 
@@ -40,7 +46,13 @@ class JsonlTraceStore:
         self._lock = threading.Lock()
 
     def _run_path(self, run_id: str) -> Path:
-        return self.base_dir / f"{_safe_run_id(run_id)}.jsonl"
+        path = self.base_dir / f"{_safe_run_id(run_id)}.jsonl"
+        # R-SEC4: Resolve and verify path stays within base_dir.
+        try:
+            path.resolve().relative_to(self.base_dir.resolve())
+        except ValueError:
+            raise ValueError(f"run_id path escapes base_dir: {run_id!r}")
+        return path
 
     def trace_path(self, run_id: str) -> Path:
         """Return the trace path used for a run ID."""
