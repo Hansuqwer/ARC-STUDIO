@@ -1,4 +1,5 @@
 """SQLite store for ARC metadata (runs index, audit log) — ADR-003."""
+
 from __future__ import annotations
 
 import json
@@ -81,7 +82,10 @@ class SqliteStore:
 
     def _conn(self) -> sqlite3.Connection:
         self._ensure_init()
-        return sqlite3.connect(str(self.db_path))
+        conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA wal_autocheckpoint = 1000")
+        return conn
 
     def insert_run(
         self,
@@ -231,9 +235,7 @@ class SqliteStore:
         """Check if a run is already indexed."""
         try:
             with self._conn() as conn:
-                row = conn.execute(
-                    "SELECT 1 FROM runs WHERE id=?", (run_id,)
-                ).fetchone()
+                row = conn.execute("SELECT 1 FROM runs WHERE id=?", (run_id,)).fetchone()
                 return row is not None
         except Exception as e:
             log.warning("SQLite run_exists failed for %s: %s", run_id, e)

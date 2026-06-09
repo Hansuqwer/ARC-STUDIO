@@ -70,6 +70,8 @@ class TaskStorage:
     def _conn(self) -> sqlite3.Connection:
         self._ensure_init()
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA wal_autocheckpoint = 1000")
         conn.row_factory = sqlite3.Row
         return conn
 
