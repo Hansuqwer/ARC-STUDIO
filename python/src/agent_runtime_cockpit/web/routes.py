@@ -1438,6 +1438,9 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_get("/api/arena/rankings", arena_rankings)
     app.router.add_get("/api/audit/verify/{run_id}", audit_verify_route)
     app.router.add_post("/v1/ir/simulate", ir_simulate)
+    from ..stream.websocket import add_routes as _add_global_stream  # noqa: PLC0415
+
+    _add_global_stream(app)
 
 
 async def audit_verify_route(request: web.Request) -> web.Response:

@@ -7905,3 +7905,21 @@ behavior. Each item leaving `Not Started` will open its own phase and clear the 
 
 **Evidence:** local worktree 2026-06-09; additive docs + binary mockup assets only; no
 source/protocol/CLI changes; not committed (left in working tree for review per charter rule 7).
+
+---
+
+## Phase 275 — R87a: GlobalEventBroker + `/api/global/events/stream` SSE endpoint
+
+**Status:** Baseline Complete
+
+**What changed:**
+- `python/src/agent_runtime_cockpit/stream/websocket.py`: Implemented `GlobalEventBroker.publish()`, `subscribe()`, `unsubscribe()`; `global_sse_handler()` SSE endpoint; `TuiEventSource` with `_parse_sse_line()` and `connect()` with exponential backoff; `get_global_broker()` / `reset_global_broker()` singletons; `add_routes()` registering `/api/global/events/stream`.
+- `python/src/agent_runtime_cockpit/web/routes.py`: Added `from ..stream.websocket import add_routes as _add_global_stream; _add_global_stream(app)` at end of `setup_routes()`.
+- `python/tests/web/test_events_sse.py`: 8 tests — broker publish/subscribe/unsubscribe/queue-full/multi-subscriber, SSE route registered, `_parse_sse_line` data+comment, singleton.
+
+**DoD gates:**
+1. UX states: N/A (internal broker, no user-visible surface yet).
+4. Tests: 8 tests pass; `uv run pytest tests/web/test_events_sse.py -q` → 8 passed.
+2. Ruff: `uv run ruff check src tests` → All checks passed.
+
+**Evidence:** 8 tests pass, ruff clean. Route `/api/global/events/stream` registered and functional (does not conflict with existing `/api/events/stream`).
