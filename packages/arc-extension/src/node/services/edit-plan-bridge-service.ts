@@ -1,4 +1,3 @@
-import { execFileSync } from 'child_process';
 import {
     ArcError,
     ArcErrorCode,
@@ -8,7 +7,7 @@ import {
     EditPlanInfo,
     EditPlanListResult,
 } from '../../common/arc-protocol';
-import { buildArcCliEnv } from './arc-cli-utils';
+import { buildArcCliEnv, execArcCliAsync } from './arc-cli-utils';
 
 interface ArcEnvelope {
     ok: boolean;
@@ -21,26 +20,26 @@ const PLAN_ID_RE = /^[A-Za-z0-9_-]{1,96}$/;
 export class EditPlanBridgeService {
     constructor(private readonly workspaceRoot: string) {}
 
-    listEditPlans(limit = 50): EditPlanListResult {
+    async listEditPlans(limit = 50): Promise<EditPlanListResult> {
         const safeLimit = Math.max(1, Math.min(Math.floor(limit || 50), 200));
-        const data = this.runArcJson(['edit', 'list', '--workspace', this.workspaceRoot, '--limit', String(safeLimit), '--json']);
+        const data = await this.runArcJson(['edit', 'list', '--workspace', this.workspaceRoot, '--limit', String(safeLimit), '--json']);
         return {
             plans: Array.isArray(data.plans) ? (data.plans as Record<string, unknown>[]).map(plan => this.toPlan(plan)) : [],
             count: Number(data.count || 0),
         };
     }
 
-    showEditPlan(planId: string): EditPlanInfo {
+    async showEditPlan(planId: string): Promise<EditPlanInfo> {
         this.validatePlanId(planId);
-        return this.toPlan(this.runArcJson(['edit', 'show', '--workspace', this.workspaceRoot, '--plan-id', planId, '--json']));
+        return this.toPlan(await this.runArcJson(['edit', 'show', '--workspace', this.workspaceRoot, '--plan-id', planId, '--json']));
     }
 
-    approveEditPlan(planId: string, token: string): EditPlanApprovalResult {
+    async approveEditPlan(planId: string, token: string): Promise<EditPlanApprovalResult> {
         this.validatePlanId(planId);
         if (!token || token.length > 512) {
             throw new ArcError(ArcErrorCode.INVALID_INPUT, 'invalid edit approval token');
         }
-        const data = this.runArcJson(['edit', 'approve', '--workspace', this.workspaceRoot, '--plan-id', planId, '--token', token, '--json']);
+        const data = await this.runArcJson(['edit', 'approve', '--workspace', this.workspaceRoot, '--plan-id', planId, '--token', token, '--json']);
         return {
             version: Number(data.version || 1),
             approval_id: String(data.approval_id || ''),
@@ -51,10 +50,10 @@ export class EditPlanBridgeService {
         };
     }
 
-    diffEditPlan(planId: string, maxBytes = 131072): EditPlanDiffResult {
+    async diffEditPlan(planId: string, maxBytes = 131072): Promise<EditPlanDiffResult> {
         this.validatePlanId(planId);
         const safeMax = Math.max(1024, Math.min(Math.floor(maxBytes || 131072), 1024 * 1024));
-        const data = this.runArcJson(['edit', 'diff', '--workspace', this.workspaceRoot, '--plan-id', planId, '--max-bytes', String(safeMax), '--json']);
+        const data = await this.runArcJson(['edit', 'diff', '--workspace', this.workspaceRoot, '--plan-id', planId, '--max-bytes', String(safeMax), '--json']);
         const files = Array.isArray(data.files) ? data.files as Record<string, unknown>[] : [];
         return {
             plan_id: String(data.plan_id || planId),
@@ -67,7 +66,7 @@ export class EditPlanBridgeService {
         };
     }
 
-    applyEditPlan(planId: string, content: string, token: string): EditPlanApplyResult {
+    async applyEditPlan(planId: string, content: string, token: string): Promise<EditPlanApplyResult> {
         this.validatePlanId(planId);
         if (!token || token.length > 512) {
             throw new ArcError(ArcErrorCode.INVALID_INPUT, 'invalid edit approval token');
@@ -75,7 +74,7 @@ export class EditPlanBridgeService {
         if (content.length > 1024 * 1024) {
             throw new ArcError(ArcErrorCode.INVALID_INPUT, 'edit content too large');
         }
-        const data = this.runArcJson(['edit', 'apply', '--workspace', this.workspaceRoot, '--plan-id', planId, '--content', content, '--approval-token', token, '--json']);
+        const data = await this.runArcJson(['edit', 'apply', '--workspace', this.workspaceRoot, '--plan-id', planId, '--content', content, '--approval-token', token, '--json']);
         return {
             applied: Boolean(data.applied),
             reason: String(data.reason || ''),
@@ -91,14 +90,10 @@ export class EditPlanBridgeService {
         }
     }
 
-    private runArcJson(args: string[]): Record<string, unknown> {
+    private async runArcJson(args: string[]): Promise<Record<string, unknown>> {
         try {
-            const output = execFileSync('arc', args, {
+            const output = await execArcCliAsync(args, {
                 timeout: 10000,
-                encoding: 'utf-8',
-                windowsHide: true,
-                env: buildArcCliEnv(),
-                maxBuffer: 1024 * 1024,
             });
             const parsed: ArcEnvelope = JSON.parse(output);
             if (!parsed.ok || !parsed.data) {
