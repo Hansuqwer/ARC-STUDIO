@@ -41,14 +41,14 @@ def git_init(
     else:
         result = _run_git(["init"], ws)
         if result.returncode != 0:
-            console.print(f"[red]git init failed:[/red] {result.stderr.strip()}", err=True)
+            typer.echo(f"[red]git init failed:[/red] {result.stderr.strip()}", err=True)
             raise typer.Exit(1)
         msg = {"ok": True, "message": f"git initialized at {ws}", "workspace": str(ws)}
 
     if json_output:
         print(json.dumps(msg))
     else:
-        console.print(msg["message"])
+        typer.echo(msg["message"])
 
 
 @git_native_app.command("branch")
@@ -88,7 +88,7 @@ def git_branch(
         existed = False
 
     if switch.returncode != 0:
-        console.print(
+        typer.echo(
             f"[red]Failed to {'switch to' if existed else 'create'} branch:[/red] {switch.stderr.strip()}",
             err=True,
         )
@@ -124,7 +124,7 @@ def git_auto_commit(
 
     stage = _run_git(["add", "-A"], ws)
     if stage.returncode != 0:
-        console.print(f"[red]git add failed:[/red] {stage.stderr.strip()}", err=True)
+        typer.echo(f"[red]git add failed:[/red] {stage.stderr.strip()}", err=True)
         raise typer.Exit(1)
 
     # Check if there's anything to commit
@@ -134,7 +134,7 @@ def git_auto_commit(
         if json_output:
             print(json.dumps(msg))
         else:
-            console.print("[dim]Nothing to commit.[/dim]")
+            typer.echo("[dim]Nothing to commit.[/dim]")
         return
 
     commit = _run_git(["commit", "-m", message], ws)
@@ -150,7 +150,7 @@ def git_auto_commit(
     if json_output:
         print(json.dumps(msg))
     else:
-        console.print(f"Committed [bold]{sha}[/bold]: {message}")
+        typer.echo(f"Committed [bold]{sha}[/bold]: {message}")
 
 
 @git_native_app.command("auto-revert")
@@ -168,7 +168,7 @@ def git_auto_revert(
     # Reset staged changes
     reset = _run_git(["reset", "--hard", "HEAD"], ws)
     if reset.returncode != 0:
-        console.print(f"[red]git reset failed:[/red] {reset.stderr.strip()}", err=True)
+        typer.echo(f"[red]git reset failed:[/red] {reset.stderr.strip()}", err=True)
         raise typer.Exit(1)
 
     # Clean untracked files (-fd: force + directories)

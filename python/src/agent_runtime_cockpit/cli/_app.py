@@ -129,7 +129,7 @@ def dashboard(
     if json_output:
         import json
 
-        console.print(json.dumps(result.data, indent=2, default=str))
+        typer.echo(json.dumps(result.data, indent=2, default=str))
         return
     if isinstance(result.data, dict) and isinstance(result.data.get("sections"), dict):
         table = Table(title="ARC Dashboard")

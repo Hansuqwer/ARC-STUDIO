@@ -77,7 +77,7 @@ def continuum_resume(
     key = _load_key()
     db_path = SessionStore._get_sessions_dir() / session_id / "state.db"
     if not db_path.exists():
-        console.print(f"[red]Session '{session_id}' not found.[/red]", err=True)
+        typer.echo(f"Session '{session_id}' not found.", err=True)
         raise typer.Exit(1)
 
     store = SessionStore(session_id, key)

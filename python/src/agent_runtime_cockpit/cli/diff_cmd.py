@@ -73,7 +73,7 @@ def diff_apply(
     patch_path = Path(patch_file)
 
     if not patch_path.exists():
-        console.print(f"[red]Patch file not found: {patch_path}[/red]", err=True)
+        typer.echo(f"[red]Patch file not found: {patch_path}[/red]", err=True)
         raise typer.Exit(1)
 
     patch_text = patch_path.read_text()
@@ -87,7 +87,7 @@ def diff_apply(
             text=True,
         )
         if result.returncode != 0:
-            console.print(f"[red]git apply failed:[/red] {result.stderr.strip()}", err=True)
+            typer.echo(f"[red]git apply failed:[/red] {result.stderr.strip()}", err=True)
             raise typer.Exit(1)
         msg = {"ok": True, "applied": True, "patch": str(patch_path)}
         if json_output:
