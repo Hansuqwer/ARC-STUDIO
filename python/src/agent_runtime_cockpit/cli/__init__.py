@@ -25,6 +25,7 @@ from . import (
     edit,  # noqa: F401 — Phase 85: safety-gated edit loop
     events,  # noqa: F401
     exec,  # noqa: F401
+    git_native,  # noqa: F401 — Phase 289 / R88a: git-native init + auto-branch
     info,  # noqa: F401
     ir,  # noqa: F401 — SwarmGraph IR compile/inspect/validate/policy
     simulate,  # noqa: F401 — SwarmGraph IR action simulation (arc ir simulate)

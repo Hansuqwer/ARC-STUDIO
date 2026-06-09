@@ -11,6 +11,10 @@ adapter_app = typer.Typer(name="adapter", help="Adapter management commands")
 continuum_app = typer.Typer(
     name="continuum", help="Session persistence — list and resume sessions (R86)"
 )
+git_native_app = typer.Typer(
+    name="git-native",
+    help="Git-native agent workflow — init workspace, auto-branch per session (R88)",
+)
 arena_app = typer.Typer(name="arena", help="LM Arena model battle and comparison")
 doctor_app = typer.Typer(name="doctor", help="ARC diagnostics")
 workspace_app = typer.Typer(name="workspace", help="Workspace configuration and trust management")

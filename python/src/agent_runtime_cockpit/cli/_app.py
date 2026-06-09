@@ -23,6 +23,7 @@ from ._subapps import (
     config_app,
     context_app,
     continuum_app,
+    git_native_app,
     doctor_app,
     eval_app,
     edit_app,
@@ -111,6 +112,7 @@ app.add_typer(ci_app)
 app.add_typer(runtime_pack_app)
 app.add_typer(a2a_app)
 app.add_typer(continuum_app)
+app.add_typer(git_native_app)
 
 
 @app.command("dashboard")
