@@ -272,9 +272,53 @@ for target in "$@"; do
     done
 done
 
+# ---------------------------------------------------------------------------
+# Date-fabrication detection (R-PROC5)
+# Flags ISO-8601 dates (YYYY-MM-DD) more than 7 days in the future.
+# Skips code blocks and allowlisted sections (same rules as banned phrases).
+# ---------------------------------------------------------------------------
+
+# Today + 7 days as threshold (accommodates release/planning docs)
+FUTURE_THRESHOLD=$(python3 -c "
+import datetime
+print((datetime.date.today() + datetime.timedelta(days=7)).isoformat())
+" 2>/dev/null || echo "9999-99-99")
+
+DATE_VIOLATIONS=0
+for target in "$@"; do
+    while IFS= read -r -d '' file; do
+        if should_skip_file "$file"; then
+            continue
+        fi
+        line_num=0
+        while IFS= read -r raw_line; do
+            line_num=$((line_num + 1))
+            [[ "$raw_line" == *20[0-9][0-9]-* ]] || continue
+            is_in_skip_range "$file" "$line_num" && continue
+            # Extract all YYYY-MM-DD patterns
+            scan_line="$raw_line"
+            while [[ "$scan_line" =~ (20[0-9][0-9]-[01][0-9]-[0-3][0-9]) ]]; do
+                date_str="${BASH_REMATCH[1]}"
+                scan_line="${scan_line/"$date_str"/X}"
+                if [[ "$date_str" > "$FUTURE_THRESHOLD" ]]; then
+                    echo "DATE-FABRICATION: $file:$line_num"
+                    echo "  Future date: $date_str  (threshold: $FUTURE_THRESHOLD)"
+                    DATE_VIOLATIONS=$((DATE_VIOLATIONS + 1))
+                    TOTAL_MATCHES=$((TOTAL_MATCHES + 1))
+                fi
+            done
+        done < "$file"
+    done < <(find "$target" -maxdepth 10 -type f \( -name "*.md" -o -name "*.txt" \) -print0 2>/dev/null)
+done
+
+if [[ $DATE_VIOLATIONS -gt 0 ]]; then
+    echo ""
+    echo "DATE-FABRICATION: $DATE_VIOLATIONS future date(s) detected (threshold $FUTURE_THRESHOLD)."
+fi
+
 if [[ $TOTAL_MATCHES -gt 0 ]]; then
     echo "---"
-    echo "Found $TOTAL_MATCHES banned claim(s)."
+    echo "Found $TOTAL_MATCHES banned claim(s) / date violation(s)."
     if [[ "$FIX_MODE" == true ]]; then
         echo "Re-run without --fix to see file:line locations."
     else
