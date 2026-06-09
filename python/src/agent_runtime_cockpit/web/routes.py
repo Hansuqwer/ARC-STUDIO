@@ -794,6 +794,9 @@ async def run_events_sse(request: web.Request) -> web.StreamResponse:
                     category=DeprecationWarning,
                 )
                 broker = EventBroker(_trace_store(request))
+                from ..stream.websocket import hook_event_broker_publish  # noqa: PLC0415
+
+                hook_event_broker_publish(broker)
                 request.app[EVENT_BROKER_KEY] = broker
         run_id = request.match_info["run_id"]
         run = _trace_store(request).load(run_id)
