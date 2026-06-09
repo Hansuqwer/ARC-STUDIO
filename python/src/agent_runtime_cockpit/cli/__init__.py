@@ -22,6 +22,7 @@ from . import (
     ci,  # noqa: F401 — Phase 80 / R51: CI guardrails
     continuum,  # noqa: F401 — Phase 279 / R86b: session persistence list/resume
     diff_cmd,  # noqa: F401 — Phase 291 / R89a: arc diff apply --interactive
+    index_cmd,  # noqa: F401 — Phase 303 / R84: arc index build/search
     discover,  # noqa: F401
     edit,  # noqa: F401 — Phase 85: safety-gated edit loop
     events,  # noqa: F401

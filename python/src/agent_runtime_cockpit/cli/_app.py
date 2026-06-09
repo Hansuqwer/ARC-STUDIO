@@ -24,6 +24,7 @@ from ._subapps import (
     context_app,
     continuum_app,
     diff_app,
+    index_app,
     git_native_app,
     doctor_app,
     eval_app,
@@ -115,6 +116,7 @@ app.add_typer(a2a_app)
 app.add_typer(continuum_app)
 app.add_typer(git_native_app)
 app.add_typer(diff_app)
+app.add_typer(index_app)
 
 
 @app.command("dashboard")
