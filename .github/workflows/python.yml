@@ -41,6 +41,8 @@ jobs:
         # until they are cleaned up. New patch files added after this gate is
         # in place must apply cleanly or the step will fail.
         run: bash scripts/check-patches-freshness.sh || true
+      - name: Release snapshot (R-PROC3)
+        run: bash scripts/generate-release-snapshot.sh --json
       - name: Tests (strict warnings)
         working-directory: python
         run: uv run pytest -q -W error -W ignore::ResourceWarning -W ignore::pytest.PytestUnraisableExceptionWarning -W ignore::DeprecationWarning -W ignore::ImportWarning
