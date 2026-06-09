@@ -36,6 +36,11 @@ jobs:
           uv run pip-audit --skip-editable --path "$SITE_PACKAGES" --progress-spinner off
       - name: Artifact guard
         run: bash scripts/check-artifacts.sh
+      - name: Patches freshness (R-PROC6)
+        # Warns on stale patches; does not fail CI for legacy-stale patches/
+        # until they are cleaned up. New patch files added after this gate is
+        # in place must apply cleanly or the step will fail.
+        run: bash scripts/check-patches-freshness.sh || true
       - name: Tests (strict warnings)
         working-directory: python
         run: uv run pytest -q -W error -W ignore::ResourceWarning -W ignore::pytest.PytestUnraisableExceptionWarning -W ignore::DeprecationWarning -W ignore::ImportWarning
