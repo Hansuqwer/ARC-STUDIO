@@ -333,6 +333,14 @@ uv run arc isolation use <backend>
 # Providers & models
 uv run arc providers list --json
 uv run arc providers status
+uv run arc providers diagnostics --json     # redacted diagnostics (statuses, routing, accounts, quota)
+uv run arc providers set-key <provider-id> <api-key>    # encrypt + store key in auth.json
+uv run arc providers get-key <provider-id> --json        # key metadata (never reveals raw key)
+uv run arc providers delete-key <provider-id>            # remove stored encrypted key
+uv run arc providers export-env --json                   # export VAR=*** for all stored keys (--reveal for actual values)
+uv run arc providers key status --json      # env-var-backed key references
+uv run arc providers key set <provider-id> --env <VAR>   # save env-var key reference (no raw key stored)
+uv run arc providers key unset <provider-id>             # remove env-var key reference
 uv run arc providers action --help          # gated provider action (explicit opt-in required)
 
 # Audit & HITL
@@ -383,6 +391,9 @@ uv run arc mobile audit-retention --ttl-days 30    # apply TTL to decisions log
 # Doctor
 uv run arc doctor all --json
 uv run arc doctor storage
+uv run arc doctor providers --json          # key-config status for all bundled providers (env|stored|local|none)
+uv run arc doctor env --json
+uv run arc doctor network --json
 ```
 
 Full reference: `uv run arc --help`
