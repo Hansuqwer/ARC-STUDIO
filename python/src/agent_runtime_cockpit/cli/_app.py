@@ -22,6 +22,7 @@ from ._subapps import (
     ci_app,
     config_app,
     context_app,
+    continuum_app,
     doctor_app,
     eval_app,
     edit_app,
@@ -109,6 +110,7 @@ app.add_typer(testbench_app)
 app.add_typer(ci_app)
 app.add_typer(runtime_pack_app)
 app.add_typer(a2a_app)
+app.add_typer(continuum_app)
 
 
 @app.command("dashboard")
