@@ -1879,7 +1879,7 @@ detail and dedupe notes: `docs/research-findings/competitive-feature-backlog-202
 | R-SEC1 | Subprocess isolation for MCP tool execution (via `isolation/selector.py`) | Baseline Complete |
 | R-SEC2 | `prompt_guard.py` — regex injection-pattern detection (research-grade) | Not Started |
 | R-SEC3 | Python SBOM + `pnpm-lock.yaml` integrity verification + reproducible-build attestation | Not Started |
-| R-SEC4 | `run_id` storage path-traversal residual (allowlist + `relative_to()` confinement); workspace realpath already done | Not Started |
+| R-SEC4 | `run_id` storage path-traversal residual (allowlist + `relative_to()` confinement); workspace realpath already done | Baseline Complete |
 | R-PERF1 | Streaming workspace inventory (< 5s for 100K files) | Not Started |
 | R-PERF2 | Virtualize residual lists (`TraceViewerSection`/`AssuranceTab`); event stream already virtualized via R17 | Baseline Complete |
 | R-PERF3 | Lazy provider loading (< 2s startup with 109 providers) | Baseline Complete |

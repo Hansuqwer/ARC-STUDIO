@@ -7987,3 +7987,15 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 8. Docs: roadmap.md + phases.md updated in place; banned-claims passes.
 
 **Evidence:** 2026-06-09; all 20 phases committed to origin/main.
+
+## Phase 295 — Fix R-SEC4 roadmap gap + CI green (pre-existing failures)
+
+**Status:** Baseline Complete
+
+**What changed:**
+- `docs/roadmap.md`: R-SEC4 status updated Not Started → Baseline Complete (implementation was in commit 11ef03f2 but roadmap was not updated).
+- `scripts/check-artifacts.sh`: added `runtimes/mobile/flutter/` to ALLOWLIST_PATTERNS — Flutter `/lib/` sources were triggering the artifact guard (pre-existing CI failure).
+- `scripts/check-banned-claims.sh`: added `AGENTS.md` to SKIP_PATH_PATTERNS (governance doc, not release-facing); extended `is_table_row()` to skip box-drawing `│` lines (architecture diagram false positives on Linux bash 5).
+- `runtimes/mobile/expo/packages/arc-mobile-runtime/expo-module.config.json` + `runtimes/mobile/react-native/packages/arc-mobile-runtime/tsconfig.json`: force-tracked; both existed locally but were excluded by `.gitignore runtimes/` rule, causing mobile CI tests to fail.
+
+**Evidence:** All four pre-existing CI failure root causes resolved; 15/15 mobile tests pass locally; artifact guard + banned-claims pass locally.
