@@ -5,7 +5,7 @@ Rules:
   V1  capability ID required
   V2  platform support required
   V3  sensitive capabilities require approval_mode
-  V4  write capabilities require audit + hitl/trust (error in strict mode, warning otherwise)
+  V4  write capabilities require audit + hitl/trust (always error — Phase 207)
   V5  sensitive native capabilities must be mock-only in MVP
   V6  background execution blocked in MVP
   V7  network blocked unless mock

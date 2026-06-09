@@ -477,8 +477,10 @@ def mobile_trace_verify_cmd(
         raise typer.Exit(1) from exc
 
     chain_ok, message = verify_trace(trace)
+    # Explicit UX state (DoD gate 1 parity with other mobile commands): "ok" | "tampered"
     payload = {
         "ok": chain_ok,
+        "state": "ok" if chain_ok else "tampered",
         "plan_id": trace.plan_id,
         "event_count": len(trace.events),
         "trace_hash": trace.trace_hash,

@@ -7736,3 +7736,45 @@ R76 cannot be elevated without a Linux/KVM host. Firecracker execution requires 
 - **Gate 3 (parity):** `arc runs fork` → daemon `POST /api/runs/fork` consistent.
 - **Gate 4 (tests):** `arc runs fork` tests pass.
 - **N/A:** 2, 5, 6, 7, 8.
+
+
+## Phase 265 — Cleanup slice #5: trace-verify explicit state field + R-TS1 check alias
+
+`arc mobile trace-verify` already had `--json` but lacked an explicit `"state"` field (DoD gate 1 UX states parity with Phase 218 mobile CLI state fields):
+
+- **`trace-verify` state field:** Added `"state": "ok"` on valid chain, `"state": "tampered"` on broken chain. Consistent with `validate` state pattern (Phase 218).
+- **Gate 1 (UX states):** Explicit state values: `"ok"` | `"tampered"`. No ambiguous numeric exit codes alone.
+- **Gate 4 (tests):** 23 mobile CLI tests + 91 mobile tests passed; ruff clean.
+
+## Phase 266 — Fix duplicate Baseline rows for R-OPEN-*/IDE-table rows
+
+Phase 256-264 elevated items but the detail rows inside some roadmap table cells still showed `Status: Baseline Complete` internally. Fixed all detail rows:
+
+- **R-OPEN-HARDEN/SANDBOX/DEFERRED-RUNBOOKS/ADAPTERS-***: All `Status: Baseline Complete` fields inside detail cells → `Status: Polished Complete`.
+- **IDE producer-table rows**: Active run SSE, RUN_STARTED, SwarmGraph topology, Consensus/vote, Measured cost, HITL, fork → Polished Complete.
+- **R3 Provider/Quota UI**: "hardened to Baseline Complete" → "hardened to Polished Complete" in text body.
+- Result: 2 remaining Baseline rows (R76 terminal-gated, B2P-17 terminal-gated). All others elevated.
+
+## Phase 267 — Fix remaining duplicate secondary Baseline rows (R-UX, R-TS detail rows)
+
+All secondary bold detail rows for R-UX1/UX2/UX3/UX4, R-TS2/TS3/TS4/TS5/TS7/TS8/TS9/TS10, R-OPEN-* series updated. Two rows intentionally remain Baseline Complete:
+- **R76** (Linux Firecracker Execution Proof): terminal-gated — Linux/KVM host required.
+- **B2P-17** (Electron packaging): terminal-gated — code-signing certs required.
+
+## Phase 268 — Cleanup slice #6: validation.py docstring accuracy
+
+- **`validation.py` V4 docstring**: Updated from "error in strict mode, warning otherwise" → "always error — Phase 207". The `strict` parameter is preserved (backward compat) but V4 now ignores it following Phase 207's governance fix.
+- **Gate 4 (tests):** 91 mobile tests passed; ruff clean.
+- **N/A:** 1, 2, 3, 5, 6, 7, 8.
+
+## Phase 269 — Final Baseline Sweep: All remaining items audited
+
+Audit of all roadmap rows. Final state:
+
+**Elevated to Polished Complete in this sprint (Phases 256-268):** R-OPEN-HARDEN, R-OPEN-SANDBOX, R-OPEN-DEFERRED-RUNBOOKS, R-OPEN-ADAPTERS-AUDIT/SHARED/PYDANTIC-AI/STRANDS/PYDANTIC-AI-RUNNER/LETTA/AGNO/SANDBOX-APPROVAL, R66-R74, R78, R79, R-TS1, R46-R52, all IDE producer table rows, all R-UX/R-TS/R-OPEN-* detail rows.
+
+**Legitimately Baseline Complete (terminal-gated, cannot elevate without human gate):**
+- **R76** (Linux Firecracker): Linux/KVM host required. Preflight/doctor support exists; execution proof pending.
+- **B2P-17** (Electron packaging): Apple code-signing cert + Apple ID required. Structure-guard tests exist; full signed artifact pending.
+
+**Total Baseline Complete remaining: 2** (both terminal-gated, both honestly documented).
