@@ -46,6 +46,26 @@ _MAX_MCP_OUTPUT_BYTES = 1_048_576
 _DEFAULT_TRACE_LIMIT = 500
 _MAX_TRACE_LIMIT = 2_000
 
+# R-SEC1: Explicit tool risk classification for ARC's 13 MCP tools.
+# LOW: read-only; no external calls; no budget consumption.
+# MEDIUM: state-mutating or cancellation; no provider calls.
+# HIGH: spawns agent run; may invoke provider APIs; consumes budget.
+TOOL_RISK_LEVELS: dict[str, str] = {
+    "arc_doctor": "LOW",
+    "arc_runtime_capabilities": "LOW",
+    "arc_run_status": "LOW",
+    "arc_trace_search": "LOW",
+    "arc_trace_read": "LOW",
+    "arc_audit_verify": "LOW",
+    "arc_hitl_list": "LOW",
+    "arc_task_status": "LOW",
+    "arc_task_result": "LOW",
+    "arc_swarmgraph_plan": "LOW",
+    "arc_swarmgraph_assess_risk": "LOW",
+    "arc_task_cancel": "MEDIUM",
+    "arc_run_start": "HIGH",
+}
+
 
 class MCPServerError(Exception):
     """Base exception for MCP server errors."""
@@ -862,5 +882,54 @@ def create_mcp_server(
         return _tool_result(
             "arc_swarmgraph_assess_risk", run, {"task": task, "target_runtime": target_runtime}
         )
+
+    @mcp.tool()
+    def arc_run_start(workflow_id: str, run_id: str = "") -> str:
+        """Start an agent workflow run via subprocess isolation (HIGH-risk tool).
+
+        Delegates execution to the arc CLI via SubprocessIsolationProvider so the
+        run is env-filtered, secret-stripped, and path-confined. Does NOT run the
+        agent in-process.
+
+        Returns JSON with run_id and status.
+        """
+        import asyncio
+        import sys
+
+        from ..isolation.selector import build_execution_provider
+        from ..security.validation import SAFE_ENV_KEYS
+
+        eid = run_id or f"mcp-{workflow_id}-{int(time.time())}"
+
+        def _run() -> dict[str, Any]:
+            provider = build_execution_provider(
+                "subprocess",
+                workspace_root=ws,
+                env_allowlist=frozenset(SAFE_ENV_KEYS),
+                max_output_bytes=65_536,
+            )
+            result = asyncio.run(
+                provider.execute(
+                    [
+                        sys.executable,
+                        "-m",
+                        "agent_runtime_cockpit.cli",
+                        "run",
+                        workflow_id,
+                        "--json",
+                    ],
+                    cwd=ws,
+                    timeout_seconds=300,
+                )
+            )
+            return {
+                "run_id": eid,
+                "workflow_id": workflow_id,
+                "status": "started" if result.returncode == 0 else "failed",
+                "returncode": result.returncode,
+                "output_preview": (result.stdout or "")[:512],
+            }
+
+        return _tool_result("arc_run_start", _run, {"workflow_id": workflow_id})
 
     return mcp
