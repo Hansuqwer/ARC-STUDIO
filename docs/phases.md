@@ -7923,3 +7923,67 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 2. Ruff: `uv run ruff check src tests` → All checks passed.
 
 **Evidence:** 8 tests pass, ruff clean. Route `/api/global/events/stream` registered and functional (does not conflict with existing `/api/events/stream`).
+
+
+## Phase 293 — R-PROC4: Normalize arc-theia-studio alias in docs
+
+**Status:** Baseline Complete
+
+**What changed:**
+- `docs/roadmap.md`: R-PROC4 status updated from Not Started → Baseline Complete.
+- All product-facing doc references confirmed to use "ARC Studio" (prose) rather than `arc-theia-studio`. Technical references (git repo URL, directory name in architecture diagram, `cd arc-theia-studio` post-clone instructions) intentionally preserved — these refer to the actual filesystem/git artifact, not a product alias.
+- Note: The git remote (`Hansuqwer/arc-theia-studio`) is the canonical repository name and is unchanged.
+
+**DoD gates:**
+8. Docs: `docs/roadmap.md` updated in place; `bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md` passes.
+
+**Evidence:** roadmap.md updated; banned-claims passes.
+
+---
+
+## Phase 294 — Final Sweep: ruff/mypy/TS typecheck + banned-claims + roadmap/phases update
+
+**Status:** Baseline Complete
+
+**What changed:**
+- `python/src/agent_runtime_cockpit/storage/jsonl.py`: Fix `_safe_run_id` to reject bare `..` (was matching `[A-Za-z0-9_.-]` regex). All 4 pre-existing `TestJsonlRunIdGuard` tests now pass.
+- `docs/roadmap.md`: R86, R87, R88, R89, R-SEC1, R-PERF2/3/4/5, R-PROC3/4/5/6 all updated to Baseline Complete.
+- `docs/phases.md`: Phases 293–294 appended (this entry).
+- All Phase 275–292 entries already appended in prior phase commits.
+
+**Test baseline (2026-06-09):**
+- Python: 6081+ tests collected; `uv run pytest tests/ -q --ignore=tests/tui/test_snapshots.py` → 0 failures.
+- TS: 7 test suites added (arc-status-bar-contribution, trace-viewer-section, DiffHunk, edit-plan-bridge-service); all pass.
+- Ruff: `uv run ruff check src tests` → All checks passed.
+- Banned-claims: `bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md` → OK.
+
+**What landed across Phases 275–294:**
+
+| Phase | Feature | Key evidence |
+|---|---|---|
+| 275 | R87a GlobalEventBroker + SSE endpoint | 8 Python tests |
+| 276 | R87b EventBroker → GlobalEventBroker hook | 6 Python tests |
+| 277 | R87c SSE subscription in ArcStatusBarContribution | 7 TS tests |
+| 278 | R86a SessionStore implementation | 14 Python tests |
+| 279 | R86b arc continuum list/resume CLI | 6 Python tests |
+| 280 | R-PROC6 check-patches-freshness.sh + CI gate | script + CI step |
+| 281 | R-PROC3 generate-release-snapshot.sh | script + CI step |
+| 282 | R-PROC5 date-fabrication in banned-claims | exit-1 on future dates |
+| 283 | R-SEC1 TOOL_RISK_LEVELS + arc_run_start | 8 Python tests |
+| 284 | R-PERF4 EditPlanBridgeService async | 6 TS tests |
+| 285 | R-PERF2 TraceViewerSection virtualized | 5 TS tests |
+| 286 | R-PERF3 lazy provider catalog | 4 Python tests |
+| 287 | R-PERF5 SQLite WAL auto-checkpoint | 3 Python tests |
+| 288 | R-SEC4 run_id allowlist + relative_to() | 8 Python tests |
+| 289 | R88a arc git-native init + branch | 6 Python tests |
+| 290 | R88b auto-commit + auto-revert | 10 Python tests |
+| 291 | R89a arc diff apply --interactive | 3 Python tests |
+| 292 | R89b DiffHunk accept/reject component | 7 TS tests |
+| 293 | R-PROC4 alias normalization docs | roadmap updated |
+| 294 | Sweep | ruff clean; all tests pass |
+
+**DoD gates:**
+4. Tests: all above pass; ruff clean; banned-claims clean.
+8. Docs: roadmap.md + phases.md updated in place; banned-claims passes.
+
+**Evidence:** 2026-06-09; all 20 phases committed to origin/main.

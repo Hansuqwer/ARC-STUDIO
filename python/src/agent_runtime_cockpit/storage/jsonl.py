@@ -33,7 +33,7 @@ def _safe_run_id(run_id: str) -> str:
     ``run-001``, ``run_abc``) are returned unchanged.
     """
     rid = str(run_id)
-    if not rid or not _RUN_ID_RE.fullmatch(rid):
+    if not rid or rid in (".", "..") or not _RUN_ID_RE.fullmatch(rid):
         raise ValueError(f"unsafe run_id: {run_id!r} — must match {_RUN_ID_RE.pattern}")
     return rid
 

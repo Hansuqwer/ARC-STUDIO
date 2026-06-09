@@ -1841,10 +1841,10 @@ Full detail: `docs/research-findings/competitive-feature-backlog-2026-06-09.md`.
 | R83 | ARC Predict — local next-edit autocomplete (PDF Feature 1) | Not Started |
 | R84 | ARC Index — local semantic codebase search (PDF Feature 2) | Not Started |
 | R85 | ARC Context — automatic context retrieval (PDF Feature 3) | Not Started |
-| R86 | ARC Continuum — session persistence & resume (PDF Feature 4) | Not Started |
-| R87 | ARC Stream — real-time event relay, Python → IDE/TUI (PDF Feature 12) | Not Started |
-| R88 | ARC Git — git-native agent workflow (PDF Feature 7) | Not Started |
-| R89 | ARC Diff — one-click inline patch apply (PDF Feature 8) | Not Started |
+| R86 | ARC Continuum — session persistence & resume (PDF Feature 4) | Baseline Complete |
+| R87 | ARC Stream — real-time event relay, Python → IDE/TUI (PDF Feature 12) | Baseline Complete |
+| R88 | ARC Git — git-native agent workflow (PDF Feature 7) | Baseline Complete |
+| R89 | ARC Diff — one-click inline patch apply (PDF Feature 8) | Baseline Complete |
 | R90 | ARC Memory — persistent project knowledge (PDF Feature 10) | Not Started |
 | R91 | ARC Hub — local-first assistant/config sharing (PDF Feature 9) | Not Started |
 | R92 | ARC Daemon Tasks — local background task runner (PDF Feature 11) | Not Started |
@@ -1876,25 +1876,25 @@ detail and dedupe notes: `docs/research-findings/competitive-feature-backlog-202
 
 | ID | Title | Status |
 |---|---|---|
-| R-SEC1 | Subprocess isolation for MCP tool execution (via `isolation/selector.py`) | Not Started |
+| R-SEC1 | Subprocess isolation for MCP tool execution (via `isolation/selector.py`) | Baseline Complete |
 | R-SEC2 | `prompt_guard.py` — regex injection-pattern detection (research-grade) | Not Started |
 | R-SEC3 | Python SBOM + `pnpm-lock.yaml` integrity verification + reproducible-build attestation | Not Started |
 | R-SEC4 | `run_id` storage path-traversal residual (allowlist + `relative_to()` confinement); workspace realpath already done | Not Started |
 | R-PERF1 | Streaming workspace inventory (< 5s for 100K files) | Not Started |
-| R-PERF2 | Virtualize residual lists (`TraceViewerSection`/`AssuranceTab`); event stream already virtualized via R17 | Not Started |
-| R-PERF3 | Lazy provider loading (< 2s startup with 109 providers) | Not Started |
-| R-PERF4 | Async `startRun()` bridge residual (eliminate remaining blocking `execFileSync`); config-service done in R-POLISH7/14 | Not Started |
-| R-PERF5 | SQLite WAL auto-checkpoint tuning (< 50ms write latency) | Not Started |
+| R-PERF2 | Virtualize residual lists (`TraceViewerSection`/`AssuranceTab`); event stream already virtualized via R17 | Baseline Complete |
+| R-PERF3 | Lazy provider loading (< 2s startup with 109 providers) | Baseline Complete |
+| R-PERF4 | Async `startRun()` bridge residual (eliminate remaining blocking `execFileSync`); config-service done in R-POLISH7/14 | Baseline Complete |
+| R-PERF5 | SQLite WAL auto-checkpoint tuning (< 50ms write latency) | Baseline Complete |
 | R-PERF6 | Memory-mapped trace reading (1 GB trace < 5s) | Not Started |
 | R-PERF7 | Incremental workspace index (< 1s per file change; depends on R84) | Not Started |
 | R-PERF8 | Provider connection pooling (10 concurrent calls/provider) | Not Started |
 | R-PERF9 | WASM trace parser (research; ~10× large-trace speedup) | Not Started |
 | R-PROC1 | Auto-generate release intelligence from CI on merge to main | Not Started |
 | R-PROC2 | `docs/RELEASE_SNAPSHOTS/` — dated, locked, HEAD-derived markdown | Not Started |
-| R-PROC3 | Enforce `patches/INDEX.md` freshness in CI (warn/fail if > 24h behind HEAD) | Not Started |
-| R-PROC4 | Normalize repo name in docs (`arc-theia-studio` alias → `ARC-STUDIO`) | Not Started |
-| R-PROC5 | Extend `check-banned-claims.sh` to flag forward-dated docs | Not Started |
-| R-PROC6 | Retire/archive `patches/` → `docs/archive/patches-2026-06-04/` (+ verify.sh 788dbc9-only warning) | Not Started |
+| R-PROC3 | Enforce `patches/INDEX.md` freshness in CI (warn/fail if > 24h behind HEAD) | Baseline Complete |
+| R-PROC4 | Normalize repo name in docs (`arc-theia-studio` alias → `ARC-STUDIO`) | Baseline Complete |
+| R-PROC5 | Extend `check-banned-claims.sh` to flag forward-dated docs | Baseline Complete |
+| R-PROC6 | Retire/archive `patches/` → `docs/archive/patches-2026-06-04/` (+ verify.sh 788dbc9-only warning) | Baseline Complete |
 
 **Approved design mockups** for several of the above and for the R83–R102 features are preserved
 in `docs/handover/mockups/` (14 files) and mapped to their features/surfaces in the backlog doc.
