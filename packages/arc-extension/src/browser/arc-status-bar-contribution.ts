@@ -30,16 +30,41 @@ export class ArcStatusBarContribution implements FrontendApplicationContribution
 
     protected pollTimer: ReturnType<typeof setInterval> | undefined;
     protected arcService: ArcService | undefined;
+    protected sseSource: EventSource | undefined;
 
     @postConstruct()
     protected init(): void {
         this.updateStatusBar();
-        this.pollTimer = setInterval(() => this.updateStatusBar(), 10000);
+        this._connectSse();
+        // Fallback poll (60s) catches daemon restarts when SSE is unavailable.
+        this.pollTimer = setInterval(() => this.updateStatusBar(), 60000);
+    }
+
+    /** Connect to the GlobalEventBroker SSE feed; refresh status on terminal events. */
+    protected _connectSse(): void {
+        if (typeof EventSource === 'undefined') {
+            return; // SSE not available in this environment
+        }
+        const sse = new EventSource('http://127.0.0.1:7777/api/global/events/stream');
+        this.sseSource = sse;
+        const refresh = (): void => { void this.updateStatusBar(); };
+        for (const t of ['RUN_STARTED', 'RUN_COMPLETED', 'RUN_FAILED', 'RUN_CANCELLED']) {
+            sse.addEventListener(t, refresh);
+        }
+        sse.onerror = (): void => {
+            // On error, close and let the fallback poll handle it.
+            sse.close();
+            this.sseSource = undefined;
+        };
     }
 
     async onStop(): Promise<void> {
         if (this.pollTimer) {
             clearInterval(this.pollTimer);
+        }
+        if (this.sseSource) {
+            this.sseSource.close();
+            this.sseSource = undefined;
         }
     }
 
