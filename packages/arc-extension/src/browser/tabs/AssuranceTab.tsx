@@ -115,6 +115,10 @@ export const AssuranceTab: React.FC<AssuranceTabProps> = ({ arcService, initialR
     const [hitlRespondingId, setHitlRespondingId] = React.useState<string | null>(null);
     const [hitlError, setHitlError] = React.useState<string | null>(null);
 
+    // R-PERF2: Bounded decisions list — show first DECISIONS_VISIBLE_LIMIT, expand on demand
+    const DECISIONS_VISIBLE_LIMIT = 50;
+    const [showAllDecisions, setShowAllDecisions] = React.useState(false);
+
     const [runId, setRunId] = React.useState(initialRunId ?? '');
     const [auditInfo, setAuditInfo] = React.useState<AuditChainInfo | null>(null);
     const [auditLoading, setAuditLoading] = React.useState(false);
@@ -399,7 +403,7 @@ export const AssuranceTab: React.FC<AssuranceTabProps> = ({ arcService, initialR
                 )}
                 {cardSummary && cardSummary.decisions.length > 0 && (
                     <ul className='arc-studio-assurance__cards-list'>
-                        {cardSummary.decisions.map((d, i) => (
+                        {(showAllDecisions ? cardSummary.decisions : cardSummary.decisions.slice(0, DECISIONS_VISIBLE_LIMIT)).map((d, i) => (
                             <li key={i} className={`arc-studio-assurance__state-banner arc-studio-assurance__state-banner--${d.decision === 'allow' ? 'success' : d.decision === 'warn' ? 'warning' : 'info'}`}>
                                 <strong>{d.decision.toUpperCase()}</strong>
                                 {d.cardId && <span> [{d.cardId}]</span>}
@@ -407,6 +411,16 @@ export const AssuranceTab: React.FC<AssuranceTabProps> = ({ arcService, initialR
                                 {d.remediation && <em> · {d.remediation}</em>}
                             </li>
                         ))}
+                        {!showAllDecisions && cardSummary.decisions.length > DECISIONS_VISIBLE_LIMIT && (
+                            <li>
+                                <button
+                                    className='arc-studio-assurance__show-more'
+                                    onClick={() => setShowAllDecisions(true)}
+                                >
+                                    Show all {cardSummary.decisions.length} decisions
+                                </button>
+                            </li>
+                        )}
                     </ul>
                 )}
             </section>
