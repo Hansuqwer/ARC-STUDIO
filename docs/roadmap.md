@@ -1807,3 +1807,16 @@ P2 — Quality:
 | R-MOBILE-HARDEN | Mobile hardening + DoD elevation: simulate-through-gate, signed tenant RBAC/ABAC overlay, mypy gate for 9 modules, REAL_VS_MOCK refresh, property/fuzz tests (Batch 6 Track D) (Phase 195) | Status: Polished Complete | Evidence: local worktree 2026-06-08 | All DoD gates cited (Phase 221). 115 mobile tests (7 property). mypy clean. Gate 6: deterministic security (no LLM), audit on execute (Phase 220), fixtures-only invariant. Gate 7: step count limit (Phase 219). Gate 1/3/8: (Phases 217/218). 324 mobile tests. |
 | R-MOBILE-AUDIT | Mobile SDK Audit Hardening (Phase 207) | Status: Polished Complete | Evidence: local worktree 2026-06-08 | _Base extra=forbid (unknown-field injection closed); write_requires_hitl_or_trust always ERROR; write caps require trust; fixture regenerated. 308 tests; ruff clean. |
 | R-MOBILE-AUDIT-TS | TS type guards + Expo/RN package.json + Flutter pubspec (Phases 209-210) | Status: Polished Complete | Evidence: local worktree 2026-06-08 | isMobileCapability/isMobileRuntimeManifest check 6 discriminants; Expo/RN package.json main→dist; Flutter pubspec accurate; privacy_manifest_intent in TS mirror; AUDIT_REPORT committed. 968 arc-extension + 11 mobile-runtime tests passed. |
+
+
+---
+
+## v0.9 Track
+
+Items opened after v0.8-r-ux5 release gate (2026-06-09).
+
+| ID | Title | Status |
+|---|---|---|
+| R80 | Provider Key Management CLI (`arc providers set-key / get-key / delete-key / export-env`) | Polished Complete |
+| R81 | `arc doctor providers` — configured-key status for all bundled providers | Polished Complete |
+| R82 | Token estimator accuracy benchmark (real traces required) | Deferred |

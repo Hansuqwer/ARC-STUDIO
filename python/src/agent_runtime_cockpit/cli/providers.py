@@ -1176,3 +1176,119 @@ def providers_routing_set(
 
     policy = ProviderRoutingPolicy(mode=mode, default_provider=provider, default_model=model)
     _out(ok(ProviderRoutingStore().set(policy).model_dump()), json_output)
+
+
+# ---------------------------------------------------------------------------
+# R80 — Provider Key Management CLI (Phase 271)
+# Wraps auth/manager.py Fernet-encrypted store; separate from env-ref accounts.
+# ---------------------------------------------------------------------------
+
+
+@providers_app.command("set-key")
+def providers_set_key(
+    provider_id: str = typer.Argument(..., help="Provider id (e.g. openai, anthropic)"),
+    api_key: str = typer.Argument(..., help="Raw API key — stored encrypted at rest"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Encrypt and store a provider API key in ~/.local/share/arc-studio/auth.json."""
+    _setup_logging(debug)
+    from ..auth.manager import encrypt_credential, save_credential
+
+    cred = encrypt_credential(provider_id, api_key)
+    save_credential(cred)
+    _out(ok({"provider_id": provider_id, "stored": True, "label": cred.label}), json_output)
+
+
+@providers_app.command("get-key")
+def providers_get_key(
+    provider_id: str = typer.Argument(..., help="Provider id"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show stored key metadata (never reveals the raw key)."""
+    _setup_logging(debug)
+    from ..auth.manager import get_credential
+
+    cred = get_credential(provider_id, trust_check=False)
+    if cred is None:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"No stored key for: {provider_id}"), json_output)
+        raise typer.Exit(1)
+    _out(
+        ok(
+            {
+                "provider_id": cred.provider_id,
+                "label": cred.label,
+                "auth_method": cred.auth_method,
+                "has_credential": bool(cred.credential_data),
+                "created_at": cred.created_at,
+            }
+        ),
+        json_output,
+    )
+
+
+@providers_app.command("delete-key")
+def providers_delete_key(
+    provider_id: str = typer.Argument(..., help="Provider id"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Delete stored encrypted key for a provider."""
+    _setup_logging(debug)
+    from ..auth.manager import remove_credential
+
+    removed = remove_credential(provider_id, trust_check=False)
+    if not removed:
+        _out(
+            err(ArcErrorCode.INVALID_INPUT, f"No stored key found for: {provider_id}"), json_output
+        )
+        raise typer.Exit(1)
+    _out(ok({"provider_id": provider_id, "deleted": True}), json_output)
+
+
+@providers_app.command("export-env")
+def providers_export_env(
+    reveal: bool = typer.Option(
+        False, "--reveal", help="Print actual key values (confirmation required)"
+    ),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Print shell export statements for all stored provider keys.
+
+    Keys are masked by default. Use --reveal to print actual values (requires confirmation).
+    """
+    _setup_logging(debug)
+    from ..auth.manager import get_decrypted_api_key, list_credentials
+    from ..provider_action import PROVIDERS
+
+    if reveal and not json_output:
+        confirmed = typer.confirm(
+            "This will print raw API keys to stdout. Continue?", default=False
+        )
+        if not confirmed:
+            raise typer.Abort()
+
+    creds = list_credentials(trust_check=False)
+    # Build env-key map from provider definitions
+    env_map: dict[str, list[str]] = {p.id: p.env_key_names for p in PROVIDERS if p.env_key_names}
+
+    lines = []
+    for cred in creds:
+        pid = str(cred["provider_id"])
+        env_keys = env_map.get(pid, [f"{pid.upper().replace('-', '_')}_API_KEY"])
+        env_key = env_keys[0] if env_keys else f"{pid.upper().replace('-', '_')}_API_KEY"
+        if reveal:
+            raw = get_decrypted_api_key(pid, trust_check=False)
+            value = raw or "<decrypt-failed>"
+        else:
+            value = "***"
+        lines.append({"env_var": env_key, "provider_id": pid, "value": value})
+
+    if json_output:
+        _out(ok({"exports": lines}), json_output)
+    else:
+        for line in lines:
+            v = line["value"] if reveal else "***"
+            typer.echo(f"export {line['env_var']}={v}")

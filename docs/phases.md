@@ -7791,3 +7791,36 @@ Final release gate for the Phases 253–270 elevation sprint.
 - **Version:** `v0.8-r-ux5` in README.
 - **AGENTS.md:** Updated to reflect Phases 253–270 complete.
 - **Remaining Baseline:** 2 items (R76 terminal-gated Linux/KVM; B2P-17 terminal-gated code-signing). All other ~220+ roadmap items are Polished Complete.
+
+
+## Phase 271 — R80: Provider Key Management CLI
+
+New commands in `python/src/agent_runtime_cockpit/cli/providers.py`, all wired to `auth/manager.py` Fernet-encrypted store:
+
+- **`arc providers set-key <provider-id> <api-key>`** — encrypts and persists key to `~/.local/share/arc-studio/auth.json`; returns `{stored: true}`.
+- **`arc providers get-key <provider-id> --json`** — returns metadata (provider_id, label, has_credential, created_at); never reveals raw key. Exits 1 if not found.
+- **`arc providers delete-key <provider-id>`** — removes stored key; exits 1 if not found.
+- **`arc providers export-env [--reveal] [--json]`** — prints `export ENV_VAR=***` for all stored keys; `--reveal` prints actual values (confirmation gate in interactive mode).
+
+**DoD gates:**
+1. UX states: every command has explicit ok/error envelope with typed fields.
+3. Parity: JSON output (`--json`) on all commands; matches existing providers CLI conventions.
+4. Tests: 6 tests covering set/get/delete/export-masked/export-reveal/get-missing; all pass.
+6. Security: raw keys never logged; `--reveal` requires confirmation in TTY; keys stored Fernet-encrypted at rest (existing `auth/manager.py`).
+8. Docs: `--help` on each command; README CLI reference updated in Phase 270.
+
+## Phase 272 — R81: `arc doctor providers` sub-check
+
+New `@doctor_app.command("providers")` in `python/src/agent_runtime_cockpit/cli/mgmt_doctor.py`:
+
+- Iterates all bundled providers via `PROVIDERS` list.
+- For each provider reports: `provider_id`, `display_name`, `key_source` (env | stored | local | none), `is_free_tier` (True for `ProviderAuthKind.LOCAL`), `configured`.
+- Merges env-var presence (`provider_statuses(os.environ)`) with Fernet-stored credentials (`get_credential()`). `doctor all` continues to have the env-only check; `doctor providers` is the full picture.
+- Output: `{total, configured, providers: [...]}` JSON envelope.
+
+**DoD gates:**
+1. UX states: explicit `configured: bool` and `key_source` field on every row; degraded state (none) clearly labelled.
+3. Parity: `--json` output; consistent with other `arc doctor` sub-commands.
+4. Tests: 5 tests (returns-all, local-is-free-tier, stored-key, env-key, no-key); 11 total new tests, all pass.
+5. Performance: no network calls; env + file read only.
+8. Docs: `--help` registered; `arc doctor providers --json` usable immediately.

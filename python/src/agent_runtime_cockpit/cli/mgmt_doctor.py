@@ -514,3 +514,48 @@ def doctor_storage(
 # CR-025: the legacy `eval run` command was removed here; `eval_run_new` below
 # is the single `@eval_app.command("run")` registration (Typer last-wins meant
 # this older definition was already shadowed/dead).
+
+
+@doctor_app.command("providers")
+def doctor_providers(json_output: bool = JSON_FLAG, debug: bool = DEBUG_FLAG) -> None:
+    """Show key-configuration status for all bundled providers.
+
+    Reports key_source (env | stored | none) and whether the provider is free-tier
+    (LOCAL auth — no key required). Does not make network calls.
+    """
+    import os
+
+    _setup_logging(debug)
+    from ..auth.manager import get_credential
+    from ..provider_action import PROVIDERS, ProviderAuthKind, provider_statuses
+
+    env_status = {s.provider: s for s in provider_statuses(os.environ)}
+
+    entries = []
+    for p in PROVIDERS:
+        is_free = p.auth_kind == ProviderAuthKind.LOCAL
+        env_s = env_status.get(p.id)
+        key_source: str
+        if is_free:
+            key_source = "local"
+        elif env_s and env_s.api_key_configured:
+            key_source = "env"
+        elif get_credential(p.id, trust_check=False) is not None:
+            key_source = "stored"
+        else:
+            key_source = "none"
+        entries.append(
+            {
+                "provider_id": p.id,
+                "display_name": p.display_name,
+                "key_source": key_source,
+                "is_free_tier": is_free,
+                "configured": key_source != "none",
+            }
+        )
+
+    configured = sum(1 for e in entries if e["configured"])
+    _out(
+        ok({"total": len(entries), "configured": configured, "providers": entries}),
+        json_output,
+    )
