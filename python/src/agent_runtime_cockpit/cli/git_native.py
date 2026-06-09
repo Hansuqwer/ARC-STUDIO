@@ -1,4 +1,4 @@
-"""arc git-native — git-native agent workflow commands (R88a)."""
+"""arc git-native — git-native agent workflow commands (R88a/R88b)."""
 
 from __future__ import annotations
 
@@ -107,3 +107,75 @@ def git_branch(
     else:
         action = "Switched to existing" if existed else "Created and switched to"
         console.print(f"{action} branch: [bold]{branch}[/bold]")
+
+
+@git_native_app.command("auto-commit")
+def git_auto_commit(
+    message: str = typer.Option("arc: agent file edit", "--message", "-m", help="Commit message"),
+    workspace: str = typer.Option("", "--workspace", "-w", help="Workspace root (default: cwd)"),
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
+    """Stage all changes and commit — called after every agent file edit (R88b)."""
+    ws = Path(workspace).resolve() if workspace else Path.cwd()
+
+    if not (ws / ".git").exists():
+        console.print("[red]Not a git repo.[/red]", err=True)
+        raise typer.Exit(1)
+
+    stage = _run_git(["add", "-A"], ws)
+    if stage.returncode != 0:
+        console.print(f"[red]git add failed:[/red] {stage.stderr.strip()}", err=True)
+        raise typer.Exit(1)
+
+    # Check if there's anything to commit
+    diff = _run_git(["diff", "--cached", "--quiet"], ws)
+    if diff.returncode == 0:
+        msg = {"ok": True, "committed": False, "message": "nothing to commit"}
+        if json_output:
+            print(json.dumps(msg))
+        else:
+            console.print("[dim]Nothing to commit.[/dim]")
+        return
+
+    commit = _run_git(["commit", "-m", message], ws)
+    if commit.returncode != 0:
+        console.print(f"[red]git commit failed:[/red] {commit.stderr.strip()}", err=True)
+        raise typer.Exit(1)
+
+    # Extract commit SHA
+    sha_result = _run_git(["rev-parse", "--short", "HEAD"], ws)
+    sha = sha_result.stdout.strip() if sha_result.returncode == 0 else "unknown"
+
+    msg = {"ok": True, "committed": True, "sha": sha, "message": message}
+    if json_output:
+        print(json.dumps(msg))
+    else:
+        console.print(f"Committed [bold]{sha}[/bold]: {message}")
+
+
+@git_native_app.command("auto-revert")
+def git_auto_revert(
+    workspace: str = typer.Option("", "--workspace", "-w", help="Workspace root (default: cwd)"),
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
+    """Revert uncommitted changes on run failure — discard unstaged edits (R88b)."""
+    ws = Path(workspace).resolve() if workspace else Path.cwd()
+
+    if not (ws / ".git").exists():
+        console.print("[red]Not a git repo.[/red]", err=True)
+        raise typer.Exit(1)
+
+    # Reset staged changes
+    reset = _run_git(["reset", "--hard", "HEAD"], ws)
+    if reset.returncode != 0:
+        console.print(f"[red]git reset failed:[/red] {reset.stderr.strip()}", err=True)
+        raise typer.Exit(1)
+
+    # Clean untracked files (-fd: force + directories)
+    clean = _run_git(["clean", "-fd"], ws)
+
+    msg = {"ok": True, "reverted": True, "clean_output": clean.stdout.strip()}
+    if json_output:
+        print(json.dumps(msg))
+    else:
+        console.print("[yellow]Reverted uncommitted changes.[/yellow]")

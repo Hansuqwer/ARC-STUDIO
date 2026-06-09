@@ -21,6 +21,7 @@ from . import (
     battle,  # noqa: F401
     ci,  # noqa: F401 — Phase 80 / R51: CI guardrails
     continuum,  # noqa: F401 — Phase 279 / R86b: session persistence list/resume
+    diff_cmd,  # noqa: F401 — Phase 291 / R89a: arc diff apply --interactive
     discover,  # noqa: F401
     edit,  # noqa: F401 — Phase 85: safety-gated edit loop
     events,  # noqa: F401

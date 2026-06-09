@@ -65,3 +65,38 @@ def test_git_branch_json_output(git_repo):
 def test_git_branch_fails_without_repo(tmp_path):
     result = runner.invoke(app, ["git-native", "branch", "sess-1", "--workspace", str(tmp_path)])
     assert result.exit_code == 1
+
+
+def test_auto_commit_stages_and_commits(git_repo):
+    (git_repo / "test.txt").write_text("hello")
+    result = runner.invoke(
+        app, ["git-native", "auto-commit", "--message", "test commit", "--workspace", str(git_repo)]
+    )
+    assert result.exit_code == 0
+    log = subprocess.run(
+        ["git", "log", "--oneline", "-1"], cwd=str(git_repo), capture_output=True, text=True
+    ).stdout
+    assert "test commit" in log
+
+
+def test_auto_commit_nothing_to_commit(git_repo):
+    result = runner.invoke(app, ["git-native", "auto-commit", "--workspace", str(git_repo)])
+    assert result.exit_code == 0
+    assert "Nothing" in result.output or "nothing" in result.output
+
+
+def test_auto_commit_json_output(git_repo):
+    (git_repo / "file2.txt").write_text("data")
+    result = runner.invoke(
+        app, ["git-native", "auto-commit", "--json", "--workspace", str(git_repo)]
+    )
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["ok"] is True
+
+
+def test_auto_revert_discards_changes(git_repo):
+    (git_repo / "revert_me.txt").write_text("will be reverted")
+    result = runner.invoke(app, ["git-native", "auto-revert", "--workspace", str(git_repo)])
+    assert result.exit_code == 0
+    assert not (git_repo / "revert_me.txt").exists()
