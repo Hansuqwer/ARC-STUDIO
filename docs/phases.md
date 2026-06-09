@@ -7824,3 +7824,84 @@ New `@doctor_app.command("providers")` in `python/src/agent_runtime_cockpit/cli/
 4. Tests: 5 tests (returns-all, local-is-free-tier, stored-key, env-key, no-key); 11 total new tests, all pass.
 5. Performance: no network calls; env + file read only.
 8. Docs: `--help` registered; `arc doctor providers --json` usable immediately.
+
+
+## Phase 273 — Competitive Feature Backlog Intake (R83–R102 + R-NATIVE-RUNTIME)
+
+**Type:** Planning / registration only. **No code, no tests** were written in this phase.
+
+Captured the competitive analysis from `docs/handover/ARC-Studio-Complete-Deliverable.pdf`
+(Section 5 "Twenty Invented Realistic Features" + Section 7 "Native Runtime Specification") into
+the canonical planning surface so the ideas are tracked in one place without overclaiming.
+
+**What changed:**
+- New backlog doc `docs/research-findings/competitive-feature-backlog-2026-06-09.md` listing all
+  20 features (R83–R102) plus the native-runtime track (R-NATIVE-RUNTIME): concept, competitive
+  target, dependencies, applicable DoD gates, and effort estimate per item.
+- `docs/roadmap.md`: new "Competitive Feature Backlog Intake" subsection appended under NEW
+  INTAKE with 21 rows, **all `Not Started`**, additive (no existing row changed).
+
+**Status discipline (no overclaim):**
+- Every registered item is `Not Started` — no implementation, no tests, no evidence in this repo.
+  IDs R83–R102 / R-NATIVE-RUNTIME are reserved, not active.
+- Posture unchanged: ARC Studio remains a single-user, loopback-only alpha. No item implies a
+  production-grade, remote, or shared-host capability; R97 compliance profiles are aspirational
+  targets, not certifications.
+- The R-NATIVE-RUNTIME prototype skeleton lives only in an external arena workspace and is **not**
+  part of this repo and **not** promoted; adoption would require a dedicated ADR.
+- This explicitly avoids the deliverable's own flagged failure mode (unstarted features presented
+  as shipped). Status follows evidence.
+
+**DoD gates:**
+8. Docs: backlog doc + roadmap rows added in place; `bash scripts/check-banned-claims.sh
+   docs/roadmap.md docs/phases.md docs/research-findings/competitive-feature-backlog-2026-06-09.md`
+   passes (exit 0).
+
+**Not addressed (by design):** gates 1–7 are not applicable — this phase ships no user-facing
+behavior, only planning records. Any feature leaving `Not Started` will open its own phase and
+must clear the full DoD before any status above `Not Started`.
+
+**Evidence:** local worktree 2026-06-09; additive docs only; no source/protocol/CLI changes; not
+committed (left in working tree for review per charter rule 7).
+
+
+## Phase 274 — Security / Performance / Process Backlog Intake + Approved Mockups Incorporation
+
+**Type:** Planning / registration + asset incorporation. **No code, no tests** were written.
+
+Completed the capture of the remaining actionable items from
+`docs/handover/ARC-Studio-Complete-Deliverable.pdf` (Section 6 security, Section 9 performance,
+Section 1 process recommendations) and incorporated the deliverable's approved UI mockups.
+
+**What changed:**
+- `docs/research-findings/competitive-feature-backlog-2026-06-09.md`: appended Security
+  (R-SEC1–4), Performance (R-PERF1–9), and Process/Release-Hygiene (R-PROC1–6) backlog sections,
+  each with explicit dedupe notes against existing audits and roadmap rows; plus an Approved
+  Mockups map.
+- `docs/roadmap.md`: new "Security / Performance / Process Backlog Intake" subsection appended
+  under NEW INTAKE with 19 rows, **all `Not Started`**, additive (no existing row changed).
+- `docs/handover/mockups/`: 14 approved design-reference mockups (~13 MB) preserved from the
+  arena deliverable workspace into the repository, mapped to their features/surfaces in the
+  backlog doc.
+
+**Dedupe / honesty notes (no double-counting, no overclaim):**
+- R-PERF2 is registered as **residual only** — the event stream is already virtualized
+  (R17 `VirtualizedEventList`) and bounded (R-POLISH9); only `TraceViewerSection`/`AssuranceTab`
+  remain.
+- R-PERF4 is **residual only** — `config-service`/notification backend already async
+  (R-POLISH7/R-POLISH14); residual is `startRun()` + `EditPlanBridge`.
+- R-SEC4 is **residual only** — workspace paths already use `realpath()`/`is_path_within_root()`
+  (R-POLISH1/CR-006); residual is the `run_id` storage-layer allowlist.
+- Mockup approval applies to **designs**, not implementations: every mapped feature remains at
+  its listed status (mostly `Not Started`). Mockups are not implementation evidence.
+
+**DoD gates:**
+8. Docs: backlog sections + roadmap rows added in place; mockups incorporated and mapped;
+   `bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md
+   docs/research-findings/competitive-feature-backlog-2026-06-09.md` passes (exit 0).
+
+**Not addressed (by design):** gates 1–7 are not applicable — this phase ships no user-facing
+behavior. Each item leaving `Not Started` will open its own phase and clear the full DoD.
+
+**Evidence:** local worktree 2026-06-09; additive docs + binary mockup assets only; no
+source/protocol/CLI changes; not committed (left in working tree for review per charter rule 7).

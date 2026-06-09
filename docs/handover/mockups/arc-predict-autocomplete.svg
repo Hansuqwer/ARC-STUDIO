@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1b26"/>
+      <stop offset="100%" stop-color="#16161e"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+
+  <!-- Title bar -->
+  <rect x="0" y="0" width="1920" height="40" fill="#1f2335"/>
+  <text x="20" y="26" fill="#7dcfff" font-family="monospace" font-size="16" font-weight="bold">ARC Predict</text>
+  <text x="180" y="26" fill="#565f89" font-family="monospace" font-size="12">Smart Tab Autocomplete — Qwen2.5-Coder 1.5B</text>
+  <text x="1750" y="26" fill="#7aa2f7" font-family="monospace" font-size="12">Latency: 94ms</text>
+
+  <!-- Left panel: code editor -->
+  <rect x="20" y="60" width="1200" height="980" rx="8" fill="#1f2335" stroke="#3b4261" stroke-width="1"/>
+  <text x="40" y="90" fill="#a9b1d6" font-family="monospace" font-size="14">user_service.py</text>
+
+  <!-- Code lines -->
+  <text x="40" y="130" fill="#7aa2f7" font-family="monospace" font-size="16">def</text>
+  <text x="80" y="130" fill="#e0af68" font-family="monospace" font-size="16">authenticate_user</text>
+  <text x="260" y="130" fill="#c0caf5" font-family="monospace" font-size="16">(username: str, password: str):</text>
+
+  <text x="40" y="160" fill="#c0caf5" font-family="monospace" font-size="16">    user = db.query(User).filter(User.username == username).first()</text>
+  <text x="40" y="190" fill="#c0caf5" font-family="monospace" font-size="16">    if not user:</text>
+  <text x="40" y="220" fill="#c0caf5" font-family="monospace" font-size="16">        return None</text>
+  <text x="40" y="250" fill="#c0caf5" font-family="monospace" font-size="16">    </text>
+  <text x="80" y="250" fill="#c0caf5" font-family="monospace" font-size="16">if not</text>
+  <text x="140" y="250" fill="#e0af68" font-family="monospace" font-size="16">verify_password</text>
+  <text x="300" y="250" fill="#c0caf5" font-family="monospace" font-size="16">(password, user.password_hash):</text>
+
+  <text x="40" y="280" fill="#c0caf5" font-family="monospace" font-size="16">        return None</text>
+  <text x="40" y="310" fill="#c0caf5" font-family="monospace" font-size="16">    </text>
+
+  <!-- Ghost text prediction -->
+  <text x="40" y="340" fill="#7dcfff" font-family="monospace" font-size="16">    user.last_login = datetime.now(timezone.utc)</text>
+  <text x="40" y="370" fill="#7dcfff" font-family="monospace" font-size="16">    db.commit()</text>
+  <text x="40" y="400" fill="#7dcfff" font-family="monospace" font-size="16">    return user</text>
+  <text x="40" y="430" fill="#7dcfff" font-family="monospace" font-size="16">    </text>
+  <rect x="35" y="325" width="500" height="110" fill="none" stroke="#7dcfff" stroke-width="1" stroke-dasharray="4 2" opacity="0.6"/>
+  <text x="550" y="340" fill="#7dcfff" font-family="monospace" font-size="12">TAB to accept</text>
+
+  <!-- Cursor blinking -->
+  <rect x="40" y="325" width="2" height="22" fill="#7aa2f7">
+    <animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite"/>
+  </rect>
+
+  <!-- Tooltip -->
+  <rect x="600" y="320" width="320" height="40" rx="6" fill="#24283b" stroke="#7dcfff" stroke-width="1" opacity="0.95"/>
+  <text x="615" y="345" fill="#7dcfff" font-family="monospace" font-size="12">ARC Predict — 4 lines, 97% confidence</text>
+
+  <!-- Right panel: Context Sources -->
+  <rect x="1240" y="60" width="660" height="480" rx="8" fill="#1f2335" stroke="#3b4261" stroke-width="1"/>
+  <text x="1260" y="90" fill="#c0caf5" font-family="monospace" font-size="16" font-weight="bold">Context Sources</text>
+
+  <rect x="1260" y="110" width="620" height="36" rx="4" fill="#24283b"/>
+  <text x="1270" y="133" fill="#7aa2f7" font-family="monospace" font-size="14">auth/manager.py</text>
+  <text x="1700" y="133" fill="#73daca" font-family="monospace" font-size="14">94%</text>
+
+  <rect x="1260" y="156" width="620" height="36" rx="4" fill="#24283b"/>
+  <text x="1270" y="179" fill="#7aa2f7" font-family="monospace" font-size="14">models/user.py</text>
+  <text x="1700" y="179" fill="#73daca" font-family="monospace" font-size="14">87%</text>
+
+  <rect x="1260" y="202" width="620" height="36" rx="4" fill="#24283b"/>
+  <text x="1270" y="225" fill="#7aa2f7" font-family="monospace" font-size="14">security/password.py</text>
+  <text x="1700" y="225" fill="#73daca" font-family="monospace" font-size="14">82%</text>
+
+  <rect x="1260" y="248" width="620" height="36" rx="4" fill="#24283b"/>
+  <text x="1270" y="271" fill="#7aa2f7" font-family="monospace" font-size="14">api/login.py</text>
+  <text x="1700" y="271" fill="#73daca" font-family="monospace" font-size="14">65%</text>
+
+  <rect x="1260" y="294" width="620" height="36" rx="4" fill="#24283b"/>
+  <text x="1270" y="317" fill="#7aa2f7" font-family="monospace" font-size="14">tests/test_auth.py</text>
+  <text x="1700" y="317" fill="#73daca" font-family="monospace" font-size="14">43%</text>
+
+  <!-- Right panel: Stats -->
+  <rect x="1240" y="560" width="660" height="480" rx="8" fill="#1f2335" stroke="#3b4261" stroke-width="1"/>
+  <text x="1260" y="590" fill="#c0caf5" font-family="monospace" font-size="16" font-weight="bold">ARC Predict Stats</text>
+
+  <text x="1260" y="630" fill="#7aa2f7" font-family="monospace" font-size="14">Model</text>
+  <text x="1500" y="630" fill="#73daca" font-family="monospace" font-size="14">Qwen2.5-Coder 1.5B (ONNX)</text>
+
+  <text x="1260" y="670" fill="#7aa2f7" font-family="monospace" font-size="14">Context Window</text>
+  <text x="1500" y="670" fill="#73daca" font-family="monospace" font-size="14">2,048 tokens</text>
+
+  <text x="1260" y="710" fill="#7aa2f7" font-family="monospace" font-size="14">Avg Latency</text>
+  <text x="1500" y="710" fill="#73daca" font-family="monospace" font-size="14">94ms (p95: 142ms)</text>
+
+  <text x="1260" y="750" fill="#7aa2f7" font-family="monospace" font-size="14">Acceptance Rate</text>
+  <text x="1500" y="750" fill="#73daca" font-family="monospace" font-size="14">72% (last 7 days)</text>
+
+  <text x="1260" y="790" fill="#7aa2f7" font-family="monospace" font-size="14">Predictions Today</text>
+  <text x="1500" y="790" fill="#73daca" font-family="monospace" font-size="14">1,247</text>
+
+  <!-- Bottom status bar -->
+  <rect x="0" y="1040" width="1920" height="40" fill="#1f2335" stroke="#3b4261" stroke-width="1"/>
+  <text x="20" y="1065" fill="#7dcfff" font-family="monospace" font-size="14">🧠 ARC Predict: ON (Local ONNX)</text>
+  <text x="400" y="1065" fill="#73daca" font-family="monospace" font-size="14">| Session: 4,230 / 50,000 tokens</text>
+  <text x="750" y="1065" fill="#e0af68" font-family="monospace" font-size="14">| Provider: Claude Sonnet 4.6</text>
+  <text x="1100" y="1065" fill="#bb9af7" font-family="monospace" font-size="14">| Mode: AUTO</text>
+  <text x="1300" y="1065" fill="#73daca" font-family="monospace" font-size="14">| Trust: VERIFIED</text>
+  <text x="1550" y="1065" fill="#7aa2f7" font-family="monospace" font-size="14">| Daemon: ●</text>
+</svg>

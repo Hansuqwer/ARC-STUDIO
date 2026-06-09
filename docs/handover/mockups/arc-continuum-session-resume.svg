@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a1b26"/><stop offset="100%" stop-color="#16161e"/></linearGradient>
+    <linearGradient id="cardBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#24283b"/><stop offset="100%" stop-color="#1f2335"/></linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+
+  <!-- Header -->
+  <rect x="0" y="0" width="1920" height="60" fill="#1f2335" stroke="#3b4261" stroke-width="1"/>
+  <text x="30" y="38" fill="#7dcfff" font-family="monospace" font-size="22" font-weight="bold">ARC Continuum</text>
+  <text x="220" y="38" fill="#565f89" font-family="monospace" font-size="14">Session Persistence & Resume</text>
+  <rect x="1600" y="15" width="280" height="30" rx="15" fill="#24283b" stroke="#3b4261" stroke-width="1"/>
+  <text x="1620" y="35" fill="#7aa2f7" font-family="monospace" font-size="14">🔍 Search sessions...</text>
+
+  <!-- Left: Session List -->
+  <rect x="30" y="80" width="900" height="960" rx="8" fill="#1f2335" stroke="#3b4261" stroke-width="1"/>
+  <text x="50" y="110" fill="#c0caf5" font-family="monospace" font-size="16" font-weight="bold">Recent Sessions</text>
+
+  <!-- Session Card 1 -->
+  <rect x="50" y="130" width="860" height="140" rx="8" fill="url(#cardBg)" stroke="#3b4261" stroke-width="1"/>
+  <text x="70" y="160" fill="#e0af68" font-family="monospace" font-size="16" font-weight="bold">Feature: OAuth Refactor</text>
+  <rect x="750" y="145" width="80" height="24" rx="4" fill="#73daca" opacity="0.2"/>
+  <text x="760" y="162" fill="#73daca" font-family="monospace" font-size="12">COMPLETED</text>
+  <text x="850" y="162" fill="#565f89" font-family="monospace" font-size="12">Jun 8, 14:32</text>
+  <text x="70" y="185" fill="#565f89" font-family="monospace" font-size="12">Duration: 2h 14m • Tokens: 8,420 • Provider: Claude Sonnet 4.6</text>
+  <text x="70" y="210" fill="#7aa2f7" font-family="monospace" font-size="12">→ "Refactored auth flow to use JWT tokens with refresh rotation..."</text>
+  <text x="70" y="235" fill="#565f89" font-family="monospace" font-size="12">Files: 12 modified • SwarmGraph: 3 nodes • Budget remaining: $12.40</text>
+  <rect x="750" y="220" width="140" height="32" rx="6" fill="#7dcfff" opacity="0.15" stroke="#7dcfff" stroke-width="1"/>
+  <text x="770" y="241" fill="#7dcfff" font-family="monospace" font-size="14">Resume</text>
+
+  <!-- Session Card 2 -->
+  <rect x="50" y="290" width="860" height="140" rx="8" fill="url(#cardBg)" stroke="#3b4261" stroke-width="1"/>
+  <text x="70" y="320" fill="#e0af68" font-family="monospace" font-size="16" font-weight="bold">Bug: Race Condition in Event Broker</text>
+  <rect x="750" y="305" width="80" height="24" rx="4" fill="#e0af68" opacity="0.2"/>
+  <text x="760" y="322" fill="#e0af68" font-family="monospace" font-size="12">PAUSED</text>
+  <text x="850" y="322" fill="#565f89" font-family="monospace" font-size="12">Jun 8, 18:45</text>
+  <text x="70" y="345" fill="#565f89" font-family="monospace" font-size="12">Duration: 45m • Tokens: 3,120 • Provider: GPT-5.3</text>
+  <text x="70" y="370" fill="#7aa2f7" font-family="monospace" font-size="12">→ "The event broker drops messages under high concurrency. Need to add..."</text>
+  <text x="70" y="395" fill="#565f89" font-family="monospace" font-size="12">Files: 3 modified • SwarmGraph: 1 node • Budget remaining: $18.20</text>
+  <rect x="750" y="380" width="140" height="32" rx="6" fill="#7dcfff" opacity="0.15" stroke="#7dcfff" stroke-width="1"/>
+  <text x="770" y="401" fill="#7dcfff" font-family="monospace" font-size="14">Resume</text>
+
+  <!-- Session Card 3 -->
+  <rect x="50" y="450" width="860" height="140" rx="8" fill="url(#cardBg)" stroke="#3b4261" stroke-width="1"/>
+  <text x="70" y="480" fill="#e0af68" font-family="monospace" font-size="16" font-weight="bold">Eval: Benchmark Suite Migration</text>
+  <rect x="750" y="465" width="80" height="24" rx="4" fill="#bb9af7" opacity="0.2"/>
+  <text x="760" y="482" fill="#bb9af7" font-family="monospace" font-size="12">RUNNING</text>
+  <text x="850" y="482" fill="#565f89" font-family="monospace" font-size="12">Jun 9, 09:12</text>
+  <text x="70" y="505" fill="#565f89" font-family="monospace" font-size="12">Duration: 3h 10m • Tokens: 12,800 • Provider: DeepSeek V3</text>
+  <text x="70" y="530" fill="#7aa2f7" font-family="monospace" font-size="12">→ "Running batch evaluation across 50 test cases. Progress: 34/50..."</text>
+  <text x="70" y="555" fill="#565f89" font-family="monospace" font-size="12">Daemon task: Background eval • Budget: $5.40 / $50.00</text>
+  <rect x="750" y="540" width="140" height="32" rx="6" fill="#bb9af7" opacity="0.15" stroke="#bb9af7" stroke-width="1"/>
+  <text x="770" y="561" fill="#bb9af7" font-family="monospace" font-size="14">Watch</text>
+
+  <!-- Sparkline chart -->
+  <rect x="50" y="620" width="860" height="200" rx="8" fill="#24283b" stroke="#3b4261" stroke-width="1"/>
+  <text x="70" y="650" fill="#c0caf5" font-family="monospace" font-size="14" font-weight="bold">Token Usage — Last 30 Days</text>
+  <polyline points="80,760 120,740 160,750 200,720 240,700 280,710 320,680 360,690 400,660 440,670 480,640 520,630 560,650 600,620 640,610 680,580 720,590 760,560 800,570 840,540 880,530 920,520" fill="none" stroke="#7dcfff" stroke-width="2"/>
+  <polyline points="80,760 120,750 160,755 200,745 240,740 280,742 320,735 360,738 400,730 440,732 480,725 520,728 560,722 600,718 640,720 680,712 720,715 760,708 800,710 840,705 880,707 920,700" fill="none" stroke="#e0af68" stroke-width="2" stroke-dasharray="4 2"/>
+  <text x="950" y="650" fill="#7dcfff" font-family="monospace" font-size="12">Claude</text>
+  <text x="950" y="670" fill="#e0af68" font-family="monospace" font-size="12">DeepSeek</text>
+
+  <!-- Right: Session Snapshot -->
+  <rect x="960" y="80" width="930" height="960" rx="8" fill="#1f2335" stroke="#3b4261" stroke-width="1"/>
+  <text x="980" y="110" fill="#c0caf5" font-family="monospace" font-size="16" font-weight="bold">Session Snapshot</text>
+  <text x="980" y="140" fill="#e0af68" font-family="monospace" font-size="14">Feature: OAuth Refactor</text>
+
+  <text x="980" y="180" fill="#7aa2f7" font-family="monospace" font-size="14">Open Files</text>
+  <rect x="980" y="195" width="880" height="30" rx="4" fill="#24283b"/>
+  <text x="990" y="215" fill="#73daca" font-family="monospace" font-size="12">● auth/manager.py</text>
+  <text x="1150" y="215" fill="#565f89" font-family="monospace" font-size="12">(modified)</text>
+  <rect x="980" y="230" width="880" height="30" rx="4" fill="#24283b"/>
+  <text x="990" y="250" fill="#73daca" font-family="monospace" font-size="12">○ models/token.py</text>
+  <text x="1150" y="250" fill="#565f89" font-family="monospace" font-size="12">(new)</text>
+  <rect x="980" y="265" width="880" height="30" rx="4" fill="#24283b"/>
+  <text x="990" y="285" fill="#73daca" font-family="monospace" font-size="12">○ tests/test_oauth.py</text>
+  <text x="1150" y="285" fill="#565f89" font-family="monospace" font-size="12">(new)</text>
+
+  <text x="980" y="330" fill="#7aa2f7" font-family="monospace" font-size="14">Active Provider</text>
+  <text x="980" y="355" fill="#c0caf5" font-family="monospace" font-size="14">Claude Sonnet 4.6</text>
+
+  <text x="980" y="395" fill="#7aa2f7" font-family="monospace" font-size="14">Token Budget</text>
+  <rect x="980" y="415" width="400" height="20" rx="10" fill="#24283b"/>
+  <rect x="980" y="415" width="320" height="20" rx="10" fill="#73daca" opacity="0.6"/>
+  <text x="980" y="460" fill="#73daca" font-family="monospace" font-size="14">$12.40 / $20.00 remaining</text>
+
+  <text x="980" y="500" fill="#7aa2f7" font-family="monospace" font-size="14">SwarmGraph Active</text>
+  <text x="980" y="525" fill="#c0caf5" font-family="monospace" font-size="14">3 nodes: Queen, Coder, Reviewer</text>
+
+  <text x="980" y="565" fill="#7aa2f7" font-family="monospace" font-size="14">Last Chat Messages</text>
+  <rect x="980" y="585" width="880" height="60" rx="4" fill="#24283b"/>
+  <text x="990" y="605" fill="#7aa2f7" font-family="monospace" font-size="12">User:</text>
+  <text x="1050" y="605" fill="#c0caf5" font-family="monospace" font-size="12">Refactor the auth flow to use JWT with refresh tokens.</text>
+  <text x="990" y="625" fill="#e0af68" font-family="monospace" font-size="12">Agent:</text>
+  <text x="1060" y="625" fill="#c0caf5" font-family="monospace" font-size="12">I'll refactor auth/manager.py to add JWT token generation...</text>
+
+  <rect x="980" y="800" width="200" height="40" rx="6" fill="#7dcfff" opacity="0.15" stroke="#7dcfff" stroke-width="1"/>
+  <text x="1010" y="825" fill="#7dcfff" font-family="monospace" font-size="14">🔄 Restore Session</text>
+  <rect x="1200" y="800" width="200" height="40" rx="6" fill="#bb9af7" opacity="0.15" stroke="#bb9af7" stroke-width="1"/>
+  <text x="1230" y="825" fill="#bb9af7" font-family="monospace" font-size="14">💾 Export .arcnb</text>
+</svg>

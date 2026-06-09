@@ -1820,3 +1820,83 @@ Items opened after v0.8-r-ux5 release gate (2026-06-09).
 | R80 | Provider Key Management CLI (`arc providers set-key / get-key / delete-key / export-env`) | Polished Complete |
 | R81 | `arc doctor providers` — configured-key status for all bundled providers | Polished Complete |
 | R82 | Token estimator accuracy benchmark (real traces required) | Deferred |
+
+
+---
+
+## Competitive Feature Backlog Intake (R83–R102 + R-NATIVE-RUNTIME)
+
+Candidate scope captured 2026-06-09 from `docs/handover/ARC-Studio-Complete-Deliverable.pdf`
+(Section 5 "Twenty Invented Realistic Features" + Section 7 "Native Runtime Specification").
+Full detail: `docs/research-findings/competitive-feature-backlog-2026-06-09.md`.
+
+> Every row below is **Not Started**: no implementation, no tests, no evidence. These IDs are
+> reserved/proposed only and are not active work. Each requires an explicit roadmap decision
+> before any slice begins, and only one item may move to In Progress at a time (Finish 1 → 100%
+> before broadening). These items do not change ARC Studio's single-user, loopback-only alpha
+> posture; none implies a production-grade, remote, or shared-host capability.
+
+| ID | Title | Status |
+|---|---|---|
+| R83 | ARC Predict — local next-edit autocomplete (PDF Feature 1) | Not Started |
+| R84 | ARC Index — local semantic codebase search (PDF Feature 2) | Not Started |
+| R85 | ARC Context — automatic context retrieval (PDF Feature 3) | Not Started |
+| R86 | ARC Continuum — session persistence & resume (PDF Feature 4) | Not Started |
+| R87 | ARC Stream — real-time event relay, Python → IDE/TUI (PDF Feature 12) | Not Started |
+| R88 | ARC Git — git-native agent workflow (PDF Feature 7) | Not Started |
+| R89 | ARC Diff — one-click inline patch apply (PDF Feature 8) | Not Started |
+| R90 | ARC Memory — persistent project knowledge (PDF Feature 10) | Not Started |
+| R91 | ARC Hub — local-first assistant/config sharing (PDF Feature 9) | Not Started |
+| R92 | ARC Daemon Tasks — local background task runner (PDF Feature 11) | Not Started |
+| R93 | ARC Vision — local browser/desktop automation, HITL-gated (PDF Feature 5) | Not Started |
+| R94 | ARC Advisor — token cost optimization advisor (PDF Feature 17) | Not Started |
+| R95 | ARC Dashboard — multi-workspace control center (PDF Feature 15) | Not Started |
+| R96 | ARC Voice — local voice-to-command interface (PDF Feature 6) | Not Started |
+| R97 | ARC Policies — sandbox policy template library (PDF Feature 14) | Not Started |
+| R98 | ARC Composer — visual SwarmGraph builder (PDF Feature 16) | Not Started |
+| R99 | ARC Debug — inline debugger & REPL via DAP (PDF Feature 13) | Not Started |
+| R100 | ARC Notebook — agent workbook `.arcnb` (PDF Feature 18) | Not Started |
+| R101 | ARC Time Travel — run replay & diff debugger (PDF Feature 19) | Not Started |
+| R102 | ARC Migrate — cross-adapter migration assistant (PDF Feature 20) | Not Started |
+| R-NATIVE-RUNTIME | Native GPU visualizer (Rust/wgpu/egui) augmenting the Theia IDE (PDF §7) | Not Started |
+
+
+---
+
+## Security / Performance / Process Backlog Intake (R-SEC*, R-PERF*, R-PROC*)
+
+Candidate scope captured 2026-06-09 from `docs/handover/ARC-Studio-Complete-Deliverable.pdf`
+(Section 6 security hardening + Section 9 performance + Section 1 process recommendations). Full
+detail and dedupe notes: `docs/research-findings/competitive-feature-backlog-2026-06-09.md`.
+
+> Every row below is **Not Started**: no implementation, no tests, no evidence. Three rows are
+> **residual only** (the bulk of the work already shipped under the cross-referenced ID) and are
+> scoped to the remaining slice. These items do not change ARC Studio's single-user,
+> loopback-only alpha posture. One item moves to In Progress at a time (Finish 1 → 100%).
+
+| ID | Title | Status |
+|---|---|---|
+| R-SEC1 | Subprocess isolation for MCP tool execution (via `isolation/selector.py`) | Not Started |
+| R-SEC2 | `prompt_guard.py` — regex injection-pattern detection (research-grade) | Not Started |
+| R-SEC3 | Python SBOM + `pnpm-lock.yaml` integrity verification + reproducible-build attestation | Not Started |
+| R-SEC4 | `run_id` storage path-traversal residual (allowlist + `relative_to()` confinement); workspace realpath already done | Not Started |
+| R-PERF1 | Streaming workspace inventory (< 5s for 100K files) | Not Started |
+| R-PERF2 | Virtualize residual lists (`TraceViewerSection`/`AssuranceTab`); event stream already virtualized via R17 | Not Started |
+| R-PERF3 | Lazy provider loading (< 2s startup with 109 providers) | Not Started |
+| R-PERF4 | Async `startRun()` bridge residual (eliminate remaining blocking `execFileSync`); config-service done in R-POLISH7/14 | Not Started |
+| R-PERF5 | SQLite WAL auto-checkpoint tuning (< 50ms write latency) | Not Started |
+| R-PERF6 | Memory-mapped trace reading (1 GB trace < 5s) | Not Started |
+| R-PERF7 | Incremental workspace index (< 1s per file change; depends on R84) | Not Started |
+| R-PERF8 | Provider connection pooling (10 concurrent calls/provider) | Not Started |
+| R-PERF9 | WASM trace parser (research; ~10× large-trace speedup) | Not Started |
+| R-PROC1 | Auto-generate release intelligence from CI on merge to main | Not Started |
+| R-PROC2 | `docs/RELEASE_SNAPSHOTS/` — dated, locked, HEAD-derived markdown | Not Started |
+| R-PROC3 | Enforce `patches/INDEX.md` freshness in CI (warn/fail if > 24h behind HEAD) | Not Started |
+| R-PROC4 | Normalize repo name in docs (`arc-theia-studio` alias → `ARC-STUDIO`) | Not Started |
+| R-PROC5 | Extend `check-banned-claims.sh` to flag forward-dated docs | Not Started |
+| R-PROC6 | Retire/archive `patches/` → `docs/archive/patches-2026-06-04/` (+ verify.sh 788dbc9-only warning) | Not Started |
+
+**Approved design mockups** for several of the above and for the R83–R102 features are preserved
+in `docs/handover/mockups/` (14 files) and mapped to their features/surfaces in the backlog doc.
+Approval applies to the design references only; the corresponding implementations remain at the
+status listed in their rows.
