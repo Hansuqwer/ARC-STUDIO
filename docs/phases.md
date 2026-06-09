@@ -8121,3 +8121,126 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
    - `docs/roadmap.md` R-PROC3/4/5/6 → Baseline Complete.
 
 **Evidence:** `bash scripts/check-banned-claims.sh AGENTS.md README.md docs/roadmap.md docs/phases.md` → `OK: No banned claims found.` `bash scripts/check-artifacts.sh` → `Artifact check passed.`
+
+## Phase 303 — R84a: arc index build — SQLite+FTS5 codebase index
+
+**Status:** Baseline Complete
+
+**What changed:** New `python/src/agent_runtime_cockpit/index/__init__.py` with `CodebaseIndex`:
+- `build()`: scans workspace files (100K max), extracts symbols via regex, stores in SQLite + FTS5.
+- `search()`: FTS5 full-text + path LIKE fallback. `stats()`: file count, last built, db path.
+- `arc index build/search/stats` CLI with `--json` output.
+
+**Evidence:** 8 tests pass (`tests/test_index_r84.py`). `arc index --help` shows build/search/stats.
+
+---
+
+## Phase 304 — R84b: arc index search — top-k results
+
+**Status:** Baseline Complete (combined with Phase 303 implementation)
+
+---
+
+## Phase 305-306 — R85 ARC Context suggest/attach
+
+**Status:** Baseline Complete
+
+**What changed:** `python/src/agent_runtime_cockpit/cli/context_cmd.py`:
+- `arc context suggest <prompt>`: queries codebase index, returns top-k relevant files.
+- `arc context attach <files>`: writes `.arc_context_attach.json` in workspace.
+- `arc context list / clear`: manage attached context.
+
+**Evidence:** 5 tests pass (`tests/test_context_r85.py`).
+
+---
+
+## Phase 307-308 — R90 ARC Memory save/load/search
+
+**Status:** Baseline Complete
+
+**What changed:** `python/src/agent_runtime_cockpit/cli/memory_cmd.py`:
+- `arc memory save <key> <content>`: Fernet-encrypted SQLite note with FTS5 tags index.
+- `arc memory load <key>`: decrypt and display.
+- `arc memory search <query>`: FTS5 key+tags search.
+- `arc memory list`: list all notes.
+
+**Evidence:** 5 tests pass (`tests/test_memory_r90.py`).
+
+---
+
+## Phase 309 — R83a: arc predict next-edit stub
+
+**Status:** Baseline Complete
+
+**What changed:** `python/src/agent_runtime_cockpit/cli/predict_cmd.py` — heuristic next-edit autocomplete stub using regex call-site pattern matching. JSON output with `mode: "heuristic-stub"`. Live LM gated behind `ARC_REAL_RUNTIME_SMOKE=1`.
+
+**Evidence:** 3 tests pass (`tests/test_predict_r83.py`).
+
+---
+
+## Phase 310 — R-SEC2: prompt_guard.py
+
+**Status:** Baseline Complete
+
+**What changed:** `python/src/agent_runtime_cockpit/security/prompt_guard.py` — deterministic regex injection detection: blocked/degraded/clean severity. 8 pattern families covering ignore-instructions, role-switch, system tags, jailbreak, DAN. No LLM judgment.
+
+**Evidence:** 8 tests pass (`tests/security/test_prompt_guard.py`).
+
+---
+
+## Phase 311 — R-SEC3: SBOM + pnpm-lock integrity
+
+**Status:** Baseline Complete
+
+**What changed:** `scripts/check-sbom-integrity.sh` — `pip-audit` Python SBOM generation + `pnpm-lock.yaml` SHA-256 hash attestation. Exit 0 if clean, exit 1 on vulnerabilities or hash change.
+
+---
+
+## Phase 312 — R-PERF1: async workspace inventory
+
+**Status:** Baseline Complete
+
+**What changed:** `workspace.py` `aiter_workspace_files()` — async generator using `asyncio.gather + run_in_executor(os.scandir)`. Yields Path objects non-blocking; `yield_every=200` for event loop responsiveness. Max 100K files.
+
+**Evidence:** 2 tests pass (`tests/test_perf_r85_r86_r87.py`).
+
+---
+
+## Phase 313 — R-PERF8: provider connection pooling
+
+**Status:** Baseline Complete
+
+**What changed:** `providers/models_dev.py` + `providers/agentrouter_proxy.py`: `aiohttp.TCPConnector(limit_per_host=10)` — connection pooling for concurrent provider calls.
+
+**Evidence:** 1 source-inspection test pass; ruff clean.
+
+---
+
+## Phase 314 — R-PERF6: mmap trace reading
+
+**Status:** Baseline Complete
+
+**What changed:** `orchestration/event_broker.py` `_iter_trace_events()`: uses `mmap.mmap(ACCESS_READ)` for files > 10 MB, enables 1 GB trace reading without full memory load.
+
+**Evidence:** 1 test pass (`tests/test_perf_r85_r86_r87.py::test_mmap_trace_reading`).
+
+---
+
+## Phase 315 — Final sweep: roadmap/phases/release snapshot
+
+**Status:** Baseline Complete
+
+**What changed:**
+- `docs/roadmap.md`: R83/R84/R85/R90/R-SEC2/R-SEC3/R-PERF1/R-PERF6/R-PERF8 → Baseline Complete.
+- `docs/phases.md`: Phases 295–315 appended.
+- `bash scripts/generate-release-snapshot.sh` → ruff clean, banned-claims clean.
+
+**Test baseline (2026-06-09 session 2):**
+- Python: 6177 tests collected; ruff clean; banned-claims clean.
+- New tests: 64 Python tests across 10 new test files; 16 TS tests.
+
+**Session 2 summary (Phases 295–315):**
+- 4 pre-existing CI failures fixed (artifact guard, banned-claims, mobile files)
+- 14 roadmap items elevated to Polished Complete
+- 9 new features: R83/R84/R85/R90 (predict/index/context/memory), R-SEC2/3 (prompt guard/SBOM), R-PERF1/6/8 (async inventory/mmap/pooling)
+- 1 real bug fixed: `console.print(..., err=True)` TypeError on error paths
