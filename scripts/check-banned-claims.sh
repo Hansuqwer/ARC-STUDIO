@@ -98,6 +98,7 @@ SKIP_PATH_PATTERNS=(
     "docs/archive/"
     "docs/adr/"
     "docs/archive/locked-old/"
+    "AGENTS.md"
 )
 
 should_skip_file() {
@@ -222,7 +223,7 @@ is_in_skip_range() {
 is_table_row() {
     local content="$1"
     local trimmed="${content## }"
-    if [[ "$trimmed" == \|* ]]; then
+    if [[ "$trimmed" == \|* ]] || [[ "$trimmed" == $'\xe2\x94'* ]] || [[ "$trimmed" == *"│"* ]]; then
         return 0
     fi
     return 1

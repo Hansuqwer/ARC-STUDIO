@@ -9,6 +9,7 @@ echo "Checking for accidental generated artifacts..."
 # Paths that look like artifacts but are required to be tracked.
 ALLOWLIST_PATTERNS=(
   '\.env\.example$'                     # template, no secrets
+  '^runtimes/mobile/flutter/'            # Flutter package sources (lib/ is source, not build output)
 )
 
 violations=0
