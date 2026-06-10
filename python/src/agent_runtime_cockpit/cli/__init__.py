@@ -22,6 +22,7 @@ from . import (
     ci,  # noqa: F401 — Phase 80 / R51: CI guardrails
     continuum,  # noqa: F401 — Phase 279 / R86b: session persistence list/resume
     diff_cmd,  # noqa: F401 — Phase 291 / R89a: arc diff apply --interactive
+    hub,  # noqa: F401 — Phase 316 / R91: arc hub list/add/remove/verify/inspect
     index_cmd,  # noqa: F401 — Phase 303 / R84: arc index build/search
     context_cmd,  # noqa: F401 — Phase 305 / R85: arc context suggest/attach
     memory_cmd,  # noqa: F401 — Phase 307 / R90: arc memory save/load/search

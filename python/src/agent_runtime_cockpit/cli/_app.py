@@ -32,6 +32,7 @@ from ._subapps import (
     edit_app,
     events_app,
     hitl_app,
+    hub_app,
     ir_app,
     capabilities_app,
     flight_app,
@@ -119,6 +120,7 @@ app.add_typer(git_native_app)
 app.add_typer(diff_app)
 app.add_typer(index_app)
 app.add_typer(predict_app)
+app.add_typer(hub_app)
 
 
 @app.command("dashboard")

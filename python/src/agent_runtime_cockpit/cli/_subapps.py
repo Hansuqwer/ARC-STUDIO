@@ -125,3 +125,8 @@ a2a_app = typer.Typer(
     name="a2a",
     help="A2A AgentCard — generate, inspect, verify, approve, invoke (loopback only)",
 )
+hub_app = typer.Typer(
+    name="hub",
+    help="Local-first catalog — share provider presets, policies, swarms, eval suites, themes (R91)",
+    no_args_is_help=True,
+)

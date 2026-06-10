@@ -8244,3 +8244,17 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - 14 roadmap items elevated to Polished Complete
 - 9 new features: R83/R84/R85/R90 (predict/index/context/memory), R-SEC2/3 (prompt guard/SBOM), R-PERF1/6/8 (async inventory/mmap/pooling)
 - 1 real bug fixed: `console.print(..., err=True)` TypeError on error paths
+
+---
+
+## Phase 316 — R91: ARC Hub — local-first config sharing
+
+**Status:** Baseline Complete
+
+**What changed:**
+- New `hub/__init__.py`: `HubCatalog`, `HubItem`, `load_hub_item()` — local-first catalog for sharing provider presets, policy templates, swarm defs, eval suites, and themes via git/local dirs. No central server. Install verification via sha256 checksum (deterministic, gate 6).
+- New `cli/hub.py`: `arc hub list|add|remove|verify|inspect` CLI with `--json` envelope output.
+- Wired `hub_app` into `cli/_subapps.py`, `cli/_app.py`, `cli/__init__.py`.
+- 5 valid item types: `provider-preset`, `policy-template`, `swarm-def`, `eval-suite`, `theme`.
+
+**Evidence:** 27 tests pass (`tests/hub/test_hub_r91.py`); ruff clean. Full suite: 6153 passed (27 new).
