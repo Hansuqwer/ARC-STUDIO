@@ -5,6 +5,10 @@
 **HEAD:** `cb0208c1` on `main`  
 **Scope:** 41 commits spanning Phases 296–335 + AGENTS.md active-track refresh
 
+> **Verification note (2026-06-10):** This document was independently verified against a fresh clone at `55c38b1b`.
+> Summary metrics, test counts, commit/phase mapping, and file inventories are accurate.
+> Per-phase prose has been corrected below against actual source; see `docs/handover/verification-report-phases-296-335.md` for the full audit.
+
 ---
 
 ## Summary Metrics
@@ -78,11 +82,11 @@
 **Commit:** `4e114c2b`  
 **Type:** Feature (Baseline)  
 **Files:**
-- `python/src/agent_runtime_cockpit/cli/git_native.py` — `arc git init|branch|commit|revert`
+- `python/src/agent_runtime_cockpit/cli/git_native.py` — `arc git-native init|branch|auto-commit|auto-revert`
 - `python/src/agent_runtime_cockpit/cli/__init__.py`, `_app.py`, `_subapps.py` — wiring
 - `python/tests/cli/test_git_native.py` — baseline tests
 
-**What changed:** `arc git` CLI subcommand introduced. `init` creates a bare git repo in the workspace. `branch` creates an auto-named branch per session (format: `arc/<run_id>`). `commit` stages and commits all changes. `revert` reverts to a prior commit. All local-only; no remote push.
+**What changed:** `arc git-native` CLI subcommand introduced (Typer name `"git-native"`). `init` runs `git init` (normal working repo, not bare). `branch` creates an auto-named branch per session (format: `arc/session-<id>`). `auto-commit` stages and commits all changes. `auto-revert` reverts to a prior commit. All local-only; no remote push.
 
 ---
 
@@ -97,7 +101,7 @@
 - `packages/arc-extension/src/browser/components/DiffHunk.tsx` — IDE inline diff component
 - `packages/arc-extension/src/browser/components/DiffHunk.test.tsx` — component tests
 
-**What changed:** Full R88/R89 cross-layer implementation. Python: auto-commit on run boundary, `arc diff apply` parses unified-diff patches and applies them via Python's `patch` stdlib. TypeScript: new `DiffHunk` React component renders inline diffs in the Theia IDE panel with accept/reject controls.
+**What changed:** Full R88/R89 cross-layer implementation. Python: auto-commit on run boundary; `arc diff apply` parses unified-diff hunks via a custom parser and applies them via `subprocess` + `git apply`. TypeScript: new `DiffHunk` React component renders inline diffs in the Theia IDE panel with per-hunk `onAccept`/`onReject` callbacks.
 
 ---
 
@@ -108,7 +112,7 @@
 - `python/src/agent_runtime_cockpit/storage/jsonl.py` — `relative_to()` + regex allowlist
 - `python/tests/storage/test_run_id_allowlist.py` — path traversal tests
 
-**What changed:** `run_id` values now validated against a `^[a-zA-Z0-9_\-]{1,128}$` allowlist before being used as filesystem path components. `relative_to()` enforces that resolved paths stay inside the workspace root. Prevents `../../../etc/passwd`-style path traversal.
+**What changed:** `run_id` values now validated against `^[A-Za-z0-9_.\-]{1,128}$` (also allows dots; explicit `"."` / `".."` rejection added) before use as filesystem path components. `path.resolve().relative_to(base_dir.resolve())` enforces workspace confinement (belt-and-braces). Prevents `../../../etc/passwd`-style path traversal.
 
 ---
 
@@ -133,7 +137,7 @@
 - `python/src/agent_runtime_cockpit/providers/__init__.py` — lazy registration wrapper
 - `python/tests/providers/test_lazy_provider_loading.py` — startup time test
 
-**What changed:** 109 bundled providers previously registered at import time (O(n) at startup). Now wrapped in a `LazyProviderCatalog` that defers registration until first access. Startup target: < 2s with full provider catalog.
+**What changed:** 109 bundled providers previously registered at import time (O(n) at startup). Deferred via a module-level `_BUNDLED_REGISTERED` flag and monkey-patched registry functions (`_reg.get = _lazy_get`, `_reg.known = _lazy_known`) — registration triggers only on first catalog access. No `LazyProviderCatalog` class; mechanism is module-level flag + function patching. Startup target: < 2s with full provider catalog.
 
 ---
 
@@ -145,7 +149,7 @@
 - `packages/arc-extension/src/browser/tabs/AssuranceTab.tsx` — bounded decisions list
 - `packages/arc-extension/src/browser/__tests__/trace-viewer-section.test.tsx` — tests
 
-**What changed:** `TraceViewerSection` now uses a virtualized list (windowed rendering) for large traces. `AssuranceTab` decisions list bounded to 500 entries with "show more" pagination. Prevents DOM thrash on runs with thousands of trace events.
+**What changed:** `TraceViewerSection` now uses `@tanstack/react-virtual` (`useVirtualizer`, overscan 5) for windowed rendering of large traces. `AssuranceTab` decisions list bounded to `DECISIONS_VISIBLE_LIMIT = 50` entries with a "show all" toggle. Prevents DOM thrash on runs with thousands of trace events.
 
 ---
 
@@ -168,7 +172,7 @@
 - `python/tests/mcp/test_mcp_client_session.py` — isolation tests
 - `python/tests/mcp/test_tool_runner.py` — risk-level tests
 
-**What changed:** `TOOL_RISK_LEVELS` dict classifies MCP tools as `LOW/MEDIUM/HIGH/CRITICAL`. High/Critical tools are now dispatched via a subprocess-isolated runner (separate process; limited env; no access to parent's file descriptors). Low/Medium tools run in-process with a capability sandbox.
+**What changed:** `TOOL_RISK_LEVELS` dict classifies MCP tools as `LOW/MEDIUM/HIGH` (three tiers; no CRITICAL). Exactly one tool (`arc_run_start`, HIGH) is dispatched via `SubprocessIsolationProvider` with an env allowlist (`SAFE_ENV_KEYS`) and output cap. LOW/MEDIUM tools run in-process as standard MCP tools.
 
 ---
 
@@ -178,7 +182,7 @@
 **Files:**
 - `scripts/check-banned-claims.sh` — forward-date regex added
 
-**What changed:** `check-banned-claims.sh` extended with a pattern that flags any docs date claiming a year beyond the current year (`2027+`). Prevents accidentally forward-dated release claims from landing in CI-protected docs.
+**What changed:** `check-banned-claims.sh` extended with a pattern that flags ISO-8601 dates more than **7 days** in the future (today + 7 day threshold, not year-boundary). Prevents accidentally forward-dated release claims from landing in CI-protected docs.
 
 ---
 
@@ -189,7 +193,7 @@
 - `scripts/generate-release-snapshot.sh` — new script (133 lines)
 - `.github/workflows/python.yml` — CI step added
 
-**What changed:** `generate-release-snapshot.sh` produces a dated markdown snapshot of the current HEAD (test counts, git info, ruff status, banned-claims status). CI step runs on every merge to main and commits the snapshot to `docs/RELEASE_SNAPSHOTS/`.
+**What changed:** `generate-release-snapshot.sh` produces a dated markdown or JSON snapshot of the current HEAD (git info, test counts, ruff status, banned-claims status). Supports `--json` and `--out FILE` flags; without `--out` output goes to stdout only. CI step runs the script on every push (stdout; no file committed by CI). `docs/RELEASE_SNAPSHOTS/` directory is managed by the Python `release_snapshots` module (Phase 331), not by the shell script or CI auto-commit.
 
 ---
 
@@ -200,7 +204,7 @@
 - `scripts/check-patches-freshness.sh` — new script (69 lines)
 - `.github/workflows/python.yml` — CI gate step added
 
-**What changed:** `check-patches-freshness.sh` warns/fails if `patches/INDEX.md` is more than 24h behind HEAD (detects stale patch index). CI gate runs on every push.
+**What changed:** `check-patches-freshness.sh` runs `git apply --check --whitespace=nowarn` on each `*.patch` file to verify patches still apply cleanly against HEAD (no `INDEX.md`, no 24h staleness logic). CI step runs with `|| true` — non-blocking warning, not a hard gate.
 
 ---
 
@@ -232,11 +236,11 @@
 - `scripts/check-sbom-integrity.sh` — SBOM integrity check script (114 lines)
 
 **What changed:** 
-- **R83 Predict:** `arc predict next` queries the local model for next-edit suggestions based on current file context.
-- **R-SEC2 PromptGuard:** Regex-based injection pattern detector; 12 patterns covering prompt injection, jailbreak, and system-prompt extraction attempts.
+- **R83 Predict:** `arc predict next-edit` — heuristic regex stub (research-grade; no live provider call unless `ARC_REAL_RUNTIME_SMOKE=1`). Predicts likely next edit based on file text + cursor line.
+- **R-SEC2 PromptGuard:** Regex-based injection pattern detector; 14 patterns (9 `_BLOCKED_PATTERNS` + 5 `_DEGRADED_PATTERNS`) covering prompt injection, jailbreak, and system-prompt extraction attempts.
 - **R-SEC3 SBOM:** `check-sbom-integrity.sh` verifies `pnpm-lock.yaml` checksum + Python package hashes against known-good baseline.
 - **R-PERF1:** Streaming workspace inventory uses `os.scandir()` recursively with async yield; handles 100K+ files without loading all into memory.
-- **R-PERF6/8:** Memory-mapped trace reading (`mmap`) for large traces; TCPConnector pool for provider HTTP clients.
+- **R-PERF6/8:** Memory-mapped trace reading (`mmap`) for files > 10 MB in `orchestration/event_broker.py` (not `workspace.py`); `TCPConnector(limit_per_host=10)` connection pool in `providers/agentrouter_proxy.py` only.
 
 ---
 
@@ -251,7 +255,7 @@
 - `python/tests/test_memory_r90.py` — memory tests
 
 **What changed:**
-- **R85 Context:** `arc context suggest` ranks files by recency + semantic similarity to current run. `arc context attach` pins files into the run context window.
+- **R85 Context:** `arc context suggest` queries the R84 FTS5 codebase index (`idx.search(prompt)`) — keyword search, no recency signal or embeddings. `arc context attach` pins files into the run context window. Also exposes `list` and `clear` commands.
 - **R90 Memory:** `arc memory save` persists key/value pairs tagged to project + session. `arc memory load` retrieves by key. `arc memory search` runs SQLite FTS5 full-text search across saved memories.
 
 ---
@@ -273,14 +277,14 @@
 **Commit:** `f032460d`  
 **Type:** Feature (Baseline)  
 **Files:**
-- `python/src/agent_runtime_cockpit/hub/__init__.py` — `HubCatalog`, `HubItem`, `HubItemType`
-- `python/src/agent_runtime_cockpit/cli/hub.py` — `arc hub install|remove|list|inspect`
+- `python/src/agent_runtime_cockpit/hub/__init__.py` — `HubCatalog`, `HubItem`, `VALID_ITEM_TYPES` frozenset
+- `python/src/agent_runtime_cockpit/cli/hub.py` — `arc hub list|add|remove|verify|inspect`
 - `python/src/agent_runtime_cockpit/cli/__init__.py`, `_app.py`, `_subapps.py` — wiring
 - `python/tests/hub/test_hub_r91.py` — 27 tests
 - `docs/prompts/20-phase-execution-plan-2026-06-09.md` — session plan
 - `docs/prompts/execute-next-20-phases.md` — prompt doc
 
-**What changed:** ARC Hub is a local-first config/assistant sharing catalog. Items are typed (prompt, config, plugin, template). Install copies item files to workspace. Checksum (SHA256) verified on install. List/inspect commands for catalog browsing.
+**What changed:** ARC Hub is a local-first config/assistant sharing catalog. Item types: `provider-preset`, `policy-template`, `swarm-def`, `eval-suite`, `theme` (plain str, no `HubItemType` enum class). `add` installs items to `.arc_hub/` with a `hub_manifest.json`. Checksum (streaming SHA256) verified on add. `list`, `inspect`, `verify`, `remove` commands for catalog management.
 
 ---
 
@@ -290,10 +294,10 @@
 **Files:**
 - `python/src/agent_runtime_cockpit/tasks/scheduler.py` — `TaskScheduler`, `ScheduleConfig`
 - `python/src/agent_runtime_cockpit/tasks/__init__.py` — package
-- `python/src/agent_runtime_cockpit/cli/task.py` — `arc task run|schedule|list|unschedule|scheduled`
+- `python/src/agent_runtime_cockpit/cli/task.py` — `arc task create|status|list|cancel|schedule|unschedule|scheduled|scheduler-stats`
 - `python/tests/tasks/test_scheduler_r92.py` — 21 tests
 
-**What changed:** Background task runner with cron-style scheduling. Tasks have type, budget cap, and sandbox policy. `TaskScheduler` runs tasks asynchronously via `asyncio`. Budget enforcement is pre-execution (fails fast on budget exceeded). Task results persisted to SQLite store.
+**What changed:** Background task runner with interval-based scheduling (cron expressions accepted but fall back to interval with a logged warning — not implemented in baseline). Tasks have type, budget cap, and sandbox policy. `TaskScheduler` runs tasks asynchronously via `asyncio`. Budget enforcement is pre-execution (fails fast on budget exceeded). Task results persisted to SQLite store.
 
 ---
 
@@ -302,11 +306,11 @@
 **Type:** Feature (Baseline)  
 **Files:**
 - `python/src/agent_runtime_cockpit/vision/__init__.py` — `VisionDriver`, `HitlGatedVisionSession`, `VisionAction`
-- `python/src/agent_runtime_cockpit/cli/vision.py` — `arc vision capture|click|type|run`
+- `python/src/agent_runtime_cockpit/cli/vision.py` — `arc vision screenshot|navigate|click|type|scroll|session`
 - `python/src/agent_runtime_cockpit/cli/__init__.py`, `_app.py`, `_subapps.py` — wiring
 - `python/tests/vision/test_vision_r93.py` — 28 tests
 
-**What changed:** HITL-gated browser/desktop automation. All actions routed through `HitlGatedVisionSession` which requires explicit human approval before executing. `FakeVisionDriver` used in tests (no real browser). Screenshot capture stores PNG locally. No cloud vision API calls.
+**What changed:** HITL-gated browser/desktop automation. Module includes `VisionDriver` ABC, `HitlGatedVisionSession`, `VisionAction`, `FakeVisionDriver` (tests), and `PlaywrightVisionDriver` (optional real browser). All actions routed through `HitlGatedVisionSession` requiring explicit human approval. Screenshot capture stores PNG locally. No cloud vision API calls.
 
 ---
 
@@ -314,12 +318,12 @@
 **Commit:** `e4cdf6a0`  
 **Type:** Feature (Baseline)  
 **Files:**
-- `python/src/agent_runtime_cockpit/advisor/__init__.py` — `TokenAdvisor`, `AdvisorReport`, `CostRecommendation`
-- `python/src/agent_runtime_cockpit/cli/advisor.py` — `arc advisor analyze|recommend|report`
+- `python/src/agent_runtime_cockpit/advisor/__init__.py` — `CostAdvisor`, `UsageRecord`, `Recommendation`, `AdvisorReport`
+- `python/src/agent_runtime_cockpit/cli/advisor.py` — `arc advisor analyze|simulate|pricing`
 - `python/src/agent_runtime_cockpit/cli/__init__.py`, `_app.py`, `_subapps.py` — wiring
 - `python/tests/advisor/test_advisor_r94.py` — 19 tests
 
-**What changed:** Token cost optimization advisor. Analyzes run traces to identify high-cost patterns (large context windows, repeated retrievals, unused tool calls). Generates ranked recommendations with estimated savings. Report output as JSON or human-readable markdown.
+**What changed:** Token cost optimization advisor. `CostAdvisor.analyze()` loads usage from traces and generates ranked `Recommendation` objects (model-switch, context-compression, caching, batching). `simulate` runs a cost projection. `pricing` shows current model pricing table. Report output as JSON or human-readable text.
 
 ---
 
@@ -332,7 +336,7 @@
 - `packages/arc-extension/src/browser/arc-extension-frontend-module.ts` — DI bindings
 - `packages/arc-extension/src/browser/__tests__/arc-dashboard-widget.test.tsx` — 2 TS tests
 
-**What changed:** New Theia IDE tab: ARC Dashboard. Shows multi-workspace overview (run counts, active tasks, budget utilization, advisor alerts). Opens via `ARC: Open Dashboard` command. State-managed via React hooks; async backend bridge. Only new feature in the TypeScript layer across the 40 phases.
+**What changed:** New Theia IDE tab: ARC Dashboard. Shows 3 summary cards: **Workspaces / Active / Total Cost** for a multi-workspace list. Opens via `ARC: Open Dashboard` command. State-managed via React hooks; async backend bridge. Only new feature in the TypeScript layer across the 40 phases.
 
 ---
 
@@ -340,12 +344,12 @@
 **Commit:** `5229952f`  
 **Type:** Feature (Baseline)  
 **Files:**
-- `python/src/agent_runtime_cockpit/voice/__init__.py` — `VoiceInterface`, `VoiceCommand`, `SpeechRecognizer`
-- `python/src/agent_runtime_cockpit/cli/voice.py` — `arc voice listen|transcribe|map`
+- `python/src/agent_runtime_cockpit/voice/__init__.py` — `VoiceState`, `TranscriptionResult`, `VoiceDriver` (ABC), `FakeVoiceDriver`, `WhisperVoiceDriver`, `VoicePipeline`
+- `python/src/agent_runtime_cockpit/cli/voice.py` — `arc voice transcribe|listen|status`
 - `python/src/agent_runtime_cockpit/cli/__init__.py`, `_app.py`, `_subapps.py` — wiring
 - `python/tests/voice/test_voice_r96.py` — 24 tests
 
-**What changed:** Local voice-to-command interface. `SpeechRecognizer` uses a stub/offline recognizer (no cloud API). `VoiceCommand` maps recognized utterances to arc CLI commands via a configurable phrase map. `arc voice listen` starts continuous recognition loop. `arc voice map` manages the phrase → command table.
+**What changed:** Local voice-to-command interface. `VoicePipeline` wraps a `VoiceDriver`; `WhisperVoiceDriver` uses local Whisper model (optional install); `FakeVoiceDriver` used in tests. `VoicePipeline` classifies transcript into `chat`/`slash`/`cli` command types heuristically — no configurable phrase-map table. `arc voice transcribe` transcribes a file; `arc voice listen` starts continuous recognition loop; `arc voice status` reports driver availability.
 
 ---
 
@@ -353,16 +357,16 @@
 **Commit:** `5893ecb6`  
 **Type:** Feature (Baseline)  
 **Files:**
-- `python/src/agent_runtime_cockpit/security/policy_templates/__init__.py` — `PolicyTemplate`, `PolicyTemplateLibrary`
+- `python/src/agent_runtime_cockpit/security/policy_templates/__init__.py` — `PolicyTemplate` dataclass, module-level `load_template()`, `list_templates()`, `validate_template()`, `apply_template()` functions
 - `python/src/agent_runtime_cockpit/security/policy_templates/templates/ci-cd.yaml` — CI/CD policy
 - `python/src/agent_runtime_cockpit/security/policy_templates/templates/data-science.yaml` — data science policy
 - `python/src/agent_runtime_cockpit/security/policy_templates/templates/development.yaml` — development policy
 - `python/src/agent_runtime_cockpit/security/policy_templates/templates/open-source.yaml` — open source policy
 - `python/src/agent_runtime_cockpit/security/policy_templates/templates/regulated-industry.yaml` — regulated industry policy
-- `python/src/agent_runtime_cockpit/cli/sandbox.py` — extended with `arc sandbox policy` subcommands
+- `python/src/agent_runtime_cockpit/cli/sandbox.py` — extended with `arc sandbox policy template-list|template-show|template-validate|template-apply` subcommands
 - `python/tests/security/policy_templates/test_policy_templates_r97.py` — 25 tests
 
-**What changed:** Sandbox policy template library. 5 pre-built YAML templates covering common deployment contexts. Each template specifies: allowed/denied tools, network egress rules, filesystem access scope, budget caps, audit requirements. `arc sandbox policy list|apply|export` commands. Templates are composable (merge multiple).
+**What changed:** Sandbox policy template library. 5 pre-built YAML templates covering common deployment contexts. Each template specifies: allowed/denied tools, network egress rules, filesystem access scope, budget caps, audit requirements. No `PolicyTemplateLibrary` class; no template composition/merge functionality in baseline.
 
 ---
 
@@ -370,12 +374,12 @@
 **Commit:** `8395db30`  
 **Type:** Feature (Baseline)  
 **Files:**
-- `python/src/agent_runtime_cockpit/composer/__init__.py` — `SwarmGraphBuilder`, `ComposerNode`, `ComposerEdge`, `ComposerGraph`
-- `python/src/agent_runtime_cockpit/cli/composer.py` — `arc composer new|add-node|connect|export|validate`
+- `python/src/agent_runtime_cockpit/composer/__init__.py` — `CodeGenResult` dataclass, `generate_swarmgraph_code()`, `validate_composer_graph()` functions (reuses `IRGraph`/`IRNode`/`IREdge` from `swarmgraph_ir`)
+- `python/src/agent_runtime_cockpit/cli/composer.py` — `arc composer generate|validate`
 - `python/src/agent_runtime_cockpit/cli/__init__.py`, `_app.py`, `_subapps.py` — wiring
 - `python/tests/composer/test_composer_r98.py` — 18 tests
 
-**What changed:** Visual SwarmGraph builder (CLI-first; IDE widget deferred). Nodes are typed (agent, tool, human, condition, loop). Edges are typed (data, control, approval). `export` serializes to `.swarmgraph.json` compatible with SwarmGraphAdapter. `validate` checks for cycles, disconnected nodes, missing required edges.
+**What changed:** SwarmGraph code generator (CLI-first; IDE widget deferred). `generate_swarmgraph_code()` takes an `IRGraph` and produces Python source for a SwarmGraph workflow. `validate_composer_graph()` checks for cycles, disconnected nodes, missing required edges. No `SwarmGraphBuilder`/`ComposerNode`/`ComposerEdge`/`ComposerGraph` classes — module operates on the existing IR types.
 
 ---
 
@@ -401,7 +405,7 @@
 - `python/src/agent_runtime_cockpit/cli/__init__.py`, `_app.py`, `_subapps.py` — wiring
 - `python/tests/notebook/test_notebook_r100.py` — 23 tests
 
-**What changed:** Agent workbook format `.arcnb`. Cells are typed: `prompt`, `tool_call`, `code`, `markdown`, `output`. Schema version 1 with forward-compatible metadata. Export formats: `.arcnb` (native JSON), `.ipynb` (Jupyter v4), `.md` (Markdown), `.py` (Python script). Designed for reproducible agent experiment documentation.
+**What changed:** Agent workbook format `.arcnb`. `CellType` enum has 4 values: `prompt`, `tool_call`, `code`, `markdown`. Outputs are `CellOutput` attachments on cells (not a cell type). Schema version 1 with forward-compatible metadata. Export formats: `.arcnb` (native JSON), `.ipynb` (Jupyter v4), `.md` (Markdown), `.py` (Python script). Designed for reproducible agent experiment documentation.
 
 ---
 
@@ -414,7 +418,7 @@
 - `python/src/agent_runtime_cockpit/cli/__init__.py`, `_app.py`, `_subapps.py` — wiring
 - `python/tests/time_travel/test_time_travel_r101.py` — 31 tests
 
-**What changed:** Per-step state recording for agent runs. Captures: context window, tool calls, model outputs, sandbox decisions at each step. Forward/backward replay with step-granularity. Branch from any recorded step to explore alternative paths. `compare_paths()` diffs two execution branches. Builds on existing `run_diff` + `flight_recorder` infrastructure.
+**What changed:** Per-step state recording for agent runs. Captures: context window, tool calls, model outputs, sandbox decisions at each step. Forward/backward replay with step-granularity. Branch from any recorded step to explore alternative paths. `compare_paths()` diffs two execution branches. Standalone module (json/dataclasses/pathlib only — does not import `run_diff` or `flight_recorder`).
 
 ---
 
@@ -427,7 +431,7 @@
 - `python/src/agent_runtime_cockpit/cli/__init__.py`, `_app.py`, `_subapps.py` — wiring
 - `python/tests/migrate/test_migrate_r102.py` — 23 tests
 
-**What changed:** Cross-adapter migration assistant. AST-based framework detection (LangGraph, CrewAI, SwarmGraph, OpenAI Agents). `analyze_migration()` identifies incompatible patterns and estimates migration effort. `generate_migration()` produces templated output. `validate_migration()` checks equivalence by running both versions on a synthetic trace. Supported paths: LangGraph↔CrewAI, SwarmGraph↔OpenAI Agents, and more.
+**What changed:** Cross-adapter migration assistant. AST-based framework detection (LangGraph, CrewAI, SwarmGraph, OpenAI Agents, AutoGen, LlamaIndex). `analyze_migration()` identifies incompatible patterns and estimates migration effort. `generate_migration()` produces templated output. `validate_migration()` performs AST syntax-check (`ast.parse`) on generated files and compares file count — no runtime equivalence checking or synthetic trace execution. Supported paths: LangGraph↔CrewAI, SwarmGraph↔OpenAI Agents, and more.
 
 ---
 
@@ -557,22 +561,22 @@
 ### New CLI subcommands added (Phases 316–335)
 | Command | Module | Phase |
 |---|---|---|
-| `arc hub install\|remove\|list\|inspect` | `hub/` | 316/332 |
-| `arc task run\|schedule\|list\|unschedule\|scheduled` | `tasks/` | 317/333 |
-| `arc vision capture\|click\|type\|run` | `vision/` | 318/334 |
-| `arc advisor analyze\|recommend\|report` | `advisor/` | 319 |
-| `arc voice listen\|transcribe\|map` | `voice/` | 321 |
-| `arc sandbox policy list\|apply\|export` | `security/policy_templates/` | 322 |
-| `arc composer new\|add-node\|connect\|export\|validate` | `composer/` | 323 |
+| `arc hub list\|add\|remove\|verify\|inspect` | `hub/` | 316/332 |
+| `arc task create\|status\|list\|cancel\|schedule\|unschedule\|scheduled\|scheduler-stats` | `tasks/` | 317/333 |
+| `arc vision screenshot\|navigate\|click\|type\|scroll\|session` | `vision/` | 318/334 |
+| `arc advisor analyze\|simulate\|pricing` | `advisor/` | 319 |
+| `arc voice transcribe\|listen\|status` | `voice/` | 321 |
+| `arc sandbox policy template-list\|template-show\|template-validate\|template-apply` | `security/policy_templates/` | 322 |
+| `arc composer generate\|validate` | `composer/` | 323 |
 | `arc debug launch\|attach\|status` | `debug/` | 324 |
 | `arc notebook new\|show\|export\|add-cell` | `notebook/` | 325 |
 | `arc time-travel record\|replay\|branch\|compare\|show` | `time_travel/` | 326 |
 | `arc migrate detect\|analyze\|run\|validate` | `migrate/` | 327 |
-| `arc predict next` | `cli/predict_cmd.py` | 303 |
-| `arc context suggest\|attach` | `cli/context_cmd.py` | 304 |
-| `arc memory save\|load\|search` | `cli/memory_cmd.py` | 304 |
+| `arc predict next-edit` | `cli/predict_cmd.py` | 303 |
+| `arc context suggest\|attach\|list\|clear` | `cli/context_cmd.py` | 304 |
+| `arc memory save\|load\|search\|list` | `cli/memory_cmd.py` | 304 |
 | `arc index build\|search\|stats` | `cli/index_cmd.py` | 305 |
-| `arc git init\|branch\|commit\|revert` | `cli/git_native.py` | 278–285 |
+| `arc git-native init\|branch\|auto-commit\|auto-revert` | `cli/git_native.py` | 278–285 |
 | `arc diff apply` | `cli/diff_cmd.py` | 283–285 |
 
 ### New IDE (TypeScript) surfaces
@@ -604,8 +608,8 @@
 | Virtualized lists | `TraceViewerSection.tsx`, `AssuranceTab.tsx` | Windowed rendering |
 | Async EditPlanBridge | `edit-plan-bridge-service.ts` | `execArcCliAsync` |
 | Streaming workspace inventory | `workspace/__init__.py` | `os.scandir` async |
-| Memory-mapped traces | `workspace.py` | `mmap` |
-| TCPConnector pooling | `orchestration/event_broker.py`, `providers/agentrouter_proxy.py` | Connection pool |
+| Memory-mapped traces (> 10 MB) | `orchestration/event_broker.py` | `mmap` |
+| TCPConnector pooling | `providers/agentrouter_proxy.py` | `aiohttp.TCPConnector(limit_per_host=10)` |
 | Incremental codebase index | `index/__init__.py` | mtime+hash delta |
 | WASM trace parser (research) | `wasm_parser/__init__.py` | Research baseline |
 
@@ -657,7 +661,7 @@
 
 4. **Security decisions are deterministic throughout.** No phase introduced LLM-based allow/deny. All gating is regex, hash, path comparison, or human confirmation. This is a deliberate charter constraint honored across all 40 phases.
 
-5. **Performance improvements are measured, not claimed.** Each R-PERF item cites a specific target (< 2s startup, < 1s/file, < 50ms write, < 5s for 100K files) and a mechanism. WASM parser correctly labeled as research (no production claim).
+5. **Performance targets are stated per item.** Each R-PERF item cites a specific target (< 2s startup, < 1s/file, < 50ms write, < 5s for 100K files) as code-comment goals. Benchmark infrastructure exists (`pytest-benchmark`) but targets are not automatically enforced in CI. WASM parser correctly labeled as research (no production claim).
 
 6. **The `cli/__init__.py` / `_app.py` / `_subapps.py` triad is a hotspot.** Changed in nearly every feature phase. Refactoring this routing layer into a registry pattern would reduce merge conflicts at scale.
 
@@ -679,4 +683,5 @@
 
 ---
 
-*Generated: 2026-06-10 | HEAD: `cb0208c1` | Repo: https://github.com/Hansuqwer/ARC-STUDIO*
+*Generated: 2026-06-10 | HEAD: `cb0208c1` | Repo: https://github.com/Hansuqwer/ARC-STUDIO*  
+*Corrected: 2026-06-10 against independent verification report `docs/handover/verification-report-phases-296-335.md` (HEAD `55c38b1b`). All per-phase prose now reflects actual shipped code, not design intent.*
