@@ -96,6 +96,7 @@ def notebook_export(
     format: str = typer.Option(
         "arcnb", "--format", "-f", help="Export format: arcnb, ipynb, md, py"
     ),
+    yes: bool = typer.Option(False, "--yes", help="Overwrite output file without confirmation"),
     as_json: bool = JSON_FLAG,
     workspace: Optional[str] = WORKSPACE_FLAG,
 ) -> None:
@@ -110,6 +111,18 @@ def notebook_export(
 
     nb = load_notebook(nb_path)
     output_path = Path(output)
+
+    if output_path.exists() and not yes:
+        if as_json:
+            _out(
+                err(
+                    ArcErrorCode.PERMISSION_DENIED,
+                    f"Refusing to overwrite existing file {output} without --yes.",
+                ),
+                as_json,
+            )
+            raise typer.Exit(1)
+        typer.confirm(f"Overwrite existing file {output}?", abort=True)
 
     try:
         export_notebook(nb, output_path, format=format)

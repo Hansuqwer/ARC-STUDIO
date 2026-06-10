@@ -8665,3 +8665,21 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 8. Docs: `--help` comprehensive; docs updated; banned claims clean.
 
 **Evidence:** 28 tests pass; ruff clean.
+
+---
+
+## Phase 342 — R100 DoD elevation: ARC Notebook → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: Missing notebook → `INVALID_INPUT` envelope; invalid cell type → `INVALID_INPUT`; overwrite without `--yes` → `PERMISSION_DENIED`.
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: All 4 commands (`new`, `show`, `export`, `add-cell`) use consistent `ok()`/`err()` JSON envelope.
+4. Tests: 27 tests pass (`tests/notebook/test_notebook_r100.py`) — 23 original + 4 new (NotebookError, `__all__`, CellType enum coverage, overwrite gate).
+5. Performance: Export is synchronous; JSON serialization bounded; no streaming required.
+6. Security: Output file overwrite is confirmation-gated (`--yes` required in JSON mode; `typer.confirm` in interactive mode).
+7. Reliability: `NotebookError` exception class added; schema version forward-compat (`ARCNB_SCHEMA_VERSION = 1`).
+8. Docs: `--help` comprehensive; docs updated; banned claims clean.
+
+**Evidence:** 27 tests pass; ruff clean.

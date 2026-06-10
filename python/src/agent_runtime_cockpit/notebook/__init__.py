@@ -18,6 +18,11 @@ from typing import Any, Optional
 
 log = logging.getLogger(__name__)
 
+
+class NotebookError(Exception):
+    """Raised when notebook operations fail (IO, schema mismatch, export error)."""
+
+
 ARCNB_SCHEMA_VERSION = 1
 
 
@@ -341,6 +346,7 @@ def export_notebook(notebook: Notebook, path: Path, format: str = "arcnb") -> No
 
 
 __all__ = [
+    "NotebookError",
     "ARCNB_SCHEMA_VERSION",
     "CellType",
     "CellStatus",

@@ -294,3 +294,65 @@ class TestNotebookCLI:
         data = json.loads(result.output)
         assert data["ok"] is True
         assert out_path.exists()
+
+
+class TestNotebookError:
+    """Phase 342 DoD elevation: structured error class + overwrite gate."""
+
+    def test_notebook_error_is_exception(self) -> None:
+        from agent_runtime_cockpit.notebook import NotebookError
+
+        assert issubclass(NotebookError, Exception)
+        err = NotebookError("test message")
+        assert str(err) == "test message"
+
+    def test_notebook_error_in_all(self) -> None:
+        import agent_runtime_cockpit.notebook as nb_mod
+
+        assert "NotebookError" in nb_mod.__all__
+
+    def test_cell_type_has_4_values(self) -> None:
+        from agent_runtime_cockpit.notebook import CellType
+
+        values = [v.value for v in CellType]
+        assert "prompt" in values
+        assert "tool_call" in values
+        assert "code" in values
+        assert "markdown" in values
+        assert len(values) == 4
+
+    def test_notebook_export_overwrite_requires_yes(self, tmp_path: Path) -> None:
+        """export --output to existing file must require --yes in JSON mode."""
+        from typer.testing import CliRunner
+        from agent_runtime_cockpit.cli._app import app
+
+        # Create source notebook
+        src = tmp_path / "src.arcnb"
+        src.write_text(
+            '{"schema_version": 1, "metadata": {"title": "t", "created_at": "", "modified_at": ""}, "cells": []}'
+        )
+
+        # Create existing output
+        out = tmp_path / "out.md"
+        out.write_text("# existing\n")
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            [
+                "notebook",
+                "export",
+                str(src),
+                "--output",
+                str(out),
+                "--format",
+                "md",
+                "--json",
+                "-w",
+                str(tmp_path),
+            ],
+        )
+        assert result.exit_code == 1
+        data = json.loads(result.output)
+        assert data["ok"] is False
+        assert data["error"]["code"] == "PERMISSION_DENIED"
