@@ -16,6 +16,8 @@ import { ArcEventStreamWidget } from './arc-event-stream-widget';
 import { ArcEventStreamContribution } from './arc-event-stream-contribution';
 import { ArcHealthWidget } from './arc-health-widget';
 import { ArcHealthContribution } from './arc-health-contribution';
+import { ArcDashboardWidget } from './arc-dashboard-widget';
+import { ArcDashboardContribution } from './arc-dashboard-contribution';
 import { ArcSimulationWidget } from './arc-simulation-widget';
 import { ArcSimulationContribution } from './arc-simulation-contribution';
 import { ArcStatusBarContribution } from './arc-status-bar-contribution';
@@ -130,6 +132,15 @@ export default new ContainerModule(bind => {
     })).inSingletonScope();
     bindViewContribution(bind, ArcHealthContribution);
     bind(FrontendApplicationContribution).toService(ArcHealthContribution);
+
+    // Bind the ARC Dashboard widget (R95)
+    bind(ArcDashboardWidget).toSelf();
+    bind(WidgetFactory).toDynamicValue(ctx => ({
+        id: ArcDashboardWidget.ID,
+        createWidget: () => ctx.container.get<ArcDashboardWidget>(ArcDashboardWidget),
+    })).inSingletonScope();
+    bindViewContribution(bind, ArcDashboardContribution);
+    bind(FrontendApplicationContribution).toService(ArcDashboardContribution);
 
     // Bind the ARC IR Simulation Panel widget
     bind(ArcSimulationWidget).toSelf();

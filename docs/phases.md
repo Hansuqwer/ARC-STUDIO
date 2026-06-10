@@ -8300,3 +8300,17 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - Reads existing optimizer pricing data; recommendations are pure arithmetic.
 
 **Evidence:** 19 tests pass (`tests/advisor/test_advisor_r94.py`); ruff clean. Full suite: 6220 passed (19 new).
+
+---
+
+## Phase 320 — R95: ARC Dashboard — multi-workspace control center (TS)
+
+**Status:** Baseline Complete
+
+**What changed:**
+- New `arc-dashboard-widget.tsx`: `ArcDashboardWidget` — top-level view of all local ARC workspaces with status, recent runs, spend, health. All five UX states (loading, empty, error, degraded, success). Producer-truth — every card names its real producer or renders degraded.
+- New `arc-dashboard-contribution.ts`: `ArcDashboardContribution` with `arc:open-dashboard` command.
+- Registered in `arc-extension-frontend-module.ts`.
+- New test: `arc-dashboard-widget.test.tsx` — static contract tests.
+
+**Evidence:** 2 TS tests pass (`arc-dashboard-widget.test.tsx`); typecheck clean; build clean. Full TS suite: 990 passed.
