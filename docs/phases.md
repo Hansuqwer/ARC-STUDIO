@@ -8449,3 +8449,18 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - Schema version 1 with forward-compatible metadata.
 
 **Evidence:** 14 tests pass (`tests/wasm_parser/test_wasm_parser_r_perf9.py`); ruff clean. Full suite: 6411 passed (14 new). Benchmark infrastructure ready for WASM performance comparison.
+
+---
+
+## Phase 330 — R-PROC1: Auto-generate release intelligence from CI
+
+**Status:** Baseline Complete
+
+**What changed:**
+- New `release_intelligence/__init__.py`: `ReleaseIntelligence`, `CommitInfo`, `generate_release_intelligence()`, `parse_git_log()`, `get_commit_stats()`, `save_release_intelligence()`, `load_release_intelligence()` — auto-generate release intelligence from git history.
+- Git log parsing extracts commit SHA, author, date, message, and stats (files changed, insertions, deletions).
+- Release intelligence report includes: version, git info, commit history, test counts, ruff/banned-claims status.
+- Schema version 1 with forward-compatible metadata.
+- Integrates with existing `scripts/generate-release-snapshot.sh` for CI pipeline integration.
+
+**Evidence:** 10 tests pass (`tests/release_intelligence/test_release_intelligence_r_proc1.py`); ruff clean. Full suite: 6421 passed (10 new).
