@@ -150,3 +150,8 @@ composer_app = typer.Typer(
     help="Visual SwarmGraph builder — generate, validate (R98)",
     no_args_is_help=True,
 )
+debug_app = typer.Typer(
+    name="debug",
+    help="DAP debugger — launch, attach, status (R99)",
+    no_args_is_help=True,
+)

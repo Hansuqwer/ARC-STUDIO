@@ -8358,3 +8358,18 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - Validation detects cycles (advisory warning) and dead/isolated nodes.
 
 **Evidence:** 18 tests pass (`tests/composer/test_composer_r98.py`); ruff clean. Full suite: 6287 passed (18 new).
+
+---
+
+## Phase 324 — R99: ARC Debug — inline debugger & REPL via DAP
+
+**Status:** Baseline Complete
+
+**What changed:**
+- New `debug/__init__.py`: `DebugAdapter`, `DebugSession`, `DAPMessage`, `Breakpoint`, `Variable`, `StackFrame` — baseline DAP adapter using stdlib bdb/pdb. Speaks DAP JSON over a loopback socket. Local only.
+- New `cli/debug.py`: `arc debug launch|attach|status` CLI with `--json` envelope output.
+- Wired `debug_app` into `cli/_subapps.py`, `cli/_app.py`, `cli/__init__.py`.
+- DAP protocol support: initialize, launch, setBreakpoints, threads, stackTrace, scopes, variables, disconnect.
+- debugpy is an optional dependency (not installed); baseline uses stdlib socket server.
+
+**Evidence:** 24 tests pass (`tests/debug/test_debug_r99.py`); ruff clean. Full suite: 6311 passed (24 new).
