@@ -155,3 +155,8 @@ debug_app = typer.Typer(
     help="DAP debugger — launch, attach, status (R99)",
     no_args_is_help=True,
 )
+notebook_app = typer.Typer(
+    name="notebook",
+    help="Agent workbook .arcnb — new, show, export, add-cell (R100)",
+    no_args_is_help=True,
+)

@@ -8373,3 +8373,18 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - debugpy is an optional dependency (not installed); baseline uses stdlib socket server.
 
 **Evidence:** 24 tests pass (`tests/debug/test_debug_r99.py`); ruff clean. Full suite: 6311 passed (24 new).
+
+---
+
+## Phase 325 — R100: ARC Notebook — agent workbook `.arcnb`
+
+**Status:** Baseline Complete
+
+**What changed:**
+- New `notebook/__init__.py`: `Notebook`, `NotebookCell`, `CellOutput`, `CellType`, `CellStatus` — agent workbook format where cells are prompts, tool calls, code, or markdown. Output cells show results/logs. Saved as `.arcnb` JSON with export to `.ipynb`/`.md`/`.py`.
+- New `cli/notebook.py`: `arc notebook new|show|export|add-cell` CLI with `--json` envelope output.
+- Wired `notebook_app` into `cli/_subapps.py`, `cli/_app.py`, `cli/__init__.py`.
+- Export formats: `.arcnb` (native JSON), `.ipynb` (Jupyter v4), `.md` (Markdown), `.py` (Python script).
+- Schema version 1 with forward-compatible metadata.
+
+**Evidence:** 23 tests pass (`tests/notebook/test_notebook_r100.py`); ruff clean. Full suite: 6334 passed (23 new).

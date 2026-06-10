@@ -1855,7 +1855,7 @@ Full detail: `docs/research-findings/competitive-feature-backlog-2026-06-09.md`.
 | R97 | ARC Policies — sandbox policy template library (PDF Feature 14) | Baseline Complete |
 | R98 | ARC Composer — visual SwarmGraph builder (PDF Feature 16) | Baseline Complete |
 | R99 | ARC Debug — inline debugger & REPL via DAP (PDF Feature 13) | Baseline Complete |
-| R100 | ARC Notebook — agent workbook `.arcnb` (PDF Feature 18) | Not Started |
+| R100 | ARC Notebook — agent workbook `.arcnb` (PDF Feature 18) | Baseline Complete |
 | R101 | ARC Time Travel — run replay & diff debugger (PDF Feature 19) | Not Started |
 | R102 | ARC Migrate — cross-adapter migration assistant (PDF Feature 20) | Not Started |
 | R-NATIVE-RUNTIME | Native GPU visualizer (Rust/wgpu/egui) augmenting the Theia IDE (PDF §7) | Not Started |

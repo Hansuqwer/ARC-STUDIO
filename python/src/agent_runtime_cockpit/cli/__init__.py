@@ -28,6 +28,7 @@ from . import (
     voice,  # noqa: F401 — Phase 321 / R96: arc voice transcribe/listen/status
     composer,  # noqa: F401 — Phase 323 / R98: arc composer generate/validate
     debug,  # noqa: F401 — Phase 324 / R99: arc debug launch/attach/status
+    notebook,  # noqa: F401 — Phase 325 / R100: arc notebook new/show/export/add-cell
     index_cmd,  # noqa: F401 — Phase 303 / R84: arc index build/search
     context_cmd,  # noqa: F401 — Phase 305 / R85: arc context suggest/attach
     memory_cmd,  # noqa: F401 — Phase 307 / R90: arc memory save/load/search
