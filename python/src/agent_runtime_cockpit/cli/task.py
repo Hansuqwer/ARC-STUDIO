@@ -400,3 +400,153 @@ def task_cancel(
         from ._app import console
 
         console.print(f"Task cancelled: [bold]{task_id}[/bold]")
+
+
+@task_app.command("schedule")
+def task_schedule(
+    operation: str = typer.Argument(..., help="Operation to schedule (e.g., 'run', 'trace')"),
+    task_type: str = typer.Option("run", "--type", "-t", help="Task type: run, trace, or audit"),
+    params: str = typer.Option("{}", "--params", "-p", help="JSON parameters"),
+    interval: int = typer.Option(3600, "--interval", "-i", help="Interval in seconds"),
+    budget_tokens: Optional[int] = typer.Option(None, "--budget-tokens", help="Token budget limit"),
+    budget_cost: Optional[float] = typer.Option(
+        None, "--budget-cost", help="Cost budget limit (USD)"
+    ),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Schedule a task for recurring background execution (R92).
+
+    Tasks run in the local daemon with budget caps. No cloud execution.
+    """
+    _setup_logging(debug)
+
+    from ..tasks import ScheduleConfig, Task, TaskScheduler, TaskStorage, TaskType
+
+    try:
+        task_type_enum = TaskType(task_type)
+    except ValueError:
+        _out(
+            err(
+                ArcErrorCode.INVALID_INPUT,
+                f"Invalid task type: {task_type}. Must be run, trace, or audit.",
+            ),
+            json_output,
+        )
+        raise typer.Exit(1)
+
+    try:
+        params_dict = json_mod.loads(params)
+    except json_mod.JSONDecodeError as e:
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Invalid JSON params: {e}"), json_output)
+        raise typer.Exit(1)
+
+    task = Task(type=task_type_enum, operation=operation, params=params_dict)
+    config = ScheduleConfig(
+        interval_seconds=interval,
+        budget_tokens=budget_tokens,
+        budget_cost_usd=budget_cost,
+    )
+    storage = TaskStorage(Path.cwd() / ".arc" / "tasks.db")
+    scheduler = TaskScheduler(storage, config)
+    task_id = scheduler.schedule(task, interval_seconds=interval)
+
+    payload = {
+        "task_id": task_id,
+        "type": task.type.value,
+        "operation": task.operation,
+        "interval_seconds": interval,
+        "budget_tokens": budget_tokens,
+        "budget_cost_usd": budget_cost,
+        "scheduled": True,
+    }
+    _out(ok(payload), json_output)
+
+    if not json_output:
+        from ._app import console
+
+        console.print(f"Task scheduled: [bold]{task_id}[/bold]")
+        console.print(f"Interval: {interval}s, Type: {task.type.value}, Operation: {operation}")
+
+
+@task_app.command("unschedule")
+def task_unschedule(
+    task_id: str = typer.Argument(..., help="Task ID to unschedule"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Remove a task from the recurring schedule (R92)."""
+    _setup_logging(debug)
+
+    from ..tasks import TaskScheduler, TaskStorage
+
+    storage = TaskStorage(Path.cwd() / ".arc" / "tasks.db")
+    scheduler = TaskScheduler(storage)
+    removed = scheduler.unschedule(task_id)
+
+    if not removed:
+        _out(err(ArcErrorCode.RUN_NOT_FOUND, f"Scheduled task not found: {task_id}"), json_output)
+        raise typer.Exit(1)
+
+    payload = {"task_id": task_id, "unscheduled": True}
+    _out(ok(payload), json_output)
+
+    if not json_output:
+        from ._app import console
+
+        console.print(f"Task unscheduled: [bold]{task_id}[/bold]")
+
+
+@task_app.command("scheduled")
+def task_list_scheduled(
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """List all scheduled recurring tasks (R92)."""
+    _setup_logging(debug)
+
+    from ..tasks import TaskScheduler, TaskStorage
+
+    storage = TaskStorage(Path.cwd() / ".arc" / "tasks.db")
+    scheduler = TaskScheduler(storage)
+    scheduled = scheduler.list_scheduled()
+
+    payload = {"count": len(scheduled), "scheduled": scheduled}
+    _out(ok(payload), json_output)
+
+    if not json_output:
+        from ._app import console
+
+        console.print(f"Scheduled tasks: {len(scheduled)}")
+        for s in scheduled:
+            console.print(
+                f"  {s['task_id'][:8]}... {s['type']:5} {s['operation']:20} "
+                f"(interval={s['interval_seconds']}s, next={s['next_run']})"
+            )
+
+
+@task_app.command("scheduler-stats")
+def task_scheduler_stats(
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show scheduler statistics and budget usage (R92)."""
+    _setup_logging(debug)
+
+    from ..tasks import TaskScheduler, TaskStorage
+
+    storage = TaskStorage(Path.cwd() / ".arc" / "tasks.db")
+    scheduler = TaskScheduler(storage)
+    stats = scheduler.get_stats()
+
+    _out(ok(stats), json_output)
+
+    if not json_output:
+        from ._app import console
+
+        console.print("Scheduler Statistics:")
+        console.print(f"  Running: {stats['running']}")
+        console.print(f"  Scheduled: {stats['scheduled_count']}")
+        budget = stats["budget"]
+        console.print(f"  Tokens used: {budget['tokens_used']} / {budget['tokens_limit']}")
+        console.print(f"  Cost used: ${budget['cost_used']:.4f} / ${budget['cost_limit']}")

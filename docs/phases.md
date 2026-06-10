@@ -8258,3 +8258,17 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - 5 valid item types: `provider-preset`, `policy-template`, `swarm-def`, `eval-suite`, `theme`.
 
 **Evidence:** 27 tests pass (`tests/hub/test_hub_r91.py`); ruff clean. Full suite: 6153 passed (27 new).
+
+---
+
+## Phase 317 — R92: ARC Daemon Tasks — local background scheduler
+
+**Status:** Baseline Complete
+
+**What changed:**
+- New `tasks/scheduler.py`: `TaskScheduler`, `ScheduleConfig` — local background task scheduler with budget caps (tokens, cost). Recurring task execution in the daemon. All tasks sandboxed, budget-capped, audited. No cloud execution.
+- Extended `cli/task.py`: `arc task schedule|unschedule|scheduled|scheduler-stats` CLI commands with `--json` envelope output.
+- Updated `tasks/__init__.py` to export `TaskScheduler`, `ScheduleConfig`.
+- Budget enforcement: token/cost limits checked before each scheduled execution.
+
+**Evidence:** 20 tests pass (`tests/tasks/test_scheduler_r92.py`); ruff clean. Full suite: 6173 passed (20 new).
