@@ -8683,3 +8683,21 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 8. Docs: `--help` comprehensive; docs updated; banned claims clean.
 
 **Evidence:** 27 tests pass; ruff clean.
+
+---
+
+## Phase 343 — R101 DoD elevation: ARC Time Travel → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: End-of-session → `step_forward()` returns `None` (explicit done indicator); empty session has `current_step_index=-1`.
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: All 5 commands (`record`, `replay`, `branch`, `compare`, `show`) use consistent `ok()`/`err()` JSON envelope.
+4. Tests: 35 tests pass (`tests/time_travel/test_time_travel_r101.py`) — 31 original + 4 new (TimeTravelError, `__all__`, StepType enum coverage, end-of-session state).
+5. Performance: Snapshots stored as dataclass lists; bounded by in-memory session.
+6. Security: No network calls; all state local.
+7. Reliability: `TimeTravelError` exception class added; `step_forward()`/`step_backward()` return `None` at bounds (no raise).
+8. Docs: `--help` comprehensive; docs updated; banned claims clean.
+
+**Evidence:** 35 tests pass; ruff clean.

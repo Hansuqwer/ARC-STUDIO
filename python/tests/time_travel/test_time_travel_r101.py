@@ -395,3 +395,42 @@ class TestTimeTravelCLI:
         data = json.loads(result.output)
         assert data["ok"] is True
         assert data["data"]["paths_identical"] is True
+
+
+class TestTimeTravelError:
+    """Phase 343 DoD elevation: structured error class + state coverage."""
+
+    def test_time_travel_error_is_exception(self) -> None:
+        from agent_runtime_cockpit.time_travel import TimeTravelError
+
+        assert issubclass(TimeTravelError, Exception)
+        err = TimeTravelError("test message")
+        assert str(err) == "test message"
+
+    def test_time_travel_error_in_all(self) -> None:
+        import agent_runtime_cockpit.time_travel as tt_mod
+
+        assert "TimeTravelError" in tt_mod.__all__
+
+    def test_step_type_has_7_values(self) -> None:
+        from agent_runtime_cockpit.time_travel import StepType
+
+        values = [v.value for v in StepType]
+        assert "tool_call" in values
+        assert "model_output" in values
+        assert "sandbox_decision" in values
+        assert "context_change" in values
+        assert "hitl_gate" in values
+        assert "consensus" in values
+        assert "branch_point" in values
+        assert len(values) == 7
+
+    def test_step_forward_at_end_returns_none(self) -> None:
+        """step_forward() past end returns None (explicit done indicator)."""
+        from agent_runtime_cockpit.time_travel import StateSnapshot, StepType, create_session
+
+        session = create_session("test-session", "test-run")
+        session.add_step(StateSnapshot(step_id="s1", step_type=StepType.TOOL_CALL))
+        # Step forward past the only step — at end, returns None
+        step = session.step_forward()
+        assert step is None

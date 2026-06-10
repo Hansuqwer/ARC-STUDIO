@@ -18,6 +18,11 @@ from typing import Any, Optional
 
 log = logging.getLogger(__name__)
 
+
+class TimeTravelError(Exception):
+    """Raised when time-travel operations fail (session not found, replay error, etc.)."""
+
+
 TIME_TRAVEL_SCHEMA_VERSION = 1
 
 
@@ -270,6 +275,7 @@ def compare_paths(session1: TimeTravelSession, session2: TimeTravelSession) -> d
 
 
 __all__ = [
+    "TimeTravelError",
     "TIME_TRAVEL_SCHEMA_VERSION",
     "StepType",
     "StateSnapshot",
