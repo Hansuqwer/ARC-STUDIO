@@ -84,7 +84,7 @@ export class ArcDashboardWidget extends ReactWidget {
     protected render(): React.ReactNode {
         if (this.state.loading) {
             return (
-                <div style={styles.container} data-testid="arc-dashboard-loading">
+                <div style={styles.container} data-testid="arc-dashboard-loading" role="status" aria-label="Loading workspaces">
                     <h2 style={styles.title}>ARC Dashboard</h2>
                     <div style={styles.loading}>Loading workspaces...</div>
                 </div>
@@ -93,17 +93,17 @@ export class ArcDashboardWidget extends ReactWidget {
 
         if (this.state.error) {
             return (
-                <div style={styles.container} data-testid="arc-dashboard-error">
+                <div style={styles.container} data-testid="arc-dashboard-error" role="alert" aria-label="Dashboard error">
                     <h2 style={styles.title}>ARC Dashboard</h2>
                     <div style={styles.error}>Error: {this.state.error}</div>
-                    <button style={styles.button} onClick={() => this.refreshDashboard()}>Retry</button>
+                    <button style={styles.button} onClick={() => this.refreshDashboard()} aria-label="Retry loading dashboard">Retry</button>
                 </div>
             );
         }
 
         if (this.state.workspaces.length === 0) {
             return (
-                <div style={styles.container} data-testid="arc-dashboard-empty">
+                <div style={styles.container} data-testid="arc-dashboard-empty" role="status" aria-label="No workspaces found">
                     <h2 style={styles.title}>ARC Dashboard</h2>
                     <div style={styles.empty}>No workspaces found. Open a workspace to get started.</div>
                 </div>
@@ -113,18 +113,18 @@ export class ArcDashboardWidget extends ReactWidget {
         return (
             <div style={styles.container} data-testid="arc-dashboard">
                 <h2 style={styles.title}>ARC Dashboard</h2>
-                <div style={styles.summary}>
-                    <div style={styles.summaryCard}>
+                <div style={styles.summary} role="group" aria-label="Workspace summary">
+                    <div style={styles.summaryCard} aria-label={`Workspaces: ${this.state.workspaces.length}`}>
                         <div style={styles.summaryLabel}>Workspaces</div>
                         <div style={styles.summaryValue}>{this.state.workspaces.length}</div>
                     </div>
-                    <div style={styles.summaryCard}>
+                    <div style={styles.summaryCard} aria-label={`Active workspaces: ${this.state.workspaces.filter(w => w.status === 'active').length}`}>
                         <div style={styles.summaryLabel}>Active</div>
                         <div style={styles.summaryValue}>
                             {this.state.workspaces.filter(w => w.status === 'active').length}
                         </div>
                     </div>
-                    <div style={styles.summaryCard}>
+                    <div style={styles.summaryCard} aria-label={`Total cost in dollars`}>
                         <div style={styles.summaryLabel}>Total Cost</div>
                         <div style={styles.summaryValue}>
                             ${this.state.workspaces.reduce((sum, w) => sum + w.totalCost, 0).toFixed(2)}
@@ -171,7 +171,7 @@ export class ArcDashboardWidget extends ReactWidget {
                 {this.state.lastUpdated && (
                     <div style={styles.muted}>Last updated: {this.state.lastUpdated}</div>
                 )}
-                <button style={styles.button} onClick={() => this.refreshDashboard()}>Refresh</button>
+                <button style={styles.button} onClick={() => this.refreshDashboard()} aria-label="Refresh dashboard">Refresh</button>
             </div>
         );
     }

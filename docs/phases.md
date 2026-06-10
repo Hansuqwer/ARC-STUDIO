@@ -8575,3 +8575,21 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 8. Docs: `--help` comprehensive; `docs/roadmap.md` and `docs/phases.md` updated; banned claims clean.
 
 **Evidence:** 24 tests pass; ruff clean. Full suite: 6438 passed (no regression).
+
+---
+
+## Phase 337 — R95 DoD elevation: ARC Dashboard → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: Loading (`role="status"`), error (`role="alert"` with Retry), empty (`role="status"`), success — all 4 explicit.
+2. Accessibility: `aria-label` on loading/error/empty containers, summary cards, workspace cards, retry/refresh buttons. `role="button"` + `tabIndex={0}` on workspace cards for keyboard navigation.
+3. Parity: Uses Theia standard React widget pattern; `ArcService.getConfigStatus()` async bridge.
+4. Tests: 7 tests pass (5 new a11y/UX-state contract tests + 2 original static contract tests).
+5. Performance: Async data fetch; no blocking main thread; bounded state.
+6. Security: Read-only workspace list; no secrets in widget.
+7. Reliability: Try/catch in `refreshDashboard()`; error state preserved on failure; retry button available.
+8. Docs: Component JSDoc; docs updated; typecheck clean.
+
+**Evidence:** 7 tests pass; typecheck clean.
