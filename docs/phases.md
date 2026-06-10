@@ -8611,3 +8611,21 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 8. Docs: `--help` comprehensive; docs updated; banned claims clean.
 
 **Evidence:** 28 tests pass; ruff clean.
+
+---
+
+## Phase 339 — R97 DoD elevation: ARC Policies → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: Unknown template → `FileNotFoundError` (caught by CLI → err envelope); apply without `--yes` → `PERMISSION_DENIED` envelope.
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: All `template-*` commands use consistent `ok()`/`err()` JSON envelope.
+4. Tests: 30 tests pass (`tests/security/policy_templates/test_policy_templates_r97.py`) — 25 original + 5 new (PolicyTemplateError, `__all__`, confirmation gate, load_template error, --yes success).
+5. Performance: YAML load is O(1) per template; no full-dir scan on show/validate.
+6. Security: `template-apply` is confirmation-gated (`--yes` required in JSON mode; `typer.confirm` in interactive mode); `PERMISSION_DENIED` envelope on refusal.
+7. Reliability: `PolicyTemplateError` exception class added; per-template exception isolation in `list_templates()`.
+8. Docs: `--help` comprehensive; docs updated; banned claims clean.
+
+**Evidence:** 30 tests pass; ruff clean; scoped mypy for `security/` clean.

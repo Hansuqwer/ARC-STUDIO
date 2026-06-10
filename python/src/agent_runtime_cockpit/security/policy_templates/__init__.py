@@ -21,6 +21,11 @@ from ...gating import BackendMode
 
 log = logging.getLogger(__name__)
 
+
+class PolicyTemplateError(Exception):
+    """Raised when policy template operations fail (invalid ID, malformed YAML, etc.)."""
+
+
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 
@@ -95,7 +100,7 @@ def load_template(template_id: str) -> PolicyTemplate:
 
 def list_templates(category: Optional[str] = None) -> list[PolicyTemplate]:
     """List all available policy templates, optionally filtered by category."""
-    templates = []
+    templates: list[PolicyTemplate] = []
     if not TEMPLATES_DIR.exists():
         return templates
 
@@ -189,6 +194,7 @@ def apply_template(template_id: str, workspace: Path) -> dict[str, Any]:
 
 
 __all__ = [
+    "PolicyTemplateError",
     "PolicyTemplate",
     "load_template",
     "list_templates",

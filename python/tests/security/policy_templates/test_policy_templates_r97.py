@@ -206,9 +206,62 @@ class TestPolicyTemplatesCLI:
         runner = CliRunner()
         result = runner.invoke(
             app,
-            ["policy", "template-apply", "open-source", "--json", "-w", str(tmp_path)],
+            ["policy", "template-apply", "open-source", "--json", "--yes", "-w", str(tmp_path)],
         )
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["ok"] is True
         assert data["data"]["template_id"] == "open-source"
+
+
+class TestPolicyTemplateError:
+    """Phase 339 DoD elevation: structured error class + confirmation gate."""
+
+    def test_policy_template_error_is_exception(self) -> None:
+        from agent_runtime_cockpit.security.policy_templates import PolicyTemplateError
+
+        assert issubclass(PolicyTemplateError, Exception)
+        err = PolicyTemplateError("test message")
+        assert str(err) == "test message"
+
+    def test_policy_template_error_in_all(self) -> None:
+        import agent_runtime_cockpit.security.policy_templates as pt_mod
+
+        assert "PolicyTemplateError" in pt_mod.__all__
+
+    def test_load_template_raises_for_unknown(self) -> None:
+        from agent_runtime_cockpit.security.policy_templates import load_template
+
+        with pytest.raises(FileNotFoundError):
+            load_template("nonexistent-template-id")
+
+    def test_template_apply_requires_yes_in_json_mode(self, tmp_path: Path) -> None:
+        """template-apply must require --yes in JSON mode (confirmation-gated)."""
+        from typer.testing import CliRunner
+        from agent_runtime_cockpit.cli._app import app
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            ["policy", "template-apply", "open-source", "--json", "-w", str(tmp_path)],
+        )
+        assert result.exit_code == 1
+        data = json.loads(result.output)
+        assert data["ok"] is False
+        assert data["error"]["code"] == "PERMISSION_DENIED"
+
+    def test_template_apply_with_yes_succeeds(self, tmp_path: Path) -> None:
+        """template-apply with --yes succeeds and writes profile.yaml."""
+        from typer.testing import CliRunner
+        from agent_runtime_cockpit.cli._app import app
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            ["policy", "template-apply", "data-science", "--json", "--yes", "-w", str(tmp_path)],
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["ok"] is True
+        assert data["data"]["template_id"] == "data-science"
+        assert (tmp_path / ".arc" / "profile.yaml").exists()

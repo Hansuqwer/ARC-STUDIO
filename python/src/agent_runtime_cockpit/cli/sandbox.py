@@ -1264,17 +1264,32 @@ def policy_template_validate(
 def policy_template_apply(
     template_id: str = typer.Argument(..., help="Template ID to apply"),
     workspace: Optional[str] = WORKSPACE_FLAG,
+    yes: bool = typer.Option(False, "--yes", help="Skip the confirmation prompt"),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
     """Apply a policy template to a workspace (R97).
 
     Writes a .arc/profile.yaml file. Does NOT execute any code.
+    Requires --yes in JSON mode (confirmation-gated mutating action).
     """
     _setup_logging(debug)
     from ..security.policy_templates import apply_template
 
     ws = _workspace(workspace)
+    if json_output and not yes:
+        _out(
+            err(
+                ArcErrorCode.PERMISSION_DENIED,
+                "Refusing to apply policy template in JSON mode without --yes.",
+            ),
+            json_output,
+        )
+        raise typer.Exit(1)
+
+    if not yes:
+        typer.confirm(f"Apply policy template '{template_id}' to {ws}?", abort=True)
+
     result = apply_template(template_id, ws)
     if result["ok"]:
         _out(ok(result), json_output)
