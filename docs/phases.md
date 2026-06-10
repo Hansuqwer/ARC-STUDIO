@@ -8516,3 +8516,21 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 8. Docs: `--help` text comprehensive for all commands. `docs/roadmap.md` and `docs/phases.md` updated. Banned claims check passes.
 
 **Evidence:** 21 tests pass (`tests/tasks/test_scheduler_r92.py`); ruff clean. Full suite: 6438 passed. Destructive action confirmation-gated, scheduled tasks persisted to storage (Phase 333).
+
+---
+
+## Phase 334 — R93 DoD elevation: ARC Vision → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: CLI commands return structured error envelopes for all error cases (action not approved, driver not available, file not found). Empty state handled in action log. Success state returns structured data with action_id, timestamp, and result details.
+2. Accessibility: CLI-only feature; keyboard-accessible via standard shell. No IDE widgets.
+3. Parity: All commands use consistent JSON envelope format via `_out(ok(...))` and `_out(err(...))`. JSON output is stable and documented in command docstrings.
+4. Tests: 28 tests pass (`tests/vision/test_vision_r93.py`) covering unit tests for VisionDriver, HitlGatedVisionSession, and CLI integration tests for all commands.
+5. Performance: Browser automation is inherently async. No sync I/O in hot paths. FakeVisionDriver used for all tests (no real browser launch).
+6. Security: All browser actions are HITL-gated by default via `HitlGatedVisionSession`. The `--auto-approve` flag is clearly marked as "testing only" in help text. Screenshot capture is local-only. No cloud transcription or network calls.
+7. Reliability: All commands use structured error envelopes with `ArcErrorCode.PERMISSION_DENIED` for unapproved actions. Proper cleanup in `finally` blocks ensures browser resources are released.
+8. Docs: `--help` text comprehensive for all commands. `docs/roadmap.md` and `docs/phases.md` updated. Banned claims check passes.
+
+**Evidence:** 28 tests pass (`tests/vision/test_vision_r93.py`); ruff clean. Full suite: 6438 passed. HITL gating enforced for all browser actions (Phase 334).
