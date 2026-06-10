@@ -280,3 +280,84 @@ class TestComposerCLI:
             ],
         )
         assert result.exit_code == 1
+
+
+class TestComposerError:
+    """Phase 340 DoD elevation: structured error class + overwrite gate."""
+
+    def test_composer_error_is_exception(self) -> None:
+        from agent_runtime_cockpit.composer import ComposerError
+
+        assert issubclass(ComposerError, Exception)
+        err = ComposerError("test message")
+        assert str(err) == "test message"
+
+    def test_composer_error_in_all(self) -> None:
+        import agent_runtime_cockpit.composer as composer_mod
+
+        assert "ComposerError" in composer_mod.__all__
+
+    def test_composer_generate_overwrite_requires_yes(
+        self, tmp_path: Path, simple_graph: IRGraph
+    ) -> None:
+        """generate --output to existing file must require --yes in JSON mode."""
+        from typer.testing import CliRunner
+        from agent_runtime_cockpit.cli._app import app
+
+        graph_file = tmp_path / "graph.json"
+        graph_file.write_text(simple_graph.model_dump_json(indent=2))
+
+        output_file = tmp_path / "out.py"
+        output_file.write_text("# existing content\n")
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            [
+                "composer",
+                "generate",
+                str(graph_file),
+                "--output",
+                str(output_file),
+                "--json",
+                "-w",
+                str(tmp_path),
+            ],
+        )
+        assert result.exit_code == 1
+        data = json.loads(result.output)
+        assert data["ok"] is False
+        assert data["error"]["code"] == "PERMISSION_DENIED"
+
+    def test_composer_generate_overwrite_with_yes(
+        self, tmp_path: Path, simple_graph: IRGraph
+    ) -> None:
+        """generate --output with --yes overwrites existing file."""
+        from typer.testing import CliRunner
+        from agent_runtime_cockpit.cli._app import app
+
+        graph_file = tmp_path / "graph.json"
+        graph_file.write_text(simple_graph.model_dump_json(indent=2))
+
+        output_file = tmp_path / "out.py"
+        output_file.write_text("# existing content\n")
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            [
+                "composer",
+                "generate",
+                str(graph_file),
+                "--output",
+                str(output_file),
+                "--yes",
+                "--json",
+                "-w",
+                str(tmp_path),
+            ],
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["ok"] is True
+        assert "build_" in output_file.read_text()

@@ -25,6 +25,7 @@ from ._subapps import composer_app
 def composer_generate(
     graph_file: str = typer.Argument(..., help="Path to IR graph JSON file"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Output Python file path"),
+    yes: bool = typer.Option(False, "--yes", help="Overwrite output file without confirmation"),
     as_json: bool = JSON_FLAG,
     workspace: Optional[str] = WORKSPACE_FLAG,
 ) -> None:
@@ -61,6 +62,17 @@ def composer_generate(
 
     if output:
         output_path = Path(output)
+        if output_path.exists() and not yes:
+            if as_json:
+                _out(
+                    err(
+                        ArcErrorCode.PERMISSION_DENIED,
+                        f"Refusing to overwrite existing file {output} without --yes.",
+                    ),
+                    as_json,
+                )
+                raise typer.Exit(1)
+            typer.confirm(f"Overwrite existing file {output}?", abort=True)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(result.code, encoding="utf-8")
 

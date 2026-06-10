@@ -8629,3 +8629,21 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 8. Docs: `--help` comprehensive; docs updated; banned claims clean.
 
 **Evidence:** 30 tests pass; ruff clean; scoped mypy for `security/` clean.
+
+---
+
+## Phase 340 — R98 DoD elevation: ARC Composer → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: Missing graph file → `INVALID_INPUT` envelope; validation failure → `INVALID_INPUT` with errors; overwrite without `--yes` → `PERMISSION_DENIED`.
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: Both commands (`generate`, `validate`) use consistent `ok()`/`err()` JSON envelope.
+4. Tests: 22 tests pass (`tests/composer/test_composer_r98.py`) — 18 original + 4 new (ComposerError, `__all__`, overwrite gate, overwrite with --yes).
+5. Performance: Code generation is synchronous; pure string building; no AST parsing on output.
+6. Security: Output file overwrite is confirmation-gated (`--yes` required in JSON mode; `typer.confirm` in interactive mode).
+7. Reliability: `ComposerError` exception class added; `CodeGenResult.ok` checked before file write; structured error envelope.
+8. Docs: `--help` comprehensive; docs updated; banned claims clean.
+
+**Evidence:** 22 tests pass; ruff clean.

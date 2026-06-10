@@ -16,6 +16,10 @@ from ..swarmgraph_ir.validation import validate_graph
 log = logging.getLogger(__name__)
 
 
+class ComposerError(Exception):
+    """Raised when composer operations fail (invalid graph, file IO, etc.)."""
+
+
 @dataclass
 class CodeGenResult:
     code: str
@@ -163,6 +167,7 @@ def validate_composer_graph(graph: IRGraph) -> dict[str, Any]:
 
 
 __all__ = [
+    "ComposerError",
     "CodeGenResult",
     "generate_swarmgraph_code",
     "validate_composer_graph",
