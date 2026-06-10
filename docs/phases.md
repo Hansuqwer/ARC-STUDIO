@@ -8286,3 +8286,17 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - Playwright is an optional dependency (not installed); `FakeVisionDriver` used for all tests.
 
 **Evidence:** 28 tests pass (`tests/vision/test_vision_r93.py`); ruff clean. Full suite: 6201 passed (28 new).
+
+---
+
+## Phase 319 — R94: ARC Advisor — token cost optimization advisor
+
+**Status:** Baseline Complete
+
+**What changed:**
+- New `advisor/__init__.py`: `CostAdvisor`, `UsageRecord`, `Recommendation`, `AdvisorReport` — local analyzer over usage history that recommends cost-saving strategies (model switch, context compression, caching, batching) with a what-if simulator. All analysis local and deterministic. No provider calls.
+- New `cli/advisor.py`: `arc advisor analyze|simulate|pricing` CLI with `--json` envelope output.
+- Wired `advisor_app` into `cli/_subapps.py`, `cli/_app.py`, `cli/__init__.py`.
+- Reads existing optimizer pricing data; recommendations are pure arithmetic.
+
+**Evidence:** 19 tests pass (`tests/advisor/test_advisor_r94.py`); ruff clean. Full suite: 6220 passed (19 new).

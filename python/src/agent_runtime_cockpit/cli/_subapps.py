@@ -135,3 +135,8 @@ vision_app = typer.Typer(
     help="HITL-gated browser automation — screenshot, click, type, scroll (R93)",
     no_args_is_help=True,
 )
+advisor_app = typer.Typer(
+    name="advisor",
+    help="Token cost optimization advisor — analyze, simulate, pricing (R94)",
+    no_args_is_help=True,
+)

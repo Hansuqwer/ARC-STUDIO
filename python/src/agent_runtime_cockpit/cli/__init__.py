@@ -24,6 +24,7 @@ from . import (
     diff_cmd,  # noqa: F401 — Phase 291 / R89a: arc diff apply --interactive
     hub,  # noqa: F401 — Phase 316 / R91: arc hub list/add/remove/verify/inspect
     vision,  # noqa: F401 — Phase 318 / R93: arc vision screenshot/click/type/scroll
+    advisor,  # noqa: F401 — Phase 319 / R94: arc advisor analyze/simulate/pricing
     index_cmd,  # noqa: F401 — Phase 303 / R84: arc index build/search
     context_cmd,  # noqa: F401 — Phase 305 / R85: arc context suggest/attach
     memory_cmd,  # noqa: F401 — Phase 307 / R90: arc memory save/load/search
