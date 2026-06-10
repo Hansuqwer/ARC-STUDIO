@@ -302,7 +302,9 @@ class TestHubCLI:
 
         runner = CliRunner()
         runner.invoke(app, ["hub", "add", str(preset), "--json", "-w", str(tmp_path)])
-        result = runner.invoke(app, ["hub", "remove", "remove-test", "--json", "-w", str(tmp_path)])
+        result = runner.invoke(
+            app, ["hub", "remove", "remove-test", "--yes", "--json", "-w", str(tmp_path)]
+        )
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["ok"] is True

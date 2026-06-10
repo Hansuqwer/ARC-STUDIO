@@ -1846,7 +1846,7 @@ Full detail: `docs/research-findings/competitive-feature-backlog-2026-06-09.md`.
 | R88 | ARC Git — git-native agent workflow (PDF Feature 7) | Polished Complete |
 | R89 | ARC Diff — one-click inline patch apply (PDF Feature 8) | Polished Complete |
 | R90 | ARC Memory — persistent project knowledge (PDF Feature 10) | Baseline Complete |
-| R91 | ARC Hub — local-first assistant/config sharing (PDF Feature 9) | Baseline Complete |
+| R91 | ARC Hub — local-first assistant/config sharing (PDF Feature 9) | Polished Complete |
 | R92 | ARC Daemon Tasks — local background task runner (PDF Feature 11) | Baseline Complete |
 | R93 | ARC Vision — local browser/desktop automation, HITL-gated (PDF Feature 5) | Baseline Complete |
 | R94 | ARC Advisor — token cost optimization advisor (PDF Feature 17) | Baseline Complete |

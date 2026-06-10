@@ -101,14 +101,29 @@ def hub_add(
 @hub_app.command("remove")
 def hub_remove(
     item_id: str = typer.Argument(..., help="Hub item ID to remove."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt."),
     as_json: bool = JSON_FLAG,
     workspace: Optional[str] = WORKSPACE_FLAG,
 ) -> None:
-    """Remove an installed hub item."""
+    """Remove an installed hub item.
+
+    This is a destructive action that requires confirmation unless --yes is provided.
+    """
     from ..hub import HubError, create_catalog
 
     ws = _workspace(workspace)
     catalog = create_catalog(ws)
+
+    if not yes and not as_json:
+        from ._app import console
+
+        console.print(
+            f"[yellow]Warning:[/yellow] This will remove hub item '{item_id}' and all its files."
+        )
+        if not typer.confirm("Are you sure?"):
+            console.print("[dim]Aborted.[/dim]")
+            raise typer.Exit(0)
+
     try:
         catalog.remove(item_id)
         _out(ok({"id": item_id, "message": f"Hub item '{item_id}' removed."}), as_json)

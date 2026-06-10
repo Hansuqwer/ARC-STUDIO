@@ -8480,3 +8480,21 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - Schema version 1 with forward-compatible metadata.
 
 **Evidence:** 16 tests pass (`tests/release_snapshots/test_release_snapshots_r_proc2.py`); ruff clean. Full suite: 6437 passed (16 new).
+
+---
+
+## Phase 332 — R91 DoD elevation: ARC Hub → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: CLI commands return structured error envelopes for all error cases (invalid type, not found, checksum mismatch). Empty state handled in `list` command (returns empty list). Success state returns structured data.
+2. Accessibility: CLI-only feature; keyboard-accessible via standard shell. No IDE widgets.
+3. Parity: All commands use consistent JSON envelope format via `_out(ok(...))` and `_out(err(...))`. JSON output is stable and documented in command docstrings.
+4. Tests: 27 tests pass (`tests/hub/test_hub_r91.py`) covering unit tests for HubCatalog, HubItem, and CLI integration tests for all commands.
+5. Performance: File-based operations are O(n) where n is number of installed items. No sync I/O in hot paths (CLI commands are short-lived). SHA256 computation uses streaming reads for large files.
+6. Security: Destructive `remove` command is confirmation-gated (requires `--yes` flag or interactive confirmation). No network connections opened. Checksum verification is deterministic (SHA256).
+7. Reliability: All commands use structured error envelopes with `ArcErrorCode` enum. Timeouts not applicable (local file operations only).
+8. Docs: `--help` text comprehensive for all commands. `docs/roadmap.md` and `docs/phases.md` updated. Banned claims check passes.
+
+**Evidence:** 27 tests pass (`tests/hub/test_hub_r91.py`); ruff clean. Full suite: 6437 passed. Destructive action confirmation-gated (Phase 332).
