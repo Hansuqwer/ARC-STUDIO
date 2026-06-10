@@ -8464,3 +8464,19 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - Integrates with existing `scripts/generate-release-snapshot.sh` for CI pipeline integration.
 
 **Evidence:** 10 tests pass (`tests/release_intelligence/test_release_intelligence_r_proc1.py`); ruff clean. Full suite: 6421 passed (10 new).
+
+---
+
+## Phase 331 — R-PROC2: `docs/RELEASE_SNAPSHOTS/` — dated, locked, HEAD-derived markdown
+
+**Status:** Baseline Complete
+
+**What changed:**
+- New `release_snapshots/__init__.py`: `generate_snapshot_filename()`, `generate_snapshot_markdown()`, `save_snapshot()`, `list_snapshots()`, `get_latest_snapshot()`, `verify_snapshot_immutability()` — generates dated, locked, HEAD-derived markdown snapshots.
+- Snapshot naming: `YYYY-MM-DD-<short-sha>.md` format.
+- Immutability: existing snapshots are never edited (preserves historical record).
+- Integrates with `release_intelligence` module for data source.
+- Created `docs/RELEASE_SNAPSHOTS/` directory for snapshot storage.
+- Schema version 1 with forward-compatible metadata.
+
+**Evidence:** 16 tests pass (`tests/release_snapshots/test_release_snapshots_r_proc2.py`); ruff clean. Full suite: 6437 passed (16 new).

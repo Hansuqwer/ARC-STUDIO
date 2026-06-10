@@ -1890,7 +1890,7 @@ detail and dedupe notes: `docs/research-findings/competitive-feature-backlog-202
 | R-PERF8 | Provider connection pooling (10 concurrent calls/provider) | Baseline Complete |
 | R-PERF9 | WASM trace parser (research; ~10× large-trace speedup) | Baseline Complete |
 | R-PROC1 | Auto-generate release intelligence from CI on merge to main | Baseline Complete |
-| R-PROC2 | `docs/RELEASE_SNAPSHOTS/` — dated, locked, HEAD-derived markdown | Not Started |
+| R-PROC2 | `docs/RELEASE_SNAPSHOTS/` — dated, locked, HEAD-derived markdown | Baseline Complete |
 | R-PROC3 | Enforce `patches/INDEX.md` freshness in CI (warn/fail if > 24h behind HEAD) | Polished Complete |
 | R-PROC4 | Normalize repo name in docs (`arc-theia-studio` alias → `ARC-STUDIO`) | Polished Complete |
 | R-PROC5 | Extend `check-banned-claims.sh` to flag forward-dated docs | Polished Complete |
