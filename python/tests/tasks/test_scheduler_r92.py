@@ -219,3 +219,24 @@ class TestTaskSchedulerCLI:
         assert data["ok"] is True
         assert "scheduled_count" in data["data"]
         assert "budget" in data["data"]
+
+    def test_unschedule_task(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        from typer.testing import CliRunner
+        from agent_runtime_cockpit.cli._app import app
+        from agent_runtime_cockpit.tasks import Task, TaskScheduler, TaskStorage, TaskType
+
+        # Create a task directly in storage using the same path as CLI
+        db_path = tmp_path / ".arc" / "tasks.db"
+        storage = TaskStorage(db_path)
+        scheduler = TaskScheduler(storage)
+        task = Task(type=TaskType.RUN, operation="test-op", params={})
+        task_id = scheduler.schedule(task, interval_seconds=60)
+
+        runner = CliRunner()
+        # Now unschedule with --yes flag
+        result = runner.invoke(app, ["task", "unschedule", task_id, "--yes", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["ok"] is True
+        assert data["data"]["unscheduled"] is True

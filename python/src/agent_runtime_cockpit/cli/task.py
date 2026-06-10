@@ -472,13 +472,27 @@ def task_schedule(
 @task_app.command("unschedule")
 def task_unschedule(
     task_id: str = typer.Argument(..., help="Task ID to unschedule"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt."),
     json_output: bool = JSON_FLAG,
     debug: bool = DEBUG_FLAG,
 ) -> None:
-    """Remove a task from the recurring schedule (R92)."""
+    """Remove a task from the recurring schedule (R92).
+
+    This is a destructive action that requires confirmation unless --yes is provided.
+    """
     _setup_logging(debug)
 
     from ..tasks import TaskScheduler, TaskStorage
+
+    if not yes and not json_output:
+        from ._app import console
+
+        console.print(
+            f"[yellow]Warning:[/yellow] This will remove task '{task_id}' from the schedule."
+        )
+        if not typer.confirm("Are you sure?"):
+            console.print("[dim]Aborted.[/dim]")
+            raise typer.Exit(0)
 
     storage = TaskStorage(Path.cwd() / ".arc" / "tasks.db")
     scheduler = TaskScheduler(storage)

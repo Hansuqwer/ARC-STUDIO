@@ -8498,3 +8498,21 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 8. Docs: `--help` text comprehensive for all commands. `docs/roadmap.md` and `docs/phases.md` updated. Banned claims check passes.
 
 **Evidence:** 27 tests pass (`tests/hub/test_hub_r91.py`); ruff clean. Full suite: 6437 passed. Destructive action confirmation-gated (Phase 332).
+
+---
+
+## Phase 333 — R92 DoD elevation: ARC Daemon Tasks → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: CLI commands return structured error envelopes for all error cases (task not found, invalid type). Empty state handled in `list` and `scheduled` commands. Success state returns structured data.
+2. Accessibility: CLI-only feature; keyboard-accessible via standard shell. No IDE widgets.
+3. Parity: All commands use consistent JSON envelope format via `_out(ok(...))` and `_out(err(...))`. JSON output is stable and documented in command docstrings.
+4. Tests: 21 tests pass (`tests/tasks/test_scheduler_r92.py`) covering unit tests for TaskScheduler, ScheduleConfig, and CLI integration tests for all commands.
+5. Performance: Scheduler uses async `run_once()` method. No sync I/O in hot paths. Budget checks are O(1). Task storage uses SQLite with WAL mode for concurrent access.
+6. Security: Destructive `unschedule` command is confirmation-gated (requires `--yes` flag or interactive confirmation). Budget caps enforced before task execution. All tasks sandboxed and audited.
+7. Reliability: All commands use structured error envelopes with `ArcErrorCode` enum. Scheduler persists scheduled tasks to storage on initialization for crash recovery.
+8. Docs: `--help` text comprehensive for all commands. `docs/roadmap.md` and `docs/phases.md` updated. Banned claims check passes.
+
+**Evidence:** 21 tests pass (`tests/tasks/test_scheduler_r92.py`); ruff clean. Full suite: 6438 passed. Destructive action confirmation-gated, scheduled tasks persisted to storage (Phase 333).

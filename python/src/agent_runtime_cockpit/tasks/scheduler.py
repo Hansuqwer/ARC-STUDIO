@@ -44,6 +44,25 @@ class TaskScheduler:
         self._scheduled_tasks: dict[str, dict[str, Any]] = {}
         self._tokens_used: int = 0
         self._cost_used: float = 0.0
+        self._load_scheduled_tasks()
+
+    def _load_scheduled_tasks(self) -> None:
+        """Load scheduled tasks from storage on initialization."""
+        try:
+            tasks = self._storage.list_tasks(status=TaskStatus.PENDING)
+            for task in tasks:
+                # Use default interval for loaded tasks
+                interval = self._config.interval_seconds
+                self._scheduled_tasks[task.id] = {
+                    "task": task,
+                    "interval": interval,
+                    "last_run": None,
+                    "next_run": time.time() + interval,
+                }
+            if tasks:
+                log.info("Loaded %d scheduled tasks from storage", len(tasks))
+        except Exception as e:
+            log.warning("Failed to load scheduled tasks from storage: %s", e)
 
     @property
     def is_running(self) -> bool:
