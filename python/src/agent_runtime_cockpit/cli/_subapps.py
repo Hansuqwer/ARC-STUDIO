@@ -160,3 +160,8 @@ notebook_app = typer.Typer(
     help="Agent workbook .arcnb — new, show, export, add-cell (R100)",
     no_args_is_help=True,
 )
+time_travel_app = typer.Typer(
+    name="time-travel",
+    help="Run replay & diff debugger — record, replay, branch, compare (R101)",
+    no_args_is_help=True,
+)

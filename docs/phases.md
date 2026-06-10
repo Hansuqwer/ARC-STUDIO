@@ -8388,3 +8388,18 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - Schema version 1 with forward-compatible metadata.
 
 **Evidence:** 23 tests pass (`tests/notebook/test_notebook_r100.py`); ruff clean. Full suite: 6334 passed (23 new).
+
+---
+
+## Phase 326 — R101: ARC Time Travel — run replay & diff debugger
+
+**Status:** Baseline Complete
+
+**What changed:**
+- New `time_travel/__init__.py`: `TimeTravelSession`, `StateSnapshot`, `Branch`, `StepType`, `compare_paths()` — per-step state recording (context, tool calls, model outputs, sandbox decisions), forward/backward replay, branch from any step, and execution path comparison.
+- New `cli/time_travel.py`: `arc time-travel record|replay|branch|compare|show` CLI with `--json` envelope output.
+- Wired `time_travel_app` into `cli/_subapps.py`, `cli/_app.py`, `cli/__init__.py`.
+- Builds on existing `run_diff` and `flight_recorder` infrastructure.
+- Schema version 1 with forward-compatible metadata.
+
+**Evidence:** 31 tests pass (`tests/time_travel/test_time_travel_r101.py`); ruff clean. Full suite: 6365 passed (31 new).
