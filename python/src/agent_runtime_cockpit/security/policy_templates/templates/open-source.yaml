@@ -1,0 +1,20 @@
+id: open-source
+name: Open Source Profile
+description: >
+  Policy template for open-source project workflows. Minimal permissions
+  for safety. No network, no paid calls, no shell, no secrets.
+category: open-source
+tags:
+  - open-source
+  - community
+  - safe
+compliance_note: "Aspirational target for open-source safety, not a certification."
+profile:
+  id: open-source
+  name: Open Source Safe
+  allow_paid_calls: false
+  allow_network: false
+  allow_shell: false
+  allow_secrets: false
+  env_allowlist: []
+  backend: stub

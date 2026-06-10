@@ -1,0 +1,24 @@
+id: data-science
+name: Data Science Profile
+description: >
+  Policy template for data science workflows. Allows network access for
+  data fetching and paid API calls for model inference. Shell access disabled
+  for safety. Secrets access disabled.
+category: data-science
+tags:
+  - data-science
+  - ml
+  - analytics
+compliance_note: "Aspirational target for data science best practices, not a certification."
+profile:
+  id: data-science
+  name: Data Science
+  allow_paid_calls: true
+  allow_network: true
+  allow_shell: false
+  allow_secrets: false
+  env_allowlist:
+    - PYTHONPATH
+    - DATA_DIR
+    - MODEL_DIR
+  backend: local

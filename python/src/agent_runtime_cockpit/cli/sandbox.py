@@ -1203,3 +1203,81 @@ def policy_rule_remove(
     _setup_logging(debug)
     result = remove_command_rule(pattern=pattern)
     _out(ok(result), json_output)
+
+
+@policy_app.command("template-list")
+def policy_template_list(
+    category: Optional[str] = typer.Option(None, "--category", "-c", help="Filter by category"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """List available policy templates (R97)."""
+    _setup_logging(debug)
+    from ..security.policy_templates import list_templates
+
+    templates = list_templates(category=category)
+    payload = {
+        "count": len(templates),
+        "category_filter": category,
+        "templates": [t.to_dict() for t in templates],
+    }
+    _out(ok(payload), json_output)
+
+
+@policy_app.command("template-show")
+def policy_template_show(
+    template_id: str = typer.Argument(..., help="Template ID to show"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Show details of a policy template (R97)."""
+    _setup_logging(debug)
+    from ..security.policy_templates import load_template
+
+    try:
+        template = load_template(template_id)
+        _out(ok(template.to_dict()), json_output)
+    except FileNotFoundError as exc:
+        _out(err(ArcErrorCode.INVALID_INPUT, str(exc)), json_output)
+        raise typer.Exit(1)
+
+
+@policy_app.command("template-validate")
+def policy_template_validate(
+    template_id: str = typer.Argument(..., help="Template ID to validate"),
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Validate a policy template (R97)."""
+    _setup_logging(debug)
+    from ..security.policy_templates import validate_template
+
+    result = validate_template(template_id)
+    if result["ok"]:
+        _out(ok(result), json_output)
+    else:
+        _out(err(ArcErrorCode.INVALID_INPUT, result.get("error", "Validation failed")), json_output)
+        raise typer.Exit(1)
+
+
+@policy_app.command("template-apply")
+def policy_template_apply(
+    template_id: str = typer.Argument(..., help="Template ID to apply"),
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Apply a policy template to a workspace (R97).
+
+    Writes a .arc/profile.yaml file. Does NOT execute any code.
+    """
+    _setup_logging(debug)
+    from ..security.policy_templates import apply_template
+
+    ws = _workspace(workspace)
+    result = apply_template(template_id, ws)
+    if result["ok"]:
+        _out(ok(result), json_output)
+    else:
+        _out(err(ArcErrorCode.INVALID_INPUT, result.get("error", "Apply failed")), json_output)
+        raise typer.Exit(1)

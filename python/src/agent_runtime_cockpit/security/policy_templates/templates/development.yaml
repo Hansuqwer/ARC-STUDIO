@@ -1,0 +1,23 @@
+id: development
+name: Development Profile
+description: >
+  Policy template for local development workflows. Allows shell access for
+  build tools and network access for package installation. Paid calls disabled.
+category: development
+tags:
+  - development
+  - local
+  - build
+compliance_note: "Aspirational target for development workflows, not a certification."
+profile:
+  id: development
+  name: Development
+  allow_paid_calls: false
+  allow_network: true
+  allow_shell: true
+  allow_secrets: false
+  env_allowlist:
+    - PATH
+    - HOME
+    - PYTHONPATH
+  backend: local

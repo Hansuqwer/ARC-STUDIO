@@ -1,0 +1,25 @@
+id: ci-cd
+name: CI/CD Profile
+description: >
+  Policy template for CI/CD pipeline workflows. Allows shell for build/test,
+  network for artifact publishing. Paid calls and secrets disabled for safety.
+category: ci-cd
+tags:
+  - ci
+  - cd
+  - pipeline
+  - automation
+compliance_note: "Aspirational target for CI/CD safety, not a certification."
+profile:
+  id: ci-cd
+  name: CI/CD Pipeline
+  allow_paid_calls: false
+  allow_network: true
+  allow_shell: true
+  allow_secrets: false
+  env_allowlist:
+    - CI
+    - GITHUB_ACTIONS
+    - GITLAB_CI
+    - PATH
+  backend: local

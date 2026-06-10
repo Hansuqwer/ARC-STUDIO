@@ -1,0 +1,22 @@
+id: regulated-industry
+name: Regulated Industry Profile
+description: >
+  Policy template for regulated industry workflows (finance, healthcare, etc.).
+  Strict permissions: no network, no shell, no secrets. Paid calls disabled.
+  All actions require HITL approval.
+category: regulated
+tags:
+  - regulated
+  - finance
+  - healthcare
+  - compliance
+compliance_note: "Aspirational target for regulated industry compliance, not a certification."
+profile:
+  id: regulated-industry
+  name: Regulated Industry
+  allow_paid_calls: false
+  allow_network: false
+  allow_shell: false
+  allow_secrets: false
+  env_allowlist: []
+  backend: stub

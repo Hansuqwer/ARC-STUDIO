@@ -8329,3 +8329,17 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - Command type detection: chat, slash (`/`), cli (`arc `).
 
 **Evidence:** 24 tests pass (`tests/voice/test_voice_r96.py`); ruff clean. Full suite: 6244 passed (24 new).
+
+---
+
+## Phase 322 — R97: ARC Policies — sandbox policy template library
+
+**Status:** Baseline Complete
+
+**What changed:**
+- New `security/policy_templates/__init__.py`: `PolicyTemplate`, `load_template()`, `list_templates()`, `validate_template()`, `apply_template()` — curated library of sandbox policy templates per use case. All policies deterministic. No LLM allow/deny. Compliance profiles are "aspirational targets, not certifications".
+- 5 YAML templates: `data-science`, `open-source`, `regulated-industry`, `development`, `ci-cd`.
+- Extended `cli/sandbox.py`: `arc policy template-list|template-show|template-validate|template-apply` CLI commands.
+- `apply_template()` writes `.arc/profile.yaml` — does NOT execute any code or modify runtime state.
+
+**Evidence:** 25 tests pass (`tests/security/policy_templates/test_policy_templates_r97.py`); ruff clean. Full suite: 6269 passed (25 new).
