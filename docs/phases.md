@@ -8403,3 +8403,18 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - Schema version 1 with forward-compatible metadata.
 
 **Evidence:** 31 tests pass (`tests/time_travel/test_time_travel_r101.py`); ruff clean. Full suite: 6365 passed (31 new).
+
+---
+
+## Phase 327 — R102: ARC Migrate — cross-adapter migration assistant
+
+**Status:** Baseline Complete
+
+**What changed:**
+- New `migrate/__init__.py`: `MigrationResult`, `MigrationAnalysis`, `MigrationIssue`, `FrameworkType`, `MigrationStatus`, `detect_framework()`, `analyze_migration()`, `generate_migration()`, `validate_migration()`, `migrate_workspace()` — cross-adapter migration via AST analysis + templated generation, with equivalence validation.
+- New `cli/migrate.py`: `arc migrate detect|analyze|run|validate` CLI with `--json` envelope output.
+- Wired `migrate_app` into `cli/_subapps.py`, `cli/_app.py`, `cli/__init__.py`.
+- Supports migration paths: LangGraph ↔ CrewAI, SwarmGraph ↔ OpenAI Agents, and more.
+- AST-based pattern detection and template-based code generation.
+
+**Evidence:** 23 tests pass (`tests/migrate/test_migrate_r102.py`); ruff clean. Full suite: 6388 passed (23 new).

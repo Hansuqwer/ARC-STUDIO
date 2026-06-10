@@ -1857,7 +1857,7 @@ Full detail: `docs/research-findings/competitive-feature-backlog-2026-06-09.md`.
 | R99 | ARC Debug — inline debugger & REPL via DAP (PDF Feature 13) | Baseline Complete |
 | R100 | ARC Notebook — agent workbook `.arcnb` (PDF Feature 18) | Baseline Complete |
 | R101 | ARC Time Travel — run replay & diff debugger (PDF Feature 19) | Baseline Complete |
-| R102 | ARC Migrate — cross-adapter migration assistant (PDF Feature 20) | Not Started |
+| R102 | ARC Migrate — cross-adapter migration assistant (PDF Feature 20) | Baseline Complete |
 | R-NATIVE-RUNTIME | Native GPU visualizer (Rust/wgpu/egui) augmenting the Theia IDE (PDF §7) | Not Started |
 
 

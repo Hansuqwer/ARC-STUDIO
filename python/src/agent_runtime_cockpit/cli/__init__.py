@@ -30,6 +30,7 @@ from . import (
     debug,  # noqa: F401 — Phase 324 / R99: arc debug launch/attach/status
     notebook,  # noqa: F401 — Phase 325 / R100: arc notebook new/show/export/add-cell
     time_travel,  # noqa: F401 — Phase 326 / R101: arc time-travel record/replay/branch/compare
+    migrate,  # noqa: F401 — Phase 327 / R102: arc migrate detect/analyze/run/validate
     index_cmd,  # noqa: F401 — Phase 303 / R84: arc index build/search
     context_cmd,  # noqa: F401 — Phase 305 / R85: arc context suggest/attach
     memory_cmd,  # noqa: F401 — Phase 307 / R90: arc memory save/load/search

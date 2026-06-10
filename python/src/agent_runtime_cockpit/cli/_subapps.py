@@ -165,3 +165,8 @@ time_travel_app = typer.Typer(
     help="Run replay & diff debugger — record, replay, branch, compare (R101)",
     no_args_is_help=True,
 )
+migrate_app = typer.Typer(
+    name="migrate",
+    help="Cross-adapter migration — detect, analyze, run, validate (R102)",
+    no_args_is_help=True,
+)
