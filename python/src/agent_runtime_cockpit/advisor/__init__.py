@@ -23,6 +23,10 @@ from ..optimizer.local import KNOWN_PRICING, ModelPricing
 log = logging.getLogger(__name__)
 
 
+class AdvisorError(Exception):
+    """Raised when advisor operations fail (file IO, invalid input, etc.)."""
+
+
 @dataclass
 class UsageRecord:
     run_id: str
@@ -346,6 +350,7 @@ class CostAdvisor:
 
 
 __all__ = [
+    "AdvisorError",
     "UsageRecord",
     "Recommendation",
     "AdvisorReport",

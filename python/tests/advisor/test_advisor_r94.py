@@ -263,3 +263,94 @@ class TestAdvisorCLI:
         assert result.exit_code == 1
         data = json.loads(result.output)
         assert data["ok"] is False
+
+
+class TestAdvisorError:
+    """Phase 336 DoD elevation: structured error class + envelope coverage."""
+
+    def test_advisor_error_is_exception(self) -> None:
+        from agent_runtime_cockpit.advisor import AdvisorError
+
+        assert issubclass(AdvisorError, Exception)
+        err = AdvisorError("test message")
+        assert str(err) == "test message"
+
+    def test_advisor_error_in_all(self) -> None:
+        import agent_runtime_cockpit.advisor as advisor_mod
+
+        assert "AdvisorError" in advisor_mod.__all__
+
+    def test_analyze_json_envelope_schema(self, tmp_path: Path) -> None:
+        """Verify --json output is a valid ArcEnvelope with stable schema."""
+        from typer.testing import CliRunner
+        from agent_runtime_cockpit.cli._app import app
+
+        traces_dir = tmp_path / ".arc" / "traces"
+        traces_dir.mkdir(parents=True)
+        trace_file = traces_dir / "run-1.jsonl"
+        trace_file.write_text(
+            json.dumps(
+                {
+                    "type": "run_complete",
+                    "data": {
+                        "run_id": "run-1",
+                        "model": "gpt-4",
+                        "input_tokens": 6000,
+                        "output_tokens": 1000,
+                        "cost_usd": 0.1,
+                    },
+                }
+            )
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["advisor", "analyze", "--json", "-w", str(tmp_path)])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["ok"] is True
+        assert "data" in data
+        assert data["data"]["total_runs"] == 1
+        assert data["data"]["total_cost_usd"] == 0.1
+        assert isinstance(data["data"]["recommendations"], list)
+        assert len(data["data"]["recommendations"]) >= 1
+
+    def test_simulate_json_envelope_schema(self, tmp_path: Path) -> None:
+        """Verify simulate --json output is a valid ArcEnvelope with error path."""
+        from typer.testing import CliRunner
+        from agent_runtime_cockpit.cli._app import app
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            [
+                "advisor",
+                "simulate",
+                "caching",
+                "--json",
+                "-w",
+                str(tmp_path),
+            ],
+        )
+        assert result.exit_code == 1
+        data = json.loads(result.output)
+        assert data["ok"] is False
+        assert "error" in data
+        assert data["error"]["code"] == "INVALID_INPUT"
+
+    def test_pricing_json_envelope_schema(self) -> None:
+        """Verify pricing --json output schema is stable."""
+        from typer.testing import CliRunner
+        from agent_runtime_cockpit.cli._app import app
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["advisor", "pricing", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["ok"] is True
+        assert "data" in data
+        assert "count" in data["data"]
+        assert "pricing" in data["data"]
+        for entry in data["data"]["pricing"]:
+            assert "model" in entry
+            assert "input_per_1k" in entry
+            assert "output_per_1k" in entry

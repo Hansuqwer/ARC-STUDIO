@@ -8557,3 +8557,21 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - All banned claims checks pass
 
 **Evidence:** ruff clean; pytest 6438 passed; typecheck clean; build clean; banned claims clean. Release snapshot: `65e6af1b`.
+
+---
+
+## Phase 336 — R94 DoD elevation: ARC Advisor → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: Empty workspace → empty `AdvisorReport` (`total_runs=0`, recommendations=[]) via `ok()` envelope; no records on `simulate` → `err(INVALID_INPUT)` envelope.
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: All 3 commands (`analyze`, `simulate`, `pricing`) use consistent `ok()`/`err()` JSON envelope via `_out()`.
+4. Tests: 24 tests pass (`tests/advisor/test_advisor_r94.py`) — 19 original + 5 new (AdvisorError class, `__all__` export, --json envelope schema for analyze/simulate/pricing).
+5. Performance: `load_usage_from_traces()` bounded by `limit` parameter; per-file exception isolation; no full-workspace scan.
+6. Security: No paid provider calls; all analysis local; `AdvisorError` structured exception added.
+7. Reliability: `AdvisorError` exception class added; all CLI paths exit cleanly with structured error envelopes; `simulate` returns `err()` envelope on unknown strategy/model.
+8. Docs: `--help` comprehensive; `docs/roadmap.md` and `docs/phases.md` updated; banned claims clean.
+
+**Evidence:** 24 tests pass; ruff clean. Full suite: 6438 passed (no regression).
