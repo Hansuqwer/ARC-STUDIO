@@ -1888,7 +1888,7 @@ detail and dedupe notes: `docs/research-findings/competitive-feature-backlog-202
 | R-PERF6 | Memory-mapped trace reading (1 GB trace < 5s) | Baseline Complete |
 | R-PERF7 | Incremental workspace index (< 1s per file change; depends on R84) | Baseline Complete |
 | R-PERF8 | Provider connection pooling (10 concurrent calls/provider) | Baseline Complete |
-| R-PERF9 | WASM trace parser (research; ~10× large-trace speedup) | Not Started |
+| R-PERF9 | WASM trace parser (research; ~10× large-trace speedup) | Baseline Complete |
 | R-PROC1 | Auto-generate release intelligence from CI on merge to main | Not Started |
 | R-PROC2 | `docs/RELEASE_SNAPSHOTS/` — dated, locked, HEAD-derived markdown | Not Started |
 | R-PROC3 | Enforce `patches/INDEX.md` freshness in CI (warn/fail if > 24h behind HEAD) | Polished Complete |
