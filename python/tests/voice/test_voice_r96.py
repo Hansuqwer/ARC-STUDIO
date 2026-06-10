@@ -241,3 +241,41 @@ class TestVoiceCLI:
         data = json.loads(result.output)
         assert data["ok"] is True
         assert "not yet implemented" in data["data"]["message"]
+
+
+class TestVoiceError:
+    """Phase 338 DoD elevation: structured error class + degraded-state coverage."""
+
+    def test_voice_error_is_exception(self) -> None:
+        from agent_runtime_cockpit.voice import VoiceError
+
+        assert issubclass(VoiceError, Exception)
+        err = VoiceError("test message")
+        assert str(err) == "test message"
+
+    def test_voice_error_in_all(self) -> None:
+        import agent_runtime_cockpit.voice as voice_mod
+
+        assert "VoiceError" in voice_mod.__all__
+
+    def test_whisper_degraded_when_unavailable(self, tmp_path: Path) -> None:
+        """Whisper driver without model installed returns degraded result, not raise."""
+        from agent_runtime_cockpit.voice import WhisperVoiceDriver
+
+        driver = WhisperVoiceDriver(model_name="nonexistent")
+        result = driver.transcribe(tmp_path / "audio.wav")
+        assert result.is_final is False
+        assert result.text == ""
+        assert result.confidence == 0.0
+
+    def test_voice_status_json_envelope(self) -> None:
+        """Verify voice status --json output schema is stable."""
+        from typer.testing import CliRunner
+        from agent_runtime_cockpit.cli._app import app
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["voice", "status", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["ok"] is True
+        assert "data" in data

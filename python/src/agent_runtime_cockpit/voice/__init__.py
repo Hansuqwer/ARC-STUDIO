@@ -17,6 +17,10 @@ from typing import Any, Optional
 log = logging.getLogger(__name__)
 
 
+class VoiceError(Exception):
+    """Raised when voice operations fail (driver unavailable, transcription error, etc.)."""
+
+
 class VoiceState(str, Enum):
     IDLE = "idle"
     LISTENING = "listening"
@@ -271,6 +275,7 @@ def create_voice_pipeline(
 
 
 __all__ = [
+    "VoiceError",
     "VoiceState",
     "TranscriptionResult",
     "VoiceDriver",

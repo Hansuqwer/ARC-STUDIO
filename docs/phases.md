@@ -8593,3 +8593,21 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 8. Docs: Component JSDoc; docs updated; typecheck clean.
 
 **Evidence:** 7 tests pass; typecheck clean.
+
+---
+
+## Phase 338 — R96 DoD elevation: ARC Voice → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: Whisper driver without model → degraded `TranscriptionResult(is_final=False, text="")` (not raise); all CLI commands return structured envelope.
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: All 3 commands (`transcribe`, `listen`, `status`) use consistent `ok()`/`err()` JSON envelope.
+4. Tests: 28 tests pass (`tests/voice/test_voice_r96.py`) — 24 original + 4 new (VoiceError class, degraded-state, status --json envelope, `__all__` export).
+5. Performance: Transcription bounded by audio file; no streaming; no model download in tests.
+6. Security: No cloud API calls; local Whisper only; `VoiceError` structured exception added.
+7. Reliability: `VoiceError` exception class added; degraded state on driver unavailable; no unhandled exceptions.
+8. Docs: `--help` comprehensive; docs updated; banned claims clean.
+
+**Evidence:** 28 tests pass; ruff clean.
