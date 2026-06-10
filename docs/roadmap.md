@@ -1886,7 +1886,7 @@ detail and dedupe notes: `docs/research-findings/competitive-feature-backlog-202
 | R-PERF4 | Async `startRun()` bridge residual (eliminate remaining blocking `execFileSync`); config-service done in R-POLISH7/14 | Polished Complete |
 | R-PERF5 | SQLite WAL auto-checkpoint tuning (< 50ms write latency) | Polished Complete |
 | R-PERF6 | Memory-mapped trace reading (1 GB trace < 5s) | Baseline Complete |
-| R-PERF7 | Incremental workspace index (< 1s per file change; depends on R84) | Not Started |
+| R-PERF7 | Incremental workspace index (< 1s per file change; depends on R84) | Baseline Complete |
 | R-PERF8 | Provider connection pooling (10 concurrent calls/provider) | Baseline Complete |
 | R-PERF9 | WASM trace parser (research; ~10× large-trace speedup) | Not Started |
 | R-PROC1 | Auto-generate release intelligence from CI on merge to main | Not Started |

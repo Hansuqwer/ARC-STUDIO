@@ -8418,3 +8418,19 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - AST-based pattern detection and template-based code generation.
 
 **Evidence:** 23 tests pass (`tests/migrate/test_migrate_r102.py`); ruff clean. Full suite: 6388 passed (23 new).
+
+---
+
+## Phase 328 — R-PERF7: Incremental workspace index
+
+**Status:** Baseline Complete
+
+**What changed:**
+- Extended `index/__init__.py`: Added `update_file()`, `remove_file()`, `get_changed_files()`, `incremental_update()` methods to `CodebaseIndex` class.
+- Incremental indexing updates only changed files since last build (< 1s per file change).
+- `update_file()` incrementally updates a single file in the index.
+- `remove_file()` removes a single file from the index.
+- `get_changed_files()` detects files changed since last build.
+- `incremental_update()` performs full incremental update cycle.
+
+**Evidence:** 9 tests pass (`tests/index/test_incremental_index_r_perf7.py`); ruff clean. Full suite: 6397 passed (9 new). Performance test confirms < 1s per file change.

@@ -267,3 +267,102 @@ class CodebaseIndex:
             "last_built": float(last[0]) if last else None,
             "db_path": str(self.db_path),
         }
+
+    def update_file(self, path: Path, extensions: frozenset[str] | None = None) -> bool:
+        """Incrementally update a single file in the index. Returns True if indexed."""
+        exts = extensions or frozenset(_LANG_MAP.keys())
+        if path.suffix not in exts:
+            return False
+
+        try:
+            rel = str(path.relative_to(self.workspace))
+            stat = path.stat()
+            lang = _LANG_MAP.get(path.suffix, "unknown")
+            try:
+                text = path.read_text(encoding="utf-8", errors="ignore")[:16384]
+            except OSError:
+                return False
+            symbols = _extract_symbols(text)
+            preview = text[:_PREVIEW_CHARS].replace("\n", " ")
+
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("PRAGMA journal_mode = WAL")
+                conn.execute(
+                    """INSERT INTO files (path, size_bytes, last_modified, language,
+                       symbol_count, indexed_at)
+                       VALUES (?,?,?,?,?,?)
+                       ON CONFLICT(path) DO UPDATE SET
+                         size_bytes=excluded.size_bytes,
+                         last_modified=excluded.last_modified,
+                         language=excluded.language,
+                         symbol_count=excluded.symbol_count,
+                         indexed_at=excluded.indexed_at""",
+                    (rel, stat.st_size, stat.st_mtime, lang, len(symbols.split()), time.time()),
+                )
+                conn.execute("DELETE FROM files_fts WHERE path=?", (rel,))
+                conn.execute(
+                    "INSERT INTO files_fts(path, symbols, content_preview) VALUES (?,?,?)",
+                    (rel, symbols, preview),
+                )
+            return True
+        except Exception as exc:
+            log.debug("Index update skip %s: %s", path, exc)
+            return False
+
+    def remove_file(self, path: Path) -> bool:
+        """Remove a single file from the index. Returns True if removed."""
+        try:
+            rel = str(path.relative_to(self.workspace))
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("PRAGMA journal_mode = WAL")
+                cursor = conn.execute("DELETE FROM files WHERE path=?", (rel,))
+                conn.execute("DELETE FROM files_fts WHERE path=?", (rel,))
+                return cursor.rowcount > 0
+        except Exception as exc:
+            log.debug("Index remove skip %s: %s", path, exc)
+            return False
+
+    def get_changed_files(self, since: float | None = None) -> list[Path]:
+        """Get files that have changed since the given timestamp (or last index build)."""
+        if since is None:
+            with sqlite3.connect(self.db_path) as conn:
+                last = conn.execute(
+                    "SELECT value FROM index_meta WHERE key='last_built'"
+                ).fetchone()
+                since = float(last[0]) if last else 0.0
+
+        changed = []
+        exts = frozenset(_LANG_MAP.keys())
+        for path in _iter_files(self.workspace, exts):
+            try:
+                stat = path.stat()
+                if stat.st_mtime > since:
+                    changed.append(path)
+            except OSError:
+                continue
+        return changed
+
+    def incremental_update(self, extensions: frozenset[str] | None = None) -> dict:
+        """Incrementally update only changed files since last build. Returns update stats."""
+        exts = extensions or frozenset(_LANG_MAP.keys())
+        t0 = time.perf_counter()
+        updated = 0
+        removed = 0
+
+        changed_files = self.get_changed_files()
+        for path in changed_files:
+            if path.exists():
+                if self.update_file(path, exts):
+                    updated += 1
+            else:
+                if self.remove_file(path):
+                    removed += 1
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO index_meta (key,value) VALUES (?,?)",
+                ("last_built", str(time.time())),
+            )
+
+        elapsed = time.perf_counter() - t0
+        return {"updated": updated, "removed": removed, "elapsed_s": round(elapsed, 3)}
