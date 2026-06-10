@@ -8343,3 +8343,18 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - `apply_template()` writes `.arc/profile.yaml` — does NOT execute any code or modify runtime state.
 
 **Evidence:** 25 tests pass (`tests/security/policy_templates/test_policy_templates_r97.py`); ruff clean. Full suite: 6269 passed (25 new).
+
+---
+
+## Phase 323 — R98: ARC Composer — visual SwarmGraph builder
+
+**Status:** Baseline Complete
+
+**What changed:**
+- New `composer/__init__.py`: `CodeGenResult`, `generate_swarmgraph_code()`, `validate_composer_graph()` — generates SwarmGraph Python code from an IR graph representation. Includes validation (cycle/dead-node detection) via `swarmgraph_ir.validation`.
+- New `cli/composer.py`: `arc composer generate|validate` CLI with `--json` envelope output.
+- Wired `composer_app` into `cli/_subapps.py`, `cli/_app.py`, `cli/__init__.py`.
+- Codegen produces valid Python with SwarmGraph imports, node definitions, and edge connections.
+- Validation detects cycles (advisory warning) and dead/isolated nodes.
+
+**Evidence:** 18 tests pass (`tests/composer/test_composer_r98.py`); ruff clean. Full suite: 6287 passed (18 new).

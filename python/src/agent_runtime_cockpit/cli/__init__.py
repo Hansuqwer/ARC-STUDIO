@@ -26,6 +26,7 @@ from . import (
     vision,  # noqa: F401 — Phase 318 / R93: arc vision screenshot/click/type/scroll
     advisor,  # noqa: F401 — Phase 319 / R94: arc advisor analyze/simulate/pricing
     voice,  # noqa: F401 — Phase 321 / R96: arc voice transcribe/listen/status
+    composer,  # noqa: F401 — Phase 323 / R98: arc composer generate/validate
     index_cmd,  # noqa: F401 — Phase 303 / R84: arc index build/search
     context_cmd,  # noqa: F401 — Phase 305 / R85: arc context suggest/attach
     memory_cmd,  # noqa: F401 — Phase 307 / R90: arc memory save/load/search

@@ -145,3 +145,8 @@ voice_app = typer.Typer(
     help="Local voice-to-command — transcribe, listen, status (R96)",
     no_args_is_help=True,
 )
+composer_app = typer.Typer(
+    name="composer",
+    help="Visual SwarmGraph builder — generate, validate (R98)",
+    no_args_is_help=True,
+)

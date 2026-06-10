@@ -36,6 +36,7 @@ from ._subapps import (
     vision_app,
     advisor_app,
     voice_app,
+    composer_app,
     ir_app,
     capabilities_app,
     flight_app,
@@ -127,6 +128,7 @@ app.add_typer(hub_app)
 app.add_typer(vision_app)
 app.add_typer(advisor_app)
 app.add_typer(voice_app)
+app.add_typer(composer_app)
 
 
 @app.command("dashboard")
