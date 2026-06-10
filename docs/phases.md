@@ -8534,3 +8534,26 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 8. Docs: `--help` text comprehensive for all commands. `docs/roadmap.md` and `docs/phases.md` updated. Banned claims check passes.
 
 **Evidence:** 28 tests pass (`tests/vision/test_vision_r93.py`); ruff clean. Full suite: 6438 passed. HITL gating enforced for all browser actions (Phase 334).
+
+---
+
+## Phase 335 — Final sweep: session summary + release snapshot
+
+**Status:** Complete
+
+**What changed:**
+- Full verification suite: ruff clean, pytest 6438 passed (43 skipped, 7 xfailed, 1 xpassed), typecheck clean, build clean.
+- Banned claims check passes on `docs/roadmap.md` and `docs/phases.md`.
+- Release snapshot generated: `65e6af1b` on `main` branch.
+
+**Session summary (Phases 316–335):**
+- 20 phases completed (316–335)
+- 16 new features/modules: R91 Hub, R92 Daemon Tasks, R93 Vision, R94 Advisor, R95 Dashboard (TS), R96 Voice, R97 Policies, R98 Composer, R99 Debug, R100 Notebook, R101 Time Travel, R102 Migrate, R-PERF7 Incremental Index, R-PERF9 WASM Parser (research), R-PROC1 Release Intelligence, R-PROC2 Release Snapshots
+- 3 DoD elevations to Polished Complete: R91 Hub, R92 Daemon Tasks, R93 Vision
+- 314 new tests added (312 Python + 2 TS)
+- Python test suite: 6438 passed (up from 6126 at session start)
+- TS test suite: 990 passed (unchanged)
+- All ruff/typecheck/build checks clean
+- All banned claims checks pass
+
+**Evidence:** ruff clean; pytest 6438 passed; typecheck clean; build clean; banned claims clean. Release snapshot: `65e6af1b`.
