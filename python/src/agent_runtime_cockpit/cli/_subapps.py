@@ -130,3 +130,8 @@ hub_app = typer.Typer(
     help="Local-first catalog — share provider presets, policies, swarms, eval suites, themes (R91)",
     no_args_is_help=True,
 )
+vision_app = typer.Typer(
+    name="vision",
+    help="HITL-gated browser automation — screenshot, click, type, scroll (R93)",
+    no_args_is_help=True,
+)

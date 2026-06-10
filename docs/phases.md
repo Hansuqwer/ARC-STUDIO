@@ -8272,3 +8272,17 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - Budget enforcement: token/cost limits checked before each scheduled execution.
 
 **Evidence:** 20 tests pass (`tests/tasks/test_scheduler_r92.py`); ruff clean. Full suite: 6173 passed (20 new).
+
+---
+
+## Phase 318 — R93: ARC Vision — HITL-gated browser automation
+
+**Status:** Baseline Complete
+
+**What changed:**
+- New `vision/__init__.py`: `VisionDriver` ABC, `FakeVisionDriver` (testing), `PlaywrightVisionDriver` (optional, lazy import), `HitlGatedVisionSession` — every mouse/keyboard action requires HITL approval by default. Screenshot capture local-only.
+- New `cli/vision.py`: `arc vision screenshot|navigate|click|type|scroll|session` CLI with `--json` envelope output. All actions HITL-gated (`--auto-approve` for testing only).
+- Wired `vision_app` into `cli/_subapps.py`, `cli/_app.py`, `cli/__init__.py`.
+- Playwright is an optional dependency (not installed); `FakeVisionDriver` used for all tests.
+
+**Evidence:** 28 tests pass (`tests/vision/test_vision_r93.py`); ruff clean. Full suite: 6201 passed (28 new).
