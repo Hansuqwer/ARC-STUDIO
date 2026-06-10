@@ -8314,3 +8314,18 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 - New test: `arc-dashboard-widget.test.tsx` — static contract tests.
 
 **Evidence:** 2 TS tests pass (`arc-dashboard-widget.test.tsx`); typecheck clean; build clean. Full TS suite: 990 passed.
+
+---
+
+## Phase 321 — R96: ARC Voice — local voice-to-command interface
+
+**Status:** Baseline Complete
+
+**What changed:**
+- New `voice/__init__.py`: `VoiceDriver` ABC, `FakeVoiceDriver` (testing, fixture transcripts), `WhisperVoiceDriver` (optional, lazy import), `VoicePipeline` — local on-device STT feeding the existing chat/command pipeline. No cloud transcription.
+- New `cli/voice.py`: `arc voice transcribe|listen|status` CLI with `--json` envelope output. `listen` is a placeholder for future real-time integration.
+- Wired `voice_app` into `cli/_subapps.py`, `cli/_app.py`, `cli/__init__.py`.
+- Whisper is an optional dependency (not installed); `FakeVoiceDriver` used for all tests.
+- Command type detection: chat, slash (`/`), cli (`arc `).
+
+**Evidence:** 24 tests pass (`tests/voice/test_voice_r96.py`); ruff clean. Full suite: 6244 passed (24 new).

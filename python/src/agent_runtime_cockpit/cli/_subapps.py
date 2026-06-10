@@ -140,3 +140,8 @@ advisor_app = typer.Typer(
     help="Token cost optimization advisor — analyze, simulate, pricing (R94)",
     no_args_is_help=True,
 )
+voice_app = typer.Typer(
+    name="voice",
+    help="Local voice-to-command — transcribe, listen, status (R96)",
+    no_args_is_help=True,
+)

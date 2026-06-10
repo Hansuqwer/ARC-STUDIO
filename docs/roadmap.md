@@ -1851,7 +1851,7 @@ Full detail: `docs/research-findings/competitive-feature-backlog-2026-06-09.md`.
 | R93 | ARC Vision — local browser/desktop automation, HITL-gated (PDF Feature 5) | Baseline Complete |
 | R94 | ARC Advisor — token cost optimization advisor (PDF Feature 17) | Baseline Complete |
 | R95 | ARC Dashboard — multi-workspace control center (PDF Feature 15) | Baseline Complete |
-| R96 | ARC Voice — local voice-to-command interface (PDF Feature 6) | Not Started |
+| R96 | ARC Voice — local voice-to-command interface (PDF Feature 6) | Baseline Complete |
 | R97 | ARC Policies — sandbox policy template library (PDF Feature 14) | Not Started |
 | R98 | ARC Composer — visual SwarmGraph builder (PDF Feature 16) | Not Started |
 | R99 | ARC Debug — inline debugger & REPL via DAP (PDF Feature 13) | Not Started |
