@@ -1854,7 +1854,7 @@ Full detail: `docs/research-findings/competitive-feature-backlog-2026-06-09.md`.
 | R96 | ARC Voice — local voice-to-command interface (PDF Feature 6) | Polished Complete |
 | R97 | ARC Policies — sandbox policy template library (PDF Feature 14) | Polished Complete |
 | R98 | ARC Composer — visual SwarmGraph builder (PDF Feature 16) | Polished Complete |
-| R99 | ARC Debug — inline debugger & REPL via DAP (PDF Feature 13) | Baseline Complete |
+| R99 | ARC Debug — inline debugger & REPL via DAP (PDF Feature 13) | Polished Complete |
 | R100 | ARC Notebook — agent workbook `.arcnb` (PDF Feature 18) | Baseline Complete |
 | R101 | ARC Time Travel — run replay & diff debugger (PDF Feature 19) | Baseline Complete |
 | R102 | ARC Migrate — cross-adapter migration assistant (PDF Feature 20) | Baseline Complete |

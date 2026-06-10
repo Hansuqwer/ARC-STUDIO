@@ -241,3 +241,40 @@ class TestDebugCLI:
         data = json.loads(result.output)
         assert data["ok"] is True
         assert data["data"]["port"] == 5678
+
+
+class TestDebugError:
+    """Phase 341 DoD elevation: structured error class + state coverage."""
+
+    def test_debug_error_is_exception(self) -> None:
+        from agent_runtime_cockpit.debug import DebugError
+
+        assert issubclass(DebugError, Exception)
+        err = DebugError("test message")
+        assert str(err) == "test message"
+
+    def test_debug_error_in_all(self) -> None:
+        import agent_runtime_cockpit.debug as debug_mod
+
+        assert "DebugError" in debug_mod.__all__
+
+    def test_debug_state_enum_has_6_states(self) -> None:
+        from agent_runtime_cockpit.debug import DebugState
+
+        states = [s.value for s in DebugState]
+        assert "idle" in states
+        assert "launching" in states
+        assert "running" in states
+        assert "paused" in states
+        assert "stopped" in states
+        assert "error" in states
+        assert len(states) == 6
+
+    def test_debug_session_default_state_is_idle(self) -> None:
+        from agent_runtime_cockpit.debug import DebugSession, DebugState
+
+        session = DebugSession(session_id="test-1")
+        assert session.state == DebugState.IDLE
+        assert session.host == "127.0.0.1"
+        assert session.variables == []
+        assert session.breakpoints == []

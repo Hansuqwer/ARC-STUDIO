@@ -20,6 +20,10 @@ from typing import Any, Optional
 log = logging.getLogger(__name__)
 
 
+class DebugError(Exception):
+    """Raised when debug operations fail (session not found, connection error, etc.)."""
+
+
 class DebugState(str, Enum):
     IDLE = "idle"
     LAUNCHING = "launching"
@@ -420,6 +424,7 @@ class DebugAdapter:
 
 
 __all__ = [
+    "DebugError",
     "DebugState",
     "Breakpoint",
     "Variable",

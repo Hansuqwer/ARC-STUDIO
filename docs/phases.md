@@ -8647,3 +8647,21 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 8. Docs: `--help` comprehensive; docs updated; banned claims clean.
 
 **Evidence:** 22 tests pass; ruff clean.
+
+---
+
+## Phase 341 — R99 DoD elevation: ARC Debug → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: All 4 session states explicit (`DebugState` enum has 6: IDLE/LAUNCHING/RUNNING/PAUSED/STOPPED/ERROR).
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: All 3 commands (`launch`, `attach`, `status`) use consistent `ok()`/`err()` JSON envelope.
+4. Tests: 28 tests pass (`tests/debug/test_debug_r99.py`) — 24 original + 4 new (DebugError, `__all__`, state enum coverage, default state).
+5. Performance: Socket timeout configured; non-blocking connect attempt; loopback-only (`127.0.0.1`).
+6. Security: DAP only on loopback; no remote debug sessions; `DebugError` structured exception added.
+7. Reliability: `DebugError` exception class added; all failure paths return structured error envelopes; state transitions explicit.
+8. Docs: `--help` comprehensive; docs updated; banned claims clean.
+
+**Evidence:** 28 tests pass; ruff clean.
