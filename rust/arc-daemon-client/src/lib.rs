@@ -12,6 +12,7 @@
 
 pub mod replay;
 pub mod sse;
+pub mod streams;
 
 use arc_protocol_rs::{ArcEnvelope, ArcError, DaemonNotification, RunEvent};
 use std::time::Duration;

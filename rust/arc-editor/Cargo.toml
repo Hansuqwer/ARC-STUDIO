@@ -1,0 +1,13 @@
+[package]
+name = "arc-editor"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "ARC v2 editor core (Sprint 4): rope buffer, transactions, undo/redo — framework-free; rendering arrives after the Sprint-3 decision"
+
+[dependencies]
+ropey = "1.6.1"
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

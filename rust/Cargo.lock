@@ -18,6 +18,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "arc-dock"
+version = "0.1.0"
+dependencies = [
+ "arc-daemon-client",
+ "arc-protocol-rs",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "arc-editor"
+version = "0.1.0"
+dependencies = [
+ "ropey",
+ "thiserror",
+]
+
+[[package]]
 name = "arc-protocol-rs"
 version = "0.1.0"
 dependencies = [
@@ -761,6 +779,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ropey"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93411e420bcd1a75ddd1dc3caf18c23155eda2c090631a85af21ba19e97093b5"
+dependencies = [
+ "smallvec",
+ "str_indices",
+]
+
+[[package]]
 name = "rustc-hash"
 version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -918,6 +946,12 @@ name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
+
+[[package]]
+name = "str_indices"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d08889ec5408683408db66ad89e0e1f93dff55c73a4ccc71c427d5b277ee47e6"
 
 [[package]]
 name = "subtle"
