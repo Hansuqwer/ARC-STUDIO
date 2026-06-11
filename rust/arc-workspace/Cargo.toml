@@ -1,0 +1,18 @@
+[package]
+name = "arc-workspace"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "ARC v2 workspace model (Sprint 5): worktree scan, ignore rules, debounced watcher — framework-free"
+
+[dependencies]
+notify = "8.2.0"
+notify-debouncer-full = "0.6.0"
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempdir = "0.3.7"
+
+[lints]
+workspace = true

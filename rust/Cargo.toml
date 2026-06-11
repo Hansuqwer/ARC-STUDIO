@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["arc-protocol-rs", "arc-daemon-client", "arc-ui", "arc-shell", "arc-editor", "arc-dock"] # grows per sprint
+members = [
+    "arc-protocol-rs", "arc-daemon-client", "arc-ui", "arc-shell",
+    "arc-editor", "arc-dock",
+    "arc-workspace", "arc-index", "arc-terminal",
+] # grows per sprint
 
 [workspace.dependencies]
 serde = { version = "1.0.219", features = ["derive"] }

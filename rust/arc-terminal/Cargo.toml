@@ -1,0 +1,14 @@
+[package]
+name = "arc-terminal"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "ARC v2 terminal core (Sprint 6): alacritty_terminal PTY + grid, echo/resize/kill matrix — rendering arrives with the Sprint-3 framework"
+
+[dependencies]
+alacritty_terminal = "0.25.1"
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

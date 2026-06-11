@@ -1,0 +1,18 @@
+[package]
+name = "arc-index"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "ARC v2 search index (Sprint 5): tantivy full-text + SQLite symbol cache, corruption-rebuild semantics, redaction-aware — ADR-0005"
+
+[dependencies]
+tantivy = "0.22.0"
+rusqlite = { version = "0.32.1", features = ["bundled"] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempdir = "0.3.7"
+
+[lints]
+workspace = true
