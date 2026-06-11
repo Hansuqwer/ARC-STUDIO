@@ -1,0 +1,18 @@
+[package]
+name = "spike-harness"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Framework-agnostic measurement harness for the ADR-0002 Sprint-3 spike (G1-G8). No UI dependency; candidates link this and report numbers through one code path."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[[bin]]
+name = "gen-workloads"
+path = "src/bin/gen_workloads.rs"
+
+[[bin]]
+name = "g3-headless-baseline"
+path = "src/bin/g3_headless_baseline.rs"

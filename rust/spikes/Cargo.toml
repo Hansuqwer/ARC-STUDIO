@@ -1,0 +1,17 @@
+# Sprint-3 spike workspace — SEPARATE from rust/Cargo.toml on purpose:
+# framework dependencies (gpui/gpui-ce/floem/masonry) must never enter the main
+# workspace Cargo.lock (Sprint-1 exit gate; facade rule). Everything under
+# rust/spikes/ is throwaway-by-contract: the Sprint-3 decision record survives,
+# this code does not.
+[workspace]
+resolver = "2"
+members = ["spike-harness"]
+# Candidate spike crates are NOT default members: they only build on desktop
+# hardware with a display server. Uncomment per-machine during the spike:
+#   "gpui-editor",
+#   "floem-editor",
+#   "bespoke-editor",
+
+[workspace.dependencies]
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = { version = "1.0.140" }
