@@ -47,7 +47,10 @@ impl DaemonClient {
     /// `base` must be loopback (e.g. `http://127.0.0.1:8765`); enforced here.
     pub fn new(base: &str) -> Result<Self, ClientError> {
         let url = reqwest::Url::parse(base).map_err(|_| ClientError::BadUrl)?;
-        let loopback = matches!(url.host_str(), Some("127.0.0.1") | Some("localhost") | Some("[::1]"));
+        let loopback = matches!(
+            url.host_str(),
+            Some("127.0.0.1") | Some("localhost") | Some("[::1]")
+        );
         if !loopback {
             return Err(ClientError::BadUrl);
         }

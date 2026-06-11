@@ -62,10 +62,22 @@ mod tests {
 
     fn ring() -> FocusRing {
         FocusRing::new(vec![
-            Region { id: "workspace", label: "Workspace tree" },
-            Region { id: "editor", label: "Editor" },
-            Region { id: "dock", label: "ARC dock" },
-            Region { id: "status", label: "Status rail" },
+            Region {
+                id: "workspace",
+                label: "Workspace tree",
+            },
+            Region {
+                id: "editor",
+                label: "Editor",
+            },
+            Region {
+                id: "dock",
+                label: "ARC dock",
+            },
+            Region {
+                id: "status",
+                label: "Status rail",
+            },
         ])
     }
 
@@ -73,7 +85,10 @@ mod tests {
     fn f6_cycles_deterministically_and_wraps() {
         let mut r = ring();
         let order: Vec<&str> = (0..5).map(|_| r.focus_next().unwrap().id).collect();
-        assert_eq!(order, vec!["editor", "dock", "status", "workspace", "editor"]);
+        assert_eq!(
+            order,
+            vec!["editor", "dock", "status", "workspace", "editor"]
+        );
     }
 
     #[test]

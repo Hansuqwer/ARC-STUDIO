@@ -12,7 +12,9 @@ use tokio_util::sync::CancellationToken;
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
-    let base = args.next().unwrap_or_else(|| "http://127.0.0.1:7777".into());
+    let base = args
+        .next()
+        .unwrap_or_else(|| "http://127.0.0.1:7777".into());
     let reports = std::path::PathBuf::from(args.next().unwrap_or_else(|| "../reports".into()));
 
     let client = DaemonClient::new(&base)?;
@@ -33,7 +35,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let mut sorted = samples_us.clone();
     sorted.sort_unstable();
-    let pct = |p: f64| sorted[((sorted.len() as f64 * p).ceil() as usize - 1).min(sorted.len() - 1)];
+    let pct =
+        |p: f64| sorted[((sorted.len() as f64 * p).ceil() as usize - 1).min(sorted.len() - 1)];
     let (p50, p95, p99) = (pct(0.50), pct(0.95), pct(0.99));
     eprintln!("rtt GET /api/runs: p50={p50}us p95={p95}us p99={p99}us (n=200)");
 

@@ -19,7 +19,7 @@ pub struct MachineIdentity {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SpikeReport {
-    pub candidate: String,         // "gpui" | "gpui-ce" | "floem" | "bespoke-masonry"
+    pub candidate: String, // "gpui" | "gpui-ce" | "floem" | "bespoke-masonry"
     pub candidate_version: String, // exact pinned version/rev
     pub date: String,
     pub machine: MachineIdentity,
@@ -72,7 +72,10 @@ impl SpikeReport {
     }
 
     pub fn write(&self, path: &std::path::Path) -> std::io::Result<()> {
-        std::fs::write(path, serde_json::to_string_pretty(self).map_err(std::io::Error::other)?)
+        std::fs::write(
+            path,
+            serde_json::to_string_pretty(self).map_err(std::io::Error::other)?,
+        )
     }
 }
 
@@ -105,10 +108,30 @@ mod tests {
     fn verdict_blocks_on_pending_evidence_and_notrun() {
         let mut r = SpikeReport::new("floem", "0.2.0", "2026-06-11", machine());
         let p = Percentiles::from_us(&[10_000; 100]);
-        r.rows.push(GateRow::evaluate(Gate::G4TypingLatency, "floem", 60.0, p, None, None, None));
-        r.rows.push(GateRow::evaluate(Gate::G6Ime, "floem", 60.0, None, None, None, None));
+        r.rows.push(GateRow::evaluate(
+            Gate::G4TypingLatency,
+            "floem",
+            60.0,
+            p,
+            None,
+            None,
+            None,
+        ));
+        r.rows.push(GateRow::evaluate(
+            Gate::G6Ime,
+            "floem",
+            60.0,
+            None,
+            None,
+            None,
+            None,
+        ));
         let blockers = r.spike_verdict().unwrap_err();
-        assert_eq!(blockers.len(), 1, "G4 passed; G6 evidence blocks: {blockers:?}");
+        assert_eq!(
+            blockers.len(),
+            1,
+            "G4 passed; G6 evidence blocks: {blockers:?}"
+        );
         assert!(blockers[0].contains("G6Ime"));
     }
 

@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "type": "BATTLE_HITL_REQUIRED",
+  "timestamp": "2026-05-22T10:30:03.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 303,
+  "data": {
+    "battle_id": "bt_001",
+    "candidates": [
+      "cand_a",
+      "cand_b"
+    ],
+    "hitl_id": "hitl_bt_001"
+  }
+}

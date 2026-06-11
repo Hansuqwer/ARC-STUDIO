@@ -1,0 +1,87 @@
+name: arc-v2-rust
+
+# Additive arc-v2 gate (Sprint 1-3 prep): Rust protocol bridge + shell model +
+# spike harness. Enforces in CI what the sprint exit gates enforce locally:
+#   - fixture conformance (decode + semantic re-encode + registry coverage)
+#   - ordered-scenario replay (gap-free; Sprint-7 parity oracle)
+#   - arc-ui facade boundary (scripts/check-arc-ui-facade.sh)
+#   - no UI framework in the MAIN workspace Cargo.lock (spikes are separate)
+#   - clippy clean with workspace lints (unwrap_used = deny)
+# Rollback: delete this file. Touches no existing workflow.
+
+on:
+  pull_request:
+    paths:
+      - 'rust/**'
+      - 'protocol/fixtures/**'
+      - 'scripts/check-arc-ui-facade.sh'
+      - '.github/workflows/arc-v2-rust.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'rust/**'
+      - 'protocol/fixtures/**'
+      - 'scripts/check-arc-ui-facade.sh'
+      - '.github/workflows/arc-v2-rust.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            rust
+            rust/spikes
+
+      - name: Facade gate (arc-ui is the only framework import site)
+        run: bash scripts/check-arc-ui-facade.sh
+
+      - name: No UI framework in main workspace lock
+        run: |
+          if grep -E '^name = "(gpui|gpui-ce|floem|masonry|xilem)"' rust/Cargo.lock; then
+            echo "UI framework leaked into the main workspace Cargo.lock"; exit 1
+          fi
+          echo "OK: main Cargo.lock is framework-free."
+
+      - name: Format check
+        working-directory: rust
+        run: cargo fmt --all --check
+
+      - name: Clippy (workspace lints, unwrap_used = deny)
+        working-directory: rust
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests (protocol conformance, replay oracle, shell model)
+        working-directory: rust
+        run: cargo test --workspace
+
+      - name: Spike harness (separate workspace; no framework members in CI)
+        working-directory: rust/spikes
+        run: |
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+
+      - name: Fixture coverage report is fresh
+        run: |
+          # The registry coverage test regenerates reports/fixture-coverage.md.
+          # A stale committed copy means fixtures changed without rerunning gates.
+          if ! git diff --exit-code reports/fixture-coverage.md; then
+            echo "reports/fixture-coverage.md is stale — run cargo test -p arc-protocol-rs and commit"; exit 1
+          fi

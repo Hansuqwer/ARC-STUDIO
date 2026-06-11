@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "type": "POLICY_BYPASS_WARNING",
+  "timestamp": "2026-05-22T10:30:26.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 326,
+  "data": {
+    "policy_id": "paid-call-gate",
+    "bypass_reason": "ARC_ALLOW_PAID_CALLS=1 env override active",
+    "suggested_remediation": "Unset the override; use profile budget gates instead.",
+    "surface": "env",
+    "surface_identifier": "ARC_ALLOW_PAID_CALLS"
+  }
+}

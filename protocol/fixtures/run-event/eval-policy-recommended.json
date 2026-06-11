@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "type": "EVAL_POLICY_RECOMMENDED",
+  "timestamp": "2026-05-22T10:30:18.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 318,
+  "data": {
+    "actions": [
+      "raise paid-call cap to 5 USD",
+      "enable consensus for risky merges"
+    ],
+    "correlation_id": "corr_7d2",
+    "profile_id": "default",
+    "recommendations_count": 2
+  }
+}

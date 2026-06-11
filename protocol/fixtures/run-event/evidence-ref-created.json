@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "type": "EVIDENCE_REF_CREATED",
+  "timestamp": "2026-05-22T10:30:19.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 319,
+  "data": {
+    "evidence_ref": {
+      "ref_id": "ev_88a1",
+      "kind": "test-output",
+      "uri": "arc-evidence://runs/01HV7B3S0K9N3W2Q5J4Y8A6C2P/ev_88a1"
+    }
+  }
+}

@@ -101,8 +101,8 @@ fn runtime_capabilities_fixtures_are_valid_json_objects() {
     // JSON objects so additions/corruption are caught. Typed mirror = Sprint 2+.
     for p in json_files(&fixtures_root().join("runtime-capabilities")) {
         let raw = fs::read_to_string(&p).unwrap();
-        let v: serde_json::Value = serde_json::from_str(&raw)
-            .unwrap_or_else(|e| panic!("{}: {e}", p.display()));
+        let v: serde_json::Value =
+            serde_json::from_str(&raw).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
         assert!(v.is_object(), "{}: not an object", p.display());
     }
 }
@@ -196,8 +196,7 @@ fn unknown_kind_and_unknown_fields_are_tolerated() {
 #[test]
 fn ok_false_without_error_is_a_protocol_violation() {
     let raw = r#"{"version":"1.0","ok":false,"data":null,"error":null,"meta":null}"#;
-    let env: arc_protocol_rs::ArcEnvelope<serde_json::Value> =
-        serde_json::from_str(raw).unwrap();
+    let env: arc_protocol_rs::ArcEnvelope<serde_json::Value> = serde_json::from_str(raw).unwrap();
     let err = env.into_result().unwrap_err();
     assert_eq!(err.code, "PROTOCOL_VIOLATION");
 }

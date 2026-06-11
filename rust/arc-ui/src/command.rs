@@ -40,10 +40,7 @@ impl<C> Command<C> {
         self
     }
 
-    pub fn enabled_when(
-        mut self,
-        f: impl Fn(&C) -> Enablement + Send + Sync + 'static,
-    ) -> Self {
+    pub fn enabled_when(mut self, f: impl Fn(&C) -> Enablement + Send + Sync + 'static) -> Self {
         self.enabled_when = Some(Box::new(f));
         self
     }
@@ -110,19 +107,27 @@ mod tests {
 
     fn registry() -> CommandRegistry<Ctx> {
         let mut r = CommandRegistry::default();
-        r.register(Command::new("arc.runs.open", "ARC: Open Runs Panel", "panels"))
-            .unwrap();
+        r.register(Command::new(
+            "arc.runs.open",
+            "ARC: Open Runs Panel",
+            "panels",
+        ))
+        .unwrap();
         r.register(
-            Command::new("arc.replay.fixture", "ARC: Replay Event Stream Fixture", "debug")
-                .enabled_when(|c: &Ctx| {
-                    if c.daemon_healthy {
-                        Enablement::Enabled
-                    } else {
-                        Enablement::Disabled {
-                            reason: "daemon unavailable (status rail: Degraded)".into(),
-                        }
+            Command::new(
+                "arc.replay.fixture",
+                "ARC: Replay Event Stream Fixture",
+                "debug",
+            )
+            .enabled_when(|c: &Ctx| {
+                if c.daemon_healthy {
+                    Enablement::Enabled
+                } else {
+                    Enablement::Disabled {
+                        reason: "daemon unavailable (status rail: Degraded)".into(),
                     }
-                }),
+                }
+            }),
         )
         .unwrap();
         r
@@ -141,8 +146,15 @@ mod tests {
     fn enablement_exposes_reason() {
         let r = registry();
         let cmd = r.get(CommandId("arc.replay.fixture")).unwrap();
-        assert_eq!(cmd.enablement(&Ctx { daemon_healthy: true }), Enablement::Enabled);
-        match cmd.enablement(&Ctx { daemon_healthy: false }) {
+        assert_eq!(
+            cmd.enablement(&Ctx {
+                daemon_healthy: true
+            }),
+            Enablement::Enabled
+        );
+        match cmd.enablement(&Ctx {
+            daemon_healthy: false,
+        }) {
             Enablement::Disabled { reason } => assert!(reason.contains("daemon")),
             _ => panic!("expected disabled with reason"),
         }

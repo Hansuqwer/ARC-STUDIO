@@ -18,7 +18,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap_or_else(|| "../../protocol/fixtures/run-event-seq/tool-use-streaming".into()),
     );
     let reports = std::path::PathBuf::from(
-        std::env::args().nth(2).unwrap_or_else(|| "../../reports".into()),
+        std::env::args()
+            .nth(2)
+            .unwrap_or_else(|| "../../reports".into()),
     );
 
     // Load raw fixture bytes once (I/O excluded from the measured path).
@@ -45,7 +47,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let ev: serde_json::Value = serde_json::from_str(raw)?;
             let kind = ev["type"].as_str().unwrap_or("?");
             let seq = ev["sequence"].as_u64().unwrap_or(0);
-            let summary = format!("{seq:>4} {kind:<24} {}", ev["timestamp"].as_str().unwrap_or(""));
+            let summary = format!(
+                "{seq:>4} {kind:<24} {}",
+                ev["timestamp"].as_str().unwrap_or("")
+            );
             std::hint::black_box(&summary);
             if iter >= 10 {
                 per_row_us.push(t_row.elapsed().as_micros() as u64);

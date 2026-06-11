@@ -1,0 +1,13 @@
+{
+  "schema_version": 2,
+  "type": "CAPABILITY_CARD_DECISION",
+  "timestamp": "2026-05-22T10:30:08.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 308,
+  "data": {
+    "action": "fs.write:${workspace}/src",
+    "decision": "allow",
+    "mode": "deterministic",
+    "reason": "capability granted for this workspace by user on 2026-06-10"
+  }
+}

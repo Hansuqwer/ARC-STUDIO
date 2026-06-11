@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "type": "NODE_UPDATE",
+  "timestamp": "2026-05-22T10:30:24.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 324,
+  "data": {
+    "runtime": "swarmgraph",
+    "status": "running",
+    "node_id": "node-planner-1"
+  }
+}

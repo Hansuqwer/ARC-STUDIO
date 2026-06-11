@@ -18,10 +18,7 @@ pub struct ReplayReport {
 /// Replay every `*.json` fixture in `dir` (sorted by filename) through `on_event`.
 /// Sorting by filename supports the future additive convention
 /// `run-event-seq/<scenario>/NNN-<TYPE>.json`.
-pub fn replay_dir(
-    dir: &Path,
-    mut on_event: impl FnMut(RunEvent),
-) -> std::io::Result<ReplayReport> {
+pub fn replay_dir(dir: &Path, mut on_event: impl FnMut(RunEvent)) -> std::io::Result<ReplayReport> {
     let mut files: Vec<_> = std::fs::read_dir(dir)?
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("json"))
@@ -32,8 +29,12 @@ pub fn replay_dir(
     let mut last_seq: Option<u64> = None;
     for p in files {
         let raw = std::fs::read_to_string(&p)?;
-        let ev: RunEvent = serde_json::from_str(&raw)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{}: {e}", p.display())))?;
+        let ev: RunEvent = serde_json::from_str(&raw).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("{}: {e}", p.display()),
+            )
+        })?;
         if let Some(last) = last_seq {
             if ev.sequence > last + 1 {
                 report.gaps.push((last + 1, ev.sequence));
@@ -65,15 +66,33 @@ mod tests {
             .join("../../protocol/fixtures/run-event-seq/tool-use-streaming");
         let mut kinds = Vec::new();
         let report = replay_dir(&dir, |ev| kinds.push(ev.kind)).unwrap();
-        assert!(report.events >= 18, "scenario unexpectedly short: {}", report.events);
-        assert!(report.gaps.is_empty(), "ordered scenario has gaps: {:?}", report.gaps);
+        assert!(
+            report.events >= 18,
+            "scenario unexpectedly short: {}",
+            report.events
+        );
+        assert!(
+            report.gaps.is_empty(),
+            "ordered scenario has gaps: {:?}",
+            report.gaps
+        );
         // Lifecycle brackets present and ordered.
         assert_eq!(kinds.first().map(String::as_str), Some("RUN_STARTED"));
         assert_eq!(kinds.last().map(String::as_str), Some("RUN_COMPLETED"));
         // Streaming families the scrubber renders specially are present.
-        for needed in ["TOOL_CALL_START", "TOOL_CALL_ARGS", "TEXT_MESSAGE_CONTENT",
-                       "STATE_SNAPSHOT", "SHELL_DENIED", "HITL_PROMPT", "HITL_RESPONSE"] {
-            assert!(kinds.iter().any(|k| k == needed), "scenario missing {needed}");
+        for needed in [
+            "TOOL_CALL_START",
+            "TOOL_CALL_ARGS",
+            "TEXT_MESSAGE_CONTENT",
+            "STATE_SNAPSHOT",
+            "SHELL_DENIED",
+            "HITL_PROMPT",
+            "HITL_RESPONSE",
+        ] {
+            assert!(
+                kinds.iter().any(|k| k == needed),
+                "scenario missing {needed}"
+            );
         }
     }
 

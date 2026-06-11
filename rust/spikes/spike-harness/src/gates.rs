@@ -26,11 +26,20 @@ pub enum Gate {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PassBar {
     /// Automatic: compared against measured numbers.
-    P99FramesAtMost { frames: f64 },
-    FirstPaintAtMostMs { ms: u64 },
-    TotalBudgetMs { ms: u64, no_frame_over_ms: u64 },
+    P99FramesAtMost {
+        frames: f64,
+    },
+    FirstPaintAtMostMs {
+        ms: u64,
+    },
+    TotalBudgetMs {
+        ms: u64,
+        no_frame_over_ms: u64,
+    },
     /// Evidence gate: requires recorded artifacts per OS, never auto-passes.
-    Evidence { required_artifacts: Vec<String> },
+    Evidence {
+        required_artifacts: Vec<String>,
+    },
 }
 
 impl Gate {
@@ -39,7 +48,10 @@ impl Gate {
             // Placeholders per brief §3.5 — re-pin with hardware.
             Gate::G1HugeFileFirstPaint => PassBar::FirstPaintAtMostMs { ms: 1000 },
             Gate::G2DiffScrollFrameTime => PassBar::P99FramesAtMost { frames: 1.0 }, // ≤1 frame @ recorded Hz (≈16.6ms @60)
-            Gate::G3EventReplayBudget => PassBar::TotalBudgetMs { ms: 250, no_frame_over_ms: 33 },
+            Gate::G3EventReplayBudget => PassBar::TotalBudgetMs {
+                ms: 250,
+                no_frame_over_ms: 33,
+            },
             Gate::G4TypingLatency => PassBar::P99FramesAtMost { frames: 1.0 },
             Gate::G5Accessibility => PassBar::Evidence {
                 required_artifacts: to_vec(&[
@@ -58,7 +70,9 @@ impl Gate {
                 ]),
             },
             Gate::G7BidiLigatures => PassBar::Evidence {
-                required_artifacts: to_vec(&["golden-image match: bidi paragraph + programming ligatures"]),
+                required_artifacts: to_vec(&[
+                    "golden-image match: bidi paragraph + programming ligatures",
+                ]),
             },
             Gate::G8Sustainability => PassBar::Evidence {
                 required_artifacts: to_vec(&[
@@ -75,9 +89,13 @@ impl Gate {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum GateOutcome {
     Pass,
-    Fail { reason: String },
+    Fail {
+        reason: String,
+    },
     /// Evidence gates start here and flip to Pass only when artifacts exist.
-    EvidencePending { missing: Vec<String> },
+    EvidencePending {
+        missing: Vec<String>,
+    },
     NotRun,
 }
 
@@ -116,7 +134,9 @@ impl GateRow {
                         GateOutcome::Pass
                     } else {
                         GateOutcome::Fail {
-                            reason: format!("p99 = {got:.2} frames @ {refresh_hz} Hz (bar {frames})"),
+                            reason: format!(
+                                "p99 = {got:.2} frames @ {refresh_hz} Hz (bar {frames})"
+                            ),
                         }
                     }
                 }
@@ -128,7 +148,10 @@ impl GateRow {
                     reason: format!("first paint {got} ms (bar {ms} ms)"),
                 },
             },
-            PassBar::TotalBudgetMs { ms, no_frame_over_ms } => match (total_ms, worst_frame_ms) {
+            PassBar::TotalBudgetMs {
+                ms,
+                no_frame_over_ms,
+            } => match (total_ms, worst_frame_ms) {
                 (Some(t), Some(w)) => {
                     if t <= ms && w <= no_frame_over_ms {
                         GateOutcome::Pass
@@ -169,7 +192,15 @@ mod tests {
     fn g4_pass_and_fail_are_vsync_aware() {
         // 15 ms p99: pass at 60 Hz (0.9 frames), FAIL at 120 Hz (1.8 frames).
         let p = Percentiles::from_us(&[15_000; 100]);
-        let pass = GateRow::evaluate(Gate::G4TypingLatency, "x", 60.0, p.clone(), None, None, None);
+        let pass = GateRow::evaluate(
+            Gate::G4TypingLatency,
+            "x",
+            60.0,
+            p.clone(),
+            None,
+            None,
+            None,
+        );
         assert_eq!(pass.outcome, GateOutcome::Pass);
         let fail = GateRow::evaluate(Gate::G4TypingLatency, "x", 120.0, p, None, None, None);
         assert!(matches!(fail.outcome, GateOutcome::Fail { .. }));
@@ -177,31 +208,79 @@ mod tests {
 
     #[test]
     fn g1_first_paint_bar() {
-        let r = GateRow::evaluate(Gate::G1HugeFileFirstPaint, "x", 60.0, None, Some(999), None, None);
+        let r = GateRow::evaluate(
+            Gate::G1HugeFileFirstPaint,
+            "x",
+            60.0,
+            None,
+            Some(999),
+            None,
+            None,
+        );
         assert_eq!(r.outcome, GateOutcome::Pass);
-        let r = GateRow::evaluate(Gate::G1HugeFileFirstPaint, "x", 60.0, None, Some(1001), None, None);
+        let r = GateRow::evaluate(
+            Gate::G1HugeFileFirstPaint,
+            "x",
+            60.0,
+            None,
+            Some(1001),
+            None,
+            None,
+        );
         assert!(matches!(r.outcome, GateOutcome::Fail { .. }));
     }
 
     #[test]
     fn g3_both_conditions_required() {
-        let ok = GateRow::evaluate(Gate::G3EventReplayBudget, "x", 60.0, None, None, Some(200), Some(30));
+        let ok = GateRow::evaluate(
+            Gate::G3EventReplayBudget,
+            "x",
+            60.0,
+            None,
+            None,
+            Some(200),
+            Some(30),
+        );
         assert_eq!(ok.outcome, GateOutcome::Pass);
-        let slow_frame = GateRow::evaluate(Gate::G3EventReplayBudget, "x", 60.0, None, None, Some(200), Some(40));
+        let slow_frame = GateRow::evaluate(
+            Gate::G3EventReplayBudget,
+            "x",
+            60.0,
+            None,
+            None,
+            Some(200),
+            Some(40),
+        );
         assert!(matches!(slow_frame.outcome, GateOutcome::Fail { .. }));
     }
 
     #[test]
     fn evidence_gates_never_autopass() {
-        for g in [Gate::G5Accessibility, Gate::G6Ime, Gate::G7BidiLigatures, Gate::G8Sustainability] {
+        for g in [
+            Gate::G5Accessibility,
+            Gate::G6Ime,
+            Gate::G7BidiLigatures,
+            Gate::G8Sustainability,
+        ] {
             let r = GateRow::evaluate(g, "x", 60.0, None, None, None, None);
-            assert!(matches!(r.outcome, GateOutcome::EvidencePending { .. }), "{g:?}");
+            assert!(
+                matches!(r.outcome, GateOutcome::EvidencePending { .. }),
+                "{g:?}"
+            );
         }
     }
 
     #[test]
     fn missing_measurements_are_notrun_not_pass() {
-        let r = GateRow::evaluate(Gate::G2DiffScrollFrameTime, "x", 60.0, None, None, None, None);
+        let r = GateRow::evaluate(
+            Gate::G2DiffScrollFrameTime,
+            "x",
+            60.0,
+            None,
+            None,
+            None,
+            None,
+        );
         assert_eq!(r.outcome, GateOutcome::NotRun);
     }
 }

@@ -153,8 +153,13 @@ mod tests {
     #[test]
     fn export_import_round_trip() {
         let mut km = Keymap::default();
-        km.bind(Chord::parse("ctrl+shift+p").unwrap(), CommandId("arc.palette.open")).unwrap();
-        km.bind(Chord::parse("f6").unwrap(), CommandId("arc.focus.next")).unwrap();
+        km.bind(
+            Chord::parse("ctrl+shift+p").unwrap(),
+            CommandId("arc.palette.open"),
+        )
+        .unwrap();
+        km.bind(Chord::parse("f6").unwrap(), CommandId("arc.focus.next"))
+            .unwrap();
         let text = km.export();
         let km2 = Keymap::import(&text, lookup).unwrap();
         assert_eq!(km2.export(), text, "round-trip stable");

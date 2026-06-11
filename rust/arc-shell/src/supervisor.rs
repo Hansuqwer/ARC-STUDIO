@@ -13,9 +13,13 @@ use std::time::{Duration, Instant};
 pub enum DaemonState {
     Starting,
     Healthy,
-    Degraded { reason: String },
+    Degraded {
+        reason: String,
+    },
     /// Circuit breaker open: supervisor will NOT restart; user action required.
-    CircuitOpen { restarts_in_window: usize },
+    CircuitOpen {
+        restarts_in_window: usize,
+    },
     Stopped,
 }
 
@@ -106,9 +110,15 @@ mod tests {
         let mut cb = CircuitBreaker::default();
         let t0 = Instant::now();
         for i in 0..5 {
-            assert!(cb.record_restart(t0 + Duration::from_secs(i)), "restart {i} allowed");
+            assert!(
+                cb.record_restart(t0 + Duration::from_secs(i)),
+                "restart {i} allowed"
+            );
         }
-        assert!(!cb.record_restart(t0 + Duration::from_secs(5)), "6th restart trips breaker");
+        assert!(
+            !cb.record_restart(t0 + Duration::from_secs(5)),
+            "6th restart trips breaker"
+        );
     }
 
     #[test]

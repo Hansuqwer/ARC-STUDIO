@@ -10,7 +10,10 @@ impl Lcg {
         Self(seed)
     }
     pub fn next_u32(&mut self) -> u32 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (self.0 >> 33) as u32
     }
 }
@@ -18,9 +21,9 @@ impl Lcg {
 /// G1 workload A: `size_bytes` of plausible source-like lines (60–100 chars).
 pub fn source_like(size_bytes: usize, seed: u64) -> String {
     const WORDS: &[&str] = &[
-        "fn", "let", "match", "impl", "pub", "struct", "enum", "async", "await",
-        "self", "return", "mut", "ref", "for", "while", "loop", "if", "else",
-        "buffer", "editor", "render", "viewport", "daemon", "event", "stream",
+        "fn", "let", "match", "impl", "pub", "struct", "enum", "async", "await", "self", "return",
+        "mut", "ref", "for", "while", "loop", "if", "else", "buffer", "editor", "render",
+        "viewport", "daemon", "event", "stream",
     ];
     let mut rng = Lcg::new(seed);
     let mut out = String::with_capacity(size_bytes + 128);
@@ -68,7 +71,11 @@ pub fn synthetic_diff(lines: usize, seed: u64) -> String {
             if written >= lines {
                 break;
             }
-            let sign = if rng.next_u32().is_multiple_of(2) { '-' } else { '+' };
+            let sign = if rng.next_u32().is_multiple_of(2) {
+                '-'
+            } else {
+                '+'
+            };
             out.push(sign);
             out.push_str(&format!(" line {written}: value = {};\n", rng.next_u32()));
             written += 1;
@@ -82,8 +89,8 @@ pub fn synthetic_diff(lines: usize, seed: u64) -> String {
 /// instrumentation sketch sizes its sample buffer to 2000).
 pub fn synthetic_keystream(seed: u64) -> Vec<char> {
     const KEYS: &[char] = &[
-        'a', 'e', 'i', 'o', 'u', 't', 'n', 's', 'r', 'l', ' ', '(', ')', '{',
-        '}', ';', ':', '.', ',', '_', '\n',
+        'a', 'e', 'i', 'o', 'u', 't', 'n', 's', 'r', 'l', ' ', '(', ')', '{', '}', ';', ':', '.',
+        ',', '_', '\n',
     ];
     let mut rng = Lcg::new(seed);
     (0..2000)
@@ -136,7 +143,10 @@ mod tests {
     #[test]
     fn diff_has_requested_change_lines() {
         let d = synthetic_diff(5000, seeds::G2_DIFF);
-        let changes = d.lines().filter(|l| l.starts_with('+') || l.starts_with('-')).count();
+        let changes = d
+            .lines()
+            .filter(|l| l.starts_with('+') || l.starts_with('-'))
+            .count();
         // +/- lines plus the two file-header lines (--- / +++).
         assert_eq!(changes, 5000 + 2);
     }

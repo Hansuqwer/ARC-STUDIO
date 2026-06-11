@@ -1,0 +1,17 @@
+{
+  "schema_version": 2,
+  "type": "RAW",
+  "timestamp": "2026-05-22T10:30:29.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 329,
+  "data": {
+    "raw": {
+      "vendor": "langgraph",
+      "payload": {
+        "kind": "checkpoint",
+        "step": 7
+      }
+    },
+    "source": "adapter"
+  }
+}

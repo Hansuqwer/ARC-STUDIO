@@ -77,7 +77,10 @@ mod tests {
     fn frames_conversion() {
         let p = Percentiles::from_us(&[16_600]).unwrap(); // 16.6 ms
         let frames_60 = p.p99_frames(60.0);
-        assert!((frames_60 - 0.996).abs() < 0.01, "≈1 frame at 60 Hz: {frames_60}");
+        assert!(
+            (frames_60 - 0.996).abs() < 0.01,
+            "≈1 frame at 60 Hz: {frames_60}"
+        );
         let frames_120 = p.p99_frames(120.0);
         assert!((frames_120 - 1.992).abs() < 0.01, "≈2 frames at 120 Hz");
     }

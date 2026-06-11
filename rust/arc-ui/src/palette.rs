@@ -74,7 +74,9 @@ pub enum PaletteEffect {
     Announce(String),
     Execute(CommandId),
     /// Enter on a disabled command: announce the reason, do NOT execute.
-    Rejected { reason: String },
+    Rejected {
+        reason: String,
+    },
     Closed,
 }
 
@@ -171,8 +173,7 @@ impl PaletteModel {
         let pattern = Pattern::parse(&self.query, CaseMatching::Ignore, Normalization::Smart);
         let mut buf = Vec::new();
         for cmd in registry.iter() {
-            let haystack =
-                nucleo_matcher::Utf32Str::new(cmd.title, &mut buf);
+            let haystack = nucleo_matcher::Utf32Str::new(cmd.title, &mut buf);
             if let Some(score) = pattern.score(haystack, &mut self.matcher) {
                 self.items.push(PaletteItem {
                     id: cmd.id,

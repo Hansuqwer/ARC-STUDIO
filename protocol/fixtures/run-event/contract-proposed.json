@@ -1,0 +1,18 @@
+{
+  "schema_version": 2,
+  "type": "CONTRACT_PROPOSED",
+  "timestamp": "2026-05-22T10:30:15.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 315,
+  "data": {
+    "contract": {
+      "contract_id": "ct_5f1e02",
+      "goal": "Refactor parser without changing public API",
+      "acceptance_criteria": [
+        "all existing tests pass",
+        "no public symbol removed"
+      ]
+    },
+    "node_id": "node-planner-1"
+  }
+}

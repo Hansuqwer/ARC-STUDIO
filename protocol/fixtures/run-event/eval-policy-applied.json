@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "type": "EVAL_POLICY_APPLIED",
+  "timestamp": "2026-05-22T10:30:17.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 317,
+  "data": {
+    "correlation_id": "corr_7d2",
+    "diff_summary": "+paid_call_cap_usd: 5.0 (was 2.0)",
+    "dry_run": false,
+    "new_path": ".arc/profiles/default.yaml",
+    "profile_id": "default",
+    "version": 4
+  }
+}

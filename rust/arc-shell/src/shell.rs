@@ -36,14 +36,57 @@ impl ShellModel {
         // Sprint-2 command set (placeholders execute as no-ops until panels land).
         #[allow(clippy::unwrap_used)] // static registration; duplicate = programming error
         {
-            registry.register(Command::new("arc.palette.open", "ARC: Command Palette", "shell").shortcut("ctrl+shift+p")).unwrap();
-            registry.register(Command::new("arc.focus.next", "ARC: Focus Next Region", "shell").shortcut("f6")).unwrap();
-            registry.register(Command::new("arc.focus.prev", "ARC: Focus Previous Region", "shell").shortcut("ctrl+shift+f6")).unwrap();
-            registry.register(Command::new("arc.theme.contrast", "ARC: Toggle High Contrast", "shell")).unwrap();
-            registry.register(Command::new("arc.daemon.health", "ARC: Show Daemon Health", "daemon")).unwrap();
-            registry.register(Command::new("arc.runs.open", "ARC: Open Runs Panel", "panels").enabled_when(daemon_gated)).unwrap();
-            registry.register(Command::new("arc.events.open", "ARC: Open Event Stream", "panels").enabled_when(daemon_gated)).unwrap();
-            registry.register(Command::new("arc.replay.fixture", "ARC: Replay Event Stream Fixture", "debug")).unwrap();
+            registry
+                .register(
+                    Command::new("arc.palette.open", "ARC: Command Palette", "shell")
+                        .shortcut("ctrl+shift+p"),
+                )
+                .unwrap();
+            registry
+                .register(
+                    Command::new("arc.focus.next", "ARC: Focus Next Region", "shell")
+                        .shortcut("f6"),
+                )
+                .unwrap();
+            registry
+                .register(
+                    Command::new("arc.focus.prev", "ARC: Focus Previous Region", "shell")
+                        .shortcut("ctrl+shift+f6"),
+                )
+                .unwrap();
+            registry
+                .register(Command::new(
+                    "arc.theme.contrast",
+                    "ARC: Toggle High Contrast",
+                    "shell",
+                ))
+                .unwrap();
+            registry
+                .register(Command::new(
+                    "arc.daemon.health",
+                    "ARC: Show Daemon Health",
+                    "daemon",
+                ))
+                .unwrap();
+            registry
+                .register(
+                    Command::new("arc.runs.open", "ARC: Open Runs Panel", "panels")
+                        .enabled_when(daemon_gated),
+                )
+                .unwrap();
+            registry
+                .register(
+                    Command::new("arc.events.open", "ARC: Open Event Stream", "panels")
+                        .enabled_when(daemon_gated),
+                )
+                .unwrap();
+            registry
+                .register(Command::new(
+                    "arc.replay.fixture",
+                    "ARC: Replay Event Stream Fixture",
+                    "debug",
+                ))
+                .unwrap();
         }
 
         let mut keymap = Keymap::default();
@@ -66,10 +109,22 @@ impl ShellModel {
         Self {
             theme,
             focus: FocusRing::new(vec![
-                Region { id: "workspace", label: "Workspace tree" },
-                Region { id: "editor", label: "Editor" },
-                Region { id: "dock", label: "ARC dock" },
-                Region { id: "status", label: "Status rail" },
+                Region {
+                    id: "workspace",
+                    label: "Workspace tree",
+                },
+                Region {
+                    id: "editor",
+                    label: "Editor",
+                },
+                Region {
+                    id: "dock",
+                    label: "ARC dock",
+                },
+                Region {
+                    id: "status",
+                    label: "Status rail",
+                },
             ]),
             palette: PaletteModel::default(),
             registry,
@@ -85,16 +140,32 @@ impl ShellModel {
     /// trust state is text, honors NO_COLOR via Theme markers.
     pub fn status_rail(&self) -> String {
         let (marker, text) = match &self.ctx.daemon {
-            DaemonState::Healthy => (self.theme.status_marker(StatusLevel::Ok), "daemon healthy".to_string()),
-            DaemonState::Starting => (self.theme.status_marker(StatusLevel::Warn), "daemon starting".to_string()),
-            DaemonState::Degraded { reason } => (self.theme.status_marker(StatusLevel::Error), format!("daemon degraded: {reason}")),
+            DaemonState::Healthy => (
+                self.theme.status_marker(StatusLevel::Ok),
+                "daemon healthy".to_string(),
+            ),
+            DaemonState::Starting => (
+                self.theme.status_marker(StatusLevel::Warn),
+                "daemon starting".to_string(),
+            ),
+            DaemonState::Degraded { reason } => (
+                self.theme.status_marker(StatusLevel::Error),
+                format!("daemon degraded: {reason}"),
+            ),
             DaemonState::CircuitOpen { restarts_in_window } => (
                 self.theme.status_marker(StatusLevel::Error),
                 format!("daemon crash-loop ({restarts_in_window} restarts) — restart manually"),
             ),
-            DaemonState::Stopped => (self.theme.status_marker(StatusLevel::Error), "daemon stopped".to_string()),
+            DaemonState::Stopped => (
+                self.theme.status_marker(StatusLevel::Error),
+                "daemon stopped".to_string(),
+            ),
         };
-        let trust = if self.ctx.workspace_trusted { "trust: trusted" } else { "trust: UNTRUSTED" };
+        let trust = if self.ctx.workspace_trusted {
+            "trust: trusted"
+        } else {
+            "trust: UNTRUSTED"
+        };
         format!("{marker} {text} | {trust}")
     }
 
@@ -140,7 +211,9 @@ mod tests {
     #[test]
     fn status_rail_degraded_is_explicit_text() {
         let mut s = shell();
-        s.ctx.daemon = DaemonState::Degraded { reason: "health timeout".into() };
+        s.ctx.daemon = DaemonState::Degraded {
+            reason: "health timeout".into(),
+        };
         let rail = s.status_rail();
         assert!(rail.contains("daemon degraded: health timeout"));
         assert!(rail.contains("UNTRUSTED"), "untrusted state never hidden");
@@ -150,14 +223,20 @@ mod tests {
     fn status_rail_honors_no_color() {
         let mut s = ShellModel::new(Theme::from_vars(Some("1"), None));
         s.ctx.daemon = DaemonState::Healthy;
-        assert!(s.status_rail().starts_with("[OK]"), "text marker, not glyph");
+        assert!(
+            s.status_rail().starts_with("[OK]"),
+            "text marker, not glyph"
+        );
     }
 
     #[test]
     fn keyboard_only_palette_flow_through_shell() {
         let mut s = shell();
         s.ctx.daemon = DaemonState::Healthy;
-        assert_eq!(s.handle_chord(&Chord::parse("ctrl+shift+p").unwrap()), "palette opened");
+        assert_eq!(
+            s.handle_chord(&Chord::parse("ctrl+shift+p").unwrap()),
+            "palette opened"
+        );
         for c in "runs".chars() {
             s.palette_key(PaletteKey::Char(c));
         }
@@ -170,7 +249,9 @@ mod tests {
     #[test]
     fn daemon_gated_commands_blocked_when_degraded() {
         let mut s = shell();
-        s.ctx.daemon = DaemonState::Degraded { reason: "down".into() };
+        s.ctx.daemon = DaemonState::Degraded {
+            reason: "down".into(),
+        };
         s.handle_chord(&Chord::parse("ctrl+shift+p").unwrap());
         for c in "open runs".chars() {
             s.palette_key(PaletteKey::Char(c));
@@ -186,6 +267,9 @@ mod tests {
         let mut s = shell();
         let a = s.handle_chord(&Chord::parse("f6").unwrap());
         let b = s.handle_chord(&Chord::parse("f6").unwrap());
-        assert_eq!((a.as_str(), b.as_str()), ("focus: Editor", "focus: ARC dock"));
+        assert_eq!(
+            (a.as_str(), b.as_str()),
+            ("focus: Editor", "focus: ARC dock")
+        );
     }
 }

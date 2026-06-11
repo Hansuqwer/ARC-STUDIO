@@ -1,0 +1,13 @@
+{
+  "schema_version": 2,
+  "type": "QUOTA_WARNING",
+  "timestamp": "2026-05-22T10:30:28.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 328,
+  "data": {
+    "current": 8200,
+    "dimension": "tokens_per_run",
+    "limit": 10000,
+    "usage_pct": 82.0
+  }
+}

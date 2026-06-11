@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "type": "BATTLE_VOTE_COMMITTED",
+  "timestamp": "2026-05-22T10:30:05.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 305,
+  "data": {
+    "battle_id": "bt_001",
+    "commit_hash": "9c1ffadb22",
+    "vote_id": "v_01"
+  }
+}

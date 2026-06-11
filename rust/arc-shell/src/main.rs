@@ -28,7 +28,10 @@ fn main() -> std::process::ExitCode {
 
     // Probe the daemon once (non-fatal): producer-truth from day one — the
     // status rail must reflect real daemon state, never invent it.
-    let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
+    let rt = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
         Ok(rt) => rt,
         Err(e) => {
             eprintln!("runtime: {e}");
@@ -41,10 +44,14 @@ fn main() -> std::process::ExitCode {
             if await_healthy(&client, std::time::Duration::from_secs(2)).await {
                 DaemonState::Healthy
             } else {
-                DaemonState::Degraded { reason: "health probe timeout (2s)".into() }
+                DaemonState::Degraded {
+                    reason: "health probe timeout (2s)".into(),
+                }
             }
         }),
-        Err(e) => DaemonState::Degraded { reason: format!("bad daemon url: {e}") },
+        Err(e) => DaemonState::Degraded {
+            reason: format!("bad daemon url: {e}"),
+        },
     };
 
     if headless {
