@@ -33,6 +33,16 @@ arc serve    # starts the HTTP daemon on 127.0.0.1:7777
 | **TUI Themes** | dark / light / mocha / latte / high-contrast / mono; live re-skin via `/theme`; `NO_COLOR` fallback |
 | **Mobile Runtime SDK** | Simulator-preview mobile governance layer — 13 mock capabilities, manifest validation, action-plan simulator, SIEM export, SBOM, RBAC/ABAC, audit retention; Expo, React Native, Flutter scaffolds (no real device access) |
 
+### Terminal-Gated Surfaces
+
+These surfaces are scaffolded and guarded, but remain blocked on real external evidence:
+
+| Surface | Current gate |
+|---|---|
+| Linux Firecracker proof | Requires Linux + `/dev/kvm` + Firecracker + ARC rootfs/kernel gates; inspect with `arc sandbox firecracker-gates --json`. |
+| Electron signed packaging | Requires signing credentials and notarization assets; unsigned local smoke builds use `package:smoke`. |
+| Token estimator accuracy | Requires diverse real dogfood traces; benchmark script can emit CSV/JSON summaries but does not fabricate representative results. |
+
 ---
 
 ## Quick Start

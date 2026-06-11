@@ -9081,3 +9081,203 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 **What changed:** Release snapshot command run after the Phases 344-365 ledger/docs sweep.
 
 **Evidence:** `bash scripts/generate-release-snapshot.sh --json` returned version `0.1.0a0`, internal track `v0.8-r-ux5`, git short `6f266e68`, branch `main`, dirty `true`, ruff clean `true`, banned clean `true`, patches stale `27`, python_tests `unknown` from the snapshot helper. Authoritative verification evidence for this phase remains Phase 364: full Python suite 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean; scoped mypy clean; `pnpm typecheck` passed; `pnpm build` passed. Final banned-claims gate passed: `OK: No banned claims found.`
+
+---
+
+## Phase 366 — R82 benchmark summary contract
+
+**Status:** Complete
+
+**What changed:** `scripts/research/measure_estimator_accuracy.py` now emits deterministic JSON summaries via `--summary-out` / `--json`, supports seeded sampling, and can fail a representative gate with `--require-representative` when sample/category thresholds are not met.
+
+**Evidence:** Targeted ruff passed for the script and new tests. `uv run --directory python pytest tests/context/test_measure_estimator_accuracy.py -q` passed as part of the targeted 36 passed / 1 skipped run. `uv run --directory python python ../scripts/research/measure_estimator_accuracy.py /tmp/arc-no-such-trace.jsonl --json --summary-out /var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/token-estimator-summary.json` returned `{"status":"deferred"...}`. R82 remains deferred until real diverse dogfood traces exist.
+
+---
+
+## Phase 367 — R82 representative gate readiness
+
+**Status:** Complete
+
+**What changed:** Added `--min-samples`, `--min-categories`, and `--require-representative` so CI/humans can distinguish a measured corpus from a representative corpus without fabricated benchmark claims.
+
+**Evidence:** `python/tests/context/test_measure_estimator_accuracy.py` locks summary shape and deferred JSON behavior. Full verification recorded in Phase 385.
+
+---
+
+## Phase 368 — R82 docs posture refresh
+
+**Status:** Complete
+
+**What changed:** `README.md`, `docs/roadmap.md`, and `AGENTS.md` now describe token-estimator accuracy as benchmark-gate-ready but still dependent on real traces.
+
+**Evidence:** Banned-claims gate recorded in Phase 385. R82 status stayed `Deferred`.
+
+---
+
+## Phase 369 — B2P-17 notarization hook scaffold
+
+**Status:** Complete
+
+**What changed:** Added `applications/electron/scripts/notarize.mjs` using `@electron/notarize` with `tool: 'notarytool'`, wired through `mac.afterSign` in `electron-builder.release.yml`.
+
+**Evidence:** `python/tests/test_electron_packaging_b2p17.py` now asserts the hook exists and uses notarytool. `bash scripts/test-electron-packaging.sh` passed.
+
+---
+
+## Phase 370 — B2P-17 macOS entitlements guard
+
+**Status:** Complete
+
+**What changed:** Added `applications/electron/resources/entitlements.mac.plist` and wired `mac.entitlements` / `mac.entitlementsInherit` in the release config.
+
+**Evidence:** Electron packaging structure test passed; Python structure test passed. B2P-17 remains signing/notarization-gated.
+
+---
+
+## Phase 371 — B2P-17 signing preflight config drift guard
+
+**Status:** Complete
+
+**What changed:** `scripts/require-electron-signing.mjs`, `scripts/check-pr.sh`, and `scripts/test-electron-packaging.sh` now fail if notarization hook or entitlements config disappears.
+
+**Evidence:** `bash scripts/test-electron-packaging.sh` passed; targeted Python tests passed. No signing credential or notarization attempt was made.
+
+---
+
+## Phase 372 — B2P-17 dependency declaration
+
+**Status:** Complete
+
+**What changed:** Declared `@electron/notarize` directly in `applications/electron/package.json` and refreshed `pnpm-lock.yaml` with `pnpm install --lockfile-only`.
+
+**Evidence:** Lockfile update completed. `pnpm typecheck` / `pnpm build` evidence recorded in Phase 385.
+
+---
+
+## Phase 373 — B2P-17 documentation honesty sweep
+
+**Status:** Complete
+
+**What changed:** README and roadmap wording now state Electron signed packaging remains gated on signing credentials despite notarization scaffolding.
+
+**Evidence:** Banned-claims gate recorded in Phase 385. B2P-17 status stayed Baseline.
+
+---
+
+## Phase 374 — R76 Firecracker proof-gate CLI
+
+**Status:** Complete
+
+**What changed:** Added `arc sandbox firecracker-gates --json`, which reports Linux/KVM/binary/env/artifact blockers without booting a VM.
+
+**Evidence:** `uv run --directory python arc sandbox firecracker-gates --json --workspace /Users/hansvilund/HansuQWER/WorkSpace/ARC/arc-theia-studio` returned `ready: false` with macOS host blockers. No VM boot was attempted.
+
+---
+
+## Phase 375 — R76 proof-gate CLI tests
+
+**Status:** Complete
+
+**What changed:** Added a CLI regression test proving the Firecracker gate report is JSON-emitted and blocked on non-Linux hosts.
+
+**Evidence:** Targeted run `uv run --directory python pytest tests/context/test_measure_estimator_accuracy.py tests/test_electron_packaging_b2p17.py tests/isolation/test_firecracker_smoke.py -q` passed: 36 passed / 1 skipped.
+
+---
+
+## Phase 376 — R76 docs posture refresh
+
+**Status:** Complete
+
+**What changed:** Roadmap and README now point to the proof-gate CLI and continue to mark Linux Firecracker execution as host-unproven.
+
+**Evidence:** R76 status stayed Baseline Complete (host-unproven). Banned-claims gate recorded in Phase 385.
+
+---
+
+## Phase 377 — Terminal-gated README matrix
+
+**Status:** Complete
+
+**What changed:** README gained a terminal-gated surfaces matrix for R76, B2P-17, and R82 with exact current gates.
+
+**Evidence:** Docs-only update; banned-claims gate recorded in Phase 385.
+
+---
+
+## Phase 378 — AGENTS active-track refresh
+
+**Status:** Complete
+
+**What changed:** `AGENTS.md` now records Phases 366-385 as a readiness sweep and explicitly states these phases do not promote R76, B2P-17, or R82.
+
+**Evidence:** Charter updated in place; banned-claims gate recorded in Phase 385.
+
+---
+
+## Phase 379 — Roadmap status refresh
+
+**Status:** Complete
+
+**What changed:** `docs/roadmap.md` now reflects R76 proof-gate hardening, B2P-17 signing/notarization gating, and R82 benchmark gate readiness without changing terminal-gated status.
+
+**Evidence:** Roadmap updated in place; no new roadmap/status doc created.
+
+---
+
+## Phase 380 — Targeted quality gate
+
+**Status:** Complete
+
+**What changed:** Ran focused quality checks across touched Python files.
+
+**Evidence:** `uv run --directory python ruff check ../scripts/research/measure_estimator_accuracy.py tests/context/test_measure_estimator_accuracy.py tests/test_electron_packaging_b2p17.py tests/isolation/test_firecracker_smoke.py src/agent_runtime_cockpit/cli/sandbox.py` passed.
+
+---
+
+## Phase 381 — Targeted behavior gate
+
+**Status:** Complete
+
+**What changed:** Ran focused tests for R82 benchmark readiness, B2P-17 packaging guards, and R76 Firecracker gates.
+
+**Evidence:** `uv run --directory python pytest tests/context/test_measure_estimator_accuracy.py tests/test_electron_packaging_b2p17.py tests/isolation/test_firecracker_smoke.py -q` passed: 36 passed / 1 skipped.
+
+---
+
+## Phase 382 — Electron packaging structure gate
+
+**Status:** Complete
+
+**What changed:** Ran the shell packaging structure check after notarization/entitlements wiring.
+
+**Evidence:** `bash scripts/test-electron-packaging.sh` passed all 8 checks.
+
+---
+
+## Phase 383 — Package lock refresh
+
+**Status:** Complete
+
+**What changed:** Refreshed `pnpm-lock.yaml` for the direct Electron notarization dependency.
+
+**Evidence:** `pnpm install --lockfile-only` completed with existing deprecation warnings only.
+
+---
+
+## Phase 384 — Terminal-gated no-promotion audit
+
+**Status:** Complete
+
+**What changed:** Confirmed R76, B2P-17, and R82 remain terminal-gated; the sweep adds repeatability and drift guards only.
+
+**Evidence:** `docs/roadmap.md` keeps R76 Baseline host-unproven, B2P-17 Baseline signing/notarization-gated, and R82 Deferred pending real traces.
+
+---
+
+## Phase 385 — Full verification gate
+
+**Status:** Complete
+
+**What changed:** Full verification run after the Phases 366-384 implementation and docs sweep.
+
+**Evidence:** `uv run --directory python ruff check src tests ../scripts/research/measure_estimator_accuracy.py` passed. `uv run --directory python pytest tests/ -q` passed: 6515 passed / 43 skipped / 7 xfailed / 1 xpassed, with one existing SQLite concurrent-write warning and the existing Textual xfail snapshot report. Standard scoped mypy passed: `uv run --directory python mypy src/agent_runtime_cockpit/security/ src/agent_runtime_cockpit/protocol/ src/agent_runtime_cockpit/workspace.py src/agent_runtime_cockpit/gating.py src/agent_runtime_cockpit/ag_ui/`. `pnpm typecheck` passed. `pnpm build` passed with existing Theia/Electron DEP0190 warnings. `bash scripts/test-electron-packaging.sh` passed. `bash scripts/check-pr.sh` passed. `bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md AGENTS.md README.md` passed: `OK: No banned claims found.`

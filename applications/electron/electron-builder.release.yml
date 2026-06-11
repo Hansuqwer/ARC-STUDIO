@@ -42,6 +42,7 @@ extraResources:
     to: "arc-python/pyproject.toml"
 
 mac:
+  afterSign: "scripts/notarize.mjs"
   target:
     - target: dmg
       arch: [x64, arm64]
@@ -49,6 +50,8 @@ mac:
   icon: "resources/icons/icon.icns"
   hardenedRuntime: true
   gatekeeperAssess: false
+  entitlements: "resources/entitlements.mac.plist"
+  entitlementsInherit: "resources/entitlements.mac.plist"
 
 linux:
   target:

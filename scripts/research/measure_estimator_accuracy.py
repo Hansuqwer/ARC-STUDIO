@@ -19,6 +19,7 @@ import random
 import sys
 from pathlib import Path
 from statistics import mean, median
+from typing import Any
 
 # These imports assume the script runs from the python/ directory
 from agent_runtime_cockpit.context.token_counter import estimate_tokens
@@ -101,11 +102,66 @@ def tiktoken_count(content: str) -> int | None:
     return len(enc.encode(content))
 
 
-def main():
+def _summary(
+    rows: list[dict[str, Any]], *, requested_samples: int, corpus_size: int
+) -> dict[str, Any]:
+    by_cat: dict[str, list[float]] = {}
+    for row in rows:
+        by_cat.setdefault(str(row["category"]), []).append(float(row["rel_error_pct"]))
+
+    categories = {
+        cat: {
+            "n": len(vals),
+            "median_rel_error_pct": round(median(vals), 2),
+            "mean_rel_error_pct": round(mean(vals), 2),
+            "max_rel_error_pct": round(max(vals), 2),
+        }
+        for cat, vals in sorted(by_cat.items())
+    }
+    overall = [float(row["rel_error_pct"]) for row in rows]
+    return {
+        "status": "measured" if rows else "deferred",
+        "corpus_size": corpus_size,
+        "requested_samples": requested_samples,
+        "measured_samples": len(rows),
+        "categories_seen": sorted(categories),
+        "categories": categories,
+        "overall": {
+            "mean_rel_error_pct": round(mean(overall), 2) if overall else None,
+            "median_rel_error_pct": round(median(overall), 2) if overall else None,
+            "max_rel_error_pct": round(max(overall), 2) if overall else None,
+        },
+    }
+
+
+def _deferred(status: str, reason: str, *, json_output: bool, summary_out: Path | None) -> int:
+    payload = {"status": status, "reason": reason}
+    if summary_out:
+        summary_out.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+    if json_output:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(reason)
+    return 0
+
+
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("trace_files", nargs="+", type=Path)
     parser.add_argument("--samples", type=int, default=100)
+    parser.add_argument("--min-samples", type=int, default=100)
+    parser.add_argument("--min-categories", type=int, default=4)
     parser.add_argument("--out", type=Path, default=Path("token-estimator-results.csv"))
+    parser.add_argument("--summary-out", type=Path)
+    parser.add_argument("--json", action="store_true", help="Print a stable JSON summary")
+    parser.add_argument(
+        "--require-representative",
+        action="store_true",
+        help="Exit non-zero unless sample/category thresholds are met",
+    )
+    parser.add_argument("--seed", type=int, default=0, help="Deterministic sample seed")
     args = parser.parse_args()
 
     # Collect
@@ -115,17 +171,26 @@ def main():
             all_contents.extend(extract_message_contents(p))
 
     if not all_contents:
-        print("no trace corpus available; benchmark deferred to first R-01 dogfood week")
-        return 0
+        return _deferred(
+            "deferred",
+            "no trace corpus available; benchmark deferred to real dogfood traces",
+            json_output=args.json,
+            summary_out=args.summary_out,
+        )
 
     if len(all_contents) < args.samples:
         print(f"WARNING: only {len(all_contents)} samples found (wanted {args.samples})")
 
-    sample = random.sample(all_contents, min(args.samples, len(all_contents)))
+    rng = random.Random(args.seed)
+    sample = rng.sample(all_contents, min(args.samples, len(all_contents)))
 
     if not TIKTOKEN_AVAILABLE:
-        print("no ground-truth tokenizer (tiktoken) available; benchmark deferred")
-        return 0
+        return _deferred(
+            "deferred",
+            "no ground-truth tokenizer (tiktoken) available; benchmark deferred",
+            json_output=args.json,
+            summary_out=args.summary_out,
+        )
 
     # Measure
     rows = []
@@ -169,6 +234,17 @@ def main():
             f"(N={len(overall)}, median={median(overall):.1f}%, max={max(overall):.1f}%)"
         )
 
+    summary = _summary(rows, requested_samples=args.samples, corpus_size=len(all_contents))
+    representative = (
+        summary["measured_samples"] >= args.min_samples
+        and len(summary["categories_seen"]) >= args.min_categories
+    )
+    summary["representative"] = representative
+    summary["representative_requirements"] = {
+        "min_samples": args.min_samples,
+        "min_categories": args.min_categories,
+    }
+
     # Write CSV
     with args.out.open("w") as f:
         if rows:
@@ -176,10 +252,20 @@ def main():
             w.writeheader()
             w.writerows(rows)
     print(f"\nResults written to {args.out}")
+    if args.summary_out:
+        args.summary_out.write_text(
+            json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        print(f"Summary written to {args.summary_out}")
+    if args.json:
+        print(json.dumps(summary, indent=2, sort_keys=True))
 
     # ASCII scatter (heuristic vs truth)
     print("\nScatter (truth on X, heuristic on Y, diagonal = perfect):")
     _ascii_scatter([(r["tiktoken_truth"], r["heuristic"]) for r in rows])
+    if args.require_representative and not representative:
+        print("representative benchmark requirements not met", file=sys.stderr)
+        return 3
     return 0
 
 

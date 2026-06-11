@@ -121,7 +121,7 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 | R73 | Live Terminal/Event Streaming UX | Polished Complete|
 | R74 | Broad CLI CI Orchestration | Polished Complete|
 | R75 | macOS MicroVM Execution + Strict No-Network Proof | Gated proof passed once; default-off |
-| R76 | Linux Firecracker Execution Proof | Baseline Complete (host-unproven) |
+| R76 | Linux Firecracker Execution Proof | Baseline Complete (host-unproven; proof gates hardened) |
 | R78 | A2A Local AgentCard Generator + Loopback Client | Polished Complete|
 
 ### Token-saving + UX + open-hardening track (R-TS / R-UX / R-OPEN)
@@ -193,7 +193,7 @@ GATED items (auth / native-device / paid-live provider / Linux-KVM host) are int
 | B2P-11 | Eval artifact schema + Inspect-AI export + two-run report compare | Polished Complete | 3,4,8 · M |
 | B2P-12 | Memory runtime wiring (extract/query during runs, redaction-first) | Polished Complete | 3,4 · M |
 | B2P-13 | IDE write bridge (Phase 42; depends on advisory lock) | Polished Complete | 6,7 · M |
-| B2P-17 | Full Electron app packaging (browser stays canonical) | Baseline Complete | 4,8 · L |
+| B2P-17 | Full Electron app packaging (browser stays canonical) | Baseline Complete (signing/notarization-gated) | 4,8 · L |
 | B2P-18 | Doctor/daemon parity remainder (resolve fate-labeled orphan routes) | Polished Complete | 3,8 · M |
 | B2P-19 | Keyed audit material across every adapter run path | Polished Complete | 4,6 · M |
 
@@ -1702,9 +1702,9 @@ P2 — Quality:
 
 **Goal:** Prove real Linux Firecracker boot/run/destroy for a workspace-bounded command.
 
-**Current:** Linux/Firecracker execution code is wired but host-unproven. `MicroVMIsolationProvider.execute()` delegates to `FirecrackerExecutionRunner` only on Linux when `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, `ARC_FIRECRACKER_KERNEL`, `ARC_FIRECRACKER_ROOTFS`, `firecracker`, `/dev/kvm` rw, `mkfs.ext4`, and `truncate` are present. The runner builds a read-only ext4 workspace snapshot, starts Firecracker with no `network-interfaces`, requires guest `ARC_FC_PROOF` markers for no default route/network failure/workspace/symlink, parses `ARC_FC_RESULT`, terminates the process group, and emits audit. Normal CI and this macOS host skip real boot.
+**Current:** Linux/Firecracker execution code is wired but host-unproven. `MicroVMIsolationProvider.execute()` delegates to `FirecrackerExecutionRunner` only on Linux when `ARC_MICROVM_EXEC_ENABLED=1`, `ARC_MICROVM_INTEGRATION=1`, `ARC_FC_REAL_EXEC=1`, `ARC_FIRECRACKER_KERNEL`, `ARC_FIRECRACKER_ROOTFS`, `firecracker`, `/dev/kvm` rw, `mkfs.ext4`, and `truncate` are present. The runner builds a read-only ext4 workspace snapshot, starts Firecracker with no `network-interfaces`, requires guest `ARC_FC_PROOF` markers for no default route/network failure/workspace/symlink, parses `ARC_FC_RESULT`, terminates the process group, and emits audit. `arc sandbox firecracker-gates --json` reports the real-host proof blockers without booting a VM. Normal CI and this macOS host skip real boot.
 
-**Status:** Baseline Complete (host-unproven) | Evidence: local targeted `uv run pytest tests/isolation/test_microvm_truth_guard.py tests/isolation/test_firecracker_smoke.py -q` → 40 passed / 1 skipped; no Linux/KVM boot run on this host | Notes: To prove execution, run on Linux/KVM with ARC exec rootfs and the documented gates; do not claim real microVM execution until that test boots a VM and passes.
+**Status:** Baseline Complete (host-unproven) | Evidence: Phases 366-385 added non-booting gate CLI coverage; no Linux/KVM boot run on this host | Notes: To prove execution, run on Linux/KVM with ARC exec rootfs and the documented gates; do not claim real microVM execution until that test boots a VM and passes.
 
 ## R78 — A2A Local AgentCard Generator + Loopback Client
 
@@ -1819,7 +1819,7 @@ Items opened after v0.8-r-ux5 release gate (2026-06-09).
 |---|---|---|
 | R80 | Provider Key Management CLI (`arc providers set-key / get-key / delete-key / export-env`) | Polished Complete |
 | R81 | `arc doctor providers` — configured-key status for all bundled providers | Polished Complete |
-| R82 | Token estimator accuracy benchmark (real traces required) | Deferred |
+| R82 | Token estimator accuracy benchmark (real traces required) | Deferred (benchmark gate-ready; representative corpus absent) |
 
 
 ---

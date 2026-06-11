@@ -43,6 +43,9 @@ SIGNING_PATTERNS=(
   'forceCodeSigning:\s*true'
   'hardenedRuntime:\s*true'
   'gatekeeperAssess:\s*false'
+  'entitlements:\s*"resources/entitlements\.mac\.plist"'
+  'entitlementsInherit:\s*"resources/entitlements\.mac\.plist"'
+  'afterSign:\s*"scripts/notarize\.mjs"'
   'verifyUpdateCodeSignature:\s*true'
   'signAndEditExecutable:\s*true'
   'requestedExecutionLevel:\s*"asInvoker"'
@@ -53,6 +56,12 @@ for pat in "${SIGNING_PATTERNS[@]}"; do
     exit 1
   fi
 done
+
+if [ ! -f applications/electron/resources/entitlements.mac.plist ] \
+  || [ ! -f applications/electron/scripts/notarize.mjs ]; then
+  echo "ERROR: Electron notarization hook or entitlements file missing."
+  exit 1
+fi
 
 if git grep -n 'swarmgraph-stub.sh' -- \
   ':(exclude).github/workflows/e2e.yml' \

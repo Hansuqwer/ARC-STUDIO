@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { platform } from 'node:process';
 
 const SIGNING_ENVS = ['CSC_LINK', 'CSC_KEY_PASSWORD'];
@@ -7,6 +7,8 @@ const API_KEY_ENVS = ['APPLE_API_KEY_PATH', 'APPLE_API_KEY_ID', 'APPLE_API_ISSUE
 const LEGACY_APPLE_ID_ENVS = ['APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID'];
 const PHASE = process.env.ARC_SIGNING_PREFLIGHT_PHASE || 'pre-import';
 const RELEASE_CONFIG_PATH = new URL('../applications/electron/electron-builder.release.yml', import.meta.url);
+const ENTITLEMENTS_PATH = new URL('../applications/electron/resources/entitlements.mac.plist', import.meta.url);
+const NOTARIZE_HOOK_PATH = new URL('../applications/electron/scripts/notarize.mjs', import.meta.url);
 
 function envShape(env = process.env) {
   const missing = [...SIGNING_ENVS, ...API_KEY_ENVS].filter(name => !env[name]);
@@ -57,12 +59,22 @@ function releaseConfigCheck() {
     { key: 'forceCodeSigning', pattern: /^forceCodeSigning:\s*true\s*$/m },
     { key: 'mac.hardenedRuntime', pattern: /^\s{2}hardenedRuntime:\s*true\s*$/m },
     { key: 'mac.gatekeeperAssess', pattern: /^\s{2}gatekeeperAssess:\s*false\s*$/m },
+    { key: 'mac.entitlements', pattern: /^\s{2}entitlements:\s*"resources\/entitlements\.mac\.plist"\s*$/m },
+    { key: 'mac.entitlementsInherit', pattern: /^\s{2}entitlementsInherit:\s*"resources\/entitlements\.mac\.plist"\s*$/m },
+    { key: 'mac.afterSign', pattern: /^\s{2}afterSign:\s*"scripts\/notarize\.mjs"\s*$/m },
     { key: 'win.verifyUpdateCodeSignature', pattern: /^\s{2}verifyUpdateCodeSignature:\s*true\s*$/m },
     { key: 'win.signAndEditExecutable', pattern: /^\s{2}signAndEditExecutable:\s*true\s*$/m },
     { key: 'win.requestedExecutionLevel', pattern: /^\s{2}requestedExecutionLevel:\s*"asInvoker"\s*$/m },
   ];
   const missing = required.filter(item => !item.pattern.test(config)).map(item => item.key);
-  return { ok: missing.length === 0, missing_keys: missing };
+  const missingFiles = [];
+  if (!existsSync(ENTITLEMENTS_PATH)) {
+    missingFiles.push('resources/entitlements.mac.plist');
+  }
+  if (!existsSync(NOTARIZE_HOOK_PATH)) {
+    missingFiles.push('scripts/notarize.mjs');
+  }
+  return { ok: missing.length === 0 && missingFiles.length === 0, missing_keys: missing, missing_files: missingFiles };
 }
 
 function certificateCheck(phase = PHASE) {

@@ -33,6 +33,9 @@ def test_release_packaging_is_signing_gated() -> None:
     assert "require-electron-signing.mjs" in pkg  # release build refuses to run unsigned
     rel = (_ELECTRON / "electron-builder.release.yml").read_text(encoding="utf-8")
     assert "forceCodeSigning: true" in rel
+    assert 'afterSign: "scripts/notarize.mjs"' in rel
+    assert 'entitlements: "resources/entitlements.mac.plist"' in rel
+    assert 'entitlementsInherit: "resources/entitlements.mac.plist"' in rel
     for target in ("mac:", "win:", "linux:"):
         assert target in rel
 
@@ -42,3 +45,13 @@ def test_auto_update_feed_configured() -> None:
     rel = (_ELECTRON / "electron-builder.release.yml").read_text(encoding="utf-8")
     assert "publish:" in rel
     assert "provider: github" in rel
+
+
+@pytest.mark.skipif(not _ELECTRON.is_dir(), reason="electron app not present")
+def test_notarization_assets_are_reviewable_and_notarytool_based() -> None:
+    entitlements = (_ELECTRON / "resources" / "entitlements.mac.plist").read_text(encoding="utf-8")
+    hook = (_ELECTRON / "scripts" / "notarize.mjs").read_text(encoding="utf-8")
+    assert "com.apple.security.cs.allow-jit" in entitlements
+    assert "@electron/notarize" in hook
+    assert "tool: 'notarytool'" in hook
+    assert "APPLE_API_KEY_PATH" in hook

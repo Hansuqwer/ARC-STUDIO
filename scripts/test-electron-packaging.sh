@@ -49,7 +49,7 @@ fi
 # 5. Verify release config signing keys are intact
 echo "--- Test 5: Release config signing keys ---"
 RELEASE_CONFIG="applications/electron/electron-builder.release.yml"
-for pattern in 'forceCodeSigning:\s*true' 'hardenedRuntime:\s*true' 'gatekeeperAssess:\s*false' 'verifyUpdateCodeSignature:\s*true' 'signAndEditExecutable:\s*true' 'requestedExecutionLevel:\s*"asInvoker"'; do
+for pattern in 'forceCodeSigning:\s*true' 'hardenedRuntime:\s*true' 'gatekeeperAssess:\s*false' 'entitlements:\s*"resources/entitlements\.mac\.plist"' 'entitlementsInherit:\s*"resources/entitlements\.mac\.plist"' 'afterSign:\s*"scripts/notarize\.mjs"' 'verifyUpdateCodeSignature:\s*true' 'signAndEditExecutable:\s*true' 'requestedExecutionLevel:\s*"asInvoker"'; do
   if grep -qE "${pattern}" "${RELEASE_CONFIG}"; then
     echo "  PASS: ${pattern}"
   else
@@ -82,6 +82,9 @@ SIGNING_PATTERNS=(
   'forceCodeSigning:\s*true'
   'hardenedRuntime:\s*true'
   'gatekeeperAssess:\s*false'
+  'entitlements:\s*"resources/entitlements\.mac\.plist"'
+  'entitlementsInherit:\s*"resources/entitlements\.mac\.plist"'
+  'afterSign:\s*"scripts/notarize\.mjs"'
   'verifyUpdateCodeSignature:\s*true'
   'signAndEditExecutable:\s*true'
   'requestedExecutionLevel:\s*"asInvoker"'

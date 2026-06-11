@@ -15,6 +15,7 @@ from ..isolation.base import IsolationProvider
 from ..isolation.microvm import (
     MicroVMIsolationProvider,
     build_microvm_run_plan,
+    firecracker_proof_gates,
     generate_firecracker_exec_artifacts,
     generate_firecracker_proof_artifacts,
 )
@@ -551,6 +552,18 @@ def sandbox_firecracker_artifacts(
         else generate_firecracker_proof_artifacts(Path(output).expanduser())
     )
     _out(ok(report.model_dump(mode="json"), workspace=str(ws)), json_output)
+
+
+@sandbox_app.command("firecracker-gates")
+def sandbox_firecracker_gates(
+    workspace: Optional[str] = WORKSPACE_FLAG,
+    json_output: bool = JSON_FLAG,
+    debug: bool = DEBUG_FLAG,
+) -> None:
+    """Report Firecracker real-host proof gates; does not boot a VM."""
+    _setup_logging(debug)
+    ws = _workspace(workspace)
+    _out(ok(firecracker_proof_gates(), workspace=str(ws)), json_output)
 
 
 @sandbox_app.command("vz-artifacts")

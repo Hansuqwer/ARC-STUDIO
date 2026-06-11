@@ -42,6 +42,7 @@
     "arc-extension": "workspace:*"
   },
   "devDependencies": {
+    "@electron/notarize": "2.2.1",
     "@theia/cli": "1.71.0",
     "electron": "39.8.7",
     "electron-builder": "^24.13.3",

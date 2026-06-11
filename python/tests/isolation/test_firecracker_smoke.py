@@ -125,6 +125,23 @@ class TestFirecrackerSmokeSkipBehaviour:
         )
         assert firecracker_real_exec_available() is False
 
+    def test_firecracker_gates_cli_reports_blockers_without_booting(self, tmp_path, monkeypatch):
+        from typer.testing import CliRunner
+
+        from agent_runtime_cockpit.cli import app
+
+        monkeypatch.setattr(
+            "agent_runtime_cockpit.isolation.microvm.platform.system", lambda: "Darwin"
+        )
+        monkeypatch.setattr("agent_runtime_cockpit.isolation.microvm.shutil.which", lambda _: None)
+        result = CliRunner().invoke(
+            app,
+            ["sandbox", "firecracker-gates", "--json", "--workspace", str(tmp_path)],
+        )
+        assert result.exit_code == 0
+        assert '"ready": false' in result.output
+        assert "Linux required" in result.output
+
 
 class TestFirecrackerNoNetworkDesignProof:
     """Always-run no-NIC design-proof tests."""

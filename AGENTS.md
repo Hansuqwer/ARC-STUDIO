@@ -87,7 +87,12 @@ The **v0.9 competitive feature track** (Phases 271–365) is **complete**. Sessi
 **Terminal-gated (stay Baseline):** R76 (Linux/KVM Firecracker), B2P-17 (Electron
 code-signing), R82 (token estimator accuracy benchmark — real traces required).
 
-See `docs/phases.md` (Phases 159–365) and `docs/roadmap.md` for full evidence records.
+The Phases 366–385 readiness sweep added non-promotional prep around the three
+terminal-gated surfaces: deterministic token-estimator benchmark summaries,
+Electron signing/notarization config guards, and Firecracker proof-gate reporting.
+These phases do **not** promote R76, B2P-17, or R82.
+
+See `docs/phases.md` (Phases 159–385) and `docs/roadmap.md` for full evidence records.
 
 ## Sandbox / microVM truth constraints (still in force)
 
