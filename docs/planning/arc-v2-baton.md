@@ -1,11 +1,28 @@
 # arc-v2 baton state (update this file at every handback)
 
-Last updated: 2026-06-11 · Branch: `arc-v2/sprint-1-protocol-bridge` @ `00c24bd`
+Last updated: 2026-06-11 (PM-4) · Branch: `arc-v2/sprint-1-protocol-bridge` @ `ececa19` + sprint-8 cherry-pick
 
 ## Who holds the baton
 
-**Local CLI on the M4.** Arena agent idle until `reports/spike-<candidate>.json`
-files land (handover §6 stop-conditions govern).
+**Split lanes (owner directive "execute as many phases as you can"):**
+- **M4 (local CLI):** the spike queue — unchanged, **top priority / critical path**.
+- **Arena (sandbox):** all framework-free phase cores are now DONE and merged:
+  §3.12 streams (`arc-daemon-client::streams`), Sprint-4 editor core
+  (`arc-editor`: Buffer/undo-redo/completion stub), Sprint-5
+  (`arc-workspace` worktree+watcher; `arc-index` tantivy w/ planted-secret
+  redaction + corruption-rebuilds, rusqlite WAL symbols), Sprint-6
+  (`arc-terminal` PTY echo/resize/exit matrix; Linux rows container-proven,
+  macOS rows CLI-proven, ConPTY rows await Windows shell), Sprint-7 panels
+  (`arc-dock`: SurfaceState/Runs/EventStream w/ replay parity), Sprint-8
+  security surfaces (`arc-dock`: HitlModal Escape=dismiss-not-deny +
+  DiffReview confirmation-gated apply).
+  Workspace: 9 crates / 104 tests (Linux) / 97 (macOS — two honest
+  #[cfg(linux)] gates: watcher-live, 1MiB throughput; xcompile CI covers).
+  **When the spike selects a framework, Sprints 4–8 collapse into pure
+  render work over tested models.**
+- **Open owner item:** HITL decision API proposal
+  (`arc-v2-hitl-decision-api-proposal.md`, F3) — checkbox block awaiting
+  verdict; gates Sprint-8 daemon integration.
 
 ## M4 execution order (recorded recommendation)
 
