@@ -24,7 +24,7 @@ Date: 2026-06-11 · Branch: `arc-v2/sprint-1-protocol-bridge` @ `351744f`
 | 2 | C1: bless `docs/planning/` in `AGENTS.md` (additive exception paragraph) | **APPLIED** — see AGENTS.md "Additive exception"; reversal = delete one paragraph |
 | 3 | F5 stream split documented as contract (global = notifications, per-run = RunEvents) | **RATIFIED** (additive doc note; no protocol change) |
 | 4 | Q10 fixture authoring priority: TOOL_CALL_*, TEXT_MESSAGE_*/MESSAGE*, STATE_SNAPSHOT, *_DENIED first | **ACCEPTED as recommendation** — daemon-side authoring scheduled before the panels that render them (Sprint 7 prep) |
-| 5 | TS round-trip leg re-run in CI before gate 2 closes fully | **OPEN** (tracked) |
+| 5 | TS round-trip leg re-run in CI before gate 2 closes fully | **CLOSED locally 2026-06-11** — `pnpm --filter @arc-studio/protocol test` passed (14 suites / 185 tests); `pnpm --filter @arc-studio/protocol build` passed; v1 regression `PYTHONPATH=src uv run pytest tests/protocol tests/web -q` passed (220 tests). |
 
 Constraints unchanged: native-only; additive protocol; deterministic security;
 daemon = producer of truth. Sprint 3+ remains gated (ADR-0002 addendum required

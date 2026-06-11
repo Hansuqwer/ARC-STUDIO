@@ -163,6 +163,7 @@
 | 104 | macOS MicroVM Execution + Strict No-Network Proof | Gated public CLI proof passed once; default-off; not production-grade |
 | 105 | Linux Firecracker Execution Proof | Baseline Complete (host-unproven; Linux/KVM only) |
 | 111 | Mobile Runtime SDK Integration | Partial — slices 110.1–110.5 done; 110.6 Theia/TUI surfacing follow-up |
+| 366 | ARC v2 native IDE Sprint-3 framework spike backlog | Blocked |
 
 ---
 
@@ -9081,3 +9082,59 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 **What changed:** Release snapshot command run after the Phases 344-365 ledger/docs sweep.
 
 **Evidence:** `bash scripts/generate-release-snapshot.sh --json` returned version `0.1.0a0`, internal track `v0.8-r-ux5`, git short `6f266e68`, branch `main`, dirty `true`, ruff clean `true`, banned clean `true`, patches stale `27`, python_tests `unknown` from the snapshot helper. Authoritative verification evidence for this phase remains Phase 364: full Python suite 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean; scoped mypy clean; `pnpm typecheck` passed; `pnpm build` passed. Final banned-claims gate passed: `OK: No banned claims found.`
+
+---
+
+## Phase 366 — ARC v2 native IDE Sprint-3 framework spike backlog
+
+**Roadmap:** R-ARC-V2-NATIVE
+
+**Status:** Blocked | Evidence: `arc-v2-HANDOVER.md`; ADR-0002 addendum owner-confirmed as written on 2026-06-11; `docs/planning/arc-v2-sprint-3-spike-runbook.md`; `reports/sprint3-local-preflight.json`; local closure of the TS protocol round-trip leg on 2026-06-11 (`pnpm --filter @arc-studio/protocol test` 14 suites / 185 tests, `pnpm --filter @arc-studio/protocol build`, `PYTHONPATH=src uv run pytest tests/protocol tests/web -q` 220 passed). | Notes: Sprint-3 framework decision is blocked until candidate spike reports and the decision matrix exist. Local preflight resolved Rust/Metal tooling, candidate pins, workload digests, main/spike Rust baselines, and dependency buildability; this unpinned macOS-only machine cannot produce final pass/fail claims or complete Linux/Windows G5/G6 evidence.
+
+### Acceptance
+
+1. Owner verdict on `docs/planning/arc-v2-adr-0002-addendum-draft.md` is recorded before any framework decision.
+2. Candidate pins for gpui, gpui-ce, floem, and bespoke are resolved on spike day and recorded in raw reports.
+3. `spike-harness` generates `reports/spike-<candidate>.json` for each candidate; NotRun/Pending gates block the verdict.
+4. `docs/planning/arc-v2-sprint-3-decision-matrix.md` is filled only from committed spike reports.
+5. `rust/arc-ui` remains the sole UI-framework import facade; main `rust/Cargo.lock` remains framework-free.
+6. v1 regression gate remains green: `PYTHONPATH=src uv run pytest tests/protocol tests/web -q`.
+7. If all candidates fail or any gate fails ambiguously, stop and escalate to owner/Arena; do not select Electron, WebView, Tauri, or continued Theia.
+
+### Backlog
+
+1. Present ADR-0002 addendum to owner and record the checkbox verdict in place.
+2. Run deterministic workload generation and digest verification on the desktop spike machine.
+3. Execute G1-G4 automatic gates plus G5 screen-reader, G6 IME, G7 bidi/ligature golden, and G8 sustainability evidence for each candidate.
+4. Commit raw spike report JSON and evidence paths; then fill the matrix.
+5. Hand back after reports and matrix exist; Arena/owner own the final selection memo and `arc-ui::kit` implementation plan.
+
+### Resume prompt
+
+```text
+Continue ARC v2 native IDE Sprint-3. First read arc-v2-HANDOVER.md, AGENTS.md,
+docs/planning/arc-v2-adr-0002-addendum-draft.md,
+docs/planning/arc-v2-sprint-3-spike-runbook.md, and
+docs/planning/arc-v2-sprint-3-decision-matrix.md. Do not select a framework until
+the owner records the ADR-0002 addendum verdict. If approved, run the framework
+spike on desktop hardware with display/GPU, pin gpui/gpui-ce/floem/bespoke
+candidates, generate raw reports/spike-<candidate>.json via spike-harness, fill
+the decision matrix only from those reports, preserve the arc-ui facade boundary,
+keep framework deps out of main rust/Cargo.lock, and stop for owner/Arena handback
+after reports and matrix exist. Keep v1 protocol/web green.
+```
+
+### Verification
+
+```bash
+pnpm --filter @arc-studio/protocol test
+pnpm --filter @arc-studio/protocol build
+cd python && PYTHONPATH=src uv run pytest tests/protocol tests/web -q
+bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md docs/planning
+```
+
+### Known risks
+
+- Desktop spike results are hardware-dependent; unpinned-machine results are indicative only.
+- ADR-0002 addendum remains owner-gated; no framework may be selected while it is unconfirmed.
+- UI framework dependencies must remain isolated to the spikes workspace until a decision is recorded.

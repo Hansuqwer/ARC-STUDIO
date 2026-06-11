@@ -26,7 +26,7 @@ Pinned benchmark machine: yes / no (if no: matrix is indicative-only, no selecti
 | G7 bidi+ligature golden | | | | |
 | G8 cadence / bus factor / breakage rate / vendoring cost | | | | |
 
-## Decision rule (ADR-0002 addendum — owner-confirmed at ARC2-13 before use)
+## Decision rule (ADR-0002 addendum — owner-confirmed 2026-06-11 at ARC2-13)
 
 Among candidates whose `spike_verdict()` is clean:
 1. **Facade cost** — diff size + concept mismatch of implementing `arc_ui::kit`

@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "environment": {
             "os": std::env::consts::OS,
             "arch": std::env::consts::ARCH,
-            "note": "sandboxed CI-class container; NOT the pinned benchmark machine"
+            "note": "local preflight run; NOT the pinned benchmark machine"
         },
         "raw_total_samples_us": totals_us,
     });

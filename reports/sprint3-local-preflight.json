@@ -1,0 +1,117 @@
+{
+  "phase": "ARC v2 Sprint-3 framework spike preflight",
+  "date": "2026-06-11",
+  "status": "preflight_complete_decision_blocked",
+  "honesty_note": "This machine is not recorded as the pinned benchmark machine; all local measurements are indicative-only and cannot select a framework. Full G5/G6 evidence also requires Linux and Windows sessions.",
+  "owner_verdict": {
+    "adr_0002_addendum": "confirmed_as_written",
+    "recorded_in": "docs/planning/arc-v2-adr-0002-addendum-draft.md"
+  },
+  "machine": {
+    "hostname": "BLUETEAM.local",
+    "os": "Darwin 25.4.0",
+    "arch": "arm64",
+    "machine": "MacBook Air Mac16,12",
+    "cpu": "Apple M4",
+    "gpu": "Apple M4, 8 cores, Metal 4",
+    "display": "Color LCD 2940x1912 physical, 1470x956 @ 60.00Hz logical",
+    "memory": "16 GB",
+    "power_profile": "No thermal/performance/CPU power warning recorded",
+    "is_pinned_benchmark_machine": false
+  },
+  "toolchain": {
+    "rust": "Homebrew rust 1.96.0 installed locally during preflight",
+    "xcode": "Xcode 26.5 build 17F42",
+    "metal_toolchain": "Installed via xcodebuild -downloadComponent MetalToolchain after gpui preflight initially failed without it"
+  },
+  "candidate_pins": {
+    "gpui": "crates.io gpui 0.2.2",
+    "gpui_ce": "https://github.com/gpui-ce/gpui-ce rev c237d57d1caed1bb6c6651ddc3ce9cafa86161b6",
+    "floem": "crates.io floem 0.2.0",
+    "bespoke": {
+      "winit": "0.31.0-beta.2",
+      "vello": "0.9.0",
+      "parley": "0.10.0",
+      "accesskit_winit": "0.33.0",
+      "masonry_optional": "0.4.0"
+    }
+  },
+  "workloads": {
+    "path": "/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-v2-spike/workloads",
+    "digests": {
+      "g1-pathological-10mb-single-line.txt": "40d2094e0b4e8235",
+      "g1-source-100mb.txt": "55698ad22d910c2a",
+      "g1-source-10mb.txt": "12ffe06c82255722",
+      "g2-diff-5k-lines.patch": "9c7c40e09dd7027b"
+    }
+  },
+  "baseline_checks": [
+    {
+      "command": "cargo test --workspace",
+      "cwd": "rust",
+      "result": "passed"
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets -- -D warnings",
+      "cwd": "rust",
+      "result": "passed"
+    },
+    {
+      "command": "cargo test",
+      "cwd": "rust/spikes",
+      "result": "passed"
+    },
+    {
+      "command": "cargo clippy --all-targets -- -D warnings",
+      "cwd": "rust/spikes",
+      "result": "passed"
+    },
+    {
+      "command": "bash scripts/check-arc-ui-facade.sh",
+      "cwd": ".",
+      "result": "passed"
+    }
+  ],
+  "dependency_preflight": [
+    {
+      "candidate": "gpui",
+      "command": "cargo check",
+      "temp_workspace": "/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-v2-spike/dep-check-gpui",
+      "result": "passed_after_metal_toolchain_install",
+      "note": "Initial failure: cannot execute tool 'metal' due to missing Metal Toolchain; fixed with xcodebuild -downloadComponent MetalToolchain."
+    },
+    {
+      "candidate": "gpui-ce",
+      "command": "cargo check",
+      "temp_workspace": "/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-v2-spike/dep-check-gpui-ce",
+      "result": "passed"
+    },
+    {
+      "candidate": "floem",
+      "command": "cargo check",
+      "temp_workspace": "/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-v2-spike/dep-check-floem",
+      "result": "passed"
+    },
+    {
+      "candidate": "bespoke",
+      "command": "cargo check",
+      "temp_workspace": "/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-v2-spike/dep-check-bespoke",
+      "result": "passed"
+    }
+  ],
+  "measurements": {
+    "g3_headless_baseline": {
+      "command": "cargo run -p spike-harness --bin g3-headless-baseline -- ../../protocol/fixtures/run-event-seq/tool-use-streaming ../../reports",
+      "total_p50_us": 749,
+      "total_p99_us": 1126,
+      "per_row_p99_us": 12,
+      "report": "reports/g3-headless-baseline.json",
+      "note": "Decode+project only; not a rendering pass."
+    }
+  },
+  "blocked_next": [
+    "Implement and run the five render hooks per candidate to produce reports/spike-<candidate>.json.",
+    "Collect G5/G6/G7 evidence. Full G5/G6 cannot complete on this macOS-only session because Linux and Windows screen-reader/IME evidence is required.",
+    "Do not select a framework until all candidate reports and the decision matrix exist."
+  ]
+}

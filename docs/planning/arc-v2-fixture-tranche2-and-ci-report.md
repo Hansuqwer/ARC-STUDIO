@@ -72,5 +72,7 @@ Sandbox-executable runway is now **exhausted**. Remaining critical path:
 1. Owner verdict on ADR-0002 addendum (ARC2-13) — draft has sign-off block.
 2. Sprint-3 spike on desktop hardware — runbook ready, harness tested,
    workloads deterministic, decision matrix templated.
-3. (Parallel, optional) TS round-trip leg in repo CI (jest env) — closes the
-   last open line of Sprint-1 gate 2.
+3. TS round-trip leg: closed locally 2026-06-11 after jest env sync.
+   Evidence: `pnpm --filter @arc-studio/protocol test` passed (14 suites / 185
+   tests), `pnpm --filter @arc-studio/protocol build` passed, and v1 regression
+   `PYTHONPATH=src uv run pytest tests/protocol tests/web -q` passed (220 tests).

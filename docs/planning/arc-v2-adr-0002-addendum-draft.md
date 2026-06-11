@@ -1,6 +1,6 @@
-# ADR-0002 Addendum (DRAFT) — Spike decision rule revision + G8
+# ADR-0002 Addendum — Spike decision rule revision + G8
 
-Status: **DRAFT — awaiting owner confirmation (backlog item ARC2-13).**
+Status: **CONFIRMED — owner approved as written on 2026-06-11 (ARC2-13).**
 This is an additive addendum; ADR-0002's candidate set, gate structure G1–G7,
 and never-WebView escalation path are unchanged.
 
@@ -46,10 +46,10 @@ Evidence gathered 2026-06-11 (deep-research review §4.1, sources cited there):
 - Spike cost rises by one candidate (gpui-ce); harness reuse keeps the increment
   to the render hooks only.
 
-## Owner decision requested
+## Owner decision
 
-- [ ] Confirm addendum as written
+- [x] Confirm addendum as written
 - [ ] Confirm with changes: ____________________
 - [ ] Reject (spike proceeds under original ADR-0002 rule)
 
-Recorded: ____________ (date / venue)
+Recorded: 2026-06-11 / local CLI owner prompt

@@ -168,6 +168,7 @@ Status lines should follow: `Status: <Status Value> | Evidence: <commit/run/test
 | R79.4 | Mobile package supply-chain provenance | Polished Complete | Evidence: local worktree 2026-06-08; `arc mobile provenance` + 4 tests | Notes: `mobile/provenance.py` build_provenance (SBOM + build metadata + digest) + local HMAC sign/verify (deterministic, no external sigstore/cosign infra); `arc mobile provenance [--sign --key-file]` + `mobile:provenance` release gate. Advisory/simulator-preview. |
 | R79.5 | Mobile-package dependency vulnerability scanning | Polished Complete | Evidence: local worktree 2026-06-08; `scripts/mobile-deps-audit.sh` dry-run scanned Flutter `pubspec.lock` via OSV-Scanner (24 deps, no issues) | Notes: `scripts/mobile-deps-audit.sh` (npm/pnpm audit for Expo/RN JS trees + OSV-Scanner for Flutter; best-effort, fails on high/critical) wired as the `mobile:deps-audit` release gate + a CI step in mobile-{flutter,rn,expo}.yml. Self-skips without lockfiles/toolchains. Closes DoD 6,8. |
 | R34.6 / Battle Arena | Provider-Backed Battle Arena | Blocked (no default paid/live calls) |
+| R-ARC-V2-NATIVE | ARC v2 native IDE shell/editor (Rust, native-only) | Blocked | Evidence: `arc-v2-HANDOVER.md`; `docs/planning/arc-v2-sprint-3-spike-runbook.md`; ADR-0002 addendum owner-confirmed 2026-06-11; `reports/sprint3-local-preflight.json`; local TS leg closure 2026-06-11 (`pnpm --filter @arc-studio/protocol test` 185 passed, protocol build passed, v1 protocol/web 220 passed) | Notes: Sprint-3 framework decision remains blocked until candidate spike reports and matrix exist. Local preflight resolved Rust/Metal toolchain, pins, workload digests, and dependency buildability; this macOS-only, unpinned machine cannot produce full G5/G6 Linux/Windows evidence or a selection. No Electron/WebView/Tauri fallback. |
 | R-AUDIT26 | IDE McpWorkbench risk-badge color + aria-label (a11y) | Polished Complete | Evidence: local worktree 2026-06-08; `pnpm --filter arc-extension build` (tsc) clean + full suite 937 passed/3 skipped incl. new `mcp-risk.test.ts` (5) | Notes: extracted `RISK_VARIANT` to pure `tabs/mcp-risk.ts` with distinct per-level variants (low/medium/high/critical → green/amber/orange/red; critical bold) + CSS for each (previously all emitted non-existent classes → identical render); badge gains `aria-label="risk level {score}"`. Closes WCAG 1.4.1 / DoD gate 2. Source: SLICE 10 (P0). |
 | R-AUDIT27 | IDE status rail (mode/trust/model/daemon) | Polished Complete | Evidence: local worktree 2026-06-08; arc-extension build clean + suite 940 passed/3 skipped (+ arc-status-rail.contract.test) | Notes: enhanced the existing ArcStatusBarContribution to a 5-slot rail (daemon · mode · trust · runtime · profile) derived from a single getConfigStatus poll; degrades to unknown/offline when the daemon is unreachable (producer-truth); ARIA accessibilityInformation on every entry. Closes DoD 1,2,3. Source: SLICE 13 (P1). |
 | R-AUDIT28 | Remove orphaned IDE dead code | Polished Complete | Evidence: local worktree 2026-06-08; `pnpm --filter arc-extension build` clean + suite 937 passed/3 skipped | Notes: removed the dead duplicate `browser/arena/arena-frontend-module.ts` (an unloaded `ContainerModule`; nothing imports it and `package.json` doesn't register it — its bindings are duplicated in `arc-extension-frontend-module.ts:53-58`). **Correction (verify-first):** `arc-run-timeline-widget.tsx` is NOT dead — it is bound via factory + `ArcRunsContribution` + locked by a ui-components contract test; kept. Closes DoD 8. Source: SLICE 15 (P1). |
@@ -1900,3 +1901,50 @@ detail and dedupe notes: `docs/research-findings/competitive-feature-backlog-202
 in `docs/handover/mockups/` (14 files) and mapped to their features/surfaces in the backlog doc.
 Approval applies to the design references only; the corresponding implementations remain at the
 status listed in their rows.
+
+---
+
+## ARC v2 Native IDE Backlog Intake (R-ARC-V2-NATIVE)
+
+Source: `arc-v2-HANDOVER.md` from the arena workspace plus additive planning artifacts under
+`docs/planning/`. This is the native-only Rust shell/editor effort that talks to the existing
+Python daemon as producer of truth. The v1 Theia/Electron IDE stays shippable and must not be
+modified by this track.
+
+| ID | Title | Status |
+|---|---|---|
+| R-ARC-V2-NATIVE | ARC v2 native IDE shell/editor (Rust, native-only) | Blocked |
+
+**Current state:** Sprint 1 protocol bridge and Sprint 2 framework-free shell model exist on
+`arc-v2/sprint-1-protocol-bridge`; TS protocol round-trip leg was closed locally on 2026-06-11
+with `pnpm --filter @arc-studio/protocol test` (14 suites / 185 tests),
+`pnpm --filter @arc-studio/protocol build`, and
+`PYTHONPATH=src uv run pytest tests/protocol tests/web -q` (220 passed). The ADR-0002
+addendum is owner-confirmed as written. Local preflight evidence is in
+`reports/sprint3-local-preflight.json`: Rust 1.96 installed, Xcode Metal Toolchain installed,
+candidate pins resolved, deterministic workload digests generated, main/spike Rust baseline gates
+passed, and candidate dependency build checks passed. This local machine is unpinned and macOS-only,
+so it cannot produce final pass/fail claims or complete Linux/Windows G5/G6 evidence.
+
+**Backlog / gates before selection:**
+- Owner must confirm, amend, or reject `docs/planning/arc-v2-adr-0002-addendum-draft.md` before any framework decision.
+- Sprint-3 must run on desktop hardware with display server and GPU using `docs/planning/arc-v2-sprint-3-spike-runbook.md`.
+- Candidate reports must be generated by `spike-harness` only: `reports/spike-<candidate>.json` for gpui, gpui-ce, floem, and bespoke.
+- Decision matrix values must come only from committed spike reports: `docs/planning/arc-v2-sprint-3-decision-matrix.md`.
+- `rust/arc-ui` remains the only crate allowed to import a UI framework; main `rust/Cargo.lock` stays framework-free.
+- If every candidate fails, stop and escalate to owner. Do not silently fall back to Electron, WebView, Tauri, or continued Theia.
+
+**Resume prompt:**
+
+```text
+Continue ARC v2 native IDE Sprint-3. First read arc-v2-HANDOVER.md, AGENTS.md,
+docs/planning/arc-v2-adr-0002-addendum-draft.md,
+docs/planning/arc-v2-sprint-3-spike-runbook.md, and
+docs/planning/arc-v2-sprint-3-decision-matrix.md. Do not select a framework until
+the owner records the ADR-0002 addendum verdict. If approved, run the framework
+spike on desktop hardware with display/GPU, pin gpui/gpui-ce/floem/bespoke
+candidates, generate raw reports/spike-<candidate>.json via spike-harness, fill
+the decision matrix only from those reports, preserve the arc-ui facade boundary,
+keep framework deps out of main rust/Cargo.lock, and stop for owner/Arena handback
+after reports and matrix exist. Keep v1 protocol/web green.
+```

@@ -4,9 +4,9 @@ Date prepared: 2026-06-11 · Prepared on: sandbox (no display) · Executes on:
 **desktop hardware with display server + GPU** (this runbook's whole purpose is
 that the desktop session is fill-in-the-numbers, not engineering).
 
-Preconditions (both currently OPEN):
+Preconditions:
 1. Owner confirms the ADR-0002 addendum (`arc-v2-adr-0002-addendum-draft.md`) — revised
-   decision rule + G8 (ARC2-13).
+   decision rule + G8 (ARC2-13). **DONE 2026-06-11, confirmed as written.**
 2. A spike machine matching `arc-v2-benchmark-plan.md §Environment`, or an explicit
    owner note that spike numbers are indicative-only until re-run on pinned hardware.
 
@@ -23,6 +23,24 @@ Preconditions (both currently OPEN):
 
 The spikes workspace is **separate** (`rust/spikes/Cargo.toml`): framework deps can
 never leak into the main `Cargo.lock` (Sprint-1 gate stays true by construction).
+
+## Local preflight 2026-06-11
+
+Owner confirmed the ADR-0002 addendum as written. Local macOS preflight ran on an
+unpinned MacBook Air (Apple M4, 60 Hz built-in display); results are indicative-only.
+Evidence lives in `reports/sprint3-local-preflight.json`.
+
+Preflight completed:
+- Rust 1.96 installed via Homebrew.
+- Xcode Metal Toolchain installed via `xcodebuild -downloadComponent MetalToolchain` after gpui initially failed without `metal`.
+- Candidate pins resolved: gpui 0.2.2, gpui-ce rev `c237d57d1caed1bb6c6651ddc3ce9cafa86161b6`, floem 0.2.0, bespoke deps winit 0.31.0-beta.2 / vello 0.9.0 / parley 0.10.0 / accesskit_winit 0.33.0 / optional masonry 0.4.0.
+- Deterministic workloads generated under `/var/folders/dp/1fh07k_922j5qk7xfncn1zv40000gn/T/opencode/arc-v2-spike/workloads`; digest values are recorded in the preflight report.
+- Main Rust tests, main clippy, spike-harness tests, spike-harness clippy, and facade gate passed.
+- Temp dependency build checks passed for gpui, gpui-ce, floem, and bespoke deps. No framework deps entered main `rust/Cargo.lock`.
+
+Still blocked:
+- No `reports/spike-<candidate>.json` exist yet because the five render hooks have not been implemented per candidate.
+- Full G5/G6 evidence requires Linux and Windows screen-reader/IME sessions in addition to macOS; this macOS-only preflight cannot complete those gates.
 
 ## 1. Candidate pins (resolve exact versions on spike day — pin THEN build)
 
