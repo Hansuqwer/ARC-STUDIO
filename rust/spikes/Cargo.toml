@@ -6,9 +6,17 @@
 [workspace]
 resolver = "2"
 members = ["spike-harness"]
+exclude = [
+  "gpui-editor",
+  "gpui-ce-editor",
+  "floem-editor",
+  "bespoke-editor",
+]
 # Candidate spike crates are NOT default members: they only build on desktop
-# hardware with a display server. Uncomment per-machine during the spike:
+# hardware with a display server. Move one crate from `exclude` to `members`
+# per machine during the spike:
 #   "gpui-editor",
+#   "gpui-ce-editor",
 #   "floem-editor",
 #   "bespoke-editor",
 

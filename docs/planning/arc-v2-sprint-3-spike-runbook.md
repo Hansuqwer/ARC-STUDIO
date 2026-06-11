@@ -17,6 +17,7 @@ Preconditions:
 | Measurement harness: percentiles (nearest-rank, Sprint-1-consistent), vsync-aware frames conversion | `rust/spikes/spike-harness/src/percentile.rs` | 5 tests green |
 | Gate table G1–G8 with encoded pass bars; evidence gates can NEVER auto-pass; missing measurements = NotRun (not Pass) | `src/gates.rs` | 5 tests green |
 | SpikeReport JSON (machine identity embedded; honesty note auto-attached on unpinned machines; verdict blocks on Fail/Pending/NotRun) | `src/report.rs` | 3 tests green |
+| FrameScript event-loop inversion: one `Action` per present callback; G1/G2/G3/G4 sample semantics centralized; chunked G3 arrival records finding F9 | `src/script.rs` + `src/runner.rs` | simulated loop tests green |
 | Deterministic workloads (seeded LCG, digest-verified): source-like 10/100 MB, pathological single-line, 5k-line diff, 2000-key stream | `src/workloads.rs` + `gen-workloads` bin | 4 tests green; 10 MB digest `12ffe06c82255722` reproduced |
 | G3 headless baseline (decode+project half, for time attribution) | `g3-headless-baseline` bin → `reports/g3-headless-baseline.json` | run: 100-row replay p50 122 µs — rendering budget is effectively the whole 250 ms |
 | Shell model as executable spec (palette/focus/status-rail behaviors) | `rust/arc-shell` tests | 37 tests green since Sprint 2 |
@@ -51,16 +52,23 @@ Still blocked:
 | floem | crates.io | active (repo updated Feb 2026); pre-1.0, expect breaking changes |
 | bespoke | winit + vello + parley + accesskit_winit (+ optionally masonry as widget layer) | Linebender Q1-2026: Masonry has IME via ui-events; CuTTY (alacritty fork on Vello/Parley) is the text-surface existence proof |
 
-Per candidate, create `rust/spikes/<name>-editor/`, add to `spikes/Cargo.toml`
-members (uncomment), and implement the **same five hooks** against spike-harness:
+Per candidate, move one `rust/spikes/<name>-editor/` crate from `exclude` to
+`members` in `spikes/Cargo.toml`, implement one window/event loop against
+`FrameScript`, run it, then move it back before starting the next candidate:
 
 ```text
-open_workload(path) -> first_paint_ms          (G1: 100 MB + pathological)
-scroll_diff(patch) -> frame_times              (G2: 5k-line diff)
-replay_rows(100 fixture rows) -> total+frames  (G3: tool-use-streaming scenario)
-type_stream(2000 keys) -> keypress->present    (G4: on_next_present callback)
-render_bidi_ligature_sample() -> screenshot    (G7: golden compare)
+Action::OpenWorkload(path,label) -> swap text view, next present closes G1 sample
+Action::LoadDiff(path)           -> swap diff view, warmup/settle only
+Action::ScrollStep               -> scroll once; G2 samples present-to-present
+Action::AppendRows{from,count}   -> append only that chunk; G3 samples issue-to-present
+Action::TypeChar{ch}             -> insert one synthetic key; G4 samples issue-to-present
+Action::TakeScreenshot{out}      -> render bidi/ligature sample, write screenshot
 ```
+
+Finding F9: the old one-row-per-frame G3 rule and the 250 ms total budget were
+mutually unsatisfiable at vsync. The script uses chunked arrival (`g3_chunk=10`)
+to model SSE bursts while preventing all-rows batching; the 33 ms worst-frame
+bar still guards per-frame rendering cost.
 
 ## 2. Run order per candidate (one sitting, one report file)
 

@@ -9,8 +9,12 @@
 pub mod gates;
 pub mod percentile;
 pub mod report;
+pub mod runner;
+pub mod script;
 pub mod workloads;
 
 pub use gates::{Gate, GateOutcome, GateRow, PassBar};
 pub use percentile::Percentiles;
-pub use report::SpikeReport;
+pub use report::{MachineIdentity, SpikeReport};
+pub use runner::{assemble_report, RunConfig};
+pub use script::{Action, FrameScript, ScriptPlan, ScriptResults};

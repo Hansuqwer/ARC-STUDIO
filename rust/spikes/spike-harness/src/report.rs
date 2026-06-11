@@ -2,7 +2,14 @@
 //! Machine identity is embedded in the report itself (review §10.6), not in a
 //! side document that can drift.
 
-use crate::gates::{GateOutcome, GateRow};
+use crate::gates::{Gate, GateOutcome, GateRow};
+
+fn is_evidence_gate(gate: Gate) -> bool {
+    matches!(
+        gate,
+        Gate::G5Accessibility | Gate::G6Ime | Gate::G7BidiLigatures | Gate::G8Sustainability
+    )
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MachineIdentity {
@@ -52,7 +59,22 @@ impl SpikeReport {
         let mut blockers = Vec::new();
         for row in &self.rows {
             match &row.outcome {
-                GateOutcome::Pass => {}
+                GateOutcome::Pass => {
+                    if is_evidence_gate(row.gate)
+                        && row
+                            .raw_data_path
+                            .as_deref()
+                            .unwrap_or_default()
+                            .trim()
+                            .is_empty()
+                        && row.notes.trim().is_empty()
+                    {
+                        blockers.push(format!(
+                            "{:?}: evidence pass missing artifact path",
+                            row.gate
+                        ));
+                    }
+                }
                 GateOutcome::Fail { reason } => {
                     blockers.push(format!("{:?}: FAIL — {reason}", row.gate))
                 }
@@ -141,5 +163,17 @@ mod tests {
         let json = serde_json::to_string(&r).unwrap();
         let back: SpikeReport = serde_json::from_str(&json).unwrap();
         assert_eq!(back.candidate, "gpui-ce");
+    }
+
+    #[test]
+    fn evidence_pass_requires_artifact_path() {
+        let mut r = SpikeReport::new("floem", "0.2.0", "2026-06-11", machine());
+        let mut row =
+            GateRow::evaluate(Gate::G7BidiLigatures, "floem", 60.0, None, None, None, None);
+        row.outcome = GateOutcome::Pass;
+        r.rows.push(row);
+
+        let blockers = r.spike_verdict().unwrap_err();
+        assert!(blockers[0].contains("missing artifact path"));
     }
 }
