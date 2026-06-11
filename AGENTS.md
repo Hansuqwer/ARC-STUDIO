@@ -14,6 +14,8 @@ There is exactly **one** of each. Do not create competing or replacement copies.
 
 Both `docs/roadmap.md` and `docs/phases.md` are CI-protected (`scripts/release_check.sh`). Update them **in place**. Never add a new roadmap/phase/status markdown — everything else is archived under `docs/archive/`.
 
+> **Additive exception (owner-approved, 2026-06-11, resolves arc-v2 conflict C1):** `docs/planning/` holds ARC Studio **v2 planning and evidence artifacts only** (ADRs, sprint plans, execution reports). These are *not* roadmap/phase/status documents and never compete with the two canonical files above; v1 status continues to live exclusively in `docs/roadmap.md` and `docs/phases.md`.
+
 ## Working discipline
 
 1. **Finish 1 → 100% before broadening.** Complete the active phase end to end — with tests and evidence — before starting any new phase, feature, or roadmap item. No new top-level scope while the active phase is incomplete.

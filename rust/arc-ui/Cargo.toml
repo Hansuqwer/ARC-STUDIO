@@ -1,0 +1,21 @@
+[package]
+name = "arc-ui"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "ARC v2 UI facade — the ONLY crate allowed to depend on a UI framework (improvement #1)"
+
+[features]
+# No default framework: Sprint 3's spike (gates G1-G8) selects one. Until then
+# the kit module is intentionally empty and arc-shell builds headless-only.
+default = []
+# Enabled exclusively by the Sprint-3 spike crates on desktop hardware:
+# framework-gpui  = ["dep:gpui"]
+# framework-floem = ["dep:floem"]
+
+[dependencies]
+nucleo-matcher = "0.3.1"
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

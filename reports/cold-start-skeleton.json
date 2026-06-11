@@ -1,0 +1,9 @@
+{
+  "generated": "2026-06-11",
+  "binary": "arc-shell --smoke-exit (Sprint-2 HEADLESS skeleton: model + single daemon health probe; NO window, NO renderer)",
+  "honesty_note": "This is NOT a UI cold-start number. It bounds only process+model+probe overhead. Real cold-start gates (B1) are measured after the Sprint-3 framework decision on pinned hardware.",
+  "environment": { "os": "linux", "arch": "x86_64", "machine": "sandboxed CI-class container - NOT the pinned benchmark machine" },
+  "daemon": "live, healthy, loopback :7777",
+  "method": "20 sequential runs, wall-clock via date +%s%N",
+  "mean_ms": 3, "min_ms": 3, "max_ms": 4, "n": 20
+}
