@@ -1,10 +1,26 @@
 # HITL Decision API — daemon-side additive proposal (F3 / owner question Q9)
 
-Status: **PROPOSAL — owner authorization required before any daemon code.**
-Finding F3 (Sprint-1, repo-verified): `hitl_required` exists only as an SSE
-push notification; there is no decision endpoint. The native HITL modal
+Status: **AUTHORIZED & IMPLEMENTED** (2026-06-11). Owner directive "execute all
+phases you're able to" recorded as authorization per checkpoint-#1 precedent.
+Delete-only rollback: remove the two routes from `web/routes.py` and this doc.
+
+Implementation notes:
+- Discovery: `HitlSqliteStore` already existed with complete HITL machinery
+  (single-use tokens, `HitlDecided` bus event, audit-signable `HitlResponse`).
+  The endpoint is a thin additive HTTP face over existing persistence.
+- Decision vocabulary follows the daemon's enum: `approve | reject | modify | skip`.
+  The sketch's invented `always_require` is dropped (producer-truth applies to
+  vocabularies too); the shell's `AlwaysRequireApproval` maps to `reject` + notes
+  (documented in `rust/arc-dock/src/hitl.rs`).
+- Routes: `GET /api/hitl` (pending queue) + `POST /api/hitl/{hitl_id}/decision`.
+- Evidence: 10 route tests (230 total web+protocol suite), live e2e verified,
+  Rust client `hitl_list()` / `hitl_decide()` in `arc-daemon-client::hitl`.
+
+Finding F3 (Sprint-1, repo-verified): `hitl_required` existed only as an SSE
+push notification; there was no decision endpoint. The native HITL modal
 (`rust/arc-dock/src/hitl.rs`, view-model complete and tested) emits a
-`HitlDecision` and needs somewhere to POST it. Sprint 8 is blocked on this.
+`HitlDecision` and needed somewhere to POST it. Sprint 8 was blocked on this.
+**Now unblocked.**
 
 Constraints honored: additive only (new route, new schema, no renames);
 deterministic security (the daemon validates and decides; no LLM anywhere);

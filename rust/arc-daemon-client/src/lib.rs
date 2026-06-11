@@ -10,6 +10,7 @@
 //! heartbeat reset; structured errors; ordered-stream consumers resume from
 //! `sequence` (gap => Degraded/Stale surface state upstream, never silence).
 
+pub mod hitl;
 pub mod replay;
 pub mod sse;
 pub mod streams;
@@ -35,6 +36,8 @@ pub enum ClientError {
     Cancelled,
     #[error("invalid base url")]
     BadUrl,
+    #[error("http {status}: {body}")]
+    Http { status: u16, body: String },
 }
 
 pub struct DaemonClient {

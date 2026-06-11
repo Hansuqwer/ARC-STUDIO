@@ -56,11 +56,38 @@ impl HitlPrompt {
 }
 
 /// The verdicts a user can submit. Mirrors wireframe §6.5 buttons.
+///
+/// ## Verdict vocabulary mapping (daemon integration, Sprint-8)
+///
+/// The daemon's decision enum is `approve | reject | modify | skip`
+/// (producer-truth: the shell uses the daemon's vocabulary, never invents
+/// new verbs). Mapping:
+///
+/// | Shell `Verdict`          | Daemon `decision` | Notes                                      |
+/// |--------------------------|-------------------|--------------------------------------------|
+/// | `ApproveOnce`            | `"approve"`       |                                            |
+/// | `Deny`                   | `"reject"`        |                                            |
+/// | `AlwaysRequireApproval`  | `"reject"`        | + `notes: "policy: always require approval"` |
+///
+/// `AlwaysRequireApproval` has no daemon-side policy verb yet; it maps to
+/// `reject` with an explanatory note. If a `always_require` verb lands
+/// daemon-side later, this mapping updates — the shell UI is unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Verdict {
     ApproveOnce,
     Deny,
     AlwaysRequireApproval,
+}
+
+impl Verdict {
+    /// Convert to the daemon's decision string + optional notes.
+    pub fn to_daemon_request(self) -> (&'static str, Option<&'static str>) {
+        match self {
+            Verdict::ApproveOnce => ("approve", None),
+            Verdict::Deny => ("reject", None),
+            Verdict::AlwaysRequireApproval => ("reject", Some("policy: always require approval")),
+        }
+    }
 }
 
 /// The ONLY artifact this surface produces: a decision to send to the daemon.
