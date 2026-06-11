@@ -114,6 +114,23 @@ def run_server(host: str = "127.0.0.1", port: int = 7777, workspace: Path | None
         await runner.setup()
         site = web.TCPSite(runner, host, port)
         await site.start()
+
+        # --- ADDITIVE (arc-v2 Sprint 1, ADR-0004): optional UDS listener.   ---
+        # Default OFF; enabled only via ARC_ENABLE_UDS=1. HTTP+SSE on loopback
+        # stays canonical and untouched. Rollback = delete this block.
+        if os.environ.get("ARC_ENABLE_UDS") == "1":
+            runtime_dir = Path(
+                os.environ.get("ARC_RUNTIME_DIR", str(Path.home() / ".arc"))
+            )
+            runtime_dir.mkdir(parents=True, exist_ok=True)
+            sock_path = runtime_dir / "arc-daemon.sock"
+            sock_path.unlink(missing_ok=True)
+            uds_site = web.UnixSite(runner, path=str(sock_path))
+            await uds_site.start()
+            os.chmod(sock_path, 0o600)  # owner-only; permission test in Sprint 12
+            log.info("ARC daemon UDS listener at %s (mode 0600)", sock_path)
+        # --- end additive UDS block ---
+
         log.info("ARC daemon listening on http://%s:%d", host, port)
         print(f"  ARC daemon running at http://{host}:{port}")
         print(f"  Workspace: {workspace or Path.cwd()}")
