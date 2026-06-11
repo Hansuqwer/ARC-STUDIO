@@ -26,12 +26,36 @@ Pinned benchmark machine: yes / no (if no: matrix is indicative-only, no selecti
 | G7 bidi+ligature golden | | | | |
 | G8 cadence / bus factor / breakage rate / vendoring cost | | | | |
 
+## Facade cost scores (criterion #1 — fill from shell_port.rs + tokei, per candidate)
+
+Protocol: `docs/planning/arc-v2-facade-cost-protocol.md`
+Port target: Sprint-2 ShellModel surface (palette overlay, focus ring, status rail, theme hook).
+File: `rust/spikes/<candidate>-editor/src/shell_port.rs` (one file, tokei-counted).
+
+| Sub-score (max 5 each) | gpui | gpui-ce | floem | bespoke |
+|---|---|---|---|---|
+| F-LOC (tokei Rust LOC of shell_port.rs; 5=<300) | | | | |
+| F-CONCEPT (shared-model edits forced; 5=0) | | | | |
+| F-EVENT (input routing fit; 5=direct) | | | | |
+| F-SWAP (days to re-port to runner-up; 5=≤3d) | | | | |
+| **Facade total (max 20)** | | | | |
+
+Ties on total broken by F-CONCEPT (facade leaks are costliest long-term).
+
+## G8 sustainability scores (pre-filled — desk research 2026-06-11)
+
+Source: `docs/planning/arc-v2-g8-sustainability-evidence.md`
+
+| | gpui | gpui-ce | floem | bespoke |
+|---|---|---|---|---|
+| G8 total (max 20) | 9 | 8 | **14** | 13 |
+| One-line risk | upstream attention withdrawn | youngest fork, part-time maintainers | healthiest single dependency | healthiest ecosystem, integration is ours |
+
 ## Decision rule (ADR-0002 addendum — owner-confirmed 2026-06-11 at ARC2-13)
 
 Among candidates whose `spike_verdict()` is clean:
-1. **Facade cost** — diff size + concept mismatch of implementing `arc_ui::kit`
-   (estimate by porting the Sprint-2 ShellModel render: palette, focus ring,
-   status rail). Smallest wins.
+1. **Facade cost** — F-LOC + F-CONCEPT + F-EVENT + F-SWAP (max 20). Highest wins.
+   See `arc-v2-facade-cost-protocol.md` for rubric and worked anchors.
 2. **G8 sustainability** — tie-break 1. A candidate with "unbounded" vendoring
    cost cannot win a tie.
 3. **A11y/IME evidence quality** — tie-break 2.
@@ -42,6 +66,14 @@ as widget layer). If bespoke fails → escalate to owner. Never silently select
 WebView/Tauri/Electron.
 
 ## Verdict
+
+### Provisional (after macOS round — unblocks arc_ui::kit feature-flag only)
+
+Selected: _________ · Owner sign-off: _________ · Date: _________
+Labeled: `reversible-pending-Linux`
+Condition: macOS G1–G4 + facade + G5/G6 macOS + G8 complete; Linux/Windows gap recorded.
+
+### Final (after Linux session + Windows-gap owner decision)
 
 Selected: _________ · Owner sign-off: _________ · Date: _________
 Follow-ups (facade feature flag, window-mode arc-shell, G-gate re-runs in CI): _________
