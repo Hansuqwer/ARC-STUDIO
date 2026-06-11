@@ -1,0 +1,6 @@
+A: Standard ASCII baseline — all text should render identically across candidates.
+B: مرحبا بكم في عالم النصوص — هذا مثال للكتابة من اليمين (RTL) و (brackets).
+C: The function getCwd() يُستخدم للعثور على المسار — mixed LTR/RTL.
+D: Ligature test: => != >= -> <- === !== := :: ;; … … …
+E: Combining marks: café naïve über résumé façade coöperate grève côte (7 marks).
+F: PUA fallback probes: U+F0123 &#x1F600; U+00A0 U+200B (PUA chars + zero-width). 

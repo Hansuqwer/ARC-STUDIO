@@ -1,0 +1,99 @@
+name: arc-v2-spike-xcompile
+
+# Owner directive (2026-06-11, docs/planning/arc-v2-sprint-3-os-sequencing.md):
+# macOS spike first; push Linux/Windows as far as possible WITHOUT physical
+# sessions. This workflow is that push: cross-OS COMPILE + clippy + unit tests
+# of the spike candidates against their pinned deps on ubuntu/windows/macos
+# runners. It produces COMPILE EVIDENCE ONLY:
+#   - it cannot produce G1-G4 numbers (headless; no real compositor presents)
+#   - it cannot produce G5/G6 evidence
+#   - a green run here must never be cited as "works on <OS>"
+# Build failures here = candidate platform breakage caught before any
+# physical session is spent on it.
+#
+# Rollback: delete this file. Touches no existing workflow.
+# NOTE: candidate crates are workspace-EXCLUDED; this workflow builds them by
+# manifest path on purpose — the main rust/Cargo.lock stays framework-free.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'rust/spikes/**'
+      - '.github/workflows/arc-v2-spike-xcompile.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  harness:
+    name: harness ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust/spikes
+      - name: Harness tests + clippy (all OSes)
+        working-directory: rust/spikes
+        run: |
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+
+  candidates:
+    name: ${{ matrix.candidate }} on ${{ matrix.os }}
+    needs: harness
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        candidate: [gpui-editor, gpui-ce-editor, floem-editor, bespoke-editor]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust/spikes
+          key: ${{ matrix.candidate }}
+      - name: Linux build deps (X11/Wayland/fontconfig headers)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config cmake \
+            libx11-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev \
+            libfontconfig1-dev libfreetype-dev \
+            libvulkan-dev mesa-vulkan-drivers \
+            libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+            libgtk-3-dev libssl-dev
+      - name: Compile candidate against pinned deps (COMPILE EVIDENCE ONLY)
+        working-directory: rust/spikes
+        shell: bash
+        run: |
+          cargo clippy --manifest-path ${{ matrix.candidate }}/Cargo.toml --all-targets -- -D warnings
+          cargo build --manifest-path ${{ matrix.candidate }}/Cargo.toml --release
+      - name: Honesty banner
+        shell: bash
+        run: |
+          echo "::notice::${{ matrix.candidate }} on ${{ matrix.os }}: COMPILE evidence only."
+          echo "::notice::No G1-G4 numbers, no G5/G6 evidence, no 'works on ${{ runner.os }}' claim may cite this run."
