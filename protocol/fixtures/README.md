@@ -84,3 +84,18 @@ Each fixture must:
 - `docs/SCHEMA_AUDIT_REPORT.md` - Schema consistency audit
 - `docs/adr/ADR-022-deprecation-policy.md` - Schema versioning policy
 - `docs/adr/ADR-018-protocol-package-as-canonical-schema-home.md` - Protocol package structure
+
+## run-event-seq/ (additive, arc-v2)
+
+Ordered, gap-free event sequences for replay/scrubber testing, one scenario per
+directory, files named `NNN-<TYPE>.json` (NNN = zero-padded `sequence`).
+Unlike the per-instance fixtures above, these model a *coherent run*: contiguous
+`sequence`, one `run_id`, lifecycle brackets (RUN_STARTED … RUN_COMPLETED).
+Generated and registry-validated by `scripts/generate-priority-fixtures.py`
+(refuses to overwrite; refuses invalid data). Consumed by
+`rust/arc-daemon-client` replay tests and, from Sprint 7, the Event Stream
+panel's row-for-row parity oracle.
+
+Note: `run-record/`, `workflow/`, and `cockpit/` listed above are aspirational
+(finding F2 in `docs/planning/arc-v2-sprint-1-execution-report.md`) — they do
+not exist yet; tests must enumerate actual directories.

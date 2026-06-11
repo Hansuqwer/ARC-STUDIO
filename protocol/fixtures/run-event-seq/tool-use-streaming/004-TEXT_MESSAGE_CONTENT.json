@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "type": "TEXT_MESSAGE_CONTENT",
+  "timestamp": "2026-05-22T10:20:01.120Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 4,
+  "data": {
+    "message_id": "msg_100",
+    "delta": "Reading the entrypoint "
+  }
+}

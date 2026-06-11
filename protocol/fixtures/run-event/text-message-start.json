@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "type": "TEXT_MESSAGE_START",
+  "timestamp": "2026-05-22T10:16:12.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 212,
+  "data": {
+    "message_id": "msg_045",
+    "role": "assistant"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "type": "TOOL_CALL_ERROR",
+  "timestamp": "2026-05-22T10:16:16.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 216,
+  "data": {
+    "tool_call_id": "call_b7e004",
+    "error": "ENOENT: no such file or directory: src/missing.rs"
+  }
+}

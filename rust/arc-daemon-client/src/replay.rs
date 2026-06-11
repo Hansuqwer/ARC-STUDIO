@@ -57,6 +57,27 @@ mod tests {
     }
 
     #[test]
+    fn ordered_scenario_replays_gap_free_through_panel_path() {
+        // run-event-seq/<scenario>/NNN-<TYPE>.json (additive, brief §5.6):
+        // the replay scrubber's oracle. Ordered streams must be gap-free at
+        // rest; a gap here is fixture corruption, not a Stale surface state.
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../protocol/fixtures/run-event-seq/tool-use-streaming");
+        let mut kinds = Vec::new();
+        let report = replay_dir(&dir, |ev| kinds.push(ev.kind)).unwrap();
+        assert!(report.events >= 18, "scenario unexpectedly short: {}", report.events);
+        assert!(report.gaps.is_empty(), "ordered scenario has gaps: {:?}", report.gaps);
+        // Lifecycle brackets present and ordered.
+        assert_eq!(kinds.first().map(String::as_str), Some("RUN_STARTED"));
+        assert_eq!(kinds.last().map(String::as_str), Some("RUN_COMPLETED"));
+        // Streaming families the scrubber renders specially are present.
+        for needed in ["TOOL_CALL_START", "TOOL_CALL_ARGS", "TEXT_MESSAGE_CONTENT",
+                       "STATE_SNAPSHOT", "SHELL_DENIED", "HITL_PROMPT", "HITL_RESPONSE"] {
+            assert!(kinds.iter().any(|k| k == needed), "scenario missing {needed}");
+        }
+    }
+
+    #[test]
     fn replays_all_fixtures_through_panel_path() {
         let mut kinds = Vec::new();
         let report = replay_dir(&fixtures(), |ev| {

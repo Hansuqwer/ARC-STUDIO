@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "type": "TEXT_MESSAGE_CHUNK",
+  "timestamp": "2026-05-22T10:16:09.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 209,
+  "data": {
+    "delta": "Reading src/",
+    "role": "assistant",
+    "message_id": "msg_045"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": 2,
+  "type": "HITL_PROMPT",
+  "timestamp": "2026-05-22T10:20:05.000Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 14,
+  "data": {
+    "hitl_id": "hitl_seq_001",
+    "step_id": "approval-gate",
+    "prompt_text": "Planner requests shell access to run cargo build. Approve?",
+    "options": [
+      "approve",
+      "reject"
+    ],
+    "timeout_seconds": 120
+  }
+}

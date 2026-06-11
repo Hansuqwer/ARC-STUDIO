@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "type": "TOOL_CALL_ARGS",
+  "timestamp": "2026-05-22T10:20:02.080Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 8,
+  "data": {
+    "tool_call_id": "call_seq01",
+    "delta": "{\"path\": \"src/"
+  }
+}

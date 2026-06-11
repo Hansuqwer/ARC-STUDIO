@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "type": "AGENT_START",
+  "timestamp": "2026-05-22T10:20:00.250Z",
+  "run_id": "01HV7B3S0K9N3W2Q5J4Y8A6C2P",
+  "sequence": 2,
+  "data": {
+    "agent_name": "planner",
+    "instructions": "Read entrypoint, propose patch"
+  }
+}
