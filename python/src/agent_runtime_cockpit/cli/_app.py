@@ -49,6 +49,7 @@ from ._subapps import (
     isolation_app,
     mcp_app,
     memory_app,
+    release_app,
     policy_app,
     profiles_app,
     prompt_app,
@@ -57,6 +58,7 @@ from ._subapps import (
     replay_app,
     runs_app,
     sandbox_app,
+    security_app,
     skills_app,
     storage_app,
     studio_app,
@@ -110,6 +112,8 @@ app.add_typer(audit_app)
 app.add_typer(profiles_app)
 app.add_typer(mcp_app)
 app.add_typer(memory_app)
+app.add_typer(security_app)
+app.add_typer(release_app)
 app.add_typer(task_app)
 app.add_typer(replay_app)
 app.add_typer(battle_app)

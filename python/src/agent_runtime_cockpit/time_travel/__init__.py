@@ -24,6 +24,7 @@ class TimeTravelError(Exception):
 
 
 TIME_TRAVEL_SCHEMA_VERSION = 1
+MAX_SNAPSHOTS = 1000
 
 
 class StepType(str, Enum):
@@ -114,6 +115,12 @@ class TimeTravelSession:
 
     def add_step(self, step: StateSnapshot) -> int:
         self.steps.append(step)
+        if len(self.steps) > MAX_SNAPSHOTS:
+            dropped = len(self.steps) - MAX_SNAPSHOTS
+            self.steps = self.steps[-MAX_SNAPSHOTS:]
+            self.metadata["cap_warning"] = (
+                f"snapshots capped at {MAX_SNAPSHOTS}; dropped {dropped} oldest"
+            )
         self.current_step_index = len(self.steps) - 1
         return self.current_step_index
 
@@ -277,6 +284,7 @@ def compare_paths(session1: TimeTravelSession, session2: TimeTravelSession) -> d
 __all__ = [
     "TimeTravelError",
     "TIME_TRAVEL_SCHEMA_VERSION",
+    "MAX_SNAPSHOTS",
     "StepType",
     "StateSnapshot",
     "Branch",

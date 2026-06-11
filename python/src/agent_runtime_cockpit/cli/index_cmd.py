@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
+from ..protocol.errors import ArcErrorCode
+from ..protocol.event_envelope import err, ok
+from ._helpers import _out
 from ._subapps import index_app
 
 console = Console()
@@ -30,7 +32,7 @@ def index_build(
     stats = idx.build()
 
     if json_output:
-        print(json.dumps({"ok": True, "workspace": str(ws), **stats}))
+        _out(ok({"workspace": str(ws), **stats}), json_output)
     else:
         console.print(
             f"[green]Indexed[/green] {stats['indexed']} files "
@@ -53,16 +55,25 @@ def index_search(
     stats = idx.stats()
 
     if stats["file_count"] == 0:
-        typer.echo("Index is empty. Run `arc index build` first.", err=True)
+        payload = {
+            "query": query,
+            "results": [],
+            "state": "degraded",
+            "reason": "index_empty",
+            "message": "Index is empty. Run `arc index build` first.",
+        }
+        if json_output:
+            _out(ok(payload), json_output)
+            return
+        _out(err(ArcErrorCode.CONTEXT_PROVIDER_ERROR, payload["message"], payload), json_output)
         raise typer.Exit(1)
 
     results = idx.search(query, limit=limit)
 
     if json_output:
-        print(
-            json.dumps(
+        _out(
+            ok(
                 {
-                    "ok": True,
                     "query": query,
                     "results": [
                         {
@@ -74,8 +85,10 @@ def index_search(
                         }
                         for r in results
                     ],
+                    "state": "empty" if not results else "success",
                 }
-            )
+            ),
+            json_output,
         )
         return
 
@@ -106,7 +119,7 @@ def index_stats(
     stats = idx.stats()
 
     if json_output:
-        print(json.dumps({"ok": True, "workspace": str(ws), **stats}))
+        _out(ok({"workspace": str(ws), **stats}), json_output)
         return
 
     console.print(f"Files indexed : {stats['file_count']}")

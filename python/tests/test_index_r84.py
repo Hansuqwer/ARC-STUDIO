@@ -8,7 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from agent_runtime_cockpit.cli._app import app
-from agent_runtime_cockpit.index import CodebaseIndex
+from agent_runtime_cockpit.index import CodebaseIndex, IncrementalUpdateResult, IndexBuildResult
 
 runner = CliRunner()
 
@@ -60,7 +60,7 @@ def test_cli_build_json(workspace, monkeypatch):
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["ok"] is True
-    assert data["indexed"] == 3
+    assert data["data"]["indexed"] == 3
 
 
 def test_cli_search_empty_exits_1(tmp_path, monkeypatch):
@@ -78,7 +78,7 @@ def test_cli_search_json(workspace, monkeypatch):
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["ok"] is True
-    assert isinstance(data["results"], list)
+    assert isinstance(data["data"]["results"], list)
 
 
 def test_cli_stats_json(workspace, monkeypatch):
@@ -87,4 +87,16 @@ def test_cli_stats_json(workspace, monkeypatch):
     result = runner.invoke(app, ["index", "stats", "--json", "--workspace", str(workspace)])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["file_count"] == 3
+    assert data["data"]["file_count"] == 3
+
+
+def test_build_result_schema():
+    result = IndexBuildResult(file_count=0, skipped=0, elapsed_ms=1.0, errors=[], state="empty")
+    assert result.to_dict()["state"] == "empty"
+    assert result.to_dict()["elapsed_ms"] == 1.0
+
+
+def test_incremental_update_result_schema():
+    result = IncrementalUpdateResult(1, 2, 3, 4.0, [])
+    assert result.to_dict()["files_added"] == 1
+    assert result.to_dict()["updated"] == 3

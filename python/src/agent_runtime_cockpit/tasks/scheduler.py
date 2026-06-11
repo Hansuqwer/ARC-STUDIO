@@ -25,6 +25,7 @@ class ScheduleConfig:
     budget_tokens: Optional[int] = None
     budget_cost_usd: Optional[float] = None
     enabled: bool = True
+    task_timeout_seconds: float = 60.0
 
 
 class TaskScheduler:
@@ -227,6 +228,7 @@ class TaskScheduler:
                 "budget_tokens": self._config.budget_tokens,
                 "budget_cost_usd": self._config.budget_cost_usd,
                 "enabled": self._config.enabled,
+                "task_timeout_seconds": self._config.task_timeout_seconds,
             },
             "budget": self.check_budget(),
         }

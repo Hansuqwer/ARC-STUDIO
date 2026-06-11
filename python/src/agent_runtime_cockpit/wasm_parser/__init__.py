@@ -1,6 +1,7 @@
 """ARC WASM Trace Parser — research module (R-PERF9).
 
-Research into WASM-based trace parsing for ~10× large-trace speedup.
+Research into WASM-based trace parsing. WASM is not wired by default; install path
+for local experiments is `pip install wasmtime`.
 
 This module provides:
 - Baseline Python trace parser implementation
@@ -22,6 +23,56 @@ from typing import Any, Iterator
 log = logging.getLogger(__name__)
 
 WASM_PARSER_SCHEMA_VERSION = 1
+
+
+@dataclass
+class WasmParserConfig:
+    enabled: bool = False
+    module_path: str | None = None
+    fallback_to_python: bool = True
+    label: str = "research milestone — WASM not wired by default"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "module_path": self.module_path,
+            "fallback_to_python": self.fallback_to_python,
+            "label": self.label,
+        }
+
+
+@dataclass
+class BenchmarkResult:
+    iterations: int
+    event_count: int
+    python_baseline_time_ms: float
+    wasm_estimate_time_ms: float | None
+    speedup_factor: float | None
+    throughput_events_per_sec: float
+    state: str
+    min_time_ms: float | None = None
+    max_time_ms: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "iterations": self.iterations,
+            "event_count": self.event_count,
+            "python_baseline_time_ms": self.python_baseline_time_ms,
+            "avg_time_ms": self.python_baseline_time_ms,
+            "min_time_ms": self.min_time_ms
+            if self.min_time_ms is not None
+            else self.python_baseline_time_ms,
+            "max_time_ms": self.max_time_ms
+            if self.max_time_ms is not None
+            else self.python_baseline_time_ms,
+            "wasm_estimate_time_ms": self.wasm_estimate_time_ms,
+            "speedup_factor": self.speedup_factor,
+            "throughput_events_per_sec": self.throughput_events_per_sec,
+            "state": self.state,
+        }
+
+    def __getitem__(self, key: str) -> Any:
+        return self.to_dict()[key]
 
 
 @dataclass
@@ -154,7 +205,7 @@ class WasmTraceParser:
 
 def benchmark_parser(
     path: Path, iterations: int = 10, parser: TraceParser | None = None
-) -> dict[str, Any]:
+) -> BenchmarkResult:
     """Benchmark trace parser performance.
 
     Args:
@@ -176,16 +227,19 @@ def benchmark_parser(
     min_time = min(times)
     max_time = max(times)
 
-    return {
-        "iterations": iterations,
-        "event_count": result.event_count,
-        "avg_time_ms": round(avg_time, 3),
-        "min_time_ms": round(min_time, 3),
-        "max_time_ms": round(max_time, 3),
-        "throughput_events_per_sec": round(result.event_count / (avg_time / 1000), 2)
-        if avg_time > 0
-        else 0,
-    }
+    _ = (min_time, max_time)
+    throughput = round(result.event_count / (avg_time / 1000), 2) if avg_time > 0 else 0
+    return BenchmarkResult(
+        iterations=iterations,
+        event_count=result.event_count,
+        python_baseline_time_ms=round(avg_time, 3),
+        wasm_estimate_time_ms=None,
+        speedup_factor=None,
+        throughput_events_per_sec=throughput,
+        state="degraded_optional_wasm_absent",
+        min_time_ms=round(min_time, 3),
+        max_time_ms=round(max_time, 3),
+    )
 
 
 def generate_test_trace(path: Path, event_count: int = 10000) -> None:
@@ -204,8 +258,10 @@ def generate_test_trace(path: Path, event_count: int = 10000) -> None:
 
 __all__ = [
     "WASM_PARSER_SCHEMA_VERSION",
+    "BenchmarkResult",
     "TraceParseResult",
     "TraceParser",
+    "WasmParserConfig",
     "WasmTraceParser",
     "benchmark_parser",
     "generate_test_trace",

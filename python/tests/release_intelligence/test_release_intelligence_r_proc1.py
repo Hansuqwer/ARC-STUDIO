@@ -9,6 +9,7 @@ from agent_runtime_cockpit.release_intelligence import (
     RELEASE_INTELLIGENCE_SCHEMA_VERSION,
     CommitInfo,
     ReleaseIntelligence,
+    ReleaseIntelligenceError,
     generate_release_intelligence,
     load_release_intelligence,
     save_release_intelligence,
@@ -84,6 +85,16 @@ class TestReleaseIntelligence:
         assert data["version"] == "1.0.0"
         assert data["git_branch"] == "main"
 
+    def test_error_class_importable(self) -> None:
+        assert issubclass(ReleaseIntelligenceError, Exception)
+
+    def test_release_intelligence_to_markdown(self) -> None:
+        ri = ReleaseIntelligence(version="1.0.0", git_short="abc12345", git_branch="main")
+        md = ri.to_markdown()
+        assert "# ARC Release Intelligence" in md
+        assert "Version: 1.0.0" in md
+        assert "Commit: `abc12345`" in md
+
 
 class TestGenerateReleaseIntelligence:
     def test_generate_from_current_repo(self) -> None:
@@ -150,3 +161,15 @@ class TestReleaseIntelligenceCLI:
         runner = CliRunner()
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
+
+    def test_release_intelligence_cli_json(self, tmp_path: Path) -> None:
+        from typer.testing import CliRunner
+        from agent_runtime_cockpit.cli._app import app
+
+        result = CliRunner().invoke(
+            app, ["release", "intelligence", "--json", "--workspace", str(tmp_path)]
+        )
+        data = json.loads(result.output)
+        assert result.exit_code == 0
+        assert data["ok"] is True
+        assert "metadata" in data["data"]

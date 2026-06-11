@@ -7,6 +7,7 @@ from pathlib import Path
 
 from agent_runtime_cockpit.migrate import (
     FrameworkType,
+    MigrationError,
     MigrationAnalysis,
     MigrationIssue,
     MigrationStatus,
@@ -296,6 +297,7 @@ class TestMigrateCLI:
                 "--source",
                 str(source),
                 "--json",
+                "--yes",
                 "-w",
                 str(tmp_path),
             ],
@@ -304,6 +306,61 @@ class TestMigrateCLI:
         data = json.loads(result.output)
         assert data["ok"] is True
         assert data["data"]["status"] == "completed"
+
+    def test_migration_error_importable(self) -> None:
+        assert issubclass(MigrationError, Exception)
+
+    def test_migrate_dry_run_does_not_write(self, tmp_path: Path) -> None:
+        source = tmp_path / "source"
+        source.mkdir()
+        (source / "main.py").write_text("from langgraph.graph import StateGraph", encoding="utf-8")
+        output = tmp_path / "output"
+        result = migrate_workspace(source, output, FrameworkType.CREWAI, dry_run=True)
+        assert result.dry_run is True
+        assert result.status == MigrationStatus.COMPLETED
+        assert not output.exists()
+
+    def test_migrate_run_without_yes_denied(self, tmp_path: Path) -> None:
+        from typer.testing import CliRunner
+        from agent_runtime_cockpit.cli._app import app
+
+        source = tmp_path / "source"
+        source.mkdir()
+        (source / "main.py").write_text("from langgraph.graph import StateGraph", encoding="utf-8")
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            [
+                "migrate",
+                "run",
+                "crewai",
+                "--output",
+                str(tmp_path / "output"),
+                "--source",
+                str(source),
+                "--json",
+                "-w",
+                str(tmp_path),
+            ],
+        )
+        data = json.loads(result.output)
+        assert result.exit_code == 1
+        assert data["ok"] is False
+
+    def test_validate_strict_missing_generated_file(self, tmp_path: Path) -> None:
+        source = tmp_path / "source"
+        source.mkdir()
+        (source / "main.py").write_text("x = 1", encoding="utf-8")
+        output = tmp_path / "output"
+        output.mkdir()
+        analysis = MigrationAnalysis(
+            source_framework=FrameworkType.LANGGRAPH,
+            target_framework=FrameworkType.CREWAI,
+            source_files=["main.py"],
+        )
+        report = validate_migration(source, output, analysis, strict=True)
+        assert report["validation_passed"] is False
+        assert report["issues"][0]["type"] == "missing_generated_file"
 
     def test_migrate_validate(self, tmp_path: Path) -> None:
         from typer.testing import CliRunner

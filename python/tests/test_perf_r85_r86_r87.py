@@ -66,3 +66,31 @@ def test_tcp_connector_in_models_dev():
     src = inspect.getsource(fetch_models_dev_catalog)
     assert "TCPConnector" in src
     assert "limit_per_host" in src
+
+
+def test_mmap_threshold_env_override(tmp_path, monkeypatch):
+    import json
+    from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
+    from agent_runtime_cockpit.orchestration.event_broker import EventBroker
+
+    store = JsonlTraceStore(base_dir=tmp_path)
+    trace_path = tmp_path / "run-mmap.jsonl"
+    trace_path.write_text(json.dumps({"type": "TEST_EVENT"}) + "\n")
+    broker = EventBroker(store)
+
+    monkeypatch.setenv("ARC_MMAP_THRESHOLD", "1")
+    metrics = broker.read_trace_metrics("run-mmap")
+    assert metrics.mmap_used is True
+    assert metrics.line_count == 1
+
+
+def test_mmap_invalid_threshold_degrades_to_default(tmp_path, monkeypatch):
+    import json
+    from agent_runtime_cockpit.storage.jsonl import JsonlTraceStore
+    from agent_runtime_cockpit.orchestration.event_broker import EventBroker, mmap_threshold_bytes
+
+    store = JsonlTraceStore(base_dir=tmp_path)
+    (tmp_path / "run-small.jsonl").write_text(json.dumps({"type": "TEST_EVENT"}) + "\n")
+    monkeypatch.setenv("ARC_MMAP_THRESHOLD", "bad")
+    assert mmap_threshold_bytes() > 1
+    assert EventBroker(store).read_trace_metrics("run-small").mmap_used is False

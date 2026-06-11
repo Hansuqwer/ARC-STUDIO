@@ -11,9 +11,11 @@ Integrates with release_intelligence module for data source.
 from __future__ import annotations
 
 import logging
+import hashlib
 from datetime import datetime, timezone
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from ..release_intelligence import ReleaseIntelligence
 
@@ -21,6 +23,36 @@ log = logging.getLogger(__name__)
 
 RELEASE_SNAPSHOTS_SCHEMA_VERSION = 1
 SNAPSHOT_DIR_NAME = "RELEASE_SNAPSHOTS"
+
+
+class SnapshotError(Exception):
+    """Raised when release snapshot immutability would be violated."""
+
+
+@dataclass(frozen=True)
+class SnapshotInfo:
+    name: str
+    path: str
+    size_bytes: int
+    sha256: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "path": self.path,
+            "size_bytes": self.size_bytes,
+            "sha256": self.sha256,
+        }
+
+
+def _snapshot_info(path: Path) -> SnapshotInfo:
+    content = path.read_bytes()
+    return SnapshotInfo(
+        name=path.name,
+        path=str(path),
+        size_bytes=len(content),
+        sha256=hashlib.sha256(content).hexdigest(),
+    )
 
 
 def generate_snapshot_filename(intelligence: ReleaseIntelligence) -> str:
@@ -111,8 +143,7 @@ def save_snapshot(
     output_path = output_dir / fname
 
     if output_path.exists():
-        log.warning("Snapshot already exists: %s (immutability preserved)", output_path)
-        return output_path
+        raise SnapshotError(f"Snapshot already exists: {output_path}")
 
     content = generate_snapshot_markdown(intelligence)
     output_path.write_text(content, encoding="utf-8")
@@ -120,17 +151,19 @@ def save_snapshot(
     return output_path
 
 
-def list_snapshots(snapshot_dir: Path) -> list[Path]:
+def list_snapshots(snapshot_dir: Path) -> list[SnapshotInfo]:
     """List all snapshot files in the directory, sorted by name (newest first)."""
     if not snapshot_dir.exists():
         return []
-    snapshots = sorted(snapshot_dir.glob("*.md"), reverse=True)
+    snapshots = [_snapshot_info(path) for path in sorted(snapshot_dir.glob("*.md"), reverse=True)]
     return snapshots
 
 
 def get_latest_snapshot(snapshot_dir: Path) -> Optional[Path]:
     """Get the most recent snapshot file."""
-    snapshots = list_snapshots(snapshot_dir)
+    if not snapshot_dir.exists():
+        return None
+    snapshots = sorted(snapshot_dir.glob("*.md"), reverse=True)
     return snapshots[0] if snapshots else None
 
 
@@ -140,7 +173,9 @@ def verify_snapshot_immutability(snapshot_dir: Path) -> dict[str, bool]:
     Returns a dict with verification status for each snapshot.
     """
     results = {}
-    for snapshot in list_snapshots(snapshot_dir):
+    for snapshot in (
+        sorted(snapshot_dir.glob("*.md"), reverse=True) if snapshot_dir.exists() else []
+    ):
         # Check if file is tracked by git and has no uncommitted changes
         try:
             import subprocess
@@ -160,6 +195,8 @@ def verify_snapshot_immutability(snapshot_dir: Path) -> dict[str, bool]:
 
 __all__ = [
     "RELEASE_SNAPSHOTS_SCHEMA_VERSION",
+    "SnapshotError",
+    "SnapshotInfo",
     "SNAPSHOT_DIR_NAME",
     "generate_snapshot_filename",
     "generate_snapshot_markdown",

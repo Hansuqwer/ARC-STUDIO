@@ -56,9 +56,11 @@ from . import (
     prompt,  # noqa: F401
     providers,  # noqa: F401
     receipt,  # noqa: F401
+    release_cmd,  # noqa: F401 — Phase 355/356: release intelligence/snapshots
     review,  # noqa: F401 — Phase 74: trace-aware review
     runs,  # noqa: F401
     sandbox,  # noqa: F401
+    security_cmd,  # noqa: F401 — Phase 350: prompt guard CLI
     studio_workspace,  # noqa: F401
     testbench,  # noqa: F401
     swarmgraph,  # noqa: F401 — Phase 51: arc swarmgraph assess-risk

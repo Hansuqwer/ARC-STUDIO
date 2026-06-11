@@ -9,7 +9,9 @@ from aiohttp.test_utils import TestClient, TestServer
 from agent_runtime_cockpit.providers.agentrouter_proxy import (
     AgentRouterProxyConfig,
     AgentRouterProxyConfigError,
+    POOL_LIMIT_PER_HOST,
     create_agentrouter_proxy_app,
+    get_pool_stats,
     proxy_bind_host,
 )
 
@@ -142,6 +144,19 @@ async def test_request_size_cap_rejects_oversized_body():
 
 def test_proxy_binds_only_to_loopback_by_default():
     assert proxy_bind_host() == "127.0.0.1"
+
+
+@pytest.mark.asyncio
+async def test_pool_stats_schema_and_limit():
+    app = create_agentrouter_proxy_app(AgentRouterProxyConfig(api_key="sk-test-secret"))
+    proxy = await _client(app)
+    try:
+        stats = get_pool_stats(app)
+        assert stats["limit_per_host"] == POOL_LIMIT_PER_HOST == 10
+        assert stats["session_open"] is True
+        assert "active_connections" in stats
+    finally:
+        await proxy.close()
 
 
 def test_env_config_port_and_base_url():

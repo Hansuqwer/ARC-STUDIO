@@ -21,6 +21,10 @@ log = logging.getLogger(__name__)
 MIGRATE_SCHEMA_VERSION = 1
 
 
+class MigrationError(Exception):
+    """Raised for structured migration failures."""
+
+
 class MigrationStatus(str, Enum):
     PENDING = "pending"
     ANALYZING = "analyzing"
@@ -91,6 +95,8 @@ class MigrationResult:
     validation_passed: bool = False
     validation_report: dict[str, Any] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    dry_run: bool = False
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     completed_at: Optional[str] = None
 
@@ -105,6 +111,8 @@ class MigrationResult:
             "validation_passed": self.validation_passed,
             "validation_report": self.validation_report,
             "errors": self.errors,
+            "warnings": self.warnings,
+            "dry_run": self.dry_run,
             "created_at": self.created_at,
             "completed_at": self.completed_at,
         }
@@ -260,7 +268,9 @@ def _apply_migration_templates(content: str, source: FrameworkType, target: Fram
     return migrated
 
 
-def validate_migration(source: Path, output: Path, analysis: MigrationAnalysis) -> dict[str, Any]:
+def validate_migration(
+    source: Path, output: Path, analysis: MigrationAnalysis, *, strict: bool = False
+) -> dict[str, Any]:
     """Validate the migrated code for equivalence."""
     issues = []
     source_files_count = len(analysis.source_files)
@@ -268,25 +278,35 @@ def validate_migration(source: Path, output: Path, analysis: MigrationAnalysis) 
 
     for source_file in analysis.source_files:
         output_path = output / source_file
-        if output_path.exists():
-            generated_files_count += 1
-            try:
-                content = output_path.read_text(encoding="utf-8")
-                ast.parse(content)
-            except SyntaxError as e:
+        if not output_path.exists():
+            if strict:
                 issues.append(
                     {
-                        "type": "syntax_error",
+                        "type": "missing_generated_file",
                         "file": source_file,
-                        "message": str(e),
+                        "message": f"Missing generated file: {source_file}",
                     }
                 )
+            continue
+        generated_files_count += 1
+        try:
+            content = output_path.read_text(encoding="utf-8")
+            ast.parse(content)
+        except SyntaxError as e:
+            issues.append(
+                {
+                    "type": "syntax_error",
+                    "file": source_file,
+                    "message": str(e),
+                }
+            )
 
     return {
         "source_files": source_files_count,
         "generated_files": generated_files_count,
         "parse_errors": len(issues),
         "issues": issues,
+        "strict": strict,
         "validation_passed": len(issues) == 0 and generated_files_count == source_files_count,
     }
 
@@ -296,12 +316,15 @@ def migrate_workspace(
     output: Path,
     target_framework: FrameworkType,
     session_id: str = "default",
+    *,
+    dry_run: bool = False,
 ) -> MigrationResult:
     """Perform a full migration from source to target framework."""
     result = MigrationResult(
         session_id=session_id,
         source_framework=detect_framework(source),
         target_framework=target_framework,
+        dry_run=dry_run,
     )
 
     try:
@@ -309,10 +332,26 @@ def migrate_workspace(
         result.analysis = analyze_migration(source, result.source_framework, target_framework)
 
         result.status = MigrationStatus.GENERATING
-        result.generated_files = generate_migration(source, output, result.analysis)
+        if dry_run:
+            result.warnings.append("dry_run: no files written")
+            result.generated_files = [str(output / f) for f in result.analysis.source_files]
+        else:
+            result.generated_files = generate_migration(source, output, result.analysis)
 
         result.status = MigrationStatus.VALIDATING
-        result.validation_report = validate_migration(source, output, result.analysis)
+        result.validation_report = (
+            {
+                "source_files": len(result.analysis.source_files),
+                "generated_files": len(result.generated_files),
+                "parse_errors": 0,
+                "issues": [],
+                "strict": False,
+                "validation_passed": True,
+                "state": "dry_run",
+            }
+            if dry_run
+            else validate_migration(source, output, result.analysis)
+        )
         result.validation_passed = result.validation_report.get("validation_passed", False)
 
         result.status = MigrationStatus.COMPLETED
@@ -326,6 +365,7 @@ def migrate_workspace(
 
 __all__ = [
     "MIGRATE_SCHEMA_VERSION",
+    "MigrationError",
     "MigrationStatus",
     "FrameworkType",
     "MigrationIssue",

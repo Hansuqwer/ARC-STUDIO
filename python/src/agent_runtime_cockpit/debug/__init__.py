@@ -18,6 +18,8 @@ from enum import Enum
 from typing import Any, Optional
 
 log = logging.getLogger(__name__)
+MAX_VARIABLES = 500
+DEFAULT_CONNECT_TIMEOUT_SECONDS = 10.0
 
 
 class DebugError(Exception):
@@ -71,6 +73,7 @@ class DebugSession:
     host: str = "127.0.0.1"
 
     def to_dict(self) -> dict[str, Any]:
+        variables = self.variables[:MAX_VARIABLES]
         return {
             "session_id": self.session_id,
             "state": self.state.value,
@@ -103,8 +106,11 @@ class DebugSession:
                     "type": v.type,
                     "variables_reference": v.variables_reference,
                 }
-                for v in self.variables
+                for v in variables
             ],
+            "warnings": [f"variables capped at {MAX_VARIABLES}"]
+            if len(self.variables) > MAX_VARIABLES
+            else [],
             "port": self.port,
             "host": self.host,
         }
@@ -182,6 +188,30 @@ class DebugAdapter:
 
         log.info("DAP adapter started on %s:%d", self._host, self._port)
         return self._port
+
+    def connect(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        *,
+        timeout_seconds: float = DEFAULT_CONNECT_TIMEOUT_SECONDS,
+    ) -> dict[str, Any]:
+        """Attempt a bounded loopback DAP connection."""
+        target_host = host or self._host
+        target_port = port if port is not None else self._port
+        try:
+            with socket.create_connection((target_host, target_port), timeout=timeout_seconds):
+                return {"ok": True, "state": "connected", "host": target_host, "port": target_port}
+        except socket.timeout:
+            return {"ok": False, "state": "timeout", "host": target_host, "port": target_port}
+        except OSError as exc:
+            return {
+                "ok": False,
+                "state": "degraded",
+                "host": target_host,
+                "port": target_port,
+                "error": str(exc),
+            }
 
     def stop(self) -> None:
         """Stop the DAP server."""
@@ -380,6 +410,7 @@ class DebugAdapter:
         variables = []
         if self._sessions:
             session = next(iter(self._sessions.values()))
+            capped = session.variables[:MAX_VARIABLES]
             variables = [
                 {
                     "name": v.name,
@@ -387,8 +418,17 @@ class DebugAdapter:
                     "type": v.type,
                     "variablesReference": v.variables_reference,
                 }
-                for v in session.variables
+                for v in capped
             ]
+            if len(session.variables) > MAX_VARIABLES:
+                variables.append(
+                    {
+                        "name": "__arc_warning__",
+                        "value": f"variables capped at {MAX_VARIABLES}",
+                        "type": "warning",
+                        "variablesReference": 0,
+                    }
+                )
 
         return DAPMessage(
             seq=self._next_seq(),
@@ -425,7 +465,9 @@ class DebugAdapter:
 
 __all__ = [
     "DebugError",
+    "DEFAULT_CONNECT_TIMEOUT_SECONDS",
     "DebugState",
+    "MAX_VARIABLES",
     "Breakpoint",
     "Variable",
     "StackFrame",

@@ -6,9 +6,11 @@
 #   bash scripts/check-sbom-integrity.sh              # full check
 #   bash scripts/check-sbom-integrity.sh --json       # JSON output
 #   bash scripts/check-sbom-integrity.sh --sbom-only  # SBOM only (skip pnpm)
+#   bash scripts/check-sbom-integrity.sh --strict     # fail if attestation missing
 #
 # Exit 0 = all checks clean.
 # Exit 1 = vulnerabilities found or integrity check failed.
+# Exit 2 = strict baseline missing or invalid arguments.
 
 set -uo pipefail
 
@@ -17,12 +19,14 @@ cd "$REPO_ROOT"
 
 JSON_MODE=false
 SBOM_ONLY=false
+STRICT=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --json)      JSON_MODE=true; shift ;;
         --sbom-only) SBOM_ONLY=true; shift ;;
-        --help)      echo "Usage: $0 [--json] [--sbom-only]"; exit 0 ;;
+        --strict)    STRICT=true; shift ;;
+        --help)      echo "Usage: $0 [--json] [--sbom-only] [--strict]"; exit 0 ;;
         *)           echo "Unknown arg: $1" >&2; exit 2 ;;
     esac
 done
@@ -69,16 +73,19 @@ if [[ -f "$PNPM_LOCK" ]] && ! $SBOM_ONLY; then
     if [[ -f "$PNPM_HASH_FILE" ]]; then
         PNPM_STORED_HASH=$(cat "$PNPM_HASH_FILE")
         if [[ "$PNPM_CURRENT_HASH" != "$PNPM_STORED_HASH" ]]; then
-            echo "WARN: pnpm-lock.yaml hash changed since last attestation."
+            echo "FAIL: pnpm-lock.yaml hash changed since last attestation."
             echo "  Stored : $PNPM_STORED_HASH"
             echo "  Current: $PNPM_CURRENT_HASH"
             echo "  Run: echo \"\$CURRENT_HASH\" > .pnpm-lock-hash  to update."
             PNPM_OK=false
         fi
     else
-        # First run — record the hash
+        if $STRICT; then
+            echo "WARN: pnpm-lock.yaml hash baseline missing: $PNPM_HASH_FILE"
+            exit 2
+        fi
         echo "$PNPM_CURRENT_HASH" > "$PNPM_HASH_FILE"
-        echo "pnpm-lock.yaml hash recorded: $PNPM_CURRENT_HASH"
+        echo "WARN: pnpm-lock.yaml hash baseline recorded: $PNPM_CURRENT_HASH"
     fi
 fi
 
@@ -95,9 +102,9 @@ print(json.dumps({
 }))
 "
 else
-    echo "Python SBOM : $([[ $SBOM_GENERATED == true ]] && echo "generated → $SBOM_PATH" || echo "skipped (uv not found)")"
+    echo "Python SBOM : $([[ $SBOM_GENERATED == true ]] && echo "PASS generated -> $SBOM_PATH" || echo "WARN skipped (uv not found)")"
     echo "Python vulns: ${VULN_COUNT:-0}"
-    echo "pnpm-lock OK: $PNPM_OK"
+    echo "pnpm-lock OK: $([[ $PNPM_OK == true ]] && echo "PASS" || echo "FAIL")"
 fi
 
 if [[ "${VULN_COUNT:-0}" -gt 0 ]]; then
@@ -110,5 +117,5 @@ if ! $PNPM_OK; then
     exit 1
 fi
 
-echo "OK: SBOM checks passed."
+echo "PASS: SBOM checks passed."
 exit 0

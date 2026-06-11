@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 
 from agent_runtime_cockpit.release_intelligence import CommitInfo, ReleaseIntelligence
 from agent_runtime_cockpit.release_snapshots import (
     RELEASE_SNAPSHOTS_SCHEMA_VERSION,
+    SnapshotError,
     generate_snapshot_filename,
     generate_snapshot_markdown,
     get_latest_snapshot,
@@ -129,12 +131,16 @@ class TestSaveSnapshot:
         path1 = save_snapshot(ri, output_dir)
         content1 = path1.read_text(encoding="utf-8")
 
-        # Try to save again (should not overwrite)
+        # Try to save again (should fail closed and not overwrite)
         ri.version = "2.0.0"
-        path2 = save_snapshot(ri, output_dir)
-        content2 = path2.read_text(encoding="utf-8")
+        try:
+            save_snapshot(ri, output_dir)
+        except SnapshotError:
+            pass
+        else:  # pragma: no cover - explicit failure path
+            raise AssertionError("expected SnapshotError")
+        content2 = path1.read_text(encoding="utf-8")
 
-        assert path1 == path2
         assert content1 == content2
         assert "1.0.0" in content2
         assert "2.0.0" not in content2
@@ -193,3 +199,40 @@ class TestReleaseSnapshotsCLI:
         runner = CliRunner()
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
+
+    def test_release_snapshot_list_json(self, tmp_path: Path) -> None:
+        from typer.testing import CliRunner
+        from agent_runtime_cockpit.cli._app import app
+
+        result = CliRunner().invoke(
+            app, ["release", "snapshot", "list", "--json", "--snapshot-dir", str(tmp_path)]
+        )
+        data = json.loads(result.output)
+        assert result.exit_code == 0
+        assert data["ok"] is True
+        assert data["data"]["state"] == "empty"
+
+    def test_release_snapshot_create_json(self, tmp_path: Path) -> None:
+        from typer.testing import CliRunner
+        from agent_runtime_cockpit.cli._app import app
+
+        out = tmp_path / "snapshots"
+        result = CliRunner().invoke(
+            app,
+            [
+                "release",
+                "snapshot",
+                "create",
+                "--json",
+                "--output-dir",
+                str(out),
+                "--filename",
+                "test.md",
+                "--workspace",
+                str(tmp_path),
+            ],
+        )
+        data = json.loads(result.output)
+        assert result.exit_code == 0
+        assert data["ok"] is True
+        assert (out / "test.md").exists()

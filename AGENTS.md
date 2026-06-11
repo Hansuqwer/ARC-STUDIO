@@ -66,7 +66,7 @@ The DoD elevation track (R-POLISH1–18 / Phases 159–176 + Phases 177–270) i
 for the v0.8-r-ux5 internal release. All 18 phases of the Phases 253–270 elevation sprint
 landed with cited per-gate DoD evidence.
 
-The **v0.9 competitive feature track** (Phases 271–335) is **complete**. Session summary:
+The **v0.9 competitive feature track** (Phases 271–365) is **complete**. Session summary:
 
 - **v0.9 track (R80–R81, Phases 271–315):** Provider key management, doctor providers,
   R83–R90 competitive features (Predict, Index, Context, Continuum, Stream, Git, Diff,
@@ -79,12 +79,15 @@ The **v0.9 competitive feature track** (Phases 271–335) is **complete**. Sessi
   to Polished Complete with full per-gate DoD evidence.
 - **Release gate (Phase 335):** 6438 Python + 990 TS tests, ruff clean, banned-claims
   clean. HEAD: `78899b9e` on `main`.
+- **DoD elevation + hardening (Phases 336–365):** R83-R85, R90, R94-R102,
+  R-SEC2/3, R-PERF6/7/8/9, R-PROC1/2, CLI JSON/confirmation audits, bounded-buffer
+  and timeout sweeps, docs sweep, full release gate, and release snapshot evidence.
+  Evidence: 6511 Python tests passed, scoped mypy clean, ruff clean.
 
 **Terminal-gated (stay Baseline):** R76 (Linux/KVM Firecracker), B2P-17 (Electron
-code-signing), R82 (token estimator accuracy benchmark — real traces required),
-R94–R102 + R-PERF7/9 + R-PROC1/2 (Baseline Complete; DoD elevation pending).
+code-signing), R82 (token estimator accuracy benchmark — real traces required).
 
-See `docs/phases.md` (Phases 159–335) and `docs/roadmap.md` for full evidence records.
+See `docs/phases.md` (Phases 159–365) and `docs/roadmap.md` for full evidence records.
 
 ## Sandbox / microVM truth constraints (still in force)
 

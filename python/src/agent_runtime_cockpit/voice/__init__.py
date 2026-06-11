@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 log = logging.getLogger(__name__)
+DEFAULT_LISTEN_TIMEOUT_SECONDS = 60.0
+MAX_HISTORY = 1000
 
 
 class VoiceError(Exception):
@@ -211,7 +213,18 @@ class VoicePipeline:
         result = self._driver.transcribe(audio_path)
         if result.text:
             self._history.append(result)
+            if len(self._history) > MAX_HISTORY:
+                self._history = self._history[-MAX_HISTORY:]
         return result
+
+    def listen(self, timeout_seconds: float = DEFAULT_LISTEN_TIMEOUT_SECONDS) -> dict[str, Any]:
+        """Return an explicit bounded placeholder listen state."""
+        return {
+            "state": "degraded",
+            "reason": "microphone_loop_not_wired",
+            "timeout_seconds": timeout_seconds,
+            "cancelled": False,
+        }
 
     def transcribe_and_dispatch(self, audio_path: Path) -> dict[str, Any]:
         """Transcribe audio and prepare for pipeline dispatch.
@@ -276,11 +289,13 @@ def create_voice_pipeline(
 
 __all__ = [
     "VoiceError",
+    "DEFAULT_LISTEN_TIMEOUT_SECONDS",
     "VoiceState",
     "TranscriptionResult",
     "VoiceDriver",
     "FakeVoiceDriver",
     "WhisperVoiceDriver",
     "VoicePipeline",
+    "MAX_HISTORY",
     "create_voice_pipeline",
 ]

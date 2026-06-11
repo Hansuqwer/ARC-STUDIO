@@ -21,6 +21,12 @@ from typing import Any, Optional
 log = logging.getLogger(__name__)
 
 RELEASE_INTELLIGENCE_SCHEMA_VERSION = 1
+MAX_COMMITS = 500
+GIT_TIMEOUT_SECONDS = 10
+
+
+class ReleaseIntelligenceError(Exception):
+    """Raised for structured release-intelligence failures."""
 
 
 @dataclass
@@ -95,11 +101,29 @@ class ReleaseIntelligence:
     def to_json(self, indent: int = 2) -> str:
         return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
 
+    def to_markdown(self) -> str:
+        lines = [
+            "# ARC Release Intelligence",
+            "",
+            f"Version: {self.version or 'unknown'}",
+            f"Commit: `{self.git_short or 'unknown'}`",
+            f"Branch: {self.git_branch or 'unknown'}",
+            f"State: {self.metadata.get('state', 'success')}",
+            "",
+            "## Summary",
+            f"- Total commits: {self.total_commits}",
+            f"- Files changed: {self.total_files_changed}",
+            f"- Insertions: {self.total_insertions}",
+            f"- Deletions: {self.total_deletions}",
+        ]
+        return "\n".join(lines)
+
 
 def parse_git_log(
     repo_path: Path, since: Optional[str] = None, max_count: int = 100
 ) -> list[CommitInfo]:
     """Parse git log and return list of CommitInfo objects."""
+    max_count = max(0, min(max_count, MAX_COMMITS))
     cmd = ["git", "log", f"--max-count={max_count}", "--pretty=format:%H|%h|%an|%ae|%ai|%s"]
     if since:
         cmd.append(f"--since={since}")
@@ -111,8 +135,9 @@ def parse_git_log(
             capture_output=True,
             text=True,
             check=True,
+            timeout=GIT_TIMEOUT_SECONDS,
         )
-    except subprocess.CalledProcessError as e:
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
         log.error("Failed to run git log: %s", e)
         return []
 
@@ -148,8 +173,9 @@ def get_commit_stats(repo_path: Path, sha: str) -> tuple[int, int, int]:
             capture_output=True,
             text=True,
             check=True,
+            timeout=GIT_TIMEOUT_SECONDS,
         )
-    except subprocess.CalledProcessError:
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return 0, 0, 0
 
     files_changed = 0
@@ -179,6 +205,7 @@ def generate_release_intelligence(
 ) -> ReleaseIntelligence:
     """Generate release intelligence report from git history."""
     intelligence = ReleaseIntelligence(version=version)
+    max_commits = max(0, min(max_commits, MAX_COMMITS))
 
     # Get current git info
     try:
@@ -188,11 +215,14 @@ def generate_release_intelligence(
             capture_output=True,
             text=True,
             check=True,
+            timeout=GIT_TIMEOUT_SECONDS,
         )
         intelligence.git_commit = result.stdout.strip()
         intelligence.git_short = intelligence.git_commit[:8]
-    except subprocess.CalledProcessError:
-        pass
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        intelligence.metadata.update(
+            {"state": "degraded", "reason": "git_unavailable", "error": str(exc)}
+        )
 
     try:
         result = subprocess.run(
@@ -201,24 +231,30 @@ def generate_release_intelligence(
             capture_output=True,
             text=True,
             check=True,
+            timeout=GIT_TIMEOUT_SECONDS,
         )
         intelligence.git_branch = result.stdout.strip()
-    except subprocess.CalledProcessError:
-        pass
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        intelligence.metadata.setdefault("state", "degraded")
+        intelligence.metadata.setdefault("reason", "git_unavailable")
+        intelligence.metadata.setdefault("error", str(exc))
 
     try:
         result = subprocess.run(
             ["git", "diff", "--quiet"],
             cwd=repo_path,
             capture_output=True,
+            timeout=GIT_TIMEOUT_SECONDS,
         )
         intelligence.git_dirty = result.returncode != 0
-    except subprocess.CalledProcessError:
-        pass
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        intelligence.metadata.setdefault("state", "degraded")
 
     # Parse commits
     commits = parse_git_log(repo_path, since=since, max_count=max_commits)
-    intelligence.commits_since_last_release = commits
+    intelligence.commits_since_last_release = commits[:MAX_COMMITS]
+    if len(commits) > MAX_COMMITS:
+        intelligence.metadata["cap_warning"] = f"commits capped at {MAX_COMMITS}"
     intelligence.total_commits = len(commits)
 
     # Get stats for each commit
@@ -279,8 +315,10 @@ def load_release_intelligence(input_path: Path) -> ReleaseIntelligence:
 
 __all__ = [
     "RELEASE_INTELLIGENCE_SCHEMA_VERSION",
+    "MAX_COMMITS",
     "CommitInfo",
     "ReleaseIntelligence",
+    "ReleaseIntelligenceError",
     "parse_git_log",
     "get_commit_stats",
     "generate_release_intelligence",

@@ -111,6 +111,10 @@ def migrate_run(
     target: str = typer.Argument(..., help="Target framework"),
     output: str = typer.Option(..., "--output", "-o", help="Output directory for migrated code"),
     source: Optional[str] = typer.Option(None, "--source", "-s", help="Source workspace path"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Analyze and preview without writing files"
+    ),
+    yes: bool = typer.Option(False, "--yes", help="Confirm writing migration output"),
     as_json: bool = JSON_FLAG,
     workspace: Optional[str] = WORKSPACE_FLAG,
 ) -> None:
@@ -133,8 +137,21 @@ def migrate_run(
         )
         raise typer.Exit(1)
 
+    if not dry_run and not yes:
+        _out(
+            err(
+                ArcErrorCode.PERMISSION_DENIED,
+                "Migration writes files; pass --yes to confirm or --dry-run to preview.",
+                {"output": str(output_path)},
+            ),
+            as_json,
+        )
+        raise typer.Exit(1)
+
     session_id = str(uuid.uuid4())
-    result = migrate_workspace(source_path, output_path, target_framework, session_id)
+    result = migrate_workspace(
+        source_path, output_path, target_framework, session_id, dry_run=dry_run
+    )
 
     _out(ok(result.to_dict()), as_json)
 
@@ -158,6 +175,7 @@ def migrate_run(
 def migrate_validate(
     output: str = typer.Argument(..., help="Output directory with migrated code"),
     source: Optional[str] = typer.Option(None, "--source", "-s", help="Source workspace path"),
+    strict: bool = typer.Option(False, "--strict", help="Treat missing generated files as errors"),
     as_json: bool = JSON_FLAG,
     workspace: Optional[str] = WORKSPACE_FLAG,
 ) -> None:
@@ -175,7 +193,7 @@ def migrate_validate(
     source_framework = detect_framework(source_path)
     target_framework = detect_framework(output_path)
     analysis = analyze_migration(source_path, source_framework, target_framework)
-    report = validate_migration(source_path, output_path, analysis)
+    report = validate_migration(source_path, output_path, analysis, strict=strict)
 
     _out(ok(report), as_json)
 

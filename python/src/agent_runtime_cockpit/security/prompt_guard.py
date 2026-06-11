@@ -57,6 +57,13 @@ class GuardResult:
     matched_patterns: list[str] = field(default_factory=list)
     is_safe: bool = True
 
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "severity": self.severity,
+            "matched_patterns": list(self.matched_patterns),
+            "is_safe": self.is_safe,
+        }
+
 
 def scan(prompt: str) -> GuardResult:
     """Scan a prompt for injection patterns. Returns a GuardResult."""
@@ -81,6 +88,11 @@ def scan(prompt: str) -> GuardResult:
     return GuardResult(severity="clean", is_safe=True)
 
 
+def scan_batch(prompts: list[str]) -> list[GuardResult]:
+    """Scan prompts in order without model/provider calls."""
+    return [scan(prompt) for prompt in prompts]
+
+
 def highest_severity(results: list[GuardResult]) -> str:
     """Return the highest severity across multiple scan results."""
     if any(r.severity == "blocked" for r in results):
@@ -88,3 +100,11 @@ def highest_severity(results: list[GuardResult]) -> str:
     if any(r.severity == "degraded" for r in results):
         return "degraded"
     return "clean"
+
+
+__all__ = [
+    "GuardResult",
+    "highest_severity",
+    "scan",
+    "scan_batch",
+]

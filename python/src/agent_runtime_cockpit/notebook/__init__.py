@@ -24,6 +24,7 @@ class NotebookError(Exception):
 
 
 ARCNB_SCHEMA_VERSION = 1
+MAX_CELLS = 500
 
 
 class CellType(str, Enum):
@@ -115,6 +116,12 @@ class Notebook:
 
     def add_cell(self, cell: NotebookCell) -> str:
         self.cells.append(cell)
+        if len(self.cells) > MAX_CELLS:
+            dropped = len(self.cells) - MAX_CELLS
+            self.cells = self.cells[-MAX_CELLS:]
+            self.metadata.extra["cap_warning"] = (
+                f"cells capped at {MAX_CELLS}; dropped {dropped} oldest"
+            )
         self.metadata.modified_at = datetime.now(timezone.utc).isoformat()
         return cell.id
 
@@ -348,6 +355,7 @@ def export_notebook(notebook: Notebook, path: Path, format: str = "arcnb") -> No
 __all__ = [
     "NotebookError",
     "ARCNB_SCHEMA_VERSION",
+    "MAX_CELLS",
     "CellType",
     "CellStatus",
     "CellOutput",

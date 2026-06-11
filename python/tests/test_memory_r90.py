@@ -36,7 +36,7 @@ def test_save_json(memory_ws, monkeypatch):
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["ok"] is True
-    assert data["key"] == "mykey"
+    assert data["data"]["key"] == "mykey"
 
 
 def test_list_empty(memory_ws, monkeypatch):
@@ -44,7 +44,8 @@ def test_list_empty(memory_ws, monkeypatch):
     result = runner.invoke(app, ["memory", "list", "--json", "--workspace", str(memory_ws)])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["notes"] == []
+    assert data["data"]["notes"] == []
+    assert data["data"]["state"] == "empty"
 
 
 def test_search_empty(memory_ws, monkeypatch):
@@ -54,10 +55,31 @@ def test_search_empty(memory_ws, monkeypatch):
     )
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["results"] == []
+    assert data["data"]["results"] == []
 
 
 def test_load_missing(memory_ws, monkeypatch):
     monkeypatch.setenv("ARC_MEMORY_DIR", str(memory_ws / ".mem"))
-    result = runner.invoke(app, ["memory", "load", "nonexistent", "--workspace", str(memory_ws)])
+    result = runner.invoke(
+        app, ["memory", "load", "nonexistent", "--json", "--workspace", str(memory_ws)]
+    )
     assert result.exit_code == 1
+    assert json.loads(result.output)["ok"] is False
+
+
+def test_clear_requires_yes(memory_ws, monkeypatch):
+    monkeypatch.setenv("ARC_MEMORY_DIR", str(memory_ws / ".mem"))
+    result = runner.invoke(app, ["memory", "clear", "--json", "--workspace", str(memory_ws)])
+    assert result.exit_code == 1
+    assert json.loads(result.output)["ok"] is False
+
+
+def test_clear_with_yes(memory_ws, monkeypatch):
+    monkeypatch.setenv("ARC_MEMORY_DIR", str(memory_ws / ".mem"))
+    runner.invoke(app, ["memory", "save", "foo", "bar", "--workspace", str(memory_ws)])
+    result = runner.invoke(
+        app, ["memory", "clear", "--json", "--yes", "--workspace", str(memory_ws)]
+    )
+    data = json.loads(result.output)
+    assert result.exit_code == 0
+    assert data["data"]["cleared"] is True

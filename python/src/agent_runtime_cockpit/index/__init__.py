@@ -84,8 +84,14 @@ _LANG_MAP = {
 
 # Max files to index; guard against pathologically large repos
 _MAX_FILES = 100_000
+MAX_INCREMENTAL_BATCH = 1000
+DEFAULT_CHANGE_SCAN_TIMEOUT_S = 5.0
 _PREVIEW_CHARS = 200
 _SYMBOL_RE = re.compile(r"\b(def |class |function |fn |func |pub fn |async fn )(\w+)")
+
+
+class IndexError(Exception):
+    """Raised for structured codebase-index failures."""
 
 
 @dataclass(frozen=True)
@@ -95,6 +101,50 @@ class IndexSearchResult:
     score: float
     symbols_preview: str
     content_preview: str
+
+
+@dataclass(frozen=True)
+class IndexBuildResult:
+    file_count: int
+    skipped: int
+    elapsed_ms: float
+    errors: list[str]
+    state: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "indexed": self.file_count,
+            "file_count": self.file_count,
+            "skipped": self.skipped,
+            "elapsed_s": round(self.elapsed_ms / 1000, 2),
+            "elapsed_ms": self.elapsed_ms,
+            "errors": self.errors,
+            "state": self.state,
+        }
+
+
+@dataclass(frozen=True)
+class IncrementalUpdateResult:
+    files_added: int
+    files_updated: int
+    files_removed: int
+    elapsed_ms: float
+    errors: list[str]
+    state: str = "success"
+
+    def to_dict(self) -> dict[str, object]:
+        updated = self.files_added + self.files_updated
+        return {
+            "updated": updated,
+            "removed": self.files_removed,
+            "elapsed_s": round(self.elapsed_ms / 1000, 3),
+            "files_added": self.files_added,
+            "files_updated": self.files_updated,
+            "files_removed": self.files_removed,
+            "elapsed_ms": self.elapsed_ms,
+            "errors": self.errors,
+            "state": self.state,
+        }
 
 
 def _workspace_hash(workspace: Path) -> str:
@@ -165,6 +215,7 @@ class CodebaseIndex:
         t0 = time.perf_counter()
         indexed = 0
         skipped = 0
+        errors: list[str] = []
 
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("PRAGMA journal_mode = WAL")
@@ -177,6 +228,7 @@ class CodebaseIndex:
                         text = path.read_text(encoding="utf-8", errors="ignore")[:16384]
                     except OSError:
                         skipped += 1
+                        errors.append(str(path.relative_to(self.workspace)))
                         continue
                     symbols = _extract_symbols(text)
                     preview = text[:_PREVIEW_CHARS].replace("\n", " ")
@@ -204,13 +256,20 @@ class CodebaseIndex:
                 except Exception as exc:
                     log.debug("Index skip %s: %s", path, exc)
                     skipped += 1
+                    errors.append(f"{path}: {exc}")
             conn.execute(
                 "INSERT OR REPLACE INTO index_meta (key,value) VALUES (?,?)",
                 ("last_built", str(time.time())),
             )
 
         elapsed = time.perf_counter() - t0
-        return {"indexed": indexed, "skipped": skipped, "elapsed_s": round(elapsed, 2)}
+        return IndexBuildResult(
+            file_count=indexed,
+            skipped=skipped,
+            elapsed_ms=round(elapsed * 1000, 3),
+            errors=errors,
+            state="empty" if indexed == 0 else "success",
+        ).to_dict()
 
     def search(self, query: str, limit: int = 10) -> list[IndexSearchResult]:
         """Top-k keyword/path search using FTS5 + path prefix match."""
@@ -322,7 +381,14 @@ class CodebaseIndex:
             log.debug("Index remove skip %s: %s", path, exc)
             return False
 
-    def get_changed_files(self, since: float | None = None) -> list[Path]:
+    def _indexed_paths(self) -> set[str]:
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute("SELECT path FROM files").fetchall()
+        return {str(row[0]) for row in rows}
+
+    def get_changed_files(
+        self, since: float | None = None, *, timeout_s: float = DEFAULT_CHANGE_SCAN_TIMEOUT_S
+    ) -> list[Path]:
         """Get files that have changed since the given timestamp (or last index build)."""
         if since is None:
             with sqlite3.connect(self.db_path) as conn:
@@ -332,28 +398,47 @@ class CodebaseIndex:
                 since = float(last[0]) if last else 0.0
 
         changed = []
+        started = time.perf_counter()
         exts = frozenset(_LANG_MAP.keys())
         for path in _iter_files(self.workspace, exts):
+            if time.perf_counter() - started > timeout_s:
+                break
             try:
                 stat = path.stat()
                 if stat.st_mtime > since:
                     changed.append(path)
             except OSError:
                 continue
+        indexed_paths = self._indexed_paths()
+        existing_paths = {
+            str(path.relative_to(self.workspace)) for path in _iter_files(self.workspace, exts)
+        }
+        for rel in sorted(indexed_paths - existing_paths):
+            changed.append(self.workspace / rel)
         return changed
 
     def incremental_update(self, extensions: frozenset[str] | None = None) -> dict:
         """Incrementally update only changed files since last build. Returns update stats."""
         exts = extensions or frozenset(_LANG_MAP.keys())
         t0 = time.perf_counter()
+        added = 0
         updated = 0
         removed = 0
+        errors: list[str] = []
 
-        changed_files = self.get_changed_files()
+        before = self._indexed_paths()
+        changed_files = self.get_changed_files()[:MAX_INCREMENTAL_BATCH]
         for path in changed_files:
             if path.exists():
-                if self.update_file(path, exts):
-                    updated += 1
+                try:
+                    rel = str(path.relative_to(self.workspace))
+                    if self.update_file(path, exts):
+                        if rel in before:
+                            updated += 1
+                        else:
+                            added += 1
+                except Exception as exc:
+                    errors.append(f"{path}: {exc}")
             else:
                 if self.remove_file(path):
                     removed += 1
@@ -365,4 +450,24 @@ class CodebaseIndex:
             )
 
         elapsed = time.perf_counter() - t0
-        return {"updated": updated, "removed": removed, "elapsed_s": round(elapsed, 3)}
+        state = "degraded" if len(self.get_changed_files()) > MAX_INCREMENTAL_BATCH else "success"
+        if state == "degraded":
+            errors.append(f"batch capped at {MAX_INCREMENTAL_BATCH} files")
+        return IncrementalUpdateResult(
+            files_added=added,
+            files_updated=updated,
+            files_removed=removed,
+            elapsed_ms=round(elapsed * 1000, 3),
+            errors=errors,
+            state=state,
+        ).to_dict()
+
+
+__all__ = [
+    "CodebaseIndex",
+    "IndexBuildResult",
+    "IndexError",
+    "IndexSearchResult",
+    "IncrementalUpdateResult",
+    "MAX_INCREMENTAL_BATCH",
+]

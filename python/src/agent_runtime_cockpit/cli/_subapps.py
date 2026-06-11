@@ -59,9 +59,23 @@ mcp_workbench_app = typer.Typer(
     help="MCP workbench diagnostics — inspect servers, check local MCP status (Phase 78 / R48)",
 )
 mcp_app.add_typer(mcp_workbench_app)
-memory_app = typer.Typer(
-    name="memory", help="Swarm memory graph research commands (Phase 59 / R26)"
+memory_app = typer.Typer(name="memory", help="Project memory — save, load, search, list, clear")
+security_app = typer.Typer(
+    name="security",
+    help="Security diagnostics — deterministic local checks",
+    no_args_is_help=True,
 )
+release_app = typer.Typer(
+    name="release",
+    help="Release intelligence and immutable snapshots",
+    no_args_is_help=True,
+)
+release_snapshot_app = typer.Typer(
+    name="snapshot",
+    help="Release snapshot create, list, verify",
+    no_args_is_help=True,
+)
+release_app.add_typer(release_snapshot_app)
 task_app = typer.Typer(name="task", help="Async task execution and management (Phase 27 / R20)")
 replay_app = typer.Typer(name="replay", help="Replay capability analysis (Phase 28 / R21)")
 battle_app = typer.Typer(name="battle", help="SwarmGraph battle mode (Phase 34 / R26A)")

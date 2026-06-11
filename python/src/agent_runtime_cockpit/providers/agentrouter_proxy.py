@@ -20,6 +20,7 @@ DEFAULT_PORT = 8787
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_BODY_BYTES = 1_048_576
+POOL_LIMIT_PER_HOST = 10
 
 
 class AgentRouterProxyConfigError(RuntimeError):
@@ -60,6 +61,7 @@ class AgentRouterProxyConfig:
 
 
 AGENTROUTER_CONFIG_KEY = web.AppKey("agentrouter_config", AgentRouterProxyConfig)
+AGENTROUTER_SESSION_KEY = web.AppKey("agentrouter_session", ClientSession)
 
 
 def redacted(text: str, config: AgentRouterProxyConfig) -> str:
@@ -70,10 +72,38 @@ def redacted(text: str, config: AgentRouterProxyConfig) -> str:
 def create_agentrouter_proxy_app(config: AgentRouterProxyConfig) -> web.Application:
     app = web.Application(client_max_size=config.max_body_bytes)
     app[AGENTROUTER_CONFIG_KEY] = config
+    app.on_startup.append(_startup_pool)
+    app.on_cleanup.append(_cleanup_pool)
     app.router.add_get("/v1/models", _models)
     app.router.add_post("/v1/chat/completions", _chat_completions)
     app.router.add_get("/health", _health)
     return app
+
+
+async def _startup_pool(app: web.Application) -> None:
+    from aiohttp import TCPConnector
+
+    config = app[AGENTROUTER_CONFIG_KEY]
+    timeout = ClientTimeout(total=config.timeout_seconds, sock_read=config.timeout_seconds)
+    connector = TCPConnector(limit_per_host=POOL_LIMIT_PER_HOST)
+    app[AGENTROUTER_SESSION_KEY] = ClientSession(timeout=timeout, connector=connector)
+
+
+async def _cleanup_pool(app: web.Application) -> None:
+    session = app.get(AGENTROUTER_SESSION_KEY)
+    if session is not None and not session.closed:
+        await session.close()
+
+
+def get_pool_stats(app: web.Application) -> dict[str, int | bool]:
+    session = app.get(AGENTROUTER_SESSION_KEY)
+    connector = getattr(session, "connector", None) if session is not None else None
+    acquired = len(getattr(connector, "_acquired", set())) if connector is not None else 0
+    return {
+        "limit_per_host": POOL_LIMIT_PER_HOST,
+        "active_connections": acquired,
+        "session_open": bool(session is not None and not session.closed),
+    }
 
 
 async def _health(_request: web.Request) -> web.Response:
@@ -125,24 +155,17 @@ async def _forward(
     }
     if json_body is not None:
         headers["Content-Type"] = "application/json"
-    timeout = ClientTimeout(total=config.timeout_seconds, sock_read=config.timeout_seconds)
     try:
-        # R-PERF8: TCPConnector with limit_per_host=10 for connection pooling.
-        from aiohttp import TCPConnector
-
-        connector = TCPConnector(limit_per_host=10)
-        async with ClientSession(timeout=timeout, connector=connector) as session:
-            async with session.request(method, url, json=json_body, headers=headers) as response:
-                if json_body and json_body.get("stream") is True:
-                    return await _stream_upstream(request, response)
-                data = await response.read()
-                return web.Response(
-                    body=data,
-                    status=response.status,
-                    headers={
-                        "Content-Type": response.headers.get("Content-Type", "application/json")
-                    },
-                )
+        session = request.app[AGENTROUTER_SESSION_KEY]
+        async with session.request(method, url, json=json_body, headers=headers) as response:
+            if json_body and json_body.get("stream") is True:
+                return await _stream_upstream(request, response)
+            data = await response.read()
+            return web.Response(
+                body=data,
+                status=response.status,
+                headers={"Content-Type": response.headers.get("Content-Type", "application/json")},
+            )
     except asyncio.TimeoutError:
         return _error_response(504, "upstream timeout")
     except ClientError as exc:
@@ -174,3 +197,15 @@ def proxy_bind_host() -> str:
 
 def run_agentrouter_proxy(config: AgentRouterProxyConfig) -> None:
     web.run_app(create_agentrouter_proxy_app(config), host=config.host, port=config.port)
+
+
+__all__ = [
+    "AgentRouterProxyConfig",
+    "AgentRouterProxyConfigError",
+    "POOL_LIMIT_PER_HOST",
+    "create_agentrouter_proxy_app",
+    "get_pool_stats",
+    "proxy_bind_host",
+    "redacted",
+    "run_agentrouter_proxy",
+]

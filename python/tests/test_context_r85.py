@@ -30,7 +30,7 @@ def test_suggest_json(indexed_ws, monkeypatch):
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["ok"] is True
-    assert isinstance(data["suggestions"], list)
+    assert isinstance(data["data"]["suggestions"], list)
 
 
 def test_attach_and_list(tmp_path):
@@ -40,8 +40,8 @@ def test_attach_and_list(tmp_path):
     assert result.exit_code == 0
     result2 = runner.invoke(app, ["context", "list", "--json", "--workspace", str(tmp_path)])
     data = json.loads(result2.output)
-    assert "main.py" in data["attached"]
-    assert "utils.py" in data["attached"]
+    assert "main.py" in data["data"]["attached"]
+    assert "utils.py" in data["data"]["attached"]
 
 
 def test_attach_json(tmp_path):
@@ -55,8 +55,17 @@ def test_attach_json(tmp_path):
 
 def test_clear(tmp_path):
     runner.invoke(app, ["context", "attach", "x.py", "--workspace", str(tmp_path)])
+    result = runner.invoke(
+        app, ["context", "clear", "--json", "--yes", "--workspace", str(tmp_path)]
+    )
+    data = json.loads(result.output)
+    assert data["data"]["cleared"] is True
+    result2 = runner.invoke(app, ["context", "list", "--json", "--workspace", str(tmp_path)])
+    assert json.loads(result2.output)["data"]["attached"] == []
+
+
+def test_clear_without_yes_denied(tmp_path):
     result = runner.invoke(app, ["context", "clear", "--json", "--workspace", str(tmp_path)])
     data = json.loads(result.output)
-    assert data["cleared"] is True
-    result2 = runner.invoke(app, ["context", "list", "--json", "--workspace", str(tmp_path)])
-    assert json.loads(result2.output)["attached"] == []
+    assert result.exit_code == 1
+    assert data["ok"] is False

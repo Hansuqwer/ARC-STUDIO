@@ -11,6 +11,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import time
+from dataclasses import dataclass
 from typing import Any, AsyncIterator, Optional
 
 from aiohttp import web
@@ -24,6 +27,32 @@ QUEUE_MAX_SIZE = 1000
 RING_BUFFER_SIZE = 1000
 TERMINAL_EVENT_TYPES = {"RUN_COMPLETED", "RUN_FAILED", "RUN_CANCELLED"}
 DEGRADED_EVENT_TYPE = "STREAM_DEGRADED"
+MMAP_THRESHOLD_BYTES = 10 * 1024 * 1024
+
+
+@dataclass(frozen=True)
+class MmapReadResult:
+    line_count: int
+    elapsed_ms: float
+    mmap_used: bool
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "line_count": self.line_count,
+            "elapsed_ms": self.elapsed_ms,
+            "mmap_used": self.mmap_used,
+        }
+
+
+def mmap_threshold_bytes() -> int:
+    raw = os.environ.get("ARC_MMAP_THRESHOLD")
+    if raw is None:
+        return MMAP_THRESHOLD_BYTES
+    try:
+        value = int(raw)
+    except ValueError:
+        return MMAP_THRESHOLD_BYTES
+    return max(1, value)
 
 
 class RingBuffer:
@@ -182,9 +211,8 @@ class EventBroker:
             return
 
         file_size = trace_path.stat().st_size
-        USE_MMAP_THRESHOLD = 10 * 1024 * 1024  # 10 MB
 
-        if file_size > USE_MMAP_THRESHOLD:
+        if file_size > mmap_threshold_bytes():
             # Memory-mapped read for large files
             with open(trace_path, "rb") as f:
                 with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
@@ -227,6 +255,37 @@ class EventBroker:
                                 yield event
                         continue
                     yield item
+
+    def read_trace_metrics(self, run_id: str) -> MmapReadResult:
+        """Return bounded trace-read metrics for R-PERF6 tests/diagnostics."""
+        trace_path = self.store.trace_path(run_id)
+        if not trace_path.exists():
+            return MmapReadResult(line_count=0, elapsed_ms=0.0, mmap_used=False)
+        started = time.perf_counter()
+        size = trace_path.stat().st_size
+        mmap_used = size > mmap_threshold_bytes()
+        line_count = 0
+        if mmap_used:
+            import mmap
+
+            with open(trace_path, "rb") as f:
+                with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                    pos = 0
+                    while pos < mm.size():
+                        end = mm.find(b"\n", pos)
+                        if end == -1:
+                            end = mm.size()
+                        if mm[pos:end].strip():
+                            line_count += 1
+                        pos = end + 1
+        else:
+            with open(trace_path, encoding="utf-8") as f:
+                line_count = sum(1 for line in f if line.strip())
+        return MmapReadResult(
+            line_count=line_count,
+            elapsed_ms=round((time.perf_counter() - started) * 1000, 3),
+            mmap_used=mmap_used,
+        )
 
     async def sse_handler(self, request: web.Request) -> web.StreamResponse:
         """HTTP handler for SSE event streaming with heartbeat.

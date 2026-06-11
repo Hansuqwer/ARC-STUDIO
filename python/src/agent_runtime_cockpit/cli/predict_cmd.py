@@ -7,13 +7,15 @@ call site pattern matching). No live provider call unless explicitly gated.
 
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 
 import typer
 from rich.console import Console
 
+from ..protocol.errors import ArcErrorCode
+from ..protocol.event_envelope import err, ok
+from ._helpers import _out
 from ._subapps import predict_app
 
 console = Console()
@@ -42,36 +44,45 @@ def predict_next_edit(
     line: int = typer.Option(1, "--line", "-l", help="Cursor line (1-indexed)", min=1),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Predict the next likely edit at a cursor position (R83a stub).
+    """Predict the next likely edit at a cursor position (research-grade stub).
 
     This is a heuristic autocomplete stub. A future version will call a
     local LM (requires ARC_REAL_RUNTIME_SMOKE=1 and a configured provider).
     """
     path = Path(file)
     if not path.exists():
-        typer.echo(f"File not found: {file}", err=True)
+        _out(err(ArcErrorCode.WORKSPACE_NOT_FOUND, f"File not found: {file}"), json_output)
         raise typer.Exit(1)
 
     try:
         text = path.read_text(encoding="utf-8", errors="ignore")
     except OSError as exc:
-        typer.echo(f"Cannot read file: {exc}", err=True)
+        _out(err(ArcErrorCode.INVALID_INPUT, f"Cannot read file: {exc}"), json_output)
         raise typer.Exit(1)
 
-    suggestions = _heuristic_next_edit(text, line - 1)
+    total_lines = len(text.splitlines())
+    state = "success"
+    details: dict[str, object] = {}
+    if total_lines == 0:
+        state = "empty"
+    elif line > total_lines:
+        state = "degraded"
+        details["reason"] = "line_out_of_range"
+        details["line_count"] = total_lines
+        line = total_lines
+
+    suggestions = _heuristic_next_edit(text, max(0, line - 1))
+    payload = {
+        "file": str(path),
+        "line": line,
+        "suggestions": suggestions,
+        "mode": "heuristic-stub",
+        "state": state,
+        **details,
+    }
 
     if json_output:
-        print(
-            json.dumps(
-                {
-                    "ok": True,
-                    "file": str(path),
-                    "line": line,
-                    "suggestions": suggestions,
-                    "mode": "heuristic-stub",
-                }
-            )
-        )
+        _out(ok(payload), json_output)
         return
 
     if not suggestions:

@@ -8,6 +8,9 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from ..protocol.errors import ArcErrorCode
+from ..protocol.event_envelope import err, ok
+from ._helpers import _out
 from ._subapps import context_app
 
 console = Console()
@@ -35,23 +38,40 @@ def context_suggest(
     stats = idx.stats()
 
     if stats["file_count"] == 0:
-        typer.echo("Index empty. Run `arc index build` first.", err=True)
+        payload = {
+            "prompt": prompt,
+            "suggestions": [],
+            "state": "degraded",
+            "reason": "index_empty",
+        }
+        if json_output:
+            _out(ok(payload), json_output)
+            return
+        _out(
+            err(
+                ArcErrorCode.CONTEXT_PROVIDER_ERROR,
+                "Index empty. Run `arc index build` first.",
+                payload,
+            ),
+            json_output,
+        )
         raise typer.Exit(1)
 
     results = idx.search(prompt, limit=limit)
 
     if json_output:
-        print(
-            json.dumps(
+        _out(
+            ok(
                 {
-                    "ok": True,
                     "prompt": prompt,
                     "suggestions": [
                         {"path": r.path, "language": r.language, "relevance": abs(r.score)}
                         for r in results
                     ],
+                    "state": "empty" if not results else "success",
                 }
-            )
+            ),
+            json_output,
         )
         return
 
@@ -90,9 +110,9 @@ def context_attach(
 
     ctx_file.write_text(json.dumps(existing, indent=2))
 
-    msg = {"ok": True, "attached": added, "total": len(existing), "file": str(ctx_file)}
+    msg = {"attached": added, "total": len(existing), "file": str(ctx_file)}
     if json_output:
-        print(json.dumps(msg))
+        _out(ok(msg), json_output)
     else:
         console.print(f"Attached {len(added)} file(s). Total context: {len(existing)}")
 
@@ -114,7 +134,9 @@ def context_list(
             attached = []
 
     if json_output:
-        print(json.dumps({"ok": True, "attached": attached}))
+        _out(
+            ok({"attached": attached, "state": "empty" if not attached else "success"}), json_output
+        )
         return
 
     if not attached:
@@ -127,15 +149,26 @@ def context_list(
 @context_app.command("clear")
 def context_clear(
     workspace: str = typer.Option("", "--workspace", "-w"),
+    yes: bool = typer.Option(False, "--yes", help="Confirm clearing attached context"),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Clear all attached context."""
     ws = Path(workspace).resolve() if workspace else Path.cwd()
     ctx_file = _context_file(ws)
+    if not yes:
+        _out(
+            err(
+                ArcErrorCode.PERMISSION_DENIED,
+                "Clearing attached context requires --yes.",
+                {"workspace": str(ws)},
+            ),
+            json_output,
+        )
+        raise typer.Exit(1)
     if ctx_file.exists():
         ctx_file.unlink()
-    msg = {"ok": True, "cleared": True}
+    msg = {"cleared": True, "state": "empty"}
     if json_output:
-        print(json.dumps(msg))
+        _out(ok(msg), json_output)
     else:
         console.print("[dim]Context cleared.[/dim]")

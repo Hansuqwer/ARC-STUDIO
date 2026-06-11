@@ -8701,3 +8701,383 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 8. Docs: `--help` comprehensive; docs updated; banned claims clean.
 
 **Evidence:** 35 tests pass; ruff clean.
+
+---
+
+## Phase 344 — R102 DoD elevation: ARC Migrate → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: `arc migrate run --dry-run` returns preview state without writes; actual write without `--yes` returns `PERMISSION_DENIED`; `validate --strict` reports missing generated files.
+2. Accessibility: CLI-only; keyboard-accessible with explicit `--help` flags.
+3. Parity: `detect`, `analyze`, `run`, and `validate` use `ok()`/`err()` envelopes.
+4. Tests: `tests/migrate/test_migrate_r102.py` expanded to cover `MigrationError`, dry-run, `--yes`, denied mutation, and strict validation.
+5. Performance: AST/template migration remains local; dry-run avoids file writes.
+6. Security: Mutating migration is confirmation-gated by `--yes`; no provider/network calls.
+7. Reliability: `MigrationError`, strict validation, and structured CLI errors added.
+8. Docs: Roadmap/phases updated; banned-claims gate included in Phase 364.
+
+**Evidence:** Targeted phase set: 151 passed. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean; scoped mypy clean.
+
+---
+
+## Phase 345 — R83 DoD elevation: ARC Predict → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: missing file returns structured error; out-of-range line returns degraded state; empty/success states explicit.
+2. Accessibility: CLI-only; help labels command as a research-grade stub.
+3. Parity: `next-edit --json` uses standard ARC envelope.
+4. Tests: `tests/test_predict_r83.py` covers success, missing-file envelope, degraded line range, stable suggestions.
+5. Performance: Pure local heuristic over bounded line window; no provider calls.
+6. Security: No network, paid calls, or model execution.
+7. Reliability: File read errors return `err()` envelope; no traceback in JSON mode.
+8. Docs: Roadmap/phases updated; banned-claims gate included in Phase 364.
+
+**Evidence:** Targeted phase set: 151 passed. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean.
+
+---
+
+## Phase 346 — R84 DoD elevation: ARC Index → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: empty workspace build returns `state=empty`; search before build returns degraded JSON state.
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: `build`, `search`, and `stats` return standard envelopes in JSON mode.
+4. Tests: `tests/test_index_r84.py` covers envelope schema and `IndexBuildResult`/`IncrementalUpdateResult` result contracts.
+5. Performance: SQLite/FTS remains local; build/search stats expose elapsed timing and errors.
+6. Security: Local workspace indexing only; no external calls.
+7. Reliability: `IndexError`, explicit errors list, degraded unbuilt-index search.
+8. Docs: Roadmap/phases updated; banned-claims gate included in Phase 364.
+
+**Evidence:** Targeted phase set: 151 passed. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean.
+
+---
+
+## Phase 347 — R85 DoD elevation: ARC Context → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: empty attached-context list returns `state=empty`; unbuilt index returns degraded suggestions.
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: `suggest`, `attach`, `list`, and `clear` use standard JSON envelopes.
+4. Tests: `tests/test_context_r85.py` covers list/clear registration, empty state, `--yes`, and envelopes.
+5. Performance: Uses existing local index; result list bounded by `--limit`.
+6. Security: `clear` requires `--yes`; workspace-local attachment file only.
+7. Reliability: Corrupt/missing context file degrades to empty list; no traceback in JSON mode.
+8. Docs: Roadmap/phases updated; banned-claims gate included in Phase 364.
+
+**Evidence:** Targeted phase set: 151 passed. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean.
+
+---
+
+## Phase 348 — R90 DoD elevation: ARC Memory → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: empty memory/search states explicit; missing key returns structured error.
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: `save`, `load`, `search`, `list`, and new `clear` use standard envelopes.
+4. Tests: `tests/test_memory_r90.py` covers save/load/search/list/clear envelopes and confirmation.
+5. Performance: Local SQLite/FTS; list bounded to latest 100 notes.
+6. Security: Fernet-encrypted content preserved; `clear` requires `--yes`; no network calls.
+7. Reliability: Missing store/key and decrypt errors are structured envelopes.
+8. Docs: Roadmap/phases updated; banned-claims gate included in Phase 364.
+
+**Evidence:** Targeted phase set: 151 passed. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean.
+
+---
+
+## Phase 349 — R-PERF7 DoD elevation: Incremental Index → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: incremental update result includes success/degraded state and explicit errors.
+2. Accessibility: CLI-independent backend feature; no UI surface.
+3. Parity: Result schema remains dict-compatible while adding typed dataclass fields.
+4. Tests: `tests/index/test_incremental_index_r_perf7.py` and `tests/test_index_r84.py` cover incremental update and result schema.
+5. Performance: `MAX_INCREMENTAL_BATCH=1000`; changed-file scan has timeout; elapsed ms reported.
+6. Security: Local file indexing only; no external calls.
+7. Reliability: Removed files detected from DB-vs-filesystem comparison; batch cap warnings explicit.
+8. Docs: Roadmap/phases updated; banned-claims gate included in Phase 364.
+
+**Evidence:** Targeted phase set: 151 passed. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean.
+
+---
+
+## Phase 350 — R-SEC2 DoD elevation: PromptGuard → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: CLI scan returns clean/degraded/blocked severities with highest-severity summary.
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: `arc security scan-prompt --json` uses ARC envelope and deterministic schema.
+4. Tests: `tests/security/test_prompt_guard.py` covers all blocked/degraded patterns, `to_dict()`, `scan_batch()`, and CLI envelope.
+5. Performance: Regex-only deterministic scan; preserves input order for batches.
+6. Security: No LLM judgement; no provider/network calls.
+7. Reliability: Stable `GuardResult.to_dict()` schema and batch API.
+8. Docs: Roadmap/phases updated; banned-claims gate included in Phase 364.
+
+**Evidence:** Targeted phase set: 151 passed; scoped mypy clean for security/protocol/workspace/gating/ag_ui. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed.
+
+---
+
+## Phase 351 — R-SEC3 DoD elevation: SBOM integrity → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: script emits PASS/WARN/FAIL labels; `--help` documents `--strict`.
+2. Accessibility: CLI/script surface; keyboard-accessible.
+3. Parity: Exit codes explicit: 0 clean, 1 mismatch/vuln, 2 strict missing baseline or invalid args.
+4. Tests: `tests/security/test_sbom_integrity.py` covers help/strict flag documentation.
+5. Performance: Hash check is streaming shell utility; SBOM generation unchanged and optional by local tool availability.
+6. Security: Strict mode fails if attestation baseline is absent; no secrets emitted.
+7. Reliability: First-run non-strict records with WARN; strict mode fails closed.
+8. Docs: Roadmap/phases updated; banned-claims gate included in Phase 364.
+
+**Evidence:** Targeted phase set: 151 passed; ruff clean; scoped mypy clean.
+
+---
+
+## Phase 352 — R-PERF6 DoD elevation: Memory-mapped traces → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: `read_trace_metrics()` reports small/large trace state via `mmap_used`.
+2. Accessibility: Backend diagnostic surface; no UI.
+3. Parity: Existing replay behavior preserved; metrics dataclass has stable `to_dict()`.
+4. Tests: `tests/test_perf_r85_r86_r87.py` covers small path, env threshold override, invalid env fallback.
+5. Performance: `MMAP_THRESHOLD_BYTES` exported; `ARC_MMAP_THRESHOLD` override supported; elapsed ms and line count reported.
+6. Security: Local trace reads only; no network/provider calls.
+7. Reliability: Invalid env override degrades to default threshold.
+8. Docs: Roadmap/phases updated; banned-claims gate included in Phase 364.
+
+**Evidence:** Targeted phase set: 151 passed. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean.
+
+---
+
+## Phase 353 — R-PERF8 DoD elevation: Provider connection pooling → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: `get_pool_stats()` reports open/active/limit state.
+2. Accessibility: Backend/CLI-adjacent diagnostic surface; no UI.
+3. Parity: Proxy API preserved; pooling is app-scoped and transparent.
+4. Tests: `tests/providers/test_agentrouter_proxy.py` covers pool limit/stat schema with local aiohttp test app.
+5. Performance: `POOL_LIMIT_PER_HOST=10`; app-scoped `ClientSession`/connector reused.
+6. Security: Secret redaction tests remain green; no real provider calls in tests.
+7. Reliability: Startup/cleanup hooks create and close pooled session.
+8. Docs: Roadmap/phases updated; banned-claims gate included in Phase 364.
+
+**Evidence:** Targeted phase set: 151 passed. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean.
+
+---
+
+## Phase 354 — R-PERF9 DoD elevation: WASM trace parser → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: Benchmark result labels optional WASM absence as degraded; Python parser remains success path.
+2. Accessibility: Library/research module only; no UI.
+3. Parity: Existing dict-style benchmark access preserved via `__getitem__`; dataclass `to_dict()` added.
+4. Tests: `tests/wasm_parser/test_wasm_parser_r_perf9.py` covers parser, config, benchmark result schema, fallback.
+5. Performance: Python baseline timing measured; no specific WASM speedup claimed because WASM is not wired by default.
+6. Security: Optional `wasmtime` remains unimported by default; no external calls.
+7. Reliability: `WasmParserConfig` and `BenchmarkResult` stabilize optional dependency behavior.
+8. Docs: Module docstring states `pip install wasmtime` experiment path and default-off state.
+
+**Evidence:** Targeted phase set: 151 passed. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean.
+
+---
+
+## Phase 355 — R-PROC1 DoD elevation: Release Intelligence → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: Git-unavailable paths return degraded metadata; markdown and JSON outputs available.
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: `arc release intelligence --json` returns ARC envelope; `--markdown` is deterministic text.
+4. Tests: `tests/release_intelligence/test_release_intelligence_r_proc1.py` covers error class, markdown, degraded CLI JSON.
+5. Performance: `MAX_COMMITS=500`; subprocess calls bounded by `GIT_TIMEOUT_SECONDS=10`.
+6. Security: Local git metadata only; no provider/network calls.
+7. Reliability: `ReleaseIntelligenceError`; git subprocess failures/timeouts degrade instead of raising.
+8. Docs: Roadmap/phases updated; banned-claims gate included in Phase 364.
+
+**Evidence:** Targeted phase set: 151 passed. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean.
+
+---
+
+## Phase 356 — R-PROC2 DoD elevation: RELEASE_SNAPSHOTS → Polished Complete
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: Snapshot create/list/verify return success/empty/error envelopes.
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: `arc release snapshot create|list|verify --json` use ARC envelopes.
+4. Tests: `tests/release_snapshots/test_release_snapshots_r_proc2.py` covers `SnapshotError`, immutability fail-closed, list/create CLI JSON.
+5. Performance: Snapshot list computes metadata for local markdown files only.
+6. Security: Existing snapshot overwrite raises `SnapshotError`; create path fails closed.
+7. Reliability: `SnapshotInfo` metadata includes name/path/size/sha256; verify remains structured.
+8. Docs: Roadmap/phases updated; banned-claims gate included in Phase 364.
+
+**Evidence:** Targeted phase set: 151 passed. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean.
+
+---
+
+## Phase 357 — CLI parity audit: missing `list` / `clear` commands
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: Context and memory list empty states are explicit; clear returns success/error envelopes.
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: Context and memory both expose `list` and `clear` with JSON envelopes.
+4. Tests: `tests/test_context_r85.py` and `tests/test_memory_r90.py` cover registration/behavior.
+5. Performance: Workspace-local files/SQLite only; bounded list sizes.
+6. Security: Both clear commands require `--yes`.
+7. Reliability: Missing stores/files degrade to empty or structured error.
+8. Docs: Ledger updated; banned-claims gate included in Phase 364.
+
+**Evidence:** Targeted phase set: 151 passed. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean.
+
+---
+
+## Phase 358 — `--json` envelope audit across elevated modules
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: JSON success/error/degraded states audited for predict/index/context/memory/migrate/release/security surfaces.
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: Raw JSON outputs converted to standard `ArcEnvelope` via `_out(ok(...))` / `_out(err(...))`.
+4. Tests: Targeted CLI tests cover envelope top-level `ok`, `data`, and error paths.
+5. Performance: No new hot path; envelope serialization is bounded.
+6. Security: Error envelopes avoid tracebacks/secrets.
+7. Reliability: Failure paths return structured error codes instead of stderr-only exits in JSON mode.
+8. Docs: Ledger updated; banned-claims gate included in Phase 364.
+
+**Evidence:** Targeted phase set: 151 passed. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean.
+
+---
+
+## Phase 359 — Security surface audit: confirmation gates
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: Denied mutations return `PERMISSION_DENIED`; confirmed mutations return success state.
+2. Accessibility: CLI-only; keyboard-accessible.
+3. Parity: JSON mode fails closed without `--yes` for audited mutating actions.
+4. Tests: Migrate/context/memory/release snapshot tests cover deny-without-confirm and allow-with-confirm where applicable.
+5. Performance: Confirmation checks are O(1).
+6. Security: Migration writes, context clear, memory clear, and snapshot overwrite paths are confirmation/fail-closed gated.
+7. Reliability: Denials are structured envelopes, not partial mutations.
+8. Docs: Ledger updated; banned-claims gate included in Phase 364.
+
+**Evidence:** Targeted phase set: 151 passed. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean.
+
+---
+
+## Phase 360 — Performance audit: bound in-memory buffers
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: Cap warnings are explicit in metadata/warnings, not silent drops.
+2. Accessibility: Backend/library behavior only; no UI.
+3. Parity: Public APIs preserved; optional warning fields added.
+4. Tests: `tests/perf/test_phase360_buffer_caps.py` covers time-travel, notebook, debug, and release-intelligence caps.
+5. Performance: `MAX_SNAPSHOTS=1000`, `MAX_CELLS=500`, `MAX_VARIABLES=500`, `MAX_COMMITS=500`, `MAX_HISTORY=1000`.
+6. Security: Local memory bounds reduce resource exhaustion risk; no external calls.
+7. Reliability: Oldest entries are truncated deterministically with warning metadata.
+8. Docs: Ledger updated; banned-claims gate included in Phase 364.
+
+**Evidence:** `tests/perf/test_phase360_buffer_caps.py` passed in targeted set. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean.
+
+---
+
+## Phase 361 — Reliability audit: timeouts + cancellation
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: Voice listen placeholder returns explicit degraded timeout state; debug connect returns connected/degraded/timeout state.
+2. Accessibility: CLI/library behavior only; no UI.
+3. Parity: Timeout defaults exposed through constants/config.
+4. Tests: `tests/reliability/test_phase361_timeouts.py` covers voice, debug, scheduler timeout config.
+5. Performance: Long-running defaults bounded: voice listen 60s, debug connect 10s, scheduler per-task timeout config visible.
+6. Security: Loopback-only debug connect; no provider/network calls.
+7. Reliability: Git subprocesses in release intelligence also use bounded timeout and degrade on timeout/unavailable git.
+8. Docs: Ledger updated; banned-claims gate included in Phase 364.
+
+**Evidence:** `tests/reliability/test_phase361_timeouts.py` passed in targeted set. Full suite: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean.
+
+---
+
+## Phase 362 — Ruff + type annotations sweep
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: No UI changes; code-quality sweep preserved prior states.
+2. Accessibility: No UI changes.
+3. Parity: Public APIs preserved; additive dataclasses/constants only.
+4. Tests: Full Python suite passed.
+5. Performance: No style-only rewrites; bounded-buffer and timeout changes retained.
+6. Security: Scoped mypy for security/protocol/workspace/gating/ag_ui passed.
+7. Reliability: Ruff clean and scoped mypy clean.
+8. Docs: Ledger updated; banned-claims gate included in Phase 364.
+
+**Evidence:** `uv run --directory python ruff check src tests` passed; `uv run --directory python mypy src/agent_runtime_cockpit/security/ src/agent_runtime_cockpit/protocol/ src/agent_runtime_cockpit/workspace.py src/agent_runtime_cockpit/gating.py src/agent_runtime_cockpit/ag_ui/` passed; full suite 6511 passed / 43 skipped / 7 xfailed / 1 xpassed.
+
+---
+
+## Phase 363 — docs/roadmap.md + docs/phases.md sweep
+
+**Status:** Polished Complete
+
+**DoD gates:**
+1. UX states: Docs now reflect implemented/degraded states rather than implied readiness.
+2. Accessibility: Docs-only; no UI.
+3. Parity: Roadmap rows for R83-R85, R90, R94, R102, R-SEC2/3, R-PERF6/7/8/9, R-PROC1/2 match phase evidence.
+4. Tests: Banned-claims gate run in Phase 364.
+5. Performance: No performance claim added beyond structural/measured evidence.
+6. Security: Terminal-gated list in `AGENTS.md` keeps R76/B2P-17/R82 out of polished claims.
+7. Reliability: Phase entries 344-362 appended once in the canonical ledger.
+8. Docs: `AGENTS.md`, `docs/roadmap.md`, and `docs/phases.md` updated in place.
+
+**Evidence:** `docs/phases.md` includes Phase 344-363 entries; roadmap rows updated; banned claims checked in Phase 364.
+
+---
+
+## Phase 364 — Final sweep: full verification
+
+**Status:** Complete
+
+**What changed:** Full release gate executed after Phases 344-363 implementation and docs sweep.
+
+**Evidence:** `uv run --directory python ruff check src tests` passed. `uv run --directory python pytest tests/ -q` passed: 6511 passed / 43 skipped / 7 xfailed / 1 xpassed. Scoped CI mypy passed. `pnpm typecheck` passed. `pnpm build` passed (Theia build emitted existing DEP0190 warnings, compiled successfully). Banned-claims gate run in Phase 365 after final snapshot entry.
+
+---
+
+## Phase 365 — Release snapshot
+
+**Status:** Complete
+
+**What changed:** Release snapshot command run after the Phases 344-365 ledger/docs sweep.
+
+**Evidence:** `bash scripts/generate-release-snapshot.sh --json` returned version `0.1.0a0`, internal track `v0.8-r-ux5`, git short `6f266e68`, branch `main`, dirty `true`, ruff clean `true`, banned clean `true`, patches stale `27`, python_tests `unknown` from the snapshot helper. Authoritative verification evidence for this phase remains Phase 364: full Python suite 6511 passed / 43 skipped / 7 xfailed / 1 xpassed; ruff clean; scoped mypy clean; `pnpm typecheck` passed; `pnpm build` passed. Final banned-claims gate passed: `OK: No banned claims found.`
