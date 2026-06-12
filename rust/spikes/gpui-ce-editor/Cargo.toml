@@ -4,9 +4,8 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
-[workspace]
-
 [dependencies]
 anyhow = "1.0.98"
 gpui = { git = "https://github.com/gpui-ce/gpui-ce", rev = "c237d57d1caed1bb6c6651ddc3ce9cafa86161b6" }
+gpui_platform = { git = "https://github.com/gpui-ce/gpui-ce", rev = "c237d57d1caed1bb6c6651ddc3ce9cafa86161b6" }
 spike-harness = { path = "../spike-harness" }
