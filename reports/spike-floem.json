@@ -169,5 +169,27 @@
       "notes": ""
     }
   ],
-  "honesty_note": "NOT the pinned benchmark machine; numbers are indicative only and may not be used for pass/fail claims (do-not-overclaim)"
+  "honesty_note": "NOT the pinned benchmark machine; numbers are indicative only and may not be used for pass/fail claims (do-not-overclaim)",
+  "facade": {
+    "f_loc": {
+      "score": 5,
+      "render_loc": 214,
+      "note": "shell_port.rs render layer, code lines excl tests/comments/blanks; tokei unavailable on this box so counted by blank/comment-stripping; <300 => 5"
+    },
+    "f_concept": {
+      "score": 5,
+      "shared_edits": 0,
+      "note": "arc-ui PaletteModel/FocusRing/Theme imported unchanged; zero facade leaks"
+    },
+    "f_event": {
+      "score": 4,
+      "note": "input direct to PaletteModel::key + FocusRing (no shadow input state machine); floem fine-grained reactivity requires a mechanical model->signal mirror on OUTPUT (open/query/rows/sel signals) \u2014 thin, no logic"
+    },
+    "f_swap": {
+      "score": 4,
+      "note": "provisional pending gpui port. Shared models do not change on re-port (facade win); re-port = rewrite ~214-line render layer in gpui Entity/render idiom + swap on_event_stop->gpui on_event. ~5 days est."
+    },
+    "total": 18,
+    "tooling": "cargo build+test+clippy(-j1) clean; block v0.1.6 warning is transitive floem dep not port code"
+  }
 }

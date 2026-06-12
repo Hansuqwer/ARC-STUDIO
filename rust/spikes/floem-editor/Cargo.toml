@@ -8,4 +8,5 @@ publish = false
 anyhow = "1.0.98"
 floem = "0.2.0"
 floem_reactive = "0.2.0"
+arc-ui = { path = "../../arc-ui" }
 spike-harness = { path = "../spike-harness" }
