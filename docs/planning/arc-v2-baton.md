@@ -22,9 +22,9 @@ Docs: `arc-v2-sprint-3-final-adjudication.md`, `arc-v2-kit-implementation-plan.m
 | Phase | What | Status |
 |---|---|---|
 | K1 | `framework-gpui` feature in arc-ui; deny.toml wrapper; Sprint-1 lock gate retired | **DONE** (0ee9618e) |
-| K2 | shell_port.rs → arc-shell/src/render_gpui.rs; window + palette + NO_COLOR + B1 | **NEXT (M4)** |
-| K3 | G5 VoiceOver + G6 IME + G7 bidi evidence on the real K2 shell | after K2 |
-| K4 | Event Stream panel end-to-end (model→render→daemon) | after K2 |
+| K2 | shell_port.rs → arc-shell/src/render_gpui.rs; window + palette + NO_COLOR + B1 | **DONE (headless+pixel, fa8bdb0f+K2-evidence)** |
+| K3 | G5 VoiceOver + G6 IME + G7 bidi evidence on the real K2 shell | **NEXT (M4)** |
+| K4 | Event Stream panel end-to-end (model→render→daemon) | after K3 |
 
 ## K1 evidence (committed)
 
@@ -32,6 +32,13 @@ Docs: `arc-v2-sprint-3-final-adjudication.md`, `arc-v2-kit-implementation-plan.m
 - `rust/arc-ui/src/lib.rs`: `#[cfg(feature = "framework-gpui")] pub use gpui::*;` in `pub mod kit`
 - `rust/deny.toml`: `{ crate = "gpui", wrappers = ["arc-ui"] }` — feature-scoped exception
 - Headless: 15/15 arc-ui tests pass; flag-on: disk-blocked (same root as gpui-test SIGBUS)
+
+## K2 evidence (committed, pinned M4 — binding per benchmark-environment.md)
+
+- **Window**: `cargo build -p arc-shell --features framework-gpui --release` — clean in 3m06s; `arc-shell --window` opens gpui window (PID 29300 confirmed running)
+- **NO_COLOR**: `NO_COLOR=1 arc-shell --headless-status` → `[ERR]` text marker instead of `○` glyph — verified
+- **B1 cold-start**: `hyperfine --runs 10 'arc-shell --smoke-exit'` → mean=2012ms ±1ms (min=2010, max=2015). Dominated by 2s hardcoded daemon health-probe timeout; model init itself is near-instant. `reports/b1-cold-start.json` committed.
+- **v1 gate**: 220 passed (main repo `tests/protocol tests/web`)
 
 ## Open items before FINAL selection
 
