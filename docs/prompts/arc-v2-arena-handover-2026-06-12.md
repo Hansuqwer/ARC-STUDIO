@@ -11,7 +11,7 @@ You are the Arena sandbox agent on the ARC v2 project. ARC Studio is a local AI
 agent workstation tool (Python CLI + Textual TUI + Eclipse Theia IDE). The v2
 track is building a **native Rust IDE** to replace the Theia browser frontend.
 
-The canonical repo: `https://github.com/Hansuqwer/arc-theia-studio` (redirects
+The canonical repo: `https://github.com/Hansuqwer/ARC-STUDIO` (redirects
 to `Hansuqwer/ARC-STUDIO.git`).
 
 Active branch: **`arc-v2/sprint-1-protocol-bridge`**  
