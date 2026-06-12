@@ -3,6 +3,7 @@ name = "arc-shell"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+publish = false
 description = "ARC Studio v2 native shell (Sprint 2: headless skeleton — window rendering lands with the Sprint-3 framework decision)"
 
 [dependencies]

@@ -1,6 +1,6 @@
 # arc-v2 baton state (update this file at every handback)
 
-Last updated: 2026-06-12 (PM) · Branch: `arc-v2/sprint-1-protocol-bridge` @ c4bc61c+1
+Last updated: 2026-06-12 (PM-2) · Branch: `arc-v2/sprint-1-protocol-bridge` @ b36cf54+1
 
 ## Who holds the baton
 
@@ -48,6 +48,24 @@ Reports: `reports/spike-{floem,gpui,gpui-ce}.json` + raws + `.status` sidecars.
   rank vs upstream gpui.
 - floem has the best G1 (58ms) and clean text; gpui has the cleanest present
   callback (on_next_frame). These two lead the provisional 3-way.
+
+## NEW (PM-2): Sprint-10 core + Sprint-12 supply-chain slices landed (Arena)
+
+- **arc-plugin-host** (15 tests, probe-verified wasmtime 36 in-container):
+  fuel + epoch budget kills (typed-Trap classified, real ticker thread);
+  guarded_host_call — deny-by-default early-denial (op never executes),
+  worker-thread time-bound, audit-on-allow AND on-deny, **fail-closed on
+  audit failure** (result discarded — review §9.2); CapabilitySet with
+  scope-exact matching (no implicit widening); minisign manifest verify
+  (unsigned refused; dev override loud). Honest scope label: component-model
+  ABI + WASI ctx land with the first real extension; wasm ≠ VM boundary.
+- **Supply chain (Sprint-12 slice):** rust/deny.toml live and PASSING
+  (advisories/bans/licenses/sources all ok) after real fixes — tempdir→
+  tempfile (RUSTSEC deprecation chain), tantivy 0.22→0.25 (drops
+  unmaintained `instant`), publish=false on all 10 private crates,
+  CC0 allowed for notify. Framework crates also banned at the deny layer
+  (defense in depth vs the facade grep).
+- Workspace: 10 crates / 124 tests / clippy 0 / fmt clean / deny clean.
 
 ## DECIDED 2026-06-12 (owner delegated via "decide")
 

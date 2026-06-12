@@ -4,6 +4,7 @@ members = [
     "arc-protocol-rs", "arc-daemon-client", "arc-ui", "arc-shell",
     "arc-editor", "arc-dock",
     "arc-workspace", "arc-index", "arc-terminal",
+    "arc-plugin-host",
 ] # grows per sprint
 
 [workspace.dependencies]

@@ -104,12 +104,14 @@ impl DaemonClient {
         }
         let env: arc_protocol_rs::ArcEnvelope<HitlDecisionResponse> = resp.json().await?;
         env.into_result()
-            .and_then(|(d, _)| d.ok_or_else(|| ArcError {
-                code: "INVALID_RESPONSE".into(),
-                message: "daemon returned empty response".into(),
-                details: None,
-                extra: Map::new(),
-            }))
+            .and_then(|(d, _)| {
+                d.ok_or_else(|| ArcError {
+                    code: "INVALID_RESPONSE".into(),
+                    message: "daemon returned empty response".into(),
+                    details: None,
+                    extra: Map::new(),
+                })
+            })
             .map_err(|e| ClientError::Daemon(Box::new(e)))
     }
 }

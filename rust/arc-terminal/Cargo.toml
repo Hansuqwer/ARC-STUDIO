@@ -3,6 +3,7 @@ name = "arc-terminal"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+publish = false
 description = "ARC v2 terminal core (Sprint 6): alacritty_terminal PTY + grid, echo/resize/kill matrix — rendering arrives with the Sprint-3 framework"
 
 [dependencies]

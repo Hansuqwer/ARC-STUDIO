@@ -127,7 +127,7 @@ mod tests {
     #[test]
     #[cfg(target_os = "linux")]
     fn live_watch_create_updates_model() {
-        let td = tempdir::TempDir::new("arc-watch").unwrap();
+        let td = tempfile::tempdir().unwrap();
         let root = td.path().to_path_buf();
         std::fs::create_dir(root.join("src")).unwrap();
 
@@ -154,7 +154,7 @@ mod tests {
     #[test]
     #[cfg(target_os = "linux")]
     fn debounce_collapses_storms() {
-        let td = tempdir::TempDir::new("arc-storm").unwrap();
+        let td = tempfile::tempdir().unwrap();
         let root = td.path().to_path_buf();
         let f = root.join("hot.txt");
         std::fs::write(&f, "0").unwrap();

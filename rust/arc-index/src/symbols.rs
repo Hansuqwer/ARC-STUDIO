@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn wal_mode_and_schema() {
-        let td = tempdir::TempDir::new("arc-sym").unwrap();
+        let td = tempfile::tempdir().unwrap();
         let (store, rebuilt) = SymbolStore::open_or_rebuild(&td.path().join("cache.db")).unwrap();
         assert!(!rebuilt);
         let mode: String = store
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn staleness_tracking() {
-        let td = tempdir::TempDir::new("arc-sym2").unwrap();
+        let td = tempfile::tempdir().unwrap();
         let (store, _) = SymbolStore::open_or_rebuild(&td.path().join("c.db")).unwrap();
         assert!(
             store.is_stale("a.rs", 100, 10).unwrap(),
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn symbol_replace_is_atomic_and_prefix_lookup_sorted() {
-        let td = tempdir::TempDir::new("arc-sym3").unwrap();
+        let td = tempfile::tempdir().unwrap();
         let (mut store, _) = SymbolStore::open_or_rebuild(&td.path().join("c.db")).unwrap();
         store
             .replace_symbols(
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn corrupt_db_rebuilds_never_crashes() {
-        let td = tempdir::TempDir::new("arc-sym4").unwrap();
+        let td = tempfile::tempdir().unwrap();
         let db = td.path().join("c.db");
         std::fs::write(&db, b"this is not a sqlite database at all").unwrap();
         let (store, rebuilt) = SymbolStore::open_or_rebuild(&db).unwrap();

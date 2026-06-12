@@ -3,6 +3,7 @@ name = "arc-protocol-rs"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+publish = false
 description = "Typed ARC protocol bridge: ArcEnvelope, RunEvent, fixture conformance (Sprint 1)"
 
 [dependencies]

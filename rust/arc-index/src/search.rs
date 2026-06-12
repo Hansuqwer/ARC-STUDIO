@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn index_search_update_delete_roundtrip() {
-        let td = tempdir::TempDir::new("arc-idx").unwrap();
+        let td = tempfile::tempdir().unwrap();
         let (mut idx, outcome) = SearchIndex::open_or_rebuild(td.path()).unwrap();
         assert!(outcome.rebuilt, "fresh dir counts as rebuilt");
 
@@ -192,7 +192,7 @@ mod tests {
     /// Review §9.6: plant a fake secret; it must be unfindable via search.
     #[test]
     fn planted_secret_is_not_indexed() {
-        let td = tempdir::TempDir::new("arc-idx-secret").unwrap();
+        let td = tempfile::tempdir().unwrap();
         let (mut idx, _) = SearchIndex::open_or_rebuild(td.path()).unwrap();
         let body = "normal code line with findable_needle\n\
                     API_KEY=sk-supersecret12345\n\
@@ -219,7 +219,7 @@ mod tests {
     /// ADR-0005: corruption rebuilds, never crashes.
     #[test]
     fn corrupt_index_dir_rebuilds_never_crashes() {
-        let td = tempdir::TempDir::new("arc-idx-corrupt").unwrap();
+        let td = tempfile::tempdir().unwrap();
         // garbage where tantivy expects meta.json
         std::fs::write(td.path().join("meta.json"), "{ not valid tantivy meta").unwrap();
         std::fs::write(td.path().join("junk.bin"), [0u8; 64]).unwrap();
@@ -233,7 +233,7 @@ mod tests {
 
     #[test]
     fn explicit_rebuild_is_a_command() {
-        let td = tempdir::TempDir::new("arc-idx-cmd").unwrap();
+        let td = tempfile::tempdir().unwrap();
         let (mut idx, _) = SearchIndex::open_or_rebuild(td.path()).unwrap();
         idx.upsert("a.rs", "before_rebuild_marker").unwrap();
         idx.commit().unwrap();

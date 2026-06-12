@@ -1,0 +1,22 @@
+[package]
+name = "arc-plugin-host"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "ARC v2 plugin host core (Sprint 10): Wasmtime engine w/ fuel+epoch budgets, guarded host-call policy (improvement #5), minisign manifest verification. Component-model ABI layer lands with the first real extension (ADR-0003); budgets/safety are ABI-independent and proven here."
+
+[dependencies]
+# Probe-verified in-container 2026-06-12 (fuel + epoch on core modules).
+# Feature-minimal on purpose: runtime+cranelift+wat — no component-model,
+# no WASI yet (those arrive with the extension ABI; they add deps, not
+# safety semantics). Honest scope label in lib.rs.
+wasmtime = { version = "36", default-features = false, features = ["runtime", "cranelift", "wat"] }
+minisign-verify = "0.2.4"
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

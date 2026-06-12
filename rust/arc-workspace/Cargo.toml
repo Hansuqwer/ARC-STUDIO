@@ -3,6 +3,7 @@ name = "arc-workspace"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+publish = false
 description = "ARC v2 workspace model (Sprint 5): worktree scan, ignore rules, debounced watcher — framework-free"
 
 [dependencies]
@@ -12,7 +13,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-tempdir = "0.3.7"
+tempfile = "3.20"
 
 [lints]
 workspace = true

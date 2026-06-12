@@ -3,6 +3,7 @@ name = "arc-daemon-client"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+publish = false
 description = "HTTP+SSE client for the ARC daemon (Sprint 1); UDS JSON-RPC later, flag-gated"
 
 [dependencies]

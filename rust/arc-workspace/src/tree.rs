@@ -187,8 +187,8 @@ impl WorktreeModel {
 mod tests {
     use super::*;
 
-    fn fixture_tree() -> (tempdir::TempDir, WorktreeModel) {
-        let td = tempdir::TempDir::new("arc-worktree").unwrap();
+    fn fixture_tree() -> (tempfile::TempDir, WorktreeModel) {
+        let td = tempfile::tempdir().unwrap();
         let r = td.path();
         std::fs::create_dir_all(r.join("src/sub")).unwrap();
         std::fs::create_dir_all(r.join("docs")).unwrap();

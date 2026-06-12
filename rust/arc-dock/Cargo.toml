@@ -3,6 +3,7 @@ name = "arc-dock"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+publish = false
 description = "ARC v2 dock panels (Sprint 7 prep): SurfaceState + Runs/EventStream view-models, fixture-replay parity tested — framework-free"
 
 [dependencies]
