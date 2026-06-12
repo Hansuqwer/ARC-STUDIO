@@ -107,7 +107,9 @@ fn tick(weak: WeakEntity<SpikeView>, window: &mut Window, cx: &mut App) {
             }
             Action::TakeScreenshot { out: _ } => {
                 v.lines = bidi_sample_lines().iter().map(|s| s.to_string()).collect();
-                // G7: operator screenshots the bidi frame → reports/spike-gpui-bidi.png
+                // G7: bidi text visible — window holds here for 30s.
+                // Screenshot now: Cmd+Shift+4, save to reports/spike-gpui-bidi.png
+                std::thread::sleep(std::time::Duration::from_secs(30));
             }
             Action::Settle => {}
             Action::Finished => {

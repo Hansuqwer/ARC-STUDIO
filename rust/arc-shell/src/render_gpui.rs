@@ -129,10 +129,154 @@ fn region_card(
 /// The real shell-chrome gpui view. It holds the ARC-owned ShellModel directly:
 /// input mutates the model, render reads the model, and `cx.notify()` requests
 /// the repaint. No parallel palette/focus state is introduced.
+/// IME composition state for the palette TypeBox — holds the committed text,
+/// the in-progress composition mark, and cursor position (all in UTF-16 units
+/// as required by NSTextInputClient / gpui::InputHandler).
+#[derive(Default)]
+pub struct TypeBoxContent {
+    pub committed: String,
+    pub marked: Option<String>,
+    pub selected: usize, // UTF-16 cursor after committed text
+}
+
+impl TypeBoxContent {
+    /// Full content including composition mark (what the text field displays).
+    pub fn display(&self) -> String {
+        match &self.marked {
+            Some(m) => format!("{}{}", self.committed, m),
+            None => self.committed.clone(),
+        }
+    }
+
+    fn utf16_len(s: &str) -> usize {
+        s.encode_utf16().count()
+    }
+
+    fn committed_utf16_len(&self) -> usize {
+        Self::utf16_len(&self.committed)
+    }
+}
+
+/// gpui::InputHandler implementation — exposes the TypeBox to NSTextInputClient
+/// so IME composition renders inline in the palette query line (G6).
+struct TypeBoxHandler {
+    entity: Entity<ShellChromeView>,
+}
+
+impl InputHandler for TypeBoxHandler {
+    fn selected_text_range(
+        &mut self,
+        _ignore_disabled: bool,
+        _window: &mut Window,
+        cx: &mut App,
+    ) -> Option<UTF16Selection> {
+        self.entity.read(cx).typebox.committed_utf16_len().pipe(|n| {
+            Some(UTF16Selection { range: n..n, reversed: false })
+        })
+    }
+
+    fn marked_text_range(&mut self, _window: &mut Window, cx: &mut App) -> Option<std::ops::Range<usize>> {
+        let tb = &self.entity.read(cx).typebox;
+        tb.marked.as_ref().map(|m| {
+            let start = TypeBoxContent::utf16_len(&tb.committed);
+            start..start + TypeBoxContent::utf16_len(m)
+        })
+    }
+
+    fn text_for_range(
+        &mut self,
+        range_utf16: std::ops::Range<usize>,
+        adjusted: &mut Option<std::ops::Range<usize>>,
+        _window: &mut Window,
+        cx: &mut App,
+    ) -> Option<String> {
+        let full = self.entity.read(cx).typebox.display();
+        let chars: Vec<u16> = full.encode_utf16().collect();
+        let start = range_utf16.start.min(chars.len());
+        let end = range_utf16.end.min(chars.len());
+        *adjusted = Some(start..end);
+        String::from_utf16(&chars[start..end]).ok()
+    }
+
+    fn replace_text_in_range(
+        &mut self,
+        _range: Option<std::ops::Range<usize>>,
+        text: &str,
+        _window: &mut Window,
+        cx: &mut App,
+    ) {
+        self.entity.update(cx, |view, cx| {
+            view.typebox.marked = None;
+            view.typebox.committed.push_str(text);
+            // Mirror into the PaletteModel query for palette filtering.
+            for ch in text.chars() {
+                view.model.palette.key(
+                    arc_ui::palette::PaletteKey::Char(ch),
+                    &view.model.registry,
+                    &view.model.ctx,
+                );
+            }
+            cx.notify();
+        });
+    }
+
+    fn replace_and_mark_text_in_range(
+        &mut self,
+        _range: Option<std::ops::Range<usize>>,
+        new_text: &str,
+        _new_selected: Option<std::ops::Range<usize>>,
+        _window: &mut Window,
+        cx: &mut App,
+    ) {
+        self.entity.update(cx, |view, cx| {
+            view.typebox.marked = Some(new_text.to_string());
+            cx.notify();
+        });
+    }
+
+    fn unmark_text(&mut self, _window: &mut Window, cx: &mut App) {
+        self.entity.update(cx, |view, cx| {
+            if let Some(m) = view.typebox.marked.take() {
+                view.typebox.committed.push_str(&m);
+            }
+            cx.notify();
+        });
+    }
+
+    fn bounds_for_range(
+        &mut self,
+        _range: std::ops::Range<usize>,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> Option<Bounds<Pixels>> {
+        // Return None — platform will position the candidate window near the
+        // focused element. Returning real coordinates requires layout info
+        // not yet wired (K2 scope; good enough for G6 inline composition proof).
+        None
+    }
+
+    fn character_index_for_point(
+        &mut self,
+        _point: Point<Pixels>,
+        _window: &mut Window,
+        cx: &mut App,
+    ) -> Option<usize> {
+        Some(self.entity.read(cx).typebox.committed_utf16_len())
+    }
+}
+
+// Convenience extension to pipe a value through a closure (avoids temp bindings).
+trait Pipe: Sized {
+    fn pipe<R>(self, f: impl FnOnce(Self) -> R) -> R { f(self) }
+}
+impl<T: Sized> Pipe for T {}
+
 pub struct ShellChromeView {
     pub model: ShellModel,
     pub announce: String,
     pub focus_handle: FocusHandle,
+    /// IME composition state for the palette TypeBox (G6).
+    pub typebox: TypeBoxContent,
 }
 
 impl ShellChromeView {
@@ -140,6 +284,7 @@ impl ShellChromeView {
         Self {
             announce: String::new(),
             focus_handle: cx.focus_handle(),
+            typebox: TypeBoxContent::default(),
             model,
         }
     }
@@ -199,7 +344,14 @@ fn palette_key(key: &str) -> Option<PaletteKey> {
 }
 
 impl Render for ShellChromeView {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Register the InputHandler so NSTextInputClient/IME sends composition
+        // inline into the TypeBox rather than a floating fallback window (G6).
+        window.handle_input(
+            &self.focus_handle.clone(),
+            TypeBoxHandler { entity: cx.entity().clone() },
+            cx,
+        );
         let theme = self.model.theme.clone();
         let current = current_focus_id(&self.model);
         let rows: Vec<AnyElement> = self
@@ -235,7 +387,8 @@ impl Render for ShellChromeView {
                 .w(px(640.0))
                 .flex()
                 .flex_col()
-                .child(div().child(format!("> {}", self.model.palette.query)))
+                .child(div().child(format!("> {}{}", self.model.palette.query,
+                    self.typebox.marked.as_deref().map(|m| format!("[{m}]")).unwrap_or_default())))
                 .children(rows)
                 .into_any_element()
         } else {
