@@ -12,8 +12,17 @@
 //!
 //! on_next_frame is a trustworthy post-present hook, so G1/G4 timings are
 //! accurate to GPU present (not render-call-return).
+#![recursion_limit = "512"]
 
 use gpui::*;
+
+// Facade-cost measurement unit (criterion #1): compiled-but-not-run by design.
+// The spike's main() runs the FrameScript harness (G1–G7); this module is the
+// separately-scored shell-chrome render layer, tokei-counted and exercised by
+// its own unit tests. Not wired into the harness loop — hence allow(dead_code).
+#[allow(dead_code)]
+mod shell_port;
+
 use spike_harness::views::{bidi_sample_lines, DiffDoc, EventTable, TextDoc, TypeBox};
 use spike_harness::workloads::{seeds, synthetic_keystream};
 use spike_harness::{assemble_report, Action, FrameScript, MachineIdentity, RunConfig, ScriptPlan};

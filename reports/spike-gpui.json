@@ -169,5 +169,27 @@
       "notes": ""
     }
   ],
-  "honesty_note": "NOT the pinned benchmark machine; numbers are indicative only and may not be used for pass/fail claims (do-not-overclaim)"
+  "honesty_note": "NOT the pinned benchmark machine; numbers are indicative only and may not be used for pass/fail claims (do-not-overclaim)",
+  "facade": {
+    "f_loc": {
+      "score": 5,
+      "render_loc": 190,
+      "note": "shell_port.rs render layer, code lines excl tests/comments/blanks; leaner than floem (214)"
+    },
+    "f_concept": {
+      "score": 5,
+      "shared_edits": 0,
+      "note": "arc-ui PaletteModel/FocusRing/Theme imported unchanged; zero facade leaks"
+    },
+    "f_event": {
+      "score": 5,
+      "note": "fully direct BOTH ways: view Entity holds PaletteModel/FocusRing; render() reads them; on_key_down mutates + cx.notify(). No output mirror (floem needed model->signal mirror => floem F-EVENT 4). Retained-mode = single source of truth."
+    },
+    "f_swap": {
+      "score": 5,
+      "note": "shared models unchanged on re-port; 190-line render layer; gpui->floem re-port only ADDS the mechanical signal mirror. <=3 days est."
+    },
+    "total": 20,
+    "tooling": "cargo build -p gpui-editor + clippy(-j1) CLEAN. Unit tests (3 pure fns) DISK-BLOCKED: gpui --test binary exceeds ~1.6Gi free disk on this box (SIGBUS during codegen); same pure logic as floem tests which passed 3/3. Re-run on a box with >5GB free to confirm."
+  }
 }
