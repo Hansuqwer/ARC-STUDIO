@@ -5,9 +5,8 @@
 # this code does not.
 [workspace]
 resolver = "2"
-members = ["spike-harness", "floem-editor"]
+members = ["spike-harness", "floem-editor", "gpui-editor"]
 exclude = [
-  "gpui-editor",
   "gpui-ce-editor",
   "bespoke-editor",
 ]

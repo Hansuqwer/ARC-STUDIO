@@ -1,0 +1,173 @@
+{
+  "candidate": "gpui",
+  "candidate_version": "0.2.2",
+  "date": "2026-06-12",
+  "machine": {
+    "hostname": "BLUETEAM.local",
+    "os": "Darwin 25.4.0",
+    "arch": "arm64",
+    "cpu": "Apple M4",
+    "gpu": "Apple M4, 8 cores, Metal 4",
+    "display": "Color LCD 2940x1912 physical, 1470x956 @ 60.00Hz logical",
+    "power_profile": "No thermal/performance/CPU power warning recorded",
+    "is_pinned_benchmark_machine": false
+  },
+  "rows": [
+    {
+      "gate": "G1HugeFileFirstPaint",
+      "candidate": "gpui",
+      "refresh_hz": 60.0,
+      "percentiles": null,
+      "first_paint_ms": 201,
+      "total_ms": null,
+      "worst_frame_ms": null,
+      "outcome": "Pass",
+      "raw_data_path": null,
+      "notes": "median first paint: source-100mb Some(51) ms, pathological Some(201) ms (worst governs)"
+    },
+    {
+      "gate": "G2DiffScrollFrameTime",
+      "candidate": "gpui",
+      "refresh_hz": 60.0,
+      "percentiles": {
+        "n": 300,
+        "p50_us": 16665,
+        "p95_us": 17525,
+        "p99_us": 17663,
+        "max_us": 17668
+      },
+      "first_paint_ms": null,
+      "total_ms": null,
+      "worst_frame_ms": null,
+      "outcome": {
+        "Fail": {
+          "reason": "p99 = 1.06 frames @ 60 Hz (bar 1)"
+        }
+      },
+      "raw_data_path": "../../reports/spike-raw-gpui-g2.json",
+      "notes": ""
+    },
+    {
+      "gate": "G3EventReplayBudget",
+      "candidate": "gpui",
+      "refresh_hz": 60.0,
+      "percentiles": {
+        "n": 10,
+        "p50_us": 16665,
+        "p95_us": 17627,
+        "p99_us": 17627,
+        "max_us": 17627
+      },
+      "first_paint_ms": null,
+      "total_ms": 167,
+      "worst_frame_ms": 17,
+      "outcome": "Pass",
+      "raw_data_path": "../../reports/spike-raw-gpui-g3.json",
+      "notes": "headless decode baseline: reports/g3-headless-baseline.json"
+    },
+    {
+      "gate": "G4TypingLatency",
+      "candidate": "gpui",
+      "refresh_hz": 60.0,
+      "percentiles": {
+        "n": 2000,
+        "p50_us": 16666,
+        "p95_us": 17585,
+        "p99_us": 17669,
+        "max_us": 19365
+      },
+      "first_paint_ms": null,
+      "total_ms": null,
+      "worst_frame_ms": null,
+      "outcome": {
+        "Fail": {
+          "reason": "p99 = 1.06 frames @ 60 Hz (bar 1)"
+        }
+      },
+      "raw_data_path": "../../reports/spike-raw-gpui-g4.json",
+      "notes": ""
+    },
+    {
+      "gate": "G7BidiLigatures",
+      "candidate": "gpui",
+      "refresh_hz": 60.0,
+      "percentiles": null,
+      "first_paint_ms": null,
+      "total_ms": null,
+      "worst_frame_ms": null,
+      "outcome": {
+        "EvidencePending": {
+          "missing": [
+            "golden-image match: bidi paragraph + programming ligatures"
+          ]
+        }
+      },
+      "raw_data_path": "../../reports/spike-gpui-bidi.png",
+      "notes": ""
+    },
+    {
+      "gate": "G5Accessibility",
+      "candidate": "gpui",
+      "refresh_hz": 60.0,
+      "percentiles": null,
+      "first_paint_ms": null,
+      "total_ms": null,
+      "worst_frame_ms": null,
+      "outcome": {
+        "EvidencePending": {
+          "missing": [
+            "voiceover-recording-or-tree-dump (macOS)",
+            "orca-recording-or-atspi-dump (Linux, X11 AND Wayland)",
+            "nvda-recording-or-uia-dump (Windows)"
+          ]
+        }
+      },
+      "raw_data_path": null,
+      "notes": ""
+    },
+    {
+      "gate": "G6Ime",
+      "candidate": "gpui",
+      "refresh_hz": 60.0,
+      "percentiles": null,
+      "first_paint_ms": null,
+      "total_ms": null,
+      "worst_frame_ms": null,
+      "outcome": {
+        "EvidencePending": {
+          "missing": [
+            "macos: ja-hiragana->kanji, zh-pinyin, ko-2set (compose+commit+cancel)",
+            "linux-wayland: fcitx5 AND ibus, same scripts",
+            "linux-x11: fcitx5 smoke (best-effort, documented)",
+            "windows: TSF, same scripts, inline composition verified",
+            "dead-keys/compose-key row (European layouts)"
+          ]
+        }
+      },
+      "raw_data_path": null,
+      "notes": ""
+    },
+    {
+      "gate": "G8Sustainability",
+      "candidate": "gpui",
+      "refresh_hz": 60.0,
+      "percentiles": null,
+      "first_paint_ms": null,
+      "total_ms": null,
+      "worst_frame_ms": null,
+      "outcome": {
+        "EvidencePending": {
+          "missing": [
+            "release cadence trailing 12mo",
+            "bus factor / governance summary",
+            "breaking-change rate vs pinned version",
+            "vendoring cost estimate if upstream stalls"
+          ]
+        }
+      },
+      "raw_data_path": null,
+      "notes": ""
+    }
+  ],
+  "honesty_note": "NOT the pinned benchmark machine; numbers are indicative only and may not be used for pass/fail claims (do-not-overclaim)"
+}

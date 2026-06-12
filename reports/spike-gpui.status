@@ -1,0 +1,8 @@
+done
+blockers:
+G2DiffScrollFrameTime: FAIL — p99 = 1.06 frames @ 60 Hz (bar 1)
+G4TypingLatency: FAIL — p99 = 1.06 frames @ 60 Hz (bar 1)
+G7BidiLigatures: evidence missing (1 artifacts)
+G5Accessibility: evidence missing (3 artifacts)
+G6Ime: evidence missing (5 artifacts)
+G8Sustainability: evidence missing (4 artifacts)
