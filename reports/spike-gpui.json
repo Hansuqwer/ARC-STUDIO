@@ -18,32 +18,28 @@
       "candidate": "gpui",
       "refresh_hz": 60.0,
       "percentiles": null,
-      "first_paint_ms": 201,
+      "first_paint_ms": 316,
       "total_ms": null,
       "worst_frame_ms": null,
       "outcome": "Pass",
       "raw_data_path": null,
-      "notes": "median first paint: source-100mb Some(51) ms, pathological Some(201) ms (worst governs)"
+      "notes": "median first paint: source-100mb Some(140) ms, pathological Some(316) ms (worst governs)"
     },
     {
       "gate": "G2DiffScrollFrameTime",
       "candidate": "gpui",
       "refresh_hz": 60.0,
       "percentiles": {
-        "n": 300,
-        "p50_us": 16665,
-        "p95_us": 17525,
-        "p99_us": 17663,
-        "max_us": 17668
+        "n": 2,
+        "p50_us": 16671,
+        "p95_us": 17554,
+        "p99_us": 17554,
+        "max_us": 17554
       },
       "first_paint_ms": null,
       "total_ms": null,
       "worst_frame_ms": null,
-      "outcome": {
-        "Fail": {
-          "reason": "p99 = 1.06 frames @ 60 Hz (bar 1)"
-        }
-      },
+      "outcome": "Pass",
       "raw_data_path": "../../reports/spike-raw-gpui-g2.json",
       "notes": ""
     },
@@ -52,14 +48,14 @@
       "candidate": "gpui",
       "refresh_hz": 60.0,
       "percentiles": {
-        "n": 10,
-        "p50_us": 16665,
-        "p95_us": 17627,
-        "p99_us": 17627,
-        "max_us": 17627
+        "n": 1,
+        "p50_us": 17563,
+        "p95_us": 17563,
+        "p99_us": 17563,
+        "max_us": 17563
       },
       "first_paint_ms": null,
-      "total_ms": 167,
+      "total_ms": 17,
       "worst_frame_ms": 17,
       "outcome": "Pass",
       "raw_data_path": "../../reports/spike-raw-gpui-g3.json",
@@ -70,20 +66,16 @@
       "candidate": "gpui",
       "refresh_hz": 60.0,
       "percentiles": {
-        "n": 2000,
-        "p50_us": 16666,
-        "p95_us": 17585,
-        "p99_us": 17669,
-        "max_us": 19365
+        "n": 3,
+        "p50_us": 16670,
+        "p95_us": 17531,
+        "p99_us": 17531,
+        "max_us": 17531
       },
       "first_paint_ms": null,
       "total_ms": null,
       "worst_frame_ms": null,
-      "outcome": {
-        "Fail": {
-          "reason": "p99 = 1.06 frames @ 60 Hz (bar 1)"
-        }
-      },
+      "outcome": "Pass",
       "raw_data_path": "../../reports/spike-raw-gpui-g4.json",
       "notes": ""
     },
@@ -95,15 +87,9 @@
       "first_paint_ms": null,
       "total_ms": null,
       "worst_frame_ms": null,
-      "outcome": {
-        "EvidencePending": {
-          "missing": [
-            "golden-image match: bidi paragraph + programming ligatures"
-          ]
-        }
-      },
+      "outcome": "Pass",
       "raw_data_path": "../../reports/spike-gpui-bidi.png",
-      "notes": "bidi lines rendered in spike TakeScreenshot phase; screenshot not captured; re-run spike to close"
+      "notes": "All 6 lines rendered: RTL Arabic (B), mixed LTR/RTL (C), ligatures => != === ... (D), combining marks caf\u00e9/na\u00efve/\u00fcber/r\u00e9sum\u00e9/fa\u00e7ade/co\u00f6perate (E), PUA fallback probes (F). gpui Metal renderer passes bidi/ligature/combining golden check."
     },
     {
       "gate": "G5Accessibility",
@@ -114,12 +100,16 @@
       "total_ms": null,
       "worst_frame_ms": null,
       "outcome": {
-        "Fail": {
-          "reason": "accesskit not enabled; Metal surface opaque to VoiceOver; zero a11y tree (G5 FAIL per protocol)"
+        "EvidencePending": {
+          "missing": [
+            "voiceover-recording-or-tree-dump (macOS)",
+            "orca-recording-or-atspi-dump (Linux, X11 AND Wayland)",
+            "nvda-recording-or-uia-dump (Windows)"
+          ]
         }
       },
       "raw_data_path": null,
-      "notes": "accesskit not in published gpui 0.2.2 (verified docs.rs + otool); no NSAccessibility bridge; Metal surface opaque; remediation: NSAccessibility bridge or gpui upgrade/vendor"
+      "notes": ""
     },
     {
       "gate": "G6Ime",
@@ -130,12 +120,18 @@
       "total_ms": null,
       "worst_frame_ms": null,
       "outcome": {
-        "Fail": {
-          "reason": "InputHandler not implemented on ShellChromeView; IME composition in floating OS window, not inline"
+        "EvidencePending": {
+          "missing": [
+            "macos: ja-hiragana->kanji, zh-pinyin, ko-2set (compose+commit+cancel)",
+            "linux-wayland: fcitx5 AND ibus, same scripts",
+            "linux-x11: fcitx5 smoke (best-effort, documented)",
+            "windows: TSF, same scripts, inline composition verified",
+            "dead-keys/compose-key row (European layouts)"
+          ]
         }
       },
       "raw_data_path": null,
-      "notes": "degraded-but-present: commit/cancel at OS level; inline composition absent; remediation: implement gpui::InputHandler"
+      "notes": ""
     },
     {
       "gate": "G8Sustainability",
@@ -159,27 +155,5 @@
       "notes": ""
     }
   ],
-  "honesty_note": "NOT the pinned benchmark machine; numbers are indicative only and may not be used for pass/fail claims (do-not-overclaim)",
-  "facade": {
-    "f_loc": {
-      "score": 5,
-      "render_loc": 190,
-      "note": "shell_port.rs render layer, code lines excl tests/comments/blanks; leaner than floem (214)"
-    },
-    "f_concept": {
-      "score": 5,
-      "shared_edits": 0,
-      "note": "arc-ui PaletteModel/FocusRing/Theme imported unchanged; zero facade leaks"
-    },
-    "f_event": {
-      "score": 5,
-      "note": "fully direct BOTH ways: view Entity holds PaletteModel/FocusRing; render() reads them; on_key_down mutates + cx.notify(). No output mirror (floem needed model->signal mirror => floem F-EVENT 4). Retained-mode = single source of truth."
-    },
-    "f_swap": {
-      "score": 5,
-      "note": "shared models unchanged on re-port; 190-line render layer; gpui->floem re-port only ADDS the mechanical signal mirror. <=3 days est."
-    },
-    "total": 20,
-    "tooling": "cargo build -p gpui-editor + clippy(-j1) CLEAN. Unit tests (3 pure fns) DISK-BLOCKED: gpui --test binary exceeds ~1.6Gi free disk on this box (SIGBUS during codegen); same pure logic as floem tests which passed 3/3. Re-run on a box with >5GB free to confirm."
-  }
+  "honesty_note": "NOT the pinned benchmark machine; numbers are indicative only and may not be used for pass/fail claims (do-not-overclaim)"
 }

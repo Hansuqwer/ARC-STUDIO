@@ -39,6 +39,8 @@ struct SpikeView {
     lines: Vec<String>,
     done: bool,
     cfg: RunConfig,
+    /// Non-zero while holding the bidi frame for G7 screenshot (counts down).
+    bidi_hold_frames: u32,
 }
 
 impl Render for SpikeView {
@@ -74,6 +76,12 @@ fn tick(weak: WeakEntity<SpikeView>, window: &mut Window, cx: &mut App) {
         if v.done {
             return true;
         }
+        // Hold on bidi frame until counter expires (G7 screenshot window).
+        if v.bidi_hold_frames > 0 {
+            v.bidi_hold_frames -= 1;
+            cx.notify();
+            return false;
+        }
         match v.script.on_present(now) {
             Action::OpenWorkload { path, label: _ } => {
                 if let Ok(doc) = TextDoc::load(&path) {
@@ -107,9 +115,9 @@ fn tick(weak: WeakEntity<SpikeView>, window: &mut Window, cx: &mut App) {
             }
             Action::TakeScreenshot { out: _ } => {
                 v.lines = bidi_sample_lines().iter().map(|s| s.to_string()).collect();
-                // G7: bidi text visible — window holds here for 30s.
-                // Screenshot now: Cmd+Shift+4, save to reports/spike-gpui-bidi.png
-                std::thread::sleep(std::time::Duration::from_secs(30));
+                // G7: hold on this frame for ~30s (1800 frames @ 60Hz).
+                // Screenshot now: Cmd+Shift+4 → reports/spike-gpui-bidi.png
+                v.bidi_hold_frames = 1800;
             }
             Action::Settle => {}
             Action::Finished => {
@@ -169,6 +177,7 @@ fn main() {
                 lines: vec!["gpui spike — starting…".into()],
                 done: false,
                 cfg: config(),
+                bidi_hold_frames: 0,
             });
             // Register the FIRST tick here (not from render) — the chain self-sustains.
             let weak = view.downgrade();
@@ -220,12 +229,12 @@ fn empty_plan() -> ScriptPlan {
         source_100mb: "".into(),
         pathological_10mb: "".into(),
         diff_5k: "".into(),
-        g1_reps: 0,
-        scroll_frames: 0,
-        rows: 0,
+        g1_reps: 5,
+        scroll_frames: 300,
+        rows: 100,
         g3_chunk: 10,
         keys: vec![],
         screenshot_out: "".into(),
-        warmup_frames: 0,
+        warmup_frames: 5,
     }
 }
