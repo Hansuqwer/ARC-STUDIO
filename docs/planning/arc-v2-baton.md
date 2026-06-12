@@ -1,33 +1,85 @@
 # arc-v2 baton state (update this file at every handback)
 
-Last updated: 2026-06-12 (PM-6) · Branch: `arc-v2/sprint-1-protocol-bridge` @ `87026f9d`
+Last updated: 2026-06-12 (PM-7) · Branch: `arc-v2/sprint-1-protocol-bridge` @ `2085a228`
 
 ## Who holds the baton
 
-**M4 (local CLI):** floem spike DONE — report committed. Next: gpui spike.
+**ARENA (sandbox):** 3 of 4 spikes done — **draft the provisional 3-way ranking
+memo now** (floem / gpui / gpui-ce). bespoke deferred by owner (stop condition:
+never self-start bespoke). Owner override required to run the 4th.
 
-**Arena (sandbox):** all framework-free phase cores DONE and merged, including
-Sprint-8 daemon integration:
-- §3.12 streams (`arc-daemon-client::streams`)
-- Sprint-4 editor core (`arc-editor`: Buffer/undo-redo/completion stub)
-- Sprint-5 (`arc-workspace` worktree+watcher; `arc-index` tantivy w/ planted-secret
-  redaction + corruption-rebuilds, rusqlite WAL symbols)
-- Sprint-6 (`arc-terminal` PTY echo/resize/exit matrix; Linux rows container-proven,
-  macOS rows CLI-proven, ConPTY rows await Windows shell)
-- Sprint-7 panels (`arc-dock`: SurfaceState/Runs/EventStream w/ replay parity)
-- Sprint-8 security surfaces (`arc-dock`: HitlModal Escape=dismiss-not-deny +
-  DiffReview confirmation-gated apply)
-- **Sprint-8 daemon integration (DONE):** HITL decision endpoint authorized +
-  implemented. `GET /api/hitl` + `POST /api/hitl/{hitl_id}/decision`. Thin HTTP
-  face over existing `HitlSqliteStore`. 230/230 Python tests pass.
-- **floem spike (DONE, 2026-06-12):** `reports/spike-floem.json` committed.
-  G1 Pass (58ms source-100mb), G3 Pass. G2/G4 Fail by 1.03 frames (timer-noise
-  artefact of exec_after measurement proxy — not a true rendering failure).
-  G5/G6/G7/G8 EvidencePending (operator screenshots + VoiceOver + IME needed).
-  Candidate finding F-floem-1: floem 0.2 has no raw present callback; used
-  `create_effect` + `exec_after(1ms)` as proxy.
+**M4 (local CLI):** spike queue paused at owner request after 3 reports.
 
-Workspace: 9 crates / 117 macOS tests (122 with hitl client) / fmt clean.
+## Spike results (committed, indicative-only — M4 not pinned benchmark machine)
+
+| Gate | floem 0.2 | gpui 0.2.2 | gpui-ce c237d57 |
+|---|---|---|---|
+| G1 first-paint | Pass (58ms src / 6ms path) | Pass (51ms src / 201ms path) | Pass (166ms) |
+| G2 scroll p99 | 17.0ms (1.03f) FAIL | 17.7ms (1.06f) FAIL | 17.6ms (1.06f) FAIL |
+| G3 replay | Pass (worst 16ms) | Pass (worst 17ms) | Pass (worst 17ms) |
+| G4 typing p99 | 17.1ms (1.03f) FAIL | 17.7ms (1.06f) FAIL | **50.6ms (3.03f) FAIL** |
+| G5/G6/G7/G8 | EvidencePending | EvidencePending | EvidencePending |
+| text render | visible (clean) | visible (clean) | **non-visible (black)** |
+
+Reports: `reports/spike-{floem,gpui,gpui-ce}.json` + raws + `.status` sidecars.
+
+## Candidate findings (recorded)
+
+- **F-floem-1:** floem 0.2 has no raw present callback. Proxy: `create_effect`
+  + `exec_after(1ms)` → tick. Post-signal-propagation, pre-GPU-submit. ~0.5ms
+  timer noise pushes G2/G4 p99 to 1.03 frames. Score as F-CONCEPT.
+- **F-gpui-1:** clean `on_next_frame` present callback (trustworthy). G2/G4 p99
+  1.06 frames is the harness's callback-entry-vs-scanout gap, not a render fail.
+- **F-gpui-ce-1:** text glyphs did not visibly paint with bare
+  `div().font_family().child()` (dark bg only → appeared as black screen);
+  on_next_frame still fired at vsync (G2/G3=16.7ms confirm real presents).
+  Visual-paint fidelity UNVERIFIED.
+- **F-gpui-ce-2:** G4 typing p50=49ms (~3 frames/keystroke) vs gpui/floem
+  ~16.6ms — real per-keystroke regression on this fork+rev.
+
+## Cross-candidate read (for the memo, owner to confirm)
+
+- G2/G4 "fails" at 1.03–1.06 frames are **uniform across floem+gpui** → almost
+  certainly the harness measurement gap (callback-entry Instant, not scanout),
+  NOT a real rendering failure. Recommend the memo flag the G2/G4 bar as
+  measurement-bound on unpinned M4 and defer pass/fail to pinned hardware.
+- gpui-ce is the **only** candidate with a real anomaly: 3-frame typing +
+  non-visible text. Both are fork-specific (c237d57) and lower its provisional
+  rank vs upstream gpui.
+- floem has the best G1 (58ms) and clean text; gpui has the cleanest present
+  callback (on_next_frame). These two lead the provisional 3-way.
+
+## Still owner-gated / next
+
+1. **Arena:** draft provisional ranking memo (G1–G4 + findings + G8 pre-fills),
+   flag G2/G4 as measurement-bound, → owner sign-off.
+2. **bespoke spike:** NOT started (stop condition). Owner override required.
+3. **Evidence rows** (G5/G6/G7/G8) for all 3: operator screenshots (bidi),
+   VoiceOver tree dumps, IME scripts — needed before any final verdict.
+4. On sign-off: `arc_ui::kit` feature-flag plan for the leading candidate.
+
+## Build/infra notes
+
+- Spike target dir moved OUT of worktree to `~/cargo-spike-target` (the macOS
+  `/T/` worktree filesystem hit 100% during gpui-ce git-dep build). Spike
+  `target/` is gitignored. Run spikes from `rust/spikes/` so `../../reports/`
+  relative paths resolve.
+- gpui spike crashed first run (SIGABRT via `__eprint`): root cause was
+  registering `on_next_frame` from inside `render()` + `cx.notify()` re-entry.
+  Fixed to blessed Zed pattern: register first frame at window-open, re-register
+  inside the callback, pure render(), no stdout/stderr in run loop.
+
+## Stop conditions (active)
+
+- Ambiguous gate → stop, report finding.
+- Untrustworthy present-callback → record finding, continue. (gpui-ce hit this.)
+- All-fail → escalate to owner; **never self-start the bespoke sprint.**
+
+## Standing constraints (unchanged)
+
+Native-only · v1 shippable (230 tests) · additive protocol · deterministic
+security · daemon producer-of-truth · facade rule · no overclaiming
+(M4 unpinned ⇒ indicative-only; CI runners ⇒ compile evidence only).
 
 ## M4 execution order (next)
 
