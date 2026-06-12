@@ -131,7 +131,7 @@ fn region_card(
 /// the repaint. No parallel palette/focus state is introduced.
 /// IME composition state for the palette TypeBox — holds the committed text,
 /// the in-progress composition mark, and cursor position (all in UTF-16 units
-/// as required by NSTextInputClient / gpui::InputHandler).
+/// as required by NSTextInputClient / kit InputHandler).
 #[derive(Default)]
 pub struct TypeBoxContent {
     pub committed: String,
@@ -157,7 +157,7 @@ impl TypeBoxContent {
     }
 }
 
-/// gpui::InputHandler implementation — exposes the TypeBox to NSTextInputClient
+/// kit InputHandler implementation — exposes the TypeBox to NSTextInputClient
 /// so IME composition renders inline in the palette query line (G6).
 struct TypeBoxHandler {
     entity: Entity<ShellChromeView>,
@@ -352,6 +352,37 @@ impl Render for ShellChromeView {
             TypeBoxHandler { entity: cx.entity().clone() },
             cx,
         );
+
+        // G5: attach the ARC accessibility tree to the gpui NSView (macOS).
+        // Truth lives in arc_ui::a11y; this only bridges it to NSAccessibility.
+        #[cfg(target_os = "macos")]
+        {
+            let regions: Vec<(&str, &str)> = self
+                .model
+                .focus
+                .regions_for_a11y();
+            let rows: Vec<(String, bool)> = self
+                .model
+                .palette
+                .items
+                .iter()
+                .take(50)
+                .map(|it| (it.title.clone(), matches!(it.enablement, Enablement::Disabled { .. })))
+                .collect();
+            let status = self.model.status_rail();
+            let snap = arc_ui::a11y::A11ySnapshot {
+                focused_region_id: current_focus_id(&self.model),
+                regions: &regions,
+                palette_open: self.model.palette.open,
+                palette_query: &self.model.palette.query,
+                palette_rows: &rows,
+                palette_selected: self.model.palette.selected,
+                typebox_text: &self.typebox.committed,
+                status_rail: &status,
+            };
+            let tree = arc_ui::a11y::ShellA11yTree::build(&snap);
+            crate::a11y_macos::attach_a11y_tree(window, &tree);
+        }
         let theme = self.model.theme.clone();
         let current = current_focus_id(&self.model);
         let rows: Vec<AnyElement> = self

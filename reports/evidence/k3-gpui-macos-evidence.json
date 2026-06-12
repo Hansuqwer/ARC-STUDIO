@@ -4,9 +4,9 @@
   "date": "2026-06-12",
   "machine": "BLUETEAM.local M4 \u2014 pinned benchmark machine",
   "g5_voiceover": {
-    "outcome": "Fail",
-    "notes": "accesskit not linked (verified via otool) AND not a declared feature in published gpui 0.2.2 Cargo.toml (verified via docs.rs). Metal GPU surface is opaque to VoiceOver NSAccessibility tree. Per protocol: zero a11y tree = G5 FAIL, not pending.",
-    "raw_data_path": null,
+    "outcome": "Pass",
+    "notes": "RESOLVED via ARC NSAccessibility bridge. VoiceOver on M4 confirmed: window title + 4 labeled landmarks navigable (Workspace tree/Editor/ARC dock/Status rail). Two bugs fixed during bring-up: setAccessibilityElement must be false (container, not leaf) and child elements need real non-zero screen frames (VO culls zero-frame). a11y semantic tree is framework-free (arc_ui::a11y) \u2192 reusable if floem escape executes.",
+    "raw_data_path": "operator VoiceOver confirmation 2026-06-12 (Workspace tree/Editor/ARC dock/Status rail announced)",
     "remediation": "No accesskit feature in published gpui=0.2.2 on crates.io. Options: (a) add NSAccessibility bridge on ShellChromeView, (b) vendor/patch gpui with AccessKit path, (c) upgrade gpui pin to a rev that exposes accesskit support. Required before FINAL."
   },
   "g6_ime": {

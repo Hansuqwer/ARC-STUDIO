@@ -53,6 +53,12 @@ impl FocusRing {
         self.current = idx;
         self.current()
     }
+
+    /// (id, label) pairs in focus order — for the accessibility bridge to
+    /// expose each region as a labeled landmark.
+    pub fn regions_for_a11y(&self) -> Vec<(&str, &str)> {
+        self.regions.iter().map(|r| (r.id, r.label)).collect()
+    }
 }
 
 #[cfg(test)]

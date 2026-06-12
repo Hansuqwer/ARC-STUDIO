@@ -13,6 +13,7 @@ pub mod focus;
 pub mod keymap;
 pub mod palette;
 pub mod theme;
+pub mod a11y;
 
 /// The only framework import site in the workspace. K1: gpui live behind the
 /// feature flag. Floem entry preserved as the tested escape (adjudication §3).
@@ -27,3 +28,4 @@ pub use focus::FocusRing;
 pub use keymap::{Chord, Keymap, KeymapError};
 pub use palette::PaletteModel;
 pub use theme::Theme;
+pub use a11y::{A11yNode, A11yRole, A11ySnapshot, ShellA11yTree};

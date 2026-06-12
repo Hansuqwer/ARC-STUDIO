@@ -6,6 +6,8 @@
 
 #[cfg(feature = "framework-gpui")]
 pub mod render_gpui;
+#[cfg(all(feature = "framework-gpui", target_os = "macos"))]
+pub mod a11y_macos;
 pub mod shell;
 pub mod supervisor;
 

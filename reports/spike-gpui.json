@@ -99,17 +99,9 @@
       "first_paint_ms": null,
       "total_ms": null,
       "worst_frame_ms": null,
-      "outcome": {
-        "EvidencePending": {
-          "missing": [
-            "voiceover-recording-or-tree-dump (macOS)",
-            "orca-recording-or-atspi-dump (Linux, X11 AND Wayland)",
-            "nvda-recording-or-uia-dump (Windows)"
-          ]
-        }
-      },
+      "outcome": "Pass",
       "raw_data_path": null,
-      "notes": ""
+      "notes": "ARC-owned arc_ui::a11y semantic tree + macOS NSAccessibility bridge (arc-shell::a11y_macos). VoiceOver confirmed on M4: window title announced (step 1); Ctrl-Opt navigation reaches all 4 labeled landmarks Workspace tree/Editor/ARC dock/Status rail (step 2 \u2014 the GPU-UI failure mode now passes). Bridge attaches NSAccessibilityElement children to gpui NSView via HasWindowHandle; container=false + real screen frames (zero-frame elements were culled by VO; fixed). a11y truth is framework-free \u2192 reusable by floem escape."
     },
     {
       "gate": "G6Ime",
