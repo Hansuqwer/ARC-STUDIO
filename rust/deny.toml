@@ -32,7 +32,10 @@ allow-wildcard-paths = true  # path-only deps inside this private workspace are 
 # Framework crates must never appear in the MAIN workspace graph
 # (facade rule, mechanically enforced here as well as in CI grep):
 deny = [
-  { crate = "gpui" },
+  # K1 (2026-06-12): gpui allowed ONLY as arc-ui's optional dep (the single
+  # framework import site). All other workspace crates still banned — the
+  # source-level CI grep gate enforces this independently.
+  { crate = "gpui", wrappers = ["arc-ui"] },
   { crate = "floem" },
   { crate = "masonry" },
   { crate = "xilem" },

@@ -5,8 +5,8 @@
 //! - everything else programs against the ARC-owned vocabulary below, so a
 //!   framework swap after the Sprint-3 spike touches exactly one crate.
 //!
-//! Sprint-2 status: **no framework selected** (ADR-0002 spike pending, gates
-//! G1–G8). `kit` is therefore empty; the shell builds and tests headless.
+//! K1 (2026-06-12): framework-gpui feature active, gpui 0.2.2 exact pin.
+//! Sprint-1 "no framework in lock" gate formally retired — its job is done.
 
 pub mod command;
 pub mod focus;
@@ -14,12 +14,12 @@ pub mod keymap;
 pub mod palette;
 pub mod theme;
 
-/// The only framework import site in the workspace. Populated by the Sprint-3
-/// decision; until then any attempt to use a framework type elsewhere fails
-/// both compilation and the facade CI gate.
+/// The only framework import site in the workspace. K1: gpui live behind the
+/// feature flag. Floem entry preserved as the tested escape (adjudication §3).
 pub mod kit {
-    // #[cfg(feature = "framework-gpui")]  pub use gpui::*;
-    // #[cfg(feature = "framework-floem")] pub use floem::*;
+    #[cfg(feature = "framework-gpui")]
+    pub use gpui::*;
+    // #[cfg(feature = "framework-floem")] pub use floem::*;  // escape — kept
 }
 
 pub use command::{Command, CommandId, CommandRegistry};

@@ -7,16 +7,17 @@ publish = false
 description = "ARC v2 UI facade — the ONLY crate allowed to depend on a UI framework (improvement #1)"
 
 [features]
-# No default framework: Sprint 3's spike (gates G1-G8) selects one. Until then
-# the kit module is intentionally empty and arc-shell builds headless-only.
+# Headless stays the default everywhere (flag off = today's headless build).
 default = []
-# Enabled exclusively by the Sprint-3 spike crates on desktop hardware:
-# framework-gpui  = ["dep:gpui"]
-# framework-floem = ["dep:floem"]
+# Sprint-3 selection: gpui 0.2.2. Feature off = headless; on = framework enabled.
+# floem entry stays as the tested escape (≤3-day re-port per adjudication §3).
+framework-gpui  = ["dep:gpui"]
+# framework-floem = ["dep:floem"]  # escape hatch — kept, not deleted
 
 [dependencies]
 nucleo-matcher = "0.3.1"
 thiserror = { workspace = true }
+gpui = { version = "=0.2.2", optional = true }
 
 [lints]
 workspace = true
