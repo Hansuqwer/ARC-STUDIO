@@ -4,11 +4,32 @@ Last updated: 2026-06-12 (PM-2) · Branch: `arc-v2/sprint-1-protocol-bridge` @ b
 
 ## Who holds the baton
 
-**ARENA (sandbox):** 3 of 4 spikes done — **draft the provisional 3-way ranking
-memo now** (floem / gpui / gpui-ce). bespoke deferred by owner (stop condition:
-never self-start bespoke). Owner override required to run the 4th.
+**ARENA (sandbox):** facade-cost ports landed (criterion #1). **Do the final
+criterion-#1 adjudication** — gpui 20 vs floem 18 reorders the provisional
+ranking; tension vs G8/G1 documented in memo §5b. CLI did NOT self-adjudicate
+the close call (memo reserved it for Arena + owner). Then: `arc_ui::kit`
+feature-flag plan for the confirmed leader + top-two G5/G6/G7 evidence.
 
-**M4 (local CLI):** spike queue paused at owner request after 3 reports.
+**M4 (local CLI):** both facade ports done (`shell_port.rs` floem + gpui,
+committed). Awaiting final-ranking confirmation before kit work.
+
+## Facade-cost results (criterion #1, 2026-06-12, committed)
+
+| Sub-score | floem | gpui |
+|---|---|---|
+| F-LOC | 5 (214) | 5 (190) |
+| F-CONCEPT | 5 (0 edits) | 5 (0 edits) |
+| F-EVENT | 4 (reactive signal mirror) | 5 (retained-mode direct) |
+| F-SWAP | 4 | 5 |
+| **Total** | **18/20** | **20/20** |
+
+gpui leads criterion #1 (the top criterion) by 2 pts — the floem↔gpui reorder
+the memo predicted. Tension: floem still leads G8 (14 vs 9) + G1 (58 vs 201ms).
+Final call is Arena's + owner's. `facade` blocks committed in both reports.
+
+Caveat: gpui shell_port tests disk-blocked on M4 box (gpui --test binary >1.6GB
+free; SIGBUS). Build+clippy clean; pure-fn logic identical to floem's passing
+tests.
 
 ## Spike results (committed, indicative-only — M4 not pinned benchmark machine)
 

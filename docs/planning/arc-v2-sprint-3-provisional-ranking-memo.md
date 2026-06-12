@@ -108,6 +108,39 @@ Still blocked regardless: final selection (needs Linux session + Windows-gap
 decision per os-sequencing doc), Sprint 4+ render work beyond the flag-gated
 kit, retirement-path anything.
 
+## 5b. Facade-cost ports landed (criterion #1 — CLI, 2026-06-12)
+
+Both authorized ports built against the UNCHANGED arc-ui models
+(`shell_port.rs`, one file each). Scores per `arc-v2-facade-cost-protocol.md`:
+
+| Sub-score | floem 0.2.0 | gpui 0.2.2 | Why they differ |
+|---|---|---|---|
+| F-LOC | 5 (214 lines) | 5 (190 lines) | both <300; gpui leaner |
+| F-CONCEPT | 5 (0 edits) | 5 (0 edits) | neither forced an arc-ui change — facade holds both ways |
+| F-EVENT | **4** | **5** | floem fine-grained reactivity REQUIRES a model→signal output mirror (open/query/rows/sel signals synced from PaletteModel); gpui retained-mode HOLDS the model in the view Entity and render() reads it directly — no mirror, single source of truth. Input is direct in both. |
+| F-SWAP | 4 | 5 | symmetric ~200-line render layer over identical unchanged models; floem carries the extra mirror in both directions |
+| **Total** | **18 / 20** | **20 / 20** | |
+
+**This is the floem↔gpui reorder the memo predicted §3.** On criterion #1
+(the TOP criterion in the ADR-0002 addendum, above G8 and a11y), **gpui leads
+by 2 points**, driven entirely by floem's reactive-signal mirror (a real
+architectural cost, not a measurement artifact — cited in both reports'
+`facade` blocks with the exact code difference).
+
+**The tension for final adjudication (Arena + owner):** criterion #1 now
+favors gpui; criteria #2 (G8: floem 14 vs gpui 9) and the G1 first-paint
+(floem 58 ms vs gpui 201 ms) favor floem. The addendum rule orders #1 > #2,
+so by the letter gpui becomes the provisional leader — but the 2-point margin
+is one sub-score (F-EVENT) and floem's 3× G1 advantage + healthier upstream
+(G8) are real. **CLI does not self-adjudicate this** — it is exactly the
+close criterion-#1 call the memo reserved for Arena's final scoring + owner
+sign-off. Both reports carry the raw `facade` blocks; the decision is open.
+
+Honesty caveat: gpui shell_port unit tests (3 pure fns) are disk-blocked on
+the CLI's box (gpui `--test` binary exceeds ~1.6 GB free; SIGBUS at codegen).
+Build + clippy are clean; the tested logic is framework-independent and
+identical to floem's passing tests. Re-run on a >5 GB-free box to close.
+
 ## 6. Owner decision record
 
 Decided 2026-06-12 via owner delegation ("decide", chat) — verdicts by the
