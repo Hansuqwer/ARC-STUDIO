@@ -32,7 +32,9 @@ fn main() {
         // Official floem timer loop pattern.
         create_effect(move |_| {
             let t = tick.get(); // subscribe
-            if done.get() { return; }
+            if done.get() {
+                return;
+            }
 
             let action = spike.borrow_mut().script.on_present(t);
             match action {
@@ -61,7 +63,12 @@ fn main() {
                             r#"{{"sequence":{i},"type":"TOOL_CALL","timestamp":"2026-06-12T00:00:00Z","data":{{"tool_name":"row_{i}"}}}}"#
                         ));
                     }
-                    lines.set(sp.event_table.tail_viewport().map(EventTable::display_line).collect());
+                    lines.set(
+                        sp.event_table
+                            .tail_viewport()
+                            .map(EventTable::display_line)
+                            .collect(),
+                    );
                 }
                 Action::TypeChar { ch } => {
                     spike.borrow_mut().typebox.push(ch);
@@ -75,10 +82,16 @@ fn main() {
                 Action::Finished => {
                     done.set(true);
                     let dummy = FrameScript::new(ScriptPlan {
-                        source_100mb: "".into(), pathological_10mb: "".into(),
-                        diff_5k: "".into(), g1_reps: 0, scroll_frames: 0,
-                        rows: 0, g3_chunk: 10, keys: vec![],
-                        screenshot_out: "".into(), warmup_frames: 0,
+                        source_100mb: "".into(),
+                        pathological_10mb: "".into(),
+                        diff_5k: "".into(),
+                        g1_reps: 0,
+                        scroll_frames: 0,
+                        rows: 0,
+                        g3_chunk: 10,
+                        keys: vec![],
+                        screenshot_out: "".into(),
+                        warmup_frames: 0,
                     });
                     let real = std::mem::replace(&mut spike.borrow_mut().script, dummy);
                     let results = real.into_results();
@@ -86,7 +99,9 @@ fn main() {
                     match assemble_report(CANDIDATE, VERSION, &results, &cfg) {
                         Ok(report) => {
                             if let Err(bs) = report.spike_verdict() {
-                                for b in bs { eprintln!("BLOCKER: {b}"); }
+                                for b in bs {
+                                    eprintln!("BLOCKER: {b}");
+                                }
                             }
                             eprintln!("✓ Report: {}/spike-floem.json", cfg.reports_dir.display());
                         }
@@ -108,8 +123,11 @@ fn main() {
             move || lines.get().into_iter().enumerate(),
             |(i, _)| *i,
             |(_, line)| {
-                label(move || line.clone())
-                    .style(|s| s.font_family("Menlo".to_string()).font_size(11.0).padding_vert(1.0))
+                label(move || line.clone()).style(|s| {
+                    s.font_family("Menlo".to_string())
+                        .font_size(11.0)
+                        .padding_vert(1.0)
+                })
             },
         )
         .style(|s| s.flex_col().width_pct(100.0))

@@ -39,6 +39,14 @@ impl Percentiles {
     pub fn p99_frames(&self, refresh_hz: f64) -> f64 {
         (self.p99_us as f64 / 1_000_000.0) * refresh_hz
     }
+
+    /// R1 discriminator: count of samples exceeding two vsync periods.
+    /// 0 => timing sits at/near the frame schedule (callback-entry noise);
+    /// >0 => real missed deadlines. Computed from raw samples.
+    pub fn over_two_vsync(samples: &[u64], refresh_hz: f64) -> usize {
+        let two_vsync_us = (2.0 * 1_000_000.0 / refresh_hz) as u64;
+        samples.iter().filter(|&&s| s > two_vsync_us).count()
+    }
 }
 
 #[cfg(test)]

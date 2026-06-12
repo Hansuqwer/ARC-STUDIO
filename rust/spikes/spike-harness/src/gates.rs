@@ -47,12 +47,12 @@ impl Gate {
         match self {
             // Placeholders per brief §3.5 — re-pin with hardware.
             Gate::G1HugeFileFirstPaint => PassBar::FirstPaintAtMostMs { ms: 1000 },
-            Gate::G2DiffScrollFrameTime => PassBar::P99FramesAtMost { frames: 1.0 }, // ≤1 frame @ recorded Hz (≈16.6ms @60)
+            Gate::G2DiffScrollFrameTime => PassBar::P99FramesAtMost { frames: 1.1 }, // R1: ≤1.1 frames AND 0% >2vsync
             Gate::G3EventReplayBudget => PassBar::TotalBudgetMs {
                 ms: 250,
                 no_frame_over_ms: 33,
             },
-            Gate::G4TypingLatency => PassBar::P99FramesAtMost { frames: 1.0 },
+            Gate::G4TypingLatency => PassBar::P99FramesAtMost { frames: 1.1 }, // R1: ≤1.1 frames AND 0% >2vsync
             Gate::G5Accessibility => PassBar::Evidence {
                 required_artifacts: to_vec(&[
                     "voiceover-recording-or-tree-dump (macOS)",
@@ -125,18 +125,61 @@ impl GateRow {
         total_ms: Option<u64>,
         worst_frame_ms: Option<u64>,
     ) -> Self {
+        Self::evaluate_with_raw(
+            gate,
+            candidate,
+            refresh_hz,
+            percentiles,
+            None,
+            first_paint_ms,
+            total_ms,
+            worst_frame_ms,
+        )
+    }
+
+    /// Full form: P99 gates require `raw_samples` for the R1 discriminator.
+    #[allow(clippy::too_many_arguments)]
+    pub fn evaluate_with_raw(
+        gate: Gate,
+        candidate: &str,
+        refresh_hz: f64,
+        percentiles: Option<Percentiles>,
+        raw_samples: Option<&[u64]>,
+        first_paint_ms: Option<u64>,
+        total_ms: Option<u64>,
+        worst_frame_ms: Option<u64>,
+    ) -> Self {
         let outcome = match gate.pass_bar() {
             PassBar::P99FramesAtMost { frames } => match &percentiles {
                 None => GateOutcome::NotRun,
                 Some(p) => {
                     let got = p.p99_frames(refresh_hz);
-                    if got <= frames {
-                        GateOutcome::Pass
-                    } else {
-                        GateOutcome::Fail {
-                            reason: format!(
-                                "p99 = {got:.2} frames @ {refresh_hz} Hz (bar {frames})"
-                            ),
+                    // R1 (owner-accepted 2026-06-12): pass requires BOTH
+                    // p99 within the bar AND zero samples beyond two vsync
+                    // periods. Raw samples are required for P99 gates —
+                    // absent raws = NotRun, never a blind pass.
+                    match raw_samples {
+                        None => GateOutcome::NotRun,
+                        Some(raw) => {
+                            let over =
+                                crate::percentile::Percentiles::over_two_vsync(raw, refresh_hz);
+                            if got <= frames && over == 0 {
+                                GateOutcome::Pass
+                            } else if over > 0 {
+                                GateOutcome::Fail {
+                                    reason: format!(
+                                        "{over}/{} samples > 2 vsyncs ({:.1}%) — real missed frames (R1)",
+                                        raw.len(),
+                                        100.0 * over as f64 / raw.len() as f64
+                                    ),
+                                }
+                            } else {
+                                GateOutcome::Fail {
+                                    reason: format!(
+                                        "p99 = {got:.2} frames @ {refresh_hz} Hz (bar {frames})"
+                                    ),
+                                }
+                            }
                         }
                     }
                 }
@@ -189,10 +232,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn g4_pass_and_fail_are_vsync_aware() {
-        // 15 ms p99: pass at 60 Hz (0.9 frames), FAIL at 120 Hz (1.8 frames).
-        let p = Percentiles::from_us(&[15_000; 100]);
-        let pass = GateRow::evaluate(
+    fn g4_pass_and_fail_are_vsync_aware_r1() {
+        // R1: raws REQUIRED for P99 gates; evaluate() without raws => NotRun.
+        let raw = [15_000u64; 100];
+        let p = Percentiles::from_us(&raw);
+        let no_raws = GateRow::evaluate(
             Gate::G4TypingLatency,
             "x",
             60.0,
@@ -201,9 +245,78 @@ mod tests {
             None,
             None,
         );
+        assert_eq!(
+            no_raws.outcome,
+            GateOutcome::NotRun,
+            "no raws = NotRun, not pass"
+        );
+
+        // 15 ms p99, 0% >2vsync: pass at 60 Hz (0.9f), FAIL at 120 Hz (1.8f > 1.1 bar).
+        let pass = GateRow::evaluate_with_raw(
+            Gate::G4TypingLatency,
+            "x",
+            60.0,
+            p.clone(),
+            Some(&raw),
+            None,
+            None,
+            None,
+        );
         assert_eq!(pass.outcome, GateOutcome::Pass);
-        let fail = GateRow::evaluate(Gate::G4TypingLatency, "x", 120.0, p, None, None, None);
+        let fail = GateRow::evaluate_with_raw(
+            Gate::G4TypingLatency,
+            "x",
+            120.0,
+            p,
+            Some(&raw),
+            None,
+            None,
+            None,
+        );
         assert!(matches!(fail.outcome, GateOutcome::Fail { .. }));
+    }
+
+    #[test]
+    fn r1_discriminator_separates_artifact_from_regression() {
+        // The gpui-ce case in miniature: p99 marginal but 90% of frames at
+        // ~3 vsyncs => FAIL with the R1 reason; and the floem/gpui case:
+        // p99 = 1.03 frames but 0% >2vsync => PASS under the 1.1 bar.
+        let regression: Vec<u64> = (0..100)
+            .map(|i| if i < 90 { 50_000 } else { 16_700 })
+            .collect();
+        let p = Percentiles::from_us(&regression);
+        let r = GateRow::evaluate_with_raw(
+            Gate::G4TypingLatency,
+            "x",
+            60.0,
+            p,
+            Some(&regression),
+            None,
+            None,
+            None,
+        );
+        match &r.outcome {
+            GateOutcome::Fail { reason } => assert!(reason.contains("R1"), "{reason}"),
+            other => panic!("expected R1 fail, got {other:?}"),
+        }
+
+        let artifact = [17_100u64; 100]; // 1.03 frames, never >2vsync
+        let p = Percentiles::from_us(&artifact);
+        let r = GateRow::evaluate_with_raw(
+            Gate::G4TypingLatency,
+            "x",
+            60.0,
+            p,
+            Some(&artifact),
+            None,
+            None,
+            None,
+        );
+        assert_eq!(
+            r.outcome,
+            GateOutcome::Pass,
+            "1.03f with 0% >2v passes the R1 bar"
+        );
     }
 
     #[test]

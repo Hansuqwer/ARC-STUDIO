@@ -129,12 +129,15 @@ mod tests {
     #[test]
     fn verdict_blocks_on_pending_evidence_and_notrun() {
         let mut r = SpikeReport::new("floem", "0.2.0", "2026-06-11", machine());
-        let p = Percentiles::from_us(&[10_000; 100]);
-        r.rows.push(GateRow::evaluate(
+        let raw = [10_000u64; 100];
+        let p = Percentiles::from_us(&raw);
+        // R1: P99 gates need raws to pass.
+        r.rows.push(GateRow::evaluate_with_raw(
             Gate::G4TypingLatency,
             "floem",
             60.0,
             p,
+            Some(&raw),
             None,
             None,
             None,

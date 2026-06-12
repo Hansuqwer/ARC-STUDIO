@@ -5,9 +5,12 @@
 # this code does not.
 [workspace]
 resolver = "2"
-members = ["spike-harness", "floem-editor", "gpui-editor", "gpui-ce-editor"]
+members = ["spike-harness", "floem-editor", "gpui-editor"]
 exclude = [
   "bespoke-editor",
+  # gpui-ce-editor: parked per provisional ranking memo (F-gpui-ce-1/2/3 —
+  # the rev does not compile on Linux). Move back to members only on re-pin.
+  "gpui-ce-editor",
 ]
 # Candidate spike crates are NOT default members: they only build on desktop
 # hardware with a display server. Move one crate from `exclude` to `members`

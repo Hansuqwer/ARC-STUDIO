@@ -9,6 +9,7 @@
 //!   2. each callback: entity.update(cx, ..) → re-register next on_next_frame → window.refresh()
 //!   3. render() is PURE (no side effects, no frame registration)
 //!   4. NO eprintln!/println! inside the run loop — report is written to file only
+//!
 //! on_next_frame is a trustworthy post-present hook, so G1/G4 timings are
 //! accurate to GPU present (not render-call-return).
 
@@ -41,13 +42,15 @@ impl Render for SpikeView {
             .bg(rgb(0x1e1e1e))
             .text_color(rgb(0xd4d4d4))
             .children(
-                self.lines.iter().map(|line| {
-                    div()
-                        .font_family("Menlo")
-                        .text_size(px(11.0))
-                        .child(line.clone())
-                })
-                .collect::<Vec<_>>()
+                self.lines
+                    .iter()
+                    .map(|line| {
+                        div()
+                            .font_family("Menlo")
+                            .text_size(px(11.0))
+                            .child(line.clone())
+                    })
+                    .collect::<Vec<_>>(),
             )
     }
 }

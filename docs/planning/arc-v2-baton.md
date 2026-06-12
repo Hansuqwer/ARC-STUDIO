@@ -1,6 +1,6 @@
 # arc-v2 baton state (update this file at every handback)
 
-Last updated: 2026-06-12 (PM-7) · Branch: `arc-v2/sprint-1-protocol-bridge` @ `2085a228`
+Last updated: 2026-06-12 (PM) · Branch: `arc-v2/sprint-1-protocol-bridge` @ c4bc61c+1
 
 ## Who holds the baton
 
@@ -48,6 +48,18 @@ Reports: `reports/spike-{floem,gpui,gpui-ce}.json` + raws + `.status` sidecars.
   rank vs upstream gpui.
 - floem has the best G1 (58ms) and clean text; gpui has the cleanest present
   callback (on_next_frame). These two lead the provisional 3-way.
+
+## DECIDED 2026-06-12 (owner delegated via "decide")
+
+All five checkboxes recorded in the memo §6: (1) ranking ACCEPTED — floem 1,
+gpui 2, gpui-ce PARKED (now with F-gpui-ce-3: rev doesn't compile on Linux,
+E0308 in surface.rs — three defects at one rev); (2) R1 ACCEPTED and
+CODIFIED in spike-harness (P99 gates: p99 ≤ 1.1 frames AND 0% >2vsync,
+raws required — no raws = NotRun); (3) bespoke SKIPPED (reversible);
+(4) **M4 PINNED as benchmark machine** (arc-v2-benchmark-environment.md —
+macOS numbers now binding); (5) **facade ports AUTHORIZED** for floem +
+gpui — THE CLI'S NEXT M4 TASK (shell_port.rs per facade-cost-protocol,
+then top-two G5/G6/G7 evidence).
 
 ## Still owner-gated / next
 

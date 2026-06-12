@@ -96,11 +96,12 @@ pub fn assemble_report(
     report.rows.push(g1);
 
     // G2: present-to-present scroll frames.
-    let mut g2 = GateRow::evaluate(
+    let mut g2 = GateRow::evaluate_with_raw(
         Gate::G2DiffScrollFrameTime,
         candidate,
         hz,
         Percentiles::from_us(&results.g2_frame_us),
+        Some(&results.g2_frame_us),
         None,
         None,
         None,
@@ -139,11 +140,12 @@ pub fn assemble_report(
     report.rows.push(g3);
 
     // G4: issue-to-present per key.
-    let mut g4 = GateRow::evaluate(
+    let mut g4 = GateRow::evaluate_with_raw(
         Gate::G4TypingLatency,
         candidate,
         hz,
         Percentiles::from_us(&results.g4_us),
+        Some(&results.g4_us),
         None,
         None,
         None,

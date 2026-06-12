@@ -75,10 +75,13 @@ Reasoning against the ADR-0002 addendum rule, honestly labeled:
   attention withdrawn) are the debits.
 - gpui-ce at c237d57: 3-frames-per-keystroke (raw-data confirmed, 88.8% of
   samples) + unverified glyph paint are fork-specific regressions vs
-  upstream gpui (F-gpui-ce-1/2). **Recommend: park the fork** — do not
-  spend G5/G6/G7 evidence effort on it at this rev; re-pin only if a later
-  rev demonstrably fixes both findings. Its existence remains G8-relevant
-  to gpui (it is the vendor path).
+  upstream gpui (F-gpui-ce-1/2). **F-gpui-ce-3 (found post-memo, Linux
+  container):** the rev does not even COMPILE on Linux — E0308 in
+  `crates/gpui/src/elements/surface.rs:50` (a Linux-only cfg path macOS
+  never builds). Three independent defects at one rev. **Recommend: park
+  the fork** — do not spend G5/G6/G7 evidence effort on it at this rev;
+  re-pin only if a later rev demonstrably fixes all three findings. Its
+  existence remains G8-relevant to gpui (it is the vendor path).
 
 ## 4. Bespoke spike: recommend SKIP for the provisional round (owner call)
 
@@ -105,15 +108,37 @@ Still blocked regardless: final selection (needs Linux session + Windows-gap
 decision per os-sequencing doc), Sprint 4+ render work beyond the flag-gated
 kit, retirement-path anything.
 
-## 6. Owner decision checkboxes
+## 6. Owner decision record
 
-- [ ] **Ranking accepted** (floem 1 · gpui 2 · gpui-ce parked at this rev)
-- [ ] **R1 accepted** — G2/G4 measurement-bound reading + frames>2vsync
-      discriminator, re-adjudicated at pinned hardware
-- [ ] **Bespoke spike:** skip for provisional round / run anyway: ____
-- [ ] **M4 pinning:** pin as benchmark machine (one line in
-      arc-v2-benchmark-plan §Environment; upgrades these numbers from
-      indicative to binding) / keep unpinned: ____
-- [ ] **Authorize facade-cost ports** for floem + gpui (top-two decider)
+Decided 2026-06-12 via owner delegation ("decide", chat) — verdicts by the
+Arena agent under that delegation, recorded per checkpoint-#1 precedent.
+The CLI independently re-verified the discriminator math from the committed
+raws before this record (floem/gpui 0.0%, gpui-ce 88.8% — exact match).
 
-Recorded: ____________ (date / venue)
+- [x] **1. Ranking ACCEPTED** — floem 1 · gpui 2 · gpui-ce PARKED at
+      c237d57 (raw-data-confirmed regression; re-pin only if a later rev
+      demonstrably fixes F-gpui-ce-1 AND -2).
+- [x] **2. R1 ACCEPTED** — frames>2vsync is the gate discriminator on this
+      hardware; since the M4 is now pinned (item 4), the re-adjudication
+      lands immediately: **G2/G4 pass bar = p99 ≤ 1.1 frames AND
+      frames>2vsync = 0%** (codified; harness bar update is a follow-up
+      task for the next spike-harness touch). Clarification, not
+      relaxation — gpui-ce still fails.
+- [x] **3. Bespoke SKIPPED** for the provisional round. Reversible: crate
+      skeleton + pins stay committed; revisit only if BOTH facade ports
+      score F-EVENT ≤ 2 (the disqualifying-smell threshold).
+- [x] **4. M4 PINNED as the benchmark machine.** Rationale: it is the
+      daily-driver hardware v2 must feel good on; no competing pin
+      candidate exists; the review recommended exactly this. Consequence:
+      these numbers upgrade from indicative to binding for macOS rows;
+      the owner's Linux box becomes the secondary environment when its
+      session happens. Follow-up: one line in arc-v2-benchmark-plan
+      §Environment + future reports set is_pinned_benchmark_machine=true.
+- [x] **5. Facade-cost ports AUTHORIZED** for floem + gpui
+      (`shell_port.rs` per arc-v2-facade-cost-protocol.md). This is the
+      deciding input between the top two; CLI's next M4 task.
+
+Effective immediately: `arc_ui::kit` work behind `framework-floem` /
+`framework-gpui` feature flags is unblocked (provisional, reversible
+pending Linux). Final selection still requires: both facade ports scored,
+top-two G5/G6/G7 evidence, Linux session, Windows-gap decision.

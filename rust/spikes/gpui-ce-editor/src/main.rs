@@ -29,10 +29,15 @@ impl Render for SpikeView {
             .bg(rgb(0x1e1e1e))
             .text_color(rgb(0xd4d4d4))
             .children(
-                self.lines.iter().map(|line| {
-                    div().font_family("Menlo").text_size(px(11.0)).child(line.clone())
-                })
-                .collect::<Vec<_>>()
+                self.lines
+                    .iter()
+                    .map(|line| {
+                        div()
+                            .font_family("Menlo")
+                            .text_size(px(11.0))
+                            .child(line.clone())
+                    })
+                    .collect::<Vec<_>>(),
             )
     }
 }
@@ -133,7 +138,8 @@ fn main() {
             let weak = view.downgrade();
             window.on_next_frame(move |window, cx| tick(weak, window, cx));
             view
-        }).unwrap();
+        })
+        .unwrap();
         cx.activate(true);
     });
 }
@@ -163,7 +169,10 @@ fn plan() -> ScriptPlan {
         source_100mb: root.join("g1-source-100mb.txt"),
         pathological_10mb: root.join("g1-pathological-10mb-single-line.txt"),
         diff_5k: root.join("g2-diff-5k-lines.patch"),
-        g1_reps: 5, scroll_frames: 300, rows: 100, g3_chunk: 10,
+        g1_reps: 5,
+        scroll_frames: 300,
+        rows: 100,
+        g3_chunk: 10,
         keys: synthetic_keystream(seeds::G4_KEYS),
         screenshot_out: "../../reports/spike-gpui-ce-bidi.png".into(),
         warmup_frames: 5,
@@ -172,8 +181,15 @@ fn plan() -> ScriptPlan {
 
 fn empty_plan() -> ScriptPlan {
     ScriptPlan {
-        source_100mb: "".into(), pathological_10mb: "".into(), diff_5k: "".into(),
-        g1_reps: 0, scroll_frames: 0, rows: 0, g3_chunk: 10,
-        keys: vec![], screenshot_out: "".into(), warmup_frames: 0,
+        source_100mb: "".into(),
+        pathological_10mb: "".into(),
+        diff_5k: "".into(),
+        g1_reps: 0,
+        scroll_frames: 0,
+        rows: 0,
+        g3_chunk: 10,
+        keys: vec![],
+        screenshot_out: "".into(),
+        warmup_frames: 0,
     }
 }
