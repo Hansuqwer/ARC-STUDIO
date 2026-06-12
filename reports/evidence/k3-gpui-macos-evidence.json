@@ -10,9 +10,9 @@
     "remediation": "No accesskit feature in published gpui=0.2.2 on crates.io. Options: (a) add NSAccessibility bridge on ShellChromeView, (b) vendor/patch gpui with AccessKit path, (c) upgrade gpui pin to a rev that exposes accesskit support. Required before FINAL."
   },
   "g6_ime": {
-    "outcome": "Degraded",
-    "notes": "ShellChromeView does not implement gpui::InputHandler (NSTextInputClient 1:1). IME composition will appear in platform floating input window, not inline in the palette TypeBox. Commit/cancel paths functional at OS level but inline composition is absent. This is the standard behavior for any GPU-rendered view without InputHandler. Remediation: implement InputHandler on ShellChromeView (or the TypeBox element) per gpui docs.",
-    "raw_data_path": null,
+    "outcome": "PartialPass",
+    "notes": "InputHandler wired and confirmed on M4: Option+e then e composes \u00e9 INLINE in the palette TypeBox (not a floating window) \u2014 proves the NSTextInputClient marked-text/commit pipe works via replace_and_mark_text_in_range/replace_text_in_range. Dead-key (ABC layout) path PASS. Full CJK rerun (JA nihongo\u2192\u306b\u307b\u3093\u3054\u2192\u65e5\u672c\u8a9e, ZH nihao\u2192\u4f60\u597d, KO gksrnrdj) still pending: requires adding the Japanese/Pinyin/Korean input sources (only Swedish enabled on this box). CJK exercises the multi-syllable marked-text path more heavily; dead-key proves the same underlying mechanism.",
+    "raw_data_path": "operator confirmation 2026-06-12: dead-key \u00e9 inline in palette TypeBox",
     "remediation": "Implement gpui::InputHandler on the text-input element. Standard gpui pattern; Zed editor does this."
   },
   "g7_bidi": {

@@ -123,7 +123,7 @@
         }
       },
       "raw_data_path": null,
-      "notes": ""
+      "notes": "dead-key inline composition CONFIRMED (\u00e9 via Option+e in palette TypeBox; InputHandler pipe works); full CJK marked-text rerun pending input-source setup (JA/ZH/KO)"
     },
     {
       "gate": "G8Sustainability",
