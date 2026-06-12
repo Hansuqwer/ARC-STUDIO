@@ -5,11 +5,10 @@
 # this code does not.
 [workspace]
 resolver = "2"
-members = ["spike-harness"]
+members = ["spike-harness", "floem-editor"]
 exclude = [
   "gpui-editor",
   "gpui-ce-editor",
-  "floem-editor",
   "bespoke-editor",
 ]
 # Candidate spike crates are NOT default members: they only build on desktop

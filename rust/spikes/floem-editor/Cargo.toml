@@ -4,9 +4,8 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
-[workspace]
-
 [dependencies]
 anyhow = "1.0.98"
 floem = "0.2.0"
+floem_reactive = "0.2.0"
 spike-harness = { path = "../spike-harness" }
