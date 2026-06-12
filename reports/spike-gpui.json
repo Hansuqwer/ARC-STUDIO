@@ -119,7 +119,7 @@
         }
       },
       "raw_data_path": null,
-      "notes": "accesskit feature not compiled; remediation: enable accesskit or add NSAccessibility bridge"
+      "notes": "accesskit not in published gpui 0.2.2 (verified docs.rs + otool); no NSAccessibility bridge; Metal surface opaque; remediation: NSAccessibility bridge or gpui upgrade/vendor"
     },
     {
       "gate": "G6Ime",

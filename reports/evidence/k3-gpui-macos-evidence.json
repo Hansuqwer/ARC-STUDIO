@@ -2,12 +2,12 @@
   "candidate": "gpui",
   "candidate_version": "0.2.2",
   "date": "2026-06-12",
-  "machine": "BLUETEAM.local M4 — pinned benchmark machine",
+  "machine": "BLUETEAM.local M4 \u2014 pinned benchmark machine",
   "g5_voiceover": {
     "outcome": "Fail",
-    "notes": "accesskit not enabled in gpui 0.2.2 release build; Metal GPU surface is opaque to VoiceOver NSAccessibility tree; step 2 of protocol (VO-navigate across views) fails — zero a11y tree. accesskit feature exists in gpui codebase but is not compiled into arc-shell at this rev. Honest per protocol: zero a11y tree = G5 FAIL, not pending.",
+    "notes": "accesskit not linked (verified via otool) AND not a declared feature in published gpui 0.2.2 Cargo.toml (verified via docs.rs). Metal GPU surface is opaque to VoiceOver NSAccessibility tree. Per protocol: zero a11y tree = G5 FAIL, not pending.",
     "raw_data_path": null,
-    "remediation": "Enable accesskit feature in gpui dep OR add NSAccessibility bridge to ShellChromeView. Required before FINAL selection."
+    "remediation": "No accesskit feature in published gpui=0.2.2 on crates.io. Options: (a) add NSAccessibility bridge on ShellChromeView, (b) vendor/patch gpui with AccessKit path, (c) upgrade gpui pin to a rev that exposes accesskit support. Required before FINAL."
   },
   "g6_ime": {
     "outcome": "Degraded",
