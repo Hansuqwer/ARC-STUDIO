@@ -6,6 +6,10 @@ license = "MIT"
 publish = false
 description = "ARC Studio v2 native shell (Sprint 2: headless skeleton — window rendering lands with the Sprint-3 framework decision)"
 
+[features]
+default = []
+framework-gpui = ["arc-ui/framework-gpui"]
+
 [dependencies]
 arc-ui = { path = "../arc-ui" }
 arc-protocol-rs = { path = "../arc-protocol-rs" }

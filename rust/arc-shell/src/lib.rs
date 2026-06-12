@@ -2,6 +2,10 @@
 //! supervision policies. The `arc-shell` binary (main.rs) and the Sprint-3
 //! renderer both consume this API; tests exercise it headless.
 
+#![recursion_limit = "512"]
+
+#[cfg(feature = "framework-gpui")]
+pub mod render_gpui;
 pub mod shell;
 pub mod supervisor;
 
