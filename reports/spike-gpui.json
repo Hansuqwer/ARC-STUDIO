@@ -103,7 +103,7 @@
         }
       },
       "raw_data_path": "../../reports/spike-gpui-bidi.png",
-      "notes": ""
+      "notes": "bidi lines rendered in spike TakeScreenshot phase; screenshot not captured; re-run spike to close"
     },
     {
       "gate": "G5Accessibility",
@@ -114,16 +114,12 @@
       "total_ms": null,
       "worst_frame_ms": null,
       "outcome": {
-        "EvidencePending": {
-          "missing": [
-            "voiceover-recording-or-tree-dump (macOS)",
-            "orca-recording-or-atspi-dump (Linux, X11 AND Wayland)",
-            "nvda-recording-or-uia-dump (Windows)"
-          ]
+        "Fail": {
+          "reason": "accesskit not enabled; Metal surface opaque to VoiceOver; zero a11y tree (G5 FAIL per protocol)"
         }
       },
       "raw_data_path": null,
-      "notes": ""
+      "notes": "accesskit feature not compiled; remediation: enable accesskit or add NSAccessibility bridge"
     },
     {
       "gate": "G6Ime",
@@ -134,18 +130,12 @@
       "total_ms": null,
       "worst_frame_ms": null,
       "outcome": {
-        "EvidencePending": {
-          "missing": [
-            "macos: ja-hiragana->kanji, zh-pinyin, ko-2set (compose+commit+cancel)",
-            "linux-wayland: fcitx5 AND ibus, same scripts",
-            "linux-x11: fcitx5 smoke (best-effort, documented)",
-            "windows: TSF, same scripts, inline composition verified",
-            "dead-keys/compose-key row (European layouts)"
-          ]
+        "Fail": {
+          "reason": "InputHandler not implemented on ShellChromeView; IME composition in floating OS window, not inline"
         }
       },
       "raw_data_path": null,
-      "notes": ""
+      "notes": "degraded-but-present: commit/cancel at OS level; inline composition absent; remediation: implement gpui::InputHandler"
     },
     {
       "gate": "G8Sustainability",

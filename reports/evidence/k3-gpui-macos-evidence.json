@@ -1,0 +1,23 @@
+{
+  "candidate": "gpui",
+  "candidate_version": "0.2.2",
+  "date": "2026-06-12",
+  "machine": "BLUETEAM.local M4 — pinned benchmark machine",
+  "g5_voiceover": {
+    "outcome": "Fail",
+    "notes": "accesskit not enabled in gpui 0.2.2 release build; Metal GPU surface is opaque to VoiceOver NSAccessibility tree; step 2 of protocol (VO-navigate across views) fails — zero a11y tree. accesskit feature exists in gpui codebase but is not compiled into arc-shell at this rev. Honest per protocol: zero a11y tree = G5 FAIL, not pending.",
+    "raw_data_path": null,
+    "remediation": "Enable accesskit feature in gpui dep OR add NSAccessibility bridge to ShellChromeView. Required before FINAL selection."
+  },
+  "g6_ime": {
+    "outcome": "Degraded",
+    "notes": "ShellChromeView does not implement gpui::InputHandler (NSTextInputClient 1:1). IME composition will appear in platform floating input window, not inline in the palette TypeBox. Commit/cancel paths functional at OS level but inline composition is absent. This is the standard behavior for any GPU-rendered view without InputHandler. Remediation: implement InputHandler on ShellChromeView (or the TypeBox element) per gpui docs.",
+    "raw_data_path": null,
+    "remediation": "Implement gpui::InputHandler on the text-input element. Standard gpui pattern; Zed editor does this."
+  },
+  "g7_bidi": {
+    "outcome": "EvidencePending",
+    "notes": "bidi_sample_lines() are rendered in the gpui spike TakeScreenshot phase (confirmed: lines set in ShellPortView.on_key Action::TakeScreenshot arm). Screenshot not captured during spike run. Re-run spike and screenshot when mixed-script text visible (Arabic RTL + LTR Latin + combining marks from g7-golden/sample.txt). Path: reports/spike-gpui-bidi.png",
+    "raw_data_path": null
+  }
+}
