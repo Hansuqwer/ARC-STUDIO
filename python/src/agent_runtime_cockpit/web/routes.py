@@ -1440,6 +1440,8 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_post("/api/arena/adopt", arena_adopt)
     app.router.add_get("/api/arena/rankings", arena_rankings)
     app.router.add_get("/api/audit/verify/{run_id}", audit_verify_route)
+    app.router.add_get("/api/hitl", hitl_list)
+    app.router.add_post("/api/hitl/{hitl_id}/decision", hitl_decide)
     app.router.add_post("/v1/ir/simulate", ir_simulate)
     from ..stream.websocket import add_routes as _add_global_stream  # noqa: PLC0415
 
@@ -1490,6 +1492,70 @@ async def audit_verify_route(request: web.Request) -> web.Response:
         result = verifier.verify_sha256(chain)
 
     return _json(ok(json.loads(result.model_dump_json())).model_dump())
+
+
+async def hitl_list(request: web.Request) -> web.Response:
+    """GET /api/hitl — list pending HITL prompts."""
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "hitl_list", "daemon-hitl-list", 0)
+    except TrustEnforcementError as exc:
+        return _json(err(ArcErrorCode.PERMISSION_DENIED, str(exc)).model_dump(), 403)
+
+    from ..audit.hitl_sqlite_store import HitlSqliteStore
+
+    store = HitlSqliteStore(workspace / ".arc" / "hitl.db")
+    prompts = store.list_prompts()
+    return _json(ok({"prompts": [p.model_dump() for p in prompts]}).model_dump())
+
+
+async def hitl_decide(request: web.Request) -> web.Response:
+    """POST /api/hitl/{hitl_id}/decision — record a HITL decision."""
+    workspace = _workspace(request)
+    try:
+        enforce_workspace_trust(workspace, "hitl_decide", "daemon-hitl-decide", 0)
+    except TrustEnforcementError as exc:
+        return _json(err(ArcErrorCode.PERMISSION_DENIED, str(exc)).model_dump(), 403)
+
+    hitl_id = request.match_info["hitl_id"]
+
+    try:
+        body = await request.json()
+    except Exception:
+        return _json(err(ArcErrorCode.INVALID_INPUT, "Invalid JSON body").model_dump(), 400)
+
+    raw_decision = body.get("decision", "") if isinstance(body, dict) else ""
+    from ..audit.hitl import HitlDecision
+
+    try:
+        decision = HitlDecision(raw_decision)
+    except ValueError:
+        return _json(
+            err(ArcErrorCode.INVALID_INPUT, f"Invalid decision value: {raw_decision!r}").model_dump(),
+            400,
+        )
+
+    operator_id = body.get("operator_id", "anonymous") if isinstance(body, dict) else "anonymous"
+    notes = body.get("notes", "") if isinstance(body, dict) else ""
+
+    from ..audit.hitl_sqlite_store import HitlSqliteStore
+
+    store = HitlSqliteStore(workspace / ".arc" / "hitl.db")
+    token = store.get_token(hitl_id)
+    if token is None:
+        return _json(
+            err(ArcErrorCode.RUN_NOT_FOUND, f"HITL prompt not found or already decided: {hitl_id}").model_dump(),
+            404,
+        )
+
+    response = store.respond(hitl_id, decision, token, operator_id=operator_id, notes=notes)
+    if response is None:
+        return _json(
+            err(ArcErrorCode.RUN_NOT_FOUND, f"HITL prompt not found or already decided: {hitl_id}").model_dump(),
+            404,
+        )
+
+    return _json(ok(response.model_dump()).model_dump())
 
 
 async def ir_simulate(request: web.Request) -> web.Response:
