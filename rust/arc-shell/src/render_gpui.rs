@@ -277,14 +277,72 @@ pub struct ShellChromeView {
     pub focus_handle: FocusHandle,
     /// IME composition state for the palette TypeBox (G6).
     pub typebox: TypeBoxContent,
+    /// K4: Event Stream dock panel (replay-parity model → live SSE).
+    pub events: arc_dock::EventStreamPanel,
+    /// K4: live per-run SSE receiver (None = fixture-seeded only).
+    pub live_rx: Option<std::sync::mpsc::Receiver<arc_protocol_rs::RunEvent>>,
+}
+
+/// K4: spawn a background per-run SSE feed from the live daemon.
+///
+/// Returns a receiver the gpui view drains in `render()`. The daemon stream
+/// runs on its own thread+runtime (gpui owns the main thread); events cross
+/// via a std mpsc channel. If the daemon is unreachable the thread exits
+/// quietly and the panel keeps its fixture-seeded rows (producer-truth: the
+/// footer still names `daemon.run_events`).
+pub fn spawn_live_feed(
+    base: String,
+    run_id: String,
+) -> std::sync::mpsc::Receiver<arc_protocol_rs::RunEvent> {
+    use arc_daemon_client::DaemonClient;
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let rt = match tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+        {
+            Ok(rt) => rt,
+            Err(_) => return,
+        };
+        rt.block_on(async move {
+            let Ok(client) = DaemonClient::new(&base) else { return };
+            let cancel = tokio_util::sync::CancellationToken::new();
+            // stream_run_events feeds each decoded RunEvent to the channel;
+            // ordered-queue gap handling stays in EventStreamPanel::on_event.
+            let _ = client
+                .stream_run_events(&run_id, cancel, |ev| {
+                    let _ = tx.send(ev);
+                })
+                .await;
+        });
+    });
+    rx
 }
 
 impl ShellChromeView {
     pub fn new(model: ShellModel, cx: &mut Context<Self>) -> Self {
+        // K4: seed the Event Stream panel from the committed replay fixture so
+        // the dock renders a real model→view path immediately. A live daemon
+        // SSE feed (per-run) replaces this when connected (see feed_live_events).
+        let mut events = arc_dock::EventStreamPanel::new(256);
+        let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../protocol/fixtures/run-event-seq/tool-use-streaming");
+        let _ = arc_daemon_client::replay::replay_dir(&fixture, |ev| {
+            let _ = events.on_event(ev);
+        });
+        // K4 live path: if ARC_RUN_ID is set, attach a per-run SSE feed from the
+        // daemon (ARC_DAEMON_URL or default loopback). Absent → fixture-only.
+        let live_rx = std::env::var("ARC_RUN_ID").ok().map(|run_id| {
+            let base = std::env::var("ARC_DAEMON_URL")
+                .unwrap_or_else(|_| "http://127.0.0.1:7777".into());
+            spawn_live_feed(base, run_id)
+        });
         Self {
             announce: String::new(),
             focus_handle: cx.focus_handle(),
             typebox: TypeBoxContent::default(),
+            events,
+            live_rx,
             model,
         }
     }
@@ -345,6 +403,19 @@ fn palette_key(key: &str) -> Option<PaletteKey> {
 
 impl Render for ShellChromeView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // K4: drain any live per-run SSE events into the panel (non-blocking).
+        // Same on_event path as the fixture replay — ordered-queue gap handling
+        // and SurfaceState transitions are identical (parity oracle holds).
+        if self.live_rx.is_some() {
+            let drained: Vec<_> = self
+                .live_rx
+                .as_ref()
+                .map(|rx| rx.try_iter().collect())
+                .unwrap_or_default();
+            for ev in drained {
+                let _ = self.events.on_event(ev);
+            }
+        }
         // Register the InputHandler so NSTextInputClient/IME sends composition
         // inline into the TypeBox rather than a floating fallback window (G6).
         window.handle_input(
@@ -426,6 +497,36 @@ impl Render for ShellChromeView {
             div().into_any_element()
         };
 
+        // K4: Event Stream dock — render the EventStreamPanel rows with the
+        // same fixed-width line discipline as the spike, plus surface-state
+        // header and footer (rows/dropped/source). Last 12 rows shown.
+        let ev_rows: Vec<AnyElement> = self
+            .events
+            .rows()
+            .iter()
+            .rev()
+            .take(12)
+            .rev()
+            .map(|r| {
+                div()
+                    .font_family("Menlo")
+                    .text_size(px(11.0))
+                    .text_color(fg(&theme))
+                    .child(r.display_line())
+                    .into_any_element()
+            })
+            .collect();
+        let ev_state = self.events.state().describe();
+        let ev_footer = self.events.footer();
+        let event_dock = div()
+            .flex()
+            .flex_col()
+            .p_2()
+            .bg(panel_bg(&theme, current == "dock"))
+            .child(div().child(format!("ARC dock · Event Stream — {ev_state}")))
+            .children(ev_rows)
+            .child(div().text_size(px(10.0)).child(ev_footer));
+
         div()
             .track_focus(&self.focus_handle)
             .key_context("ArcShell")
@@ -476,6 +577,7 @@ impl Render for ShellChromeView {
                         "daemon/trust strip landmark",
                     )),
             )
+            .child(event_dock)
             .child(palette_block)
             .child(div().mt_auto().p_1().child(self.model.status_rail()))
     }
