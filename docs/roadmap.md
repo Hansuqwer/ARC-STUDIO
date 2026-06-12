@@ -1880,7 +1880,7 @@ detail and dedupe notes: `docs/research-findings/competitive-feature-backlog-202
 | R-SEC2 | `prompt_guard.py` — regex injection-pattern detection (research-grade) | Polished Complete |
 | R-SEC3 | Python SBOM + `pnpm-lock.yaml` integrity verification + reproducible-build attestation | Polished Complete |
 | R-SEC4 | `run_id` storage path-traversal residual (allowlist + `relative_to()` confinement); workspace realpath already done | Polished Complete |
-| R-PERF1 | Streaming workspace inventory (< 5s for 100K files) | Baseline Complete |
+| R-PERF1 | Streaming workspace inventory (< 5s for 100K files) | Polished Complete | Evidence: Phase 386, test_inventory_streaming.py 2 tests, ruff clean |
 | R-PERF2 | Virtualize residual lists (`TraceViewerSection`/`AssuranceTab`); event stream already virtualized via R17 | Polished Complete |
 | R-PERF3 | Lazy provider loading (< 2s startup with 109 providers) | Polished Complete |
 | R-PERF4 | Async `startRun()` bridge residual (eliminate remaining blocking `execFileSync`); config-service done in R-POLISH7/14 | Polished Complete |

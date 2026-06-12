@@ -293,8 +293,8 @@ async def inspect(request: web.Request) -> web.Response:
     registry = default_registry()
     runtimes = registry.detect_all(workspace)
 
-    py_count = len(iter_workspace_files(workspace, (".py",)))
-    ts_count = len(iter_workspace_files(workspace, (".ts",)))
+    py_count = sum(1 for _ in iter_workspace_files(workspace, (".py",)))
+    ts_count = sum(1 for _ in iter_workspace_files(workspace, (".ts",)))
 
     info = WorkspaceInfo(
         path=str(workspace),

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 from pathlib import Path
 
 from ..protocol.schemas import NodeType, WorkflowInfo, WorkflowNode
@@ -28,7 +29,7 @@ def dependency_evidence(workspace: Path, needles: tuple[str, ...]) -> tuple[floa
 def import_evidence(workspace: Path, needles: tuple[str, ...]) -> tuple[float, list[str]]:
     score = 0.0
     evidence: list[str] = []
-    for py_file in iter_workspace_files(workspace, (".py",))[:40]:
+    for py_file in itertools.islice(iter_workspace_files(workspace, (".py",)), 40):
         try:
             text = py_file.read_text(errors="ignore").lower()
         except OSError:
@@ -40,7 +41,9 @@ def import_evidence(workspace: Path, needles: tuple[str, ...]) -> tuple[float, l
     return min(score, 1.0), evidence
 
 
-def static_workflow(runtime: str, name: str, workspace: Path, evidence: list[str]) -> list[WorkflowInfo]:
+def static_workflow(
+    runtime: str, name: str, workspace: Path, evidence: list[str]
+) -> list[WorkflowInfo]:
     source = evidence[0] if evidence else None
     return [
         WorkflowInfo(

@@ -74,32 +74,46 @@ def iter_workspace_files(
     *,
     max_files: int = 1000,
     max_bytes: int = 10 * 1024 * 1024,
-) -> list[Path]:
-    """Return workspace files while excluding env, cache, dependency, build dirs.
+):
+    """Generator — yields workspace files while excluding env, cache, dependency, build dirs.
 
+    Uses ``os.scandir`` for streaming traversal so the full file list is never
+    accumulated in memory (R-PERF1: prevents OOM on 100K+ file trees).
     Symlinks are skipped, secret-bearing files (``.env``, ``*.pem``,
-    ``credentials.json``, ...) are never returned, and total scan size is
+    ``credentials.json``, ...) are never yielded, and total scan size is
     capped to keep inspection safe for generated workspaces and accidental
     dependency caches.
     """
-    results: list[Path] = []
+    import os
+
+    count = 0
     total_bytes = 0
-    for path in workspace.rglob("*"):
-        if path.is_symlink() or not path.is_file():
+    dirs = [workspace]
+
+    while dirs:
+        current = dirs.pop()
+        try:
+            with os.scandir(current) as it:
+                for entry in it:
+                    if entry.is_symlink():
+                        continue
+                    p = Path(entry.path)
+                    if entry.is_dir(follow_symlinks=False):
+                        if entry.name not in IGNORED_DIRS:
+                            dirs.append(p)
+                    elif entry.is_file(follow_symlinks=False):
+                        if p.suffix not in suffixes or is_sensitive_file(p):
+                            continue
+                        try:
+                            total_bytes += entry.stat().st_size
+                        except OSError:
+                            continue
+                        if count >= max_files or total_bytes > max_bytes:
+                            return
+                        yield p
+                        count += 1
+        except PermissionError:
             continue
-        if any(part in IGNORED_DIRS for part in path.relative_to(workspace).parts[:-1]):
-            continue
-        if is_sensitive_file(path):
-            continue
-        if path.suffix in suffixes:
-            try:
-                total_bytes += path.stat().st_size
-            except OSError:
-                continue
-            if len(results) >= max_files or total_bytes > max_bytes:
-                break
-            results.append(path)
-    return results
 
 
 async def aiter_workspace_files(

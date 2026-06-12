@@ -92,7 +92,12 @@ terminal-gated surfaces: deterministic token-estimator benchmark summaries,
 Electron signing/notarization config guards, and Firecracker proof-gate reporting.
 These phases do **not** promote R76, B2P-17, or R82.
 
-See `docs/phases.md` (Phases 159–385) and `docs/roadmap.md` for full evidence records.
+**Phase 386** elevated R-PERF1 (streaming workspace inventory) to Polished Complete:
+`iter_workspace_files` converted to `os.scandir`-based generator; 2 tests in
+`test_inventory_streaming.py`; ruff clean. All roadmap items are now Polished Complete
+except the three terminal-gated surfaces (R76, B2P-17, R82).
+
+See `docs/phases.md` (Phases 159–386) and `docs/roadmap.md` for full evidence records.
 
 ## Sandbox / microVM truth constraints (still in force)
 

@@ -9281,3 +9281,11 @@ source/protocol/CLI changes; not committed (left in working tree for review per 
 **What changed:** Full verification run after the Phases 366-384 implementation and docs sweep.
 
 **Evidence:** `uv run --directory python ruff check src tests ../scripts/research/measure_estimator_accuracy.py` passed. `uv run --directory python pytest tests/ -q` passed: 6515 passed / 43 skipped / 7 xfailed / 1 xpassed, with one existing SQLite concurrent-write warning and the existing Textual xfail snapshot report. Standard scoped mypy passed: `uv run --directory python mypy src/agent_runtime_cockpit/security/ src/agent_runtime_cockpit/protocol/ src/agent_runtime_cockpit/workspace.py src/agent_runtime_cockpit/gating.py src/agent_runtime_cockpit/ag_ui/`. `pnpm typecheck` passed. `pnpm build` passed with existing Theia/Electron DEP0190 warnings. `bash scripts/test-electron-packaging.sh` passed. `bash scripts/check-pr.sh` passed. `bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md AGENTS.md README.md` passed: `OK: No banned claims found.`
+
+## Phase 386 — R-PERF1 streaming workspace inventory (Polished Complete)
+
+**Status:** Complete
+
+**What changed:** Converted workspace inventory walk to generator-based streaming via `os.scandir`/`yield from os.walk` to prevent full-list OOM on large trees. JSON output contract unchanged.
+
+**Evidence:** `python/tests/workspace/test_inventory_streaming.py` (2 tests: populated tree + empty workspace). Full workspace test suite passed. ruff clean. `arc workspace inventory --json` output structure unchanged.
