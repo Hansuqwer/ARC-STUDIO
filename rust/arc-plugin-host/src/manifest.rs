@@ -80,7 +80,13 @@ mod tests {
     const TEST_PK: &str = "RWRzq51bKcS8ozvnSc2dW2tBhYkH4K0xZdpDgUm5nMyVbU45Kf2Ch4dF";
 
     fn tmp_manifest(content: &[u8]) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("arc-manifest-{}", std::process::id()));
+        // Unique dir per call so parallel tests never share the manifest or its
+        // sibling `.minisig` (a shared path raced: one test deleting the sig
+        // surfaced SignatureMissing in another that expected SignatureInvalid).
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("arc-manifest-{}-{}", std::process::id(), n));
         std::fs::create_dir_all(&dir).unwrap();
         let p = dir.join("arc-extension.toml");
         std::fs::write(&p, content).unwrap();

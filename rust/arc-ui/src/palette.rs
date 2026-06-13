@@ -41,6 +41,10 @@ pub struct PaletteModel {
     pub query: String,
     pub items: Vec<PaletteItem>,
     pub selected: usize,
+    /// When true, the entire query is selected (Cmd/Ctrl+A). The next printable
+    /// character or backspace replaces/clears the whole query, matching standard
+    /// text-field select-all semantics. Any cursor move or commit clears it.
+    pub select_all: bool,
     matcher: Matcher,
 }
 
@@ -51,6 +55,7 @@ impl Default for PaletteModel {
             query: String::new(),
             items: Vec::new(),
             selected: 0,
+            select_all: false,
             matcher: Matcher::new(Config::DEFAULT),
         }
     }
@@ -64,6 +69,8 @@ pub enum PaletteKey {
     Down,
     Enter,
     Escape,
+    /// Select the entire query (Cmd/Ctrl+A).
+    SelectAll,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -85,6 +92,7 @@ impl PaletteModel {
         self.open = true;
         self.query.clear();
         self.selected = 0;
+        self.select_all = false;
         self.refilter(registry, ctx);
     }
 
@@ -99,24 +107,45 @@ impl PaletteModel {
         }
         match key {
             PaletteKey::Char(c) => {
+                // Selection-replace: typing over a select-all clears first.
+                if self.select_all {
+                    self.query.clear();
+                    self.select_all = false;
+                }
                 self.query.push(c);
                 self.selected = 0;
                 self.refilter(registry, ctx);
                 self.current_announcement()
             }
             PaletteKey::Backspace => {
-                self.query.pop();
+                if self.select_all {
+                    // Backspace over a full selection clears the whole query.
+                    self.query.clear();
+                    self.select_all = false;
+                } else {
+                    self.query.pop();
+                }
                 self.selected = 0;
                 self.refilter(registry, ctx);
                 self.current_announcement()
             }
+            PaletteKey::SelectAll => {
+                if self.query.is_empty() {
+                    self.select_all = false;
+                    return PaletteEffect::Announce("query empty".into());
+                }
+                self.select_all = true;
+                PaletteEffect::Announce(format!("selected query: {}", self.query))
+            }
             PaletteKey::Down => {
+                self.select_all = false;
                 if !self.items.is_empty() {
                     self.selected = (self.selected + 1).min(self.items.len() - 1);
                 }
                 self.current_announcement()
             }
             PaletteKey::Up => {
+                self.select_all = false;
                 self.selected = self.selected.saturating_sub(1);
                 self.current_announcement()
             }
@@ -145,6 +174,7 @@ impl PaletteModel {
         self.query.clear();
         self.items.clear();
         self.selected = 0;
+        self.select_all = false;
     }
 
     fn current_announcement(&self) -> PaletteEffect {
@@ -301,5 +331,75 @@ mod tests {
             p.key(PaletteKey::Down, &reg, &ctx);
         }
         assert_eq!(p.selected, p.items.len() - 1);
+    }
+
+    #[test]
+    fn select_all_then_type_replaces_query() {
+        let reg = registry();
+        let ctx = Ctx { healthy: true };
+        let mut p = PaletteModel::default();
+        p.open_with(&reg, &ctx);
+        for c in "replay".chars() {
+            p.key(PaletteKey::Char(c), &reg, &ctx);
+        }
+        assert_eq!(p.query, "replay");
+
+        let eff = p.key(PaletteKey::SelectAll, &reg, &ctx);
+        assert!(p.select_all, "select_all flag set");
+        match eff {
+            PaletteEffect::Announce(a) => assert!(a.contains("selected query")),
+            other => panic!("expected Announce, got {other:?}"),
+        }
+
+        // Typing over the selection replaces the whole query.
+        p.key(PaletteKey::Char('r'), &reg, &ctx);
+        assert_eq!(p.query, "r", "query replaced, not appended");
+        assert!(!p.select_all, "select_all cleared after replace");
+    }
+
+    #[test]
+    fn select_all_then_backspace_clears_query() {
+        let reg = registry();
+        let ctx = Ctx { healthy: true };
+        let mut p = PaletteModel::default();
+        p.open_with(&reg, &ctx);
+        for c in "runs".chars() {
+            p.key(PaletteKey::Char(c), &reg, &ctx);
+        }
+        p.key(PaletteKey::SelectAll, &reg, &ctx);
+        p.key(PaletteKey::Backspace, &reg, &ctx);
+        assert_eq!(p.query, "", "backspace over selection clears query");
+        assert!(!p.select_all);
+    }
+
+    #[test]
+    fn select_all_on_empty_query_is_noop() {
+        let reg = registry();
+        let ctx = Ctx { healthy: true };
+        let mut p = PaletteModel::default();
+        p.open_with(&reg, &ctx);
+        let eff = p.key(PaletteKey::SelectAll, &reg, &ctx);
+        assert!(!p.select_all, "no selection when query empty");
+        match eff {
+            PaletteEffect::Announce(a) => assert!(a.contains("empty")),
+            other => panic!("expected Announce, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn navigation_clears_select_all() {
+        let reg = registry();
+        let ctx = Ctx { healthy: true };
+        let mut p = PaletteModel::default();
+        p.open_with(&reg, &ctx);
+        for c in "open".chars() {
+            p.key(PaletteKey::Char(c), &reg, &ctx);
+        }
+        p.key(PaletteKey::SelectAll, &reg, &ctx);
+        assert!(p.select_all);
+        p.key(PaletteKey::Down, &reg, &ctx);
+        assert!(!p.select_all, "arrow navigation deselects the query");
+        // Query is preserved — only the selection was cleared.
+        assert_eq!(p.query, "open");
     }
 }

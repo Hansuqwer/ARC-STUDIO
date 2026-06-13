@@ -335,6 +335,9 @@ impl EditorController {
                 char_range,
                 new_text,
             }],
+            // One collapsed selection at the cursor — a genuine single-element
+            // Vec<Range>, not a misformatted range literal.
+            #[allow(clippy::single_range_in_vec_init)]
             selections_before: vec![self.cursor..self.cursor],
         })
     }

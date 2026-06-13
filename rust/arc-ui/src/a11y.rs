@@ -254,12 +254,9 @@ mod tests {
         let mut snap = base_snapshot(&r);
         snap.focused_region_id = "dock";
         let tree = ShellA11yTree::build(&snap);
-        let dock = tree
-            .root
-            .children
-            .iter()
-            .find(|n| n.label == "ARC dock")
-            .unwrap();
+        let Some(dock) = tree.root.children.iter().find(|n| n.label == "ARC dock") else {
+            panic!("ARC dock landmark present in a11y tree");
+        };
         assert!(dock.focused, "focused landmark flagged for VO");
     }
 

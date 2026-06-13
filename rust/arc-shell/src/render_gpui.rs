@@ -220,6 +220,12 @@ impl InputHandler for TypeBoxHandler {
     ) {
         self.entity.update(cx, |view, cx| {
             view.typebox.marked = None;
+            // Typing over a full palette selection replaces the query: clear the
+            // committed IME text first so it stays aligned with palette.query
+            // (which PaletteModel::key clears on the first char).
+            if view.model.palette.open && view.model.palette.select_all {
+                view.typebox.committed.clear();
+            }
             view.typebox.committed.push_str(text);
             // Mirror into the PaletteModel query for palette filtering.
             for ch in text.chars() {
@@ -411,6 +417,11 @@ impl ShellChromeView {
             self.model
                 .palette
                 .open_with(&self.model.registry, &self.model.ctx);
+            // Start the IME TypeBox clean so committed offsets track the new
+            // (empty) query rather than carrying stale text from a prior open.
+            self.typebox.committed.clear();
+            self.typebox.marked = None;
+            self.typebox.selected = 0;
             self.announce = "palette opened".into();
             return;
         }
@@ -419,17 +430,29 @@ impl ShellChromeView {
             let Some(key) = palette_key(key) else {
                 return;
             };
-            match self
+            // Keep the IME TypeBox in sync with control keys handled here so
+            // committed UTF-16 offsets stay aligned with the visible query.
+            match key {
+                PaletteKey::Backspace => {
+                    if self.model.palette.select_all {
+                        // Backspace over a full selection clears the whole query.
+                        self.typebox.committed.clear();
+                    } else {
+                        self.typebox.committed.pop();
+                    }
+                }
+                PaletteKey::Escape => {
+                    self.typebox.committed.clear();
+                    self.typebox.marked = None;
+                    self.typebox.selected = 0;
+                }
+                _ => {}
+            }
+            let effect = self
                 .model
                 .palette
-                .key(key, &self.model.registry, &self.model.ctx)
-            {
-                PaletteEffect::Announce(announcement) => self.announce = announcement,
-                PaletteEffect::Execute(id) => self.announce = format!("execute: {}", id.0),
-                PaletteEffect::Rejected { reason } => self.announce = format!("rejected: {reason}"),
-                PaletteEffect::Closed => self.announce = "closed".into(),
-                PaletteEffect::None => {}
-            }
+                .key(key, &self.model.registry, &self.model.ctx);
+            self.apply_palette_effect(effect);
             return;
         }
 
@@ -447,13 +470,29 @@ impl ShellChromeView {
         mods: &Modifiers,
         cx: &mut Context<Self>,
     ) -> bool {
+        // Accept both platform (Cmd on macOS) and control modifiers so tests work
+        // in headless environments where platform=false.
+        let cmd = mods.platform || mods.control;
+
+        // Palette takes priority while open: Cmd+A selects the whole query and
+        // editor clipboard ops must not fire underneath it.
+        if self.model.palette.open {
+            if key == "a" && cmd {
+                let effect = self.model.palette.key(
+                    PaletteKey::SelectAll,
+                    &self.model.registry,
+                    &self.model.ctx,
+                );
+                self.apply_palette_effect(effect);
+                return true;
+            }
+            return false;
+        }
+
         let is_editor = current_focus_id(&self.model) == "editor";
         if !is_editor {
             return false;
         }
-        // Accept both platform (Cmd on macOS) and control modifiers so tests work
-        // in headless environments where platform=false.
-        let cmd = mods.platform || mods.control;
         match key {
             "c" if cmd => {
                 if let Some(text) = self.editor.copy_selection() {
@@ -483,6 +522,23 @@ impl ShellChromeView {
                 true
             }
             _ => false,
+        }
+    }
+
+    /// Reflect a PaletteEffect into the announce line (shared by key + clipboard
+    /// entry points so both produce identical surface state).
+    fn apply_palette_effect(&mut self, effect: PaletteEffect) {
+        match effect {
+            PaletteEffect::Announce(announcement) => self.announce = announcement,
+            PaletteEffect::Execute(id) => self.announce = format!("execute: {}", id.0),
+            PaletteEffect::Rejected { reason } => self.announce = format!("rejected: {reason}"),
+            PaletteEffect::Closed => {
+                self.typebox.committed.clear();
+                self.typebox.marked = None;
+                self.typebox.selected = 0;
+                self.announce = "closed".into();
+            }
+            PaletteEffect::None => {}
         }
     }
 
@@ -582,8 +638,10 @@ fn palette_key(key: &str) -> Option<PaletteKey> {
         "down" => Some(PaletteKey::Down),
         "enter" => Some(PaletteKey::Enter),
         "escape" => Some(PaletteKey::Escape),
-        "space" => Some(PaletteKey::Char(' ')),
-        s if s.chars().count() == 1 => s.chars().next().map(PaletteKey::Char),
+        // Printable characters (incl. space) are delivered through the
+        // TypeBoxHandler InputHandler (`replace_text_in_range`), which mirrors
+        // them into the palette query. Handling them here too would double the
+        // input (one `d` -> `dd`). on_key only owns control keys for the palette.
         _ => None,
     }
 }
@@ -694,21 +752,47 @@ impl Render for ShellChromeView {
             })
             .collect();
 
-        let palette_block =
-            if self.model.palette.open {
-                div()
-                    .bg(palette_bg(&theme))
-                    .p_2()
-                    .w(px(640.0))
-                    .flex()
-                    .flex_col()
-                    .child(div().child(format!("> {}{}", self.model.palette.query,
-                    self.typebox.marked.as_deref().map(|m| format!("[{m}]")).unwrap_or_default())))
-                    .children(rows)
-                    .into_any_element()
-            } else {
-                div().into_any_element()
-            };
+        let palette_block = if self.model.palette.open {
+            let marked = self
+                .typebox
+                .marked
+                .as_deref()
+                .map(|m| format!("[{m}]"))
+                .unwrap_or_default();
+            let query_line =
+                if self.model.palette.select_all && !self.model.palette.query.is_empty() {
+                    // Selection highlight: the whole query renders on a selected
+                    // background so Cmd+A is visible without color-only reliance
+                    // (the announce line also states "selected query: ...").
+                    div()
+                        .flex()
+                        .flex_row()
+                        .child(div().child("> "))
+                        .child(
+                            div()
+                                .bg(selected_bg(&theme))
+                                .text_color(fg(&theme))
+                                .child(self.model.palette.query.clone()),
+                        )
+                        .child(div().child(marked))
+                } else {
+                    div().child(format!("> {}{}", self.model.palette.query, marked))
+                };
+            div()
+                .absolute()
+                .top(px(60.0))
+                .left(px(200.0))
+                .bg(palette_bg(&theme))
+                .p_2()
+                .w(px(640.0))
+                .flex()
+                .flex_col()
+                .child(query_line)
+                .children(rows)
+                .into_any_element()
+        } else {
+            div().into_any_element()
+        };
 
         // K4: Event Stream dock — render the EventStreamPanel rows with the
         // same fixed-width line discipline as the spike, plus surface-state
@@ -743,6 +827,7 @@ impl Render for ShellChromeView {
         div()
             .track_focus(&self.focus_handle)
             .key_context("ArcShell")
+            .relative()
             .on_key_down(cx.listener(|view, event: &KeyDownEvent, _window, cx| {
                 let key = event.keystroke.key.as_str();
                 let mods = &event.keystroke.modifiers;
