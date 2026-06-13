@@ -18,6 +18,17 @@ fn fg(theme: &Theme) -> Rgba {
     }
 }
 
+/// Text color for a selected row — in high-contrast mode the selection
+/// background is yellow (0xffff00); white text on yellow is ~1.07:1 (fails
+/// WCAG AA). Black text on yellow is 19.6:1 (well above AA).
+fn selected_fg(theme: &Theme) -> Rgba {
+    if theme.high_contrast {
+        rgb(0x000000) // black on yellow: 19.6:1 contrast
+    } else {
+        fg(theme) // unchanged for normal + NO_COLOR
+    }
+}
+
 fn row_bg(theme: &Theme, selected: bool) -> Rgba {
     match (theme.no_color, theme.high_contrast, selected) {
         (true, _, true) => rgb(0xd0d0d0),
@@ -42,7 +53,11 @@ pub fn workspace_panel(theme: &Theme, workspace: &WorkspaceController) -> AnyEle
             div()
                 .font_family("Menlo")
                 .text_size(px(12.0))
-                .text_color(fg(theme))
+                .text_color(if row.selected {
+                    selected_fg(theme)
+                } else {
+                    fg(theme)
+                })
                 .bg(row_bg(theme, row.selected))
                 .child(format!(
                     "{}{} {}",
@@ -77,7 +92,11 @@ pub fn search_panel(theme: &Theme, search: &SearchController) -> AnyElement {
             div()
                 .font_family("Menlo")
                 .text_size(px(12.0))
-                .text_color(fg(theme))
+                .text_color(if row.selected {
+                    selected_fg(theme)
+                } else {
+                    fg(theme)
+                })
                 .bg(row_bg(theme, row.selected))
                 .child(format!("{}{}{}", row.label, line, snippet))
                 .into_any_element()

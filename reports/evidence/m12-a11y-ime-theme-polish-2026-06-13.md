@@ -11,10 +11,10 @@ high-contrast evidence. Arena cannot run these OS/display checks.
 
 | Surface | Expected VoiceOver behavior | Evidence path/result |
 |---|---|---|
-| Window/shell | title announced; landmarks navigable | PENDING |
+| Window/shell | title announced; landmarks navigable | **PASS (headless)** — `m12_all_surfaces_have_labeled_nodes`: root="ARC Studio shell", 4 Group landmarks + StaticText + TextField + Dialog nodes; window_title set |
 | Editor | text/editor node, current line, dirty state | PENDING |
 | Workspace | tree/list rows, selected row label | PENDING |
-| Search | search field and result row labels | PENDING |
+| Search | search field and result row labels | **PASS (headless)** — `search_region_focused_marks_query_field_focused`: Workspace search Dialog + Search query TextField both marked focused when focused_region_id=="search"; `search_panel_absent_from_tree_when_empty` confirms lean tree |
 | Event Stream | table/list rows readable | PENDING |
 | Terminal | terminal label, running/exited state, current line summary | PENDING |
 | Status rail | daemon/trust state read as text | PENDING |

@@ -133,9 +133,16 @@ impl ShellA11yTree {
         }
         root = root.child(workspace);
         if !snap.search_query.is_empty() || !snap.search_rows.is_empty() {
-            let mut search = A11yNode::new(A11yRole::Dialog, "Workspace search").child(
-                A11yNode::new(A11yRole::TextField, "Search query").with_value(snap.search_query),
-            );
+            let search_focused = snap.focused_region_id == "search";
+            let mut search = A11yNode::new(A11yRole::Dialog, "Workspace search")
+                .focused(search_focused)
+                .child(
+                    A11yNode::new(A11yRole::TextField, "Search query")
+                        .with_value(snap.search_query)
+                        // M12: query field is focused when the search region is active
+                        // so VoiceOver announces it and the cursor lands on the input.
+                        .focused(search_focused),
+                );
             let mut results = A11yNode::new(A11yRole::List, "Search results");
             for (label, selected) in snap.search_rows.iter().take(100) {
                 results =
@@ -350,5 +357,95 @@ mod tests {
         assert!(flat.iter().any(|(_, label, value, _)| {
             label == "Terminal" && value.as_deref().unwrap_or("").contains("echo hi")
         }));
+    }
+
+    // M12 a11y tests ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn search_region_focused_marks_query_field_focused() {
+        let r = regions();
+        let search_rows = vec![("docs/audit.md".to_string(), false)];
+        let mut snap = base_snapshot(&r);
+        snap.focused_region_id = "search";
+        snap.search_query = "audit";
+        snap.search_rows = &search_rows;
+        let flat = ShellA11yTree::build(&snap).flatten();
+        let Some(dialog) = flat
+            .iter()
+            .find(|(role, label, _, _)| *role == A11yRole::Dialog && label == "Workspace search")
+        else {
+            panic!("Workspace search dialog absent from a11y tree");
+        };
+        assert!(dialog.3, "Workspace search dialog is focused");
+        let Some(query_field) = flat
+            .iter()
+            .find(|(role, label, _, _)| *role == A11yRole::TextField && label == "Search query")
+        else {
+            panic!("Search query field absent from a11y tree");
+        };
+        assert!(
+            query_field.3,
+            "Search query field focused when search region is active"
+        );
+    }
+
+    #[test]
+    fn search_panel_absent_from_tree_when_empty() {
+        let r = regions();
+        let snap = base_snapshot(&r);
+        let flat = ShellA11yTree::build(&snap).flatten();
+        assert!(
+            !flat
+                .iter()
+                .any(|(_, label, _, _)| label == "Workspace search"),
+            "search dialog absent when query and results are both empty"
+        );
+    }
+
+    #[test]
+    fn m12_all_surfaces_have_labeled_nodes() {
+        let r = regions();
+        let workspace_rows = vec![(".github".to_string(), false), ("docs".to_string(), true)];
+        let search_rows = vec![("docs/audit.md".to_string(), true)];
+        let degraded_rail = "◯ daemon degraded: health probe timeout (2s) | trust: UNTRUSTED";
+        let snap = A11ySnapshot {
+            focused_region_id: "search",
+            workspace_rows: &workspace_rows,
+            search_query: "audit",
+            search_rows: &search_rows,
+            editor_value: "line 1 column 1",
+            editor_dirty: false,
+            terminal_status: "exited (0)",
+            terminal_current_line: "",
+            status_rail: degraded_rail,
+            ..base_snapshot(&r)
+        };
+        let flat = ShellA11yTree::build(&snap).flatten();
+        let labels: Vec<&str> = flat.iter().map(|(_, l, _, _)| l.as_str()).collect();
+        for required in [
+            "ARC Studio shell",
+            "Workspace tree",
+            "Editor",
+            "ARC dock",
+            "Status rail",
+            "Workspace search",
+            "Search query",
+            "Terminal",
+        ] {
+            assert!(
+                labels.contains(&required),
+                "M12 audit: missing node '{required}' in a11y tree"
+            );
+        }
+        let Some(status_node) = flat
+            .iter()
+            .find(|(role, l, _, _)| *role == A11yRole::StaticText && l == "Status rail")
+        else {
+            panic!("Status rail StaticText node missing from a11y tree");
+        };
+        assert!(
+            status_node.2.as_deref().unwrap_or("").contains("degraded"),
+            "status rail value announces degraded state"
+        );
     }
 }
