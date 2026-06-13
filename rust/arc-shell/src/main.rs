@@ -140,7 +140,10 @@ mod tests {
 
     #[test]
     fn parses_existing_headless_modes() {
-        assert_eq!(mode_from_args(&args(&["--smoke-exit"])), Some(Mode::SmokeExit));
+        assert_eq!(
+            mode_from_args(&args(&["--smoke-exit"])),
+            Some(Mode::SmokeExit)
+        );
         assert_eq!(
             mode_from_args(&args(&["--headless-status"])),
             Some(Mode::HeadlessStatus)
