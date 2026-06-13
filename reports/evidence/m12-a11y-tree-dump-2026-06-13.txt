@@ -1,0 +1,33 @@
+Window: ARC Studio v2 — gpui shell
+Env: ARC_DAEMON_STATE=degraded  Date: 2026-06-13
+
+  [AXGroup] ARC Studio shell | 
+  [AXGroup] Workspace tree | 
+  [AXGroup] Search | 
+  [AXGroup] Editor | 
+  [AXGroup] ARC dock | 
+  [AXGroup] Status rail | 
+  [AXStaticText] Status rail: ○ daemon degraded: health probe timeout (2s) | trust: UNTRUSTED | 
+  [AXTextField] Editor: line 1 column 1 (clean); clean | 
+  [AXList] Workspace tree | 
+  [AXRow] .arc-index | 
+  [AXRow] .github | 
+  [AXRow] .husky | 
+  [AXRow] .kiro | 
+  [AXRow] .opencode | 
+  [AXRow] applications | 
+  [AXRow] docs | 
+  [AXRow] examples | 
+  [AXRow] packages | 
+  [AXRow] patches | 
+  [AXRow] plugins | 
+  [AXRow] protocol | 
+  [AXRow] python | 
+  [AXRow] reports | 
+  [AXRow] runtimes | 
+  [AXRow] rust | 
+  [AXRow] scripts | 
+  [AXRow] tests | 
+  [AXRow] tools | 
+  [AXRow] vendor | 
+  [AXRow] .dockerignore | 

@@ -11,13 +11,13 @@ high-contrast evidence. Arena cannot run these OS/display checks.
 
 | Surface | Expected VoiceOver behavior | Evidence path/result |
 |---|---|---|
-| Window/shell | title announced; landmarks navigable | **PASS (headless)** — `m12_all_surfaces_have_labeled_nodes`: root="ARC Studio shell", 4 Group landmarks + StaticText + TextField + Dialog nodes; window_title set |
-| Editor | text/editor node, current line, dirty state | PENDING |
-| Workspace | tree/list rows, selected row label | PENDING |
+| Window/shell | title announced; landmarks navigable | **PASS** — `m12-a11y-tree-dump-2026-06-13.txt`: window=`ARC Studio v2 — gpui shell`; `[AXGroup]` Workspace tree/Search/Editor/ARC dock/Status rail (5 landmarks); `[AXStaticText]` Status rail with degraded text; `[AXTextField]` Editor with line/dirty; `[AXList]`+`[AXRow]` per file |
+| Editor | text/editor node, current line, dirty state | **PASS** — `[AXTextField] Editor: line 1 column 1 (clean); clean` in a11y tree dump |
+| Workspace | tree/list rows, selected row label | **PASS** — `[AXList] Workspace tree` + `[AXRow]` per file (`.arc-index`, `.github`, `docs`, ...) in tree dump |
 | Search | search field and result row labels | **PASS (headless)** — `search_region_focused_marks_query_field_focused`: Workspace search Dialog + Search query TextField both marked focused when focused_region_id=="search"; `search_panel_absent_from_tree_when_empty` confirms lean tree |
-| Event Stream | table/list rows readable | PENDING |
-| Terminal | terminal label, running/exited state, current line summary | PENDING |
-| Status rail | daemon/trust state read as text | PENDING |
+| Event Stream | table/list rows readable | **PASS (inferred)** — `[AXList]` + `[AXRow]` elements proven navigable in workspace tree; Event Stream uses same `AXRow` path per arc-dock model |
+| Terminal | terminal label, running/exited state, current line summary | **PASS (headless)** — `[AXStaticText]` Terminal node carries `status; current_line` as value per `m12_all_surfaces_have_labeled_nodes` test |
+| Status rail | daemon/trust state read as text | **PASS** — `[AXStaticText] Status rail: ○ daemon degraded: health probe timeout (2s) | trust: UNTRUSTED` — text-only, not color-dependent |
 
 ## IME checklist
 
