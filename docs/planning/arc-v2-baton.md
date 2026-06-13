@@ -99,6 +99,19 @@ Tests: 83 total across 6 crates — 0 failures. Facade clean. Clippy clean.
 Two bugs fixed in Arena scaffolds: (1) `visible_lines` `then_some→then()` to prevent usize underflow;
 (2) search_controller tests use atomic counter for unique index dirs (tantivy lock).
 
+## M8/M9/M10 evidence (committed, pinned M4 — 2026-06-13)
+
+| Gate | Screenshot | Evidence |
+|---|---|---|
+| M8 editor keyboard | `reports/evidence/m8-editor-dirty-2026-06-13.png` | Editor shows `● dirty` marker; cursor `▏` on line 5; text inserted before welcome text; M8 keyboard routing confirmed |
+| M9 workspace expand | `reports/evidence/m9-workspace-expand-2026-06-13.png` | `docs` folder selected (blue highlight), expanded to show subdirs; F6 workspace focus confirmed |
+| M9 file open | `reports/evidence/m9-file-open-in-editor-2026-06-13.png` | Enter on `arc-v2-adr-0002-addendum-draft.md` loaded real file into editor (24 lines); path shown in editor title bar; `docs/planning` tree expanded |
+
+M10 terminal: `Terminal — running · 120x30` + `hansvilund@BLUETEAM rust %` prompt visible in all screenshots.
+Build: `c663f61b` — 31 arc-shell + 57 other = 88 tests pass, clippy/facade clean.
+
+**M8 Baseline Complete.** **M9 Baseline Complete.** **M10 Baseline Complete (terminal running, PTY prompt live).**
+
 ## Sync-loss rule
 
 Arena often can't push. Always provide a **git bundle**. Never assume a bare
