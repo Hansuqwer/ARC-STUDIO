@@ -1,13 +1,19 @@
 # arc-v2 baton state (update this file at every handback)
 
-Last updated: 2026-06-13 (Arena M11–M13 prep) · Branch: `arc-v2/sprint-1-protocol-bridge` @ `cd0a9b0`
+Last updated: 2026-06-13 (M4 local CLI — M11 closed) · Branch: `arc-v2/sprint-1-protocol-bridge` @ `a40132c`
 
 ## Who holds the baton
 
-**Arena (sandbox):** synced to remote `cd0a9b0`. macOS native path is Baseline
-Complete through M10. This turn prepared M11/M12/M13 parallel execution artifacts
-and evidence templates, but did not close those phases because M4 pixel,
-VoiceOver, IME, performance, and Rust toolchain evidence are required.
+**M4/local CLI:** **M11 UX states + interaction polish is DONE** — all 9 surface
+rows Pass with committed pixel evidence (shell-chrome focus, terminal PTY,
+editor copy/paste, command palette, workspace nav, search/index, event stream,
+terminal lifecycle, status-rail degraded). Verified with `cargo test --workspace`
+green and `cargo clippy --workspace --all-targets -- -D warnings` clean. Next:
+M12 (a11y/IME/theme), then M13 certification.
+
+**Arena (sandbox):** prepared the M11/M12/M13 parallel execution artifacts and
+evidence templates. Cannot close phases needing pixel/VoiceOver/IME/performance
+or Rust-toolchain evidence — those route through the M4/local CLI.
 
 New/updated Arena artifacts this turn:
 
@@ -42,8 +48,8 @@ Docs: `arc-v2-sprint-3-final-adjudication.md`, `arc-v2-kit-implementation-plan.m
 | M8 Editor polish baseline | **Baseline Complete** (`6578db8`) |
 | M9 Workspace/Search polish baseline | **Baseline Complete** (`6578db8`) |
 | M10 Terminal polish baseline | **Baseline Complete** (`6578db8`) |
-| M11 UX states + interaction polish | **PREPARED; pending M4 evidence** |
-| M12 Accessibility + IME + theme polish | **PREPARED; pending M4 evidence** |
+| M11 UX states + interaction polish | **DONE** (`a40132c`) — 9/9 rows Pass, pixel evidence |
+| M12 Accessibility + IME + theme polish | **IN PROGRESS** (a11y tree + high-contrast automated; VoiceOver/IME pixel pending) |
 | M13 macOS certification pass | **PREPARED; pending local CLI certification** |
 
 ## Current macOS evidence highlights

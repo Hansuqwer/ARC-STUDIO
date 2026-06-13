@@ -49,3 +49,6 @@ CLAUDE.md
 packages/*/gen-webpack.config.js
 packages/*/gen-webpack.node.config.js
 python/.arc/flight/
+
+# Runtime search index (written by arc-shell search panel)
+.arc-index/
