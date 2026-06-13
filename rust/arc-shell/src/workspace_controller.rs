@@ -184,8 +184,14 @@ mod tests {
     use super::*;
 
     fn fixture() -> (PathBuf, WorkspaceController) {
-        let root =
-            std::env::temp_dir().join(format!("arc-workspace-controller-{}", std::process::id()));
+        use std::sync::atomic::{AtomicU32, Ordering};
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+        let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "arc-workspace-controller-{}-{}",
+            std::process::id(),
+            id
+        ));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("src")).unwrap();
         std::fs::create_dir_all(root.join("docs")).unwrap();

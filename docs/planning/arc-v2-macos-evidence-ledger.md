@@ -2,10 +2,10 @@
 
 Date: 2026-06-13
 Branch: `arc-v2/sprint-1-protocol-bridge`
-Current synced baseline: `6578db8`
+Current synced baseline: `cd0a9b0`
 
-This ledger indexes committed macOS evidence. It is a navigation aid, not a new
-source of truth that overrides the underlying reports.
+This ledger indexes committed and prepared macOS evidence. It is a navigation
+aid, not a new source of truth that overrides underlying reports.
 
 ## Framework selection / K phases
 
@@ -38,13 +38,13 @@ source of truth that overrides the underlying reports.
 | M10 terminal running prompt | `6578db8`; terminal prompt visible in all three M8/M9 screenshots |
 | M8–M10 code/tests | `c663f61b`; 31 arc-shell + 57 other tests reported by local CLI; clippy/facade clean |
 
-## Remaining macOS polish evidence to add
+## M11–M13 prepared evidence templates (not closed)
 
-| Future phase | Evidence expected |
-|---|---|
-| M11 UX/interaction polish | interaction screenshots, UX-state table, command outputs |
-| M12 a11y/IME/theme polish | VoiceOver/IME/theme screenshots, a11y tests |
-| M13 certification | performance/reliability/security report, final macOS evidence summary |
+| Phase | Prepared artifact | Status |
+|---|---|---|
+| M11 UX/interaction polish | `reports/evidence/m11-ux-interaction-polish-2026-06-13.md` | Prepared by Arena; pending M4 execution evidence |
+| M12 a11y/IME/theme polish | `reports/evidence/m12-a11y-ime-theme-polish-2026-06-13.md` | Prepared by Arena; pending VoiceOver/IME/theme evidence |
+| M13 certification | `reports/evidence/m13-macos-certification-2026-06-13.md` | Prepared by Arena; pending local CLI certification run |
 
 ## Deferred final-selection evidence
 

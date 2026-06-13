@@ -507,4 +507,32 @@ mod tests {
         editor.select_all();
         assert_eq!(editor.selected_text().as_deref(), Some("abc\ndef"));
     }
+    #[test]
+    fn large_file_viewport_is_bounded() {
+        // M13: editor never renders more than `height` lines regardless of buffer size
+        let big = "line
+"
+        .repeat(10_000);
+        let editor = EditorController::from_text(&big, None);
+        let rows = editor.visible_lines(24);
+        assert_eq!(rows.len(), 24, "viewport must be bounded to height");
+    }
+
+    #[test]
+    fn viewport_start_line_clamps_to_buffer() {
+        let editor = EditorController::from_text(
+            "a
+b
+c", None,
+        );
+        let mut e2 = EditorController::from_text(
+            "a
+b
+c", None,
+        );
+        e2.set_viewport_start_line(9999);
+        assert!(e2.viewport_start_line() <= 2);
+        let rows = editor.visible_lines(10);
+        assert!(rows.len() <= 3);
+    }
 }

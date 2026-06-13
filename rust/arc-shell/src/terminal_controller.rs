@@ -234,4 +234,16 @@ mod tests {
         controller.ingest_grid_for_test(vec!["".into(), "prompt$ echo arc".into(), "".into()]);
         assert_eq!(controller.current_line_summary(), "prompt$ echo arc");
     }
+    #[test]
+    fn scrollback_never_exceeds_max_rows() {
+        // M13: bounded scrollback — no matter how many rows arrive, cap is enforced
+        let mut controller = TerminalController::new(5, 80, 24);
+        controller.ingest_grid_for_test((0..1000).map(|i| format!("row {i}")).collect());
+        assert_eq!(
+            controller.rows().len(),
+            5,
+            "scrollback must be bounded to max_rows"
+        );
+        assert_eq!(controller.rows()[0], "row 995");
+    }
 }
