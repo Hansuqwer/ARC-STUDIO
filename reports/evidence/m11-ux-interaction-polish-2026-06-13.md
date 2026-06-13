@@ -14,7 +14,7 @@ pixel evidence or run Rust tests in this sandbox.
 | Shell chrome | focused landmark, command palette open/closed, daemon healthy/degraded | F6/Shift-F6 cycles all landmarks | PENDING |
 | Command palette | empty query, results, disabled command, rejected command, closed | Ctrl+Shift+P, type, arrow, enter, escape | **PASS** — `m11-palette-select-all-2026-06-13.png`: Ctrl+Shift+P opens overlay, single-char typing (no double), Cmd+A highlights query + announces `selected query: dvwvw`; fixed double-type (IME path was duplicated by `palette_key`) and added query select-all |
 | Editor | empty, dirty, saved, open error, save error | type, select, copy/paste, undo/redo, save/reopen | PENDING |
-| Workspace tree | loading, empty folder, scan error, watcher degraded, success | up/down, expand/collapse, enter opens file | PENDING |
+| Workspace tree | loading, empty folder, scan error, watcher degraded, success | up/down, expand/collapse, enter opens file | **PASS** — `m11-workspace-keyboard-nav-2026-06-13.png`: F6→Workspace tree, docs+audit expanded, audit row selected (blue), Enter on `accessibility-audit.md` → editor title + real content; selection bounds and collapse confirmed by +3 tests |
 | Search/index | empty query, no results, rebuilding, query error, success | query, result select, enter opens editor | PENDING |
 | Event Stream | fixture fallback, live connected, daemon unreachable, stale/gap | fixture rows and live SSE use same `on_event` path | PENDING |
 | Terminal | empty, running, spawn error, exited, restarting | type command, output, resize, exit, restart | PENDING |

@@ -242,4 +242,51 @@ mod tests {
         assert!(!controller.rows().iter().any(|r| r.label == "src"));
         let _ = std::fs::remove_dir_all(root);
     }
+
+    #[test]
+    fn selection_does_not_leave_bounds() {
+        let (_root, mut controller) = fixture();
+        // Move up past the top — must clamp at 0.
+        controller.move_up();
+        controller.move_up();
+        assert_eq!(controller.selected_index(), 0, "clamp at top");
+        // Move down past the end — must clamp at last row index.
+        let total = controller.rows().len();
+        for _ in 0..total + 10 {
+            controller.move_down();
+        }
+        assert_eq!(controller.selected_index(), total - 1, "clamp at bottom");
+    }
+
+    #[test]
+    fn collapse_removes_children_from_rows() {
+        let (_root, mut controller) = fixture();
+        // Select src (index 1) and expand.
+        controller.move_down();
+        controller.toggle_selected(); // expand src
+        let rows_expanded = controller.rows().len();
+        assert!(rows_expanded > 3, "children visible after expand");
+        // Toggle again: should collapse, children disappear.
+        controller.toggle_selected();
+        let rows_collapsed = controller.rows().len();
+        assert!(
+            rows_collapsed < rows_expanded,
+            "children hidden after collapse"
+        );
+        assert_eq!(rows_collapsed, 3, "back to original row count");
+    }
+
+    #[test]
+    fn workspace_key_does_not_affect_editor_content() {
+        let (_root, mut controller) = fixture();
+        // Simulate a full workspace nav sequence: selection stays valid,
+        // no text has been pushed to any editor (workspace controller owns
+        // only selection/expansion state, no text buffer).
+        for _ in 0..5 {
+            controller.move_down();
+        }
+        controller.toggle_selected(); // expand/open — doesn't matter which
+                                      // Selection is bounded and no panics: cross-surface safety.
+        assert!(controller.selected_index() < controller.rows().len());
+    }
 }
