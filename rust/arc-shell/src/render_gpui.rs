@@ -430,7 +430,16 @@ impl ShellChromeView {
                 self.model.focus.focus_next()
             };
             if let Some(region) = focused {
-                self.announce = format!("focus: {}", region.label);
+                let id = region.id;
+                let label = region.label;
+                // The status region announces its live daemon/trust state so the
+                // degraded/stopped state is readable from the announce line (and
+                // to VO) even when the rail panel is scrolled out of view.
+                if id == "status" {
+                    self.announce = format!("focus: {} — {}", label, self.model.status_rail());
+                } else {
+                    self.announce = format!("focus: {label}");
+                }
             }
             return;
         }
@@ -1008,15 +1017,20 @@ impl Render for ShellChromeView {
                             ),
                         )
                     })
-                    .child(region_card(
-                        &theme,
-                        current,
-                        "status",
-                        "Status rail",
-                        "daemon/trust strip landmark",
-                    )),
+                    .child({
+                        // Status rail — shows live daemon/trust state text.
+                        let focused = current == "status";
+                        let prefix = if focused { "focus ▸ " } else { "" };
+                        let rail = self.model.status_rail();
+                        div()
+                            .p_2()
+                            .bg(panel_bg(&theme, focused))
+                            .text_color(fg(&theme))
+                            .child(format!("{prefix}Status rail"))
+                            .child(div().child(rail))
+                            .into_any_element()
+                    }),
             )
             .child(palette_block)
-            .child(div().mt_auto().p_1().child(self.model.status_rail()))
     }
 }

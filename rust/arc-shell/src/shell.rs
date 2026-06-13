@@ -134,7 +134,17 @@ impl ShellModel {
             registry,
             keymap,
             ctx: ShellCtx {
-                daemon: DaemonState::Starting,
+                daemon: match std::env::var("ARC_DAEMON_STATE").as_deref() {
+                    Ok("degraded") => DaemonState::Degraded {
+                        reason: "ARC_DAEMON_STATE=degraded (forced for diagnostics)".into(),
+                    },
+                    Ok("circuit-open") => DaemonState::CircuitOpen {
+                        restarts_in_window: 3,
+                    },
+                    Ok("healthy") => DaemonState::Healthy,
+                    Ok("stopped") => DaemonState::Stopped,
+                    _ => DaemonState::Starting,
+                },
                 workspace_trusted: false,
             },
         }

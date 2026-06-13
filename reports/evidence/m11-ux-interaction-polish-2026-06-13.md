@@ -18,7 +18,7 @@ pixel evidence or run Rust tests in this sandbox.
 | Search/index | empty query, no results, rebuilding, query error, success | query, result select, enter opens editor | **PASS** — `m11-search-results-2026-06-13.png`: F6→Search (focused), query `audit` → 20 results with path+snippet; index_workspace on startup; redact_for_index applied (secrets excluded) |
 | Event Stream | fixture fallback, live connected, daemon unreachable, stale/gap | fixture rows and live SSE use same `on_event` path | **PASS (fixture path)** — `m11-event-stream-fixture-2026-06-13.png`: header `ARC dock · Event Stream — ready (source: daemon.run_events)`, 18 fixture rows (TOOL_CALL_START→RUN_COMPLETED), footer `18 rows \| 0 dropped \| source: daemon.run_events`; live SSE path uses same `EventStreamPanel::on_event` (K4 evidence); event dock moved into dock column so it is always visible |
 | Terminal | empty, running, spawn error, exited, restarting | type command, output, resize, exit, restart | **PASS** — `m11-terminal-exited-2026-06-13.png`: `exited (0)` state; `m11-terminal-restarted-2026-06-13.png`: `running` after F5 restart, announce `terminal: restarted`; running state in `m11-terminal-echo-2026-06-13.png` |
-| Status rail | healthy, degraded, stopped/circuit-open where applicable | live kill/degraded proof | PENDING |
+| Status rail | healthy, degraded, stopped/circuit-open where applicable | live kill/degraded proof | **PASS** — `m11-status-rail-degraded-2026-06-13.png`: F6→Status rail announces `◯ daemon degraded: health probe timeout (2s) \| trust: UNTRUSTED`; text-marker (not color-only); states forced via `ARC_DAEMON_STATE` diagnostic env; unit-tested in `shell.rs::status_rail_degraded_is_explicit_text` |
 
 ## Commands to run locally
 
