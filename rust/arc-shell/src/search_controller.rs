@@ -3,7 +3,7 @@
 //! Owns an `arc-index::SearchIndex`, exposes deterministic query/result state,
 //! and returns file-open effects for the editor controller.
 
-use arc_index::search::IndexError;
+use arc_index::search::{redact_for_index, IndexError};
 use arc_index::{RebuildOutcome, SearchIndex};
 use std::path::{Path, PathBuf};
 
@@ -21,6 +21,8 @@ pub enum SearchControllerError {
 pub struct SearchRowVm {
     pub path: PathBuf,
     pub label: String,
+    pub line_number: Option<usize>,
+    pub snippet: Option<String>,
     pub selected: bool,
 }
 
@@ -138,9 +140,12 @@ impl SearchController {
             .enumerate()
             .map(|(idx, hit)| {
                 let path = self.root.join(&hit.path);
+                let (line_number, snippet) = snippet_for_query(&path, &self.query);
                 SearchRowVm {
                     label: hit.path,
                     path,
+                    line_number,
+                    snippet,
                     selected: idx == 0,
                 }
             })
@@ -170,6 +175,26 @@ impl SearchController {
             row.selected = idx == self.selected;
         }
     }
+}
+
+fn snippet_for_query(path: &Path, query: &str) -> (Option<usize>, Option<String>) {
+    let Ok(body) = std::fs::read_to_string(path) else {
+        return (None, None);
+    };
+    let redacted = redact_for_index(&body);
+    let q = query.to_ascii_lowercase();
+    for (idx, line) in redacted.lines().enumerate() {
+        if line.to_ascii_lowercase().contains(&q) {
+            let snippet = line.trim();
+            let snippet = if snippet.chars().count() > 120 {
+                snippet.chars().take(117).collect::<String>() + "..."
+            } else {
+                snippet.to_string()
+            };
+            return (Some(idx + 1), Some(snippet));
+        }
+    }
+    (None, None)
 }
 
 #[cfg(test)]
@@ -206,6 +231,11 @@ mod tests {
         let (_root, mut controller) = fixture();
         controller.set_query("unique_alpha", 10).unwrap();
         assert_eq!(controller.rows().len(), 1);
+        assert_eq!(controller.rows()[0].line_number, Some(1));
+        assert_eq!(
+            controller.rows()[0].snippet.as_deref(),
+            Some("fn alpha() { unique_alpha }")
+        );
         match controller.activate_selected() {
             SearchEffect::OpenFile(path) => assert!(path.ends_with("src/a.rs")),
             other => panic!("expected OpenFile, got {other:?}"),

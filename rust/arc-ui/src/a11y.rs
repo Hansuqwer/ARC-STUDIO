@@ -88,6 +88,16 @@ pub struct A11ySnapshot<'a> {
     pub palette_selected: usize,
     pub typebox_text: &'a str,
     pub status_rail: &'a str,
+    /// M8: current editor summary/value.
+    pub editor_value: &'a str,
+    pub editor_dirty: bool,
+    /// M9: workspace/search semantic rows.
+    pub workspace_rows: &'a [(String, bool)],
+    pub search_query: &'a str,
+    pub search_rows: &'a [(String, bool)],
+    /// M10: terminal semantic status.
+    pub terminal_status: &'a str,
+    pub terminal_current_line: &'a str,
 }
 
 impl ShellA11yTree {
@@ -103,8 +113,46 @@ impl ShellA11yTree {
         }
 
         // Status rail landmark (always present; text equivalent of daemon dot).
+        root = root
+            .child(A11yNode::new(A11yRole::StaticText, "Status rail").with_value(snap.status_rail));
+
+        // M8: editor semantic text area summary.
+        let editor_state = if snap.editor_dirty { "dirty" } else { "clean" };
         root = root.child(
-            A11yNode::new(A11yRole::StaticText, "Status rail").with_value(snap.status_rail),
+            A11yNode::new(A11yRole::TextField, "Editor")
+                .with_value(format!("{}; {editor_state}", snap.editor_value))
+                .focused(snap.focused_region_id == "editor"),
+        );
+
+        // M9: workspace tree rows and search results.
+        let mut workspace = A11yNode::new(A11yRole::List, "Workspace tree")
+            .focused(snap.focused_region_id == "workspace");
+        for (label, selected) in snap.workspace_rows.iter().take(100) {
+            workspace =
+                workspace.child(A11yNode::new(A11yRole::Row, label.clone()).focused(*selected));
+        }
+        root = root.child(workspace);
+        if !snap.search_query.is_empty() || !snap.search_rows.is_empty() {
+            let mut search = A11yNode::new(A11yRole::Dialog, "Workspace search").child(
+                A11yNode::new(A11yRole::TextField, "Search query").with_value(snap.search_query),
+            );
+            let mut results = A11yNode::new(A11yRole::List, "Search results");
+            for (label, selected) in snap.search_rows.iter().take(100) {
+                results =
+                    results.child(A11yNode::new(A11yRole::Row, label.clone()).focused(*selected));
+            }
+            search = search.child(results);
+            root = root.child(search);
+        }
+
+        // M10: terminal status/current line summary.
+        root = root.child(
+            A11yNode::new(A11yRole::StaticText, "Terminal")
+                .with_value(format!(
+                    "{}; {}",
+                    snap.terminal_status, snap.terminal_current_line
+                ))
+                .focused(snap.focused_region_id == "dock"),
         );
 
         // Command palette dialog (only when open).
@@ -175,6 +223,13 @@ mod tests {
             palette_selected: 0,
             typebox_text: "",
             status_rail: "● daemon healthy | trust: trusted",
+            editor_value: "line 1 column 1",
+            editor_dirty: false,
+            workspace_rows: &[],
+            search_query: "",
+            search_rows: &[],
+            terminal_status: "running",
+            terminal_current_line: "prompt$",
         }
     }
 
@@ -214,17 +269,27 @@ mod tests {
         let mut snap = base_snapshot(&r);
         snap.palette_open = true;
         snap.palette_query = "run";
-        let rows = vec![("ARC: Open Runs".to_string(), false), ("ARC: Replay".to_string(), true)];
+        let rows = vec![
+            ("ARC: Open Runs".to_string(), false),
+            ("ARC: Replay".to_string(), true),
+        ];
         snap.palette_rows = &rows;
         snap.palette_selected = 0;
         let tree = ShellA11yTree::build(&snap);
         let flat = tree.flatten();
         assert!(flat.iter().any(|(role, _, _, _)| *role == A11yRole::Dialog));
-        assert!(flat.iter().any(|(role, l, _, _)| *role == A11yRole::TextField && l == "Command query"));
-        let rows_flat: Vec<_> = flat.iter().filter(|(role, _, _, _)| *role == A11yRole::Row).collect();
+        assert!(flat
+            .iter()
+            .any(|(role, l, _, _)| *role == A11yRole::TextField && l == "Command query"));
+        let rows_flat: Vec<_> = flat
+            .iter()
+            .filter(|(role, _, _, _)| *role == A11yRole::Row)
+            .collect();
         assert_eq!(rows_flat.len(), 2);
         // disabled state announced via value
-        assert!(rows_flat.iter().any(|(_, l, v, _)| l == "ARC: Replay" && v.as_deref() == Some("disabled")));
+        assert!(rows_flat
+            .iter()
+            .any(|(_, l, v, _)| l == "ARC: Replay" && v.as_deref() == Some("disabled")));
     }
 
     #[test]
@@ -236,7 +301,9 @@ mod tests {
         let flat = tree.flatten();
         assert!(flat
             .iter()
-            .any(|(role, l, v, _)| *role == A11yRole::TextField && l == "Type box" && v.as_deref() == Some("abc")));
+            .any(|(role, l, v, _)| *role == A11yRole::TextField
+                && l == "Type box"
+                && v.as_deref() == Some("abc")));
     }
 
     #[test]
@@ -244,11 +311,11 @@ mod tests {
         let r = regions();
         let tree = ShellA11yTree::build(&base_snapshot(&r));
         let flat = tree.flatten();
-        assert!(flat.iter().any(
-            |(role, l, v, _)| *role == A11yRole::StaticText
+        assert!(flat
+            .iter()
+            .any(|(role, l, v, _)| *role == A11yRole::StaticText
                 && l == "Status rail"
-                && v.as_deref().unwrap_or("").contains("daemon healthy")
-        ));
+                && v.as_deref().unwrap_or("").contains("daemon healthy")));
     }
 
     #[test]
@@ -257,5 +324,34 @@ mod tests {
         let tree = ShellA11yTree::build(&base_snapshot(&r));
         let flat = tree.flatten();
         assert_eq!(flat[0].1, "ARC Studio shell", "root first");
+    }
+
+    #[test]
+    fn polish_surfaces_have_semantic_nodes() {
+        let r = regions();
+        let workspace_rows = vec![("src/main.rs".to_string(), true)];
+        let search_rows = vec![("src/main.rs: fn main".to_string(), false)];
+        let snap = A11ySnapshot {
+            workspace_rows: &workspace_rows,
+            search_query: "main",
+            search_rows: &search_rows,
+            editor_value: "line 2 column 3",
+            editor_dirty: true,
+            terminal_status: "running",
+            terminal_current_line: "arc$ echo hi",
+            ..base_snapshot(&r)
+        };
+        let flat = ShellA11yTree::build(&snap).flatten();
+        assert!(flat.iter().any(|(role, label, value, _)| {
+            *role == A11yRole::TextField
+                && label == "Editor"
+                && value.as_deref().unwrap_or("").contains("dirty")
+        }));
+        assert!(flat.iter().any(|(role, label, _, focused)| {
+            *role == A11yRole::Row && label == "src/main.rs" && *focused
+        }));
+        assert!(flat.iter().any(|(_, label, value, _)| {
+            label == "Terminal" && value.as_deref().unwrap_or("").contains("echo hi")
+        }));
     }
 }

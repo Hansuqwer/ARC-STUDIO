@@ -273,6 +273,58 @@ impl EditorController {
             .collect()
     }
 
+    pub fn set_cursor(&mut self, char_idx: usize) {
+        self.cursor = char_idx.min(self.buffer.len_chars());
+        self.selection = None;
+        self.keep_cursor_visible();
+    }
+
+    pub fn set_cursor_line_col(&mut self, line: usize, col: usize) {
+        self.cursor = self
+            .char_for_line_col(line, col)
+            .min(self.buffer.len_chars());
+        self.selection = None;
+        self.keep_cursor_visible();
+    }
+
+    pub fn line_col(&self) -> (usize, usize) {
+        self.line_col_for_char(self.cursor)
+    }
+
+    pub fn selected_text(&self) -> Option<String> {
+        self.selection
+            .as_ref()
+            .and_then(|r| self.buffer.slice(r.clone()))
+    }
+
+    pub fn copy_selection(&self) -> Option<String> {
+        self.selected_text()
+    }
+
+    pub fn cut_selection(&mut self) -> Result<Option<String>, EditorControllerError> {
+        let Some(text) = self.selected_text() else {
+            return Ok(None);
+        };
+        self.delete_forward()?;
+        Ok(Some(text))
+    }
+
+    pub fn paste_text(&mut self, text: &str) -> Result<EditorEffect, EditorControllerError> {
+        self.insert_text(text)
+    }
+
+    pub fn select_all(&mut self) {
+        self.selection = Some(0..self.buffer.len_chars());
+        self.cursor = self.buffer.len_chars();
+        self.keep_cursor_visible();
+    }
+
+    pub fn current_line_summary(&self) -> String {
+        let (line, col) = self.line_col_for_char(self.cursor);
+        let dirty = if self.dirty { "dirty" } else { "clean" };
+        format!("line {} column {} ({dirty})", line + 1, col + 1)
+    }
+
     fn apply_single(
         &mut self,
         char_range: Range<usize>,
@@ -431,5 +483,28 @@ mod tests {
         assert!(!editor.dirty());
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "!hello");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn clipboard_style_operations_use_transaction_path() {
+        let mut editor = EditorController::from_text("abcdef", None);
+        editor.select(1..4);
+        assert_eq!(editor.copy_selection().as_deref(), Some("bcd"));
+        assert_eq!(editor.cut_selection().unwrap().as_deref(), Some("bcd"));
+        assert_eq!(editor.text(), "aef");
+        editor.paste_text("XYZ").unwrap();
+        assert_eq!(editor.text(), "aXYZef");
+        editor.undo().unwrap();
+        assert_eq!(editor.text(), "aef");
+    }
+
+    #[test]
+    fn cursor_line_col_and_summary_are_stable() {
+        let mut editor = EditorController::from_text("abc\ndef", None);
+        editor.set_cursor_line_col(1, 2);
+        assert_eq!(editor.line_col(), (1, 2));
+        assert!(editor.current_line_summary().contains("line 2"));
+        editor.select_all();
+        assert_eq!(editor.selected_text().as_deref(), Some("abc\ndef"));
     }
 }

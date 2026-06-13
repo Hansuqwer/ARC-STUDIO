@@ -377,15 +377,13 @@ impl ShellChromeView {
                 let root = std::env::var("ARC_WORKSPACE_ROOT")
                     .map(std::path::PathBuf::from)
                     .unwrap_or_else(|_| {
-                        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                            .join("../..")
+                        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
                     });
-                crate::workspace_controller::WorkspaceController::open(&root)
-                    .unwrap_or_else(|_| {
-                        crate::workspace_controller::WorkspaceController::from_model(
-                            arc_workspace::WorktreeModel::new(&root),
-                        )
-                    })
+                crate::workspace_controller::WorkspaceController::open(&root).unwrap_or_else(|_| {
+                    crate::workspace_controller::WorkspaceController::from_model(
+                        arc_workspace::WorktreeModel::new(&root),
+                    )
+                })
             },
             // M7: controller starts empty; spawn when window opens.
             terminal: {
@@ -417,23 +415,115 @@ impl ShellChromeView {
             return;
         }
 
-        if !self.model.palette.open {
+        if self.model.palette.open {
+            let Some(key) = palette_key(key) else {
+                return;
+            };
+            match self
+                .model
+                .palette
+                .key(key, &self.model.registry, &self.model.ctx)
+            {
+                PaletteEffect::Announce(announcement) => self.announce = announcement,
+                PaletteEffect::Execute(id) => self.announce = format!("execute: {}", id.0),
+                PaletteEffect::Rejected { reason } => self.announce = format!("rejected: {reason}"),
+                PaletteEffect::Closed => self.announce = "closed".into(),
+                PaletteEffect::None => {}
+            }
             return;
         }
 
-        let Some(key) = palette_key(key) else {
-            return;
+        match current_focus_id(&self.model) {
+            "workspace" => self.on_workspace_key(key),
+            "editor" => self.on_editor_key(key, modifiers),
+            "dock" => self.on_terminal_key(key),
+            _ => {}
+        }
+    }
+
+    fn on_workspace_key(&mut self, key: &str) {
+        match key {
+            "up" => self.workspace.move_up(),
+            "down" => self.workspace.move_down(),
+            "enter" => {
+                if let crate::workspace_controller::WorkspaceEffect::OpenFile(path) =
+                    self.workspace.toggle_selected()
+                {
+                    match crate::editor_controller::EditorController::open_path(&path) {
+                        Ok(editor) => {
+                            self.editor = editor;
+                            self.announce = format!("opened: {}", path.display());
+                        }
+                        Err(err) => self.announce = format!("open failed: {err}"),
+                    }
+                }
+            }
+            "right" | "left" => {
+                let _ = self.workspace.toggle_selected();
+            }
+            _ => {}
+        }
+    }
+
+    fn on_editor_key(&mut self, key: &str, modifiers: &Modifiers) {
+        let result = match key {
+            "backspace" => self.editor.delete_backward(),
+            "delete" => self.editor.delete_forward(),
+            "enter" => self.editor.insert_text("\n"),
+            "left" => {
+                self.editor.move_left();
+                Ok(crate::editor_controller::EditorEffect::None)
+            }
+            "right" => {
+                self.editor.move_right();
+                Ok(crate::editor_controller::EditorEffect::None)
+            }
+            "up" => {
+                self.editor.move_up();
+                Ok(crate::editor_controller::EditorEffect::None)
+            }
+            "down" => {
+                self.editor.move_down();
+                Ok(crate::editor_controller::EditorEffect::None)
+            }
+            "home" => {
+                self.editor.move_home();
+                Ok(crate::editor_controller::EditorEffect::None)
+            }
+            "end" => {
+                self.editor.move_end();
+                Ok(crate::editor_controller::EditorEffect::None)
+            }
+            "s" if modifiers.control => self.editor.save(),
+            "z" if modifiers.control && modifiers.shift => self.editor.redo(),
+            "z" if modifiers.control => self.editor.undo(),
+            s if s.chars().count() == 1 => self.editor.insert_text(s),
+            _ => Ok(crate::editor_controller::EditorEffect::None),
         };
-        match self
-            .model
-            .palette
-            .key(key, &self.model.registry, &self.model.ctx)
-        {
-            PaletteEffect::Announce(announcement) => self.announce = announcement,
-            PaletteEffect::Execute(id) => self.announce = format!("execute: {}", id.0),
-            PaletteEffect::Rejected { reason } => self.announce = format!("rejected: {reason}"),
-            PaletteEffect::Closed => self.announce = "closed".into(),
-            PaletteEffect::None => {}
+        match result {
+            Ok(_) => self.announce = self.editor.current_line_summary(),
+            Err(err) => self.announce = format!("editor: {err}"),
+        }
+    }
+
+    fn on_terminal_key(&mut self, key: &str) {
+        use crate::terminal_controller::TerminalKey;
+        let terminal_key = match key {
+            "enter" => Some(TerminalKey::Enter),
+            "backspace" => Some(TerminalKey::Backspace),
+            "tab" => Some(TerminalKey::Tab),
+            "escape" => Some(TerminalKey::Escape),
+            "up" => Some(TerminalKey::ArrowUp),
+            "down" => Some(TerminalKey::ArrowDown),
+            "right" => Some(TerminalKey::ArrowRight),
+            "left" => Some(TerminalKey::ArrowLeft),
+            s if s.chars().count() == 1 => Some(TerminalKey::Text(s.to_string())),
+            _ => None,
+        };
+        if let Some(terminal_key) = terminal_key {
+            if let Err(err) = self.terminal.write_key(terminal_key) {
+                self.announce = format!("terminal: {err}");
+            }
         }
     }
 }
@@ -465,6 +555,9 @@ impl Render for ShellChromeView {
                 let _ = self.events.on_event(ev);
             }
         }
+        // M10: pump terminal to refresh grid before a11y/render.
+        self.terminal.pump();
+
         // Register the InputHandler so NSTextInputClient/IME sends composition
         // inline into the TypeBox rather than a floating fallback window (G6).
         window.handle_input(
@@ -494,6 +587,17 @@ impl Render for ShellChromeView {
                 })
                 .collect();
             let status = self.model.status_rail();
+            let editor_value = self.editor.current_line_summary();
+            let workspace_rows: Vec<(String, bool)> = self
+                .workspace
+                .rows()
+                .into_iter()
+                .take(100)
+                .map(|row| (row.label, row.selected))
+                .collect();
+            let search_rows: Vec<(String, bool)> = Vec::new();
+            let terminal_status = format!("{:?}", self.terminal.status());
+            let terminal_current_line = self.terminal.current_line_summary();
             let snap = arc_ui::a11y::A11ySnapshot {
                 focused_region_id: current_focus_id(&self.model),
                 regions: &regions,
@@ -503,13 +607,17 @@ impl Render for ShellChromeView {
                 palette_selected: self.model.palette.selected,
                 typebox_text: &self.typebox.committed,
                 status_rail: &status,
+                editor_value: &editor_value,
+                editor_dirty: self.editor.dirty(),
+                workspace_rows: &workspace_rows,
+                search_query: "",
+                search_rows: &search_rows,
+                terminal_status: &terminal_status,
+                terminal_current_line: &terminal_current_line,
             };
             let tree = arc_ui::a11y::ShellA11yTree::build(&snap);
             crate::a11y_macos::attach_a11y_tree(window, &tree);
         }
-        // M7: pump terminal to refresh grid before render.
-        self.terminal.pump();
-
         let theme = self.model.theme.clone();
         let current = current_focus_id(&self.model);
         let rows: Vec<AnyElement> = self
@@ -605,7 +713,10 @@ impl Render for ShellChromeView {
             .child(
                 div()
                     .flex()
-                    .child(crate::render_workspace_gpui::workspace_panel(&theme, &self.workspace))
+                    .child(crate::render_workspace_gpui::workspace_panel(
+                        &theme,
+                        &self.workspace,
+                    ))
                     .child(crate::render_editor_gpui::editor_panel(
                         &theme,
                         current == "editor",

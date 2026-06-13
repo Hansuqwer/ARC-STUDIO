@@ -17,9 +17,8 @@ use arc_ui::kit::Window;
 use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
 use objc2_app_kit::{
-    NSAccessibilityElement, NSAccessibilityGroupRole, NSAccessibilityListRole,
-    NSAccessibilityRole, NSAccessibilityRowRole, NSAccessibilityStaticTextRole,
-    NSAccessibilityTextFieldRole,
+    NSAccessibilityElement, NSAccessibilityGroupRole, NSAccessibilityListRole, NSAccessibilityRole,
+    NSAccessibilityRowRole, NSAccessibilityStaticTextRole, NSAccessibilityTextFieldRole,
 };
 use objc2_foundation::{NSArray, NSRect, NSString};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
@@ -150,9 +149,16 @@ mod tests {
             palette_selected: 0,
             typebox_text: "",
             status_rail: "● daemon healthy | trust: trusted",
+            editor_value: "line 1 column 1",
+            editor_dirty: false,
+            workspace_rows: &[],
+            search_query: "",
+            search_rows: &[],
+            terminal_status: "running",
+            terminal_current_line: "prompt$",
         };
         let tree = ShellA11yTree::build(&snap);
-        // root + 4 regions + status rail + typebox = 7 elements
-        assert_eq!(tree.flatten().len(), 7);
+        // root + 4 regions + status + editor + workspace list + terminal + typebox.
+        assert_eq!(tree.flatten().len(), 10);
     }
 }

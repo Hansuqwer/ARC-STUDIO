@@ -68,12 +68,18 @@ pub fn search_panel(theme: &Theme, search: &SearchController) -> AnyElement {
         .rows()
         .iter()
         .map(|row| {
+            let line = row.line_number.map(|n| format!(":{n}")).unwrap_or_default();
+            let snippet = row
+                .snippet
+                .as_deref()
+                .map(|s| format!(" — {s}"))
+                .unwrap_or_default();
             div()
                 .font_family("Menlo")
                 .text_size(px(12.0))
                 .text_color(fg(theme))
                 .bg(row_bg(theme, row.selected))
-                .child(row.label.clone())
+                .child(format!("{}{}{}", row.label, line, snippet))
                 .into_any_element()
         })
         .collect();

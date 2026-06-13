@@ -33,6 +33,7 @@ pub struct WorkspaceController {
     model: WorktreeModel,
     expanded: BTreeSet<PathBuf>,
     selected: usize,
+    opened_file: Option<PathBuf>,
 }
 
 impl WorkspaceController {
@@ -46,6 +47,7 @@ impl WorkspaceController {
             model,
             expanded,
             selected: 0,
+            opened_file: None,
         })
     }
 
@@ -56,6 +58,7 @@ impl WorkspaceController {
             model,
             expanded,
             selected: 0,
+            opened_file: None,
         }
     }
 
@@ -69,6 +72,24 @@ impl WorkspaceController {
 
     pub fn selected_index(&self) -> usize {
         self.selected
+    }
+
+    pub fn opened_file(&self) -> Option<&Path> {
+        self.opened_file.as_deref()
+    }
+
+    pub fn selected_row(&self) -> Option<WorkspaceRowVm> {
+        self.rows().get(self.selected).cloned()
+    }
+
+    pub fn select_path(&mut self, path: &Path) -> bool {
+        let rows = self.rows();
+        if let Some(idx) = rows.iter().position(|row| row.path == path) {
+            self.selected = idx;
+            true
+        } else {
+            false
+        }
     }
 
     pub fn rows(&self) -> Vec<WorkspaceRowVm> {
@@ -98,7 +119,10 @@ impl WorkspaceController {
             return WorkspaceEffect::None;
         };
         match row.kind {
-            NodeKind::File => WorkspaceEffect::OpenFile(row.path.clone()),
+            NodeKind::File => {
+                self.opened_file = Some(row.path.clone());
+                WorkspaceEffect::OpenFile(row.path.clone())
+            }
             NodeKind::Dir => {
                 if self.expanded.contains(&row.path) {
                     self.expanded.remove(&row.path);
@@ -120,6 +144,13 @@ impl WorkspaceController {
         if kind == ChangeKind::Removed {
             let removed = path.to_path_buf();
             self.expanded.retain(|p| !p.starts_with(&removed));
+            if self
+                .opened_file
+                .as_ref()
+                .is_some_and(|p| p.starts_with(&removed))
+            {
+                self.opened_file = None;
+            }
         }
         let max = self.rows().len().saturating_sub(1);
         self.selected = self.selected.min(max);
@@ -184,6 +215,16 @@ mod tests {
             WorkspaceEffect::OpenFile(path) => assert!(path.ends_with("src/main.rs")),
             other => panic!("expected open file, got {other:?}"),
         }
+        assert!(controller.opened_file().unwrap().ends_with("src/main.rs"));
+    }
+
+    #[test]
+    fn select_path_marks_existing_row() {
+        let (root, mut controller) = fixture();
+        controller.move_down();
+        controller.toggle_selected(); // expand src
+        assert!(controller.select_path(&root.join("src/main.rs")));
+        assert_eq!(controller.selected_row().unwrap().label, "main.rs");
     }
 
     #[test]

@@ -13,6 +13,19 @@ pub enum TerminalStatus {
     Error(String),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TerminalKey {
+    Text(String),
+    Enter,
+    Backspace,
+    Tab,
+    Escape,
+    ArrowUp,
+    ArrowDown,
+    ArrowRight,
+    ArrowLeft,
+}
+
 pub struct TerminalController {
     session: Option<TerminalSession>,
     rows: Vec<String>,
@@ -76,6 +89,14 @@ impl TerminalController {
         self.write_bytes(text.as_bytes())
     }
 
+    pub fn write_key(&mut self, key: TerminalKey) -> Result<(), TerminalError> {
+        self.write_bytes(&terminal_bytes_for_key(&key))
+    }
+
+    pub fn paste_text(&mut self, text: &str) -> Result<(), TerminalError> {
+        self.write_text(text)
+    }
+
     pub fn resize(&mut self, cols: u16, lines: u16) -> Result<(), TerminalError> {
         self.cols = cols.max(1);
         self.lines = lines.max(1);
@@ -119,6 +140,29 @@ impl TerminalController {
 
     pub fn ingest_grid_for_test(&mut self, rows: Vec<String>) {
         self.rows = bounded_rows(rows, self.max_rows);
+    }
+
+    pub fn current_line_summary(&self) -> String {
+        self.rows
+            .iter()
+            .rev()
+            .find(|row| !row.trim().is_empty())
+            .cloned()
+            .unwrap_or_else(|| "terminal empty".to_string())
+    }
+}
+
+pub fn terminal_bytes_for_key(key: &TerminalKey) -> Vec<u8> {
+    match key {
+        TerminalKey::Text(text) => text.as_bytes().to_vec(),
+        TerminalKey::Enter => b"\n".to_vec(),
+        TerminalKey::Backspace => vec![0x7f],
+        TerminalKey::Tab => b"\t".to_vec(),
+        TerminalKey::Escape => vec![0x1b],
+        TerminalKey::ArrowUp => b"\x1b[A".to_vec(),
+        TerminalKey::ArrowDown => b"\x1b[B".to_vec(),
+        TerminalKey::ArrowRight => b"\x1b[C".to_vec(),
+        TerminalKey::ArrowLeft => b"\x1b[D".to_vec(),
     }
 }
 
@@ -168,5 +212,26 @@ mod tests {
         let mut controller = TerminalController::new(10, 80, 24);
         controller.shutdown();
         assert_eq!(controller.status(), &TerminalStatus::Exited(None));
+    }
+
+    #[test]
+    fn terminal_key_bytes_are_deterministic() {
+        assert_eq!(terminal_bytes_for_key(&TerminalKey::Enter), b"\n".to_vec());
+        assert_eq!(terminal_bytes_for_key(&TerminalKey::Backspace), vec![0x7f]);
+        assert_eq!(
+            terminal_bytes_for_key(&TerminalKey::ArrowLeft),
+            b"\x1b[D".to_vec()
+        );
+        assert_eq!(
+            terminal_bytes_for_key(&TerminalKey::Text("abc".into())),
+            b"abc".to_vec()
+        );
+    }
+
+    #[test]
+    fn current_line_summary_uses_last_non_empty_row() {
+        let mut controller = TerminalController::new(5, 80, 24);
+        controller.ingest_grid_for_test(vec!["".into(), "prompt$ echo arc".into(), "".into()]);
+        assert_eq!(controller.current_line_summary(), "prompt$ echo arc");
     }
 }
