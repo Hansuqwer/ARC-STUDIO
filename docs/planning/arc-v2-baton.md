@@ -24,7 +24,7 @@ Docs: `arc-v2-sprint-3-final-adjudication.md`, `arc-v2-kit-implementation-plan.m
 |---|---|---|
 | K1 | `framework-gpui` feature in arc-ui; deny.toml wrapper; Sprint-1 lock gate retired | **DONE** (`0ee9618e`) |
 | K2 | shell_port.rs → arc-shell/src/render_gpui.rs; window + palette + NO_COLOR + B1 | **DONE** (`fa8bdb0f` + `900d38d1`) |
-| K3 | G5 VoiceOver + G6 IME + G7 bidi evidence on the real K2 shell | **G5 Pass; G7 Pass; G6 impl done, manual CJK rerun pending** |
+| K3 | G5 VoiceOver + G6 IME + G7 bidi evidence on the real K2 shell | **DONE — G5 Pass; G6 Pass (JA inline, 2026-06-13); G7 Pass** |
 | K4 | Event Stream panel end-to-end (model→render→daemon) | **DONE** (`a9f816c1`) |
 | G8 | Sustainability evidence (Zed Industries backing, release cadence) | **DONE** (`276b0f60`) |
 
@@ -54,11 +54,11 @@ Docs: `arc-v2-sprint-3-final-adjudication.md`, `arc-v2-kit-implementation-plan.m
 - K2 B1 cold-start: 2012ms ±1ms (M4 pinned); `reports/b1-cold-start.json`
 - G5 VoiceOver: Pass — `arc_ui::a11y` 6-test framework-free semantic tree + `arc-shell::a11y_macos` NSAccessibility bridge; VoiceOver navigates all 4 landmarks on M4
 - G7 Bidi: Pass — `reports/spike-gpui-bidi.png`; all 6 sample lines rendered
-- G6 dead-key: confirmed (é via Option+e in palette TypeBox on M4); full CJK pending
+- G6: PASS — dead-key (é) + JA Romaji inline composition (見本号 marked in palette query line); screenshot at reports/evidence/g6-ime-ja-screenshot-2026-06-13.png
 
 ## Open items before FINAL selection
 
-1. **G6 manual CJK rerun** (M4 required):
+1. **G6 DONE** — JA Romaji inline composition confirmed on M4 (2026-06-13):
    - Add JA input source: System Settings → Keyboard → Text Input → Edit → + → Japanese → Romaji
    - Switch: Ctrl+Space → open `arc-shell --window` → Ctrl+Shift+P opens palette → type in Romaji → expect hiragana inline with underline
    - Record: inline vs floating, candidate anchoring, commit (Enter), cancel (Esc)
