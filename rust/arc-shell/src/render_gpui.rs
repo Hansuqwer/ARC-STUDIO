@@ -33,8 +33,10 @@ pub fn open_window(model: ShellModel) {
         };
 
         if cx
-            .open_window(options, move |_window, cx| {
-                cx.new(|cx| ShellChromeView::new(model, cx))
+            .open_window(options, move |window, cx| {
+                let view = cx.new(|cx| ShellChromeView::new(model, cx));
+                view.read(cx).focus_handle.clone().focus(window);
+                view
             })
             .is_err()
         {
