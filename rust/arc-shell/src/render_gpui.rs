@@ -441,6 +441,51 @@ impl ShellChromeView {
         }
     }
 
+    fn handle_clipboard_key(
+        &mut self,
+        key: &str,
+        mods: &Modifiers,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let is_editor = current_focus_id(&self.model) == "editor";
+        if !is_editor {
+            return false;
+        }
+        // Accept both platform (Cmd on macOS) and control modifiers so tests work
+        // in headless environments where platform=false.
+        let cmd = mods.platform || mods.control;
+        match key {
+            "c" if cmd => {
+                if let Some(text) = self.editor.copy_selection() {
+                    cx.write_to_clipboard(ClipboardItem::new_string(text));
+                }
+                true
+            }
+            "x" if cmd => {
+                if let Ok(Some(text)) = self.editor.cut_selection() {
+                    cx.write_to_clipboard(ClipboardItem::new_string(text));
+                    self.announce = self.editor.current_line_summary();
+                }
+                true
+            }
+            "v" if cmd => {
+                if let Some(item) = cx.read_from_clipboard() {
+                    if let Some(text) = item.text() {
+                        let _ = self.editor.paste_text(&text);
+                        self.announce = self.editor.current_line_summary();
+                    }
+                }
+                true
+            }
+            "a" if cmd => {
+                self.editor.select_all();
+                self.announce = "selected all".into();
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn on_workspace_key(&mut self, key: &str) {
         match key {
             "up" => self.workspace.move_up(),
@@ -699,7 +744,14 @@ impl Render for ShellChromeView {
             .track_focus(&self.focus_handle)
             .key_context("ArcShell")
             .on_key_down(cx.listener(|view, event: &KeyDownEvent, _window, cx| {
-                view.on_key(event.keystroke.key.as_str(), &event.keystroke.modifiers);
+                let key = event.keystroke.key.as_str();
+                let mods = &event.keystroke.modifiers;
+                // Clipboard ops need the App context (cx), so they are handled
+                // here rather than in on_key. Cmd/Ctrl + C/X/V/A on the editor.
+                let clipboard_handled = view.handle_clipboard_key(key, mods, cx);
+                if !clipboard_handled {
+                    view.on_key(key, mods);
+                }
                 cx.notify();
             }))
             .size_full()
