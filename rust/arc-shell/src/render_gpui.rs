@@ -674,6 +674,14 @@ impl ShellChromeView {
 
     fn on_terminal_key(&mut self, key: &str) {
         use crate::terminal_controller::TerminalKey;
+        // F5 restarts the terminal (spawn error → running, exited → running).
+        if key == "f5" {
+            match self.terminal.restart() {
+                Ok(()) => self.announce = "terminal: restarted".into(),
+                Err(err) => self.announce = format!("terminal: restart failed: {err}"),
+            }
+            return;
+        }
         let terminal_key = match key {
             "enter" => Some(TerminalKey::Enter),
             "backspace" => Some(TerminalKey::Backspace),
