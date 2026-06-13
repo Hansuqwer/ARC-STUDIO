@@ -988,11 +988,18 @@ impl Render for ShellChromeView {
                         current == "editor",
                         &self.editor,
                     ))
-                    .child(crate::render_terminal_gpui::terminal_panel(
-                        &theme,
-                        current == "dock",
-                        &self.terminal,
-                    ))
+                    .child({
+                        // Dock column: Event Stream (top) + Terminal (bottom).
+                        // Both share the dock focused-panel background so the
+                        // region reads as one landmark to the user and VO.
+                        div().flex().flex_col().child(event_dock).child(
+                            crate::render_terminal_gpui::terminal_panel(
+                                &theme,
+                                current == "dock",
+                                &self.terminal,
+                            ),
+                        )
+                    })
                     .child(region_card(
                         &theme,
                         current,
@@ -1001,7 +1008,6 @@ impl Render for ShellChromeView {
                         "daemon/trust strip landmark",
                     )),
             )
-            .child(event_dock)
             .child(palette_block)
             .child(div().mt_auto().p_1().child(self.model.status_rail()))
     }

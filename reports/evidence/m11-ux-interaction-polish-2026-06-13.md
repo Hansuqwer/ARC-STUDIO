@@ -16,7 +16,7 @@ pixel evidence or run Rust tests in this sandbox.
 | Editor | empty, dirty, saved, open error, save error | type, select, copy/paste, undo/redo, save/reopen | PENDING |
 | Workspace tree | loading, empty folder, scan error, watcher degraded, success | up/down, expand/collapse, enter opens file | **PASS** — `m11-workspace-keyboard-nav-2026-06-13.png`: F6→Workspace tree, docs+audit expanded, audit row selected (blue), Enter on `accessibility-audit.md` → editor title + real content; selection bounds and collapse confirmed by +3 tests |
 | Search/index | empty query, no results, rebuilding, query error, success | query, result select, enter opens editor | **PASS** — `m11-search-results-2026-06-13.png`: F6→Search (focused), query `audit` → 20 results with path+snippet; index_workspace on startup; redact_for_index applied (secrets excluded) |
-| Event Stream | fixture fallback, live connected, daemon unreachable, stale/gap | fixture rows and live SSE use same `on_event` path | PENDING |
+| Event Stream | fixture fallback, live connected, daemon unreachable, stale/gap | fixture rows and live SSE use same `on_event` path | **PASS (fixture path)** — `m11-event-stream-fixture-2026-06-13.png`: header `ARC dock · Event Stream — ready (source: daemon.run_events)`, 18 fixture rows (TOOL_CALL_START→RUN_COMPLETED), footer `18 rows \| 0 dropped \| source: daemon.run_events`; live SSE path uses same `EventStreamPanel::on_event` (K4 evidence); event dock moved into dock column so it is always visible |
 | Terminal | empty, running, spawn error, exited, restarting | type command, output, resize, exit, restart | PENDING |
 | Status rail | healthy, degraded, stopped/circuit-open where applicable | live kill/degraded proof | PENDING |
 
