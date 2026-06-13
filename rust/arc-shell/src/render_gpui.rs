@@ -497,6 +497,7 @@ impl ShellChromeView {
             "s" if modifiers.control => self.editor.save(),
             "z" if modifiers.control && modifiers.shift => self.editor.redo(),
             "z" if modifiers.control => self.editor.undo(),
+            "space" => self.editor.insert_text(" "),
             s if s.chars().count() == 1 => self.editor.insert_text(s),
             _ => Ok(crate::editor_controller::EditorEffect::None),
         };
@@ -513,6 +514,7 @@ impl ShellChromeView {
             "backspace" => Some(TerminalKey::Backspace),
             "tab" => Some(TerminalKey::Tab),
             "escape" => Some(TerminalKey::Escape),
+            "space" => Some(TerminalKey::Text(" ".to_string())),
             "up" => Some(TerminalKey::ArrowUp),
             "down" => Some(TerminalKey::ArrowDown),
             "right" => Some(TerminalKey::ArrowRight),
@@ -535,6 +537,7 @@ fn palette_key(key: &str) -> Option<PaletteKey> {
         "down" => Some(PaletteKey::Down),
         "enter" => Some(PaletteKey::Enter),
         "escape" => Some(PaletteKey::Escape),
+        "space" => Some(PaletteKey::Char(' ')),
         s if s.chars().count() == 1 => s.chars().next().map(PaletteKey::Char),
         _ => None,
     }
