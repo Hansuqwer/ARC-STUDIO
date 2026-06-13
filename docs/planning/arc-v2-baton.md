@@ -84,6 +84,21 @@ Docs: `arc-v2-sprint-3-final-adjudication.md`, `arc-v2-kit-implementation-plan.m
 - Python v1: 220 passed (2026-06-13, `tests/protocol tests/web`)
 - arc-dock 30 tests; arc-shell headless tests pass; deny.toml clean
 
+## M5/M6/M7 evidence (committed, pinned M4 — 2026-06-13)
+
+Screenshot: `reports/evidence/m5-m6-m7-panels-2026-06-13.png`
+
+| Panel | Evidence |
+|---|---|
+| M5 Editor | "Editor — Untitled" with 4 lines of welcome text, line numbers (Menlo 12pt), cursor marker visible |
+| M6 Workspace | "Workspace — /Users/hansvilund/arc-v2-work" tree with .github/.husky/.kiro/applications/docs/examples/… folders, selected row highlighted |
+| M7 Terminal | "Terminal — running · 120x30" spawned default shell, status running |
+
+Build: `cargo build -p arc-shell --features framework-gpui --release -j2` — clean, 0 errors/warnings.
+Tests: 83 total across 6 crates — 0 failures. Facade clean. Clippy clean.
+Two bugs fixed in Arena scaffolds: (1) `visible_lines` `then_some→then()` to prevent usize underflow;
+(2) search_controller tests use atomic counter for unique index dirs (tantivy lock).
+
 ## Sync-loss rule
 
 Arena often can't push. Always provide a **git bundle**. Never assume a bare

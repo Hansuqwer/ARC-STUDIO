@@ -172,12 +172,23 @@ impl InputHandler for TypeBoxHandler {
         _window: &mut Window,
         cx: &mut App,
     ) -> Option<UTF16Selection> {
-        self.entity.read(cx).typebox.committed_utf16_len().pipe(|n| {
-            Some(UTF16Selection { range: n..n, reversed: false })
-        })
+        self.entity
+            .read(cx)
+            .typebox
+            .committed_utf16_len()
+            .pipe(|n| {
+                Some(UTF16Selection {
+                    range: n..n,
+                    reversed: false,
+                })
+            })
     }
 
-    fn marked_text_range(&mut self, _window: &mut Window, cx: &mut App) -> Option<std::ops::Range<usize>> {
+    fn marked_text_range(
+        &mut self,
+        _window: &mut Window,
+        cx: &mut App,
+    ) -> Option<std::ops::Range<usize>> {
         let tb = &self.entity.read(cx).typebox;
         tb.marked.as_ref().map(|m| {
             let start = TypeBoxContent::utf16_len(&tb.committed);
@@ -269,7 +280,9 @@ impl InputHandler for TypeBoxHandler {
 
 // Convenience extension to pipe a value through a closure (avoids temp bindings).
 trait Pipe: Sized {
-    fn pipe<R>(self, f: impl FnOnce(Self) -> R) -> R { f(self) }
+    fn pipe<R>(self, f: impl FnOnce(Self) -> R) -> R {
+        f(self)
+    }
 }
 impl<T: Sized> Pipe for T {}
 
@@ -283,6 +296,12 @@ pub struct ShellChromeView {
     pub events: arc_dock::EventStreamPanel,
     /// K4: live per-run SSE receiver (None = fixture-seeded only).
     pub live_rx: Option<std::sync::mpsc::Receiver<arc_protocol_rs::RunEvent>>,
+    /// M5: editor panel.
+    pub editor: crate::editor_controller::EditorController,
+    /// M6: workspace tree panel.
+    pub workspace: crate::workspace_controller::WorkspaceController,
+    /// M7: terminal panel.
+    pub terminal: crate::terminal_controller::TerminalController,
 }
 
 /// K4: spawn a background per-run SSE feed from the live daemon.
@@ -307,7 +326,9 @@ pub fn spawn_live_feed(
             Err(_) => return,
         };
         rt.block_on(async move {
-            let Ok(client) = DaemonClient::new(&base) else { return };
+            let Ok(client) = DaemonClient::new(&base) else {
+                return;
+            };
             let cancel = tokio_util::sync::CancellationToken::new();
             // stream_run_events feeds each decoded RunEvent to the channel;
             // ordered-queue gap handling stays in EventStreamPanel::on_event.
@@ -335,8 +356,8 @@ impl ShellChromeView {
         // K4 live path: if ARC_RUN_ID is set, attach a per-run SSE feed from the
         // daemon (ARC_DAEMON_URL or default loopback). Absent → fixture-only.
         let live_rx = std::env::var("ARC_RUN_ID").ok().map(|run_id| {
-            let base = std::env::var("ARC_DAEMON_URL")
-                .unwrap_or_else(|_| "http://127.0.0.1:7777".into());
+            let base =
+                std::env::var("ARC_DAEMON_URL").unwrap_or_else(|_| "http://127.0.0.1:7777".into());
             spawn_live_feed(base, run_id)
         });
         Self {
@@ -346,6 +367,32 @@ impl ShellChromeView {
             events,
             live_rx,
             model,
+            // M5: start with a scratch buffer seeded with a welcome note.
+            editor: crate::editor_controller::EditorController::from_text(
+                "# ARC Studio v2\n\nOpen a file from the workspace tree.\n",
+                None,
+            ),
+            // M6: open workspace at the repo root (best-effort; falls back to empty on error).
+            workspace: {
+                let root = std::env::var("ARC_WORKSPACE_ROOT")
+                    .map(std::path::PathBuf::from)
+                    .unwrap_or_else(|_| {
+                        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                            .join("../..")
+                    });
+                crate::workspace_controller::WorkspaceController::open(&root)
+                    .unwrap_or_else(|_| {
+                        crate::workspace_controller::WorkspaceController::from_model(
+                            arc_workspace::WorktreeModel::new(&root),
+                        )
+                    })
+            },
+            // M7: controller starts empty; spawn when window opens.
+            terminal: {
+                let mut t = crate::terminal_controller::TerminalController::new(200, 120, 30);
+                let _ = t.spawn_default_shell();
+                t
+            },
         }
     }
 
@@ -422,7 +469,9 @@ impl Render for ShellChromeView {
         // inline into the TypeBox rather than a floating fallback window (G6).
         window.handle_input(
             &self.focus_handle.clone(),
-            TypeBoxHandler { entity: cx.entity().clone() },
+            TypeBoxHandler {
+                entity: cx.entity().clone(),
+            },
             cx,
         );
 
@@ -430,17 +479,19 @@ impl Render for ShellChromeView {
         // Truth lives in arc_ui::a11y; this only bridges it to NSAccessibility.
         #[cfg(target_os = "macos")]
         {
-            let regions: Vec<(&str, &str)> = self
-                .model
-                .focus
-                .regions_for_a11y();
+            let regions: Vec<(&str, &str)> = self.model.focus.regions_for_a11y();
             let rows: Vec<(String, bool)> = self
                 .model
                 .palette
                 .items
                 .iter()
                 .take(50)
-                .map(|it| (it.title.clone(), matches!(it.enablement, Enablement::Disabled { .. })))
+                .map(|it| {
+                    (
+                        it.title.clone(),
+                        matches!(it.enablement, Enablement::Disabled { .. }),
+                    )
+                })
                 .collect();
             let status = self.model.status_rail();
             let snap = arc_ui::a11y::A11ySnapshot {
@@ -456,6 +507,9 @@ impl Render for ShellChromeView {
             let tree = arc_ui::a11y::ShellA11yTree::build(&snap);
             crate::a11y_macos::attach_a11y_tree(window, &tree);
         }
+        // M7: pump terminal to refresh grid before render.
+        self.terminal.pump();
+
         let theme = self.model.theme.clone();
         let current = current_focus_id(&self.model);
         let rows: Vec<AnyElement> = self
@@ -484,20 +538,21 @@ impl Render for ShellChromeView {
             })
             .collect();
 
-        let palette_block = if self.model.palette.open {
-            div()
-                .bg(palette_bg(&theme))
-                .p_2()
-                .w(px(640.0))
-                .flex()
-                .flex_col()
-                .child(div().child(format!("> {}{}", self.model.palette.query,
+        let palette_block =
+            if self.model.palette.open {
+                div()
+                    .bg(palette_bg(&theme))
+                    .p_2()
+                    .w(px(640.0))
+                    .flex()
+                    .flex_col()
+                    .child(div().child(format!("> {}{}", self.model.palette.query,
                     self.typebox.marked.as_deref().map(|m| format!("[{m}]")).unwrap_or_default())))
-                .children(rows)
-                .into_any_element()
-        } else {
-            div().into_any_element()
-        };
+                    .children(rows)
+                    .into_any_element()
+            } else {
+                div().into_any_element()
+            };
 
         // K4: Event Stream dock — render the EventStreamPanel rows with the
         // same fixed-width line discipline as the spike, plus surface-state
@@ -550,26 +605,16 @@ impl Render for ShellChromeView {
             .child(
                 div()
                     .flex()
-                    .child(region_card(
+                    .child(crate::render_workspace_gpui::workspace_panel(&theme, &self.workspace))
+                    .child(crate::render_editor_gpui::editor_panel(
                         &theme,
-                        current,
-                        "workspace",
-                        "Workspace tree",
-                        "project files placeholder",
+                        current == "editor",
+                        &self.editor,
                     ))
-                    .child(region_card(
+                    .child(crate::render_terminal_gpui::terminal_panel(
                         &theme,
-                        current,
-                        "editor",
-                        "Editor",
-                        "editor surface placeholder",
-                    ))
-                    .child(region_card(
-                        &theme,
-                        current,
-                        "dock",
-                        "ARC dock",
-                        "event stream / HITL dock placeholder",
+                        current == "dock",
+                        &self.terminal,
                     ))
                     .child(region_card(
                         &theme,
@@ -584,4 +629,3 @@ impl Render for ShellChromeView {
             .child(div().mt_auto().p_1().child(self.model.status_rail()))
     }
 }
-
