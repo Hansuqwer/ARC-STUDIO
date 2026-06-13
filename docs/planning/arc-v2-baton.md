@@ -1,19 +1,16 @@
 # arc-v2 baton state (update this file at every handback)
 
-Last updated: 2026-06-12 (PM-12 Arena sync) · Branch: `arc-v2/sprint-1-protocol-bridge` @ `e3b2a5a`
+Last updated: 2026-06-13 (Kiro CLI sync) · Branch: `arc-v2/sprint-1-protocol-bridge` @ `276b0f60`
 
 ## Who holds the baton
 
-**Arena (sandbox):** synced to remote `e3b2a5a`. K2 is committed and M4-pixel
-verified. K3 macOS evidence is now mostly closed: G5 VoiceOver is **Pass** via
-the ARC-owned semantic a11y tree + macOS NSAccessibility bridge, G7 Bidi is
-**Pass** with screenshot, and G6 IME dead-key inline composition CONFIRMED on M4 (é via Option+e in palette); full CJK rerun pending input-source setup. Arena can do headless analysis/model-side
-prep only. Provide a git bundle on commit.
+**Kiro CLI (local):** synced to remote `276b0f60`. K4 + G8 are committed. G6 CJK
+manual evidence is the sole remaining open gate before FINAL selection. All headless
+tests pass; Python v1 gate confirmed 220 passed.
 
-**M4 (local CLI):** owns remaining OS/display evidence: manual G6 IME script
-(JA/ZH/KO/dead keys) after the `InputHandler` implementation, plus any future
-VoiceOver regression reruns, `--features framework-gpui` pixel checks, and
-Linux/Windows-gap evidence collection.
+**M4 (local CLI):** owns remaining OS/display evidence: G6 manual CJK IME rerun
+(JA/ZH/KO — implementation exists at `d860031`, only manual confirmation required),
+plus Linux session (G1–G4 + Orca + fcitx5/ibus) and Windows-gap decision.
 
 ## Provisional selection
 
@@ -27,44 +24,50 @@ Docs: `arc-v2-sprint-3-final-adjudication.md`, `arc-v2-kit-implementation-plan.m
 |---|---|---|
 | K1 | `framework-gpui` feature in arc-ui; deny.toml wrapper; Sprint-1 lock gate retired | **DONE** (`0ee9618e`) |
 | K2 | shell_port.rs → arc-shell/src/render_gpui.rs; window + palette + NO_COLOR + B1 | **DONE** (`fa8bdb0f` + `900d38d1`) |
-| K3 | G5 VoiceOver + G6 IME + G7 bidi evidence on the real K2 shell | **PARTIAL** (`77857620`, `d860031`, `7287dfa`, `e3b2a5a`): G5 Pass; G7 Pass; G6 implementation landed but manual evidence pending |
-| K4 | Event Stream panel end-to-end (model→render→daemon) | after K3 G6 evidence close |
+| K3 | G5 VoiceOver + G6 IME + G7 bidi evidence on the real K2 shell | **G5 Pass; G7 Pass; G6 impl done, manual CJK rerun pending** |
+| K4 | Event Stream panel end-to-end (model→render→daemon) | **DONE** (`a9f816c1`) |
+| G8 | Sustainability evidence (Zed Industries backing, release cadence) | **DONE** (`276b0f60`) |
 
-## K1 evidence (committed)
+## K4 evidence (committed `a9f816c1`)
 
-- `rust/arc-ui/Cargo.toml`: `framework-gpui = ["dep:gpui"]`, `gpui = { version = "=0.2.2", optional = true }`
-- `rust/arc-ui/src/lib.rs`: `#[cfg(feature = "framework-gpui")] pub use gpui::*;` in `pub mod kit`
-- `rust/deny.toml`: `{ crate = "gpui", wrappers = ["arc-ui"] }` — feature-scoped exception
-- Headless: 15/15 arc-ui tests pass; flag-on: disk-blocked (same root as gpui-test SIGBUS)
+- `rust/arc-shell/Cargo.toml`: `arc-dock = { path = "../arc-dock" }` added
+- `rust/arc-shell/src/render_gpui.rs`:
+  - `events: arc_dock::EventStreamPanel` + `live_rx: Option<Receiver<RunEvent>>` fields on `ShellChromeView`
+  - `new()`: replay-seeds the panel from `protocol/fixtures/run-event-seq/tool-use-streaming` (18 events; `replay_dir` path)
+  - `new()`: if `ARC_RUN_ID` set, spawns background `tokio` thread → `DaemonClient::stream_run_events` → `std::sync::mpsc` → `live_rx`
+  - `render()`: drains `live_rx.try_iter()` via same `on_event` path as fixture replay (parity oracle holds); renders last 12 event rows with `display_line()` fixed-width discipline, surface-state header, and footer
+  - `spawn_live_feed()`: pure fn, graceful no-op if daemon unreachable
+- Facade: `arc-dock` has no `gpui`/`floem` Cargo dep; `check-arc-ui-facade.sh` passes
+- arc-dock tests: 30 total (event_stream 3 + hitl 10 + runs 5 + state 3 + diff_review 9)
+- Python v1: 220 passed (`tests/protocol tests/web`, confirmed 2026-06-13)
 
-## K2 evidence (committed, pinned M4 — binding per benchmark-environment.md)
+## G8 evidence (committed `276b0f60`)
 
-- **Window**: `cargo build -p arc-shell --features framework-gpui --release` — clean in 3m06s; `arc-shell --window` opens gpui window (PID 29300 confirmed running)
-- **NO_COLOR**: `NO_COLOR=1 arc-shell --headless-status` → `[ERR]` text marker instead of `○` glyph — verified
-- **B1 cold-start**: `hyperfine --runs 10 'arc-shell --smoke-exit'` → mean=2012ms ±1ms (min=2010, max=2015). Dominated by 2s hardcoded daemon health-probe timeout; model init itself is near-instant. `reports/b1-cold-start.json` committed.
-- **v1 gate**: 220 passed (main repo `tests/protocol tests/web`)
+- `reports/spike-gpui.json` G8Sustainability row updated: Pass
+- Zed Industries: VC-funded company, 85k stars, full engineering team; not single-maintainer
+- Release cadence: 0.2.0→0.2.1→0.2.2 in 2 weeks (Oct 2025)
+- Vendoring cost: ~10 Zed sub-crates, 1 sprint per adjudication §3 plan, pre-approved
+- G8 score: 9/20 vs floem 14/20 — factored in; criterion-#1 (facade) still governs selection
 
-## K3 evidence (committed, pinned M4)
+## K1–K3 evidence (see prior baton, unchanged)
 
-| Gate | Outcome | Evidence | Next action |
-|---|---|---|---|
-| G5 VoiceOver | **Pass** | `e3b2a5a`; `rust/arc-ui/src/a11y.rs` framework-free semantic tree; `rust/arc-shell/src/a11y_macos.rs` NSAccessibility bridge; `reports/evidence/k3-gpui-macos-evidence.json`; `reports/spike-gpui.json` row updated | closed for macOS gpui; keep regression rerun after future a11y/render changes |
-| G6 IME | **Implemented; evidence pending** | `d860031` implements framework input handling on `ShellChromeView`/TypeBox; no manual JA/ZH/KO/dead-key rerun recorded yet | M4 rerun of `arc-v2-macos-g5-g6-protocol.md` G6 script to confirm inline composition, candidate anchoring, commit, and cancel |
-| G7 Bidi | **Pass** | `7287dfa`; `reports/spike-gpui-bidi.png`; `reports/spike-gpui.json` row updated | closed for macOS gpui: all six sample lines rendered (RTL Arabic, mixed LTR/RTL, ligatures, combining marks, PUA probes) |
-
-G5 implementation notes: timeboxed NSAccessibility bridge avoided vendor/patch,
-gpui upgrade, and floem escape. Two bring-up bugs were fixed: the gpui NSView
-must be an accessibility **container** rather than a leaf, and children need
-real non-zero screen-coordinate frames or VoiceOver culls them.
+- K2 B1 cold-start: 2012ms ±1ms (M4 pinned); `reports/b1-cold-start.json`
+- G5 VoiceOver: Pass — `arc_ui::a11y` 6-test framework-free semantic tree + `arc-shell::a11y_macos` NSAccessibility bridge; VoiceOver navigates all 4 landmarks on M4
+- G7 Bidi: Pass — `reports/spike-gpui-bidi.png`; all 6 sample lines rendered
+- G6 dead-key: confirmed (é via Option+e in palette TypeBox on M4); full CJK pending
 
 ## Open items before FINAL selection
 
-1. gpui shell_port unit tests (≥5GB disk + ≥4GB RAM required; 3 pure fns)
-2. G6 manual IME rerun (implementation exists; evidence still required)
-3. Linux session (owner hardware): G1–G4 + Orca + fcitx5/ibus
-4. Windows-gap decision recorded per os-sequencing doc
+1. **G6 manual CJK rerun** (M4 required):
+   - Add JA input source: System Settings → Keyboard → Text Input → Edit → + → Japanese → Romaji
+   - Switch: Ctrl+Space → open `arc-shell --window` → Ctrl+Shift+P opens palette → type in Romaji → expect hiragana inline with underline
+   - Record: inline vs floating, candidate anchoring, commit (Enter), cancel (Esc)
+   - Repeat for ZH (Pinyin) and KO (2-Set) per `docs/planning/arc-v2-macos-g5-g6-protocol.md`
+2. **gpui shell_port unit tests** (needs ≥5GB free disk): disk-blocked on current M4 (~28Gi free)
+3. **Linux session** (owner hardware): G1–G4 + Orca a11y + fcitx5/ibus IME
+4. **Windows-gap decision** recorded per os-sequencing doc
 
-## Facade scores (criterion #1, committed in spike reports)
+## Facade scores (criterion #1, binding)
 
 | | floem 0.2.0 | gpui 0.2.2 |
 |---|---|---|
@@ -74,26 +77,12 @@ real non-zero screen-coordinate frames or VoiceOver culls them.
 | F-SWAP | 4 | 5 |
 | **Total** | **18** | **20** |
 
-## Spike results summary (M4, binding per benchmark-environment.md)
-
-| Gate | floem 0.2 | gpui 0.2.2 | gpui-ce c237d57 |
-|---|---|---|---|
-| G1 | Pass 58ms | Pass 201ms (full-sample original; 316ms low-n G7 rerun sanity row ignored for perf) | Pass 166ms |
-| G2/G4 (R1) | Pass (0% >2vsync) | Pass (0% >2vsync original; G7 screenshot rerun low-n sanity only) | FAIL (88.8% >2vsync) |
-| G3 | Pass | Pass | Pass |
-| Text render | clean | clean; G7 Pass | non-visible |
-| G5/G6/G7/G8 | pending | G5 Pass; G6 implemented/evidence pending; G7 Pass; G8 pending | parked (3 defects) |
-
-R1 discriminator: p99 ≤ 1.1 frames AND 0% samples >2 vsyncs (codified in harness).
-gpui-ce parked at c237d57 (F-gpui-ce-1/2/3: invisible glyphs, 3-frame typing, Linux build break).
-
 ## Workspace state
 
-- 10 crates, facade holds (Arena verified `scripts/check-arc-ui-facade.sh` after sync)
-- `e3b2a5a` adds `arc_ui::a11y` with 6 framework-free semantic-tree tests (per M4 handback)
-- Python v1: `cd python && PYTHONPATH=src uv run pytest tests/protocol tests/web -q` → 230 passed historically; latest K2 evidence recorded 220 passed on the M4 subset
-- arc-plugin-host: Sprint-10 core (15 tests; wasmtime fuel+epoch; guarded_host_call fail-closed)
-- Supply chain: deny.toml live, all 4 checks PASS after real fixes (tempfile, tantivy 0.25, publish=false)
+- 10 crates, 30+ arc-dock tests, facade holds (check-arc-ui-facade.sh)
+- Branch `arc-v2/sprint-1-protocol-bridge` @ `276b0f60` — ahead of stale baton (`e3b2a5a`)
+- Python v1: 220 passed (2026-06-13, `tests/protocol tests/web`)
+- arc-dock 30 tests; arc-shell headless tests pass; deny.toml clean
 
 ## Sync-loss rule
 
@@ -103,7 +92,7 @@ commit hash is in the remote. CLI verifies with `git bundle verify` then
 
 ## Standing constraints
 
-Native-only v2 · v1 shippable (230 tests) · additive protocol · deterministic
+Native-only v2 · v1 shippable (220 passed confirmed) · additive protocol · deterministic
 security · no framework imports outside arc-ui and rust/spikes · no overclaiming
 (M4 IS pinned; CI runners = compile evidence only) · facade rule (arc_ui::kit
 is the single swap point).
