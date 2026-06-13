@@ -308,6 +308,8 @@ pub struct ShellChromeView {
     pub workspace: crate::workspace_controller::WorkspaceController,
     /// M7: terminal panel.
     pub terminal: crate::terminal_controller::TerminalController,
+    /// M11: search panel.
+    pub search: crate::search_controller::SearchController,
 }
 
 /// K4: spawn a background per-run SSE feed from the live daemon.
@@ -397,6 +399,26 @@ impl ShellChromeView {
                 let _ = t.spawn_default_shell();
                 t
             },
+            // M11: search panel — opens index in .arc-index under workspace root.
+            search: {
+                let root = std::env::var("ARC_WORKSPACE_ROOT")
+                    .map(std::path::PathBuf::from)
+                    .unwrap_or_else(|_| {
+                        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+                    });
+                let index_dir = root.join(".arc-index");
+                let mut sc = crate::search_controller::SearchController::open(&root, &index_dir)
+                    .unwrap_or_else(|_| {
+                        crate::search_controller::SearchController::open(
+                            &root,
+                            &std::env::temp_dir().join("arc-search-fallback"),
+                        )
+                        .expect("fallback search open")
+                    });
+                // Index the workspace on first open so search returns real results.
+                sc.index_workspace();
+                sc
+            },
         }
     }
 
@@ -458,8 +480,50 @@ impl ShellChromeView {
 
         match current_focus_id(&self.model) {
             "workspace" => self.on_workspace_key(key),
+            "search" => self.on_search_key(key),
             "editor" => self.on_editor_key(key, modifiers),
             "dock" => self.on_terminal_key(key),
+            _ => {}
+        }
+    }
+
+    fn on_search_key(&mut self, key: &str) {
+        match key {
+            "up" => self.search.move_up(),
+            "down" => self.search.move_down(),
+            "enter" => {
+                if let crate::search_controller::SearchEffect::OpenFile(path) =
+                    self.search.activate_selected()
+                {
+                    match crate::editor_controller::EditorController::open_path(&path) {
+                        Ok(editor) => {
+                            self.editor = editor;
+                            self.announce = format!("opened: {}", path.display());
+                        }
+                        Err(err) => self.announce = format!("open failed: {err}"),
+                    }
+                }
+            }
+            "backspace" => {
+                let mut q = self.search.query().to_string();
+                q.pop();
+                let _ = self.search.set_query(q, 20);
+                self.announce = format!("search: {}", self.search.query());
+            }
+            s if s.chars().count() == 1 => {
+                let q = format!("{}{}", self.search.query(), s);
+                let _ = self.search.set_query(q, 20);
+                self.announce = format!(
+                    "search: {} ({} results)",
+                    self.search.query(),
+                    self.search.rows().len()
+                );
+            }
+            "space" => {
+                let q = format!("{} ", self.search.query());
+                let _ = self.search.set_query(q, 20);
+                self.announce = format!("search: {}", self.search.query());
+            }
             _ => {}
         }
     }
@@ -701,7 +765,12 @@ impl Render for ShellChromeView {
                 .take(100)
                 .map(|row| (row.label, row.selected))
                 .collect();
-            let search_rows: Vec<(String, bool)> = Vec::new();
+            let search_rows: Vec<(String, bool)> = self
+                .search
+                .rows()
+                .iter()
+                .map(|r| (r.label.clone(), r.selected))
+                .collect();
             let terminal_status = format!("{:?}", self.terminal.status());
             let terminal_current_line = self.terminal.current_line_summary();
             let snap = arc_ui::a11y::A11ySnapshot {
@@ -716,7 +785,7 @@ impl Render for ShellChromeView {
                 editor_value: &editor_value,
                 editor_dirty: self.editor.dirty(),
                 workspace_rows: &workspace_rows,
-                search_query: "",
+                search_query: self.search.query(),
                 search_rows: &search_rows,
                 terminal_status: &terminal_status,
                 terminal_current_line: &terminal_current_line,
@@ -857,6 +926,63 @@ impl Render for ShellChromeView {
                         &theme,
                         &self.workspace,
                     ))
+                    .child({
+                        // M11 search panel — query line + result rows.
+                        let focused = current == "search";
+                        let query_line = format!("/{}_", self.search.query());
+                        let result_rows: Vec<AnyElement> = self
+                            .search
+                            .rows()
+                            .iter()
+                            .map(|r| {
+                                let mut row = div()
+                                    .font_family("Menlo")
+                                    .text_size(px(11.0))
+                                    .text_color(fg(&theme))
+                                    .px_1()
+                                    .child(format!(
+                                        "{} {}",
+                                        r.label,
+                                        r.snippet.as_deref().unwrap_or("")
+                                    ));
+                                if r.selected {
+                                    row = row.bg(selected_bg(&theme));
+                                }
+                                row.into_any_element()
+                            })
+                            .collect();
+                        let empty_hint = if self.search.query().is_empty() {
+                            "type to search"
+                        } else if self.search.rows().is_empty() {
+                            "no results"
+                        } else {
+                            ""
+                        };
+                        div()
+                            .flex()
+                            .flex_col()
+                            .w(px(260.0))
+                            .p_2()
+                            .bg(panel_bg(&theme, focused))
+                            .child(div().child(format!(
+                                "Search{}",
+                                if focused { " (focused)" } else { "" }
+                            )))
+                            .child(
+                                div()
+                                    .bg(selected_bg(&theme))
+                                    .text_color(fg(&theme))
+                                    .px_1()
+                                    .child(query_line),
+                            )
+                            .children(result_rows)
+                            .child(
+                                div()
+                                    .text_size(px(10.0))
+                                    .text_color(fg(&theme))
+                                    .child(empty_hint),
+                            )
+                    })
                     .child(crate::render_editor_gpui::editor_panel(
                         &theme,
                         current == "editor",

@@ -114,6 +114,10 @@ impl ShellModel {
                     label: "Workspace tree",
                 },
                 Region {
+                    id: "search",
+                    label: "Search",
+                },
+                Region {
                     id: "editor",
                     label: "Editor",
                 },
@@ -267,10 +271,7 @@ mod tests {
         let mut s = shell();
         let a = s.handle_chord(&Chord::parse("f6").unwrap());
         let b = s.handle_chord(&Chord::parse("f6").unwrap());
-        assert_eq!(
-            (a.as_str(), b.as_str()),
-            ("focus: Editor", "focus: ARC dock")
-        );
+        assert_eq!((a.as_str(), b.as_str()), ("focus: Search", "focus: Editor"));
     }
     // render_gpui pure-logic tests relocated here so they run headless
     // (gpui_macros SIGBUS on M4 blocks framework-gpui test compilation).
@@ -309,5 +310,4 @@ mod tests {
         assert!(model.status_rail().contains("daemon degraded: kill test"));
         assert!(model.status_rail().starts_with("[ERR]"));
     }
-
 }

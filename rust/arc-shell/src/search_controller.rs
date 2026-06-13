@@ -95,6 +95,56 @@ impl SearchController {
         Ok(())
     }
 
+    /// Walk the workspace root and upsert all text files into the index.
+    /// Skips hidden dirs, binary files, and files larger than 512 KB.
+    /// Best-effort: individual file errors are silently skipped.
+    pub fn index_workspace(&mut self) {
+        let root = self.root.clone();
+        self.walk_and_index(&root);
+        let _ = self.index.as_mut().map(|idx| idx.commit());
+    }
+
+    fn walk_and_index(&mut self, dir: &std::path::Path) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+            // Skip hidden dirs/files and common non-text dirs.
+            if name_str.starts_with('.') {
+                continue;
+            }
+            if matches!(
+                name_str.as_ref(),
+                "node_modules" | "target" | "dist" | "build" | ".git"
+            ) {
+                continue;
+            }
+            if path.is_dir() {
+                self.walk_and_index(&path);
+            } else if path.is_file() {
+                // Skip large files.
+                if path.metadata().map(|m| m.len()).unwrap_or(0) > 512 * 1024 {
+                    continue;
+                }
+                let Ok(body) = std::fs::read_to_string(&path) else {
+                    continue; // binary or unreadable
+                };
+                let rel = path
+                    .strip_prefix(&self.root)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .to_string();
+                let Some(idx) = self.index.as_mut() else {
+                    continue;
+                };
+                let _ = idx.upsert(&rel, &body);
+            }
+        }
+    }
+
     pub fn upsert_file(&mut self, path: impl AsRef<Path>) -> Result<(), SearchControllerError> {
         let path = path.as_ref();
         let body = std::fs::read_to_string(path)?;
