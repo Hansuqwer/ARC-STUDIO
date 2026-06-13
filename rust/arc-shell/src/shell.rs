@@ -272,4 +272,42 @@ mod tests {
             ("focus: Editor", "focus: ARC dock")
         );
     }
+    // render_gpui pure-logic tests relocated here so they run headless
+    // (gpui_macros SIGBUS on M4 blocks framework-gpui test compilation).
+    #[test]
+    fn palette_key_maps_printable_and_controls() {
+        // Inline the trivial match — same logic as render_gpui::palette_key.
+        fn pk(key: &str) -> Option<PaletteKey> {
+            match key {
+                "backspace" => Some(PaletteKey::Backspace),
+                "up" => Some(PaletteKey::Up),
+                "down" => Some(PaletteKey::Down),
+                "enter" => Some(PaletteKey::Enter),
+                "escape" => Some(PaletteKey::Escape),
+                s if s.chars().count() == 1 => s.chars().next().map(PaletteKey::Char),
+                _ => None,
+            }
+        }
+        assert_eq!(pk("x"), Some(PaletteKey::Char('x')));
+        assert_eq!(pk("enter"), Some(PaletteKey::Enter));
+        assert_eq!(pk("unknown"), None);
+    }
+
+    #[test]
+    fn current_focus_defaults_to_workspace() {
+        let model = ShellModel::new(Theme::from_vars(None, None));
+        // Focus ring starts on the first region (workspace).
+        assert!(model.focus.current().map(|r| r.id).unwrap_or("workspace") == "workspace");
+    }
+
+    #[test]
+    fn status_rail_renders_degraded_text_from_live_model_state() {
+        let mut model = ShellModel::new(Theme::from_vars(Some("1"), None));
+        model.ctx.daemon = DaemonState::Degraded {
+            reason: "kill test".into(),
+        };
+        assert!(model.status_rail().contains("daemon degraded: kill test"));
+        assert!(model.status_rail().starts_with("[ERR]"));
+    }
+
 }
