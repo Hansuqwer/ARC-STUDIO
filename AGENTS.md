@@ -91,6 +91,15 @@ code-signing), R82 (token estimator accuracy benchmark — real traces required)
 
 See `docs/phases.md` (Phases 159–365) and `docs/roadmap.md` for full evidence records.
 
+**ARC v2 native IDE track (Phases 367–368, branch `arc-v2/sprint-1-protocol-bridge`):**
+Sprint-3 framework selection complete (gpui 0.2.2, facade 20/20). K1–K4 + G5/G6/G7/G8
+done on macOS M4. M5–M10 Baseline Complete with pinned-M4 pixel evidence (`6578db8`).
+88 headless tests pass; clippy/facade clean. macOS polish M11–M13 in progress.
+Remaining FINAL-selection gates: Linux session + Windows-gap decision (deferred until
+macOS M11–M13 polish is complete). No Electron/WebView/Tauri fallback.
+
+See `docs/phases.md` (Phases 159–368) and `docs/roadmap.md` for full evidence records.
+
 ## Sandbox / microVM truth constraints (still in force)
 
 - **No microVM execution claims** beyond what is proven. macOS direct VZ is a gated public CLI proof passed once for guest-available `pwd` (default-off, not production-grade). Linux/Firecracker is preflight/baseline only, host-unproven (Linux/KVM only). Windows is out of scope.

@@ -9138,3 +9138,52 @@ bash scripts/check-banned-claims.sh docs/roadmap.md docs/phases.md docs/planning
 - Desktop spike results are hardware-dependent; unpinned-machine results are indicative only.
 - ADR-0002 addendum remains owner-gated; no framework may be selected while it is unconfirmed.
 - UI framework dependencies must remain isolated to the spikes workspace until a decision is recorded.
+
+---
+
+## Phase 367 — ARC v2 native IDE: macOS K1–K4 + M5–M10 Baseline Complete
+
+**Roadmap:** R-ARC-V2-NATIVE
+
+**Status:** Baseline Complete | Evidence: commits `ed110a43`–`6578db8` on `arc-v2/sprint-1-protocol-bridge`; pinned M4 pixel screenshots; 88 tests pass.
+
+**What changed:** Sprint-3 framework selection resolved (gpui 0.2.2, facade 20/20). K1–K4 all done. G5 VoiceOver / G6 IME / G7 Bidi / G8 sustainability all Pass on M4. M5 Editor / M6 Workspace / M7 Terminal panels visible in pixels. M8 editor keyboard routing / M9 workspace expand + file open / M10 terminal PTY prompt all have cited pixel evidence.
+
+**Evidence:**
+- K2 window/B1: `900d38d1`; `reports/b1-cold-start.json` (2012ms ±1ms)
+- G5 VoiceOver: `e3b2a5a`; `reports/evidence/k3-gpui-macos-evidence.json`
+- G6 IME: `4e04bcde`; `reports/evidence/g6-ime-ja-screenshot-2026-06-13.png` (m[見本号] inline)
+- G7 Bidi: `7287dfa`; `reports/spike-gpui-bidi.png`
+- K4 Event Stream: `a9f816c1`; arc-dock 30 tests, fixture + live SSE path
+- M5–M7 pixels: `b58c6a99`; `reports/evidence/m5-m6-m7-panels-2026-06-13.png`
+- M8–M10 pixels: `6578db8`; `reports/evidence/m8-editor-dirty-2026-06-13.png`, `m9-workspace-expand-2026-06-13.png`, `m9-file-open-in-editor-2026-06-13.png`
+- Tests: 88 total (31 arc-shell + 30 arc-dock + 12 arc-editor + 8 arc-workspace + 3 arc-terminal + 4 arc-index); clippy clean; facade clean
+- Python v1: 220 passed (`tests/protocol tests/web`)
+
+**Acceptance:**
+1. gpui 0.2.2 provisional selection recorded in `docs/planning/arc-v2-sprint-3-final-adjudication.md`.
+2. K1–K4 and G5/G6/G7/G8 closed with cited M4 evidence.
+3. M5–M10 Baseline Complete with pixel evidence.
+4. 88 headless tests pass; clippy and facade clean.
+5. Python v1 gate green.
+
+---
+
+## Phase 368 — ARC v2 native IDE: M11–M13 macOS polish planning
+
+**Roadmap:** R-ARC-V2-NATIVE
+
+**Status:** In Progress | Evidence: planning docs committed; M11–M13 local CLI prompts committed.
+
+**What changed:** Arena produced macOS completion planning for the three remaining polish phases (M11 UX states + interaction, M12 accessibility + IME + theme, M13 certification). DoD gap matrix and evidence ledger committed. Baton updated.
+
+**Evidence:**
+- `docs/planning/arc-v2-m8-m10-macos-polish-plan.md` — M8–M10 plan (committed `c663f61b`)
+- `docs/planning/arc-v2-macos-100-percent-completion-plan.md` — M11–M13 plan
+- `docs/planning/arc-v2-macos-dod-gap-matrix.md` — gap matrix by surface × DoD gate
+- `docs/planning/arc-v2-macos-evidence-ledger.md` — index of all committed macOS evidence
+- `docs/prompts/arc-v2-m11-ux-interaction-polish-local-cli-prompt-2026-06-13.md`
+- `docs/prompts/arc-v2-m12-a11y-ime-theme-polish-local-cli-prompt-2026-06-13.md`
+- `docs/prompts/arc-v2-m13-macos-certification-local-cli-prompt-2026-06-13.md`
+
+**Next:** Execute M11 UX states + interaction polish on local CLI/M4.
