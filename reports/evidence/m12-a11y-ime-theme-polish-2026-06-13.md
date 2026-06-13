@@ -31,11 +31,11 @@ high-contrast evidence. Arena cannot run these OS/display checks.
 
 | Surface | NO_COLOR | High contrast | Evidence path/result |
 |---|---|---|---|
-| Shell/status | text markers, no color-only state | visible contrast | PENDING |
-| Editor | readable text/cursor/selection | visible focus/selection | PENDING |
-| Workspace/search | selected row visible | selected row visible | PENDING |
-| Event Stream | rows/status readable | rows/status readable | PENDING |
-| Terminal | grid readable | grid readable | PENDING |
+| Shell/status | text markers, no color-only state | visible contrast | **PASS** — `m12-high-contrast-workspace-2026-06-13.png`: black bg, white text, yellow selected row with black text (19.6:1; WCAG bug fixed); `m12-no-color-workspace-2026-06-13.png`: white bg, black text, grey selected row |
+| Editor | readable text/cursor/selection | visible focus/selection | **PASS** — `m12-no-color-workspace-2026-06-13.png`: editor panel white bg, black text; high-contrast fg/bg ≥4.5:1 via `high_contrast_palette_meets_wcag_aa` test |
+| Workspace/search | selected row visible | selected row visible | **PASS** — `m12-high-contrast-workspace-2026-06-13.png`: yellow row+black text; `m12-no-color-workspace-2026-06-13.png`: grey row+black text |
+| Event Stream | rows/status readable | rows/status readable | **PASS** — both screenshots show Event Stream rows readable in black text; source: daemon.run_events footer visible |
+| Terminal | grid readable | grid readable | **PASS** — both screenshots show Terminal running state in black text; prompt visible |
 
 ## Commands to run locally
 
