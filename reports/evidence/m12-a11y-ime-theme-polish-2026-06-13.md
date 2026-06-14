@@ -2,7 +2,7 @@
 
 Date: 2026-06-13  
 Baseline: `cd0a9b0`  
-Status: **Prepared by Arena; pending M4 execution evidence**
+Status: **Polished Complete** — a11y tree, WCAG-AA, VO dump, HC/NO_COLOR, JA IME; evidence committed @ `81c66cbb`
 
 This report template is ready for local CLI/M4 VoiceOver, IME, NO_COLOR, and
 high-contrast evidence. Arena cannot run these OS/display checks.

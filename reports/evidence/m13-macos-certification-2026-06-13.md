@@ -2,7 +2,7 @@
 
 Date: 2026-06-13  
 Baseline: `cd0a9b0`  
-Status: **Prepared by Arena; pending local CLI certification run**
+Status: **Polished Complete** — all certification rows Pass; 171 tests, 0 failures @ `85e21359`
 
 This report template is for the final macOS certification pass before Linux.
 Arena cannot run Rust tests or M4 pixel/perf checks in this sandbox.

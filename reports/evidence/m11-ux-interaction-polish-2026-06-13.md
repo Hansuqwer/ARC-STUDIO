@@ -2,7 +2,7 @@
 
 Date: 2026-06-13  
 Baseline: `cd0a9b0`  
-Status: **Prepared by Arena; pending M4 execution evidence**
+Status: **Polished Complete** — all 9 surface rows Pass; evidence committed @ `85e21359`
 
 This report template is ready for local CLI/M4 evidence. Arena cannot produce
 pixel evidence or run Rust tests in this sandbox.
