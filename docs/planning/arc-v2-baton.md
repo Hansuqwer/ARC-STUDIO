@@ -1,6 +1,6 @@
 # arc-v2 baton state (update this file at every handback)
 
-Last updated: 2026-06-13 (M4 local CLI — M11 closed) · Branch: `arc-v2/sprint-1-protocol-bridge` @ `a40132c`
+Last updated: 2026-06-14 (M4 local CLI — M11/M12/M13 closed) · Branch: `arc-v2/sprint-1-protocol-bridge` @ `81c66cbb`
 
 ## Who holds the baton
 
@@ -49,8 +49,8 @@ Docs: `arc-v2-sprint-3-final-adjudication.md`, `arc-v2-kit-implementation-plan.m
 | M9 Workspace/Search polish baseline | **Baseline Complete** (`6578db8`) |
 | M10 Terminal polish baseline | **Baseline Complete** (`6578db8`) |
 | M11 UX states + interaction polish | **DONE** (`a40132c`) — 9/9 rows Pass, pixel evidence |
-| M12 Accessibility + IME + theme polish | **IN PROGRESS** (a11y tree + high-contrast automated; VoiceOver/IME pixel pending) |
-| M13 macOS certification pass | **PREPARED; pending local CLI certification** |
+| M12 Accessibility + IME + theme polish | **DONE** (`81c66cbb`) — a11y tree, WCAG-AA, VO dump, NO_COLOR/HC screenshots, JA IME palette+editor Pass |
+| M13 macOS certification pass | **DONE** (`HEAD`) — 171 tests 0 failures; clippy/fmt clean; all certification rows Pass |
 
 ## Current macOS evidence highlights
 

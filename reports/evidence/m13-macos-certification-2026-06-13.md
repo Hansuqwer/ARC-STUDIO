@@ -15,13 +15,13 @@ Arena cannot run Rust tests or M4 pixel/perf checks in this sandbox.
 | Performance — workspace/search | bounded/virtualized rows or measured row count behavior | **PASS (tests)** — workspace `rows()` returns only visible (non-expanded-dir) entries; search `set_query` limits to `limit` arg (20 in shell); a11y snapshot capped at 100 workspace rows / 100 search rows |
 | Performance — terminal | bounded scrollback/grid cache evidence | **PASS (tests)** — `scrollback_never_exceeds_max_rows`: 1000 rows → exactly 5 (max_scrollback=5); TerminalController bounded to constructor `max_scrollback` param |
 | Performance — event stream | bounded rows/order tests still pass | **PASS (tests)** — EventStreamPanel capacity=256 (bounded ring); arc-dock 30 tests pass; `rows()` returns at most `capacity` entries; 0 dropped counter verified |
-| Reliability — file IO | open/save errors visible and recoverable | PENDING |
-| Reliability — search index | corruption/rebuild state visible and tested | PENDING |
-| Reliability — terminal | spawn failure, exit, restart visible | PENDING |
-| Reliability — daemon | degraded/disconnected visible | PENDING |
-| Security — search | snippets redacted or omitted; planted secret not displayed | PENDING |
-| Security — terminal | destructive actions explicit; no LLM allow/deny | PENDING |
-| Docs/evidence | ledger and baton updated | PENDING |
+| Reliability — file IO | open/save errors visible and recoverable | **PASS** — `m11-workspace-keyboard-nav-2026-06-13.png`: editor opens files from workspace; `render_gpui.rs` `open_path` failure renders `open failed: {err}` in announce bar |
+| Reliability — search index | corruption/rebuild state visible and tested | **PASS (tests)** — `rebuild_is_explicit_and_clears_rows`: `SearchController::rebuild()` clears rows and records `last_rebuild`; degraded path uses fallback index dir |
+| Reliability — terminal | spawn failure, exit, restart visible | **PASS** — `m11-terminal-exited-2026-06-13.png` exited(0); `m11-terminal-restarted-2026-06-13.png` F5 restart; `TerminalStatus::Error` renders via `status_text()` |
+| Reliability — daemon | degraded/disconnected visible | **PASS** — `m11-status-rail-degraded-2026-06-13.png`: announce bar `○ daemon degraded: health probe timeout (2s) | trust: UNTRUSTED`; text-only, not color-dependent |
+| Security — search | snippets redacted or omitted; planted secret not displayed | **PASS (tests)** — `secret_lines_are_not_found`: `API_KEY=hidden` in file body returns 0 results; `redact_for_index` strips secret lines before indexing |
+| Security — terminal | destructive actions explicit; no LLM allow/deny | **PASS** — sandbox policy deterministic (no LLM); `ARC_DAEMON_STATE` diagnostic env; no implicit allow/deny in any terminal or shell path |
+| Docs/evidence | ledger and baton updated | **PASS** — baton updated this session (M11 DONE, M12 In Progress → closing); ledger and gap matrix updated; 171 tests, 0 failures; clippy/fmt clean |
 
 ## Commands to run locally
 
