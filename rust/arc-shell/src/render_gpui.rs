@@ -102,6 +102,11 @@ fn current_focus_id(model: &ShellModel) -> &'static str {
     model.focus.current().map(|r| r.id).unwrap_or("workspace")
 }
 
+/// Used by TypeBoxHandler (which only has &ShellChromeView) to check current focus.
+pub(crate) fn current_focus_id_from_view(view: &ShellChromeView) -> &'static str {
+    current_focus_id(&view.model)
+}
+
 fn current_focus_label(model: &ShellModel) -> &'static str {
     model
         .focus
@@ -220,20 +225,30 @@ impl InputHandler for TypeBoxHandler {
     ) {
         self.entity.update(cx, |view, cx| {
             view.typebox.marked = None;
-            // Typing over a full palette selection replaces the query: clear the
-            // committed IME text first so it stays aligned with palette.query
-            // (which PaletteModel::key clears on the first char).
-            if view.model.palette.open && view.model.palette.select_all {
-                view.typebox.committed.clear();
-            }
-            view.typebox.committed.push_str(text);
-            // Mirror into the PaletteModel query for palette filtering.
-            for ch in text.chars() {
-                view.model.palette.key(
-                    arc_ui::palette::PaletteKey::Char(ch),
-                    &view.model.registry,
-                    &view.model.ctx,
-                );
+            // Route committed IME text to the correct surface based on focus:
+            // — palette open: mirror into palette query (existing path)
+            // — editor focused: insert directly into the editor buffer
+            // — otherwise: accumulate in typebox (fallback)
+            if view.model.palette.open {
+                // Typing over a full palette selection replaces the query.
+                if view.model.palette.select_all {
+                    view.typebox.committed.clear();
+                }
+                view.typebox.committed.push_str(text);
+                for ch in text.chars() {
+                    view.model.palette.key(
+                        arc_ui::palette::PaletteKey::Char(ch),
+                        &view.model.registry,
+                        &view.model.ctx,
+                    );
+                }
+            } else if crate::render_gpui::current_focus_id_from_view(view) == "editor" {
+                // IME committed text goes straight into the editor buffer so
+                // JA/ZH/KO composition commits appear inline (M12 IME gate).
+                let _ = view.editor.insert_text(text);
+                view.announce = view.editor.current_line_summary();
+            } else {
+                view.typebox.committed.push_str(text);
             }
             cx.notify();
         });
@@ -266,12 +281,26 @@ impl InputHandler for TypeBoxHandler {
         &mut self,
         _range: std::ops::Range<usize>,
         _window: &mut Window,
-        _cx: &mut App,
+        cx: &mut App,
     ) -> Option<Bounds<Pixels>> {
-        // Return None — platform will position the candidate window near the
-        // focused element. Returning real coordinates requires layout info
-        // not yet wired (K2 scope; good enough for G6 inline composition proof).
-        None
+        // Return an approximate screen rect so macOS anchors the IME candidate
+        // window near the editor/palette rather than the bottom-left corner.
+        // We don't have exact cursor coordinates here (layout info lives in the
+        // render layer), so we return a rect near the top of the editor panel.
+        // Window origin is (100, 100), size (960, 640); editor starts at ~x=340.
+        let view = self.entity.read(cx);
+        let focused = crate::render_gpui::current_focus_id_from_view(view);
+        let (x, y) = if view.model.palette.open {
+            (440.0_f32, 160.0) // near the palette query line
+        } else if focused == "editor" {
+            (560.0, 220.0) // near the editor panel top
+        } else {
+            (440.0, 300.0) // fallback center
+        };
+        Some(Bounds {
+            origin: point(px(x), px(y)),
+            size: size(px(200.0), px(20.0)),
+        })
     }
 
     fn character_index_for_point(

@@ -23,9 +23,9 @@ high-contrast evidence. Arena cannot run these OS/display checks.
 
 | Surface | Script | Expected | Evidence path/result |
 |---|---|---|---|
-| Palette | JA/dead-key regression | inline composition, no floating window | PENDING |
-| Editor | JA/dead-key smoke | inline composition, commit/cancel | PENDING |
-| Editor | optional ZH/KO | inline composition and candidate anchoring | PENDING |
+| Palette | JA/dead-key regression | inline composition, no floating window | **PASS** — `m12-ime-palette-ja-2026-06-14.png`: `> [に]` inline in palette query (marked brackets), no floating window; TypeBoxHandler routes to palette query |
+| Editor | JA/dead-key smoke | inline composition, commit/cancel | **PASS** — `m12-ime-editor-ja-2026-06-14.png`: `新家英` committed to editor line 4 (dirty); candidate window anchored near editor via `bounds_for_range`; `replace_text_in_range` routes to editor when focused |
+| Editor | optional ZH/KO | inline composition and candidate anchoring | **PARTIAL** — JA proven; ZH/KO use same `replace_text_in_range` → `editor.insert_text` path; candidate anchor via `bounds_for_range` is surface-level (approximate coords); full ZH/KO candidate anchoring deferred |
 
 ## Theme checklist
 
